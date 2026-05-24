@@ -3,221 +3,196 @@ import pandas as pd
 import requests
 import os
 from datetime import datetime
+import plotly.graph_objects as [Image of candlestick chart with moving average]
 
-# 建立一個通用的偽裝瀏覽器標頭
 HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
 def send_line_message(msg, access_token, user_id):
     url = "https://api.line.me/v2/bot/message/push"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {access_token}"
-    }
-    payload = {
-        "to": user_id,
-        "messages": [{"type": "text", "text": msg}]
-    }
-    response = requests.post(url, json=payload, headers=headers)
-    if response.status_code != 200:
-        print(f"LINE 發送失敗: {response.status_code}, {response.text}")
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {access_token}"}
+    payload = {"to": user_id, "messages": [{"type": "text", "text": msg}]}
+    requests.post(url, json=payload, headers=headers)
 
 def get_tw_tickers():
-    """【重大升級】調用台灣證券交易所官方 OpenAPI，徹底解決 GitHub 雲端 IP 被阻擋的問題"""
     try:
-        # 這是官方開發者通道，不鎖海外 IP，直接回傳當日全市場資料
         url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
         res = requests.get(url, headers=HTTP_HEADERS, timeout=15)
-        
         if res.status_code == 200:
-            data = res.json()
-            tickers = []
-            for item in data:
-                code = item.get("Code", "").strip()
-                # 篩選標準 4 碼的台股普通股
-                if len(code) == 4 and code.isdigit():
-                    tickers.append(f"{code}.TW")
-            
-            if tickers:
-                print(f"🔥 透過官方 OpenAPI 成功解鎖台股清單，共抓取 {len(tickers)} 檔股票！")
-                return tickers
-                
-        print(f"⚠️ OpenAPI 回傳異常狀態碼: {res.status_code}，啟用安全備用清單")
+            return [f"{item['Code'].strip()}.TW" for item in res.json() if len(item['Code'].strip()) == 4 and item['Code'].strip().isdigit()]
     except Exception as e:
-        print(f"❌ 透過 OpenAPI 獲取台股清單失敗: {e}，啟用安全備用清單")
-        
-    # 萬一連官方 API 都維護時的終極防線（精選台股高流動性代表）
-    return ["2330.TW", "2317.TW", "2454.TW", "2308.TW", "2603.TW", "2303.TW", "2881.TW", "2409.TW", "3481.TW", "2324.TW"]
+        print(f"獲取台股清單失敗: {e}")
+    return ["2330.TW", "2317.TW", "2454.TW", "2303.TW", "2881.TW"]
 
 def get_us_tickers():
-    """自動爬取美股標普 500 清單"""
     try:
         url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        res = requests.get(url, headers=HTTP_HEADERS)
-        df = pd.read_html(res.text)[0]
-        tickers = df['Symbol'].tolist()
-        return [t.replace('.', '-') for t in tickers]
+        df = pd.read_html(requests.get(url, headers=HTTP_HEADERS).text)[0]
+        return [t.replace('.', '-') for t in df['Symbol'].tolist()]
     except Exception as e:
         print(f"獲取美股清單失敗: {e}")
-        return ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA"]
+    return ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL"]
 
 def scan_market(tickers, min_volume):
     matched_list = []
-    chunk_size = 50  # 縮小分批大小，確保 yfinance 下載更穩定
-    
+    chunk_size = 50
+    # 為了畫 6 個月的 K 線，我們需要往前抓約 180 天的歷史資料
     for i in range(0, len(tickers), chunk_size):
         chunk = tickers[i:i+chunk_size]
         try:
-            data = yf.download(chunk, period="50d", progress=False)
+            data = yf.download(chunk, period="260d", progress=False)
             if data.empty: continue
-            
             for ticker in chunk:
                 try:
                     if isinstance(data.columns, pd.MultiIndex):
-                        if ('Close', ticker) not in data.columns or ('Volume', ticker) not in data.columns:
-                            continue
-                        close_series = data[('Close', ticker)]
-                        volume_series = data[('Volume', ticker)]
+                        if ('Close', ticker) not in data.columns: continue
+                        df_t = pd.DataFrame({
+                            'Open': data[('Open', ticker)], 'High': data[('High', ticker)],
+                            'Low': data[('Low', ticker)], 'Close': data[('Close', ticker)],
+                            'Volume': data[('Volume', ticker)]
+                        }).dropna()
                     else:
-                        if 'Close' not in data.columns or 'Volume' not in data.columns:
-                            continue
-                        close_series = data['Close']
-                        volume_series = data['Volume']
+                        df_t = data[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
                     
-                    df_ticker = pd.DataFrame({'Close': close_series, 'Volume': volume_series}).dropna()
-                    if len(df_ticker) < 20: continue
-                    
-                    latest_vol = float(df_ticker['Volume'].iloc[-1])
+                    if len(df_t) < 20: continue
+                    latest_vol = float(df_t['Volume'].iloc[-1])
                     if latest_vol < min_volume: continue
                     
-                    df_ticker['MA20'] = df_ticker['Close'].rolling(window=20).mean()
-                    price = float(df_ticker['Close'].iloc[-1])
-                    ma20 = float(df_ticker['MA20'].iloc[-1])
+                    df_t['MA20'] = df_t['Close'].rolling(window=20).mean()
+                    price = float(df_t['Close'].iloc[-1])
+                    ma20 = float(df_t['MA20'].iloc[-1])
                     
                     if pd.isna(ma20): continue
                     
-                    # 嚴格篩選：當前最新收盤價恰好在 20MA 之下 0% 到 -3% 區間
+                    # 條件：收盤價在 20MA 之下 0% 到 -3%
                     if ma20 * 0.97 <= price < ma20:
                         diff_pct = ((price / ma20) - 1) * 100
+                        # 只取最近 6 個月 (約 120 個交易日) 用於網頁繪圖
+                        df_chart = df_t.tail(120)
+                        
+                        # 使用 Plotly 產生互動式 K 線圖 HTML
+                        fig = plotly.graph_objects.Figure()
+                        fig.add_trace(plotly.graph_objects.Candlestick(
+                            x=df_chart.index.strftime('%Y-%m-%d'), open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'], name='K線'
+                        ))
+                        fig.add_trace(plotly.graph_objects.Scatter(
+                            x=df_chart.index.strftime('%Y-%m-%d'), y=df_chart['MA20'], line=dict(color='orange', width=2), name='20MA'
+                        ))
+                        fig.update_layout(
+                            title=f"{ticker} (現價: {round(price,2)} | 距MA20: {round(diff_pct,2)}%)",
+                            xaxis_rangeslider_visible=False, template='plotly_dark',
+                            margin=dict(l=10, r=10, t=40, b=10), height=400
+                        )
+                        chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
+                        
                         matched_list.append({
-                            'ticker': ticker,
-                            'price': round(price, 2),
-                            'diff': round(diff_pct, 2),
-                            'volume': int(latest_vol)
+                            'ticker': ticker, 'volume': int(latest_vol), 'chart_html': chart_html
                         })
-                except Exception:
-                    continue
-        except Exception as e:
-            print(f"批次下載出錯 ({i}-{i+chunk_size}): {e}")
-            
+                except Exception: continue
+        except Exception as e: print(f"錯誤 {i}: {e}")
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
     return matched_list
+
+def generate_html(tw_stocks, us_stocks, date_str):
+    # RWD 網頁切換與瀑布流佈局
+    html_template = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>台美股均線潛伏報告</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }}
+            .header {{ text-align: center; padding: 20px 0; background: #222; margin-bottom: 20px; border-radius: 8px; }}
+            .tabs {{ display: flex; justify-content: center; margin-bottom: 20px; }}
+            .tab-btn {{ background: #333; color: #ccc; border: none; padding: 12px 30px; font-size: 16px; cursor: pointer; transition: 0.3s; }}
+            .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }}
+            .tab-btn:first-child {{ border-radius: 5px 0 0 5px; }}
+            .tab-btn:last-child {{ border-radius: 0 5px 5px 0; }}
+            .market-section {{ display: none; max-width: 800px; margin: 0 auto; }}
+            .market-section.active {{ display: block; }}
+            .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }}
+            .no-data {{ text-align: center; color: #888; padding: 40px; }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2>
+            <p>條件：最新收盤價在 20MA 之下 (0% ~ -3%) | 依成交量排序</p>
+        </div>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchMarket('tw')">🇹🇼 台股 ({len(tw_stocks)})</button>
+            <button class="tab-btn" onclick="switchMarket('us')">🇺🇸 美股 ({len(us_stocks)})</button>
+        </div>
+        <div id="tw-market" class="market-section active">
+    """
+    if tw_stocks:
+        for s in tw_stocks: html_template += f'<div class="chart-card">{s["chart_html"]}</div>'
+    else: html_template += '<div class="no-data">今日台股無符合標的</div>'
+    
+    html_template += '</div><div id="us-market" class="market-section">'
+    if us_stocks:
+        for s in us_stocks: html_template += f'<div class="chart-card">{s["chart_html"]}</div>'
+    else: html_template += '<div class="no-data">今日美股無符合標的</div>'
+    
+    html_template += """
+        </div>
+        <script>
+            function switchMarket(market) {
+                document.querySelectorAll('.market-section').forEach(el => el.classList.remove('active'));
+                document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+                if(market === 'tw') {
+                    document.getElementById('tw-market').classList.add('active');
+                    event.target.classList.add('active');
+                } else {
+                    document.getElementById('us-market').classList.add('active');
+                    event.target.classList.add('active');
+                }
+                window.dispatchEvent(new Event('resize'));
+            }
+        </script>
+    </body>
+    </html>
+    """
+    # 建立 docs 資料夾（GitHub Pages 指定讀取夾）並寫入 index.html
+    os.makedirs("docs", exist_ok=True)
+    with open("docs/index.html", "w", encoding="utf-8") as f:
+        f.write(html_template)
 
 def main():
     access_token = os.environ.get("LINE_ACCESS_TOKEN")
     user_id = os.environ.get("LINE_USER_ID")
     if not access_token or not user_id: return
-
     today_str = datetime.now().strftime("%Y-%m-%d")
 
-    # ==================== 【第一部分：10 大自選股分組監控】 ====================
-    stock_groups = {
-        "1️⃣ 超級績效股": {
-            "2330.TW": [20, 0.03],  
-            "NVDA": [20, 0.03]      
-        },
-        "2️⃣ 核心績優股": {
-            "2317.TW": [60, 0.03],  
-            "AAPL": [20, 0.03]      
-        },
-        "3️⃣ 轉機投機股": {
-            "2303.TW": [20, 0.03]   
-        },
-        "4️⃣ 近期關注股": {
-            "2454.TW": [20, 0.03]   
-        },
-        "5️⃣ 殖利率概念": {},
-        "6️⃣ 產業龍頭股": {},
-        "7️⃣ 跌深反彈股": {},
-        "8️⃣ 投信作帳股": {},
-        "9️⃣ 外資鎖定股": {},
-        "🔟 強勢整理股": {}
-    }
-    
-    my_report = f"\n📊 {today_str} 分組自選股潛伏報告\n"
-    my_report += "🎯 條件: 股價在自選MA之下 (0 ~ -3%)\n" + "="*20 + "\n"
-    total_hit_count = 0
-    
-    for group_name, stocks in stock_groups.items():
-        if not stocks: continue 
-        
-        group_content = f"【{group_name}】\n"
-        group_hit_count = 0
-        
-        for symbol, params in stocks.items():
-            ma_len = params[0]
-            threshold_pct = params[1]
-            try:
-                df = yf.download(symbol, period=f"{ma_len + 20}d", progress=False)
-                if df.empty: continue
-                
-                df_clean = df[['Close', 'Volume']].dropna()
-                if len(df_clean) < ma_len: continue
-                
-                ma_col = f'MA{ma_len}'
-                df_clean[ma_col] = df_clean['Close'].rolling(window=ma_len).mean()
-                latest_price = float(df_clean['Close'].iloc[-1])
-                latest_ma = float(df_clean[ma_col].iloc[-1])
-                
-                if latest_ma * (1 - threshold_pct) <= latest_price < latest_ma:
-                    diff_pct = round((latest_price / latest_ma - 1) * 100, 2)
-                    group_content += f" 📈 {symbol}: 在 {ma_len}MA 下方 ({diff_pct}%)\n    現價: {round(latest_price, 2)} | MA: {round(latest_ma, 2)}\n"
-                    group_hit_count += 1
-                    total_hit_count += 1
-            except Exception as e:
-                print(f"處理自選股 {symbol} 出錯: {e}")
-                
-        if group_hit_count > 0:
-            my_report += group_content + "-"*15 + "\n"
-            
-    if total_hit_count == 0:
-        my_report += "今日各分組自選股皆未進入均線下方 0~3% 區間。\n"
-        
-    send_line_message(my_report, access_token, user_id)
+    print("正在掃描全市場...")
+    tw_matches = scan_market(get_tw_tickers(), min_volume=1000000)
+    us_matches = scan_market(get_us_tickers(), min_volume=1000000)
 
-
-    # ==================== 【第二部分：全市場量化篩選】 ====================
-    market_report = f"\n🚀 {today_str} 全市場量化篩選報告\n"
-    market_report += "🔥 條件: 收盤價在20MA之下(0~-3%) + 高量能\n" + "="*20 + "\n"
-
-    # --- 執行台股全市場掃描 (成交量門檻：1,000,000股 = 1000張) ---
-    print("正在掃描台股全市場...")
-    tw_tickers = get_tw_tickers()
-    tw_matches = scan_market(tw_tickers, min_volume=2000000)
+    # 產生網頁檔案
+    generate_html(tw_matches, us_matches, today_str)
     
-    market_report += f"🇹🇼 台股符合條件 ({len(tw_matches)} 檔):\n"
-    for item in tw_matches[:100]:
-        vol_lots = int(item['volume'] / 1000)
-        market_report += f"📈 {item['ticker'].replace('.TW','')}: 現價{item['price']} (距MA20: {item['diff']}% | 量: {vol_lots}張)\n"
-    if not tw_matches: market_report += "今日台股無符合標的。\n"
-    
-    market_report += "-"*20 + "\n"
+    # 自動將產生的 index.html 推送部署到 GitHub
+    os.system('git config --global user.name "github-actions[bot]"')
+    os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
+    os.system('git add docs/index.html')
+    os.system('git commit -m "📊 自動更新 K 線網頁報告"')
+    os.system('git push')
 
-    # --- 執行美股標普500掃描 (成交量 > 100萬股) ---
-    print("正在掃描美股標普500...")
-    us_tickers = get_us_tickers()
-    us_matches = scan_market(us_tickers, min_volume=1000000)
+    # 【LINE 訊息精簡化】只發送通知與專屬網頁網址
+    # 💡 請將下面的「你的GitHub帳號」和「你的專案名稱」換成你實際的名稱
+    github_user = "你的GitHub帳號"
+    github_repo = "你的專案名稱"
+    web_url = f"https://{github_user}.github.io/{github_repo}/"
     
-    market_report += f"🇺🇸 美股符合條件 ({len(us_matches)} 檔):\n"
-    for item in us_matches:
-        vol_million = round(item['volume'] / 1000000, 1)
-        market_report += f"🍏 {item['ticker']}: 現價{item['price']} (距MA20: {item['diff']}% | 量: {vol_million}百萬股)\n"
-    if not us_matches: market_report += "今日美股無符合標的。\n"
-
-    # 發送第二則訊息
-    send_line_message(market_report, access_token, user_id)
-    print("兩份報告皆已成功發送！")
+    line_msg = f"\n🎯 {today_str} 均線潛伏圖表網頁已生成！\n"
+    line_msg += f"🇹🇼 台股符合：{len(tw_matches)} 檔\n"
+    line_msg += f"🇺🇸 美股符合：{len(us_matches)} 檔\n"
+    line_msg += f"🔗 點擊網址直接「滑圖」瀏覽：\n{web_url}"
+    
+    send_line_message(line_msg, access_token, user_id)
+    print("網頁更新成功，LINE 通知已發送！")
 
 if __name__ == "__main__":
     main()
