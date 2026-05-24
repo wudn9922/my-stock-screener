@@ -36,48 +36,62 @@ def get_us_tickers():
 
 def scan_market(tickers, min_volume):
     matched_list = []
-    chunk_size = 50
-    # 為了畫 6 個月的 K 線，我們需要往前抓約 180 天的歷史資料
+    chunk_size = 40  # 稍微縮減分批大小，提高下載穩定度
+    
     for i in range(0, len(tickers), chunk_size):
         chunk = tickers[i:i+chunk_size]
         try:
-            data = yf.download(chunk, period="260d", progress=False)
+            # 確保獲取足夠計算 20MA 的天數
+            data = yf.download(chunk, period="150d", progress=False)
             if data.empty: continue
+            
             for ticker in chunk:
                 try:
+                    # 【全新相容邏輯】精準抓取單一股票的 OHLCV 資料，通殺新舊版 yfinance 結構
                     if isinstance(data.columns, pd.MultiIndex):
-                        if ('Close', ticker) not in data.columns: continue
-                        df_t = pd.DataFrame({
-                            'Open': data[('Open', ticker)], 'High': data[('High', ticker)],
-                            'Low': data[('Low', ticker)], 'Close': data[('Close', ticker)],
-                            'Volume': data[('Volume', ticker)]
-                        }).dropna()
+                        # 檢查 ticker 是否在 columns 的第二層或第一層
+                        if ticker in data.columns.get_level_values(1):
+                            df_t = data.xs(ticker, axis=1, level=1)
+                        elif ticker in data.columns.get_level_values(0):
+                            df_t = data.xs(ticker, axis=1, level=0)
+                        else:
+                            continue
                     else:
-                        df_t = data[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
+                        # 如果是單層 Index (當分批剛好只有一檔，或平鋪結構)
+                        df_t = data.copy()
                     
-                    if len(df_t) < 20: continue
-                    latest_vol = float(df_t['Volume'].iloc[-1])
+                    # 確保必要欄位存在
+                    required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
+                    if not all(col in df_t.columns for col in required_cols):
+                        continue
+                        
+                    df_clean = df_t[required_cols].dropna()
+                    if len(df_clean) < 20: continue
+                    
+                    latest_vol = float(df_clean['Volume'].iloc[-1])
                     if latest_vol < min_volume: continue
                     
-                    df_t['MA20'] = df_t['Close'].rolling(window=20).mean()
-                    price = float(df_t['Close'].iloc[-1])
-                    ma20 = float(df_t['MA20'].iloc[-1])
+                    df_clean['MA20'] = df_clean['Close'].rolling(window=20).mean()
+                    price = float(df_clean['Close'].iloc[-1])
+                    ma20 = float(df_clean['MA20'].iloc[-1])
                     
                     if pd.isna(ma20): continue
                     
-                    # 條件：收盤價在 20MA 之下 0% 到 -3%
+                    # 判斷條件：收盤價在 20MA 之下 0% 到 -3%
                     if ma20 * 0.97 <= price < ma20:
                         diff_pct = ((price / ma20) - 1) * 100
-                        # 只取最近 6 個月 (約 120 個交易日) 用於網頁繪圖
-                        df_chart = df_t.tail(120)
+                        df_chart = df_clean.tail(120)  # 取最近 6 個月畫圖
                         
-                        # 使用 Plotly 產生互動式 K 線圖 HTML
-                        fig = plotly.graph_objects.Figure()
-                        fig.add_trace(plotly.graph_objects.Candlestick(
-                            x=df_chart.index.strftime('%Y-%m-%d'), open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'], name='K線'
+                        # 繪製互動式 K 線圖
+                        fig = go.Figure()
+                        fig.add_trace(go.Candlestick(
+                            x=df_chart.index.strftime('%Y-%m-%d'), 
+                            open=df_chart['Open'], high=df_chart['High'], 
+                            low=df_chart['Low'], close=df_chart['Close'], name='K線'
                         ))
-                        fig.add_trace(plotly.graph_objects.Scatter(
-                            x=df_chart.index.strftime('%Y-%m-%d'), y=df_chart['MA20'], line=dict(color='orange', width=2), name='20MA'
+                        fig.add_trace(go.Scatter(
+                            x=df_chart.index.strftime('%Y-%m-%d'), y=df_chart['MA20'], 
+                            line=dict(color='orange', width=2), name='20MA'
                         ))
                         fig.update_layout(
                             title=f"{ticker} (現價: {round(price,2)} | 距MA20: {round(diff_pct,2)}%)",
@@ -89,13 +103,15 @@ def scan_market(tickers, min_volume):
                         matched_list.append({
                             'ticker': ticker, 'volume': int(latest_vol), 'chart_html': chart_html
                         })
-                except Exception: continue
-        except Exception as e: print(f"錯誤 {i}: {e}")
+                except Exception as e: 
+                    continue
+        except Exception as e: 
+            print(f"批次錯誤 {i}: {e}")
+            
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
     return matched_list
 
 def generate_html(tw_stocks, us_stocks, date_str):
-    # RWD 網頁切換與瀑布流佈局
     html_template = f"""
     <!DOCTYPE html>
     <html>
@@ -155,7 +171,6 @@ def generate_html(tw_stocks, us_stocks, date_str):
     </body>
     </html>
     """
-    # 建立 docs 資料夾（GitHub Pages 指定讀取夾）並寫入 index.html
     os.makedirs("docs", exist_ok=True)
     with open("docs/index.html", "w", encoding="utf-8") as f:
         f.write(html_template)
@@ -166,24 +181,22 @@ def main():
     if not access_token or not user_id: return
     today_str = datetime.now().strftime("%Y-%m-%d")
 
-    print("正在掃描全市場...")
+    print("正在全面掃描全市場...")
+    # 🧪 這裡目前依然維持限制為 0（壓力測試用），讓你能立刻看到有股票跑出來
     tw_matches = scan_market(get_tw_tickers(), min_volume=0)
     us_matches = scan_market(get_us_tickers(), min_volume=0)
 
-    # 產生網頁檔案
     generate_html(tw_matches, us_matches, today_str)
     
-    # 自動將產生的 index.html 推送部署到 GitHub
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     os.system('git add docs/index.html')
     os.system('git commit -m "📊 自動更新 K 線網頁報告"')
     os.system('git push')
 
-    # 【LINE 訊息精簡化】只發送通知與專屬網頁網址
-    # 💡 請將下面的「你的GitHub帳號」和「你的專案名稱」換成你實際的名稱
-    github_user = "wudn9922"
-    github_repo = "my-stock-screener"
+    # 💡 請記得將下面兩行換成你的 GitHub 帳號與專案庫名稱！
+    github_user = "你的GitHub帳號"
+    github_repo = "你的專案名稱"
     web_url = f"https://{github_user}.github.io/{github_repo}/"
     
     line_msg = f"\n🎯 {today_str} 均線潛伏圖表網頁已生成！\n"
