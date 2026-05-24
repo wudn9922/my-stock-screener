@@ -42,10 +42,9 @@ def get_tw_tickers():
         return ["2330.TW", "2317.TW", "2454.TW", "2308.TW"]
 
 def get_us_tickers():
-    """自動爬取美股標普 500 清單 (加入偽裝面具防止 403 錯誤)"""
+    """自動爬取美股標普 500 清單"""
     try:
         url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        # 使用 requests 加上 headers 去敲門
         res = requests.get(url, headers=HTTP_HEADERS)
         df = pd.read_html(res.text)[0]
         tickers = df['Symbol'].tolist()
@@ -61,38 +60,51 @@ def scan_market(tickers, min_volume):
     for i in range(0, len(tickers), chunk_size):
         chunk = tickers[i:i+chunk_size]
         try:
-            data = yf.download(chunk, period="40d", progress=False, group_by='ticker')
+            # 強制保持 MultiIndex 穩定結構，避免少數股票失敗導致整個 chunk 壞掉
+            data = yf.download(chunk, period="40d", progress=False, keep_multiindex=True)
+            if data.empty: continue
             
             for ticker in chunk:
-                if isinstance(data.columns, pd.MultiIndex):
-                    if ticker not in data.columns.levels[0]: continue
-                    df = data[ticker].dropna()
-                else:
-                    df = data.dropna() if len(chunk) == 1 else pd.DataFrame()
-                
-                if len(df) < 20: continue
-                
-                # 1. 檢查最新成交量
-                latest_vol = float(df['Volume'].iloc[-1])
-                if latest_vol < min_volume: continue
-                
-                # 2. 計算 20MA
-                df['MA20'] = df['Close'].rolling(window=20).mean()
-                price = float(df['Close'].iloc[-1])
-                ma20 = float(df['MA20'].iloc[-1])
-                
-                # 3. 篩選條件：20MA 之下 0% 到 3%
-                if ma20 * 0.97 <= price < ma20:
-                    diff_pct = ((price / ma20) - 1) * 100
-                    matched_list.append({
-                        'ticker': ticker,
-                        'price': round(price, 2),
-                        'diff': round(diff_pct, 2),
-                        'volume': int(latest_vol)
-                    })
+                try:
+                    # 安全檢查：確保該股票有被成功下載
+                    if ticker not in data['Close'].columns: continue
+                    
+                    # 【關鍵防殺優化】：只抽出 Close 和 Volume 進行清理，避開其他無用欄位的 NaN 陷阱
+                    close_series = data['Close'][ticker]
+                    volume_series = data['Volume'][ticker]
+                    
+                    df_ticker = pd.DataFrame({'Close': close_series, 'Volume': volume_series}).dropna()
+                    
+                    # 確保扣除極端節假日後，至少還有 20 天的數據可以算均線
+                    if len(df_ticker) < 20: continue
+                    
+                    # 1. 檢查最新成交量
+                    latest_vol = float(df_ticker['Volume'].iloc[-1])
+                    if latest_vol < min_volume: continue
+                    
+                    # 2. 計算 20MA
+                    df_ticker['MA20'] = df_ticker['Close'].rolling(window=20).mean()
+                    price = float(df_ticker['Close'].iloc[-1])
+                    ma20 = float(df_ticker['MA20'].iloc[-1])
+                    
+                    if pd.isna(ma20): continue
+                    
+                    # 3. 篩選條件：20MA 之下 0% 到 3% 區間
+                    if ma20 * 0.97 <= price < ma20:
+                        diff_pct = ((price / ma20) - 1) * 100
+                        matched_list.append({
+                            'ticker': ticker,
+                            'price': round(price, 2),
+                            'diff': round(diff_pct, 2),
+                            'volume': int(latest_vol)
+                        })
+                except Exception:
+                    # 個股解析出錯直接跳過，不影響同批次的其他股票
+                    continue
         except Exception as e:
             print(f"批次下載出錯 ({i}-{i+chunk_size}): {e}")
             
+    # 依成交量由大到小排序
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
     return matched_list
 
@@ -122,10 +134,14 @@ def main():
             df = yf.download(symbol, period=f"{ma_len + 20}d", progress=False)
             if df.empty: continue
             
+            # 自選股也同步做防呆
+            df_clean = df[['Close', 'Volume']].dropna()
+            if len(df_clean) < ma_len: continue
+            
             ma_col = f'MA{ma_len}'
-            df[ma_col] = df['Close'].rolling(window=ma_len).mean()
-            latest_price = float(df['Close'].iloc[-1])
-            latest_ma = float(df[ma_col].iloc[-1])
+            df_clean[ma_col] = df_clean['Close'].rolling(window=ma_len).mean()
+            latest_price = float(df_clean['Close'].iloc[-1])
+            latest_ma = float(df_clean[ma_col].iloc[-1])
             
             if latest_ma * (1 - threshold_pct) <= latest_price < latest_ma:
                 diff_pct = round((latest_price / latest_ma - 1) * 100, 2)
