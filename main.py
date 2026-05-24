@@ -195,8 +195,8 @@ def main():
     os.system('git push')
 
     # 💡 請記得將下面兩行換成你的 GitHub 帳號與專案庫名稱！
-    github_user = "你的GitHub帳號"
-    github_repo = "你的專案名稱"
+    github_user = "wudn9922"
+    github_repo = "my-stock-screener"
     web_url = f"https://{github_user}.github.io/{github_repo}/"
     
     line_msg = f"\n🎯 {today_str} 均線潛伏圖表網頁已生成！\n"
