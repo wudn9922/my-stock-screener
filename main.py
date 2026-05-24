@@ -4,6 +4,11 @@ import requests
 import os
 from datetime import datetime
 
+# 建立一個通用的偽裝瀏覽器標頭，防止網站阻擋機器人
+HTTP_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+
 def send_line_message(msg, access_token, user_id):
     url = "https://api.line.me/v2/bot/message/push"
     headers = {
@@ -22,7 +27,7 @@ def get_tw_tickers():
     """自動爬取台股所有上市股票代號"""
     try:
         url = "https://isin.twse.com.tw/isin/C_public.jsp?strMode=2"
-        res = requests.get(url)
+        res = requests.get(url, headers=HTTP_HEADERS)
         res.encoding = 'big5'
         df = pd.read_html(res.text)[0]
         tickers = []
@@ -37,10 +42,12 @@ def get_tw_tickers():
         return ["2330.TW", "2317.TW", "2454.TW", "2308.TW"]
 
 def get_us_tickers():
-    """自動爬取美股標普 500 清單"""
+    """自動爬取美股標普 500 清單 (加入偽裝面具防止 403 錯誤)"""
     try:
         url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        df = pd.read_html(url)[0]
+        # 使用 requests 加上 headers 去敲門
+        res = requests.get(url, headers=HTTP_HEADERS)
+        df = pd.read_html(res.text)[0]
         tickers = df['Symbol'].tolist()
         return [t.replace('.', '-') for t in tickers]
     except Exception as e:
@@ -96,9 +103,7 @@ def main():
 
     today_str = datetime.now().strftime("%Y-%m-%d")
 
-    # ==================== 【第一部分：核心自選股監控 (MA下方 0~3% 修正版)】 ====================
-    # 設定格式：[自選均線天數 , 下方容許趴數]
-    # 例如：台積電看 20MA 下方 3% 內；鴻海看 60MA 下方 3% 內
+    # ==================== 【第一部分：核心自選股監控】 ====================
     stock_config = {
         "2330.TW": [20, 0.03],   # 台積電：20MA，下方 0~3% 區間
         "2317.TW": [60, 0.03],   # 鴻海：60MA，下方 0~3% 區間
@@ -122,7 +127,6 @@ def main():
             latest_price = float(df['Close'].iloc[-1])
             latest_ma = float(df[ma_col].iloc[-1])
             
-            # 修正關鍵邏輯：股價必須在 MA 的 97% 到 100% 之間 (即 MA 下方 0~3%)
             if latest_ma * (1 - threshold_pct) <= latest_price < latest_ma:
                 diff_pct = round((latest_price / latest_ma - 1) * 100, 2)
                 my_report += f"🎯 {symbol}: 在 {ma_len}MA 下方 ({diff_pct}%)\n   現價: {round(latest_price, 2)} | MA: {round(latest_ma, 2)}\n"
@@ -133,7 +137,6 @@ def main():
     if hit_count == 0:
         my_report += "今日核心自選股皆未進入均線下方 0~3% 區間。\n"
         
-    # 發送第一則訊息
     send_line_message(my_report, access_token, user_id)
 
 
