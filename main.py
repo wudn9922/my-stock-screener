@@ -167,8 +167,8 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
 
     print("正在掃描全市場...")
-    tw_matches = scan_market(get_tw_tickers(), min_volume=1000000)
-    us_matches = scan_market(get_us_tickers(), min_volume=1000000)
+    tw_matches = scan_market(get_tw_tickers(), min_volume=0)
+    us_matches = scan_market(get_us_tickers(), min_volume=0)
 
     # 產生網頁檔案
     generate_html(tw_matches, us_matches, today_str)
@@ -182,8 +182,8 @@ def main():
 
     # 【LINE 訊息精簡化】只發送通知與專屬網頁網址
     # 💡 請將下面的「你的GitHub帳號」和「你的專案名稱」換成你實際的名稱
-    github_user = "你的GitHub帳號"
-    github_repo = "你的專案名稱"
+    github_user = "wudn9922"
+    github_repo = "my-stock-screener"
     web_url = f"https://{github_user}.github.io/{github_repo}/"
     
     line_msg = f"\n🎯 {today_str} 均線潛伏圖表網頁已生成！\n"
