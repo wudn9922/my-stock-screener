@@ -2,3 +2,4 @@ yfinance
 pandas
 requests
 lxml
+plotly
