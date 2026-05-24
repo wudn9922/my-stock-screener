@@ -60,28 +60,40 @@ def scan_market(tickers, min_volume):
     for i in range(0, len(tickers), chunk_size):
         chunk = tickers[i:i+chunk_size]
         try:
-            data = yf.download(chunk, period="40d", progress=False, keep_multiindex=True)
+            # 移除 keep_multiindex 參數，確保所有 yfinance 版本都能跑
+            data = yf.download(chunk, period="40d", progress=False)
             if data.empty: continue
             
             for ticker in chunk:
                 try:
-                    if ticker not in data['Close'].columns: continue
+                    # 智慧相容檢查：判斷回傳的資料結構
+                    if isinstance(data.columns, pd.MultiIndex):
+                        if 'Close' not in data.columns.levels[0] or ticker not in data['Close'].columns: continue
+                        close_series = data['Close'][ticker]
+                        volume_series = data['Volume'][ticker]
+                    else:
+                        # 如果只有單檔股票回傳，欄位不會是多重索引
+                        if len(chunk) == 1 or ticker == chunk[0]:
+                            close_series = data['Close']
+                            volume_series = data['Volume']
+                        else:
+                            continue
                     
-                    close_series = data['Close'][ticker]
-                    volume_series = data['Volume'][ticker]
                     df_ticker = pd.DataFrame({'Close': close_series, 'Volume': volume_series}).dropna()
-                    
                     if len(df_ticker) < 20: continue
                     
+                    # 1. 檢查最新成交量
                     latest_vol = float(df_ticker['Volume'].iloc[-1])
                     if latest_vol < min_volume: continue
                     
+                    # 2. 計算 20MA
                     df_ticker['MA20'] = df_ticker['Close'].rolling(window=20).mean()
                     price = float(df_ticker['Close'].iloc[-1])
                     ma20 = float(df_ticker['MA20'].iloc[-1])
                     
                     if pd.isna(ma20): continue
                     
+                    # 3. 篩選條件：20MA 之下 0% 到 3% 區間
                     if ma20 * 0.97 <= price < ma20:
                         diff_pct = ((price / ma20) - 1) * 100
                         matched_list.append({
@@ -106,8 +118,6 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
 
     # ==================== 【第一部分：10 大自選股分組監控】 ====================
-    # 格式說明： "分組名稱": { "股票代號": [設定均線, 下方容許趴數] }
-    # 提示：如果某個分組暫時沒有股票，保持 {} 即可
     stock_groups = {
         "1️⃣ 超級績效股": {
             "2330.TW": [20, 0.03],  # 台積電：20MA，下方 0~3% 
@@ -135,9 +145,8 @@ def main():
     my_report += "🎯 條件: 股價在自選MA之下 (0 ~ -3%)\n" + "="*20 + "\n"
     total_hit_count = 0
     
-    # 開始逐組掃描
     for group_name, stocks in stock_groups.items():
-        if not stocks: continue # 如果這組是空的，直接跳過不處理
+        if not stocks: continue 
         
         group_content = f"【{group_name}】\n"
         group_hit_count = 0
@@ -165,14 +174,12 @@ def main():
             except Exception as e:
                 print(f"處理自選股 {symbol} 出錯: {e}")
                 
-        # 只有當這一組真的有股票觸發訊號時，才把這一組塞進報告裡
         if group_hit_count > 0:
             my_report += group_content + "-"*15 + "\n"
             
     if total_hit_count == 0:
         my_report += "今日各分組自選股皆未進入均線下方 0~3% 區間。\n"
         
-    # 發送第一則訊息：分組自選股報告
     send_line_message(my_report, access_token, user_id)
 
 
@@ -204,7 +211,7 @@ def main():
         market_report += f"🍏 {item['ticker']}: 現價{item['price']} (距MA20: {item['diff']}% | 量: {vol_million}百萬股)\n"
     if not us_matches: market_report += "今日美股無符合標的。\n"
 
-    # 發送第二則訊息：全市場報告
+    # 發送第二則訊息
     send_line_message(market_report, access_token, user_id)
     print("兩份報告皆已成功發送！")
 
