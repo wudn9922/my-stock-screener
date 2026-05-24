@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 import os
 from datetime import datetime
-import plotly.graph_objects as [Image of candlestick chart with moving average]
+import plotly.graph_objects as go
 
 HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
