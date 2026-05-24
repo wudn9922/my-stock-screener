@@ -1,0 +1,31 @@
+name: Daily Stock Screener
+
+on:
+  schedule:
+    # 這裡使用的是國際標準時間 (UTC)。
+    # UTC 07:05 = 台灣時間 15:05 
+    # 1-5 代表週一到週五執行（週末不執行）
+    - cron: '5 7 * * 1-5' 
+  workflow_dispatch: # 保留這個，讓你可以隨時手動點擊按鈕執行
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        
+      - name: Run Screener
+        env:
+          # 這裡會自動去保險箱抓你存好的兩把鑰匙
+          LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python main.py
