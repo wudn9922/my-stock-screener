@@ -1,0 +1,49 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>台美股均線潛伏報告</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body { background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }
+            .header { text-align: center; padding: 20px 0; background: #222; margin-bottom: 20px; border-radius: 8px; }
+            .tabs { display: flex; justify-content: center; margin-bottom: 20px; }
+            .tab-btn { background: #333; color: #ccc; border: none; padding: 12px 30px; font-size: 16px; cursor: pointer; transition: 0.3s; }
+            .tab-btn.active { background: #00b0ff; color: #fff; font-weight: bold; }
+            .tab-btn:first-child { border-radius: 5px 0 0 5px; }
+            .tab-btn:last-child { border-radius: 0 5px 5px 0; }
+            .market-section { display: none; max-width: 800px; margin: 0 auto; }
+            .market-section.active { display: block; }
+            .chart-card { background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+            .no-data { text-align: center; color: #888; padding: 40px; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h2>📈 台美股量化潛伏網頁報告 (2026-05-24)</h2>
+            <p>條件：最新收盤價在 20MA 之下 (0% ~ -3%) | 依成交量排序</p>
+        </div>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchMarket('tw')">🇹🇼 台股 (0)</button>
+            <button class="tab-btn" onclick="switchMarket('us')">🇺🇸 美股 (0)</button>
+        </div>
+        <div id="tw-market" class="market-section active">
+    <div class="no-data">今日台股無符合標的</div></div><div id="us-market" class="market-section"><div class="no-data">今日美股無符合標的</div>
+        </div>
+        <script>
+            function switchMarket(market) {
+                document.querySelectorAll('.market-section').forEach(el => el.classList.remove('active'));
+                document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+                if(market === 'tw') {
+                    document.getElementById('tw-market').classList.add('active');
+                    event.target.classList.add('active');
+                } else {
+                    document.getElementById('us-market').classList.add('active');
+                    event.target.classList.add('active');
+                }
+                window.dispatchEvent(new Event('resize'));
+            }
+        </script>
+    </body>
+    </html>
+    
