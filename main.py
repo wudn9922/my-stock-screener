@@ -244,8 +244,8 @@ def main():
     print("正在全面掃描全市場與全新客製化自選股...")
     
     data_dict = {
-        'tw': scan_market(get_tw_tickers(), min_volume=0),
-        'us': scan_market(get_us_tickers(), min_volume=0),
+        'tw': scan_market(get_tw_tickers(), min_volume=20000000),
+        'us': scan_market(get_us_tickers(), min_volume=1000000),
         
         'g1': process_custom_groups(g1_config),
         'g2': process_custom_groups(g2_config),
