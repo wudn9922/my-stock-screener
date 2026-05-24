@@ -194,10 +194,10 @@ def main():
     # --- 執行台股全市場掃描 (成交量門檻：1,000,000股 = 1000張) ---
     print("正在掃描台股全市場...")
     tw_tickers = get_tw_tickers()
-    tw_matches = scan_market(tw_tickers, min_volume=1000000)
+    tw_matches = scan_market(tw_tickers, min_volume=2000000)
     
     market_report += f"🇹🇼 台股符合條件 ({len(tw_matches)} 檔):\n"
-    for item in tw_matches[:20]:
+    for item in tw_matches[:100]:
         vol_lots = int(item['volume'] / 1000)
         market_report += f"📈 {item['ticker'].replace('.TW','')}: 現價{item['price']} (距MA20: {item['diff']}% | 量: {vol_lots}張)\n"
     if not tw_matches: market_report += "今日台股無符合標的。\n"
@@ -210,7 +210,7 @@ def main():
     us_matches = scan_market(us_tickers, min_volume=1000000)
     
     market_report += f"🇺🇸 美股符合條件 ({len(us_matches)} 檔):\n"
-    for item in us_matches[:20]:
+    for item in us_matches:
         vol_million = round(item['volume'] / 1000000, 1)
         market_report += f"🍏 {item['ticker']}: 現價{item['price']} (距MA20: {item['diff']}% | 量: {vol_million}百萬股)\n"
     if not us_matches: market_report += "今日美股無符合標的。\n"
