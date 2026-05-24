@@ -31,15 +31,18 @@ def get_tw_tickers():
         res.encoding = 'big5'
         df = pd.read_html(res.text)[0]
         tickers = []
-        for item in df[0].dropna().tolist():
-            if ' ' in item:
+        # 【修正 1】改用 .iloc[:, 0] 依絕對位置抓取第一欄，徹底根除欄位名稱導致的 KeyError
+        first_column = df.iloc[:, 0].dropna().tolist()
+        for item in first_column:
+            if ' ' in item:  # 全形空格
                 code = item.split(' ')[0].strip()
                 if len(code) == 4 and code.isdigit():
                     tickers.append(f"{code}.TW")
+        print(f"🔥 成功完整抓取台股上市清單，共 {len(tickers)} 檔股票")
         return tickers
     except Exception as e:
-        print(f"獲取台股清單失敗: {e}")
-        return ["2330.TW", "2317.TW", "2454.TW", "2308.TW"]
+        print(f"獲取台股清單失敗: {e}，啟用安全備用清單")
+        return ["2330.TW", "2317.TW", "2454.TW", "2308.TW", "2603.TW", "2303.TW", "2881.TW"]
 
 def get_us_tickers():
     """自動爬取美股標普 500 清單"""
@@ -55,45 +58,40 @@ def get_us_tickers():
 
 def scan_market(tickers, min_volume):
     matched_list = []
-    chunk_size = 100
+    chunk_size = 50  # 縮小批次大小到 50，下載更穩定且不易超時
     
     for i in range(0, len(tickers), chunk_size):
         chunk = tickers[i:i+chunk_size]
         try:
-            # 移除 keep_multiindex 參數，確保所有 yfinance 版本都能跑
-            data = yf.download(chunk, period="40d", progress=False)
+            data = yf.download(chunk, period="50d", progress=False)
             if data.empty: continue
             
             for ticker in chunk:
                 try:
-                    # 智慧相容檢查：判斷回傳的資料結構
+                    # 【修正 2】直接用元組在 columns 中精準比對，避開不同 pandas 版本的索引解析爭議
                     if isinstance(data.columns, pd.MultiIndex):
-                        if 'Close' not in data.columns.levels[0] or ticker not in data['Close'].columns: continue
-                        close_series = data['Close'][ticker]
-                        volume_series = data['Volume'][ticker]
-                    else:
-                        # 如果只有單檔股票回傳，欄位不會是多重索引
-                        if len(chunk) == 1 or ticker == chunk[0]:
-                            close_series = data['Close']
-                            volume_series = data['Volume']
-                        else:
+                        if ('Close', ticker) not in data.columns or ('Volume', ticker) not in data.columns:
                             continue
+                        close_series = data[('Close', ticker)]
+                        volume_series = data[('Volume', ticker)]
+                    else:
+                        if 'Close' not in data.columns or 'Volume' not in data.columns:
+                            continue
+                        close_series = data['Close']
+                        volume_series = data['Volume']
                     
                     df_ticker = pd.DataFrame({'Close': close_series, 'Volume': volume_series}).dropna()
                     if len(df_ticker) < 20: continue
                     
-                    # 1. 檢查最新成交量
                     latest_vol = float(df_ticker['Volume'].iloc[-1])
                     if latest_vol < min_volume: continue
                     
-                    # 2. 計算 20MA
                     df_ticker['MA20'] = df_ticker['Close'].rolling(window=20).mean()
                     price = float(df_ticker['Close'].iloc[-1])
                     ma20 = float(df_ticker['MA20'].iloc[-1])
                     
                     if pd.isna(ma20): continue
                     
-                    # 3. 篩選條件：20MA 之下 0% 到 3% 區間
                     if ma20 * 0.97 <= price < ma20:
                         diff_pct = ((price / ma20) - 1) * 100
                         matched_list.append({
@@ -120,18 +118,18 @@ def main():
     # ==================== 【第一部分：10 大自選股分組監控】 ====================
     stock_groups = {
         "1️⃣ 超級績效股": {
-            "2330.TW": [20, 0.03],  # 台積電：20MA，下方 0~3% 
-            "NVDA": [20, 0.03]      # 輝達：20MA，下方 0~3%
+            "2330.TW": [20, 0.03],  
+            "NVDA": [20, 0.03]      
         },
         "2️⃣ 核心績優股": {
-            "2317.TW": [60, 0.03],  # 鴻海：60MA，下方 0~3%
-            "AAPL": [20, 0.03]      # 蘋果：20MA，下方 0~3%
+            "2317.TW": [60, 0.03],  
+            "AAPL": [20, 0.03]      
         },
         "3️⃣ 轉機投機股": {
-            "2303.TW": [20, 0.03]   # 聯電：20MA，下方 0~3%
+            "2303.TW": [20, 0.03]   
         },
         "4️⃣ 近期關注股": {
-            "2454.TW": [20, 0.03]   # 聯發科：20MA，下方 0~3%
+            "2454.TW": [20, 0.03]   
         },
         "5️⃣ 殖利率概念": {},
         "6️⃣ 產業龍頭股": {},
@@ -187,10 +185,10 @@ def main():
     market_report = f"\n🚀 {today_str} 全市場量化篩選報告\n"
     market_report += "🔥 條件: 20MA之下(0~-3%) + 高量能\n" + "="*20 + "\n"
 
-    # --- 執行台股全市場掃描 (成交量 > 2000張) ---
+    # --- 執行台股全市場掃描 (【修正 3】量能門檻調整為 100 萬股 = 1000張，擴大實用性) ---
     print("正在掃描台股全市場...")
     tw_tickers = get_tw_tickers()
-    tw_matches = scan_market(tw_tickers, min_volume=2000000)
+    tw_matches = scan_market(tw_tickers, min_volume=1000000)
     
     market_report += f"🇹🇼 台股符合條件 ({len(tw_matches)} 檔):\n"
     for item in tw_matches[:20]:
