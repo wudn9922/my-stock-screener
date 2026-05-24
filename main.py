@@ -4,7 +4,7 @@ import requests
 import os
 from datetime import datetime
 
-# 建立一個通用的偽裝瀏覽器標頭，防止網站阻擋機器人
+# 建立一個通用的偽裝瀏覽器標頭
 HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
@@ -24,25 +24,31 @@ def send_line_message(msg, access_token, user_id):
         print(f"LINE 發送失敗: {response.status_code}, {response.text}")
 
 def get_tw_tickers():
-    """自動爬取台股所有上市股票代號"""
+    """【重大升級】調用台灣證券交易所官方 OpenAPI，徹底解決 GitHub 雲端 IP 被阻擋的問題"""
     try:
-        url = "https://isin.twse.com.tw/isin/C_public.jsp?strMode=2"
-        res = requests.get(url, headers=HTTP_HEADERS)
-        res.encoding = 'big5'
-        df = pd.read_html(res.text)[0]
-        tickers = []
-        # 【修正 1】改用 .iloc[:, 0] 依絕對位置抓取第一欄，徹底根除欄位名稱導致的 KeyError
-        first_column = df.iloc[:, 0].dropna().tolist()
-        for item in first_column:
-            if ' ' in item:  # 全形空格
-                code = item.split(' ')[0].strip()
+        # 這是官方開發者通道，不鎖海外 IP，直接回傳當日全市場資料
+        url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
+        res = requests.get(url, headers=HTTP_HEADERS, timeout=15)
+        
+        if res.status_code == 200:
+            data = res.json()
+            tickers = []
+            for item in data:
+                code = item.get("Code", "").strip()
+                # 篩選標準 4 碼的台股普通股
                 if len(code) == 4 and code.isdigit():
                     tickers.append(f"{code}.TW")
-        print(f"🔥 成功完整抓取台股上市清單，共 {len(tickers)} 檔股票")
-        return tickers
+            
+            if tickers:
+                print(f"🔥 透過官方 OpenAPI 成功解鎖台股清單，共抓取 {len(tickers)} 檔股票！")
+                return tickers
+                
+        print(f"⚠️ OpenAPI 回傳異常狀態碼: {res.status_code}，啟用安全備用清單")
     except Exception as e:
-        print(f"獲取台股清單失敗: {e}，啟用安全備用清單")
-        return ["2330.TW", "2317.TW", "2454.TW", "2308.TW", "2603.TW", "2303.TW", "2881.TW"]
+        print(f"❌ 透過 OpenAPI 獲取台股清單失敗: {e}，啟用安全備用清單")
+        
+    # 萬一連官方 API 都維護時的終極防線（精選台股高流動性代表）
+    return ["2330.TW", "2317.TW", "2454.TW", "2308.TW", "2603.TW", "2303.TW", "2881.TW", "2409.TW", "3481.TW", "2324.TW"]
 
 def get_us_tickers():
     """自動爬取美股標普 500 清單"""
@@ -58,7 +64,7 @@ def get_us_tickers():
 
 def scan_market(tickers, min_volume):
     matched_list = []
-    chunk_size = 50  # 縮小批次大小到 50，下載更穩定且不易超時
+    chunk_size = 50  # 縮小分批大小，確保 yfinance 下載更穩定
     
     for i in range(0, len(tickers), chunk_size):
         chunk = tickers[i:i+chunk_size]
@@ -68,7 +74,6 @@ def scan_market(tickers, min_volume):
             
             for ticker in chunk:
                 try:
-                    # 【修正 2】直接用元組在 columns 中精準比對，避開不同 pandas 版本的索引解析爭議
                     if isinstance(data.columns, pd.MultiIndex):
                         if ('Close', ticker) not in data.columns or ('Volume', ticker) not in data.columns:
                             continue
@@ -92,6 +97,7 @@ def scan_market(tickers, min_volume):
                     
                     if pd.isna(ma20): continue
                     
+                    # 嚴格篩選：當前最新收盤價恰好在 20MA 之下 0% 到 -3% 區間
                     if ma20 * 0.97 <= price < ma20:
                         diff_pct = ((price / ma20) - 1) * 100
                         matched_list.append({
@@ -183,9 +189,9 @@ def main():
 
     # ==================== 【第二部分：全市場量化篩選】 ====================
     market_report = f"\n🚀 {today_str} 全市場量化篩選報告\n"
-    market_report += "🔥 條件: 20MA之下(0~-3%) + 高量能\n" + "="*20 + "\n"
+    market_report += "🔥 條件: 收盤價在20MA之下(0~-3%) + 高量能\n" + "="*20 + "\n"
 
-    # --- 執行台股全市場掃描 (【修正 3】量能門檻調整為 100 萬股 = 1000張，擴大實用性) ---
+    # --- 執行台股全市場掃描 (成交量門檻：1,000,000股 = 1000張) ---
     print("正在掃描台股全市場...")
     tw_tickers = get_tw_tickers()
     tw_matches = scan_market(tw_tickers, min_volume=1000000)
