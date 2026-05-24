@@ -60,36 +60,28 @@ def scan_market(tickers, min_volume):
     for i in range(0, len(tickers), chunk_size):
         chunk = tickers[i:i+chunk_size]
         try:
-            # 強制保持 MultiIndex 穩定結構，避免少數股票失敗導致整個 chunk 壞掉
             data = yf.download(chunk, period="40d", progress=False, keep_multiindex=True)
             if data.empty: continue
             
             for ticker in chunk:
                 try:
-                    # 安全檢查：確保該股票有被成功下載
                     if ticker not in data['Close'].columns: continue
                     
-                    # 【關鍵防殺優化】：只抽出 Close 和 Volume 進行清理，避開其他無用欄位的 NaN 陷阱
                     close_series = data['Close'][ticker]
                     volume_series = data['Volume'][ticker]
-                    
                     df_ticker = pd.DataFrame({'Close': close_series, 'Volume': volume_series}).dropna()
                     
-                    # 確保扣除極端節假日後，至少還有 20 天的數據可以算均線
                     if len(df_ticker) < 20: continue
                     
-                    # 1. 檢查最新成交量
                     latest_vol = float(df_ticker['Volume'].iloc[-1])
                     if latest_vol < min_volume: continue
                     
-                    # 2. 計算 20MA
                     df_ticker['MA20'] = df_ticker['Close'].rolling(window=20).mean()
                     price = float(df_ticker['Close'].iloc[-1])
                     ma20 = float(df_ticker['MA20'].iloc[-1])
                     
                     if pd.isna(ma20): continue
                     
-                    # 3. 篩選條件：20MA 之下 0% 到 3% 區間
                     if ma20 * 0.97 <= price < ma20:
                         diff_pct = ((price / ma20) - 1) * 100
                         matched_list.append({
@@ -99,12 +91,10 @@ def scan_market(tickers, min_volume):
                             'volume': int(latest_vol)
                         })
                 except Exception:
-                    # 個股解析出錯直接跳過，不影響同批次的其他股票
                     continue
         except Exception as e:
             print(f"批次下載出錯 ({i}-{i+chunk_size}): {e}")
             
-    # 依成交量由大到小排序
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
     return matched_list
 
@@ -115,44 +105,74 @@ def main():
 
     today_str = datetime.now().strftime("%Y-%m-%d")
 
-    # ==================== 【第一部分：核心自選股監控】 ====================
-    stock_config = {
-        "2330.TW": [20, 0.03],   # 台積電：20MA，下方 0~3% 區間
-        "2317.TW": [60, 0.03],   # 鴻海：60MA，下方 0~3% 區間
-        "AAPL": [20, 0.03],      # 蘋果：20MA，下方 0~3% 區間
-        "NVDA": [30, 0.03]       # 輝達：30MA，下方 0~3% 區間
+    # ==================== 【第一部分：10 大自選股分組監控】 ====================
+    # 格式說明： "分組名稱": { "股票代號": [設定均線, 下方容許趴數] }
+    # 提示：如果某個分組暫時沒有股票，保持 {} 即可
+    stock_groups = {
+        "1️⃣ 超級績效股": {
+            "2330.TW": [20, 0.03],  # 台積電：20MA，下方 0~3% 
+            "NVDA": [20, 0.03]      # 輝達：20MA，下方 0~3%
+        },
+        "2️⃣ 核心績優股": {
+            "2317.TW": [60, 0.03],  # 鴻海：60MA，下方 0~3%
+            "AAPL": [20, 0.03]      # 蘋果：20MA，下方 0~3%
+        },
+        "3️⃣ 轉機投機股": {
+            "2303.TW": [20, 0.03]   # 聯電：20MA，下方 0~3%
+        },
+        "4️⃣ 近期關注股": {
+            "2454.TW": [20, 0.03]   # 聯發科：20MA，下方 0~3%
+        },
+        "5️⃣ 殖利率概念": {},
+        "6️⃣ 產業龍頭股": {},
+        "7️⃣ 跌深反彈股": {},
+        "8️⃣ 投信作帳股": {},
+        "9️⃣ 外資鎖定股": {},
+        "🔟 強勢整理股": {}
     }
     
-    my_report = f"\n📊 {today_str} 核心自選股潛伏報告\n"
-    my_report += "🎯 條件: 股價在自選MA之下 (0 ~ -3%)\n" + "-"*20 + "\n"
-    hit_count = 0
+    my_report = f"\n📊 {today_str} 分組自選股潛伏報告\n"
+    my_report += "🎯 條件: 股價在自選MA之下 (0 ~ -3%)\n" + "="*20 + "\n"
+    total_hit_count = 0
     
-    for symbol, params in stock_config.items():
-        ma_len = params[0]
-        threshold_pct = params[1]
-        try:
-            df = yf.download(symbol, period=f"{ma_len + 20}d", progress=False)
-            if df.empty: continue
-            
-            # 自選股也同步做防呆
-            df_clean = df[['Close', 'Volume']].dropna()
-            if len(df_clean) < ma_len: continue
-            
-            ma_col = f'MA{ma_len}'
-            df_clean[ma_col] = df_clean['Close'].rolling(window=ma_len).mean()
-            latest_price = float(df_clean['Close'].iloc[-1])
-            latest_ma = float(df_clean[ma_col].iloc[-1])
-            
-            if latest_ma * (1 - threshold_pct) <= latest_price < latest_ma:
-                diff_pct = round((latest_price / latest_ma - 1) * 100, 2)
-                my_report += f"🎯 {symbol}: 在 {ma_len}MA 下方 ({diff_pct}%)\n   現價: {round(latest_price, 2)} | MA: {round(latest_ma, 2)}\n"
-                hit_count += 1
-        except Exception as e:
-            print(f"處理自選股 {symbol} 出錯: {e}")
-            
-    if hit_count == 0:
-        my_report += "今日核心自選股皆未進入均線下方 0~3% 區間。\n"
+    # 開始逐組掃描
+    for group_name, stocks in stock_groups.items():
+        if not stocks: continue # 如果這組是空的，直接跳過不處理
         
+        group_content = f"【{group_name}】\n"
+        group_hit_count = 0
+        
+        for symbol, params in stocks.items():
+            ma_len = params[0]
+            threshold_pct = params[1]
+            try:
+                df = yf.download(symbol, period=f"{ma_len + 20}d", progress=False)
+                if df.empty: continue
+                
+                df_clean = df[['Close', 'Volume']].dropna()
+                if len(df_clean) < ma_len: continue
+                
+                ma_col = f'MA{ma_len}'
+                df_clean[ma_col] = df_clean['Close'].rolling(window=ma_len).mean()
+                latest_price = float(df_clean['Close'].iloc[-1])
+                latest_ma = float(df_clean[ma_col].iloc[-1])
+                
+                if latest_ma * (1 - threshold_pct) <= latest_price < latest_ma:
+                    diff_pct = round((latest_price / latest_ma - 1) * 100, 2)
+                    group_content += f" 📈 {symbol}: 在 {ma_len}MA 下方 ({diff_pct}%)\n    現價: {round(latest_price, 2)} | MA: {round(latest_ma, 2)}\n"
+                    group_hit_count += 1
+                    total_hit_count += 1
+            except Exception as e:
+                print(f"處理自選股 {symbol} 出錯: {e}")
+                
+        # 只有當這一組真的有股票觸發訊號時，才把這一組塞進報告裡
+        if group_hit_count > 0:
+            my_report += group_content + "-"*15 + "\n"
+            
+    if total_hit_count == 0:
+        my_report += "今日各分組自選股皆未進入均線下方 0~3% 區間。\n"
+        
+    # 發送第一則訊息：分組自選股報告
     send_line_message(my_report, access_token, user_id)
 
 
@@ -184,7 +204,7 @@ def main():
         market_report += f"🍏 {item['ticker']}: 現價{item['price']} (距MA20: {item['diff']}% | 量: {vol_million}百萬股)\n"
     if not us_matches: market_report += "今日美股無符合標的。\n"
 
-    # 發送第二則訊息
+    # 發送第二則訊息：全市場報告
     send_line_message(market_report, access_token, user_id)
     print("兩份報告皆已成功發送！")
 
