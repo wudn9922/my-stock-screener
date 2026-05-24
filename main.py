@@ -241,7 +241,7 @@ def main():
     }
     # =========================================================================
 
-    print("正在全面掃描全市場與全新客製化自選股(修復版)...")
+    print("正在全面掃描全市場與全新客製化自選股...")
     
     data_dict = {
         'tw': scan_market(get_tw_tickers(), min_volume=0),
@@ -266,7 +266,7 @@ def main():
     github_repo = "my-stock-screener"
     web_url = f"https://{github_user}.github.io/{github_repo}/"
     
-    line_msg = f"\n🎯 {today_str} 看盤網頁（Bug修復版）已更新！\n"
+    line_msg = f"\n🎯 {today_str} 看盤網頁！\n"
     line_msg += f"🇹🇼 台股全市場：{len(data_dict['tw'])} 檔\n"
     line_msg += f"🇺🇸 美股全市場：{len(data_dict['us'])} 檔\n"
     line_msg += f"🔥 自選股狀態：\n"
@@ -278,7 +278,7 @@ def main():
     line_msg += f"🔗 點擊網址直接「高清」瀏覽：\n{web_url}"
     
     send_line_message(line_msg, access_token, user_id)
-    print("網頁更新成功，修復版已發送！")
+    print("網頁更新成功，已發送！")
 
 if __name__ == "__main__":
     main()
