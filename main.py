@@ -217,7 +217,7 @@ def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
         else: icon = "⚡"
 
         # 🎯 核心更正：在此處將輸出格式修改為兩行獨立的 └ 分支
-        return f"{icon} {name}\n   ├ 均線: {score_label} ({score}/{total_ma_count}MA)\n   └ 狀態: {final_status}"
+        return f"{icon} {name}\n   ├ 均線: {score_label} ({score}/{total_ma_count}MA)\n   └  {final_status}"
     
     except Exception as e:
         return f"⚪ {name}: 分析發生異常"
@@ -275,26 +275,26 @@ def main():
     
     # 🇹🇼 台股
     line_msg_index += f"【 🇹🇼 台灣市場 】\n"
-    line_msg_index += analyze_index_trend("^TWII", "台灣加權指數", ma_list=[20, 60, 240]) + "\n\n"
+    line_msg_index += analyze_index_trend("^TWII", "台灣加權指數", ma_list=[20, 27, 61]) + "\n\n"
     
     # 🇺🇸 美股
     line_msg_index += f"【 🇺🇸 美國市場 】\n"
-    line_msg_index += analyze_index_trend("^GSPC", "美國標普500", ma_list=[20, 60, 240]) + "\n"
-    line_msg_index += analyze_index_trend("^DJI", "美國道瓊工業", ma_list=[20, 60]) + "\n"
-    line_msg_index += analyze_index_trend("^IXIC", "美國那斯達克", ma_list=[20, 60, 240]) + "\n"
-    line_msg_index += analyze_index_trend("^RUT", "美國羅素2000", ma_list=[240]) + "\n"
-    line_msg_index += analyze_index_trend("^SOX", "美國費城半導體", ma_list=[20, 60, 240]) + "\n\n"
+    line_msg_index += analyze_index_trend("^GSPC", "美國標普500", ma_list=[23, 60]) + "\n"
+    line_msg_index += analyze_index_trend("^DJI", "美國道瓊工業", ma_list=[20, 23, 55]) + "\n"
+    line_msg_index += analyze_index_trend("^IXIC", "美國那斯達克", ma_list=[29]) + "\n"
+    line_msg_index += analyze_index_trend("^RUT", "美國羅素2000", ma_list=[21, 56]) + "\n"
+    line_msg_index += analyze_index_trend("^SOX", "美國費城半導體", ma_list=[20, 58, 108]) + "\n\n"
     
     # 🇪🇺 歐股
     line_msg_index += f"【 🇪🇺 歐洲市場 】\n"
-    line_msg_index += analyze_index_trend("^FCHI", "法國CAC40", ma_list=[20, 60, 240]) + "\n"
-    line_msg_index += analyze_index_trend("^FTSE", "英國富時100", ma_list=[20, 60, 240]) + "\n"
-    line_msg_index += analyze_index_trend("^GDAXI", "德國DAX指數", ma_list=[20, 60, 240]) + "\n\n"
+    line_msg_index += analyze_index_trend("^FCHI", "法國CAC40", ma_list=[21]) + "\n"
+    line_msg_index += analyze_index_trend("^FTSE", "英國富時100", ma_list=[20]) + "\n"
+    line_msg_index += analyze_index_trend("^GDAXI", "德國DAX指數", ma_list=[23]) + "\n\n"
     
     # 🌏 亞股
     line_msg_index += f"【 🌏 亞洲市場 】\n"
-    line_msg_index += analyze_index_trend("^N225", "日本日經225", ma_list=[20, 60, 240]) + "\n"
-    line_msg_index += analyze_index_trend("^KS11", "韓國綜合指數", ma_list=[20, 60, 240]) + "\n"
+    line_msg_index += analyze_index_trend("^N225", "日本日經225", ma_list=[24]) + "\n"
+    line_msg_index += analyze_index_trend("^KS11", "韓國綜合指數", ma_list=[22]) + "\n"
     
     send_line_message(line_msg_index, access_token, user_id)
 
