@@ -139,7 +139,7 @@ def generate_html(data_dict, date_str):
 
 
 # =========================================================================
-# 🧠 【大盤多空量化分析系統 - 修正為非黑即白判定邏輯】
+# 🧠 【大盤多空量化分析系統 - 修正型態加總至少 2 次邏輯】
 # =========================================================================
 def analyze_index_trend(ticker, name):
     try:
@@ -174,10 +174,10 @@ def analyze_index_trend(ticker, name):
         months_since_high = (latest_date - idx_3y_high).days / 30.0
         months_since_low = (latest_date - idx_3y_low).days / 30.0
         
-        # 尋找最近半年（120日）的波段轉折點，用於抓取「頂頂低、底底低」或「底底高、頂頂高」
+        # 尋找最近半年（120日）的波段高低點
         df_recent = df.tail(120).copy()
-        peaks = []
-        troughs = []
+        peaks = []   # 波段高點列表 (日期, 價格)
+        troughs = [] # 波段低點列表 (日期, 價格)
         for i in range(2, len(df_recent)-2):
             if df_recent['High'].iloc[i] > df_recent['High'].iloc[i-1] and df_recent['High'].iloc[i] > df_recent['High'].iloc[i-2] and \
                df_recent['High'].iloc[i] > df_recent['High'].iloc[i+1] and df_recent['High'].iloc[i] > df_recent['High'].iloc[i+2]:
@@ -186,33 +186,49 @@ def analyze_index_trend(ticker, name):
                df_recent['Low'].iloc[i] < df_recent['Low'].iloc[i+1] and df_recent['Low'].iloc[i] < df_recent['Low'].iloc[i+2]:
                 troughs.append((df_recent.index[i], df_recent['Low'].iloc[i]))
 
-        # 🎯 核心修正：非黑即白趨勢判定邏輯（排除盤整，只有走勢與趨勢四種狀態）
-        # 預設為多頭走勢
+        # 計算型態出現次數
+        lower_peak_count = 0  # 頂頂低次數
+        lower_trough_count = 0 # 底底低次數
+        higher_peak_count = 0  # 頂頂高次數
+        higher_trough_count = 0 # 底底高次數
+
+        # 計算頂頂低 / 頂頂高 次數
+        if len(peaks) >= 2:
+            for j in range(1, len(peaks)):
+                if peaks[j][1] < peaks[j-1][1]: lower_peak_count += 1
+                elif peaks[j][1] > peaks[j-1][1]: higher_peak_count += 1
+
+        # 計算底底低 / 底底高 次數
+        if len(troughs) >= 2:
+            for j in range(1, len(troughs)):
+                if troughs[j][1] < troughs[j-1][1]: lower_trough_count += 1
+                elif troughs[j][1] > troughs[j-1][1]: higher_trough_count += 1
+
+        # 🎯 核心修正：非黑即白判定（走勢判定依賴相加次數 >= 2）
         trend_status = "多頭走勢" 
 
-        # A. 判斷是否為空頭象限
-        if months_since_high >= 1.0 and len(peaks) >= 2 and len(troughs) >= 2:
-            # 符合頂頂低、底底低特徵 -> 確定為空頭走勢
-            if peaks[-1][1] < peaks[-2][1] and troughs[-1][1] < troughs[-2][1]:
-                trend_status = "空頭走勢"
-                
-                # 進一步判斷是否升級為空頭趨勢：空頭維繫超過 4 個月，且跌破了這段期間的最低點
-                df_bear_period = df.loc[idx_3y_high:latest_date]
-                if months_since_high >= 4.0 and len(df_bear_period) > 5:
-                    bear_low = df_bear_period['Low'].iloc[:-1].min()
-                    if latest['Close'] < bear_low:
-                        trend_status = "空頭趨勢"
+        # A. 判斷是否轉為空頭象限
+        # 條件：未破3年新高已一個月以上，且 (頂頂低次數 + 底底低次數) >= 2
+        if months_since_high >= 1.0 and (lower_peak_count + lower_trough_count) >= 2:
+            trend_status = "空頭走勢"
+            
+            # 檢查是否升級為空頭趨勢：空頭走勢時間長達 4 個月以上，並且期間的最低點已被收盤價跌破
+            df_bear_period = df.loc[idx_3y_high:latest_date]
+            if months_since_high >= 4.0 and len(df_bear_period) > 5:
+                bear_low = df_bear_period['Low'].iloc[:-1].min()
+                if latest['Close'] < bear_low:
+                    trend_status = "空頭趨勢"
 
-        # B. 判斷是否為多頭趨勢升級（如果上面沒有被判定為空頭走勢，就在此檢查是否符合多頭趨勢）
+        # B. 判斷是否滿足多頭趨勢升級
+        # 條件：如果目前還是多頭走勢，未破3年新低達 4 個月以上，且突破了這段期間的最高點
         if trend_status == "多頭走勢" and months_since_low >= 4.0:
             df_bull_period = df.loc[idx_3y_low:latest_date]
             if len(df_bull_period) > 5:
                 bull_high = df_bull_period['High'].iloc[:-1].max()
-                # 如果多頭走勢超過 4 個月，且創下這段期間新高，升級為多頭趨勢
                 if latest['Close'] > bull_high:
                     trend_status = "多頭趨勢"
 
-        # 根據多空狀態加上不同裝飾符號
+        # 裝飾符號切換
         icon = "🔺" if "多頭趨勢" in trend_status else "🔼" if "多頭走勢" in trend_status else "🔻" if "空頭趨勢" in trend_status else "🔽"
         return f"{icon} {name}: 均線得分 {score_str} | 當前趨勢: {trend_status}"
     
@@ -244,7 +260,7 @@ def main():
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     os.system('git add docs/index.html')
-    os.system('git commit -m "📢 系統修正：更換類股網址，大盤趨勢鎖定為四選一邏輯"')
+    os.system('git commit -m "📢 邏輯優化：空頭走勢要求頂頂低與底底低相加至少 2 次"')
     os.system('git push')
 
     # =========================================================================
@@ -287,7 +303,6 @@ def main():
     # =========================================================================
     if weekday == 0:  
         print("檢測到今天為週一，發送最新免登入美股類股觀測鏈結...")
-        # 🎯 核心修正：使用 Finviz 的免登入產業類股板塊分析連結，包含各大板塊的走勢與柱狀圖
         sectors_url = "https://finviz.com/groups.ashx?g=sector&v=110"
         
         line_msg_sectors = f"📅 【每週一限定】美股 11 大類股週線趨勢輪動圖\n"
