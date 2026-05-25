@@ -139,40 +139,59 @@ def generate_html(data_dict, date_str):
 
 
 # =========================================================================
-# 🧠 【大盤多空量化分析系統 - 重構為：大趨勢中的小走勢核心】
+# 🧠 【大盤多空量化分析系統 - 修正：動態均線條數滿分機制】
 # =========================================================================
-def analyze_index_trend(ticker, name):
+def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
     try:
         df = yf.download(ticker, period="4y", progress=False)
         if df.empty or len(df) < 750: return f"⚪ {name}: 數據不足無法分析"
         
         df = df.copy()
         if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-        df['MA20'] = df['Close'].rolling(window=20).mean()
-        df['MA60'] = df['Close'].rolling(window=60).mean()
-        df['MA240'] = df['Close'].rolling(window=240).mean()
-        df = df.dropna(subset=['MA20', 'MA60', 'MA240'])
         
-        # --- 1. 均線得分計算 ---
+        # 根據傳入的 ma_list 動態計算均線
+        available_mas = []
+        for ma in ma_list:
+            col_name = f'MA{ma}'
+            df[col_name] = df['Close'].rolling(window=ma).mean()
+            available_mas.append(col_name)
+            
+        df = df.dropna(subset=available_mas)
+        
+        # --- 1. 均線得分計算 (動態上限) ---
         latest = df.iloc[-1]
         score = 0
-        for ma in ['MA20', 'MA60', 'MA240']:
-            if latest['Open'] > latest[ma] and latest['High'] > latest[ma] and latest['Low'] > latest[ma] and latest['Close'] > latest[ma]:
+        total_ma_count = len(available_mas) # 動態獲取目前比對了幾條均線
+        
+        for ma_col in available_mas:
+            ma_val = latest[ma_col]
+            upper_bound = ma_val * 1.005
+            lower_bound = ma_val * 0.995
+            
+            if latest['Open'] > upper_bound and latest['High'] > upper_bound and latest['Low'] > upper_bound and latest['Close'] > upper_bound:
                 score += 1
-            elif latest['Open'] < latest[ma] and latest['High'] < latest[ma] and latest['Low'] < latest[ma] and latest['Close'] < latest[ma]:
+            elif latest['Open'] < lower_bound and latest['High'] < lower_bound and latest['Low'] < lower_bound and latest['Close'] < lower_bound:
                 score -= 1
-        score_str = f"{score}/3"
+
+        # 🎯 核心更正：基於 total_ma_count 進行動態文字標籤轉換
+        if score == total_ma_count: 
+            score_label = "看多"
+        elif score > 0: 
+            score_label = "偏多"
+        elif score == 0: 
+            score_label = "多空不明"
+        elif score == -total_ma_count: 
+            score_label = "看空"
+        else: 
+            score_label = "偏空"
 
         # --- 2. 歷史極值與時間回溯 ---
         df_3y = df.tail(252 * 3)
         idx_3y_high = df_3y['High'].idxmax()
         val_3y_high = df_3y['High'].max()
-        idx_3y_low = df_3y['Low'].idxmin()
-        val_3y_low = df_3y['Low'].min()
         
         latest_date = df.index[-1]
         months_since_high = (latest_date - idx_3y_high).days / 30.0
-        months_since_low = (latest_date - idx_3y_low).days / 30.0
         
         # 尋找最近 120 天波段轉折點
         df_recent = df.tail(120).copy()
@@ -186,31 +205,18 @@ def analyze_index_trend(ticker, name):
                df_recent['Low'].iloc[i] < df_recent['Low'].iloc[i+1] and df_recent['Low'].iloc[i] < df_recent['Low'].iloc[i+2]:
                 troughs.append((df_recent.index[i], df_recent['Low'].iloc[i]))
 
-        # 計算頂底型態累加次數
-        lower_peak_count = 0   # 頂頂低
-        lower_trough_count = 0 # 底底低
-        higher_peak_count = 0  # 頂頂高
-        higher_trough_count = 0 # 底底高
+        lower_peak_count = 0
+        lower_trough_count = 0
 
         if len(peaks) >= 2:
             for j in range(1, len(peaks)):
                 if peaks[j][1] < peaks[j-1][1]: lower_peak_count += 1
-                elif peaks[j][1] > peaks[j-1][1]: higher_peak_count += 1
 
         if len(troughs) >= 2:
             for j in range(1, len(troughs)):
                 if troughs[j][1] < troughs[j-1][1]: lower_trough_count += 1
-                elif troughs[j][1] > troughs[j-1][1]: higher_trough_count += 1
 
-        # =========================================================================
-        # 🎯 【兩維度交叉判定核心】
-        # =========================================================================
-        
-        # 🔴 獨立維度一：大趨勢判定 (非黑即白：多頭趨勢 vs 空頭趨勢)
-        # 預設為多頭趨勢
         macro_trend = "多頭趨勢" 
-        
-        # 檢查是否觸發「空頭趨勢」：從高點算起超過 4 個月，且跌破這段期間的最低點
         if months_since_high >= 4.0:
             df_bear_period = df.loc[idx_3y_high:latest_date]
             if len(df_bear_period) > 5:
@@ -218,24 +224,18 @@ def analyze_index_trend(ticker, name):
                 if latest['Close'] < bear_low:
                     macro_trend = "空頭趨勢"
 
-        # 🟢 獨立維度二：波段走勢判定 (動態切換：多頭走勢 vs 空頭走勢)
-        # 預設維持多頭走勢
         micro_走勢 = "多頭走勢"
-        
-        # 空頭走勢成立條件：未破3年新高已1個月以上，且 (頂頂低 + 底底低) 累加至少 2 次
         if months_since_high >= 1.0 and (lower_peak_count + lower_trough_count) >= 2:
             micro_走勢 = "空頭走勢"
 
-        # 組合二維輸出字串
         final_status = f"{macro_trend}中的{micro_走勢}"
         
-        # 根據不同的交叉結果，給予直觀的燈號標示
         if macro_trend == "多頭趨勢" and micro_走勢 == "多頭走勢": icon = "🔺"
-        elif macro_trend == "多頭趨勢" and micro_走勢 == "空頭走勢": icon = "💡" # 多頭拉回
+        elif macro_trend == "多頭趨勢" and micro_走勢 == "空頭走勢": icon = "💡"
         elif macro_trend == "空頭趨勢" and micro_走勢 == "空頭走勢": icon = "🔻"
-        else: icon = "⚡" # 空頭反彈
+        else: icon = "⚡"
 
-        return f"{icon} {name}: 均線得分 {score_str} | 當前狀態: {final_status}"
+        return f"{icon} {name}: 均線狀態「{score_label}」({score}/{total_ma_count}MA) | 當前狀態: {final_status}"
     
     except Exception as e:
         return f"⚪ {name}: 分析發生異常 ({str(e)[:15]})"
@@ -256,7 +256,7 @@ def main():
     
     data_dict = {
         'tw': scan_market(get_tw_tickers(), min_volume=2000000), 
-        'us': scan_market(get_us_tickers(), min_volume=10000),
+        'us': scan_market(get_us_tickers(), min_volume=1000000),
         'g1': process_custom_groups(g1_config), 'g2': process_custom_groups(g2_config),
         'g3': process_custom_groups(g3_config), 'g4': process_custom_groups(g4_config), 'g5': process_custom_groups(g5_config)
     }
@@ -265,7 +265,7 @@ def main():
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     os.system('git add docs/index.html')
-    os.system('git commit -m "📢 結構大升級：改為大趨勢中的小走勢二維度交叉分析"')
+    os.system('git commit -m "⚙️ 修復：支持動態均線數目的滿分標籤判定"')
     os.system('git push')
 
     # =========================================================================
@@ -287,19 +287,23 @@ def main():
     # =========================================================================
     # ✉️ 【發送 訊息二：每日全球大盤多空量化報告】
     # =========================================================================
-    indices = {
-        "^TWII": "台灣加權指數", "^GSPC": "美國標普500", "^DJI": "美國道瓊工業", 
-        "^IXIC": "美國那斯達克", "^RUT": "美國羅素2000", "^SOX": "美國費城半導體", 
-        "^FCHI": "法國CAC40", "^FTSE": "英國富時100", "^GDAXI": "德國DAX指數", 
-        "^N225": "日本日經225", "^KS11": "韓國綜合指數"
-    }
-    
+    # 這裡你可以針對不同的指數，自由客製化傳入不同數量的均線列表
+    # 格式：analyze_index_trend(代碼, 名稱, ma_list=[均線天數])
     line_msg_index = f"🌍 {today_str} 全球大盤多空量化報告\n"
-    line_msg_index += f"📊 評分標準: 均線四價全過/頂底形態\n"
+    line_msg_index += f"📊 評分標準: 均線0.5%緩衝/自適應滿分機制\n"
     line_msg_index += f"------------------------\n"
-    for ticker, name in indices.items():
-        analysis_result = analyze_index_trend(ticker, name)
-        line_msg_index += f"{analysis_result}\n"
+    
+    line_msg_index += analyze_index_trend("^TWII", "台灣加權指數", ma_list=[20, 60, 240]) + "\n"
+    line_msg_index += analyze_index_trend("^GSPC", "美國標普500", ma_list=[20, 60, 240]) + "\n"
+    line_msg_index += analyze_index_trend("^DJI", "美國道瓊工業", ma_list=[20, 60]) + "\n" # 範例：只測2條
+    line_msg_index += analyze_index_trend("^IXIC", "美國那斯達克", ma_list=[20, 60, 240]) + "\n"
+    line_msg_index += analyze_index_trend("^RUT", "美國羅素2000", ma_list=[240]) + "\n"      # 範例：只測1條
+    line_msg_index += analyze_index_trend("^SOX", "美國費城半導體", ma_list=[20, 60, 240]) + "\n"
+    line_msg_index += analyze_index_trend("^FCHI", "法國CAC40", ma_list=[20, 60, 240]) + "\n"
+    line_msg_index += analyze_index_trend("^FTSE", "英國富時100", ma_list=[20, 60, 240]) + "\n"
+    line_msg_index += analyze_index_trend("^GDAXI", "德國DAX指數", ma_list=[20, 60, 240]) + "\n"
+    line_msg_index += analyze_index_trend("^N225", "日本日經225", ma_list=[20, 60, 240]) + "\n"
+    line_msg_index += analyze_index_trend("^KS11", "韓國綜合指數", ma_list=[20, 60, 240]) + "\n"
     
     send_line_message(line_msg_index, access_token, user_id)
 
