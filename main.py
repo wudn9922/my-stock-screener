@@ -141,7 +141,6 @@ def process_custom_groups(group_dict):
     return matched_list
 
 def generate_html(data_dict, date_str):
-    # 建立 JavaScript 中央數據倉庫
     js_store = "const chartDataStore = {\n"
     for key in ['tw', 'us', 'g1', 'g2', 'g3', 'g4', 'g5']:
         js_store += f"  '{key}': [\n"
@@ -174,7 +173,7 @@ def generate_html(data_dict, date_str):
     <body>
         <div class="header">
             <h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2>
-            <p style="margin: 5px 0 0 0; color:#aaa; font-size:13px;">全市場完整呈現 | 智慧滾動記憶體回收版 (已修復K線與均線移位)</p>
+            <p style="margin: 5px 0 0 0; color:#aaa; font-size:13px;">全市場完整呈現 | 終極時間軸修正版 (K線均線100%歸位)</p>
         </div>
         
         <div class="tabs">
@@ -230,14 +229,17 @@ def generate_html(data_dict, date_str):
                                 if (item && item.data && item.layout) {{
                                     container.innerHTML = ""; 
                                     
-                                    // 🧠 核心修復 1：使用 JSON 深拷貝，防止 Plotly 污染原始資料結構導致 K 線消失
+                                    // 🧠 核心修復 1：深拷貝確保數據純淨
                                     const chartData = JSON.parse(JSON.stringify(item.data));
                                     const chartLayout = JSON.parse(JSON.stringify(item.layout));
                                     
-                                    // 🎯 核心修復 2：強制重置 X 軸屬性，改為 category 模式，抹平假日斷層
+                                    // 🎯 核心修復 2：還原標準時間軸，並用 rangebreaks 完美挖除週末空隙
                                     chartLayout.xaxis = chartLayout.xaxis || {{}};
+                                    chartLayout.xaxis.type = 'date';
+                                    chartLayout.xaxis.rangebreaks = [
+                                        {{ bounds: ["sat", "mon"] }} 
+                                    ];
                                     chartLayout.xaxis.rangeslider = {{ visible: false }};
-                                    chartLayout.xaxis.type = 'category';
                                     
                                     Plotly.newPlot(container, chartData, chartLayout, {{responsive: true, displayModeBar: false}});
                                     container.dataset.rendered = "true";
@@ -252,7 +254,7 @@ def generate_html(data_dict, date_str):
                         }}
                     }});
                 }}, {{ 
-                    rootMargin: '400px 0px 400px 0px' 
+                    rootMargin: '600px 0px 600px 0px' // 擴大加載緩衝，提前畫好圖表避免閃爍
                 }});
 
                 document.querySelectorAll('.chart-card').forEach(card => observer.observe(card));
@@ -280,7 +282,7 @@ def main():
     g5_config = {"2609.TW": [5, 10], "0050.TW": [5, 20]}
     # =========================================================================
 
-    print("正在執行全市場完美修復掃描與自選股...")
+    print("正在執行全市場終極修正掃描...")
     
     raw_tw = scan_market(get_tw_tickers(), min_volume=0)
     raw_us = scan_market(get_us_tickers(), min_volume=0)
@@ -300,20 +302,20 @@ def main():
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     os.system('git add docs/index.html')
-    os.system('git commit -m "🔥 完美修復：深拷貝與類別軸校正，還原K線均線"')
+    os.system('git commit -m "🔥 終極修正：還原date軸，使用rangebreaks排除週末斷層"')
     os.system('git push')
 
     github_user = "wudn9922"
     github_repo = "my-stock-screener"
     web_url = f"https://{github_user}.github.io/{github_repo}/"
     
-    line_msg = f"\n🎯 {today_str} 全市場看盤網頁（畫面修復版）已更新！\n"
+    line_msg = f"\n🎯 {today_str} 全市場看盤網頁（終極修正版）已更新！\n"
     line_msg += f"🇹🇼 台股符合：{len(data_dict['tw'])} 檔\n"
     line_msg += f"🇺🇸 美股符合：{len(data_dict['us'])} 檔\n"
     line_msg += f"🔗 點擊網址查看完美清晰圖表：\n{web_url}"
     
     send_line_message(line_msg, access_token, user_id)
-    print("完美版網頁更新成功！")
+    print("終極修正網頁更新成功！")
 
 if __name__ == "__main__":
     main()
