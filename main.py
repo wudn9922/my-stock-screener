@@ -255,8 +255,8 @@ def main():
     g5_config = {"2609.TW": [5, 10], "0050.TW": [5, 20]}
     
     data_dict = {
-        'tw': scan_market(get_tw_tickers(), min_volume=0), 
-        'us': scan_market(get_us_tickers(), min_volume=0),
+        'tw': scan_market(get_tw_tickers(), min_volume=2000000), 
+        'us': scan_market(get_us_tickers(), min_volume=10000),
         'g1': process_custom_groups(g1_config), 'g2': process_custom_groups(g2_config),
         'g3': process_custom_groups(g3_config), 'g4': process_custom_groups(g4_config), 'g5': process_custom_groups(g5_config)
     }
