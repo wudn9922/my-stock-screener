@@ -36,12 +36,15 @@ def get_us_tickers():
 
 def draw_chart(df_chart, ticker, title_suffix, ma_list):
     fig = go.Figure()
+    
+    # 建立標準 K 線
     fig.add_trace(go.Candlestick(
         x=df_chart.index.strftime('%Y-%m-%d'), 
         open=df_chart['Open'], high=df_chart['High'], 
         low=df_chart['Low'], close=df_chart['Close'], name='K線'
     ))
     
+    # 建立標準均線
     colors = ['#FF9800', '#2196F3', '#4CAF50', '#E91E63', '#9C27B0', '#00BCD4']
     for idx, ma_window in enumerate(ma_list):
         ma_col = f'MA{ma_window}'
@@ -52,10 +55,13 @@ def draw_chart(df_chart, ticker, title_suffix, ma_list):
                 line=dict(color=color, width=2), name=ma_col
             ))
             
+    # Python 端只做最標準的排版設定，不調整 X 軸型態
     fig.update_layout(
         title=f"{ticker} {title_suffix}",
-        xaxis_rangeslider_visible=False, template='plotly_dark',
-        margin=dict(l=10, r=10, t=50, b=20), height=400
+        xaxis_rangeslider_visible=False, 
+        template='plotly_dark',
+        margin=dict(l=10, r=10, t=50, b=20), 
+        height=400
     )
     return fig.to_json()
 
@@ -164,16 +170,16 @@ def generate_html(data_dict, date_str):
             .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }}
             .market-section {{ display: none; max-width: 800px; margin: 0 auto; }}
             .market-section.active {{ display: block; }}
-            .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 5px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }}
-            .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; display: flex; align-items: center; justify-content: center; }}
-            .loading-placeholder {{ color: #555; font-size: 14px; letter-spacing: 1px; }}
+            .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 5px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 410px; }}
+            .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }}
+            .loading-placeholder {{ height: 400px; display: flex; align-items: center; justify-content: center; color: #555; font-size: 14px; }}
             .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 16px; }}
         </style>
     </head>
     <body>
         <div class="header">
             <h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2>
-            <p style="margin: 5px 0 0 0; color:#aaa; font-size:13px;">全市場完整呈現 | 終極時間軸修正版 (K線均線100%歸位)</p>
+            <p style="margin: 5px 0 0 0; color:#aaa; font-size:13px;">穩定版 | 修正圖表變形、K線均線回歸原始預設型態</p>
         </div>
         
         <div class="tabs">
@@ -194,9 +200,8 @@ def generate_html(data_dict, date_str):
             for idx, s in enumerate(data_dict[key]):
                 html_template += f"""
                 <div class="chart-card" data-market="{key}" data-index="{idx}">
-                    <div class="plotly-container">
-                        <div class="loading-placeholder">滾動至此自動加載圖表...</div>
-                    </div>
+                    <div class="plotly-container" style="display:none;"></div>
+                    <div class="loading-placeholder">正在準備圖表...</div>
                 </div>
                 """
         else:
@@ -222,39 +227,33 @@ def generate_html(data_dict, date_str):
                         const market = card.dataset.market;
                         const index = parseInt(card.dataset.index);
                         const container = card.querySelector('.plotly-container');
+                        const placeholder = card.querySelector('.loading-placeholder');
                         
                         if (entry.isIntersecting) {{
-                            if (!container.dataset.rendered) {{
+                            // 如果從未畫過圖，則進行「唯一一次」的初始化
+                            if (!container.dataset.initialized) {{
                                 const item = chartDataStore[market][index];
                                 if (item && item.data && item.layout) {{
-                                    container.innerHTML = ""; 
+                                    if (placeholder) placeholder.style.display = 'none';
+                                    container.style.display = 'block';
                                     
-                                    // 🧠 核心修復 1：深拷貝確保數據純淨
-                                    const chartData = JSON.parse(JSON.stringify(item.data));
-                                    const chartLayout = JSON.parse(JSON.stringify(item.layout));
-                                    
-                                    // 🎯 核心修復 2：還原標準時間軸，並用 rangebreaks 完美挖除週末空隙
-                                    chartLayout.xaxis = chartLayout.xaxis || {{}};
-                                    chartLayout.xaxis.type = 'date';
-                                    chartLayout.xaxis.rangebreaks = [
-                                        {{ bounds: ["sat", "mon"] }} 
-                                    ];
-                                    chartLayout.xaxis.rangeslider = {{ visible: false }};
-                                    
-                                    Plotly.newPlot(container, chartData, chartLayout, {{responsive: true, displayModeBar: false}});
-                                    container.dataset.rendered = "true";
+                                    // 100% 原始資料投射，完全不做任何 X 軸侵入式修改
+                                    Plotly.newPlot(container, item.data, item.layout, {{responsive: true, displayModeBar: false}});
+                                    container.dataset.initialized = "true";
                                 }}
+                            }} else {{
+                                // 已經畫過了，滑回來時直接取消隱藏，結構絕對不會跑位
+                                container.style.visibility = 'visible';
                             }}
                         }} else {{
-                            if (container.dataset.rendered === "true") {{
-                                Plotly.purge(container);
-                                container.innerHTML = '<div class="loading-placeholder">滾動至此自動加載圖表...</div>';
-                                container.removeAttribute('data-rendered');
+                            // 滑出螢幕外時，只做隱藏（不 Purge），維持圖表結構與記憶體平穩
+                            if (container.dataset.initialized === "true") {{
+                                container.style.visibility = 'hidden';
                             }}
                         }}
                     }});
                 }}, {{ 
-                    rootMargin: '600px 0px 600px 0px' // 擴大加載緩衝，提前畫好圖表避免閃爍
+                    rootMargin: '500px 0px 500px 0px' 
                 }});
 
                 document.querySelectorAll('.chart-card').forEach(card => observer.observe(card));
@@ -282,7 +281,7 @@ def main():
     g5_config = {"2609.TW": [5, 10], "0050.TW": [5, 20]}
     # =========================================================================
 
-    print("正在執行全市場終極修正掃描...")
+    print("正在執行穩定版不變形圖表掃描...")
     
     raw_tw = scan_market(get_tw_tickers(), min_volume=0)
     raw_us = scan_market(get_us_tickers(), min_volume=0)
@@ -302,20 +301,20 @@ def main():
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     os.system('git add docs/index.html')
-    os.system('git commit -m "🔥 終極修正：還原date軸，使用rangebreaks排除週末斷層"')
+    os.system('git commit -m "🔥 穩定版修正：改用 visibility 隱藏替代 Purge，杜絕圖表變形"')
     os.system('git push')
 
     github_user = "wudn9922"
     github_repo = "my-stock-screener"
     web_url = f"https://{github_user}.github.io/{github_repo}/"
     
-    line_msg = f"\n🎯 {today_str} 全市場看盤網頁（終極修正版）已更新！\n"
+    line_msg = f"\n🎯 {today_str} 全市場看盤網頁（最終穩定版）已更新！\n"
     line_msg += f"🇹🇼 台股符合：{len(data_dict['tw'])} 檔\n"
     line_msg += f"🇺🇸 美股符合：{len(data_dict['us'])} 檔\n"
-    line_msg += f"🔗 點擊網址查看完美清晰圖表：\n{web_url}"
+    line_msg += f"🔗 點擊網址查看：\n{web_url}"
     
     send_line_message(line_msg, access_token, user_id)
-    print("終極修正網頁更新成功！")
+    print("終極穩定版網頁更新成功！")
 
 if __name__ == "__main__":
     main()
