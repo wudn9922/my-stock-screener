@@ -16,7 +16,6 @@ def send_line_message(msg, access_token, user_id):
     res = requests.post(url, json=payload, headers=headers)
     return res.status_code
 
-# --- 以下保留你原本完全正常的網頁與個股掃描函數 ---
 def get_tw_tickers():
     try:
         url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
@@ -140,15 +139,13 @@ def generate_html(data_dict, date_str):
 
 
 # =========================================================================
-# 🧠 【全新開發：全球大盤多空量化分析系統】
+# 🧠 【大盤多空量化分析系統 - 修正為非黑即白判定邏輯】
 # =========================================================================
 def analyze_index_trend(ticker, name):
     try:
-        # 下載 3.5 年的日 K 線資料，確保涵蓋 3 年新高的計算與比對空間
         df = yf.download(ticker, period="4y", progress=False)
         if df.empty or len(df) < 750: return f"⚪ {name}: 數據不足無法分析"
         
-        # 移除非必要的多重索引並計算 3 條均線 (MA20, MA60, MA240)
         df = df.copy()
         if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
         df['MA20'] = df['Close'].rolling(window=20).mean()
@@ -160,15 +157,13 @@ def analyze_index_trend(ticker, name):
         latest = df.iloc[-1]
         score = 0
         for ma in ['MA20', 'MA60', 'MA240']:
-            # 若 O, H, L, C 全都在均線之上 +1 分；全在均線之下 -1 分
             if latest['Open'] > latest[ma] and latest['High'] > latest[ma] and latest['Low'] > latest[ma] and latest['Close'] > latest[ma]:
                 score += 1
             elif latest['Open'] < latest[ma] and latest['High'] < latest[ma] and latest['Low'] < latest[ma] and latest['Close'] < latest[ma]:
                 score -= 1
-        score_str = f"{score}/3" if score >= 0 else f"{score}/3"
+        score_str = f"{score}/3"
 
-        # --- 2. 精準多空波段型態分析 (回溯尋找頂底特徵) ---
-        # 尋找 3 年內的最高點與最低點
+        # --- 2. 歷史高低點與時間回溯 ---
         df_3y = df.tail(252 * 3)
         idx_3y_high = df_3y['High'].idxmax()
         val_3y_high = df_3y['High'].max()
@@ -176,12 +171,10 @@ def analyze_index_trend(ticker, name):
         val_3y_low = df_3y['Low'].min()
         
         latest_date = df.index[-1]
-        
-        # 判斷未創高或未創低的時間 (月數)
         months_since_high = (latest_date - idx_3y_high).days / 30.0
         months_since_low = (latest_date - idx_3y_low).days / 30.0
         
-        # 計算近半年的波段轉折點 (用於尋找頂頂低、底底高)
+        # 尋找最近半年（120日）的波段轉折點，用於抓取「頂頂低、底底低」或「底底高、頂頂高」
         df_recent = df.tail(120).copy()
         peaks = []
         troughs = []
@@ -193,52 +186,47 @@ def analyze_index_trend(ticker, name):
                df_recent['Low'].iloc[i] < df_recent['Low'].iloc[i+1] and df_recent['Low'].iloc[i] < df_recent['Low'].iloc[i+2]:
                 troughs.append((df_recent.index[i], df_recent['Low'].iloc[i]))
 
-        # 趨勢判定邏輯預設
-        trend_status = "盤整格局"
-        
-        # 🔴 空頭走勢與空頭趨勢判定
+        # 🎯 核心修正：非黑即白趨勢判定邏輯（排除盤整，只有走勢與趨勢四種狀態）
+        # 預設為多頭走勢
+        trend_status = "多頭走勢" 
+
+        # A. 判斷是否為空頭象限
         if months_since_high >= 1.0 and len(peaks) >= 2 and len(troughs) >= 2:
-            # 檢查頂頂低與底底低
+            # 符合頂頂低、底底低特徵 -> 確定為空頭走勢
             if peaks[-1][1] < peaks[-2][1] and troughs[-1][1] < troughs[-2][1]:
-                trend_status = "空頭走勢成立"
-                # 若空頭走勢維繫超過 4 個月，且跌破了這段期間的波段最低點，升級為空頭趨勢
+                trend_status = "空頭走勢"
+                
+                # 進一步判斷是否升級為空頭趨勢：空頭維繫超過 4 個月，且跌破了這段期間的最低點
                 df_bear_period = df.loc[idx_3y_high:latest_date]
                 if months_since_high >= 4.0 and len(df_bear_period) > 5:
-                    bear_low = df_bear_period['Low'].iloc[:-1].min() # 排除當天之前的最低點
+                    bear_low = df_bear_period['Low'].iloc[:-1].min()
                     if latest['Close'] < bear_low:
-                        trend_status = "⚡ 空頭趨勢"
+                        trend_status = "空頭趨勢"
 
-        # 🟢 多頭走勢與多頭趨勢判定
-        if months_since_low >= 1.0 and len(peaks) >= 2 and len(troughs) >= 2:
-            # 檢查底底高與頂頂高
-            if troughs[-1][1] > troughs[-2][1] and peaks[-1][1] > peaks[-2][1]:
-                trend_status = "多頭走勢成立"
-                # 若多頭走勢維繫超過 4 個月，且突破了這段期間的波段最高點，升級為多頭趨勢
-                df_bull_period = df.loc[idx_3y_low:latest_date]
-                if months_since_low >= 4.0 and len(df_bull_period) > 5:
-                    bull_high = df_bull_period['High'].iloc[:-1].max()
-                    if latest['Close'] > bull_high:
-                        trend_status = "🔥 多頭趨勢"
+        # B. 判斷是否為多頭趨勢升級（如果上面沒有被判定為空頭走勢，就在此檢查是否符合多頭趨勢）
+        if trend_status == "多頭走勢" and months_since_low >= 4.0:
+            df_bull_period = df.loc[idx_3y_low:latest_date]
+            if len(df_bull_period) > 5:
+                bull_high = df_bull_period['High'].iloc[:-1].max()
+                # 如果多頭走勢超過 4 個月，且創下這段期間新高，升級為多頭趨勢
+                if latest['Close'] > bull_high:
+                    trend_status = "多頭趨勢"
 
         # 根據多空狀態加上不同裝飾符號
-        icon = "🔺" if "多頭" in trend_status else "🔻" if "空頭" in trend_status else "🔹"
+        icon = "🔺" if "多頭趨勢" in trend_status else "🔼" if "多頭走勢" in trend_status else "🔻" if "空頭趨勢" in trend_status else "🔽"
         return f"{icon} {name}: 均線得分 {score_str} | 當前趨勢: {trend_status}"
     
     except Exception as e:
         return f"⚪ {name}: 分析發生異常 ({str(e)[:15]})"
 
 
-# =========================================================================
-# 🚀 【主要主控台與自動排程流程】
-# =========================================================================
 def main():
     access_token = os.environ.get("LINE_ACCESS_TOKEN")
     user_id = os.environ.get("LINE_USER_ID")
     if not access_token or not user_id: return
     today_str = datetime.now().strftime("%Y-%m-%d")
-    weekday = datetime.now().weekday() # 0 代表週一，依此類推
+    weekday = datetime.now().weekday() 
 
-    # 1. 執行原有的個股篩選與網頁建置
     g1_config = {"2330.TW": [10, 20], "NVDA": [10, 20], "AMD": [20]}
     g2_config = {"2317.TW": [20, 60], "AAPL": [20, 120], "MSFT": [20, 60, 120]}
     g3_config = {"2454.TW": [5, 10, 20], "TSLA": [10, 20]}
@@ -246,18 +234,17 @@ def main():
     g5_config = {"2609.TW": [5, 10], "0050.TW": [5, 20]}
     
     data_dict = {
-        'tw': scan_market(get_tw_tickers(), min_volume=2000000), 
-        'us': scan_market(get_us_tickers(), min_volume=1000000),
+        'tw': scan_market(get_tw_tickers(), min_volume=0), 
+        'us': scan_market(get_us_tickers(), min_volume=0),
         'g1': process_custom_groups(g1_config), 'g2': process_custom_groups(g2_config),
         'g3': process_custom_groups(g3_config), 'g4': process_custom_groups(g4_config), 'g5': process_custom_groups(g5_config)
     }
     generate_html(data_dict, today_str)
     
-    # Git 更新
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     os.system('git add docs/index.html')
-    os.system('git commit -m "📢 系統升級：全面導入全球大盤多空量化分析模組"')
+    os.system('git commit -m "📢 系統修正：更換類股網址，大盤趨勢鎖定為四選一邏輯"')
     os.system('git push')
 
     # =========================================================================
@@ -279,7 +266,6 @@ def main():
     # =========================================================================
     # ✉️ 【發送 訊息二：每日全球大盤多空量化報告】
     # =========================================================================
-    print("正在執行全球大盤多空量化矩陣分析...")
     indices = {
         "^TWII": "台灣加權指數", "^GSPC": "美國標普500", "^DJI": "美國道瓊工業", 
         "^IXIC": "美國那斯達克", "^RUT": "美國羅素2000", "^SOX": "美國費城半導體", 
@@ -299,10 +285,10 @@ def main():
     # =========================================================================
     # ✉️ 【發送 訊息三：每週一限定 - 美股類股週線圖網址】
     # =========================================================================
-    if weekday == 0:  # 0 表示星期一
-        print("檢測到今天為週一，額外加發美股類股週線報告...")
-        # 這裡可以直接填入您外部看盤軟體（如 TradingView 等）儲存好的美股類股一覽表網址
-        sectors_url = "https://hk.tradingview.com/markets/stocks-usa/sector-and-industry-market-cap/"
+    if weekday == 0:  
+        print("檢測到今天為週一，發送最新免登入美股類股觀測鏈結...")
+        # 🎯 核心修正：使用 Finviz 的免登入產業類股板塊分析連結，包含各大板塊的走勢與柱狀圖
+        sectors_url = "https://finviz.com/groups.ashx?g=sector&v=110"
         
         line_msg_sectors = f"📅 【每週一限定】美股 11 大類股週線趨勢輪動圖\n"
         line_msg_sectors += f"⏳ 包含 1-2 年週線級別核心波段追蹤\n"
