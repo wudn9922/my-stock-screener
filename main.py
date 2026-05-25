@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 import os
 from datetime import datetime
-import plotly.graph_objects as go
+import json
 
 HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -34,36 +34,52 @@ def get_us_tickers():
         print(f"獲取美股清單失敗: {e}")
     return ["AAPL", "MSFT", "NVDA"]
 
-def draw_chart(df_chart, ticker, title_suffix, ma_list):
-    fig = go.Figure()
+def build_stock_data(df_chart, ticker, title_suffix, ma_list):
+    # 🎯 核心修正：拋棄 Plotly Python 導出，直接手動建立純粹的 JSON 資料結構
+    # 確保 X 軸的每一點都是絕對純淨、無時區、無雜質的 'YYYY-MM-DD' 字串
+    date_strings = [str(d)[:10] for d in df_chart.index]
     
-    # 建立標準 K 線
-    fig.add_trace(go.Candlestick(
-        x=df_chart.index.strftime('%Y-%m-%d'), 
-        open=df_chart['Open'], high=df_chart['High'], 
-        low=df_chart['Low'], close=df_chart['Close'], name='K線'
-    ))
+    traces = []
     
-    # 建立標準均線
-    colors = ['#FF9800', '#2196F3', '#4CAF50', '#E91E63', '#9C27B0', '#00BCD4']
+    # 1. K線資料
+    traces.append({
+        "type": "candlestick",
+        "name": "K線",
+        "x": date_strings,
+        "open": df_chart['Open'].tolist(),
+        "high": df_chart['High'].tolist(),
+        "low": df_chart['Low'].tolist(),
+        "close": df_chart['Close'].tolist(),
+        "increasing": {"line": {"color": "#ef5350"}},
+        "decreasing": {"line": {"color": "#26a69a"}}
+    })
+    
+    # 2. 均線資料
+    colors = ['#FF9800', '#2196F3', '#4CAF50', '#E91E63']
     for idx, ma_window in enumerate(ma_list):
         ma_col = f'MA{ma_window}'
         if ma_col in df_chart.columns:
-            color = colors[idx % len(colors)]
-            fig.add_trace(go.Scatter(
-                x=df_chart.index.strftime('%Y-%m-%d'), y=df_chart[ma_col], 
-                line=dict(color=color, width=2), name=ma_col
-            ))
+            # 濾掉 NaN，並且確保 X 軸字串與 K 線完全一致，絕對不會錯位
+            ma_values = df_chart[ma_col].tolist()
+            traces.append({
+                "type": "scatter",
+                "mode": "lines",
+                "name": ma_col,
+                "x": date_strings,
+                "y": ma_values,
+                "line": {"color": colors[idx % len(colors)], "width": 2}
+            })
             
-    # Python 端只做最標準的排版設定，不調整 X 軸型態
-    fig.update_layout(
-        title=f"{ticker} {title_suffix}",
-        xaxis_rangeslider_visible=False, 
-        template='plotly_dark',
-        margin=dict(l=10, r=10, t=50, b=20), 
-        height=400
-    )
-    return fig.to_json()
+    layout = {
+        "title": f"{ticker} {title_suffix}",
+        "xaxis": {"type": "category", "rangeslider": {"visible": False}}, # 使用 category 完美消滅週末留白
+        "yaxis": {"title": "價格", "fixedrange": False},
+        "template": "plotly_dark",
+        "margin": {"l": 40, "r": 10, "t": 50, b: 30},
+        "height": 400
+    }
+    
+    return {"data": traces, "layout": layout}
 
 def scan_market(tickers, min_volume):
     matched_list = []
@@ -98,8 +114,8 @@ def scan_market(tickers, min_volume):
                         diff_pct = ((price / ma20) - 1) * 100
                         df_chart = df_clean.tail(60)
                         title_str = f"(現價: {round(price,2)} | 距MA20: {round(diff_pct,2)}%)"
-                        chart_json = draw_chart(df_chart, ticker, title_str, [20])
-                        matched_list.append({'ticker': ticker, 'volume': int(latest_vol), 'chart_json': chart_json})
+                        chart_data = build_stock_data(df_chart, ticker, title_str, [20])
+                        matched_list.append({'ticker': ticker, 'volume': int(latest_vol), 'chart_data': chart_data})
                 except Exception: continue
         except Exception as e: print(f"批次錯誤 {i}: {e}")
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
@@ -139,21 +155,16 @@ def process_custom_groups(group_dict):
             ma_info = " | ".join([f"MA{w}: {round(df_clean[f'MA{w}'].iloc[-1], 2)}" for w in ma_list if not pd.isna(df_clean[f'MA{w}'].iloc[-1])])
             title_str = f"(現價: {round(price,2)} | {ma_info})"
             
-            chart_json = draw_chart(df_chart, ticker, title_str, ma_list)
-            matched_list.append({'ticker': ticker, 'volume': 0, 'chart_json': chart_json})
+            chart_data = build_stock_data(df_chart, ticker, title_str, ma_list)
+            matched_list.append({'ticker': ticker, 'volume': 0, 'chart_data': chart_data})
         except Exception as e:
             print(f"處理自選股 {ticker} 失敗: {e}")
             continue
     return matched_list
 
 def generate_html(data_dict, date_str):
-    js_store = "const chartDataStore = {\n"
-    for key in ['tw', 'us', 'g1', 'g2', 'g3', 'g4', 'g5']:
-        js_store += f"  '{key}': [\n"
-        for s in data_dict[key]:
-            js_store += f"    {s['chart_json']},\n"
-        js_store += "  ],\n"
-    js_store += "};\n"
+    # 🎯 將所有純淨資料序列化為標準 JSON 物件
+    js_store = "const chartDataStore = " + json.dumps(data_dict, ensure_ascii=False) + ";\n"
 
     html_template = f"""
     <!DOCTYPE html>
@@ -170,16 +181,15 @@ def generate_html(data_dict, date_str):
             .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }}
             .market-section {{ display: none; max-width: 800px; margin: 0 auto; }}
             .market-section.active {{ display: block; }}
-            .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 5px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 410px; }}
+            .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }}
             .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }}
-            .loading-placeholder {{ height: 400px; display: flex; align-items: center; justify-content: center; color: #555; font-size: 14px; }}
             .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 16px; }}
         </style>
     </head>
     <body>
         <div class="header">
             <h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2>
-            <p style="margin: 5px 0 0 0; color:#aaa; font-size:13px;">穩定版 | 修正圖表變形、K線均線回歸原始預設型態</p>
+            <p style="margin: 5px 0 0 0; color:#ffdd00; font-size:13px;">⚠️ 數據強制同步版 (澈底修復對角線與K線消失問題)</p>
         </div>
         
         <div class="tabs">
@@ -197,11 +207,10 @@ def generate_html(data_dict, date_str):
         active_class = " active" if key == 'tw' else ""
         html_template += f'<div id="{key}-market" class="market-section{active_class}">'
         if data_dict[key]:
-            for idx, s in enumerate(data_dict[key]):
+            for idx in range(len(data_dict[key])):
                 html_template += f"""
-                <div class="chart-card" data-market="{key}" data-index="{idx}">
-                    <div class="plotly-container" style="display:none;"></div>
-                    <div class="loading-placeholder">正在準備圖表...</div>
+                <div class="chart-card">
+                    <div id="chart-{key}-{idx}" class="plotly-container"></div>
                 </div>
                 """
         else:
@@ -212,51 +221,36 @@ def generate_html(data_dict, date_str):
         <script>
             {js_store}
 
+            // 拋棄複雜的延遲載入，直接在分頁切換時，一次性把該分頁的所有圖表畫出來，最簡單也最保險！
+            function renderMarketCharts(marketId) {{
+                const items = chartDataStore[marketId];
+                if (!items) return;
+                
+                items.forEach((item, idx) => {{
+                    const elementId = "chart-" + marketId + "-" + idx;
+                    const container = document.getElementById(elementId);
+                    if (container && !container.dataset.done) {{
+                        Plotly.newPlot(container, item.chart_data.data, item.chart_data.layout, {{responsive: true, displayModeBar: false}});
+                        container.dataset.done = "true";
+                    }}
+                }});
+            }}
+
             function switchMarket(event, marketId) {{
                 document.querySelectorAll('.market-section').forEach(el => el.classList.remove('active'));
                 document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+                
                 document.getElementById(marketId + '-market').classList.add('active');
                 event.currentTarget.classList.add('active');
+                
+                // 切換時立即繪製該分頁圖表
+                renderMarketCharts(marketId);
                 window.dispatchEvent(new Event('resize'));
             }}
 
+            // 網頁一打開，預設載入台股分頁
             document.addEventListener("DOMContentLoaded", function() {{
-                const observer = new IntersectionObserver((entries) => {{
-                    entries.forEach(entry => {{
-                        const card = entry.target;
-                        const market = card.dataset.market;
-                        const index = parseInt(card.dataset.index);
-                        const container = card.querySelector('.plotly-container');
-                        const placeholder = card.querySelector('.loading-placeholder');
-                        
-                        if (entry.isIntersecting) {{
-                            // 如果從未畫過圖，則進行「唯一一次」的初始化
-                            if (!container.dataset.initialized) {{
-                                const item = chartDataStore[market][index];
-                                if (item && item.data && item.layout) {{
-                                    if (placeholder) placeholder.style.display = 'none';
-                                    container.style.display = 'block';
-                                    
-                                    // 100% 原始資料投射，完全不做任何 X 軸侵入式修改
-                                    Plotly.newPlot(container, item.data, item.layout, {{responsive: true, displayModeBar: false}});
-                                    container.dataset.initialized = "true";
-                                }}
-                            }} else {{
-                                // 已經畫過了，滑回來時直接取消隱藏，結構絕對不會跑位
-                                container.style.visibility = 'visible';
-                            }}
-                        }} else {{
-                            // 滑出螢幕外時，只做隱藏（不 Purge），維持圖表結構與記憶體平穩
-                            if (container.dataset.initialized === "true") {{
-                                container.style.visibility = 'hidden';
-                            }}
-                        }}
-                    }});
-                }}, {{ 
-                    rootMargin: '500px 0px 500px 0px' 
-                }});
-
-                document.querySelectorAll('.chart-card').forEach(card => observer.observe(card));
+                renderMarketCharts('tw');
             }});
         </script>
     </body>
@@ -281,14 +275,11 @@ def main():
     g5_config = {"2609.TW": [5, 10], "0050.TW": [5, 20]}
     # =========================================================================
 
-    print("正在執行穩定版不變形圖表掃描...")
-    
-    raw_tw = scan_market(get_tw_tickers(), min_volume=0)
-    raw_us = scan_market(get_us_tickers(), min_volume=0)
+    print("正在執行徹底修復版掃描...")
     
     data_dict = {
-        'tw': raw_tw, 
-        'us': raw_us,
+        'tw': scan_market(get_tw_tickers(), min_volume=0), 
+        'us': scan_market(get_us_tickers(), min_volume=0),
         'g1': process_custom_groups(g1_config),
         'g2': process_custom_groups(g2_config),
         'g3': process_custom_groups(g3_config),
@@ -301,20 +292,18 @@ def main():
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     os.system('git add docs/index.html')
-    os.system('git commit -m "🔥 穩定版修正：改用 visibility 隱藏替代 Purge，杜絕圖表變形"')
+    os.system('git commit -m "🔥 澈底修正：重構純JSON傳輸，強行綁定X軸，移除延遲加載"')
     os.system('git push')
 
     github_user = "wudn9922"
     github_repo = "my-stock-screener"
     web_url = f"https://{github_user}.github.io/{github_repo}/"
     
-    line_msg = f"\n🎯 {today_str} 全市場看盤網頁（最終穩定版）已更新！\n"
-    line_msg += f"🇹🇼 台股符合：{len(data_dict['tw'])} 檔\n"
-    line_msg += f"🇺🇸 美股符合：{len(data_dict['us'])} 檔\n"
-    line_msg += f"🔗 點擊網址查看：\n{web_url}"
+    line_msg = f"\n🎯 {today_str} 全市場看盤網頁已更新！\n"
+    line_msg += f"🔗 點擊網址查看完美圖表：\n{web_url}"
     
     send_line_message(line_msg, access_token, user_id)
-    print("終極穩定版網頁更新成功！")
+    print("網頁更新成功！")
 
 if __name__ == "__main__":
     main()
