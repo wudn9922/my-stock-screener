@@ -280,7 +280,7 @@ def main():
     g5_config = {"2609.TW": [5, 10], "0050.TW": [5, 20]}
     # =========================================================================
 
-    print("正在執行終極穩定版掃描...")
+    print("正在執行全市場掃描並統計自選股數據...")
     
     data_dict = {
         'tw': scan_market(get_tw_tickers(), min_volume=0), 
@@ -292,23 +292,34 @@ def main():
         'g5': process_custom_groups(g5_config)
     }
 
+    # 產生網頁
     generate_html(data_dict, today_str)
     
+    # Git 推送
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     os.system('git add docs/index.html')
-    os.system('git commit -m "🔥 語法修復：更正 margin 的 Python 字典語法，還原標準 date 軸"')
+    os.system('git commit -m "📢 訊息優化：更新 LINE 訊息為分類樹狀統計格式"')
     os.system('git push')
 
-    github_user = "wudn9922"
-    github_repo = "my-stock-screener"
-    web_url = f"https://{github_user}.github.io/{github_repo}/"
+    # 🔗 固定網址
+    web_url = "https://wudn9922.github.io/my-stock-screener/"
     
-    line_msg = f"\n🎯 {today_str} 全市場看盤網頁已更新！\n"
-    line_msg += f"🔗 點擊網址查看圖表：\n{web_url}"
+    # 🎯 建立你專屬的精美 LINE 通報訊息
+    line_msg = f"🎯 {today_str} 全市場看盤網頁！\n"
+    line_msg += f"🇹🇼 台股符合：{len(data_dict['tw'])} 檔\n"
+    line_msg += f"🇺🇸 美股符合：{len(data_dict['us'])} 檔\n"
+    line_msg += f"🔥 自選股狀態：\n"
+    line_msg += f" ├ 🚀 超級績效股：{len(data_dict['g1'])} 檔\n"
+    line_msg += f" ├ 💎 績優股：{len(data_dict['g2'])} 檔\n"
+    line_msg += f" ├ 🎯 重點關注：{len(data_dict['g3'])} 檔\n"
+    line_msg += f" ├ 👀 近期關注股：{len(data_dict['g4'])} 檔\n"
+    line_msg += f" └ 🎲 投機股：{len(data_dict['g5'])} 檔\n"
+    line_msg += f"🔗 點擊網址：\n{web_url}"
     
+    # 發送訊息
     send_line_message(line_msg, access_token, user_id)
-    print("網頁更新成功！")
+    print("LINE 定製訊息發送成功！")
 
 if __name__ == "__main__":
     main()
