@@ -139,7 +139,7 @@ def generate_html(data_dict, date_str):
 
 
 # =========================================================================
-# 🧠 【大盤多空量化分析系統 - 修正型態加總至少 2 次邏輯】
+# 🧠 【大盤多空量化分析系統 - 重構為：大趨勢中的小走勢核心】
 # =========================================================================
 def analyze_index_trend(ticker, name):
     try:
@@ -163,7 +163,7 @@ def analyze_index_trend(ticker, name):
                 score -= 1
         score_str = f"{score}/3"
 
-        # --- 2. 歷史高低點與時間回溯 ---
+        # --- 2. 歷史極值與時間回溯 ---
         df_3y = df.tail(252 * 3)
         idx_3y_high = df_3y['High'].idxmax()
         val_3y_high = df_3y['High'].max()
@@ -174,10 +174,10 @@ def analyze_index_trend(ticker, name):
         months_since_high = (latest_date - idx_3y_high).days / 30.0
         months_since_low = (latest_date - idx_3y_low).days / 30.0
         
-        # 尋找最近半年（120日）的波段高低點
+        # 尋找最近 120 天波段轉折點
         df_recent = df.tail(120).copy()
-        peaks = []   # 波段高點列表 (日期, 價格)
-        troughs = [] # 波段低點列表 (日期, 價格)
+        peaks = []
+        troughs = []
         for i in range(2, len(df_recent)-2):
             if df_recent['High'].iloc[i] > df_recent['High'].iloc[i-1] and df_recent['High'].iloc[i] > df_recent['High'].iloc[i-2] and \
                df_recent['High'].iloc[i] > df_recent['High'].iloc[i+1] and df_recent['High'].iloc[i] > df_recent['High'].iloc[i+2]:
@@ -186,51 +186,56 @@ def analyze_index_trend(ticker, name):
                df_recent['Low'].iloc[i] < df_recent['Low'].iloc[i+1] and df_recent['Low'].iloc[i] < df_recent['Low'].iloc[i+2]:
                 troughs.append((df_recent.index[i], df_recent['Low'].iloc[i]))
 
-        # 計算型態出現次數
-        lower_peak_count = 0  # 頂頂低次數
-        lower_trough_count = 0 # 底底低次數
-        higher_peak_count = 0  # 頂頂高次數
-        higher_trough_count = 0 # 底底高次數
+        # 計算頂底型態累加次數
+        lower_peak_count = 0   # 頂頂低
+        lower_trough_count = 0 # 底底低
+        higher_peak_count = 0  # 頂頂高
+        higher_trough_count = 0 # 底底高
 
-        # 計算頂頂低 / 頂頂高 次數
         if len(peaks) >= 2:
             for j in range(1, len(peaks)):
                 if peaks[j][1] < peaks[j-1][1]: lower_peak_count += 1
                 elif peaks[j][1] > peaks[j-1][1]: higher_peak_count += 1
 
-        # 計算底底低 / 底底高 次數
         if len(troughs) >= 2:
             for j in range(1, len(troughs)):
                 if troughs[j][1] < troughs[j-1][1]: lower_trough_count += 1
                 elif troughs[j][1] > troughs[j-1][1]: higher_trough_count += 1
 
-        # 🎯 核心修正：非黑即白判定（走勢判定依賴相加次數 >= 2）
-        trend_status = "多頭走勢" 
-
-        # A. 判斷是否轉為空頭象限
-        # 條件：未破3年新高已一個月以上，且 (頂頂低次數 + 底底低次數) >= 2
-        if months_since_high >= 1.0 and (lower_peak_count + lower_trough_count) >= 2:
-            trend_status = "空頭走勢"
-            
-            # 檢查是否升級為空頭趨勢：空頭走勢時間長達 4 個月以上，並且期間的最低點已被收盤價跌破
+        # =========================================================================
+        # 🎯 【兩維度交叉判定核心】
+        # =========================================================================
+        
+        # 🔴 獨立維度一：大趨勢判定 (非黑即白：多頭趨勢 vs 空頭趨勢)
+        # 預設為多頭趨勢
+        macro_trend = "多頭趨勢" 
+        
+        # 檢查是否觸發「空頭趨勢」：從高點算起超過 4 個月，且跌破這段期間的最低點
+        if months_since_high >= 4.0:
             df_bear_period = df.loc[idx_3y_high:latest_date]
-            if months_since_high >= 4.0 and len(df_bear_period) > 5:
+            if len(df_bear_period) > 5:
                 bear_low = df_bear_period['Low'].iloc[:-1].min()
                 if latest['Close'] < bear_low:
-                    trend_status = "空頭趨勢"
+                    macro_trend = "空頭趨勢"
 
-        # B. 判斷是否滿足多頭趨勢升級
-        # 條件：如果目前還是多頭走勢，未破3年新低達 4 個月以上，且突破了這段期間的最高點
-        if trend_status == "多頭走勢" and months_since_low >= 4.0:
-            df_bull_period = df.loc[idx_3y_low:latest_date]
-            if len(df_bull_period) > 5:
-                bull_high = df_bull_period['High'].iloc[:-1].max()
-                if latest['Close'] > bull_high:
-                    trend_status = "多頭趨勢"
+        # 🟢 獨立維度二：波段走勢判定 (動態切換：多頭走勢 vs 空頭走勢)
+        # 預設維持多頭走勢
+        micro_走勢 = "多頭走勢"
+        
+        # 空頭走勢成立條件：未破3年新高已1個月以上，且 (頂頂低 + 底底低) 累加至少 2 次
+        if months_since_high >= 1.0 and (lower_peak_count + lower_trough_count) >= 2:
+            micro_走勢 = "空頭走勢"
 
-        # 裝飾符號切換
-        icon = "🔺" if "多頭趨勢" in trend_status else "🔼" if "多頭走勢" in trend_status else "🔻" if "空頭趨勢" in trend_status else "🔽"
-        return f"{icon} {name}: 均線得分 {score_str} | 當前趨勢: {trend_status}"
+        # 組合二維輸出字串
+        final_status = f"{macro_trend}中的{micro_走勢}"
+        
+        # 根據不同的交叉結果，給予直觀的燈號標示
+        if macro_trend == "多頭趨勢" and micro_走勢 == "多頭走勢": icon = "🔺"
+        elif macro_trend == "多頭趨勢" and micro_走勢 == "空頭走勢": icon = "💡" # 多頭拉回
+        elif macro_trend == "空頭趨勢" and micro_走勢 == "空頭走勢": icon = "🔻"
+        else: icon = "⚡" # 空頭反彈
+
+        return f"{icon} {name}: 均線得分 {score_str} | 當前狀態: {final_status}"
     
     except Exception as e:
         return f"⚪ {name}: 分析發生異常 ({str(e)[:15]})"
@@ -260,7 +265,7 @@ def main():
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     os.system('git add docs/index.html')
-    os.system('git commit -m "📢 邏輯優化：空頭走勢要求頂頂低與底底低相加至少 2 次"')
+    os.system('git commit -m "📢 結構大升級：改為大趨勢中的小走勢二維度交叉分析"')
     os.system('git push')
 
     # =========================================================================
