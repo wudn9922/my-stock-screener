@@ -34,7 +34,7 @@ def get_us_tickers():
         print(f"獲取美股清單失敗: {e}")
     return ["AAPL", "MSFT", "NVDA"]
 
-def draw_chart(df_chart, ticker, title_suffix, ma_list):
+def draw_chart(df_chart, ma_list):
     fig = go.Figure()
     fig.add_trace(go.Candlestick(
         x=df_chart.index.strftime('%Y-%m-%d'), 
@@ -53,11 +53,11 @@ def draw_chart(df_chart, ticker, title_suffix, ma_list):
             ))
             
     fig.update_layout(
-        title=f"{ticker} {title_suffix}",
         xaxis_rangeslider_visible=False, template='plotly_dark',
-        margin=dict(l=10, r=10, t=40, b=10), height=400
+        margin=dict(l=10, r=10, t=10, b=10), height=350
     )
-    return fig.to_html(full_html=False, include_plotlyjs='cdn')
+    # 💡 轉化成輕量 JSON 字串儲存，不直接生成 HTML 腳本
+    return fig.to_json()
 
 def scan_market(tickers, min_volume):
     matched_list = []
@@ -91,9 +91,9 @@ def scan_market(tickers, min_volume):
                     if ma20 * 0.97 <= price < ma20:
                         diff_pct = ((price / ma20) - 1) * 100
                         df_chart = df_clean.tail(60)
-                        title_str = f"(現價: {round(price,2)} | 距MA20: {round(diff_pct,2)}%)"
-                        chart_html = draw_chart(df_chart, ticker, title_str, [20])
-                        matched_list.append({'ticker': ticker, 'volume': int(latest_vol), 'chart_html': chart_html})
+                        title_str = f"{ticker} (現價: {round(price,2)} | 距MA20: {round(diff_pct,2)}%)"
+                        chart_json = draw_chart(df_chart, [20])
+                        matched_list.append({'ticker': ticker, 'volume': int(latest_vol), 'title': title_str, 'chart_json': chart_json})
                 except Exception: continue
         except Exception as e: print(f"批次錯誤 {i}: {e}")
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
@@ -112,13 +112,11 @@ def process_custom_groups(group_dict):
         
     for ticker in tickers:
         try:
-            # 修正處：完美閉合 isinstance 的括號
             if isinstance(data.columns, pd.MultiIndex):
                 if ticker in data.columns.get_level_values(1): df_t = data.xs(ticker, axis=1, level=1)
                 elif ticker in data.columns.get_level_values(0): df_t = data.xs(ticker, axis=1, level=0)
                 else: continue
-            else: 
-                df_t = data.copy()
+            else: df_t = data.copy()
             
             required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
             if not all(col in df_t.columns for col in required_cols): continue
@@ -133,22 +131,33 @@ def process_custom_groups(group_dict):
             df_chart = df_clean.tail(60)
             
             ma_info = " | ".join([f"MA{w}: {round(df_clean[f'MA{w}'].iloc[-1], 2)}" for w in ma_list if not pd.isna(df_clean[f'MA{w}'].iloc[-1])])
-            title_str = f"(現價: {round(price,2)} | {ma_info})"
+            title_str = f"{ticker} (現價: {round(price,2)} | {ma_info})"
             
-            chart_html = draw_chart(df_chart, ticker, title_str, ma_list)
-            matched_list.append({'ticker': ticker, 'volume': 0, 'chart_html': chart_html})
+            chart_json = draw_chart(df_chart, ma_list)
+            matched_list.append({'ticker': ticker, 'volume': 0, 'title': title_str, 'chart_json': chart_json})
         except Exception as e:
             print(f"處理自選股 {ticker} 失敗: {e}")
             continue
     return matched_list
 
 def generate_html(data_dict, date_str):
+    # 建立 JavaScript 數據中央倉庫，把所有 JSON 集中
+    js_store = "const chartDataStore = {\n"
+    for key in ['tw', 'us', 'g1', 'g2', 'g3', 'g4', 'g5']:
+        js_store += f"  '{key}': [\n"
+        for s in data_dict[key]:
+            safe_title = s['title'].replace("'", "\\'")
+            js_store += f"    {{ title: '{safe_title}', chart: {s['chart_json']} }},\n"
+        js_store += "  ],\n"
+    js_store += "};\n"
+
     html_template = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <title>台美股均線潛伏報告</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
         <style>
             body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }}
             .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }}
@@ -157,45 +166,94 @@ def generate_html(data_dict, date_str):
             .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }}
             .market-section {{ display: none; max-width: 800px; margin: 0 auto; }}
             .market-section.active {{ display: block; }}
-            .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }}
+            .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }}
+            .chart-title {{ font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #00b0ff; }}
+            .plotly-container {{ height: 350px; background: #151515; border-radius: 6px; display: flex; align-items: center; justify-content: center; }}
+            .loading-placeholder {{ color: #555; font-size: 14px; letter-spacing: 1px; }}
             .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 16px; }}
         </style>
     </head>
     <body>
         <div class="header">
             <h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2>
-            <p style="margin: 5px 0 0 0; color:#aaa; font-size:13px;">全市場條件：最新收盤價在 20MA 之下 (0% ~ -3%) | 自選股採獨立客製化均線</p>
+            <p style="margin: 5px 0 0 0; color:#aaa; font-size:13px;">全市場解鎖：完整呈現所有符合標的 | 引入智慧型滾動內存釋放技術</p>
         </div>
         
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchMarket('tw')">🇹🇼 台股 ({len(data_dict['tw'])})</button>
-            <button class="tab-btn" onclick="switchMarket('us')">🇺🇸 美股 ({len(data_dict['us'])})</button>
-            <button class="tab-btn" onclick="switchMarket('g1')">🚀 超級績效股 ({len(data_dict['g1'])})</button>
-            <button class="tab-btn" onclick="switchMarket('g2')">💎 績優股 ({len(data_dict['g2'])})</button>
-            <button class="tab-btn" onclick="switchMarket('g3')">🎯 重點關注股 ({len(data_dict['g3'])})</button>
-            <button class="tab-btn" onclick="switchMarket('g4')">👀 近期關注股 ({len(data_dict['g4'])})</button>
-            <button class="tab-btn" onclick="switchMarket('g5')">🎲 投機股 ({len(data_dict['g5'])})</button>
+            <button class="tab-btn active" onclick="switchMarket(event, 'tw')">🇹🇼 台股 ({len(data_dict['tw'])})</button>
+            <button class="tab-btn" onclick="switchMarket(event, 'us')">🇺🇸 美股 ({len(data_dict['us'])})</button>
+            <button class="tab-btn" onclick="switchMarket(event, 'g1')">🚀 超級績效股 ({len(data_dict['g1'])})</button>
+            <button class="tab-btn" onclick="switchMarket(event, 'g2')">💎 績優股 ({len(data_dict['g2'])})</button>
+            <button class="tab-btn" onclick="switchMarket(event, 'g3')">🎯 重點關注股 ({len(data_dict['g3'])})</button>
+            <button class="tab-btn" onclick="switchMarket(event, 'g4')">👀 近期關注股 ({len(data_dict['g4'])})</button>
+            <button class="tab-btn" onclick="switchMarket(event, 'g5')">🎲 投機股 ({len(data_dict['g5'])})</button>
         </div>
     """
     
+    # 產生輕量化 DOM 節點佔位符
     for key in ['tw', 'us', 'g1', 'g2', 'g3', 'g4', 'g5']:
         active_class = " active" if key == 'tw' else ""
         html_template += f'<div id="{key}-market" class="market-section{active_class}">'
         if data_dict[key]:
-            for s in data_dict[key]: html_template += f'<div class="chart-card">{s["chart_html"]}</div>'
+            for idx, s in enumerate(data_dict[key]):
+                html_template += f"""
+                <div class="chart-card" data-market="{key}" data-index="{idx}">
+                    <div class="chart-title">{s['title']}</div>
+                    <div class="plotly-container">
+                        <div class="loading-placeholder">滾動至此自動加載圖表...</div>
+                    </div>
+                </div>
+                """
         else:
             html_template += f'<div class="no-data">此分類目前無股票資料</div>'
         html_template += '</div>'
     
-    html_template += """
+    # 寫入智慧型交叉觀測器（Intersection Observer）腳本
+    html_template += f"""
         <script>
-            function switchMarket(marketId) {
+            {js_store}
+
+            function switchMarket(event, marketId) {{
                 document.querySelectorAll('.market-section').forEach(el => el.classList.remove('active'));
                 document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
                 document.getElementById(marketId + '-market').classList.add('active');
-                event.target.classList.add('active');
+                event.currentTarget.classList.add('active');
                 window.dispatchEvent(new Event('resize'));
-            }
+            }}
+
+            document.addEventListener("DOMContentLoaded", function() {{
+                const observer = new IntersectionObserver((entries) => {{
+                    entries.forEach(entry => {{
+                        const card = entry.target;
+                        const market = card.dataset.market;
+                        const index = parseInt(card.dataset.index);
+                        const container = card.querySelector('.plotly-container');
+                        
+                        if (entry.isIntersecting) {{
+                            // 🚀 進入畫面：若尚未畫圖，立刻渲染並標記
+                            if (!container.dataset.rendered) {{
+                                const item = chartDataStore[market][index];
+                                if (item && item.chart) {{
+                                    container.innerHTML = ""; 
+                                    Plotly.newPlot(container, item.chart.data, item.chart.layout, {{responsive: true, displayModeBar: false}});
+                                    container.dataset.rendered = "true";
+                                }}
+                            }}
+                        }} else {{
+                            // ♻️ 移出畫面：立刻銷毀圖表，釋放 RAM 記憶體！
+                            if (container.dataset.rendered === "true") {{
+                                Plotly.purge(container);
+                                container.innerHTML = '<div class="loading-placeholder">滾動至此自動加載圖表...</div>';
+                                container.removeAttribute('data-rendered');
+                            }}
+                        }}
+                    }});
+                }}, {{ 
+                    rootMargin: '400px 0px 400px 0px' // 提早 400 像素加載，讓使用者滑動無感
+                }});
+
+                document.querySelectorAll('.chart-card').forEach(card => observer.observe(card));
+            }});
         </script>
     </body>
     </html>
@@ -210,43 +268,24 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
 
     # =========================================================================
-    # 📝 【自選股設定區：請在這裡修改你的自選股票與各自的均線天數】
+    # 📝 【自選股與專屬均線設定區】
     # =========================================================================
-    # 🚀 1. 超級績效股
-    g1_config = {
-        "2330.TW": [10, 20], 
-        "NVDA": [10, 20],
-        "AMD": [20]
-    }
-    # 💎 2. 績優股
-    g2_config = {
-        "2317.TW": [20, 60],
-        "AAPL": [20, 120],
-        "MSFT": [20, 60, 120]
-    }
-    # 🎯 3. 重點關注股
-    g3_config = {
-        "2454.TW": [5, 10, 20],
-        "TSLA": [10, 20]
-    }
-    # 👀 4. 近期關注股
-    g4_config = {
-        "2603.TW": [20, 60],
-        "AMZN": [20]
-    }
-    # 🎲 5. 投機股
-    g5_config = {
-        "2609.TW": [5, 10],
-        "0050.TW": [5, 20]
-    }
+    g1_config = {"2330.TW": [10, 20], "NVDA": [10, 20], "AMD": [20]}
+    g2_config = {"2317.TW": [20, 60], "AAPL": [20, 120], "MSFT": [20, 60, 120]}
+    g3_config = {"2454.TW": [5, 10, 20], "TSLA": [10, 20]}
+    g4_config = {"2603.TW": [20, 60], "AMZN": [20]}
+    g5_config = {"2609.TW": [5, 10], "0050.TW": [5, 20]}
     # =========================================================================
 
-    print("正在全面掃描全市場與全新客製化自選股...")
+    print("正在執行全市場解鎖掃描與自選股...")
+    
+    # 🔓 拿掉 [:30] 限制，全面保留
+    raw_tw = scan_market(get_tw_tickers(), min_volume=0)
+    raw_us = scan_market(get_us_tickers(), min_volume=0)
     
     data_dict = {
-        'tw': scan_market(get_tw_tickers(), min_volume=20000000),
-        'us': scan_market(get_us_tickers(), min_volume=1000000),
-        
+        'tw': raw_tw, 
+        'us': raw_us,
         'g1': process_custom_groups(g1_config),
         'g2': process_custom_groups(g2_config),
         'g3': process_custom_groups(g3_config),
@@ -259,26 +298,26 @@ def main():
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     os.system('git add docs/index.html')
-    os.system('git commit -m "🐛 修正：閉合第 115 行的判斷式括號"')
+    os.system('git commit -m "⚡ 突破限制：解鎖全市場幾百檔 K 線動態釋放技術"')
     os.system('git push')
 
     github_user = "wudn9922"
     github_repo = "my-stock-screener"
     web_url = f"https://{github_user}.github.io/{github_repo}/"
     
-    line_msg = f"\n🎯 {today_str} 看盤網頁！\n"
-    line_msg += f"🇹🇼 台股全市場：{len(data_dict['tw'])} 檔\n"
-    line_msg += f"🇺🇸 美股全市場：{len(data_dict['us'])} 檔\n"
+    line_msg = f"\n🎯 {today_str} 全市場看盤網頁已完美解鎖！\n"
+    line_msg += f"🇹🇼 台股符合：{len(data_dict['tw'])} 檔 (100%全數呈現)\n"
+    line_msg += f"🇺🇸 美股符合：{len(data_dict['us'])} 檔 (100%全數呈現)\n"
     line_msg += f"🔥 自選股狀態：\n"
     line_msg += f" ├ 🚀 超級績效股：{len(data_dict['g1'])} 檔\n"
     line_msg += f" ├ 💎 績優股：{len(data_dict['g2'])} 檔\n"
     line_msg += f" ├ 🎯 重點關注股：{len(data_dict['g3'])} 檔\n"
     line_msg += f" ├ 👀 近期關注股：{len(data_dict['g4'])} 檔\n"
     line_msg += f" └ 🎲 投機股：{len(data_dict['g5'])} 檔\n"
-    line_msg += f"🔗 點擊網址直接「高清」瀏覽：\n{web_url}"
+    line_msg += f"🔗 點擊網址解鎖暢快滑圖：\n{web_url}"
     
     send_line_message(line_msg, access_token, user_id)
-    print("網頁更新成功，已發送！")
+    print("全市場解鎖網頁更新成功！")
 
 if __name__ == "__main__":
     main()
