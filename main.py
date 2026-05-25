@@ -125,7 +125,7 @@ def process_custom_groups(group_dict):
 
 def generate_html(data_dict, date_str):
     js_store = "const chartDataStore = " + json.dumps(data_dict, ensure_ascii=False) + ";\n"
-    html_template = f"""<!DOCTYPE html><html><head><title>台美股均線潛伏報告</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script><style>body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }} .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }} .tabs {{ display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-bottom: 20px; }} .tab-btn {{ background: #333; color: #ccc; border: none; padding: 10px 15px; font-size: 14px; cursor: pointer; border-radius: 4px; transition: 0.3s; }} .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }} .market-section {{ display: none; max-width: 800px; margin: 0 auto; }} .market-section.active {{ display: block; }} .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }} .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }} .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 16px; }}</style></head><body><div class="header"><h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2><p style="margin: 5px 0 0 0; color:#00ff88; font-size:13px;">穩定修復版 | K線與均線正常對齊</p></div><div class="tabs"><button class="tab-btn active" onclick="switchMarket(event, 'tw')">🇹🇼 台股 ({len(data_dict['tw'])})</button><button class="tab-btn" onclick="switchMarket(event, 'us')">🇺🇸 美股 ({len(data_dict['us'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g1')">🚀 超級績效股 ({len(data_dict['g1'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g2')">💎 績優股 ({len(data_dict['g2'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g3')">🎯 重點關注股 ({len(data_dict['g3'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g4')">👀 近期關注股 ({len(data_dict['g4'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g5')">🎲 投機股 ({len(data_dict['g5'])})</button></div>"""
+    html_template = f"""<!DOCTYPE html><html><head><title>台美股均線潛伏報告</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script><style>body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }} .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }} .tabs {{ display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-bottom: 20px; }} .tab-btn {{ background: #333; color: #ccc; border: none; padding: 10px 15px; font-size: 14px; cursor: pointer; border-radius: 4px; transition: 0.3s; }} .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }} .market-section {{ display: none; max-width: 800px; margin: 0 auto; }} .market-section.active {{ display: block; }} .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }} .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }} .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 16px; }}</style></head><body><div class="header"><h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2><p style="margin: 5px 0 0 0; color:#00ff88; font-size:13px;">穩定修復版 | K線與均線正常對齊</p></div><div class="tabs"><button class="tab-btn active" onclick="switchMarket(event, 'tw')">🇹🇼 台股 ({len(data_dict['tw'])})</button><button class="tab-btn" onclick="switchMarket(event, 'us')">🇺🇸 美股 ({len(data_dict['us'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g1')">🚀 超級績效股 ({len(data_dict['g1'])})</button><button class="tab-btn" onclick="world-market.tab-btn" onclick="switchMarket(event, 'g2')">💎 績優股 ({len(data_dict['g2'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g3')">🎯 重點關注股 ({len(data_dict['g3'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g4')">👀 近期關注股 ({len(data_dict['g4'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g5')">🎲 投機股 ({len(data_dict['g5'])})</button></div>"""
     for key in ['tw', 'us', 'g1', 'g2', 'g3', 'g4', 'g5']:
         active_class = " active" if key == 'tw' else ""
         html_template += f'<div id="{key}-market" class="market-section{active_class}">'
@@ -138,9 +138,6 @@ def generate_html(data_dict, date_str):
     with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html_template)
 
 
-# =========================================================================
-# 🧠 【大盤多空量化分析系統 - 修正：動態均線條數滿分機制】
-# =========================================================================
 def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
     try:
         df = yf.download(ticker, period="4y", progress=False)
@@ -149,7 +146,6 @@ def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
         df = df.copy()
         if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
         
-        # 根據傳入的 ma_list 動態計算均線
         available_mas = []
         for ma in ma_list:
             col_name = f'MA{ma}'
@@ -158,10 +154,9 @@ def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
             
         df = df.dropna(subset=available_mas)
         
-        # --- 1. 均線得分計算 (動態上限) ---
         latest = df.iloc[-1]
         score = 0
-        total_ma_count = len(available_mas) # 動態獲取目前比對了幾條均線
+        total_ma_count = len(available_mas)
         
         for ma_col in available_mas:
             ma_val = latest[ma_col]
@@ -173,27 +168,17 @@ def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
             elif latest['Open'] < lower_bound and latest['High'] < lower_bound and latest['Low'] < lower_bound and latest['Close'] < lower_bound:
                 score -= 1
 
-        # 🎯 核心更正：基於 total_ma_count 進行動態文字標籤轉換
-        if score == total_ma_count: 
-            score_label = "看多"
-        elif score > 0: 
-            score_label = "偏多"
-        elif score == 0: 
-            score_label = "多空不明"
-        elif score == -total_ma_count: 
-            score_label = "看空"
-        else: 
-            score_label = "偏空"
+        if score == total_ma_count: score_label = "看多"
+        elif score > 0: score_label = "偏多"
+        elif score == 0: score_label = "多空不明"
+        elif score -total_ma_count: score_label = "看空"
+        else: score_label = "偏空"
 
-        # --- 2. 歷史極值與時間回溯 ---
         df_3y = df.tail(252 * 3)
         idx_3y_high = df_3y['High'].idxmax()
-        val_3y_high = df_3y['High'].max()
-        
         latest_date = df.index[-1]
         months_since_high = (latest_date - idx_3y_high).days / 30.0
         
-        # 尋找最近 120 天波段轉折點
         df_recent = df.tail(120).copy()
         peaks = []
         troughs = []
@@ -207,11 +192,9 @@ def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
 
         lower_peak_count = 0
         lower_trough_count = 0
-
         if len(peaks) >= 2:
             for j in range(1, len(peaks)):
                 if peaks[j][1] < peaks[j-1][1]: lower_peak_count += 1
-
         if len(troughs) >= 2:
             for j in range(1, len(troughs)):
                 if troughs[j][1] < troughs[j-1][1]: lower_trough_count += 1
@@ -221,12 +204,10 @@ def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
             df_bear_period = df.loc[idx_3y_high:latest_date]
             if len(df_bear_period) > 5:
                 bear_low = df_bear_period['Low'].iloc[:-1].min()
-                if latest['Close'] < bear_low:
-                    macro_trend = "空頭趨勢"
+                if latest['Close'] < bear_low: macro_trend = "空頭趨勢"
 
         micro_走勢 = "多頭走勢"
-        if months_since_high >= 1.0 and (lower_peak_count + lower_trough_count) >= 2:
-            micro_走勢 = "空頭走勢"
+        if months_since_high >= 1.0 and (lower_peak_count + lower_trough_count) >= 2: micro_走勢 = "空頭走勢"
 
         final_status = f"{macro_trend}中的{micro_走勢}"
         
@@ -235,10 +216,11 @@ def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
         elif macro_trend == "空頭趨勢" and micro_走勢 == "空頭走勢": icon = "🔻"
         else: icon = "⚡"
 
-        return f"{icon} {name}: 均線狀態「{score_label}」({score}/{total_ma_count}MA) | 當前狀態: {final_status}"
+        # 這裡返回乾淨的單行資料，方便外層做分組與排版
+        return f"{icon} {name}\n   └ 均線: {score_label} ({score}/{total_ma_count}MA) | {final_status}"
     
     except Exception as e:
-        return f"⚪ {name}: 分析發生異常 ({str(e)[:15]})"
+        return f"⚪ {name}: 分析發生異常"
 
 
 def main():
@@ -256,7 +238,7 @@ def main():
     
     data_dict = {
         'tw': scan_market(get_tw_tickers(), min_volume=2000000), 
-        'us': scan_market(get_us_tickers(), min_volume=1000000),
+        'us': scan_market(get_us_tickers(), min_volume=100000),
         'g1': process_custom_groups(g1_config), 'g2': process_custom_groups(g2_config),
         'g3': process_custom_groups(g3_config), 'g4': process_custom_groups(g4_config), 'g5': process_custom_groups(g5_config)
     }
@@ -265,7 +247,7 @@ def main():
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     os.system('git add docs/index.html')
-    os.system('git commit -m "⚙️ 修復：支持動態均線數目的滿分標籤判定"')
+    os.system('git commit -m "⚙️ 視覺優化：大盤多空量化報告排版優化"')
     os.system('git push')
 
     # =========================================================================
@@ -274,34 +256,43 @@ def main():
     web_url = "https://wudn9922.github.io/my-stock-screener/"
     line_msg_stocks = f"🎯 {today_str} 全市場看盤網頁！\n"
     line_msg_stocks += f"🇹🇼 台股符合：{len(data_dict['tw'])} 檔\n"
-    line_msg_stocks += f"🇺🇸 美股符合：{len(data_dict['us'])} 檔\n"
+    line_msg_stocks += f"🇺🇸 美股符合：{len(data_dict['us'])} 檔\n\n"
     line_msg_stocks += f"🔥 自選股狀態：\n"
     line_msg_stocks += f" ├ 🚀 超級績效股：{len(data_dict['g1'])} 檔\n"
     line_msg_stocks += f" ├ 💎 績優股：{len(data_dict['g2'])} 檔\n"
     line_msg_stocks += f" ├ 🎯 重點關注：{len(data_dict['g3'])} 檔\n"
     line_msg_stocks += f" ├ 👀 近期關注股：{len(data_dict['g4'])} 檔\n"
-    line_msg_stocks += f" └ 🎲 投機股：{len(data_dict['g5'])} 檔\n"
+    line_msg_stocks += f" └ 🎲 投機股：{len(data_dict['g5'])} 檔\n\n"
     line_msg_stocks += f"🔗 點擊網址：\n{web_url}"
     send_line_message(line_msg_stocks, access_token, user_id)
 
     # =========================================================================
-    # ✉️ 【發送 訊息二：每日全球大盤多空量化報告】
+    # ✉️ 【發送 訊息二：每日全球大盤多空量化報告 - 視覺排版進化版】
     # =========================================================================
-    # 這裡你可以針對不同的指數，自由客製化傳入不同數量的均線列表
-    # 格式：analyze_index_trend(代碼, 名稱, ma_list=[均線天數])
     line_msg_index = f"🌍 {today_str} 全球大盤多空量化報告\n"
-    line_msg_index += f"📊 評分標準: 均線0.5%緩衝/自適應滿分機制\n"
-    line_msg_index += f"------------------------\n"
+    line_msg_index += f"📊 評分標準: 均線0.5%緩衝/自適應機制\n"
+    line_msg_index += f"========================\n\n"
     
-    line_msg_index += analyze_index_trend("^TWII", "台灣加權指數", ma_list=[20, 60, 240]) + "\n"
+    # 🇹🇼 台股
+    line_msg_index += f"【 🇹🇼 台灣市場 】\n"
+    line_msg_index += analyze_index_trend("^TWII", "台灣加權指數", ma_list=[20, 60, 240]) + "\n\n"
+    
+    # 🇺🇸 美股
+    line_msg_index += f"【 🇺🇸 美國市場 】\n"
     line_msg_index += analyze_index_trend("^GSPC", "美國標普500", ma_list=[20, 60, 240]) + "\n"
-    line_msg_index += analyze_index_trend("^DJI", "美國道瓊工業", ma_list=[20, 60]) + "\n" # 範例：只測2條
+    line_msg_index += analyze_index_trend("^DJI", "美國道瓊工業", ma_list=[20, 60]) + "\n"
     line_msg_index += analyze_index_trend("^IXIC", "美國那斯達克", ma_list=[20, 60, 240]) + "\n"
-    line_msg_index += analyze_index_trend("^RUT", "美國羅素2000", ma_list=[240]) + "\n"      # 範例：只測1條
-    line_msg_index += analyze_index_trend("^SOX", "美國費城半導體", ma_list=[20, 60, 240]) + "\n"
+    line_msg_index += analyze_index_trend("^RUT", "美國羅素2000", ma_list=[240]) + "\n"
+    line_msg_index += analyze_index_trend("^SOX", "美國費城半導體", ma_list=[20, 60, 240]) + "\n\n"
+    
+    # 🇪🇺 歐股
+    line_msg_index += f"【 🇪🇺 歐洲市場 】\n"
     line_msg_index += analyze_index_trend("^FCHI", "法國CAC40", ma_list=[20, 60, 240]) + "\n"
     line_msg_index += analyze_index_trend("^FTSE", "英國富時100", ma_list=[20, 60, 240]) + "\n"
-    line_msg_index += analyze_index_trend("^GDAXI", "德國DAX指數", ma_list=[20, 60, 240]) + "\n"
+    line_msg_index += analyze_index_trend("^GDAXI", "德國DAX指數", ma_list=[20, 60, 240]) + "\n\n"
+    
+    # 🌏 亞股
+    line_msg_index += f"【 🌏 亞洲市場 】\n"
     line_msg_index += analyze_index_trend("^N225", "日本日經225", ma_list=[20, 60, 240]) + "\n"
     line_msg_index += analyze_index_trend("^KS11", "韓國綜合指數", ma_list=[20, 60, 240]) + "\n"
     
@@ -315,7 +306,7 @@ def main():
         sectors_url = "https://finviz.com/groups.ashx?g=sector&v=110"
         
         line_msg_sectors = f"📅 【每週一限定】美股 11 大類股週線趨勢輪動圖\n"
-        line_msg_sectors += f"⏳ 包含 1-2 年週線級別核心波段追蹤\n"
+        line_msg_sectors += f"⏳ 包含 1-2 年週線級別核心波段追蹤\n\n"
         line_msg_sectors += f"🔗 類股觀測鏈結：\n{sectors_url}"
         send_line_message(line_msg_sectors, access_token, user_id)
 
