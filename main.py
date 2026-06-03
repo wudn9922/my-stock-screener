@@ -4,6 +4,8 @@ import requests
 import os
 from datetime import datetime
 import json
+import time
+import random
 
 HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -126,39 +128,55 @@ def build_stock_data(df_chart, ticker, title_suffix, ma_list):
 
 def scan_market(tickers, min_volume):
     matched_list = []
-    chunk_size = 40
+    chunk_size = 40  # 40-50 檔一批很剛好
+    
     for i in range(0, len(tickers), chunk_size):
         chunk = tickers[i:i+chunk_size]
         try:
-            data = yf.download(chunk, period="150d", progress=False)
+            # 🌟 改裝版下載設定：開啟多線程與分組
+            data = yf.download(chunk, period="150d", progress=False, group_by='ticker', threads=True, timeout=20)
             if data.empty: continue
+            
             for ticker in chunk:
                 try:
-                    if isinstance(data.columns, pd.MultiIndex):
-                        if ticker in data.columns.get_level_values(1): df_t = data.xs(ticker, axis=1, level=1)
-                        elif ticker in data.columns.get_level_values(0): df_t = data.xs(ticker, axis=1, level=0)
-                        else: continue
-                    else: df_t = data.copy()
+                    # 🌟 因為用了 group_by='ticker'，抓取單檔資料變得極度穩定
+                    if ticker in data.columns.get_level_values(0):
+                        df_t = data[ticker]
+                    else:
+                        continue
+                        
                     required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
                     if not all(col in df_t.columns for col in required_cols): continue
+                    
                     df_clean = df_t[required_cols].dropna()
                     if len(df_clean) < 20: continue
+                    
                     latest_vol = float(df_clean['Volume'].iloc[-1])
                     if latest_vol < min_volume: continue
+                    
                     df_clean['MA20'] = df_clean['Close'].rolling(window=20).mean()
                     price = float(df_clean['Close'].iloc[-1])
                     ma20 = float(df_clean['MA20'].iloc[-1])
                     if pd.isna(ma20): continue
-                    if ma20 * 0.98 <= price <= ma20 * 1.01:
+                    
+                    if ma20 * 0.97 <= price < ma20:
                         diff_pct = ((price / ma20) - 1) * 100
                         df_chart = df_clean.tail(60)
                         title_str = f"(現價: {round(price,2)} | 距MA20: {round(diff_pct,2)}%)"
                         chart_data = build_stock_data(df_chart, ticker, title_str, [20])
                         matched_list.append({'ticker': ticker, 'volume': int(latest_vol), 'chart_data': chart_data})
                 except Exception: continue
-        except Exception as e: print(f"批次錯誤 {i}: {e}")
+                
+            # 🌟 核心防封鎖：每跑完一批，隨機休息 1~2 秒，模擬真人行為
+            time.sleep(random.uniform(1.0, 2.0))
+            
+        except Exception as e: 
+            print(f"批次錯誤 {i}: {e}")
+            time.sleep(5) # 如果這批失敗了，可能被注意到了，加大休息時間再繼續
+            
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
     return matched_list
+
 
 def process_custom_groups(group_dict):
     matched_list = []
@@ -387,7 +405,7 @@ def main():
     
     # 🇹🇼 台股
     line_msg_index += f"【 🇹🇼 台灣市場 】\n"
-    line_msg_index += analyze_index_trend("^TWII", "台灣加權指數", ma_list=[20, 27, 61], tickers = tw_tickers) + "\n\n"
+    line_msg_index += analyze_index_trend("^TWII", "台灣加權指數", ma_list=[20, 27, 61]) + "\n\n"
     
     # 🇺🇸 美股
     line_msg_index += f"【 🇺🇸 美國市場 】\n"
