@@ -6,6 +6,29 @@ from datetime import datetime
 import json
 import time
 import random
+import requests
+from urllib3.util import Retry
+from requests.adapters import HTTPAdapter
+
+def get_disguised_session():
+    """ 🎭 建立偽裝瀏覽器的連線池，阻絕 Yahoo 阻斷服務攻擊 """
+    session = requests.Session()
+    
+    # 隨機瀏覽器標頭，讓 Yahoo 以為是真人在看網頁
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0"
+    ]
+    session.headers.update({'User-Agent': random.choice(user_agents)})
+    
+    # 設定自動重試機制：遇到 429 (Rate Limit) 或 502 等錯誤，會自動依序隔 2、4、8 秒後重試
+    retries = Retry(total=3, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504])
+    session.mount('https://', HTTPAdapter(max_retries=retries))
+    
+    return session
+
+
 
 HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -53,49 +76,72 @@ def get_us_tickers():
 
 import time
 
+import time
+import yfinance as yf
+
 def get_market_breadth(tickers):
     if not tickers: return ""
-    try:
-        above_60, above_200, total = 0, 0, 0
+    
+    above_60, above_200, total = 0, 0, 0
+    chunk_size = 100  # 💡 降低單次下載總量，細水長流
+    
+    print(f"🚀 開始計算市場廣度，總計 {len(tickers)} 檔個股...")
+    
+    for i in range(0, len(tickers), chunk_size):
+        chunk = tickers[i:i+chunk_size]
         
-        # 💡 將批次從 500 縮小到 200，降低單次 URL 請求長度，避免觸發防護
-        chunk_size = 200
-        for i in range(0, len(tickers), chunk_size):
-            chunk = tickers[i:i+chunk_size]
-            data = yf.download(chunk, period="1y", progress=False, group_by="ticker")
-            
-            if data.empty: continue
-            
-            for ticker in chunk:
-                try:
-                    if ticker in data.columns.get_level_values(0):
-                        df_t = data[ticker]
-                    else:
-                        continue
-                        
-                    close_series = df_t['Close'].dropna()
-                    if len(close_series) < 200: continue
+        # 💡 防禦核心：如果被限流，給予 3 次復活機會
+        retry_count = 0
+        data = None
+        
+        while retry_count < 3:
+            try:
+                # 🎭 帶入偽裝連線池
+                sess = get_disguised_session()
+                data = yf.download(chunk, period="1y", progress=False, group_by="ticker", session=sess)
+                break # 成功下載就跳出重試迴圈
+            except Exception as e:
+                if "Rate limit" in str(e) or "Too Many Requests" in str(e):
+                    retry_count += 1
+                    print(f"⚠️ 觸發 Yahoo 限流防禦！原地休眠 20 秒... (嘗試第 {retry_count} 次)")
+                    time.sleep(20)
+                else:
+                    break # 其他異常直接跳過
                     
-                    price = float(close_series.iloc[-1])
-                    ma60 = float(close_series.rolling(60).mean().iloc[-1])
-                    ma200 = float(close_series.rolling(200).mean().iloc[-1])
-                    
-                    total += 1
-                    if price > ma60: above_60 += 1
-                    if price > ma200: above_200 += 1
-                except:
+        if data is None or data.empty: 
+            continue
+        
+        # 統計個股均線
+        for ticker in chunk:
+            try:
+                if ticker in data.columns.get_level_values(0):
+                    df_t = data[ticker]
+                else:
                     continue
-            
-            # 💡 關鍵：每下載完一批，小睡 1.5 秒，做足禮貌，徹底解決 YFRateLimitError
-            time.sleep(1.5)
                     
-        if total == 0: return ""
-        pct_60 = round((above_60 / total) * 100, 1)
-        pct_200 = round((above_200 / total) * 100, 1)
-        return f"   📊 廣度: ＞60MA: {pct_60}% | ＞200MA: {pct_200}% (統計共 {total} 檔)"
+                close_series = df_t['Close'].dropna()
+                if len(close_series) < 200: continue
+                
+                price = float(close_series.iloc[-1])
+                ma60 = float(close_series.rolling(60).mean().iloc[-1])
+                ma200 = float(close_series.rolling(200).mean().iloc[-1])
+                
+                total += 1
+                if price > ma60: above_60 += 1
+                if price > ma200: above_200 += 1
+            except:
+                continue
         
-    except Exception as e:
-        return f"   📊 廣度計算失敗: {e}"
+        # 每批次間溫和冷卻
+        time.sleep(1.2)
+                
+    if total == 0: 
+        return "   📊 廣度: ⚠️ Yahoo 當前限制連線，無法取得足夠樣本"
+        
+    pct_60 = round((above_60 / total) * 100, 1)
+    pct_200 = round((above_200 / total) * 100, 1)
+    return f"   📊 廣度: ＞60MA: {pct_60}% | ＞200MA: {pct_200}% (統計共 {total} 檔)"
+
 
 
 def build_stock_data(df_chart, ticker, title_suffix, ma_list):
@@ -249,7 +295,9 @@ def generate_html(data_dict, date_str):
 def analyze_index_trend(ticker, name, ma_list=[20, 60, 240], breadth_str=None):
     """ 🌍 完美融合：你專屬的型態多空評分系統 + 全球市場廣度共享機制 """
     try:
-        df = yf.download(ticker, period="4y", progress=False)
+        # 大盤下載也一併穿上偽裝外衣
+        df = yf.download(ticker, period="4y", progress=False, session=get_disguised_session())
+
         if df.empty or len(df) < 750: return f"⚪ {name}: 數據不足無法分析"
         
         df = df.copy()
