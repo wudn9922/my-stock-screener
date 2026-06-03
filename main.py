@@ -29,57 +29,52 @@ def get_tw_tickers():
 
 
 def get_us_tickers():
-    """ 🚀 從 NASDAQ FTP 伺服器下載全美股上市股票 (自動剔除 ETF 與測試股) """
+    """ 🚀 從 NASDAQ FTP 下載美股清單 (升級版：嚴格濾除 5 碼權證、特別股與測試股) """
     try:
-        # 1. 抓取 NASDAQ 交易所上市股票 (約 4000+ 檔)
+        # 1. 抓取 NASDAQ
         nasdaq = pd.read_csv("ftp://ftp.nasdaqtrader.com/SymbolDirectory/nasdaqlisted.txt", sep="|")
-        # 💡 精準篩選：非 ETF、非測試股
         nasdaq = nasdaq[(nasdaq['ETF'] == 'N') & (nasdaq['Test Issue'] == 'N')]
         nasdaq_tickers = nasdaq['Symbol'].dropna().astype(str).tolist()
-        # 濾掉最後一行的說明文字，且只留純英文代碼 (避開特別股)
-        nasdaq_tickers = [t for t in nasdaq_tickers if t.isalpha() and t != 'File']
+        # 💡 重點優化：len(t) <= 4 完美剔除所有 5 碼衍生商品與特別股
+        nasdaq_tickers = [t for t in nasdaq_tickers if t.isalpha() and len(t) <= 4 and t != 'File']
         
-        # 2. 抓取其他交易所上市股票 (NYSE, AMEX 等，約 4000+ 檔)
+        # 2. 抓取 NYSE / AMEX
         other = pd.read_csv("ftp://ftp.nasdaqtrader.com/SymbolDirectory/otherlisted.txt", sep="|")
         other = other[(other['ETF'] == 'N') & (other['Test Issue'] == 'N')]
         other_tickers = other['ACT Symbol'].dropna().astype(str).tolist()
-        other_tickers = [t for t in other_tickers if t.isalpha()]
+        other_tickers = [t for t in other_tickers if t.isalpha() and len(t) <= 4]
         
-        # 3. 合併、去重
         all_tickers = list(set(nasdaq_tickers + other_tickers))
-        
-        print(f"✅ 成功獲取全美股普通股清單！共計：{len(all_tickers)} 檔 (已自動排除 ETF)")
+        print(f"✅ 成功獲取精煉美股普通股清單！共計：{len(all_tickers)} 檔 (已過濾衍生權證)")
         return all_tickers
-        
     except Exception as e:
-        print(f"⚠️ FTP 抓取失敗 ({e})，自動啟動熱門美股核心安全清單...")
-        # 防禦機制：若官方 FTP 斷線，回傳基本熱門股避免程式死當
-        return ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD", "NFLX", "COST"]
+        print(f"⚠️ FTP 抓取失敗 ({e})，啟動防禦清單...")
+        return ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD"]
+
+import time
 
 def get_market_breadth(tickers):
     if not tickers: return ""
     try:
         above_60, above_200, total = 0, 0, 0
         
-        # 💡 安全機制：將 4500+ 檔股票拆成每 500 檔一組分批下載，防止被 Yahoo 拒絕連線
-        chunk_size = 500
+        # 💡 將批次從 500 縮小到 200，降低單次 URL 請求長度，避免觸發防護
+        chunk_size = 200
         for i in range(0, len(tickers), chunk_size):
             chunk = tickers[i:i+chunk_size]
-            # 分批進行 bulk download
             data = yf.download(chunk, period="1y", progress=False, group_by="ticker")
             
             if data.empty: continue
             
             for ticker in chunk:
                 try:
-                    # 檢查 yfinance 回傳的多重索引中是否有該股票
                     if ticker in data.columns.get_level_values(0):
                         df_t = data[ticker]
                     else:
                         continue
                         
                     close_series = df_t['Close'].dropna()
-                    if len(close_series) < 200: continue # 交易歷史不足 200 天則跳過
+                    if len(close_series) < 200: continue
                     
                     price = float(close_series.iloc[-1])
                     ma60 = float(close_series.rolling(60).mean().iloc[-1])
@@ -90,6 +85,9 @@ def get_market_breadth(tickers):
                     if price > ma200: above_200 += 1
                 except:
                     continue
+            
+            # 💡 關鍵：每下載完一批，小睡 1.5 秒，做足禮貌，徹底解決 YFRateLimitError
+            time.sleep(1.5)
                     
         if total == 0: return ""
         pct_60 = round((above_60 / total) * 100, 1)
@@ -409,7 +407,7 @@ def main():
     
     # 🇺🇸 美股
     line_msg_index += f"【 🇺🇸 美國市場 】\n"
-    line_msg_index += analyze_index_trend("^GSPC", "美國標普500", ma_list=[23, 60], tickers = us_tickers) + "\n"
+    line_msg_index += analyze_index_trend("^GSPC", "美國標普500", ma_list=[23, 60], breadth_str = us_breadth) + "\n"
     line_msg_index += analyze_index_trend("^DJI", "美國道瓊工業", ma_list=[20, 23, 55]) + "\n"
     line_msg_index += analyze_index_trend("^IXIC", "美國那斯達克", ma_list=[29]) + "\n"
     line_msg_index += analyze_index_trend("^RUT", "美國羅素2000", ma_list=[21, 56]) + "\n"
