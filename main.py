@@ -25,13 +25,78 @@ def get_tw_tickers():
     except Exception as e: print(f"獲取台股清單失敗: {e}")
     return ["2330.TW", "2317.TW", "2454.TW"]
 
+
 def get_us_tickers():
+    """ 🚀 從 NASDAQ FTP 伺服器下載全美股上市股票 (自動剔除 ETF 與測試股) """
     try:
-        url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        df = pd.read_html(requests.get(url, headers=HTTP_HEADERS).text)[0]
-        return [t.replace('.', '-') for t in df['Symbol'].tolist()]
-    except Exception as e: print(f"獲取美股清單失敗: {e}")
-    return ["AAPL", "MSFT", "NVDA"]
+        # 1. 抓取 NASDAQ 交易所上市股票 (約 4000+ 檔)
+        nasdaq = pd.read_csv("ftp://ftp.nasdaqtrader.com/SymbolDirectory/nasdaqlisted.txt", sep="|")
+        # 💡 精準篩選：非 ETF、非測試股
+        nasdaq = nasdaq[(nasdaq['ETF'] == 'N') & (nasdaq['Test Issue'] == 'N')]
+        nasdaq_tickers = nasdaq['Symbol'].dropna().astype(str).tolist()
+        # 濾掉最後一行的說明文字，且只留純英文代碼 (避開特別股)
+        nasdaq_tickers = [t for t in nasdaq_tickers if t.isalpha() and t != 'File']
+        
+        # 2. 抓取其他交易所上市股票 (NYSE, AMEX 等，約 4000+ 檔)
+        other = pd.read_csv("ftp://ftp.nasdaqtrader.com/SymbolDirectory/otherlisted.txt", sep="|")
+        other = other[(other['ETF'] == 'N') & (other['Test Issue'] == 'N')]
+        other_tickers = other['ACT Symbol'].dropna().astype(str).tolist()
+        other_tickers = [t for t in other_tickers if t.isalpha()]
+        
+        # 3. 合併、去重
+        all_tickers = list(set(nasdaq_tickers + other_tickers))
+        
+        print(f"✅ 成功獲取全美股普通股清單！共計：{len(all_tickers)} 檔 (已自動排除 ETF)")
+        return all_tickers
+        
+    except Exception as e:
+        print(f"⚠️ FTP 抓取失敗 ({e})，自動啟動熱門美股核心安全清單...")
+        # 防禦機制：若官方 FTP 斷線，回傳基本熱門股避免程式死當
+        return ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD", "NFLX", "COST"]
+
+def get_market_breadth(tickers):
+    if not tickers: return ""
+    try:
+        above_60, above_200, total = 0, 0, 0
+        
+        # 💡 安全機制：將 4500+ 檔股票拆成每 500 檔一組分批下載，防止被 Yahoo 拒絕連線
+        chunk_size = 500
+        for i in range(0, len(tickers), chunk_size):
+            chunk = tickers[i:i+chunk_size]
+            # 分批進行 bulk download
+            data = yf.download(chunk, period="1y", progress=False, group_by="ticker")
+            
+            if data.empty: continue
+            
+            for ticker in chunk:
+                try:
+                    # 檢查 yfinance 回傳的多重索引中是否有該股票
+                    if ticker in data.columns.get_level_values(0):
+                        df_t = data[ticker]
+                    else:
+                        continue
+                        
+                    close_series = df_t['Close'].dropna()
+                    if len(close_series) < 200: continue # 交易歷史不足 200 天則跳過
+                    
+                    price = float(close_series.iloc[-1])
+                    ma60 = float(close_series.rolling(60).mean().iloc[-1])
+                    ma200 = float(close_series.rolling(200).mean().iloc[-1])
+                    
+                    total += 1
+                    if price > ma60: above_60 += 1
+                    if price > ma200: above_200 += 1
+                except:
+                    continue
+                    
+        if total == 0: return ""
+        pct_60 = round((above_60 / total) * 100, 1)
+        pct_200 = round((above_200 / total) * 100, 1)
+        return f"   📊 廣度: ＞60MA: {pct_60}% | ＞200MA: {pct_200}% (統計共 {total} 檔)"
+        
+    except Exception as e:
+        return f"   📊 廣度計算失敗: {e}"
+
 
 def build_stock_data(df_chart, ticker, title_suffix, ma_list):
     date_strings = [str(d)[:10] for d in df_chart.index]
@@ -165,7 +230,8 @@ def generate_html(data_dict, date_str):
 
 
 
-def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
+def analyze_index_trend(ticker, name, ma_list=[20, 60, 240], breadth_str=None):
+    """ 🌍 完美融合：你專屬的型態多空評分系統 + 全球市場廣度共享機制 """
     try:
         df = yf.download(ticker, period="4y", progress=False)
         if df.empty or len(df) < 750: return f"⚪ {name}: 數據不足無法分析"
@@ -243,11 +309,17 @@ def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
         elif macro_trend == "空頭趨勢" and micro_走勢 == "空頭走勢": icon = "🔻"
         else: icon = "⚡"
 
-        # 🎯 核心更正：在此處將輸出格式修改為兩行獨立的 └ 分支
-        return f"{icon} {name}\n   ├ 均線: {score_label} ({score}/{total_ma_count}MA)\n   └  {final_status}"
+        # 💡 【修正重點 1】：將以下區塊移入 try 的正確縮排內
+        base_output = f"{icon} {name}\n   ├ 均線: {score_label} ({score}/{total_ma_count}MA)\n   └  {final_status}"
+
+        # 💡 【修正重點 2】：改為直接接收外部算好的 breadth_str，避免全球多指數重複撈取導致當機
+        if breadth_str:
+            base_output += "\n" + breadth_str
+
+        return base_output
     
     except Exception as e:
-        return f"⚪ {name}: 分析發生異常"
+        return f"⚪ {name}: 分析發生異常 ({e})"
 
 
 def main():
@@ -257,6 +329,9 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
     weekday = datetime.now().weekday() 
 
+    tw_tickers = get_tw_tickers()
+    us_tickers = get_us_tickers()
+
     twg1_config = {"2330.TW": [10, 20], "NVDA": [10, 20], "AMD": [20]}
     twg2_config = {"2317.TW": [20, 60], "AAPL": [20, 120], "MSFT": [20, 60, 120]}
     usg1_config = {"2454.TW": [5, 10, 20], "TSLA": [10, 20]}
@@ -265,8 +340,8 @@ def main():
     usg4_config = {"2609.TW": [5, 10], "0050.TW": [5, 20]}
     
     data_dict = {
-        'twall': scan_market(get_tw_tickers(), min_volume=2000000), 
-        'us500': scan_market(get_us_tickers(), min_volume=100000),
+        'twall': scan_market(tw_tickers, min_volume=2000000), 
+        'us500': scan_market(us_tickers, min_volume=100000),
         'twg1': process_custom_groups(twg1_config), 'twg2': process_custom_groups(twg2_config),
         'usg1': process_custom_groups(usg1_config), 'usg2': process_custom_groups(usg2_config), 
         'usg3': process_custom_groups(usg3_config), 'usg4': process_custom_groups(usg4_config)
@@ -312,11 +387,11 @@ def main():
     
     # 🇹🇼 台股
     line_msg_index += f"【 🇹🇼 台灣市場 】\n"
-    line_msg_index += analyze_index_trend("^TWII", "台灣加權指數", ma_list=[20, 27, 61]) + "\n\n"
+    line_msg_index += analyze_index_trend("^TWII", "台灣加權指數", ma_list=[20, 27, 61], tickers = tw_tickers) + "\n\n"
     
     # 🇺🇸 美股
     line_msg_index += f"【 🇺🇸 美國市場 】\n"
-    line_msg_index += analyze_index_trend("^GSPC", "美國標普500", ma_list=[23, 60]) + "\n"
+    line_msg_index += analyze_index_trend("^GSPC", "美國標普500", ma_list=[23, 60], tickers = us_tickers) + "\n"
     line_msg_index += analyze_index_trend("^DJI", "美國道瓊工業", ma_list=[20, 23, 55]) + "\n"
     line_msg_index += analyze_index_trend("^IXIC", "美國那斯達克", ma_list=[29]) + "\n"
     line_msg_index += analyze_index_trend("^RUT", "美國羅素2000", ma_list=[21, 56]) + "\n"
