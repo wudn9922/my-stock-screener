@@ -84,7 +84,7 @@ def scan_market(tickers, min_volume):
                     price = float(df_clean['Close'].iloc[-1])
                     ma20 = float(df_clean['MA20'].iloc[-1])
                     if pd.isna(ma20): continue
-                    if ma20 * 0.97 <= price < ma20:
+                    if ma20 * 0.98 <= price <= ma20 * 1.01:
                         diff_pct = ((price / ma20) - 1) * 100
                         df_chart = df_clean.tail(60)
                         title_str = f"(現價: {round(price,2)} | 距MA20: {round(diff_pct,2)}%)"
