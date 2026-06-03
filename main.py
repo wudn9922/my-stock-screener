@@ -125,17 +125,44 @@ def process_custom_groups(group_dict):
 
 def generate_html(data_dict, date_str):
     js_store = "const chartDataStore = " + json.dumps(data_dict, ensure_ascii=False) + ";\n"
-    html_template = f"""<!DOCTYPE html><html><head><title>台美股均線潛伏報告</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script><style>body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }} .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }} .tabs {{ display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-bottom: 20px; }} .tab-btn {{ background: #333; color: #ccc; border: none; padding: 10px 15px; font-size: 14px; cursor: pointer; border-radius: 4px; transition: 0.3s; }} .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }} .market-section {{ display: none; max-width: 800px; margin: 0 auto; }} .market-section.active {{ display: block; }} .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }} .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }} .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 16px; }}</style></head><body><div class="header"><h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2><p style="margin: 5px 0 0 0; color:#00ff88; font-size:13px;">穩定修復版 | K線與均線正常對齊</p></div><div class="tabs"><button class="tab-btn active" onclick="switchMarket(event, 'tw')">🇹🇼 台股 ({len(data_dict['tw'])})</button><button class="tab-btn" onclick="switchMarket(event, 'us')">🇺🇸 美股 ({len(data_dict['us'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g1')">🚀 超級績效股 ({len(data_dict['g1'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g2')">💎 績優股 ({len(data_dict['g2'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g3')">🎯 重點關注股 ({len(data_dict['g3'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g4')">👀 近期關注股 ({len(data_dict['g4'])})</button><button class="tab-btn" onclick="switchMarket(event, 'g5')">🎲 投機股 ({len(data_dict['g5'])})</button></div>"""
-    for key in ['tw', 'us', 'g1', 'g2', 'g3', 'g4', 'g5']:
-        active_class = " active" if key == 'tw' else ""
+    html_template = f"""<!DOCTYPE html><html><head><title>台美股均線潛伏報告</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script><style>body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }} .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }} .category-box {{ background: #1a1a1a; padding: 12px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #00b0ff; }} .category-title {{ font-size: 15px; font-weight: bold; color: #00ff88; margin-bottom: 10px; padding-left: 5px; }} .tabs {{ display: flex; flex-wrap: wrap; gap: 6px; }} .tab-btn {{ background: #2a2a2a; color: #aaa; border: none; padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; transition: 0.3s; }} .tab-btn:hover {{ background: #3a3a3a; }} .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }} .market-section {{ display: none; max-width: 800px; margin: 0 auto; }} .market-section.active {{ display: block; }} .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }} .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }} .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 14px; }}</style></head><body><div class="header"><h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2><p style="margin: 5px 0 0 0; color:#00ff88; font-size:13px;">|</p></div>
+    
+    <div class="category-box" style="border-left-color: #ff5252;">
+        <div class="category-title">🇹🇼 台灣股市區塊</div>
+        <div class="tabs">
+            <button id="btn-twall" class="tab-btn active" onclick="switchMarket(event, 'twall')">全市場 ({len(data_dict['twall'])})</button>
+            <button id="btn-twg1" class="tab-btn" onclick="switchMarket(event, 'twg1')">日常關注股 ({len(data_dict['twg1'])})</button>
+            <button id="btn-twg2" class="tab-btn" onclick="switchMarket(event, 'twg2')">熱門股 ({len(data_dict['twg2'])})</button>
+        </div>
+    </div>
+
+    <div class="category-box" style="border-left-color: #00b0ff;">
+        <div class="category-title">🇺🇸 美國股市區塊</div>
+        <div class="tabs">
+            <button id="btn-us500" class="tab-btn" onclick="switchMarket(event, 'us500')">SPX ({len(data_dict['us500'])})</button>
+            <button id="btn-usg1" class="tab-btn" onclick="switchMarket(event, 'usg1')">日常關注股 ({len(data_dict['usg1'])})</button>
+            <button id="btn-usg2" class="tab-btn" onclick="switchMarket(event, 'usg2')">潛力熱門股 ({len(data_dict['usg2'])})</button>
+            <button id="btn-usg3" class="tab-btn" onclick="switchMarket(event, 'usg3')">超級績效股 ({len(data_dict['usg3'])})</button>
+            <button id="btn-usg4" class="tab-btn" onclick="switchMarket(event, 'usg4')">重點關注股 ({len(data_dict['usg4'])})</button>
+        </div>
+    </div>
+    """
+    
+    keys_list = ['twall', 'twg1', 'twg2', 'us500', 'usg1', 'usg2', 'usg3', 'usg4']
+    for key in keys_list:
+        active_class = " active" if key == 'twall' else ""
         html_template += f'<div id="{key}-market" class="market-section{active_class}">'
         if data_dict[key]:
             for idx in range(len(data_dict[key])): html_template += f'<div class="chart-card"><div id="chart-{key}-{idx}" class="plotly-container"></div></div>'
         else: html_template += '<div class="no-data">此分類目前無股票資料</div>'
         html_template += '</div>'
-    html_template += f"""<script>{js_store} function renderMarketCharts(marketId) {{ const items = chartDataStore[marketId]; if (!items) return; items.forEach((item, idx) => {{ const elementId = "chart-" + marketId + "-" + idx; const container = document.getElementById(elementId); if (container && !container.dataset.done) {{ Plotly.newPlot(container, item.chart_data.data, item.chart_data.layout, {{responsive: true, displayModeBar: false}}); container.dataset.done = "true"; }} }}); }} function switchMarket(event, marketId) {{ document.querySelectorAll('.market-section').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); document.getElementById(marketId + '-market').classList.add('active'); event.currentTarget.classList.add('active'); renderMarketCharts(marketId); window.dispatchEvent(new Event('resize')); }} window.addEventListener("load", function() {{ renderMarketCharts('tw'); }});</script></body></html>"""
+        
+    # 🌟 尾端預設載入修正為 'twall'
+    html_template += f"""<script>{js_store} function renderMarketCharts(marketId) {{ const items = chartDataStore[marketId]; if (!items) return; items.forEach((item, idx) => {{ const elementId = "chart-" + marketId + "-" + idx; const container = document.getElementById(elementId); if (container && !container.dataset.done) {{ Plotly.newPlot(container, item.chart_data.data, item.chart_data.layout, {{responsive: true, displayModeBar: false}}); container.dataset.done = "true"; }} }}); }} function switchMarket(event, marketId) {{ document.querySelectorAll('.market-section').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); document.getElementById(marketId + '-market').classList.add('active'); if(event) {{ event.currentTarget.classList.add('active'); }} else {{ document.getElementById('btn-' + marketId).classList.add('active'); }} renderMarketCharts(marketId); window.dispatchEvent(new Event('resize')); }} window.addEventListener("load", function() {{ renderMarketCharts('twall'); }});</script></body></html>"""
+    
     os.makedirs("docs", exist_ok=True)
     with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html_template)
+
 
 
 def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
@@ -230,17 +257,19 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
     weekday = datetime.now().weekday() 
 
-    g1_config = {"2330.TW": [10, 20], "NVDA": [10, 20], "AMD": [20]}
-    g2_config = {"2317.TW": [20, 60], "AAPL": [20, 120], "MSFT": [20, 60, 120]}
-    g3_config = {"2454.TW": [5, 10, 20], "TSLA": [10, 20]}
-    g4_config = {"2603.TW": [20, 60], "AMZN": [20]}
-    g5_config = {"2609.TW": [5, 10], "0050.TW": [5, 20]}
+    twg1_config = {"2330.TW": [10, 20], "NVDA": [10, 20], "AMD": [20]}
+    twg2_config = {"2317.TW": [20, 60], "AAPL": [20, 120], "MSFT": [20, 60, 120]}
+    usg1_config = {"2454.TW": [5, 10, 20], "TSLA": [10, 20]}
+    usg2_config = {"2603.TW": [20, 60], "AMZN": [20]}
+    usg3_config = {"2609.TW": [5, 10], "0050.TW": [5, 20]}
+    usg4_config = {"2609.TW": [5, 10], "0050.TW": [5, 20]}
     
     data_dict = {
-        'tw': scan_market(get_tw_tickers(), min_volume=2000000), 
-        'us': scan_market(get_us_tickers(), min_volume=100000),
-        'g1': process_custom_groups(g1_config), 'g2': process_custom_groups(g2_config),
-        'g3': process_custom_groups(g3_config), 'g4': process_custom_groups(g4_config), 'g5': process_custom_groups(g5_config)
+        'twall': scan_market(get_tw_tickers(), min_volume=2000000), 
+        'us500': scan_market(get_us_tickers(), min_volume=100000),
+        'twg1': process_custom_groups(twg1_config), 'twg2': process_custom_groups(twg2_config),
+        'usg1': process_custom_groups(usg1_config), 'usg2': process_custom_groups(usg2_config), 
+        'usg3': process_custom_groups(usg3_config), 'usg4': process_custom_groups(usg4_config)
     }
     generate_html(data_dict, today_str)
     
@@ -254,17 +283,25 @@ def main():
     # ✉️ 【發送 訊息一：每日個股均線潛伏報告】
     # =========================================================================
     web_url = "https://wudn9922.github.io/my-stock-screener/"
-    line_msg_stocks = f"🎯 {today_str} 全市場看盤網頁！\n"
-    line_msg_stocks += f"🇹🇼 台股符合：{len(data_dict['tw'])} 檔\n"
-    line_msg_stocks += f"🇺🇸 美股符合：{len(data_dict['us'])} 檔\n\n"
-    line_msg_stocks += f"🔥 自選股狀態：\n"
-    line_msg_stocks += f" ├ 🚀 超級績效股：{len(data_dict['g1'])} 檔\n"
-    line_msg_stocks += f" ├ 💎 績優股：{len(data_dict['g2'])} 檔\n"
-    line_msg_stocks += f" ├ 🎯 重點關注：{len(data_dict['g3'])} 檔\n"
-    line_msg_stocks += f" ├ 👀 近期關注股：{len(data_dict['g4'])} 檔\n"
-    line_msg_stocks += f" └ 🎲 投機股：{len(data_dict['g5'])} 檔\n\n"
+    line_msg_stocks = f"🎯 {today_str} 全市場看盤網頁！\n\n"
+    
+    # 🌟 對齊台股新的 3 個組別數量
+    line_msg_stocks += f"🇹🇼 【台灣股市區塊】\n"
+    line_msg_stocks += f" ├ 1. 全市場：{len(data_dict['twall'])} 檔\n"
+    line_msg_stocks += f" ├ 2. 日常關注：{len(data_dict['twg1'])} 檔\n"
+    line_msg_stocks += f" └ 3. 熱門：{len(data_dict['twg2'])} 檔\n\n"
+    
+    # 🌟 對齊美股新的 5 個組別數量
+    line_msg_stocks += f"🇺🇸 【美國股市區塊】\n"
+    line_msg_stocks += f" ├ 1. SPX：{len(data_dict['us500'])} 檔\n"
+    line_msg_stocks += f" ├ 2. 日常關注：{len(data_dict['usg1'])} 檔\n"
+    line_msg_stocks += f" ├ 3. 潛力熱門：{len(data_dict['usg2'])} 檔\n"
+    line_msg_stocks += f" ├ 4. 超級績效：{len(data_dict['usg3'])} 檔\n"
+    line_msg_stocks += f" └ 5. 重點關注：{len(data_dict['usg4'])} 檔\n\n"
+    
     line_msg_stocks += f"🔗 點擊網址：\n{web_url}"
     send_line_message(line_msg_stocks, access_token, user_id)
+
 
     # =========================================================================
     # ✉️ 【發送 訊息二：每日全球大盤多空量化報告】
