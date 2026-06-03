@@ -398,8 +398,12 @@ def main():
     # ✉️ 【發送 訊息二：每日全球大盤多空量化報告】
     # =========================================================================
     line_msg_index = f"🌍 {today_str} 全球大盤多空量化報告\n"
-    line_msg_index += f"📊 評分標準: 均線0.5%緩衝/自適應機制\n"
     line_msg_index += f"========================\n\n"
+    print("⏳ 正在計算 台灣市場 全市場廣度...")
+    tw_breadth = get_market_breadth(tw_tickers)
+    
+    print("⏳ 正在計算 美國市場 全市場廣度...")
+    us_breadth = get_market_breadth(us_tickers) 
     
     # 🇹🇼 台股
     line_msg_index += f"【 🇹🇼 台灣市場 】\n"
@@ -408,10 +412,10 @@ def main():
     # 🇺🇸 美股
     line_msg_index += f"【 🇺🇸 美國市場 】\n"
     line_msg_index += analyze_index_trend("^GSPC", "美國標普500", ma_list=[23, 60], breadth_str = us_breadth) + "\n"
-    line_msg_index += analyze_index_trend("^DJI", "美國道瓊工業", ma_list=[20, 23, 55]) + "\n"
-    line_msg_index += analyze_index_trend("^IXIC", "美國那斯達克", ma_list=[29]) + "\n"
-    line_msg_index += analyze_index_trend("^RUT", "美國羅素2000", ma_list=[21, 56]) + "\n"
-    line_msg_index += analyze_index_trend("^SOX", "美國費城半導體", ma_list=[20, 58, 108]) + "\n\n"
+    line_msg_index += analyze_index_trend("^DJI", "美國道瓊工業", ma_list=[20, 23, 55], breadth_str=us_breadth) + "\n"
+    line_msg_index += analyze_index_trend("^IXIC", "美國那斯達克", ma_list=[29], breadth_str=us_breadth) + "\n"
+    line_msg_index += analyze_index_trend("^RUT", "美國羅素2000", ma_list=[21, 56], breadth_str=us_breadth) + "\n"
+    line_msg_index += analyze_index_trend("^SOX", "美國費城半導體", ma_list=[20, 58, 108], breadth_str=us_breadth) + "\n\n"
     
     # 🇪🇺 歐股
     line_msg_index += f"【 🇪🇺 歐洲市場 】\n"
