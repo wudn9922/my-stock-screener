@@ -12,24 +12,37 @@ from requests.adapters import HTTPAdapter
 import logging
 import warnings
 
-# 🤫 讓 yfinance 的警告閉嘴，保持 GitHub Actions 日誌乾淨
+# 🤫 讓 yfinance 的下市警告與無效警告閉嘴，保持 GitHub Actions 日誌乾淨
 logging.getLogger('yfinance').setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=UserWarning, module="yfinance")
 
 HTTP_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 }
 
 def get_disguised_session():
-    """ 🎭 建立偽裝瀏覽器的連線池，阻絕 Yahoo 阻斷服務攻擊 """
+    """ 🎭 建立高度偽裝且具備指數型退避重試的連線池 """
     session = requests.Session()
+    # 隨機更換 User-Agent 混淆 Yahoo 伺服器
     user_agents = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
     ]
-    session.headers.update({'User-Agent': random.choice(user_agents)})
-    retries = Retry(total=3, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504])
+    session.headers.update({
+        'User-Agent': random.choice(user_agents),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'zh-TW,zh;q=0.8,en-US;q=0.5,en;q=0.3',
+    })
+    
+    # 關鍵：遇到 429 (Too Many Requests) 時，自動進行指數型等待重試 (2秒、4秒、8秒...)
+    retries = Retry(
+        total=5, 
+        backoff_factor=3, 
+        status_forcelist=[429, 500, 502, 503, 504],
+        raise_on_status=False
+    )
     session.mount('https://', HTTPAdapter(max_retries=retries))
     return session
 
@@ -41,7 +54,7 @@ def send_line_message(msg, access_token, user_id):
     return res.status_code
 
 def get_tw_tickers():
-    """ 🇹🇼 真正全市場：動態爬取證交所與櫃買中心，獲取「所有」最新上市與上櫃股票代碼 """
+    """ 🇹🇼 真正全市場：動態爬取證交所與櫃買中心 """
     print("⏳ 正在從證交所及櫃買中心下載全台股最新名單...")
     tw_stocks = []
     
@@ -111,29 +124,55 @@ def build_stock_data(df_chart, ticker, title_suffix, ma_list):
 
 def scan_market(tickers, min_volume):
     matched_list = []
-    chunk_size = 35 # 調小批次，大幅降低全市場掃描被 Yahoo 429 封鎖的機率
+    # 📉 進一步縮減批次大小至 25 檔，大幅降低伺服器單次負荷
+    chunk_size = 25 
     total_len = len(tickers)
     
     for i in range(0, total_len, chunk_size):
         chunk = tickers[i:i+chunk_size]
+        print(f" ⏳ 全市場掃描進度: {i}/{total_len}...")
         try:
+            # 建立獨立的、帶防禦機制的連線
             sess = get_disguised_session()
-            data = yf.download(chunk, period="150d", progress=False, group_by='ticker', threads=False, session=sess, timeout=25)
-            if data.empty: continue
+            
+            # 使用 yf.download 並強制設定 threads=False (單線程安全慢速前進)
+            data = yf.download(
+                tickers=chunk, 
+                period="150d", 
+                progress=False, 
+                group_by='ticker', 
+                threads=False, 
+                session=sess, 
+                timeout=20
+            )
+            
+            if data.empty: 
+                time.sleep(3)
+                continue
+                
             for ticker in chunk:
                 try:
-                    if ticker in data.columns.get_level_values(0): df_t = data[ticker]
-                    else: continue
+                    # 處理單檔與多檔返回的欄位結構差異
+                    if len(chunk) == 1:
+                        df_t = data
+                    elif ticker in data.columns.get_level_values(0): 
+                        df_t = data[ticker]
+                    else: 
+                        continue
+                        
                     required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
                     if not all(col in df_t.columns for col in required_cols): continue
                     df_clean = df_t[required_cols].dropna()
                     if len(df_clean) < 20: continue
+                    
                     latest_vol = float(df_clean['Volume'].iloc[-1])
                     if latest_vol < min_volume: continue
+                    
                     df_clean['MA20'] = df_clean['Close'].rolling(window=20).mean()
                     price = float(df_clean['Close'].iloc[-1])
                     ma20 = float(df_clean['MA20'].iloc[-1])
                     if pd.isna(ma20): continue
+                    
                     if ma20 * 0.97 <= price < ma20:
                         diff_pct = ((price / ma20) - 1) * 100
                         df_chart = df_clean.tail(60)
@@ -141,10 +180,14 @@ def scan_market(tickers, min_volume):
                         chart_data = build_stock_data(df_chart, ticker, title_str, [20])
                         matched_list.append({'ticker': ticker, 'volume': int(latest_vol), 'chart_data': chart_data})
                 except Exception: continue
-            time.sleep(random.uniform(1.5, 3.5)) # 防護性隨機冷卻
+            
+            # 🛑 核心防禦：每抓取 25 檔，強制隨機深度睡眠 3.5 ~ 6 秒，徹底瓦解 Yahoo 429 偵測機制
+            time.sleep(random.uniform(3.5, 6.0))
+            
         except Exception as e: 
-            print(f"批次錯誤 {i}: {e}")
-            time.sleep(5)
+            print(f"⚠️ 批次爆發錯誤 {i}: {e}，觸發緊急避難，冷卻 12 秒...")
+            time.sleep(12)
+            
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
     return matched_list
 
@@ -152,8 +195,11 @@ def process_custom_groups(group_dict):
     matched_list = []
     tickers = list(group_dict.keys())
     if not tickers: return matched_list
-    try: data = yf.download(tickers, period="500d", progress=False, session=get_disguised_session(), threads=False)
-    except Exception: return matched_list
+    try: 
+        sess = get_disguised_session()
+        data = yf.download(tickers, period="500d", progress=False, session=sess, threads=False)
+    except Exception: 
+        return matched_list
     for ticker in tickers:
         try:
             if isinstance(data.columns, pd.MultiIndex):
@@ -178,7 +224,7 @@ def process_custom_groups(group_dict):
 
 def generate_html(data_dict, date_str):
     js_store = "const chartDataStore = " + json.dumps(data_dict, ensure_ascii=False) + ";\n"
-    html_template = f"""<!DOCTYPE html><html><head><title>台美股均線潛伏報告</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script><style>body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }} .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }} .category-box {{ background: #1a1a1a; padding: 12px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #00b0ff; }} .category-title {{ font-size: 15px; font-weight: bold; color: #00ff88; margin-bottom: 10px; padding-left: 5px; }} .tabs {{ display: flex; flex-wrap: wrap; gap: 6px; }} .tab-btn {{ background: #2a2a2a; color: #aaa; border: none; padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; transition: 0.3s; }} .tab-btn:hover {{ background: #3a3a3a; }} .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }} .market-section {{ display: none; max-width: 800px; margin: 0 auto; }} .market-section.active {{ display: block; }} .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }} .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }} .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 14px; }}</style></head><body><div class="header"><h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2><p style="margin: 5px 0 0 0; color:#00ff88; font-size:13px;">全市場上市上櫃掃描版</p></div>
+    html_template = f"""<!DOCTYPE html><html><head><title>台美股均線潛伏報告</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script><style>body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }} .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }} .category-box {{ background: #1a1a1a; padding: 12px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #00b0ff; }} .category-title {{ font-size: 15px; font-weight: bold; color: #00ff88; margin-bottom: 10px; padding-left: 5px; }} .tabs {{ display: flex; flex-wrap: wrap; gap: 6px; }} .tab-btn {{ background: #2a2a2a; color: #aaa; border: none; padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; transition: 0.3s; }} .tab-btn:hover {{ background: #3a3a3a; }} .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }} .market-section {{ display: none; max-width: 800px; margin: 0 auto; }} .market-section.active {{ display: block; }} .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }} .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }} .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 14px; }}</style></head><body><div class="header"><h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2><p style="margin: 5px 0 0 0; color:#00ff88; font-size:13px;">全市場上市上櫃高防禦掃描版</p></div>
     
     <div class="category-box" style="border-left-color: #ff5252;">
         <div class="category-title">🇹🇼 台灣股市區塊</div>
@@ -216,7 +262,8 @@ def generate_html(data_dict, date_str):
 
 def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
     try:
-        df = yf.download(ticker, period="4y", progress=False, session=get_disguised_session(), threads=False)
+        sess = get_disguised_session()
+        df = yf.download(ticker, period="4y", progress=False, session=sess, threads=False)
         if df.empty or len(df) < 750: return f"⚪ {name}: 數據不足無法分析"
         df = df.copy()
         if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
@@ -307,7 +354,7 @@ def main():
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     os.system('git add docs/index.html')
-    os.system('git commit -m "⚙️ 運行全市場掃描自動更新 (含櫃買指數升級)"')
+    os.system('git commit -m "⚙️ 運行全市場高避護機制自動更新"')
     os.system('git push')
 
     # =========================================================================
@@ -335,7 +382,6 @@ def main():
     line_msg_index += f"📊 評分標準: 均線0.5%緩衝/自適應機制\n"
     line_msg_index += f"========================\n\n"
     
-    # 💡 核心升級：將台灣市場細分為加權指數與櫃買指數
     line_msg_index += f"【 🇹🇼 台灣市場 】\n"
     line_msg_index += analyze_index_trend("^TWII", "台灣加權指數", ma_list=[20, 27, 61]) + "\n"
     line_msg_index += analyze_index_trend("^TWOII", "台灣櫃買指數(OTC)", ma_list=[20, 60, 120]) + "\n\n"
