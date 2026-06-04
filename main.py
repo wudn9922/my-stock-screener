@@ -75,7 +75,7 @@ def get_tw_tickers(min_volume):
                         if len(code) == 4 and code.isdigit():
                             # 2. 自動尋找成交股數欄位 (新版 OpenAPI 預設為 TradingVolume)
                             vol_val = 0
-                            for vol_key in ["TradingVolume", "成交股數", "volume", "Volume"]:
+                            for vol_key in ["TradingShares", "TradingVolume", "成交股數", "volume", "Volume"]:
                                 if vol_key in item:
                                     try:
                                         vol_val = float(str(item[vol_key]).replace(',', ''))
