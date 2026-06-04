@@ -357,7 +357,7 @@ def main():
     # =========================================================================
     # ✉️ 【發送 訊息一：每日個股均線潛伏報告】
     # =========================================================================
-    web_url = "https://wudn9922.github.io/stock_tracker/"
+    web_url = "https://wudn9922.github.io/my_stock_screener/"
     
     line_msg_stocks = f"🎯 {today_str} 全市場增量看盤網頁！\n\n"
     line_msg_stocks += f"🇹🇼 【台灣股市區塊】\n"
