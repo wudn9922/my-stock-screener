@@ -22,11 +22,23 @@ def send_line_message(msg, access_token, user_id):
 
 def get_tw_tickers():
     try:
-        url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
+        # 🌟 修正：更換為目前最新、免申請最穩定的證交所個股行情 API
+        url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data"
         res = requests.get(url, headers=HTTP_HEADERS, timeout=15)
         if res.status_code == 200:
-            return [f"{item['Code'].strip()}.TW" for item in res.json() if len(item['Code'].strip()) == 4 and item['Code'].strip().isdigit()]
-    except Exception as e: print(f"獲取台股清單失敗: {e}")
+            data = res.json()
+            # 判斷回傳結構是帶有 data 欄位的 dict 還是直接為 list
+            rows = data['data'] if isinstance(data, dict) and 'data' in data else data
+            
+            tickers = []
+            for item in rows:
+                # 兼容新舊版欄位名稱 (Code 或 證券代號)
+                code = item.get('Code', item.get('證券代號', '')).strip()
+                if len(code) == 4 and code.isdigit():
+                    tickers.append(f"{code}.TW")
+            return tickers
+    except Exception as e: 
+        print(f"獲取台股清單失敗: {e}")
     return ["2330.TW", "2317.TW", "2454.TW"]
 
 def get_us_tickers():
