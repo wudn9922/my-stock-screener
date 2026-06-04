@@ -47,14 +47,13 @@ def update_and_scan_dataset(tickers, is_us=False):
     """
     🔄 核心邏輯：
     1. 判斷本地是否有歷史 CSV，若無則初始化下載 250 天。
-    2. 若有，則只向 Yahoo 下載最新 5 天的資料（防週末跳空），並進行聯集（Combine）。
+    2. 若有，則只向 Yahoo 下載最新 5 天的資料，並進行聯集。
     3. 嚴格對資料集進行瘦身，只保留最新的 201 天紀錄，並存回 CSV。
     4. 進行 MA20 潛伏股篩選。
     """
     os.makedirs(DATA_DIR, exist_ok=True)
     matched_list = []
     
-    # 判斷哪些股票需要初始化（新加入的），哪些可以進行快速增量更新
     need_init = []
     need_update = []
     
@@ -65,7 +64,7 @@ def update_and_scan_dataset(tickers, is_us=False):
         else:
             need_init.append(ticker)
             
-    # 1. 處理新股票（初始化下載較長歷史）
+    # 1. 處理新股票
     if need_init:
         print(f"🆕 發現 {len(need_init)} 檔新標的，進行首次歷史資料下載...")
         try:
@@ -74,12 +73,12 @@ def update_and_scan_dataset(tickers, is_us=False):
                 df_t = init_data[ticker] if ticker in init_data.columns.get_level_values(0) else None
                 if df_t is not None and not df_t.empty:
                     df_clean = df_t[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
-                    df_clean = df_clean.tail(MAX_DAYS) # 只留 201 天
+                    df_clean = df_clean.tail(MAX_DAYS) 
                     df_clean.to_csv(os.path.join(DATA_DIR, f"{ticker}.csv"))
         except Exception as e:
             print(f"初始化下載失敗: {e}")
 
-    # 2. 處理舊股票（增量更新：只下載最新 5 天以包含最新交易日）
+    # 2. 處理舊股票（增量更新）
     if need_update:
         print(f"⚡ 正在對 {len(need_update)} 檔股票進行「當日最新進度」增量更新...")
         try:
@@ -88,26 +87,24 @@ def update_and_scan_dataset(tickers, is_us=False):
                 df_today = today_data[ticker] if ticker in today_data.columns.get_level_values(0) else None
                 csv_path = os.path.join(DATA_DIR, f"{ticker}.csv")
                 
-                # 讀取本地舊資料
                 df_local = pd.read_csv(csv_path, index_col=0, parse_dates=True)
                 
                 if df_today is not None and not df_today.empty:
                     df_today_clean = df_today[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
                     
-                    # 合併新舊資料，並以「日期」去重（重複的以最新下載的為準）
+                    # 合併新舊資料
                     df_combined = pd.concat([df_local, df_today_clean])
-                    df_combined = df_combined ~ df_combined.index.duplicated(keep='last')
+                    # 🛠️ 這裡修正了：加上中括號，正確排除重複的日期列
+                    df_combined = df_combined[~df_combined.index.duplicated(keep='last')]
                     df_combined = df_combined.sort_index()
                     
-                    # ✂️ 關鍵：只保留最新 201 天的資料，刪除更早以前的
+                    # ✂️ 滾動保留最新 201 天
                     df_combined = df_combined.tail(MAX_DAYS)
-                    
-                    # 存回本地檔案系統
                     df_combined.to_csv(csv_path)
         except Exception as e:
             print(f"增量更新過程中發生錯誤: {e}. 將使用本地既有資料進行分析。")
 
-    # 3. 全面掃描本地已更新完畢的資料集，計算技術指標
+    # 3. 全面掃描本地已更新完畢的資料集
     for ticker in tickers:
         try:
             csv_path = os.path.join(DATA_DIR, f"{ticker}.csv")
@@ -116,16 +113,14 @@ def update_and_scan_dataset(tickers, is_us=False):
             df_local = pd.read_csv(csv_path, index_col=0, parse_dates=True)
             if len(df_local) < 20: continue
             
-            # 計算 MA20
             df_local['MA20'] = df_local['Close'].rolling(window=20).mean()
             price = float(df_local['Close'].iloc[-1])
             ma20 = float(df_local['MA20'].iloc[-1])
             if pd.isna(ma20): continue
             
-            # 均線潛伏條件：現價在 MA20 之下且距離 3% 以內
             if ma20 * 0.97 <= price < ma20:
                 diff_pct = ((price / ma20) - 1) * 100
-                df_chart = df_local.tail(30) # 網頁只展示近 30 天 K 線
+                df_chart = df_local.tail(30)
                 title_str = f"(現價: {round(price,2)} | 距MA20: {round(diff_pct,2)}%)"
                 chart_data = build_stock_data(df_chart, ticker, title_str)
                 matched_list.append({
@@ -138,6 +133,7 @@ def update_and_scan_dataset(tickers, is_us=False):
             
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
     return matched_list
+
 
 def generate_html(data_dict, date_str):
     js_store = "const chartDataStore = " + json.dumps(data_dict, ensure_ascii=False) + ";\n"
