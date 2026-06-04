@@ -322,7 +322,6 @@ def main():
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     
-    # 🌟 修正點：將本地滾動歷史數據 CSV 檔案一併加入 commit 機制，實現實體化持久存檔
     os.system('git add docs/index.html data/*.csv')
     os.system('git commit -m "⚙️ 視覺優化：升級增量更新數據存檔排版"')
     os.system('git push')
@@ -330,7 +329,9 @@ def main():
     # =========================================================================
     # ✉️ 【發送 訊息一：每日個股均線潛伏報告】
     # =========================================================================
-    web_url = "https://wudn9922.github.io/my-stock-screener/"
+    # 🌟 修正點：網址已更新為新專案路徑 stock_tracker
+    web_url = "https://wudn9922.github.io/stock_tracker/"
+    
     line_msg_stocks = f"🎯 {today_str} 全市場增量看盤網頁！\n\n"
     line_msg_stocks += f"🇹🇼 【台灣股市區塊】\n"
     line_msg_stocks += f" ├ 1. 全市場符合：{len(data_dict['tw_all'])} 檔\n"
@@ -354,7 +355,6 @@ def main():
     
     line_msg_index += f"【 🇹🇼 台灣市場 】\n"
     line_msg_index += analyze_index_trend("^TWII", "台灣加權指數", ma_list=[20, 27, 61]) + "\n"
-    # 🌟 升級點：同步將台灣櫃買指數(OTC)追加進多空速報
     line_msg_index += analyze_index_trend("^TWOII", "台灣櫃買指數(OTC)", ma_list=[20, 60, 120]) + "\n\n"
     
     line_msg_index += f"【 🇺🇸 美國市場 】\n"
