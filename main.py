@@ -58,29 +58,31 @@ def get_tw_tickers(min_volume):
 
     # ==========================================
     # 引擎 2：櫃買中心 (TPEx) - 獲取「上櫃」股票 (.TWO)
-    # 🟢 修正點：改用「每日收盤行情」API，免參數直接獲取全市場
+    # 🟢 終極修正點：改用官方 OpenAPI 免日期參數端點，徹底解決空包彈問題
     # ==========================================
-    tpex_url = "https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&o=json"
+    tpex_url = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
     for attempt in range(3):
         try:
             res = requests.get(tpex_url, headers=HTTP_HEADERS, timeout=15)
             if res.status_code == 200:
                 data = res.json()
-                if "aaData" in data:
-                    for row in data["aaData"]:
-                        code = str(row[0]).strip()
+                if isinstance(data, list):
+                    for item in data:
+                        # 1. 自動相容英中欄位，提取股票代號
+                        code = str(item.get("SecuritiesCompanyCode", item.get("證券代號", ""))).strip()
+                        
+                        # 篩選標準 4 碼個股
                         if len(code) == 4 and code.isdigit():
-                            # 動態尋找成交股數 (通常在索引 8 或 7)
+                            # 2. 自動尋找成交股數欄位 (新版 OpenAPI 預設為 TradingVolume)
                             vol_val = 0
-                            for idx in [8, 7]:
-                                try:
-                                    # 嘗試將字串轉為數字 (移除逗號)
-                                    test_val = float(str(row[idx]).replace(',', ''))
-                                    if test_val > 0: 
-                                        vol_val = test_val
+                            for vol_key in ["TradingVolume", "成交股數", "volume", "Volume"]:
+                                if vol_key in item:
+                                    try:
+                                        vol_val = float(str(item[vol_key]).replace(',', ''))
                                         break
-                                except: pass
+                                    except: pass
                             
+                            # 3. 量能門檻過濾
                             if vol_val >= min_volume:
                                 tickers.append(f"{code}.TWO")
                 break
@@ -96,6 +98,7 @@ def get_tw_tickers(min_volume):
         
     print(f"🔥 雙引擎啟動！今日通過量能前置篩選的台股 (含上市+上櫃) 總計: {len(tickers)} 檔")
     return tickers
+
 
 
 def get_us_tickers():
