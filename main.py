@@ -21,20 +21,36 @@ def send_line_message(msg, access_token, user_id):
     return res.status_code
 
 def get_tw_tickers():
+    tickers = []
+    # 獲取上市股票 (.TW)
     try:
         url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data"
         res = requests.get(url, headers=HTTP_HEADERS, timeout=15)
         if res.status_code == 200:
             df = pd.read_csv(io.StringIO(res.text))
             code_col = '證券代號' if '證券代號' in df.columns else 'Code' if 'Code' in df.columns else df.columns[0]
-            tickers = []
             for code in df[code_col].astype(str).str.strip():
                 if len(code) == 4 and code.isdigit():
                     tickers.append(f"{code}.TW")
-            return tickers
     except Exception as e: 
-        print(f"獲取台股清單失敗: {e}")
-    return ["2330.TW", "2317.TW", "2454.TW"]
+        print(f"獲取台股上市清單失敗: {e}")
+        
+    # 獲取上櫃股票 (.TWO)
+    try:
+        url_tpex = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
+        res_tpex = requests.get(url_tpex, headers=HTTP_HEADERS, timeout=15)
+        if res_tpex.status_code == 200:
+            data_tpex = res_tpex.json()
+            for item in data_tpex:
+                code = str(item.get('SecuritiesCompanyCode', '')).strip()
+                if len(code) == 4 and code.isdigit():
+                    tickers.append(f"{code}.TWO")
+    except Exception as e:
+        print(f"獲取台股上櫃清單失敗: {e}")
+        
+    if not tickers:
+        return ["2330.TW", "2317.TW", "2454.TW", "8069.TWO"]
+    return tickers
 
 def get_us_tickers():
     try:
@@ -92,7 +108,6 @@ def scan_market(tickers, min_volume):
                 if data.empty: continue
                 for ticker in chunk:
                     try:
-                        # 🌟 核心修復：高精確度相容 yfinance 批次下載的雙層欄位解構
                         if isinstance(data.columns, pd.MultiIndex):
                             if ticker in data.columns.get_level_values(1):
                                 df_t = data.xs(ticker, level=1, axis=1)
@@ -117,7 +132,6 @@ def scan_market(tickers, min_volume):
                 if data.empty: continue
                 for ticker in chunk:
                     try:
-                        # 🌟 核心修復：高精確度相容批次下載欄位
                         if isinstance(data.columns, pd.MultiIndex):
                             if ticker in data.columns.get_level_values(1):
                                 df_today = data.xs(ticker, level=1, axis=1)
@@ -180,7 +194,6 @@ def process_custom_groups(group_dict):
         data = yf.download(tickers, period="5d", progress=False, threads=False)
         for ticker in tickers:
             try:
-                # 🌟 核心修復：自選群組同樣進行雙層欄位安全對齊
                 if isinstance(data.columns, pd.MultiIndex):
                     if ticker in data.columns.get_level_values(1):
                         df_today = data.xs(ticker, level=1, axis=1)
@@ -207,14 +220,34 @@ def process_custom_groups(group_dict):
                 df_combined = df_combined[~df_combined.index.duplicated(keep='last')].sort_index().tail(MAX_DAYS)
                 df_combined.to_csv(csv_path)
                 
+                # 🌟 核心修正：計算該股票專屬的所有自訂均線
                 ma_list = group_dict[ticker]
                 for ma_window in ma_list: 
                     df_combined[f'MA{ma_window}'] = df_combined['Close'].rolling(window=ma_window).mean()
                     
                 price = float(df_combined['Close'].iloc[-1])
+                
+                # 🌟 核心過濾邏輯：檢查是否符合「任意一條自訂均線」之下且 3% 以內的規則
+                matched_any_ma = False
+                triggered_info = []
+                
+                for ma_window in ma_list:
+                    ma_val = float(df_combined[f'MA{ma_window}'].iloc[-1])
+                    if pd.isna(ma_val): continue
+                    
+                    # 判斷現價是否在此條均線下方，且差距在 3% 以內
+                    if ma_val * 0.97 <= price < ma_val:
+                        diff_pct = ((price / ma_val) - 1) * 100
+                        triggered_info.append(f"近MA{ma_window}({round(diff_pct,2)}%)")
+                        matched_any_ma = True
+                
+                # 如果這檔股票沒有靠近任何一條它自己的均線，直接剔除不顯示！
+                if not matched_any_ma: continue
+                
+                # 建立圖表與資訊標題
                 df_chart = df_combined.tail(60)
-                ma_info = " | ".join([f"MA{w}: {round(df_combined[f'MA{w}'].iloc[-1], 2)}" for w in ma_list if not pd.isna(df_combined[f'MA{w}'].iloc[-1])])
-                title_str = f"(現價: {round(price,2)} | {ma_info})"
+                ma_status_str = " | ".join([f"MA{w}:{round(df_combined[f'MA{w}'].iloc[-1], 2)}" for w in ma_list if not pd.isna(df_combined[f'MA{w}'].iloc[-1])])
+                title_str = f"(現價: {round(price,2)} | {'/'.join(triggered_info)} | {ma_status_str})"
                 chart_data = build_stock_data(df_chart, ticker, title_str, ma_list)
                 matched_list.append({'ticker': ticker, 'volume': 0, 'chart_data': chart_data})
             except Exception: continue
@@ -226,7 +259,7 @@ def generate_html(data_dict, date_str):
     html_template = f"""<!DOCTYPE html><html><head><title>台美股均線潛伏報告</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script><style>body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }} .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }} .category-box {{ background: #1a1a1a; padding: 12px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #00b0ff; }} .category-title {{ font-size: 15px; font-weight: bold; color: #00ff88; margin-bottom: 10px; padding-left: 5px; }} .tabs {{ display: flex; flex-wrap: wrap; gap: 6px; }} .tab-btn {{ background: #2a2a2a; color: #aaa; border: none; padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; transition: 0.3s; }} .tab-btn:hover {{ background: #3a3a3a; }} .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }} .market-section {{ display: none; max-width: 800px; margin: 0 auto; }} .market-section.active {{ display: block; }} .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }} .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }} .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 14px; }}</style></head><body><div class="header"><h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2><p style="margin: 5px 0 0 0; color:#00ff88; font-size:13px;">增量滾動數據儲存版</p></div>
     
     <div class="category-box" style="border-left-color: #ff5252;">
-        <div class="category-title">🇹🇼 台灣股市區塊</div>
+        <div class="category-title">🇹🇼 台灣股市區塊 (已整合上市與上櫃公司)</div>
         <div class="tabs">
             <button id="btn-tw_all" class="tab-btn active" onclick="switchMarket(event, 'tw_all')">全市場潛伏 ({len(data_dict['tw_all'])})</button>
             <button id="btn-tw_g1" class="tab-btn" onclick="switchMarket(event, 'tw_g1')">核心權值精選 ({len(data_dict['tw_g1'])})</button>
@@ -252,7 +285,7 @@ def generate_html(data_dict, date_str):
         html_template += f'<div id="{key}-market" class="market-section{active_class}">'
         if data_dict[key]:
             for idx in range(len(data_dict[key])): html_template += f'<div class="chart-card"><div id="chart-{key}-{idx}" class="plotly-container"></div></div>'
-        else: html_template += '<div class="no-data">此分類目前無股票資料</div>'
+        else: html_template += '<div class="no-data">此分類目前無股票符合群組自訂均線潛伏條件</div>'
         html_template += '</div>'
         
     html_template += f"""<script>{js_store} function renderMarketCharts(marketId) {{ const items = chartDataStore[marketId]; if (!items) return; items.forEach((item, idx) => {{ const elementId = "chart-" + marketId + "-" + idx; const container = document.getElementById(elementId); if (container && !container.dataset.done) {{ Plotly.newPlot(container, item.chart_data.data, item.chart_data.layout, {{responsive: true, displayModeBar: false}}); container.dataset.done = "true"; }} }}); }} function switchMarket(event, marketId) {{ document.querySelectorAll('.market-section').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); document.getElementById(marketId + '-market').classList.add('active'); if(event) {{ event.currentTarget.classList.add('active'); }} else {{ document.getElementById('btn-' + marketId).classList.add('active'); }} renderMarketCharts(marketId); window.dispatchEvent(new Event('resize')); }} window.addEventListener("load", function() {{ renderMarketCharts('tw_all'); }});</script></body></html>"""
@@ -326,6 +359,7 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
     weekday = datetime.now().weekday() 
 
+    # 這裡可以自由調整你認為最適合每檔股票的 1~4 條均線
     tw_g1_config = {"2330.TW": [10, 20], "2317.TW": [20, 60], "2454.TW": [5, 10, 20]} 
     tw_g2_config = {"2603.TW": [20, 60], "2609.TW": [5, 10], "0050.TW": [5, 20]}      
     
@@ -351,25 +385,25 @@ def main():
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     
     os.system('git add docs/index.html data/*.csv')
-    os.system('git commit -m "⚙️ 視覺優化：升級增量更新數據存檔排版"')
+    os.system('git commit -m "⚙️ 邏輯優化：修正自選群組均線自適應過濾機制"')
     os.system('git push')
 
     # =========================================================================
     # ✉️ 【發送 訊息一：每日個股均線潛伏報告】
     # =========================================================================
-    web_url = "https://wudn9922.github.io/my-stock-screener/"
+    web_url = "https://wudn9922.github.io/stock_tracker/"
     
     line_msg_stocks = f"🎯 {today_str} 全市場增量看盤網頁！\n\n"
     line_msg_stocks += f"🇹🇼 【台灣股市區塊】\n"
-    line_msg_stocks += f" ├ 1. 全市場符合：{len(data_dict['tw_all'])} 檔\n"
-    line_msg_stocks += f" ├ 2. 核心權值精選：{len(data_dict['tw_g1'])} 檔\n"
-    line_msg_stocks += f" └ 3. 航運與指標ETF：{len(data_dict['tw_g2'])} 檔\n\n"
+    line_msg_stocks += f" ├ 1. 全市場符合(含上市櫃)：{len(data_dict['tw_all'])} 檔\n"
+    line_msg_stocks += f" ├ 2. 核心權值精選符合：{len(data_dict['tw_g1'])} 檔\n"
+    line_msg_stocks += f" └ 3. 航運與指標ETF符合：{len(data_dict['tw_g2'])} 檔\n\n"
     line_msg_stocks += f"🇺🇸 【美國股市區塊】\n"
     line_msg_stocks += f" ├ 1. 全市場符合：{len(data_dict['us_all'])} 檔\n"
-    line_msg_stocks += f" ├ 2. AI與半導體：{len(data_dict['us_g1'])} 檔\n"
-    line_msg_stocks += f" ├ 3. 科技旗艦巨頭：{len(data_dict['us_g2'])} 檔\n"
-    line_msg_stocks += f" ├ 4. 特斯拉特選：{len(data_dict['us_g3'])} 檔\n"
-    line_msg_stocks += f" └ 5. 亞馬遜消費成長：{len(data_dict['us_g4'])} 檔\n\n"
+    line_msg_stocks += f" ├ 2. AI與半導體符合：{len(data_dict['us_g1'])} 檔\n"
+    line_msg_stocks += f" ├ 3. 科技旗艦巨頭符合：{len(data_dict['us_g2'])} 檔\n"
+    line_msg_stocks += f" ├ 4. 特斯拉特選符合：{len(data_dict['us_g3'])} 檔\n"
+    line_msg_stocks += f" └ 5. 亞馬遜消費成長符合：{len(data_dict['us_g4'])} 檔\n\n"
     line_msg_stocks += f"🔗 點擊網址：\n{web_url}"
     send_line_message(line_msg_stocks, access_token, user_id)
 
@@ -403,7 +437,6 @@ def main():
     send_line_message(line_msg_index, access_token, user_id)
 
     if weekday == 0:  
-        print("檢測到今天為週一，發送最新免登入美股類股觀測鏈結...")
         sectors_url = "https://finviz.com/groups.ashx?g=sector&v=110"
         line_msg_sectors = f"📅 【每週一限定】美股 11 大類股週線趨勢輪動圖\n"
         line_msg_sectors += f"⏳ 包含 1-2 年週線級別核心波段追蹤\n\n"
