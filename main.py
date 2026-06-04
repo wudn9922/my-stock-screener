@@ -49,8 +49,9 @@ def get_tw_tickers(min_volume):
                 vol_col = '成交股數' if '成交股數' in df_twse.columns else 'TradeVolume' if 'TradeVolume' in df_twse.columns else 'Volume' if 'Volume' in df_twse.columns else None
                 
                 for _, row in df_twse.iterrows():
-                    code = str(row[code_col]).strip()
-                    if len(code) == 4 and code.isdigit():
+                    code = str(int(row[code_col])).strip()  # 先轉int去掉小數點
+                    if len(code) == 4 and code.isdigit() and not code.startswith('0'):
+
                         if vol_col:
                             try:
                                 vol_val = float(str(row[vol_col]).replace(',', ''))*1000
