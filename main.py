@@ -30,85 +30,71 @@ def send_line_message(msg, access_token, user_id):
 def get_tw_tickers(min_volume):
     tickers = []
     
-    # ==========================================
-    # 引擎 1：台灣證交所 (TWSE) - 獲取「上市」股票 (.TW)
-    # ==========================================
+    # 引擎 1：TWSE 上市
     twse_url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data"
     for attempt in range(3):
         try:
             res = requests.get(twse_url, headers=HTTP_HEADERS, timeout=15)
             if res.status_code == 200:
                 df_twse = pd.read_csv(io.StringIO(res.text))
-                # ===== 加這幾行 DEBUG =====
-                print("TWSE 欄位名稱:", df_twse.columns.tolist())
-                print("TWSE 前3筆資料:")
-                print(df_twse.head(3))
-                print("總行數:", len(df_twse))
-                # ==========================
-                code_col = '證券代號' if '證券代號' in df_twse.columns else 'Code' if 'Code' in df_twse.columns else df_twse.columns[0]
-                vol_col = '成交股數' if '成交股數' in df_twse.columns else 'TradeVolume' if 'TradeVolume' in df_twse.columns else 'Volume' if 'Volume' in df_twse.columns else None
-                
-                for _, row in df_twse.iterrows():
-                    code = str(int(row[code_col])).strip()  # 先轉int去掉小數點
-                    if len(code) == 4 and code.isdigit() and not code.startswith('0'):
+                code_col = '證券代號' if '證券代號' in df_twse.columns else df_twse.columns[0]
+                vol_col = '成交股數' if '成交股數' in df_twse.columns else None
 
+                for _, row in df_twse.iterrows():
+                    try:
+                        raw = str(row[code_col]).strip()
+                        # 過濾：只保留純4位數字、不以0開頭（排除ETF）
+                        if len(raw) != 4 or not raw.isdigit() or raw.startswith('0'):
+                            continue
                         if vol_col:
-                            try:
-                                vol_val = float(str(row[vol_col]).replace(',', ''))*1000
-                                if vol_val < min_volume: continue
-                            except: pass
-                        tickers.append(f"{code}.TW")
+                            vol_val = float(str(row[vol_col]).replace(',', ''))
+                            if vol_val < min_volume:
+                                continue
+                        tickers.append(f"{raw}.TW")
+                    except Exception:
+                        continue
+                print(f"✅ TWSE 上市：{len(tickers)} 檔通過")
                 break
         except Exception as e:
             if attempt == 2: print(f"❌ 獲取上市清單失敗: {e}")
             else: time.sleep(2)
 
-    # ==========================================
-    # 引擎 2：櫃買中心 (TPEx) - 獲取「上櫃」股票 (.TWO)
-    # 🟢 終極修正點：改用官方 OpenAPI 免日期參數端點，徹底解決空包彈問題
-    # ==========================================
+    # 引擎 2：TPEx 上櫃
     tpex_url = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
+    tpex_count = 0
     for attempt in range(3):
         try:
             res = requests.get(tpex_url, headers=HTTP_HEADERS, timeout=15)
-
             if res.status_code == 200:
                 data = res.json()
-                # ===== 加這幾行 DEBUG =====
-                print("TPEx 第一筆:", data[0] if data else "空的")
-                print("TPEx 總筆數:", len(data))
-                # ==========================
                 if isinstance(data, list):
                     for item in data:
-                        # 1. 自動相容英中欄位，提取股票代號
-                        code = str(item.get("SecuritiesCompanyCode", item.get("證券代號", ""))).strip()
+                        code = str(item.get("SecuritiesCompanyCode", "")).strip()
+                        if len(code) != 4 or not code.isdigit():
+                            continue
+                        vol_val = 0
+                        for vol_key in ["TradingShares", "TradingVolume", "成交股數"]:
+                            if vol_key in item:
+                                try:
+                                    vol_val = float(str(item[vol_key]).replace(',', ''))
+                                    break
+                                except: pass
                         
-                        # 篩選標準 4 碼個股
-                        if len(code) == 4 and code.isdigit():
-                            # 2. 自動尋找成交股數欄位 (新版 OpenAPI 預設為 TradingVolume)
-                            vol_val = 0
-                            for vol_key in ["TradingShares", "TradingVolume", "成交股數", "volume", "Volume"]:
-                                if vol_key in item:
-                                    try:
-                                        vol_val = float(str(item[vol_key]).replace(',', ''))
-                                        break
-                                    except: pass
-                            
-                            # 3. 量能門檻過濾
-                            if vol_val >= min_volume:
-                                tickers.append(f"{code}.TWO")
+                        if vol_val >= min_volume:
+                            tickers.append(f"{code}.TWO")
+                            tpex_count += 1
+                print(f"✅ TPEx 上櫃：{tpex_count} 檔通過")
                 break
         except Exception as e:
             if attempt == 2: print(f"❌ 獲取上櫃清單失敗: {e}")
             else: time.sleep(2)
 
     tickers = list(set(tickers))
-    
-    # 防禦機制
+
     if not tickers:
-        return ["2330.TW", "2317.TW", "2454.TW", "2603.TW", "0050.TW", "8069.TWO", "5483.TWO", "6488.TWO"]
-        
-    print(f"🔥 雙引擎啟動！今日通過量能前置篩選的台股 (含上市+上櫃) 總計: {len(tickers)} 檔")
+        return ["2330.TW", "2317.TW", "2454.TW", "2603.TW", "0050.TW"]
+
+    print(f"🔥 雙引擎完成！台股總計: {len(tickers)} 檔 (含上市+上櫃)")
     return tickers
 
 
@@ -439,7 +425,7 @@ def main():
     # =========================================================================
     # ✉️ 【發送 訊息一：每日個股均線潛伏報告】
     # =========================================================================
-    web_url = "https://wudn9922.github.io/stock_tracker/"
+    web_url = "https://wudn9922.github.io/my-stock-screener/"
     
     line_msg_stocks = f"🎯 {today_str} 全市場增量看盤網頁！\n\n"
     line_msg_stocks += f"🇹🇼 【台灣股市區塊】\n"
