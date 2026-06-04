@@ -6,6 +6,9 @@ from datetime import datetime
 import json
 import io
 
+# 🌟 核心修正 1：關閉 yfinance 的 SQLite 快取，徹底解決 database is locked 錯誤
+yf.set_tz_cache_location(None)
+
 HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
@@ -22,18 +25,18 @@ def send_line_message(msg, access_token, user_id):
 
 def get_tw_tickers():
     try:
-        # 🌟 修正：更換為目前最新、免申請最穩定的證交所個股行情 API
+        # 🌟 核心修正 2：改用證交所最穩定的 CSV OpenData 網址，100% 避開不穩定的 OpenAPI
         url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data"
         res = requests.get(url, headers=HTTP_HEADERS, timeout=15)
         if res.status_code == 200:
-            data = res.json()
-            # 判斷回傳結構是帶有 data 欄位的 dict 還是直接為 list
-            rows = data['data'] if isinstance(data, dict) and 'data' in data else data
+            # 使用 StringIO 讀取 CSV，完美兼容新版 pandas 規範
+            df = pd.read_csv(io.StringIO(res.text))
+            
+            # 確保欄位存在（欄位名稱可能是 '證券代號' 或 'Code'）
+            code_col = '證券代號' if '證券代號' in df.columns else 'Code' if 'Code' in df.columns else df.columns[0]
             
             tickers = []
-            for item in rows:
-                # 兼容新舊版欄位名稱 (Code 或 證券代號)
-                code = item.get('Code', item.get('證券代號', '')).strip()
+            for code in df[code_col].astype(str).str.strip():
                 if len(code) == 4 and code.isdigit():
                     tickers.append(f"{code}.TW")
             return tickers
@@ -44,7 +47,9 @@ def get_tw_tickers():
 def get_us_tickers():
     try:
         url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        df = pd.read_html(requests.get(url, headers=HTTP_HEADERS).text)[0]
+        # 🌟 核心修正 3：加入 io.StringIO 消除 pandas.read_html 的警告
+        html_text = requests.get(url, headers=HTTP_HEADERS).text
+        df = pd.read_html(io.StringIO(html_text))[0]
         return [t.replace('.', '-') for t in df['Symbol'].tolist()]
     except Exception as e: print(f"獲取美股清單失敗: {e}")
     return ["AAPL", "MSFT", "NVDA"]
@@ -76,12 +81,10 @@ def build_stock_data(df_chart, ticker, title_suffix, ma_list):
     return {"data": traces, "layout": layout}
 
 def scan_market(tickers, min_volume):
-    """ 🔄 升級為增量儲存 + 滾動裁切資料庫模式 (全市場掃描) """
     os.makedirs(DATA_DIR, exist_ok=True)
     matched_list = []
     chunk_size = 40
     
-    # 分流處理：新票初始化下載，舊票增量下載
     need_init = []
     need_update = []
     for ticker in tickers:
@@ -90,7 +93,6 @@ def scan_market(tickers, min_volume):
         else:
             need_init.append(ticker)
             
-    # 1. 初始化下載歷史 (250天)
     if need_init:
         for i in range(0, len(need_init), chunk_size):
             chunk = need_init[i:i+chunk_size]
@@ -107,7 +109,6 @@ def scan_market(tickers, min_volume):
                     except Exception: continue
             except Exception: pass
 
-    # 2. 增量下載當日最新數據 (5天，防週末跳空)
     if need_update:
         for i in range(0, len(need_update), chunk_size):
             chunk = need_update[i:i+chunk_size]
@@ -124,18 +125,15 @@ def scan_market(tickers, min_volume):
                         csv_path = os.path.join(DATA_DIR, f"{ticker}.csv")
                         df_local = pd.read_csv(csv_path, index_col=0, parse_dates=True)
                         
-                        # 聯集去重
                         df_combined = pd.concat([df_local, df_today_clean])
                         df_combined = df_combined[~df_combined.index.duplicated(keep='last')]
                         df_combined = df_combined.sort_index()
                         
-                        # ✂️ 滾動刪除 201 天以前的舊資料
                         df_combined = df_combined.tail(MAX_DAYS)
                         df_combined.to_csv(csv_path)
                     except Exception: continue
             except Exception: pass
 
-    # 3. 掃描本地已更新的資料集並計算均線
     for ticker in tickers:
         try:
             csv_path = os.path.join(DATA_DIR, f"{ticker}.csv")
@@ -164,7 +162,6 @@ def scan_market(tickers, min_volume):
     return matched_list
 
 def process_custom_groups(group_dict):
-    """ 🔄 自選群組同步升級為增量儲存 201 天模式 """
     matched_list = []
     tickers = list(group_dict.keys())
     if not tickers: return matched_list
@@ -184,7 +181,6 @@ def process_custom_groups(group_dict):
                     df_local = pd.read_csv(csv_path, index_col=0, parse_dates=True)
                     df_combined = pd.concat([df_local, df_today_clean])
                 else:
-                    # 沒有歷史的話補抓歷史
                     df_init = yf.download(ticker, period="250d", progress=False)
                     df_combined = df_init[required_cols].dropna()
                     
@@ -341,7 +337,6 @@ def main():
     # =========================================================================
     # ✉️ 【發送 訊息一：每日個股均線潛伏報告】
     # =========================================================================
-    # 🌟 修正點：網址已更新為新專案路徑 stock_tracker
     web_url = "https://wudn9922.github.io/stock_tracker/"
     
     line_msg_stocks = f"🎯 {today_str} 全市場增量看盤網頁！\n\n"
