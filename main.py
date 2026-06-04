@@ -58,9 +58,9 @@ def get_tw_tickers(min_volume):
 
     # ==========================================
     # 引擎 2：櫃買中心 (TPEx) - 獲取「上櫃」股票 (.TWO)
-    # 改用網頁前端端點 (o=json)，避開 OpenAPI 防火牆
+    # 🟢 修正點：改用「每日收盤行情」API，免參數直接獲取全市場
     # ==========================================
-    tpex_url = "https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php?l=zh-tw&o=json&se=EW"
+    tpex_url = "https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&o=json"
     for attempt in range(3):
         try:
             res = requests.get(tpex_url, headers=HTTP_HEADERS, timeout=15)
@@ -69,15 +69,20 @@ def get_tw_tickers(min_volume):
                 if "aaData" in data:
                     for row in data["aaData"]:
                         code = str(row[0]).strip()
-                        # row[7] 通常是成交股數
-                        vol_str = str(row[7]).replace(',', '')
-                        
                         if len(code) == 4 and code.isdigit():
-                            try:
-                                vol_val = float(vol_str)
-                                if vol_val < min_volume: continue
-                            except: pass
-                            tickers.append(f"{code}.TWO")
+                            # 動態尋找成交股數 (通常在索引 8 或 7)
+                            vol_val = 0
+                            for idx in [8, 7]:
+                                try:
+                                    # 嘗試將字串轉為數字 (移除逗號)
+                                    test_val = float(str(row[idx]).replace(',', ''))
+                                    if test_val > 0: 
+                                        vol_val = test_val
+                                        break
+                                except: pass
+                            
+                            if vol_val >= min_volume:
+                                tickers.append(f"{code}.TWO")
                 break
         except Exception as e:
             if attempt == 2: print(f"❌ 獲取上櫃清單失敗: {e}")
@@ -91,6 +96,7 @@ def get_tw_tickers(min_volume):
         
     print(f"🔥 雙引擎啟動！今日通過量能前置篩選的台股 (含上市+上櫃) 總計: {len(tickers)} 檔")
     return tickers
+
 
 def get_us_tickers():
     try:
