@@ -5,12 +5,13 @@ import os
 from datetime import datetime
 import json
 import io
+import time
 
 # =========================================================================
 # ⚙️ 全域核心參數設定（可在這裡自由調整篩選嚴格度）
 # =========================================================================
-TW_MIN_VOLUME = 1000000  # 台股全市場基本門檻：1,000,000股 (等於 1000張)。若想看到更多中小型股，可改為 500000 (500張)
-US_MIN_VOLUME = 100000   # 美股全市場基本門檻：100,000股
+TW_MIN_VOLUME = 1000000  # 1,000,000股 = 1000張
+US_MIN_VOLUME = 100000   # 美股基本門檻：100,000股
 
 HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -28,47 +29,53 @@ def send_line_message(msg, access_token, user_id):
 
 def get_tw_tickers(min_volume):
     tickers = []
-    # 🌟 優化：在 API 端直接過濾量能，避免集體請求被 Yahoo 封鎖
-    # 1. 獲取上市股票 (.TW)
-    try:
-        url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data"
-        res = requests.get(url, headers=HTTP_HEADERS, timeout=15)
-        if res.status_code == 200:
-            df = pd.read_csv(io.StringIO(res.text))
-            code_col = '證券代號' if '證券代號' in df.columns else 'Code' if 'Code' in df.columns else df.columns[0]
-            vol_col = '成交股數' if '成交股數' in df.columns else 'TradeVolume' if 'TradeVolume' in df.columns else 'Volume' if 'Volume' in df.columns else None
+    
+    # 1. 獲取上市股票 (.TW) - 加上重試機制
+    for attempt in range(3):
+        try:
+            url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data"
+            res = requests.get(url, headers=HTTP_HEADERS, timeout=30) # 拉長至 30 秒
+            if res.status_code == 200:
+                df = pd.read_csv(io.StringIO(res.text))
+                code_col = '證券代號' if '證券代號' in df.columns else 'Code' if 'Code' in df.columns else df.columns[0]
+                vol_col = '成交股數' if '成交股數' in df.columns else 'TradeVolume' if 'TradeVolume' in df.columns else 'Volume' if 'Volume' in df.columns else None
+                
+                for _, row in df.iterrows():
+                    code = str(row[code_col]).strip()
+                    if len(code) == 4 and code.isdigit():
+                        if vol_col:
+                            try:
+                                vol_val = float(str(row[vol_col]).replace(',', ''))
+                                if vol_val < min_volume: continue
+                            except: pass
+                        tickers.append(f"{code}.TW")
+                break # 成功就跳出重試迴圈
+        except Exception as e:
+            if attempt == 2: print(f"❌ 獲取台股上市清單失敗 (已重試3次): {e}")
+            else: time.sleep(2)
             
-            for _, row in df.iterrows():
-                code = str(row[code_col]).strip()
-                if len(code) == 4 and code.isdigit():
-                    # 前置量能過濾
-                    if vol_col:
+    # 2. 獲取上櫃股票 (.TWO) - 強化抗突發性斷線與超時
+    for attempt in range(3):
+        try:
+            url_tpex = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
+            res_tpex = requests.get(url_tpex, headers=HTTP_HEADERS, timeout=30) # 拉長至 30 秒
+            if res_tpex.status_code == 200:
+                data_tpex = res_tpex.json()
+                for item in data_tpex:
+                    code = str(item.get('SecuritiesCompanyCode', '')).strip()
+                    if len(code) == 4 and code.isdigit():
                         try:
-                            vol_val = float(str(row[vol_col]).replace(',', ''))
+                            vol_val = float(item.get('TradeVolume', 0))
                             if vol_val < min_volume: continue
                         except: pass
-                    tickers.append(f"{code}.TW")
-    except Exception as e: 
-        print(f"獲取台股上市清單失敗: {e}")
-        
-    # 2. 獲取上櫃股票 (.TWO)
-    try:
-        url_tpex = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
-        res_tpex = requests.get(url_tpex, headers=HTTP_HEADERS, timeout=15)
-        if res_tpex.status_code == 200:
-            data_tpex = res_tpex.json()
-            for item in data_tpex:
-                code = str(item.get('SecuritiesCompanyCode', '')).strip()
-                if len(code) == 4 and code.isdigit():
-                    # 前置量能過濾
-                    try:
-                        vol_val = float(item.get('TradeVolume', 0))
-                        if vol_val < min_volume: continue
-                    except: pass
-                    tickers.append(f"{code}.TWO")
-    except Exception as e:
-        print(f"獲取台股上櫃清單失敗: {e}")
-        
+                        tickers.append(f"{code}.TWO")
+                break # 成功就跳出重試迴圈
+        except Exception as e:
+            if attempt == 2: print(f"❌ 獲取台股上櫃清單失敗 (已重試3次): {e}")
+            else: 
+                print(f"⚠️ 上櫃伺服器回應慢，正在進行第 {attempt + 1} 次重新連線...")
+                time.sleep(3) # 失敗稍微等 3 秒再試
+                
     if not tickers:
         return ["2330.TW", "2317.TW", "2454.TW", "8069.TWO"]
     print(f"🔥 今日通過量能前置篩選的台股共: {len(tickers)} 檔")
@@ -384,7 +391,6 @@ def main():
     us_g3_config = {"TSLA": [10, 20]}                          
     us_g4_config = {"AMZN": [20]}                              
     
-    # 🌟 核心串接優化：直接把全域設定的量能門檻丟進 get_tw_tickers 進行前置清洗
     tw_market_pool = get_tw_tickers(TW_MIN_VOLUME)
     
     data_dict = {
@@ -404,13 +410,13 @@ def main():
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     
     os.system('git add docs/index.html data/*.csv')
-    os.system('git commit -m "⚙️ 性能與精準度優化：改用前置成交量過濾法避免防爬蟲鎖定"')
+    os.system('git commit -m "⚙️ 防禦力升級：加入櫃買中心API多重容錯與自動重試機制"')
     os.system('git push')
 
     # =========================================================================
     # ✉️ 【發送 訊息一：每日個股均線潛伏報告】
     # =========================================================================
-    web_url = "https://wudn9922.github.io/my-stock-screener/"
+    web_url = "https://wudn9922.github.io/stock_tracker/"
     
     line_msg_stocks = f"🎯 {today_str} 全市場增量看盤網頁！\n\n"
     line_msg_stocks += f"🇹🇼 【台灣股市區塊】\n"
