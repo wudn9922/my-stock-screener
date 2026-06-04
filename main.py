@@ -47,7 +47,7 @@ def get_tw_tickers(min_volume):
                     if len(code) == 4 and code.isdigit():
                         if vol_col:
                             try:
-                                vol_val = float(str(row[vol_col]).replace(',', ''))
+                                vol_val = float(str(row[vol_col]).replace(',', ''))*1000
                                 if vol_val < min_volume: continue
                             except: pass
                         tickers.append(f"{code}.TW")
