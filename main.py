@@ -6,9 +6,6 @@ from datetime import datetime
 import json
 import io
 
-# 🌟 核心修正 1：移除 yf.set_tz_cache_location(None)
-# 改用 yf.enable_debug_mode() 或是直接不設定，避免 TypeError
-
 HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
@@ -91,12 +88,20 @@ def scan_market(tickers, min_volume):
         for i in range(0, len(need_init), chunk_size):
             chunk = need_init[i:i+chunk_size]
             try:
-                # 🌟 核心修正 2：改用 threads=False 避免多執行緒造成的 sqlite locked 問題
                 data = yf.download(chunk, period="250d", progress=False, threads=False)
                 if data.empty: continue
                 for ticker in chunk:
                     try:
-                        df_t = data[ticker] if isinstance(data.columns, pd.MultiIndex) else data.copy()
+                        # 🌟 核心修復：高精確度相容 yfinance 批次下載的雙層欄位解構
+                        if isinstance(data.columns, pd.MultiIndex):
+                            if ticker in data.columns.get_level_values(1):
+                                df_t = data.xs(ticker, level=1, axis=1)
+                            elif ticker in data.columns.get_level_values(0):
+                                df_t = data[ticker]
+                            else: continue
+                        else:
+                            df_t = data.copy()
+                        
                         required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
                         if not all(col in df_t.columns for col in required_cols): continue
                         df_clean = df_t[required_cols].dropna().tail(MAX_DAYS)
@@ -108,12 +113,20 @@ def scan_market(tickers, min_volume):
         for i in range(0, len(need_update), chunk_size):
             chunk = need_update[i:i+chunk_size]
             try:
-                # 🌟 核心修正 3：同樣加上 threads=False
                 data = yf.download(chunk, period="5d", progress=False, threads=False)
                 if data.empty: continue
                 for ticker in chunk:
                     try:
-                        df_today = data[ticker] if isinstance(data.columns, pd.MultiIndex) else data.copy()
+                        # 🌟 核心修復：高精確度相容批次下載欄位
+                        if isinstance(data.columns, pd.MultiIndex):
+                            if ticker in data.columns.get_level_values(1):
+                                df_today = data.xs(ticker, level=1, axis=1)
+                            elif ticker in data.columns.get_level_values(0):
+                                df_today = data[ticker]
+                            else: continue
+                        else:
+                            df_today = data.copy()
+                        
                         required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
                         if not all(col in df_today.columns for col in required_cols): continue
                         df_today_clean = df_today[required_cols].dropna()
@@ -167,7 +180,16 @@ def process_custom_groups(group_dict):
         data = yf.download(tickers, period="5d", progress=False, threads=False)
         for ticker in tickers:
             try:
-                df_today = data[ticker] if isinstance(data.columns, pd.MultiIndex) else data.copy()
+                # 🌟 核心修復：自選群組同樣進行雙層欄位安全對齊
+                if isinstance(data.columns, pd.MultiIndex):
+                    if ticker in data.columns.get_level_values(1):
+                        df_today = data.xs(ticker, level=1, axis=1)
+                    elif ticker in data.columns.get_level_values(0):
+                        df_today = data[ticker]
+                    else: continue
+                else:
+                    df_today = data.copy()
+                
                 required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
                 if not all(col in df_today.columns for col in required_cols): continue
                 df_today_clean = df_today[required_cols].dropna()
@@ -178,6 +200,8 @@ def process_custom_groups(group_dict):
                     df_combined = pd.concat([df_local, df_today_clean])
                 else:
                     df_init = yf.download(ticker, period="250d", progress=False, threads=False)
+                    if isinstance(df_init.columns, pd.MultiIndex):
+                        df_init = df_init.xs(ticker, level=1, axis=1) if ticker in df_init.columns.get_level_values(1) else df_init[ticker]
                     df_combined = df_init[required_cols].dropna()
                     
                 df_combined = df_combined[~df_combined.index.duplicated(keep='last')].sort_index().tail(MAX_DAYS)
@@ -237,7 +261,6 @@ def generate_html(data_dict, date_str):
 
 def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
     try:
-        # 🌟 核心修正 4：同樣加上 threads=False
         df = yf.download(ticker, period="4y", progress=False, threads=False)
         if df.empty or len(df) < 750: return f"⚪ {name}: 數據不足無法分析"
         df = df.copy()
