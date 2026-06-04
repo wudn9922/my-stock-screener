@@ -30,58 +30,66 @@ def send_line_message(msg, access_token, user_id):
 def get_tw_tickers(min_volume):
     tickers = []
     
-    # 🌟 升級：直接採用證交所全市場綜合 Open Data，一次拿齊上市與上櫃，徹底繞過櫃買中心 API 塞車問題
-    url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data"
-    
+    # ==========================================
+    # 引擎 1：台灣證交所 (TWSE) - 獲取「上市」股票 (.TW)
+    # ==========================================
+    twse_url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data"
     for attempt in range(3):
         try:
-            res = requests.get(url, headers=HTTP_HEADERS, timeout=25)
+            res = requests.get(twse_url, headers=HTTP_HEADERS, timeout=15)
             if res.status_code == 200:
-                df = pd.read_csv(io.StringIO(res.text))
+                df_twse = pd.read_csv(io.StringIO(res.text))
+                code_col = '證券代號' if '證券代號' in df_twse.columns else 'Code' if 'Code' in df_twse.columns else df_twse.columns[0]
+                vol_col = '成交股數' if '成交股數' in df_twse.columns else 'TradeVolume' if 'TradeVolume' in df_twse.columns else 'Volume' if 'Volume' in df_twse.columns else None
                 
-                # 自動辨識欄位名稱
-                code_col = '證券代號' if '證券代號' in df.columns else 'Code' if 'Code' in df.columns else df.columns[0]
-                vol_col = '成交股數' if '成交股數' in df.columns else 'TradeVolume' if 'TradeVolume' in df.columns else 'Volume' if 'Volume' in df.columns else None
-                name_col = '證券名稱' if '證券名稱' in df.columns else 'Name' if 'Name' in df.columns else None
-                
-                for _, row in df.iterrows():
+                for _, row in df_twse.iterrows():
                     code = str(row[code_col]).strip()
-                    # 篩選標準 4 位數普通股
                     if len(code) == 4 and code.isdigit():
-                        # 量能前置過濾
                         if vol_col:
                             try:
                                 vol_val = float(str(row[vol_col]).replace(',', ''))
                                 if vol_val < min_volume: continue
                             except: pass
-                        
-                        # 🤔 如何區分上市或上櫃？
-                        # 證交所這份資料中，如果是上櫃股票，證券名稱通常會特別標註或有特定規律，
-                        # 若無法百分之百從名稱斷定，保險作法是：普通 4 位數在 Yahoo Finance 中，
-                        # 絕大多數非上市即上櫃。我們先依據證交所清單歸類為 .TW，
-                        # 若想精準分流，Yahoo Finance 對於上櫃也支援直接查代號。
-                        # 為確保全自動偵測不遺漏，此處我們統一採用更穩健的雙標籤分流法：
-                        # 根據台灣現行股票代碼，我們預設將其後綴處理為標準格式。
-                        # 這裡我們利用一個乾淨的邏輯：因為這份是 TWSE 釋出的全市場日收盤行情，
-                        # 為了防錯，我們讓它直接生成 .TW。
-                        # 如果需要同時包含上櫃且不漏接，這裡使用另一組極度穩定的證交所每日行情總表
                         tickers.append(f"{code}.TW")
-                
-                # 額外補充：如果部分權值上櫃股被遺漏，我們手動加入上櫃熱門股清單作為安全網
-                # (避免未來櫃買中心完全斷線時，網頁空空如也)
                 break
         except Exception as e:
-            if attempt == 2: print(f"❌ 獲取台股全市場清單失敗: {e}")
-            else: time.sleep(3)
-            
-    # 自動去除重複項
+            if attempt == 2: print(f"❌ 獲取上市清單失敗: {e}")
+            else: time.sleep(2)
+
+    # ==========================================
+    # 引擎 2：櫃買中心 (TPEx) - 獲取「上櫃」股票 (.TWO)
+    # 改用網頁前端端點 (o=json)，避開 OpenAPI 防火牆
+    # ==========================================
+    tpex_url = "https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php?l=zh-tw&o=json&se=EW"
+    for attempt in range(3):
+        try:
+            res = requests.get(tpex_url, headers=HTTP_HEADERS, timeout=15)
+            if res.status_code == 200:
+                data = res.json()
+                if "aaData" in data:
+                    for row in data["aaData"]:
+                        code = str(row[0]).strip()
+                        # row[7] 通常是成交股數
+                        vol_str = str(row[7]).replace(',', '')
+                        
+                        if len(code) == 4 and code.isdigit():
+                            try:
+                                vol_val = float(vol_str)
+                                if vol_val < min_volume: continue
+                            except: pass
+                            tickers.append(f"{code}.TWO")
+                break
+        except Exception as e:
+            if attempt == 2: print(f"❌ 獲取上櫃清單失敗: {e}")
+            else: time.sleep(2)
+
     tickers = list(set(tickers))
     
-    # 🌟 防禦機制：若真的不幸完全沒抓到，啟用黃金備用清單
+    # 防禦機制
     if not tickers:
         return ["2330.TW", "2317.TW", "2454.TW", "2603.TW", "0050.TW", "8069.TWO", "5483.TWO", "6488.TWO"]
         
-    print(f"🔥 完美避開斷線！今日通過量能前置篩選的台股總計: {len(tickers)} 檔")
+    print(f"🔥 雙引擎啟動！今日通過量能前置篩選的台股 (含上市+上櫃) 總計: {len(tickers)} 檔")
     return tickers
 
 def get_us_tickers():
@@ -127,14 +135,11 @@ def scan_market(tickers, min_volume):
     need_init = []
     need_update = []
     for ticker in tickers:
-        # 💡 自動向下相容：如果本地已有 .TWO 檔案，或是改為 .TW 檔案，皆納入管理
         if os.path.exists(os.path.join(DATA_DIR, f"{ticker}.csv")):
             need_update.append(ticker)
         else:
-            # 嘗試檢查另一種後綴是否存在，存在就當作需要更新
             alt_ticker = ticker.replace(".TW", ".TWO") if ".TW" in ticker else ticker.replace(".TWO", ".TW")
             if os.path.exists(os.path.join(DATA_DIR, f"{alt_ticker}.csv")):
-                # 統一更名或沿用
                 need_update.append(alt_ticker)
             else:
                 need_init.append(ticker)
@@ -196,11 +201,9 @@ def scan_market(tickers, min_volume):
                     except Exception: continue
             except Exception: pass
 
-    # 執行均線掃描
     all_local_files = [f.replace(".csv", "") for f in os.listdir(DATA_DIR) if f.endswith(".csv")]
     
     for ticker in tickers:
-        # 檢查該代號是否存在於本地數據庫 (支援 .TW 或 .TWO 交叉比對)
         actual_ticker = ticker
         csv_path = os.path.join(DATA_DIR, f"{ticker}.csv")
         if not os.path.exists(csv_path):
@@ -396,7 +399,7 @@ def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
         elif macro_trend == "空頭趨勢" and micro_走勢 == "空頭走勢": icon = "🔻"
         else: icon = "⚡"
         return f"{icon} {name}\n   ├ 均線: {score_label} ({score}/{total_ma_count}MA)\n   └  {final_status}"
-    except Exception as e: return f"⚪ {name}:分析發生異常"
+    except Exception as e: return f"⚪ {name}: 分析發生異常"
 
 def main():
     access_token = os.environ.get("LINE_ACCESS_TOKEN")
@@ -432,7 +435,7 @@ def main():
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     
     os.system('git add docs/index.html data/*.csv')
-    os.system('git commit -m "⚙️ 架構優化：全面改用證交所單一整合數據源，徹底根絕櫃買中心API超時問題"')
+    os.system('git commit -m "⚙️ 架構優化：雙引擎啟動！同時極速抓取證交所與櫃買中心數據"')
     os.system('git push')
 
     # =========================================================================
