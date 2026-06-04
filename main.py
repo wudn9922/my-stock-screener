@@ -164,7 +164,10 @@ def scan_market(tickers, min_volume):
                 need_update.append(alt_ticker)
             else:
                 need_init.append(ticker)
-            
+        print(f"need_init: {len(need_init)} 檔")
+        print(f"need_update: {len(need_update)} 檔")
+        print(f"最終掃描本地CSV數: {len(all_local_files)} 檔")
+
     if need_init:
         for i in range(0, len(need_init), chunk_size):
             chunk = need_init[i:i+chunk_size]
