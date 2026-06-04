@@ -6,6 +6,12 @@ from datetime import datetime
 import json
 import io
 
+# =========================================================================
+# ⚙️ 全域核心參數設定（可在這裡自由調整篩選嚴格度）
+# =========================================================================
+TW_MIN_VOLUME = 1000000  # 台股全市場基本門檻：1,000,000股 (等於 1000張)。若想看到更多中小型股，可改為 500000 (500張)
+US_MIN_VOLUME = 100000   # 美股全市場基本門檻：100,000股
+
 HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
@@ -20,22 +26,32 @@ def send_line_message(msg, access_token, user_id):
     res = requests.post(url, json=payload, headers=headers)
     return res.status_code
 
-def get_tw_tickers():
+def get_tw_tickers(min_volume):
     tickers = []
-    # 獲取上市股票 (.TW)
+    # 🌟 優化：在 API 端直接過濾量能，避免集體請求被 Yahoo 封鎖
+    # 1. 獲取上市股票 (.TW)
     try:
         url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data"
         res = requests.get(url, headers=HTTP_HEADERS, timeout=15)
         if res.status_code == 200:
             df = pd.read_csv(io.StringIO(res.text))
             code_col = '證券代號' if '證券代號' in df.columns else 'Code' if 'Code' in df.columns else df.columns[0]
-            for code in df[code_col].astype(str).str.strip():
+            vol_col = '成交股數' if '成交股數' in df.columns else 'TradeVolume' if 'TradeVolume' in df.columns else 'Volume' if 'Volume' in df.columns else None
+            
+            for _, row in df.iterrows():
+                code = str(row[code_col]).strip()
                 if len(code) == 4 and code.isdigit():
+                    # 前置量能過濾
+                    if vol_col:
+                        try:
+                            vol_val = float(str(row[vol_col]).replace(',', ''))
+                            if vol_val < min_volume: continue
+                        except: pass
                     tickers.append(f"{code}.TW")
     except Exception as e: 
         print(f"獲取台股上市清單失敗: {e}")
         
-    # 獲取上櫃股票 (.TWO)
+    # 2. 獲取上櫃股票 (.TWO)
     try:
         url_tpex = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
         res_tpex = requests.get(url_tpex, headers=HTTP_HEADERS, timeout=15)
@@ -44,12 +60,18 @@ def get_tw_tickers():
             for item in data_tpex:
                 code = str(item.get('SecuritiesCompanyCode', '')).strip()
                 if len(code) == 4 and code.isdigit():
+                    # 前置量能過濾
+                    try:
+                        vol_val = float(item.get('TradeVolume', 0))
+                        if vol_val < min_volume: continue
+                    except: pass
                     tickers.append(f"{code}.TWO")
     except Exception as e:
         print(f"獲取台股上櫃清單失敗: {e}")
         
     if not tickers:
         return ["2330.TW", "2317.TW", "2454.TW", "8069.TWO"]
+    print(f"🔥 今日通過量能前置篩選的台股共: {len(tickers)} 檔")
     return tickers
 
 def get_us_tickers():
@@ -220,14 +242,12 @@ def process_custom_groups(group_dict):
                 df_combined = df_combined[~df_combined.index.duplicated(keep='last')].sort_index().tail(MAX_DAYS)
                 df_combined.to_csv(csv_path)
                 
-                # 🌟 核心修正：計算該股票專屬的所有自訂均線
                 ma_list = group_dict[ticker]
                 for ma_window in ma_list: 
                     df_combined[f'MA{ma_window}'] = df_combined['Close'].rolling(window=ma_window).mean()
                     
                 price = float(df_combined['Close'].iloc[-1])
                 
-                # 🌟 核心過濾邏輯：檢查是否符合「任意一條自訂均線」之下且 3% 以內的規則
                 matched_any_ma = False
                 triggered_info = []
                 
@@ -235,16 +255,13 @@ def process_custom_groups(group_dict):
                     ma_val = float(df_combined[f'MA{ma_window}'].iloc[-1])
                     if pd.isna(ma_val): continue
                     
-                    # 判斷現價是否在此條均線下方，且差距在 3% 以內
                     if ma_val * 0.97 <= price < ma_val:
                         diff_pct = ((price / ma_val) - 1) * 100
                         triggered_info.append(f"近MA{ma_window}({round(diff_pct,2)}%)")
                         matched_any_ma = True
                 
-                # 如果這檔股票沒有靠近任何一條它自己的均線，直接剔除不顯示！
                 if not matched_any_ma: continue
                 
-                # 建立圖表與資訊標題
                 df_chart = df_combined.tail(60)
                 ma_status_str = " | ".join([f"MA{w}:{round(df_combined[f'MA{w}'].iloc[-1], 2)}" for w in ma_list if not pd.isna(df_combined[f'MA{w}'].iloc[-1])])
                 title_str = f"(現價: {round(price,2)} | {'/'.join(triggered_info)} | {ma_status_str})"
@@ -359,7 +376,6 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
     weekday = datetime.now().weekday() 
 
-    # 這裡可以自由調整你認為最適合每檔股票的 1~4 條均線
     tw_g1_config = {"2330.TW": [10, 20], "2317.TW": [20, 60], "2454.TW": [5, 10, 20]} 
     tw_g2_config = {"2603.TW": [20, 60], "2609.TW": [5, 10], "0050.TW": [5, 20]}      
     
@@ -368,12 +384,15 @@ def main():
     us_g3_config = {"TSLA": [10, 20]}                          
     us_g4_config = {"AMZN": [20]}                              
     
+    # 🌟 核心串接優化：直接把全域設定的量能門檻丟進 get_tw_tickers 進行前置清洗
+    tw_market_pool = get_tw_tickers(TW_MIN_VOLUME)
+    
     data_dict = {
-        'tw_all': scan_market(get_tw_tickers(), min_volume=2000000), 
+        'tw_all': scan_market(tw_market_pool, min_volume=TW_MIN_VOLUME), 
         'tw_g1': process_custom_groups(tw_g1_config), 
         'tw_g2': process_custom_groups(tw_g2_config),
         
-        'us_all': scan_market(get_us_tickers(), min_volume=100000),
+        'us_all': scan_market(get_us_tickers(), min_volume=US_MIN_VOLUME),
         'us_g1': process_custom_groups(us_g1_config), 
         'us_g2': process_custom_groups(us_g2_config),
         'us_g3': process_custom_groups(us_g3_config), 
@@ -385,13 +404,13 @@ def main():
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     
     os.system('git add docs/index.html data/*.csv')
-    os.system('git commit -m "⚙️ 邏輯優化：修正自選群組均線自適應過濾機制"')
+    os.system('git commit -m "⚙️ 性能與精準度優化：改用前置成交量過濾法避免防爬蟲鎖定"')
     os.system('git push')
 
     # =========================================================================
     # ✉️ 【發送 訊息一：每日個股均線潛伏報告】
     # =========================================================================
-    web_url = "https://wudn9922.github.io/stock_tracker/"
+    web_url = "https://wudn9922.github.io/my-stock-screener/"
     
     line_msg_stocks = f"🎯 {today_str} 全市場增量看盤網頁！\n\n"
     line_msg_stocks += f"🇹🇼 【台灣股市區塊】\n"
