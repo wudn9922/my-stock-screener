@@ -159,14 +159,10 @@ def scan_market(tickers, min_volume):
         if os.path.exists(os.path.join(DATA_DIR, f"{ticker}.csv")):
             need_update.append(ticker)
         else:
-            alt_ticker = ticker.replace(".TW", ".TWO") if ".TW" in ticker else ticker.replace(".TWO", ".TW")
-            if os.path.exists(os.path.join(DATA_DIR, f"{alt_ticker}.csv")):
-                need_update.append(alt_ticker)
-            else:
-                need_init.append(ticker)
-        print(f"need_init: {len(need_init)} 檔")
-        print(f"need_update: {len(need_update)} 檔")
-        print(f"最終掃描本地CSV數: {len(all_local_files)} 檔")
+            need_init.append(ticker)
+
+    print(f"need_init: {len(need_init)} 檔")
+    print(f"need_update: {len(need_update)} 檔")
 
     if need_init:
         for i in range(0, len(need_init), chunk_size):
@@ -179,12 +175,9 @@ def scan_market(tickers, min_volume):
                         if isinstance(data.columns, pd.MultiIndex):
                             if ticker in data.columns.get_level_values(1):
                                 df_t = data.xs(ticker, level=1, axis=1)
-                            elif ticker in data.columns.get_level_values(0):
-                                df_t = data[ticker]
                             else: continue
                         else:
                             df_t = data.copy()
-                        
                         required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
                         if not all(col in df_t.columns for col in required_cols): continue
                         df_clean = df_t[required_cols].dropna().tail(MAX_DAYS)
@@ -203,64 +196,45 @@ def scan_market(tickers, min_volume):
                         if isinstance(data.columns, pd.MultiIndex):
                             if ticker in data.columns.get_level_values(1):
                                 df_today = data.xs(ticker, level=1, axis=1)
-                            elif ticker in data.columns.get_level_values(0):
-                                df_today = data[ticker]
                             else: continue
                         else:
                             df_today = data.copy()
-                        
                         required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
                         if not all(col in df_today.columns for col in required_cols): continue
                         df_today_clean = df_today[required_cols].dropna()
-                        
                         csv_path = os.path.join(DATA_DIR, f"{ticker}.csv")
                         df_local = pd.read_csv(csv_path, index_col=0, parse_dates=True)
-                        
                         df_combined = pd.concat([df_local, df_today_clean])
-                        df_combined = df_combined[~df_combined.index.duplicated(keep='last')]
-                        df_combined = df_combined.sort_index()
-                        
-                        df_combined = df_combined.tail(MAX_DAYS)
+                        df_combined = df_combined[~df_combined.index.duplicated(keep='last')].sort_index().tail(MAX_DAYS)
                         df_combined.to_csv(csv_path)
                     except Exception: continue
             except Exception: pass
 
-    all_local_files = [f.replace(".csv", "") for f in os.listdir(DATA_DIR) if f.endswith(".csv")]
-    
+    # ── 掃描篩選 ──
     for ticker in tickers:
-        actual_ticker = ticker
         csv_path = os.path.join(DATA_DIR, f"{ticker}.csv")
-        if not os.path.exists(csv_path):
-            alt_ticker = ticker.replace(".TW", ".TWO") if ".TW" in ticker else ticker.replace(".TWO", ".TW")
-            alt_path = os.path.join(DATA_DIR, f"{alt_ticker}.csv")
-            if os.path.exists(alt_path):
-                csv_path = alt_path
-                actual_ticker = alt_ticker
-            else:
-                continue
-                
+        if not os.path.exists(csv_path): continue
         try:
             df_clean = pd.read_csv(csv_path, index_col=0, parse_dates=True)
             if len(df_clean) < 20: continue
-            
             latest_vol = float(df_clean['Volume'].iloc[-1])
             if latest_vol < min_volume: continue
-            
             df_clean['MA20'] = df_clean['Close'].rolling(window=20).mean()
             price = float(df_clean['Close'].iloc[-1])
             ma20 = float(df_clean['MA20'].iloc[-1])
             if pd.isna(ma20): continue
-            
             if ma20 * 0.97 <= price < ma20:
                 diff_pct = ((price / ma20) - 1) * 100
                 df_chart = df_clean.tail(60)
                 title_str = f"(現價: {round(price,2)} | 距MA20: {round(diff_pct,2)}%)"
-                chart_data = build_stock_data(df_chart, actual_ticker, title_str, [20])
-                matched_list.append({'ticker': actual_ticker, 'volume': int(latest_vol), 'chart_data': chart_data})
+                chart_data = build_stock_data(df_chart, ticker, title_str, [20])
+                matched_list.append({'ticker': ticker, 'volume': int(latest_vol), 'chart_data': chart_data})
         except Exception: continue
 
+    print(f"掃描結果: {len(matched_list)} 檔符合條件")
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
     return matched_list
+
 
 def process_custom_groups(group_dict):
     matched_list = []
