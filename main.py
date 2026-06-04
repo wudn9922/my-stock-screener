@@ -5,412 +5,213 @@ import os
 from datetime import datetime
 import json
 import time
-import random
-import io
-from urllib3.util import Retry
-from requests.adapters import HTTPAdapter
-import logging
-import warnings
 
-# 🤫 讓 yfinance 的下市警告與無效警告閉嘴，保持 GitHub Actions 日誌乾淨
-logging.getLogger('yfinance').setLevel(logging.ERROR)
-warnings.filterwarnings("ignore", category=UserWarning, module="yfinance")
-
-HTTP_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-}
-
-def get_disguised_session():
-    """ 🎭 建立高度偽裝且具備指數型退避重試的連線池 """
-    session = requests.Session()
-    # 隨機更換 User-Agent 混淆 Yahoo 伺服器
-    user_agents = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
-    ]
-    session.headers.update({
-        'User-Agent': random.choice(user_agents),
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'zh-TW,zh;q=0.8,en-US;q=0.5,en;q=0.3',
-    })
-    
-    # 關鍵：遇到 429 (Too Many Requests) 時，自動進行指數型等待重試 (2秒、4秒、8秒...)
-    retries = Retry(
-        total=5, 
-        backoff_factor=3, 
-        status_forcelist=[429, 500, 502, 503, 504],
-        raise_on_status=False
-    )
-    session.mount('https://', HTTPAdapter(max_retries=retries))
-    return session
+DATA_DIR = "data"
+MAX_DAYS = 201 # 嚴格維持資料集最大天數
 
 def send_line_message(msg, access_token, user_id):
     url = "https://api.line.me/v2/bot/message/push"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {access_token}"}
     payload = {"to": user_id, "messages": [{"type": "text", "text": msg}]}
-    res = requests.post(url, json=payload, headers=headers)
-    return res.status_code
+    try: requests.post(url, json=payload, headers=headers, timeout=10)
+    except Exception: pass
 
-def get_tw_tickers():
-    """ 🇹🇼 真正全市場：動態爬取證交所與櫃買中心 """
-    print("⏳ 正在從證交所及櫃買中心下載全台股最新名單...")
-    tw_stocks = []
-    
-    # 1. 抓取上市股票 (TW)
-    try:
-        res_tw = requests.get("https://isin.twse.com.tw/isin/C_public.jsp?strMode=2", headers=HTTP_HEADERS, timeout=15)
-        df_tw = pd.read_html(io.StringIO(res_tw.text))[0]
-        df_tw.columns = df_tw.iloc[0]
-        df_tw = df_tw.iloc[1:]
-        for item in df_tw['有價證券代號及名稱'].dropna():
-            parts = item.split('\u3000') 
-            if len(parts) >= 2 and len(parts[0]) == 4 and parts[0].isdigit():
-                tw_stocks.append(f"{parts[0]}.TW")
-    except Exception as e:
-        print(f"⚠️ 上市股票名單抓取失敗: {e}")
-
-    # 2. 抓取上櫃股票 (TWO)
-    try:
-        res_two = requests.get("https://isin.twse.com.tw/isin/C_public.jsp?strMode=4", headers=HTTP_HEADERS, timeout=15)
-        df_two = pd.read_html(io.StringIO(res_two.text))[0]
-        df_two.columns = df_two.iloc[0]
-        df_two = df_two.iloc[1:]
-        for item in df_two['有價證券代號及名稱'].dropna():
-            parts = item.split('\u3000')
-            if len(parts) >= 2 and len(parts[0]) == 4 and parts[0].isdigit():
-                tw_stocks.append(f"{parts[0]}.TWO")
-    except Exception as e:
-        print(f"⚠️ 上櫃股票名單抓取失敗: {e}")
-
-    tw_stocks = list(sorted(set(tw_stocks)))
-    print(f"✅ 成功獲取全台股最新上市上櫃總計：{len(tw_stocks)} 檔股票！")
-    return tw_stocks
-
-def get_us_tickers():
-    try:
-        url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        df = pd.read_html(requests.get(url, headers=HTTP_HEADERS).text)[0]
-        return [t.replace('.', '-') for t in df['Symbol'].tolist()]
-    except Exception as e: print(f"獲取美股清單失敗: {e}")
-    return ["AAPL", "MSFT", "NVDA"]
-
-def build_stock_data(df_chart, ticker, title_suffix, ma_list):
+def build_stock_data(df_chart, ticker, title_suffix):
+    # 用於 Plotly 網頁的繪圖格式
     date_strings = [str(d)[:10] for d in df_chart.index]
-    traces = []
-    traces.append({
-        "type": "candlestick", "name": "K線", "x": date_strings,
-        "open": [float(x) for x in df_chart['Open'].tolist()],
-        "high": [float(x) for x in df_chart['High'].tolist()],
-        "low": [float(x) for x in df_chart['Low'].tolist()],
-        "close": [float(x) for x in df_chart['Close'].tolist()],
-        "increasing": {"line": {"color": "#ef5350"}}, "decreasing": {"line": {"color": "#26a69a"}}
-    })
-    colors = ['#FF9800', '#2196F3', '#4CAF50', '#E91E63']
-    for idx, ma_window in enumerate(ma_list):
-        ma_col = f'MA{ma_window}'
-        if ma_col in df_chart.columns:
-            ma_values = [None if pd.isna(val) else float(val) for val in df_chart[ma_col].tolist()]
-            traces.append({
-                "type": "scatter", "mode": "lines", "name": ma_col,
-                "x": date_strings, "y": ma_values, "line": {"color": colors[idx % len(colors)], "width": 2}
-            })
-    layout = {
-        "title": f"{ticker} {title_suffix}", "xaxis": {"type": "date", "rangeslider": {"visible": False}},
-        "yaxis": {"fixedrange": False}, "template": "plotly_dark", "margin": {"l": 40, "r": 20, "t": 50, "b": 40}, "height": 400
+    return {
+        "data": [
+            {
+                "type": "candlestick", "name": "K線", "x": date_strings,
+                "open": df_chart['Open'].astype(float).tolist(),
+                "high": df_chart['High'].astype(float).tolist(),
+                "low": df_chart['Low'].astype(float).tolist(),
+                "close": df_chart['Close'].astype(float).tolist(),
+                "increasing": {"line": {"color": "#ef5350"}}, "decreasing": {"line": {"color": "#26a69a"}}
+            },
+            {
+                "type": "scatter", "mode": "lines", "name": "MA20",
+                "x": date_strings, "y": df_chart['MA20'].astype(float).tolist(),
+                "line": {"color": "#FF9800", "width": 2}
+            }
+        ],
+        "layout": {
+            "title": f"{ticker} {title_suffix}", 
+            "xaxis": {"type": "date", "rangeslider": {"visible": False}},
+            "yaxis": {"fixedrange": False}, "template": "plotly_dark", 
+            "margin": {"l": 40, "r": 20, "t": 50, "b": 40}, "height": 400
+        }
     }
-    return {"data": traces, "layout": layout}
 
-def scan_market(tickers, min_volume):
+def update_and_scan_dataset(tickers, is_us=False):
+    """
+    🔄 核心邏輯：
+    1. 判斷本地是否有歷史 CSV，若無則初始化下載 250 天。
+    2. 若有，則只向 Yahoo 下載最新 5 天的資料（防週末跳空），並進行聯集（Combine）。
+    3. 嚴格對資料集進行瘦身，只保留最新的 201 天紀錄，並存回 CSV。
+    4. 進行 MA20 潛伏股篩選。
+    """
+    os.makedirs(DATA_DIR, exist_ok=True)
     matched_list = []
-    # 📉 進一步縮減批次大小至 25 檔，大幅降低伺服器單次負荷
-    chunk_size = 25 
-    total_len = len(tickers)
     
-    for i in range(0, total_len, chunk_size):
-        chunk = tickers[i:i+chunk_size]
-        print(f" ⏳ 全市場掃描進度: {i}/{total_len}...")
+    # 判斷哪些股票需要初始化（新加入的），哪些可以進行快速增量更新
+    need_init = []
+    need_update = []
+    
+    for ticker in tickers:
+        csv_path = os.path.join(DATA_DIR, f"{ticker}.csv")
+        if os.path.exists(csv_path):
+            need_update.append(ticker)
+        else:
+            need_init.append(ticker)
+            
+    # 1. 處理新股票（初始化下載較長歷史）
+    if need_init:
+        print(f"🆕 發現 {len(need_init)} 檔新標的，進行首次歷史資料下載...")
         try:
-            # 建立獨立的、帶防禦機制的連線
-            sess = get_disguised_session()
-            
-            # 使用 yf.download 並強制設定 threads=False (單線程安全慢速前進)
-            data = yf.download(
-                tickers=chunk, 
-                period="150d", 
-                progress=False, 
-                group_by='ticker', 
-                threads=False, 
-                session=sess, 
-                timeout=20
-            )
-            
-            if data.empty: 
-                time.sleep(3)
-                continue
+            init_data = yf.download(need_init, period="250d", progress=False, group_by='ticker', timeout=30)
+            for ticker in need_init:
+                df_t = init_data[ticker] if ticker in init_data.columns.get_level_values(0) else None
+                if df_t is not None and not df_t.empty:
+                    df_clean = df_t[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
+                    df_clean = df_clean.tail(MAX_DAYS) # 只留 201 天
+                    df_clean.to_csv(os.path.join(DATA_DIR, f"{ticker}.csv"))
+        except Exception as e:
+            print(f"初始化下載失敗: {e}")
+
+    # 2. 處理舊股票（增量更新：只下載最新 5 天以包含最新交易日）
+    if need_update:
+        print(f"⚡ 正在對 {len(need_update)} 檔股票進行「當日最新進度」增量更新...")
+        try:
+            today_data = yf.download(need_update, period="5d", progress=False, group_by='ticker', timeout=20)
+            for ticker in need_update:
+                df_today = today_data[ticker] if ticker in today_data.columns.get_level_values(0) else None
+                csv_path = os.path.join(DATA_DIR, f"{ticker}.csv")
                 
-            for ticker in chunk:
-                try:
-                    # 處理單檔與多檔返回的欄位結構差異
-                    if len(chunk) == 1:
-                        df_t = data
-                    elif ticker in data.columns.get_level_values(0): 
-                        df_t = data[ticker]
-                    else: 
-                        continue
-                        
-                    required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
-                    if not all(col in df_t.columns for col in required_cols): continue
-                    df_clean = df_t[required_cols].dropna()
-                    if len(df_clean) < 20: continue
+                # 讀取本地舊資料
+                df_local = pd.read_csv(csv_path, index_col=0, parse_dates=True)
+                
+                if df_today is not None and not df_today.empty:
+                    df_today_clean = df_today[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
                     
-                    latest_vol = float(df_clean['Volume'].iloc[-1])
-                    if latest_vol < min_volume: continue
+                    # 合併新舊資料，並以「日期」去重（重複的以最新下載的為準）
+                    df_combined = pd.concat([df_local, df_today_clean])
+                    df_combined = df_combined ~ df_combined.index.duplicated(keep='last')
+                    df_combined = df_combined.sort_index()
                     
-                    df_clean['MA20'] = df_clean['Close'].rolling(window=20).mean()
-                    price = float(df_clean['Close'].iloc[-1])
-                    ma20 = float(df_clean['MA20'].iloc[-1])
-                    if pd.isna(ma20): continue
+                    # ✂️ 關鍵：只保留最新 201 天的資料，刪除更早以前的
+                    df_combined = df_combined.tail(MAX_DAYS)
                     
-                    if ma20 * 0.97 <= price < ma20:
-                        diff_pct = ((price / ma20) - 1) * 100
-                        df_chart = df_clean.tail(60)
-                        title_str = f"(現價: {round(price,2)} | 距MA20: {round(diff_pct,2)}%)"
-                        chart_data = build_stock_data(df_chart, ticker, title_str, [20])
-                        matched_list.append({'ticker': ticker, 'volume': int(latest_vol), 'chart_data': chart_data})
-                except Exception: continue
+                    # 存回本地檔案系統
+                    df_combined.to_csv(csv_path)
+        except Exception as e:
+            print(f"增量更新過程中發生錯誤: {e}. 將使用本地既有資料進行分析。")
+
+    # 3. 全面掃描本地已更新完畢的資料集，計算技術指標
+    for ticker in tickers:
+        try:
+            csv_path = os.path.join(DATA_DIR, f"{ticker}.csv")
+            if not os.path.exists(csv_path): continue
             
-            # 🛑 核心防禦：每抓取 25 檔，強制隨機深度睡眠 3.5 ~ 6 秒，徹底瓦解 Yahoo 429 偵測機制
-            time.sleep(random.uniform(3.5, 6.0))
+            df_local = pd.read_csv(csv_path, index_col=0, parse_dates=True)
+            if len(df_local) < 20: continue
             
-        except Exception as e: 
-            print(f"⚠️ 批次爆發錯誤 {i}: {e}，觸發緊急避難，冷卻 12 秒...")
-            time.sleep(12)
+            # 計算 MA20
+            df_local['MA20'] = df_local['Close'].rolling(window=20).mean()
+            price = float(df_local['Close'].iloc[-1])
+            ma20 = float(df_local['MA20'].iloc[-1])
+            if pd.isna(ma20): continue
+            
+            # 均線潛伏條件：現價在 MA20 之下且距離 3% 以內
+            if ma20 * 0.97 <= price < ma20:
+                diff_pct = ((price / ma20) - 1) * 100
+                df_chart = df_local.tail(30) # 網頁只展示近 30 天 K 線
+                title_str = f"(現價: {round(price,2)} | 距MA20: {round(diff_pct,2)}%)"
+                chart_data = build_stock_data(df_chart, ticker, title_str)
+                matched_list.append({
+                    'ticker': ticker, 
+                    'volume': int(df_local['Volume'].iloc[-1]), 
+                    'chart_data': chart_data
+                })
+        except Exception:
+            continue
             
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
     return matched_list
 
-def process_custom_groups(group_dict):
-    matched_list = []
-    tickers = list(group_dict.keys())
-    if not tickers: return matched_list
-    try: 
-        sess = get_disguised_session()
-        data = yf.download(tickers, period="500d", progress=False, session=sess, threads=False)
-    except Exception: 
-        return matched_list
-    for ticker in tickers:
-        try:
-            if isinstance(data.columns, pd.MultiIndex):
-                if ticker in data.columns.get_level_values(1): df_t = data.xs(ticker, axis=1, level=1)
-                elif ticker in data.columns.get_level_values(0): df_t = data.xs(ticker, axis=1, level=0)
-                else: continue
-            else: df_t = data.copy()
-            required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
-            if not all(col in df_t.columns for col in required_cols): continue
-            df_clean = df_t[required_cols].dropna()
-            if df_clean.empty: continue
-            ma_list = group_dict[ticker]
-            for ma_window in ma_list: df_clean[f'MA{ma_window}'] = df_clean['Close'].rolling(window=ma_window).mean()
-            price = float(df_clean['Close'].iloc[-1])
-            df_chart = df_clean.tail(60)
-            ma_info = " | ".join([f"MA{w}: {round(df_clean[f'MA{w}'].iloc[-1], 2)}" for w in ma_list if not pd.isna(df_clean[f'MA{w}'].iloc[-1])])
-            title_str = f"(現價: {round(price,2)} | {ma_info})"
-            chart_data = build_stock_data(df_chart, ticker, title_str, ma_list)
-            matched_list.append({'ticker': ticker, 'volume': 0, 'chart_data': chart_data})
-        except Exception: continue
-    return matched_list
-
 def generate_html(data_dict, date_str):
     js_store = "const chartDataStore = " + json.dumps(data_dict, ensure_ascii=False) + ";\n"
-    html_template = f"""<!DOCTYPE html><html><head><title>台美股均線潛伏報告</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script><style>body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }} .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }} .category-box {{ background: #1a1a1a; padding: 12px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #00b0ff; }} .category-title {{ font-size: 15px; font-weight: bold; color: #00ff88; margin-bottom: 10px; padding-left: 5px; }} .tabs {{ display: flex; flex-wrap: wrap; gap: 6px; }} .tab-btn {{ background: #2a2a2a; color: #aaa; border: none; padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; transition: 0.3s; }} .tab-btn:hover {{ background: #3a3a3a; }} .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }} .market-section {{ display: none; max-width: 800px; margin: 0 auto; }} .market-section.active {{ display: block; }} .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }} .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }} .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 14px; }}</style></head><body><div class="header"><h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2><p style="margin: 5px 0 0 0; color:#00ff88; font-size:13px;">全市場上市上櫃高防禦掃描版</p></div>
-    
+    html_template = f"""<!DOCTYPE html><html><head><title>均線潛伏報告</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script><style>body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }} .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }} .category-box {{ background: #1a1a1a; padding: 12px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #00b0ff; }} .tabs {{ display: flex; flex-wrap: wrap; gap: 6px; }} .tab-btn {{ background: #2a2a2a; color: #aaa; border: none; padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; }} .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }} .market-section {{ display: none; max-width: 800px; margin: 0 auto; }} .market-section.active {{ display: block; }} .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; }} .plotly-container {{ height: 400px; }} .no-data {{ text-align: center; color: #888; padding: 40px; }}</style></head><body><div class="header"><h2>📈 增量更新版·均線潛伏報告 ({date_str})</h2></div>
     <div class="category-box" style="border-left-color: #ff5252;">
-        <div class="category-title">🇹🇼 台灣股市區塊</div>
         <div class="tabs">
-            <button id="btn-tw_all" class="tab-btn active" onclick="switchMarket(event, 'tw_all')">全市場潛伏 ({len(data_dict['tw_all'])})</button>
-            <button id="btn-tw_g1" class="tab-btn" onclick="switchMarket(event, 'tw_g1')">核心權值精選 ({len(data_dict['tw_g1'])})</button>
-            <button id="btn-tw_g2" class="tab-btn" onclick="switchMarket(event, 'tw_g2')">航運與指標ETF ({len(data_dict['tw_g2'])})</button>
+            <button id="btn-tw" class="tab-btn active" onclick="switchMarket('tw')">🇹🇼 台股精選 ({len(data_dict['tw'])})</button>
+            <button id="btn-us" class="tab-btn" onclick="switchMarket('us')">🇺🇸 美股巨頭 ({len(data_dict['us'])})</button>
         </div>
     </div>
-
-    <div class="category-box" style="border-left-color: #00b0ff;">
-        <div class="category-title">🇺🇸 美國股市區塊</div>
-        <div class="tabs">
-            <button id="btn-us_all" class="tab-btn" onclick="switchMarket(event, 'us_all')">全市場潛伏 ({len(data_dict['us_all'])})</button>
-            <button id="btn-us_g1" class="tab-btn" onclick="switchMarket(event, 'us_g1')">AI與半導體 ({len(data_dict['us_g1'])})</button>
-            <button id="btn-us_g2" class="tab-btn" onclick="switchMarket(event, 'us_g2')">科技旗艦巨頭 ({len(data_dict['us_g2'])})</button>
-            <button id="btn-us_g3" class="tab-btn" onclick="switchMarket(event, 'us_g3')">特斯拉特選 ({len(data_dict['us_g3'])})</button>
-            <button id="btn-us_g4" class="tab-btn" onclick="switchMarket(event, 'us_g4')">亞馬遜消費成長 ({len(data_dict['us_g4'])})</button>
-        </div>
-    </div>
-    """
-    
-    keys_list = ['tw_all', 'tw_g1', 'tw_g2', 'us_all', 'us_g1', 'us_g2', 'us_g3', 'us_g4']
-    for key in keys_list:
-        active_class = " active" if key == 'tw_all' else ""
-        html_template += f'<div id="{key}-market" class="market-section{active_class}">'
-        if data_dict[key]:
-            for idx in range(len(data_dict[key])): html_template += f'<div class="chart-card"><div id="chart-{key}-{idx}" class="plotly-container"></div></div>'
-        else: html_template += '<div class="no-data">此分類目前無股票資料</div>'
-        html_template += '</div>'
-        
-    html_template += f"""<script>{js_store} function renderMarketCharts(marketId) {{ const items = chartDataStore[marketId]; if (!items) return; items.forEach((item, idx) => {{ const elementId = "chart-" + marketId + "-" + idx; const container = document.getElementById(elementId); if (container && !container.dataset.done) {{ Plotly.newPlot(container, item.chart_data.data, item.chart_data.layout, {{responsive: true, displayModeBar: false}}); container.dataset.done = "true"; }} }}); }} function switchMarket(event, marketId) {{ document.querySelectorAll('.market-section').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); document.getElementById(marketId + '-market').classList.add('active'); if(event) {{ event.currentTarget.classList.add('active'); }} else {{ document.getElementById('btn-' + marketId).classList.add('active'); }} renderMarketCharts(marketId); window.dispatchEvent(new Event('resize')); }} window.addEventListener("load", function() {{ renderMarketCharts('tw_all'); }});</script></body></html>"""
+    <div id="tw-market" class="market-section active">"""
+    for idx in range(len(data_dict['tw'])): html_template += f'<div class="chart-card"><div id="chart-tw-{idx}" class="plotly-container"></div></div>'
+    if not data_dict['tw']: html_template += '<div class="no-data">今日台股無符合潛伏標的</div>'
+    html_template += '</div><div id="us-market" class="market-section">'
+    for idx in range(len(data_dict['us'])): html_template += f'<div class="chart-card"><div id="chart-us-{idx}" class="plotly-container"></div></div>'
+    if not data_dict['us']: html_template += '<div class="no-data">今日美股無符合潛伏標的</div>'
+    html_template += f"""</div><script>{js_store} function renderMarketCharts(marketId) {{ const items = chartDataStore[marketId]; if (!items) return; items.forEach((item, idx) => {{ const elementId = "chart-" + marketId + "-" + idx; const container = document.getElementById(elementId); if (container && !container.dataset.done) {{ Plotly.newPlot(container, item.chart_data.data, item.chart_data.layout, {{responsive: true, displayModeBar: false}}); container.dataset.done = "true"; }} }}); }} function switchMarket(marketId) {{ document.querySelectorAll('.market-section').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); document.getElementById(marketId + '-market').classList.add('active'); document.getElementById('btn-' + marketId).classList.add('active'); renderMarketCharts(marketId); }} window.addEventListener("load", function() {{ renderMarketCharts('tw'); }});</script></body></html>"""
     os.makedirs("docs", exist_ok=True)
     with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html_template)
-
-def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
-    try:
-        sess = get_disguised_session()
-        df = yf.download(ticker, period="4y", progress=False, session=sess, threads=False)
-        if df.empty or len(df) < 750: return f"⚪ {name}: 數據不足無法分析"
-        df = df.copy()
-        if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-        available_mas = []
-        for ma in ma_list:
-            col_name = f'MA{ma}'
-            df[col_name] = df['Close'].rolling(window=ma).mean()
-            available_mas.append(col_name)
-        df = df.dropna(subset=available_mas)
-        latest = df.iloc[-1]
-        score = 0
-        total_ma_count = len(available_mas)
-        for ma_col in available_mas:
-            ma_val = latest[ma_col]
-            upper_bound = ma_val * 1.005
-            lower_bound = ma_val * 0.995
-            if latest['Open'] > upper_bound and latest['High'] > upper_bound and latest['Low'] > upper_bound and latest['Close'] > upper_bound: score += 1
-            elif latest['Open'] < lower_bound and latest['High'] < lower_bound and latest['Low'] < lower_bound and latest['Close'] < lower_bound: score -= 1
-        if score == total_ma_count: score_label = "看多"
-        elif score > 0: score_label = "偏多"
-        elif score == 0: score_label = "多空不明"
-        elif score == -total_ma_count: score_label = "看空"
-        else: score_label = "偏空"
-        df_3y = df.tail(252 * 3)
-        idx_3y_high = df_3y['High'].idxmax()
-        latest_date = df.index[-1]
-        months_since_high = (latest_date - idx_3y_high).days / 30.0
-        df_recent = df.tail(120).copy()
-        peaks = []
-        troughs = []
-        for i in range(2, len(df_recent)-2):
-            if df_recent['High'].iloc[i] > df_recent['High'].iloc[i-1] and df_recent['High'].iloc[i] > df_recent['High'].iloc[i-2] and df_recent['High'].iloc[i] > df_recent['High'].iloc[i+1] and df_recent['High'].iloc[i] > df_recent['High'].iloc[i+2]: peaks.append((df_recent.index[i], df_recent['High'].iloc[i]))
-            if df_recent['Low'].iloc[i] < df_recent['Low'].iloc[i-1] and df_recent['Low'].iloc[i] < df_recent['Low'].iloc[i-2] and df_recent['Low'].iloc[i] < df_recent['Low'].iloc[i+1] and df_recent['Low'].iloc[i] < df_recent['Low'].iloc[i+2]: troughs.append((df_recent.index[i], df_recent['Low'].iloc[i]))
-        lower_peak_count = 0
-        lower_trough_count = 0
-        if len(peaks) >= 2:
-            for j in range(1, len(peaks)):
-                if peaks[j][1] < peaks[j-1][1]: lower_peak_count += 1
-        if len(troughs) >= 2:
-            for j in range(1, len(troughs)):
-                if troughs[j][1] < troughs[j-1][1]: lower_trough_count += 1
-        macro_trend = "多頭趨勢" 
-        if months_since_high >= 4.0:
-            df_bear_period = df.loc[idx_3y_high:latest_date]
-            if len(df_bear_period) > 5:
-                bear_low = df_bear_period['Low'].iloc[:-1].min()
-                if latest['Close'] < bear_low: macro_trend = "空頭趨勢"
-        micro_走勢 = "多頭走勢"
-        if months_since_high >= 1.0 and (lower_peak_count + lower_trough_count) >= 2: micro_走勢 = "空頭走勢"
-        final_status = f"{macro_trend}中的{micro_走勢}"
-        if macro_trend == "多頭趨勢" and micro_走勢 == "多頭走勢": icon = "🔺"
-        elif macro_trend == "多頭趨勢" and micro_走勢 == "空頭走勢": icon = "💡"
-        elif macro_trend == "空頭趨勢" and micro_走勢 == "空頭走勢": icon = "🔻"
-        else: icon = "⚡"
-        return f"{icon} {name}\n   ├ 均線: {score_label} ({score}/{total_ma_count}MA)\n   └  {final_status}"
-    except Exception as e: return f"⚪ {name}: 分析發生異常"
 
 def main():
     access_token = os.environ.get("LINE_ACCESS_TOKEN")
     user_id = os.environ.get("LINE_USER_ID")
     if not access_token or not user_id: return
     today_str = datetime.now().strftime("%Y-%m-%d")
-    weekday = datetime.now().weekday() 
 
-    tw_tickers = get_tw_tickers()
-    
-    tw_g1_config = {"2330.TW": [10, 20], "2317.TW": [20, 60], "2454.TW": [5, 10, 20]} 
-    tw_g2_config = {"2603.TW": [20, 60], "2609.TW": [5, 10], "0050.TW": [5, 20]}      
-    
-    us_g1_config = {"NVDA": [10, 20], "AMD": [20]}             
-    us_g2_config = {"AAPL": [20, 120], "MSFT": [20, 60, 120]} 
-    us_g3_config = {"TSLA": [10, 20]}                          
-    us_g4_config = {"AMZN": [20]}                              
-    
+    # 🇹🇼 嚴選台灣核心成分股 (150 檔)
+    tw_core_tickers = [
+        "0050.TW", "0056.TW", "00878.TW", "00919.TW", "00929.TW", "2330.TW", "2317.TW", "2454.TW", "2382.TW", "2308.TW",
+        "2881.TW", "2882.TW", "2891.TW", "2886.TW", "2884.TW", "2892.TW", "2885.TW", "2880.TW", "2883.TW", "5880.TW",
+        "2303.TW", "3711.TW", "2324.TW", "2357.TW", "2353.TW", "2327.TW", "2345.TW", "3231.TW", "6669.TW", 
+        "2603.TW", "2609.TW", "2615.TW", "2618.TW", "2610.TW", "2201.TW", "2207.TW", "2352.TW", "2379.TW", "3034.TW",
+        "3037.TW", "3189.TW", "8046.TW", "2408.TW", "2344.TW", "2449.TW", "3008.TW", "3406.TW", "2313.TW", "2360.TW",
+        "3044.TW", "2409.TW", "3481.TW", "6116.TW", "1101.TW", "1102.TW", "1301.TW", "1303.TW", "1326.TW", "1402.TW",
+        "2105.TW", "2002.TW", "2606.TW", "9904.TW", "9921.TW", "9945.TW", "2912.TW", "5904.TW", "1216.TW", "1227.TW",
+        "1722.TW", "1717.TW", "4147.TW", "1795.TW", "6446.TW", "3702.TW", "2347.TW", "3036.TW", "2474.TW", "2354.TW",
+        "2356.TW", "2395.TW", "6239.TW", "6205.TW", "3005.TW", "3596.TW", "3017.TW", "2421.TW", "3035.TW", "3443.TW",
+        "3661.TW", "5269.TW", "6415.TW", "8054.TW", "2455.TW", "2458.TW", "3532.TW", "4919.TW", "4961.TW", "6271.TW",
+        "6147.TWO", "5347.TWO", "6488.TWO", "8299.TWO", "3105.TWO", "5483.TWO", "3529.TWO", "3293.TWO", "6182.TWO", "4108.TWO",
+        "4128.TWO", "4162.TWO", "4743.TWO", "6547.TWO", "3264.TWO", "5425.TWO", "6138.TWO", "8069.TWO", "8358.TWO", "3081.TWO",
+        "3548.TWO", "3624.TWO", "4966.TWO", "5274.TWO", "5289.TWO", "6180.TWO", "6223.TWO", "6510.TWO", "8086.TWO", "8436.TWO",
+        "1513.TW", "1519.TW", "1503.TW", "1514.TW", "1605.TW", "1608.TW", "1609.TW", "6806.TW", "3019.TW", "2368.TW",
+        "5434.TW", "2481.TW", "3042.TW", "2457.TW", "2367.TW", "3515.TW", "2412.TW", "4904.TW", "3045.TW", "2498.TW"
+    ]
+
+    # 🇺🇸 嚴選美國市值前 50 大巨頭
+    us_core_tickers = [
+        "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "BRK-B", "LLY", "AVGO",
+        "V", "JPM", "NVO", "UNH", "MA", "WMT", "XOM", "HD", "PG", "ORCL",
+        "COST", "ASML", "AMD", "NFLX", "CTAS", "AAL", "INTC", "QCOM", "TXN", "MU",
+        "AMAT", "LRCX", "ADI", "NXPI", "MRVL", "PANW", "SNPS", "CDNS", "MS", "GS",
+        "BAC", "CAT", "GE", "HON", "BA", "LMT", "UPS", "FDX", "DIS", "NKE"
+    ]
+
     data_dict = {
-        'tw_all': scan_market(tw_tickers, min_volume=2000000), 
-        'tw_g1': process_custom_groups(tw_g1_config), 
-        'tw_g2': process_custom_groups(tw_g2_config),
-        
-        'us_all': scan_market(get_us_tickers(), min_volume=100000),
-        'us_g1': process_custom_groups(us_g1_config), 
-        'us_g2': process_custom_groups(us_g2_config),
-        'us_g3': process_custom_groups(us_g3_config), 
-        'us_g4': process_custom_groups(us_g4_config)
+        'tw': update_and_scan_dataset(tw_core_tickers, is_us=False),
+        'us': update_and_scan_dataset(us_core_tickers, is_us=True)
     }
+    
     generate_html(data_dict, today_str)
     
+    # 這裡的 git add 要同步把 data 資料夾加進去，才能把 CSV 進度存回 GitHub
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
-    os.system('git add docs/index.html')
-    os.system('git commit -m "⚙️ 運行全市場高避護機制自動更新"')
+    os.system('git add docs/index.html data/*.csv')
+    os.system('git commit -m "⚙️ 滾動增量更新資料集與網頁報告"')
     os.system('git push')
 
-    # =========================================================================
-    # ✉️ 【發送 訊息一：每日個股均線潛伏報告】
-    # =========================================================================
     web_url = f"https://{os.environ.get('GITHUB_REPOSITORY_OWNER', 'wudn9922')}.github.io/my-stock-screener/"
-    line_msg_stocks = f"🎯 {today_str} 全市場看盤網頁！\n\n"
-    line_msg_stocks += f"🇹🇼 【台灣股市區塊】\n"
-    line_msg_stocks += f" ├ 1. 全市場符合：{len(data_dict['tw_all'])} 檔\n"
-    line_msg_stocks += f" ├ 2. 核心權值精選：{len(data_dict['tw_g1'])} 檔\n"
-    line_msg_stocks += f" └ 3. 航運與指標ETF：{len(data_dict['tw_g2'])} 檔\n\n"
-    line_msg_stocks += f"🇺🇸 【美國股市區塊】\n"
-    line_msg_stocks += f" ├ 1. 全市場符合：{len(data_dict['us_all'])} 檔\n"
-    line_msg_stocks += f" ├ 2. AI與半導體：{len(data_dict['us_g1'])} 檔\n"
-    line_msg_stocks += f" ├ 3. 科技旗艦巨頭：{len(data_dict['us_g2'])} 檔\n"
-    line_msg_stocks += f" ├ 4. 特斯拉特選：{len(data_dict['us_g3'])} 檔\n"
-    line_msg_stocks += f" └ 5. 亞馬遜消費成長：{len(data_dict['us_g4'])} 檔\n\n"
-    line_msg_stocks += f"🔗 點擊網址：\n{web_url}"
-    send_line_message(line_msg_stocks, access_token, user_id)
-
-    # =========================================================================
-    # ✉️ 【發送 訊息二：每日全球大盤多空量化報告】
-    # =========================================================================
-    line_msg_index = f"🌍 {today_str} 全球大盤多空量化報告\n"
-    line_msg_index += f"📊 評分標準: 均線0.5%緩衝/自適應機制\n"
-    line_msg_index += f"========================\n\n"
-    
-    line_msg_index += f"【 🇹🇼 台灣市場 】\n"
-    line_msg_index += analyze_index_trend("^TWII", "台灣加權指數", ma_list=[20, 27, 61]) + "\n"
-    line_msg_index += analyze_index_trend("^TWOII", "台灣櫃買指數(OTC)", ma_list=[20, 60, 120]) + "\n\n"
-    
-    line_msg_index += f"【 🇺🇸 美國市場 】\n"
-    line_msg_index += analyze_index_trend("^GSPC", "美國標普500", ma_list=[23, 60]) + "\n"
-    line_msg_index += analyze_index_trend("^DJI", "美國道瓊工業", ma_list=[20, 23, 55]) + "\n"
-    line_msg_index += analyze_index_trend("^IXIC", "美國那斯達克", ma_list=[29]) + "\n"
-    line_msg_index += analyze_index_trend("^RUT", "美國羅素2000", ma_list=[21, 56]) + "\n"
-    line_msg_index += analyze_index_trend("^SOX", "美國費城半導體", ma_list=[20, 58, 108]) + "\n\n"
-    
-    line_msg_index += f"【 🇪🇺 歐洲市場 】\n"
-    line_msg_index += analyze_index_trend("^FCHI", "法國CAC40", ma_list=[21]) + "\n"
-    line_msg_index += analyze_index_trend("^FTSE", "英國富時100", ma_list=[20]) + "\n"
-    line_msg_index += analyze_index_trend("^GDAXI", "德國DAX指數", ma_list=[23]) + "\n\n"
-    
-    line_msg_index += f"【 🌏 亞洲市場 】\n"
-    line_msg_index += analyze_index_trend("^N225", "日本日經225", ma_list=[24]) + "\n"
-    line_msg_index += analyze_index_trend("^KS11", "韓國綜合指數", ma_list=[22]) + "\n"
-    
-    send_line_message(line_msg_index, access_token, user_id)
-
-    if weekday == 0:  
-        print("檢測到今天為週一，發送最新免登入美股類股觀測鏈結...")
-        sectors_url = "https://finviz.com/groups.ashx?g=sector&v=110"
-        line_msg_sectors = f"📅 【每週一限定】美股 11 大類股週線趨勢輪動圖\n"
-        line_msg_sectors += f"⏳ 包含 1-2 年週線級別核心波段追蹤\n\n"
-        line_msg_sectors += f"🔗 類股觀測鏈結：\n{sectors_url}"
-        send_line_message(line_msg_sectors, access_token, user_id)
+    line_msg = f"🎯 {today_str} 增量儲存版報告\n\n"
+    line_msg += f"🇹🇼 台股符合：{len(data_dict['tw'])} 檔\n"
+    line_msg += f"🇺🇸 美股符合：{len(data_dict['us'])} 檔\n\n"
+    line_msg += f"🔗 網址：\n{web_url}"
+    send_line_message(line_msg, access_token, user_id)
 
 if __name__ == "__main__":
     main()
