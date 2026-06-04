@@ -39,6 +39,12 @@ def get_tw_tickers(min_volume):
             res = requests.get(twse_url, headers=HTTP_HEADERS, timeout=15)
             if res.status_code == 200:
                 df_twse = pd.read_csv(io.StringIO(res.text))
+                # ===== 加這幾行 DEBUG =====
+                print("TWSE 欄位名稱:", df_twse.columns.tolist())
+                print("TWSE 前3筆資料:")
+                print(df_twse.head(3))
+                print("總行數:", len(df_twse))
+                # ==========================
                 code_col = '證券代號' if '證券代號' in df_twse.columns else 'Code' if 'Code' in df_twse.columns else df_twse.columns[0]
                 vol_col = '成交股數' if '成交股數' in df_twse.columns else 'TradeVolume' if 'TradeVolume' in df_twse.columns else 'Volume' if 'Volume' in df_twse.columns else None
                 
@@ -64,8 +70,13 @@ def get_tw_tickers(min_volume):
     for attempt in range(3):
         try:
             res = requests.get(tpex_url, headers=HTTP_HEADERS, timeout=15)
+
             if res.status_code == 200:
                 data = res.json()
+                # ===== 加這幾行 DEBUG =====
+                print("TPEx 第一筆:", data[0] if data else "空的")
+                print("TPEx 總筆數:", len(data))
+                # ==========================
                 if isinstance(data, list):
                     for item in data:
                         # 1. 自動相容英中欄位，提取股票代號
