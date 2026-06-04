@@ -6,15 +6,15 @@ from datetime import datetime
 import json
 import io
 
-# 🌟 核心修正 1：關閉 yfinance 的 SQLite 快取，徹底解決 database is locked 錯誤
-yf.set_tz_cache_location(None)
+# 🌟 核心修正 1：移除 yf.set_tz_cache_location(None)
+# 改用 yf.enable_debug_mode() 或是直接不設定，避免 TypeError
 
 HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
 DATA_DIR = "data"
-MAX_DAYS = 201 # 滾動資料庫的最大保存天數
+MAX_DAYS = 201 
 
 def send_line_message(msg, access_token, user_id):
     url = "https://api.line.me/v2/bot/message/push"
@@ -25,16 +25,11 @@ def send_line_message(msg, access_token, user_id):
 
 def get_tw_tickers():
     try:
-        # 🌟 核心修正 2：改用證交所最穩定的 CSV OpenData 網址，100% 避開不穩定的 OpenAPI
         url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data"
         res = requests.get(url, headers=HTTP_HEADERS, timeout=15)
         if res.status_code == 200:
-            # 使用 StringIO 讀取 CSV，完美兼容新版 pandas 規範
             df = pd.read_csv(io.StringIO(res.text))
-            
-            # 確保欄位存在（欄位名稱可能是 '證券代號' 或 'Code'）
             code_col = '證券代號' if '證券代號' in df.columns else 'Code' if 'Code' in df.columns else df.columns[0]
-            
             tickers = []
             for code in df[code_col].astype(str).str.strip():
                 if len(code) == 4 and code.isdigit():
@@ -47,7 +42,6 @@ def get_tw_tickers():
 def get_us_tickers():
     try:
         url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        # 🌟 核心修正 3：加入 io.StringIO 消除 pandas.read_html 的警告
         html_text = requests.get(url, headers=HTTP_HEADERS).text
         df = pd.read_html(io.StringIO(html_text))[0]
         return [t.replace('.', '-') for t in df['Symbol'].tolist()]
@@ -97,7 +91,8 @@ def scan_market(tickers, min_volume):
         for i in range(0, len(need_init), chunk_size):
             chunk = need_init[i:i+chunk_size]
             try:
-                data = yf.download(chunk, period="250d", progress=False)
+                # 🌟 核心修正 2：改用 threads=False 避免多執行緒造成的 sqlite locked 問題
+                data = yf.download(chunk, period="250d", progress=False, threads=False)
                 if data.empty: continue
                 for ticker in chunk:
                     try:
@@ -113,7 +108,8 @@ def scan_market(tickers, min_volume):
         for i in range(0, len(need_update), chunk_size):
             chunk = need_update[i:i+chunk_size]
             try:
-                data = yf.download(chunk, period="5d", progress=False)
+                # 🌟 核心修正 3：同樣加上 threads=False
+                data = yf.download(chunk, period="5d", progress=False, threads=False)
                 if data.empty: continue
                 for ticker in chunk:
                     try:
@@ -168,7 +164,7 @@ def process_custom_groups(group_dict):
     os.makedirs(DATA_DIR, exist_ok=True)
     
     try:
-        data = yf.download(tickers, period="5d", progress=False)
+        data = yf.download(tickers, period="5d", progress=False, threads=False)
         for ticker in tickers:
             try:
                 df_today = data[ticker] if isinstance(data.columns, pd.MultiIndex) else data.copy()
@@ -181,7 +177,7 @@ def process_custom_groups(group_dict):
                     df_local = pd.read_csv(csv_path, index_col=0, parse_dates=True)
                     df_combined = pd.concat([df_local, df_today_clean])
                 else:
-                    df_init = yf.download(ticker, period="250d", progress=False)
+                    df_init = yf.download(ticker, period="250d", progress=False, threads=False)
                     df_combined = df_init[required_cols].dropna()
                     
                 df_combined = df_combined[~df_combined.index.duplicated(keep='last')].sort_index().tail(MAX_DAYS)
@@ -241,7 +237,8 @@ def generate_html(data_dict, date_str):
 
 def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
     try:
-        df = yf.download(ticker, period="4y", progress=False)
+        # 🌟 核心修正 4：同樣加上 threads=False
+        df = yf.download(ticker, period="4y", progress=False, threads=False)
         if df.empty or len(df) < 750: return f"⚪ {name}: 數據不足無法分析"
         df = df.copy()
         if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
