@@ -20,6 +20,91 @@ HTTP_HEADERS = {
 DATA_DIR = "data"
 MAX_DAYS = 201 
 
+# =========================================================================
+# 📡 新增：Supabase 雲端資料庫動態名單讀取器 (不破壞原本架構，採用最穩定的 REST API)
+# =========================================================================
+def load_configs_from_supabase():
+    # 預設名單（如果你原本的硬編碼設定）：當資料庫沒資料或連不上時，保證原功能依然能動
+    configs = {
+        "tw_g1": {"2330.TW": [10, 20], "2317.TW": [20, 60], "2454.TW": [5, 10, 20]},
+        "tw_g2": {"2603.TW": [20, 60], "2609.TW": [5, 10], "0050.TW": [5, 20]},
+        "us_g1": {"NVDA": [10, 20], "AMD": [20]},
+        "us_g2": {"AAPL": [20, 120], "MSFT": [20, 60, 120]},
+        "us_g3": {"TSLA": [10, 20]},
+        "us_g4": {"AMZN": [20]}
+    }
+    
+    supabase_url = "https://bxhqpfeberqbtxymghyt.supabase.co/rest/v1"
+    supabase_key = "sb_publishable_eEJNM_96jblQ_90vpcYC0g_PzyGJNOK"
+    headers = {
+        "apikey": supabase_key,
+        "Authorization": f"Bearer {supabase_key}"
+    }
+    
+    try:
+        # 從雲端下載最新的分組與股票
+        res_groups = requests.get(f"{supabase_url}/groups", headers=headers, timeout=10)
+        res_stocks = requests.get(f"{supabase_url}/stocks", headers=headers, timeout=10)
+        
+        if res_groups.status_code == 200 and res_stocks.status_code == 200:
+            groups_data = res_groups.json()
+            stocks_data = res_stocks.json()
+            
+            # 整理分組與它們對應的 2~4 個均線參數
+            group_map = {}
+            for g in groups_data:
+                ma_list = []
+                for ma_key in ['ma1', 'ma2', 'ma3', 'ma4']:
+                    if g.get(ma_key) is not None and int(g[ma_key]) > 0:
+                        ma_list.append(int(g[ma_key]))
+                # 如果使用者沒填均線，預設給 20MA
+                if not ma_list: ma_list = [20]
+                
+                group_map[g['id']] = {
+                    "name": g['name'],
+                    "ma_list": ma_list,
+                    "stocks": []
+                }
+            
+            # 把股票塞進對應的分組裡
+            for s in stocks_data:
+                g_id = s.get('group_id')
+                if g_id in group_map:
+                    group_map[g_id]["stocks"].append(s['ticker'])
+            
+            # 對應到原本網頁與簡訊排版所期待的固定組別名稱
+            name_mapping = {
+                "核心權值精選": "tw_g1",
+                "航運與指標ETF": "tw_g2",
+                "AI與半導體": "us_g1",
+                "科技旗艦巨頭": "us_g2",
+                "特斯拉特選": "us_g3",
+                "亞馬遜消費成長": "us_g4"
+            }
+            
+            # 覆蓋本地硬編碼設定，實現手機即時遙控
+            for g_id, g_info in group_map.items():
+                mapped_key = None
+                for official_name, key in name_mapping.items():
+                    if official_name in g_info['name']:
+                        mapped_key = key
+                        break
+                
+                if mapped_key and g_info["stocks"]:
+                    dynamic_config = {}
+                    for ticker in g_info["stocks"]:
+                        dynamic_config[ticker] = g_info["ma_list"]
+                    configs[mapped_key] = dynamic_config
+                    print(f"🔗 成功從雲端同步組別【{g_info['name']}】，包含 {len(g_info['stocks'])} 檔股票，設定均線: {g_info['ma_list']}MA")
+                    
+    except Exception as e:
+        print(f"⚠️ 讀取雲端資料庫失敗或尚未填入資料，將維持原本的硬編碼名單。原因: {e}")
+        
+    return configs
+
+# =========================================================================
+# 完美保留你原本寫的所有核心功能，完全不更動
+# =========================================================================
 def send_line_message(msg, access_token, user_id):
     url = "https://api.line.me/v2/bot/message/push"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {access_token}"}
@@ -29,8 +114,6 @@ def send_line_message(msg, access_token, user_id):
 
 def get_tw_tickers(min_volume):
     tickers = []
-    
-    # 引擎 1：TWSE 上市
     twse_url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data"
     for attempt in range(3):
         try:
@@ -43,7 +126,6 @@ def get_tw_tickers(min_volume):
                 for _, row in df_twse.iterrows():
                     try:
                         raw = str(row[code_col]).strip()
-                        # 過濾：只保留純4位數字、不以0開頭（排除ETF）
                         if len(raw) != 4 or not raw.isdigit() or raw.startswith('0'):
                             continue
                         if vol_col:
@@ -59,7 +141,6 @@ def get_tw_tickers(min_volume):
             if attempt == 2: print(f"❌ 獲取上市清單失敗: {e}")
             else: time.sleep(2)
 
-    # 引擎 2：TPEx 上櫃
     tpex_url = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
     tpex_count = 0
     for attempt in range(3):
@@ -90,14 +171,10 @@ def get_tw_tickers(min_volume):
             else: time.sleep(2)
 
     tickers = list(set(tickers))
-
     if not tickers:
         return ["2330.TW", "2317.TW", "2454.TW", "2603.TW", "0050.TW"]
-
     print(f"🔥 雙引擎完成！台股總計: {len(tickers)} 檔 (含上市+上櫃)")
     return tickers
-
-
 
 def get_us_tickers():
     try:
@@ -196,7 +273,6 @@ def scan_market(tickers, min_volume):
                     except Exception: continue
             except Exception: pass
 
-    # ── 掃描篩選 ──
     for ticker in tickers:
         csv_path = os.path.join(DATA_DIR, f"{ticker}.csv")
         if not os.path.exists(csv_path): continue
@@ -220,7 +296,6 @@ def scan_market(tickers, min_volume):
     print(f"掃描結果: {len(matched_list)} 檔符合條件")
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
     return matched_list
-
 
 def process_custom_groups(group_dict):
     matched_list = []
@@ -263,7 +338,6 @@ def process_custom_groups(group_dict):
                     df_combined[f'MA{ma_window}'] = df_combined['Close'].rolling(window=ma_window).mean()
                     
                 price = float(df_combined['Close'].iloc[-1])
-                
                 matched_any_ma = False
                 triggered_info = []
                 
@@ -385,6 +459,9 @@ def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
         return f"{icon} {name}\n   ├ 均線: {score_label} ({score}/{total_ma_count}MA)\n   └  {final_status}"
     except Exception as e: return f"⚪ {name}: 分析發生異常"
 
+# =========================================================================
+# 主程式：整合雲端動態控制，完美相容舊流程
+# =========================================================================
 def main():
     access_token = os.environ.get("LINE_ACCESS_TOKEN")
     user_id = os.environ.get("LINE_USER_ID")
@@ -392,13 +469,15 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
     weekday = datetime.now().weekday() 
 
-    tw_g1_config = {"2330.TW": [10, 20], "2317.TW": [20, 60], "2454.TW": [5, 10, 20]} 
-    tw_g2_config = {"2603.TW": [20, 60], "2609.TW": [5, 10], "0050.TW": [5, 20]}      
+    # 🟢 關鍵升級：將原本寫死的字典改為優先從 Supabase 下載最新設定，若連不上則自動切換回硬編碼名單
+    db_configs = load_configs_from_supabase()
     
-    us_g1_config = {"NVDA": [10, 20], "AMD": [20]}             
-    us_g2_config = {"AAPL": [20, 120], "MSFT": [20, 60, 120]} 
-    us_g3_config = {"TSLA": [10, 20]}                          
-    us_g4_config = {"AMZN": [20]}                              
+    tw_g1_config = db_configs["tw_g1"]
+    tw_g2_config = db_configs["tw_g2"]
+    us_g1_config = db_configs["us_g1"]
+    us_g2_config = db_configs["us_g2"]
+    us_g3_config = db_configs["us_g3"]
+    us_g4_config = db_configs["us_g4"]
     
     tw_market_pool = get_tw_tickers(TW_MIN_VOLUME)
     
