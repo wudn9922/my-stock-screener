@@ -1,5 +1,8 @@
-yfinance
-pandas
-requests
 lxml
 plotly
+flask
+flask-cors
+yfinance
+pandas
+supabase
+requests
