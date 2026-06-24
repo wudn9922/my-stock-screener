@@ -21,10 +21,10 @@ DATA_DIR = "data"
 MAX_DAYS = 201 
 
 # =========================================================================
-# 📡 新增：Supabase 雲端資料庫動態名單讀取器 (不破壞原本架構，採用最穩定的 REST API)
+# 📡 修正版：Supabase 雲端資料庫動態名單讀取器 (改成股票獨立均線版)
 # =========================================================================
 def load_configs_from_supabase():
-    # 預設名單（如果你原本的硬編碼設定）：當資料庫沒資料或連不上時，保證原功能依然能動
+    # 預設名單
     configs = {
         "tw_g1": {"2330.TW": [10, 20], "2317.TW": [20, 60], "2454.TW": [5, 10, 20]},
         "tw_g2": {"2603.TW": [20, 60], "2609.TW": [5, 10], "0050.TW": [5, 20]},
@@ -50,29 +50,7 @@ def load_configs_from_supabase():
             groups_data = res_groups.json()
             stocks_data = res_stocks.json()
             
-            # 整理分組與它們對應的 2~4 個均線參數
-            group_map = {}
-            for g in groups_data:
-                ma_list = []
-                for ma_key in ['ma1', 'ma2', 'ma3', 'ma4']:
-                    if g.get(ma_key) is not None and int(g[ma_key]) > 0:
-                        ma_list.append(int(g[ma_key]))
-                # 如果使用者沒填均線，預設給 20MA
-                if not ma_list: ma_list = [20]
-                
-                group_map[g['id']] = {
-                    "name": g['name'],
-                    "ma_list": ma_list,
-                    "stocks": []
-                }
-            
-            # 把股票塞進對應的分組裡
-            for s in stocks_data:
-                g_id = s.get('group_id')
-                if g_id in group_map:
-                    group_map[g_id]["stocks"].append(s['ticker'])
-            
-            # 對應到原本網頁與簡訊排版所期待的固定組別名稱
+            # 定義對應到原本 LINE 訊息排版所期待的固定組別 Key
             name_mapping = {
                 "核心權值精選": "tw_g1",
                 "航運與指標ETF": "tw_g2",
@@ -82,23 +60,40 @@ def load_configs_from_supabase():
                 "亞馬遜消費成長": "us_g4"
             }
             
-            # 覆蓋本地硬編碼設定，實現手機即時遙控
-            for g_id, g_info in group_map.items():
-                mapped_key = None
+            # 1. 建立組別 ID 到官方 Key 的對照表
+            group_id_to_key = {}
+            for g in groups_data:
                 for official_name, key in name_mapping.items():
-                    if official_name in g_info['name']:
-                        mapped_key = key
+                    if official_name in g['name']:
+                        group_id_to_key[g['id']] = key
                         break
+            
+            # 2. 清空即將從雲端同步的組別，避免新舊資料混雜
+            for key in set(group_id_to_key.values()):
+                configs[key] = {}
+            
+            # 3. 🟢 關鍵改動：一檔一檔股票讀取，並且直接拔取它「自己的均線欄位」！
+            for s in stocks_data:
+                g_id = s.get('group_id')
+                mapped_key = group_id_to_key.get(g_id)
                 
-                if mapped_key and g_info["stocks"]:
-                    dynamic_config = {}
-                    for ticker in g_info["stocks"]:
-                        dynamic_config[ticker] = g_info["ma_list"]
-                    configs[mapped_key] = dynamic_config
-                    print(f"🔗 成功從雲端同步組別【{g_info['name']}】，包含 {len(g_info['stocks'])} 檔股票，設定均線: {g_info['ma_list']}MA")
+                if mapped_key:
+                    # 讀取這檔股票在網頁上設定的專屬 4 條均線
+                    ma_list = []
+                    for ma_key in ['ma1', 'ma2', 'ma3', 'ma4']:
+                        if s.get(ma_key) is not None and int(s[ma_key]) > 0:
+                            ma_list.append(int(s[ma_key]))
+                    
+                    # 防呆機制：如果使用者在網頁沒填均線，預設給 20MA
+                    if not ma_list: 
+                        ma_list = [20]
+                    
+                    # 將股票代碼與它專屬的均線，塞進對應的組別中
+                    configs[mapped_key][s['ticker']] = ma_list
+                    print(f"🔗 雲端同步：【{s['ticker']}】成功加入組別【{mapped_key}】，使用自訂均線: {ma_list}MA")
                     
     except Exception as e:
-        print(f"⚠️ 讀取雲端資料庫失敗或尚未填入資料，將維持原本的硬編碼名單。原因: {e}")
+        print(f"⚠️ 讀取雲端資料庫失敗，將維持原本的硬編碼名單。原因: {e}")
         
     return configs
 
