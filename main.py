@@ -21,17 +21,13 @@ DATA_DIR = "data"
 MAX_DAYS = 201 
 
 # =========================================================================
-# 📡 修正版：Supabase 雲端資料庫動態名單讀取器 (改成股票獨立均線版)
+# 📡 修正版：Supabase 雲端資料庫動態名單讀取器 (改成股票獨立均線 + 完美對齊真實分組)
 # =========================================================================
 def load_configs_from_supabase():
-    # 預設名單
+    # 預設名單：當資料庫沒資料或連不上時的防呆備援
     configs = {
-        "tw_g1": {"2330.TW": [10, 20], "2317.TW": [20, 60], "2454.TW": [5, 10, 20]},
-        "tw_g2": {"2603.TW": [20, 60], "2609.TW": [5, 10], "0050.TW": [5, 20]},
-        "us_g1": {"NVDA": [10, 20], "AMD": [20]},
-        "us_g2": {"AAPL": [20, 120], "MSFT": [20, 60, 120]},
-        "us_g3": {"TSLA": [10, 20]},
-        "us_g4": {"AMZN": [20]}
+        "tw_g1": {}, "tw_g2": {},
+        "us_g1": {}, "us_g2": {}, "us_g3": {}, "us_g4": {}
     }
     
     supabase_url = "https://bxhqpfeberqbtxymghyt.supabase.co/rest/v1"
@@ -42,7 +38,6 @@ def load_configs_from_supabase():
     }
     
     try:
-        # 從雲端下載最新的分組與股票
         res_groups = requests.get(f"{supabase_url}/groups", headers=headers, timeout=10)
         res_stocks = requests.get(f"{supabase_url}/stocks", headers=headers, timeout=10)
         
@@ -50,50 +45,42 @@ def load_configs_from_supabase():
             groups_data = res_groups.json()
             stocks_data = res_stocks.json()
             
-            # 定義對應到原本 LINE 訊息排版所期待的固定組別 Key
+            # 🟢 完美解法：加上市場前綴，避開 Python 字典 Key 重複被蓋掉的驚天大 Bug！
             name_mapping = {
-                "權值精選": "tw_g1",
-                "熱門": "tw_g2",
-                "權值精選": "us_g1",
-                "低本益比": "us_g2",
-                "超級績效": "us_g3",
-                "熱門": "us_g4"
+                "台股-權值精選": "tw_g1",
+                "台股-熱門": "tw_g2",
+                "美股-權值精選": "us_g1",
+                "美股-低本益比": "us_g2",
+                "美股-超級績效": "us_g3",
+                "美股-熱門": "us_g4"
             }
             
             # 1. 建立組別 ID 到官方 Key 的對照表
             group_id_to_key = {}
             for g in groups_data:
-                for official_name, key in name_mapping.items():
-                    if official_name in g['name']:
-                        group_id_to_key[g['id']] = key
-                        break
+                g_name = g['name'].strip()
+                if g_name in name_mapping:
+                    group_id_to_key[g['id']] = name_mapping[g_name]
             
-            # 2. 清空即將從雲端同步的組別，避免新舊資料混雜
-            for key in set(group_id_to_key.values()):
-                configs[key] = {}
-            
-            # 3. 🟢 關鍵改動：一檔一檔股票讀取，並且直接拔取它「自己的均線欄位」！
+            # 2. 循著股票一檔一檔拔取它在網頁上設定的「獨立均線」
             for s in stocks_data:
                 g_id = s.get('group_id')
                 mapped_key = group_id_to_key.get(g_id)
                 
                 if mapped_key:
-                    # 讀取這檔股票在網頁上設定的專屬 4 條均線
                     ma_list = []
                     for ma_key in ['ma1', 'ma2', 'ma3', 'ma4']:
                         if s.get(ma_key) is not None and int(s[ma_key]) > 0:
                             ma_list.append(int(s[ma_key]))
                     
-                    # 防呆機制：如果使用者在網頁沒填均線，預設給 20MA
                     if not ma_list: 
-                        ma_list = [20]
+                        ma_list = [20]  # 完全沒填時的防呆預設值
                     
-                    # 將股票代碼與它專屬的均線，塞進對應的組別中
                     configs[mapped_key][s['ticker']] = ma_list
-                    print(f"🔗 雲端同步：【{s['ticker']}】成功加入組別【{mapped_key}】，使用自訂均線: {ma_list}MA")
+                    print(f"🔗 雲端同步：【{s['ticker']}】成功納入 {mapped_key}，獨立均線: {ma_list}MA")
                     
     except Exception as e:
-        print(f"⚠️ 讀取雲端資料庫失敗，將維持原本的硬編碼名單。原因: {e}")
+        print(f"⚠️ 讀取雲端資料庫失敗，原因: {e}")
         
     return configs
 
@@ -219,9 +206,6 @@ def scan_market(tickers, min_volume):
         else:
             need_init.append(ticker)
 
-    print(f"need_init: {len(need_init)} 檔")
-    print(f"need_update: {len(need_update)} 檔")
-
     if need_init:
         for i in range(0, len(need_init), chunk_size):
             chunk = need_init[i:i+chunk_size]
@@ -294,8 +278,8 @@ def scan_market(tickers, min_volume):
 
 def process_custom_groups(group_dict):
     matched_list = []
+    if not group_dict: return matched_list
     tickers = list(group_dict.keys())
-    if not tickers: return matched_list
     os.makedirs(DATA_DIR, exist_ok=True)
     
     try:
@@ -356,12 +340,15 @@ def process_custom_groups(group_dict):
     except Exception: pass
     return matched_list
 
+# =========================================================================
+# 🟢 修正版：網頁報告 HTML 生成器 (將標籤按鈕完美更換為你的真實組別)
+# =========================================================================
 def generate_html(data_dict, date_str):
     js_store = "const chartDataStore = " + json.dumps(data_dict, ensure_ascii=False) + ";\n"
     html_template = f"""<!DOCTYPE html><html><head><title>台美股均線潛伏報告</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script><style>body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }} .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }} .category-box {{ background: #1a1a1a; padding: 12px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #00b0ff; }} .category-title {{ font-size: 15px; font-weight: bold; color: #00ff88; margin-bottom: 10px; padding-left: 5px; }} .tabs {{ display: flex; flex-wrap: wrap; gap: 6px; }} .tab-btn {{ background: #2a2a2a; color: #aaa; border: none; padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; transition: 0.3s; }} .tab-btn:hover {{ background: #3a3a3a; }} .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }} .market-section {{ display: none; max-width: 800px; margin: 0 auto; }} .market-section.active {{ display: block; }} .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }} .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }} .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 14px; }}</style></head><body><div class="header"><h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2><p style="margin: 5px 0 0 0; color:#00ff88; font-size:13px;">增量滾動數據儲存版</p></div>
     
     <div class="category-box" style="border-left-color: #ff5252;">
-        <div class="category-title">🇹🇼 台灣股市區塊 (已整合上市與上櫃公司)</div>
+        <div class="category-title">🇹🇼 台灣股市區塊</div>
         <div class="tabs">
             <button id="btn-tw_all" class="tab-btn active" onclick="switchMarket(event, 'tw_all')">全市場潛伏 ({len(data_dict['tw_all'])})</button>
             <button id="btn-tw_g1" class="tab-btn" onclick="switchMarket(event, 'tw_g1')">權值精選 ({len(data_dict['tw_g1'])})</button>
@@ -454,9 +441,6 @@ def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
         return f"{icon} {name}\n   ├ 均線: {score_label} ({score}/{total_ma_count}MA)\n   └  {final_status}"
     except Exception as e: return f"⚪ {name}: 分析發生異常"
 
-# =========================================================================
-# 主程式：整合雲端動態控制，完美相容舊流程
-# =========================================================================
 def main():
     access_token = os.environ.get("LINE_ACCESS_TOKEN")
     user_id = os.environ.get("LINE_USER_ID")
@@ -464,7 +448,7 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
     weekday = datetime.now().weekday() 
 
-    # 🟢 關鍵升級：將原本寫死的字典改為優先從 Supabase 下載最新設定，若連不上則自動切換回硬編碼名單
+    # 📡 下載雲端設定
     db_configs = load_configs_from_supabase()
     
     tw_g1_config = db_configs["tw_g1"]
@@ -493,25 +477,25 @@ def main():
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
     
     os.system('git add docs/index.html data/*.csv')
-    os.system('git commit -m "⚙️ 架構優化：雙引擎啟動！同時極速抓取證交所與櫃買中心數據"')
+    os.system('git commit -m "⚙️ 量化報告自動更新"')
     os.system('git push')
 
     # =========================================================================
-    # ✉️ 【發送 訊息一：每日個股均線潛伏報告】
+    # ✉️ 修正版：【發送 訊息一：每日個股均線潛伏報告】(完美對齊你的真實分組名稱)
     # =========================================================================
     web_url = "https://wudn9922.github.io/my-stock-screener/"
     
     line_msg_stocks = f"🎯 {today_str} 全市場增量看盤網頁！\n\n"
     line_msg_stocks += f"🇹🇼 【台灣股市區塊】\n"
     line_msg_stocks += f" ├ 1. 全市場符合(含上市櫃)：{len(data_dict['tw_all'])} 檔\n"
-    line_msg_stocks += f" ├ 2. 核心權值精選符合：{len(data_dict['tw_g1'])} 檔\n"
-    line_msg_stocks += f" └ 3. 航運與指標ETF符合：{len(data_dict['tw_g2'])} 檔\n\n"
+    line_msg_stocks += f" ├ 2. 權值精選符合：{len(data_dict['tw_g1'])} 檔\n"
+    line_msg_stocks += f" └ 3. 熱門符合：{len(data_dict['tw_g2'])} 檔\n\n"
     line_msg_stocks += f"🇺🇸 【美國股市區塊】\n"
     line_msg_stocks += f" ├ 1. 全市場符合：{len(data_dict['us_all'])} 檔\n"
-    line_msg_stocks += f" ├ 2. AI與半導體符合：{len(data_dict['us_g1'])} 檔\n"
-    line_msg_stocks += f" ├ 3. 科技旗艦巨頭符合：{len(data_dict['us_g2'])} 檔\n"
-    line_msg_stocks += f" ├ 4. 特斯拉特選符合：{len(data_dict['us_g3'])} 檔\n"
-    line_msg_stocks += f" └ 5. 亞馬遜消費成長符合：{len(data_dict['us_g4'])} 檔\n\n"
+    line_msg_stocks += f" ├ 2. 權值精選符合：{len(data_dict['us_g1'])} 檔\n"
+    line_msg_stocks += f" ├ 3. 低本益比符合：{len(data_dict['us_g2'])} 檔\n"
+    line_msg_stocks += f" ├ 4. 超級績效符合：{len(data_dict['us_g3'])} 檔\n"
+    line_msg_stocks += f" └ 5. 熱門符合：{len(data_dict['us_g4'])} 檔\n\n"
     line_msg_stocks += f"🔗 點擊網址：\n{web_url}"
     send_line_message(line_msg_stocks, access_token, user_id)
 
