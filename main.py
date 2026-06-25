@@ -24,12 +24,10 @@ MAX_DAYS = 201
 # 📡 Supabase 雲端資料庫動態名單與大盤參數讀取器
 # =========================================================================
 def load_configs_from_supabase():
-    # 個股預設結構
     configs = {
         "tw_g1": {}, "tw_g2": {},
         "us_g1": {}, "us_g2": {}, "us_g3": {}, "us_g4": {}
     }
-    # 大盤預設結構（備援防呆）
     index_configs = []
     
     supabase_url = "https://bxhqpfeberqbtxymghyt.supabase.co/rest/v1"
@@ -39,7 +37,6 @@ def load_configs_from_supabase():
         "Authorization": f"Bearer {supabase_key}"
     }
     
-    # 1. 讀取個股與群組設定
     try:
         res_groups = requests.get(f"{supabase_url}/groups", headers=headers, timeout=10)
         res_stocks = requests.get(f"{supabase_url}/stocks", headers=headers, timeout=10)
@@ -77,18 +74,14 @@ def load_configs_from_supabase():
     except Exception as e:
         print(f"⚠️ 讀取雲端個股失敗: {e}")
 
-    # 2. 🟢 動態讀取雲端大盤均線設定
     try:
         res_index = requests.get(f"{supabase_url}/index_configs", headers=headers, timeout=10)
         if res_index.status_code == 200:
             index_configs = res_index.json()
             print(f"📡 成功從雲端同步 {len(index_configs)} 檔全球大盤自訂均線參數！")
-        else:
-            print(f"⚠️ 大盤資料表回傳錯誤碼: {res_index.status_code}")
     except Exception as e:
-        print(f"⚠️ 讀取雲端大盤設定失敗，將啟用程式內建防呆參數. 原因: {e}")
+        print(f"⚠️ 讀取雲端大盤設定失敗: {e}")
         
-    # 如果雲端完全沒資料，啟動防呆清單以免報錯
     if not index_configs:
         index_configs = [
             {"ticker": "^TWII", "name": "台灣加權指數", "ma1": 20, "ma2": 27, "ma3": 61, "ma4": None},
@@ -137,11 +130,8 @@ def get_tw_tickers(min_volume):
                         tickers.append(f"{raw}.TW")
                     except Exception:
                         continue
-                print(f"✅ TWSE 上市：{len(tickers)} 檔通過")
                 break
-        except Exception as e:
-            if attempt == 2: print(f"❌ 獲取上市清單失敗: {e}")
-            else: time.sleep(2)
+        except Exception: time.sleep(2)
 
     tpex_url = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
     tpex_count = 0
@@ -166,16 +156,12 @@ def get_tw_tickers(min_volume):
                         if vol_val >= min_volume:
                             tickers.append(f"{code}.TWO")
                             tpex_count += 1
-                print(f"✅ TPEx 上櫃：{tpex_count} 檔通過")
                 break
-        except Exception as e:
-            if attempt == 2: print(f"❌ 獲取上櫃清單失敗: {e}")
-            else: time.sleep(2)
+        except Exception: time.sleep(2)
 
     tickers = list(set(tickers))
     if not tickers:
         return ["2330.TW", "2317.TW", "2454.TW", "2603.TW", "0050.TW"]
-    print(f"🔥 雙引擎完成！台股總計: {len(tickers)} 檔 (含上市+上櫃)")
     return tickers
 
 def get_us_tickers():
@@ -184,7 +170,7 @@ def get_us_tickers():
         html_text = requests.get(url, headers=HTTP_HEADERS).text
         df = pd.read_html(io.StringIO(html_text))[0]
         return [t.replace('.', '-') for t in df['Symbol'].tolist()]
-    except Exception as e: print(f"獲取美股清單失敗: {e}")
+    except Exception: pass
     return ["AAPL", "MSFT", "NVDA"]
 
 def build_stock_data(df_chart, ticker, title_suffix, ma_list):
@@ -292,7 +278,6 @@ def scan_market(tickers, min_volume):
                 matched_list.append({'ticker': ticker, 'volume': int(latest_vol), 'chart_data': chart_data})
         except Exception: continue
 
-    print(f"掃描結果: {len(matched_list)} 檔符合條件")
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
     return matched_list
 
@@ -398,9 +383,6 @@ def generate_html(data_dict, date_str):
     os.makedirs("docs", exist_ok=True)
     with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html_template)
 
-# =========================================================================
-# 🎯 大盤自適應判定大腦 (收盤價在均線上下 0.1% 緩衝增減分 + 5天內3天觸碰強歸0)
-# =========================================================================
 def analyze_index_trend(ticker, name, ma_list):
     if not ma_list: return f"⚪ {name}: 未設定任何均線參數"
     try:
@@ -421,28 +403,22 @@ def analyze_index_trend(ticker, name, ma_list):
         latest = df.iloc[-1]
         score = 0
         total_ma_count = len(available_mas)
-        
         df_last5 = df.tail(5)
         
         for ma_col in available_mas:
-            # 💡 檢查 5 天內是否有 3 天以上實體或影線觸碰均線
             touch_count = 0
             for _, row_5 in df_last5.iterrows():
                 if row_5['Low'] <= row_5[ma_col] <= row_5['High']:
                     touch_count += 1
             
             if touch_count >= 3:
-                score += 0 # 糾纏狀態，強制給 0 分
+                score += 0 
             else:
                 latest_close = latest['Close']
                 latest_ma = latest[ma_col]
-                
-                if latest_close > latest_ma * 1.001:    # 收盤大於均線 0.1%
-                    score += 1
-                elif latest_close < latest_ma * 0.999:  # 收盤小於均線 0.1%
-                    score -= 1
-                else:
-                    score += 0                          # 緩衝區內給 0 分
+                if latest_close > latest_ma * 1.001: score += 1
+                elif latest_close < latest_ma * 0.999: score -= 1
+                else: score += 0
                     
         if score == total_ma_count: score_label = "看多"
         elif score > 0: score_label = "偏多"
@@ -482,10 +458,9 @@ def analyze_index_trend(ticker, name, ma_list):
         elif macro_trend == "空頭趨勢" and micro_走勢 == "空頭走勢": icon = "🔻"
         else: icon = "⚡"
         
-        # 組裝顯示用的均線列表文字
         ma_str_list = "/".join([str(x) for x in ma_list])
         return f"{icon} {name}\n   ├ 均線: {score_label} ({score}/{total_ma_count}MA - {ma_str_list})\n   └  {final_status}"
-    except Exception as e: return f"⚪ {name}: 分析發生異常"
+    except Exception: return f"⚪ {name}: 分析發生異常"
 
 def main():
     access_token = os.environ.get("LINE_ACCESS_TOKEN")
@@ -494,7 +469,6 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
     weekday = datetime.now().weekday() 
 
-    # 📡 下載雲端所有設定（包含個股與大盤參數）
     db_configs, db_index_configs = load_configs_from_supabase()
     
     tw_g1_config = db_configs["tw_g1"]
@@ -521,13 +495,15 @@ def main():
     
     os.system('git config --global user.name "github-actions[bot]"')
     os.system('git config --global user.email "github-actions[bot]@users.noreply.github.com"')
-    
     os.system('git add docs/index.html data/*.csv')
     os.system('git commit -m "⚙️ 量化報告自動更新"')
     os.system('git push')
 
-    web_url = "https://wudn9922.github.io/my-stock-screener/"
-    web_url = "https://liff.line.me/2010330411-SbwvRXRN"
+    # =========================================================================
+    # 🔗 雙連結智慧生成區塊 (已修正黏字導致失敗的問題)
+    # =========================================================================
+    report_url = "https://wudn9922.github.io/my-stock-screener/"
+    liff_setting_url = "https://liff.line.me/2010330411-SbwvRXRN"
     
     line_msg_stocks = f"🎯 {today_str} 全市場增量看盤網頁！\n\n"
     line_msg_stocks += f"🇹🇼 【台灣股市區塊】\n"
@@ -540,23 +516,23 @@ def main():
     line_msg_stocks += f" ├ 3. 低本益比符合：{len(data_dict['us_g2'])} 檔\n"
     line_msg_stocks += f" ├ 4. 超級績效符合：{len(data_dict['us_g3'])} 檔\n"
     line_msg_stocks += f" └ 5. 熱門符合：{len(data_dict['us_g4'])} 檔\n\n"
-    line_msg_stocks += f"🔗 點擊網址：\n{web_url}"
+    line_msg_stocks += f"🔗 1. 點擊查看量化潛伏網頁圖表：\n{report_url}\n\n"
+    line_msg_stocks += f"⚙️ 2. 點擊進入手機自訂參數控制台：\n{liff_setting_url}"
+    
     send_line_message(line_msg_stocks, access_token, user_id)
 
     # =========================================================================
-    # ✉️ 💡 全面進化：動態大盤多空量化報告 (迴圈讀取雲端參數)
+    # ✉️ 大盤多空量化報告
     # =========================================================================
     line_msg_index = f"🌍 {today_str} 全球大盤多空量化報告\n"
     line_msg_index += f"📊 評分標準: 均線糾纏自適應/0.1%過濾機制\n"
     line_msg_index += f"========================\n\n"
     
-    # 將大盤依照市場分組顯示
     tw_indices = ["^TWII", "^TWOII"]
     us_indices = ["^GSPC", "^DJI", "^IXIC", "^RUT", "^SOX"]
     eu_indices = ["^FCHI", "^FTSE", "^GDAXI"]
     as_indices = ["^N225", "^KS11"]
     
-    # 建立一個快速搜尋對照字典
     idx_map = {item["ticker"]: item for item in db_index_configs}
     
     def get_ma_list_from_item(item):
@@ -566,32 +542,24 @@ def main():
                 ma_list.append(int(item[ma_key]))
         return ma_list if ma_list else [20]
 
-    # 1. 台灣
     line_msg_index += f"【 🇹🇼 台灣市場 】\n"
     for t in tw_indices:
-        if t in idx_map:
-            line_msg_index += analyze_index_trend(t, idx_map[t]["name"], get_ma_list_from_item(idx_map[t])) + "\n"
+        if t in idx_map: line_msg_index += analyze_index_trend(t, idx_map[t]["name"], get_ma_list_from_item(idx_map[t])) + "\n"
     line_msg_index += "\n"
     
-    # 2. 美國
     line_msg_index += f"【 🇺🇸 美國市場 】\n"
     for t in us_indices:
-        if t in idx_map:
-            line_msg_index += analyze_index_trend(t, idx_map[t]["name"], get_ma_list_from_item(idx_map[t])) + "\n"
+        if t in idx_map: line_msg_index += analyze_index_trend(t, idx_map[t]["name"], get_ma_list_from_item(idx_map[t])) + "\n"
     line_msg_index += "\n"
     
-    # 3. 歐洲
     line_msg_index += f"【 🇪🇺 歐洲市場 】\n"
     for t in eu_indices:
-        if t in idx_map:
-            line_msg_index += analyze_index_trend(t, idx_map[t]["name"], get_ma_list_from_item(idx_map[t])) + "\n"
+        if t in idx_map: line_msg_index += analyze_index_trend(t, idx_map[t]["name"], get_ma_list_from_item(idx_map[t])) + "\n"
     line_msg_index += "\n"
     
-    # 4. 亞洲
     line_msg_index += f"【 🌏 亞洲市場 】\n"
     for t in as_indices:
-        if t in idx_map:
-            line_msg_index += analyze_index_trend(t, idx_map[t]["name"], get_ma_list_from_item(idx_map[t])) + "\n"
+        if t in idx_map: line_msg_index += analyze_index_trend(t, idx_map[t]["name"], get_ma_list_from_item(idx_map[t])) + "\n"
             
     send_line_message(line_msg_index, access_token, user_id)
 
