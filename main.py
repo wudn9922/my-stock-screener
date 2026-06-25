@@ -21,13 +21,16 @@ DATA_DIR = "data"
 MAX_DAYS = 201 
 
 # =========================================================================
-# 📡 Supabase 雲端資料庫動態名單讀取器
+# 📡 Supabase 雲端資料庫動態名單與大盤參數讀取器
 # =========================================================================
 def load_configs_from_supabase():
+    # 個股預設結構
     configs = {
         "tw_g1": {}, "tw_g2": {},
         "us_g1": {}, "us_g2": {}, "us_g3": {}, "us_g4": {}
     }
+    # 大盤預設結構（備援防呆）
+    index_configs = []
     
     supabase_url = "https://bxhqpfeberqbtxymghyt.supabase.co/rest/v1"
     supabase_key = "sb_publishable_eEJNM_96jblQ_90vpcYC0g_PzyGJNOK"
@@ -36,6 +39,7 @@ def load_configs_from_supabase():
         "Authorization": f"Bearer {supabase_key}"
     }
     
+    # 1. 讀取個股與群組設定
     try:
         res_groups = requests.get(f"{supabase_url}/groups", headers=headers, timeout=10)
         res_stocks = requests.get(f"{supabase_url}/stocks", headers=headers, timeout=10)
@@ -68,17 +72,40 @@ def load_configs_from_supabase():
                     for ma_key in ['ma1', 'ma2', 'ma3', 'ma4']:
                         if s.get(ma_key) is not None and int(s[ma_key]) > 0:
                             ma_list.append(int(s[ma_key]))
-                    
-                    if not ma_list: 
-                        ma_list = [20]
-                    
+                    if not ma_list: ma_list = [20]
                     configs[mapped_key][s['ticker']] = ma_list
-                    print(f"🔗 雲端同步：【{s['ticker']}】成功納入 {mapped_key}，獨立均線: {ma_list}MA")
-                    
     except Exception as e:
-        print(f"⚠️ 讀取雲端資料庫失敗，原因: {e}")
+        print(f"⚠️ 讀取雲端個股失敗: {e}")
+
+    # 2. 🟢 動態讀取雲端大盤均線設定
+    try:
+        res_index = requests.get(f"{supabase_url}/index_configs", headers=headers, timeout=10)
+        if res_index.status_code == 200:
+            index_configs = res_index.json()
+            print(f"📡 成功從雲端同步 {len(index_configs)} 檔全球大盤自訂均線參數！")
+        else:
+            print(f"⚠️ 大盤資料表回傳錯誤碼: {res_index.status_code}")
+    except Exception as e:
+        print(f"⚠️ 讀取雲端大盤設定失敗，將啟用程式內建防呆參數. 原因: {e}")
         
-    return configs
+    # 如果雲端完全沒資料，啟動防呆清單以免報錯
+    if not index_configs:
+        index_configs = [
+            {"ticker": "^TWII", "name": "台灣加權指數", "ma1": 20, "ma2": 27, "ma3": 61, "ma4": None},
+            {"ticker": "^TWOII", "name": "台灣櫃買指數(OTC)", "ma1": 20, "ma2": 60, "ma3": 120, "ma4": None},
+            {"ticker": "^GSPC", "name": "美國標普500", "ma1": 23, "ma2": 60, "ma3": None, "ma4": None},
+            {"ticker": "^DJI", "name": "美國道瓊工業", "ma1": 20, "ma2": 23, "ma3": 55, "ma4": None},
+            {"ticker": "^IXIC", "name": "美國那斯達克", "ma1": 29, "ma2": None, "ma3": None, "ma4": None},
+            {"ticker": "^RUT", "name": "美國羅素2000", "ma1": 21, "ma2": 56, "ma3": None, "ma4": None},
+            {"ticker": "^SOX", "name": "美國費城半導體", "ma1": 20, "ma2": 58, "ma3": 108, "ma4": None},
+            {"ticker": "^FCHI", "name": "法國CAC40", "ma1": 21, "ma2": None, "ma3": None, "ma4": None},
+            {"ticker": "^FTSE", "name": "英國富時100", "ma1": 20, "ma2": None, "ma3": None, "ma4": None},
+            {"ticker": "^GDAXI", "name": "德國DAX指數", "ma1": 23, "ma2": None, "ma3": None, "ma4": None},
+            {"ticker": "^N225", "name": "日本日經225", "ma1": 24, "ma2": None, "ma3": None, "ma4": None},
+            {"ticker": "^KS11", "name": "韓國綜合指數", "ma1": 22, "ma2": None, "ma3": None, "ma4": None}
+        ]
+        
+    return configs, index_configs
 
 def send_line_message(msg, access_token, user_id):
     url = "https://api.line.me/v2/bot/message/push"
@@ -317,7 +344,7 @@ def process_custom_groups(group_dict):
                     ma_val = float(df_combined[f'MA{ma_window}'].iloc[-1])
                     if pd.isna(ma_val): continue
                     
-                    if ma_val * 0.98 <= price < ma_val:
+                    if ma_val * 0.98 <= price < ma_val * 1.01:
                         diff_pct = ((price / ma_val) - 1) * 100
                         triggered_info.append(f"近MA{ma_window}({round(diff_pct,2)}%)")
                         matched_any_ma = True
@@ -372,9 +399,10 @@ def generate_html(data_dict, date_str):
     with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html_template)
 
 # =========================================================================
-# 🎯 核心修正：大盤扣抵判定大腦 (收盤正負0.1%增減分 + 5天內3天觸碰強制+0)
+# 🎯 大盤自適應判定大腦 (收盤價在均線上下 0.1% 緩衝增減分 + 5天內3天觸碰強歸0)
 # =========================================================================
-def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
+def analyze_index_trend(ticker, name, ma_list):
+    if not ma_list: return f"⚪ {name}: 未設定任何均線參數"
     try:
         df = yf.download(ticker, period="4y", progress=False, threads=False)
         if df.empty or len(df) < 750: return f"⚪ {name}: 數據不足無法分析"
@@ -394,30 +422,27 @@ def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
         score = 0
         total_ma_count = len(available_mas)
         
-        # 獲取最近 5 個交易日的數據（包含今天）
         df_last5 = df.tail(5)
         
         for ma_col in available_mas:
-            # 💡 檢查 5 天內是否有 3 天以上（含）實體或上下影線碰觸到均線 (Low <= MA <= High)
+            # 💡 檢查 5 天內是否有 3 天以上實體或影線觸碰均線
             touch_count = 0
             for _, row_5 in df_last5.iterrows():
                 if row_5['Low'] <= row_5[ma_col] <= row_5['High']:
                     touch_count += 1
             
             if touch_count >= 3:
-                # 🟢 糾纏狀態：5天內有3天以上觸碰，此均線判定直接給 +0
-                score += 0
+                score += 0 # 糾纏狀態，強制給 0 分
             else:
-                # 📈 未糾纏：改看最新收盤價是否超出 0.1% 的關鍵門檻
                 latest_close = latest['Close']
                 latest_ma = latest[ma_col]
                 
-                if latest_close > latest_ma * 1.001:    # 收盤價在均線上 0.1% 以上
+                if latest_close > latest_ma * 1.001:    # 收盤大於均線 0.1%
                     score += 1
-                elif latest_close < latest_ma * 0.999:  # 收盤價在均線下 0.1% 以下
+                elif latest_close < latest_ma * 0.999:  # 收盤小於均線 0.1%
                     score -= 1
                 else:
-                    score += 0                          # 落在正負 0.1% 緩衝區內記為 +0
+                    score += 0                          # 緩衝區內給 0 分
                     
         if score == total_ma_count: score_label = "看多"
         elif score > 0: score_label = "偏多"
@@ -456,7 +481,10 @@ def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
         elif macro_trend == "多頭趨勢" and micro_走勢 == "空頭走勢": icon = "💡"
         elif macro_trend == "空頭趨勢" and micro_走勢 == "空頭走勢": icon = "🔻"
         else: icon = "⚡"
-        return f"{icon} {name}\n   ├ 均線: {score_label} ({score}/{total_ma_count}MA)\n   └  {final_status}"
+        
+        # 組裝顯示用的均線列表文字
+        ma_str_list = "/".join([str(x) for x in ma_list])
+        return f"{icon} {name}\n   ├ 均線: {score_label} ({score}/{total_ma_count}MA - {ma_str_list})\n   └  {final_status}"
     except Exception as e: return f"⚪ {name}: 分析發生異常"
 
 def main():
@@ -466,7 +494,8 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
     weekday = datetime.now().weekday() 
 
-    db_configs = load_configs_from_supabase()
+    # 📡 下載雲端所有設定（包含個股與大盤參數）
+    db_configs, db_index_configs = load_configs_from_supabase()
     
     tw_g1_config = db_configs["tw_g1"]
     tw_g2_config = db_configs["tw_g2"]
@@ -513,30 +542,56 @@ def main():
     line_msg_stocks += f"🔗 點擊網址：\n{web_url}"
     send_line_message(line_msg_stocks, access_token, user_id)
 
+    # =========================================================================
+    # ✉️ 💡 全面進化：動態大盤多空量化報告 (迴圈讀取雲端參數)
+    # =========================================================================
     line_msg_index = f"🌍 {today_str} 全球大盤多空量化報告\n"
     line_msg_index += f"📊 評分標準: 均線糾纏自適應/0.1%過濾機制\n"
     line_msg_index += f"========================\n\n"
     
+    # 將大盤依照市場分組顯示
+    tw_indices = ["^TWII", "^TWOII"]
+    us_indices = ["^GSPC", "^DJI", "^IXIC", "^RUT", "^SOX"]
+    eu_indices = ["^FCHI", "^FTSE", "^GDAXI"]
+    as_indices = ["^N225", "^KS11"]
+    
+    # 建立一個快速搜尋對照字典
+    idx_map = {item["ticker"]: item for item in db_index_configs}
+    
+    def get_ma_list_from_item(item):
+        ma_list = []
+        for ma_key in ["ma1", "ma2", "ma3", "ma4"]:
+            if item.get(ma_key) is not None and int(item[ma_key]) > 0:
+                ma_list.append(int(item[ma_key]))
+        return ma_list if ma_list else [20]
+
+    # 1. 台灣
     line_msg_index += f"【 🇹🇼 台灣市場 】\n"
-    line_msg_index += analyze_index_trend("^TWII", "台灣加權指數", ma_list=[20, 27, 61]) + "\n"
-    line_msg_index += analyze_index_trend("^TWOII", "台灣櫃買指數(OTC)", ma_list=[20, 60, 120]) + "\n\n"
+    for t in tw_indices:
+        if t in idx_map:
+            line_msg_index += analyze_index_trend(t, idx_map[t]["name"], get_ma_list_from_item(idx_map[t])) + "\n"
+    line_msg_index += "\n"
     
+    # 2. 美國
     line_msg_index += f"【 🇺🇸 美國市場 】\n"
-    line_msg_index += analyze_index_trend("^GSPC", "美國標普500", ma_list=[23, 60]) + "\n"
-    line_msg_index += analyze_index_trend("^DJI", "美國道瓊工業", ma_list=[20, 23, 55]) + "\n"
-    line_msg_index += analyze_index_trend("^IXIC", "美國那斯達克", ma_list=[29]) + "\n"
-    line_msg_index += analyze_index_trend("^RUT", "美國羅素2000", ma_list=[21, 56]) + "\n"
-    line_msg_index += analyze_index_trend("^SOX", "美國費城半導體", ma_list=[20, 58, 108]) + "\n\n"
+    for t in us_indices:
+        if t in idx_map:
+            line_msg_index += analyze_index_trend(t, idx_map[t]["name"], get_ma_list_from_item(idx_map[t])) + "\n"
+    line_msg_index += "\n"
     
+    # 3. 歐洲
     line_msg_index += f"【 🇪🇺 歐洲市場 】\n"
-    line_msg_index += analyze_index_trend("^FCHI", "法國CAC40", ma_list=[21]) + "\n"
-    line_msg_index += analyze_index_trend("^FTSE", "英國富時100", ma_list=[20]) + "\n"
-    line_msg_index += analyze_index_trend("^GDAXI", "德國DAX指數", ma_list=[23]) + "\n\n"
+    for t in eu_indices:
+        if t in idx_map:
+            line_msg_index += analyze_index_trend(t, idx_map[t]["name"], get_ma_list_from_item(idx_map[t])) + "\n"
+    line_msg_index += "\n"
     
+    # 4. 亞洲
     line_msg_index += f"【 🌏 亞洲市場 】\n"
-    line_msg_index += analyze_index_trend("^N225", "日本日經225", ma_list=[24]) + "\n"
-    line_msg_index += analyze_index_trend("^KS11", "韓國綜合指數", ma_list=[22]) + "\n"
-    
+    for t in as_indices:
+        if t in idx_map:
+            line_msg_index += analyze_index_trend(t, idx_map[t]["name"], get_ma_list_from_item(idx_map[t])) + "\n"
+            
     send_line_message(line_msg_index, access_token, user_id)
 
     if weekday == 0:  
