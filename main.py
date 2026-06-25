@@ -527,6 +527,7 @@ def main():
     os.system('git push')
 
     web_url = "https://wudn9922.github.io/my-stock-screener/"
+    web_url = "https://liff.line.me/2010330411-SbwvRXRN"
     
     line_msg_stocks = f"🎯 {today_str} 全市場增量看盤網頁！\n\n"
     line_msg_stocks += f"🇹🇼 【台灣股市區塊】\n"
