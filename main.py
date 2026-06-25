@@ -52,12 +52,12 @@ def load_configs_from_supabase():
             
             # 定義對應到原本 LINE 訊息排版所期待的固定組別 Key
             name_mapping = {
-                "核心權值精選": "tw_g1",
-                "航運與指標ETF": "tw_g2",
-                "AI與半導體": "us_g1",
-                "科技旗艦巨頭": "us_g2",
-                "特斯拉特選": "us_g3",
-                "亞馬遜消費成長": "us_g4"
+                "權值精選": "tw_g1",
+                "熱門": "tw_g2",
+                "權值精選": "us_g1",
+                "低本益比": "us_g2",
+                "超級績效": "us_g3",
+                "熱門": "us_g4"
             }
             
             # 1. 建立組別 ID 到官方 Key 的對照表
@@ -364,8 +364,8 @@ def generate_html(data_dict, date_str):
         <div class="category-title">🇹🇼 台灣股市區塊 (已整合上市與上櫃公司)</div>
         <div class="tabs">
             <button id="btn-tw_all" class="tab-btn active" onclick="switchMarket(event, 'tw_all')">全市場潛伏 ({len(data_dict['tw_all'])})</button>
-            <button id="btn-tw_g1" class="tab-btn" onclick="switchMarket(event, 'tw_g1')">核心權值精選 ({len(data_dict['tw_g1'])})</button>
-            <button id="btn-tw_g2" class="tab-btn" onclick="switchMarket(event, 'tw_g2')">航運與指標ETF ({len(data_dict['tw_g2'])})</button>
+            <button id="btn-tw_g1" class="tab-btn" onclick="switchMarket(event, 'tw_g1')">權值精選 ({len(data_dict['tw_g1'])})</button>
+            <button id="btn-tw_g2" class="tab-btn" onclick="switchMarket(event, 'tw_g2')">熱門 ({len(data_dict['tw_g2'])})</button>
         </div>
     </div>
 
@@ -373,10 +373,10 @@ def generate_html(data_dict, date_str):
         <div class="category-title">🇺🇸 美國股市區塊</div>
         <div class="tabs">
             <button id="btn-us_all" class="tab-btn" onclick="switchMarket(event, 'us_all')">全市場潛伏 ({len(data_dict['us_all'])})</button>
-            <button id="btn-us_g1" class="tab-btn" onclick="switchMarket(event, 'us_g1')">AI與半導體 ({len(data_dict['us_g1'])})</button>
-            <button id="btn-us_g2" class="tab-btn" onclick="switchMarket(event, 'us_g2')">科技旗艦巨頭 ({len(data_dict['us_g2'])})</button>
-            <button id="btn-us_g3" class="tab-btn" onclick="switchMarket(event, 'us_g3')">特斯拉特選 ({len(data_dict['us_g3'])})</button>
-            <button id="btn-us_g4" class="tab-btn" onclick="switchMarket(event, 'us_g4')">亞馬遜消費成長 ({len(data_dict['us_g4'])})</button>
+            <button id="btn-us_g1" class="tab-btn" onclick="switchMarket(event, 'us_g1')">權值精選 ({len(data_dict['us_g1'])})</button>
+            <button id="btn-us_g2" class="tab-btn" onclick="switchMarket(event, 'us_g2')">低本益比 ({len(data_dict['us_g2'])})</button>
+            <button id="btn-us_g3" class="tab-btn" onclick="switchMarket(event, 'us_g3')">超級績效 ({len(data_dict['us_g3'])})</button>
+            <button id="btn-us_g4" class="tab-btn" onclick="switchMarket(event, 'us_g4')">熱門 ({len(data_dict['us_g4'])})</button>
         </div>
     </div>
     """
