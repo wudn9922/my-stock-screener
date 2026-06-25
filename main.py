@@ -8,7 +8,7 @@ import io
 import time
 
 # =========================================================================
-# ⚙️ 全域核心參數設定（可在這裡自由調整篩選嚴格度）
+# ⚙️ 全域核心參數設定
 # =========================================================================
 TW_MIN_VOLUME = 1000000  # 1,000,000股 = 1000張
 US_MIN_VOLUME = 100000   # 美股基本門檻：100,000股
@@ -21,10 +21,9 @@ DATA_DIR = "data"
 MAX_DAYS = 201 
 
 # =========================================================================
-# 📡 修正版：Supabase 雲端資料庫動態名單讀取器 (改成股票獨立均線 + 完美對齊真實分組)
+# 📡 Supabase 雲端資料庫動態名單讀取器
 # =========================================================================
 def load_configs_from_supabase():
-    # 預設名單：當資料庫沒資料或連不上時的防呆備援
     configs = {
         "tw_g1": {}, "tw_g2": {},
         "us_g1": {}, "us_g2": {}, "us_g3": {}, "us_g4": {}
@@ -45,7 +44,6 @@ def load_configs_from_supabase():
             groups_data = res_groups.json()
             stocks_data = res_stocks.json()
             
-            # 🟢 完美解法：加上市場前綴，避開 Python 字典 Key 重複被蓋掉的驚天大 Bug！
             name_mapping = {
                 "台股-權值精選": "tw_g1",
                 "台股-熱門": "tw_g2",
@@ -55,14 +53,12 @@ def load_configs_from_supabase():
                 "美股-熱門": "us_g4"
             }
             
-            # 1. 建立組別 ID 到官方 Key 的對照表
             group_id_to_key = {}
             for g in groups_data:
                 g_name = g['name'].strip()
                 if g_name in name_mapping:
                     group_id_to_key[g['id']] = name_mapping[g_name]
             
-            # 2. 循著股票一檔一檔拔取它在網頁上設定的「獨立均線」
             for s in stocks_data:
                 g_id = s.get('group_id')
                 mapped_key = group_id_to_key.get(g_id)
@@ -74,7 +70,7 @@ def load_configs_from_supabase():
                             ma_list.append(int(s[ma_key]))
                     
                     if not ma_list: 
-                        ma_list = [20]  # 完全沒填時的防呆預設值
+                        ma_list = [20]
                     
                     configs[mapped_key][s['ticker']] = ma_list
                     print(f"🔗 雲端同步：【{s['ticker']}】成功納入 {mapped_key}，獨立均線: {ma_list}MA")
@@ -84,9 +80,6 @@ def load_configs_from_supabase():
         
     return configs
 
-# =========================================================================
-# 完美保留你原本寫的所有核心功能，完全不更動
-# =========================================================================
 def send_line_message(msg, access_token, user_id):
     url = "https://api.line.me/v2/bot/message/push"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {access_token}"}
@@ -340,9 +333,6 @@ def process_custom_groups(group_dict):
     except Exception: pass
     return matched_list
 
-# =========================================================================
-# 🟢 修正版：網頁報告 HTML 生成器 (將標籤按鈕完美更換為你的真實組別)
-# =========================================================================
 def generate_html(data_dict, date_str):
     js_store = "const chartDataStore = " + json.dumps(data_dict, ensure_ascii=False) + ";\n"
     html_template = f"""<!DOCTYPE html><html><head><title>台美股均線潛伏報告</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script><style>body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }} .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }} .category-box {{ background: #1a1a1a; padding: 12px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #00b0ff; }} .category-title {{ font-size: 15px; font-weight: bold; color: #00ff88; margin-bottom: 10px; padding-left: 5px; }} .tabs {{ display: flex; flex-wrap: wrap; gap: 6px; }} .tab-btn {{ background: #2a2a2a; color: #aaa; border: none; padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; transition: 0.3s; }} .tab-btn:hover {{ background: #3a3a3a; }} .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }} .market-section {{ display: none; max-width: 800px; margin: 0 auto; }} .market-section.active {{ display: block; }} .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }} .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }} .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 14px; }}</style></head><body><div class="header"><h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2><p style="margin: 5px 0 0 0; color:#00ff88; font-size:13px;">增量滾動數據儲存版</p></div>
@@ -381,32 +371,60 @@ def generate_html(data_dict, date_str):
     os.makedirs("docs", exist_ok=True)
     with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html_template)
 
+# =========================================================================
+# 🎯 核心修正：大盤扣抵判定大腦 (收盤正負0.1%增減分 + 5天內3天觸碰強制+0)
+# =========================================================================
 def analyze_index_trend(ticker, name, ma_list=[20, 60, 240]):
     try:
         df = yf.download(ticker, period="4y", progress=False, threads=False)
         if df.empty or len(df) < 750: return f"⚪ {name}: 數據不足無法分析"
         df = df.copy()
         if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+        
         available_mas = []
         for ma in ma_list:
             col_name = f'MA{ma}'
             df[col_name] = df['Close'].rolling(window=ma).mean()
             available_mas.append(col_name)
+        
         df = df.dropna(subset=available_mas)
+        if len(df) < 5: return f"⚪ {name}: 計算後可用數據小於5日"
+        
         latest = df.iloc[-1]
         score = 0
         total_ma_count = len(available_mas)
+        
+        # 獲取最近 5 個交易日的數據（包含今天）
+        df_last5 = df.tail(5)
+        
         for ma_col in available_mas:
-            ma_val = latest[ma_col]
-            upper_bound = ma_val * 1.005
-            lower_bound = ma_val * 0.995
-            if latest['Open'] > upper_bound and latest['High'] > upper_bound and latest['Low'] > upper_bound and latest['Close'] > upper_bound: score += 1
-            elif latest['Open'] < lower_bound and latest['High'] < lower_bound and latest['Low'] < lower_bound and latest['Close'] < lower_bound: score -= 1
+            # 💡 檢查 5 天內是否有 3 天以上（含）實體或上下影線碰觸到均線 (Low <= MA <= High)
+            touch_count = 0
+            for _, row_5 in df_last5.iterrows():
+                if row_5['Low'] <= row_5[ma_col] <= row_5['High']:
+                    touch_count += 1
+            
+            if touch_count >= 3:
+                # 🟢 糾纏狀態：5天內有3天以上觸碰，此均線判定直接給 +0
+                score += 0
+            else:
+                # 📈 未糾纏：改看最新收盤價是否超出 0.1% 的關鍵門檻
+                latest_close = latest['Close']
+                latest_ma = latest[ma_col]
+                
+                if latest_close > latest_ma * 1.001:    # 收盤價在均線上 0.1% 以上
+                    score += 1
+                elif latest_close < latest_ma * 0.999:  # 收盤價在均線下 0.1% 以下
+                    score -= 1
+                else:
+                    score += 0                          # 落在正負 0.1% 緩衝區內記為 +0
+                    
         if score == total_ma_count: score_label = "看多"
         elif score > 0: score_label = "偏多"
         elif score == 0: score_label = "多空不明"
         elif score == -total_ma_count: score_label = "看空"
         else: score_label = "偏空"
+        
         df_3y = df.tail(252 * 3)
         idx_3y_high = df_3y['High'].idxmax()
         latest_date = df.index[-1]
@@ -448,7 +466,6 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
     weekday = datetime.now().weekday() 
 
-    # 📡 下載雲端設定
     db_configs = load_configs_from_supabase()
     
     tw_g1_config = db_configs["tw_g1"]
@@ -480,9 +497,6 @@ def main():
     os.system('git commit -m "⚙️ 量化報告自動更新"')
     os.system('git push')
 
-    # =========================================================================
-    # ✉️ 修正版：【發送 訊息一：每日個股均線潛伏報告】(完美對齊你的真實分組名稱)
-    # =========================================================================
     web_url = "https://wudn9922.github.io/my-stock-screener/"
     
     line_msg_stocks = f"🎯 {today_str} 全市場增量看盤網頁！\n\n"
@@ -499,11 +513,8 @@ def main():
     line_msg_stocks += f"🔗 點擊網址：\n{web_url}"
     send_line_message(line_msg_stocks, access_token, user_id)
 
-    # =========================================================================
-    # ✉️ 【發送 訊息二：每日全球大盤多空量化報告】
-    # =========================================================================
     line_msg_index = f"🌍 {today_str} 全球大盤多空量化報告\n"
-    line_msg_index += f"📊 評分標準: 均線0.5%緩衝/自適應機制\n"
+    line_msg_index += f"📊 評分標準: 均線糾纏自適應/0.1%過濾機制\n"
     line_msg_index += f"========================\n\n"
     
     line_msg_index += f"【 🇹🇼 台灣市場 】\n"
