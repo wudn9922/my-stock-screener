@@ -518,8 +518,8 @@ def main():
     line_msg_stocks += f" ├ 4. 超級績效符合：{len(data_dict['us_g3'])} 檔\n"
     line_msg_stocks += f" └ 5. 熱門符合：{len(data_dict['us_g4'])} 檔\n\n"
     line_msg_stocks += f"🔗 1. 量化潛伏網頁圖表：\n{report_url}\n\n"
-    line_msg_stocks += f"⚙️ 2. 手機自訂參數控制台：\n{liff_setting_url}"
-    line_msg_stocks += f"💰 3. 自動交易參數控制台：\n{liff_setting_url}"
+    line_msg_stocks += f"⚙️ 2. 手機自訂參數控制台：\n{liff_setting_url}\n\n"
+    line_msg_stocks += f"💰 3. 自動交易參數控制台：\n{bitget_setting_url}"
     
     send_line_message(line_msg_stocks, access_token, user_id)
 
