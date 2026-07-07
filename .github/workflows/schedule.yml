@@ -27,7 +27,9 @@ jobs:
           python-version: '3.10'
           
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install requests # 額外確保有安裝 Dify 腳本需要的 requests 套件
         
       - name: Run Screener
         env:
@@ -35,3 +37,10 @@ jobs:
           LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: python main.py
+
+        # 🔥 2. 這是新加入的步驟，獨立運作，互不干涉
+      - name: Run Dify Wall Street Report
+        env:
+          DIFY_API_KEY: ${{ secrets.DIFY_API_KEY }}
+          LINE_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }} # 這是 LINE Notify 的 Token
+        run: python dify_report.py
