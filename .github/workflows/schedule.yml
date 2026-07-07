@@ -38,9 +38,10 @@ jobs:
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: python main.py
 
-        # 🔥 2. 這是新加入的步驟，獨立運作，互不干涉
+# 🔥 2. 新增的 Dify 晨報程式 (統一使用官方帳號的變數)
       - name: Run Dify Wall Street Report
         env:
           DIFY_API_KEY: ${{ secrets.DIFY_API_KEY }}
-          LINE_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }} # 這是 LINE Notify 的 Token
+          LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: python dify_report.py
