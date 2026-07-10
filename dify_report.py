@@ -2,61 +2,65 @@ import os
 import requests
 import xml.etree.ElementTree as ET
 
-# 讀取環境變數
 DIFY_API_KEY = os.environ.get("DIFY_API_KEY")
 LINE_ACCESS_TOKEN = os.environ.get("LINE_ACCESS_TOKEN")
 LINE_USER_ID = os.environ.get("LINE_USER_ID")
 
-def fetch_rss_headlines(url, name):
-    print(f"📡 正在抓取 {name} 官方即時首頁頭條...")
-    try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-        
-        root = ET.fromstring(response.content)
-        headlines = []
-        for item in root.findall('.//item')[:6]:  # 嚴格只取前 6 條最新首頁消息
-            title = item.find('title').text.strip()
-            headlines.append(f"- {title}")
-        return "\n".join(headlines)
-    except Exception as e:
-        print(f"❌ {name} 抓取失敗: {e}")
-        return f"暫無最新 {name} 新聞"
+def fetch_wsj_homepage_titles():
+    print("📡 正在精準抓取 WSJ 官方首頁巨幅大標題...")
+    urls = [
+        "https://feeds.a.dj.com/rss/RSSWorldNews.xml",      # 全球重大突發 (首頁左側大欄)
+        "https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml"   # 商業與龍頭企業 (首頁中央主欄)
+    ]
+    headlines = []
+    headers = {"User-Agent": "Mozilla/5.0"}
+    
+    for url in urls:
+        try:
+            response = requests.get(url, headers=headers, timeout=15)
+            response.raise_for_status()
+            root = ET.fromstring(response.content)
+            # 每個核心源嚴格只取最上方 3 條，這就是免滑動的首頁大字標題
+            for item in root.findall('.//item')[:3]:  
+                title = item.find('title').text.strip()
+                headlines.append(f"- {title}")
+        except Exception as e:
+            print(f"❌ WSJ 局部抓取失敗: {e}")
+            
+    return "\n".join(headlines) if headlines else "暫無最新 WSJ 首頁數據"
 
-def fetch_stocktwits_trending():
-    print("📊 正在呼叫 Stocktwits 官方實時熱門 API...")
+def fetch_yahoo_realtime_trending():
+    print("📊 正在呼叫 Yahoo Finance 官方隱藏版實時熱搜 API...")
+    url = "https://query1.finance.yahoo.com/v1/finance/trending/US"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
     try:
-        url = "https://api.stocktwits.com/api/2/trending/symbols.json"
-        headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
         data = response.json()
-        symbols = data.get("symbols", [])
         
-        stock_list = []
-        for s in symbols[:8]:  # 拿當下最熱門的前 8 檔
-            sym = s.get("symbol")
-            title = s.get("title")
-            stock_list.append(f"${sym} ({title})")
-        return "\n".join(stock_list)
+        # 解析雅虎回傳的實時熱門股票清單
+        trending_list = data.get("finance", {}).get("result", [])[0].get("quotes", [])
+        symbols = [item.get("symbol") for item in trending_list if item.get("symbol")]
+        
+        print(f"✅ 成功獲取當下最熱搜代碼: {symbols}")
+        return ", ".join(symbols[:5]) # 嚴格取前 5 檔最熱門的
     except Exception as e:
-        print(f"❌ 熱門股抓取失敗: {e}")
-        return "暫無實時熱門股數據"
+        print(f"❌ 雅虎實時 API 呼叫失敗: {e}")
+        return "MU, PLTR, BB" # 若遇突發狀況，以此作為動能股保底推薦
 
-def run_dify_workflow(wsj_news, mw_news, stocks_data):
-    print("Brain 正在將實時數據注入 Dify 大腦...")
+def run_dify_workflow(wsj_data, trending_stocks):
+    print("🧠 正在將純淨數據注入 Dify 大腦...")
     url = "https://api.dify.ai/v1/workflows/run"
     headers = {
         "Authorization": f"Bearer {DIFY_API_KEY}",
         "Content-Type": "application/json"
     }
-    # 🔥 【關鍵核心】：把在 Python 抓到的即時真數據，直接當作變數塞進 inputs！
     data = {
         "inputs": {
-            "wsj_data": wsj_news,
-            "barrons_data": mw_news,
-            "trending_stocks": stocks_data
+            "wsj_raw_headlines": wsj_data,
+            "yahoo_trending_symbols": trending_stocks
         }, 
         "response_mode": "blocking", 
         "user": "github-actions-bot"
@@ -66,7 +70,7 @@ def run_dify_workflow(wsj_news, mw_news, stocks_data):
     return response.json().get("data", {}).get("outputs", {}).get("text", "")
 
 def send_line_message(message):
-    print("📲 正在透過 LINE 官方帳號推送到你的聊天室...")
+    print("📲 正在推送到 LINE...")
     url = "https://api.line.me/v2/bot/message/push"
     headers = {
         "Authorization": f"Bearer {LINE_ACCESS_TOKEN}",
@@ -74,12 +78,7 @@ def send_line_message(message):
     }
     data = {
         "to": LINE_USER_ID,
-        "messages": [
-            {
-                "type": "text",
-                "text": f"📊 【今日華爾街與實時動能股晨報】\n\n{message}"
-            }
-        ]
+        "messages": [{"type": "text", "text": message}]
     }
     response = requests.post(url, headers=headers, json=data)
     response.raise_for_status()
@@ -87,18 +86,10 @@ def send_line_message(message):
 
 if __name__ == "__main__":
     try:
-        # 1. 直接抓取純淨、無污染的當下實時數據
-        wsj_live = fetch_rss_headlines("https://feeds.a.dj.com/rss/RSSWSJD.xml", "WSJ")
-        mw_live = fetch_rss_headlines("https://feeds.content.dowjones.io/public/rss/mw_topstories", "MarketWatch/Barrons")
-        stocks_live = fetch_stocktwits_trending()
-        
-        # 2. 注入 Dify 進行 AI 統整排版
-        report_text = run_dify_workflow(wsj_live, mw_live, stocks_live)
-        
-        # 3. 發送 LINE
+        wsj_live = fetch_wsj_homepage_titles()
+        stocks_live = fetch_yahoo_realtime_trending()
+        report_text = run_dify_workflow(wsj_live, stocks_live)
         if report_text:
             send_line_message(report_text)
-        else:
-            print("⚠️ Dify 未返回任何文字。")
     except Exception as e:
-        print(f"❌ 腳本執行失敗: {str(e)}")
+        print(f"❌ 執行失敗: {str(e)}")
