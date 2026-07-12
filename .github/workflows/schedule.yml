@@ -30,6 +30,12 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install requests # 額外確保有安裝 Dify 腳本需要的 requests 套件
+
+      - name: Inject Secrets into HTML
+        run: |
+          sed -i 's/SUPABASE_URL_PLACEHOLDER/${{ secrets.SUPABASE_URL }}/g' index.html
+          sed -i 's/SUPABASE_ANON_KEY_PLACEHOLDER/${{ secrets.SUPABASE_ANON_KEY }}/g' index.html
+          sed -i 's/ADMIN_LINE_ID_PLACEHOLDER/${{ secrets.ADMIN_LINE_ID }}/g' index.html
         
       - name: Run Screener
         env:
@@ -38,6 +44,8 @@ jobs:
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: python main.py
 
+
+
 # 🔥 2. 新增的 Dify 晨報程式 (統一使用官方帳號的變數)
       - name: Run Dify Wall Street Report
         env:
@@ -45,3 +53,10 @@ jobs:
           LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: python dify_report.py
+      - name: Commit and Push changes
+              run: |
+                git config --local user.name "github-actions[bot]"
+                git config --local user.email "github-actions[bot]@users.noreply.github.com"
+                git add index.html
+                git commit -m "Auto-inject secrets and update daily data" || echo "No changes to commit"
+                git push
