@@ -359,50 +359,215 @@ def process_custom_groups(group_dict):
 
 def generate_html(data_dict, date_str):
     js_store = "const chartDataStore = " + json.dumps(data_dict, ensure_ascii=False) + ";\n"
-    html_template = f"""<!DOCTYPE html><html><head><title>台美股均線潛伏報告</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script><style>body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }} .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }} .category-box {{ background: #1a1a1a; padding: 12px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #00b0ff; }} .category-title {{ font-size: 15px; font-weight: bold; color: #00ff88; margin-bottom: 10px; padding-left: 5px; }} .tabs {{ display: flex; flex-wrap: wrap; gap: 6px; }} .tab-btn {{ background: #2a2a2a; color: #aaa; border: none; padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; transition: 0.3s; }} .tab-btn:hover {{ background: #3a3a3a; }} .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }} .market-section {{ display: none; max-width: 800px; margin: 0 auto; }} .market-section.active {{ display: block; }} .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }} .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }} .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 14px; }}</style></head><body><div class="header"><h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2><p style="margin: 5px 0 0 0; color:#00ff88; font-size:13px;">增量滾動數據儲存版</p></div>
+    
+    # 讓 Python 去抓 GitHub 保險箱的金鑰
+    supa_url = os.environ.get("SUPABASE_URL", "")
+    supa_key = os.environ.get("SUPABASE_ANON_KEY", "")
+    admin_id = os.environ.get("LINE_USER_ID", "")
+    liff_id = "2010330411-SbwvRXRN" # 你的 LIFF ID
+
+    html_template = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>台美股均線潛伏報告</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {{ background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; }} 
+        .header {{ text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; }} 
+        .category-box {{ background: #1a1a1a; padding: 12px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #00b0ff; }} 
+        .category-title {{ font-size: 15px; font-weight: bold; color: #00ff88; margin-bottom: 10px; padding-left: 5px; }} 
+        .tabs {{ display: flex; flex-wrap: wrap; gap: 6px; }} 
+        .tab-btn {{ background: #2a2a2a; color: #aaa; border: none; padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; transition: 0.3s; }} 
+        .tab-btn:hover {{ background: #3a3a3a; }} 
+        .tab-btn.active {{ background: #00b0ff; color: #fff; font-weight: bold; }} 
+        .market-section {{ display: none; max-width: 800px; margin: 0 auto; }} 
+        .market-section.active {{ display: block; }} 
+        .chart-card {{ background: #1e1e1e; margin-bottom: 25px; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }} 
+        .plotly-container {{ height: 400px; background: #151515; border-radius: 6px; }} 
+        .no-data {{ text-align: center; color: #888; padding: 40px; font-size: 14px; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2>
+        <p style="margin: 5px 0 0 0; color:#00ff88; font-size:13px;">增量滾動數據儲存版</p>
+    </div>
     
     <div class="category-box" style="border-left-color: #ff5252;">
         <div class="category-title">🇹🇼 台灣股市區塊</div>
         <div class="tabs">
-            <button id="btn-tw_all" class="tab-btn active" onclick="switchMarket(event, 'tw_all')">全市場潛伏 ({len(data_dict['tw_all'])})</button>
-            <button id="btn-tw_g1" class="tab-btn" onclick="switchMarket(event, 'tw_g1')">權值精選 ({len(data_dict['tw_g1'])})</button>
-            <button id="btn-tw_g2" class="tab-btn" onclick="switchMarket(event, 'tw_g2')">熱門 ({len(data_dict['tw_g2'])})</button>
+            <button id="btn-tw_all" class="tab-btn active" onclick="switchMarket(event, 'tw_all')">全市場潛伏 ({len(data_dict.get('tw_all', []))})</button>
+            <button id="btn-tw_g1" class="tab-btn" onclick="switchMarket(event, 'tw_g1')">權值精選 ({len(data_dict.get('tw_g1', []))})</button>
+            <button id="btn-tw_g2" class="tab-btn" onclick="switchMarket(event, 'tw_g2')">熱門 ({len(data_dict.get('tw_g2', []))})</button>
         </div>
     </div>
 
     <div class="category-box" style="border-left-color: #00b0ff;">
         <div class="category-title">🇺🇸 美國股市區塊</div>
         <div class="tabs">
-            <button id="btn-us_all" class="tab-btn" onclick="switchMarket(event, 'us_all')">全市場潛伏 ({len(data_dict['us_all'])})</button>
-            <button id="btn-us_g1" class="tab-btn" onclick="switchMarket(event, 'us_g1')">權值精選 ({len(data_dict['us_g1'])})</button>
-            <button id="btn-us_g2" class="tab-btn" onclick="switchMarket(event, 'us_g2')">低本益比 ({len(data_dict['us_g2'])})</button>
-            <button id="btn-us_g3" class="tab-btn" onclick="switchMarket(event, 'us_g3')">超級績效 ({len(data_dict['us_g3'])})</button>
-            <button id="btn-us_g4" class="tab-btn" onclick="switchMarket(event, 'us_g4')">熱門 ({len(data_dict['us_g4'])})</button>
+            <button id="btn-us_all" class="tab-btn" onclick="switchMarket(event, 'us_all')">全市場潛伏 ({len(data_dict.get('us_all', []))})</button>
+            <button id="btn-us_g1" class="tab-btn" onclick="switchMarket(event, 'us_g1')">權值精選 ({len(data_dict.get('us_g1', []))})</button>
+            <button id="btn-us_g2" class="tab-btn" onclick="switchMarket(event, 'us_g2')">低本益比 ({len(data_dict.get('us_g2', []))})</button>
+            <button id="btn-us_g3" class="tab-btn" onclick="switchMarket(event, 'us_g3')">超級績效 ({len(data_dict.get('us_g3', []))})</button>
+            <button id="btn-us_g4" class="tab-btn" onclick="switchMarket(event, 'us_g4')">熱門 ({len(data_dict.get('us_g4', []))})</button>
         </div>
     </div>
 
     <div class="category-box" style="border-left-color: #e040fb;">
         <div class="category-title">👤 用戶自選聯動區</div>
         <div class="tabs">
-            <button id="btn-user_custom" class="tab-btn" onclick="switchMarket(event, 'user_custom')">自選股潛伏 ({len(data_dict['user_custom'])})</button>
+            <button id="btn-user_custom" class="tab-btn" onclick="switchMarket(event, 'user_custom')">自選股潛伏 ({len(data_dict.get('user_custom', []))})</button>
         </div>
     </div>
-    """
-    
-    # 💡 這裡將 'user_custom' 加入渲染清單
+"""
+
     keys_list = ['tw_all', 'tw_g1', 'tw_g2', 'us_all', 'us_g1', 'us_g2', 'us_g3', 'us_g4', 'user_custom']
     for key in keys_list:
         active_class = " active" if key == 'tw_all' else ""
         html_template += f'<div id="{key}-market" class="market-section{active_class}">'
-        if data_dict[key]:
-            for idx in range(len(data_dict[key])): html_template += f'<div class="chart-card"><div id="chart-{key}-{idx}" class="plotly-container"></div></div>'
-        else: html_template += '<div class="no-data">此分類目前無股票符合群組自訂均線潛伏條件</div>'
+        if data_dict.get(key):
+            for idx in range(len(data_dict[key])): 
+                html_template += f'<div class="chart-card"><div id="chart-{key}-{idx}" class="plotly-container"></div></div>'
+        else: 
+            html_template += '<div class="no-data">此分類目前無股票符合群組自訂均線潛伏條件</div>'
         html_template += '</div>'
         
-    html_template += f"""<script>{js_store} function renderMarketCharts(marketId) {{ const items = chartDataStore[marketId]; if (!items) return; items.forEach((item, idx) => {{ const elementId = "chart-" + marketId + "-" + idx; const container = document.getElementById(elementId); if (container && !container.dataset.done) {{ Plotly.newPlot(container, item.chart_data.data, item.chart_data.layout, {{responsive: true, displayModeBar: false}}); container.dataset.done = "true"; }} }}); }} function switchMarket(event, marketId) {{ document.querySelectorAll('.market-section').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); document.getElementById(marketId + '-market').classList.add('active'); if(event) {{ event.currentTarget.classList.add('active'); }} else {{ document.getElementById('btn-' + marketId).classList.add('active'); }} renderMarketCharts(marketId); window.dispatchEvent(new Event('resize')); }} window.addEventListener("load", function() {{ renderMarketCharts('tw_all'); }});</script></body></html>"""
+    html_template += f"""
+    <hr style="border: 1px solid #333; margin: 30px 0;">
+    <div class="header" style="background: #00b0ff; padding: 10px;">
+        <h3 style="margin: 0; color: #fff;">⚙️ 參數設定控制台</h3>
+        <p id="liff-status" style="margin: 5px 0 0 0; color:#fff; font-size:13px;">正在檢查 LINE 登入狀態...</p>
+    </div>
+
+    <div class="category-box" style="border-left-color: #00ff88; display: none;" id="user-panel">
+        <div class="category-title" style="color: #00ff88;">➕ 新增/修改 我的自選股</div>
+        <input type="text" id="reg-ticker" placeholder="股票代號 (例: 2330.TW)" style="width: 100%; padding: 8px; margin: 5px 0; background: #222; color: #fff; border: 1px solid #444;">
+        <input type="text" id="reg-name" placeholder="股票名稱 (例: 台積電)" style="width: 100%; padding: 8px; margin: 5px 0; background: #222; color: #fff; border: 1px solid #444;">
+        <input type="text" id="reg-mas" placeholder="均線參數 (用逗號隔開，例: 20,60,120)" style="width: 100%; padding: 8px; margin: 5px 0; background: #222; color: #fff; border: 1px solid #444;">
+        <button onclick="saveStock(false)" style="width: 100%; padding: 10px; background: #00ff88; color: #000; font-weight: bold; border: none; border-radius: 4px; margin-top: 10px;">儲存設定</button>
+    </div>
+
+    <div class="category-box" style="border-left-color: #ff5252; display: none;" id="admin-panel">
+        <div class="category-title" style="color: #ff5252;">👑 全域大盤廣播參數 (僅您可見)</div>
+        <input type="text" id="idx-ticker" placeholder="大盤代號 (必須以 ^ 開頭，例: ^TWII)" style="width: 100%; padding: 8px; margin: 5px 0; background: #222; color: #fff; border: 1px solid #444;">
+        <input type="text" id="idx-name" placeholder="大盤名稱 (例: 台灣加權指數)" style="width: 100%; padding: 8px; margin: 5px 0; background: #222; color: #fff; border: 1px solid #444;">
+        <input type="text" id="idx-mas" placeholder="均線參數 (用逗號隔開，例: 20,27,61)" style="width: 100%; padding: 8px; margin: 5px 0; background: #222; color: #fff; border: 1px solid #444;">
+        <button onclick="saveStock(true)" style="width: 100%; padding: 10px; background: #ff5252; color: #fff; font-weight: bold; border: none; border-radius: 4px; margin-top: 10px;">儲存大盤設定</button>
+    </div>
+
+    <script>
+        {js_store}
+        
+        // 這些變數會由 Python 在執行時自動填入
+        const SUPABASE_URL = "{supa_url}";
+        const SUPABASE_ANON_KEY = "{supa_key}";
+        const LIFF_ID = "{liff_id}";
+        const ADMIN_LINE_ID = "{admin_id}";
+
+        let _supabase;
+        let currentUserId = "GUEST";
+
+        window.onload = async function() {{
+            try {{
+                _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                await liff.init({{ liffId: LIFF_ID }});
+                
+                if (liff.isLoggedIn()) {{
+                    const profile = await liff.getProfile();
+                    currentUserId = profile.userId;
+                    
+                    document.getElementById("liff-status").innerText = "👤 已登入: " + profile.displayName;
+                    alert("成功抓到 LINE ID: " + currentUserId); 
+
+                    document.getElementById("user-panel").style.display = "block";
+                    if (currentUserId === ADMIN_LINE_ID) {{
+                        document.getElementById("admin-panel").style.display = "block";
+                    }}
+                }} else {{
+                    document.getElementById("liff-status").innerText = "⚠️ 尚未登入 LINE，正在導向登入...";
+                    liff.login();
+                }}
+            }} catch (err) {{
+                document.getElementById("liff-status").innerText = "❌ 系統初始化失敗: " + err.message;
+                console.error(err);
+            }}
+            
+            renderMarketCharts('tw_all');
+        }};
+
+        async function saveStock(isAdminForm) {{
+            if (!_supabase) return alert("Supabase 尚未初始化完成！");
+            if (currentUserId === "GUEST") return alert("未取得 LINE 授權，無法儲存！");
+
+            let ticker = isAdminForm ? document.getElementById("idx-ticker").value.trim() : document.getElementById("reg-ticker").value.trim();
+            let name = isAdminForm ? document.getElementById("idx-name").value.trim() : document.getElementById("reg-name").value.trim();
+            let masStr = isAdminForm ? document.getElementById("idx-mas").value.trim() : document.getElementById("reg-mas").value.trim();
+
+            if (!ticker || !name || !masStr) return alert("請填寫所有欄位！");
+
+            if (!isAdminForm && (ticker.startsWith("^") || ticker === "大盤")) {{
+                return alert("🛑 操作遭拒：一般用戶無法修改或設定大盤廣播參數！");
+            }}
+
+            let masArray = masStr.split(',').map(num => parseInt(num.trim())).filter(num => !isNaN(num));
+
+            const saveData = {{
+                line_user_id: currentUserId,
+                ticker: ticker,
+                name: name,
+                ma1: masArray[0] || null,
+                ma2: masArray[1] || null,
+                ma3: masArray[2] || null,
+                ma4: masArray[3] || null
+            }};
+
+            const {{ data, error }} = await _supabase
+                .from('stocks')
+                .upsert(saveData, {{ onConflict: 'line_user_id,ticker' }}); 
+
+            if (error) {{
+                alert("❌ Supabase 寫入失敗: " + error.message);
+            }} else {{
+                alert("🎉 資料成功存入 Supabase！\\nticker: " + ticker);
+                if(!isAdminForm) {{
+                    document.getElementById("reg-ticker").value = "";
+                    document.getElementById("reg-name").value = "";
+                    document.getElementById("reg-mas").value = "";
+                }}
+            }}
+        }}
+
+        function renderMarketCharts(marketId) {{ 
+            const items = chartDataStore[marketId]; 
+            if (!items) return; 
+            items.forEach((item, idx) => {{ 
+                const elementId = "chart-" + marketId + "-" + idx; 
+                const container = document.getElementById(elementId); 
+                if (container && !container.dataset.done) {{ 
+                    Plotly.newPlot(container, item.chart_data.data, item.chart_data.layout, {{responsive: true, displayModeBar: false}}); 
+                    container.dataset.done = "true"; 
+                }} 
+            }}); 
+        }} 
+        
+        function switchMarket(event, marketId) {{ 
+            document.querySelectorAll('.market-section').forEach(el => el.classList.remove('active')); 
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); 
+            document.getElementById(marketId + '-market').classList.add('active'); 
+            if(event) {{ event.currentTarget.classList.add('active'); }} 
+            else {{ document.getElementById('btn-' + marketId).classList.add('active'); }} 
+            renderMarketCharts(marketId); 
+            window.dispatchEvent(new Event('resize')); 
+        }}
+    </script>
+</body>
+</html>
+"""
     os.makedirs("docs", exist_ok=True)
     with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html_template)
-
 def analyze_index_trend(ticker, name, ma_list):
     if not ma_list: return f"⚪ {name}: 未設定任何均線參數"
     try:
