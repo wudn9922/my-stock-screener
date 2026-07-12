@@ -31,8 +31,8 @@ def load_configs_from_supabase():
     index_configs = []
     user_custom_config = {}  # 💡 新增：用來存放網頁端寫入的用戶自選股
     
-    supabase_url = "https://bxhqpfeberqbtxymghyt.supabase.co/rest/v1"
-    supabase_key = "sb_publishable_eEJNM_96jblQ_90vpcYC0g_PzyGJNOK"
+    supabase_url = os.environ.get("SUPABASE_URL", "")
+    supabase_key = os.environ.get("SUPABASE_ANON_KEY", "")
     headers = {
         "apikey": supabase_key,
         "Authorization": f"Bearer {supabase_key}"
