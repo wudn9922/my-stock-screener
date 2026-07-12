@@ -29,6 +29,7 @@ def load_configs_from_supabase():
         "us_g1": {}, "us_g2": {}, "us_g3": {}, "us_g4": {}
     }
     index_configs = []
+    user_custom_config = {}  # 💡 新增：用來存放網頁端寫入的用戶自選股
     
     supabase_url = "https://bxhqpfeberqbtxymghyt.supabase.co/rest/v1"
     supabase_key = "sb_publishable_eEJNM_96jblQ_90vpcYC0g_PzyGJNOK"
@@ -64,13 +65,24 @@ def load_configs_from_supabase():
                 g_id = s.get('group_id')
                 mapped_key = group_id_to_key.get(g_id)
                 
+                # 解析均線參數
+                ma_list = []
+                for ma_key in ['ma1', 'ma2', 'ma3', 'ma4']:
+                    if s.get(ma_key) is not None and int(s[ma_key]) > 0:
+                        ma_list.append(int(s[ma_key]))
+                if not ma_list: ma_list = [20]
+                
                 if mapped_key:
-                    ma_list = []
-                    for ma_key in ['ma1', 'ma2', 'ma3', 'ma4']:
-                        if s.get(ma_key) is not None and int(s[ma_key]) > 0:
-                            ma_list.append(int(s[ma_key]))
-                    if not ma_list: ma_list = [20]
                     configs[mapped_key][s['ticker']] = ma_list
+                # 💡 新增判斷：若沒有內建群組 ID 但有 line_user_id，代表是用戶自選股
+                elif s.get('line_user_id'):
+                    ticker_clean = str(s['ticker']).strip().upper()
+                    if ticker_clean not in user_custom_config:
+                        user_custom_config[ticker_clean] = []
+                    user_custom_config[ticker_clean].extend(ma_list)
+                    # 自動去重（例如不同用戶設了相同的均線，或同用戶設重複）
+                    user_custom_config[ticker_clean] = list(set(user_custom_config[ticker_clean]))
+                    
     except Exception as e:
         print(f"⚠️ 讀取雲端個股失敗: {e}")
 
@@ -98,7 +110,7 @@ def load_configs_from_supabase():
             {"ticker": "^KS11", "name": "韓國綜合指數", "ma1": 22, "ma2": None, "ma3": None, "ma4": None}
         ]
         
-    return configs, index_configs
+    return configs, index_configs, user_custom_config  # 💡 調整回傳值
 
 def send_line_message(msg, access_token, user_id):
     url = "https://api.line.me/v2/bot/message/push"
@@ -368,9 +380,17 @@ def generate_html(data_dict, date_str):
             <button id="btn-us_g4" class="tab-btn" onclick="switchMarket(event, 'us_g4')">熱門 ({len(data_dict['us_g4'])})</button>
         </div>
     </div>
+
+    <div class="category-box" style="border-left-color: #e040fb;">
+        <div class="category-title">👤 用戶自選聯動區</div>
+        <div class="tabs">
+            <button id="btn-user_custom" class="tab-btn" onclick="switchMarket(event, 'user_custom')">自選股潛伏 ({len(data_dict['user_custom'])})</button>
+        </div>
+    </div>
     """
     
-    keys_list = ['tw_all', 'tw_g1', 'tw_g2', 'us_all', 'us_g1', 'us_g2', 'us_g3', 'us_g4']
+    # 💡 這裡將 'user_custom' 加入渲染清單
+    keys_list = ['tw_all', 'tw_g1', 'tw_g2', 'us_all', 'us_g1', 'us_g2', 'us_g3', 'us_g4', 'user_custom']
     for key in keys_list:
         active_class = " active" if key == 'tw_all' else ""
         html_template += f'<div id="{key}-market" class="market-section{active_class}">'
@@ -470,7 +490,8 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
     weekday = datetime.now().weekday() 
 
-    db_configs, db_index_configs = load_configs_from_supabase()
+    # 💡 接收三個回傳參數
+    db_configs, db_index_configs, user_custom_config = load_configs_from_supabase()
     
     tw_g1_config = db_configs["tw_g1"]
     tw_g2_config = db_configs["tw_g2"]
@@ -490,7 +511,10 @@ def main():
         'us_g1': process_custom_groups(us_g1_config), 
         'us_g2': process_custom_groups(us_g2_config),
         'us_g3': process_custom_groups(us_g3_config), 
-        'us_g4': process_custom_groups(us_g4_config)
+        'us_g4': process_custom_groups(us_g4_config),
+        
+        # 💡 新增：將網頁使用者自選股放入算圖引擎
+        'user_custom': process_custom_groups(user_custom_config)
     }
     generate_html(data_dict, today_str)
     
@@ -501,7 +525,7 @@ def main():
     os.system('git push')
 
     # =========================================================================
-    # 🔗 雙連結智慧生成區塊 (已修正黏字導致失敗的問題)
+    # 🔗 雙連結智慧生成區塊
     # =========================================================================
     report_url = "https://wudn9922.github.io/my-stock-screener/"
     liff_setting_url = "https://liff.line.me/2010330411-SbwvRXRN"
@@ -518,6 +542,11 @@ def main():
     line_msg_stocks += f" ├ 3. 低本益比符合：{len(data_dict['us_g2'])} 檔\n"
     line_msg_stocks += f" ├ 4. 超級績效符合：{len(data_dict['us_g3'])} 檔\n"
     line_msg_stocks += f" └ 5. 熱門符合：{len(data_dict['us_g4'])} 檔\n\n"
+    
+    # 💡 新增：LINE 推播中加上用戶自選股的結果回報
+    line_msg_stocks += f"👤 【用戶自選聯動區】\n"
+    line_msg_stocks += f" └ 符合自訂均線：{len(data_dict['user_custom'])} 檔\n\n"
+    
     line_msg_stocks += f"🔗 1. 量化潛伏網頁圖表：\n{report_url}\n\n"
     line_msg_stocks += f"⚙️ 2. 手機自訂參數控制台：\n{liff_setting_url}\n\n"
     line_msg_stocks += f"💰 3. 自動交易參數控制台：\n{bitget_setting_url}"
