@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
     <style>
         body { background-color: #111; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 10px; } 
         .header { text-align: center; padding: 15px 0; background: #222; margin-bottom: 15px; border-radius: 8px; } 
@@ -83,17 +85,15 @@
     </div>
 
     <script>
-        // 1. 你原本的圖表資料 (請將 Python 產生的完整 JSON 貼在這裡替換)
+        // 1. 你原本的圖表資料 (由 Python 自動生成替換)
         const chartDataStore = {
             "tw_all": [], 
             "tw_g1": [], 
             "tw_g2": [], 
-            "us_all": [
-                // ... 這裡放你原本完整的股票資料 ...
-            ]
+            "us_all": []
         };
 
-        // 2. 切換頁籤邏輯 (你原本寫的，確保它還在)
+        // 2. 切換頁籤邏輯
         function switchMarket(evt, marketName) {
             var i, tabcontent, tablinks;
             tabcontent = document.getElementsByClassName("market-section");
@@ -108,6 +108,107 @@
             evt.currentTarget.className += " active";
         }
 
-        // 3. LIFF 與 Supabase 控制邏輯
-        const LIFF_ID = "2010330411-SbwvRXRN"; // 🚨 換成你的 LIFF ID
-        const ADMIN_LINE_ID = "U12
+        // 3. 配置參數設定 (🚨請在此填入你的正確 Supabase 連線資訊)
+        const SUPABASE_URL = "https://你的SUPABASE專案ID.supabase.co"; 
+        const SUPABASE_ANON_KEY = "你的SUPABASE_ANON_KEY匿名金鑰";
+        const LIFF_ID = "2010330411-SbwvRXRN"; 
+        const ADMIN_LINE_ID = "你的LINE用戶USER_ID"; // 🚨 請填入完整的管理員 LINE ID (通常是 U 開頭的 33 位碼)
+
+        let _supabase;
+        let currentUserId = "GUEST";
+
+        // 頁面載入時自動執行初始化
+        window.onload = async function() {
+            try {
+                // 初始化 Supabase 客戶端
+                _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                
+                // 初始化 LINE LIFF
+                await liff.init({ liffId: LIFF_ID });
+                
+                if (liff.isLoggedIn()) {
+                    const profile = await liff.getProfile();
+                    currentUserId = profile.userId;
+                    
+                    document.getElementById("liff-status").innerText = "👤 已登入: " + profile.displayName;
+                    alert("成功抓到 LINE ID: " + currentUserId); // 測試確認用
+
+                    // 權限分流判斷
+                    document.getElementById("user-panel").style.display = "block";
+                    if (currentUserId === ADMIN_LINE_ID) {
+                        document.getElementById("admin-panel").style.display = "block";
+                    } else {
+                        document.getElementById("admin-panel").style.display = "none";
+                    }
+                } else {
+                    document.getElementById("liff-status").innerText = "⚠️ 尚未登入 LINE，正在導向登入...";
+                    liff.login();
+                }
+            } catch (err) {
+                document.getElementById("liff-status").innerText = "❌ 系統初始化失敗: " + err.message;
+                console.error(err);
+            }
+        };
+
+        // 儲存資料核心函式 (大盤過濾機制整合)
+        async function saveStock(isAdminForm) {
+            if (!_supabase) {
+                alert("Supabase 尚未初始化完成！");
+                return;
+            }
+            if (currentUserId === "GUEST") {
+                alert("未取得 LINE 授權，無法儲存！");
+                return;
+            }
+
+            // 根據表單類型拿資料
+            let ticker = isAdminForm ? document.getElementById("idx-ticker").value.trim() : document.getElementById("reg-ticker").value.trim();
+            let name = isAdminForm ? document.getElementById("idx-name").value.trim() : document.getElementById("reg-name").value.trim();
+            let masStr = isAdminForm ? document.getElementById("idx-mas").value.trim() : document.getElementById("reg-mas").value.trim();
+
+            if (!ticker || !name || !masStr) {
+                alert("請填寫所有欄位！");
+                return;
+            }
+
+            // 🛑 防呆防禦鎖定機制：
+            // 如果是一般用戶，卻在股票代號輸入了大盤符號 (^ 或者是大盤名稱) 進行竄改，直接攔截
+            if (!isAdminForm && (ticker.startsWith("^") || ticker === "大盤")) {
+                alert("🛑 操作遭拒：一般用戶無法修改或設定大盤廣播參數！");
+                return;
+            }
+
+            // 解析均線字串轉整數陣列 (例如: "20,60" -> [20, 60])
+            let masArray = masStr.split(',').map(num => parseInt(num.trim())).filter(num => !isNaN(num));
+
+            // 組裝寫入 Supabase 的 JSON 資料
+            const saveData = {
+                line_user_id: currentUserId,
+                ticker: ticker,
+                stock_name: name,
+                ma_params: masArray,
+                is_admin: isAdminForm,
+                updated_at: new Date().toISOString()
+            };
+
+            // 寫入資料庫
+            const { data, error } = await _supabase
+                .from('stocks')
+                .upsert(saveData, { onConflict: 'line_user_id,ticker' }); // 防止同個人重複重複插一樣的股票
+
+            if (error) {
+                alert("❌ Supabase 寫入失敗: " + error.message + "\n(請檢查 RLS 是否有關閉)");
+                console.error("Supabase 錯誤細節：", error);
+            } else {
+                alert("🎉 資料成功存入 Supabase！\nticker: " + ticker);
+                // 儲存成功後清空表單
+                if(!isAdminForm) {
+                    document.getElementById("reg-ticker").value = "";
+                    document.getElementById("reg-name").value = "";
+                    document.getElementById("reg-mas").value = "";
+                }
+            }
+        }
+    </script>
+</body>
+</html>
