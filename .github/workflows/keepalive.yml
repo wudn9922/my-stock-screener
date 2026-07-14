@@ -1,0 +1,29 @@
+name: 🔄 GitHub Actions 永久續命腳本
+
+on:
+  schedule:
+    # 💡 每個月 1 號的凌晨 0:00 自動執行一次
+    - cron: '0 0 1 * *'
+  workflow_dispatch: # 允許手動點擊觸發測試
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 🚨 關鍵：必須給予寫入權限，否則無法推回 commit
+      
+    steps:
+    - name: 📥 複製儲存庫資料
+      uses: actions/checkout@v4
+
+    - name: 📝 刷新時間戳記
+      run: |
+        echo "最後續命時間: $(date)" > keepalive.txt
+
+    - name: 🚀 自動提交 Commit 並推回 GitHub
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action Bot"
+        git add keepalive.txt
+        # 檢查是否有檔案變更，防止沒有變更時報錯
+        git diff --quiet && git diff --staged --quiet || (git commit -m "chore: GitHub Actions 自動續命點燈 💡" && git push)
