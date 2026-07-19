@@ -44,7 +44,6 @@ jobs:
           DIFY_API_KEY: ${{ secrets.DIFY_API_KEY }}
           LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
-          IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
         run: python dify_report.py
 
       - name: Commit and Push changes
