@@ -1,19 +1,21 @@
 import os
 import requests
-from playwright.sync_api import sync_playwright  # ✨ 新增：微軟自動化截圖引擎
+from playwright.sync_api import sync_playwright
 
 DIFY_API_KEY = os.environ.get("DIFY_API_KEY")
 LINE_ACCESS_TOKEN = os.environ.get("LINE_ACCESS_TOKEN")
 LINE_USER_ID = os.environ.get("LINE_USER_ID")
-IMGUR_CLIENT_ID = os.environ.get("IMGUR_CLIENT_ID")  # ✨ 新增：Imgur 圖床金鑰
 
 def capture_and_upload_screenshots():
-    """✨ 新增函數：自動前往 WSJ 與 Barron's 首頁截圖並上傳至 Imgur"""
+    """自動前往 WSJ 與 Barron's 首頁截圖，並直接同步至 GitHub 倉庫轉為公開網址"""
     print("📡 正在啟動隱形瀏覽器進行 WSJ 與 Barron's 首頁截圖...")
-    image_urls = []
+    
+    # 確保 docs 資料夾存在
+    os.makedirs("docs", exist_ok=True)
+    
     targets = [
-        {"name": "WSJ", "url": "https://www.wsj.com", "file": "wsj.png"},
-        {"name": "Barron's", "url": "https://www.barrons.com", "file": "barrons.png"}
+        {"name": "WSJ", "url": "https://www.wsj.com", "file": "docs/wsj.png"},
+        {"name": "Barron's", "url": "https://www.barrons.com", "file": "docs/barrons.png"}
     ]
     
     try:
@@ -23,45 +25,36 @@ def capture_and_upload_screenshots():
             
             for target in targets:
                 try:
-                    print(f"📸 正在截圖 {target['name']} 首頁...")
+                    print(f"📸 正在截圖 {target['name']} 首頁並儲存至本機...")
                     page.goto(target['url'], timeout=60000, wait_until="networkidle")
-                    # full_page=False 代表只拍第一屏畫面（免滑動的巨幅大標題）
+                    # 只拍第一屏畫面（免滑動的巨幅大標題）
                     page.screenshot(path=target['file'], full_page=False)
-                    
-                    # 立即上傳到 Imgur 轉成網址
-                    img_url = upload_to_imgur(target['file'])
-                    if img_url:
-                        image_urls.append(img_url)
                 except Exception as e:
-                    print(f"❌ {target['name']} 截圖或上傳失敗: {e}")
+                    print(f"❌ {target['name']} 截圖失敗: {e}")
             browser.close()
     except Exception as e:
         print(f"❌ Playwright 瀏覽器核心啟動失敗: {e}")
-        
-    return image_urls
-
-def upload_to_imgur(filepath):
-    """✨ 新增函數：將截圖圖片上傳到 Imgur，取得 LINE 必須使用的公開 HTTPS 網址"""
-    if not IMGUR_CLIENT_ID:
-        print("⚠️ 未偵測到 IMGUR_CLIENT_ID 環境變數，跳過圖片上傳")
-        return None
     
-    headers = {"Authorization": f"Client-ID {IMGUR_CLIENT_ID}"}
-    try:
-        with open(filepath, "rb") as file:
-            response = requests.post(
-                "https://api.imgur.com/3/image", 
-                headers=headers, 
-                files={"image": file},
-                timeout=30
-            )
-            response.raise_for_status()
-            img_url = response.json().get("data", {}).get("link")
-            print(f"✅ Imgur 上傳成功！圖片網址: {img_url}")
-            return img_url
-    except Exception as e:
-        print(f"❌ Imgur 上傳失敗: {e}")
-        return None
+    # 🚀 核心魔法：直接在雲端把截圖 Git Push 到你的倉庫，讓它變成網路上活生生的圖片網址
+    print("📤 正在將最新截圖即時同步回推至 GitHub 倉庫...")
+    os.system('git config --local user.name "github-actions[bot]"')
+    os.system('git config --local user.email "github-actions[bot]@users.noreply.github.com"')
+    os.system('git add docs/wsj.png docs/barrons.png')
+    os.system('git commit -m "🤖 雲端自動更新 LINE 所需財經截圖" || echo "截圖無變化"')
+    os.system('git push')
+    
+    # 算出 GitHub 官方提供的 Raw 圖片公開直連網址
+    repo = os.environ.get("GITHUB_REPOSITORY")  # 格式如 "你的帳號/你的專案"
+    branch = os.environ.get("GITHUB_REF_NAME", "main")  # 當前分支名稱
+    
+    image_urls = []
+    if os.path.exists("docs/wsj.png"):
+        image_urls.append(f"https://raw.githubusercontent.com/{repo}/{branch}/docs/wsj.png")
+    if os.path.exists("docs/barrons.png"):
+        image_urls.append(f"https://raw.githubusercontent.com/{repo}/{branch}/docs/barrons.png")
+        
+    print(f"🔗 產生 GitHub 官方圖片直連網址: {image_urls}")
+    return image_urls
 
 def fetch_yahoo_realtime_trending():
     """📊 保留原本邏輯：呼叫 Yahoo Finance 官方隱藏版實時熱搜 API"""
@@ -94,7 +87,7 @@ def run_dify_workflow(wsj_data, trending_stocks):
     }
     data = {
         "inputs": {
-            "wsj_raw_headlines": wsj_data,   # 這裡會傳入截圖完成的通知與圖片網址，確保 Dify 不會出錯
+            "wsj_raw_headlines": wsj_data,
             "yahoo_trending_symbols": trending_stocks
         }, 
         "response_mode": "blocking", 
@@ -105,22 +98,18 @@ def run_dify_workflow(wsj_data, trending_stocks):
     return response.json().get("data", {}).get("outputs", {}).get("text", "")
 
 def send_line_report(message, image_urls):
-    """📲 升級版：支援同一個 Push 同時發送 Dify 文字報表與多張 Imgur 截圖"""
-    print("📲 正在準備組合包推送到 LINE...")
+    """📲 同一個 Push 同時發送 Dify 文字報表與 GitHub 直連截圖"""
+    print("📲 正在準備綜合包推送到 LINE...")
     url = "https://api.line.me/v2/bot/message/push"
     headers = {
         "Authorization": f"Bearer {LINE_ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
     
-    # LINE 的 messages 陣列最多可以塞 5 個訊息物件
     messages = []
-    
-    # 1. 先加入 Dify 的文字財經晨報
     if message:
         messages.append({"type": "text", "text": message})
         
-    # 2. 依序把 WSJ 和 Barron's 的截圖網址塞進去
     for img_url in image_urls:
         if img_url:
             messages.append({
@@ -130,7 +119,7 @@ def send_line_report(message, image_urls):
             })
             
     if not messages:
-        print("⚠️ 沒有任何內容（文字或圖片）可以發送")
+        print("⚠️ 沒有任何內容可以發送")
         return
 
     data = {
@@ -143,20 +132,20 @@ def send_line_report(message, image_urls):
 
 if __name__ == "__main__":
     try:
-        # 1. ✨ 執行網頁首頁截圖並上傳（頂替原本的舊 RSS 函數）
+        # 1. 執行網頁首頁截圖並直接同步回倉庫
         uploaded_images = capture_and_upload_screenshots()
         
-        # 2. 📊 執行原本的雅虎熱搜股票抓取
+        # 2. 執行原本的雅虎熱搜股票抓取
         stocks_live = fetch_yahoo_realtime_trending()
         
-        # 3. 🧠 產生餵給 Dify 的文字提示（包含圖片網址，讓 Dify 知道截圖已完成）
-        wsj_placeholder = "已成功完成 WSJ 與 Barron's 首頁首屏截圖並上傳。"
+        # 3. 產生餵給 Dify 的文字提示
+        wsj_placeholder = "已成功完成 WSJ 與 Barron's 首頁首屏截圖並上傳至 GitHub 伺服器。"
         if uploaded_images:
-            wsj_placeholder += f"\n截圖備份連結: {', '.join(uploaded_images)}"
+            wsj_placeholder += f"\n截圖直連網址: {', '.join(uploaded_images)}"
             
         report_text = run_dify_workflow(wsj_placeholder, stocks_live)
         
-        # 4. 📲 將 Dify 文字成果與實體截圖一起送進 LINE
+        # 4. 將 Dify 文字成果與 GitHub 直連圖片一起送進 LINE
         if report_text or uploaded_images:
             send_line_report(report_text, uploaded_images)
             
