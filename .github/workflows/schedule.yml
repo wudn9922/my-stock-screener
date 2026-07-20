@@ -27,7 +27,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install requests playwright
-          playwright install chromium
+          playwright install firefox
 
       # 這裡把 Supabase 金鑰直接餵給 Python
       - name: Run Screener
