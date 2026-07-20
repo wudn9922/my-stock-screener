@@ -7,10 +7,9 @@ LINE_ACCESS_TOKEN = os.environ.get("LINE_ACCESS_TOKEN")
 LINE_USER_ID = os.environ.get("LINE_USER_ID")
 
 def capture_and_upload_screenshots():
-    """自動前往 WSJ 與 Barron's 首頁截圖，並直接同步至 GitHub 倉庫轉為公開網址"""
-    print("📡 正在啟動隱形瀏覽器進行 WSJ 與 Barron's 首頁截圖...")
+    """🤖 隱身強化版：改用 Firefox 並偽裝真實人類特徵，繞過道瓊防火牆"""
+    print("📡 正在啟動 Firefox 隱身瀏覽器進行 WSJ 與 Barron's 首頁截圖...")
     
-    # 確保 docs 資料夾存在
     os.makedirs("docs", exist_ok=True)
     
     targets = [
@@ -20,22 +19,38 @@ def capture_and_upload_screenshots():
     
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+            # 💡 策略 1：改用 firefox 啟動，避開嚴檢 Chromium 的防火牆
+            browser = p.firefox.launch(headless=True)
+            
+            # 💡 策略 2：建立偽裝環境，塞入真實人類的瀏覽器特徵 (Context)
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:130.0) Gecko/20100101 Firefox/130.0",
+                viewport={"width": 1440, "height": 900},
+                locale="en-US",
+                timezone_id="America/New_York"
+            )
+            page = context.new_page()
+            
+            # 💡 策略 3：防止 navigator.webdriver 被偵測
+            page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             
             for target in targets:
                 try:
-                    print(f"📸 正在截圖 {target['name']} 首頁並儲存至本機...")
-                    page.goto(target['url'], timeout=60000, wait_until="networkidle")
-                    # 只拍第一屏畫面（免滑動的巨幅大標題）
+                    print(f"📸 正在混淆進入 {target['name']} 首頁...")
+                    page.goto(target['url'], timeout=60000, wait_until="domcontentloaded")
+                    
+                    # 稍微模擬人類等待 3 秒，讓網頁加載更自然
+                    page.wait_for_timeout(3000)
+                    
                     page.screenshot(path=target['file'], full_page=False)
+                    print(f"✅ {target['name']} 成功騙過防火牆，截圖完成！")
                 except Exception as e:
                     print(f"❌ {target['name']} 截圖失敗: {e}")
             browser.close()
     except Exception as e:
-        print(f"❌ Playwright 瀏覽器核心啟動失敗: {e}")
+        print(f"❌ Playwright Firefox 核心啟動失敗: {e}")
     
-    # 🚀 核心魔法：直接在雲端把截圖 Git Push 到你的倉庫，讓它變成網路上活生生的圖片網址
+    # 保持原本的 Git Push 與網址生成邏輯
     print("📤 正在將最新截圖即時同步回推至 GitHub 倉庫...")
     os.system('git config --local user.name "github-actions[bot]"')
     os.system('git config --local user.email "github-actions[bot]@users.noreply.github.com"')
@@ -43,9 +58,8 @@ def capture_and_upload_screenshots():
     os.system('git commit -m "🤖 雲端自動更新 LINE 所需財經截圖" || echo "截圖無變化"')
     os.system('git push')
     
-    # 算出 GitHub 官方提供的 Raw 圖片公開直連網址
-    repo = os.environ.get("GITHUB_REPOSITORY")  # 格式如 "你的帳號/你的專案"
-    branch = os.environ.get("GITHUB_REF_NAME", "main")  # 當前分支名稱
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    branch = os.environ.get("GITHUB_REF_NAME", "main")
     
     image_urls = []
     if os.path.exists("docs/wsj.png"):
@@ -53,8 +67,8 @@ def capture_and_upload_screenshots():
     if os.path.exists("docs/barrons.png"):
         image_urls.append(f"https://raw.githubusercontent.com/{repo}/{branch}/docs/barrons.png")
         
-    print(f"🔗 產生 GitHub 官方圖片直連網址: {image_urls}")
     return image_urls
+
 
 def fetch_yahoo_realtime_trending():
     """📊 保留原本邏輯：呼叫 Yahoo Finance 官方隱藏版實時熱搜 API"""
