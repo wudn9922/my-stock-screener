@@ -1896,6 +1896,11 @@ function renderMarketCharts(marketId) {{
         return;
     }}
 
+    if (typeof Plotly === "undefined") {{
+        console.error("Plotly 載入失敗");
+        return;
+    }}
+
     items.forEach((item, index) => {{
         const id = "chart-" + marketId + "-" + index;
         const container = document.getElementById(id);
@@ -1904,17 +1909,65 @@ function renderMarketCharts(marketId) {{
             return;
         }}
 
+        const layout = {{
+            ...item.chart_data.layout
+        }};
+
+        if (window.innerWidth <= 600) {{
+            layout.height = 390;
+            layout.margin = {{
+                l: 10,
+                r: 55,
+                t: 105,
+                b: 30
+            }};
+
+            layout.title = {{
+                ...layout.title,
+                font: {{
+                    ...(layout.title?.font || {{}}),
+                    size: 15
+                }}
+            }};
+
+            layout.legend = {{
+                ...layout.legend,
+                font: {{
+                    ...(layout.legend?.font || {{}}),
+                    size: 10
+                }}
+            }};
+        }} else {{
+            layout.height = 440;
+        }}
+
+        const config = {{
+            responsive: true,
+            displayModeBar: false,
+            scrollZoom: true,
+            doubleClick: "reset",
+            showTips: false
+        }};
+
         Plotly.newPlot(
             container,
             item.chart_data.data,
-            item.chart_data.layout,
-            {{
-                responsive:true,
-                displayModeBar:false
-            }}
-        );
+            layout,
+            config
+        ).then(() => {{
+            container.dataset.done = "true";
 
-        container.dataset.done = "true";
+            requestAnimationFrame(() => {{
+                Plotly.Plots.resize(container);
+            }});
+        }}).catch((error) => {{
+            console.error(
+                "圖表繪製失敗：",
+                marketId,
+                index,
+                error
+            );
+        }});
     }});
 }}
 
