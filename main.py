@@ -28,6 +28,69 @@ DATA_DIR = "data"
 DOCS_DIR = "docs"
 MAX_DAYS = 201
 
+# 類股固定使用週均線，不讀取 Supabase
+SECTOR_WEEKLY_MA_LIST = [20, 60]
+SECTOR_BENCHMARK = "SPY"
+SECTOR_CHART_WEEKS = 160
+
+SECTOR_CONFIGS = [
+    {
+        "ticker": "XLK",
+        "name": "科技類股",
+        "sort_order": 1
+    },
+    {
+        "ticker": "XLC",
+        "name": "通訊服務",
+        "sort_order": 2
+    },
+    {
+        "ticker": "XLY",
+        "name": "非必需消費",
+        "sort_order": 3
+    },
+    {
+        "ticker": "XLP",
+        "name": "必需消費",
+        "sort_order": 4
+    },
+    {
+        "ticker": "XLE",
+        "name": "能源類股",
+        "sort_order": 5
+    },
+    {
+        "ticker": "XLF",
+        "name": "金融類股",
+        "sort_order": 6
+    },
+    {
+        "ticker": "XLV",
+        "name": "醫療保健",
+        "sort_order": 7
+    },
+    {
+        "ticker": "XLI",
+        "name": "工業類股",
+        "sort_order": 8
+    },
+    {
+        "ticker": "XLB",
+        "name": "原物料",
+        "sort_order": 9
+    },
+    {
+        "ticker": "XLRE",
+        "name": "房地產",
+        "sort_order": 10
+    },
+    {
+        "ticker": "XLU",
+        "name": "公用事業",
+        "sort_order": 11
+    }
+]
+
 # 台股中文名稱快取
 TW_STOCK_NAMES = {
     "2330.TW": "台積電",
@@ -62,7 +125,28 @@ def safe_int(value, default=None):
     try:
         if value is None or value == "":
             return default
+
         return int(value)
+
+    except (TypeError, ValueError):
+        return default
+
+
+def safe_float(value, default=0.0):
+    try:
+        if value is None or pd.isna(value):
+            return default
+
+        result = float(value)
+
+        if result in (
+            float("inf"),
+            float("-inf")
+        ):
+            return default
+
+        return result
+
     except (TypeError, ValueError):
         return default
 
@@ -80,6 +164,9 @@ def clean_json_value(value):
             for item in value
         ]
 
+    if isinstance(value, pd.Timestamp):
+        return value.strftime("%Y-%m-%d")
+
     if isinstance(value, float):
         if pd.isna(value):
             return None
@@ -91,6 +178,12 @@ def clean_json_value(value):
             return None
 
     return value
+
+
+def format_signed_percent(value):
+    value = safe_float(value)
+
+    return f"{value:+.2f}%"
 
 
 def register_tw_stock_name(ticker, name):
@@ -205,7 +298,6 @@ def clean_ohlcv_dataframe(df):
             errors="coerce"
         )
 
-    # 指數成交量有時會是 NaN
     result = result.dropna(
         subset=[
             "Open",
@@ -241,6 +333,35 @@ def clean_ohlcv_dataframe(df):
     ].sort_index()
 
     return result
+
+
+def calculate_return(close_series, periods):
+    if close_series is None:
+        return 0.0
+
+    if len(close_series) <= periods:
+        return 0.0
+
+    current_value = safe_float(
+        close_series.iloc[-1],
+        None
+    )
+
+    previous_value = safe_float(
+        close_series.iloc[-1 - periods],
+        None
+    )
+
+    if (
+        current_value is None
+        or previous_value is None
+        or previous_value == 0
+    ):
+        return 0.0
+
+    return (
+        (current_value / previous_value) - 1
+    ) * 100
 
 
 # =========================================================================
@@ -428,8 +549,14 @@ def load_configs_from_supabase(target_user_id):
                 f"{stocks_response.text[:500]}"
             )
 
-        print(f"📋 Supabase 群組總數：{len(groups_data)}")
-        print(f"📋 Supabase 股票總數：{len(stocks_data)}")
+        print(
+            f"📋 Supabase 群組總數："
+            f"{len(groups_data)}"
+        )
+        print(
+            f"📋 Supabase 股票總數："
+            f"{len(stocks_data)}"
+        )
 
         group_id_to_key = {}
 
@@ -569,7 +696,9 @@ def load_configs_from_supabase(target_user_id):
 
         if index_response.status_code == 200:
             index_configs = index_response.json()
-            print("📡 成功從雲端同步全球大盤自訂均線參數")
+            print(
+                "📡 成功從雲端同步全球大盤自訂均線參數"
+            )
         else:
             print(
                 f"⚠️ index_configs 查詢失敗："
@@ -619,7 +748,10 @@ def send_line_message(message, access_token, user_id):
         return None
 
     if len(message) > 5000:
-        message = message[:4980] + "\n...(訊息已截斷)"
+        message = (
+            message[:4980]
+            + "\n...(訊息已截斷)"
+        )
 
     url = "https://api.line.me/v2/bot/message/push"
 
@@ -646,7 +778,10 @@ def send_line_message(message, access_token, user_id):
             timeout=20
         )
 
-        print(f"📨 LINE 推播狀態：{response.status_code}")
+        print(
+            f"📨 LINE 推播狀態："
+            f"{response.status_code}"
+        )
 
         if response.status_code >= 400:
             request_id = response.headers.get(
@@ -669,6 +804,7 @@ def send_line_message(message, access_token, user_id):
             f"⚠️ LINE 推播異常："
             f"{type(exc).__name__}: {exc}"
         )
+
         return None
 
 
@@ -739,7 +875,9 @@ def get_tw_tickers(min_volume):
 
                     if volume_col:
                         volume = float(
-                            str(row[volume_col]).replace(",", "")
+                            str(
+                                row[volume_col]
+                            ).replace(",", "")
                         )
 
                         if volume < min_volume:
@@ -904,7 +1042,8 @@ def build_stock_data(
     title_suffix,
     ma_list,
     show_volume=False,
-    display_name=None
+    display_name=None,
+    timeframe_label="日K"
 ):
     display_name = str(
         display_name or ""
@@ -913,7 +1052,13 @@ def build_stock_data(
     display_ticker = str(ticker)
 
     if display_name:
-        display_ticker = f"{ticker}　{display_name}"
+        display_ticker = (
+            f"{ticker}　{display_name}"
+        )
+
+    timeframe_label = str(
+        timeframe_label or "日K"
+    ).strip()
 
     date_strings = [
         str(date)[:10]
@@ -945,7 +1090,6 @@ def build_stock_data(
         for value in df_chart["Volume"].tolist()
     ]
 
-    # 點擊後用來固定顯示完整 OHLCV
     ohlcv_records = []
 
     for (
@@ -970,7 +1114,8 @@ def build_stock_data(
                 "high": high_value,
                 "low": low_value,
                 "close": close_value,
-                "volume": volume_value
+                "volume": volume_value,
+                "timeframe": timeframe_label
             }
         )
 
@@ -1107,6 +1252,8 @@ def build_stock_data(
         "title": {
             "text": (
                 f"<b>{display_ticker}</b>"
+                f"　<span style='font-size:12px;"
+                f"color:#c084fc'>{timeframe_label}</span>"
                 f"<br><span style='font-size:12px;"
                 f"color:#9ca3af'>{title_suffix}</span>"
             ),
@@ -1129,9 +1276,6 @@ def build_stock_data(
             ),
             "color": "#d1d4dc"
         },
-
-        # category 會依實際交易日離散排列，
-        # 完全移除週末及休市日空格
         "xaxis": {
             "type": "category",
             "categoryorder": "array",
@@ -1204,7 +1348,7 @@ def build_stock_data(
         "margin": {
             "l": 18,
             "r": 68,
-            "t": 100,
+            "t": 110,
             "b": bottom_margin
         },
         "height": chart_height,
@@ -1257,7 +1401,8 @@ def build_stock_data(
     return {
         "data": traces,
         "layout": layout,
-        "ohlcv": ohlcv_records
+        "ohlcv": ohlcv_records,
+        "timeframe": timeframe_label
     }
 
 
@@ -1274,11 +1419,13 @@ def download_market_data(tickers, period):
             auto_adjust=False,
             group_by="column"
         )
+
     except Exception as exc:
         print(
             f"❌ 全市場批次下載失敗："
             f"{type(exc).__name__}: {exc}"
         )
+
         return pd.DataFrame()
 
 
@@ -1301,8 +1448,14 @@ def scan_market(tickers, min_volume):
         else:
             need_init.append(ticker)
 
-    for start in range(0, len(need_init), chunk_size):
-        chunk = need_init[start:start + chunk_size]
+    for start in range(
+        0,
+        len(need_init),
+        chunk_size
+    ):
+        chunk = need_init[
+            start:start + chunk_size
+        ]
 
         downloaded = download_market_data(
             chunk,
@@ -1336,8 +1489,14 @@ def scan_market(tickers, min_volume):
                     f"⚠️ {ticker} 初始化失敗：{exc}"
                 )
 
-    for start in range(0, len(need_update), chunk_size):
-        chunk = need_update[start:start + chunk_size]
+    for start in range(
+        0,
+        len(need_update),
+        chunk_size
+    ):
+        chunk = need_update[
+            start:start + chunk_size
+        ]
 
         downloaded = download_market_data(
             chunk,
@@ -1465,27 +1624,26 @@ def scan_market(tickers, min_volume):
                 or ticker.endswith(".TWO")
             )
 
+            display_name = (
+                get_tw_stock_name(ticker)
+                if is_tw_stock
+                else ""
+            )
+
             chart_data = build_stock_data(
                 df.tail(60),
                 ticker,
                 title,
                 [20],
                 show_volume=True,
-                display_name=(
-                    get_tw_stock_name(ticker)
-                    if is_tw_stock
-                    else ""
-                )
+                display_name=display_name,
+                timeframe_label="日K"
             )
 
             matched_list.append(
                 {
                     "ticker": ticker,
-                    "name": (
-                        get_tw_stock_name(ticker)
-                        if is_tw_stock
-                        else ""
-                    ),
+                    "name": display_name,
                     "volume": int(latest_volume),
                     "chart_data": chart_data
                 }
@@ -1517,7 +1675,9 @@ def get_ticker_candidates(raw_ticker, group_key):
         return []
 
     if group_key.startswith("us_"):
-        return [ticker.replace(".", "-")]
+        return [
+            ticker.replace(".", "-")
+        ]
 
     if group_key.startswith("tw_"):
         if (
@@ -1562,7 +1722,9 @@ def download_custom_stock(raw_ticker, group_key):
             df = clean_ohlcv_dataframe(df)
 
             if df.empty:
-                print(f"⚠️ {candidate} 下載結果為空")
+                print(
+                    f"⚠️ {candidate} 下載結果為空"
+                )
                 continue
 
             print(
@@ -1593,6 +1755,7 @@ def process_custom_groups(
             f"⚠️ {group_key} "
             f"沒有讀到 Supabase 股票"
         )
+
         return matched_list
 
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -1672,6 +1835,7 @@ def process_custom_groups(
             ma_list = sorted(set(ma_list)) or [20]
 
             max_ma = max(ma_list)
+
             keep_days = max(
                 MAX_DAYS,
                 max_ma + 60
@@ -1798,7 +1962,8 @@ def process_custom_groups(
                 title,
                 ma_list,
                 show_volume=True,
-                display_name=display_name
+                display_name=display_name,
+                timeframe_label="日K"
             )
 
             matched_list.append(
@@ -2011,7 +2176,8 @@ def process_index_charts(index_configs):
                 title,
                 ma_list,
                 show_volume=True,
-                display_name=name
+                display_name=name,
+                timeframe_label="日K"
             )
 
             matched_list.append(
@@ -2045,9 +2211,682 @@ def process_index_charts(index_configs):
 
 
 # =========================================================================
+# 美股 11 大類股週 K
+# =========================================================================
+def convert_daily_to_weekly(
+    daily_df,
+    drop_incomplete_week=True
+):
+    daily_df = clean_ohlcv_dataframe(daily_df)
+
+    if daily_df.empty:
+        return pd.DataFrame()
+
+    last_daily_date = daily_df.index[-1].normalize()
+
+    weekly_df = daily_df.resample(
+        "W-FRI"
+    ).agg(
+        {
+            "Open": "first",
+            "High": "max",
+            "Low": "min",
+            "Close": "last",
+            "Volume": "sum"
+        }
+    )
+
+    weekly_df = clean_ohlcv_dataframe(
+        weekly_df
+    )
+
+    if weekly_df.empty:
+        return weekly_df
+
+    # 若本週尚未到週五，移除未完成週 K。
+    # 星期一推播因此不會誤用尚未完成的當週資料。
+    if (
+        drop_incomplete_week
+        and weekly_df.index[-1].normalize()
+        > last_daily_date
+    ):
+        weekly_df = weekly_df.iloc[:-1]
+
+    return weekly_df
+
+
+def determine_sector_price_volume_status(
+    weekly_df,
+    weekly_return,
+    volume_ratio
+):
+    if weekly_df.empty:
+        return "資料不足"
+
+    if weekly_return > 0 and volume_ratio >= 1.05:
+        return "上漲放量，資金流入"
+
+    if weekly_return > 0 and volume_ratio < 0.95:
+        return "上漲縮量，動能普通"
+
+    if weekly_return < 0 and volume_ratio >= 1.05:
+        return "下跌放量，資金流出"
+
+    if weekly_return < 0 and volume_ratio < 0.95:
+        return "下跌縮量，賣壓減弱"
+
+    return "量價中性"
+
+
+def determine_sector_trend(
+    latest_close,
+    ma20,
+    ma60
+):
+    above_ma20 = (
+        ma20 is not None
+        and latest_close > ma20
+    )
+
+    above_ma60 = (
+        ma60 is not None
+        and latest_close > ma60
+    )
+
+    if above_ma20 and above_ma60:
+        return "週線多頭"
+
+    if not above_ma20 and not above_ma60:
+        return "週線空頭"
+
+    if above_ma60 and not above_ma20:
+        return "多頭回檔"
+
+    return "空頭反彈"
+
+
+def process_sector_weekly_charts():
+    sector_tickers = [
+        item["ticker"]
+        for item in SECTOR_CONFIGS
+    ]
+
+    download_tickers = (
+        sector_tickers
+        + [SECTOR_BENCHMARK]
+    )
+
+    print("\n====================================")
+    print("🧭 開始建立美股 11 大類股週 K")
+    print(
+        f"📏 固定週均線："
+        f"{SECTOR_WEEKLY_MA_LIST}"
+    )
+    print(
+        f"📊 相對強弱基準："
+        f"{SECTOR_BENCHMARK}"
+    )
+    print("====================================")
+
+    try:
+        downloaded = yf.download(
+            download_tickers,
+            period="10y",
+            progress=False,
+            threads=False,
+            auto_adjust=False,
+            group_by="column"
+        )
+
+    except Exception as exc:
+        print(
+            f"❌ 類股批次下載失敗："
+            f"{type(exc).__name__}: {exc}"
+        )
+
+        return [], []
+
+    if downloaded.empty:
+        print("❌ 類股批次下載結果為空")
+        return [], []
+
+    benchmark_daily = extract_yfinance_data(
+        downloaded,
+        SECTOR_BENCHMARK
+    )
+
+    benchmark_daily = clean_ohlcv_dataframe(
+        benchmark_daily
+    )
+
+    benchmark_weekly = convert_daily_to_weekly(
+        benchmark_daily,
+        drop_incomplete_week=True
+    )
+
+    if benchmark_weekly.empty:
+        print("❌ SPY 週線資料不足")
+        return [], []
+
+    benchmark_return_13w = calculate_return(
+        benchmark_weekly["Close"],
+        13
+    )
+
+    sector_results = []
+
+    for config in SECTOR_CONFIGS:
+        ticker = config["ticker"]
+        name = config["name"]
+
+        try:
+            daily_df = extract_yfinance_data(
+                downloaded,
+                ticker
+            )
+
+            daily_df = clean_ohlcv_dataframe(
+                daily_df
+            )
+
+            weekly_df = convert_daily_to_weekly(
+                daily_df,
+                drop_incomplete_week=True
+            )
+
+            if (
+                weekly_df.empty
+                or len(weekly_df) < 61
+            ):
+                print(
+                    f"⚠️ {ticker} 週線資料不足"
+                )
+                continue
+
+            for ma_window in SECTOR_WEEKLY_MA_LIST:
+                weekly_df[f"MA{ma_window}"] = (
+                    weekly_df["Close"]
+                    .rolling(
+                        window=ma_window,
+                        min_periods=ma_window
+                    )
+                    .mean()
+                )
+
+            weekly_df["VOL_MA10"] = (
+                weekly_df["Volume"]
+                .rolling(
+                    window=10,
+                    min_periods=5
+                )
+                .mean()
+            )
+
+            latest_close = safe_float(
+                weekly_df["Close"].iloc[-1]
+            )
+
+            latest_volume = safe_float(
+                weekly_df["Volume"].iloc[-1]
+            )
+
+            return_1w = calculate_return(
+                weekly_df["Close"],
+                1
+            )
+
+            return_4w = calculate_return(
+                weekly_df["Close"],
+                4
+            )
+
+            return_13w = calculate_return(
+                weekly_df["Close"],
+                13
+            )
+
+            relative_strength_13w = (
+                return_13w
+                - benchmark_return_13w
+            )
+
+            # 使用前十週平均量作為比較基準，
+            # 避免當週成交量被納入平均後稀釋。
+            previous_volumes = (
+                weekly_df["Volume"]
+                .iloc[-11:-1]
+            )
+
+            average_volume_10w = safe_float(
+                previous_volumes.mean(),
+                0.0
+            )
+
+            if average_volume_10w > 0:
+                volume_ratio = (
+                    latest_volume
+                    / average_volume_10w
+                )
+            else:
+                volume_ratio = 1.0
+
+            volume_change_pct = (
+                volume_ratio - 1
+            ) * 100
+
+            ma20_value = weekly_df[
+                "MA20"
+            ].iloc[-1]
+
+            ma60_value = weekly_df[
+                "MA60"
+            ].iloc[-1]
+
+            ma20 = (
+                None
+                if pd.isna(ma20_value)
+                else float(ma20_value)
+            )
+
+            ma60 = (
+                None
+                if pd.isna(ma60_value)
+                else float(ma60_value)
+            )
+
+            trend_status = determine_sector_trend(
+                latest_close,
+                ma20,
+                ma60
+            )
+
+            volume_status = (
+                determine_sector_price_volume_status(
+                    weekly_df,
+                    return_1w,
+                    volume_ratio
+                )
+            )
+
+            # 類股動能分數：
+            # 20% 一週、25% 四週、30% 十三週、
+            # 25% 相對 SPY 十三週強弱。
+            momentum_score = (
+                return_1w * 0.20
+                + return_4w * 0.25
+                + return_13w * 0.30
+                + relative_strength_13w * 0.25
+            )
+
+            title = (
+                f"(完整週K | "
+                f"本週:{return_1w:+.2f}% | "
+                f"4週:{return_4w:+.2f}% | "
+                f"13週:{return_13w:+.2f}% | "
+                f"相對SPY:{relative_strength_13w:+.2f}% | "
+                f"{trend_status} | "
+                f"{volume_status} "
+                f"{volume_change_pct:+.1f}%)"
+            )
+
+            chart_data = build_stock_data(
+                weekly_df.tail(
+                    SECTOR_CHART_WEEKS
+                ),
+                ticker,
+                title,
+                SECTOR_WEEKLY_MA_LIST,
+                show_volume=True,
+                display_name=name,
+                timeframe_label="週K"
+            )
+
+            sector_results.append(
+                {
+                    "ticker": ticker,
+                    "name": name,
+                    "sort_order": config["sort_order"],
+                    "volume": int(latest_volume),
+                    "latest_close": latest_close,
+                    "return_1w": return_1w,
+                    "return_4w": return_4w,
+                    "return_13w": return_13w,
+                    "benchmark_return_13w": (
+                        benchmark_return_13w
+                    ),
+                    "relative_strength_13w": (
+                        relative_strength_13w
+                    ),
+                    "volume_ratio": volume_ratio,
+                    "volume_change_pct": (
+                        volume_change_pct
+                    ),
+                    "volume_status": volume_status,
+                    "trend_status": trend_status,
+                    "momentum_score": momentum_score,
+                    "ma_list": (
+                        SECTOR_WEEKLY_MA_LIST.copy()
+                    ),
+                    "chart_data": chart_data
+                }
+            )
+
+            print(
+                f"✅ {ticker} {name}："
+                f"動能={momentum_score:+.2f}，"
+                f"13週={return_13w:+.2f}%，"
+                f"相對SPY="
+                f"{relative_strength_13w:+.2f}%"
+            )
+
+        except Exception as exc:
+            print(
+                f"❌ 類股處理失敗："
+                f"{ticker} / "
+                f"{type(exc).__name__}: {exc}"
+            )
+
+    sector_results.sort(
+        key=lambda item: item["momentum_score"],
+        reverse=True
+    )
+
+    sector_summary = []
+
+    for rank, item in enumerate(
+        sector_results,
+        start=1
+    ):
+        item["rank"] = rank
+
+        if rank <= 3:
+            strength_group = "strong"
+            strength_label = "強勢領先"
+        elif rank > max(
+            0,
+            len(sector_results) - 3
+        ):
+            strength_group = "weak"
+            strength_label = "弱勢落後"
+        else:
+            strength_group = "neutral"
+            strength_label = "中性輪動"
+
+        item["strength_group"] = strength_group
+        item["strength_label"] = strength_label
+
+        sector_summary.append(
+            {
+                "rank": rank,
+                "ticker": item["ticker"],
+                "name": item["name"],
+                "return_1w": item["return_1w"],
+                "return_4w": item["return_4w"],
+                "return_13w": item["return_13w"],
+                "relative_strength_13w": (
+                    item["relative_strength_13w"]
+                ),
+                "momentum_score": (
+                    item["momentum_score"]
+                ),
+                "volume_status": (
+                    item["volume_status"]
+                ),
+                "trend_status": (
+                    item["trend_status"]
+                ),
+                "strength_group": strength_group,
+                "strength_label": strength_label
+            }
+        )
+
+    print(
+        f"📊 類股週 K 圖表數量："
+        f"{len(sector_results)}"
+    )
+
+    return sector_results, sector_summary
+
+
+def build_sector_monday_message(
+    today_str,
+    sector_summary,
+    report_url
+):
+    if not sector_summary:
+        return (
+            f"📅 {today_str} 美股類股週線輪動\n\n"
+            "⚠️ 本週類股資料不足，"
+            "請至網頁稍後重新查看。\n\n"
+            f"🔗 完整圖表：\n{report_url}"
+        )
+
+    strongest = sector_summary[:3]
+    weakest = sector_summary[-3:]
+
+    lines = [
+        f"📅 {today_str} 美股類股週線輪動",
+        "📊 週均線：MA20 / MA60",
+        "📌 排名依據：1週、4週、13週與相對SPY強弱",
+        "",
+        "🟢 【強勢前三名】"
+    ]
+
+    for item in strongest:
+        lines.append(
+            f"{item['rank']}. "
+            f"{item['ticker']} "
+            f"{item['name']}\n"
+            f"   ├ 13週："
+            f"{item['return_13w']:+.2f}%\n"
+            f"   ├ 相對SPY："
+            f"{item['relative_strength_13w']:+.2f}%\n"
+            f"   └ {item['trend_status']}｜"
+            f"{item['volume_status']}"
+        )
+
+    lines.extend(
+        [
+            "",
+            "🔴 【弱勢後三名】"
+        ]
+    )
+
+    for item in weakest:
+        lines.append(
+            f"{item['rank']}. "
+            f"{item['ticker']} "
+            f"{item['name']}\n"
+            f"   ├ 13週："
+            f"{item['return_13w']:+.2f}%\n"
+            f"   ├ 相對SPY："
+            f"{item['relative_strength_13w']:+.2f}%\n"
+            f"   └ {item['trend_status']}｜"
+            f"{item['volume_status']}"
+        )
+
+    inflow_items = [
+        item
+        for item in sector_summary
+        if "資金流入" in item["volume_status"]
+    ]
+
+    outflow_items = [
+        item
+        for item in sector_summary
+        if "資金流出" in item["volume_status"]
+    ]
+
+    lines.extend(
+        [
+            "",
+            "💰 【量價資金狀態】"
+        ]
+    )
+
+    if inflow_items:
+        lines.append(
+            "資金流入："
+            + "、".join(
+                item["name"]
+                for item in inflow_items
+            )
+        )
+    else:
+        lines.append("資金流入：目前無明顯類股")
+
+    if outflow_items:
+        lines.append(
+            "資金流出："
+            + "、".join(
+                item["name"]
+                for item in outflow_items
+            )
+        )
+    else:
+        lines.append("資金流出：目前無明顯類股")
+
+    lines.extend(
+        [
+            "",
+            "🔗 查看完整類股週K：",
+            report_url
+        ]
+    )
+
+    return "\n".join(lines)
+
+
+# =========================================================================
 # HTML 產生
 # =========================================================================
-def generate_html(data_dict, date_str):
+def generate_sector_overview_html(sector_summary):
+    if not sector_summary:
+        return """
+<div class="sector-overview">
+    <div class="sector-overview-title">
+        🧭 類股週線強弱總覽
+    </div>
+    <div class="no-data">
+        類股強弱資料不足
+    </div>
+</div>
+"""
+
+    groups = [
+        (
+            "strong",
+            "🟢 強勢領先",
+            [
+                item
+                for item in sector_summary
+                if item.get("strength_group") == "strong"
+            ]
+        ),
+        (
+            "neutral",
+            "🟡 中性輪動",
+            [
+                item
+                for item in sector_summary
+                if item.get("strength_group") == "neutral"
+            ]
+        ),
+        (
+            "weak",
+            "🔴 弱勢落後",
+            [
+                item
+                for item in sector_summary
+                if item.get("strength_group") == "weak"
+            ]
+        )
+    ]
+
+    html = """
+<div class="sector-overview">
+    <div class="sector-overview-title">
+        🧭 美股 11 大類股週線強弱總覽
+    </div>
+    <div class="sector-overview-subtitle">
+        固定週均線 MA20 / MA60，
+        排名綜合 1週、4週、13週報酬與相對 SPY 強弱
+    </div>
+    <div class="sector-summary-grid">
+"""
+
+    for group_class, group_title, items in groups:
+        html += (
+            f'<div class="sector-summary-column '
+            f'{group_class}">'
+            f'<div class="sector-summary-title">'
+            f'{group_title}'
+            f'</div>'
+        )
+
+        if not items:
+            html += (
+                '<div class="sector-summary-empty">'
+                '目前沒有類股'
+                '</div>'
+            )
+
+        for item in items:
+            relative_class = (
+                "positive"
+                if item["relative_strength_13w"] >= 0
+                else "negative"
+            )
+
+            html += (
+                '<div class="sector-summary-item">'
+                '<div class="sector-summary-head">'
+                f'<span class="sector-rank">'
+                f'#{item["rank"]}'
+                '</span>'
+                f'<span class="sector-symbol">'
+                f'{item["ticker"]}'
+                '</span>'
+                f'<span class="sector-name">'
+                f'{item["name"]}'
+                '</span>'
+                '</div>'
+                '<div class="sector-summary-metrics">'
+                f'<span>1週 '
+                f'{item["return_1w"]:+.2f}%</span>'
+                f'<span>4週 '
+                f'{item["return_4w"]:+.2f}%</span>'
+                f'<span>13週 '
+                f'{item["return_13w"]:+.2f}%</span>'
+                f'<span class="{relative_class}">'
+                f'相對SPY '
+                f'{item["relative_strength_13w"]:+.2f}%'
+                '</span>'
+                '</div>'
+                '<div class="sector-summary-status">'
+                f'{item["trend_status"]}｜'
+                f'{item["volume_status"]}'
+                '</div>'
+                '</div>'
+            )
+
+        html += "</div>"
+
+    html += """
+    </div>
+</div>
+"""
+
+    return html
+
+
+def generate_html(
+    data_dict,
+    date_str,
+    sector_summary=None
+):
+    sector_summary = sector_summary or []
+
     clean_data = clean_json_value(data_dict)
 
     chart_json = json.dumps(
@@ -2095,8 +2934,7 @@ body {
     border-radius: 14px;
     box-sizing: border-box;
     box-shadow:
-        0 12px 35px
-        rgba(0, 0, 0, 0.3);
+        0 12px 35px rgba(0, 0, 0, 0.3);
 }
 
 .header h2 {
@@ -2165,8 +3003,7 @@ body {
         );
     border-color: #38bdf8;
     box-shadow:
-        0 5px 16px
-        rgba(37, 99, 235, 0.3);
+        0 5px 16px rgba(37, 99, 235, 0.3);
 }
 
 .index-btn.active {
@@ -2179,6 +3016,16 @@ body {
     border-color: #c084fc;
 }
 
+.sector-btn.active {
+    background:
+        linear-gradient(
+            135deg,
+            #0f766e,
+            #059669
+        );
+    border-color: #34d399;
+}
+
 .market-section {
     display: none;
     max-width: 1100px;
@@ -2187,6 +3034,118 @@ body {
 
 .market-section.active {
     display: block;
+}
+
+.sector-overview {
+    margin-bottom: 18px;
+    padding: 16px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(52, 211, 153, 0.22);
+    border-radius: 14px;
+}
+
+.sector-overview-title {
+    color: #f8fafc;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.sector-overview-subtitle {
+    margin-top: 6px;
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.sector-summary-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.sector-summary-column {
+    padding: 12px;
+    background: rgba(30, 41, 59, 0.62);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 11px;
+}
+
+.sector-summary-column.strong {
+    border-top: 3px solid #22c55e;
+}
+
+.sector-summary-column.neutral {
+    border-top: 3px solid #eab308;
+}
+
+.sector-summary-column.weak {
+    border-top: 3px solid #ef4444;
+}
+
+.sector-summary-title {
+    margin-bottom: 10px;
+    color: #e2e8f0;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.sector-summary-item {
+    margin-bottom: 9px;
+    padding: 10px;
+    background: rgba(15, 23, 42, 0.75);
+    border-radius: 8px;
+}
+
+.sector-summary-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.sector-rank {
+    color: #fbbf24;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.sector-symbol {
+    color: #f8fafc;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.sector-name {
+    color: #cbd5e1;
+    font-size: 12px;
+}
+
+.sector-summary-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 9px;
+    margin-top: 7px;
+    color: #94a3b8;
+    font-size: 10px;
+}
+
+.sector-summary-status {
+    margin-top: 7px;
+    color: #a5b4fc;
+    font-size: 10px;
+}
+
+.positive {
+    color: #4ade80;
+}
+
+.negative {
+    color: #fb7185;
+}
+
+.sector-summary-empty {
+    color: #64748b;
+    font-size: 12px;
 }
 
 .chart-card {
@@ -2198,8 +3157,7 @@ body {
     border-radius: 14px;
     box-sizing: border-box;
     box-shadow:
-        0 12px 30px
-        rgba(0, 0, 0, 0.32);
+        0 12px 30px rgba(0, 0, 0, 0.32);
     transition:
         border-color 0.2s ease,
         transform 0.2s ease;
@@ -2239,22 +3197,12 @@ body {
     font-weight: 700;
     cursor: pointer;
     touch-action: manipulation;
-    transition:
-        color 0.2s ease,
-        background 0.2s ease,
-        border-color 0.2s ease,
-        transform 0.2s ease;
 }
 
 .chart-tool-btn:hover {
     color: #ffffff;
     background: #334155;
     border-color: #38bdf8;
-    transform: translateY(-1px);
-}
-
-.chart-tool-btn:active {
-    transform: translateY(0);
 }
 
 .chart-tool-btn.reset-btn {
@@ -2281,6 +3229,11 @@ body {
 
 .ohlcv-date {
     color: #f8fafc;
+    font-weight: 700;
+}
+
+.ohlcv-timeframe {
+    color: #c084fc;
     font-weight: 700;
 }
 
@@ -2359,6 +3312,12 @@ body {
     text-align: center;
     background: rgba(127, 29, 29, 0.2);
     border-radius: 10px;
+}
+
+@media (max-width: 760px) {
+    .sector-summary-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 600px) {
@@ -2454,7 +3413,7 @@ body {
     style="border-left-color:#a855f7;"
 >
     <div class="category-title">
-        🌍 全球指數區塊
+        🌍 全球大盤指數
     </div>
 
     <div class="tabs">
@@ -2471,10 +3430,30 @@ body {
 
 <div
     class="category-box"
+    style="border-left-color:#10b981;"
+>
+    <div class="category-title">
+        🧭 美股類股週 K
+    </div>
+
+    <div class="tabs">
+        <button
+            id="btn-sectors"
+            class="tab-btn sector-btn"
+            onclick="switchMarket(event, 'sectors')"
+        >
+            11 大類股週線輪動
+            ({len(data_dict.get("sectors", []))})
+        </button>
+    </div>
+</div>
+
+<div
+    class="category-box"
     style="border-left-color:#ff5252;"
 >
     <div class="category-title">
-        🇹🇼 台灣股市區塊
+        🇹🇼 台灣股市
     </div>
 
     <div class="tabs">
@@ -2509,7 +3488,7 @@ body {
     style="border-left-color:#00b0ff;"
 >
     <div class="category-title">
-        🇺🇸 美國股市區塊
+        🇺🇸 美國股市
     </div>
 
     <div class="tabs">
@@ -2558,6 +3537,7 @@ body {
 
     keys = [
         "indices",
+        "sectors",
         "tw_all",
         "tw_g1",
         "tw_g2",
@@ -2580,12 +3560,23 @@ body {
             f'class="market-section{active_class}">'
         )
 
+        if key == "sectors":
+            html += generate_sector_overview_html(
+                sector_summary
+            )
+
         items = data_dict.get(key, [])
 
         if items:
             for index in range(len(items)):
                 chart_id = f"chart-{key}-{index}"
                 info_id = f"info-{key}-{index}"
+
+                timeframe_text = (
+                    "點擊週 K 後固定顯示週期與 OHLCV"
+                    if key == "sectors"
+                    else "點擊 K 線後固定顯示日期與 OHLCV"
+                )
 
                 html += (
                     '<div class="chart-card">'
@@ -2597,21 +3588,24 @@ body {
                     '<button '
                     'type="button" '
                     'class="chart-tool-btn" '
-                    f'onclick="zoomChart(\'{chart_id}\', 0.7)">'
+                    f'onclick="zoomChart('
+                    f'\'{chart_id}\', 0.7)">'
                     '＋ 放大'
                     '</button>'
 
                     '<button '
                     'type="button" '
                     'class="chart-tool-btn" '
-                    f'onclick="zoomChart(\'{chart_id}\', 1.4)">'
+                    f'onclick="zoomChart('
+                    f'\'{chart_id}\', 1.4)">'
                     '－ 縮小'
                     '</button>'
 
                     '<button '
                     'type="button" '
                     'class="chart-tool-btn reset-btn" '
-                    f'onclick="resetChart(\'{chart_id}\')">'
+                    f'onclick="resetChart('
+                    f'\'{chart_id}\')">'
                     '↺ 重設'
                     '</button>'
 
@@ -2621,7 +3615,7 @@ body {
                     'class="ohlcv-fixed-panel">'
 
                     '<span class="ohlcv-placeholder">'
-                    '點擊 K 線後固定顯示日期與 OHLCV'
+                    f'{timeframe_text}'
                     '</span>'
 
                     '</div>'
@@ -2635,11 +3629,18 @@ body {
                     '</div>'
                 )
         else:
-            no_data_text = (
-                "此分類目前沒有可顯示的指數"
-                if key == "indices"
-                else "此分類目前沒有可顯示的股票"
-            )
+            if key == "indices":
+                no_data_text = (
+                    "目前沒有可顯示的指數"
+                )
+            elif key == "sectors":
+                no_data_text = (
+                    "目前沒有可顯示的類股週 K"
+                )
+            else:
+                no_data_text = (
+                    "此分類目前沒有可顯示的股票"
+                )
 
             html += (
                 '<div class="no-data">'
@@ -2653,10 +3654,6 @@ body {
 <script>
 const chartDataStore = __CHART_JSON__;
 
-
-/*
- * 價格格式化
- */
 function formatPrice(value) {
     const numberValue = Number(value);
 
@@ -2673,10 +3670,6 @@ function formatPrice(value) {
     );
 }
 
-
-/*
- * 成交量格式化
- */
 function formatVolume(value) {
     const numberValue = Number(value);
 
@@ -2689,10 +3682,6 @@ function formatVolume(value) {
     );
 }
 
-
-/*
- * 取得指定圖表的原始資料
- */
 function getChartItem(container) {
     if (!container) {
         return null;
@@ -2714,10 +3703,6 @@ function getChartItem(container) {
     return chartDataStore[marketId][chartIndex] || null;
 }
 
-
-/*
- * 將 category 座標範圍轉為交易日索引
- */
 function categoryRangeToIndex(
     rangeValue,
     dateList,
@@ -2742,12 +3727,6 @@ function categoryRangeToIndex(
     return fallbackValue;
 }
 
-
-/*
- * 自訂放大縮小
- * factor < 1：放大
- * factor > 1：縮小
- */
 function zoomChart(chartId, factor) {
     const container = document.getElementById(
         chartId
@@ -2882,11 +3861,6 @@ function zoomChart(chartId, factor) {
     );
 }
 
-
-/*
- * 重設縮放與座標範圍
- * 固定 OHLCV 資訊不會因重設而消失
- */
 function resetChart(chartId) {
     const container = document.getElementById(
         chartId
@@ -2918,10 +3892,6 @@ function resetChart(chartId) {
     );
 }
 
-
-/*
- * 依日期找出 OHLCV
- */
 function findOhlcvRecord(item, clickedDate) {
     if (
         !item
@@ -2943,10 +3913,6 @@ function findOhlcvRecord(item, clickedDate) {
     );
 }
 
-
-/*
- * 在圖表內固定顯示選取日期垂直線與收盤標記
- */
 function markSelectedDate(container, record) {
     if (
         !container
@@ -3018,15 +3984,12 @@ function markSelectedDate(container, record) {
     );
 }
 
-
-/*
- * 點擊後固定顯示日期與 OHLCV
- */
 function showFixedOhlcv(
     container,
     clickedDate
 ) {
     const item = getChartItem(container);
+
     const record = findOhlcvRecord(
         item,
         clickedDate
@@ -3087,9 +4050,23 @@ function showFixedOhlcv(
         }
     }
 
+    const timeframe = (
+        record.timeframe
+        || (
+            item
+            && item.chart_data
+            && item.chart_data.timeframe
+        )
+        || "日K"
+    );
+
     infoPanel.innerHTML = (
         '<span class="ohlcv-date">'
         + record.date
+        + '</span>'
+
+        + '<span class="ohlcv-timeframe">'
+        + timeframe
         + '</span>'
 
         + '<span class="'
@@ -3137,11 +4114,6 @@ function showFixedOhlcv(
     );
 }
 
-
-/*
- * 綁定點擊事件
- * 點擊 K 線、均線或成交量都能取得該交易日 OHLCV
- */
 function bindChartClickEvent(container) {
     if (
         !container
@@ -3181,10 +4153,6 @@ function bindChartClickEvent(container) {
     container.dataset.clickBound = "true";
 }
 
-
-/*
- * 繪製指定分類圖表
- */
 function renderMarketCharts(marketId) {
     const items = chartDataStore[marketId];
 
@@ -3233,13 +4201,6 @@ function renderMarketCharts(marketId) {
             || !item.chart_data
             || !Array.isArray(item.chart_data.data)
         ) {
-            console.error(
-                "圖表資料格式錯誤：",
-                marketId,
-                index,
-                item
-            );
-
             container.innerHTML = (
                 '<div class="plotly-error">'
                 + '圖表資料格式錯誤'
@@ -3310,7 +4271,7 @@ function renderMarketCharts(marketId) {
                 ...layout.margin,
                 l: 8,
                 r: 52,
-                t: 112,
+                t: 120,
                 b: 34
             };
 
@@ -3344,22 +4305,11 @@ function renderMarketCharts(marketId) {
 
         const config = {
             responsive: true,
-
-            /*
-             * 顯示 Plotly 工具列：
-             * 框選縮放、平移、放大、縮小、重設
-             */
             displayModeBar: true,
             displaylogo: false,
-
-            /*
-             * 滑鼠滾輪及手機雙指縮放
-             */
             scrollZoom: true,
-
             doubleClick: "reset",
             showTips: false,
-
             modeBarButtonsToRemove: [
                 "select2d",
                 "lasso2d",
@@ -3379,9 +4329,6 @@ function renderMarketCharts(marketId) {
         .then(() => {
             container.dataset.done = "true";
 
-            /*
-             * 保留原始分隔線，之後選取日期時不會被刪除
-             */
             container._baseShapes = Array.isArray(
                 originalLayout.shapes
             )
@@ -3415,10 +4362,6 @@ function renderMarketCharts(marketId) {
     });
 }
 
-
-/*
- * 重新調整目前分類圖表大小
- */
 function resizeMarketCharts(marketId) {
     const items = chartDataStore[marketId];
 
@@ -3446,10 +4389,6 @@ function resizeMarketCharts(marketId) {
     });
 }
 
-
-/*
- * 切換市場分類
- */
 function switchMarket(event, marketId) {
     document
         .querySelectorAll(".market-section")
@@ -3490,11 +4429,9 @@ function switchMarket(event, marketId) {
     }, 150);
 }
 
-
 window.addEventListener("load", () => {
     renderMarketCharts("tw_all");
 });
-
 
 window.addEventListener("resize", () => {
     const activeSection = document.querySelector(
@@ -3561,10 +4498,11 @@ def analyze_index_trend(ticker, name, ma_list):
         if df.empty or len(df) < 750:
             return f"⚪ {name}: 數據不足無法分析"
 
-        df = df.copy()
-
         if isinstance(df.columns, pd.MultiIndex):
-            df = extract_yfinance_data(df, ticker)
+            df = extract_yfinance_data(
+                df,
+                ticker
+            )
 
         df = clean_ohlcv_dataframe(df)
 
@@ -3584,7 +4522,9 @@ def analyze_index_trend(ticker, name, ma_list):
 
             available_mas.append(col_name)
 
-        df = df.dropna(subset=available_mas)
+        df = df.dropna(
+            subset=available_mas
+        )
 
         if len(df) < 5:
             return f"⚪ {name}: 計算後可用數據小於5日"
@@ -3605,11 +4545,14 @@ def analyze_index_trend(ticker, name, ma_list):
                 ):
                     touch_count += 1
 
-            if touch_count >= 3:
-                score += 0
-            else:
-                latest_close = float(latest["Close"])
-                latest_ma = float(latest[ma_col])
+            if touch_count < 3:
+                latest_close = float(
+                    latest["Close"]
+                )
+
+                latest_ma = float(
+                    latest[ma_col]
+                )
 
                 if latest_close > latest_ma * 1.001:
                     score += 1
@@ -3629,7 +4572,10 @@ def analyze_index_trend(ticker, name, ma_list):
 
         df_3y = df.tail(252 * 3)
 
-        idx_3y_high = df_3y["High"].idxmax()
+        idx_3y_high = df_3y[
+            "High"
+        ].idxmax()
+
         latest_date = df.index[-1]
 
         months_since_high = (
@@ -3690,15 +4636,16 @@ def analyze_index_trend(ticker, name, ma_list):
         lower_peak_count = 0
         lower_trough_count = 0
 
-        if len(peaks) >= 2:
-            for index in range(1, len(peaks)):
-                if peaks[index][1] < peaks[index - 1][1]:
-                    lower_peak_count += 1
+        for index in range(1, len(peaks)):
+            if peaks[index][1] < peaks[index - 1][1]:
+                lower_peak_count += 1
 
-        if len(troughs) >= 2:
-            for index in range(1, len(troughs)):
-                if troughs[index][1] < troughs[index - 1][1]:
-                    lower_trough_count += 1
+        for index in range(1, len(troughs)):
+            if (
+                troughs[index][1]
+                < troughs[index - 1][1]
+            ):
+                lower_trough_count += 1
 
         macro_trend = "多頭趨勢"
 
@@ -3850,7 +4797,7 @@ def push_report_to_github():
             "-m",
             (
                 "⚙️ 量化報告自動更新 "
-                "(新增互動縮放與固定OHLCV)"
+                "(新增11大類股週K輪動)"
             )
         ]
     )
@@ -3927,8 +4874,15 @@ def main():
         db_index_configs
     )
 
+    print("🧭 開始建立類股週 K 圖表")
+
+    sector_charts, sector_summary = (
+        process_sector_weekly_charts()
+    )
+
     data_dict = {
         "indices": index_charts,
+        "sectors": sector_charts,
         "tw_all": tw_all,
         "tw_g1": process_custom_groups(
             user_configs["tw_g1"],
@@ -3972,7 +4926,8 @@ def main():
 
     generate_html(
         data_dict,
-        today_str
+        today_str,
+        sector_summary=sector_summary
     )
 
     report_url = (
@@ -3995,6 +4950,9 @@ def main():
         f"🌍 【全球指數區塊】\n"
         f" └ 指數圖表："
         f"{len(data_dict['indices'])} 張\n\n"
+        f"🧭 【美股類股週K】\n"
+        f" └ 類股圖表："
+        f"{len(data_dict['sectors'])} 張\n\n"
         f"🇹🇼 【台灣股市區塊】\n"
         f" ├ 1. 全市場符合："
         f"{len(data_dict['tw_all'])} 檔\n"
@@ -4141,18 +5099,15 @@ def main():
         line_push_user_id
     )
 
+    # 星期一限定推播：
+    # 改為類股週線強弱摘要，不再使用 Finviz。
     if weekday == 0:
-        sectors_url = (
-            "https://finviz.com/"
-            "groups.ashx?g=sector&v=110"
-        )
-
         sectors_message = (
-            "📅 【每週一限定】"
-            "美股 11 大類股週線趨勢輪動圖\n"
-            "⏳ 包含 1-2 年週線級別核心波段追蹤\n\n"
-            f"🔗 類股觀測鏈結：\n"
-            f"{sectors_url}"
+            build_sector_monday_message(
+                today_str,
+                sector_summary,
+                report_url
+            )
         )
 
         send_line_message(
