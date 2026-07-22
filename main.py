@@ -1035,20 +1035,43 @@ def generate_html(data_dict, date_str):
     </div>
     """
     
-    keys_list = ['tw_all', 'tw_g1', 'tw_g2', 'us_all', 'us_g1', 'us_g2', 'us_g3', 'us_g4']
+    keys_list = [
+        "tw_all",
+        "tw_g1",
+        "tw_g2",
+        "us_all",
+        "us_g1",
+        "us_g2",
+        "us_g3",
+        "us_g4"
+    ]
+
     for key in keys_list:
-        active_class = " active" if key == 'tw_all' else ""
-        html_template += f'<div id="{key}-market" class="market-section{active_class}">'
-        if data_dict[key]:
-            for idx in range(len(data_dict[key])): html_template += f'<div class="chart-card"><div id="chart-{key}-{idx}" class="plotly-container"></div></div>'
-		else:
-    		html_template += (
-        		'<div class="no-data">'
-        		'此分類目前沒有可顯示的股票，'
-        		'請查看 GitHub Actions 執行紀錄確認 Supabase 與 yfinance 狀態'
-        		'</div>'
-    		)
-        html_template += '</div>'
+        active_class = " active" if key == "tw_all" else ""
+
+        html_template += (
+            f'<div id="{key}-market" '
+            f'class="market-section{active_class}">'
+        )
+
+        if data_dict.get(key):
+            for idx in range(len(data_dict[key])):
+                html_template += (
+                    '<div class="chart-card">'
+                    f'<div id="chart-{key}-{idx}" '
+                    'class="plotly-container"></div>'
+                    '</div>'
+                )
+        else:
+            html_template += (
+                '<div class="no-data">'
+                '此分類目前沒有可顯示的股票，'
+                '請查看 GitHub Actions 執行紀錄確認 '
+                'Supabase 與 yfinance 狀態'
+                '</div>'
+            )
+
+        html_template += "</div>"
         
     html_template += f"""<script>{js_store} function renderMarketCharts(marketId) {{ const items = chartDataStore[marketId]; if (!items) return; items.forEach((item, idx) => {{ const elementId = "chart-" + marketId + "-" + idx; const container = document.getElementById(elementId); if (container && !container.dataset.done) {{ Plotly.newPlot(container, item.chart_data.data, item.chart_data.layout, {{responsive: true, displayModeBar: false}}); container.dataset.done = "true"; }} }}); }} function switchMarket(event, marketId) {{ document.querySelectorAll('.market-section').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); document.getElementById(marketId + '-market').classList.add('active'); if(event) {{ event.currentTarget.classList.add('active'); }} else {{ document.getElementById('btn-' + marketId).classList.add('active'); }} renderMarketCharts(marketId); window.dispatchEvent(new Event('resize')); }} window.addEventListener("load", function() {{ renderMarketCharts('tw_all'); }});</script></body></html>"""
     
