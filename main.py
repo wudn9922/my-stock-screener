@@ -18,83 +18,313 @@ HTTP_HEADERS = {
 }
 
 DATA_DIR = "data"
-MAX_DAYS = 201 
+MAX_DAYS = 201
+
+# =========================================================================
+# 🧪 Supabase 自訂群組測試設定
+# =========================================================================
+
+# True：只要股票可下載，就直接顯示圖表，用來檢查 Supabase 名單
+# False：恢復均線條件篩選
+CUSTOM_GROUP_TEST_MODE = True
+
+# 關閉測試模式後使用的均線篩選範圍
+# 0.97～1.03 代表股價位於均線上下 3%
+CUSTOM_MA_MIN_RATIO = 0.97
+CUSTOM_MA_MAX_RATIO = 1.02
 
 # =========================================================================
 # 📡 Supabase 雲端資料庫動態名單與大盤參數讀取器 (單一用戶版)
 # =========================================================================
+# =========================================================================
+# 📡 Supabase 雲端資料庫動態名單與大盤參數讀取器
+# =========================================================================
 def load_configs_from_supabase(target_user_id):
-    # 恢復為原本的單一字典結構
     configs = {
-        "tw_g1": {}, "tw_g2": {},
-        "us_g1": {}, "us_g2": {}, "us_g3": {}, "us_g4": {}
+        "tw_g1": {},
+        "tw_g2": {},
+        "us_g1": {},
+        "us_g2": {},
+        "us_g3": {},
+        "us_g4": {}
     }
+
     index_configs = []
-    
+
     supabase_url = "https://bxhqpfeberqbtxymghyt.supabase.co/rest/v1"
     supabase_key = "sb_publishable_eEJNM_96jblQ_90vpcYC0g_PzyGJNOK"
+
     headers = {
         "apikey": supabase_key,
         "Authorization": f"Bearer {supabase_key}"
     }
-    
-    try:
-        res_groups = requests.get(f"{supabase_url}/groups", headers=headers, timeout=10)
-        res_stocks = requests.get(f"{supabase_url}/stocks", headers=headers, timeout=10)
-        
-        if res_groups.status_code == 200 and res_stocks.status_code == 200:
-            groups_data = res_groups.json()
-            stocks_data = res_stocks.json()
-            
-            name_mapping = {
-                "台股-權值精選": "tw_g1", "台股-熱門": "tw_g2",
-                "美股-權值精選": "us_g1", "美股-低本益比": "us_g2",
-                "美股-超級績效": "us_g3", "美股-熱門": "us_g4"
-            }
-            
-            group_id_to_key = {}
-            for g in groups_data:
-                g_name = g['name'].strip()
-                if g_name in name_mapping:
-                    group_id_to_key[g['id']] = name_mapping[g_name]
-            
-            # 只過濾屬於自己 (target_user_id) 的股票
-            for s in stocks_data:
-                if s.get('line_user_id') != target_user_id:
-                    continue 
-                
-                g_id = s.get('group_id')
-                mapped_key = group_id_to_key.get(g_id)
-                
-                if mapped_key:
-                    ma_list = []
-                    for ma_key in ['ma1', 'ma2', 'ma3', 'ma4']:
-                        if s.get(ma_key) is not None and int(s[ma_key]) > 0:
-                            ma_list.append(int(s[ma_key]))
-                    if not ma_list: ma_list = [20]
-                    configs[mapped_key][s['ticker']] = ma_list
-    except Exception as e:
-        print(f"⚠️ 讀取雲端個股失敗: {e}")
+
+    target_user_id = str(target_user_id).strip()
 
     try:
-        res_index = requests.get(f"{supabase_url}/index_configs", headers=headers, timeout=10)
+        res_groups = requests.get(
+            f"{supabase_url}/groups",
+            headers=headers,
+            params={"select": "*"},
+            timeout=15
+        )
+
+        res_stocks = requests.get(
+            f"{supabase_url}/stocks",
+            headers=headers,
+            params={"select": "*"},
+            timeout=15
+        )
+
+        print(
+            f"📡 Supabase groups 狀態："
+            f"{res_groups.status_code}"
+        )
+        print(
+            f"📡 Supabase stocks 狀態："
+            f"{res_stocks.status_code}"
+        )
+
+        if res_groups.status_code != 200:
+            print(
+                f"❌ groups 查詢失敗："
+                f"{res_groups.text[:500]}"
+            )
+
+        if res_stocks.status_code != 200:
+            print(
+                f"❌ stocks 查詢失敗："
+                f"{res_stocks.text[:500]}"
+            )
+
+        if (
+            res_groups.status_code == 200
+            and res_stocks.status_code == 200
+        ):
+            groups_data = res_groups.json()
+            stocks_data = res_stocks.json()
+
+            print(f"📋 Supabase 群組總數：{len(groups_data)}")
+            print(f"📋 Supabase 股票總數：{len(stocks_data)}")
+
+            name_mapping = {
+                "台股-權值精選": "tw_g1",
+                "台股-熱門": "tw_g2",
+                "美股-權值精選": "us_g1",
+                "美股-低本益比": "us_g2",
+                "美股-超級績效": "us_g3",
+                "美股-熱門": "us_g4"
+            }
+
+            group_id_to_key = {}
+
+            for group_item in groups_data:
+                group_name = str(
+                    group_item.get("name", "")
+                ).strip()
+
+                group_id = str(
+                    group_item.get("id", "")
+                ).strip()
+
+                if group_name in name_mapping and group_id:
+                    group_id_to_key[group_id] = (
+                        name_mapping[group_name]
+                    )
+
+                    print(
+                        f"✅ 群組對應成功："
+                        f"{group_name} → "
+                        f"{name_mapping[group_name]} "
+                        f"(ID={group_id})"
+                    )
+
+            matched_user_stock_count = 0
+
+            for stock_item in stocks_data:
+                stock_user_id = str(
+                    stock_item.get("line_user_id", "")
+                ).strip()
+
+                if stock_user_id != target_user_id:
+                    continue
+
+                matched_user_stock_count += 1
+
+                group_id = str(
+                    stock_item.get("group_id", "")
+                ).strip()
+
+                mapped_key = group_id_to_key.get(group_id)
+
+                raw_ticker = str(
+                    stock_item.get("ticker", "")
+                ).strip().upper()
+
+                if not raw_ticker:
+                    print(
+                        f"⚠️ 發現 ticker 為空的資料："
+                        f"{stock_item}"
+                    )
+                    continue
+
+                if not mapped_key:
+                    print(
+                        f"⚠️ 股票找不到對應群組："
+                        f"ticker={raw_ticker}, "
+                        f"group_id={group_id}"
+                    )
+                    continue
+
+                # 美股 Yahoo Finance 使用 BRK-B，而不是 BRK.B
+                if mapped_key.startswith("us_"):
+                    raw_ticker = raw_ticker.replace(".", "-")
+
+                # 台股純數字先保留，下載時會自動嘗試 .TW 與 .TWO
+                ma_list = []
+
+                for ma_key in [
+                    "ma1",
+                    "ma2",
+                    "ma3",
+                    "ma4"
+                ]:
+                    raw_ma = stock_item.get(ma_key)
+
+                    if raw_ma is None:
+                        continue
+
+                    try:
+                        ma_value = int(raw_ma)
+
+                        if ma_value > 0:
+                            ma_list.append(ma_value)
+
+                    except (TypeError, ValueError):
+                        print(
+                            f"⚠️ {raw_ticker} 的 "
+                            f"{ma_key} 格式錯誤：{raw_ma}"
+                        )
+
+                if not ma_list:
+                    ma_list = [20]
+
+                ma_list = sorted(set(ma_list))
+
+                configs[mapped_key][raw_ticker] = ma_list
+
+                print(
+                    f"✅ 載入 Supabase 股票："
+                    f"{mapped_key} / "
+                    f"{raw_ticker} / "
+                    f"MA={ma_list}"
+                )
+
+            print(
+                f"👤 符合目前 LINE_USER_ID 的股票數："
+                f"{matched_user_stock_count}"
+            )
+
+    except Exception as e:
+        print(
+            f"❌ 讀取雲端個股失敗："
+            f"{type(e).__name__}: {e}"
+        )
+
+    try:
+        res_index = requests.get(
+            f"{supabase_url}/index_configs",
+            headers=headers,
+            params={"select": "*"},
+            timeout=15
+        )
+
         if res_index.status_code == 200:
             index_configs = res_index.json()
-            print(f"📡 成功從雲端同步全球大盤自訂均線參數！")
+            print("📡 成功從雲端同步全球大盤自訂均線參數！")
+        else:
+            print(
+                f"⚠️ 讀取大盤設定失敗："
+                f"HTTP {res_index.status_code} "
+                f"{res_index.text[:500]}"
+            )
+
     except Exception as e:
-        print(f"⚠️ 讀取雲端大盤設定失敗: {e}")
-        
-    if not index_configs: # 預設參數防呆機制
+        print(
+            f"⚠️ 讀取雲端大盤設定失敗："
+            f"{type(e).__name__}: {e}"
+        )
+
+    if not index_configs:
         index_configs = [
-            {"ticker": "^TWII", "name": "台灣加權指數", "ma1": 20, "ma2": 27, "ma3": 61, "ma4": None},
-            {"ticker": "^TWOII", "name": "台灣櫃買指數(OTC)", "ma1": 20, "ma2": 60, "ma3": 120, "ma4": None},
-            {"ticker": "^GSPC", "name": "美國標普500", "ma1": 23, "ma2": 60, "ma3": None, "ma4": None},
-            {"ticker": "^DJI", "name": "美國道瓊工業", "ma1": 20, "ma2": 23, "ma3": 55, "ma4": None},
-            {"ticker": "^IXIC", "name": "美國那斯達克", "ma1": 29, "ma2": None, "ma3": None, "ma4": None},
-            {"ticker": "^RUT", "name": "美國羅素2000", "ma1": 21, "ma2": 56, "ma3": None, "ma4": None},
-            {"ticker": "^SOX", "name": "美國費城半導體", "ma1": 20, "ma2": 58, "ma3": 108, "ma4": None}
+            {
+                "ticker": "^TWII",
+                "name": "台灣加權指數",
+                "ma1": 23,
+                "ma2": 29,
+                "ma3": 61,
+                "ma4": None
+            },
+            {
+                "ticker": "^TWOII",
+                "name": "台灣櫃買指數(OTC)",
+                "ma1": 20,
+                "ma2": 60,
+                "ma3": 120,
+                "ma4": None
+            },
+            {
+                "ticker": "^GSPC",
+                "name": "美國標普500",
+                "ma1": 23,
+                "ma2": 60,
+                "ma3": None,
+                "ma4": None
+            },
+            {
+                "ticker": "^DJI",
+                "name": "美國道瓊工業",
+                "ma1": 20,
+                "ma2": 23,
+                "ma3": 55,
+                "ma4": None
+            },
+            {
+                "ticker": "^IXIC",
+                "name": "美國那斯達克",
+                "ma1": 29,
+                "ma2": None,
+                "ma3": None,
+                "ma4": None
+            },
+            {
+                "ticker": "^RUT",
+                "name": "美國羅素2000",
+                "ma1": 21,
+                "ma2": 56,
+                "ma3": None,
+                "ma4": None
+            },
+            {
+                "ticker": "^SOX",
+                "name": "美國費城半導體",
+                "ma1": 20,
+                "ma2": 58,
+                "ma3": 108,
+                "ma4": None
+            }
         ]
-        
+
+    print("\n===== Supabase 自訂群組讀取結果 =====")
+
+    for group_key, stocks in configs.items():
+        print(f"{group_key}: {len(stocks)} 檔")
+
+        for ticker, ma_list in stocks.items():
+            print(f"  └─ {ticker}: {ma_list}")
+
+    print("====================================\n")
+
     return configs, index_configs
 
 def send_line_message(msg, access_token, user_id):
@@ -273,7 +503,7 @@ def scan_market(tickers, min_volume):
             price = float(df_clean['Close'].iloc[-1])
             ma20 = float(df_clean['MA20'].iloc[-1])
             if pd.isna(ma20): continue
-            if ma20 * 0.97 <= price < ma20 * 2:
+            if ma20 * 0.98 <= price < ma20 * 1.01:
                 diff_pct = ((price / ma20) - 1) * 100
                 df_chart = df_clean.tail(60)
                 title_str = f"(現價: {round(price,2)} | 距MA20: {round(diff_pct,2)}%)"
@@ -284,74 +514,500 @@ def scan_market(tickers, min_volume):
     matched_list.sort(key=lambda x: x['volume'], reverse=True)
     return matched_list
 
-# 🛠️ 均線邏輯修正：先算好所有使用者的均線，再切 tail(60) 繪圖
-def process_custom_groups(group_dict):
+# =========================================================================
+# 🛠️ yfinance 自訂群組資料處理工具
+# =========================================================================
+def extract_yfinance_data(downloaded_data, ticker):
+    if downloaded_data is None or downloaded_data.empty:
+        return pd.DataFrame()
+
+    df = downloaded_data.copy()
+
+    if not isinstance(df.columns, pd.MultiIndex):
+        return df
+
+    level_0 = [
+        str(value)
+        for value in df.columns.get_level_values(0)
+    ]
+
+    level_1 = [
+        str(value)
+        for value in df.columns.get_level_values(1)
+    ]
+
+    # 常見格式：(Price, Ticker)
+    if ticker in level_1:
+        return df.xs(
+            ticker,
+            level=1,
+            axis=1
+        ).copy()
+
+    # 另一種格式：(Ticker, Price)
+    if ticker in level_0:
+        return df.xs(
+            ticker,
+            level=0,
+            axis=1
+        ).copy()
+
+    # 單一股票時可能仍是 MultiIndex
+    price_fields = {
+        "Open",
+        "High",
+        "Low",
+        "Close",
+        "Adj Close",
+        "Volume"
+    }
+
+    if price_fields.intersection(set(level_0)):
+        df.columns = df.columns.get_level_values(0)
+        return df
+
+    if price_fields.intersection(set(level_1)):
+        df.columns = df.columns.get_level_values(1)
+        return df
+
+    return pd.DataFrame()
+
+
+def get_ticker_candidates(raw_ticker, group_key):
+    ticker = str(raw_ticker).strip().upper()
+
+    if not ticker:
+        return []
+
+    if group_key.startswith("us_"):
+        return [ticker.replace(".", "-")]
+
+    if group_key.startswith("tw_"):
+        if ticker.endswith(".TW") or ticker.endswith(".TWO"):
+            return [ticker]
+
+        if ticker.isdigit():
+            # 純數字無法確認上市或上櫃時，依序嘗試
+            return [
+                f"{ticker}.TW",
+                f"{ticker}.TWO"
+            ]
+
+    return [ticker]
+
+
+def download_custom_stock(raw_ticker, group_key):
+    candidates = get_ticker_candidates(
+        raw_ticker,
+        group_key
+    )
+
+    for candidate in candidates:
+        try:
+            print(f"⬇️ 嘗試下載：{candidate}")
+
+            downloaded_data = yf.download(
+                candidate,
+                period="2y",
+                progress=False,
+                threads=False,
+                auto_adjust=False
+            )
+
+            df = extract_yfinance_data(
+                downloaded_data,
+                candidate
+            )
+
+            if df.empty:
+                print(f"⚠️ {candidate} 下載結果為空")
+                continue
+
+            required_cols = [
+                "Open",
+                "High",
+                "Low",
+                "Close",
+                "Volume"
+            ]
+
+            missing_cols = [
+                col
+                for col in required_cols
+                if col not in df.columns
+            ]
+
+            if missing_cols:
+                print(
+                    f"⚠️ {candidate} 缺少欄位："
+                    f"{missing_cols}"
+                )
+                continue
+
+            df = df[required_cols].copy()
+
+            for col in required_cols:
+                df[col] = pd.to_numeric(
+                    df[col],
+                    errors="coerce"
+                )
+
+            df = df.dropna(
+                subset=required_cols
+            ).sort_index()
+
+            if df.empty:
+                print(
+                    f"⚠️ {candidate} 清理後沒有可用資料"
+                )
+                continue
+
+            df.index = pd.to_datetime(df.index)
+
+            # 移除時區，避免與 CSV 合併時發生錯誤
+            if getattr(df.index, "tz", None) is not None:
+                df.index = df.index.tz_localize(None)
+
+            print(
+                f"✅ {candidate} 下載成功，"
+                f"共 {len(df)} 筆"
+            )
+
+            return candidate, df
+
+        except Exception as e:
+            print(
+                f"❌ {candidate} 下載失敗："
+                f"{type(e).__name__}: {e}"
+            )
+
+    return None, pd.DataFrame()
+
+# =========================================================================
+# 📊 Supabase 自訂群組股票處理
+# =========================================================================
+def process_custom_groups(
+    group_dict,
+    group_key,
+    test_mode=CUSTOM_GROUP_TEST_MODE
+):
     matched_list = []
-    if not group_dict: return matched_list
-    tickers = list(group_dict.keys())
+
+    if not group_dict:
+        print(f"⚠️ {group_key} 沒有讀到 Supabase 股票")
+        return matched_list
+
     os.makedirs(DATA_DIR, exist_ok=True)
-    
-    try:
-        data = yf.download(tickers, period="5d", progress=False, threads=False)
-        for ticker in tickers:
-            try:
-                if isinstance(data.columns, pd.MultiIndex):
-                    if ticker in data.columns.get_level_values(1):
-                        df_today = data.xs(ticker, level=1, axis=1)
-                    elif ticker in data.columns.get_level_values(0):
-                        df_today = data[ticker]
-                    else: continue
-                else:
-                    df_today = data.copy()
-                
-                required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
-                if not all(col in df_today.columns for col in required_cols): continue
-                df_today_clean = df_today[required_cols].dropna()
-                
-                csv_path = os.path.join(DATA_DIR, f"{ticker}.csv")
-                if os.path.exists(csv_path):
-                    df_local = pd.read_csv(csv_path, index_col=0, parse_dates=True)
-                    df_combined = pd.concat([df_local, df_today_clean])
-                else:
-                    df_init = yf.download(ticker, period="250d", progress=False, threads=False)
-                    if isinstance(df_init.columns, pd.MultiIndex):
-                        df_init = df_init.xs(ticker, level=1, axis=1) if ticker in df_init.columns.get_level_values(1) else df_init[ticker]
-                    df_combined = df_init[required_cols].dropna()
-                    
-                df_combined = df_combined[~df_combined.index.duplicated(keep='last')].sort_index().tail(MAX_DAYS)
-                df_combined.to_csv(csv_path)
-                
-                # 💡 修正點：在計算觸發與裁切之前，先計算出所有 MA
-                ma_list = group_dict[ticker]
-                for ma_window in ma_list: 
-                    df_combined[f'MA{ma_window}'] = df_combined['Close'].rolling(window=ma_window).mean()
-                    
-                price = float(df_combined['Close'].iloc[-1])
-                matched_any_ma = False
-                triggered_info = []
-                
-                for ma_window in ma_list:
-                    ma_col = f'MA{ma_window}'
-                    if ma_col not in df_combined.columns: continue
-                    ma_val = float(df_combined[ma_col].iloc[-1])
-                    if pd.isna(ma_val): continue
-                    
-                    if ma_val * 0.97 <= price < ma_val * 2:
-                        diff_pct = ((price / ma_val) - 1) * 100
-                        triggered_info.append(f"近MA{ma_window}({round(diff_pct,2)}%)")
-                        matched_any_ma = True
-                
-                if not matched_any_ma: continue
-                
-                # 裁切圖表資料，此時 dataframe 已經帶有算好的 MA
-                df_chart = df_combined.tail(60)
-                ma_status_str = " | ".join([f"MA{w}:{round(df_combined[f'MA{w}'].iloc[-1], 2)}" for w in ma_list if f'MA{w}' in df_combined.columns and not pd.isna(df_combined[f'MA{w}'].iloc[-1])])
-                title_str = f"(現價: {round(price,2)} | {'/'.join(triggered_info)} | {ma_status_str})"
-                
-                chart_data = build_stock_data(df_chart, ticker, title_str, ma_list)
-                matched_list.append({'ticker': ticker, 'volume': 0, 'chart_data': chart_data})
-            except Exception: continue
-    except Exception: pass
+
+    print("\n====================================")
+    print(f"📋 開始處理自訂群組：{group_key}")
+    print(f"📋 Supabase 股票數：{len(group_dict)}")
+    print(f"🧪 測試模式：{test_mode}")
+    print("====================================")
+
+    for raw_ticker, ma_list in group_dict.items():
+        try:
+            print(
+                f"\n🔍 開始處理：{raw_ticker}，"
+                f"MA={ma_list}"
+            )
+
+            actual_ticker, df_downloaded = (
+                download_custom_stock(
+                    raw_ticker,
+                    group_key
+                )
+            )
+
+            if not actual_ticker or df_downloaded.empty:
+                print(
+                    f"❌ {raw_ticker} 所有 Yahoo "
+                    f"Finance 代碼皆下載失敗"
+                )
+                continue
+
+            csv_path = os.path.join(
+                DATA_DIR,
+                f"{actual_ticker}.csv"
+            )
+
+            # 合併本機歷史資料
+            if os.path.exists(csv_path):
+                try:
+                    df_local = pd.read_csv(
+                        csv_path,
+                        index_col=0,
+                        parse_dates=True
+                    )
+
+                    required_cols = [
+                        "Open",
+                        "High",
+                        "Low",
+                        "Close",
+                        "Volume"
+                    ]
+
+                    if all(
+                        col in df_local.columns
+                        for col in required_cols
+                    ):
+                        df_local = df_local[
+                            required_cols
+                        ].copy()
+
+                        for col in required_cols:
+                            df_local[col] = pd.to_numeric(
+                                df_local[col],
+                                errors="coerce"
+                            )
+
+                        df_local = df_local.dropna(
+                            subset=required_cols
+                        )
+
+                        if (
+                            getattr(
+                                df_local.index,
+                                "tz",
+                                None
+                            )
+                            is not None
+                        ):
+                            df_local.index = (
+                                df_local.index.tz_localize(
+                                    None
+                                )
+                            )
+
+                        df_combined = pd.concat([
+                            df_local,
+                            df_downloaded
+                        ])
+                    else:
+                        print(
+                            f"⚠️ {actual_ticker} 本機 CSV "
+                            f"欄位不完整，改用下載資料"
+                        )
+                        df_combined = df_downloaded.copy()
+
+                except Exception as e:
+                    print(
+                        f"⚠️ {actual_ticker} 讀取本機 "
+                        f"CSV 失敗，改用下載資料：{e}"
+                    )
+                    df_combined = df_downloaded.copy()
+            else:
+                df_combined = df_downloaded.copy()
+
+            df_combined = (
+                df_combined[
+                    ~df_combined.index.duplicated(
+                        keep="last"
+                    )
+                ]
+                .sort_index()
+            )
+
+            if df_combined.empty:
+                print(
+                    f"❌ {actual_ticker} 合併後無資料"
+                )
+                continue
+
+            ma_list = sorted({
+                int(ma)
+                for ma in ma_list
+                if int(ma) > 0
+            })
+
+            if not ma_list:
+                ma_list = [20]
+
+            # 保留足夠計算最大均線的歷史資料
+            max_ma_window = max(ma_list)
+
+            keep_days = max(
+                MAX_DAYS,
+                max_ma_window + 60
+            )
+
+            df_combined = df_combined.tail(
+                keep_days
+            ).copy()
+
+            # 儲存原始 OHLCV，不將 MA 寫入 CSV
+            df_combined[
+                [
+                    "Open",
+                    "High",
+                    "Low",
+                    "Close",
+                    "Volume"
+                ]
+            ].to_csv(csv_path)
+
+            # 先計算所有均線
+            for ma_window in ma_list:
+                df_combined[f"MA{ma_window}"] = (
+                    df_combined["Close"]
+                    .rolling(
+                        window=ma_window,
+                        min_periods=ma_window
+                    )
+                    .mean()
+                )
+
+            price = float(
+                df_combined["Close"].iloc[-1]
+            )
+
+            latest_volume = float(
+                df_combined["Volume"].iloc[-1]
+            )
+
+            triggered_info = []
+            available_ma_count = 0
+            matched_any_ma = False
+
+            for ma_window in ma_list:
+                ma_col = f"MA{ma_window}"
+
+                if ma_col not in df_combined.columns:
+                    continue
+
+                ma_value = df_combined[
+                    ma_col
+                ].iloc[-1]
+
+                if pd.isna(ma_value):
+                    print(
+                        f"⚠️ {actual_ticker} 的 "
+                        f"MA{ma_window} 資料不足："
+                        f"目前 {len(df_combined)} 筆"
+                    )
+                    continue
+
+                available_ma_count += 1
+                ma_value = float(ma_value)
+
+                diff_pct = (
+                    (price / ma_value) - 1
+                ) * 100
+
+                if test_mode:
+                    # 測試模式不套用均線距離條件
+                    matched_any_ma = True
+
+                    triggered_info.append(
+                        f"MA{ma_window}差距"
+                        f"({diff_pct:.2f}%)"
+                    )
+
+                elif (
+                    ma_value * CUSTOM_MA_MIN_RATIO
+                    <= price
+                    <= ma_value * CUSTOM_MA_MAX_RATIO
+                ):
+                    matched_any_ma = True
+
+                    triggered_info.append(
+                        f"近MA{ma_window}"
+                        f"({diff_pct:.2f}%)"
+                    )
+
+            # 測試模式下，即使均線資料不足，
+            # 只要 K 線可下載，仍然顯示圖表
+            if test_mode and available_ma_count == 0:
+                matched_any_ma = True
+                triggered_info.append(
+                    "測試模式：均線資料不足，但K線正常"
+                )
+
+            if not matched_any_ma:
+                print(
+                    f"⏭️ {actual_ticker} 未符合均線條件"
+                )
+                continue
+
+            df_chart = df_combined.tail(60).copy()
+
+            ma_status_list = []
+
+            for ma_window in ma_list:
+                ma_col = f"MA{ma_window}"
+
+                if ma_col not in df_combined.columns:
+                    continue
+
+                latest_ma = df_combined[
+                    ma_col
+                ].iloc[-1]
+
+                if not pd.isna(latest_ma):
+                    ma_status_list.append(
+                        f"MA{ma_window}:"
+                        f"{float(latest_ma):.2f}"
+                    )
+
+            if test_mode:
+                mode_text = "Supabase測試模式"
+            else:
+                mode_text = "均線潛伏"
+
+            info_text = (
+                " / ".join(triggered_info)
+                if triggered_info
+                else "無可用均線"
+            )
+
+            ma_status_text = (
+                " | ".join(ma_status_list)
+                if ma_status_list
+                else "均線資料不足"
+            )
+
+            title_str = (
+                f"({mode_text} | "
+                f"現價:{price:.2f} | "
+                f"{info_text} | "
+                f"{ma_status_text})"
+            )
+
+            chart_data = build_stock_data(
+                df_chart,
+                actual_ticker,
+                title_str,
+                ma_list
+            )
+
+            matched_list.append({
+                "ticker": actual_ticker,
+                "volume": int(latest_volume),
+                "chart_data": chart_data
+            })
+
+            print(
+                f"✅ {actual_ticker} 已成功加入圖表"
+            )
+
+        except Exception as e:
+            print(
+                f"❌ {group_key} / {raw_ticker} "
+                f"處理失敗："
+                f"{type(e).__name__}: {e}"
+            )
+
+    matched_list.sort(
+        key=lambda item: item["volume"],
+        reverse=True
+    )
+
+    print(
+        f"\n📊 {group_key} 最後產生 "
+        f"{len(matched_list)} 張圖表"
+    )
+
     return matched_list
 
 def generate_html(data_dict, date_str):
@@ -385,7 +1041,13 @@ def generate_html(data_dict, date_str):
         html_template += f'<div id="{key}-market" class="market-section{active_class}">'
         if data_dict[key]:
             for idx in range(len(data_dict[key])): html_template += f'<div class="chart-card"><div id="chart-{key}-{idx}" class="plotly-container"></div></div>'
-        else: html_template += '<div class="no-data">此分類目前無股票符合群組自訂均線潛伏條件</div>'
+		else:
+    		html_template += (
+        		'<div class="no-data">'
+        		'此分類目前沒有可顯示的股票，'
+        		'請查看 GitHub Actions 執行紀錄確認 Supabase 與 yfinance 狀態'
+        		'</div>'
+    		)
         html_template += '</div>'
         
     html_template += f"""<script>{js_store} function renderMarketCharts(marketId) {{ const items = chartDataStore[marketId]; if (!items) return; items.forEach((item, idx) => {{ const elementId = "chart-" + marketId + "-" + idx; const container = document.getElementById(elementId); if (container && !container.dataset.done) {{ Plotly.newPlot(container, item.chart_data.data, item.chart_data.layout, {{responsive: true, displayModeBar: false}}); container.dataset.done = "true"; }} }}); }} function switchMarket(event, marketId) {{ document.querySelectorAll('.market-section').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); document.getElementById(marketId + '-market').classList.add('active'); if(event) {{ event.currentTarget.classList.add('active'); }} else {{ document.getElementById('btn-' + marketId).classList.add('active'); }} renderMarketCharts(marketId); window.dispatchEvent(new Event('resize')); }} window.addEventListener("load", function() {{ renderMarketCharts('tw_all'); }});</script></body></html>"""
@@ -494,15 +1156,56 @@ def main():
     us_all = scan_market(get_us_tickers(), min_volume=US_MIN_VOLUME)
 
     data_dict = {
-        'tw_all': tw_all, 
-        'tw_g1': process_custom_groups(user_configs["tw_g1"]), 
-        'tw_g2': process_custom_groups(user_configs["tw_g2"]),
-        'us_all': us_all,
-        'us_g1': process_custom_groups(user_configs["us_g1"]), 
-        'us_g2': process_custom_groups(user_configs["us_g2"]),
-        'us_g3': process_custom_groups(user_configs["us_g3"]), 
-        'us_g4': process_custom_groups(user_configs["us_g4"])
+        "tw_all": tw_all,
+
+        "tw_g1": process_custom_groups(
+            user_configs["tw_g1"],
+            "tw_g1",
+            test_mode=CUSTOM_GROUP_TEST_MODE
+        ),
+
+        "tw_g2": process_custom_groups(
+            user_configs["tw_g2"],
+            "tw_g2",
+            test_mode=CUSTOM_GROUP_TEST_MODE
+        ),
+
+        "us_all": us_all,
+
+        "us_g1": process_custom_groups(
+            user_configs["us_g1"],
+            "us_g1",
+            test_mode=CUSTOM_GROUP_TEST_MODE
+        ),
+
+        "us_g2": process_custom_groups(
+            user_configs["us_g2"],
+            "us_g2",
+            test_mode=CUSTOM_GROUP_TEST_MODE
+        ),
+
+        "us_g3": process_custom_groups(
+            user_configs["us_g3"],
+            "us_g3",
+            test_mode=CUSTOM_GROUP_TEST_MODE
+        ),
+
+        "us_g4": process_custom_groups(
+            user_configs["us_g4"],
+            "us_g4",
+            test_mode=CUSTOM_GROUP_TEST_MODE
+        )
     }
+
+    print("\n===== 最終圖表數量 =====")
+
+    for group_key, items in data_dict.items():
+        print(f"{group_key}: {len(items)} 檔")
+
+        for item in items:
+            print(f"  └─ {item['ticker']}")
+
+    print("========================\n")
     
     # 產生 index.html
     generate_html(data_dict, today_str)
