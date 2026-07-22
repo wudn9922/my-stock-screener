@@ -205,7 +205,7 @@ def clean_ohlcv_dataframe(df):
             errors="coerce"
         )
 
-    # 指數成交量有時會是 NaN，價格不可為 NaN，成交量改為 0
+    # 指數成交量有時會是 NaN
     result = result.dropna(
         subset=[
             "Open",
@@ -913,9 +913,7 @@ def build_stock_data(
     display_ticker = str(ticker)
 
     if display_name:
-        display_ticker = (
-            f"{ticker}　{display_name}"
-        )
+        display_ticker = f"{ticker}　{display_name}"
 
     date_strings = [
         str(date)[:10]
@@ -946,6 +944,35 @@ def build_stock_data(
         float(value)
         for value in df_chart["Volume"].tolist()
     ]
+
+    # 點擊後用來固定顯示完整 OHLCV
+    ohlcv_records = []
+
+    for (
+        date_value,
+        open_value,
+        high_value,
+        low_value,
+        close_value,
+        volume_value
+    ) in zip(
+        date_strings,
+        open_values,
+        high_values,
+        low_values,
+        close_values,
+        volume_values
+    ):
+        ohlcv_records.append(
+            {
+                "date": date_value,
+                "open": open_value,
+                "high": high_value,
+                "low": low_value,
+                "close": close_value,
+                "volume": volume_value
+            }
+        )
 
     traces = [
         {
@@ -1102,12 +1129,18 @@ def build_stock_data(
             ),
             "color": "#d1d4dc"
         },
+
+        # category 會依實際交易日離散排列，
+        # 完全移除週末及休市日空格
         "xaxis": {
-            "type": "date",
+            "type": "category",
+            "categoryorder": "array",
+            "categoryarray": date_strings,
             "anchor": "y2" if show_volume else "y",
             "rangeslider": {
                 "visible": False
             },
+            "fixedrange": False,
             "showgrid": True,
             "gridcolor": "rgba(255,255,255,0.055)",
             "gridwidth": 1,
@@ -1117,20 +1150,13 @@ def build_stock_data(
                 "size": 10,
                 "color": "#8b949e"
             },
-            "hoverformat": "%Y-%m-%d",
+            "tickangle": 0,
+            "nticks": 12,
             "spikemode": "across",
             "spikesnap": "cursor",
             "showspikes": True,
             "spikecolor": "#64748b",
-            "spikethickness": 1,
-            "rangebreaks": [
-                {
-                    "bounds": [
-                        "sat",
-                        "mon"
-                    ]
-                }
-            ]
+            "spikethickness": 1
         },
         "yaxis": {
             "domain": price_domain,
@@ -1230,7 +1256,8 @@ def build_stock_data(
 
     return {
         "data": traces,
-        "layout": layout
+        "layout": layout,
+        "ohlcv": ohlcv_records
     }
 
 
@@ -2183,11 +2210,125 @@ body {
     transform: translateY(-2px);
 }
 
+.chart-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 48px;
+    padding: 8px 10px;
+    background: #111827;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px 10px 0 0;
+    box-sizing: border-box;
+}
+
+.zoom-buttons {
+    display: flex;
+    flex-shrink: 0;
+    gap: 6px;
+}
+
+.chart-tool-btn {
+    padding: 7px 11px;
+    color: #e2e8f0;
+    background: #1e293b;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition:
+        color 0.2s ease,
+        background 0.2s ease,
+        border-color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.chart-tool-btn:hover {
+    color: #ffffff;
+    background: #334155;
+    border-color: #38bdf8;
+    transform: translateY(-1px);
+}
+
+.chart-tool-btn:active {
+    transform: translateY(0);
+}
+
+.chart-tool-btn.reset-btn {
+    color: #ddd6fe;
+    border-color: rgba(168, 85, 247, 0.38);
+}
+
+.ohlcv-fixed-panel {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px 12px;
+    min-width: 0;
+    color: #cbd5e1;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.ohlcv-placeholder {
+    color: #64748b;
+}
+
+.ohlcv-date {
+    color: #f8fafc;
+    font-weight: 700;
+}
+
+.ohlcv-open {
+    color: #fbbf24;
+}
+
+.ohlcv-high {
+    color: #fb7185;
+}
+
+.ohlcv-low {
+    color: #2dd4bf;
+}
+
+.ohlcv-close {
+    color: #60a5fa;
+}
+
+.ohlcv-volume {
+    color: #c084fc;
+}
+
+.ohlcv-change {
+    color: #94a3b8;
+}
+
+.ohlcv-up {
+    color: #ef5350;
+    font-weight: 700;
+}
+
+.ohlcv-down {
+    color: #26a69a;
+    font-weight: 700;
+}
+
+.ohlcv-flat {
+    color: #cbd5e1;
+    font-weight: 700;
+}
+
 .plotly-container {
     width: 100%;
     height: 520px;
     background: #131722;
-    border-radius: 12px;
+    border-radius: 0 0 12px 12px;
+    touch-action: none;
 }
 
 .no-data {
@@ -2242,6 +2383,30 @@ body {
         flex: 1 1 auto;
         padding: 9px 8px;
         font-size: 12px;
+    }
+
+    .chart-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
+    }
+
+    .zoom-buttons {
+        width: 100%;
+    }
+
+    .chart-tool-btn {
+        flex: 1;
+        padding: 8px 5px;
+        font-size: 11px;
+    }
+
+    .ohlcv-fixed-panel {
+        justify-content: flex-start;
+        min-height: 42px;
+        padding: 2px 4px;
+        font-size: 11px;
     }
 
     .plotly-container {
@@ -2419,10 +2584,54 @@ body {
 
         if items:
             for index in range(len(items)):
+                chart_id = f"chart-{key}-{index}"
+                info_id = f"info-{key}-{index}"
+
                 html += (
                     '<div class="chart-card">'
-                    f'<div id="chart-{key}-{index}" '
+
+                    '<div class="chart-toolbar">'
+
+                    '<div class="zoom-buttons">'
+
+                    '<button '
+                    'type="button" '
+                    'class="chart-tool-btn" '
+                    f'onclick="zoomChart(\'{chart_id}\', 0.7)">'
+                    '＋ 放大'
+                    '</button>'
+
+                    '<button '
+                    'type="button" '
+                    'class="chart-tool-btn" '
+                    f'onclick="zoomChart(\'{chart_id}\', 1.4)">'
+                    '－ 縮小'
+                    '</button>'
+
+                    '<button '
+                    'type="button" '
+                    'class="chart-tool-btn reset-btn" '
+                    f'onclick="resetChart(\'{chart_id}\')">'
+                    '↺ 重設'
+                    '</button>'
+
+                    '</div>'
+
+                    f'<div id="{info_id}" '
+                    'class="ohlcv-fixed-panel">'
+
+                    '<span class="ohlcv-placeholder">'
+                    '點擊 K 線後固定顯示日期與 OHLCV'
+                    '</span>'
+
+                    '</div>'
+                    '</div>'
+
+                    f'<div id="{chart_id}" '
+                    f'data-market-id="{key}" '
+                    f'data-chart-index="{index}" '
                     'class="plotly-container"></div>'
+
                     '</div>'
                 )
         else:
@@ -2444,6 +2653,538 @@ body {
 <script>
 const chartDataStore = __CHART_JSON__;
 
+
+/*
+ * 價格格式化
+ */
+function formatPrice(value) {
+    const numberValue = Number(value);
+
+    if (!Number.isFinite(numberValue)) {
+        return "--";
+    }
+
+    return numberValue.toLocaleString(
+        "zh-TW",
+        {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }
+    );
+}
+
+
+/*
+ * 成交量格式化
+ */
+function formatVolume(value) {
+    const numberValue = Number(value);
+
+    if (!Number.isFinite(numberValue)) {
+        return "--";
+    }
+
+    return Math.round(numberValue).toLocaleString(
+        "zh-TW"
+    );
+}
+
+
+/*
+ * 取得指定圖表的原始資料
+ */
+function getChartItem(container) {
+    if (!container) {
+        return null;
+    }
+
+    const marketId = container.dataset.marketId;
+    const chartIndex = Number(
+        container.dataset.chartIndex
+    );
+
+    if (
+        !marketId
+        || !Number.isInteger(chartIndex)
+        || !Array.isArray(chartDataStore[marketId])
+    ) {
+        return null;
+    }
+
+    return chartDataStore[marketId][chartIndex] || null;
+}
+
+
+/*
+ * 將 category 座標範圍轉為交易日索引
+ */
+function categoryRangeToIndex(
+    rangeValue,
+    dateList,
+    fallbackValue
+) {
+    if (
+        typeof rangeValue === "number"
+        && Number.isFinite(rangeValue)
+    ) {
+        return rangeValue;
+    }
+
+    if (typeof rangeValue === "string") {
+        const normalizedDate = rangeValue.substring(0, 10);
+        const foundIndex = dateList.indexOf(normalizedDate);
+
+        if (foundIndex >= 0) {
+            return foundIndex;
+        }
+    }
+
+    return fallbackValue;
+}
+
+
+/*
+ * 自訂放大縮小
+ * factor < 1：放大
+ * factor > 1：縮小
+ */
+function zoomChart(chartId, factor) {
+    const container = document.getElementById(
+        chartId
+    );
+
+    if (
+        !container
+        || container.dataset.done !== "true"
+        || typeof Plotly === "undefined"
+    ) {
+        return;
+    }
+
+    const item = getChartItem(container);
+
+    if (
+        !item
+        || !item.chart_data
+        || !Array.isArray(item.chart_data.ohlcv)
+    ) {
+        return;
+    }
+
+    const dateList = item.chart_data.ohlcv.map(
+        (record) => record.date
+    );
+
+    const totalPoints = dateList.length;
+
+    if (totalPoints <= 1) {
+        return;
+    }
+
+    const xaxisLayout = (
+        container.layout
+        && container.layout.xaxis
+    )
+        ? container.layout.xaxis
+        : {};
+
+    const currentRange = Array.isArray(
+        xaxisLayout.range
+    )
+        ? xaxisLayout.range
+        : [
+            -0.5,
+            totalPoints - 0.5
+        ];
+
+    let rangeStart = categoryRangeToIndex(
+        currentRange[0],
+        dateList,
+        -0.5
+    );
+
+    let rangeEnd = categoryRangeToIndex(
+        currentRange[1],
+        dateList,
+        totalPoints - 0.5
+    );
+
+    if (rangeEnd < rangeStart) {
+        const temporaryValue = rangeStart;
+        rangeStart = rangeEnd;
+        rangeEnd = temporaryValue;
+    }
+
+    const currentWidth = Math.max(
+        1,
+        rangeEnd - rangeStart
+    );
+
+    const minimumWidth = Math.min(
+        8,
+        Math.max(1, totalPoints - 1)
+    );
+
+    const maximumWidth = totalPoints;
+
+    let nextWidth = (
+        currentWidth
+        * Number(factor)
+    );
+
+    nextWidth = Math.max(
+        minimumWidth,
+        Math.min(
+            maximumWidth,
+            nextWidth
+        )
+    );
+
+    const center = (
+        rangeStart + rangeEnd
+    ) / 2;
+
+    let nextStart = center - nextWidth / 2;
+    let nextEnd = center + nextWidth / 2;
+
+    const minimumRange = -0.5;
+    const maximumRange = totalPoints - 0.5;
+
+    if (nextStart < minimumRange) {
+        nextEnd += minimumRange - nextStart;
+        nextStart = minimumRange;
+    }
+
+    if (nextEnd > maximumRange) {
+        nextStart -= nextEnd - maximumRange;
+        nextEnd = maximumRange;
+    }
+
+    nextStart = Math.max(
+        minimumRange,
+        nextStart
+    );
+
+    nextEnd = Math.min(
+        maximumRange,
+        nextEnd
+    );
+
+    Plotly.relayout(
+        container,
+        {
+            "xaxis.autorange": false,
+            "xaxis.range": [
+                nextStart,
+                nextEnd
+            ]
+        }
+    );
+}
+
+
+/*
+ * 重設縮放與座標範圍
+ * 固定 OHLCV 資訊不會因重設而消失
+ */
+function resetChart(chartId) {
+    const container = document.getElementById(
+        chartId
+    );
+
+    if (
+        !container
+        || container.dataset.done !== "true"
+        || typeof Plotly === "undefined"
+    ) {
+        return;
+    }
+
+    const update = {
+        "xaxis.autorange": true,
+        "yaxis.autorange": true
+    };
+
+    if (
+        container.layout
+        && container.layout.yaxis2
+    ) {
+        update["yaxis2.autorange"] = true;
+    }
+
+    Plotly.relayout(
+        container,
+        update
+    );
+}
+
+
+/*
+ * 依日期找出 OHLCV
+ */
+function findOhlcvRecord(item, clickedDate) {
+    if (
+        !item
+        || !item.chart_data
+        || !Array.isArray(item.chart_data.ohlcv)
+    ) {
+        return null;
+    }
+
+    const normalizedDate = String(
+        clickedDate || ""
+    ).substring(0, 10);
+
+    return (
+        item.chart_data.ohlcv.find(
+            (row) => row.date === normalizedDate
+        )
+        || null
+    );
+}
+
+
+/*
+ * 在圖表內固定顯示選取日期垂直線與收盤標記
+ */
+function markSelectedDate(container, record) {
+    if (
+        !container
+        || !record
+        || typeof Plotly === "undefined"
+    ) {
+        return;
+    }
+
+    const originalShapes = Array.isArray(
+        container._baseShapes
+    )
+        ? container._baseShapes
+        : [];
+
+    const selectedShape = {
+        type: "line",
+        xref: "x",
+        yref: "paper",
+        x0: record.date,
+        x1: record.date,
+        y0: 0,
+        y1: 1,
+        line: {
+            color: "#facc15",
+            width: 1.5,
+            dash: "dot"
+        }
+    };
+
+    const selectedAnnotation = {
+        xref: "x",
+        yref: "paper",
+        x: record.date,
+        y: 1,
+        text: (
+            record.date
+            + "<br>收 "
+            + formatPrice(record.close)
+        ),
+        showarrow: true,
+        arrowhead: 2,
+        arrowsize: 1,
+        arrowwidth: 1,
+        arrowcolor: "#facc15",
+        ax: 0,
+        ay: -38,
+        bgcolor: "rgba(17,24,39,0.95)",
+        bordercolor: "#facc15",
+        borderwidth: 1,
+        borderpad: 4,
+        font: {
+            color: "#f8fafc",
+            size: 10
+        }
+    };
+
+    Plotly.relayout(
+        container,
+        {
+            shapes: [
+                ...originalShapes,
+                selectedShape
+            ],
+            annotations: [
+                selectedAnnotation
+            ]
+        }
+    );
+}
+
+
+/*
+ * 點擊後固定顯示日期與 OHLCV
+ */
+function showFixedOhlcv(
+    container,
+    clickedDate
+) {
+    const item = getChartItem(container);
+    const record = findOhlcvRecord(
+        item,
+        clickedDate
+    );
+
+    if (!record) {
+        return;
+    }
+
+    const marketId = container.dataset.marketId;
+    const chartIndex = container.dataset.chartIndex;
+
+    const infoPanel = document.getElementById(
+        "info-"
+        + marketId
+        + "-"
+        + chartIndex
+    );
+
+    if (!infoPanel) {
+        return;
+    }
+
+    const openValue = Number(record.open);
+    const closeValue = Number(record.close);
+
+    let directionClass = "ohlcv-flat";
+    let directionText = "平盤";
+    let changeText = "--";
+
+    if (
+        Number.isFinite(openValue)
+        && Number.isFinite(closeValue)
+    ) {
+        const changeValue = closeValue - openValue;
+
+        if (closeValue > openValue) {
+            directionClass = "ohlcv-up";
+            directionText = "上漲";
+        } else if (closeValue < openValue) {
+            directionClass = "ohlcv-down";
+            directionText = "下跌";
+        }
+
+        if (openValue !== 0) {
+            const changePercent = (
+                changeValue / openValue
+            ) * 100;
+
+            changeText = (
+                (changeValue >= 0 ? "+" : "")
+                + formatPrice(changeValue)
+                + " / "
+                + (changePercent >= 0 ? "+" : "")
+                + changePercent.toFixed(2)
+                + "%"
+            );
+        }
+    }
+
+    infoPanel.innerHTML = (
+        '<span class="ohlcv-date">'
+        + record.date
+        + '</span>'
+
+        + '<span class="'
+        + directionClass
+        + '">'
+        + directionText
+        + '</span>'
+
+        + '<span class="ohlcv-open">'
+        + '開 '
+        + formatPrice(record.open)
+        + '</span>'
+
+        + '<span class="ohlcv-high">'
+        + '高 '
+        + formatPrice(record.high)
+        + '</span>'
+
+        + '<span class="ohlcv-low">'
+        + '低 '
+        + formatPrice(record.low)
+        + '</span>'
+
+        + '<span class="ohlcv-close">'
+        + '收 '
+        + formatPrice(record.close)
+        + '</span>'
+
+        + '<span class="ohlcv-volume">'
+        + '量 '
+        + formatVolume(record.volume)
+        + '</span>'
+
+        + '<span class="ohlcv-change">'
+        + 'K棒 '
+        + changeText
+        + '</span>'
+    );
+
+    container.dataset.selectedDate = record.date;
+
+    markSelectedDate(
+        container,
+        record
+    );
+}
+
+
+/*
+ * 綁定點擊事件
+ * 點擊 K 線、均線或成交量都能取得該交易日 OHLCV
+ */
+function bindChartClickEvent(container) {
+    if (
+        !container
+        || container.dataset.clickBound === "true"
+    ) {
+        return;
+    }
+
+    container.on(
+        "plotly_click",
+        (eventData) => {
+            if (
+                !eventData
+                || !Array.isArray(eventData.points)
+                || eventData.points.length === 0
+            ) {
+                return;
+            }
+
+            const clickedPoint = eventData.points[0];
+
+            if (
+                !clickedPoint
+                || clickedPoint.x === undefined
+                || clickedPoint.x === null
+            ) {
+                return;
+            }
+
+            showFixedOhlcv(
+                container,
+                clickedPoint.x
+            );
+        }
+    );
+
+    container.dataset.clickBound = "true";
+}
+
+
+/*
+ * 繪製指定分類圖表
+ */
 function renderMarketCharts(marketId) {
     const items = chartDataStore[marketId];
 
@@ -2480,7 +3221,10 @@ function renderMarketCharts(marketId) {
 
         const container = document.getElementById(id);
 
-        if (!container || container.dataset.done) {
+        if (
+            !container
+            || container.dataset.done === "true"
+        ) {
             return;
         }
 
@@ -2505,8 +3249,19 @@ function renderMarketCharts(marketId) {
             return;
         }
 
+        container.dataset.marketId = marketId;
+        container.dataset.chartIndex = String(index);
+
         const originalLayout = (
             item.chart_data.layout || {}
+        );
+
+        const categoryDates = (
+            Array.isArray(item.chart_data.ohlcv)
+                ? item.chart_data.ohlcv.map(
+                    (record) => record.date
+                )
+                : []
         );
 
         const layout = {
@@ -2519,8 +3274,30 @@ function renderMarketCharts(marketId) {
             },
             legend: {
                 ...(originalLayout.legend || {})
-            }
+            },
+            xaxis: {
+                ...(originalLayout.xaxis || {}),
+                type: "category",
+                categoryorder: "array",
+                categoryarray: categoryDates,
+                rangeslider: {
+                    visible: false
+                },
+                fixedrange: false
+            },
+            yaxis: {
+                ...(originalLayout.yaxis || {}),
+                fixedrange: false
+            },
+            dragmode: "pan"
         };
+
+        if (originalLayout.yaxis2) {
+            layout.yaxis2 = {
+                ...originalLayout.yaxis2,
+                fixedrange: false
+            };
+        }
 
         const hasVolume = Boolean(
             originalLayout.yaxis2
@@ -2567,10 +3344,30 @@ function renderMarketCharts(marketId) {
 
         const config = {
             responsive: true,
-            displayModeBar: false,
+
+            /*
+             * 顯示 Plotly 工具列：
+             * 框選縮放、平移、放大、縮小、重設
+             */
+            displayModeBar: true,
+            displaylogo: false,
+
+            /*
+             * 滑鼠滾輪及手機雙指縮放
+             */
             scrollZoom: true,
+
             doubleClick: "reset",
-            showTips: false
+            showTips: false,
+
+            modeBarButtonsToRemove: [
+                "select2d",
+                "lasso2d",
+                "toggleSpikelines",
+                "hoverClosestCartesian",
+                "hoverCompareCartesian",
+                "toImage"
+            ]
         };
 
         Plotly.newPlot(
@@ -2581,6 +3378,21 @@ function renderMarketCharts(marketId) {
         )
         .then(() => {
             container.dataset.done = "true";
+
+            /*
+             * 保留原始分隔線，之後選取日期時不會被刪除
+             */
+            container._baseShapes = Array.isArray(
+                originalLayout.shapes
+            )
+                ? originalLayout.shapes.map(
+                    (shape) => ({
+                        ...shape
+                    })
+                )
+                : [];
+
+            bindChartClickEvent(container);
 
             requestAnimationFrame(() => {
                 Plotly.Plots.resize(container);
@@ -2603,6 +3415,10 @@ function renderMarketCharts(marketId) {
     });
 }
 
+
+/*
+ * 重新調整目前分類圖表大小
+ */
 function resizeMarketCharts(marketId) {
     const items = chartDataStore[marketId];
 
@@ -2622,7 +3438,7 @@ function resizeMarketCharts(marketId) {
 
         if (
             container
-            && container.dataset.done
+            && container.dataset.done === "true"
             && typeof Plotly !== "undefined"
         ) {
             Plotly.Plots.resize(container);
@@ -2630,6 +3446,10 @@ function resizeMarketCharts(marketId) {
     });
 }
 
+
+/*
+ * 切換市場分類
+ */
 function switchMarket(event, marketId) {
     document
         .querySelectorAll(".market-section")
@@ -2670,9 +3490,11 @@ function switchMarket(event, marketId) {
     }, 150);
 }
 
+
 window.addEventListener("load", () => {
     renderMarketCharts("tw_all");
 });
+
 
 window.addEventListener("resize", () => {
     const activeSection = document.querySelector(
@@ -3028,7 +3850,7 @@ def push_report_to_github():
             "-m",
             (
                 "⚙️ 量化報告自動更新 "
-                "(新增全球指數與台股中文名稱)"
+                "(新增互動縮放與固定OHLCV)"
             )
         ]
     )
