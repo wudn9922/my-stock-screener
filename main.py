@@ -28,6 +28,20 @@ DATA_DIR = "data"
 DOCS_DIR = "docs"
 MAX_DAYS = 201
 
+# 台股中文名稱快取
+TW_STOCK_NAMES = {
+    "2330.TW": "台積電",
+    "2330": "台積電",
+    "2317.TW": "鴻海",
+    "2317": "鴻海",
+    "2454.TW": "聯發科",
+    "2454": "聯發科",
+    "2603.TW": "長榮",
+    "2603": "長榮",
+    "0050.TW": "元大台灣50",
+    "0050": "元大台灣50"
+}
+
 # True：Supabase 自訂群組只要可下載就顯示
 # False：套用均線距離條件
 CUSTOM_GROUP_TEST_MODE = (
@@ -37,7 +51,6 @@ CUSTOM_GROUP_TEST_MODE = (
     in {"1", "true", "yes", "on"}
 )
 
-# 正式模式的均線距離
 CUSTOM_MA_MIN_RATIO = 0.97
 CUSTOM_MA_MAX_RATIO = 1.01
 
@@ -71,10 +84,43 @@ def clean_json_value(value):
         if pd.isna(value):
             return None
 
-        if value in (float("inf"), float("-inf")):
+        if value in (
+            float("inf"),
+            float("-inf")
+        ):
             return None
 
     return value
+
+
+def register_tw_stock_name(ticker, name):
+    ticker = str(ticker or "").strip().upper()
+    name = str(name or "").strip()
+
+    if not ticker or not name:
+        return
+
+    TW_STOCK_NAMES[ticker] = name
+
+    stock_code = ticker.split(".")[0]
+
+    if stock_code:
+        TW_STOCK_NAMES[stock_code] = name
+
+
+def get_tw_stock_name(ticker):
+    ticker = str(ticker or "").strip().upper()
+
+    if not ticker:
+        return ""
+
+    stock_code = ticker.split(".")[0]
+
+    return (
+        TW_STOCK_NAMES.get(ticker)
+        or TW_STOCK_NAMES.get(stock_code)
+        or ""
+    )
 
 
 def extract_yfinance_data(downloaded_data, ticker=None):
@@ -159,8 +205,20 @@ def clean_ohlcv_dataframe(df):
             errors="coerce"
         )
 
+    # 指數成交量有時會是 NaN，價格不可為 NaN，成交量改為 0
     result = result.dropna(
-        subset=required_cols
+        subset=[
+            "Open",
+            "High",
+            "Low",
+            "Close"
+        ]
+    )
+
+    result["Volume"] = (
+        result["Volume"]
+        .fillna(0)
+        .clip(lower=0)
     )
 
     if result.empty:
@@ -224,7 +282,9 @@ def get_default_index_configs():
             "ma1": 23,
             "ma2": 29,
             "ma3": 61,
-            "ma4": None
+            "ma4": None,
+            "enabled": True,
+            "sort_order": 1
         },
         {
             "ticker": "^TWOII",
@@ -232,7 +292,9 @@ def get_default_index_configs():
             "ma1": 20,
             "ma2": 60,
             "ma3": 120,
-            "ma4": None
+            "ma4": None,
+            "enabled": True,
+            "sort_order": 2
         },
         {
             "ticker": "^GSPC",
@@ -240,7 +302,9 @@ def get_default_index_configs():
             "ma1": 23,
             "ma2": 60,
             "ma3": None,
-            "ma4": None
+            "ma4": None,
+            "enabled": True,
+            "sort_order": 3
         },
         {
             "ticker": "^DJI",
@@ -248,7 +312,9 @@ def get_default_index_configs():
             "ma1": 20,
             "ma2": 23,
             "ma3": 55,
-            "ma4": None
+            "ma4": None,
+            "enabled": True,
+            "sort_order": 4
         },
         {
             "ticker": "^IXIC",
@@ -256,7 +322,9 @@ def get_default_index_configs():
             "ma1": 29,
             "ma2": None,
             "ma3": None,
-            "ma4": None
+            "ma4": None,
+            "enabled": True,
+            "sort_order": 5
         },
         {
             "ticker": "^RUT",
@@ -264,7 +332,9 @@ def get_default_index_configs():
             "ma1": 21,
             "ma2": 56,
             "ma3": None,
-            "ma4": None
+            "ma4": None,
+            "enabled": True,
+            "sort_order": 6
         },
         {
             "ticker": "^SOX",
@@ -272,7 +342,9 @@ def get_default_index_configs():
             "ma1": 20,
             "ma2": 58,
             "ma3": 108,
-            "ma4": None
+            "ma4": None,
+            "enabled": True,
+            "sort_order": 7
         }
     ]
 
@@ -356,14 +428,8 @@ def load_configs_from_supabase(target_user_id):
                 f"{stocks_response.text[:500]}"
             )
 
-        print(
-            f"📋 Supabase 群組總數："
-            f"{len(groups_data)}"
-        )
-        print(
-            f"📋 Supabase 股票總數："
-            f"{len(stocks_data)}"
-        )
+        print(f"📋 Supabase 群組總數：{len(groups_data)}")
+        print(f"📋 Supabase 股票總數：{len(stocks_data)}")
 
         group_id_to_key = {}
 
@@ -402,19 +468,25 @@ def load_configs_from_supabase(target_user_id):
                 stock_item.get("ticker", "")
             ).strip().upper()
 
+            stock_name = str(
+                stock_item.get("name")
+                or stock_item.get("stock_name")
+                or stock_item.get("company_name")
+                or stock_item.get("chinese_name")
+                or stock_item.get("tw_name")
+                or ""
+            ).strip()
+
             if not ticker:
                 print("⚠️ 發現 ticker 為空的資料")
                 continue
 
             if group_id == "admin_index":
-                print(
-                    f"ℹ️ 略過 admin_index：{ticker}"
-                )
+                print(f"ℹ️ 略過 admin_index：{ticker}")
                 continue
 
             mapped_key = group_id_to_key.get(group_id)
 
-            # 支援 group_id 直接保存 tw_g1、us_g1
             if not mapped_key and group_id in configs:
                 mapped_key = group_id
 
@@ -428,6 +500,12 @@ def load_configs_from_supabase(target_user_id):
 
             if mapped_key.startswith("us_"):
                 ticker = ticker.replace(".", "-")
+
+            if mapped_key.startswith("tw_") and stock_name:
+                register_tw_stock_name(
+                    ticker,
+                    stock_name
+                )
 
             ma_list = []
 
@@ -491,9 +569,7 @@ def load_configs_from_supabase(target_user_id):
 
         if index_response.status_code == 200:
             index_configs = index_response.json()
-            print(
-                "📡 成功從雲端同步全球大盤自訂均線參數"
-            )
+            print("📡 成功從雲端同步全球大盤自訂均線參數")
         else:
             print(
                 f"⚠️ index_configs 查詢失敗："
@@ -510,9 +586,7 @@ def load_configs_from_supabase(target_user_id):
     if not index_configs:
         index_configs = default_index_configs
 
-    print(
-        "\n===== Supabase 自訂群組讀取結果 ====="
-    )
+    print("\n===== Supabase 自訂群組讀取結果 =====")
 
     for group_key, stocks in configs.items():
         print(f"{group_key}: {len(stocks)} 檔")
@@ -520,9 +594,7 @@ def load_configs_from_supabase(target_user_id):
         for ticker, ma_list in stocks.items():
             print(f"  └─ {ticker}: {ma_list}")
 
-    print(
-        "====================================\n"
-    )
+    print("====================================\n")
 
     return configs, index_configs
 
@@ -547,10 +619,7 @@ def send_line_message(message, access_token, user_id):
         return None
 
     if len(message) > 5000:
-        message = (
-            message[:4980]
-            + "\n...(訊息已截斷)"
-        )
+        message = message[:4980] + "\n...(訊息已截斷)"
 
     url = "https://api.line.me/v2/bot/message/push"
 
@@ -577,10 +646,7 @@ def send_line_message(message, access_token, user_id):
             timeout=20
         )
 
-        print(
-            f"📨 LINE 推播狀態："
-            f"{response.status_code}"
-        )
+        print(f"📨 LINE 推播狀態：{response.status_code}")
 
         if response.status_code >= 400:
             request_id = response.headers.get(
@@ -592,9 +658,7 @@ def send_line_message(message, access_token, user_id):
                 f"⚠️ LINE 推播失敗："
                 f"{response.text[:500]}"
             )
-            print(
-                f"LINE Request ID：{request_id}"
-            )
+            print(f"LINE Request ID：{request_id}")
         else:
             print("✅ LINE 推播成功")
 
@@ -642,6 +706,12 @@ def get_tw_tickers(min_volume):
                 else df_twse.columns[0]
             )
 
+            name_col = (
+                "證券名稱"
+                if "證券名稱" in df_twse.columns
+                else None
+            )
+
             volume_col = (
                 "成交股數"
                 if "成交股數" in df_twse.columns
@@ -650,9 +720,7 @@ def get_tw_tickers(min_volume):
 
             for _, row in df_twse.iterrows():
                 try:
-                    code = str(
-                        row[code_col]
-                    ).strip()
+                    code = str(row[code_col]).strip()
 
                     if (
                         len(code) != 4
@@ -661,17 +729,23 @@ def get_tw_tickers(min_volume):
                     ):
                         continue
 
+                    ticker = f"{code}.TW"
+
+                    if name_col:
+                        register_tw_stock_name(
+                            ticker,
+                            row.get(name_col, "")
+                        )
+
                     if volume_col:
                         volume = float(
-                            str(
-                                row[volume_col]
-                            ).replace(",", "")
+                            str(row[volume_col]).replace(",", "")
                         )
 
                         if volume < min_volume:
                             continue
 
-                    tickers.append(f"{code}.TW")
+                    tickers.append(ticker)
 
                 except Exception:
                     continue
@@ -722,6 +796,27 @@ def get_tw_tickers(min_volume):
                 ):
                     continue
 
+                ticker = f"{code}.TWO"
+                company_name = ""
+
+                for name_key in [
+                    "CompanyName",
+                    "SecuritiesCompanyName",
+                    "SecuritiesName",
+                    "公司名稱",
+                    "證券名稱"
+                ]:
+                    if item.get(name_key):
+                        company_name = str(
+                            item.get(name_key)
+                        ).strip()
+                        break
+
+                register_tw_stock_name(
+                    ticker,
+                    company_name
+                )
+
                 volume = 0
 
                 for key in [
@@ -741,7 +836,7 @@ def get_tw_tickers(min_volume):
                         continue
 
                 if volume >= min_volume:
-                    tickers.append(f"{code}.TWO")
+                    tickers.append(ticker)
 
             break
 
@@ -808,8 +903,20 @@ def build_stock_data(
     ticker,
     title_suffix,
     ma_list,
-    show_volume=False
+    show_volume=False,
+    display_name=None
 ):
+    display_name = str(
+        display_name or ""
+    ).strip()
+
+    display_ticker = str(ticker)
+
+    if display_name:
+        display_ticker = (
+            f"{ticker}　{display_name}"
+        )
+
     date_strings = [
         str(date)[:10]
         for date in df_chart.index
@@ -843,7 +950,7 @@ def build_stock_data(
     traces = [
         {
             "type": "candlestick",
-            "name": ticker,
+            "name": display_ticker,
             "x": date_strings,
             "open": open_values,
             "high": high_values,
@@ -921,7 +1028,6 @@ def build_stock_data(
             }
         )
 
-    # 自訂群組才加入成交量
     if show_volume:
         volume_colors = []
 
@@ -973,7 +1079,7 @@ def build_stock_data(
     layout = {
         "title": {
             "text": (
-                f"<b>{ticker}</b>"
+                f"<b>{display_ticker}</b>"
                 f"<br><span style='font-size:12px;"
                 f"color:#9ca3af'>{title_suffix}</span>"
             ),
@@ -1127,6 +1233,7 @@ def build_stock_data(
         "layout": layout
     }
 
+
 # =========================================================================
 # 全市場掃描
 # =========================================================================
@@ -1167,14 +1274,8 @@ def scan_market(tickers, min_volume):
         else:
             need_init.append(ticker)
 
-    for start in range(
-        0,
-        len(need_init),
-        chunk_size
-    ):
-        chunk = need_init[
-            start:start + chunk_size
-        ]
+    for start in range(0, len(need_init), chunk_size):
+        chunk = need_init[start:start + chunk_size]
 
         downloaded = download_market_data(
             chunk,
@@ -1208,14 +1309,8 @@ def scan_market(tickers, min_volume):
                     f"⚠️ {ticker} 初始化失敗：{exc}"
                 )
 
-    for start in range(
-        0,
-        len(need_update),
-        chunk_size
-    ):
-        chunk = need_update[
-            start:start + chunk_size
-        ]
+    for start in range(0, len(need_update), chunk_size):
+        chunk = need_update[start:start + chunk_size]
 
         downloaded = download_market_data(
             chunk,
@@ -1322,7 +1417,6 @@ def scan_market(tickers, min_volume):
 
             ma20 = float(ma20)
 
-            # 保留目前全市場放大條件
             if not (
                 ma20 * 0.98
                 <= price
@@ -1339,16 +1433,32 @@ def scan_market(tickers, min_volume):
                 f"距MA20:{diff_pct:.2f}%)"
             )
 
+            is_tw_stock = (
+                ticker.endswith(".TW")
+                or ticker.endswith(".TWO")
+            )
+
             chart_data = build_stock_data(
                 df.tail(60),
                 ticker,
                 title,
-                [20]
+                [20],
+                show_volume=True,
+                display_name=(
+                    get_tw_stock_name(ticker)
+                    if is_tw_stock
+                    else ""
+                )
             )
 
             matched_list.append(
                 {
                     "ticker": ticker,
+                    "name": (
+                        get_tw_stock_name(ticker)
+                        if is_tw_stock
+                        else ""
+                    ),
                     "volume": int(latest_volume),
                     "chart_data": chart_data
                 }
@@ -1425,9 +1535,7 @@ def download_custom_stock(raw_ticker, group_key):
             df = clean_ohlcv_dataframe(df)
 
             if df.empty:
-                print(
-                    f"⚠️ {candidate} 下載結果為空"
-                )
+                print(f"⚠️ {candidate} 下載結果為空")
                 continue
 
             print(
@@ -1650,17 +1758,26 @@ def process_custom_groups(
                 f"{' | '.join(ma_status_list)})"
             )
 
+            display_name = ""
+
+            if group_key.startswith("tw_"):
+                display_name = get_tw_stock_name(
+                    actual_ticker
+                )
+
             chart_data = build_stock_data(
                 combined.tail(60),
                 actual_ticker,
                 title,
                 ma_list,
-                show_volume=True
+                show_volume=True,
+                display_name=display_name
             )
 
             matched_list.append(
                 {
                     "ticker": actual_ticker,
+                    "name": display_name,
                     "volume": int(latest_volume),
                     "chart_data": chart_data
                 }
@@ -1692,6 +1809,215 @@ def process_custom_groups(
 
 
 # =========================================================================
+# 大盤參數與指數圖表
+# =========================================================================
+def get_ma_list_from_item(item):
+    ma_list = []
+
+    for ma_key in [
+        "ma1",
+        "ma2",
+        "ma3",
+        "ma4"
+    ]:
+        ma_value = safe_int(
+            item.get(ma_key)
+        )
+
+        if ma_value is not None and ma_value > 0:
+            ma_list.append(ma_value)
+
+    return sorted(set(ma_list)) or [20]
+
+
+def is_config_enabled(item):
+    enabled_value = item.get(
+        "enabled",
+        True
+    )
+
+    if isinstance(enabled_value, str):
+        return (
+            enabled_value.strip().lower()
+            not in {
+                "0",
+                "false",
+                "no",
+                "off"
+            }
+        )
+
+    return bool(enabled_value)
+
+
+def process_index_charts(index_configs):
+    matched_list = []
+
+    if not index_configs:
+        print("⚠️ 沒有可用的大盤指數設定")
+        return matched_list
+
+    sorted_configs = sorted(
+        index_configs,
+        key=lambda item: safe_int(
+            item.get("sort_order"),
+            9999
+        )
+    )
+
+    processed_tickers = set()
+
+    for item in sorted_configs:
+        ticker = str(
+            item.get("ticker", "")
+        ).strip().upper()
+
+        name = str(
+            item.get("name")
+            or ticker
+        ).strip()
+
+        if not ticker:
+            continue
+
+        if ticker in processed_tickers:
+            print(f"⚠️ 略過重複指數：{ticker}")
+            continue
+
+        if not is_config_enabled(item):
+            print(f"⏭️ 指數已停用：{ticker}")
+            continue
+
+        processed_tickers.add(ticker)
+
+        ma_list = get_ma_list_from_item(item)
+
+        try:
+            print(
+                f"📉 開始建立指數圖表："
+                f"{ticker} / {name} / "
+                f"MA={ma_list}"
+            )
+
+            downloaded = yf.download(
+                ticker,
+                period="4y",
+                progress=False,
+                threads=False,
+                auto_adjust=False,
+                group_by="column"
+            )
+
+            df = extract_yfinance_data(
+                downloaded,
+                ticker
+            )
+
+            df = clean_ohlcv_dataframe(df)
+
+            if df.empty:
+                print(
+                    f"⚠️ 指數下載結果為空："
+                    f"{ticker}"
+                )
+                continue
+
+            for ma_window in ma_list:
+                df[f"MA{ma_window}"] = (
+                    df["Close"]
+                    .rolling(
+                        window=ma_window,
+                        min_periods=ma_window
+                    )
+                    .mean()
+                )
+
+            latest_close = float(
+                df["Close"].iloc[-1]
+            )
+
+            latest_volume = float(
+                df["Volume"].iloc[-1]
+            )
+
+            ma_status = []
+
+            for ma_window in ma_list:
+                ma_col = f"MA{ma_window}"
+                ma_value = df[ma_col].iloc[-1]
+
+                if pd.isna(ma_value):
+                    continue
+
+                ma_value = float(ma_value)
+
+                diff_pct = (
+                    (latest_close / ma_value) - 1
+                ) * 100
+
+                ma_status.append(
+                    f"MA{ma_window}:"
+                    f"{ma_value:.2f}"
+                    f"({diff_pct:+.2f}%)"
+                )
+
+            title_parts = [
+                "Supabase 指數參數",
+                f"收盤:{latest_close:,.2f}",
+                f"成交量:{latest_volume:,.0f}"
+            ]
+
+            if ma_status:
+                title_parts.append(
+                    " | ".join(ma_status)
+                )
+
+            title = (
+                "("
+                + " | ".join(title_parts)
+                + ")"
+            )
+
+            chart_data = build_stock_data(
+                df.tail(90),
+                ticker,
+                title,
+                ma_list,
+                show_volume=True,
+                display_name=name
+            )
+
+            matched_list.append(
+                {
+                    "ticker": ticker,
+                    "name": name,
+                    "volume": int(latest_volume),
+                    "ma_list": ma_list,
+                    "chart_data": chart_data
+                }
+            )
+
+            print(
+                f"✅ 指數圖表建立完成："
+                f"{ticker} {name}"
+            )
+
+        except Exception as exc:
+            print(
+                f"❌ 指數圖表建立失敗："
+                f"{ticker} / "
+                f"{type(exc).__name__}: {exc}"
+            )
+
+    print(
+        f"📊 全球指數圖表數量："
+        f"{len(matched_list)}"
+    )
+
+    return matched_list
+
+
+# =========================================================================
 # HTML 產生
 # =========================================================================
 def generate_html(data_dict, date_str):
@@ -1701,9 +2027,8 @@ def generate_html(data_dict, date_str):
         clean_data,
         ensure_ascii=False,
         allow_nan=False
-    )
+    ).replace("</script>", "<\\/script>")
 
-    # 這一段不使用 f-string，避免 CSS 大括號衝突
     html = """<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -1817,6 +2142,16 @@ body {
         rgba(37, 99, 235, 0.3);
 }
 
+.index-btn.active {
+    background:
+        linear-gradient(
+            135deg,
+            #7c3aed,
+            #a855f7
+        );
+    border-color: #c084fc;
+}
+
 .market-section {
     display: none;
     max-width: 1100px;
@@ -1850,7 +2185,7 @@ body {
 
 .plotly-container {
     width: 100%;
-    height: 440px;
+    height: 520px;
     background: #131722;
     border-radius: 12px;
 }
@@ -1910,7 +2245,7 @@ body {
     }
 
     .plotly-container {
-        min-height: 390px;
+        min-height: 470px;
         height: auto;
     }
 
@@ -1948,8 +2283,27 @@ body {
 </div>
 """
 
-    # 這一段需要插入分類數量，因此使用 f-string
     html += f"""
+<div
+    class="category-box"
+    style="border-left-color:#a855f7;"
+>
+    <div class="category-title">
+        🌍 全球指數區塊
+    </div>
+
+    <div class="tabs">
+        <button
+            id="btn-indices"
+            class="tab-btn index-btn"
+            onclick="switchMarket(event, 'indices')"
+        >
+            全球指數圖表
+            ({len(data_dict.get("indices", []))})
+        </button>
+    </div>
+</div>
+
 <div
     class="category-box"
     style="border-left-color:#ff5252;"
@@ -2038,6 +2392,7 @@ body {
 """
 
     keys = [
+        "indices",
         "tw_all",
         "tw_g1",
         "tw_g2",
@@ -2071,46 +2426,51 @@ body {
                     '</div>'
                 )
         else:
+            no_data_text = (
+                "此分類目前沒有可顯示的指數"
+                if key == "indices"
+                else "此分類目前沒有可顯示的股票"
+            )
+
             html += (
                 '<div class="no-data">'
-                '此分類目前沒有可顯示的股票'
-                '</div>'
+                f"{no_data_text}"
+                "</div>"
             )
 
         html += "</div>"
 
-    # JavaScript 使用 f-string，所以 JS 大括號必須寫成 {{ 與 }}
-    html += f"""
+    html += """
 <script>
-const chartDataStore = {chart_json};
+const chartDataStore = __CHART_JSON__;
 
-function renderMarketCharts(marketId) {{
+function renderMarketCharts(marketId) {
     const items = chartDataStore[marketId];
 
-    if (!items || !Array.isArray(items)) {{
+    if (!items || !Array.isArray(items)) {
         return;
-    }}
+    }
 
-    if (typeof Plotly === "undefined") {{
+    if (typeof Plotly === "undefined") {
         console.error("Plotly 載入失敗");
 
         const section = document.getElementById(
             marketId + "-market"
         );
 
-        if (section) {{
+        if (section) {
             section.innerHTML = (
                 '<div class="plotly-error">'
                 + 'Plotly 圖表套件載入失敗，'
                 + '請重新整理頁面或檢查網路連線。'
                 + '</div>'
             );
-        }}
+        }
 
         return;
-    }}
+    }
 
-    items.forEach((item, index) => {{
+    items.forEach((item, index) => {
         const id = (
             "chart-"
             + marketId
@@ -2120,15 +2480,15 @@ function renderMarketCharts(marketId) {{
 
         const container = document.getElementById(id);
 
-        if (!container || container.dataset.done) {{
+        if (!container || container.dataset.done) {
             return;
-        }}
+        }
 
         if (
             !item
             || !item.chart_data
             || !Array.isArray(item.chart_data.data)
-        ) {{
+        ) {
             console.error(
                 "圖表資料格式錯誤：",
                 marketId,
@@ -2143,75 +2503,75 @@ function renderMarketCharts(marketId) {{
             );
 
             return;
-        }}
+        }
 
         const originalLayout = (
-            item.chart_data.layout || {{}}
+            item.chart_data.layout || {}
         );
 
-        const layout = {{
+        const layout = {
             ...originalLayout,
-            margin: {{
-                ...(originalLayout.margin || {{}})
-            }},
-            title: {{
-                ...(originalLayout.title || {{}})
-            }},
-            legend: {{
-                ...(originalLayout.legend || {{}})
-            }}
-        }};
+            margin: {
+                ...(originalLayout.margin || {})
+            },
+            title: {
+                ...(originalLayout.title || {})
+            },
+            legend: {
+                ...(originalLayout.legend || {})
+            }
+        };
 
         const hasVolume = Boolean(
             originalLayout.yaxis2
         );
 
-        if (window.innerWidth <= 600) {{
+        if (window.innerWidth <= 600) {
             layout.height = hasVolume ? 470 : 390;
 
-            layout.margin = {{
+            layout.margin = {
                 ...layout.margin,
                 l: 8,
                 r: 52,
-                t: 105,
+                t: 112,
                 b: 34
-            }};
+            };
 
-            layout.title = {{
+            layout.title = {
                 ...layout.title,
-                font: {{
+                font: {
                     ...(
                         layout.title.font
-                        || {{}}
+                        || {}
                     ),
                     size: 15
-                }}
-            }};
+                }
+            };
 
-            layout.legend = {{
+            layout.legend = {
                 ...layout.legend,
-                font: {{
+                font: {
                     ...(
                         layout.legend.font
-                        || {{}}
+                        || {}
                     ),
                     size: 10
-                }}
-            }};
-        }} else {{
+                }
+            };
+        } else {
             layout.height = (
                 originalLayout.height
                 || (hasVolume ? 520 : 440)
             );
-        }}
+        }
 
-        const config = {{
+        const config = {
             responsive: true,
             displayModeBar: false,
             scrollZoom: true,
             doubleClick: "reset",
             showTips: false
-        }};
+        };
 
         Plotly.newPlot(
             container,
@@ -2219,14 +2579,14 @@ function renderMarketCharts(marketId) {{
             layout,
             config
         )
-        .then(() => {{
+        .then(() => {
             container.dataset.done = "true";
 
-            requestAnimationFrame(() => {{
+            requestAnimationFrame(() => {
                 Plotly.Plots.resize(container);
-            }});
-        }})
-        .catch((error) => {{
+            });
+        })
+        .catch((error) => {
             console.error(
                 "圖表繪製失敗：",
                 marketId,
@@ -2239,18 +2599,18 @@ function renderMarketCharts(marketId) {{
                 + '圖表繪製失敗'
                 + '</div>'
             );
-        }});
-    }});
-}}
+        });
+    });
+}
 
-function resizeMarketCharts(marketId) {{
+function resizeMarketCharts(marketId) {
     const items = chartDataStore[marketId];
 
-    if (!items || !Array.isArray(items)) {{
+    if (!items || !Array.isArray(items)) {
         return;
-    }}
+    }
 
-    items.forEach((item, index) => {{
+    items.forEach((item, index) => {
         const id = (
             "chart-"
             + marketId
@@ -2264,64 +2624,64 @@ function resizeMarketCharts(marketId) {{
             container
             && container.dataset.done
             && typeof Plotly !== "undefined"
-        ) {{
+        ) {
             Plotly.Plots.resize(container);
-        }}
-    }});
-}}
+        }
+    });
+}
 
-function switchMarket(event, marketId) {{
+function switchMarket(event, marketId) {
     document
         .querySelectorAll(".market-section")
-        .forEach((element) => {{
+        .forEach((element) => {
             element.classList.remove("active");
-        }});
+        });
 
     document
         .querySelectorAll(".tab-btn")
-        .forEach((element) => {{
+        .forEach((element) => {
             element.classList.remove("active");
-        }});
+        });
 
     const section = document.getElementById(
         marketId + "-market"
     );
 
-    if (section) {{
+    if (section) {
         section.classList.add("active");
-    }}
+    }
 
-    if (event && event.currentTarget) {{
+    if (event && event.currentTarget) {
         event.currentTarget.classList.add("active");
-    }} else {{
+    } else {
         const button = document.getElementById(
             "btn-" + marketId
         );
 
-        if (button) {{
+        if (button) {
             button.classList.add("active");
-        }}
-    }}
+        }
+    }
 
     renderMarketCharts(marketId);
 
-    setTimeout(() => {{
+    setTimeout(() => {
         resizeMarketCharts(marketId);
-    }}, 150);
-}}
+    }, 150);
+}
 
-window.addEventListener("load", () => {{
+window.addEventListener("load", () => {
     renderMarketCharts("tw_all");
-}});
+});
 
-window.addEventListener("resize", () => {{
+window.addEventListener("resize", () => {
     const activeSection = document.querySelector(
         ".market-section.active"
     );
 
-    if (!activeSection) {{
+    if (!activeSection) {
         return;
-    }}
+    }
 
     const marketId = activeSection.id.replace(
         "-market",
@@ -2329,11 +2689,16 @@ window.addEventListener("resize", () => {{
     );
 
     resizeMarketCharts(marketId);
-}});
+});
 </script>
 </body>
 </html>
 """
+
+    html = html.replace(
+        "__CHART_JSON__",
+        chart_json
+    )
 
     os.makedirs(
         DOCS_DIR,
@@ -2353,12 +2718,10 @@ window.addEventListener("resize", () => {{
         file.write(html)
 
     print(f"✅ HTML 已產生：{path}")
-    
-    
+
 
 # =========================================================================
 # 大盤多空趨勢分析
-# 保留原本的均線糾纏、三年高點、波峰波谷與大小趨勢判斷
 # =========================================================================
 def analyze_index_trend(ticker, name, ma_list):
     if not ma_list:
@@ -2409,10 +2772,6 @@ def analyze_index_trend(ticker, name, ma_list):
         total_ma_count = len(available_mas)
         df_last5 = df.tail(5)
 
-        # -------------------------------------------------------------
-        # 原本的均線糾纏自適應判斷
-        # 最近五天至少三天 K 棒碰到均線，該均線計為中性
-        # -------------------------------------------------------------
         for ma_col in available_mas:
             touch_count = 0
 
@@ -2446,9 +2805,6 @@ def analyze_index_trend(ticker, name, ma_list):
         else:
             score_label = "偏空"
 
-        # -------------------------------------------------------------
-        # 原本的三年高點與大小趨勢判斷
-        # -------------------------------------------------------------
         df_3y = df.tail(252 * 3)
 
         idx_3y_high = df_3y["High"].idxmax()
@@ -2458,9 +2814,6 @@ def analyze_index_trend(ticker, name, ma_list):
             latest_date - idx_3y_high
         ).days / 30.0
 
-        # -------------------------------------------------------------
-        # 原本的近 120 日波峰／波谷判斷
-        # -------------------------------------------------------------
         df_recent = df.tail(120).copy()
 
         peaks = []
@@ -2522,15 +2875,9 @@ def analyze_index_trend(ticker, name, ma_list):
 
         if len(troughs) >= 2:
             for index in range(1, len(troughs)):
-                if (
-                    troughs[index][1]
-                    < troughs[index - 1][1]
-                ):
+                if troughs[index][1] < troughs[index - 1][1]:
                     lower_trough_count += 1
 
-        # -------------------------------------------------------------
-        # 原本的大趨勢判斷
-        # -------------------------------------------------------------
         macro_trend = "多頭趨勢"
 
         if months_since_high >= 4.0:
@@ -2548,9 +2895,6 @@ def analyze_index_trend(ticker, name, ma_list):
                 if float(latest["Close"]) < bear_low:
                     macro_trend = "空頭趨勢"
 
-        # -------------------------------------------------------------
-        # 原本的小走勢判斷
-        # -------------------------------------------------------------
         micro_trend = "多頭走勢"
 
         if (
@@ -2604,25 +2948,6 @@ def analyze_index_trend(ticker, name, ma_list):
         )
 
         return f"⚪ {name}: 分析發生異常"
-
-
-def get_ma_list_from_item(item):
-    ma_list = []
-
-    for ma_key in [
-        "ma1",
-        "ma2",
-        "ma3",
-        "ma4"
-    ]:
-        ma_value = safe_int(
-            item.get(ma_key)
-        )
-
-        if ma_value is not None and ma_value > 0:
-            ma_list.append(ma_value)
-
-    return sorted(set(ma_list)) or [20]
 
 
 # =========================================================================
@@ -2703,7 +3028,7 @@ def push_report_to_github():
             "-m",
             (
                 "⚙️ 量化報告自動更新 "
-                "(完整功能保留版)"
+                "(新增全球指數與台股中文名稱)"
             )
         ]
     )
@@ -2733,28 +3058,21 @@ def main():
         "LINE_ACCESS_TOKEN"
     )
 
-    # Messaging API 推播專用 User ID
     line_push_user_id = os.environ.get(
         "LINE_USER_ID"
     )
 
-    # Supabase 股票名單查詢專用 ID
-    # 若未設定才使用 LINE_USER_ID
     supabase_user_id = (
         os.environ.get("SUPABASE_USER_ID")
         or line_push_user_id
     )
 
     if not line_push_user_id:
-        print(
-            "❌ 未設定 LINE_USER_ID"
-        )
+        print("❌ 未設定 LINE_USER_ID")
         return
 
     if not supabase_user_id:
-        print(
-            "❌ 未設定 SUPABASE_USER_ID"
-        )
+        print("❌ 未設定 SUPABASE_USER_ID")
         return
 
     today = datetime.now()
@@ -2781,7 +3099,14 @@ def main():
         min_volume=US_MIN_VOLUME
     )
 
+    print("🌍 開始建立全球指數圖表")
+
+    index_charts = process_index_charts(
+        db_index_configs
+    )
+
     data_dict = {
+        "indices": index_charts,
         "tw_all": tw_all,
         "tw_g1": process_custom_groups(
             user_configs["tw_g1"],
@@ -2845,6 +3170,9 @@ def main():
 
     line_message_stocks = (
         f"🎯 {today_str} 專屬量化看盤網頁！\n\n"
+        f"🌍 【全球指數區塊】\n"
+        f" └ 指數圖表："
+        f"{len(data_dict['indices'])} 張\n\n"
         f"🇹🇼 【台灣股市區塊】\n"
         f" ├ 1. 全市場符合："
         f"{len(data_dict['tw_all'])} 檔\n"
@@ -2877,9 +3205,6 @@ def main():
         line_push_user_id
     )
 
-    # -----------------------------------------------------------------
-    # 原本的大盤分類與趨勢推播
-    # -----------------------------------------------------------------
     tw_indices = [
         "^TWII",
         "^TWOII"
@@ -2908,6 +3233,7 @@ def main():
         str(item.get("ticker", "")).strip(): item
         for item in db_index_configs
         if item.get("ticker")
+        and is_config_enabled(item)
     }
 
     index_lines = [
@@ -2993,9 +3319,6 @@ def main():
         line_push_user_id
     )
 
-    # -----------------------------------------------------------------
-    # 原本每週一限定推播
-    # -----------------------------------------------------------------
     if weekday == 0:
         sectors_url = (
             "https://finviz.com/"
