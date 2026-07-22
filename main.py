@@ -151,37 +151,43 @@ def load_configs_from_supabase(target_user_id):
 
                 matched_user_stock_count += 1
 
+
                 group_id = str(
                     stock_item.get("group_id", "")
                 ).strip()
 
-                mapped_key = group_id_to_key.get(group_id)
+                 raw_ticker = str(
+                     stock_item.get("ticker", "")
+                 ).strip().upper()
 
-                if not mapped_key and group_id in valid_group_keys:
-                    mapped_key = group_id
+                 if not raw_ticker:
+                     print("⚠️ 發現 ticker 為空的資料")
+                     continue
 
-                raw_ticker = str(
-                    stock_item.get("ticker", "")
-                ).strip().upper()
+                 # 大盤資料不放入自訂個股群組
+                 if group_id == "admin_index":
+                     print(f"ℹ️ 略過大盤設定：{raw_ticker}")
+                     continue
 
-                if not raw_ticker:
-                    print(
-                        f"⚠️ 發現 ticker 為空的資料："
-                        f"{stock_item}"
-                    )
-                    continue
+                 # group_id 若為資料表關聯 ID，使用 groups 對照
+                 mapped_key = group_id_to_key.get(group_id)
 
-                if not mapped_key:
-                    print(
-                        f"⚠️ 股票找不到對應群組："
-                        f"ticker={raw_ticker}, "
-                        f"group_id={group_id}"
-                    )
-                    continue
+                 # group_id 若直接儲存 tw_g1、us_g1 等代碼
+                 if not mapped_key and group_id in configs:
+                     mapped_key = group_id
 
-                # 美股 Yahoo Finance 使用 BRK-B，而不是 BRK.B
-                if mapped_key.startswith("us_"):
-                    raw_ticker = raw_ticker.replace(".", "-")
+                 if not mapped_key:
+                     print(
+                         f"⚠️ 股票找不到對應群組："
+                         f"ticker={raw_ticker}, "
+                         f"group_id={group_id}"
+                     )
+                     continue
+
+                 if mapped_key.startswith("us_"):
+                     raw_ticker = raw_ticker.replace(".", "-")
+
+
 
                 # 台股純數字先保留，下載時會自動嘗試 .TW 與 .TWO
                 ma_list = []
