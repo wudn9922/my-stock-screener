@@ -817,7 +817,7 @@ def build_stock_data(
     traces = [
         {
             "type": "candlestick",
-            "name": "K線",
+            "name": ticker,
             "x": date_strings,
             "open": [
                 float(value)
@@ -837,24 +837,35 @@ def build_stock_data(
             ],
             "increasing": {
                 "line": {
-                    "color": "#ef5350"
-                }
+                    "color": "#ef5350",
+                    "width": 1
+                },
+                "fillcolor": "#ef5350"
             },
             "decreasing": {
                 "line": {
-                    "color": "#26a69a"
+                    "color": "#26a69a",
+                    "width": 1
+                },
+                "fillcolor": "#26a69a"
+            },
+            "hoverlabel": {
+                "bgcolor": "#1e222d",
+                "bordercolor": "#3b4252",
+                "font": {
+                    "color": "#ffffff"
                 }
             }
         }
     ]
 
     colors = [
-        "#FF9800",
-        "#2196F3",
-        "#4CAF50",
-        "#E91E63",
-        "#9C27B0",
-        "#00BCD4"
+        "#ffb74d",
+        "#42a5f5",
+        "#66bb6a",
+        "#ec407a",
+        "#ab47bc",
+        "#26c6da"
     ]
 
     for index, ma_window in enumerate(ma_list):
@@ -863,13 +874,18 @@ def build_stock_data(
         if ma_col not in df_chart.columns:
             continue
 
-        values = [
+        ma_values = [
             None if pd.isna(value) else float(value)
             for value in df_chart[ma_col].tolist()
         ]
 
-        if not any(value is not None for value in values):
+        if not any(
+            value is not None
+            for value in ma_values
+        ):
             continue
+
+        color = colors[index % len(colors)]
 
         traces.append(
             {
@@ -877,35 +893,123 @@ def build_stock_data(
                 "mode": "lines",
                 "name": ma_col,
                 "x": date_strings,
-                "y": values,
+                "y": ma_values,
                 "line": {
-                    "color": colors[
-                        index % len(colors)
-                    ],
-                    "width": 2
-                }
+                    "color": color,
+                    "width": 1.8
+                },
+                "hovertemplate": (
+                    f"{ma_col}: %{{y:.2f}}"
+                    "<extra></extra>"
+                )
             }
         )
 
     layout = {
-        "title": f"{ticker} {title_suffix}",
+        "title": {
+            "text": (
+                f"<b>{ticker}</b>"
+                f"<br><span style='font-size:12px;"
+                f"color:#9ca3af'>{title_suffix}</span>"
+            ),
+            "x": 0.02,
+            "xanchor": "left",
+            "y": 0.97,
+            "yanchor": "top",
+            "font": {
+                "size": 18,
+                "color": "#f8fafc"
+            }
+        },
+        "paper_bgcolor": "#131722",
+        "plot_bgcolor": "#131722",
+        "font": {
+            "family": (
+                "Arial, "
+                "'Noto Sans TC', "
+                "sans-serif"
+            ),
+            "color": "#d1d4dc"
+        },
         "xaxis": {
             "type": "date",
             "rangeslider": {
                 "visible": False
-            }
+            },
+            "showgrid": True,
+            "gridcolor": "rgba(255,255,255,0.055)",
+            "gridwidth": 1,
+            "showline": False,
+            "zeroline": False,
+            "tickfont": {
+                "size": 10,
+                "color": "#8b949e"
+            },
+            "hoverformat": "%Y-%m-%d",
+            "spikemode": "across",
+            "spikesnap": "cursor",
+            "showspikes": True,
+            "spikecolor": "#64748b",
+            "spikethickness": 1,
+            "rangebreaks": [
+                {
+                    "bounds": [
+                        "sat",
+                        "mon"
+                    ]
+                }
+            ]
         },
         "yaxis": {
-            "fixedrange": False
+            "side": "right",
+            "fixedrange": False,
+            "showgrid": True,
+            "gridcolor": "rgba(255,255,255,0.055)",
+            "gridwidth": 1,
+            "showline": False,
+            "zeroline": False,
+            "tickfont": {
+                "size": 10,
+                "color": "#8b949e"
+            },
+            "tickformat": ",.2f",
+            "automargin": True,
+            "spikemode": "across",
+            "spikesnap": "cursor",
+            "showspikes": True,
+            "spikecolor": "#64748b",
+            "spikethickness": 1
         },
-        "template": "plotly_dark",
+        "legend": {
+            "orientation": "h",
+            "x": 0.01,
+            "y": 1.02,
+            "xanchor": "left",
+            "yanchor": "bottom",
+            "font": {
+                "size": 11,
+                "color": "#cbd5e1"
+            },
+            "bgcolor": "rgba(0,0,0,0)"
+        },
+        "hovermode": "x unified",
+        "hoverlabel": {
+            "bgcolor": "#1e222d",
+            "bordercolor": "#374151",
+            "font": {
+                "color": "#ffffff",
+                "size": 12
+            }
+        },
         "margin": {
-            "l": 40,
-            "r": 20,
-            "t": 60,
-            "b": 40
+            "l": 18,
+            "r": 68,
+            "t": 100,
+            "b": 35
         },
-        "height": 400
+        "height": 440,
+        "dragmode": "pan",
+        "uirevision": ticker
     }
 
     return {
