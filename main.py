@@ -336,7 +336,7 @@ def process_custom_groups(group_dict):
                     ma_val = float(df_combined[ma_col].iloc[-1])
                     if pd.isna(ma_val): continue
                     
-                    if ma_val * 0.97 <= price < ma_val:
+                    if ma_val * 0.97 <= price < ma_val * 2:
                         diff_pct = ((price / ma_val) - 1) * 100
                         triggered_info.append(f"近MA{ma_window}({round(diff_pct,2)}%)")
                         matched_any_ma = True
