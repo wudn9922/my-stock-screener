@@ -1593,13 +1593,18 @@ def generate_html(data_dict, date_str):
         allow_nan=False
     )
 
-    html = f"""<!DOCTYPE html>
+    # 這一段不使用 f-string，避免 CSS 大括號衝突
+    html = """<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
 <title>台美股均線潛伏報告</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
 <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+
 <style>
 body {
     background:
@@ -1626,7 +1631,10 @@ body {
     background: rgba(19, 23, 34, 0.92);
     border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 14px;
-    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.3);
+    box-sizing: border-box;
+    box-shadow:
+        0 12px 35px
+        rgba(0, 0, 0, 0.3);
 }
 
 .header h2 {
@@ -1635,14 +1643,19 @@ body {
     letter-spacing: 0.5px;
 }
 
+.header p {
+    margin: 8px 0 0;
+}
+
 .category-box {
-    max-width: 1076px;
+    max-width: 1100px;
     margin: 0 auto 14px;
     padding: 14px 16px;
     background: rgba(19, 23, 34, 0.9);
     border: 1px solid rgba(255, 255, 255, 0.07);
     border-left: 4px solid #00b0ff;
     border-radius: 12px;
+    box-sizing: border-box;
 }
 
 .category-title {
@@ -1669,12 +1682,14 @@ body {
     transition:
         background 0.2s ease,
         color 0.2s ease,
-        transform 0.2s ease;
+        transform 0.2s ease,
+        border-color 0.2s ease;
 }
 
 .tab-btn:hover {
     color: #ffffff;
     background: #334155;
+    border-color: rgba(56, 189, 248, 0.35);
     transform: translateY(-1px);
 }
 
@@ -1709,6 +1724,7 @@ body {
     background: #131722;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 14px;
+    box-sizing: border-box;
     box-shadow:
         0 12px 30px
         rgba(0, 0, 0, 0.32);
@@ -1740,13 +1756,22 @@ body {
 }
 
 .test-notice {
-    max-width: 1076px;
+    max-width: 1100px;
     margin: 0 auto 15px;
     padding: 11px 16px;
     color: #fde68a;
     text-align: center;
     background: rgba(120, 53, 15, 0.35);
     border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 10px;
+    box-sizing: border-box;
+}
+
+.plotly-error {
+    padding: 40px 15px;
+    color: #fca5a5;
+    text-align: center;
+    background: rgba(127, 29, 29, 0.2);
     border-radius: 10px;
 }
 
@@ -1785,63 +1810,117 @@ body {
 }
 </style>
 </head>
+
 <body>
 <div class="header">
-    <h2>📈 台美股量化潛伏網頁報告 ({date_str})</h2>
+    <h2>
+        📈 台美股量化潛伏網頁報告
+        (__REPORT_DATE__)
+    </h2>
+
     <p style="color:#00ff88;font-size:13px;">
         專屬訂製滾動數據儲存版
     </p>
 </div>
 """
 
+    html = html.replace(
+        "__REPORT_DATE__",
+        str(date_str)
+    )
+
     if CUSTOM_GROUP_TEST_MODE:
         html += """
 <div class="test-notice">
-目前為 Supabase 測試模式，自訂群組不套用均線距離篩選
+    目前為 Supabase 測試模式，
+    自訂群組不套用均線距離篩選
 </div>
 """
 
+    # 這一段需要插入分類數量，因此使用 f-string
     html += f"""
-<div class="category-box" style="border-left-color:#ff5252;">
-    <div class="category-title">🇹🇼 台灣股市區塊</div>
+<div
+    class="category-box"
+    style="border-left-color:#ff5252;"
+>
+    <div class="category-title">
+        🇹🇼 台灣股市區塊
+    </div>
+
     <div class="tabs">
-        <button id="btn-tw_all" class="tab-btn active"
-            onclick="switchMarket(event,'tw_all')">
-            全市場潛伏 ({len(data_dict["tw_all"])})
+        <button
+            id="btn-tw_all"
+            class="tab-btn active"
+            onclick="switchMarket(event, 'tw_all')"
+        >
+            全市場潛伏 ({len(data_dict.get("tw_all", []))})
         </button>
-        <button id="btn-tw_g1" class="tab-btn"
-            onclick="switchMarket(event,'tw_g1')">
-            權值精選 ({len(data_dict["tw_g1"])})
+
+        <button
+            id="btn-tw_g1"
+            class="tab-btn"
+            onclick="switchMarket(event, 'tw_g1')"
+        >
+            權值精選 ({len(data_dict.get("tw_g1", []))})
         </button>
-        <button id="btn-tw_g2" class="tab-btn"
-            onclick="switchMarket(event,'tw_g2')">
-            熱門 ({len(data_dict["tw_g2"])})
+
+        <button
+            id="btn-tw_g2"
+            class="tab-btn"
+            onclick="switchMarket(event, 'tw_g2')"
+        >
+            熱門 ({len(data_dict.get("tw_g2", []))})
         </button>
     </div>
 </div>
 
-<div class="category-box">
-    <div class="category-title">🇺🇸 美國股市區塊</div>
+<div
+    class="category-box"
+    style="border-left-color:#00b0ff;"
+>
+    <div class="category-title">
+        🇺🇸 美國股市區塊
+    </div>
+
     <div class="tabs">
-        <button id="btn-us_all" class="tab-btn"
-            onclick="switchMarket(event,'us_all')">
-            全市場潛伏 ({len(data_dict["us_all"])})
+        <button
+            id="btn-us_all"
+            class="tab-btn"
+            onclick="switchMarket(event, 'us_all')"
+        >
+            全市場潛伏 ({len(data_dict.get("us_all", []))})
         </button>
-        <button id="btn-us_g1" class="tab-btn"
-            onclick="switchMarket(event,'us_g1')">
-            權值精選 ({len(data_dict["us_g1"])})
+
+        <button
+            id="btn-us_g1"
+            class="tab-btn"
+            onclick="switchMarket(event, 'us_g1')"
+        >
+            權值精選 ({len(data_dict.get("us_g1", []))})
         </button>
-        <button id="btn-us_g2" class="tab-btn"
-            onclick="switchMarket(event,'us_g2')">
-            低本益比 ({len(data_dict["us_g2"])})
+
+        <button
+            id="btn-us_g2"
+            class="tab-btn"
+            onclick="switchMarket(event, 'us_g2')"
+        >
+            低本益比 ({len(data_dict.get("us_g2", []))})
         </button>
-        <button id="btn-us_g3" class="tab-btn"
-            onclick="switchMarket(event,'us_g3')">
-            超級績效 ({len(data_dict["us_g3"])})
+
+        <button
+            id="btn-us_g3"
+            class="tab-btn"
+            onclick="switchMarket(event, 'us_g3')"
+        >
+            超級績效 ({len(data_dict.get("us_g3", []))})
         </button>
-        <button id="btn-us_g4" class="tab-btn"
-            onclick="switchMarket(event,'us_g4')">
-            熱門 ({len(data_dict["us_g4"])})
+
+        <button
+            id="btn-us_g4"
+            class="tab-btn"
+            onclick="switchMarket(event, 'us_g4')"
+        >
+            熱門 ({len(data_dict.get("us_g4", []))})
         </button>
     </div>
 </div>
@@ -1859,11 +1938,15 @@ body {
     ]
 
     for key in keys:
-        active = " active" if key == "tw_all" else ""
+        active_class = (
+            " active"
+            if key == "tw_all"
+            else ""
+        )
 
         html += (
             f'<div id="{key}-market" '
-            f'class="market-section{active}">'
+            f'class="market-section{active_class}">'
         )
 
         items = data_dict.get(key, [])
@@ -1885,10 +1968,275 @@ body {
 
         html += "</div>"
 
+    # JavaScript 使用 f-string，所以 JS 大括號必須寫成 {{ 與 }}
     html += f"""
 <script>
 const chartDataStore = {chart_json};
 
+function renderMarketCharts(marketId) {{
+    const items = chartDataStore[marketId];
+
+    if (!items || !Array.isArray(items)) {{
+        return;
+    }}
+
+    if (typeof Plotly === "undefined") {{
+        console.error("Plotly 載入失敗");
+
+        const section = document.getElementById(
+            marketId + "-market"
+        );
+
+        if (section) {{
+            section.innerHTML = (
+                '<div class="plotly-error">'
+                + 'Plotly 圖表套件載入失敗，'
+                + '請重新整理頁面或檢查網路連線。'
+                + '</div>'
+            );
+        }}
+
+        return;
+    }}
+
+    items.forEach((item, index) => {{
+        const id = (
+            "chart-"
+            + marketId
+            + "-"
+            + index
+        );
+
+        const container = document.getElementById(id);
+
+        if (!container || container.dataset.done) {{
+            return;
+        }}
+
+        if (
+            !item
+            || !item.chart_data
+            || !Array.isArray(item.chart_data.data)
+        ) {{
+            console.error(
+                "圖表資料格式錯誤：",
+                marketId,
+                index,
+                item
+            );
+
+            container.innerHTML = (
+                '<div class="plotly-error">'
+                + '圖表資料格式錯誤'
+                + '</div>'
+            );
+
+            return;
+        }}
+
+        const originalLayout = (
+            item.chart_data.layout || {{}}
+        );
+
+        const layout = {{
+            ...originalLayout,
+            margin: {{
+                ...(originalLayout.margin || {{}})
+            }},
+            title: {{
+                ...(originalLayout.title || {{}})
+            }},
+            legend: {{
+                ...(originalLayout.legend || {{}})
+            }}
+        }};
+
+        if (window.innerWidth <= 600) {{
+            layout.height = 390;
+
+            layout.margin = {{
+                ...layout.margin,
+                l: 10,
+                r: 55,
+                t: 105,
+                b: 30
+            }};
+
+            layout.title = {{
+                ...layout.title,
+                font: {{
+                    ...(
+                        layout.title.font
+                        || {{}}
+                    ),
+                    size: 15
+                }}
+            }};
+
+            layout.legend = {{
+                ...layout.legend,
+                font: {{
+                    ...(
+                        layout.legend.font
+                        || {{}}
+                    ),
+                    size: 10
+                }}
+            }};
+        }} else {{
+            layout.height = 440;
+        }}
+
+        const config = {{
+            responsive: true,
+            displayModeBar: false,
+            scrollZoom: true,
+            doubleClick: "reset",
+            showTips: false
+        }};
+
+        Plotly.newPlot(
+            container,
+            item.chart_data.data,
+            layout,
+            config
+        )
+        .then(() => {{
+            container.dataset.done = "true";
+
+            requestAnimationFrame(() => {{
+                Plotly.Plots.resize(container);
+            }});
+        }})
+        .catch((error) => {{
+            console.error(
+                "圖表繪製失敗：",
+                marketId,
+                index,
+                error
+            );
+
+            container.innerHTML = (
+                '<div class="plotly-error">'
+                + '圖表繪製失敗'
+                + '</div>'
+            );
+        }});
+    }});
+}}
+
+function resizeMarketCharts(marketId) {{
+    const items = chartDataStore[marketId];
+
+    if (!items || !Array.isArray(items)) {{
+        return;
+    }}
+
+    items.forEach((item, index) => {{
+        const id = (
+            "chart-"
+            + marketId
+            + "-"
+            + index
+        );
+
+        const container = document.getElementById(id);
+
+        if (
+            container
+            && container.dataset.done
+            && typeof Plotly !== "undefined"
+        ) {{
+            Plotly.Plots.resize(container);
+        }}
+    }});
+}}
+
+function switchMarket(event, marketId) {{
+    document
+        .querySelectorAll(".market-section")
+        .forEach((element) => {{
+            element.classList.remove("active");
+        }});
+
+    document
+        .querySelectorAll(".tab-btn")
+        .forEach((element) => {{
+            element.classList.remove("active");
+        }});
+
+    const section = document.getElementById(
+        marketId + "-market"
+    );
+
+    if (section) {{
+        section.classList.add("active");
+    }}
+
+    if (event && event.currentTarget) {{
+        event.currentTarget.classList.add("active");
+    }} else {{
+        const button = document.getElementById(
+            "btn-" + marketId
+        );
+
+        if (button) {{
+            button.classList.add("active");
+        }}
+    }}
+
+    renderMarketCharts(marketId);
+
+    setTimeout(() => {{
+        resizeMarketCharts(marketId);
+    }}, 150);
+}}
+
+window.addEventListener("load", () => {{
+    renderMarketCharts("tw_all");
+}});
+
+window.addEventListener("resize", () => {{
+    const activeSection = document.querySelector(
+        ".market-section.active"
+    );
+
+    if (!activeSection) {{
+        return;
+    }}
+
+    const marketId = activeSection.id.replace(
+        "-market",
+        ""
+    );
+
+    resizeMarketCharts(marketId);
+}});
+</script>
+</body>
+</html>
+"""
+
+    os.makedirs(
+        DOCS_DIR,
+        exist_ok=True
+    )
+
+    path = os.path.join(
+        DOCS_DIR,
+        "index.html"
+    )
+
+    with open(
+        path,
+        "w",
+        encoding="utf-8"
+    ) as file:
+        file.write(html)
+
+    print(f"✅ HTML 已產生：{path}")
+    
+    
 function renderMarketCharts(marketId) {{
     const items = chartDataStore[marketId];
 
