@@ -157,6 +157,9 @@ def load_configs_from_supabase(target_user_id):
 
                 mapped_key = group_id_to_key.get(group_id)
 
+                if not mapped_key and group_id in valid_group_keys:
+                    mapped_key = group_id
+
                 raw_ticker = str(
                     stock_item.get("ticker", "")
                 ).strip().upper()
