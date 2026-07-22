@@ -807,11 +807,37 @@ def build_stock_data(
     df_chart,
     ticker,
     title_suffix,
-    ma_list
+    ma_list,
+    show_volume=False
 ):
     date_strings = [
         str(date)[:10]
         for date in df_chart.index
+    ]
+
+    open_values = [
+        float(value)
+        for value in df_chart["Open"].tolist()
+    ]
+
+    high_values = [
+        float(value)
+        for value in df_chart["High"].tolist()
+    ]
+
+    low_values = [
+        float(value)
+        for value in df_chart["Low"].tolist()
+    ]
+
+    close_values = [
+        float(value)
+        for value in df_chart["Close"].tolist()
+    ]
+
+    volume_values = [
+        float(value)
+        for value in df_chart["Volume"].tolist()
     ]
 
     traces = [
@@ -819,22 +845,11 @@ def build_stock_data(
             "type": "candlestick",
             "name": ticker,
             "x": date_strings,
-            "open": [
-                float(value)
-                for value in df_chart["Open"].tolist()
-            ],
-            "high": [
-                float(value)
-                for value in df_chart["High"].tolist()
-            ],
-            "low": [
-                float(value)
-                for value in df_chart["Low"].tolist()
-            ],
-            "close": [
-                float(value)
-                for value in df_chart["Close"].tolist()
-            ],
+            "open": open_values,
+            "high": high_values,
+            "low": low_values,
+            "close": close_values,
+            "yaxis": "y",
             "increasing": {
                 "line": {
                     "color": "#ef5350",
@@ -894,6 +909,7 @@ def build_stock_data(
                 "name": ma_col,
                 "x": date_strings,
                 "y": ma_values,
+                "yaxis": "y",
                 "line": {
                     "color": color,
                     "width": 1.8
@@ -904,6 +920,55 @@ def build_stock_data(
                 )
             }
         )
+
+    # 自訂群組才加入成交量
+    if show_volume:
+        volume_colors = []
+
+        for open_price, close_price in zip(
+            open_values,
+            close_values
+        ):
+            if close_price >= open_price:
+                volume_colors.append(
+                    "rgba(239, 83, 80, 0.62)"
+                )
+            else:
+                volume_colors.append(
+                    "rgba(38, 166, 154, 0.62)"
+                )
+
+        traces.append(
+            {
+                "type": "bar",
+                "name": "成交量",
+                "x": date_strings,
+                "y": volume_values,
+                "yaxis": "y2",
+                "marker": {
+                    "color": volume_colors,
+                    "line": {
+                        "width": 0
+                    }
+                },
+                "opacity": 0.85,
+                "hovertemplate": (
+                    "成交量: %{y:,.0f}"
+                    "<extra></extra>"
+                )
+            }
+        )
+
+    if show_volume:
+        price_domain = [0.27, 1.0]
+        volume_domain = [0.0, 0.19]
+        chart_height = 520
+        bottom_margin = 42
+    else:
+        price_domain = [0.0, 1.0]
+        volume_domain = None
+        chart_height = 440
+        bottom_margin = 35
 
     layout = {
         "title": {
@@ -933,6 +998,7 @@ def build_stock_data(
         },
         "xaxis": {
             "type": "date",
+            "anchor": "y2" if show_volume else "y",
             "rangeslider": {
                 "visible": False
             },
@@ -961,7 +1027,9 @@ def build_stock_data(
             ]
         },
         "yaxis": {
+            "domain": price_domain,
             "side": "right",
+            "anchor": "x",
             "fixedrange": False,
             "showgrid": True,
             "gridcolor": "rgba(255,255,255,0.055)",
@@ -1005,18 +1073,59 @@ def build_stock_data(
             "l": 18,
             "r": 68,
             "t": 100,
-            "b": 35
+            "b": bottom_margin
         },
-        "height": 440,
+        "height": chart_height,
         "dragmode": "pan",
+        "bargap": 0.15,
         "uirevision": ticker
     }
+
+    if show_volume:
+        layout["yaxis2"] = {
+            "domain": volume_domain,
+            "side": "right",
+            "anchor": "x",
+            "fixedrange": False,
+            "showgrid": False,
+            "showline": False,
+            "zeroline": False,
+            "rangemode": "tozero",
+            "tickfont": {
+                "size": 9,
+                "color": "#64748b"
+            },
+            "tickformat": ".2s",
+            "automargin": True,
+            "title": {
+                "text": "成交量",
+                "font": {
+                    "size": 10,
+                    "color": "#64748b"
+                }
+            }
+        }
+
+        layout["shapes"] = [
+            {
+                "type": "line",
+                "xref": "paper",
+                "yref": "paper",
+                "x0": 0,
+                "x1": 1,
+                "y0": 0.225,
+                "y1": 0.225,
+                "line": {
+                    "color": "rgba(148,163,184,0.20)",
+                    "width": 1
+                }
+            }
+        ]
 
     return {
         "data": traces,
         "layout": layout
     }
-
 
 # =========================================================================
 # 全市場掃描
@@ -1545,7 +1654,8 @@ def process_custom_groups(
                 combined.tail(60),
                 actual_ticker,
                 title,
-                ma_list
+                ma_list,
+                show_volume=True
             )
 
             matched_list.append(
@@ -1800,7 +1910,8 @@ body {
     }
 
     .plotly-container {
-        height: 390px;
+        min-height: 390px;
+        height: auto;
     }
 
     .chart-card {
@@ -2051,15 +2162,19 @@ function renderMarketCharts(marketId) {{
             }}
         }};
 
+        const hasVolume = Boolean(
+            originalLayout.yaxis2
+        );
+
         if (window.innerWidth <= 600) {{
-            layout.height = 390;
+            layout.height = hasVolume ? 470 : 390;
 
             layout.margin = {{
                 ...layout.margin,
-                l: 10,
-                r: 55,
+                l: 8,
+                r: 52,
                 t: 105,
-                b: 30
+                b: 34
             }};
 
             layout.title = {{
@@ -2084,7 +2199,10 @@ function renderMarketCharts(marketId) {{
                 }}
             }};
         }} else {{
-            layout.height = 440;
+            layout.height = (
+                originalLayout.height
+                || (hasVolume ? 520 : 440)
+            );
         }}
 
         const config = {{
