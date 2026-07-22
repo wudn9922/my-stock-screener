@@ -39,7 +39,7 @@ CUSTOM_GROUP_TEST_MODE = (
 
 # 正式模式的均線距離
 CUSTOM_MA_MIN_RATIO = 0.97
-CUSTOM_MA_MAX_RATIO = 1.10
+CUSTOM_MA_MAX_RATIO = 1.01
 
 
 # =========================================================================
