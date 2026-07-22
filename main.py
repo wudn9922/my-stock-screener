@@ -31,7 +31,7 @@ CUSTOM_GROUP_TEST_MODE = True
 # 關閉測試模式後使用的均線篩選範圍
 # 0.97～1.03 代表股價位於均線上下 3%
 CUSTOM_MA_MIN_RATIO = 0.97
-CUSTOM_MA_MAX_RATIO = 1.02
+CUSTOM_MA_MAX_RATIO = 1.1
 
 # =========================================================================
 # 📡 Supabase 雲端資料庫動態名單與大盤參數讀取器 (單一用戶版)
