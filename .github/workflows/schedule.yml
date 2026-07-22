@@ -37,6 +37,7 @@ jobs:
           SUPABASE_USER_ID: ${{ secrets.SUPABASE_USER_ID }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        CUSTOM_GROUP_TEST_MODE: "false"
         run: python main.py
 
       # ✨ 已修改：注入 Imgur 金鑰，讓自動截圖流能順利上傳並傳入 LINE
