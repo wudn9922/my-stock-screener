@@ -31,7 +31,7 @@ MAX_DAYS = 201
 # True：Supabase 自訂群組只要可下載就顯示
 # False：套用均線距離條件
 CUSTOM_GROUP_TEST_MODE = (
-    os.environ.get("CUSTOM_GROUP_TEST_MODE", "true")
+    os.environ.get("CUSTOM_GROUP_TEST_MODE", "false")
     .strip()
     .lower()
     in {"1", "true", "yes", "on"}
