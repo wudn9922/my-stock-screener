@@ -1601,84 +1601,188 @@ def generate_html(data_dict, date_str):
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
 <style>
-body {{
-    background:#111;
-    color:#fff;
-    font-family:Arial,sans-serif;
-    margin:0;
-    padding:10px;
-}}
-.header {{
-    text-align:center;
-    padding:15px 0;
-    background:#222;
-    margin-bottom:15px;
-    border-radius:8px;
-}}
-.category-box {{
-    background:#1a1a1a;
-    padding:12px;
-    margin-bottom:15px;
-    border-radius:8px;
-    border-left:4px solid #00b0ff;
-}}
-.category-title {{
-    font-size:15px;
-    font-weight:bold;
-    color:#00ff88;
-    margin-bottom:10px;
-}}
-.tabs {{
-    display:flex;
-    flex-wrap:wrap;
-    gap:6px;
-}}
-.tab-btn {{
-    background:#2a2a2a;
-    color:#aaa;
-    border:none;
-    padding:8px 12px;
-    font-size:13px;
-    cursor:pointer;
-    border-radius:4px;
-}}
-.tab-btn.active {{
-    background:#00b0ff;
-    color:#fff;
-    font-weight:bold;
-}}
-.market-section {{
-    display:none;
-    max-width:800px;
-    margin:0 auto;
-}}
-.market-section.active {{
-    display:block;
-}}
-.chart-card {{
-    background:#1e1e1e;
-    margin-bottom:25px;
-    padding:10px;
-    border-radius:8px;
-}}
-.plotly-container {{
-    height:400px;
-    background:#151515;
-    border-radius:6px;
-}}
-.no-data {{
-    text-align:center;
-    color:#888;
-    padding:40px;
-}}
-.test-notice {{
-    text-align:center;
-    background:#4d3b00;
-    color:#ffd54f;
-    padding:10px;
-    margin-bottom:15px;
-    border-radius:6px;
-}}
+body {
+    background:
+        radial-gradient(
+            circle at top,
+            #182033 0,
+            #0b0e14 45%,
+            #080a0f 100%
+        );
+    color: #f8fafc;
+    font-family:
+        Arial,
+        "Noto Sans TC",
+        sans-serif;
+    margin: 0;
+    padding: 16px;
+}
+
+.header {
+    max-width: 1100px;
+    margin: 0 auto 18px;
+    padding: 22px 18px;
+    text-align: center;
+    background: rgba(19, 23, 34, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.3);
+}
+
+.header h2 {
+    margin: 0;
+    font-size: 24px;
+    letter-spacing: 0.5px;
+}
+
+.category-box {
+    max-width: 1076px;
+    margin: 0 auto 14px;
+    padding: 14px 16px;
+    background: rgba(19, 23, 34, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-left: 4px solid #00b0ff;
+    border-radius: 12px;
+}
+
+.category-title {
+    margin-bottom: 12px;
+    color: #e2e8f0;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tab-btn {
+    padding: 9px 14px;
+    color: #94a3b8;
+    background: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition:
+        background 0.2s ease,
+        color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.tab-btn:hover {
+    color: #ffffff;
+    background: #334155;
+    transform: translateY(-1px);
+}
+
+.tab-btn.active {
+    color: #ffffff;
+    background:
+        linear-gradient(
+            135deg,
+            #0284c7,
+            #2563eb
+        );
+    border-color: #38bdf8;
+    box-shadow:
+        0 5px 16px
+        rgba(37, 99, 235, 0.3);
+}
+
+.market-section {
+    display: none;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.market-section.active {
+    display: block;
+}
+
+.chart-card {
+    overflow: hidden;
+    margin-bottom: 20px;
+    padding: 4px;
+    background: #131722;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    box-shadow:
+        0 12px 30px
+        rgba(0, 0, 0, 0.32);
+    transition:
+        border-color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.chart-card:hover {
+    border-color: rgba(56, 189, 248, 0.35);
+    transform: translateY(-2px);
+}
+
+.plotly-container {
+    width: 100%;
+    height: 440px;
+    background: #131722;
+    border-radius: 12px;
+}
+
+.no-data {
+    margin-top: 20px;
+    padding: 55px 20px;
+    text-align: center;
+    color: #64748b;
+    background: rgba(19, 23, 34, 0.75);
+    border: 1px dashed rgba(148, 163, 184, 0.25);
+    border-radius: 12px;
+}
+
+.test-notice {
+    max-width: 1076px;
+    margin: 0 auto 15px;
+    padding: 11px 16px;
+    color: #fde68a;
+    text-align: center;
+    background: rgba(120, 53, 15, 0.35);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 10px;
+}
+
+@media (max-width: 600px) {
+    body {
+        padding: 8px;
+    }
+
+    .header {
+        padding: 16px 10px;
+        border-radius: 10px;
+    }
+
+    .header h2 {
+        font-size: 19px;
+    }
+
+    .category-box {
+        padding: 12px 10px;
+    }
+
+    .tab-btn {
+        flex: 1 1 auto;
+        padding: 9px 8px;
+        font-size: 12px;
+    }
+
+    .plotly-container {
+        height: 390px;
+    }
+
+    .chart-card {
+        margin-bottom: 14px;
+        border-radius: 10px;
+    }
+}
 </style>
 </head>
 <body>
