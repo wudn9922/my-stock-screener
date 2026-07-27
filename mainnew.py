@@ -4079,3 +4079,4942 @@ def analyze_index_trend(
 # 下一部分：HTML、動態群組頁籤、LIFF 與畫線同步
 # =========================================================================
 
+# =========================================================================
+# 第 4 部分：HTML、動態群組頁籤、圖表與畫線工具介面
+# =========================================================================
+
+import html as html_module
+
+
+# =========================================================================
+# HTML 共用工具
+# =========================================================================
+def escape_html(value):
+    return html_module.escape(
+        str(value or ""),
+        quote=True
+    )
+
+
+def get_sorted_custom_group_keys(
+    group_metadata,
+    market=None
+):
+    keys = []
+
+    for group_key, metadata in (
+        group_metadata.items()
+    ):
+        if not metadata.get(
+            "is_custom",
+            False
+        ):
+            continue
+
+        if (
+            market is not None
+            and metadata.get("market")
+            != market
+        ):
+            continue
+
+        keys.append(group_key)
+
+    return sorted(
+        keys,
+        key=get_custom_group_number
+    )
+
+
+def is_drawing_enabled_market(
+    market_key
+):
+    return (
+        market_key
+        not in DRAWING_DISABLED_MARKETS
+    )
+
+
+# =========================================================================
+# 類股週線總覽 HTML
+# =========================================================================
+def generate_sector_overview_html(
+    sector_summary
+):
+    if not sector_summary:
+        return """
+<div class="sector-overview">
+    <div class="sector-overview-title">
+        🧭 類股週線強弱總覽
+    </div>
+
+    <div class="no-data">
+        類股強弱資料不足
+    </div>
+</div>
+"""
+
+    groups = [
+        (
+            "strong",
+            "🟢 強勢領先",
+            [
+                item
+                for item in sector_summary
+                if item.get(
+                    "strength_group"
+                ) == "strong"
+            ]
+        ),
+        (
+            "neutral",
+            "🟡 中性輪動",
+            [
+                item
+                for item in sector_summary
+                if item.get(
+                    "strength_group"
+                ) == "neutral"
+            ]
+        ),
+        (
+            "weak",
+            "🔴 弱勢落後",
+            [
+                item
+                for item in sector_summary
+                if item.get(
+                    "strength_group"
+                ) == "weak"
+            ]
+        )
+    ]
+
+    result = """
+<div class="sector-overview">
+    <div class="sector-overview-title">
+        🧭 美股 11 大類股週線強弱總覽
+    </div>
+
+    <div class="sector-overview-subtitle">
+        固定週均線 MA20／MA60，
+        排名綜合 1 週、4 週、13 週報酬
+        與相對 SPY 強弱
+    </div>
+
+    <div class="sector-summary-grid">
+"""
+
+    for (
+        group_class,
+        group_title,
+        items
+    ) in groups:
+        result += (
+            '<div class="sector-summary-column '
+            f'{escape_html(group_class)}">'
+            '<div class="sector-summary-title">'
+            f'{escape_html(group_title)}'
+            '</div>'
+        )
+
+        if not items:
+            result += (
+                '<div class="sector-summary-empty">'
+                '目前沒有類股'
+                '</div>'
+            )
+
+        for item in items:
+            relative_strength = safe_float(
+                item.get(
+                    "relative_strength_13w"
+                )
+            )
+
+            relative_class = (
+                "positive"
+                if relative_strength >= 0
+                else "negative"
+            )
+
+            rank = safe_int(
+                item.get("rank"),
+                0
+            )
+
+            ticker = escape_html(
+                item.get("ticker")
+            )
+
+            name = escape_html(
+                item.get("name")
+            )
+
+            return_1w = safe_float(
+                item.get("return_1w")
+            )
+
+            return_4w = safe_float(
+                item.get("return_4w")
+            )
+
+            return_13w = safe_float(
+                item.get("return_13w")
+            )
+
+            trend_status = escape_html(
+                item.get("trend_status")
+            )
+
+            volume_status = escape_html(
+                item.get("volume_status")
+            )
+
+            result += (
+                '<div class="sector-summary-item">'
+
+                '<div class="sector-summary-head">'
+
+                '<span class="sector-rank">'
+                f'#{rank}'
+                '</span>'
+
+                '<span class="sector-symbol">'
+                f'{ticker}'
+                '</span>'
+
+                '<span class="sector-name">'
+                f'{name}'
+                '</span>'
+
+                '</div>'
+
+                '<div class="sector-summary-metrics">'
+
+                '<span>'
+                f'1週 {return_1w:+.2f}%'
+                '</span>'
+
+                '<span>'
+                f'4週 {return_4w:+.2f}%'
+                '</span>'
+
+                '<span>'
+                f'13週 {return_13w:+.2f}%'
+                '</span>'
+
+                f'<span class="{relative_class}">'
+                '相對SPY '
+                f'{relative_strength:+.2f}%'
+                '</span>'
+
+                '</div>'
+
+                '<div class="sector-summary-status">'
+                f'{trend_status}｜{volume_status}'
+                '</div>'
+
+                '</div>'
+            )
+
+        result += "</div>"
+
+    result += """
+    </div>
+</div>
+"""
+
+    return result
+
+
+# =========================================================================
+# 動態群組頁籤按鈕
+# =========================================================================
+def generate_custom_group_buttons_html(
+    data_dict,
+    group_metadata,
+    market
+):
+    group_keys = (
+        get_sorted_custom_group_keys(
+            group_metadata,
+            market=market
+        )
+    )
+
+    if not group_keys:
+        return ""
+
+    result = """
+<div class="custom-tabs-divider">
+    <span>自訂群組</span>
+</div>
+"""
+
+    for group_key in group_keys:
+        metadata = group_metadata.get(
+            group_key,
+            {}
+        )
+
+        group_name = normalize_group_name(
+            metadata.get(
+                "name",
+                group_key
+            )
+        )
+
+        result += (
+            '<button '
+            f'id="btn-{escape_html(group_key)}" '
+            'class="tab-btn custom-group-btn" '
+            'onclick="switchMarket('
+            "event, "
+            f"'{escape_html(group_key)}'"
+            ')">'
+            f'{escape_html(group_name)} '
+            '('
+            f'{len(data_dict.get(group_key, []))}'
+            ')'
+            '</button>'
+        )
+
+    return result
+
+
+# =========================================================================
+# 圖表卡片 HTML
+# =========================================================================
+def generate_chart_card_html(
+    market_key,
+    chart_index,
+    item,
+    drawing_enabled
+):
+    chart_id = (
+        f"chart-{market_key}-{chart_index}"
+    )
+
+    info_id = (
+        f"info-{market_key}-{chart_index}"
+    )
+
+    drawing_status_id = (
+        f"drawing-status-"
+        f"{market_key}-{chart_index}"
+    )
+
+    ticker = str(
+        item.get("ticker", "")
+    ).strip().upper()
+
+    chart_data = item.get(
+        "chart_data",
+        {}
+    )
+
+    drawing_timeframe = str(
+        chart_data.get(
+            "drawing_timeframe",
+            "1d"
+        )
+    ).strip()
+
+    timeframe_label = str(
+        chart_data.get(
+            "timeframe",
+            "日K"
+        )
+    ).strip()
+
+    placeholder_text = (
+        "點擊週 K 後固定顯示週期與 OHLCV"
+        if drawing_timeframe == "1w"
+        else "點擊 K 線後固定顯示日期與 OHLCV"
+    )
+
+    result = """
+<div class="chart-card">
+    <div class="chart-toolbar">
+        <div class="chart-toolbar-row">
+            <div class="zoom-buttons">
+"""
+
+    result += (
+        '<button '
+        'type="button" '
+        'class="chart-tool-btn" '
+        f'onclick="zoomChart('
+        f'\'{escape_html(chart_id)}\', '
+        '0.70)">'
+        '＋ 放大'
+        '</button>'
+    )
+
+    result += (
+        '<button '
+        'type="button" '
+        'class="chart-tool-btn" '
+        f'onclick="zoomChart('
+        f'\'{escape_html(chart_id)}\', '
+        '1.40)">'
+        '－ 縮小'
+        '</button>'
+    )
+
+    result += (
+        '<button '
+        'type="button" '
+        'class="chart-tool-btn reset-btn" '
+        f'onclick="resetChart('
+        f'\'{escape_html(chart_id)}\')">'
+        '↺ 重設'
+        '</button>'
+    )
+
+    result += """
+            </div>
+"""
+
+    if drawing_enabled:
+        result += (
+            '<div class="drawing-status" '
+            f'id="{escape_html(drawing_status_id)}">'
+            '畫線尚未同步'
+            '</div>'
+        )
+    else:
+        result += (
+            '<div class="drawing-status disabled">'
+            '全市場圖表不開放畫線'
+            '</div>'
+        )
+
+    result += """
+        </div>
+"""
+
+    if drawing_enabled:
+        result += """
+        <div class="drawing-toolbar">
+            <div class="drawing-tool-group">
+"""
+
+        result += (
+            '<button '
+            'type="button" '
+            'class="drawing-tool-btn" '
+            f'onclick="activateDrawingTool('
+            f'\'{escape_html(chart_id)}\', '
+            '\'drawline\')">'
+            '╱ 趨勢線'
+            '</button>'
+        )
+
+        result += (
+            '<button '
+            'type="button" '
+            'class="drawing-tool-btn" '
+            f'onclick="activateHorizontalLineTool('
+            f'\'{escape_html(chart_id)}\')">'
+            '─ 水平線'
+            '</button>'
+        )
+
+        result += (
+            '<button '
+            'type="button" '
+            'class="drawing-tool-btn" '
+            f'onclick="activateDrawingTool('
+            f'\'{escape_html(chart_id)}\', '
+            '\'drawrect\')">'
+            '▭ 矩形'
+            '</button>'
+        )
+
+        result += """
+            </div>
+
+            <div class="drawing-style-group">
+                <label class="drawing-label">
+                    顏色
+                </label>
+
+                <select
+                    class="drawing-select"
+"""
+
+        result += (
+            f'id="drawing-color-'
+            f'{escape_html(chart_id)}" '
+            f'onchange="applyDrawingStyle('
+            f'\'{escape_html(chart_id)}\')">'
+        )
+
+        result += """
+                    <option value="#facc15">
+                        黃色
+                    </option>
+                    <option value="#38bdf8">
+                        藍色
+                    </option>
+                    <option value="#ef4444">
+                        紅色
+                    </option>
+                    <option value="#22c55e">
+                        綠色
+                    </option>
+                    <option value="#a855f7">
+                        紫色
+                    </option>
+                    <option value="#f8fafc">
+                        白色
+                    </option>
+                </select>
+
+                <label class="drawing-label">
+                    粗細
+                </label>
+
+                <select
+                    class="drawing-select"
+"""
+
+        result += (
+            f'id="drawing-width-'
+            f'{escape_html(chart_id)}" '
+            f'onchange="applyDrawingStyle('
+            f'\'{escape_html(chart_id)}\')">'
+        )
+
+        result += """
+                    <option value="1">
+                        1 px
+                    </option>
+                    <option value="2" selected>
+                        2 px
+                    </option>
+                    <option value="3">
+                        3 px
+                    </option>
+                    <option value="4">
+                        4 px
+                    </option>
+                </select>
+            </div>
+
+            <div class="drawing-action-group">
+"""
+
+        result += (
+            '<button '
+            'type="button" '
+            'class="drawing-tool-btn danger-outline" '
+            f'onclick="activateEraseTool('
+            f'\'{escape_html(chart_id)}\')">'
+            '⌫ 刪除圖形'
+            '</button>'
+        )
+
+        result += (
+            '<button '
+            'type="button" '
+            'class="drawing-tool-btn danger" '
+            f'onclick="clearAllDrawings('
+            f'\'{escape_html(chart_id)}\')">'
+            '清除全部'
+            '</button>'
+        )
+
+        result += (
+            '<button '
+            'type="button" '
+            'class="drawing-tool-btn sync-btn" '
+            f'onclick="syncChartDrawings('
+            f'\'{escape_html(chart_id)}\', '
+            'true)">'
+            '☁ 立即同步'
+            '</button>'
+        )
+
+        result += """
+            </div>
+        </div>
+"""
+
+    result += (
+        f'<div id="{escape_html(info_id)}" '
+        'class="ohlcv-fixed-panel">'
+        '<span class="ohlcv-placeholder">'
+        f'{escape_html(placeholder_text)}'
+        '</span>'
+        '</div>'
+    )
+
+    result += (
+        f'<div id="{escape_html(chart_id)}" '
+        f'data-market-id="{escape_html(market_key)}" '
+        f'data-chart-index="{chart_index}" '
+        f'data-ticker="{escape_html(ticker)}" '
+        f'data-timeframe="{escape_html(drawing_timeframe)}" '
+        f'data-drawing-enabled="'
+        f'{"true" if drawing_enabled else "false"}" '
+        'class="plotly-container">'
+        '</div>'
+    )
+
+    result += """
+    </div>
+</div>
+"""
+
+    return result
+
+
+# =========================================================================
+# 完整 HTML 產生
+# =========================================================================
+def generate_html(
+    data_dict,
+    date_str,
+    sector_summary=None,
+    group_metadata=None
+):
+    sector_summary = (
+        sector_summary or []
+    )
+
+    group_metadata = (
+        group_metadata or {}
+    )
+
+    clean_data = clean_json_value(
+        data_dict
+    )
+
+    chart_json = json.dumps(
+        clean_data,
+        ensure_ascii=False,
+        allow_nan=False
+    ).replace(
+        "</script>",
+        "<\\/script>"
+    )
+
+    tw_custom_group_keys = (
+        get_sorted_custom_group_keys(
+            group_metadata,
+            market="tw"
+        )
+    )
+
+    us_custom_group_keys = (
+        get_sorted_custom_group_keys(
+            group_metadata,
+            market="us"
+        )
+    )
+
+    all_custom_group_keys = (
+        tw_custom_group_keys
+        + us_custom_group_keys
+    )
+
+    html = """<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+
+<title>
+    台美股均線潛伏報告
+</title>
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+
+<style>
+:root {
+    color-scheme: dark;
+    --page-bg: #080a0f;
+    --panel-bg: rgba(19, 23, 34, 0.94);
+    --chart-bg: #131722;
+    --toolbar-bg: #111827;
+    --border: rgba(255, 255, 255, 0.08);
+    --text-main: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
+    --blue: #38bdf8;
+    --purple: #a855f7;
+    --green: #10b981;
+    --red: #ef4444;
+    --yellow: #facc15;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    min-height: 100vh;
+    margin: 0;
+    padding: 16px;
+    color: var(--text-main);
+    background:
+        radial-gradient(
+            circle at top,
+            #182033 0,
+            #0b0e14 45%,
+            #080a0f 100%
+        );
+    font-family:
+        Arial,
+        "Noto Sans TC",
+        sans-serif;
+}
+
+button,
+select {
+    font-family: inherit;
+}
+
+.header {
+    max-width: 1100px;
+    margin: 0 auto 18px;
+    padding: 22px 18px;
+    text-align: center;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow:
+        0 12px 35px
+        rgba(0, 0, 0, 0.30);
+}
+
+.header h2 {
+    margin: 0;
+    font-size: 24px;
+    letter-spacing: 0.5px;
+}
+
+.header p {
+    margin: 8px 0 0;
+    color: #00ff88;
+    font-size: 13px;
+}
+
+.liff-status {
+    max-width: 1100px;
+    margin: 0 auto 12px;
+    padding: 10px 14px;
+    color: #93c5fd;
+    text-align: center;
+    background: rgba(30, 64, 175, 0.18);
+    border: 1px solid rgba(59, 130, 246, 0.30);
+    border-radius: 10px;
+    font-size: 12px;
+}
+
+.liff-status.success {
+    color: #86efac;
+    background: rgba(22, 101, 52, 0.22);
+    border-color: rgba(34, 197, 94, 0.34);
+}
+
+.liff-status.warning {
+    color: #fde68a;
+    background: rgba(120, 53, 15, 0.26);
+    border-color: rgba(245, 158, 11, 0.34);
+}
+
+.category-box {
+    max-width: 1100px;
+    margin: 0 auto 14px;
+    padding: 14px 16px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--blue);
+    border-radius: 12px;
+}
+
+.category-title {
+    margin-bottom: 12px;
+    color: #e2e8f0;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.custom-tabs-divider {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin: 5px 0 1px;
+    color: #c084fc;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.custom-tabs-divider::after {
+    flex: 1;
+    height: 1px;
+    margin-left: 8px;
+    background:
+        rgba(192, 132, 252, 0.25);
+    content: "";
+}
+
+.tab-btn {
+    padding: 9px 14px;
+    color: #94a3b8;
+    background: #1e293b;
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition:
+        background 0.2s ease,
+        color 0.2s ease,
+        transform 0.2s ease,
+        border-color 0.2s ease;
+}
+
+.tab-btn:hover {
+    color: #ffffff;
+    background: #334155;
+    border-color:
+        rgba(56, 189, 248, 0.35);
+    transform: translateY(-1px);
+}
+
+.tab-btn.active {
+    color: #ffffff;
+    background:
+        linear-gradient(
+            135deg,
+            #0284c7,
+            #2563eb
+        );
+    border-color: #38bdf8;
+    box-shadow:
+        0 5px 16px
+        rgba(37, 99, 235, 0.30);
+}
+
+.index-btn.active {
+    background:
+        linear-gradient(
+            135deg,
+            #7c3aed,
+            #a855f7
+        );
+    border-color: #c084fc;
+}
+
+.sector-btn.active {
+    background:
+        linear-gradient(
+            135deg,
+            #0f766e,
+            #059669
+        );
+    border-color: #34d399;
+}
+
+.custom-group-btn {
+    border-color:
+        rgba(192, 132, 252, 0.28);
+}
+
+.custom-group-btn.active {
+    background:
+        linear-gradient(
+            135deg,
+            #6d28d9,
+            #9333ea
+        );
+    border-color: #c084fc;
+}
+
+.market-section {
+    display: none;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.market-section.active {
+    display: block;
+}
+
+.test-notice {
+    max-width: 1100px;
+    margin: 0 auto 15px;
+    padding: 11px 16px;
+    color: #fde68a;
+    text-align: center;
+    background:
+        rgba(120, 53, 15, 0.35);
+    border:
+        1px solid
+        rgba(245, 158, 11, 0.30);
+    border-radius: 10px;
+}
+
+.sector-overview {
+    margin-bottom: 18px;
+    padding: 16px;
+    background:
+        rgba(15, 23, 42, 0.95);
+    border:
+        1px solid
+        rgba(52, 211, 153, 0.22);
+    border-radius: 14px;
+}
+
+.sector-overview-title {
+    color: #f8fafc;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.sector-overview-subtitle {
+    margin-top: 6px;
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.sector-summary-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.sector-summary-column {
+    padding: 12px;
+    background:
+        rgba(30, 41, 59, 0.62);
+    border:
+        1px solid
+        rgba(148, 163, 184, 0.14);
+    border-radius: 11px;
+}
+
+.sector-summary-column.strong {
+    border-top: 3px solid #22c55e;
+}
+
+.sector-summary-column.neutral {
+    border-top: 3px solid #eab308;
+}
+
+.sector-summary-column.weak {
+    border-top: 3px solid #ef4444;
+}
+
+.sector-summary-title {
+    margin-bottom: 10px;
+    color: #e2e8f0;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.sector-summary-item {
+    margin-bottom: 9px;
+    padding: 10px;
+    background:
+        rgba(15, 23, 42, 0.75);
+    border-radius: 8px;
+}
+
+.sector-summary-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.sector-rank {
+    color: #fbbf24;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.sector-symbol {
+    color: #f8fafc;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.sector-name {
+    color: #cbd5e1;
+    font-size: 12px;
+}
+
+.sector-summary-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 9px;
+    margin-top: 7px;
+    color: #94a3b8;
+    font-size: 10px;
+}
+
+.sector-summary-status {
+    margin-top: 7px;
+    color: #a5b4fc;
+    font-size: 10px;
+}
+
+.positive {
+    color: #4ade80;
+}
+
+.negative {
+    color: #fb7185;
+}
+
+.sector-summary-empty {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.chart-card {
+    overflow: hidden;
+    margin-bottom: 20px;
+    padding: 4px;
+    background: var(--chart-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow:
+        0 12px 30px
+        rgba(0, 0, 0, 0.32);
+    transition:
+        border-color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.chart-card:hover {
+    border-color:
+        rgba(56, 189, 248, 0.35);
+    transform: translateY(-2px);
+}
+
+.chart-toolbar {
+    padding: 8px 10px;
+    background: var(--toolbar-bg);
+    border-bottom: 1px solid var(--border);
+    border-radius: 10px 10px 0 0;
+}
+
+.chart-toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.zoom-buttons,
+.drawing-tool-group,
+.drawing-style-group,
+.drawing-action-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.chart-tool-btn,
+.drawing-tool-btn {
+    padding: 7px 11px;
+    color: #e2e8f0;
+    background: #1e293b;
+    border:
+        1px solid
+        rgba(148, 163, 184, 0.22);
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.chart-tool-btn:hover,
+.drawing-tool-btn:hover {
+    color: #ffffff;
+    background: #334155;
+    border-color: #38bdf8;
+}
+
+.chart-tool-btn.reset-btn {
+    color: #ddd6fe;
+    border-color:
+        rgba(168, 85, 247, 0.38);
+}
+
+.drawing-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top:
+        1px solid
+        rgba(255, 255, 255, 0.06);
+}
+
+.drawing-tool-btn.active {
+    color: #111827;
+    background: #facc15;
+    border-color: #fde047;
+}
+
+.drawing-tool-btn.danger-outline {
+    color: #fca5a5;
+    border-color:
+        rgba(239, 68, 68, 0.35);
+}
+
+.drawing-tool-btn.danger {
+    color: #ffffff;
+    background:
+        rgba(185, 28, 28, 0.72);
+    border-color: #ef4444;
+}
+
+.drawing-tool-btn.sync-btn {
+    color: #bfdbfe;
+    border-color:
+        rgba(59, 130, 246, 0.40);
+}
+
+.drawing-label {
+    color: #94a3b8;
+    font-size: 11px;
+}
+
+.drawing-select {
+    min-width: 72px;
+    padding: 6px 8px;
+    color: #e2e8f0;
+    background: #0f172a;
+    border:
+        1px solid
+        rgba(148, 163, 184, 0.28);
+    border-radius: 6px;
+    font-size: 11px;
+}
+
+.drawing-status {
+    color: #94a3b8;
+    font-size: 11px;
+}
+
+.drawing-status.success {
+    color: #4ade80;
+}
+
+.drawing-status.warning {
+    color: #fbbf24;
+}
+
+.drawing-status.error {
+    color: #fb7185;
+}
+
+.drawing-status.disabled {
+    color: #64748b;
+}
+
+.ohlcv-fixed-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    min-height: 46px;
+    padding: 8px 12px;
+    color: #cbd5e1;
+    background: #0f172a;
+    border-bottom:
+        1px solid
+        rgba(255, 255, 255, 0.06);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.ohlcv-placeholder {
+    color: #64748b;
+}
+
+.ohlcv-date {
+    color: #f8fafc;
+    font-weight: 700;
+}
+
+.ohlcv-timeframe {
+    color: #c084fc;
+    font-weight: 700;
+}
+
+.ohlcv-open {
+    color: #fbbf24;
+}
+
+.ohlcv-high {
+    color: #fb7185;
+}
+
+.ohlcv-low {
+    color: #2dd4bf;
+}
+
+.ohlcv-close {
+    color: #60a5fa;
+}
+
+.ohlcv-volume {
+    color: #c084fc;
+}
+
+.ohlcv-change {
+    color: #94a3b8;
+}
+
+.ohlcv-up {
+    color: #ef5350;
+    font-weight: 700;
+}
+
+.ohlcv-down {
+    color: #26a69a;
+    font-weight: 700;
+}
+
+.ohlcv-flat {
+    color: #cbd5e1;
+    font-weight: 700;
+}
+
+.plotly-container {
+    width: 100%;
+    height: 520px;
+    background: #131722;
+    border-radius: 0 0 12px 12px;
+    touch-action: none;
+}
+
+.no-data {
+    margin-top: 20px;
+    padding: 55px 20px;
+    color: #64748b;
+    text-align: center;
+    background:
+        rgba(19, 23, 34, 0.75);
+    border:
+        1px dashed
+        rgba(148, 163, 184, 0.25);
+    border-radius: 12px;
+}
+
+.plotly-error {
+    padding: 40px 15px;
+    color: #fca5a5;
+    text-align: center;
+    background:
+        rgba(127, 29, 29, 0.20);
+    border-radius: 10px;
+}
+
+@media (max-width: 760px) {
+    .sector-summary-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    body {
+        padding: 8px;
+    }
+
+    .header {
+        padding: 16px 10px;
+        border-radius: 10px;
+    }
+
+    .header h2 {
+        font-size: 19px;
+    }
+
+    .category-box {
+        padding: 12px 10px;
+    }
+
+    .tab-btn {
+        flex: 1 1 auto;
+        padding: 9px 8px;
+        font-size: 12px;
+    }
+
+    .chart-toolbar-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .zoom-buttons {
+        width: 100%;
+    }
+
+    .chart-tool-btn {
+        flex: 1;
+        padding: 8px 5px;
+        font-size: 11px;
+    }
+
+    .drawing-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .drawing-tool-group,
+    .drawing-style-group,
+    .drawing-action-group {
+        width: 100%;
+    }
+
+    .drawing-tool-btn {
+        flex: 1;
+        padding: 8px 5px;
+        font-size: 10px;
+    }
+
+    .drawing-status {
+        text-align: left;
+    }
+
+    .ohlcv-fixed-panel {
+        min-height: 52px;
+        padding: 7px 8px;
+        font-size: 11px;
+    }
+
+    .plotly-container {
+        min-height: 470px;
+        height: auto;
+    }
+
+    .chart-card {
+        margin-bottom: 14px;
+        border-radius: 10px;
+    }
+}
+</style>
+</head>
+
+<body>
+<div class="header">
+    <h2>
+        📈 台美股量化潛伏網頁報告
+        (__REPORT_DATE__)
+    </h2>
+
+    <p>
+        專屬訂製滾動數據儲存版
+    </p>
+</div>
+
+<div
+    id="liff-status"
+    class="liff-status"
+>
+    正在初始化 LINE LIFF 與畫線同步功能……
+</div>
+"""
+
+    html = html.replace(
+        "__REPORT_DATE__",
+        escape_html(date_str)
+    )
+
+    if CUSTOM_GROUP_TEST_MODE:
+        html += """
+<div class="test-notice">
+    目前為 Supabase 測試模式，
+    自訂群組不套用均線距離篩選
+</div>
+"""
+
+    html += f"""
+<div
+    class="category-box"
+    style="border-left-color:#a855f7;"
+>
+    <div class="category-title">
+        🌍 全球大盤指數
+    </div>
+
+    <div class="tabs">
+        <button
+            id="btn-indices"
+            class="tab-btn index-btn"
+            onclick="switchMarket(event, 'indices')"
+        >
+            全球指數圖表
+            ({len(data_dict.get("indices", []))})
+        </button>
+    </div>
+</div>
+
+<div
+    class="category-box"
+    style="border-left-color:#10b981;"
+>
+    <div class="category-title">
+        🧭 美股類股週 K
+    </div>
+
+    <div class="tabs">
+        <button
+            id="btn-sectors"
+            class="tab-btn sector-btn"
+            onclick="switchMarket(event, 'sectors')"
+        >
+            11 大類股週線輪動
+            ({len(data_dict.get("sectors", []))})
+        </button>
+    </div>
+</div>
+
+<div
+    class="category-box"
+    style="border-left-color:#ff5252;"
+>
+    <div class="category-title">
+        🇹🇼 台灣股市
+    </div>
+
+    <div class="tabs">
+        <button
+            id="btn-tw_all"
+            class="tab-btn active"
+            onclick="switchMarket(event, 'tw_all')"
+        >
+            全市場潛伏
+            ({len(data_dict.get("tw_all", []))})
+        </button>
+
+        <button
+            id="btn-tw_g1"
+            class="tab-btn"
+            onclick="switchMarket(event, 'tw_g1')"
+        >
+            權值精選
+            ({len(data_dict.get("tw_g1", []))})
+        </button>
+
+        <button
+            id="btn-tw_g2"
+            class="tab-btn"
+            onclick="switchMarket(event, 'tw_g2')"
+        >
+            熱門
+            ({len(data_dict.get("tw_g2", []))})
+        </button>
+"""
+
+    html += generate_custom_group_buttons_html(
+        data_dict,
+        group_metadata,
+        market="tw"
+    )
+
+    html += """
+    </div>
+</div>
+"""
+
+    html += f"""
+<div
+    class="category-box"
+    style="border-left-color:#00b0ff;"
+>
+    <div class="category-title">
+        🇺🇸 美國股市
+    </div>
+
+    <div class="tabs">
+        <button
+            id="btn-us_all"
+            class="tab-btn"
+            onclick="switchMarket(event, 'us_all')"
+        >
+            全市場潛伏
+            ({len(data_dict.get("us_all", []))})
+        </button>
+
+        <button
+            id="btn-us_g1"
+            class="tab-btn"
+            onclick="switchMarket(event, 'us_g1')"
+        >
+            權值精選
+            ({len(data_dict.get("us_g1", []))})
+        </button>
+
+        <button
+            id="btn-us_g2"
+            class="tab-btn"
+            onclick="switchMarket(event, 'us_g2')"
+        >
+            低本益比
+            ({len(data_dict.get("us_g2", []))})
+        </button>
+
+        <button
+            id="btn-us_g3"
+            class="tab-btn"
+            onclick="switchMarket(event, 'us_g3')"
+        >
+            超級績效
+            ({len(data_dict.get("us_g3", []))})
+        </button>
+
+        <button
+            id="btn-us_g4"
+            class="tab-btn"
+            onclick="switchMarket(event, 'us_g4')"
+        >
+            熱門
+            ({len(data_dict.get("us_g4", []))})
+        </button>
+"""
+
+    html += generate_custom_group_buttons_html(
+        data_dict,
+        group_metadata,
+        market="us"
+    )
+
+    html += """
+    </div>
+</div>
+"""
+
+    keys = [
+        "indices",
+        "sectors",
+        "tw_all",
+        "tw_g1",
+        "tw_g2",
+        *tw_custom_group_keys,
+        "us_all",
+        "us_g1",
+        "us_g2",
+        "us_g3",
+        "us_g4",
+        *us_custom_group_keys
+    ]
+
+    # 去除重複，保持原順序
+    keys = list(dict.fromkeys(keys))
+
+    for key in keys:
+        active_class = (
+            " active"
+            if key == "tw_all"
+            else ""
+        )
+
+        html += (
+            f'<div id="{escape_html(key)}-market" '
+            f'class="market-section{active_class}">'
+        )
+
+        if key == "sectors":
+            html += (
+                generate_sector_overview_html(
+                    sector_summary
+                )
+            )
+
+        items = data_dict.get(
+            key,
+            []
+        )
+
+        if items:
+            drawing_enabled = (
+                is_drawing_enabled_market(key)
+            )
+
+            for chart_index, item in enumerate(
+                items
+            ):
+                html += generate_chart_card_html(
+                    key,
+                    chart_index,
+                    item,
+                    drawing_enabled
+                )
+
+        else:
+            if key == "indices":
+                no_data_text = (
+                    "目前沒有可顯示的指數"
+                )
+
+            elif key == "sectors":
+                no_data_text = (
+                    "目前沒有可顯示的類股週 K"
+                )
+
+            elif key.startswith("custom_"):
+                metadata = group_metadata.get(
+                    key,
+                    {}
+                )
+
+                group_name = metadata.get(
+                    "name",
+                    key
+                )
+
+                no_data_text = (
+                    f"{group_name} "
+                    "目前沒有符合均線條件的股票"
+                )
+
+            else:
+                no_data_text = (
+                    "此分類目前沒有可顯示的股票"
+                )
+
+            html += (
+                '<div class="no-data">'
+                f'{escape_html(no_data_text)}'
+                '</div>'
+            )
+
+        html += "</div>"
+
+    # JavaScript 與 LIFF 畫線同步會在第 5 部分加入。
+    # 目前先將已建立的 HTML 保存在 html 變數中。
+
+
+# =========================================================================
+# 第 4 部分結束
+# 注意：generate_html() 尚未結束
+# 第 5 部分必須直接接續，保持 4 個空白縮排
+# =========================================================================
+
+    html += """
+<script>
+const chartDataStore = __CHART_JSON__;
+
+const REPORT_LIFF_ID = "__REPORT_LIFF_ID__";
+const DRAWING_SYNC_URL = "__DRAWING_SYNC_URL__";
+
+let liffReady = false;
+let liffIdToken = "";
+let lineProfile = null;
+
+const chartSyncTimers = {};
+const chartLoadingFlags = {};
+const horizontalLineModes = {};
+const eraseModes = {};
+
+
+/* ======================================================================
+ * 一般格式工具
+ * ====================================================================== */
+function formatPrice(value) {
+    const numberValue = Number(value);
+
+    if (!Number.isFinite(numberValue)) {
+        return "--";
+    }
+
+    return numberValue.toLocaleString(
+        "zh-TW",
+        {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }
+    );
+}
+
+
+function formatVolume(value) {
+    const numberValue = Number(value);
+
+    if (!Number.isFinite(numberValue)) {
+        return "--";
+    }
+
+    return Math.round(
+        numberValue
+    ).toLocaleString("zh-TW");
+}
+
+
+function normalizeDate(value) {
+    return String(
+        value || ""
+    ).substring(0, 10);
+}
+
+
+function setLiffStatus(
+    message,
+    statusClass = ""
+) {
+    const statusElement = (
+        document.getElementById(
+            "liff-status"
+        )
+    );
+
+    if (!statusElement) {
+        return;
+    }
+
+    statusElement.textContent = message;
+
+    statusElement.className = (
+        "liff-status"
+        + (
+            statusClass
+                ? " " + statusClass
+                : ""
+        )
+    );
+}
+
+
+function setDrawingStatus(
+    container,
+    message,
+    statusClass = ""
+) {
+    if (!container) {
+        return;
+    }
+
+    const marketId = (
+        container.dataset.marketId
+    );
+
+    const chartIndex = (
+        container.dataset.chartIndex
+    );
+
+    const statusElement = (
+        document.getElementById(
+            "drawing-status-"
+            + marketId
+            + "-"
+            + chartIndex
+        )
+    );
+
+    if (!statusElement) {
+        return;
+    }
+
+    statusElement.textContent = message;
+
+    statusElement.className = (
+        "drawing-status"
+        + (
+            statusClass
+                ? " " + statusClass
+                : ""
+        )
+    );
+}
+
+
+/* ======================================================================
+ * LIFF 初始化
+ * ====================================================================== */
+async function initializeLiff() {
+    if (typeof liff === "undefined") {
+        setLiffStatus(
+            "⚠️ LIFF SDK 載入失敗，"
+            + "畫線仍會保存在本機瀏覽器。",
+            "warning"
+        );
+
+        return;
+    }
+
+    try {
+        await liff.init({
+            liffId: REPORT_LIFF_ID
+        });
+
+        if (!liff.isLoggedIn()) {
+            setLiffStatus(
+                "正在導向 LINE 登入……"
+            );
+
+            liff.login({
+                redirectUri: window.location.href
+            });
+
+            return;
+        }
+
+        liffIdToken = (
+            liff.getIDToken() || ""
+        );
+
+        if (!liffIdToken) {
+            setLiffStatus(
+                "⚠️ 無法取得 LINE ID Token，"
+                + "畫線只會保存在目前裝置。",
+                "warning"
+            );
+
+            return;
+        }
+
+        try {
+            lineProfile = (
+                await liff.getProfile()
+            );
+        } catch (profileError) {
+            console.warn(
+                "無法取得 LINE Profile：",
+                profileError
+            );
+        }
+
+        liffReady = true;
+
+        const displayName = (
+            lineProfile
+            && lineProfile.displayName
+                ? lineProfile.displayName
+                : "LINE 使用者"
+        );
+
+        setLiffStatus(
+            "✅ 已登入 "
+            + displayName
+            + "，畫線可跨裝置同步。",
+            "success"
+        );
+
+        await synchronizeRenderedCharts();
+
+    } catch (error) {
+        console.error(
+            "LIFF 初始化失敗：",
+            error
+        );
+
+        setLiffStatus(
+            "⚠️ LIFF 初始化失敗，"
+            + "畫線仍會保存在本機瀏覽器。",
+            "warning"
+        );
+    }
+}
+
+
+/* ======================================================================
+ * 圖表資料取得
+ * ====================================================================== */
+function getChartItem(container) {
+    if (!container) {
+        return null;
+    }
+
+    const marketId = (
+        container.dataset.marketId
+    );
+
+    const chartIndex = Number(
+        container.dataset.chartIndex
+    );
+
+    if (
+        !marketId
+        || !Number.isInteger(chartIndex)
+        || !Array.isArray(
+            chartDataStore[marketId]
+        )
+    ) {
+        return null;
+    }
+
+    return (
+        chartDataStore[marketId][
+            chartIndex
+        ]
+        || null
+    );
+}
+
+
+function getDrawingIdentity(container) {
+    const item = getChartItem(
+        container
+    );
+
+    if (!item) {
+        return null;
+    }
+
+    const ticker = String(
+        item.ticker
+        || container.dataset.ticker
+        || ""
+    ).trim().toUpperCase();
+
+    const timeframe = String(
+        (
+            item.chart_data
+            && item.chart_data.drawing_timeframe
+        )
+        || container.dataset.timeframe
+        || "1d"
+    ).trim();
+
+    const marketKey = String(
+        container.dataset.marketId
+        || ""
+    ).trim();
+
+    if (!ticker) {
+        return null;
+    }
+
+    return {
+        ticker,
+        timeframe,
+        marketKey
+    };
+}
+
+
+function getDrawingStorageKey(container) {
+    const identity = (
+        getDrawingIdentity(container)
+    );
+
+    if (!identity) {
+        return "";
+    }
+
+    return (
+        "stock_chart_drawings::"
+        + identity.ticker
+        + "::"
+        + identity.timeframe
+    );
+}
+
+
+/* ======================================================================
+ * 畫線資料清理
+ * ====================================================================== */
+function clonePlainObject(value) {
+    try {
+        return JSON.parse(
+            JSON.stringify(value)
+        );
+    } catch (error) {
+        return null;
+    }
+}
+
+
+function isSystemShape(shape) {
+    if (!shape) {
+        return true;
+    }
+
+    const shapeName = String(
+        shape.name || ""
+    );
+
+    return (
+        shapeName === "__volume_separator__"
+        || shapeName === "__selected_candle__"
+    );
+}
+
+
+function getBaseShapes(container) {
+    if (
+        container
+        && Array.isArray(
+            container._baseShapes
+        )
+    ) {
+        return container._baseShapes
+            .map(clonePlainObject)
+            .filter(Boolean);
+    }
+
+    return [];
+}
+
+
+function getUserDrawings(container) {
+    if (
+        !container
+        || !container.layout
+        || !Array.isArray(
+            container.layout.shapes
+        )
+    ) {
+        return [];
+    }
+
+    return container.layout.shapes
+        .filter(
+            (shape) => !isSystemShape(shape)
+        )
+        .map(clonePlainObject)
+        .filter(Boolean);
+}
+
+
+function normalizeLoadedDrawings(
+    drawings
+) {
+    if (!Array.isArray(drawings)) {
+        return [];
+    }
+
+    return drawings
+        .filter(
+            (shape) => (
+                shape
+                && typeof shape === "object"
+                && !isSystemShape(shape)
+            )
+        )
+        .slice(0, 200)
+        .map(clonePlainObject)
+        .filter(Boolean);
+}
+
+
+function applyUserDrawings(
+    container,
+    drawings
+) {
+    if (
+        !container
+        || typeof Plotly === "undefined"
+    ) {
+        return Promise.resolve();
+    }
+
+    const baseShapes = (
+        getBaseShapes(container)
+    );
+
+    const userShapes = (
+        normalizeLoadedDrawings(
+            drawings
+        )
+    );
+
+    container._drawingLoadInProgress = true;
+
+    return Plotly.relayout(
+        container,
+        {
+            shapes: [
+                ...baseShapes,
+                ...userShapes
+            ]
+        }
+    ).finally(() => {
+        setTimeout(() => {
+            container._drawingLoadInProgress = false;
+        }, 100);
+    });
+}
+
+
+/* ======================================================================
+ * localStorage 保存
+ * ====================================================================== */
+function loadLocalDrawingRecord(
+    container
+) {
+    const storageKey = (
+        getDrawingStorageKey(container)
+    );
+
+    if (!storageKey) {
+        return {
+            drawings: [],
+            updatedAt: null
+        };
+    }
+
+    try {
+        const rawValue = (
+            localStorage.getItem(
+                storageKey
+            )
+        );
+
+        if (!rawValue) {
+            return {
+                drawings: [],
+                updatedAt: null
+            };
+        }
+
+        const parsedValue = JSON.parse(
+            rawValue
+        );
+
+        return {
+            drawings: (
+                normalizeLoadedDrawings(
+                    parsedValue.drawings
+                )
+            ),
+            updatedAt: (
+                parsedValue.updatedAt
+                || null
+            )
+        };
+
+    } catch (error) {
+        console.error(
+            "讀取本機畫線失敗：",
+            error
+        );
+
+        return {
+            drawings: [],
+            updatedAt: null
+        };
+    }
+}
+
+
+function saveLocalDrawingRecord(
+    container,
+    drawings,
+    updatedAt = null
+) {
+    const storageKey = (
+        getDrawingStorageKey(container)
+    );
+
+    if (!storageKey) {
+        return null;
+    }
+
+    const finalUpdatedAt = (
+        updatedAt
+        || new Date().toISOString()
+    );
+
+    const record = {
+        drawings: (
+            normalizeLoadedDrawings(
+                drawings
+            )
+        ),
+        updatedAt: finalUpdatedAt
+    };
+
+    try {
+        localStorage.setItem(
+            storageKey,
+            JSON.stringify(record)
+        );
+
+        return record;
+
+    } catch (error) {
+        console.error(
+            "保存本機畫線失敗：",
+            error
+        );
+
+        return null;
+    }
+}
+
+
+/* ======================================================================
+ * Edge Function 請求
+ * ====================================================================== */
+async function requestDrawingSync(
+    payload
+) {
+    if (
+        !liffReady
+        || !liffIdToken
+    ) {
+        throw new Error(
+            "LIFF 尚未完成登入"
+        );
+    }
+
+    const response = await fetch(
+        DRAWING_SYNC_URL,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type":
+                    "application/json"
+            },
+            body: JSON.stringify({
+                ...payload,
+                idToken: liffIdToken
+            })
+        }
+    );
+
+    let responseData = {};
+
+    try {
+        responseData = (
+            await response.json()
+        );
+    } catch (error) {
+        responseData = {};
+    }
+
+    if (
+        !response.ok
+        || responseData.ok !== true
+    ) {
+        throw new Error(
+            responseData.error
+            || (
+                "同步失敗，HTTP "
+                + response.status
+            )
+        );
+    }
+
+    return responseData;
+}
+
+
+/* ======================================================================
+ * 遠端載入與衝突處理
+ * ====================================================================== */
+function parseTimestamp(value) {
+    if (!value) {
+        return 0;
+    }
+
+    const timestamp = Date.parse(value);
+
+    return (
+        Number.isFinite(timestamp)
+            ? timestamp
+            : 0
+    );
+}
+
+
+async function loadAndMergeDrawings(
+    container
+) {
+    if (
+        !container
+        || container.dataset.drawingEnabled
+            !== "true"
+    ) {
+        return;
+    }
+
+    const identity = (
+        getDrawingIdentity(container)
+    );
+
+    if (!identity) {
+        return;
+    }
+
+    const localRecord = (
+        loadLocalDrawingRecord(
+            container
+        )
+    );
+
+    if (localRecord.drawings.length) {
+        await applyUserDrawings(
+            container,
+            localRecord.drawings
+        );
+
+        setDrawingStatus(
+            container,
+            "已載入本機畫線",
+            "success"
+        );
+    }
+
+    if (
+        !liffReady
+        || !liffIdToken
+    ) {
+        setDrawingStatus(
+            container,
+            "目前只使用本機保存",
+            "warning"
+        );
+
+        return;
+    }
+
+    if (
+        chartLoadingFlags[
+            getDrawingStorageKey(container)
+        ]
+    ) {
+        return;
+    }
+
+    const loadingKey = (
+        getDrawingStorageKey(container)
+    );
+
+    chartLoadingFlags[
+        loadingKey
+    ] = true;
+
+    try {
+        setDrawingStatus(
+            container,
+            "正在讀取雲端畫線……"
+        );
+
+        const remoteRecord = (
+            await requestDrawingSync({
+                action: "load",
+                ticker: identity.ticker,
+                timeframe:
+                    identity.timeframe,
+                marketKey:
+                    identity.marketKey
+            })
+        );
+
+        const remoteDrawings = (
+            normalizeLoadedDrawings(
+                remoteRecord.drawings
+            )
+        );
+
+        const localTimestamp = (
+            parseTimestamp(
+                localRecord.updatedAt
+            )
+        );
+
+        const remoteTimestamp = (
+            parseTimestamp(
+                remoteRecord.updatedAt
+            )
+        );
+
+        if (
+            remoteTimestamp
+            > localTimestamp
+        ) {
+            await applyUserDrawings(
+                container,
+                remoteDrawings
+            );
+
+            saveLocalDrawingRecord(
+                container,
+                remoteDrawings,
+                remoteRecord.updatedAt
+            );
+
+            setDrawingStatus(
+                container,
+                "已載入雲端畫線",
+                "success"
+            );
+
+        } else if (
+            localTimestamp > remoteTimestamp
+            && localRecord.drawings.length
+        ) {
+            await saveDrawingsToRemote(
+                container,
+                localRecord.drawings,
+                false
+            );
+
+        } else if (
+            !localRecord.drawings.length
+            && remoteDrawings.length
+        ) {
+            await applyUserDrawings(
+                container,
+                remoteDrawings
+            );
+
+            saveLocalDrawingRecord(
+                container,
+                remoteDrawings,
+                remoteRecord.updatedAt
+            );
+
+            setDrawingStatus(
+                container,
+                "已載入雲端畫線",
+                "success"
+            );
+
+        } else {
+            setDrawingStatus(
+                container,
+                "畫線已同步",
+                "success"
+            );
+        }
+
+    } catch (error) {
+        console.error(
+            "載入雲端畫線失敗：",
+            error
+        );
+
+        setDrawingStatus(
+            container,
+            "雲端同步失敗，本機畫線仍保留",
+            "warning"
+        );
+
+    } finally {
+        chartLoadingFlags[
+            loadingKey
+        ] = false;
+    }
+}
+
+
+/* ======================================================================
+ * 遠端保存
+ * ====================================================================== */
+async function saveDrawingsToRemote(
+    container,
+    drawings,
+    showStatus = true
+) {
+    if (
+        !container
+        || container.dataset.drawingEnabled
+            !== "true"
+    ) {
+        return null;
+    }
+
+    const identity = (
+        getDrawingIdentity(container)
+    );
+
+    if (!identity) {
+        return null;
+    }
+
+    if (
+        !liffReady
+        || !liffIdToken
+    ) {
+        if (showStatus) {
+            setDrawingStatus(
+                container,
+                "已存本機；LIFF 未登入，尚未同步",
+                "warning"
+            );
+        }
+
+        return null;
+    }
+
+    try {
+        if (showStatus) {
+            setDrawingStatus(
+                container,
+                "正在同步畫線……"
+            );
+        }
+
+        const responseData = (
+            await requestDrawingSync({
+                action: "save",
+                ticker: identity.ticker,
+                timeframe:
+                    identity.timeframe,
+                marketKey:
+                    identity.marketKey,
+                drawings:
+                    normalizeLoadedDrawings(
+                        drawings
+                    )
+            })
+        );
+
+        saveLocalDrawingRecord(
+            container,
+            drawings,
+            responseData.updatedAt
+        );
+
+        setDrawingStatus(
+            container,
+            "畫線已跨裝置同步",
+            "success"
+        );
+
+        return responseData;
+
+    } catch (error) {
+        console.error(
+            "保存雲端畫線失敗：",
+            error
+        );
+
+        setDrawingStatus(
+            container,
+            "雲端同步失敗，本機畫線仍保留",
+            "warning"
+        );
+
+        return null;
+    }
+}
+
+
+function scheduleDrawingSave(
+    container
+) {
+    if (
+        !container
+        || container.dataset.drawingEnabled
+            !== "true"
+        || container._drawingLoadInProgress
+    ) {
+        return;
+    }
+
+    const drawings = (
+        getUserDrawings(container)
+    );
+
+    const localRecord = (
+        saveLocalDrawingRecord(
+            container,
+            drawings
+        )
+    );
+
+    if (localRecord) {
+        setDrawingStatus(
+            container,
+            "已保存至本機，等待雲端同步"
+        );
+    }
+
+    const storageKey = (
+        getDrawingStorageKey(container)
+    );
+
+    if (!storageKey) {
+        return;
+    }
+
+    if (chartSyncTimers[storageKey]) {
+        clearTimeout(
+            chartSyncTimers[storageKey]
+        );
+    }
+
+    chartSyncTimers[storageKey] = (
+        setTimeout(() => {
+            saveDrawingsToRemote(
+                container,
+                drawings,
+                true
+            );
+        }, 900)
+    );
+}
+
+
+async function syncChartDrawings(
+    chartId,
+    showStatus = true
+) {
+    const container = (
+        document.getElementById(
+            chartId
+        )
+    );
+
+    if (!container) {
+        return;
+    }
+
+    const drawings = (
+        getUserDrawings(container)
+    );
+
+    saveLocalDrawingRecord(
+        container,
+        drawings
+    );
+
+    await saveDrawingsToRemote(
+        container,
+        drawings,
+        showStatus
+    );
+}
+
+
+async function synchronizeRenderedCharts() {
+    const containers = (
+        document.querySelectorAll(
+            '.plotly-container'
+            + '[data-drawing-enabled="true"]'
+            + '[data-done="true"]'
+        )
+    );
+
+    for (const container of containers) {
+        await loadAndMergeDrawings(
+            container
+        );
+    }
+}
+
+
+/* ======================================================================
+ * 畫線樣式與工具
+ * ====================================================================== */
+function getDrawingStyle(chartId) {
+    const colorSelect = (
+        document.getElementById(
+            "drawing-color-" + chartId
+        )
+    );
+
+    const widthSelect = (
+        document.getElementById(
+            "drawing-width-" + chartId
+        )
+    );
+
+    const color = (
+        colorSelect
+            ? colorSelect.value
+            : "#facc15"
+    );
+
+    const width = Number(
+        widthSelect
+            ? widthSelect.value
+            : 2
+    );
+
+    return {
+        color,
+        width: (
+            Number.isFinite(width)
+                ? width
+                : 2
+        )
+    };
+}
+
+
+function clearActiveDrawingButtons(
+    container
+) {
+    if (!container) {
+        return;
+    }
+
+    const card = container.closest(
+        ".chart-card"
+    );
+
+    if (!card) {
+        return;
+    }
+
+    card.querySelectorAll(
+        ".drawing-tool-btn"
+    ).forEach((button) => {
+        button.classList.remove(
+            "active"
+        );
+    });
+}
+
+
+function applyDrawingStyle(chartId) {
+    const container = (
+        document.getElementById(
+            chartId
+        )
+    );
+
+    if (
+        !container
+        || typeof Plotly === "undefined"
+    ) {
+        return;
+    }
+
+    const style = (
+        getDrawingStyle(chartId)
+    );
+
+    Plotly.relayout(
+        container,
+        {
+            "newshape.line.color":
+                style.color,
+            "newshape.line.width":
+                style.width,
+            "newshape.fillcolor":
+                style.color + "22",
+            "newshape.opacity": 0.90
+        }
+    );
+}
+
+
+function activateDrawingTool(
+    chartId,
+    toolName
+) {
+    const container = (
+        document.getElementById(
+            chartId
+        )
+    );
+
+    if (
+        !container
+        || container.dataset.done
+            !== "true"
+        || container.dataset.drawingEnabled
+            !== "true"
+        || typeof Plotly === "undefined"
+    ) {
+        return;
+    }
+
+    horizontalLineModes[chartId] = false;
+    eraseModes[chartId] = false;
+
+    clearActiveDrawingButtons(
+        container
+    );
+
+    applyDrawingStyle(chartId);
+
+    Plotly.relayout(
+        container,
+        {
+            dragmode: toolName
+        }
+    );
+
+    setDrawingStatus(
+        container,
+        (
+            toolName === "drawrect"
+                ? "矩形模式：拖曳建立區域"
+                : "趨勢線模式：拖曳建立線段"
+        )
+    );
+}
+
+
+function activateHorizontalLineTool(
+    chartId
+) {
+    const container = (
+        document.getElementById(
+            chartId
+        )
+    );
+
+    if (
+        !container
+        || container.dataset.done
+            !== "true"
+        || container.dataset.drawingEnabled
+            !== "true"
+        || typeof Plotly === "undefined"
+    ) {
+        return;
+    }
+
+    clearActiveDrawingButtons(
+        container
+    );
+
+    eraseModes[chartId] = false;
+    horizontalLineModes[chartId] = true;
+
+    Plotly.relayout(
+        container,
+        {
+            dragmode: "pan"
+        }
+    );
+
+    setDrawingStatus(
+        container,
+        "水平線模式：請點擊一根 K 線的價格位置"
+    );
+}
+
+
+function activateEraseTool(chartId) {
+    const container = (
+        document.getElementById(
+            chartId
+        )
+    );
+
+    if (
+        !container
+        || container.dataset.done
+            !== "true"
+        || container.dataset.drawingEnabled
+            !== "true"
+        || typeof Plotly === "undefined"
+    ) {
+        return;
+    }
+
+    clearActiveDrawingButtons(
+        container
+    );
+
+    horizontalLineModes[chartId] = false;
+    eraseModes[chartId] = true;
+
+    Plotly.relayout(
+        container,
+        {
+            dragmode: "eraseshape"
+        }
+    ).catch(() => {
+        setDrawingStatus(
+            container,
+            "請先點選圖形，再使用 Plotly 刪除工具",
+            "warning"
+        );
+    });
+
+    setDrawingStatus(
+        container,
+        "刪除模式：點擊要刪除的圖形"
+    );
+}
+
+
+function addHorizontalPriceLine(
+    container,
+    price
+) {
+    if (
+        !container
+        || !Number.isFinite(price)
+        || typeof Plotly === "undefined"
+    ) {
+        return;
+    }
+
+    const chartId = container.id;
+    const style = (
+        getDrawingStyle(chartId)
+    );
+
+    const currentShapes = (
+        Array.isArray(
+            container.layout.shapes
+        )
+            ? container.layout.shapes
+                .map(clonePlainObject)
+                .filter(Boolean)
+            : []
+    );
+
+    const horizontalShape = {
+        type: "line",
+        xref: "paper",
+        yref: "y",
+        x0: 0,
+        x1: 1,
+        y0: price,
+        y1: price,
+        editable: true,
+        line: {
+            color: style.color,
+            width: style.width,
+            dash: "solid"
+        }
+    };
+
+    container._drawingLoadInProgress = true;
+
+    Plotly.relayout(
+        container,
+        {
+            shapes: [
+                ...currentShapes,
+                horizontalShape
+            ],
+            dragmode: "pan"
+        }
+    ).then(() => {
+        horizontalLineModes[
+            chartId
+        ] = false;
+
+        setTimeout(() => {
+            container._drawingLoadInProgress = false;
+            scheduleDrawingSave(
+                container
+            );
+        }, 100);
+
+        setDrawingStatus(
+            container,
+            "水平線已建立",
+            "success"
+        );
+    });
+}
+
+
+async function clearAllDrawings(
+    chartId
+) {
+    const container = (
+        document.getElementById(
+            chartId
+        )
+    );
+
+    if (
+        !container
+        || container.dataset.drawingEnabled
+            !== "true"
+        || typeof Plotly === "undefined"
+    ) {
+        return;
+    }
+
+    const confirmed = window.confirm(
+        "確定要清除這個商品、"
+        + "這個週期的全部人工畫線嗎？"
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    horizontalLineModes[chartId] = false;
+    eraseModes[chartId] = false;
+
+    container._drawingLoadInProgress = true;
+
+    await Plotly.relayout(
+        container,
+        {
+            shapes: getBaseShapes(
+                container
+            ),
+            dragmode: "pan"
+        }
+    );
+
+    container._drawingLoadInProgress = false;
+
+    saveLocalDrawingRecord(
+        container,
+        []
+    );
+
+    await saveDrawingsToRemote(
+        container,
+        [],
+        true
+    );
+
+    setDrawingStatus(
+        container,
+        "全部人工畫線已清除",
+        "success"
+    );
+}
+
+
+/* ======================================================================
+ * OHLCV 點擊與選取線
+ * ====================================================================== */
+function findOhlcvRecord(
+    item,
+    clickedDate
+) {
+    if (
+        !item
+        || !item.chart_data
+        || !Array.isArray(
+            item.chart_data.ohlcv
+        )
+    ) {
+        return null;
+    }
+
+    const normalizedDate = (
+        normalizeDate(clickedDate)
+    );
+
+    return (
+        item.chart_data.ohlcv.find(
+            (row) => (
+                row.date
+                === normalizedDate
+            )
+        )
+        || null
+    );
+}
+
+
+function clearSelectedCandle(
+    container
+) {
+    if (
+        !container
+        || typeof Plotly === "undefined"
+    ) {
+        return;
+    }
+
+    const shapes = (
+        Array.isArray(
+            container.layout.shapes
+        )
+            ? container.layout.shapes
+                .filter(
+                    (shape) => (
+                        String(
+                            shape.name || ""
+                        )
+                        !== "__selected_candle__"
+                    )
+                )
+            : []
+    );
+
+    container._drawingLoadInProgress = true;
+
+    Plotly.relayout(
+        container,
+        {
+            shapes,
+            annotations: []
+        }
+    ).finally(() => {
+        setTimeout(() => {
+            container._drawingLoadInProgress = false;
+        }, 50);
+    });
+
+    delete container.dataset.selectedDate;
+}
+
+
+function markSelectedDate(
+    container,
+    record
+) {
+    if (
+        !container
+        || !record
+        || typeof Plotly === "undefined"
+    ) {
+        return;
+    }
+
+    const existingShapes = (
+        Array.isArray(
+            container.layout.shapes
+        )
+            ? container.layout.shapes
+                .filter(
+                    (shape) => (
+                        String(
+                            shape.name || ""
+                        )
+                        !== "__selected_candle__"
+                    )
+                )
+                .map(clonePlainObject)
+                .filter(Boolean)
+            : []
+    );
+
+    const selectedShape = {
+        type: "line",
+        name: "__selected_candle__",
+        xref: "x",
+        yref: "paper",
+        x0: record.date,
+        x1: record.date,
+        y0: 0,
+        y1: 1,
+        editable: false,
+        line: {
+            color: "#facc15",
+            width: 1.5,
+            dash: "dot"
+        }
+    };
+
+    const selectedAnnotation = {
+        xref: "x",
+        yref: "paper",
+        x: record.date,
+        y: 1,
+        text: (
+            record.date
+            + "<br>收 "
+            + formatPrice(
+                record.close
+            )
+        ),
+        showarrow: true,
+        arrowhead: 2,
+        arrowsize: 1,
+        arrowwidth: 1,
+        arrowcolor: "#facc15",
+        ax: 0,
+        ay: -38,
+        bgcolor:
+            "rgba(17,24,39,0.95)",
+        bordercolor: "#facc15",
+        borderwidth: 1,
+        borderpad: 4,
+        font: {
+            color: "#f8fafc",
+            size: 10
+        }
+    };
+
+    container._drawingLoadInProgress = true;
+
+    Plotly.relayout(
+        container,
+        {
+            shapes: [
+                ...existingShapes,
+                selectedShape
+            ],
+            annotations: [
+                selectedAnnotation
+            ]
+        }
+    ).finally(() => {
+        setTimeout(() => {
+            container._drawingLoadInProgress = false;
+        }, 50);
+    });
+}
+
+
+function showFixedOhlcv(
+    container,
+    clickedDate
+) {
+    const item = (
+        getChartItem(container)
+    );
+
+    const record = (
+        findOhlcvRecord(
+            item,
+            clickedDate
+        )
+    );
+
+    if (!record) {
+        return;
+    }
+
+    const marketId = (
+        container.dataset.marketId
+    );
+
+    const chartIndex = (
+        container.dataset.chartIndex
+    );
+
+    const infoPanel = (
+        document.getElementById(
+            "info-"
+            + marketId
+            + "-"
+            + chartIndex
+        )
+    );
+
+    if (!infoPanel) {
+        return;
+    }
+
+    const openValue = Number(
+        record.open
+    );
+
+    const closeValue = Number(
+        record.close
+    );
+
+    let directionClass = (
+        "ohlcv-flat"
+    );
+
+    let directionText = "平盤";
+    let changeText = "--";
+
+    if (
+        Number.isFinite(openValue)
+        && Number.isFinite(closeValue)
+    ) {
+        const changeValue = (
+            closeValue - openValue
+        );
+
+        if (closeValue > openValue) {
+            directionClass = "ohlcv-up";
+            directionText = "上漲";
+
+        } else if (
+            closeValue < openValue
+        ) {
+            directionClass = (
+                "ohlcv-down"
+            );
+
+            directionText = "下跌";
+        }
+
+        if (openValue !== 0) {
+            const changePercent = (
+                changeValue / openValue
+            ) * 100;
+
+            changeText = (
+                (
+                    changeValue >= 0
+                        ? "+"
+                        : ""
+                )
+                + formatPrice(changeValue)
+                + " / "
+                + (
+                    changePercent >= 0
+                        ? "+"
+                        : ""
+                )
+                + changePercent.toFixed(2)
+                + "%"
+            );
+        }
+    }
+
+    const timeframe = (
+        record.timeframe
+        || (
+            item
+            && item.chart_data
+            && item.chart_data.timeframe
+        )
+        || "日K"
+    );
+
+    infoPanel.innerHTML = (
+        '<span class="ohlcv-date">'
+        + record.date
+        + '</span>'
+
+        + '<span class="ohlcv-timeframe">'
+        + timeframe
+        + '</span>'
+
+        + '<span class="'
+        + directionClass
+        + '">'
+        + directionText
+        + '</span>'
+
+        + '<span class="ohlcv-open">'
+        + '開 '
+        + formatPrice(record.open)
+        + '</span>'
+
+        + '<span class="ohlcv-high">'
+        + '高 '
+        + formatPrice(record.high)
+        + '</span>'
+
+        + '<span class="ohlcv-low">'
+        + '低 '
+        + formatPrice(record.low)
+        + '</span>'
+
+        + '<span class="ohlcv-close">'
+        + '收 '
+        + formatPrice(record.close)
+        + '</span>'
+
+        + '<span class="ohlcv-volume">'
+        + '量 '
+        + formatVolume(record.volume)
+        + '</span>'
+
+        + '<span class="ohlcv-change">'
+        + 'K棒 '
+        + changeText
+        + '</span>'
+    );
+
+    container.dataset.selectedDate = (
+        record.date
+    );
+
+    markSelectedDate(
+        container,
+        record
+    );
+}
+
+
+/* ======================================================================
+ * 圖表範圍
+ * ====================================================================== */
+function getCategoryDates(item) {
+    if (
+        !item
+        || !item.chart_data
+        || !Array.isArray(
+            item.chart_data.ohlcv
+        )
+    ) {
+        return [];
+    }
+
+    return item.chart_data.ohlcv.map(
+        (record) => record.date
+    );
+}
+
+
+function getDefaultRange(
+    totalPoints
+) {
+    const visibleCount = Math.min(
+        60,
+        totalPoints
+    );
+
+    return [
+        Math.max(
+            -0.5,
+            totalPoints
+            - visibleCount
+            - 0.5
+        ),
+        totalPoints - 0.5
+    ];
+}
+
+
+function categoryRangeToIndex(
+    rangeValue,
+    dateList,
+    fallbackValue
+) {
+    if (
+        typeof rangeValue === "number"
+        && Number.isFinite(rangeValue)
+    ) {
+        return rangeValue;
+    }
+
+    if (
+        typeof rangeValue === "string"
+    ) {
+        const normalizedDate = (
+            normalizeDate(rangeValue)
+        );
+
+        const foundIndex = (
+            dateList.indexOf(
+                normalizedDate
+            )
+        );
+
+        if (foundIndex >= 0) {
+            return foundIndex;
+        }
+    }
+
+    return fallbackValue;
+}
+
+
+function zoomChart(
+    chartId,
+    factor
+) {
+    const container = (
+        document.getElementById(
+            chartId
+        )
+    );
+
+    if (
+        !container
+        || container.dataset.done
+            !== "true"
+        || typeof Plotly === "undefined"
+    ) {
+        return;
+    }
+
+    const item = getChartItem(
+        container
+    );
+
+    const dateList = (
+        getCategoryDates(item)
+    );
+
+    const totalPoints = (
+        dateList.length
+    );
+
+    if (totalPoints <= 1) {
+        return;
+    }
+
+    const xaxisLayout = (
+        container.layout
+        && container.layout.xaxis
+            ? container.layout.xaxis
+            : {}
+    );
+
+    const currentRange = (
+        Array.isArray(
+            xaxisLayout.range
+        )
+            ? xaxisLayout.range
+            : getDefaultRange(
+                totalPoints
+            )
+    );
+
+    let rangeStart = (
+        categoryRangeToIndex(
+            currentRange[0],
+            dateList,
+            -0.5
+        )
+    );
+
+    let rangeEnd = (
+        categoryRangeToIndex(
+            currentRange[1],
+            dateList,
+            totalPoints - 0.5
+        )
+    );
+
+    if (rangeEnd < rangeStart) {
+        const temporaryValue = (
+            rangeStart
+        );
+
+        rangeStart = rangeEnd;
+        rangeEnd = temporaryValue;
+    }
+
+    const currentWidth = Math.max(
+        1,
+        rangeEnd - rangeStart
+    );
+
+    const minimumWidth = Math.min(
+        8,
+        Math.max(
+            1,
+            totalPoints - 1
+        )
+    );
+
+    const maximumWidth = (
+        totalPoints
+    );
+
+    let nextWidth = (
+        currentWidth
+        * Number(factor)
+    );
+
+    nextWidth = Math.max(
+        minimumWidth,
+        Math.min(
+            maximumWidth,
+            nextWidth
+        )
+    );
+
+    const center = (
+        rangeStart + rangeEnd
+    ) / 2;
+
+    let nextStart = (
+        center - nextWidth / 2
+    );
+
+    let nextEnd = (
+        center + nextWidth / 2
+    );
+
+    const minimumRange = -0.5;
+    const maximumRange = (
+        totalPoints - 0.5
+    );
+
+    if (nextStart < minimumRange) {
+        nextEnd += (
+            minimumRange - nextStart
+        );
+
+        nextStart = minimumRange;
+    }
+
+    if (nextEnd > maximumRange) {
+        nextStart -= (
+            nextEnd - maximumRange
+        );
+
+        nextEnd = maximumRange;
+    }
+
+    nextStart = Math.max(
+        minimumRange,
+        nextStart
+    );
+
+    nextEnd = Math.min(
+        maximumRange,
+        nextEnd
+    );
+
+    Plotly.relayout(
+        container,
+        {
+            "xaxis.autorange": false,
+            "xaxis.range": [
+                nextStart,
+                nextEnd
+            ]
+        }
+    );
+}
+
+
+function resetChart(chartId) {
+    const container = (
+        document.getElementById(
+            chartId
+        )
+    );
+
+    if (
+        !container
+        || container.dataset.done
+            !== "true"
+        || typeof Plotly === "undefined"
+    ) {
+        return;
+    }
+
+    const item = getChartItem(
+        container
+    );
+
+    const dateList = (
+        getCategoryDates(item)
+    );
+
+    const defaultRange = (
+        getDefaultRange(
+            dateList.length
+        )
+    );
+
+    clearSelectedCandle(
+        container
+    );
+
+    horizontalLineModes[
+        chartId
+    ] = false;
+
+    eraseModes[
+        chartId
+    ] = false;
+
+    Plotly.relayout(
+        container,
+        {
+            "xaxis.autorange": false,
+            "xaxis.range":
+                defaultRange,
+            "yaxis.autorange": true,
+            "yaxis2.autorange": true,
+            dragmode: "pan"
+        }
+    );
+}
+
+
+/* ======================================================================
+ * 圖表事件
+ * ====================================================================== */
+function bindChartEvents(container) {
+    if (
+        !container
+        || container.dataset.eventsBound
+            === "true"
+    ) {
+        return;
+    }
+
+    container.on(
+        "plotly_click",
+        (eventData) => {
+            if (
+                !eventData
+                || !Array.isArray(
+                    eventData.points
+                )
+                || !eventData.points.length
+            ) {
+                return;
+            }
+
+            const clickedPoint = (
+                eventData.points[0]
+            );
+
+            const chartId = (
+                container.id
+            );
+
+            if (
+                horizontalLineModes[
+                    chartId
+                ]
+            ) {
+                const clickedPrice = Number(
+                    clickedPoint.y
+                );
+
+                if (
+                    Number.isFinite(
+                        clickedPrice
+                    )
+                ) {
+                    addHorizontalPriceLine(
+                        container,
+                        clickedPrice
+                    );
+                }
+
+                return;
+            }
+
+            if (
+                clickedPoint.x !== undefined
+                && clickedPoint.x !== null
+            ) {
+                showFixedOhlcv(
+                    container,
+                    clickedPoint.x
+                );
+            }
+        }
+    );
+
+    container.on(
+        "plotly_relayout",
+        (eventData) => {
+            if (
+                container._drawingLoadInProgress
+                || container.dataset.drawingEnabled
+                    !== "true"
+            ) {
+                return;
+            }
+
+            const eventKeys = Object.keys(
+                eventData || {}
+            );
+
+            const shapeChanged = (
+                eventKeys.some(
+                    (key) => (
+                        key === "shapes"
+                        || key.startsWith(
+                            "shapes["
+                        )
+                    )
+                )
+            );
+
+            if (shapeChanged) {
+                scheduleDrawingSave(
+                    container
+                );
+            }
+        }
+    );
+
+    container.on(
+        "plotly_doubleclick",
+        () => {
+            resetChart(
+                container.id
+            );
+
+            return false;
+        }
+    );
+
+    container.dataset.eventsBound = (
+        "true"
+    );
+}
+
+
+/* ======================================================================
+ * 圖表渲染
+ * ====================================================================== */
+function renderMarketCharts(
+    marketId
+) {
+    const items = (
+        chartDataStore[marketId]
+    );
+
+    if (
+        !items
+        || !Array.isArray(items)
+    ) {
+        return;
+    }
+
+    if (
+        typeof Plotly === "undefined"
+    ) {
+        console.error(
+            "Plotly 載入失敗"
+        );
+
+        const section = (
+            document.getElementById(
+                marketId + "-market"
+            )
+        );
+
+        if (section) {
+            section.innerHTML = (
+                '<div class="plotly-error">'
+                + 'Plotly 圖表套件載入失敗，'
+                + '請重新整理頁面或檢查網路。'
+                + '</div>'
+            );
+        }
+
+        return;
+    }
+
+    items.forEach(
+        (item, index) => {
+            const id = (
+                "chart-"
+                + marketId
+                + "-"
+                + index
+            );
+
+            const container = (
+                document.getElementById(
+                    id
+                )
+            );
+
+            if (
+                !container
+                || container.dataset.done
+                    === "true"
+            ) {
+                return;
+            }
+
+            if (
+                !item
+                || !item.chart_data
+                || !Array.isArray(
+                    item.chart_data.data
+                )
+            ) {
+                container.innerHTML = (
+                    '<div class="plotly-error">'
+                    + '圖表資料格式錯誤'
+                    + '</div>'
+                );
+
+                return;
+            }
+
+            container.dataset.marketId = (
+                marketId
+            );
+
+            container.dataset.chartIndex = (
+                String(index)
+            );
+
+            const originalLayout = (
+                item.chart_data.layout
+                || {}
+            );
+
+            const categoryDates = (
+                getCategoryDates(item)
+            );
+
+            const defaultRange = (
+                getDefaultRange(
+                    categoryDates.length
+                )
+            );
+
+            const layout = {
+                ...originalLayout,
+                margin: {
+                    ...(
+                        originalLayout.margin
+                        || {}
+                    )
+                },
+                title: {
+                    ...(
+                        originalLayout.title
+                        || {}
+                    )
+                },
+                legend: {
+                    ...(
+                        originalLayout.legend
+                        || {}
+                    )
+                },
+                xaxis: {
+                    ...(
+                        originalLayout.xaxis
+                        || {}
+                    ),
+                    type: "category",
+                    categoryorder:
+                        "array",
+                    categoryarray:
+                        categoryDates,
+                    range:
+                        defaultRange,
+                    autorange: false,
+                    rangeslider: {
+                        visible: false
+                    },
+                    fixedrange: false
+                },
+                yaxis: {
+                    ...(
+                        originalLayout.yaxis
+                        || {}
+                    ),
+                    fixedrange: false
+                },
+                dragmode: "pan"
+            };
+
+            if (
+                originalLayout.yaxis2
+            ) {
+                layout.yaxis2 = {
+                    ...originalLayout.yaxis2,
+                    fixedrange: false
+                };
+            }
+
+            const hasVolume = Boolean(
+                originalLayout.yaxis2
+            );
+
+            if (
+                window.innerWidth <= 600
+            ) {
+                layout.height = (
+                    hasVolume
+                        ? 470
+                        : 390
+                );
+
+                layout.margin = {
+                    ...layout.margin,
+                    l: 8,
+                    r: 52,
+                    t: 120,
+                    b: 34
+                };
+
+                layout.title = {
+                    ...layout.title,
+                    font: {
+                        ...(
+                            layout.title.font
+                            || {}
+                        ),
+                        size: 15
+                    }
+                };
+
+                layout.legend = {
+                    ...layout.legend,
+                    font: {
+                        ...(
+                            layout.legend.font
+                            || {}
+                        ),
+                        size: 10
+                    }
+                };
+
+            } else {
+                layout.height = (
+                    originalLayout.height
+                    || (
+                        hasVolume
+                            ? 520
+                            : 440
+                    )
+                );
+            }
+
+            const drawingEnabled = (
+                container.dataset.drawingEnabled
+                === "true"
+            );
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false,
+                scrollZoom: true,
+                doubleClick: false,
+                showTips: false,
+                editable: drawingEnabled,
+                edits: {
+                    shapePosition:
+                        drawingEnabled
+                },
+                modeBarButtonsToAdd: (
+                    drawingEnabled
+                        ? [
+                            "drawline",
+                            "drawrect",
+                            "eraseshape"
+                        ]
+                        : []
+                ),
+                modeBarButtonsToRemove: [
+                    "select2d",
+                    "lasso2d",
+                    "toggleSpikelines",
+                    "hoverClosestCartesian",
+                    "hoverCompareCartesian",
+                    "toImage"
+                ]
+            };
+
+            Plotly.newPlot(
+                container,
+                item.chart_data.data,
+                layout,
+                config
+            )
+            .then(async () => {
+                container.dataset.done = (
+                    "true"
+                );
+
+                container._baseShapes = (
+                    Array.isArray(
+                        originalLayout.shapes
+                    )
+                        ? originalLayout.shapes
+                            .map(clonePlainObject)
+                            .filter(Boolean)
+                        : []
+                );
+
+                bindChartEvents(
+                    container
+                );
+
+                applyDrawingStyle(
+                    container.id
+                );
+
+                if (drawingEnabled) {
+                    await loadAndMergeDrawings(
+                        container
+                    );
+                }
+
+                requestAnimationFrame(
+                    () => {
+                        Plotly.Plots.resize(
+                            container
+                        );
+                    }
+                );
+            })
+            .catch((error) => {
+                console.error(
+                    "圖表繪製失敗：",
+                    marketId,
+                    index,
+                    error
+                );
+
+                container.innerHTML = (
+                    '<div class="plotly-error">'
+                    + '圖表繪製失敗'
+                    + '</div>'
+                );
+            });
+        }
+    );
+}
+
+
+function resizeMarketCharts(
+    marketId
+) {
+    const items = (
+        chartDataStore[marketId]
+    );
+
+    if (
+        !items
+        || !Array.isArray(items)
+    ) {
+        return;
+    }
+
+    items.forEach(
+        (item, index) => {
+            const container = (
+                document.getElementById(
+                    "chart-"
+                    + marketId
+                    + "-"
+                    + index
+                )
+            );
+
+            if (
+                container
+                && container.dataset.done
+                    === "true"
+                && typeof Plotly
+                    !== "undefined"
+            ) {
+                Plotly.Plots.resize(
+                    container
+                );
+            }
+        }
+    );
+}
+
+
+function switchMarket(
+    event,
+    marketId
+) {
+    document
+        .querySelectorAll(
+            ".market-section"
+        )
+        .forEach((element) => {
+            element.classList.remove(
+                "active"
+            );
+        });
+
+    document
+        .querySelectorAll(
+            ".tab-btn"
+        )
+        .forEach((element) => {
+            element.classList.remove(
+                "active"
+            );
+        });
+
+    const section = (
+        document.getElementById(
+            marketId + "-market"
+        )
+    );
+
+    if (section) {
+        section.classList.add(
+            "active"
+        );
+    }
+
+    if (
+        event
+        && event.currentTarget
+    ) {
+        event.currentTarget.classList.add(
+            "active"
+        );
+
+    } else {
+        const button = (
+            document.getElementById(
+                "btn-" + marketId
+            )
+        );
+
+        if (button) {
+            button.classList.add(
+                "active"
+            );
+        }
+    }
+
+    renderMarketCharts(
+        marketId
+    );
+
+    setTimeout(() => {
+        resizeMarketCharts(
+            marketId
+        );
+    }, 150);
+}
+
+
+window.addEventListener(
+    "load",
+    async () => {
+        renderMarketCharts(
+            "tw_all"
+        );
+
+        await initializeLiff();
+    }
+);
+
+
+window.addEventListener(
+    "resize",
+    () => {
+        const activeSection = (
+            document.querySelector(
+                ".market-section.active"
+            )
+        );
+
+        if (!activeSection) {
+            return;
+        }
+
+        const marketId = (
+            activeSection.id.replace(
+                "-market",
+                ""
+            )
+        );
+
+        resizeMarketCharts(
+            marketId
+        );
+    }
+);
+</script>
+</body>
+</html>
+"""
+
+    html = html.replace(
+        "__CHART_JSON__",
+        chart_json
+    )
+
+    html = html.replace(
+        "__REPORT_LIFF_ID__",
+        REPORT_LIFF_ID
+    )
+
+    html = html.replace(
+        "__DRAWING_SYNC_URL__",
+        DRAWING_SYNC_URL
+    )
+
+    os.makedirs(
+        DOCS_DIR,
+        exist_ok=True
+    )
+
+    path = os.path.join(
+        DOCS_DIR,
+        "index.html"
+    )
+
+    with open(
+        path,
+        "w",
+        encoding="utf-8"
+    ) as file:
+        file.write(html)
+
+    print(
+        f"✅ HTML 已產生：{path}"
+    )
+
+
+# =========================================================================
+# 第 5 部分結束
+# generate_html() 已完整結束
+# 下一部分：GitHub Pages 推送與 main()
+# =========================================================================
+
+# =========================================================================
+# 第 6 部分：GitHub Pages 推送與主程式
+# =========================================================================
+
+
+# =========================================================================
+# Git 指令工具
+# =========================================================================
+def run_git_command(command):
+    result = subprocess.run(
+        command,
+        text=True,
+        capture_output=True,
+        check=False
+    )
+
+    if result.stdout.strip():
+        print(result.stdout.strip())
+
+    if result.stderr.strip():
+        print(result.stderr.strip())
+
+    return result.returncode
+
+
+def push_report_to_github():
+    run_git_command(
+        [
+            "git",
+            "config",
+            "--global",
+            "user.name",
+            "github-actions[bot]"
+        ]
+    )
+
+    run_git_command(
+        [
+            "git",
+            "config",
+            "--global",
+            "user.email",
+            (
+                "github-actions[bot]"
+                "@users.noreply.github.com"
+            )
+        ]
+    )
+
+    add_result = run_git_command(
+        [
+            "git",
+            "add",
+            "docs/index.html",
+            "data"
+        ]
+    )
+
+    if add_result != 0:
+        print("❌ git add 失敗")
+        return False
+
+    diff_result = subprocess.run(
+        [
+            "git",
+            "diff",
+            "--cached",
+            "--quiet"
+        ],
+        check=False
+    )
+
+    if diff_result.returncode == 0:
+        print(
+            "ℹ️ 沒有 Git 異動需要提交"
+        )
+        return True
+
+    commit_result = run_git_command(
+        [
+            "git",
+            "commit",
+            "-m",
+            (
+                "⚙️ 量化報告自動更新 "
+                "(動態群組與畫線同步)"
+            )
+        ]
+    )
+
+    if commit_result != 0:
+        print("❌ git commit 失敗")
+        return False
+
+    push_result = run_git_command(
+        [
+            "git",
+            "push"
+        ]
+    )
+
+    if push_result == 0:
+        print(
+            "✅ GitHub Pages 資料推送完成"
+        )
+        return True
+
+    print("❌ git push 失敗")
+    return False
+
+
+# =========================================================================
+# 主程式共用工具
+# =========================================================================
+def process_group_for_data_dict(
+    data_dict,
+    user_configs,
+    group_metadata,
+    group_key
+):
+    group_dict = user_configs.get(
+        group_key,
+        {}
+    )
+
+    metadata = group_metadata.get(
+        group_key,
+        {}
+    )
+
+    data_dict[group_key] = (
+        process_custom_groups(
+            group_dict,
+            group_key,
+            test_mode=(
+                CUSTOM_GROUP_TEST_MODE
+            ),
+            group_metadata=metadata
+        )
+    )
+
+
+def build_index_map(index_configs):
+    index_map = {}
+
+    for item in index_configs:
+        if not is_config_enabled(item):
+            continue
+
+        ticker = str(
+            item.get("ticker", "")
+        ).strip().upper()
+
+        if not ticker:
+            continue
+
+        if ticker in index_map:
+            print(
+                "⚠️ index_configs "
+                f"出現重複 ticker：{ticker}，"
+                "將使用最後一筆"
+            )
+
+        index_map[ticker] = item
+
+    return index_map
+
+
+def append_index_market_report(
+    lines,
+    market_title,
+    tickers,
+    index_map
+):
+    lines.append(market_title)
+
+    found_count = 0
+
+    for ticker in tickers:
+        normalized_ticker = str(
+            ticker
+        ).strip().upper()
+
+        item = index_map.get(
+            normalized_ticker
+        )
+
+        if not item:
+            continue
+
+        found_count += 1
+
+        lines.append(
+            analyze_index_trend(
+                normalized_ticker,
+                item.get(
+                    "name",
+                    normalized_ticker
+                ),
+                get_ma_list_from_item(
+                    item
+                )
+            )
+        )
+
+    if found_count == 0:
+        lines.append(
+            "⚪ 此市場目前沒有啟用的指數設定"
+        )
+
+    lines.append("")
+
+
+# =========================================================================
+# 主程式
+# =========================================================================
+def main():
+    access_token = os.environ.get(
+        "LINE_ACCESS_TOKEN"
+    )
+
+    # LINE Messaging API 推播使用者 ID
+    line_push_user_id = os.environ.get(
+        "LINE_USER_ID"
+    )
+
+    # Supabase 股票名單查詢使用者 ID
+    # 若未設定，才退回使用 LINE_USER_ID
+    supabase_user_id = (
+        os.environ.get(
+            "SUPABASE_USER_ID"
+        )
+        or line_push_user_id
+    )
+
+    if not line_push_user_id:
+        print(
+            "❌ 未設定 LINE_USER_ID"
+        )
+        return
+
+    if not supabase_user_id:
+        print(
+            "❌ 未設定 SUPABASE_USER_ID"
+        )
+        return
+
+    line_push_user_id = str(
+        line_push_user_id
+    ).strip()
+
+    supabase_user_id = str(
+        supabase_user_id
+    ).strip()
+
+    print(
+        "👤 LINE 推播使用：LINE_USER_ID"
+    )
+
+    if os.environ.get(
+        "SUPABASE_USER_ID"
+    ):
+        print(
+            "👤 Supabase 查詢使用："
+            "SUPABASE_USER_ID"
+        )
+    else:
+        print(
+            "⚠️ 未設定 SUPABASE_USER_ID，"
+            "Supabase 查詢將使用 LINE_USER_ID"
+        )
+
+    today = datetime.now()
+    today_str = today.strftime(
+        "%Y-%m-%d"
+    )
+    weekday = today.weekday()
+
+    # -----------------------------------------------------------------
+    # 讀取 Supabase 股票群組、動態群組與指數參數
+    # -----------------------------------------------------------------
+    (
+        user_configs,
+        db_index_configs,
+        group_metadata
+    ) = load_configs_from_supabase(
+        supabase_user_id
+    )
+
+    # -----------------------------------------------------------------
+    # 台股全市場
+    # -----------------------------------------------------------------
+    print(
+        "📊 開始掃描台股全市場"
+    )
+
+    tw_tickers = get_tw_tickers(
+        TW_MIN_VOLUME
+    )
+
+    tw_all = scan_market(
+        tw_tickers,
+        min_volume=TW_MIN_VOLUME
+    )
+
+    # -----------------------------------------------------------------
+    # 美股全市場
+    # -----------------------------------------------------------------
+    print(
+        "📊 開始掃描美股全市場"
+    )
+
+    us_tickers = get_us_tickers()
+
+    us_all = scan_market(
+        us_tickers,
+        min_volume=US_MIN_VOLUME
+    )
+
+    # -----------------------------------------------------------------
+    # 全球大盤圖表
+    # 使用 Supabase index_configs 的均線設定
+    # -----------------------------------------------------------------
+    print(
+        "🌍 開始建立全球指數圖表"
+    )
+
+    index_charts = process_index_charts(
+        db_index_configs
+    )
+
+    # -----------------------------------------------------------------
+    # 美股 11 大類股週 K
+    # -----------------------------------------------------------------
+    print(
+        "🧭 開始建立類股週 K 圖表"
+    )
+
+    (
+        sector_charts,
+        sector_summary
+    ) = process_sector_weekly_charts()
+
+    # -----------------------------------------------------------------
+    # 建立固定分類
+    # -----------------------------------------------------------------
+    data_dict = {
+        "indices": index_charts,
+        "sectors": sector_charts,
+        "tw_all": tw_all,
+        "us_all": us_all
+    }
+
+    fixed_group_keys = [
+        "tw_g1",
+        "tw_g2",
+        "us_g1",
+        "us_g2",
+        "us_g3",
+        "us_g4"
+    ]
+
+    for group_key in fixed_group_keys:
+        process_group_for_data_dict(
+            data_dict,
+            user_configs,
+            group_metadata,
+            group_key
+        )
+
+    # -----------------------------------------------------------------
+    # 動態自訂群組
+    #
+    # groups.id = 22
+    # → group_key = custom_22
+    # → stocks.group_id = custom_22
+    # -----------------------------------------------------------------
+    custom_group_keys = sorted(
+        [
+            group_key
+            for group_key in user_configs
+            if group_key.startswith(
+                "custom_"
+            )
+        ],
+        key=get_custom_group_number
+    )
+
+    for group_key in custom_group_keys:
+        process_group_for_data_dict(
+            data_dict,
+            user_configs,
+            group_metadata,
+            group_key
+        )
+
+    # -----------------------------------------------------------------
+    # 最終圖表數量
+    # -----------------------------------------------------------------
+    print(
+        "\n===== 最終圖表數量 ====="
+    )
+
+    display_order = [
+        "indices",
+        "sectors",
+        "tw_all",
+        "tw_g1",
+        "tw_g2"
+    ]
+
+    display_order.extend(
+        get_sorted_custom_group_keys(
+            group_metadata,
+            market="tw"
+        )
+    )
+
+    display_order.extend(
+        [
+            "us_all",
+            "us_g1",
+            "us_g2",
+            "us_g3",
+            "us_g4"
+        ]
+    )
+
+    display_order.extend(
+        get_sorted_custom_group_keys(
+            group_metadata,
+            market="us"
+        )
+    )
+
+    display_order = list(
+        dict.fromkeys(
+            display_order
+        )
+    )
+
+    for key in display_order:
+        items = data_dict.get(
+            key,
+            []
+        )
+
+        metadata = group_metadata.get(
+            key,
+            {}
+        )
+
+        group_name = metadata.get(
+            "name",
+            key
+        )
+
+        print(
+            f"{key}: "
+            f"{len(items)} 檔 / "
+            f"{group_name}"
+        )
+
+    print(
+        "========================\n"
+    )
+
+    # -----------------------------------------------------------------
+    # 產生 GitHub Pages HTML
+    # -----------------------------------------------------------------
+    generate_html(
+        data_dict,
+        today_str,
+        sector_summary=sector_summary,
+        group_metadata=group_metadata
+    )
+
+    # -----------------------------------------------------------------
+    # 報告與控制台網址
+    # -----------------------------------------------------------------
+    report_url = REPORT_LIFF_URL
+
+    # 原本參數控制台：
+    # 2010330411-SbwvRXRN
+    # → my-stock-backend
+    liff_setting_url = (
+        SETTING_LIFF_URL
+    )
+
+    # 另一套原有系統，維持不變
+    bitget_setting_url = (
+        BITGET_SETTING_URL
+    )
+
+    # -----------------------------------------------------------------
+    # LINE 個股與網頁報告推播
+    #
+    # 依需求：動態自訂群組不加入 LINE 統計，
+    # 避免未來新增大量群組後訊息過長。
+    # -----------------------------------------------------------------
+    line_message_stocks = (
+        f"🎯 {today_str} "
+        "專屬量化看盤網頁！\n\n"
+
+        "🌍 【全球指數區塊】\n"
+        " └ 指數圖表："
+        f"{len(data_dict.get('indices', []))} "
+        "張\n\n"
+
+        "🧭 【美股類股週K】\n"
+        " └ 類股圖表："
+        f"{len(data_dict.get('sectors', []))} "
+        "張\n\n"
+
+        "🇹🇼 【台灣股市區塊】\n"
+        " ├ 1. 全市場符合："
+        f"{len(data_dict.get('tw_all', []))} "
+        "檔\n"
+        " ├ 2. 權值精選符合："
+        f"{len(data_dict.get('tw_g1', []))} "
+        "檔\n"
+        " └ 3. 熱門符合："
+        f"{len(data_dict.get('tw_g2', []))} "
+        "檔\n\n"
+
+        "🇺🇸 【美國股市區塊】\n"
+        " ├ 1. 全市場符合："
+        f"{len(data_dict.get('us_all', []))} "
+        "檔\n"
+        " ├ 2. 權值精選符合："
+        f"{len(data_dict.get('us_g1', []))} "
+        "檔\n"
+        " ├ 3. 低本益比符合："
+        f"{len(data_dict.get('us_g2', []))} "
+        "檔\n"
+        " ├ 4. 超級績效符合："
+        f"{len(data_dict.get('us_g3', []))} "
+        "檔\n"
+        " └ 5. 熱門符合："
+        f"{len(data_dict.get('us_g4', []))} "
+        "檔\n\n"
+
+        "🔗 1. 專屬潛伏圖表網頁：\n"
+        f"{report_url}\n\n"
+
+        "⚙️ 2. 手機自訂參數控制台：\n"
+        f"{liff_setting_url}\n\n"
+
+        "💰 3. 自動交易參數控制台：\n"
+        f"{bitget_setting_url}"
+    )
+
+    send_line_message(
+        line_message_stocks,
+        access_token,
+        line_push_user_id
+    )
+
+    # -----------------------------------------------------------------
+    # 原本的大盤分類與趨勢推播
+    # -----------------------------------------------------------------
+    tw_indices = [
+        "^TWII",
+        "^TWOII"
+    ]
+
+    us_indices = [
+        "^GSPC",
+        "^DJI",
+        "^IXIC",
+        "^RUT",
+        "^SOX"
+    ]
+
+    eu_indices = [
+        "^FCHI",
+        "^FTSE",
+        "^GDAXI"
+    ]
+
+    asia_indices = [
+        "^N225",
+        "^KS11"
+    ]
+
+    index_map = build_index_map(
+        db_index_configs
+    )
+
+    index_lines = [
+        (
+            f"🌍 {today_str} "
+            "全球大盤多空量化報告"
+        ),
+        (
+            "📊 評分標準: "
+            "均線糾纏自適應/"
+            "0.1%過濾機制"
+        ),
+        "========================",
+        ""
+    ]
+
+    append_index_market_report(
+        index_lines,
+        "【 🇹🇼 台灣市場 】",
+        tw_indices,
+        index_map
+    )
+
+    append_index_market_report(
+        index_lines,
+        "【 🇺🇸 美國市場 】",
+        us_indices,
+        index_map
+    )
+
+    append_index_market_report(
+        index_lines,
+        "【 🇪🇺 歐洲市場 】",
+        eu_indices,
+        index_map
+    )
+
+    append_index_market_report(
+        index_lines,
+        "【 🌏 亞洲市場 】",
+        asia_indices,
+        index_map
+    )
+
+    send_line_message(
+        "\n".join(index_lines).rstrip(),
+        access_token,
+        line_push_user_id
+    )
+
+    # -----------------------------------------------------------------
+    # 每週一限定類股週線輪動摘要
+    # -----------------------------------------------------------------
+    if weekday == 0:
+        sectors_message = (
+            build_sector_monday_message(
+                today_str,
+                sector_summary,
+                report_url
+            )
+        )
+
+        send_line_message(
+            sectors_message,
+            access_token,
+            line_push_user_id
+        )
+
+    # -----------------------------------------------------------------
+    # 推送最新 HTML 與 CSV 到 GitHub Pages
+    # -----------------------------------------------------------------
+    push_report_to_github()
+
+
+if __name__ == "__main__":
+    main()
+
+
+# =========================================================================
+# 完整 main.py 結束
+# =========================================================================
