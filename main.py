@@ -4386,6 +4386,7 @@ def generate_custom_group_buttons_html(
 # =========================================================================
 # 圖表卡片 HTML
 # =========================================================================
+
 def generate_chart_card_html(
     market_key,
     chart_index,
@@ -4400,9 +4401,28 @@ def generate_chart_card_html(
         f"info-{market_key}-{chart_index}"
     )
 
+    manager_id = (
+        f"line-manager-{market_key}-{chart_index}"
+    )
+
+    start_input_id = (
+        f"line-start-{market_key}-{chart_index}"
+    )
+
+    end_input_id = (
+        f"line-end-{market_key}-{chart_index}"
+    )
+
+    price_input_id = (
+        f"line-price-{market_key}-{chart_index}"
+    )
+
+    list_id = (
+        f"line-list-{market_key}-{chart_index}"
+    )
+
     drawing_status_id = (
-        f"drawing-status-"
-        f"{market_key}-{chart_index}"
+        f"drawing-status-{market_key}-{chart_index}"
     )
 
     ticker = str(
@@ -4421,66 +4441,31 @@ def generate_chart_card_html(
         )
     ).strip()
 
-    timeframe_label = str(
-        chart_data.get(
-            "timeframe",
-            "日K"
-        )
-    ).strip()
-
     placeholder_text = (
-        "點擊週 K 後固定顯示週期與 OHLCV"
+        "點擊週 K 顯示日期與 OHLCV"
         if drawing_timeframe == "1w"
-        else "點擊 K 線後固定顯示日期與 OHLCV"
+        else "點擊 K 線顯示日期與 OHLCV"
     )
 
     result = """
 <div class="chart-card">
-    <div class="chart-toolbar">
-        <div class="chart-toolbar-row">
-            <div class="zoom-buttons">
-"""
-
-    result += (
-        '<button '
-        'type="button" '
-        'class="chart-tool-btn" '
-        f'onclick="zoomChart('
-        f'\'{escape_html(chart_id)}\', '
-        '0.70)">'
-        '＋ 放大'
-        '</button>'
-    )
-
-    result += (
-        '<button '
-        'type="button" '
-        'class="chart-tool-btn" '
-        f'onclick="zoomChart('
-        f'\'{escape_html(chart_id)}\', '
-        '1.40)">'
-        '－ 縮小'
-        '</button>'
-    )
-
-    result += (
-        '<button '
-        'type="button" '
-        'class="chart-tool-btn reset-btn" '
-        f'onclick="resetChart('
-        f'\'{escape_html(chart_id)}\')">'
-        '↺ 重設'
-        '</button>'
-    )
-
-    result += """
-            </div>
+    <div class="chart-topbar">
 """
 
     if drawing_enabled:
         result += (
-            '<div class="drawing-status" '
-            f'id="{escape_html(drawing_status_id)}">'
+            '<button '
+            'type="button" '
+            'class="line-manager-button" '
+            f'onclick="toggleLineManager('
+            f'\'{escape_html(chart_id)}\')">'
+            '─ 水平線段'
+            '</button>'
+        )
+
+        result += (
+            f'<div id="{escape_html(drawing_status_id)}" '
+            'class="drawing-status">'
             '畫線尚未同步'
             '</div>'
         )
@@ -4492,160 +4477,112 @@ def generate_chart_card_html(
         )
 
     result += """
-        </div>
+    </div>
 """
 
     if drawing_enabled:
+        result += (
+            f'<div id="{escape_html(manager_id)}" '
+            'class="line-manager-panel" hidden>'
+        )
+
         result += """
-        <div class="drawing-toolbar">
-            <div class="drawing-tool-group">
+    <div class="line-form">
+        <label class="line-field">
+            <span>價格</span>
+"""
+
+        result += (
+            f'<input id="{escape_html(price_input_id)}" '
+            'type="number" '
+            'inputmode="decimal" '
+            'step="any" '
+            'placeholder="例如 125.50">'
+        )
+
+        result += """
+        </label>
+
+        <label class="line-field">
+            <span>開始日期</span>
+"""
+
+        result += (
+            f'<input id="{escape_html(start_input_id)}" '
+            'type="date">'
+        )
+
+        result += """
+        </label>
+
+        <label class="line-field">
+            <span>結束日期</span>
+"""
+
+        result += (
+            f'<input id="{escape_html(end_input_id)}" '
+            'type="date">'
+        )
+
+        result += """
+        </label>
+
+        <div class="line-form-actions">
 """
 
         result += (
             '<button '
             'type="button" '
-            'class="drawing-tool-btn" '
-            f'onclick="activateDrawingTool('
-            f'\'{escape_html(chart_id)}\', '
-            '\'drawline\')">'
-            '╱ 趨勢線'
+            'class="line-action-button add-line-button" '
+            f'onclick="addHorizontalSegment('
+            f'\'{escape_html(chart_id)}\')">'
+            '新增線段'
             '</button>'
         )
 
         result += (
             '<button '
             'type="button" '
-            'class="drawing-tool-btn" '
-            f'onclick="activateHorizontalLineTool('
-            f'\'{escape_html(chart_id)}\')">'
-            '─ 水平線'
+            'class="line-action-button sync-line-button" '
+            f'onclick="syncChartDrawings('
+            f'\'{escape_html(chart_id)}\', true)">'
+            '☁ 立即同步'
             '</button>'
         )
 
         result += (
             '<button '
             'type="button" '
-            'class="drawing-tool-btn" '
-            f'onclick="activateDrawingTool('
-            f'\'{escape_html(chart_id)}\', '
-            '\'drawrect\')">'
-            '▭ 矩形'
-            '</button>'
-        )
-
-        result += """
-            </div>
-
-            <div class="drawing-style-group">
-                <label class="drawing-label">
-                    顏色
-                </label>
-
-                <select
-                    class="drawing-select"
-"""
-
-        result += (
-            f'id="drawing-color-'
-            f'{escape_html(chart_id)}" '
-            f'onchange="applyDrawingStyle('
-            f'\'{escape_html(chart_id)}\')">'
-        )
-
-        result += """
-                    <option value="#facc15">
-                        黃色
-                    </option>
-                    <option value="#38bdf8">
-                        藍色
-                    </option>
-                    <option value="#ef4444">
-                        紅色
-                    </option>
-                    <option value="#22c55e">
-                        綠色
-                    </option>
-                    <option value="#a855f7">
-                        紫色
-                    </option>
-                    <option value="#f8fafc">
-                        白色
-                    </option>
-                </select>
-
-                <label class="drawing-label">
-                    粗細
-                </label>
-
-                <select
-                    class="drawing-select"
-"""
-
-        result += (
-            f'id="drawing-width-'
-            f'{escape_html(chart_id)}" '
-            f'onchange="applyDrawingStyle('
-            f'\'{escape_html(chart_id)}\')">'
-        )
-
-        result += """
-                    <option value="1">
-                        1 px
-                    </option>
-                    <option value="2" selected>
-                        2 px
-                    </option>
-                    <option value="3">
-                        3 px
-                    </option>
-                    <option value="4">
-                        4 px
-                    </option>
-                </select>
-            </div>
-
-            <div class="drawing-action-group">
-"""
-
-        result += (
-            '<button '
-            'type="button" '
-            'class="drawing-tool-btn danger-outline" '
-            f'onclick="activateEraseTool('
-            f'\'{escape_html(chart_id)}\')">'
-            '⌫ 刪除圖形'
-            '</button>'
-        )
-
-        result += (
-            '<button '
-            'type="button" '
-            'class="drawing-tool-btn danger" '
+            'class="line-action-button clear-line-button" '
             f'onclick="clearAllDrawings('
             f'\'{escape_html(chart_id)}\')">'
             '清除全部'
             '</button>'
         )
 
-        result += (
-            '<button '
-            'type="button" '
-            'class="drawing-tool-btn sync-btn" '
-            f'onclick="syncChartDrawings('
-            f'\'{escape_html(chart_id)}\', '
-            'true)">'
-            '☁ 立即同步'
-            '</button>'
-        )
-
         result += """
-            </div>
         </div>
+    </div>
+
+    <div class="line-manager-note">
+        日期若不是交易日，系統會自動對齊最近交易日。
+        線段固定為黃色 2px。
+    </div>
 """
+
+        result += (
+            f'<div id="{escape_html(list_id)}" '
+            'class="horizontal-line-list">'
+            '<div class="line-list-empty">'
+            '目前沒有水平線段'
+            '</div>'
+            '</div>'
+            '</div>'
+        )
 
     result += (
         f'<div id="{escape_html(info_id)}" '
-        'class="ohlcv-fixed-panel">'
+        'class="ohlcv-top-panel">'
         '<span class="ohlcv-placeholder">'
         f'{escape_html(placeholder_text)}'
         '</span>'
@@ -4665,16 +4602,12 @@ def generate_chart_card_html(
     )
 
     result += """
-    </div>
 </div>
 """
 
     return result
 
 
-# =========================================================================
-# 完整 HTML 產生
-# =========================================================================
 def generate_html(
     data_dict,
     date_str,
@@ -4716,19 +4649,12 @@ def generate_html(
         )
     )
 
-    all_custom_group_keys = (
-        tw_custom_group_keys
-        + us_custom_group_keys
-    )
-
     html = """<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
 
-<title>
-    台美股均線潛伏報告
-</title>
+<title>台美股均線潛伏報告</title>
 
 <meta
     name="viewport"
@@ -4779,7 +4705,7 @@ body {
 }
 
 button,
-select {
+input {
     font-family: inherit;
 }
 
@@ -4869,8 +4795,7 @@ select {
     flex: 1;
     height: 1px;
     margin-left: 8px;
-    background:
-        rgba(192, 132, 252, 0.25);
+    background: rgba(192, 132, 252, 0.25);
     content: "";
 }
 
@@ -4878,25 +4803,15 @@ select {
     padding: 9px 14px;
     color: #94a3b8;
     background: #1e293b;
-    border:
-        1px solid
-        rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 8px;
     font-size: 13px;
     cursor: pointer;
-    transition:
-        background 0.2s ease,
-        color 0.2s ease,
-        transform 0.2s ease,
-        border-color 0.2s ease;
 }
 
 .tab-btn:hover {
     color: #ffffff;
     background: #334155;
-    border-color:
-        rgba(56, 189, 248, 0.35);
-    transform: translateY(-1px);
 }
 
 .tab-btn.active {
@@ -4908,9 +4823,6 @@ select {
             #2563eb
         );
     border-color: #38bdf8;
-    box-shadow:
-        0 5px 16px
-        rgba(37, 99, 235, 0.30);
 }
 
 .index-btn.active {
@@ -4934,8 +4846,7 @@ select {
 }
 
 .custom-group-btn {
-    border-color:
-        rgba(192, 132, 252, 0.28);
+    border-color: rgba(192, 132, 252, 0.28);
 }
 
 .custom-group-btn.active {
@@ -4964,22 +4875,16 @@ select {
     padding: 11px 16px;
     color: #fde68a;
     text-align: center;
-    background:
-        rgba(120, 53, 15, 0.35);
-    border:
-        1px solid
-        rgba(245, 158, 11, 0.30);
+    background: rgba(120, 53, 15, 0.35);
+    border: 1px solid rgba(245, 158, 11, 0.30);
     border-radius: 10px;
 }
 
 .sector-overview {
     margin-bottom: 18px;
     padding: 16px;
-    background:
-        rgba(15, 23, 42, 0.95);
-    border:
-        1px solid
-        rgba(52, 211, 153, 0.22);
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(52, 211, 153, 0.22);
     border-radius: 14px;
 }
 
@@ -5005,11 +4910,8 @@ select {
 
 .sector-summary-column {
     padding: 12px;
-    background:
-        rgba(30, 41, 59, 0.62);
-    border:
-        1px solid
-        rgba(148, 163, 184, 0.14);
+    background: rgba(30, 41, 59, 0.62);
+    border: 1px solid rgba(148, 163, 184, 0.14);
     border-radius: 11px;
 }
 
@@ -5035,8 +4937,7 @@ select {
 .sector-summary-item {
     margin-bottom: 9px;
     padding: 10px;
-    background:
-        rgba(15, 23, 42, 0.75);
+    background: rgba(15, 23, 42, 0.75);
     border-radius: 8px;
 }
 
@@ -5086,142 +4987,46 @@ select {
     color: #fb7185;
 }
 
-.sector-summary-empty {
-    color: #64748b;
-    font-size: 12px;
-}
-
 .chart-card {
     overflow: hidden;
     margin-bottom: 20px;
-    padding: 4px;
     background: var(--chart-bg);
     border: 1px solid var(--border);
     border-radius: 14px;
     box-shadow:
         0 12px 30px
         rgba(0, 0, 0, 0.32);
-    transition:
-        border-color 0.2s ease,
-        transform 0.2s ease;
 }
 
-.chart-card:hover {
-    border-color:
-        rgba(56, 189, 248, 0.35);
-    transform: translateY(-2px);
-}
-
-.chart-toolbar {
-    padding: 8px 10px;
-    background: var(--toolbar-bg);
+.chart-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 38px;
+    padding: 5px 9px;
+    background: #111827;
     border-bottom: 1px solid var(--border);
-    border-radius: 10px 10px 0 0;
 }
 
-.chart-toolbar-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-}
-
-.zoom-buttons,
-.drawing-tool-group,
-.drawing-style-group,
-.drawing-action-group {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-.chart-tool-btn,
-.drawing-tool-btn {
-    padding: 7px 11px;
-    color: #e2e8f0;
-    background: #1e293b;
-    border:
-        1px solid
-        rgba(148, 163, 184, 0.22);
-    border-radius: 7px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    touch-action: manipulation;
-}
-
-.chart-tool-btn:hover,
-.drawing-tool-btn:hover {
-    color: #ffffff;
-    background: #334155;
-    border-color: #38bdf8;
-}
-
-.chart-tool-btn.reset-btn {
-    color: #ddd6fe;
-    border-color:
-        rgba(168, 85, 247, 0.38);
-}
-
-.drawing-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px 12px;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top:
-        1px solid
-        rgba(255, 255, 255, 0.06);
-}
-
-.drawing-tool-btn.active {
-    color: #111827;
-    background: #facc15;
-    border-color: #fde047;
-}
-
-.drawing-tool-btn.danger-outline {
-    color: #fca5a5;
-    border-color:
-        rgba(239, 68, 68, 0.35);
-}
-
-.drawing-tool-btn.danger {
-    color: #ffffff;
-    background:
-        rgba(185, 28, 28, 0.72);
-    border-color: #ef4444;
-}
-
-.drawing-tool-btn.sync-btn {
-    color: #bfdbfe;
-    border-color:
-        rgba(59, 130, 246, 0.40);
-}
-
-.drawing-label {
-    color: #94a3b8;
-    font-size: 11px;
-}
-
-.drawing-select {
-    min-width: 72px;
-    padding: 6px 8px;
-    color: #e2e8f0;
-    background: #0f172a;
-    border:
-        1px solid
-        rgba(148, 163, 184, 0.28);
+.line-manager-button {
+    padding: 6px 10px;
+    color: #fde68a;
+    background: rgba(113, 63, 18, 0.28);
+    border: 1px solid rgba(250, 204, 21, 0.32);
     border-radius: 6px;
     font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.line-manager-button:hover {
+    background: rgba(161, 98, 7, 0.42);
 }
 
 .drawing-status {
     color: #94a3b8;
-    font-size: 11px;
+    font-size: 10px;
+    text-align: right;
 }
 
 .drawing-status.success {
@@ -5240,19 +5045,146 @@ select {
     color: #64748b;
 }
 
-.ohlcv-fixed-panel {
+.line-manager-panel {
+    padding: 12px;
+    background: #0f172a;
+    border-bottom: 1px solid var(--border);
+}
+
+.line-form {
+    display: grid;
+    grid-template-columns:
+        minmax(110px, 0.8fr)
+        minmax(145px, 1fr)
+        minmax(145px, 1fr)
+        auto;
+    gap: 10px;
+    align-items: end;
+}
+
+.line-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.line-field span {
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.line-field input {
+    width: 100%;
+    min-height: 36px;
+    padding: 7px 9px;
+    color: #f8fafc;
+    background: #111827;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 7px;
+    font-size: 12px;
+}
+
+.line-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.line-action-button {
+    min-height: 36px;
+    padding: 7px 10px;
+    color: #f8fafc;
+    background: #1e293b;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.add-line-button {
+    color: #111827;
+    background: #facc15;
+    border-color: #fde047;
+}
+
+.sync-line-button {
+    color: #bfdbfe;
+    border-color: rgba(59, 130, 246, 0.42);
+}
+
+.clear-line-button {
+    color: #fecaca;
+    border-color: rgba(239, 68, 68, 0.42);
+}
+
+.line-manager-note {
+    margin-top: 8px;
+    color: #64748b;
+    font-size: 10px;
+}
+
+.horizontal-line-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.horizontal-line-item {
+    display: grid;
+    grid-template-columns:
+        minmax(80px, 0.6fr)
+        minmax(180px, 1.4fr)
+        auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    background: rgba(30, 41, 59, 0.66);
+    border-left: 3px solid #facc15;
+    border-radius: 7px;
+}
+
+.horizontal-line-price {
+    color: #fde047;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.horizontal-line-range {
+    color: #cbd5e1;
+    font-size: 11px;
+}
+
+.delete-line-button {
+    padding: 5px 8px;
+    color: #fecaca;
+    background: transparent;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    border-radius: 6px;
+    font-size: 10px;
+    cursor: pointer;
+}
+
+.line-list-empty {
+    padding: 10px;
+    color: #64748b;
+    text-align: center;
+    font-size: 11px;
+}
+
+.ohlcv-top-panel {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 4px 12px;
-    min-height: 46px;
-    padding: 8px 12px;
+    min-height: 42px;
+    padding: 7px 12px;
     color: #cbd5e1;
-    background: #0f172a;
-    border-bottom:
-        1px solid
-        rgba(255, 255, 255, 0.06);
-    font-size: 12px;
+    background: #0b1220;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 11px;
     line-height: 1.5;
 }
 
@@ -5313,7 +5245,6 @@ select {
     width: 100%;
     height: 520px;
     background: #131722;
-    border-radius: 0 0 12px 12px;
     touch-action: none;
 }
 
@@ -5322,11 +5253,8 @@ select {
     padding: 55px 20px;
     color: #64748b;
     text-align: center;
-    background:
-        rgba(19, 23, 34, 0.75);
-    border:
-        1px dashed
-        rgba(148, 163, 184, 0.25);
+    background: rgba(19, 23, 34, 0.75);
+    border: 1px dashed rgba(148, 163, 184, 0.25);
     border-radius: 12px;
 }
 
@@ -5334,14 +5262,20 @@ select {
     padding: 40px 15px;
     color: #fca5a5;
     text-align: center;
-    background:
-        rgba(127, 29, 29, 0.20);
-    border-radius: 10px;
+    background: rgba(127, 29, 29, 0.20);
 }
 
 @media (max-width: 760px) {
     .sector-summary-grid {
         grid-template-columns: 1fr;
+    }
+
+    .line-form {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .line-form-actions {
+        grid-column: 1 / -1;
     }
 }
 
@@ -5352,7 +5286,6 @@ select {
 
     .header {
         padding: 16px 10px;
-        border-radius: 10px;
     }
 
     .header h2 {
@@ -5369,46 +5302,47 @@ select {
         font-size: 12px;
     }
 
-    .chart-toolbar-row {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
-    .zoom-buttons {
-        width: 100%;
-    }
-
-    .chart-tool-btn {
-        flex: 1;
-        padding: 8px 5px;
-        font-size: 11px;
-    }
-
-    .drawing-toolbar {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
-    .drawing-tool-group,
-    .drawing-style-group,
-    .drawing-action-group {
-        width: 100%;
-    }
-
-    .drawing-tool-btn {
-        flex: 1;
-        padding: 8px 5px;
-        font-size: 10px;
+    .chart-topbar {
+        min-height: 36px;
     }
 
     .drawing-status {
-        text-align: left;
+        max-width: 62%;
+        font-size: 9px;
     }
 
-    .ohlcv-fixed-panel {
+    .line-manager-panel {
+        padding: 10px 8px;
+    }
+
+    .line-form {
+        grid-template-columns: 1fr;
+    }
+
+    .line-form-actions {
+        grid-column: auto;
+        width: 100%;
+    }
+
+    .line-action-button {
+        flex: 1;
+        padding: 7px 5px;
+        font-size: 10px;
+    }
+
+    .horizontal-line-item {
+        grid-template-columns: 1fr auto;
+    }
+
+    .horizontal-line-range {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .ohlcv-top-panel {
         min-height: 52px;
         padding: 7px 8px;
-        font-size: 11px;
+        font-size: 10px;
     }
 
     .plotly-container {
@@ -5440,7 +5374,7 @@ select {
     id="liff-status"
     class="liff-status"
 >
-    正在初始化 LINE LIFF 與畫線同步功能……
+    正在初始化 LINE LIFF 與畫線同步……
 </div>
 """
 
@@ -5628,8 +5562,9 @@ select {
         *us_custom_group_keys
     ]
 
-    # 去除重複，保持原順序
-    keys = list(dict.fromkeys(keys))
+    keys = list(
+        dict.fromkeys(keys)
+    )
 
     for key in keys:
         active_class = (
@@ -5657,7 +5592,9 @@ select {
 
         if items:
             drawing_enabled = (
-                is_drawing_enabled_market(key)
+                is_drawing_enabled_market(
+                    key
+                )
             )
 
             for chart_index, item in enumerate(
@@ -5710,16 +5647,6 @@ select {
 
         html += "</div>"
 
-    # JavaScript 與 LIFF 畫線同步會在第 5 部分加入。
-    # 目前先將已建立的 HTML 保存在 html 變數中。
-
-
-# =========================================================================
-# 第 4 部分結束
-# 注意：generate_html() 尚未結束
-# 第 5 部分必須直接接續，保持 4 個空白縮排
-# =========================================================================
-
     html += """
 <script>
 const chartDataStore = __CHART_JSON__;
@@ -5733,12 +5660,10 @@ let lineProfile = null;
 
 const chartSyncTimers = {};
 const chartLoadingFlags = {};
-const horizontalLineModes = {};
-const eraseModes = {};
 
 
 /* ======================================================================
- * 一般格式工具
+ * 顯示格式
  * ====================================================================== */
 function formatPrice(value) {
     const numberValue = Number(value);
@@ -5781,19 +5706,17 @@ function setLiffStatus(
     message,
     statusClass = ""
 ) {
-    const statusElement = (
-        document.getElementById(
-            "liff-status"
-        )
+    const element = document.getElementById(
+        "liff-status"
     );
 
-    if (!statusElement) {
+    if (!element) {
         return;
     }
 
-    statusElement.textContent = message;
+    element.textContent = message;
 
-    statusElement.className = (
+    element.className = (
         "liff-status"
         + (
             statusClass
@@ -5813,30 +5736,20 @@ function setDrawingStatus(
         return;
     }
 
-    const marketId = (
-        container.dataset.marketId
+    const element = document.getElementById(
+        "drawing-status-"
+        + container.dataset.marketId
+        + "-"
+        + container.dataset.chartIndex
     );
 
-    const chartIndex = (
-        container.dataset.chartIndex
-    );
-
-    const statusElement = (
-        document.getElementById(
-            "drawing-status-"
-            + marketId
-            + "-"
-            + chartIndex
-        )
-    );
-
-    if (!statusElement) {
+    if (!element) {
         return;
     }
 
-    statusElement.textContent = message;
+    element.textContent = message;
 
-    statusElement.className = (
+    element.className = (
         "drawing-status"
         + (
             statusClass
@@ -5848,13 +5761,13 @@ function setDrawingStatus(
 
 
 /* ======================================================================
- * LIFF 初始化
+ * LIFF
  * ====================================================================== */
 async function initializeLiff() {
     if (typeof liff === "undefined") {
         setLiffStatus(
             "⚠️ LIFF SDK 載入失敗，"
-            + "畫線仍會保存在本機瀏覽器。",
+            + "水平線段只保存在本機。",
             "warning"
         );
 
@@ -5872,7 +5785,8 @@ async function initializeLiff() {
             );
 
             liff.login({
-                redirectUri: window.location.href
+                redirectUri:
+                    window.location.href
             });
 
             return;
@@ -5885,7 +5799,7 @@ async function initializeLiff() {
         if (!liffIdToken) {
             setLiffStatus(
                 "⚠️ 無法取得 LINE ID Token，"
-                + "畫線只會保存在目前裝置。",
+                + "線段只保存在目前裝置。",
                 "warning"
             );
 
@@ -5896,10 +5810,10 @@ async function initializeLiff() {
             lineProfile = (
                 await liff.getProfile()
             );
-        } catch (profileError) {
+        } catch (error) {
             console.warn(
                 "無法取得 LINE Profile：",
-                profileError
+                error
             );
         }
 
@@ -5915,7 +5829,7 @@ async function initializeLiff() {
         setLiffStatus(
             "✅ 已登入 "
             + displayName
-            + "，畫線可跨裝置同步。",
+            + "，水平線段可跨裝置同步。",
             "success"
         );
 
@@ -5929,7 +5843,7 @@ async function initializeLiff() {
 
         setLiffStatus(
             "⚠️ LIFF 初始化失敗，"
-            + "畫線仍會保存在本機瀏覽器。",
+            + "線段只保存在本機。",
             "warning"
         );
     }
@@ -5937,7 +5851,7 @@ async function initializeLiff() {
 
 
 /* ======================================================================
- * 圖表資料取得
+ * 圖表識別
  * ====================================================================== */
 function getChartItem(container) {
     if (!container) {
@@ -5963,9 +5877,7 @@ function getChartItem(container) {
     }
 
     return (
-        chartDataStore[marketId][
-            chartIndex
-        ]
+        chartDataStore[marketId][chartIndex]
         || null
     );
 }
@@ -5996,8 +5908,7 @@ function getDrawingIdentity(container) {
     ).trim();
 
     const marketKey = String(
-        container.dataset.marketId
-        || ""
+        container.dataset.marketId || ""
     ).trim();
 
     if (!ticker) {
@@ -6022,7 +5933,7 @@ function getDrawingStorageKey(container) {
     }
 
     return (
-        "stock_chart_drawings::"
+        "horizontal_segments::"
         + identity.ticker
         + "::"
         + identity.timeframe
@@ -6030,8 +5941,25 @@ function getDrawingStorageKey(container) {
 }
 
 
+function getCategoryDates(item) {
+    if (
+        !item
+        || !item.chart_data
+        || !Array.isArray(
+            item.chart_data.ohlcv
+        )
+    ) {
+        return [];
+    }
+
+    return item.chart_data.ohlcv.map(
+        (record) => record.date
+    );
+}
+
+
 /* ======================================================================
- * 畫線資料清理
+ * 水平線段資料
  * ====================================================================== */
 function clonePlainObject(value) {
     try {
@@ -6045,18 +5973,78 @@ function clonePlainObject(value) {
 
 
 function isSystemShape(shape) {
-    if (!shape) {
-        return true;
-    }
-
-    const shapeName = String(
-        shape.name || ""
+    const name = String(
+        shape && shape.name
+        ? shape.name
+        : ""
     );
 
     return (
-        shapeName === "__volume_separator__"
-        || shapeName === "__selected_candle__"
+        name === "__volume_separator__"
+        || name === "__selected_candle__"
     );
+}
+
+
+function isHorizontalSegment(shape) {
+    if (
+        !shape
+        || shape.type !== "line"
+        || shape.xref !== "x"
+        || shape.yref !== "y"
+    ) {
+        return false;
+    }
+
+    const y0 = Number(shape.y0);
+    const y1 = Number(shape.y1);
+
+    return (
+        Number.isFinite(y0)
+        && Number.isFinite(y1)
+        && Math.abs(y0 - y1)
+            < 0.0000001
+        && Boolean(shape.x0)
+        && Boolean(shape.x1)
+    );
+}
+
+
+function normalizeSegment(shape) {
+    if (!isHorizontalSegment(shape)) {
+        return null;
+    }
+
+    const price = Number(shape.y0);
+
+    return {
+        type: "line",
+        name: "__horizontal_segment__",
+        xref: "x",
+        yref: "y",
+        x0: normalizeDate(shape.x0),
+        x1: normalizeDate(shape.x1),
+        y0: price,
+        y1: price,
+        editable: false,
+        line: {
+            color: "#facc15",
+            width: 2,
+            dash: "solid"
+        }
+    };
+}
+
+
+function normalizeLoadedDrawings(drawings) {
+    if (!Array.isArray(drawings)) {
+        return [];
+    }
+
+    return drawings
+        .map(normalizeSegment)
+        .filter(Boolean)
+        .slice(0, 200);
 }
 
 
@@ -6076,7 +6064,7 @@ function getBaseShapes(container) {
 }
 
 
-function getUserDrawings(container) {
+function getSelectionShapes(container) {
     if (
         !container
         || !container.layout
@@ -6089,35 +6077,34 @@ function getUserDrawings(container) {
 
     return container.layout.shapes
         .filter(
-            (shape) => !isSystemShape(shape)
+            (shape) => (
+                String(shape.name || "")
+                === "__selected_candle__"
+            )
         )
         .map(clonePlainObject)
         .filter(Boolean);
 }
 
 
-function normalizeLoadedDrawings(
-    drawings
-) {
-    if (!Array.isArray(drawings)) {
+function getUserDrawings(container) {
+    if (
+        !container
+        || !container.layout
+        || !Array.isArray(
+            container.layout.shapes
+        )
+    ) {
         return [];
     }
 
-    return drawings
-        .filter(
-            (shape) => (
-                shape
-                && typeof shape === "object"
-                && !isSystemShape(shape)
-            )
-        )
-        .slice(0, 200)
-        .map(clonePlainObject)
-        .filter(Boolean);
+    return normalizeLoadedDrawings(
+        container.layout.shapes
+    );
 }
 
 
-function applyUserDrawings(
+async function applyUserDrawings(
     container,
     drawings
 ) {
@@ -6125,43 +6112,38 @@ function applyUserDrawings(
         !container
         || typeof Plotly === "undefined"
     ) {
-        return Promise.resolve();
+        return;
     }
 
-    const baseShapes = (
-        getBaseShapes(container)
-    );
-
-    const userShapes = (
-        normalizeLoadedDrawings(
-            drawings
-        )
+    const normalizedDrawings = (
+        normalizeLoadedDrawings(drawings)
     );
 
     container._drawingLoadInProgress = true;
 
-    return Plotly.relayout(
+    await Plotly.relayout(
         container,
         {
             shapes: [
-                ...baseShapes,
-                ...userShapes
+                ...getBaseShapes(container),
+                ...normalizedDrawings,
+                ...getSelectionShapes(container)
             ]
         }
-    ).finally(() => {
-        setTimeout(() => {
-            container._drawingLoadInProgress = false;
-        }, 100);
-    });
+    );
+
+    container._drawingLoadInProgress = false;
+
+    renderHorizontalLineList(
+        container
+    );
 }
 
 
 /* ======================================================================
- * localStorage 保存
+ * localStorage
  * ====================================================================== */
-function loadLocalDrawingRecord(
-    container
-) {
+function loadLocalDrawingRecord(container) {
     const storageKey = (
         getDrawingStorageKey(container)
     );
@@ -6174,10 +6156,8 @@ function loadLocalDrawingRecord(
     }
 
     try {
-        const rawValue = (
-            localStorage.getItem(
-                storageKey
-            )
+        const rawValue = localStorage.getItem(
+            storageKey
         );
 
         if (!rawValue) {
@@ -6191,21 +6171,22 @@ function loadLocalDrawingRecord(
             rawValue
         );
 
+        const cleanedDrawings = (
+            normalizeLoadedDrawings(
+                parsedValue.drawings
+            )
+        );
+
         return {
-            drawings: (
-                normalizeLoadedDrawings(
-                    parsedValue.drawings
-                )
-            ),
-            updatedAt: (
+            drawings: cleanedDrawings,
+            updatedAt:
                 parsedValue.updatedAt
                 || null
-            )
         };
 
     } catch (error) {
         console.error(
-            "讀取本機畫線失敗：",
+            "讀取本機線段失敗：",
             error
         );
 
@@ -6230,18 +6211,14 @@ function saveLocalDrawingRecord(
         return null;
     }
 
-    const finalUpdatedAt = (
-        updatedAt
-        || new Date().toISOString()
-    );
-
     const record = {
-        drawings: (
+        drawings:
             normalizeLoadedDrawings(
                 drawings
-            )
-        ),
-        updatedAt: finalUpdatedAt
+            ),
+        updatedAt:
+            updatedAt
+            || new Date().toISOString()
     };
 
     try {
@@ -6254,7 +6231,7 @@ function saveLocalDrawingRecord(
 
     } catch (error) {
         console.error(
-            "保存本機畫線失敗：",
+            "保存本機線段失敗：",
             error
         );
 
@@ -6264,17 +6241,15 @@ function saveLocalDrawingRecord(
 
 
 /* ======================================================================
- * Edge Function 請求
+ * Edge Function
  * ====================================================================== */
-async function requestDrawingSync(
-    payload
-) {
+async function requestDrawingSync(payload) {
     if (
         !liffReady
         || !liffIdToken
     ) {
         throw new Error(
-            "LIFF 尚未完成登入"
+            "LIFF 尚未登入"
         );
     }
 
@@ -6320,15 +6295,10 @@ async function requestDrawingSync(
 }
 
 
-/* ======================================================================
- * 遠端載入與衝突處理
- * ====================================================================== */
 function parseTimestamp(value) {
-    if (!value) {
-        return 0;
-    }
-
-    const timestamp = Date.parse(value);
+    const timestamp = Date.parse(
+        value || ""
+    );
 
     return (
         Number.isFinite(timestamp)
@@ -6338,191 +6308,6 @@ function parseTimestamp(value) {
 }
 
 
-async function loadAndMergeDrawings(
-    container
-) {
-    if (
-        !container
-        || container.dataset.drawingEnabled
-            !== "true"
-    ) {
-        return;
-    }
-
-    const identity = (
-        getDrawingIdentity(container)
-    );
-
-    if (!identity) {
-        return;
-    }
-
-    const localRecord = (
-        loadLocalDrawingRecord(
-            container
-        )
-    );
-
-    if (localRecord.drawings.length) {
-        await applyUserDrawings(
-            container,
-            localRecord.drawings
-        );
-
-        setDrawingStatus(
-            container,
-            "已載入本機畫線",
-            "success"
-        );
-    }
-
-    if (
-        !liffReady
-        || !liffIdToken
-    ) {
-        setDrawingStatus(
-            container,
-            "目前只使用本機保存",
-            "warning"
-        );
-
-        return;
-    }
-
-    if (
-        chartLoadingFlags[
-            getDrawingStorageKey(container)
-        ]
-    ) {
-        return;
-    }
-
-    const loadingKey = (
-        getDrawingStorageKey(container)
-    );
-
-    chartLoadingFlags[
-        loadingKey
-    ] = true;
-
-    try {
-        setDrawingStatus(
-            container,
-            "正在讀取雲端畫線……"
-        );
-
-        const remoteRecord = (
-            await requestDrawingSync({
-                action: "load",
-                ticker: identity.ticker,
-                timeframe:
-                    identity.timeframe,
-                marketKey:
-                    identity.marketKey
-            })
-        );
-
-        const remoteDrawings = (
-            normalizeLoadedDrawings(
-                remoteRecord.drawings
-            )
-        );
-
-        const localTimestamp = (
-            parseTimestamp(
-                localRecord.updatedAt
-            )
-        );
-
-        const remoteTimestamp = (
-            parseTimestamp(
-                remoteRecord.updatedAt
-            )
-        );
-
-        if (
-            remoteTimestamp
-            > localTimestamp
-        ) {
-            await applyUserDrawings(
-                container,
-                remoteDrawings
-            );
-
-            saveLocalDrawingRecord(
-                container,
-                remoteDrawings,
-                remoteRecord.updatedAt
-            );
-
-            setDrawingStatus(
-                container,
-                "已載入雲端畫線",
-                "success"
-            );
-
-        } else if (
-            localTimestamp > remoteTimestamp
-            && localRecord.drawings.length
-        ) {
-            await saveDrawingsToRemote(
-                container,
-                localRecord.drawings,
-                false
-            );
-
-        } else if (
-            !localRecord.drawings.length
-            && remoteDrawings.length
-        ) {
-            await applyUserDrawings(
-                container,
-                remoteDrawings
-            );
-
-            saveLocalDrawingRecord(
-                container,
-                remoteDrawings,
-                remoteRecord.updatedAt
-            );
-
-            setDrawingStatus(
-                container,
-                "已載入雲端畫線",
-                "success"
-            );
-
-        } else {
-            setDrawingStatus(
-                container,
-                "畫線已同步",
-                "success"
-            );
-        }
-
-    } catch (error) {
-        console.error(
-            "載入雲端畫線失敗：",
-            error
-        );
-
-        setDrawingStatus(
-            container,
-            "雲端同步失敗，本機畫線仍保留",
-            "warning"
-        );
-
-    } finally {
-        chartLoadingFlags[
-            loadingKey
-        ] = false;
-    }
-}
-
-
-/* ======================================================================
- * 遠端保存
- * ====================================================================== */
 async function saveDrawingsToRemote(
     container,
     drawings,
@@ -6551,7 +6336,7 @@ async function saveDrawingsToRemote(
         if (showStatus) {
             setDrawingStatus(
                 container,
-                "已存本機；LIFF 未登入，尚未同步",
+                "已存本機，尚未登入 LIFF",
                 "warning"
             );
         }
@@ -6563,7 +6348,7 @@ async function saveDrawingsToRemote(
         if (showStatus) {
             setDrawingStatus(
                 container,
-                "正在同步畫線……"
+                "正在同步線段……"
             );
         }
 
@@ -6590,7 +6375,7 @@ async function saveDrawingsToRemote(
 
         setDrawingStatus(
             container,
-            "畫線已跨裝置同步",
+            "線段已跨裝置同步",
             "success"
         );
 
@@ -6598,13 +6383,13 @@ async function saveDrawingsToRemote(
 
     } catch (error) {
         console.error(
-            "保存雲端畫線失敗：",
+            "保存雲端線段失敗：",
             error
         );
 
         setDrawingStatus(
             container,
-            "雲端同步失敗，本機畫線仍保留",
+            "同步失敗，本機線段仍保留",
             "warning"
         );
 
@@ -6613,9 +6398,176 @@ async function saveDrawingsToRemote(
 }
 
 
-function scheduleDrawingSave(
+async function loadAndMergeDrawings(
     container
 ) {
+    if (
+        !container
+        || container.dataset.drawingEnabled
+            !== "true"
+    ) {
+        return;
+    }
+
+    const identity = (
+        getDrawingIdentity(container)
+    );
+
+    if (!identity) {
+        return;
+    }
+
+    const localRecord = (
+        loadLocalDrawingRecord(
+            container
+        )
+    );
+
+    await applyUserDrawings(
+        container,
+        localRecord.drawings
+    );
+
+    if (
+        !liffReady
+        || !liffIdToken
+    ) {
+        setDrawingStatus(
+            container,
+            "目前只使用本機保存",
+            "warning"
+        );
+
+        return;
+    }
+
+    const storageKey = (
+        getDrawingStorageKey(container)
+    );
+
+    if (chartLoadingFlags[storageKey]) {
+        return;
+    }
+
+    chartLoadingFlags[storageKey] = true;
+
+    try {
+        setDrawingStatus(
+            container,
+            "正在讀取雲端線段……"
+        );
+
+        const remoteRecord = (
+            await requestDrawingSync({
+                action: "load",
+                ticker: identity.ticker,
+                timeframe:
+                    identity.timeframe,
+                marketKey:
+                    identity.marketKey
+            })
+        );
+
+        const originalRemoteDrawings = (
+            Array.isArray(
+                remoteRecord.drawings
+            )
+                ? remoteRecord.drawings
+                : []
+        );
+
+        const remoteDrawings = (
+            normalizeLoadedDrawings(
+                originalRemoteDrawings
+            )
+        );
+
+        const remoteWasCleaned = (
+            JSON.stringify(
+                originalRemoteDrawings
+            )
+            !== JSON.stringify(
+                remoteDrawings
+            )
+        );
+
+        const localTimestamp = (
+            parseTimestamp(
+                localRecord.updatedAt
+            )
+        );
+
+        const remoteTimestamp = (
+            parseTimestamp(
+                remoteRecord.updatedAt
+            )
+        );
+
+        let chosenDrawings = [];
+        let chosenUpdatedAt = null;
+
+        if (
+            remoteTimestamp > localTimestamp
+        ) {
+            chosenDrawings = remoteDrawings;
+            chosenUpdatedAt =
+                remoteRecord.updatedAt;
+
+        } else {
+            chosenDrawings =
+                localRecord.drawings;
+
+            chosenUpdatedAt =
+                localRecord.updatedAt;
+        }
+
+        await applyUserDrawings(
+            container,
+            chosenDrawings
+        );
+
+        saveLocalDrawingRecord(
+            container,
+            chosenDrawings,
+            chosenUpdatedAt
+        );
+
+        if (
+            localTimestamp > remoteTimestamp
+            || remoteWasCleaned
+        ) {
+            await saveDrawingsToRemote(
+                container,
+                chosenDrawings,
+                false
+            );
+        }
+
+        setDrawingStatus(
+            container,
+            "線段已同步",
+            "success"
+        );
+
+    } catch (error) {
+        console.error(
+            "載入雲端線段失敗：",
+            error
+        );
+
+        setDrawingStatus(
+            container,
+            "雲端失敗，本機線段仍保留",
+            "warning"
+        );
+
+    } finally {
+        chartLoadingFlags[storageKey] = false;
+    }
+}
+
+
+function scheduleDrawingSave(container) {
     if (
         !container
         || container.dataset.drawingEnabled
@@ -6629,27 +6581,19 @@ function scheduleDrawingSave(
         getUserDrawings(container)
     );
 
-    const localRecord = (
-        saveLocalDrawingRecord(
-            container,
-            drawings
-        )
+    saveLocalDrawingRecord(
+        container,
+        drawings
     );
 
-    if (localRecord) {
-        setDrawingStatus(
-            container,
-            "已保存至本機，等待雲端同步"
-        );
-    }
+    setDrawingStatus(
+        container,
+        "已保存本機，等待同步"
+    );
 
     const storageKey = (
         getDrawingStorageKey(container)
     );
-
-    if (!storageKey) {
-        return;
-    }
 
     if (chartSyncTimers[storageKey]) {
         clearTimeout(
@@ -6664,7 +6608,7 @@ function scheduleDrawingSave(
                 drawings,
                 true
             );
-        }, 900)
+        }, 700)
     );
 }
 
@@ -6673,10 +6617,8 @@ async function syncChartDrawings(
     chartId,
     showStatus = true
 ) {
-    const container = (
-        document.getElementById(
-            chartId
-        )
+    const container = document.getElementById(
+        chartId
     );
 
     if (!container) {
@@ -6718,354 +6660,502 @@ async function synchronizeRenderedCharts() {
 
 
 /* ======================================================================
- * 畫線樣式與工具
+ * 水平線段管理
  * ====================================================================== */
-function getDrawingStyle(chartId) {
-    const colorSelect = (
-        document.getElementById(
-            "drawing-color-" + chartId
+function getNearestTradingDate(
+    requestedDate,
+    tradingDates
+) {
+    if (
+        !requestedDate
+        || !Array.isArray(tradingDates)
+        || !tradingDates.length
+    ) {
+        return "";
+    }
+
+    const exactIndex = (
+        tradingDates.indexOf(
+            requestedDate
         )
     );
 
-    const widthSelect = (
-        document.getElementById(
-            "drawing-width-" + chartId
-        )
+    if (exactIndex >= 0) {
+        return tradingDates[exactIndex];
+    }
+
+    const requestedTime = Date.parse(
+        requestedDate + "T00:00:00"
     );
 
-    const color = (
-        colorSelect
-            ? colorSelect.value
-            : "#facc15"
+    if (!Number.isFinite(requestedTime)) {
+        return "";
+    }
+
+    let nearestDate = tradingDates[0];
+    let nearestDistance = Infinity;
+
+    tradingDates.forEach(
+        (dateValue) => {
+            const dateTime = Date.parse(
+                dateValue + "T00:00:00"
+            );
+
+            const distance = Math.abs(
+                dateTime - requestedTime
+            );
+
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestDate = dateValue;
+            }
+        }
     );
 
-    const width = Number(
-        widthSelect
-            ? widthSelect.value
-            : 2
-    );
-
-    return {
-        color,
-        width: (
-            Number.isFinite(width)
-                ? width
-                : 2
-        )
-    };
+    return nearestDate;
 }
 
 
-function clearActiveDrawingButtons(
+function setDefaultLineDates(container) {
+    const item = getChartItem(
+        container
+    );
+
+    const tradingDates = (
+        getCategoryDates(item)
+    );
+
+    if (!tradingDates.length) {
+        return;
+    }
+
+    const startInput = document.getElementById(
+        "line-start-"
+        + container.dataset.marketId
+        + "-"
+        + container.dataset.chartIndex
+    );
+
+    const endInput = document.getElementById(
+        "line-end-"
+        + container.dataset.marketId
+        + "-"
+        + container.dataset.chartIndex
+    );
+
+    if (
+        startInput
+        && !startInput.value
+    ) {
+        startInput.value = (
+            tradingDates[0]
+        );
+    }
+
+    if (
+        endInput
+        && !endInput.value
+    ) {
+        endInput.value = (
+            tradingDates[
+                tradingDates.length - 1
+            ]
+        );
+    }
+}
+
+
+function toggleLineManager(chartId) {
+    const container = document.getElementById(
+        chartId
+    );
+
+    if (!container) {
+        return;
+    }
+
+    const panel = document.getElementById(
+        "line-manager-"
+        + container.dataset.marketId
+        + "-"
+        + container.dataset.chartIndex
+    );
+
+    if (!panel) {
+        return;
+    }
+
+    panel.hidden = !panel.hidden;
+
+    if (!panel.hidden) {
+        setDefaultLineDates(
+            container
+        );
+
+        renderHorizontalLineList(
+            container
+        );
+    }
+
+    setTimeout(() => {
+        if (
+            typeof Plotly !== "undefined"
+            && container.dataset.done
+                === "true"
+        ) {
+            Plotly.Plots.resize(
+                container
+            );
+        }
+    }, 80);
+}
+
+
+async function addHorizontalSegment(
+    chartId
+) {
+    const container = document.getElementById(
+        chartId
+    );
+
+    if (
+        !container
+        || container.dataset.done
+            !== "true"
+    ) {
+        return;
+    }
+
+    const item = getChartItem(
+        container
+    );
+
+    const tradingDates = (
+        getCategoryDates(item)
+    );
+
+    const suffix = (
+        container.dataset.marketId
+        + "-"
+        + container.dataset.chartIndex
+    );
+
+    const priceInput = document.getElementById(
+        "line-price-" + suffix
+    );
+
+    const startInput = document.getElementById(
+        "line-start-" + suffix
+    );
+
+    const endInput = document.getElementById(
+        "line-end-" + suffix
+    );
+
+    const price = Number(
+        priceInput
+        ? priceInput.value
+        : NaN
+    );
+
+    if (!Number.isFinite(price)) {
+        window.alert(
+            "請輸入正確的價格。"
+        );
+        return;
+    }
+
+    const nearestStart = (
+        getNearestTradingDate(
+            startInput
+                ? startInput.value
+                : "",
+            tradingDates
+        )
+    );
+
+    const nearestEnd = (
+        getNearestTradingDate(
+            endInput
+                ? endInput.value
+                : "",
+            tradingDates
+        )
+    );
+
+    if (
+        !nearestStart
+        || !nearestEnd
+    ) {
+        window.alert(
+            "請輸入正確的開始與結束日期。"
+        );
+        return;
+    }
+
+    let startIndex = (
+        tradingDates.indexOf(
+            nearestStart
+        )
+    );
+
+    let endIndex = (
+        tradingDates.indexOf(
+            nearestEnd
+        )
+    );
+
+    if (startIndex > endIndex) {
+        const temporaryIndex = startIndex;
+        startIndex = endIndex;
+        endIndex = temporaryIndex;
+    }
+
+    const finalStart = (
+        tradingDates[startIndex]
+    );
+
+    const finalEnd = (
+        tradingDates[endIndex]
+    );
+
+    const currentSegments = (
+        getUserDrawings(container)
+    );
+
+    const newSegment = {
+        type: "line",
+        name: "__horizontal_segment__",
+        xref: "x",
+        yref: "y",
+        x0: finalStart,
+        x1: finalEnd,
+        y0: price,
+        y1: price,
+        editable: false,
+        line: {
+            color: "#facc15",
+            width: 2,
+            dash: "solid"
+        }
+    };
+
+    const nextSegments = [
+        ...currentSegments,
+        newSegment
+    ];
+
+    await applyUserDrawings(
+        container,
+        nextSegments
+    );
+
+    saveLocalDrawingRecord(
+        container,
+        nextSegments
+    );
+
+    scheduleDrawingSave(
+        container
+    );
+
+    if (priceInput) {
+        priceInput.value = "";
+    }
+
+    setDrawingStatus(
+        container,
+        "水平線段已新增",
+        "success"
+    );
+}
+
+
+async function deleteHorizontalSegment(
+    chartId,
+    segmentIndex
+) {
+    const container = document.getElementById(
+        chartId
+    );
+
+    if (!container) {
+        return;
+    }
+
+    const currentSegments = (
+        getUserDrawings(container)
+    );
+
+    if (
+        segmentIndex < 0
+        || segmentIndex
+            >= currentSegments.length
+    ) {
+        return;
+    }
+
+    currentSegments.splice(
+        segmentIndex,
+        1
+    );
+
+    await applyUserDrawings(
+        container,
+        currentSegments
+    );
+
+    saveLocalDrawingRecord(
+        container,
+        currentSegments
+    );
+
+    scheduleDrawingSave(
+        container
+    );
+
+    setDrawingStatus(
+        container,
+        "線段已刪除",
+        "success"
+    );
+}
+
+
+function renderHorizontalLineList(
     container
 ) {
     if (!container) {
         return;
     }
 
-    const card = container.closest(
-        ".chart-card"
+    const listElement = (
+        document.getElementById(
+            "line-list-"
+            + container.dataset.marketId
+            + "-"
+            + container.dataset.chartIndex
+        )
     );
 
-    if (!card) {
+    if (!listElement) {
         return;
     }
 
-    card.querySelectorAll(
-        ".drawing-tool-btn"
-    ).forEach((button) => {
-        button.classList.remove(
-            "active"
+    const segments = (
+        getUserDrawings(container)
+    );
+
+    if (!segments.length) {
+        listElement.innerHTML = (
+            '<div class="line-list-empty">'
+            + '目前沒有水平線段'
+            + '</div>'
         );
-    });
-}
 
-
-function applyDrawingStyle(chartId) {
-    const container = (
-        document.getElementById(
-            chartId
-        )
-    );
-
-    if (
-        !container
-        || typeof Plotly === "undefined"
-    ) {
         return;
     }
 
-    const style = (
-        getDrawingStyle(chartId)
-    );
+    listElement.innerHTML = "";
 
-    Plotly.relayout(
-        container,
-        {
-            "newshape.line.color":
-                style.color,
-            "newshape.line.width":
-                style.width,
-            "newshape.fillcolor":
-                style.color + "22",
-            "newshape.opacity": 0.90
-        }
-    );
-}
-
-
-function activateDrawingTool(
-    chartId,
-    toolName
-) {
-    const container = (
-        document.getElementById(
-            chartId
-        )
-    );
-
-    if (
-        !container
-        || container.dataset.done
-            !== "true"
-        || container.dataset.drawingEnabled
-            !== "true"
-        || typeof Plotly === "undefined"
-    ) {
-        return;
-    }
-
-    horizontalLineModes[chartId] = false;
-    eraseModes[chartId] = false;
-
-    clearActiveDrawingButtons(
-        container
-    );
-
-    applyDrawingStyle(chartId);
-
-    Plotly.relayout(
-        container,
-        {
-            dragmode: toolName
-        }
-    );
-
-    setDrawingStatus(
-        container,
-        (
-            toolName === "drawrect"
-                ? "矩形模式：拖曳建立區域"
-                : "趨勢線模式：拖曳建立線段"
-        )
-    );
-}
-
-
-function activateHorizontalLineTool(
-    chartId
-) {
-    const container = (
-        document.getElementById(
-            chartId
-        )
-    );
-
-    if (
-        !container
-        || container.dataset.done
-            !== "true"
-        || container.dataset.drawingEnabled
-            !== "true"
-        || typeof Plotly === "undefined"
-    ) {
-        return;
-    }
-
-    clearActiveDrawingButtons(
-        container
-    );
-
-    eraseModes[chartId] = false;
-    horizontalLineModes[chartId] = true;
-
-    Plotly.relayout(
-        container,
-        {
-            dragmode: "pan"
-        }
-    );
-
-    setDrawingStatus(
-        container,
-        "水平線模式：請點擊一根 K 線的價格位置"
-    );
-}
-
-
-function activateEraseTool(chartId) {
-    const container = (
-        document.getElementById(
-            chartId
-        )
-    );
-
-    if (
-        !container
-        || container.dataset.done
-            !== "true"
-        || container.dataset.drawingEnabled
-            !== "true"
-        || typeof Plotly === "undefined"
-    ) {
-        return;
-    }
-
-    clearActiveDrawingButtons(
-        container
-    );
-
-    horizontalLineModes[chartId] = false;
-    eraseModes[chartId] = true;
-
-    Plotly.relayout(
-        container,
-        {
-            dragmode: "eraseshape"
-        }
-    ).catch(() => {
-        setDrawingStatus(
-            container,
-            "請先點選圖形，再使用 Plotly 刪除工具",
-            "warning"
-        );
-    });
-
-    setDrawingStatus(
-        container,
-        "刪除模式：點擊要刪除的圖形"
-    );
-}
-
-
-function addHorizontalPriceLine(
-    container,
-    price
-) {
-    if (
-        !container
-        || !Number.isFinite(price)
-        || typeof Plotly === "undefined"
-    ) {
-        return;
-    }
-
-    const chartId = container.id;
-    const style = (
-        getDrawingStyle(chartId)
-    );
-
-    const currentShapes = (
-        Array.isArray(
-            container.layout.shapes
-        )
-            ? container.layout.shapes
-                .map(clonePlainObject)
-                .filter(Boolean)
-            : []
-    );
-
-    const horizontalShape = {
-        type: "line",
-        xref: "paper",
-        yref: "y",
-        x0: 0,
-        x1: 1,
-        y0: price,
-        y1: price,
-        editable: true,
-        line: {
-            color: style.color,
-            width: style.width,
-            dash: "solid"
-        }
-    };
-
-    container._drawingLoadInProgress = true;
-
-    Plotly.relayout(
-        container,
-        {
-            shapes: [
-                ...currentShapes,
-                horizontalShape
-            ],
-            dragmode: "pan"
-        }
-    ).then(() => {
-        horizontalLineModes[
-            chartId
-        ] = false;
-
-        setTimeout(() => {
-            container._drawingLoadInProgress = false;
-            scheduleDrawingSave(
-                container
+    segments.forEach(
+        (segment, index) => {
+            const item = document.createElement(
+                "div"
             );
-        }, 100);
 
-        setDrawingStatus(
-            container,
-            "水平線已建立",
-            "success"
-        );
-    });
+            item.className = (
+                "horizontal-line-item"
+            );
+
+            const price = document.createElement(
+                "div"
+            );
+
+            price.className = (
+                "horizontal-line-price"
+            );
+
+            price.textContent = (
+                formatPrice(segment.y0)
+            );
+
+            const range = document.createElement(
+                "div"
+            );
+
+            range.className = (
+                "horizontal-line-range"
+            );
+
+            range.textContent = (
+                normalizeDate(segment.x0)
+                + " ～ "
+                + normalizeDate(segment.x1)
+            );
+
+            const deleteButton = (
+                document.createElement(
+                    "button"
+                )
+            );
+
+            deleteButton.type = "button";
+
+            deleteButton.className = (
+                "delete-line-button"
+            );
+
+            deleteButton.textContent = (
+                "刪除"
+            );
+
+            deleteButton.addEventListener(
+                "click",
+                () => {
+                    deleteHorizontalSegment(
+                        container.id,
+                        index
+                    );
+                }
+            );
+
+            item.appendChild(price);
+            item.appendChild(range);
+            item.appendChild(
+                deleteButton
+            );
+
+            listElement.appendChild(item);
+        }
+    );
 }
 
 
 async function clearAllDrawings(
     chartId
 ) {
-    const container = (
-        document.getElementById(
-            chartId
-        )
+    const container = document.getElementById(
+        chartId
     );
 
-    if (
-        !container
-        || container.dataset.drawingEnabled
-            !== "true"
-        || typeof Plotly === "undefined"
-    ) {
+    if (!container) {
         return;
     }
 
     const confirmed = window.confirm(
         "確定要清除這個商品、"
-        + "這個週期的全部人工畫線嗎？"
+        + "這個週期的全部水平線段嗎？"
     );
 
     if (!confirmed) {
         return;
     }
 
-    horizontalLineModes[chartId] = false;
-    eraseModes[chartId] = false;
-
-    container._drawingLoadInProgress = true;
-
-    await Plotly.relayout(
+    await applyUserDrawings(
         container,
-        {
-            shapes: getBaseShapes(
-                container
-            ),
-            dragmode: "pan"
-        }
+        []
     );
-
-    container._drawingLoadInProgress = false;
 
     saveLocalDrawingRecord(
         container,
@@ -7080,14 +7170,14 @@ async function clearAllDrawings(
 
     setDrawingStatus(
         container,
-        "全部人工畫線已清除",
+        "全部水平線段已清除",
         "success"
     );
 }
 
 
 /* ======================================================================
- * OHLCV 點擊與選取線
+ * K 線資訊
  * ====================================================================== */
 function findOhlcvRecord(
     item,
@@ -7133,15 +7223,14 @@ function clearSelectedCandle(
         Array.isArray(
             container.layout.shapes
         )
-            ? container.layout.shapes
-                .filter(
-                    (shape) => (
-                        String(
-                            shape.name || ""
-                        )
-                        !== "__selected_candle__"
+            ? container.layout.shapes.filter(
+                (shape) => (
+                    String(
+                        shape.name || ""
                     )
+                    !== "__selected_candle__"
                 )
+            )
             : []
     );
 
@@ -7150,14 +7239,35 @@ function clearSelectedCandle(
     Plotly.relayout(
         container,
         {
-            shapes,
-            annotations: []
+            shapes
         }
     ).finally(() => {
-        setTimeout(() => {
-            container._drawingLoadInProgress = false;
-        }, 50);
+        container._drawingLoadInProgress = false;
     });
+
+    const infoPanel = document.getElementById(
+        "info-"
+        + container.dataset.marketId
+        + "-"
+        + container.dataset.chartIndex
+    );
+
+    if (infoPanel) {
+        const timeframe = (
+            container.dataset.timeframe
+            === "1w"
+                ? "週 K"
+                : "K 線"
+        );
+
+        infoPanel.innerHTML = (
+            '<span class="ohlcv-placeholder">'
+            + '點擊 '
+            + timeframe
+            + ' 顯示日期與 OHLCV'
+            + '</span>'
+        );
+    }
 
     delete container.dataset.selectedDate;
 }
@@ -7167,29 +7277,18 @@ function markSelectedDate(
     container,
     record
 ) {
-    if (
-        !container
-        || !record
-        || typeof Plotly === "undefined"
-    ) {
-        return;
-    }
-
     const existingShapes = (
         Array.isArray(
             container.layout.shapes
         )
-            ? container.layout.shapes
-                .filter(
-                    (shape) => (
-                        String(
-                            shape.name || ""
-                        )
-                        !== "__selected_candle__"
+            ? container.layout.shapes.filter(
+                (shape) => (
+                    String(
+                        shape.name || ""
                     )
+                    !== "__selected_candle__"
                 )
-                .map(clonePlainObject)
-                .filter(Boolean)
+            )
             : []
     );
 
@@ -7204,39 +7303,9 @@ function markSelectedDate(
         y1: 1,
         editable: false,
         line: {
-            color: "#facc15",
-            width: 1.5,
+            color: "#94a3b8",
+            width: 1,
             dash: "dot"
-        }
-    };
-
-    const selectedAnnotation = {
-        xref: "x",
-        yref: "paper",
-        x: record.date,
-        y: 1,
-        text: (
-            record.date
-            + "<br>收 "
-            + formatPrice(
-                record.close
-            )
-        ),
-        showarrow: true,
-        arrowhead: 2,
-        arrowsize: 1,
-        arrowwidth: 1,
-        arrowcolor: "#facc15",
-        ax: 0,
-        ay: -38,
-        bgcolor:
-            "rgba(17,24,39,0.95)",
-        bordercolor: "#facc15",
-        borderwidth: 1,
-        borderpad: 4,
-        font: {
-            color: "#f8fafc",
-            size: 10
         }
     };
 
@@ -7248,15 +7317,10 @@ function markSelectedDate(
             shapes: [
                 ...existingShapes,
                 selectedShape
-            ],
-            annotations: [
-                selectedAnnotation
             ]
         }
     ).finally(() => {
-        setTimeout(() => {
-            container._drawingLoadInProgress = false;
-        }, 50);
+        container._drawingLoadInProgress = false;
     });
 }
 
@@ -7265,36 +7329,38 @@ function showFixedOhlcv(
     container,
     clickedDate
 ) {
-    const item = (
-        getChartItem(container)
+    const normalizedDate = (
+        normalizeDate(clickedDate)
     );
 
-    const record = (
-        findOhlcvRecord(
-            item,
-            clickedDate
-        )
+    if (
+        container.dataset.selectedDate
+        === normalizedDate
+    ) {
+        clearSelectedCandle(
+            container
+        );
+        return;
+    }
+
+    const item = getChartItem(
+        container
+    );
+
+    const record = findOhlcvRecord(
+        item,
+        normalizedDate
     );
 
     if (!record) {
         return;
     }
 
-    const marketId = (
-        container.dataset.marketId
-    );
-
-    const chartIndex = (
-        container.dataset.chartIndex
-    );
-
-    const infoPanel = (
-        document.getElementById(
-            "info-"
-            + marketId
-            + "-"
-            + chartIndex
-        )
+    const infoPanel = document.getElementById(
+        "info-"
+        + container.dataset.marketId
+        + "-"
+        + container.dataset.chartIndex
     );
 
     if (!infoPanel) {
@@ -7331,10 +7397,7 @@ function showFixedOhlcv(
         } else if (
             closeValue < openValue
         ) {
-            directionClass = (
-                "ohlcv-down"
-            );
-
+            directionClass = "ohlcv-down";
             directionText = "下跌";
         }
 
@@ -7430,28 +7493,9 @@ function showFixedOhlcv(
 
 
 /* ======================================================================
- * 圖表範圍
+ * 圖表顯示範圍
  * ====================================================================== */
-function getCategoryDates(item) {
-    if (
-        !item
-        || !item.chart_data
-        || !Array.isArray(
-            item.chart_data.ohlcv
-        )
-    ) {
-        return [];
-    }
-
-    return item.chart_data.ohlcv.map(
-        (record) => record.date
-    );
-}
-
-
-function getDefaultRange(
-    totalPoints
-) {
+function getDefaultRange(totalPoints) {
     const visibleCount = Math.min(
         60,
         totalPoints
@@ -7469,50 +7513,7 @@ function getDefaultRange(
 }
 
 
-function categoryRangeToIndex(
-    rangeValue,
-    dateList,
-    fallbackValue
-) {
-    if (
-        typeof rangeValue === "number"
-        && Number.isFinite(rangeValue)
-    ) {
-        return rangeValue;
-    }
-
-    if (
-        typeof rangeValue === "string"
-    ) {
-        const normalizedDate = (
-            normalizeDate(rangeValue)
-        );
-
-        const foundIndex = (
-            dateList.indexOf(
-                normalizedDate
-            )
-        );
-
-        if (foundIndex >= 0) {
-            return foundIndex;
-        }
-    }
-
-    return fallbackValue;
-}
-
-
-function zoomChart(
-    chartId,
-    factor
-) {
-    const container = (
-        document.getElementById(
-            chartId
-        )
-    );
-
+function resetChart(container) {
     if (
         !container
         || container.dataset.done
@@ -7526,204 +7527,42 @@ function zoomChart(
         container
     );
 
-    const dateList = (
-        getCategoryDates(item)
-    );
-
-    const totalPoints = (
-        dateList.length
-    );
-
-    if (totalPoints <= 1) {
-        return;
-    }
-
-    const xaxisLayout = (
-        container.layout
-        && container.layout.xaxis
-            ? container.layout.xaxis
-            : {}
-    );
-
-    const currentRange = (
-        Array.isArray(
-            xaxisLayout.range
-        )
-            ? xaxisLayout.range
-            : getDefaultRange(
-                totalPoints
-            )
-    );
-
-    let rangeStart = (
-        categoryRangeToIndex(
-            currentRange[0],
-            dateList,
-            -0.5
-        )
-    );
-
-    let rangeEnd = (
-        categoryRangeToIndex(
-            currentRange[1],
-            dateList,
-            totalPoints - 0.5
-        )
-    );
-
-    if (rangeEnd < rangeStart) {
-        const temporaryValue = (
-            rangeStart
-        );
-
-        rangeStart = rangeEnd;
-        rangeEnd = temporaryValue;
-    }
-
-    const currentWidth = Math.max(
-        1,
-        rangeEnd - rangeStart
-    );
-
-    const minimumWidth = Math.min(
-        8,
-        Math.max(
-            1,
-            totalPoints - 1
-        )
-    );
-
-    const maximumWidth = (
-        totalPoints
-    );
-
-    let nextWidth = (
-        currentWidth
-        * Number(factor)
-    );
-
-    nextWidth = Math.max(
-        minimumWidth,
-        Math.min(
-            maximumWidth,
-            nextWidth
-        )
-    );
-
-    const center = (
-        rangeStart + rangeEnd
-    ) / 2;
-
-    let nextStart = (
-        center - nextWidth / 2
-    );
-
-    let nextEnd = (
-        center + nextWidth / 2
-    );
-
-    const minimumRange = -0.5;
-    const maximumRange = (
-        totalPoints - 0.5
-    );
-
-    if (nextStart < minimumRange) {
-        nextEnd += (
-            minimumRange - nextStart
-        );
-
-        nextStart = minimumRange;
-    }
-
-    if (nextEnd > maximumRange) {
-        nextStart -= (
-            nextEnd - maximumRange
-        );
-
-        nextEnd = maximumRange;
-    }
-
-    nextStart = Math.max(
-        minimumRange,
-        nextStart
-    );
-
-    nextEnd = Math.min(
-        maximumRange,
-        nextEnd
-    );
-
-    Plotly.relayout(
-        container,
-        {
-            "xaxis.autorange": false,
-            "xaxis.range": [
-                nextStart,
-                nextEnd
-            ]
-        }
-    );
-}
-
-
-function resetChart(chartId) {
-    const container = (
-        document.getElementById(
-            chartId
-        )
-    );
-
-    if (
-        !container
-        || container.dataset.done
-            !== "true"
-        || typeof Plotly === "undefined"
-    ) {
-        return;
-    }
-
-    const item = getChartItem(
-        container
-    );
-
-    const dateList = (
-        getCategoryDates(item)
-    );
-
-    const defaultRange = (
-        getDefaultRange(
-            dateList.length
-        )
+    const dates = getCategoryDates(
+        item
     );
 
     clearSelectedCandle(
         container
     );
 
-    horizontalLineModes[
-        chartId
-    ] = false;
+    const update = {
+        "xaxis.autorange": false,
+        "xaxis.range":
+            getDefaultRange(
+                dates.length
+            ),
+        "yaxis.autorange": true,
+        dragmode: "pan"
+    };
 
-    eraseModes[
-        chartId
-    ] = false;
+    if (
+        container.layout
+        && container.layout.yaxis2
+    ) {
+        update[
+            "yaxis2.autorange"
+        ] = true;
+    }
 
     Plotly.relayout(
         container,
-        {
-            "xaxis.autorange": false,
-            "xaxis.range":
-                defaultRange,
-            "yaxis.autorange": true,
-            "yaxis2.autorange": true,
-            dragmode: "pan"
-        }
+        update
     );
 }
 
 
 /* ======================================================================
- * 圖表事件
+ * 點擊／空白處／雙擊
  * ====================================================================== */
 function bindChartEvents(container) {
     if (
@@ -7734,9 +7573,18 @@ function bindChartEvents(container) {
         return;
     }
 
+    container._lastPointClickTime = 0;
+    container._pointerMoved = false;
+    container._pointerStartX = 0;
+    container._pointerStartY = 0;
+
     container.on(
         "plotly_click",
         (eventData) => {
+            container._lastPointClickTime = (
+                Date.now()
+            );
+
             if (
                 !eventData
                 || !Array.isArray(
@@ -7747,78 +7595,17 @@ function bindChartEvents(container) {
                 return;
             }
 
-            const clickedPoint = (
+            const point = (
                 eventData.points[0]
             );
 
-            const chartId = (
-                container.id
-            );
-
             if (
-                horizontalLineModes[
-                    chartId
-                ]
-            ) {
-                const clickedPrice = Number(
-                    clickedPoint.y
-                );
-
-                if (
-                    Number.isFinite(
-                        clickedPrice
-                    )
-                ) {
-                    addHorizontalPriceLine(
-                        container,
-                        clickedPrice
-                    );
-                }
-
-                return;
-            }
-
-            if (
-                clickedPoint.x !== undefined
-                && clickedPoint.x !== null
+                point.x !== undefined
+                && point.x !== null
             ) {
                 showFixedOhlcv(
                     container,
-                    clickedPoint.x
-                );
-            }
-        }
-    );
-
-    container.on(
-        "plotly_relayout",
-        (eventData) => {
-            if (
-                container._drawingLoadInProgress
-                || container.dataset.drawingEnabled
-                    !== "true"
-            ) {
-                return;
-            }
-
-            const eventKeys = Object.keys(
-                eventData || {}
-            );
-
-            const shapeChanged = (
-                eventKeys.some(
-                    (key) => (
-                        key === "shapes"
-                        || key.startsWith(
-                            "shapes["
-                        )
-                    )
-                )
-            );
-
-            if (shapeChanged) {
-                scheduleDrawingSave(
-                    container
+                    point.x
                 );
             }
         }
@@ -7828,10 +7615,59 @@ function bindChartEvents(container) {
         "plotly_doubleclick",
         () => {
             resetChart(
-                container.id
+                container
             );
 
             return false;
+        }
+    );
+
+    container.addEventListener(
+        "pointerdown",
+        (event) => {
+            container._pointerMoved = false;
+            container._pointerStartX =
+                event.clientX;
+            container._pointerStartY =
+                event.clientY;
+        }
+    );
+
+    container.addEventListener(
+        "pointermove",
+        (event) => {
+            const distance = Math.hypot(
+                event.clientX
+                    - container._pointerStartX,
+                event.clientY
+                    - container._pointerStartY
+            );
+
+            if (distance > 7) {
+                container._pointerMoved = true;
+            }
+        }
+    );
+
+    container.addEventListener(
+        "pointerup",
+        () => {
+            if (container._pointerMoved) {
+                return;
+            }
+
+            setTimeout(() => {
+                const elapsed = (
+                    Date.now()
+                    - container._lastPointClickTime
+                );
+
+                if (elapsed > 180) {
+                    clearSelectedCandle(
+                        container
+                    );
+                }
+            }, 80);
         }
     );
 
@@ -7844,9 +7680,7 @@ function bindChartEvents(container) {
 /* ======================================================================
  * 圖表渲染
  * ====================================================================== */
-function renderMarketCharts(
-    marketId
-) {
+function renderMarketCharts(marketId) {
     const items = (
         chartDataStore[marketId]
     );
@@ -7858,24 +7692,15 @@ function renderMarketCharts(
         return;
     }
 
-    if (
-        typeof Plotly === "undefined"
-    ) {
-        console.error(
-            "Plotly 載入失敗"
-        );
-
-        const section = (
-            document.getElementById(
-                marketId + "-market"
-            )
+    if (typeof Plotly === "undefined") {
+        const section = document.getElementById(
+            marketId + "-market"
         );
 
         if (section) {
             section.innerHTML = (
                 '<div class="plotly-error">'
-                + 'Plotly 圖表套件載入失敗，'
-                + '請重新整理頁面或檢查網路。'
+                + 'Plotly 圖表套件載入失敗'
                 + '</div>'
             );
         }
@@ -7885,16 +7710,12 @@ function renderMarketCharts(
 
     items.forEach(
         (item, index) => {
-            const id = (
-                "chart-"
-                + marketId
-                + "-"
-                + index
-            );
-
             const container = (
                 document.getElementById(
-                    id
+                    "chart-"
+                    + marketId
+                    + "-"
+                    + index
                 )
             );
 
@@ -7913,12 +7734,6 @@ function renderMarketCharts(
                     item.chart_data.data
                 )
             ) {
-                container.innerHTML = (
-                    '<div class="plotly-error">'
-                    + '圖表資料格式錯誤'
-                    + '</div>'
-                );
-
                 return;
             }
 
@@ -7937,12 +7752,6 @@ function renderMarketCharts(
 
             const categoryDates = (
                 getCategoryDates(item)
-            );
-
-            const defaultRange = (
-                getDefaultRange(
-                    categoryDates.length
-                )
             );
 
             const layout = {
@@ -7976,7 +7785,9 @@ function renderMarketCharts(
                     categoryarray:
                         categoryDates,
                     range:
-                        defaultRange,
+                        getDefaultRange(
+                            categoryDates.length
+                        ),
                     autorange: false,
                     rangeslider: {
                         visible: false
@@ -7990,8 +7801,12 @@ function renderMarketCharts(
                     ),
                     fixedrange: false
                 },
-                dragmode: "pan"
+                clickmode: "event",
+                dragmode: "pan",
+                selectdirection: undefined
             };
+
+            delete layout.selectedpoints;
 
             if (
                 originalLayout.yaxis2
@@ -8019,7 +7834,7 @@ function renderMarketCharts(
                     ...layout.margin,
                     l: 8,
                     r: 52,
-                    t: 120,
+                    t: 112,
                     b: 34
                 };
 
@@ -8034,17 +7849,6 @@ function renderMarketCharts(
                     }
                 };
 
-                layout.legend = {
-                    ...layout.legend,
-                    font: {
-                        ...(
-                            layout.legend.font
-                            || {}
-                        ),
-                        size: 10
-                    }
-                };
-
             } else {
                 layout.height = (
                     originalLayout.height
@@ -8056,40 +7860,15 @@ function renderMarketCharts(
                 );
             }
 
-            const drawingEnabled = (
-                container.dataset.drawingEnabled
-                === "true"
-            );
-
             const config = {
                 responsive: true,
-                displayModeBar: true,
+                displayModeBar: false,
                 displaylogo: false,
                 scrollZoom: true,
                 doubleClick: false,
                 showTips: false,
-                editable: drawingEnabled,
-                edits: {
-                    shapePosition:
-                        drawingEnabled
-                },
-                modeBarButtonsToAdd: (
-                    drawingEnabled
-                        ? [
-                            "drawline",
-                            "drawrect",
-                            "eraseshape"
-                        ]
-                        : []
-                ),
-                modeBarButtonsToRemove: [
-                    "select2d",
-                    "lasso2d",
-                    "toggleSpikelines",
-                    "hoverClosestCartesian",
-                    "hoverCompareCartesian",
-                    "toImage"
-                ]
+                editable: false,
+                staticPlot: false
             };
 
             Plotly.newPlot(
@@ -8108,6 +7887,15 @@ function renderMarketCharts(
                         originalLayout.shapes
                     )
                         ? originalLayout.shapes
+                            .filter(
+                                (shape) => (
+                                    String(
+                                        shape.name
+                                        || ""
+                                    )
+                                    === "__volume_separator__"
+                                )
+                            )
                             .map(clonePlainObject)
                             .filter(Boolean)
                         : []
@@ -8117,11 +7905,10 @@ function renderMarketCharts(
                     container
                 );
 
-                applyDrawingStyle(
-                    container.id
-                );
-
-                if (drawingEnabled) {
+                if (
+                    container.dataset.drawingEnabled
+                    === "true"
+                ) {
                     await loadAndMergeDrawings(
                         container
                     );
@@ -8154,9 +7941,7 @@ function renderMarketCharts(
 }
 
 
-function resizeMarketCharts(
-    marketId
-) {
+function resizeMarketCharts(marketId) {
     const items = (
         chartDataStore[marketId]
     );
@@ -8219,10 +8004,8 @@ function switchMarket(
             );
         });
 
-    const section = (
-        document.getElementById(
-            marketId + "-market"
-        )
+    const section = document.getElementById(
+        marketId + "-market"
     );
 
     if (section) {
@@ -8238,19 +8021,6 @@ function switchMarket(
         event.currentTarget.classList.add(
             "active"
         );
-
-    } else {
-        const button = (
-            document.getElementById(
-                "btn-" + marketId
-            )
-        );
-
-        if (button) {
-            button.classList.add(
-                "active"
-            );
-        }
     }
 
     renderMarketCharts(
@@ -8290,15 +8060,11 @@ window.addEventListener(
             return;
         }
 
-        const marketId = (
+        resizeMarketCharts(
             activeSection.id.replace(
                 "-market",
                 ""
             )
-        );
-
-        resizeMarketCharts(
-            marketId
         );
     }
 );
@@ -8344,11 +8110,8 @@ window.addEventListener(
     )
 
 
-# =========================================================================
-# 第 5 部分結束
-# generate_html() 已完整結束
-# 下一部分：GitHub Pages 推送與 main()
-# =========================================================================
+
+
 
 # =========================================================================
 # 第 6 部分：GitHub Pages 推送與主程式
