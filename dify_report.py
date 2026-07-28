@@ -15,7 +15,7 @@ DIFY_USER = "github-actions-bot"
 
 # 可在 GitHub Actions Secrets / Variables 自訂捲動距離
 WSJ_SCROLL_Y = int(os.environ.get("WSJ_SCROLL_Y", "650"))
-BARRONS_SCROLL_Y = int(os.environ.get("BARRONS_SCROLL_Y", "550"))
+BARRONS_SCROLL_Y = int(os.environ.get("BARRONS_SCROLL_Y", "400"))
 
 # Yahoo Finance 常見的美國交易所代碼與名稱
 US_EXCHANGES = {
