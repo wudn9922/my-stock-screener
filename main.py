@@ -2,7 +2,7 @@
 # main.py 完整整合版
 # 第 1 部分：Imports、全域設定、共用工具、Supabase 動態群組
 # =========================================================================
-
+import html as html_module
 import io
 import json
 import os
@@ -1655,132 +1655,76 @@ def get_us_tickers():
 # =========================================================================
 # Plotly 圖表資料
 # =========================================================================
+
 def build_stock_data(
     df_chart,
     ticker,
     title_suffix,
     ma_list,
-    show_volume=False,
+    show_volume=True,
     display_name=None,
     timeframe_label="日K"
 ):
+    """
+    將 DataFrame 轉成 TradingView Lightweight Charts 使用的格式。
+
+    此函數只改變圖表資料格式，不改變：
+    - 股票篩選
+    - 均線計算
+    - 成交量門檻
+    - Supabase 參數
+    """
+
+    if df_chart is None or df_chart.empty:
+        return {
+            "ticker": str(ticker),
+            "display_name": str(
+                display_name or ""
+            ),
+            "title_suffix": str(
+                title_suffix or ""
+            ),
+            "timeframe": str(
+                timeframe_label or "日K"
+            ),
+            "drawing_timeframe": (
+                "1w"
+                if timeframe_label == "週K"
+                else "1d"
+            ),
+            "candles": [],
+            "volume": [],
+            "moving_averages": [],
+            "ohlcv": []
+        }
+
     display_name = str(
         display_name or ""
     ).strip()
-
-    display_ticker = str(ticker)
-
-    if display_name:
-        display_ticker = (
-            f"{ticker}　{display_name}"
-        )
 
     timeframe_label = str(
         timeframe_label or "日K"
     ).strip()
 
-    date_strings = [
-        str(date)[:10]
-        for date in df_chart.index
-    ]
+    drawing_timeframe = (
+        "1w"
+        if timeframe_label == "週K"
+        else "1d"
+    )
 
-    open_values = [
-        safe_float(value)
-        for value in df_chart[
-            "Open"
-        ].tolist()
-    ]
+    chart_df = df_chart.copy()
 
-    high_values = [
-        safe_float(value)
-        for value in df_chart[
-            "High"
-        ].tolist()
-    ]
+    chart_df = chart_df[
+        ~chart_df.index.duplicated(
+            keep="last"
+        )
+    ].sort_index()
 
-    low_values = [
-        safe_float(value)
-        for value in df_chart[
-            "Low"
-        ].tolist()
-    ]
-
-    close_values = [
-        safe_float(value)
-        for value in df_chart[
-            "Close"
-        ].tolist()
-    ]
-
-    volume_values = [
-        safe_float(value)
-        for value in df_chart[
-            "Volume"
-        ].tolist()
-    ]
-
+    candles = []
+    volume_data = []
     ohlcv_records = []
 
-    for (
-        date_value,
-        open_value,
-        high_value,
-        low_value,
-        close_value,
-        volume_value
-    ) in zip(
-        date_strings,
-        open_values,
-        high_values,
-        low_values,
-        close_values,
-        volume_values
-    ):
-        ohlcv_records.append(
-            {
-                "date": date_value,
-                "open": open_value,
-                "high": high_value,
-                "low": low_value,
-                "close": close_value,
-                "volume": volume_value,
-                "timeframe": timeframe_label
-            }
-        )
-
-    traces = [
-        {
-            "type": "candlestick",
-            "name": display_ticker,
-            "x": date_strings,
-            "open": open_values,
-            "high": high_values,
-            "low": low_values,
-            "close": close_values,
-            "yaxis": "y",
-            "increasing": {
-                "line": {
-                    "color": "#ef5350",
-                    "width": 1
-                },
-                "fillcolor": "#ef5350"
-            },
-            "decreasing": {
-                "line": {
-                    "color": "#26a69a",
-                    "width": 1
-                },
-                "fillcolor": "#26a69a"
-            },
-            "hoverlabel": {
-                "bgcolor": "#1e222d",
-                "bordercolor": "#3b4252",
-                "font": {
-                    "color": "#ffffff"
-                }
-            }
-        }
-    ]
+    ma_series_map = {}
 
     colors = [
         "#ffb74d",
@@ -1794,295 +1738,182 @@ def build_stock_data(
     for index, ma_window in enumerate(
         ma_list
     ):
-        ma_col = f"MA{ma_window}"
+        ma_column = f"MA{ma_window}"
 
-        if ma_col not in df_chart.columns:
+        if ma_column not in chart_df.columns:
             continue
 
-        ma_values = [
-            (
-                None
-                if pd.isna(value)
-                else float(value)
+        ma_series_map[ma_column] = {
+            "name": ma_column,
+            "window": int(ma_window),
+            "color": colors[
+                index % len(colors)
+            ],
+            "data": []
+        }
+
+    for row_index, row in chart_df.iterrows():
+        date_value = pd.Timestamp(
+            row_index
+        ).strftime("%Y-%m-%d")
+
+        open_value = safe_float(
+            row.get("Open"),
+            None
+        )
+
+        high_value = safe_float(
+            row.get("High"),
+            None
+        )
+
+        low_value = safe_float(
+            row.get("Low"),
+            None
+        )
+
+        close_value = safe_float(
+            row.get("Close"),
+            None
+        )
+
+        volume_value = safe_float(
+            row.get("Volume"),
+            0.0
+        )
+
+        if (
+            open_value is None
+            or high_value is None
+            or low_value is None
+            or close_value is None
+        ):
+            continue
+
+        candle_item = {
+            "time": date_value,
+            "open": float(open_value),
+            "high": float(high_value),
+            "low": float(low_value),
+            "close": float(close_value)
+        }
+
+        candles.append(candle_item)
+
+        # 台灣市場習慣：上漲紅、下跌綠
+        if close_value > open_value:
+            volume_color = (
+                "rgba(239,83,80,0.62)"
             )
-            for value in df_chart[
-                ma_col
-            ].tolist()
-        ]
+        elif close_value < open_value:
+            volume_color = (
+                "rgba(38,166,154,0.62)"
+            )
+        else:
+            volume_color = (
+                "rgba(148,163,184,0.52)"
+            )
 
-        if not any(
-            value is not None
-            for value in ma_values
-        ):
+        if show_volume:
+            volume_data.append(
+                {
+                    "time": date_value,
+                    "value": max(
+                        0.0,
+                        float(volume_value)
+                    ),
+                    "color": volume_color
+                }
+            )
+
+        ohlcv_records.append(
+            {
+                "date": date_value,
+                "time": date_value,
+                "open": float(open_value),
+                "high": float(high_value),
+                "low": float(low_value),
+                "close": float(close_value),
+                "volume": max(
+                    0.0,
+                    float(volume_value)
+                ),
+                "timeframe": timeframe_label
+            }
+        )
+
+        for (
+            ma_column,
+            ma_config
+        ) in ma_series_map.items():
+            ma_value = row.get(ma_column)
+
+            if pd.isna(ma_value):
+                continue
+
+            numeric_ma = safe_float(
+                ma_value,
+                None
+            )
+
+            if numeric_ma is None:
+                continue
+
+            ma_config["data"].append(
+                {
+                    "time": date_value,
+                    "value": float(
+                        numeric_ma
+                    )
+                }
+            )
+
+    moving_averages = []
+
+    for ma_config in ma_series_map.values():
+        if not ma_config["data"]:
             continue
 
-        color = colors[
-            index % len(colors)
-        ]
-
-        traces.append(
-            {
-                "type": "scatter",
-                "mode": "lines",
-                "name": ma_col,
-                "x": date_strings,
-                "y": ma_values,
-                "yaxis": "y",
-                "line": {
-                    "color": color,
-                    "width": 1.8
-                },
-                "hovertemplate": (
-                    f"{ma_col}: %{{y:.2f}}"
-                    "<extra></extra>"
-                )
-            }
+        moving_averages.append(
+            ma_config
         )
 
-    if show_volume:
-        volume_colors = []
-
-        for open_price, close_price in zip(
-            open_values,
-            close_values
-        ):
-            if close_price >= open_price:
-                volume_colors.append(
-                    "rgba(239,83,80,0.62)"
-                )
-            else:
-                volume_colors.append(
-                    "rgba(38,166,154,0.62)"
-                )
-
-        traces.append(
-            {
-                "type": "bar",
-                "name": "成交量",
-                "x": date_strings,
-                "y": volume_values,
-                "yaxis": "y2",
-                "marker": {
-                    "color": volume_colors,
-                    "line": {
-                        "width": 0
-                    }
-                },
-                "opacity": 0.85,
-                "hovertemplate": (
-                    "成交量: %{y:,.0f}"
-                    "<extra></extra>"
-                )
-            }
-        )
-
-    if show_volume:
-        price_domain = [0.27, 1.0]
-        volume_domain = [0.0, 0.19]
-        chart_height = 520
-        bottom_margin = 42
-    else:
-        price_domain = [0.0, 1.0]
-        volume_domain = None
-        chart_height = 440
-        bottom_margin = 35
-
-    layout = {
-        "title": {
-            "text": (
-                f"<b>{display_ticker}</b>"
-                "　"
-                "<span style='font-size:12px;"
-                "color:#c084fc'>"
-                f"{timeframe_label}"
-                "</span>"
-                "<br>"
-                "<span style='font-size:12px;"
-                "color:#9ca3af'>"
-                f"{title_suffix}"
-                "</span>"
-            ),
-            "x": 0.02,
-            "xanchor": "left",
-            "y": 0.97,
-            "yanchor": "top",
-            "font": {
-                "size": 18,
-                "color": "#f8fafc"
-            }
-        },
-        "paper_bgcolor": "#131722",
-        "plot_bgcolor": "#131722",
-        "font": {
-            "family": (
-                "Arial, "
-                "'Noto Sans TC', "
-                "sans-serif"
-            ),
-            "color": "#d1d4dc"
-        },
-        "xaxis": {
-            "type": "category",
-            "categoryorder": "array",
-            "categoryarray": date_strings,
-            "anchor": (
-                "y2"
-                if show_volume
-                else "y"
-            ),
-            "rangeslider": {
-                "visible": False
-            },
-            "fixedrange": False,
-            "showgrid": True,
-            "gridcolor": (
-                "rgba(255,255,255,0.055)"
-            ),
-            "gridwidth": 1,
-            "showline": False,
-            "zeroline": False,
-            "tickfont": {
-                "size": 10,
-                "color": "#8b949e"
-            },
-            "tickangle": 0,
-            "nticks": 12,
-            "spikemode": "across",
-            "spikesnap": "cursor",
-            "showspikes": True,
-            "spikecolor": "#64748b",
-            "spikethickness": 1
-        },
-        "yaxis": {
-            "domain": price_domain,
-            "side": "right",
-            "anchor": "x",
-            "fixedrange": False,
-            "showgrid": True,
-            "gridcolor": (
-                "rgba(255,255,255,0.055)"
-            ),
-            "gridwidth": 1,
-            "showline": False,
-            "zeroline": False,
-            "tickfont": {
-                "size": 10,
-                "color": "#8b949e"
-            },
-            "tickformat": ",.2f",
-            "automargin": True,
-            "spikemode": "across",
-            "spikesnap": "cursor",
-            "showspikes": True,
-            "spikecolor": "#64748b",
-            "spikethickness": 1
-        },
-        "legend": {
-            "orientation": "h",
-            "x": 0.01,
-            "y": 1.02,
-            "xanchor": "left",
-            "yanchor": "bottom",
-            "font": {
-                "size": 11,
-                "color": "#cbd5e1"
-            },
-            "bgcolor": "rgba(0,0,0,0)"
-        },
-        "hovermode": "x unified",
-        "clickmode": "event+select",
-        "hoverlabel": {
-            "bgcolor": "#1e222d",
-            "bordercolor": "#374151",
-            "font": {
-                "color": "#ffffff",
-                "size": 12
-            }
-        },
-        "margin": {
-            "l": 18,
-            "r": 68,
-            "t": 110,
-            "b": bottom_margin
-        },
-        "height": chart_height,
-        "dragmode": "pan",
-        "bargap": 0.15,
-        "uirevision": ticker,
-        "newshape": {
-            "line": {
-                "color": "#facc15",
-                "width": 2
-            },
-            "fillcolor": (
-                "rgba(250,204,21,0.12)"
-            ),
-            "opacity": 0.9
-        }
-    }
-
-    if show_volume:
-        layout["yaxis2"] = {
-            "domain": volume_domain,
-            "side": "right",
-            "anchor": "x",
-            "fixedrange": False,
-            "showgrid": False,
-            "showline": False,
-            "zeroline": False,
-            "rangemode": "tozero",
-            "tickfont": {
-                "size": 9,
-                "color": "#64748b"
-            },
-            "tickformat": ".2s",
-            "automargin": True,
-            "title": {
-                "text": "成交量",
-                "font": {
-                    "size": 10,
-                    "color": "#64748b"
-                }
-            }
-        }
-
-        layout["shapes"] = [
-            {
-                "type": "line",
-                "xref": "paper",
-                "yref": "paper",
-                "x0": 0,
-                "x1": 1,
-                "y0": 0.225,
-                "y1": 0.225,
-                "editable": False,
-                "line": {
-                    "color": (
-                        "rgba(148,163,184,0.20)"
-                    ),
-                    "width": 1
-                },
-                "name": (
-                    "__volume_separator__"
-                )
-            }
-        ]
-
-    drawing_timeframe = (
-        "1w"
-        if timeframe_label == "週K"
-        else "1d"
+    latest_close = (
+        candles[-1]["close"]
+        if candles
+        else None
     )
 
+    full_display_name = str(ticker)
+
+    if display_name:
+        full_display_name = (
+            f"{ticker}　{display_name}"
+        )
+
     return {
-        "data": traces,
-        "layout": layout,
-        "ohlcv": ohlcv_records,
+        "ticker": str(ticker),
+        "display_name": display_name,
+        "full_display_name": (
+            full_display_name
+        ),
+        "title_suffix": str(
+            title_suffix or ""
+        ),
         "timeframe": timeframe_label,
         "drawing_timeframe": (
             drawing_timeframe
-        )
+        ),
+        "show_volume": bool(show_volume),
+        "latest_close": latest_close,
+        "candles": candles,
+        "volume": volume_data,
+        "moving_averages": (
+            moving_averages
+        ),
+        "ohlcv": ohlcv_records
     }
+
 
 
 # =========================================================================
@@ -4083,7 +3914,7 @@ def analyze_index_trend(
 # 第 4 部分：HTML、動態群組頁籤、圖表與畫線工具介面
 # =========================================================================
 
-import html as html_module
+
 
 
 # =========================================================================
@@ -4393,215 +4224,191 @@ def generate_chart_card_html(
     item,
     drawing_enabled
 ):
-    chart_id = (
-        f"chart-{market_key}-{chart_index}"
-    )
+    chart_id = f"chart-{market_key}-{chart_index}"
+    info_id = f"info-{market_key}-{chart_index}"
+    manager_id = f"line-manager-{market_key}-{chart_index}"
+    status_id = f"drawing-status-{market_key}-{chart_index}"
+    price_id = f"line-price-{market_key}-{chart_index}"
+    start_id = f"line-start-{market_key}-{chart_index}"
+    end_id = f"line-end-{market_key}-{chart_index}"
+    list_id = f"line-list-{market_key}-{chart_index}"
 
-    info_id = (
-        f"info-{market_key}-{chart_index}"
-    )
-
-    manager_id = (
-        f"line-manager-{market_key}-{chart_index}"
-    )
-
-    start_input_id = (
-        f"line-start-{market_key}-{chart_index}"
-    )
-
-    end_input_id = (
-        f"line-end-{market_key}-{chart_index}"
-    )
-
-    price_input_id = (
-        f"line-price-{market_key}-{chart_index}"
-    )
-
-    list_id = (
-        f"line-list-{market_key}-{chart_index}"
-    )
-
-    drawing_status_id = (
-        f"drawing-status-{market_key}-{chart_index}"
-    )
+    chart_data = item.get("chart_data", {})
 
     ticker = str(
         item.get("ticker", "")
     ).strip().upper()
 
-    chart_data = item.get(
-        "chart_data",
-        {}
-    )
-
-    drawing_timeframe = str(
+    timeframe = str(
         chart_data.get(
             "drawing_timeframe",
             "1d"
         )
     ).strip()
 
-    placeholder_text = (
-        "點擊週 K 顯示日期與 OHLCV"
-        if drawing_timeframe == "1w"
-        else "點擊 K 線顯示日期與 OHLCV"
-    )
+    timeframe_label = str(
+        chart_data.get(
+            "timeframe",
+            "日K"
+        )
+    ).strip()
 
-    result = """
+    display_name = str(
+        chart_data.get("full_display_name")
+        or ticker
+    ).strip()
+
+    result = f"""
 <div class="chart-card">
-    <div class="chart-topbar">
+    <div class="chart-header">
+        <div class="chart-identity">
+            <span class="chart-symbol">
+                {escape_html(display_name)}
+            </span>
+            <span class="chart-timeframe">
+                {escape_html(timeframe_label)}
+            </span>
+        </div>
 """
 
     if drawing_enabled:
-        result += (
-            '<button '
-            'type="button" '
-            'class="line-manager-button" '
-            f'onclick="toggleLineManager('
-            f'\'{escape_html(chart_id)}\')">'
-            '─ 水平線段'
-            '</button>'
-        )
+        result += f"""
+        <div class="line-controls">
+            <button
+                type="button"
+                class="compact-btn"
+                onclick="toggleLineManager('{escape_html(chart_id)}')"
+            >
+                ─ 水平線段
+            </button>
 
-        result += (
-            f'<div id="{escape_html(drawing_status_id)}" '
-            'class="drawing-status">'
-            '畫線尚未同步'
-            '</div>'
-        )
+            <span
+                id="{escape_html(status_id)}"
+                class="drawing-status"
+            >
+                畫線尚未同步
+            </span>
+        </div>
+"""
     else:
-        result += (
-            '<div class="drawing-status disabled">'
-            '全市場圖表不開放畫線'
-            '</div>'
-        )
+        result += """
+        <span class="drawing-status disabled">
+            全市場圖表不開放畫線
+        </span>
+"""
 
     result += """
     </div>
 """
 
     if drawing_enabled:
-        result += (
-            f'<div id="{escape_html(manager_id)}" '
-            'class="line-manager-panel" hidden>'
-        )
+        result += f"""
+    <div
+        id="{escape_html(manager_id)}"
+        class="line-manager"
+        hidden
+    >
+        <div class="line-form">
+            <label>
+                <span>價格</span>
+                <input
+                    id="{escape_html(price_id)}"
+                    type="number"
+                    inputmode="decimal"
+                    step="any"
+                    placeholder="例如 125.50"
+                >
+            </label>
 
-        result += """
-    <div class="line-form">
-        <label class="line-field">
-            <span>價格</span>
-"""
+            <label>
+                <span>開始日期</span>
+                <input
+                    id="{escape_html(start_id)}"
+                    type="date"
+                >
+            </label>
 
-        result += (
-            f'<input id="{escape_html(price_input_id)}" '
-            'type="number" '
-            'inputmode="decimal" '
-            'step="any" '
-            'placeholder="例如 125.50">'
-        )
+            <label>
+                <span>結束日期</span>
+                <input
+                    id="{escape_html(end_id)}"
+                    type="date"
+                >
+            </label>
 
-        result += """
-        </label>
+            <div class="line-actions">
+                <button
+                    type="button"
+                    class="add-line-btn"
+                    onclick="addHorizontalSegment('{escape_html(chart_id)}')"
+                >
+                    新增線段
+                </button>
 
-        <label class="line-field">
-            <span>開始日期</span>
-"""
+                <button
+                    type="button"
+                    onclick="syncChartDrawings(
+                        '{escape_html(chart_id)}',
+                        true
+                    )"
+                >
+                    ☁ 同步
+                </button>
 
-        result += (
-            f'<input id="{escape_html(start_input_id)}" '
-            'type="date">'
-        )
+                <button
+                    type="button"
+                    class="danger-btn"
+                    onclick="clearAllDrawings(
+                        '{escape_html(chart_id)}'
+                    )"
+                >
+                    清除全部
+                </button>
+            </div>
+        </div>
 
-        result += """
-        </label>
+        <div class="line-note">
+            非交易日會自動對齊最近交易日；
+            線段固定為黃色 2px。
+        </div>
 
-        <label class="line-field">
-            <span>結束日期</span>
-"""
-
-        result += (
-            f'<input id="{escape_html(end_input_id)}" '
-            'type="date">'
-        )
-
-        result += """
-        </label>
-
-        <div class="line-form-actions">
-"""
-
-        result += (
-            '<button '
-            'type="button" '
-            'class="line-action-button add-line-button" '
-            f'onclick="addHorizontalSegment('
-            f'\'{escape_html(chart_id)}\')">'
-            '新增線段'
-            '</button>'
-        )
-
-        result += (
-            '<button '
-            'type="button" '
-            'class="line-action-button sync-line-button" '
-            f'onclick="syncChartDrawings('
-            f'\'{escape_html(chart_id)}\', true)">'
-            '☁ 立即同步'
-            '</button>'
-        )
-
-        result += (
-            '<button '
-            'type="button" '
-            'class="line-action-button clear-line-button" '
-            f'onclick="clearAllDrawings('
-            f'\'{escape_html(chart_id)}\')">'
-            '清除全部'
-            '</button>'
-        )
-
-        result += """
+        <div
+            id="{escape_html(list_id)}"
+            class="line-list"
+        >
+            <div class="line-list-empty">
+                目前沒有水平線段
+            </div>
         </div>
     </div>
-
-    <div class="line-manager-note">
-        日期若不是交易日，系統會自動對齊最近交易日。
-        線段固定為黃色 2px。
-    </div>
 """
 
-        result += (
-            f'<div id="{escape_html(list_id)}" '
-            'class="horizontal-line-list">'
-            '<div class="line-list-empty">'
-            '目前沒有水平線段'
-            '</div>'
-            '</div>'
-            '</div>'
-        )
+    result += f"""
+    <div
+        id="{escape_html(info_id)}"
+        class="ohlcv-bar"
+    >
+        <span class="chart-name-info">
+            {escape_html(display_name)}
+        </span>
+        <span class="ohlcv-placeholder">
+            長按或移動十字線查看 OHLCV
+        </span>
+    </div>
 
-    result += (
-        f'<div id="{escape_html(info_id)}" '
-        'class="ohlcv-top-panel">'
-        '<span class="ohlcv-placeholder">'
-        f'{escape_html(placeholder_text)}'
-        '</span>'
-        '</div>'
-    )
-
-    result += (
-        f'<div id="{escape_html(chart_id)}" '
-        f'data-market-id="{escape_html(market_key)}" '
-        f'data-chart-index="{chart_index}" '
-        f'data-ticker="{escape_html(ticker)}" '
-        f'data-timeframe="{escape_html(drawing_timeframe)}" '
-        f'data-drawing-enabled="'
-        f'{"true" if drawing_enabled else "false"}" '
-        'class="plotly-container">'
-        '</div>'
-    )
-
-    result += """
+    <div class="chart-stage">
+        <div
+            id="{escape_html(chart_id)}"
+            class="lightweight-chart"
+            data-market-id="{escape_html(market_key)}"
+            data-chart-index="{chart_index}"
+            data-ticker="{escape_html(ticker)}"
+            data-timeframe="{escape_html(timeframe)}"
+            data-drawing-enabled="{
+                "true" if drawing_enabled else "false"
+            }"
+        ></div>
+    </div>
 </div>
 """
 
@@ -4614,17 +4421,10 @@ def generate_html(
     sector_summary=None,
     group_metadata=None
 ):
-    sector_summary = (
-        sector_summary or []
-    )
+    sector_summary = sector_summary or []
+    group_metadata = group_metadata or {}
 
-    group_metadata = (
-        group_metadata or {}
-    )
-
-    clean_data = clean_json_value(
-        data_dict
-    )
+    clean_data = clean_json_value(data_dict)
 
     chart_json = json.dumps(
         clean_data,
@@ -4658,28 +4458,24 @@ def generate_html(
 
 <meta
     name="viewport"
-    content="width=device-width, initial-scale=1.0"
+    content="width=device-width, initial-scale=1.0, maximum-scale=5.0"
 >
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
 
 <style>
 :root {
     color-scheme: dark;
-    --page-bg: #080a0f;
-    --panel-bg: rgba(19, 23, 34, 0.94);
-    --chart-bg: #131722;
-    --toolbar-bg: #111827;
+    --background: #080a0f;
+    --panel: #131722;
+    --toolbar: #0f172a;
     --border: rgba(255, 255, 255, 0.08);
-    --text-main: #f8fafc;
-    --text-secondary: #cbd5e1;
-    --text-muted: #64748b;
-    --blue: #38bdf8;
-    --purple: #a855f7;
-    --green: #10b981;
-    --red: #ef4444;
+    --text: #f8fafc;
+    --muted: #94a3b8;
     --yellow: #facc15;
+    --red: #ef5350;
+    --green: #26a69a;
 }
 
 * {
@@ -4689,8 +4485,8 @@ def generate_html(
 body {
     min-height: 100vh;
     margin: 0;
-    padding: 16px;
-    color: var(--text-main);
+    padding: 14px;
+    color: var(--text);
     background:
         radial-gradient(
             circle at top,
@@ -4709,41 +4505,45 @@ input {
     font-family: inherit;
 }
 
-.header {
+.header,
+.category-box,
+.liff-status,
+.test-notice,
+.market-section {
     max-width: 1100px;
-    margin: 0 auto 18px;
-    padding: 22px 18px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.header {
+    margin-bottom: 14px;
+    padding: 20px 16px;
     text-align: center;
-    background: var(--panel-bg);
+    background: rgba(19, 23, 34, 0.94);
     border: 1px solid var(--border);
     border-radius: 14px;
-    box-shadow:
-        0 12px 35px
-        rgba(0, 0, 0, 0.30);
 }
 
 .header h2 {
     margin: 0;
-    font-size: 24px;
-    letter-spacing: 0.5px;
+    font-size: 23px;
 }
 
 .header p {
-    margin: 8px 0 0;
+    margin: 7px 0 0;
     color: #00ff88;
     font-size: 13px;
 }
 
 .liff-status {
-    max-width: 1100px;
-    margin: 0 auto 12px;
-    padding: 10px 14px;
+    margin-bottom: 12px;
+    padding: 9px 12px;
     color: #93c5fd;
     text-align: center;
     background: rgba(30, 64, 175, 0.18);
-    border: 1px solid rgba(59, 130, 246, 0.30);
-    border-radius: 10px;
-    font-size: 12px;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 9px;
+    font-size: 11px;
 }
 
 .liff-status.success {
@@ -4758,34 +4558,44 @@ input {
     border-color: rgba(245, 158, 11, 0.34);
 }
 
+.test-notice {
+    margin-bottom: 12px;
+    padding: 10px;
+    color: #fde68a;
+    text-align: center;
+    background: rgba(120, 53, 15, 0.3);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 9px;
+    font-size: 12px;
+}
+
 .category-box {
-    max-width: 1100px;
-    margin: 0 auto 14px;
-    padding: 14px 16px;
-    background: var(--panel-bg);
+    margin-bottom: 12px;
+    padding: 13px 15px;
+    background: rgba(19, 23, 34, 0.92);
     border: 1px solid var(--border);
-    border-left: 4px solid var(--blue);
-    border-radius: 12px;
+    border-left: 4px solid #38bdf8;
+    border-radius: 11px;
 }
 
 .category-title {
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     color: #e2e8f0;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
 }
 
 .tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 7px;
 }
 
 .custom-tabs-divider {
     display: flex;
     align-items: center;
     width: 100%;
-    margin: 5px 0 1px;
+    margin-top: 5px;
     color: #c084fc;
     font-size: 11px;
     font-weight: 700;
@@ -4800,233 +4610,105 @@ input {
 }
 
 .tab-btn {
-    padding: 9px 14px;
+    padding: 8px 12px;
     color: #94a3b8;
     background: #1e293b;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 8px;
-    font-size: 13px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 7px;
+    font-size: 12px;
     cursor: pointer;
 }
 
 .tab-btn:hover {
-    color: #ffffff;
+    color: #fff;
     background: #334155;
 }
 
 .tab-btn.active {
-    color: #ffffff;
-    background:
-        linear-gradient(
-            135deg,
-            #0284c7,
-            #2563eb
-        );
+    color: #fff;
+    background: linear-gradient(135deg, #0284c7, #2563eb);
     border-color: #38bdf8;
 }
 
 .index-btn.active {
-    background:
-        linear-gradient(
-            135deg,
-            #7c3aed,
-            #a855f7
-        );
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
     border-color: #c084fc;
 }
 
 .sector-btn.active {
-    background:
-        linear-gradient(
-            135deg,
-            #0f766e,
-            #059669
-        );
+    background: linear-gradient(135deg, #0f766e, #059669);
     border-color: #34d399;
 }
 
 .custom-group-btn {
-    border-color: rgba(192, 132, 252, 0.28);
+    border-color: rgba(192, 132, 252, 0.3);
 }
 
 .custom-group-btn.active {
-    background:
-        linear-gradient(
-            135deg,
-            #6d28d9,
-            #9333ea
-        );
+    background: linear-gradient(135deg, #6d28d9, #9333ea);
     border-color: #c084fc;
 }
 
 .market-section {
     display: none;
-    max-width: 1100px;
-    margin: 0 auto;
 }
 
 .market-section.active {
     display: block;
 }
 
-.test-notice {
-    max-width: 1100px;
-    margin: 0 auto 15px;
-    padding: 11px 16px;
-    color: #fde68a;
-    text-align: center;
-    background: rgba(120, 53, 15, 0.35);
-    border: 1px solid rgba(245, 158, 11, 0.30);
-    border-radius: 10px;
+.chart-card {
+    overflow: hidden;
+    margin-bottom: 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
 }
 
-.sector-overview {
-    margin-bottom: 18px;
-    padding: 16px;
-    background: rgba(15, 23, 42, 0.95);
-    border: 1px solid rgba(52, 211, 153, 0.22);
-    border-radius: 14px;
-}
-
-.sector-overview-title {
-    color: #f8fafc;
-    font-size: 18px;
-    font-weight: 800;
-}
-
-.sector-overview-subtitle {
-    margin-top: 6px;
-    color: #94a3b8;
-    font-size: 12px;
-}
-
-.sector-summary-grid {
-    display: grid;
-    grid-template-columns:
-        repeat(3, minmax(0, 1fr));
-    gap: 12px;
-    margin-top: 14px;
-}
-
-.sector-summary-column {
-    padding: 12px;
-    background: rgba(30, 41, 59, 0.62);
-    border: 1px solid rgba(148, 163, 184, 0.14);
-    border-radius: 11px;
-}
-
-.sector-summary-column.strong {
-    border-top: 3px solid #22c55e;
-}
-
-.sector-summary-column.neutral {
-    border-top: 3px solid #eab308;
-}
-
-.sector-summary-column.weak {
-    border-top: 3px solid #ef4444;
-}
-
-.sector-summary-title {
-    margin-bottom: 10px;
-    color: #e2e8f0;
-    font-size: 14px;
-    font-weight: 800;
-}
-
-.sector-summary-item {
-    margin-bottom: 9px;
-    padding: 10px;
-    background: rgba(15, 23, 42, 0.75);
-    border-radius: 8px;
-}
-
-.sector-summary-head {
+.chart-header {
     display: flex;
     align-items: center;
-    gap: 7px;
+    justify-content: space-between;
+    min-height: 38px;
+    padding: 6px 10px;
+    background: #111827;
+    border-bottom: 1px solid var(--border);
 }
 
-.sector-rank {
-    color: #fbbf24;
-    font-size: 12px;
-    font-weight: 800;
+.chart-identity,
+.line-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.sector-symbol {
+.chart-symbol {
     color: #f8fafc;
     font-size: 13px;
     font-weight: 800;
 }
 
-.sector-name {
-    color: #cbd5e1;
-    font-size: 12px;
-}
-
-.sector-summary-metrics {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 9px;
-    margin-top: 7px;
-    color: #94a3b8;
-    font-size: 10px;
-}
-
-.sector-summary-status {
-    margin-top: 7px;
-    color: #a5b4fc;
-    font-size: 10px;
-}
-
-.positive {
-    color: #4ade80;
-}
-
-.negative {
-    color: #fb7185;
-}
-
-.chart-card {
-    overflow: hidden;
-    margin-bottom: 20px;
-    background: var(--chart-bg);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    box-shadow:
-        0 12px 30px
-        rgba(0, 0, 0, 0.32);
-}
-
-.chart-topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 38px;
-    padding: 5px 9px;
-    background: #111827;
-    border-bottom: 1px solid var(--border);
-}
-
-.line-manager-button {
-    padding: 6px 10px;
-    color: #fde68a;
-    background: rgba(113, 63, 18, 0.28);
-    border: 1px solid rgba(250, 204, 21, 0.32);
-    border-radius: 6px;
+.chart-timeframe {
+    color: #c084fc;
     font-size: 11px;
+    font-weight: 700;
+}
+
+.compact-btn {
+    padding: 5px 9px;
+    color: #fde68a;
+    background: rgba(113, 63, 18, 0.3);
+    border: 1px solid rgba(250, 204, 21, 0.35);
+    border-radius: 6px;
+    font-size: 10px;
     font-weight: 700;
     cursor: pointer;
 }
 
-.line-manager-button:hover {
-    background: rgba(161, 98, 7, 0.42);
-}
-
 .drawing-status {
     color: #94a3b8;
-    font-size: 10px;
-    text-align: right;
+    font-size: 9px;
 }
 
 .drawing-status.success {
@@ -5045,8 +4727,8 @@ input {
     color: #64748b;
 }
 
-.line-manager-panel {
-    padding: 12px;
+.line-manager {
+    padding: 11px;
     background: #0f172a;
     border-bottom: 1px solid var(--border);
 }
@@ -5054,138 +4736,135 @@ input {
 .line-form {
     display: grid;
     grid-template-columns:
-        minmax(110px, 0.8fr)
-        minmax(145px, 1fr)
-        minmax(145px, 1fr)
+        minmax(100px, 0.7fr)
+        minmax(140px, 1fr)
+        minmax(140px, 1fr)
         auto;
-    gap: 10px;
+    gap: 9px;
     align-items: end;
 }
 
-.line-field {
+.line-form label {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 4px;
 }
 
-.line-field span {
+.line-form label span {
     color: #94a3b8;
     font-size: 10px;
     font-weight: 700;
 }
 
-.line-field input {
+.line-form input {
     width: 100%;
-    min-height: 36px;
-    padding: 7px 9px;
+    min-height: 34px;
+    padding: 6px 8px;
     color: #f8fafc;
     background: #111827;
     border: 1px solid rgba(148, 163, 184, 0.28);
-    border-radius: 7px;
-    font-size: 12px;
+    border-radius: 6px;
+    font-size: 11px;
 }
 
-.line-form-actions {
+.line-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 5px;
 }
 
-.line-action-button {
-    min-height: 36px;
-    padding: 7px 10px;
-    color: #f8fafc;
+.line-actions button {
+    min-height: 34px;
+    padding: 6px 9px;
+    color: #e2e8f0;
     background: #1e293b;
-    border: 1px solid rgba(148, 163, 184, 0.24);
-    border-radius: 7px;
-    font-size: 11px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 6px;
+    font-size: 10px;
     font-weight: 700;
     cursor: pointer;
 }
 
-.add-line-button {
+.line-actions .add-line-btn {
     color: #111827;
     background: #facc15;
     border-color: #fde047;
 }
 
-.sync-line-button {
-    color: #bfdbfe;
-    border-color: rgba(59, 130, 246, 0.42);
-}
-
-.clear-line-button {
+.line-actions .danger-btn {
     color: #fecaca;
     border-color: rgba(239, 68, 68, 0.42);
 }
 
-.line-manager-note {
-    margin-top: 8px;
+.line-note {
+    margin-top: 7px;
     color: #64748b;
-    font-size: 10px;
+    font-size: 9px;
 }
 
-.horizontal-line-list {
+.line-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin-top: 10px;
+    gap: 5px;
+    margin-top: 8px;
 }
 
-.horizontal-line-item {
+.line-item {
     display: grid;
-    grid-template-columns:
-        minmax(80px, 0.6fr)
-        minmax(180px, 1.4fr)
-        auto;
+    grid-template-columns: 90px 1fr auto;
     gap: 8px;
     align-items: center;
-    padding: 8px 10px;
+    padding: 7px 9px;
     background: rgba(30, 41, 59, 0.66);
     border-left: 3px solid #facc15;
-    border-radius: 7px;
+    border-radius: 6px;
 }
 
-.horizontal-line-price {
+.line-price {
     color: #fde047;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 800;
 }
 
-.horizontal-line-range {
+.line-range {
     color: #cbd5e1;
-    font-size: 11px;
+    font-size: 10px;
 }
 
-.delete-line-button {
-    padding: 5px 8px;
+.delete-line-btn {
+    padding: 4px 7px;
     color: #fecaca;
     background: transparent;
     border: 1px solid rgba(239, 68, 68, 0.35);
-    border-radius: 6px;
-    font-size: 10px;
+    border-radius: 5px;
+    font-size: 9px;
     cursor: pointer;
 }
 
 .line-list-empty {
-    padding: 10px;
+    padding: 9px;
     color: #64748b;
     text-align: center;
-    font-size: 11px;
+    font-size: 10px;
 }
 
-.ohlcv-top-panel {
+.ohlcv-bar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px 12px;
-    min-height: 42px;
-    padding: 7px 12px;
+    gap: 3px 10px;
+    min-height: 40px;
+    padding: 6px 10px;
     color: #cbd5e1;
     background: #0b1220;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    font-size: 11px;
-    line-height: 1.5;
+    font-size: 10px;
+    line-height: 1.45;
+}
+
+.chart-name-info {
+    color: #f8fafc;
+    font-weight: 800;
 }
 
 .ohlcv-placeholder {
@@ -5194,11 +4873,6 @@ input {
 
 .ohlcv-date {
     color: #f8fafc;
-    font-weight: 700;
-}
-
-.ohlcv-timeframe {
-    color: #c084fc;
     font-weight: 700;
 }
 
@@ -5222,10 +4896,6 @@ input {
     color: #c084fc;
 }
 
-.ohlcv-change {
-    color: #94a3b8;
-}
-
 .ohlcv-up {
     color: #ef5350;
     font-weight: 700;
@@ -5236,33 +4906,134 @@ input {
     font-weight: 700;
 }
 
-.ohlcv-flat {
-    color: #cbd5e1;
+.crosshair-price {
+    color: #fde047;
     font-weight: 700;
 }
 
-.plotly-container {
+.chart-stage {
+    position: relative;
     width: 100%;
-    height: 520px;
+    height: 500px;
     background: #131722;
+}
+
+.lightweight-chart {
+    width: 100%;
+    height: 100%;
     touch-action: none;
 }
 
 .no-data {
-    margin-top: 20px;
-    padding: 55px 20px;
+    padding: 45px 18px;
     color: #64748b;
     text-align: center;
     background: rgba(19, 23, 34, 0.75);
     border: 1px dashed rgba(148, 163, 184, 0.25);
+    border-radius: 10px;
+}
+
+.sector-overview {
+    margin-bottom: 16px;
+    padding: 14px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(52, 211, 153, 0.22);
     border-radius: 12px;
 }
 
-.plotly-error {
-    padding: 40px 15px;
-    color: #fca5a5;
-    text-align: center;
-    background: rgba(127, 29, 29, 0.20);
+.sector-overview-title {
+    font-size: 17px;
+    font-weight: 800;
+}
+
+.sector-overview-subtitle {
+    margin-top: 5px;
+    color: #94a3b8;
+    font-size: 11px;
+}
+
+.sector-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.sector-summary-column {
+    padding: 10px;
+    background: rgba(30, 41, 59, 0.62);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 9px;
+}
+
+.sector-summary-column.strong {
+    border-top: 3px solid #22c55e;
+}
+
+.sector-summary-column.neutral {
+    border-top: 3px solid #eab308;
+}
+
+.sector-summary-column.weak {
+    border-top: 3px solid #ef4444;
+}
+
+.sector-summary-title {
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.sector-summary-item {
+    margin-bottom: 7px;
+    padding: 8px;
+    background: rgba(15, 23, 42, 0.75);
+    border-radius: 7px;
+}
+
+.sector-summary-head {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.sector-rank {
+    color: #fbbf24;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.sector-symbol {
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.sector-name {
+    color: #cbd5e1;
+    font-size: 11px;
+}
+
+.sector-summary-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px 7px;
+    margin-top: 6px;
+    color: #94a3b8;
+    font-size: 9px;
+}
+
+.sector-summary-status {
+    margin-top: 5px;
+    color: #a5b4fc;
+    font-size: 9px;
+}
+
+.positive {
+    color: #4ade80;
+}
+
+.negative {
+    color: #fb7185;
 }
 
 @media (max-width: 760px) {
@@ -5274,85 +5045,76 @@ input {
         grid-template-columns: 1fr 1fr;
     }
 
-    .line-form-actions {
+    .line-actions {
         grid-column: 1 / -1;
     }
 }
 
 @media (max-width: 600px) {
     body {
-        padding: 8px;
+        padding: 7px;
     }
 
     .header {
-        padding: 16px 10px;
+        padding: 14px 8px;
     }
 
     .header h2 {
-        font-size: 19px;
+        font-size: 18px;
     }
 
     .category-box {
-        padding: 12px 10px;
+        padding: 10px 8px;
     }
 
     .tab-btn {
         flex: 1 1 auto;
-        padding: 9px 8px;
-        font-size: 12px;
+        padding: 8px 6px;
+        font-size: 11px;
     }
 
-    .chart-topbar {
-        min-height: 36px;
+    .chart-header {
+        align-items: flex-start;
+        gap: 5px;
     }
 
-    .drawing-status {
-        max-width: 62%;
-        font-size: 9px;
-    }
-
-    .line-manager-panel {
-        padding: 10px 8px;
+    .chart-identity,
+    .line-controls {
+        flex-wrap: wrap;
     }
 
     .line-form {
         grid-template-columns: 1fr;
     }
 
-    .line-form-actions {
+    .line-actions {
         grid-column: auto;
-        width: 100%;
     }
 
-    .line-action-button {
+    .line-actions button {
         flex: 1;
-        padding: 7px 5px;
-        font-size: 10px;
     }
 
-    .horizontal-line-item {
+    .line-item {
         grid-template-columns: 1fr auto;
     }
 
-    .horizontal-line-range {
+    .line-range {
         grid-column: 1 / -1;
-        grid-row: 2;
     }
 
-    .ohlcv-top-panel {
+    .ohlcv-bar {
         min-height: 52px;
-        padding: 7px 8px;
-        font-size: 10px;
+        padding: 6px 7px;
+        font-size: 9px;
     }
 
-    .plotly-container {
-        min-height: 470px;
-        height: auto;
+    .chart-stage {
+        height: 455px;
     }
 
     .chart-card {
-        margin-bottom: 14px;
-        border-radius: 10px;
+        margin-bottom: 12px;
     }
 }
 </style>
@@ -5364,16 +5126,10 @@ input {
         📈 台美股量化潛伏網頁報告
         (__REPORT_DATE__)
     </h2>
-
-    <p>
-        專屬訂製滾動數據儲存版
-    </p>
+    <p>專屬訂製滾動數據儲存版</p>
 </div>
 
-<div
-    id="liff-status"
-    class="liff-status"
->
+<div id="liff-status" class="liff-status">
     正在初始化 LINE LIFF 與畫線同步……
 </div>
 """
@@ -5392,14 +5148,8 @@ input {
 """
 
     html += f"""
-<div
-    class="category-box"
-    style="border-left-color:#a855f7;"
->
-    <div class="category-title">
-        🌍 全球大盤指數
-    </div>
-
+<div class="category-box" style="border-left-color:#a855f7;">
+    <div class="category-title">🌍 全球大盤指數</div>
     <div class="tabs">
         <button
             id="btn-indices"
@@ -5412,14 +5162,8 @@ input {
     </div>
 </div>
 
-<div
-    class="category-box"
-    style="border-left-color:#10b981;"
->
-    <div class="category-title">
-        🧭 美股類股週 K
-    </div>
-
+<div class="category-box" style="border-left-color:#10b981;">
+    <div class="category-title">🧭 美股類股週 K</div>
     <div class="tabs">
         <button
             id="btn-sectors"
@@ -5432,14 +5176,8 @@ input {
     </div>
 </div>
 
-<div
-    class="category-box"
-    style="border-left-color:#ff5252;"
->
-    <div class="category-title">
-        🇹🇼 台灣股市
-    </div>
-
+<div class="category-box" style="border-left-color:#ff5252;">
+    <div class="category-title">🇹🇼 台灣股市</div>
     <div class="tabs">
         <button
             id="btn-tw_all"
@@ -5449,7 +5187,6 @@ input {
             全市場潛伏
             ({len(data_dict.get("tw_all", []))})
         </button>
-
         <button
             id="btn-tw_g1"
             class="tab-btn"
@@ -5458,7 +5195,6 @@ input {
             權值精選
             ({len(data_dict.get("tw_g1", []))})
         </button>
-
         <button
             id="btn-tw_g2"
             class="tab-btn"
@@ -5481,14 +5217,8 @@ input {
 """
 
     html += f"""
-<div
-    class="category-box"
-    style="border-left-color:#00b0ff;"
->
-    <div class="category-title">
-        🇺🇸 美國股市
-    </div>
-
+<div class="category-box" style="border-left-color:#00b0ff;">
+    <div class="category-title">🇺🇸 美國股市</div>
     <div class="tabs">
         <button
             id="btn-us_all"
@@ -5498,7 +5228,6 @@ input {
             全市場潛伏
             ({len(data_dict.get("us_all", []))})
         </button>
-
         <button
             id="btn-us_g1"
             class="tab-btn"
@@ -5507,7 +5236,6 @@ input {
             權值精選
             ({len(data_dict.get("us_g1", []))})
         </button>
-
         <button
             id="btn-us_g2"
             class="tab-btn"
@@ -5516,7 +5244,6 @@ input {
             低本益比
             ({len(data_dict.get("us_g2", []))})
         </button>
-
         <button
             id="btn-us_g3"
             class="tab-btn"
@@ -5525,7 +5252,6 @@ input {
             超級績效
             ({len(data_dict.get("us_g3", []))})
         </button>
-
         <button
             id="btn-us_g4"
             class="tab-btn"
@@ -5562,9 +5288,7 @@ input {
         *us_custom_group_keys
     ]
 
-    keys = list(
-        dict.fromkeys(keys)
-    )
+    keys = list(dict.fromkeys(keys))
 
     for key in keys:
         active_class = (
@@ -5579,69 +5303,44 @@ input {
         )
 
         if key == "sectors":
-            html += (
-                generate_sector_overview_html(
-                    sector_summary
-                )
+            html += generate_sector_overview_html(
+                sector_summary
             )
 
-        items = data_dict.get(
-            key,
-            []
-        )
+        items = data_dict.get(key, [])
 
         if items:
             drawing_enabled = (
-                is_drawing_enabled_market(
-                    key
-                )
+                is_drawing_enabled_market(key)
             )
 
-            for chart_index, item in enumerate(
-                items
-            ):
+            for chart_index, item in enumerate(items):
                 html += generate_chart_card_html(
                     key,
                     chart_index,
                     item,
                     drawing_enabled
                 )
-
         else:
             if key == "indices":
-                no_data_text = (
-                    "目前沒有可顯示的指數"
-                )
-
+                text = "目前沒有可顯示的指數"
             elif key == "sectors":
-                no_data_text = (
-                    "目前沒有可顯示的類股週 K"
-                )
-
+                text = "目前沒有可顯示的類股週 K"
             elif key.startswith("custom_"):
                 metadata = group_metadata.get(
                     key,
                     {}
                 )
-
-                group_name = metadata.get(
-                    "name",
-                    key
-                )
-
-                no_data_text = (
-                    f"{group_name} "
+                text = (
+                    f"{metadata.get('name', key)} "
                     "目前沒有符合均線條件的股票"
                 )
-
             else:
-                no_data_text = (
-                    "此分類目前沒有可顯示的股票"
-                )
+                text = "此分類目前沒有可顯示的股票"
 
             html += (
                 '<div class="no-data">'
-                f'{escape_html(no_data_text)}'
+                f'{escape_html(text)}'
                 '</div>'
             )
 
@@ -5650,29 +5349,84 @@ input {
     html += """
 <script>
 const chartDataStore = __CHART_JSON__;
-
 const REPORT_LIFF_ID = "__REPORT_LIFF_ID__";
 const DRAWING_SYNC_URL = "__DRAWING_SYNC_URL__";
+
+const chartInstances = new Map();
+const syncTimers = {};
+const loadingFlags = {};
 
 let liffReady = false;
 let liffIdToken = "";
 let lineProfile = null;
 
-const chartSyncTimers = {};
-const chartLoadingFlags = {};
+
+/* =====================================================================
+ * 一般工具
+ * ===================================================================== */
+function setLiffStatus(message, className = "") {
+    const element = document.getElementById(
+        "liff-status"
+    );
+
+    if (!element) {
+        return;
+    }
+
+    element.textContent = message;
+    element.className = (
+        "liff-status"
+        + (
+            className
+                ? " " + className
+                : ""
+        )
+    );
+}
 
 
-/* ======================================================================
- * 顯示格式
- * ====================================================================== */
+function setDrawingStatus(
+    chartId,
+    message,
+    className = ""
+) {
+    const state = chartInstances.get(chartId);
+
+    if (!state) {
+        return;
+    }
+
+    const element = document.getElementById(
+        "drawing-status-"
+        + state.marketId
+        + "-"
+        + state.chartIndex
+    );
+
+    if (!element) {
+        return;
+    }
+
+    element.textContent = message;
+    element.className = (
+        "drawing-status"
+        + (
+            className
+                ? " " + className
+                : ""
+        )
+    );
+}
+
+
 function formatPrice(value) {
-    const numberValue = Number(value);
+    const number = Number(value);
 
-    if (!Number.isFinite(numberValue)) {
+    if (!Number.isFinite(number)) {
         return "--";
     }
 
-    return numberValue.toLocaleString(
+    return number.toLocaleString(
         "zh-TW",
         {
             minimumFractionDigits: 2,
@@ -5683,94 +5437,76 @@ function formatPrice(value) {
 
 
 function formatVolume(value) {
-    const numberValue = Number(value);
+    const number = Number(value);
 
-    if (!Number.isFinite(numberValue)) {
+    if (!Number.isFinite(number)) {
         return "--";
     }
 
-    return Math.round(
-        numberValue
-    ).toLocaleString("zh-TW");
+    return Math.round(number).toLocaleString(
+        "zh-TW"
+    );
 }
 
 
 function normalizeDate(value) {
-    return String(
-        value || ""
-    ).substring(0, 10);
+    if (!value) {
+        return "";
+    }
+
+    if (typeof value === "string") {
+        return value.substring(0, 10);
+    }
+
+    if (
+        typeof value === "object"
+        && value.year
+        && value.month
+        && value.day
+    ) {
+        return (
+            String(value.year)
+            + "-"
+            + String(value.month).padStart(2, "0")
+            + "-"
+            + String(value.day).padStart(2, "0")
+        );
+    }
+
+    return String(value).substring(0, 10);
 }
 
 
-function setLiffStatus(
-    message,
-    statusClass = ""
-) {
-    const element = document.getElementById(
-        "liff-status"
-    );
+function getChartItem(marketId, index) {
+    const items = chartDataStore[marketId];
 
-    if (!element) {
-        return;
+    if (!Array.isArray(items)) {
+        return null;
     }
 
-    element.textContent = message;
-
-    element.className = (
-        "liff-status"
-        + (
-            statusClass
-                ? " " + statusClass
-                : ""
-        )
-    );
+    return items[index] || null;
 }
 
 
-function setDrawingStatus(
-    container,
-    message,
-    statusClass = ""
-) {
-    if (!container) {
-        return;
-    }
-
-    const element = document.getElementById(
-        "drawing-status-"
-        + container.dataset.marketId
-        + "-"
-        + container.dataset.chartIndex
-    );
-
-    if (!element) {
-        return;
-    }
-
-    element.textContent = message;
-
-    element.className = (
-        "drawing-status"
-        + (
-            statusClass
-                ? " " + statusClass
-                : ""
-        )
+function getStorageKey(state) {
+    return (
+        "horizontal_segments::"
+        + state.ticker
+        + "::"
+        + state.timeframe
     );
 }
 
 
-/* ======================================================================
+/* =====================================================================
  * LIFF
- * ====================================================================== */
+ * ===================================================================== */
 async function initializeLiff() {
     if (typeof liff === "undefined") {
         setLiffStatus(
-            "⚠️ LIFF SDK 載入失敗，"
-            + "水平線段只保存在本機。",
+            "⚠️ LIFF SDK 載入失敗，線段只保存在本機。",
             "warning"
         );
-
         return;
     }
 
@@ -5785,55 +5521,49 @@ async function initializeLiff() {
             );
 
             liff.login({
-                redirectUri:
-                    window.location.href
+                redirectUri: window.location.href
             });
-
             return;
         }
 
-        liffIdToken = (
-            liff.getIDToken() || ""
-        );
+        liffIdToken = liff.getIDToken() || "";
 
         if (!liffIdToken) {
             setLiffStatus(
-                "⚠️ 無法取得 LINE ID Token，"
-                + "線段只保存在目前裝置。",
+                "⚠️ 無法取得 LINE ID Token，線段只保存在本機。",
                 "warning"
             );
-
             return;
         }
 
         try {
-            lineProfile = (
-                await liff.getProfile()
-            );
+            lineProfile = await liff.getProfile();
         } catch (error) {
-            console.warn(
-                "無法取得 LINE Profile：",
-                error
-            );
+            console.warn(error);
         }
 
         liffReady = true;
 
-        const displayName = (
-            lineProfile
-            && lineProfile.displayName
-                ? lineProfile.displayName
-                : "LINE 使用者"
-        );
-
         setLiffStatus(
             "✅ 已登入 "
-            + displayName
-            + "，水平線段可跨裝置同步。",
+            + (
+                lineProfile?.displayName
+                || "LINE 使用者"
+            )
+            + "，線段可跨裝置同步。",
             "success"
         );
 
-        await synchronizeRenderedCharts();
+        for (
+            const [chartId, state]
+            of chartInstances.entries()
+        ) {
+            if (state.drawingEnabled) {
+                await loadAndMergeSegments(
+                    chartId
+                );
+            }
+        }
 
     } catch (error) {
         console.error(
@@ -5842,353 +5572,116 @@ async function initializeLiff() {
         );
 
         setLiffStatus(
-            "⚠️ LIFF 初始化失敗，"
-            + "線段只保存在本機。",
+            "⚠️ LIFF 初始化失敗，線段只保存在本機。",
             "warning"
         );
     }
 }
 
 
-/* ======================================================================
- * 圖表識別
- * ====================================================================== */
-function getChartItem(container) {
-    if (!container) {
+/* =====================================================================
+ * 線段資料格式與舊格式轉換
+ * ===================================================================== */
+function normalizeSegment(value) {
+    if (!value || typeof value !== "object") {
         return null;
     }
-
-    const marketId = (
-        container.dataset.marketId
-    );
-
-    const chartIndex = Number(
-        container.dataset.chartIndex
-    );
 
     if (
-        !marketId
-        || !Number.isInteger(chartIndex)
-        || !Array.isArray(
-            chartDataStore[marketId]
+        value.type === "horizontalSegment"
+        && Number.isFinite(
+            Number(value.price)
         )
     ) {
-        return null;
-    }
-
-    return (
-        chartDataStore[marketId][chartIndex]
-        || null
-    );
-}
-
-
-function getDrawingIdentity(container) {
-    const item = getChartItem(
-        container
-    );
-
-    if (!item) {
-        return null;
-    }
-
-    const ticker = String(
-        item.ticker
-        || container.dataset.ticker
-        || ""
-    ).trim().toUpperCase();
-
-    const timeframe = String(
-        (
-            item.chart_data
-            && item.chart_data.drawing_timeframe
-        )
-        || container.dataset.timeframe
-        || "1d"
-    ).trim();
-
-    const marketKey = String(
-        container.dataset.marketId || ""
-    ).trim();
-
-    if (!ticker) {
-        return null;
-    }
-
-    return {
-        ticker,
-        timeframe,
-        marketKey
-    };
-}
-
-
-function getDrawingStorageKey(container) {
-    const identity = (
-        getDrawingIdentity(container)
-    );
-
-    if (!identity) {
-        return "";
-    }
-
-    return (
-        "horizontal_segments::"
-        + identity.ticker
-        + "::"
-        + identity.timeframe
-    );
-}
-
-
-function getCategoryDates(item) {
-    if (
-        !item
-        || !item.chart_data
-        || !Array.isArray(
-            item.chart_data.ohlcv
-        )
-    ) {
-        return [];
-    }
-
-    return item.chart_data.ohlcv.map(
-        (record) => record.date
-    );
-}
-
-
-/* ======================================================================
- * 水平線段資料
- * ====================================================================== */
-function clonePlainObject(value) {
-    try {
-        return JSON.parse(
-            JSON.stringify(value)
+        const startTime = normalizeDate(
+            value.startTime
         );
-    } catch (error) {
-        return null;
-    }
-}
+        const endTime = normalizeDate(
+            value.endTime
+        );
 
-
-function isSystemShape(shape) {
-    const name = String(
-        shape && shape.name
-        ? shape.name
-        : ""
-    );
-
-    return (
-        name === "__volume_separator__"
-        || name === "__selected_candle__"
-    );
-}
-
-
-function isHorizontalSegment(shape) {
-    if (
-        !shape
-        || shape.type !== "line"
-        || shape.xref !== "x"
-        || shape.yref !== "y"
-    ) {
-        return false;
-    }
-
-    const y0 = Number(shape.y0);
-    const y1 = Number(shape.y1);
-
-    return (
-        Number.isFinite(y0)
-        && Number.isFinite(y1)
-        && Math.abs(y0 - y1)
-            < 0.0000001
-        && Boolean(shape.x0)
-        && Boolean(shape.x1)
-    );
-}
-
-
-function normalizeSegment(shape) {
-    if (!isHorizontalSegment(shape)) {
-        return null;
-    }
-
-    const price = Number(shape.y0);
-
-    return {
-        type: "line",
-        name: "__horizontal_segment__",
-        xref: "x",
-        yref: "y",
-        x0: normalizeDate(shape.x0),
-        x1: normalizeDate(shape.x1),
-        y0: price,
-        y1: price,
-        editable: false,
-        line: {
-            color: "#facc15",
-            width: 2,
-            dash: "solid"
+        if (!startTime || !endTime) {
+            return null;
         }
-    };
+
+        return {
+            type: "horizontalSegment",
+            price: Number(value.price),
+            startTime,
+            endTime
+        };
+    }
+
+    // 舊 Plotly 水平線格式
+    if (
+        value.type === "line"
+        && Number.isFinite(Number(value.y0))
+        && Number.isFinite(Number(value.y1))
+        && Math.abs(
+            Number(value.y0)
+            - Number(value.y1)
+        ) < 0.0000001
+    ) {
+        const startTime = normalizeDate(
+            value.x0
+        );
+        const endTime = normalizeDate(
+            value.x1
+        );
+
+        if (!startTime || !endTime) {
+            return null;
+        }
+
+        return {
+            type: "horizontalSegment",
+            price: Number(value.y0),
+            startTime,
+            endTime
+        };
+    }
+
+    return null;
 }
 
 
-function normalizeLoadedDrawings(drawings) {
-    if (!Array.isArray(drawings)) {
+function normalizeSegments(values) {
+    if (!Array.isArray(values)) {
         return [];
     }
 
-    return drawings
+    return values
         .map(normalizeSegment)
         .filter(Boolean)
         .slice(0, 200);
 }
 
 
-function getBaseShapes(container) {
-    if (
-        container
-        && Array.isArray(
-            container._baseShapes
-        )
-    ) {
-        return container._baseShapes
-            .map(clonePlainObject)
-            .filter(Boolean);
-    }
-
-    return [];
-}
-
-
-function getSelectionShapes(container) {
-    if (
-        !container
-        || !container.layout
-        || !Array.isArray(
-            container.layout.shapes
-        )
-    ) {
-        return [];
-    }
-
-    return container.layout.shapes
-        .filter(
-            (shape) => (
-                String(shape.name || "")
-                === "__selected_candle__"
-            )
-        )
-        .map(clonePlainObject)
-        .filter(Boolean);
-}
-
-
-function getUserDrawings(container) {
-    if (
-        !container
-        || !container.layout
-        || !Array.isArray(
-            container.layout.shapes
-        )
-    ) {
-        return [];
-    }
-
-    return normalizeLoadedDrawings(
-        container.layout.shapes
-    );
-}
-
-
-async function applyUserDrawings(
-    container,
-    drawings
-) {
-    if (
-        !container
-        || typeof Plotly === "undefined"
-    ) {
-        return;
-    }
-
-    const normalizedDrawings = (
-        normalizeLoadedDrawings(drawings)
-    );
-
-    container._drawingLoadInProgress = true;
-
-    await Plotly.relayout(
-        container,
-        {
-            shapes: [
-                ...getBaseShapes(container),
-                ...normalizedDrawings,
-                ...getSelectionShapes(container)
-            ]
-        }
-    );
-
-    container._drawingLoadInProgress = false;
-
-    renderHorizontalLineList(
-        container
-    );
-}
-
-
-/* ======================================================================
- * localStorage
- * ====================================================================== */
-function loadLocalDrawingRecord(container) {
-    const storageKey = (
-        getDrawingStorageKey(container)
-    );
-
-    if (!storageKey) {
-        return {
-            drawings: [],
-            updatedAt: null
-        };
-    }
-
+function loadLocalRecord(state) {
     try {
-        const rawValue = localStorage.getItem(
-            storageKey
+        const raw = localStorage.getItem(
+            getStorageKey(state)
         );
 
-        if (!rawValue) {
+        if (!raw) {
             return {
                 drawings: [],
                 updatedAt: null
             };
         }
 
-        const parsedValue = JSON.parse(
-            rawValue
-        );
-
-        const cleanedDrawings = (
-            normalizeLoadedDrawings(
-                parsedValue.drawings
-            )
-        );
+        const parsed = JSON.parse(raw);
 
         return {
-            drawings: cleanedDrawings,
+            drawings: normalizeSegments(
+                parsed.drawings
+            ),
             updatedAt:
-                parsedValue.updatedAt
-                || null
+                parsed.updatedAt || null
         };
 
     } catch (error) {
-        console.error(
-            "讀取本機線段失敗：",
-            error
-        );
+        console.error(error);
 
         return {
             drawings: [],
@@ -6198,56 +5691,32 @@ function loadLocalDrawingRecord(container) {
 }
 
 
-function saveLocalDrawingRecord(
-    container,
+function saveLocalRecord(
+    state,
     drawings,
     updatedAt = null
 ) {
-    const storageKey = (
-        getDrawingStorageKey(container)
-    );
-
-    if (!storageKey) {
-        return null;
-    }
-
     const record = {
-        drawings:
-            normalizeLoadedDrawings(
-                drawings
-            ),
+        drawings: normalizeSegments(drawings),
         updatedAt:
             updatedAt
             || new Date().toISOString()
     };
 
-    try {
-        localStorage.setItem(
-            storageKey,
-            JSON.stringify(record)
-        );
+    localStorage.setItem(
+        getStorageKey(state),
+        JSON.stringify(record)
+    );
 
-        return record;
-
-    } catch (error) {
-        console.error(
-            "保存本機線段失敗：",
-            error
-        );
-
-        return null;
-    }
+    return record;
 }
 
 
-/* ======================================================================
- * Edge Function
- * ====================================================================== */
+/* =====================================================================
+ * Edge Function 同步
+ * ===================================================================== */
 async function requestDrawingSync(payload) {
-    if (
-        !liffReady
-        || !liffIdToken
-    ) {
+    if (!liffReady || !liffIdToken) {
         throw new Error(
             "LIFF 尚未登入"
         );
@@ -6268,30 +5737,19 @@ async function requestDrawingSync(payload) {
         }
     );
 
-    let responseData = {};
-
-    try {
-        responseData = (
-            await response.json()
-        );
-    } catch (error) {
-        responseData = {};
-    }
+    const data = await response.json();
 
     if (
         !response.ok
-        || responseData.ok !== true
+        || data.ok !== true
     ) {
         throw new Error(
-            responseData.error
-            || (
-                "同步失敗，HTTP "
-                + response.status
-            )
+            data.error
+            || "同步失敗"
         );
     }
 
-    return responseData;
+    return data;
 }
 
 
@@ -6300,315 +5758,118 @@ function parseTimestamp(value) {
         value || ""
     );
 
-    return (
-        Number.isFinite(timestamp)
-            ? timestamp
-            : 0
-    );
+    return Number.isFinite(timestamp)
+        ? timestamp
+        : 0;
 }
 
 
-async function saveDrawingsToRemote(
-    container,
-    drawings,
+async function saveRemoteSegments(
+    chartId,
     showStatus = true
 ) {
-    if (
-        !container
-        || container.dataset.drawingEnabled
-            !== "true"
-    ) {
-        return null;
-    }
-
-    const identity = (
-        getDrawingIdentity(container)
+    const state = chartInstances.get(
+        chartId
     );
 
-    if (!identity) {
-        return null;
+    if (
+        !state
+        || !state.drawingEnabled
+    ) {
+        return;
     }
 
-    if (
-        !liffReady
-        || !liffIdToken
-    ) {
+    saveLocalRecord(
+        state,
+        state.drawings
+    );
+
+    if (!liffReady || !liffIdToken) {
         if (showStatus) {
             setDrawingStatus(
-                container,
+                chartId,
                 "已存本機，尚未登入 LIFF",
                 "warning"
             );
         }
-
-        return null;
+        return;
     }
 
     try {
         if (showStatus) {
             setDrawingStatus(
-                container,
+                chartId,
                 "正在同步線段……"
             );
         }
 
-        const responseData = (
-            await requestDrawingSync({
-                action: "save",
-                ticker: identity.ticker,
-                timeframe:
-                    identity.timeframe,
-                marketKey:
-                    identity.marketKey,
-                drawings:
-                    normalizeLoadedDrawings(
-                        drawings
-                    )
-            })
-        );
+        const result = await requestDrawingSync({
+            action: "save",
+            ticker: state.ticker,
+            timeframe: state.timeframe,
+            marketKey: state.marketId,
+            drawings: state.drawings
+        });
 
-        saveLocalDrawingRecord(
-            container,
-            drawings,
-            responseData.updatedAt
+        saveLocalRecord(
+            state,
+            state.drawings,
+            result.updatedAt
         );
 
         setDrawingStatus(
-            container,
+            chartId,
             "線段已跨裝置同步",
             "success"
         );
 
-        return responseData;
-
     } catch (error) {
-        console.error(
-            "保存雲端線段失敗：",
-            error
-        );
+        console.error(error);
 
         setDrawingStatus(
-            container,
+            chartId,
             "同步失敗，本機線段仍保留",
             "warning"
         );
-
-        return null;
     }
 }
 
 
-async function loadAndMergeDrawings(
-    container
-) {
-    if (
-        !container
-        || container.dataset.drawingEnabled
-            !== "true"
-    ) {
+function scheduleSegmentSave(chartId) {
+    const state = chartInstances.get(
+        chartId
+    );
+
+    if (!state) {
         return;
     }
 
-    const identity = (
-        getDrawingIdentity(container)
-    );
-
-    if (!identity) {
-        return;
-    }
-
-    const localRecord = (
-        loadLocalDrawingRecord(
-            container
-        )
-    );
-
-    await applyUserDrawings(
-        container,
-        localRecord.drawings
-    );
-
-    if (
-        !liffReady
-        || !liffIdToken
-    ) {
-        setDrawingStatus(
-            container,
-            "目前只使用本機保存",
-            "warning"
-        );
-
-        return;
-    }
-
-    const storageKey = (
-        getDrawingStorageKey(container)
-    );
-
-    if (chartLoadingFlags[storageKey]) {
-        return;
-    }
-
-    chartLoadingFlags[storageKey] = true;
-
-    try {
-        setDrawingStatus(
-            container,
-            "正在讀取雲端線段……"
-        );
-
-        const remoteRecord = (
-            await requestDrawingSync({
-                action: "load",
-                ticker: identity.ticker,
-                timeframe:
-                    identity.timeframe,
-                marketKey:
-                    identity.marketKey
-            })
-        );
-
-        const originalRemoteDrawings = (
-            Array.isArray(
-                remoteRecord.drawings
-            )
-                ? remoteRecord.drawings
-                : []
-        );
-
-        const remoteDrawings = (
-            normalizeLoadedDrawings(
-                originalRemoteDrawings
-            )
-        );
-
-        const remoteWasCleaned = (
-            JSON.stringify(
-                originalRemoteDrawings
-            )
-            !== JSON.stringify(
-                remoteDrawings
-            )
-        );
-
-        const localTimestamp = (
-            parseTimestamp(
-                localRecord.updatedAt
-            )
-        );
-
-        const remoteTimestamp = (
-            parseTimestamp(
-                remoteRecord.updatedAt
-            )
-        );
-
-        let chosenDrawings = [];
-        let chosenUpdatedAt = null;
-
-        if (
-            remoteTimestamp > localTimestamp
-        ) {
-            chosenDrawings = remoteDrawings;
-            chosenUpdatedAt =
-                remoteRecord.updatedAt;
-
-        } else {
-            chosenDrawings =
-                localRecord.drawings;
-
-            chosenUpdatedAt =
-                localRecord.updatedAt;
-        }
-
-        await applyUserDrawings(
-            container,
-            chosenDrawings
-        );
-
-        saveLocalDrawingRecord(
-            container,
-            chosenDrawings,
-            chosenUpdatedAt
-        );
-
-        if (
-            localTimestamp > remoteTimestamp
-            || remoteWasCleaned
-        ) {
-            await saveDrawingsToRemote(
-                container,
-                chosenDrawings,
-                false
-            );
-        }
-
-        setDrawingStatus(
-            container,
-            "線段已同步",
-            "success"
-        );
-
-    } catch (error) {
-        console.error(
-            "載入雲端線段失敗：",
-            error
-        );
-
-        setDrawingStatus(
-            container,
-            "雲端失敗，本機線段仍保留",
-            "warning"
-        );
-
-    } finally {
-        chartLoadingFlags[storageKey] = false;
-    }
-}
-
-
-function scheduleDrawingSave(container) {
-    if (
-        !container
-        || container.dataset.drawingEnabled
-            !== "true"
-        || container._drawingLoadInProgress
-    ) {
-        return;
-    }
-
-    const drawings = (
-        getUserDrawings(container)
-    );
-
-    saveLocalDrawingRecord(
-        container,
-        drawings
+    saveLocalRecord(
+        state,
+        state.drawings
     );
 
     setDrawingStatus(
-        container,
+        chartId,
         "已保存本機，等待同步"
     );
 
-    const storageKey = (
-        getDrawingStorageKey(container)
-    );
+    const key = getStorageKey(state);
 
-    if (chartSyncTimers[storageKey]) {
+    if (syncTimers[key]) {
         clearTimeout(
-            chartSyncTimers[storageKey]
+            syncTimers[key]
         );
     }
 
-    chartSyncTimers[storageKey] = (
-        setTimeout(() => {
-            saveDrawingsToRemote(
-                container,
-                drawings,
+    syncTimers[key] = setTimeout(
+        () => {
+            saveRemoteSegments(
+                chartId,
                 true
             );
-        }, 700)
+        },
+        700
     );
 }
 
@@ -6617,71 +5878,206 @@ async function syncChartDrawings(
     chartId,
     showStatus = true
 ) {
-    const container = document.getElementById(
-        chartId
-    );
-
-    if (!container) {
-        return;
-    }
-
-    const drawings = (
-        getUserDrawings(container)
-    );
-
-    saveLocalDrawingRecord(
-        container,
-        drawings
-    );
-
-    await saveDrawingsToRemote(
-        container,
-        drawings,
+    await saveRemoteSegments(
+        chartId,
         showStatus
     );
 }
 
 
-async function synchronizeRenderedCharts() {
-    const containers = (
-        document.querySelectorAll(
-            '.plotly-container'
-            + '[data-drawing-enabled="true"]'
-            + '[data-done="true"]'
-        )
+async function loadAndMergeSegments(
+    chartId
+) {
+    const state = chartInstances.get(
+        chartId
     );
 
-    for (const container of containers) {
-        await loadAndMergeDrawings(
-            container
+    if (
+        !state
+        || !state.drawingEnabled
+    ) {
+        return;
+    }
+
+    const local = loadLocalRecord(
+        state
+    );
+
+    state.drawings = local.drawings;
+    renderSegments(state);
+
+    if (!liffReady || !liffIdToken) {
+        setDrawingStatus(
+            chartId,
+            "目前只使用本機保存",
+            "warning"
         );
+        return;
+    }
+
+    const storageKey = getStorageKey(
+        state
+    );
+
+    if (loadingFlags[storageKey]) {
+        return;
+    }
+
+    loadingFlags[storageKey] = true;
+
+    try {
+        setDrawingStatus(
+            chartId,
+            "正在讀取雲端線段……"
+        );
+
+        const remote = await requestDrawingSync({
+            action: "load",
+            ticker: state.ticker,
+            timeframe: state.timeframe,
+            marketKey: state.marketId
+        });
+
+        const remoteSegments = normalizeSegments(
+            remote.drawings
+        );
+
+        const remoteWasCleaned = (
+            JSON.stringify(
+                remote.drawings || []
+            )
+            !== JSON.stringify(
+                remoteSegments
+            )
+        );
+
+        const localTime = parseTimestamp(
+            local.updatedAt
+        );
+
+        const remoteTime = parseTimestamp(
+            remote.updatedAt
+        );
+
+        if (remoteTime > localTime) {
+            state.drawings = remoteSegments;
+
+            saveLocalRecord(
+                state,
+                state.drawings,
+                remote.updatedAt
+            );
+        } else {
+            state.drawings = local.drawings;
+        }
+
+        renderSegments(state);
+
+        if (
+            localTime > remoteTime
+            || remoteWasCleaned
+        ) {
+            await saveRemoteSegments(
+                chartId,
+                false
+            );
+        }
+
+        setDrawingStatus(
+            chartId,
+            "線段已同步",
+            "success"
+        );
+
+    } catch (error) {
+        console.error(error);
+
+        setDrawingStatus(
+            chartId,
+            "雲端失敗，本機線段仍保留",
+            "warning"
+        );
+
+    } finally {
+        loadingFlags[storageKey] = false;
     }
 }
 
 
-/* ======================================================================
- * 水平線段管理
- * ====================================================================== */
-function getNearestTradingDate(
+/* =====================================================================
+ * 水平線段顯示
+ * ===================================================================== */
+function removeSegmentSeries(state) {
+    for (
+        const series
+        of state.segmentSeries
+    ) {
+        try {
+            state.chart.removeSeries(
+                series
+            );
+        } catch (error) {
+            console.warn(error);
+        }
+    }
+
+    state.segmentSeries = [];
+}
+
+
+function renderSegments(state) {
+    removeSegmentSeries(state);
+
+    for (
+        const segment
+        of state.drawings
+    ) {
+        const lineSeries = (
+            state.chart.addLineSeries({
+                color: "#facc15",
+                lineWidth: 2,
+                lineStyle:
+                    LightweightCharts.LineStyle.Solid,
+                priceLineVisible: false,
+                lastValueVisible: false,
+                crosshairMarkerVisible: false
+            })
+        );
+
+        lineSeries.setData([
+            {
+                time: segment.startTime,
+                value: segment.price
+            },
+            {
+                time: segment.endTime,
+                value: segment.price
+            }
+        ]);
+
+        state.segmentSeries.push(
+            lineSeries
+        );
+    }
+
+    renderLineList(state);
+}
+
+
+function nearestTradingDate(
     requestedDate,
-    tradingDates
+    dates
 ) {
     if (
         !requestedDate
-        || !Array.isArray(tradingDates)
-        || !tradingDates.length
+        || !Array.isArray(dates)
+        || !dates.length
     ) {
         return "";
     }
 
-    const exactIndex = (
-        tradingDates.indexOf(
-            requestedDate
-        )
-    );
-
-    if (exactIndex >= 0) {
-        return tradingDates[exactIndex];
+    if (dates.includes(requestedDate)) {
+        return requestedDate;
     }
 
     const requestedTime = Date.parse(
@@ -6692,64 +6088,50 @@ function getNearestTradingDate(
         return "";
     }
 
-    let nearestDate = tradingDates[0];
-    let nearestDistance = Infinity;
+    let result = dates[0];
+    let distance = Infinity;
 
-    tradingDates.forEach(
-        (dateValue) => {
-            const dateTime = Date.parse(
-                dateValue + "T00:00:00"
-            );
+    for (const date of dates) {
+        const currentDistance = Math.abs(
+            Date.parse(
+                date + "T00:00:00"
+            ) - requestedTime
+        );
 
-            const distance = Math.abs(
-                dateTime - requestedTime
-            );
-
-            if (distance < nearestDistance) {
-                nearestDistance = distance;
-                nearestDate = dateValue;
-            }
+        if (currentDistance < distance) {
+            distance = currentDistance;
+            result = date;
         }
-    );
+    }
 
-    return nearestDate;
+    return result;
 }
 
 
-function setDefaultLineDates(container) {
-    const item = getChartItem(
-        container
-    );
-
-    const tradingDates = (
-        getCategoryDates(item)
-    );
-
-    if (!tradingDates.length) {
+function setDefaultLineDates(state) {
+    if (!state.dates.length) {
         return;
     }
 
-    const startInput = document.getElementById(
-        "line-start-"
-        + container.dataset.marketId
+    const suffix = (
+        state.marketId
         + "-"
-        + container.dataset.chartIndex
+        + state.chartIndex
+    );
+
+    const startInput = document.getElementById(
+        "line-start-" + suffix
     );
 
     const endInput = document.getElementById(
-        "line-end-"
-        + container.dataset.marketId
-        + "-"
-        + container.dataset.chartIndex
+        "line-end-" + suffix
     );
 
     if (
         startInput
         && !startInput.value
     ) {
-        startInput.value = (
-            tradingDates[0]
-        );
+        startInput.value = state.dates[0];
     }
 
     if (
@@ -6757,8 +6139,8 @@ function setDefaultLineDates(container) {
         && !endInput.value
     ) {
         endInput.value = (
-            tradingDates[
-                tradingDates.length - 1
+            state.dates[
+                state.dates.length - 1
             ]
         );
     }
@@ -6766,19 +6148,19 @@ function setDefaultLineDates(container) {
 
 
 function toggleLineManager(chartId) {
-    const container = document.getElementById(
+    const state = chartInstances.get(
         chartId
     );
 
-    if (!container) {
+    if (!state) {
         return;
     }
 
     const panel = document.getElementById(
         "line-manager-"
-        + container.dataset.marketId
+        + state.marketId
         + "-"
-        + container.dataset.chartIndex
+        + state.chartIndex
     );
 
     if (!panel) {
@@ -6788,56 +6170,32 @@ function toggleLineManager(chartId) {
     panel.hidden = !panel.hidden;
 
     if (!panel.hidden) {
-        setDefaultLineDates(
-            container
-        );
-
-        renderHorizontalLineList(
-            container
-        );
+        setDefaultLineDates(state);
+        renderLineList(state);
     }
 
-    setTimeout(() => {
-        if (
-            typeof Plotly !== "undefined"
-            && container.dataset.done
-                === "true"
-        ) {
-            Plotly.Plots.resize(
-                container
-            );
-        }
-    }, 80);
+    setTimeout(
+        () => resizeChart(state),
+        80
+    );
 }
 
 
 async function addHorizontalSegment(
     chartId
 ) {
-    const container = document.getElementById(
+    const state = chartInstances.get(
         chartId
     );
 
-    if (
-        !container
-        || container.dataset.done
-            !== "true"
-    ) {
+    if (!state) {
         return;
     }
 
-    const item = getChartItem(
-        container
-    );
-
-    const tradingDates = (
-        getCategoryDates(item)
-    );
-
     const suffix = (
-        container.dataset.marketId
+        state.marketId
         + "-"
-        + container.dataset.chartIndex
+        + state.chartIndex
     );
 
     const priceInput = document.getElementById(
@@ -6853,280 +6211,137 @@ async function addHorizontalSegment(
     );
 
     const price = Number(
-        priceInput
-        ? priceInput.value
-        : NaN
+        priceInput?.value
     );
 
     if (!Number.isFinite(price)) {
-        window.alert(
-            "請輸入正確的價格。"
-        );
+        alert("請輸入正確的價格。");
         return;
     }
 
-    const nearestStart = (
-        getNearestTradingDate(
-            startInput
-                ? startInput.value
-                : "",
-            tradingDates
-        )
+    let startTime = nearestTradingDate(
+        startInput?.value || "",
+        state.dates
     );
 
-    const nearestEnd = (
-        getNearestTradingDate(
-            endInput
-                ? endInput.value
-                : "",
-            tradingDates
-        )
+    let endTime = nearestTradingDate(
+        endInput?.value || "",
+        state.dates
     );
 
-    if (
-        !nearestStart
-        || !nearestEnd
-    ) {
-        window.alert(
+    if (!startTime || !endTime) {
+        alert(
             "請輸入正確的開始與結束日期。"
         );
         return;
     }
 
-    let startIndex = (
-        tradingDates.indexOf(
-            nearestStart
-        )
-    );
-
-    let endIndex = (
-        tradingDates.indexOf(
-            nearestEnd
-        )
-    );
-
-    if (startIndex > endIndex) {
-        const temporaryIndex = startIndex;
-        startIndex = endIndex;
-        endIndex = temporaryIndex;
+    if (
+        state.dates.indexOf(startTime)
+        > state.dates.indexOf(endTime)
+    ) {
+        const temporary = startTime;
+        startTime = endTime;
+        endTime = temporary;
     }
 
-    const finalStart = (
-        tradingDates[startIndex]
-    );
+    state.drawings.push({
+        type: "horizontalSegment",
+        price,
+        startTime,
+        endTime
+    });
 
-    const finalEnd = (
-        tradingDates[endIndex]
-    );
-
-    const currentSegments = (
-        getUserDrawings(container)
-    );
-
-    const newSegment = {
-        type: "line",
-        name: "__horizontal_segment__",
-        xref: "x",
-        yref: "y",
-        x0: finalStart,
-        x1: finalEnd,
-        y0: price,
-        y1: price,
-        editable: false,
-        line: {
-            color: "#facc15",
-            width: 2,
-            dash: "solid"
-        }
-    };
-
-    const nextSegments = [
-        ...currentSegments,
-        newSegment
-    ];
-
-    await applyUserDrawings(
-        container,
-        nextSegments
-    );
-
-    saveLocalDrawingRecord(
-        container,
-        nextSegments
-    );
-
-    scheduleDrawingSave(
-        container
-    );
+    renderSegments(state);
+    scheduleSegmentSave(chartId);
 
     if (priceInput) {
         priceInput.value = "";
     }
 
     setDrawingStatus(
-        container,
+        chartId,
         "水平線段已新增",
         "success"
     );
 }
 
 
-async function deleteHorizontalSegment(
-    chartId,
-    segmentIndex
-) {
-    const container = document.getElementById(
-        chartId
+function renderLineList(state) {
+    const element = document.getElementById(
+        "line-list-"
+        + state.marketId
+        + "-"
+        + state.chartIndex
     );
 
-    if (!container) {
+    if (!element) {
         return;
     }
 
-    const currentSegments = (
-        getUserDrawings(container)
-    );
-
-    if (
-        segmentIndex < 0
-        || segmentIndex
-            >= currentSegments.length
-    ) {
-        return;
-    }
-
-    currentSegments.splice(
-        segmentIndex,
-        1
-    );
-
-    await applyUserDrawings(
-        container,
-        currentSegments
-    );
-
-    saveLocalDrawingRecord(
-        container,
-        currentSegments
-    );
-
-    scheduleDrawingSave(
-        container
-    );
-
-    setDrawingStatus(
-        container,
-        "線段已刪除",
-        "success"
-    );
-}
-
-
-function renderHorizontalLineList(
-    container
-) {
-    if (!container) {
-        return;
-    }
-
-    const listElement = (
-        document.getElementById(
-            "line-list-"
-            + container.dataset.marketId
-            + "-"
-            + container.dataset.chartIndex
-        )
-    );
-
-    if (!listElement) {
-        return;
-    }
-
-    const segments = (
-        getUserDrawings(container)
-    );
-
-    if (!segments.length) {
-        listElement.innerHTML = (
+    if (!state.drawings.length) {
+        element.innerHTML = (
             '<div class="line-list-empty">'
             + '目前沒有水平線段'
             + '</div>'
         );
-
         return;
     }
 
-    listElement.innerHTML = "";
+    element.innerHTML = "";
 
-    segments.forEach(
+    state.drawings.forEach(
         (segment, index) => {
-            const item = document.createElement(
+            const row = document.createElement(
                 "div"
             );
-
-            item.className = (
-                "horizontal-line-item"
-            );
+            row.className = "line-item";
 
             const price = document.createElement(
                 "div"
             );
-
-            price.className = (
-                "horizontal-line-price"
-            );
-
-            price.textContent = (
-                formatPrice(segment.y0)
+            price.className = "line-price";
+            price.textContent = formatPrice(
+                segment.price
             );
 
             const range = document.createElement(
                 "div"
             );
-
-            range.className = (
-                "horizontal-line-range"
-            );
-
+            range.className = "line-range";
             range.textContent = (
-                normalizeDate(segment.x0)
+                segment.startTime
                 + " ～ "
-                + normalizeDate(segment.x1)
+                + segment.endTime
             );
 
-            const deleteButton = (
-                document.createElement(
-                    "button"
-                )
+            const button = document.createElement(
+                "button"
             );
-
-            deleteButton.type = "button";
-
-            deleteButton.className = (
-                "delete-line-button"
+            button.type = "button";
+            button.className = (
+                "delete-line-btn"
             );
+            button.textContent = "刪除";
 
-            deleteButton.textContent = (
-                "刪除"
-            );
-
-            deleteButton.addEventListener(
+            button.addEventListener(
                 "click",
                 () => {
-                    deleteHorizontalSegment(
-                        container.id,
-                        index
+                    state.drawings.splice(
+                        index,
+                        1
+                    );
+                    renderSegments(state);
+                    scheduleSegmentSave(
+                        state.chartId
                     );
                 }
             );
 
-            item.appendChild(price);
-            item.appendChild(range);
-            item.appendChild(
-                deleteButton
-            );
-
-            listElement.appendChild(item);
+            row.appendChild(price);
+            row.appendChild(range);
+            row.appendChild(button);
+            element.appendChild(row);
         }
     );
 }
@@ -7135,874 +6350,603 @@ function renderHorizontalLineList(
 async function clearAllDrawings(
     chartId
 ) {
-    const container = document.getElementById(
+    const state = chartInstances.get(
         chartId
     );
 
-    if (!container) {
+    if (!state) {
         return;
     }
 
-    const confirmed = window.confirm(
-        "確定要清除這個商品、"
-        + "這個週期的全部水平線段嗎？"
-    );
-
-    if (!confirmed) {
+    if (
+        !confirm(
+            "確定清除全部水平線段嗎？"
+        )
+    ) {
         return;
     }
 
-    await applyUserDrawings(
-        container,
+    state.drawings = [];
+    renderSegments(state);
+
+    saveLocalRecord(
+        state,
         []
     );
 
-    saveLocalDrawingRecord(
-        container,
-        []
-    );
-
-    await saveDrawingsToRemote(
-        container,
-        [],
+    await saveRemoteSegments(
+        chartId,
         true
     );
-
-    setDrawingStatus(
-        container,
-        "全部水平線段已清除",
-        "success"
-    );
 }
 
 
-/* ======================================================================
- * K 線資訊
- * ====================================================================== */
-function findOhlcvRecord(
-    item,
-    clickedDate
-) {
-    if (
-        !item
-        || !item.chart_data
-        || !Array.isArray(
-            item.chart_data.ohlcv
-        )
-    ) {
-        return null;
+/* =====================================================================
+ * OHLCV 與十字線
+ * ===================================================================== */
+function clearInfo(state) {
+    state.pinned = false;
+    state.pinnedTime = "";
+
+    try {
+        state.chart.clearCrosshairPosition();
+    } catch (error) {
+        console.warn(error);
     }
 
-    const normalizedDate = (
-        normalizeDate(clickedDate)
-    );
-
-    return (
-        item.chart_data.ohlcv.find(
-            (row) => (
-                row.date
-                === normalizedDate
-            )
-        )
-        || null
-    );
-}
-
-
-function clearSelectedCandle(
-    container
-) {
-    if (
-        !container
-        || typeof Plotly === "undefined"
-    ) {
-        return;
-    }
-
-    const shapes = (
-        Array.isArray(
-            container.layout.shapes
-        )
-            ? container.layout.shapes.filter(
-                (shape) => (
-                    String(
-                        shape.name || ""
-                    )
-                    !== "__selected_candle__"
-                )
-            )
-            : []
-    );
-
-    container._drawingLoadInProgress = true;
-
-    Plotly.relayout(
-        container,
-        {
-            shapes
-        }
-    ).finally(() => {
-        container._drawingLoadInProgress = false;
-    });
-
-    const infoPanel = document.getElementById(
+    const panel = document.getElementById(
         "info-"
-        + container.dataset.marketId
+        + state.marketId
         + "-"
-        + container.dataset.chartIndex
+        + state.chartIndex
     );
 
-    if (infoPanel) {
-        const timeframe = (
-            container.dataset.timeframe
-            === "1w"
-                ? "週 K"
-                : "K 線"
-        );
-
-        infoPanel.innerHTML = (
-            '<span class="ohlcv-placeholder">'
-            + '點擊 '
-            + timeframe
-            + ' 顯示日期與 OHLCV'
+    if (panel) {
+        panel.innerHTML = (
+            '<span class="chart-name-info">'
+            + state.displayName
+            + '</span>'
+            + '<span class="ohlcv-placeholder">'
+            + '長按或移動十字線查看 OHLCV'
             + '</span>'
         );
     }
-
-    delete container.dataset.selectedDate;
 }
 
 
-function markSelectedDate(
-    container,
-    record
+function updateInfo(
+    state,
+    record,
+    crosshairPrice
 ) {
-    const existingShapes = (
-        Array.isArray(
-            container.layout.shapes
-        )
-            ? container.layout.shapes.filter(
-                (shape) => (
-                    String(
-                        shape.name || ""
-                    )
-                    !== "__selected_candle__"
-                )
-            )
-            : []
-    );
-
-    const selectedShape = {
-        type: "line",
-        name: "__selected_candle__",
-        xref: "x",
-        yref: "paper",
-        x0: record.date,
-        x1: record.date,
-        y0: 0,
-        y1: 1,
-        editable: false,
-        line: {
-            color: "#94a3b8",
-            width: 1,
-            dash: "dot"
-        }
-    };
-
-    container._drawingLoadInProgress = true;
-
-    Plotly.relayout(
-        container,
-        {
-            shapes: [
-                ...existingShapes,
-                selectedShape
-            ]
-        }
-    ).finally(() => {
-        container._drawingLoadInProgress = false;
-    });
-}
-
-
-function showFixedOhlcv(
-    container,
-    clickedDate
-) {
-    const normalizedDate = (
-        normalizeDate(clickedDate)
-    );
-
-    if (
-        container.dataset.selectedDate
-        === normalizedDate
-    ) {
-        clearSelectedCandle(
-            container
-        );
-        return;
-    }
-
-    const item = getChartItem(
-        container
-    );
-
-    const record = findOhlcvRecord(
-        item,
-        normalizedDate
-    );
-
     if (!record) {
         return;
     }
 
-    const infoPanel = document.getElementById(
+    const panel = document.getElementById(
         "info-"
-        + container.dataset.marketId
+        + state.marketId
         + "-"
-        + container.dataset.chartIndex
+        + state.chartIndex
     );
 
-    if (!infoPanel) {
+    if (!panel) {
         return;
     }
 
-    const openValue = Number(
+    const change = (
+        record.close - record.open
+    );
+
+    const changePercent = (
         record.open
+            ? change / record.open * 100
+            : 0
     );
 
-    const closeValue = Number(
-        record.close
+    const directionClass = (
+        change > 0
+            ? "ohlcv-up"
+            : (
+                change < 0
+                    ? "ohlcv-down"
+                    : ""
+            )
     );
 
-    let directionClass = (
-        "ohlcv-flat"
-    );
-
-    let directionText = "平盤";
-    let changeText = "--";
-
-    if (
-        Number.isFinite(openValue)
-        && Number.isFinite(closeValue)
-    ) {
-        const changeValue = (
-            closeValue - openValue
-        );
-
-        if (closeValue > openValue) {
-            directionClass = "ohlcv-up";
-            directionText = "上漲";
-
-        } else if (
-            closeValue < openValue
-        ) {
-            directionClass = "ohlcv-down";
-            directionText = "下跌";
-        }
-
-        if (openValue !== 0) {
-            const changePercent = (
-                changeValue / openValue
-            ) * 100;
-
-            changeText = (
-                (
-                    changeValue >= 0
-                        ? "+"
-                        : ""
-                )
-                + formatPrice(changeValue)
-                + " / "
-                + (
-                    changePercent >= 0
-                        ? "+"
-                        : ""
-                )
-                + changePercent.toFixed(2)
-                + "%"
-            );
-        }
-    }
-
-    const timeframe = (
-        record.timeframe
-        || (
-            item
-            && item.chart_data
-            && item.chart_data.timeframe
-        )
-        || "日K"
-    );
-
-    infoPanel.innerHTML = (
-        '<span class="ohlcv-date">'
+    panel.innerHTML = (
+        '<span class="chart-name-info">'
+        + state.displayName
+        + '</span>'
+        + '<span class="ohlcv-date">'
         + record.date
         + '</span>'
-
-        + '<span class="ohlcv-timeframe">'
-        + timeframe
+        + '<span class="ohlcv-open">開 '
+        + formatPrice(record.open)
         + '</span>'
-
+        + '<span class="ohlcv-high">高 '
+        + formatPrice(record.high)
+        + '</span>'
+        + '<span class="ohlcv-low">低 '
+        + formatPrice(record.low)
+        + '</span>'
+        + '<span class="ohlcv-close">收 '
+        + formatPrice(record.close)
+        + '</span>'
         + '<span class="'
         + directionClass
         + '">'
-        + directionText
-        + '</span>'
-
-        + '<span class="ohlcv-open">'
-        + '開 '
-        + formatPrice(record.open)
-        + '</span>'
-
-        + '<span class="ohlcv-high">'
-        + '高 '
-        + formatPrice(record.high)
-        + '</span>'
-
-        + '<span class="ohlcv-low">'
-        + '低 '
-        + formatPrice(record.low)
-        + '</span>'
-
-        + '<span class="ohlcv-close">'
-        + '收 '
-        + formatPrice(record.close)
-        + '</span>'
-
-        + '<span class="ohlcv-volume">'
-        + '量 '
+        + (
+            change >= 0 ? "+" : ""
+        )
+        + formatPrice(change)
+        + " / "
+        + (
+            changePercent >= 0 ? "+" : ""
+        )
+        + changePercent.toFixed(2)
+        + '%</span>'
+        + '<span class="ohlcv-volume">量 '
         + formatVolume(record.volume)
         + '</span>'
-
-        + '<span class="ohlcv-change">'
-        + 'K棒 '
-        + changeText
-        + '</span>'
-    );
-
-    container.dataset.selectedDate = (
-        record.date
-    );
-
-    markSelectedDate(
-        container,
-        record
-    );
-}
-
-
-/* ======================================================================
- * 圖表顯示範圍
- * ====================================================================== */
-function getDefaultRange(totalPoints) {
-    const visibleCount = Math.min(
-        60,
-        totalPoints
-    );
-
-    return [
-        Math.max(
-            -0.5,
-            totalPoints
-            - visibleCount
-            - 0.5
-        ),
-        totalPoints - 0.5
-    ];
-}
-
-
-function resetChart(container) {
-    if (
-        !container
-        || container.dataset.done
-            !== "true"
-        || typeof Plotly === "undefined"
-    ) {
-        return;
-    }
-
-    const item = getChartItem(
-        container
-    );
-
-    const dates = getCategoryDates(
-        item
-    );
-
-    clearSelectedCandle(
-        container
-    );
-
-    const update = {
-        "xaxis.autorange": false,
-        "xaxis.range":
-            getDefaultRange(
-                dates.length
-            ),
-        "yaxis.autorange": true,
-        dragmode: "pan"
-    };
-
-    if (
-        container.layout
-        && container.layout.yaxis2
-    ) {
-        update[
-            "yaxis2.autorange"
-        ] = true;
-    }
-
-    Plotly.relayout(
-        container,
-        update
-    );
-}
-
-
-/* ======================================================================
- * 點擊／空白處／雙擊
- * ====================================================================== */
-function bindChartEvents(container) {
-    if (
-        !container
-        || container.dataset.eventsBound
-            === "true"
-    ) {
-        return;
-    }
-
-    container._lastPointClickTime = 0;
-    container._pointerMoved = false;
-    container._pointerStartX = 0;
-    container._pointerStartY = 0;
-
-    container.on(
-        "plotly_click",
-        (eventData) => {
-            container._lastPointClickTime = (
-                Date.now()
-            );
-
-            if (
-                !eventData
-                || !Array.isArray(
-                    eventData.points
+        + (
+            Number.isFinite(crosshairPrice)
+                ? (
+                    '<span class="crosshair-price">'
+                    + '水平價位 '
+                    + formatPrice(crosshairPrice)
+                    + '</span>'
                 )
-                || !eventData.points.length
-            ) {
-                return;
-            }
-
-            const point = (
-                eventData.points[0]
-            );
-
-            if (
-                point.x !== undefined
-                && point.x !== null
-            ) {
-                showFixedOhlcv(
-                    container,
-                    point.x
-                );
-            }
-        }
-    );
-
-    container.on(
-        "plotly_doubleclick",
-        () => {
-            resetChart(
-                container
-            );
-
-            return false;
-        }
-    );
-
-    container.addEventListener(
-        "pointerdown",
-        (event) => {
-            container._pointerMoved = false;
-            container._pointerStartX =
-                event.clientX;
-            container._pointerStartY =
-                event.clientY;
-        }
-    );
-
-    container.addEventListener(
-        "pointermove",
-        (event) => {
-            const distance = Math.hypot(
-                event.clientX
-                    - container._pointerStartX,
-                event.clientY
-                    - container._pointerStartY
-            );
-
-            if (distance > 7) {
-                container._pointerMoved = true;
-            }
-        }
-    );
-
-    container.addEventListener(
-        "pointerup",
-        () => {
-            if (container._pointerMoved) {
-                return;
-            }
-
-            setTimeout(() => {
-                const elapsed = (
-                    Date.now()
-                    - container._lastPointClickTime
-                );
-
-                if (elapsed > 180) {
-                    clearSelectedCandle(
-                        container
-                    );
-                }
-            }, 80);
-        }
-    );
-
-    container.dataset.eventsBound = (
-        "true"
+                : ""
+        )
     );
 }
 
 
-/* ======================================================================
- * 圖表渲染
- * ====================================================================== */
-function renderMarketCharts(marketId) {
-    const items = (
-        chartDataStore[marketId]
-    );
+function findRecord(state, time) {
+    return state.recordMap.get(
+        normalizeDate(time)
+    ) || null;
+}
 
-    if (
-        !items
-        || !Array.isArray(items)
-    ) {
+
+/* =====================================================================
+ * 圖表建立
+ * ===================================================================== */
+function resizeChart(state) {
+    if (!state || !state.container) {
         return;
     }
 
-    if (typeof Plotly === "undefined") {
-        const section = document.getElementById(
-            marketId + "-market"
+    state.chart.resize(
+        state.container.clientWidth,
+        state.container.clientHeight
+    );
+}
+
+
+function fitLastSixty(state) {
+    const total = state.dates.length;
+
+    state.chart.timeScale()
+        .setVisibleLogicalRange({
+            from: Math.max(
+                0,
+                total - 60
+            ),
+            to: total + 2
+        });
+}
+
+
+function createLightweightChart(
+    marketId,
+    index,
+    item
+) {
+    const chartId = (
+        "chart-"
+        + marketId
+        + "-"
+        + index
+    );
+
+    if (chartInstances.has(chartId)) {
+        return chartInstances.get(
+            chartId
+        );
+    }
+
+    const container = document.getElementById(
+        chartId
+    );
+
+    if (
+        !container
+        || !item
+        || !item.chart_data
+    ) {
+        return null;
+    }
+
+    const data = item.chart_data;
+
+    const chart = (
+        LightweightCharts.createChart(
+            container,
+            {
+                width:
+                    container.clientWidth,
+                height:
+                    container.clientHeight,
+                layout: {
+                    background: {
+                        type:
+                            LightweightCharts
+                            .ColorType.Solid,
+                        color: "#131722"
+                    },
+                    textColor: "#94a3b8"
+                },
+                grid: {
+                    vertLines: {
+                        color:
+                            "rgba(255,255,255,0.045)"
+                    },
+                    horzLines: {
+                        color:
+                            "rgba(255,255,255,0.045)"
+                    }
+                },
+                rightPriceScale: {
+                    borderColor:
+                        "rgba(148,163,184,0.20)",
+                    scaleMargins: {
+                        top: 0.08,
+                        bottom: 0.27
+                    }
+                },
+                timeScale: {
+                    borderColor:
+                        "rgba(148,163,184,0.20)",
+                    timeVisible: false,
+                    secondsVisible: false,
+                    rightOffset: 3,
+                    barSpacing: 8,
+                    minBarSpacing: 2,
+                    fixLeftEdge: false,
+                    fixRightEdge: false
+                },
+                crosshair: {
+                    mode:
+                        LightweightCharts
+                        .CrosshairMode.Normal,
+                    vertLine: {
+                        color: "#64748b",
+                        width: 1,
+                        style:
+                            LightweightCharts
+                            .LineStyle.Dashed,
+                        labelBackgroundColor:
+                            "#334155"
+                    },
+                    horzLine: {
+                        color: "#64748b",
+                        width: 1,
+                        style:
+                            LightweightCharts
+                            .LineStyle.Dashed,
+                        labelBackgroundColor:
+                            "#334155"
+                    }
+                },
+                handleScroll: {
+                    mouseWheel: true,
+                    pressedMouseMove: true,
+                    horzTouchDrag: true,
+                    vertTouchDrag: false
+                },
+                handleScale: {
+                    axisPressedMouseMove: true,
+                    mouseWheel: true,
+                    pinch: true
+                },
+                kineticScroll: {
+                    touch: true,
+                    mouse: true
+                },
+                trackingMode: {
+                    exitMode: 0
+                }
+            }
+        )
+    );
+
+    const candleSeries = (
+        chart.addCandlestickSeries({
+            upColor: "#ef5350",
+            downColor: "#26a69a",
+            borderUpColor: "#ef5350",
+            borderDownColor: "#26a69a",
+            wickUpColor: "#ef5350",
+            wickDownColor: "#26a69a",
+            priceLineVisible: true,
+            lastValueVisible: true
+        })
+    );
+
+    candleSeries.setData(
+        data.candles || []
+    );
+
+    let volumeSeries = null;
+
+    if (
+        data.show_volume
+        && Array.isArray(data.volume)
+    ) {
+        volumeSeries = (
+            chart.addHistogramSeries({
+                priceFormat: {
+                    type: "volume"
+                },
+                priceScaleId: "volume",
+                priceLineVisible: false,
+                lastValueVisible: false
+            })
         );
 
-        if (section) {
-            section.innerHTML = (
-                '<div class="plotly-error">'
-                + 'Plotly 圖表套件載入失敗'
-                + '</div>'
-            );
-        }
-
-        return;
-    }
-
-    items.forEach(
-        (item, index) => {
-            const container = (
-                document.getElementById(
-                    "chart-"
-                    + marketId
-                    + "-"
-                    + index
-                )
-            );
-
-            if (
-                !container
-                || container.dataset.done
-                    === "true"
-            ) {
-                return;
-            }
-
-            if (
-                !item
-                || !item.chart_data
-                || !Array.isArray(
-                    item.chart_data.data
-                )
-            ) {
-                return;
-            }
-
-            container.dataset.marketId = (
-                marketId
-            );
-
-            container.dataset.chartIndex = (
-                String(index)
-            );
-
-            const originalLayout = (
-                item.chart_data.layout
-                || {}
-            );
-
-            const categoryDates = (
-                getCategoryDates(item)
-            );
-
-            const layout = {
-                ...originalLayout,
-                margin: {
-                    ...(
-                        originalLayout.margin
-                        || {}
-                    )
-                },
-                title: {
-                    ...(
-                        originalLayout.title
-                        || {}
-                    )
-                },
-                legend: {
-                    ...(
-                        originalLayout.legend
-                        || {}
-                    )
-                },
-                xaxis: {
-                    ...(
-                        originalLayout.xaxis
-                        || {}
-                    ),
-                    type: "category",
-                    categoryorder:
-                        "array",
-                    categoryarray:
-                        categoryDates,
-                    range:
-                        getDefaultRange(
-                            categoryDates.length
-                        ),
-                    autorange: false,
-                    rangeslider: {
-                        visible: false
-                    },
-                    fixedrange: false
-                },
-                yaxis: {
-                    ...(
-                        originalLayout.yaxis
-                        || {}
-                    ),
-                    fixedrange: false
-                },
-                clickmode: "event",
-                dragmode: "pan",
-                selectdirection: undefined
-            };
-
-            delete layout.selectedpoints;
-
-            if (
-                originalLayout.yaxis2
-            ) {
-                layout.yaxis2 = {
-                    ...originalLayout.yaxis2,
-                    fixedrange: false
-                };
-            }
-
-            const hasVolume = Boolean(
-                originalLayout.yaxis2
-            );
-
-            if (
-                window.innerWidth <= 600
-            ) {
-                layout.height = (
-                    hasVolume
-                        ? 470
-                        : 390
-                );
-
-                layout.margin = {
-                    ...layout.margin,
-                    l: 8,
-                    r: 52,
-                    t: 112,
-                    b: 34
-                };
-
-                layout.title = {
-                    ...layout.title,
-                    font: {
-                        ...(
-                            layout.title.font
-                            || {}
-                        ),
-                        size: 15
-                    }
-                };
-
-            } else {
-                layout.height = (
-                    originalLayout.height
-                    || (
-                        hasVolume
-                            ? 520
-                            : 440
-                    )
-                );
-            }
-
-            const config = {
-                responsive: true,
-                displayModeBar: false,
-                displaylogo: false,
-                scrollZoom: true,
-                doubleClick: false,
-                showTips: false,
-                editable: false,
-                staticPlot: false
-            };
-
-            Plotly.newPlot(
-                container,
-                item.chart_data.data,
-                layout,
-                config
-            )
-            .then(async () => {
-                container.dataset.done = (
-                    "true"
-                );
-
-                container._baseShapes = (
-                    Array.isArray(
-                        originalLayout.shapes
-                    )
-                        ? originalLayout.shapes
-                            .filter(
-                                (shape) => (
-                                    String(
-                                        shape.name
-                                        || ""
-                                    )
-                                    === "__volume_separator__"
-                                )
-                            )
-                            .map(clonePlainObject)
-                            .filter(Boolean)
-                        : []
-                );
-
-                bindChartEvents(
-                    container
-                );
-
-                if (
-                    container.dataset.drawingEnabled
-                    === "true"
-                ) {
-                    await loadAndMergeDrawings(
-                        container
-                    );
+        volumeSeries.priceScale()
+            .applyOptions({
+                scaleMargins: {
+                    top: 0.78,
+                    bottom: 0
                 }
-
-                requestAnimationFrame(
-                    () => {
-                        Plotly.Plots.resize(
-                            container
-                        );
-                    }
-                );
-            })
-            .catch((error) => {
-                console.error(
-                    "圖表繪製失敗：",
-                    marketId,
-                    index,
-                    error
-                );
-
-                container.innerHTML = (
-                    '<div class="plotly-error">'
-                    + '圖表繪製失敗'
-                    + '</div>'
-                );
             });
+
+        volumeSeries.setData(
+            data.volume
+        );
+    }
+
+    const maSeries = [];
+
+    for (
+        const ma
+        of data.moving_averages || []
+    ) {
+        const series = (
+            chart.addLineSeries({
+                color:
+                    ma.color || "#ffb74d",
+                lineWidth: 2,
+                priceLineVisible: false,
+                lastValueVisible: false,
+                crosshairMarkerVisible: false,
+                title:
+                    ma.name || ""
+            })
+        );
+
+        series.setData(ma.data || []);
+        maSeries.push(series);
+    }
+
+    const records = data.ohlcv || [];
+    const recordMap = new Map(
+        records.map(
+            (record) => [
+                record.date,
+                record
+            ]
+        )
+    );
+
+    const state = {
+        chartId,
+        chart,
+        container,
+        candleSeries,
+        volumeSeries,
+        maSeries,
+        segmentSeries: [],
+        drawings: [],
+        marketId,
+        chartIndex: index,
+        ticker: String(
+            item.ticker || data.ticker || ""
+        ).toUpperCase(),
+        timeframe:
+            data.drawing_timeframe
+            || "1d",
+        drawingEnabled:
+            container.dataset
+                .drawingEnabled
+            === "true",
+        dates: records.map(
+            (record) => record.date
+        ),
+        recordMap,
+        displayName:
+            data.full_display_name
+            || item.ticker
+            || "",
+        pinned: false,
+        pinnedTime: ""
+    };
+
+    chartInstances.set(
+        chartId,
+        state
+    );
+
+    chart.subscribeCrosshairMove(
+        (param) => {
+            if (
+                !param
+                || !param.time
+                || !param.point
+            ) {
+                return;
+            }
+
+            const record = findRecord(
+                state,
+                param.time
+            );
+
+            const crosshairPrice = (
+                candleSeries.coordinateToPrice(
+                    param.point.y
+                )
+            );
+
+            if (record) {
+                updateInfo(
+                    state,
+                    record,
+                    Number(
+                        crosshairPrice
+                    )
+                );
+            }
         }
     );
+
+    chart.subscribeClick(
+        (param) => {
+            if (!param || !param.time) {
+                clearInfo(state);
+                return;
+            }
+
+            const clickedTime = normalizeDate(
+                param.time
+            );
+
+            if (
+                state.pinned
+                && state.pinnedTime
+                    === clickedTime
+            ) {
+                clearInfo(state);
+                return;
+            }
+
+            state.pinned = true;
+            state.pinnedTime =
+                clickedTime;
+
+            const record = findRecord(
+                state,
+                clickedTime
+            );
+
+            const crosshairPrice = (
+                param.point
+                    ? candleSeries
+                        .coordinateToPrice(
+                            param.point.y
+                        )
+                    : NaN
+            );
+
+            if (record) {
+                updateInfo(
+                    state,
+                    record,
+                    Number(
+                        crosshairPrice
+                    )
+                );
+
+                try {
+                    chart.setCrosshairPosition(
+                        record.close,
+                        param.time,
+                        candleSeries
+                    );
+                } catch (error) {
+                    console.warn(error);
+                }
+            }
+        }
+    );
+
+    container.addEventListener(
+        "dblclick",
+        () => {
+            clearInfo(state);
+            fitLastSixty(state);
+        }
+    );
+
+    const resizeObserver = (
+        new ResizeObserver(() => {
+            resizeChart(state);
+        })
+    );
+
+    resizeObserver.observe(container);
+    state.resizeObserver =
+        resizeObserver;
+
+    fitLastSixty(state);
+
+    if (state.drawingEnabled) {
+        loadAndMergeSegments(
+            chartId
+        );
+    }
+
+    return state;
 }
 
 
-function resizeMarketCharts(marketId) {
-    const items = (
-        chartDataStore[marketId]
-    );
+/* =====================================================================
+ * 頁籤
+ * ===================================================================== */
+function renderMarketCharts(marketId) {
+    const items = chartDataStore[marketId];
 
-    if (
-        !items
-        || !Array.isArray(items)
-    ) {
+    if (!Array.isArray(items)) {
         return;
     }
 
     items.forEach(
         (item, index) => {
-            const container = (
-                document.getElementById(
-                    "chart-"
-                    + marketId
-                    + "-"
-                    + index
-                )
+            createLightweightChart(
+                marketId,
+                index,
+                item
             );
-
-            if (
-                container
-                && container.dataset.done
-                    === "true"
-                && typeof Plotly
-                    !== "undefined"
-            ) {
-                Plotly.Plots.resize(
-                    container
-                );
-            }
         }
     );
 }
 
 
-function switchMarket(
-    event,
-    marketId
-) {
+function switchMarket(event, marketId) {
     document
         .querySelectorAll(
             ".market-section"
         )
-        .forEach((element) => {
-            element.classList.remove(
-                "active"
-            );
-        });
+        .forEach(
+            (element) => {
+                element.classList.remove(
+                    "active"
+                );
+            }
+        );
 
     document
-        .querySelectorAll(
-            ".tab-btn"
-        )
-        .forEach((element) => {
-            element.classList.remove(
-                "active"
-            );
-        });
+        .querySelectorAll(".tab-btn")
+        .forEach(
+            (element) => {
+                element.classList.remove(
+                    "active"
+                );
+            }
+        );
 
     const section = document.getElementById(
         marketId + "-market"
@@ -8023,49 +6967,45 @@ function switchMarket(
         );
     }
 
-    renderMarketCharts(
-        marketId
-    );
+    renderMarketCharts(marketId);
 
-    setTimeout(() => {
-        resizeMarketCharts(
-            marketId
-        );
-    }, 150);
+    requestAnimationFrame(() => {
+        for (
+            const state
+            of chartInstances.values()
+        ) {
+            if (
+                state.marketId
+                === marketId
+            ) {
+                resizeChart(state);
+            }
+        }
+    });
 }
 
 
 window.addEventListener(
     "load",
     async () => {
+        if (
+            typeof LightweightCharts
+            === "undefined"
+        ) {
+            document.body.insertAdjacentHTML(
+                "beforeend",
+                '<div class="no-data">'
+                + 'Lightweight Charts 載入失敗'
+                + '</div>'
+            );
+            return;
+        }
+
         renderMarketCharts(
             "tw_all"
         );
 
         await initializeLiff();
-    }
-);
-
-
-window.addEventListener(
-    "resize",
-    () => {
-        const activeSection = (
-            document.querySelector(
-                ".market-section.active"
-            )
-        );
-
-        if (!activeSection) {
-            return;
-        }
-
-        resizeMarketCharts(
-            activeSection.id.replace(
-                "-market",
-                ""
-            )
-        );
     }
 );
 </script>
@@ -8106,10 +7046,8 @@ window.addEventListener(
         file.write(html)
 
     print(
-        f"✅ HTML 已產生：{path}"
+        f"✅ Lightweight Charts HTML 已產生：{path}"
     )
-
-
 
 
 
