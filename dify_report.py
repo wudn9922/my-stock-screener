@@ -1,7 +1,10 @@
+import csv
+import io
+import json
 import os
 import time
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
-import json
 
 import requests
 from playwright.sync_api import sync_playwright
@@ -122,6 +125,7 @@ def capture_and_upload_screenshots():
                     page.wait_for_timeout(2500)
 
                     actual_scroll_y = page.evaluate("window.scrollY")
+
                     print(
                         f"{target['name']} 已捲動至 Y={actual_scroll_y}，"
                         "開始截圖..."
@@ -176,6 +180,7 @@ def capture_and_upload_screenshots():
     if repo:
         for item in captured_items:
             relative_path = item["path"]
+
             item["url"] = (
                 f"https://raw.githubusercontent.com/"
                 f"{repo}/{branch}/{relative_path}"
@@ -201,7 +206,11 @@ def get_yahoo_chart_metadata(symbol, session):
         "range": "1d",
     }
 
-    response = session.get(url, params=params, timeout=15)
+    response = session.get(
+        url,
+        params=params,
+        timeout=15,
+    )
     response.raise_for_status()
 
     data = response.json()
@@ -226,7 +235,10 @@ def is_us_listed_stock(symbol, session):
     - 非美國交易所股票
     """
     try:
-        metadata = get_yahoo_chart_metadata(symbol, session)
+        metadata = get_yahoo_chart_metadata(
+            symbol,
+            session,
+        )
 
         if not metadata:
             return False
@@ -266,6 +278,7 @@ def is_us_listed_stock(symbol, session):
             f"{instrument_type}, "
             f"{full_exchange_name or exchange_name}"
         )
+
         return True
 
     except Exception as e:
@@ -292,12 +305,16 @@ def fetch_yahoo_realtime_trending(limit=5):
         with requests.Session() as session:
             session.headers.update(headers)
 
-            response = session.get(url, timeout=15)
+            response = session.get(
+                url,
+                timeout=15,
+            )
             response.raise_for_status()
 
             data = response.json()
 
             results = data.get("finance", {}).get("result") or []
+
             if not results:
                 print("Yahoo 熱門商品清單為空。")
                 return ""
@@ -309,7 +326,9 @@ def fetch_yahoo_realtime_trending(limit=5):
 
             for item in trending_list:
                 symbol = item.get("symbol")
-                quote_type = str(item.get("quoteType", "")).upper()
+                quote_type = str(
+                    item.get("quoteType", "")
+                ).upper()
 
                 if not symbol or symbol in checked_symbols:
                     continue
@@ -319,7 +338,8 @@ def fetch_yahoo_realtime_trending(limit=5):
                 # 若熱門 API 已明確表示不是股票，直接排除
                 if quote_type and quote_type != "EQUITY":
                     print(
-                        f"排除 {symbol}：熱門 API 類型為 {quote_type}"
+                        f"排除 {symbol}："
+                        f"熱門 API 類型為 {quote_type}"
                     )
                     continue
 
@@ -334,12 +354,334 @@ def fetch_yahoo_realtime_trending(limit=5):
                 return ""
 
             result = ", ".join(filtered_symbols)
+
             print(f"篩選後的美國熱門股票：{result}")
+
             return result
 
     except Exception as e:
         print(f"Yahoo 熱門商品 API 呼叫失敗：{e}")
         return ""
+
+
+def fetch_latest_fred_csv_value(series_id):
+    """
+    從 FRED CSV 取得指定數列的最新有效值。
+
+    不需要 FRED API Key。
+    """
+    print(f"正在取得 FRED 數列：{series_id}...")
+
+    # 只抓取最近 120 天，避免下載完整歷史資料
+    start_date = (
+        datetime.now(timezone.utc) - timedelta(days=120)
+    ).strftime("%Y-%m-%d")
+
+    url = "https://fred.stlouisfed.org/graph/fredgraph.csv"
+
+    params = {
+        "id": series_id,
+        "cosd": start_date,
+    }
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/130.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/csv,*/*",
+    }
+
+    response = requests.get(
+        url,
+        params=params,
+        headers=headers,
+        timeout=30,
+    )
+    response.raise_for_status()
+
+    csv_text = response.text.strip()
+
+    if not csv_text:
+        raise RuntimeError(
+            f"FRED 數列 {series_id} 回傳空白資料。"
+        )
+
+    reader = csv.DictReader(
+        io.StringIO(csv_text)
+    )
+
+    valid_values = []
+
+    for row in reader:
+        raw_value = row.get(series_id)
+
+        if raw_value in (None, "", "."):
+            continue
+
+        try:
+            numeric_value = float(raw_value)
+        except (TypeError, ValueError):
+            continue
+
+        valid_values.append(numeric_value)
+
+    if not valid_values:
+        raise RuntimeError(
+            f"FRED 數列 {series_id} 沒有有效數值。"
+        )
+
+    return valid_values[-1]
+
+
+def fetch_federal_funds_target_range():
+    """
+    取得聯邦基金目標區間。
+
+    DFEDTARL：目標區間下限
+    DFEDTARU：目標區間上限
+    """
+    print("正在取得聯邦基金目標區間...")
+
+    lower_rate = fetch_latest_fred_csv_value(
+        "DFEDTARL"
+    )
+
+    upper_rate = fetch_latest_fred_csv_value(
+        "DFEDTARU"
+    )
+
+    print(
+        "聯邦基金目標區間："
+        f"{lower_rate:.2f}%～{upper_rate:.2f}%"
+    )
+
+    return lower_rate, upper_rate
+
+
+def fetch_yahoo_us10y():
+    """
+    從 Yahoo Finance 的 ^TNX 取得美國 10 年期公債殖利率。
+
+    Yahoo ^TNX 的 regularMarketPrice 可直接視為百分比，
+    例如 4.372 代表 4.372%。
+    """
+    print("正在取得美國 10 年期公債殖利率...")
+
+    encoded_symbol = quote("^TNX", safe="")
+
+    url = (
+        "https://query1.finance.yahoo.com/v8/finance/chart/"
+        f"{encoded_symbol}"
+    )
+
+    params = {
+        "interval": "1d",
+        "range": "5d",
+    }
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/130.0.0.0 Safari/537.36"
+        ),
+        "Accept": "application/json",
+    }
+
+    response = requests.get(
+        url,
+        params=params,
+        headers=headers,
+        timeout=20,
+    )
+    response.raise_for_status()
+
+    data = response.json()
+    results = data.get("chart", {}).get("result") or []
+
+    if not results:
+        yahoo_error = data.get("chart", {}).get("error")
+
+        raise RuntimeError(
+            f"Yahoo ^TNX 沒有回傳資料：{yahoo_error}"
+        )
+
+    chart_result = results[0]
+    metadata = chart_result.get("meta") or {}
+
+    current_yield = metadata.get("regularMarketPrice")
+
+    # 如果 metadata 沒有最新數值，改從歷史收盤資料取得
+    if current_yield is None:
+        indicators = chart_result.get("indicators") or {}
+        quote_results = indicators.get("quote") or []
+
+        closes = []
+
+        if quote_results:
+            raw_closes = (
+                quote_results[0].get("close") or []
+            )
+
+            for close_value in raw_closes:
+                if close_value is None:
+                    continue
+
+                try:
+                    closes.append(float(close_value))
+                except (TypeError, ValueError):
+                    continue
+
+        if not closes:
+            raise RuntimeError(
+                "Yahoo ^TNX 沒有可用的殖利率資料。"
+            )
+
+        current_yield = closes[-1]
+
+    current_yield = float(current_yield)
+
+    print(
+        "美國 10 年期公債殖利率："
+        f"{current_yield:.3f}%"
+    )
+
+    return current_yield
+
+
+def fetch_us10y_with_fallback():
+    """
+    優先從 Yahoo ^TNX 取得 US10Y。
+
+    Yahoo 無法取得時，使用 FRED DGS10 作為備援。
+    """
+    try:
+        return fetch_yahoo_us10y()
+
+    except Exception as yahoo_error:
+        print(
+            "Yahoo ^TNX 取得失敗，"
+            f"改用 FRED DGS10：{yahoo_error}"
+        )
+
+        us10y = fetch_latest_fred_csv_value(
+            "DGS10"
+        )
+
+        print(
+            "FRED 美國 10 年期公債殖利率："
+            f"{us10y:.3f}%"
+        )
+
+        return us10y
+
+
+def fetch_us_rates_report():
+    """
+    產生只包含兩行的利率資訊。
+
+    即使其中一項取得失敗，仍會保留固定的兩行格式。
+    """
+    print("正在整理美國利率資訊...")
+
+    lower_rate = None
+    upper_rate = None
+    us10y = None
+
+    try:
+        lower_rate, upper_rate = (
+            fetch_federal_funds_target_range()
+        )
+    except Exception as e:
+        print(f"聯邦基金目標區間取得失敗：{e}")
+
+    try:
+        us10y = fetch_us10y_with_fallback()
+    except Exception as e:
+        print(f"美國 10 年期殖利率取得失敗：{e}")
+
+    if lower_rate is not None and upper_rate is not None:
+        federal_funds_line = (
+            "聯邦基金目標區間："
+            f"{lower_rate:.2f}%～{upper_rate:.2f}%"
+        )
+    else:
+        federal_funds_line = (
+            "聯邦基金目標區間：暫時無法取得"
+        )
+
+    if us10y is not None:
+        us10y_line = (
+            "美國 10 年期殖利率："
+            f"{us10y:.3f}%"
+        )
+    else:
+        us10y_line = (
+            "美國 10 年期殖利率：暫時無法取得"
+        )
+
+    return (
+        f"{federal_funds_line}\n"
+        f"{us10y_line}"
+    )
+
+
+def insert_rates_below_trending(report_text, rates_report):
+    """
+    將利率資訊放在熱門股區塊下方。
+
+    若 Dify 報告最後包含分隔線及風險提醒，
+    則將利率資訊插入風險提醒之前。
+
+    若找不到風險提醒，則直接放在報告最後。
+    """
+    if not rates_report:
+        return report_text or ""
+
+    if not report_text:
+        return rates_report
+
+    report_text = report_text.strip()
+    rates_report = rates_report.strip()
+
+    # 尋找最後一條分隔線。
+    # 正常 Dify 格式會在熱門股與風險提醒之間放置此分隔線。
+    separator = "━━━━━━━━━━━━"
+    separator_index = report_text.rfind(separator)
+
+    if separator_index >= 0:
+        text_after_separator = report_text[
+            separator_index + len(separator):
+        ]
+
+        # 只有當最後一條分隔線後方是風險提醒時，
+        # 才把利率資訊插入分隔線之前。
+        if (
+            "風險" in text_after_separator
+            or "投資建議" in text_after_separator
+            or "⚠️" in text_after_separator
+        ):
+            before_risk = report_text[
+                :separator_index
+            ].rstrip()
+
+            risk_section = report_text[
+                separator_index:
+            ].lstrip()
+
+            return (
+                f"{before_risk}\n\n"
+                f"{rates_report}\n\n"
+                f"{risk_section}"
+            )
+
+    # 找不到固定格式時，直接附加在報告最後。
+    return (
+        f"{report_text}\n\n"
+        f"{rates_report}"
+    )
 
 
 def upload_image_to_dify(image_path):
@@ -352,7 +694,9 @@ def upload_image_to_dify(image_path):
         raise ValueError("未設定 DIFY_API_KEY")
 
     if not os.path.exists(image_path):
-        raise FileNotFoundError(f"找不到圖片：{image_path}")
+        raise FileNotFoundError(
+            f"找不到圖片：{image_path}"
+        )
 
     url = "https://api.dify.ai/v1/files/upload"
 
@@ -395,6 +739,7 @@ def upload_image_to_dify(image_path):
         )
 
     print(f"已上傳至 Dify：{image_path}")
+
     return upload_id
 
 
@@ -417,7 +762,9 @@ def run_dify_workflow(captured_items, trending_stocks):
 
     for item in captured_items:
         try:
-            upload_id = upload_image_to_dify(item["path"])
+            upload_id = upload_image_to_dify(
+                item["path"]
+            )
 
             dify_images.append({
                 "transfer_method": "local_file",
@@ -428,10 +775,14 @@ def run_dify_workflow(captured_items, trending_stocks):
             source_names.append(item["name"])
 
         except Exception as e:
-            print(f"{item['name']} 上傳至 Dify 失敗：{e}")
+            print(
+                f"{item['name']} 上傳至 Dify 失敗：{e}"
+            )
 
     if not dify_images:
-        raise RuntimeError("沒有任何圖片成功上傳至 Dify。")
+        raise RuntimeError(
+            "沒有任何圖片成功上傳至 Dify。"
+        )
 
     source_description = "、".join(source_names)
 
@@ -540,13 +891,16 @@ def run_dify_workflow(captured_items, trending_stocks):
                     if not line.startswith("data:"):
                         continue
 
-                    event_json = line[len("data:"):].strip()
+                    event_json = line[
+                        len("data:"):
+                    ].strip()
 
                     if not event_json:
                         continue
 
                     try:
                         event = json.loads(event_json)
+
                     except json.JSONDecodeError:
                         print(
                             "忽略無法解析的 Dify 串流資料："
@@ -558,17 +912,30 @@ def run_dify_workflow(captured_items, trending_stocks):
                     event_data = event.get("data") or {}
 
                     if event_name == "workflow_started":
-                        print("Dify Workflow 已開始執行。")
+                        print(
+                            "Dify Workflow 已開始執行。"
+                        )
 
                     elif event_name == "node_started":
-                        node_title = event_data.get("title", "")
+                        node_title = event_data.get(
+                            "title",
+                            "",
+                        )
 
                         if node_title:
-                            print(f"Dify 節點開始：{node_title}")
+                            print(
+                                f"Dify 節點開始：{node_title}"
+                            )
 
                     elif event_name == "node_finished":
-                        node_title = event_data.get("title", "")
-                        node_status = event_data.get("status", "")
+                        node_title = event_data.get(
+                            "title",
+                            "",
+                        )
+                        node_status = event_data.get(
+                            "status",
+                            "",
+                        )
 
                         if node_title:
                             print(
@@ -578,16 +945,27 @@ def run_dify_workflow(captured_items, trending_stocks):
 
                     elif event_name == "text_chunk":
                         # 部分 Dify 工作流會逐段回傳文字
-                        text_piece = event_data.get("text", "")
+                        text_piece = event_data.get(
+                            "text",
+                            "",
+                        )
 
-                        if isinstance(text_piece, str) and text_piece:
+                        if (
+                            isinstance(text_piece, str)
+                            and text_piece
+                        ):
                             text_chunks.append(text_piece)
 
                     elif event_name == "workflow_finished":
                         workflow_finished = True
 
-                        workflow_status = event_data.get("status", "")
-                        workflow_error = event_data.get("error")
+                        workflow_status = event_data.get(
+                            "status",
+                            "",
+                        )
+                        workflow_error = event_data.get(
+                            "error"
+                        )
 
                         if (
                             workflow_status == "failed"
@@ -602,7 +980,9 @@ def run_dify_workflow(captured_items, trending_stocks):
                             event_data.get("outputs") or {}
                         )
 
-                        print("Dify Workflow 執行完成。")
+                        print(
+                            "Dify Workflow 執行完成。"
+                        )
                         break
 
                     elif event_name in {
@@ -617,7 +997,8 @@ def run_dify_workflow(captured_items, trending_stocks):
                         )
 
                         raise RuntimeError(
-                            f"Dify 串流執行失敗：{error_message}"
+                            "Dify 串流執行失敗："
+                            f"{error_message}"
                         )
 
                     # event_name == "ping" 等其他事件直接忽略
@@ -629,7 +1010,10 @@ def run_dify_workflow(captured_items, trending_stocks):
                     )
 
                 # 優先取得 End 節點的 text
-                report_text = final_outputs.get("text", "")
+                report_text = final_outputs.get(
+                    "text",
+                    "",
+                )
 
                 if isinstance(report_text, str):
                     report_text = report_text.strip()
@@ -649,12 +1033,17 @@ def run_dify_workflow(captured_items, trending_stocks):
                                 "Dify 的 text 輸出為空，"
                                 f"改用輸出變數：{output_name}"
                             )
-                            report_text = output_value.strip()
+
+                            report_text = (
+                                output_value.strip()
+                            )
                             break
 
                 # 部分工作流可能只回傳 text_chunk
                 if not report_text and text_chunks:
-                    report_text = "".join(text_chunks).strip()
+                    report_text = "".join(
+                        text_chunks
+                    ).strip()
 
                 if not report_text:
                     # 已成功執行但輸出空白，通常不是暫時性網路問題，
@@ -701,12 +1090,19 @@ def split_line_text(text, max_length=4900):
     chunks = []
 
     while len(text) > max_length:
-        split_position = text.rfind("\n", 0, max_length)
+        split_position = text.rfind(
+            "\n",
+            0,
+            max_length,
+        )
 
         if split_position <= 0:
             split_position = max_length
 
-        chunks.append(text[:split_position].strip())
+        chunks.append(
+            text[:split_position].strip()
+        )
+
         text = text[split_position:].strip()
 
     if text:
@@ -720,10 +1116,14 @@ def send_line_report(message, image_urls):
     print("正在準備 LINE 推播...")
 
     if not LINE_ACCESS_TOKEN:
-        raise ValueError("未設定 LINE_ACCESS_TOKEN")
+        raise ValueError(
+            "未設定 LINE_ACCESS_TOKEN"
+        )
 
     if not LINE_USER_ID:
-        raise ValueError("未設定 LINE_USER_ID")
+        raise ValueError(
+            "未設定 LINE_USER_ID"
+        )
 
     url = "https://api.line.me/v2/bot/message/push"
 
@@ -755,7 +1155,9 @@ def send_line_report(message, image_urls):
 
     # 若 Dify 文字很長，需分批推送，每批最多 5 則
     for index in range(0, len(messages), 5):
-        message_batch = messages[index:index + 5]
+        message_batch = messages[
+            index:index + 5
+        ]
 
         payload = {
             "to": LINE_USER_ID,
@@ -781,12 +1183,19 @@ def send_line_report(message, image_urls):
 if __name__ == "__main__":
     try:
         # 1. 向下捲動後截取 WSJ 與 Barron's
-        captured_news = capture_and_upload_screenshots()
+        captured_news = (
+            capture_and_upload_screenshots()
+        )
 
         # 2. 取得熱門商品，並只保留美國交易所掛牌股票
-        stocks_live = fetch_yahoo_realtime_trending(limit=5)
+        stocks_live = fetch_yahoo_realtime_trending(
+            limit=5
+        )
 
-        # 3. 將圖片上傳給 Dify Vision 模型辨識及翻譯
+        # 3. 取得聯邦基金目標區間及 US10Y
+        rates_report = fetch_us_rates_report()
+
+        # 4. 將圖片上傳給 Dify Vision 模型辨識及翻譯
         report_text = ""
 
         if captured_news:
@@ -829,7 +1238,13 @@ if __name__ == "__main__":
                     f"{stocks_live}"
                 )
 
-        # 4. 將 Dify 報告及原始截圖發送至 LINE
+        # 5. 將兩行利率資訊插入熱門股下方
+        report_text = insert_rates_below_trending(
+            report_text,
+            rates_report,
+        )
+
+        # 6. 將 Dify 報告、利率及原始截圖發送至 LINE
         image_urls = [
             item["url"]
             for item in captured_news
