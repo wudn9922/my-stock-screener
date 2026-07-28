@@ -29,6 +29,10 @@ jobs:
           pip install requests playwright
           playwright install firefox
 
+      - name: Check Python Syntax
+        run: python -m py_compile main.py
+
+      
       # 這裡把 Supabase 金鑰直接餵給 Python
       - name: Run Screener
         env:
