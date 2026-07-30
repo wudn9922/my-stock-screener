@@ -1,0 +1,24 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.venv/
+venv/
+
+# 環境變數與機密
+.env
+.env.*
+!.env.example
+
+# 編輯器
+.vscode/
+.idea/
+
+# 測試與快取
+.pytest_cache/
+.mypy_cache/
+.coverage
+
+# 作業系統
+.DS_Store
+Thumbs.db

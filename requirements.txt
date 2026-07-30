@@ -6,3 +6,6 @@ yfinance
 pandas
 supabase
 requests
+exchange-calendars>=4.5,<5.0
+tzdata>=2024.1
+gunicorn>=22.0,<24.0
