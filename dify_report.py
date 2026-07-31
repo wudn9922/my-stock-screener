@@ -1,9 +1,7 @@
-import csv
-import io
+
 import json
 import os
 import time
-from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 from requests.adapters import HTTPAdapter
@@ -367,44 +365,6 @@ def fetch_yahoo_realtime_trending(limit=5):
         print(f"Yahoo 熱門商品 API 呼叫失敗：{e}")
         return ""
 
-def create_retry_session():
-    """建立支援自動重試的 requests Session。"""
-    retry_strategy = Retry(
-        total=4,
-        connect=4,
-        read=4,
-        status=4,
-        backoff_factor=2,
-        status_forcelist=[
-            429,
-            500,
-            502,
-            503,
-            504,
-        ],
-        allowed_methods=frozenset(["GET"]),
-        raise_on_status=False,
-    )
-
-    adapter = HTTPAdapter(
-        max_retries=retry_strategy
-    )
-
-    session = requests.Session()
-    session.mount("https://", adapter)
-    session.mount("http://", adapter)
-
-    session.headers.update({
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/130.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/csv,*/*",
-    })
-
-    return session
-
 
 
 # 讀取環境變數（包含 FRED API Key 與備援設定）
@@ -637,7 +597,7 @@ def fetch_us10y_with_fallback():
             f"改用 FRED DGS10：{yahoo_error}"
         )
 
-        us10y = fetch_latest_fred_csv_value(
+        us10y = fetch_latest_fred_api_value(
             "DGS10"
         )
 
