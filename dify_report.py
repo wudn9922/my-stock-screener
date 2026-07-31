@@ -42,12 +42,7 @@ US_EXCHANGES = {
     "Cboe US",
 }
 
-FED_TARGET_LOWER_FALLBACK = os.environ.get(
-    "FED_TARGET_LOWER"
-)
-FED_TARGET_UPPER_FALLBACK = os.environ.get(
-    "FED_TARGET_UPPER"
-)
+
 
 def capture_and_upload_screenshots():
     """
@@ -410,181 +405,131 @@ def create_retry_session():
 
     return session
 
-def fetch_latest_fred_csv_value(series_id):
+
+
+# 讀取環境變數（包含 FRED API Key 與備援設定）
+FRED_API_KEY = os.getenv("FRED_API_KEY")
+FED_TARGET_LOWER_FALLBACK = os.getenv("FED_TARGET_LOWER_FALLBACK")
+FED_TARGET_UPPER_FALLBACK = os.getenv("FED_TARGET_UPPER_FALLBACK")
+
+
+def create_retry_session(retries=2, backoff_factor=1):
+    """建立具備 User-Agent 與快速重試策略的 requests Session。"""
+    session = requests.Session()
+    session.headers.update(
+        {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+        }
+    )
+
+    retry_strategy = Retry(
+        total=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=[500, 502, 503, 504],
+        allowed_methods=["GET"],
+    )
+
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
+def fetch_latest_fred_api_value(series_id, fallback_value=None):
+    """從 FRED 官方 REST API 取得指定數列的最新有效值。
+
+    特性：
+    - 採用 `sort_order=desc` 倒序排列，第一個抓到的有效數字即為最新數值。
+    - 設定 `limit=10` 只抓最近 10 筆資料，傳輸極速。
+    - 支援無 API Key 或網路異常時自動切換至備援值。
     """
-    從 FRED CSV 取得指定數列的最新有效值。
+    print(f"正在透過 REST API 取得 FRED 數列：{series_id}...")
 
-    發生連線逾時或 5xx 錯誤時會自動重試。
-    """
-    print(f"正在取得 FRED 數列：{series_id}...")
+    if not FRED_API_KEY:
+        print("⚠️ 未偵測到 FRED_API_KEY 環境變數。")
+        return _handle_fallback(series_id, fallback_value, "未提供 API Key")
 
-    start_date = (
-        datetime.now(timezone.utc) - timedelta(days=120)
-    ).strftime("%Y-%m-%d")
-
-    url = "https://fred.stlouisfed.org/graph/fredgraph.csv"
-
+    url = "https://api.stlouisfed.org/fred/series/observations"
     params = {
-        "id": series_id,
-        "cosd": start_date,
+        "series_id": series_id,
+        "api_key": FRED_API_KEY,
+        "file_type": "json",
+        "sort_order": "desc",  # 倒序排列：最新日期的資料會在陣列最前方
+        "limit": 10,           # 僅索取最近 10 筆，節省頻寬
     }
 
     session = create_retry_session()
 
     try:
-        response = session.get(
-            url,
-            params=params,
-            timeout=(15, 60),
-        )
+        # 官方 API 響應極快，連線 5 秒 / 讀取 15 秒即可落實 Fail-Fast
+        response = session.get(url, params=params, timeout=(5, 15))
         response.raise_for_status()
 
-        csv_text = response.text.strip()
+        data = response.json()
+        observations = data.get("observations", [])
 
-        if not csv_text:
-            raise RuntimeError(
-                f"FRED 數列 {series_id} 回傳空白資料。"
-            )
-
-        reader = csv.DictReader(
-            io.StringIO(csv_text)
-        )
+        if not observations:
+            raise RuntimeError(f"FRED 數列 {series_id} 未回傳任何觀測資料。")
 
         latest_value = None
-
-        for row in reader:
-            raw_value = row.get(series_id)
-
+        for obs in observations:
+            raw_value = obs.get("value")
+            # 排除 FRED 回應中的無效字串與缺失點 ('.')
             if raw_value in (None, "", "."):
                 continue
 
             try:
                 latest_value = float(raw_value)
+                break  # 已拿到最新有效值，直接跳出迴圈
             except (TypeError, ValueError):
                 continue
 
         if latest_value is None:
-            raise RuntimeError(
-                f"FRED 數列 {series_id} 沒有有效數值。"
-            )
+            raise RuntimeError(f"FRED 數列 {series_id} 的最近資料全為無效值。")
 
         return latest_value
 
+    except Exception as e:
+        print(f"⚠️ FRED REST API 數列 {series_id} 讀取失敗：{e}")
+        return _handle_fallback(series_id, fallback_value, str(e))
+
     finally:
         session.close()
+
+
+def _handle_fallback(series_id, fallback_value, error_reason):
+    """處理備援值判斷與錯誤拋出的輔助函式。"""
+    if fallback_value is not None:
+        try:
+            valid_fallback = float(fallback_value)
+            print(f"🔄 改用備援值 {series_id}：{valid_fallback}")
+            return valid_fallback
+        except (TypeError, ValueError):
+            print(f"❌ 備援值格式錯誤：{fallback_value}")
+
+    raise RuntimeError(
+        f"FRED 數列 {series_id} 無法取得（原因：{error_reason}）且無有效備援值。"
+    )
+
 
 def fetch_federal_funds_target_range():
-    """
-    取得聯邦基金目標區間。
-
-    DFEDTARL：目標區間下限
-    DFEDTARU：目標區間上限
-
-    優先從 FRED 即時取得。
-    FRED 無法連線時，使用 GitHub Variables 的備援值。
-    """
+    """取得聯邦基金目標區間（下限 DFEDTARL，上限 DFEDTARU）。"""
     print("正在取得聯邦基金目標區間...")
 
-    start_date = (
-        datetime.now(timezone.utc) - timedelta(days=120)
-    ).strftime("%Y-%m-%d")
+    lower_rate = fetch_latest_fred_api_value(
+        "DFEDTARL", fallback_value=FED_TARGET_LOWER_FALLBACK
+    )
+    upper_rate = fetch_latest_fred_api_value(
+        "DFEDTARU", fallback_value=FED_TARGET_UPPER_FALLBACK
+    )
 
-    url = "https://fred.stlouisfed.org/graph/fredgraph.csv"
+    print(f"聯邦基金目標區間：{lower_rate:.2f}%～{upper_rate:.2f}%")
+    return lower_rate, upper_rate
 
-    params = {
-        # 一次取得上下限，減少 FRED 請求次數
-        "id": "DFEDTARL,DFEDTARU",
-        "cosd": start_date,
-    }
-
-    session = create_retry_session()
-
-    try:
-        response = session.get(
-            url,
-            params=params,
-            timeout=(15, 60),
-        )
-        response.raise_for_status()
-
-        csv_text = response.text.strip()
-
-        if not csv_text:
-            raise RuntimeError(
-                "FRED 聯邦基金目標區間回傳空白資料。"
-            )
-
-        reader = csv.DictReader(
-            io.StringIO(csv_text)
-        )
-
-        lower_rate = None
-        upper_rate = None
-
-        for row in reader:
-            raw_lower = row.get("DFEDTARL")
-            raw_upper = row.get("DFEDTARU")
-
-            if raw_lower not in (None, "", "."):
-                try:
-                    lower_rate = float(raw_lower)
-                except (TypeError, ValueError):
-                    pass
-
-            if raw_upper not in (None, "", "."):
-                try:
-                    upper_rate = float(raw_upper)
-                except (TypeError, ValueError):
-                    pass
-
-        if lower_rate is None or upper_rate is None:
-            raise RuntimeError(
-                "FRED 沒有回傳完整的聯邦基金目標區間。"
-            )
-
-        print(
-            "聯邦基金目標區間："
-            f"{lower_rate:.2f}%～{upper_rate:.2f}%"
-        )
-
-        return lower_rate, upper_rate
-
-    except Exception as e:
-        print(f"FRED 聯邦基金目標區間取得失敗：{e}")
-
-        # FRED 暫時無法使用時，讀取 GitHub Variables 備援值
-        if (
-            FED_TARGET_LOWER_FALLBACK
-            and FED_TARGET_UPPER_FALLBACK
-        ):
-            try:
-                lower_rate = float(
-                    FED_TARGET_LOWER_FALLBACK
-                )
-                upper_rate = float(
-                    FED_TARGET_UPPER_FALLBACK
-                )
-
-                print(
-                    "改用備援聯邦基金目標區間："
-                    f"{lower_rate:.2f}%～{upper_rate:.2f}%"
-                )
-
-                return lower_rate, upper_rate
-
-            except (TypeError, ValueError):
-                raise RuntimeError(
-                    "GitHub Variables 的聯邦基金"
-                    "備援利率格式不正確。"
-                ) from e
-
-        raise RuntimeError(
-            "FRED 暫時無法連線，且未設定聯邦基金"
-            "目標區間備援值。"
-        ) from e
-
-    finally:
-        session.close()
 
 def fetch_yahoo_us10y():
     """
