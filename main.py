@@ -4861,6 +4861,7 @@ input {
     font-size: 10px;
     line-height: 1.45;
 }
+
 .ma-value {
     color: #facc15;
     font-weight: 700;
