@@ -4861,6 +4861,10 @@ input {
     font-size: 10px;
     line-height: 1.45;
 }
+.ma-value {
+    color: #facc15;
+    font-weight: 700;
+}
 
 .chart-name-info {
     color: #f8fafc;
@@ -6453,6 +6457,21 @@ function updateInfo(
                     : ""
             )
     );
+    const maValues = (
+        state.maValueMap.get(record.date)
+        || []
+    );
+
+    const maHtml = maValues.map(
+        (ma) => (
+            '<span class="ma-value">'
+            + 'MA'
+            + ma.window
+            + ' '
+            + formatPrice(ma.value)
+            + '</span>'
+        )
+    ).join("");
 
     panel.innerHTML = (
         '<span class="chart-name-info">'
@@ -6489,6 +6508,7 @@ function updateInfo(
         + '<span class="ohlcv-volume">量 '
         + formatVolume(record.volume)
         + '</span>'
+        + maHtml
         + (
             Number.isFinite(crosshairPrice)
                 ? (
@@ -6721,10 +6741,11 @@ function createLightweightChart(
                     ma.color || "#ffb74d",
                 lineWidth: 2,
                 priceLineVisible: false,
-                lastValueVisible: false,
+                lastValueVisible: true,
                 crosshairMarkerVisible: false,
                 title:
-                    ma.name || ""
+                    ma.name
+                    || `MA${ma.window}`
             })
         );
 
@@ -6741,6 +6762,45 @@ function createLightweightChart(
             ]
         )
     );
+    const maValueMap = new Map();
+
+    for (
+        const ma
+        of data.moving_averages || []
+    ) {
+        const maWindow = Number(
+            ma.window
+        );
+
+        for (
+            const point
+            of ma.data || []
+        ) {
+            const date = normalizeDate(
+                point.time
+            );
+
+            const value = Number(
+                point.value
+            );
+
+            if (
+                !date
+                || !Number.isFinite(value)
+            ) {
+                continue;
+            }
+
+            if (!maValueMap.has(date)) {
+                maValueMap.set(date, []);
+            }
+
+            maValueMap.get(date).push({
+                window: maWindow,
+                value
+            });
+        }
+    }
 
     const state = {
         chartId,
@@ -6767,6 +6827,7 @@ function createLightweightChart(
             (record) => record.date
         ),
         recordMap,
+        maValueMap,
         displayName:
             data.full_display_name
             || item.ticker
