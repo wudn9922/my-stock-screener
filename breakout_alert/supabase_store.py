@@ -799,5 +799,112 @@ class SupabaseStore:
 
         return None
 
+    def update_regular_volume_cache(
+        self,
+        *,
+        group_id,
+        ticker,
+        current_cumulative_volume,
+        previous_cumulative_volume,
+        volume_ratio,
+        checked_at=None
+    ):
+        """
+        更新最近一次正常盤量比。
+
+        只在正常盤且量比有效時呼叫，
+        因此盤前、盤後不會覆蓋既有快取。
+        """
+        if volume_ratio is None:
+            return None
+
+        checked_at = (
+            checked_at
+            or utc_now_string()
+        )
+
+        payload = {
+            "last_regular_current_cumulative_volume": (
+                current_cumulative_volume
+            ),
+            "last_regular_previous_cumulative_volume": (
+                previous_cumulative_volume
+            ),
+            "last_regular_volume_ratio": (
+                volume_ratio
+            ),
+            "last_regular_checked_at": checked_at
+        }
+
+        return self._request(
+            "PATCH",
+            "breakout_alert_state",
+            params={
+                "line_user_id": (
+                    f"eq.{self.user_id}"
+                ),
+                "group_id": (
+                    f"eq.{group_id}"
+                ),
+                "ticker": (
+                    f"eq.{ticker}"
+                )
+            },
+            json_body=payload,
+            extra_headers={
+                "Prefer": "return=minimal"
+            }
+        )
+
+    def get_cached_ticker_states(
+        self,
+        ticker
+    ):
+        """
+        供 Discord /量比 查詢使用。
+
+        此方法只讀取 Supabase 快取，
+        不呼叫 Yahoo 或 TWSE MIS。
+        """
+        ticker = str(
+            ticker or ""
+        ).strip().upper()
+
+        if not ticker:
+            return []
+
+        rows = self._request(
+            "GET",
+            "breakout_alert_state",
+            params={
+                "select": (
+                    "group_id,ticker,ma_period,"
+                    "market,session_type,"
+                    "previous_side,last_price,"
+                    "last_ma_value,price_source,"
+                    "last_checked_at,"
+                    "last_regular_current_cumulative_volume,"
+                    "last_regular_previous_cumulative_volume,"
+                    "last_regular_volume_ratio,"
+                    "last_regular_checked_at,"
+                    "metadata"
+                ),
+                "line_user_id": (
+                    f"eq.{self.user_id}"
+                ),
+                "ticker": f"eq.{ticker}",
+                "order": (
+                    "group_id.asc,"
+                    "ma_period.asc"
+                )
+            }
+        )
+
+        return rows if isinstance(
+            rows,
+            list
+        ) else []
+
+
     def close(self):
         self.session.close()

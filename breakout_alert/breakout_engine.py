@@ -123,6 +123,10 @@ def build_state_metadata(
         "group_name": config.get(
             "group_name"
         ),
+        "display_name": (
+            quote.display_name
+            or ""
+        ),
         "quoted_at": quote.quoted_at,
         "price_source": quote.source,
         "current_side": current_side,
@@ -471,6 +475,45 @@ class BreakoutEngine:
                 f"→{current_side}"
                 f"｜{direction}"
             )
+
+        # 正常盤且量比有效時，另外保存最近一次
+        # 正常盤快取。盤前及盤後不會執行此區塊，
+        # 因此不會把正常盤量比覆蓋成空值。
+        if (
+            decision.session_type == "regular"
+            and analysis.volume_ratio is not None
+        ):
+            try:
+                self.store.update_regular_volume_cache(
+                    group_id=group_id,
+                    ticker=ticker,
+                    current_cumulative_volume=(
+                        analysis
+                        .current_cumulative_volume
+                    ),
+                    previous_cumulative_volume=(
+                        analysis
+                        .previous_cumulative_volume
+                    ),
+                    volume_ratio=(
+                        analysis.volume_ratio
+                    ),
+                    checked_at=utc_now_string()
+                )
+
+                print(
+                    f"📊 {ticker}"
+                    f"｜正常盤量比快取 "
+                    f"{analysis.volume_ratio:.2f}"
+                )
+
+            except Exception as exc:
+                # 量比快取失敗不影響突破狀態及其他股票。
+                print(
+                    f"⚠️ {ticker}"
+                    "｜正常盤量比快取失敗："
+                    f"{type(exc).__name__}: {exc}"
+                )
 
         return results
 

@@ -1,0 +1,39 @@
+FROM python:3.10-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PORT=8080
+
+WORKDIR /app
+
+COPY requirements.discord-query.txt \
+    /app/requirements.discord-query.txt
+
+RUN python -m pip install --upgrade pip \
+    && python -m pip install \
+        -r /app/requirements.discord-query.txt
+
+COPY breakout_alert/__init__.py \
+    /app/breakout_alert/__init__.py
+
+COPY breakout_alert/config.py \
+    /app/breakout_alert/config.py
+
+COPY breakout_alert/supabase_store.py \
+    /app/breakout_alert/supabase_store.py
+
+COPY breakout_alert/cache_query.py \
+    /app/breakout_alert/cache_query.py
+
+COPY breakout_alert/discord_app.py \
+    /app/breakout_alert/discord_app.py
+
+CMD exec gunicorn \
+    --bind 0.0.0.0:${PORT} \
+    --workers 1 \
+    --threads 2 \
+    --timeout 30 \
+    --access-logfile - \
+    --error-logfile - \
+    breakout_alert.discord_app:app
