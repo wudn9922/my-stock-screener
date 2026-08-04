@@ -2166,7 +2166,7 @@ def scan_market(
             )
 
             chart_data = build_stock_data(
-                df.tail(60),
+                df.tail(180),
                 ticker,
                 title,
                 [20],
@@ -2582,7 +2582,7 @@ def process_custom_groups(
                 )
 
             chart_data = build_stock_data(
-                combined.tail(60),
+                combined.tail(180),
                 actual_ticker,
                 title,
                 ma_list,
@@ -6532,7 +6532,7 @@ function fitLastSixty(state) {
         .setVisibleLogicalRange({
             from: Math.max(
                 0,
-                total - 60
+                total - 180
             ),
             to: total + 2
         });
