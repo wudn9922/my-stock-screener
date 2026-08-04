@@ -381,6 +381,32 @@ class SupabaseStore:
                 )
             }
 
+                        # 動態群組的 stocks.group_id 可能儲存為 custom_22，
+            # 而 groups.id 儲存為 22，因此額外建立別名。
+            if raw_group_id.isdigit():
+                dynamic_group_id = (
+                    f"custom_{raw_group_id}"
+                )
+
+                group_mapping[
+                    dynamic_group_id
+                ] = {
+                    "group_id": dynamic_group_id,
+                    "raw_group_id": raw_group_id,
+                    "group_name": (
+                        raw_group_name
+                        or dynamic_group_id
+                    ),
+                    "market": detect_market(
+                        dynamic_group_id,
+                        raw_group_name
+                    ),
+                    "default_ma_list": (
+                        default_ma_list
+                    ),
+                    "is_dynamic": True
+                }
+
             # 支援 stocks.group_id 直接存標準群組代號，
             # 但 groups.id 是數字的情況。
             if mapped_fixed_key:
