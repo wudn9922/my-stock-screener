@@ -78,14 +78,86 @@ def normalize_ticker(ticker, market):
     return ticker
 
 
-def get_market_from_group_key(group_key):
-    if group_key.startswith("tw_"):
+def detect_market(
+    group_id,
+    group_name="",
+    ticker=""
+):
+    group_id = str(
+        group_id or ""
+    ).strip().lower()
+
+    group_name = (
+        str(group_name or "")
+        .strip()
+        .replace("－", "-")
+        .replace("–", "-")
+        .replace("—", "-")
+        .replace(" ", "")
+        .lower()
+    )
+
+    ticker = str(
+        ticker or ""
+    ).strip().upper()
+
+    # 1. 先判斷固定群組 ID
+    if group_id.startswith("tw_"):
         return "TW"
 
-    if group_key.startswith("us_"):
+    if group_id.startswith("us_"):
+        return "US"
+
+    # 2. 再依群組名稱判斷
+    tw_keywords = [
+        "台股",
+        "台灣",
+        "taiwan",
+        "twstock",
+        "tw-stock"
+    ]
+
+    us_keywords = [
+        "美股",
+        "美國",
+        "usa",
+        "usstock",
+        "us-stock"
+    ]
+
+    if any(
+        keyword in group_name
+        for keyword in tw_keywords
+    ):
+        return "TW"
+
+    if any(
+        keyword in group_name
+        for keyword in us_keywords
+    ):
+        return "US"
+
+    # 3. 依股票代號後綴判斷
+    if (
+        ticker.endswith(".TW")
+        or ticker.endswith(".TWO")
+    ):
+        return "TW"
+
+    # 4. 台股可能只儲存純數字代號
+    if ticker.isdigit():
+        return "TW"
+
+    # 5. 一般英文字母或美股格式視為美股
+    if ticker:
         return "US"
 
     return None
+
+
+def get_market_from_group_key(group_key):
+    # 保留舊函式，避免其他程式引用時失效
+    return detect_market(group_key)
 
 
 def get_ma_list(stock):
@@ -229,9 +301,9 @@ class SupabaseStore:
             list
         ) else []
 
+
     def build_group_mapping(self, groups):
-        group_id_to_key = {}
-        group_key_to_name = {}
+        group_mapping = {}
 
         for group in groups:
             raw_group_id = str(
@@ -242,13 +314,16 @@ class SupabaseStore:
                 group.get("name") or ""
             ).strip()
 
+            if not raw_group_id:
+                continue
+
             normalized_name = (
                 normalize_group_name(
                     raw_group_name
                 )
             )
 
-            mapped_key = None
+            mapped_fixed_key = None
 
             for known_name, group_key in (
                 GROUP_NAME_TO_KEY.items()
@@ -259,48 +334,96 @@ class SupabaseStore:
                     )
                     == normalized_name
                 ):
-                    mapped_key = group_key
+                    mapped_fixed_key = group_key
                     break
 
-            # 支援 groups.id 本身就是 tw_g1、us_g1。
+            # groups.id 本身可能就是 tw_g1、us_g1
             if (
-                not mapped_key
+                not mapped_fixed_key
                 and raw_group_id
                 in VALID_GROUP_KEYS
             ):
-                mapped_key = raw_group_id
+                mapped_fixed_key = raw_group_id
 
-            if (
-                raw_group_id
-                and mapped_key
-            ):
-                group_id_to_key[
-                    raw_group_id
-                ] = mapped_key
+            # 固定群組使用標準代號；
+            # 動態群組保留 custom_22 等原始 ID。
+            effective_group_id = (
+                mapped_fixed_key
+                or raw_group_id
+            )
 
-            if mapped_key:
-                group_key_to_name[
-                    mapped_key
-                ] = (
+            market = detect_market(
+                effective_group_id,
+                raw_group_name
+            )
+
+            default_ma_list = get_ma_list(
+                group
+            )
+
+            group_mapping[raw_group_id] = {
+                "group_id": effective_group_id,
+                "raw_group_id": raw_group_id,
+                "group_name": (
                     raw_group_name
-                    or GROUP_DISPLAY_NAMES[
-                        mapped_key
-                    ]
+                    or GROUP_DISPLAY_NAMES.get(
+                        effective_group_id
+                    )
+                    or raw_group_id
+                ),
+                "market": market,
+                "default_ma_list": (
+                    default_ma_list
+                ),
+                "is_dynamic": (
+                    effective_group_id
+                    not in VALID_GROUP_KEYS
+                )
+            }
+
+            # 支援 stocks.group_id 直接存標準群組代號，
+            # 但 groups.id 是數字的情況。
+            if mapped_fixed_key:
+                group_mapping.setdefault(
+                    mapped_fixed_key,
+                    {
+                        "group_id": (
+                            mapped_fixed_key
+                        ),
+                        "raw_group_id": (
+                            raw_group_id
+                        ),
+                        "group_name": (
+                            raw_group_name
+                            or GROUP_DISPLAY_NAMES.get(
+                                mapped_fixed_key
+                            )
+                            or mapped_fixed_key
+                        ),
+                        "market": (
+                            detect_market(
+                                mapped_fixed_key,
+                                raw_group_name
+                            )
+                        ),
+                        "default_ma_list": (
+                            default_ma_list
+                        ),
+                        "is_dynamic": False
+                    }
                 )
 
-        return (
-            group_id_to_key,
-            group_key_to_name
-        )
+        return group_mapping
 
     def get_monitor_configs(self):
         groups = self.get_groups()
         stocks = self.get_user_stocks()
 
-        (
-            group_id_to_key,
-            group_key_to_name
-        ) = self.build_group_mapping(groups)
+        group_mapping = (
+            self.build_group_mapping(
+                groups
+            )
+        )
 
         monitor_configs = []
         deduplicate_keys = set()
@@ -310,42 +433,104 @@ class SupabaseStore:
                 stock.get("group_id") or ""
             ).strip()
 
-            group_key = (
-                group_id_to_key.get(
-                    raw_group_id
+            raw_ticker = str(
+                stock.get("ticker") or ""
+            ).strip().upper()
+
+            if not raw_group_id:
+                print(
+                    "⚠️ 略過 group_id 為空的股票："
+                    f"{raw_ticker or '未知代號'}"
                 )
+                continue
+
+            if raw_group_id == "admin_index":
+                continue
+
+            group_info = group_mapping.get(
+                raw_group_id
             )
 
-            # 支援 stocks.group_id 直接存 tw_g1、us_g1。
-            if (
-                not group_key
-                and raw_group_id
-                in VALID_GROUP_KEYS
+            # 固定群組即使 groups 表沒有對應資料，
+            # 仍可直接辨識。
+            if group_info is None and (
+                raw_group_id in VALID_GROUP_KEYS
             ):
-                group_key = raw_group_id
+                group_info = {
+                    "group_id": raw_group_id,
+                    "raw_group_id": raw_group_id,
+                    "group_name": (
+                        GROUP_DISPLAY_NAMES.get(
+                            raw_group_id,
+                            raw_group_id
+                        )
+                    ),
+                    "market": detect_market(
+                        raw_group_id,
+                        "",
+                        raw_ticker
+                    ),
+                    "default_ma_list": [],
+                    "is_dynamic": False
+                }
 
-            if not group_key:
+            # 動態群組若 groups 資料暫時缺少，
+            # 仍依 ticker 判斷市場並保留原群組 ID。
+            if group_info is None:
+                inferred_market = detect_market(
+                    raw_group_id,
+                    "",
+                    raw_ticker
+                )
+
+                if inferred_market:
+                    group_info = {
+                        "group_id": raw_group_id,
+                        "raw_group_id": raw_group_id,
+                        "group_name": raw_group_id,
+                        "market": inferred_market,
+                        "default_ma_list": [],
+                        "is_dynamic": True
+                    }
+
+            if group_info is None:
                 print(
                     "⚠️ 略過無法辨識的群組："
                     f"group_id={raw_group_id}"
                 )
                 continue
 
+            effective_group_id = str(
+                group_info.get("group_id")
+                or raw_group_id
+            ).strip()
+
+            group_name = str(
+                group_info.get("group_name")
+                or effective_group_id
+            ).strip()
+
             market = (
-                get_market_from_group_key(
-                    group_key
+                group_info.get("market")
+                or detect_market(
+                    effective_group_id,
+                    group_name,
+                    raw_ticker
                 )
             )
 
-            if not market:
+            if market not in {"TW", "US"}:
+                print(
+                    "⚠️ 略過無法辨識市場："
+                    f"group_id={raw_group_id}, "
+                    f"ticker={raw_ticker}"
+                )
                 continue
 
             ticker = normalize_ticker(
-                stock.get("ticker"),
+                raw_ticker,
                 market
             )
-
-            ma_list = get_ma_list(stock)
 
             if not ticker:
                 print(
@@ -353,33 +538,41 @@ class SupabaseStore:
                 )
                 continue
 
+            # 優先使用 stocks 個別均線；
+            # 若沒有有效均線，才使用 groups 預設均線。
+            ma_list = get_ma_list(
+                stock
+            )
+
+            if not ma_list:
+                ma_list = sorted(
+                    set(
+                        group_info.get(
+                            "default_ma_list"
+                        )
+                        or []
+                    )
+                )
+
             if not ma_list:
                 print(
                     f"⚠️ 略過無有效均線："
-                    f"{ticker}"
+                    f"{ticker} / "
+                    f"{effective_group_id}"
                 )
                 continue
 
-            group_name = (
-                group_key_to_name.get(
-                    group_key
-                )
-                or GROUP_DISPLAY_NAMES.get(
-                    group_key
-                )
-                or group_key
-            )
-
             unique_key = (
                 self.user_id,
-                group_key,
+                effective_group_id,
                 ticker
             )
 
             if unique_key in deduplicate_keys:
                 print(
                     f"⚠️ 略過重複監控設定："
-                    f"{group_key}/{ticker}"
+                    f"{effective_group_id}/"
+                    f"{ticker}"
                 )
                 continue
 
@@ -391,14 +584,33 @@ class SupabaseStore:
                 {
                     "stock_id": stock.get("id"),
                     "line_user_id": self.user_id,
-                    "group_id": group_key,
-                    "raw_group_id": raw_group_id,
+                    "group_id": (
+                        effective_group_id
+                    ),
+                    "raw_group_id": (
+                        raw_group_id
+                    ),
                     "group_name": group_name,
                     "ticker": ticker,
                     "market": market,
-                    "ma_list": ma_list
+                    "ma_list": ma_list,
+                    "is_dynamic_group": bool(
+                        group_info.get(
+                            "is_dynamic"
+                        )
+                    )
                 }
             )
+
+            if group_info.get("is_dynamic"):
+                print(
+                    f"✅ 載入動態群組："
+                    f"{effective_group_id}"
+                    f"｜{group_name}"
+                    f"｜{ticker}"
+                    f"｜{market}"
+                    f"｜MA={ma_list}"
+                )
 
         return monitor_configs
 
