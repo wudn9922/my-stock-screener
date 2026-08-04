@@ -126,16 +126,22 @@ class SupabaseStore:
 
         self.session = requests.Session()
 
-        self.session.headers.update(
-            {
-                "apikey": self.service_key,
-                "Authorization": (
-                    f"Bearer {self.service_key}"
-                ),
-                "Accept": "application/json",
-                "Content-Type": "application/json"
-            }
-        )
+        headers = {
+            "apikey": self.service_key,
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+
+        # Legacy service_role 是 JWT，可以放入 Bearer。
+        # 新版 sb_secret_ 金鑰只放 apikey，不可當成 JWT。
+        if self.service_key.startswith("eyJ"):
+            headers["Authorization"] = (
+                f"Bearer {self.service_key}"
+            )
+
+        self.session.headers.update(headers)
+
+
 
     def _request(
         self,
