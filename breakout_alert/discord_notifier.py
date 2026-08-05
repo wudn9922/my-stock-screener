@@ -42,10 +42,10 @@ class DiscordNotifier:
     ):
         if direction == "breakout_up":
             icon = "🚨"
-            direction_text = "向上突破"
+            direction_text = "向上突破 +0.5%"
         elif direction == "breakout_down":
             icon = "⚠️"
-            direction_text = "向下跌破"
+            direction_text = "向下跌破 -1.0%"
         else:
             raise ValueError(
                 f"不支援的提醒方向：{direction}"

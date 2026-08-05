@@ -3,6 +3,12 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 
 
+# 向上突破需高於均線 0.5%
+BREAKOUT_UP_RATIO = 0.005
+
+# 向下跌破需低於均線 1.0%
+BREAKOUT_DOWN_RATIO = 0.01
+
 @dataclass
 class BreakoutResult:
     ticker: str
@@ -43,29 +49,74 @@ def safe_float(value, default=None):
 
 def determine_price_side(
     price,
-    ma_value,
-    tolerance_ratio=0.000001
+    ma_value
 ):
+    """
+    使用非對稱確認門檻判斷價格狀態。
+
+    above：
+        現價至少高於均線 0.5%。
+
+    below：
+        現價至少低於均線 1.0%。
+
+    equal：
+        位於兩個確認門檻之間。
+        此狀態代表等待確認，後續會保留原本方向。
+    """
     price = safe_float(price)
     ma_value = safe_float(ma_value)
 
-    if price is None or ma_value is None:
+    if (
+        price is None
+        or ma_value is None
+        or ma_value <= 0
+    ):
         return "unknown"
 
-    tolerance = max(
-        abs(ma_value) * tolerance_ratio,
-        0.000001
+    breakout_up_price = (
+        ma_value
+        * (1 + BREAKOUT_UP_RATIO)
     )
 
-    difference = price - ma_value
+    breakout_down_price = (
+        ma_value
+        * (1 - BREAKOUT_DOWN_RATIO)
+    )
 
-    if difference > tolerance:
+    if price >= breakout_up_price:
         return "above"
 
-    if difference < -tolerance:
+    if price <= breakout_down_price:
         return "below"
 
     return "equal"
+
+def determine_initial_side(
+    price,
+    ma_value
+):
+    """
+    第一次建立狀態時不發提醒。
+
+    若價格位於確認區間內，仍依價格目前在
+    均線上方或下方建立原始基準，避免初始
+    previous_side 被保存為 equal。
+    """
+    price = safe_float(price)
+    ma_value = safe_float(ma_value)
+
+    if (
+        price is None
+        or ma_value is None
+        or ma_value <= 0
+    ):
+        return "unknown"
+
+    if price >= ma_value:
+        return "above"
+
+    return "below"
 
 
 def determine_breakout_direction(
@@ -303,12 +354,15 @@ class BreakoutEngine:
             # 只建立基準，不發送提醒。
             if (
                 state is None
-                or previous_side == "unknown"
+                or previous_side in {
+                    "unknown",
+                    "equal"
+                }
             ):
                 baseline_side = (
-                    get_persisted_side(
-                        previous_side,
-                        current_side
+                    determine_initial_side(
+                        quote.price,
+                        ma_value
                     )
                 )
 
