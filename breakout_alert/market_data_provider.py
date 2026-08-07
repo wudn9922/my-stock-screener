@@ -500,6 +500,7 @@ def calculate_same_time_volume(
 
     if (
         current_volume is not None
+        and current_volume > 0
         and previous_volume is not None
         and previous_volume > 0
     ):

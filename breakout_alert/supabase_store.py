@@ -815,7 +815,20 @@ class SupabaseStore:
         只在正常盤且量比有效時呼叫，
         因此盤前、盤後不會覆蓋既有快取。
         """
-        if volume_ratio is None:
+        try:
+            valid_volume_ratio = float(
+                volume_ratio
+            )
+        except (TypeError, ValueError):
+            return None
+
+        if (
+            valid_volume_ratio <= 0
+            or current_cumulative_volume is None
+            or previous_cumulative_volume is None
+            or int(current_cumulative_volume) <= 0
+            or int(previous_cumulative_volume) <= 0
+        ):
             return None
 
         checked_at = (
@@ -831,7 +844,7 @@ class SupabaseStore:
                 previous_cumulative_volume
             ),
             "last_regular_volume_ratio": (
-                volume_ratio
+                valid_volume_ratio
             ),
             "last_regular_checked_at": checked_at
         }
