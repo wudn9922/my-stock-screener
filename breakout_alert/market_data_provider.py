@@ -239,45 +239,44 @@ def clean_daily_close_series(
     return close_series
 
 
-def calculate_intraday_ma(
+def calculate_previous_day_ma(
     completed_closes,
-    current_price,
     ma_period
 ):
-    ma_period = int(ma_period)
+    """
+    計算截至前一個完整交易日的固定均線。
+
+    只使用最近 N 個完整交易日的收盤價，
+    不將今天即時價格納入均線計算。
+    """
+    try:
+        ma_period = int(ma_period)
+    except (TypeError, ValueError):
+        return None
 
     if ma_period <= 0:
         return None
 
-    current_price = safe_float(
-        current_price
-    )
-
-    if current_price is None:
+    if completed_closes is None:
         return None
 
-    required_previous_count = (
-        ma_period - 1
-    )
+    close_values = pd.to_numeric(
+        completed_closes,
+        errors="coerce"
+    ).dropna()
 
-    if required_previous_count == 0:
-        return current_price
-
-    if len(completed_closes) < required_previous_count:
+    if len(close_values) < ma_period:
         return None
 
-    previous_values = (
-        completed_closes
-        .tail(required_previous_count)
-        .astype(float)
+    ma_value = (
+        close_values
+        .tail(ma_period)
+        .mean()
     )
 
-    total_value = (
-        float(previous_values.sum())
-        + current_price
+    return safe_float(
+        ma_value
     )
-
-    return total_value / ma_period
 
 
 def normalize_minute_dataframe(
@@ -803,9 +802,8 @@ class MarketDataProvider:
                     combined_ma_lists[ticker]
                 ):
                     ma_value = (
-                        calculate_intraday_ma(
+                        calculate_previous_day_ma(
                             completed_closes,
-                            quote.price,
                             ma_period
                         )
                     )
@@ -885,8 +883,8 @@ class MarketDataProvider:
                         ),
                         metadata={
                             "ma_method": (
-                                "previous_n_minus_1_"
-                                "closes_plus_live_price"
+                                "previous_completed_"
+                                "trading_day_closes"
                             ),
                             "session_type": (
                                 decision.session_type
