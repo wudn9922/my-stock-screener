@@ -1919,28 +1919,125 @@ def build_stock_data(
 # =========================================================================
 # 全市場掃描
 # =========================================================================
-def download_market_data(
-    tickers,
-    period
+
+def download_single_ticker_with_retry(
+    ticker,
+    period="15d",
+    max_attempts=3
 ):
-    try:
-        return yf.download(
-            tickers,
-            period=period,
-            progress=False,
-            threads=False,
-            auto_adjust=False,
-            group_by="column"
-        )
+    ticker = str(
+        ticker or ""
+    ).strip().upper()
 
-    except Exception as exc:
-        print(
-            "❌ 全市場批次下載失敗："
-            f"{type(exc).__name__}: {exc}"
-        )
-
+    if not ticker:
         return pd.DataFrame()
 
+    for attempt in range(
+        1,
+        max_attempts + 1
+    ):
+        try:
+            print(
+                f"⬇️ 單檔下載 {ticker} "
+                f"({attempt}/{max_attempts})"
+            )
+
+            downloaded = yf.download(
+                ticker,
+                period=period,
+                interval="1d",
+                progress=False,
+                threads=False,
+                auto_adjust=False,
+                actions=False,
+                group_by="column",
+                timeout=30
+            )
+
+            df = extract_yfinance_data(
+                downloaded,
+                ticker
+            )
+
+            df = clean_ohlcv_dataframe(df)
+
+            if not df.empty:
+                print(
+                    f"✅ {ticker} 單檔下載成功，"
+                    f"最新日期："
+                    f"{df.index[-1]:%Y-%m-%d}"
+                )
+
+                return df
+
+            print(
+                f"⚠️ {ticker} 單檔下載為空"
+            )
+
+        except Exception as exc:
+            print(
+                f"⚠️ {ticker} 單檔下載失敗："
+                f"{type(exc).__name__}: {exc}"
+            )
+
+        time.sleep(
+            min(attempt * 2, 6)
+        )
+
+    return pd.DataFrame()
+
+def download_market_data(
+    tickers,
+    period,
+    max_attempts=3
+):
+    if not tickers:
+        return pd.DataFrame()
+
+    for attempt in range(
+        1,
+        max_attempts + 1
+    ):
+        try:
+            downloaded = yf.download(
+                tickers,
+                period=period,
+                interval="1d",
+                progress=False,
+                threads=False,
+                auto_adjust=False,
+                actions=False,
+                group_by="column",
+                timeout=45
+            )
+
+            if (
+                downloaded is not None
+                and not downloaded.empty
+            ):
+                return downloaded
+
+            print(
+                "⚠️ 全市場批次下載為空："
+                f"第 {attempt}/{max_attempts} 次"
+            )
+
+        except Exception as exc:
+            print(
+                "⚠️ 全市場批次下載失敗："
+                f"第 {attempt}/{max_attempts} 次，"
+                f"{type(exc).__name__}: {exc}"
+            )
+
+        time.sleep(
+            min(attempt * 3, 9)
+        )
+
+    print(
+        "❌ 全市場批次下載重試後仍失敗"
+    )
+
+    return pd.DataFrame()
 
 def scan_market(
     tickers,
@@ -2013,40 +2110,177 @@ def scan_market(
                     f"初始化失敗：{exc}"
                 )
 
-    for start in range(
-        0,
-        len(need_update),
-        chunk_size
-    ):
-        chunk = need_update[
-            start:start + chunk_size
-        ]
+for start in range(
+    0,
+    len(need_update),
+    chunk_size
+):
+    chunk = need_update[
+        start:start + chunk_size
+    ]
 
-        downloaded = download_market_data(
-            chunk,
-            "5d"
-        )
+    # 5d 太短，遇到連假或 Yahoo 漏資料時
+    # 容錯空間不足，改抓 15d。
+    downloaded = download_market_data(
+        chunk,
+        "15d"
+    )
 
-        if downloaded.empty:
-            continue
+    batch_frames = {}
+    batch_latest_date = None
 
+    if not downloaded.empty:
         for ticker in chunk:
             try:
-                today_data = (
+                ticker_df = (
                     extract_yfinance_data(
                         downloaded,
                         ticker
                     )
                 )
 
-                today_data = (
+                ticker_df = (
                     clean_ohlcv_dataframe(
-                        today_data
+                        ticker_df
                     )
                 )
 
-                if today_data.empty:
+                if ticker_df.empty:
                     continue
+
+                batch_frames[ticker] = (
+                    ticker_df
+                )
+
+                ticker_latest_date = (
+                    ticker_df.index[-1]
+                    .normalize()
+                )
+
+                if (
+                    batch_latest_date is None
+                    or ticker_latest_date
+                    > batch_latest_date
+                ):
+                    batch_latest_date = (
+                        ticker_latest_date
+                    )
+
+            except Exception as exc:
+                print(
+                    f"⚠️ {ticker} "
+                    "解析批次資料失敗："
+                    f"{exc}"
+                )
+
+    for ticker in chunk:
+        try:
+            today_data = batch_frames.get(
+                ticker,
+                pd.DataFrame()
+            )
+
+            need_single_retry = (
+                today_data.empty
+            )
+
+            # 同一批美股若其他股票已經有更新日期，
+            # 但這檔落後，視為批次下載可能漏資料。
+            if (
+                not need_single_retry
+                and batch_latest_date is not None
+            ):
+                ticker_latest_date = (
+                    today_data.index[-1]
+                    .normalize()
+                )
+
+                if (
+                    ticker_latest_date
+                    < batch_latest_date
+                ):
+                    print(
+                        f"⚠️ {ticker} 批次資料落後："
+                        f"{ticker_latest_date:%Y-%m-%d}，"
+                        "批次最新日期："
+                        f"{batch_latest_date:%Y-%m-%d}"
+                    )
+
+                    need_single_retry = True
+
+            if need_single_retry:
+                retry_data = (
+                    download_single_ticker_with_retry(
+                        ticker,
+                        period="15d",
+                        max_attempts=3
+                    )
+                )
+
+                if not retry_data.empty:
+                    today_data = retry_data
+
+            if today_data.empty:
+                print(
+                    f"❌ {ticker} 無法取得更新資料，"
+                    "本次不更新 CSV"
+                )
+                continue
+
+            csv_path = os.path.join(
+                DATA_DIR,
+                f"{ticker}.csv"
+            )
+
+            if os.path.exists(csv_path):
+                local_data = pd.read_csv(
+                    csv_path,
+                    index_col=0,
+                    parse_dates=True
+                )
+
+                local_data = (
+                    clean_ohlcv_dataframe(
+                        local_data
+                    )
+                )
+            else:
+                local_data = pd.DataFrame()
+
+            combined = pd.concat(
+                [
+                    local_data,
+                    today_data
+                ]
+            )
+
+            combined = (
+                clean_ohlcv_dataframe(
+                    combined
+                )
+            )
+
+            if combined.empty:
+                continue
+
+            combined = combined.tail(
+                MAX_DAYS
+            )
+
+            combined.to_csv(csv_path)
+
+            print(
+                f"✅ {ticker} CSV 已更新，"
+                f"最新 K 線："
+                f"{combined.index[-1]:%Y-%m-%d}"
+            )
+
+        except Exception as exc:
+            print(
+                f"⚠️ {ticker} 更新失敗："
+                f"{type(exc).__name__}: "
+                f"{exc}"
+            )
 
                 csv_path = os.path.join(
                     DATA_DIR,
@@ -2248,46 +2482,32 @@ def download_custom_stock(
     )
 
     for candidate in candidates:
-        try:
+        print(
+            f"⬇️ 嘗試下載自訂股票："
+            f"{candidate}"
+        )
+
+        df = download_single_ticker_with_retry(
+            candidate,
+            period="2y",
+            max_attempts=3
+        )
+
+        if df.empty:
             print(
-                f"⬇️ 嘗試下載：{candidate}"
+                f"⚠️ {candidate} "
+                "重試後仍無資料"
             )
+            continue
 
-            downloaded = yf.download(
-                candidate,
-                period="2y",
-                progress=False,
-                threads=False,
-                auto_adjust=False,
-                group_by="column"
-            )
+        print(
+            f"✅ {candidate} 下載成功，"
+            f"共 {len(df)} 筆，"
+            f"最新日期："
+            f"{df.index[-1]:%Y-%m-%d}"
+        )
 
-            df = extract_yfinance_data(
-                downloaded,
-                candidate
-            )
-
-            df = clean_ohlcv_dataframe(df)
-
-            if df.empty:
-                print(
-                    f"⚠️ {candidate} "
-                    "下載結果為空"
-                )
-                continue
-
-            print(
-                f"✅ {candidate} 下載成功，"
-                f"共 {len(df)} 筆"
-            )
-
-            return candidate, df
-
-        except Exception as exc:
-            print(
-                f"❌ {candidate} 下載失敗："
-                f"{type(exc).__name__}: {exc}"
-            )
+        return candidate, df
 
     return None, pd.DataFrame()
 
