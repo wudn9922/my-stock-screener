@@ -2282,46 +2282,6 @@ for start in range(
                 f"{exc}"
             )
 
-                csv_path = os.path.join(
-                    DATA_DIR,
-                    f"{ticker}.csv"
-                )
-
-                local_data = pd.read_csv(
-                    csv_path,
-                    index_col=0,
-                    parse_dates=True
-                )
-
-                local_data = (
-                    clean_ohlcv_dataframe(
-                        local_data
-                    )
-                )
-
-                combined = pd.concat(
-                    [
-                        local_data,
-                        today_data
-                    ]
-                )
-
-                combined = combined[
-                    ~combined.index.duplicated(
-                        keep="last"
-                    )
-                ].sort_index().tail(
-                    MAX_DAYS
-                )
-
-                combined.to_csv(csv_path)
-
-            except Exception as exc:
-                print(
-                    f"⚠️ {ticker} "
-                    f"更新失敗：{exc}"
-                )
-
     for ticker in tickers:
         csv_path = os.path.join(
             DATA_DIR,
