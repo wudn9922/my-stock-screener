@@ -2053,6 +2053,9 @@ def scan_market(
     need_init = []
     need_update = []
 
+    # -----------------------------------------------------------------
+    # 判斷哪些股票需要初始化、哪些只需要更新
+    # -----------------------------------------------------------------
     for ticker in tickers:
         csv_path = os.path.join(
             DATA_DIR,
@@ -2064,6 +2067,14 @@ def scan_market(
         else:
             need_init.append(ticker)
 
+    print(
+        f"📂 需要初始化：{len(need_init)} 檔，"
+        f"需要更新：{len(need_update)} 檔"
+    )
+
+    # -----------------------------------------------------------------
+    # 初始化尚未建立 CSV 的股票
+    # -----------------------------------------------------------------
     for start in range(
         0,
         len(need_init),
@@ -2078,210 +2089,285 @@ def scan_market(
             "250d"
         )
 
-        if downloaded.empty:
-            continue
+        batch_frames = {}
+
+        if not downloaded.empty:
+            for ticker in chunk:
+                try:
+                    ticker_df = (
+                        extract_yfinance_data(
+                            downloaded,
+                            ticker
+                        )
+                    )
+
+                    ticker_df = (
+                        clean_ohlcv_dataframe(
+                            ticker_df
+                        )
+                    )
+
+                    if not ticker_df.empty:
+                        batch_frames[
+                            ticker
+                        ] = ticker_df
+
+                except Exception as exc:
+                    print(
+                        f"⚠️ {ticker} "
+                        "初始化批次資料解析失敗："
+                        f"{type(exc).__name__}: "
+                        f"{exc}"
+                    )
 
         for ticker in chunk:
             try:
-                df = extract_yfinance_data(
-                    downloaded,
-                    ticker
+                df = batch_frames.get(
+                    ticker,
+                    pd.DataFrame()
                 )
 
-                df = clean_ohlcv_dataframe(
-                    df
+                # 批次下載漏掉個別股票時，改用單檔重試
+                if df.empty:
+                    print(
+                        f"⚠️ {ticker} "
+                        "初始化批次資料為空，"
+                        "改用單檔下載"
+                    )
+
+                    df = (
+                        download_single_ticker_with_retry(
+                            ticker,
+                            period="250d",
+                            max_attempts=3
+                        )
+                    )
+
+                if df.empty:
+                    print(
+                        f"❌ {ticker} "
+                        "初始化失敗，無可用資料"
+                    )
+                    continue
+
+                df = (
+                    clean_ohlcv_dataframe(
+                        df
+                    )
                 )
 
                 if df.empty:
                     continue
 
-                df.tail(
+                df = df.tail(
                     MAX_DAYS
-                ).to_csv(
-                    os.path.join(
-                        DATA_DIR,
-                        f"{ticker}.csv"
-                    )
+                )
+
+                csv_path = os.path.join(
+                    DATA_DIR,
+                    f"{ticker}.csv"
+                )
+
+                df.to_csv(csv_path)
+
+                print(
+                    f"✅ {ticker} 初始化完成，"
+                    "最新 K 線："
+                    f"{df.index[-1]:%Y-%m-%d}"
                 )
 
             except Exception as exc:
                 print(
-                    f"⚠️ {ticker} "
-                    f"初始化失敗：{exc}"
-                )
-
-for start in range(
-    0,
-    len(need_update),
-    chunk_size
-):
-    chunk = need_update[
-        start:start + chunk_size
-    ]
-
-    # 5d 太短，遇到連假或 Yahoo 漏資料時
-    # 容錯空間不足，改抓 15d。
-    downloaded = download_market_data(
-        chunk,
-        "15d"
-    )
-
-    batch_frames = {}
-    batch_latest_date = None
-
-    if not downloaded.empty:
-        for ticker in chunk:
-            try:
-                ticker_df = (
-                    extract_yfinance_data(
-                        downloaded,
-                        ticker
-                    )
-                )
-
-                ticker_df = (
-                    clean_ohlcv_dataframe(
-                        ticker_df
-                    )
-                )
-
-                if ticker_df.empty:
-                    continue
-
-                batch_frames[ticker] = (
-                    ticker_df
-                )
-
-                ticker_latest_date = (
-                    ticker_df.index[-1]
-                    .normalize()
-                )
-
-                if (
-                    batch_latest_date is None
-                    or ticker_latest_date
-                    > batch_latest_date
-                ):
-                    batch_latest_date = (
-                        ticker_latest_date
-                    )
-
-            except Exception as exc:
-                print(
-                    f"⚠️ {ticker} "
-                    "解析批次資料失敗："
+                    f"⚠️ {ticker} 初始化失敗："
+                    f"{type(exc).__name__}: "
                     f"{exc}"
                 )
 
-    for ticker in chunk:
-        try:
-            today_data = batch_frames.get(
-                ticker,
-                pd.DataFrame()
-            )
+    # -----------------------------------------------------------------
+    # 更新已經存在 CSV 的股票
+    # -----------------------------------------------------------------
+    for start in range(
+        0,
+        len(need_update),
+        chunk_size
+    ):
+        chunk = need_update[
+            start:start + chunk_size
+        ]
 
-            need_single_retry = (
-                today_data.empty
-            )
+        # 改抓 15 日資料，增加連假及 Yahoo 漏資料時的容錯空間
+        downloaded = download_market_data(
+            chunk,
+            "15d"
+        )
 
-            # 同一批美股若其他股票已經有更新日期，
-            # 但這檔落後，視為批次下載可能漏資料。
-            if (
-                not need_single_retry
-                and batch_latest_date is not None
-            ):
-                ticker_latest_date = (
-                    today_data.index[-1]
-                    .normalize()
-                )
+        batch_frames = {}
+        batch_latest_date = None
 
-                if (
-                    ticker_latest_date
-                    < batch_latest_date
-                ):
+        if not downloaded.empty:
+            for ticker in chunk:
+                try:
+                    ticker_df = (
+                        extract_yfinance_data(
+                            downloaded,
+                            ticker
+                        )
+                    )
+
+                    ticker_df = (
+                        clean_ohlcv_dataframe(
+                            ticker_df
+                        )
+                    )
+
+                    if ticker_df.empty:
+                        continue
+
+                    batch_frames[
+                        ticker
+                    ] = ticker_df
+
+                    ticker_latest_date = (
+                        ticker_df.index[-1]
+                        .normalize()
+                    )
+
+                    if (
+                        batch_latest_date is None
+                        or ticker_latest_date
+                        > batch_latest_date
+                    ):
+                        batch_latest_date = (
+                            ticker_latest_date
+                        )
+
+                except Exception as exc:
                     print(
-                        f"⚠️ {ticker} 批次資料落後："
-                        f"{ticker_latest_date:%Y-%m-%d}，"
-                        "批次最新日期："
-                        f"{batch_latest_date:%Y-%m-%d}"
+                        f"⚠️ {ticker} "
+                        "解析批次資料失敗："
+                        f"{type(exc).__name__}: "
+                        f"{exc}"
                     )
 
-                    need_single_retry = True
+        for ticker in chunk:
+            try:
+                today_data = batch_frames.get(
+                    ticker,
+                    pd.DataFrame()
+                )
 
-            if need_single_retry:
-                retry_data = (
-                    download_single_ticker_with_retry(
-                        ticker,
-                        period="15d",
-                        max_attempts=3
+                need_single_retry = (
+                    today_data.empty
+                )
+
+                # 如果個股日期落後同一批股票的最新日期，
+                # 視為 Yahoo 批次下載可能漏掉最新資料。
+                if (
+                    not need_single_retry
+                    and batch_latest_date is not None
+                ):
+                    ticker_latest_date = (
+                        today_data.index[-1]
+                        .normalize()
                     )
+
+                    if (
+                        ticker_latest_date
+                        < batch_latest_date
+                    ):
+                        print(
+                            f"⚠️ {ticker} "
+                            "批次資料日期落後："
+                            f"{ticker_latest_date:%Y-%m-%d}，"
+                            "批次最新日期："
+                            f"{batch_latest_date:%Y-%m-%d}，"
+                            "改用單檔重試"
+                        )
+
+                        need_single_retry = True
+
+                if need_single_retry:
+                    retry_data = (
+                        download_single_ticker_with_retry(
+                            ticker,
+                            period="15d",
+                            max_attempts=3
+                        )
+                    )
+
+                    if not retry_data.empty:
+                        today_data = retry_data
+
+                if today_data.empty:
+                    print(
+                        f"❌ {ticker} "
+                        "無法取得更新資料，"
+                        "本次保留原 CSV"
+                    )
+                    continue
+
+                csv_path = os.path.join(
+                    DATA_DIR,
+                    f"{ticker}.csv"
                 )
 
-                if not retry_data.empty:
-                    today_data = retry_data
+                if os.path.exists(csv_path):
+                    local_data = pd.read_csv(
+                        csv_path,
+                        index_col=0,
+                        parse_dates=True
+                    )
 
-            if today_data.empty:
-                print(
-                    f"❌ {ticker} 無法取得更新資料，"
-                    "本次不更新 CSV"
+                    local_data = (
+                        clean_ohlcv_dataframe(
+                            local_data
+                        )
+                    )
+                else:
+                    local_data = (
+                        pd.DataFrame()
+                    )
+
+                combined = pd.concat(
+                    [
+                        local_data,
+                        today_data
+                    ]
                 )
-                continue
 
-            csv_path = os.path.join(
-                DATA_DIR,
-                f"{ticker}.csv"
-            )
-
-            if os.path.exists(csv_path):
-                local_data = pd.read_csv(
-                    csv_path,
-                    index_col=0,
-                    parse_dates=True
-                )
-
-                local_data = (
+                combined = (
                     clean_ohlcv_dataframe(
-                        local_data
+                        combined
                     )
                 )
-            else:
-                local_data = pd.DataFrame()
 
-            combined = pd.concat(
-                [
-                    local_data,
-                    today_data
-                ]
-            )
+                if combined.empty:
+                    continue
 
-            combined = (
-                clean_ohlcv_dataframe(
-                    combined
+                combined = combined.tail(
+                    MAX_DAYS
                 )
-            )
 
-            if combined.empty:
-                continue
+                combined.to_csv(
+                    csv_path
+                )
 
-            combined = combined.tail(
-                MAX_DAYS
-            )
+                print(
+                    f"✅ {ticker} CSV 已更新，"
+                    "最新 K 線："
+                    f"{combined.index[-1]:%Y-%m-%d}"
+                )
 
-            combined.to_csv(csv_path)
+            except Exception as exc:
+                print(
+                    f"⚠️ {ticker} 更新失敗："
+                    f"{type(exc).__name__}: "
+                    f"{exc}"
+                )
 
-            print(
-                f"✅ {ticker} CSV 已更新，"
-                f"最新 K 線："
-                f"{combined.index[-1]:%Y-%m-%d}"
-            )
-
-        except Exception as exc:
-            print(
-                f"⚠️ {ticker} 更新失敗："
-                f"{type(exc).__name__}: "
-                f"{exc}"
-            )
-
+    # -----------------------------------------------------------------
+    # 讀取完成更新的 CSV，執行成交量及 MA20 篩選
+    # -----------------------------------------------------------------
     for ticker in tickers:
         csv_path = os.path.join(
             DATA_DIR,
@@ -2298,7 +2384,9 @@ for start in range(
                 parse_dates=True
             )
 
-            df = clean_ohlcv_dataframe(df)
+            df = clean_ohlcv_dataframe(
+                df
+            )
 
             if len(df) < 20:
                 continue
@@ -2330,7 +2418,9 @@ for start in range(
             if pd.isna(ma20_value):
                 continue
 
-            ma20 = float(ma20_value)
+            ma20 = float(
+                ma20_value
+            )
 
             if not (
                 ma20 * 0.98
@@ -2394,7 +2484,6 @@ for start in range(
     )
 
     return matched_list
-
 
 # =========================================================================
 # Supabase 固定與動態自訂群組
