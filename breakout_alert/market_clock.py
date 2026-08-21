@@ -390,6 +390,12 @@ def get_tw_market_decision(
 def get_us_market_decision(
     now_utc=None
 ):
+    """
+    美股只監控正常交易時段。
+
+    盤前與盤後直接略過，不取得股價、
+    不計算均線、不更新突破狀態。
+    """
     now_utc = normalize_utc_datetime(
         now_utc
     )
@@ -411,61 +417,19 @@ def get_us_market_decision(
         )
 
     (
-        calendar_open,
-        calendar_close
+        regular_open,
+        regular_close
     ) = get_exchange_session_times(
         US_CALENDAR_NAME,
         local_date,
         NEW_YORK_TIMEZONE
     )
 
-    pre_market_open = (
-        combine_local_datetime(
-            local_date,
-            US_PRE_MARKET_OPEN,
-            NEW_YORK_TIMEZONE
-        )
-    )
-
-    regular_open = calendar_open
-    regular_close = calendar_close
-
-    # 正常交易日盤後到 20:00；
-    # 提早收盤日盤後到 17:00。
-    is_early_close = (
-        regular_close.time()
-        < US_REGULAR_CLOSE
-    )
-
-    after_hours_close_time = (
-        US_EARLY_AFTER_HOURS_CLOSE
-        if is_early_close
-        else US_AFTER_HOURS_CLOSE
-    )
-
-    after_hours_close = (
-        combine_local_datetime(
-            local_date,
-            after_hours_close_time,
-            NEW_YORK_TIMEZONE
-        )
-    )
-
-    if local_datetime < pre_market_open:
+    if local_datetime < regular_open:
         return build_closed_decision(
             "US",
             local_datetime,
-            "美股盤前交易尚未開始"
-        )
-
-    if local_datetime < regular_open:
-        return build_active_decision(
-            market="US",
-            session_type="pre_market",
-            local_datetime=local_datetime,
-            period_start=pre_market_open,
-            interval_minutes=30,
-            reason="美股盤前交易"
+            "美股盤前監控已關閉"
         )
 
     first_ten_minutes_end = (
@@ -495,20 +459,10 @@ def get_us_market_decision(
             reason="美股正常盤"
         )
 
-    if local_datetime < after_hours_close:
-        return build_active_decision(
-            market="US",
-            session_type="after_hours",
-            local_datetime=local_datetime,
-            period_start=regular_close,
-            interval_minutes=30,
-            reason="美股盤後交易"
-        )
-
     return build_closed_decision(
         "US",
         local_datetime,
-        "美股盤後交易已結束"
+        "美股盤後監控已關閉"
     )
 
 

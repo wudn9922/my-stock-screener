@@ -3,11 +3,11 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 
 
-# 向上突破需高於均線 0.5%
-BREAKOUT_UP_RATIO = 0.005
+# 向上突破需高於均線 1%
+BREAKOUT_UP_RATIO = 0.01
 
-# 向下跌破需低於均線 1.0%
-BREAKOUT_DOWN_RATIO = 0.01
+# 向下跌破需低於均線 1.5%
+BREAKOUT_DOWN_RATIO = 0.015
 
 @dataclass
 class BreakoutResult:
@@ -55,10 +55,10 @@ def determine_price_side(
     使用非對稱確認門檻判斷價格狀態。
 
     above：
-        現價至少高於均線 0.5%。
+        現價至少高於均線 1%。
 
     below：
-        現價至少低於均線 1.0%。
+        現價至少低於均線 1.5%。
 
     equal：
         位於兩個確認門檻之間。
@@ -177,6 +177,12 @@ def build_state_metadata(
         "display_name": (
             quote.display_name
             or ""
+        ),
+        "breakout_up_ratio": (
+            BREAKOUT_UP_RATIO
+        ),
+        "breakout_down_ratio": (
+            BREAKOUT_DOWN_RATIO
         ),
         "quoted_at": quote.quoted_at,
         "price_source": quote.source,
@@ -440,12 +446,28 @@ class BreakoutEngine:
             )
 
             try:
+                configured_ma_values = {}
+
+                for configured_ma in config["ma_list"]:
+                    configured_ma = int(
+                        configured_ma
+                    )
+
+                    configured_ma_values[
+                        str(configured_ma)
+                    ] = (
+                        analysis.ma_values.get(
+                            str(configured_ma)
+                        )
+                    )
+
                 sent = self.notifier.send_breakout(
                     ticker=ticker,
                     display_name=display_name,
                     group_name=group_name,
                     ma_period=ma_period,
                     ma_value=ma_value,
+                    ma_values=configured_ma_values,
                     price=quote.price,
                     volume_ratio=(
                         analysis.volume_ratio
