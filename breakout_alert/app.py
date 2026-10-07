@@ -1,4 +1,6 @@
-﻿import logging
+﻿import hmac
+import logging
+import os
 import threading
 import time
 import uuid
@@ -60,8 +62,43 @@ def health():
     ), 200
 
 
+def is_run_request_authorized():
+    """
+    選用的簡易驗證。
+
+    未設定環境變數 RUN_TOKEN 時維持原行為（不驗證）。
+    設定後，呼叫端必須帶上標頭：X-Run-Token: <RUN_TOKEN>
+    （Cloud Scheduler 可在 HTTP headers 欄位加入）。
+    """
+    expected_token = os.environ.get(
+        "RUN_TOKEN",
+        ""
+    ).strip()
+
+    if not expected_token:
+        return True
+
+    provided_token = request.headers.get(
+        "X-Run-Token",
+        ""
+    ).strip()
+
+    return hmac.compare_digest(
+        provided_token,
+        expected_token
+    )
+
+
 @app.post("/run")
 def run_monitor():
+    if not is_run_request_authorized():
+        return jsonify(
+            {
+                "status": "unauthorized",
+                "message": "缺少或錯誤的 X-Run-Token"
+            }
+        ), 401
+
     request_id = (
         request.headers.get(
             "X-Cloud-Trace-Context",

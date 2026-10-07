@@ -34,6 +34,11 @@ DATA_DIR = "data"
 DOCS_DIR = "docs"
 MAX_DAYS = 201
 
+# 超過此天數沒有新 K 線的 CSV 會被自動清除
+STALE_CSV_DAYS = 45
+# 單次最多刪除全部 CSV 的比例，超過視為異常不刪
+STALE_CSV_MAX_DELETE_RATIO = 0.5
+
 # =========================================================================
 # LIFF、報告與畫線同步
 # =========================================================================
@@ -7407,6 +7412,113 @@ def run_git_command(command):
     return result.returncode
 
 
+def get_csv_last_date(csv_path):
+    """
+    讀取 CSV 最後一列的日期，失敗時回傳 None。
+    只讀檔尾，避免整檔載入。
+    """
+    try:
+        with open(
+            csv_path,
+            "rb"
+        ) as csv_file:
+            csv_file.seek(0, os.SEEK_END)
+            size = csv_file.tell()
+            csv_file.seek(
+                max(0, size - 512)
+            )
+            tail_lines = (
+                csv_file.read()
+                .decode(
+                    "utf-8",
+                    errors="ignore"
+                )
+                .strip()
+                .splitlines()
+            )
+
+        if len(tail_lines) < 2:
+            return None
+
+        return datetime.strptime(
+            tail_lines[-1]
+            .split(",")[0]
+            .strip()[:10],
+            "%Y-%m-%d"
+        )
+
+    except Exception:
+        return None
+
+
+def prune_stale_csv(
+    data_dir=DATA_DIR,
+    max_age_days=STALE_CSV_DAYS
+):
+    """
+    刪除最後一根 K 線已超過 max_age_days 天沒更新的 CSV。
+
+    掉出掃描名單、下市或已從群組移除的股票不會再被更新，
+    它們的 CSV 會因此逐漸過期並被清掉，避免 repo 無限膨脹。
+    仍在名單內的股票每天都會更新，不會被刪除。
+    """
+    if not os.path.isdir(data_dir):
+        return 0
+
+    now = datetime.now()
+    csv_paths = [
+        os.path.join(data_dir, name)
+        for name in os.listdir(data_dir)
+        if name.endswith(".csv")
+    ]
+
+    stale_paths = []
+
+    for csv_path in csv_paths:
+        last_date = get_csv_last_date(
+            csv_path
+        )
+
+        if last_date is None:
+            continue
+
+        if (
+            now - last_date
+        ).days > max_age_days:
+            stale_paths.append(csv_path)
+
+    # 安全閥：資料來源整批異常時，不要一次刪光
+    if (
+        csv_paths
+        and len(stale_paths)
+        > len(csv_paths)
+        * STALE_CSV_MAX_DELETE_RATIO
+    ):
+        print(
+            "⚠️ 過期 CSV 數量異常"
+            f"（{len(stale_paths)}/"
+            f"{len(csv_paths)}），"
+            "略過清理"
+        )
+        return 0
+
+    for csv_path in stale_paths:
+        try:
+            os.remove(csv_path)
+        except OSError as exc:
+            print(
+                f"⚠️ 刪除失敗 {csv_path}："
+                f"{exc}"
+            )
+
+    print(
+        f"🧹 已清除過期 CSV："
+        f"{len(stale_paths)} 檔"
+    )
+
+    return len(stale_paths)
+
+
 def push_report_to_github():
     run_git_command(
         [
@@ -8040,6 +8152,7 @@ def main():
     # -----------------------------------------------------------------
     # 推送最新 HTML 與 CSV 到 GitHub Pages
     # -----------------------------------------------------------------
+    prune_stale_csv()
     push_report_to_github()
 
 

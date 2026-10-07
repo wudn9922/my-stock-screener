@@ -1,0 +1,37 @@
+name: Trim Git History
+
+# 每天更新 docs/index.html（約 24MB）會讓 .git 持續變大。
+# 這個流程把整個歷史壓成一個 commit，檔案內容完全不變，
+# 只是丟掉舊版本，.git 體積即可回到最小。
+#
+# ⚠️ 會 force-push 覆蓋 main 的歷史，所以預設只能手動觸發。
+# 想改成每月自動執行，取消下方 schedule 的註解即可。
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '0 18 1 * *'
+
+permissions:
+  contents: write
+
+# 與每日排程共用同一個群組，避免兩者同時推送
+concurrency:
+  group: daily-stock-screener
+  cancel-in-progress: false
+
+jobs:
+  trim:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Squash history into one commit
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan trimmed
+          git add -A
+          git commit -m "chore: 壓縮歷史（保留目前所有檔案內容）"
+          git push --force origin "trimmed:${BRANCH}"
