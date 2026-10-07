@@ -919,5 +919,102 @@ class SupabaseStore:
         ) else []
 
 
+    def prune_orphan_states(
+        self,
+        monitor_configs,
+        max_delete_ratio=0.5
+    ):
+        """
+        刪除已不在監控設定內的狀態列。
+
+        在設定頁刪除股票、移除群組，或修改均線天數後，
+        舊的 (group_id, ticker, ma_period) 狀態列不會再被
+        突破判斷使用，卻仍會被量比快取更新，也會出現在
+        Discord /量比 查詢中，並讓資料表持續變大。
+
+        monitor_configs 必須是「全部市場」的設定，
+        不能只傳入本次到執行時間的市場。
+        """
+        valid_keys = {
+            (
+                str(config["group_id"]),
+                str(config["ticker"]),
+                int(ma_period)
+            )
+            for config in monitor_configs
+            for ma_period in config["ma_list"]
+        }
+
+        # 設定載入異常時不要把整張表清空
+        if not valid_keys:
+            return 0
+
+        rows = self._request(
+            "GET",
+            "breakout_alert_state",
+            params={
+                "select": (
+                    "id,group_id,ticker,ma_period"
+                ),
+                "line_user_id": (
+                    f"eq.{self.user_id}"
+                )
+            }
+        )
+
+        if not isinstance(rows, list) or not rows:
+            return 0
+
+        orphan_ids = []
+
+        for row in rows:
+            try:
+                row_key = (
+                    str(row["group_id"]),
+                    str(row["ticker"]),
+                    int(row["ma_period"])
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+
+            if row_key not in valid_keys:
+                orphan_ids.append(row["id"])
+
+        if not orphan_ids:
+            return 0
+
+        if len(orphan_ids) > len(rows) * max_delete_ratio:
+            print(
+                "⚠️ 孤兒狀態列數量異常"
+                f"（{len(orphan_ids)}/{len(rows)}），"
+                "略過清理"
+            )
+            return 0
+
+        id_list = ",".join(
+            str(row_id)
+            for row_id in orphan_ids
+        )
+
+        self._request(
+            "DELETE",
+            "breakout_alert_state",
+            params={
+                "id": f"in.({id_list})",
+                "line_user_id": (
+                    f"eq.{self.user_id}"
+                )
+            },
+            extra_headers={
+                "Prefer": "return=minimal"
+            }
+        )
+
+        print(
+            f"🧹 已清除孤兒狀態列：{len(orphan_ids)} 筆"
+        )
+
+        return len(orphan_ids)
+
     def close(self):
         self.session.close()

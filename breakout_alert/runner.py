@@ -88,6 +88,17 @@ def main():
             store.get_monitor_configs()
         )
 
+        # 清理失敗不能影響本次監控
+        try:
+            store.prune_orphan_states(
+                monitor_configs
+            )
+        except Exception as exc:
+            print(
+                "⚠️ 清理孤兒狀態列失敗，已略過："
+                f"{type(exc).__name__}: {exc}"
+            )
+
         due_configs = [
             config
             for config in monitor_configs
