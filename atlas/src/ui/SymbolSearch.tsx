@@ -1,9 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowUpRight, Clock, Search, X } from 'lucide-react';
-import { searchStocks, preloadSymbolDirectory } from '../app/dataSources';
 import { sitePreferences, type RecentSearch } from '../app/sitePreferences';
 import { isCanonicalSymbol } from '../market-data/MarketProfile';
 import { displayTicker } from './format';
+
+// The data layer (directory, providers) loads on first use, keeping it off the shell's critical path.
+const dataSources = () => import('../app/dataSources');
 
 export interface SearchResult {
   symbol: string;
@@ -82,7 +84,8 @@ export function SymbolSearch({
     if (!trimmed) return;
     let active = true;
     const timer = setTimeout(() => {
-      void searchStocks(trimmed, 20)
+      void dataSources()
+        .then((module) => module.searchStocks(trimmed, 20))
         .then((entries) => {
           if (active)
             setRemote({
@@ -199,7 +202,7 @@ export function SymbolSearch({
           value={query}
           onFocus={() => {
             setOpen(true);
-            preloadSymbolDirectory();
+            void dataSources().then((module) => module.preloadSymbolDirectory());
           }}
           onChange={(event) => {
             setQuery(event.target.value);

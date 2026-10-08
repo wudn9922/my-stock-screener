@@ -59,7 +59,11 @@ function IndexCard({ index, onOpen }: { index: IndexStatus; onOpen: () => void }
             <span className="muted-text">未設定均線</span>
           )}
         </span>
-        <ChevronRight size={16} aria-hidden="true" className="card-chevron" />
+        <span className="index-score">
+          {index.scoreLabel && <b>{index.scoreLabel}</b>}
+          {index.score !== null && index.scoreMax ? ` ${index.score > 0 ? '+' : ''}${index.score}/${index.scoreMax}` : ''}
+          <ChevronRight size={16} aria-hidden="true" className="card-chevron" />
+        </span>
       </div>
     </a>
   );
@@ -163,7 +167,7 @@ export default function MarketsPage({ report, reload, navigate, openChart, marke
               role="tab"
               aria-selected={market === key}
               className={market === key ? 'active' : ''}
-              onClick={() => navigate({ page: 'markets', market: key }, { replace: true })}
+              onClick={() => navigate({ page: 'markets', market: key })}
             >
               <span aria-hidden="true" className="flag">{entry?.flag || MARKET_META[key].flag}</span>
               {MARKET_META[key].name}

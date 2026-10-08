@@ -15,6 +15,7 @@ import {
   toneClass,
 } from '../ui/format';
 import { serializeRoute } from '../app/routes';
+import { getMarketProfile } from '../market-data/MarketProfile';
 
 const ROW_HEIGHT = 64;
 const OVERSCAN = 8;
@@ -86,7 +87,7 @@ function GroupChips({
                 aria-pressed={group.key === active}
                 onClick={() => onChange(group.key)}
               >
-                {group.name.replace(/^(台股|美股)[-－\s]*/, '')}
+                {group.name.replace(/^(?:🇹🇼|🇺🇸)?\s*(?:台股|美股)\s*[-－]?\s*/u, '')}
                 <span className="chip-count">{group.items.length}</span>
                 {group.kind !== 'fixed' && <span className="chip-kind">{KIND_LABELS[group.kind]}</span>}
               </button>
@@ -123,7 +124,7 @@ function Row({
     >
       <span className="row-id">
         <b>{displayTicker(item.symbol)}</b>
-        <small>{item.name}</small>
+        <small>{item.name !== item.symbol ? item.name : getMarketProfile(item.symbol).market === 'TW' ? '台股' : '美股'}</small>
       </span>
       <span className="row-mas">
         {item.maList.slice(0, 3).map((period) => {

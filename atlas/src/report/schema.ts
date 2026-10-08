@@ -73,6 +73,9 @@ export const indexStatusSchema = z
     trend,
     trendLabel: text(),
     score: finiteOrNull,
+    /** Optional: number of MAs scored and the report's wording (看多 / 偏多 / 多空不明 / 偏空 / 看空). */
+    scoreMax: finiteOrNull,
+    scoreLabel: optionalText,
     maValues: numberRecord,
     asOf: optionalText,
     source: optionalText,
