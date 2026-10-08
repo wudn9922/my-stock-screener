@@ -1,0 +1,169 @@
+name: Atlas Research Terminal
+
+# 每日報告（Daily Stock Screener）成功後，重新抓取 Atlas 的行情 / 財報快照，
+# 建置 atlas/ 並部署到 docs/atlas/（GitHub Pages：/my-stock-screener/atlas/）。
+on:
+  workflow_run:
+    workflows: ["Daily Stock Screener"]
+    types: [completed]
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'atlas/**'
+      - '.github/workflows/atlas.yml'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+# 使用獨立群組：若與 schedule.yml 共用，排隊中的 Atlas 執行可能取代
+# 排隊中的每日報告，導致當天報告與 LINE 推播被取消。
+# 與每日報告同時推送的衝突由下方 pull --rebase + 重試處理。
+concurrency:
+  group: atlas-research-terminal
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    # workflow_run 只有在每日報告成功時才繼續
+    if: >-
+      github.event_name != 'workflow_run'
+      || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: atlas/package-lock.json
+
+      - name: Install Atlas dependencies
+        working-directory: atlas
+        run: npm ci
+
+      - name: Run Atlas unit tests
+        working-directory: atlas
+        run: npm test
+
+      - name: Generate symbol list from screener groups (Supabase)
+        id: symbols
+        continue-on-error: true
+        working-directory: atlas
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_USER_ID: ${{ secrets.SUPABASE_USER_ID }}
+        run: node scripts/screener-symbols.mjs
+
+      - name: Seed data from last deployment (keep last good data)
+        run: |
+          set -euo pipefail
+          for dir in market-data fundamentals; do
+            if [ -d "docs/atlas/${dir}" ]; then
+              mkdir -p "atlas/public/${dir}"
+              cp -a "docs/atlas/${dir}/." "atlas/public/${dir}/"
+              echo "已從 docs/atlas/${dir} 帶入上次部署的資料"
+            else
+              echo "docs/atlas/${dir} 不存在，略過"
+            fi
+          done
+
+      - name: Refresh market data (Yahoo snapshot)
+        id: market
+        continue-on-error: true
+        working-directory: atlas
+        env:
+          ATLAS_TIMEFRAMES: 1D,1W,1M
+        run: node scripts/refresh-market.mjs
+
+      - name: Build SEC fundamentals (US only)
+        id: fundamentals
+        continue-on-error: true
+        working-directory: atlas
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT || 'my-stock-screener-atlas (https://github.com/wudn9922/my-stock-screener)' }}
+        run: node scripts/build-fundamentals.mjs
+
+      - name: Build Atlas for GitHub Pages
+        working-directory: atlas
+        env:
+          VITE_PUBLIC_BASE: /my-stock-screener/atlas/
+        run: npm run build:pages
+
+      - name: Replace docs/atlas with build output
+        run: |
+          set -euo pipefail
+          if [ ! -f atlas/dist-pages/index.html ]; then
+            echo "::error::atlas/dist-pages/index.html 不存在，停止部署"
+            exit 1
+          fi
+          # 只動 docs/atlas，其他 docs 檔案（index.html、截圖）一律不碰
+          rm -rf docs/atlas
+          mkdir -p docs/atlas
+          cp -a atlas/dist-pages/. docs/atlas/
+          # GitHub Pages 的 Jekyll 會略過底線開頭的檔案；
+          # 若建置結果有這類檔案，補上 docs/.nojekyll（只新增，不影響既有頁面）
+          if find docs/atlas -name '_*' -print -quit | grep -q .; then
+            echo "偵測到底線開頭的檔案，建立 docs/.nojekyll"
+            touch docs/.nojekyll
+          fi
+          du -sh docs/atlas
+
+      - name: Commit and push docs/atlas
+        run: |
+          set -euo pipefail
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A docs/atlas
+          if [ -f docs/.nojekyll ]; then
+            git add docs/.nojekyll
+          fi
+          if git diff --cached --quiet; then
+            echo "docs/atlas 沒有變更，不需提交"
+            exit 0
+          fi
+          git commit -m "Auto-update Atlas research terminal"
+          for attempt in 1 2 3; do
+            git pull --rebase origin main
+            if git push origin HEAD:main; then
+              echo "推送成功（第 ${attempt} 次）"
+              exit 0
+            fi
+            echo "推送失敗（第 ${attempt} 次），稍後重試"
+            sleep $((attempt * 15))
+          done
+          echo "::error::推送 docs/atlas 失敗（已重試 3 次）"
+          exit 1
+
+      - name: Report data refresh problems
+        if: always()
+        env:
+          SYMBOLS_OUTCOME: ${{ steps.symbols.outcome }}
+          MARKET_OUTCOME: ${{ steps.market.outcome }}
+          FUNDAMENTALS_OUTCOME: ${{ steps.fundamentals.outcome }}
+        run: |
+          set -euo pipefail
+          if [ "$SYMBOLS_OUTCOME" = "failure" ]; then
+            echo "::warning::股票清單（Supabase）產生失敗，沿用 repo 內的 atlas/scripts/market-symbols.json"
+          fi
+          if [ "$FUNDAMENTALS_OUTCOME" = "failure" ]; then
+            echo "::warning::SEC 財報更新失敗，沿用上次部署的財報資料"
+          fi
+          if [ "$MARKET_OUTCOME" = "failure" ]; then
+            echo "::error::行情資料更新失敗；已部署上次的行情資料，請檢查 refresh-market 步驟"
+            exit 1
+          fi
