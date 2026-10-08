@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { readFile } from 'node:fs/promises';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FinancialNormalizer } from '../src/fundamentals/FinancialNormalizer';
 import { financialMetrics } from '../src/fundamentals/FundamentalsProvider';
 import {
@@ -18,10 +18,6 @@ const rawAapl = JSON.parse(await readFile('tests/fixtures/sec/AAPL.json', 'utf8'
 const normalizer = new FinancialNormalizer();
 const cik = String(rawAapl.cik).padStart(10, '0');
 const source = `https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`;
-const roots: string[] = [];
-afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
-});
 
 function snapshotFor(symbol = 'AAPL', generatedAt = Math.floor(Date.now() / 1000)): FinancialSnapshot {
   const quarterly = normalizer.normalize(rawAapl, 'AAPL', 'quarterly')

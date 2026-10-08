@@ -46,7 +46,7 @@ function decodeEntities(value: string): string {
 }
 
 function cellText(html: string): string {
-  return decodeEntities(html.replace(/<[^>]*>/g, ' ')).replace(/[\s　]+/g, ' ').trim();
+  return decodeEntities(html.replace(/<[^>]*>/g, ' ')).replace(/[\s\u3000]+/g, ' ').trim();
 }
 
 /**
@@ -153,7 +153,7 @@ export interface PipeTable {
 
 /** Parses NasdaqTrader pipe-delimited symbol files (header row + rows + `File Creation Time:` footer). */
 export function parsePipeTable(text: string): PipeTable {
-  const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter((line) => line.trim());
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim());
   const header = (lines.shift() ?? '').split('|').map((cell) => cell.trim());
   const rows: Record<string, string>[] = [];
   let fileCreationTime: string | undefined;

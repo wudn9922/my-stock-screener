@@ -241,7 +241,7 @@ export function computeUsValuation(
     fiscalYear: annual?.fiscalYear ?? null,
     asOf: ttm?.end ?? annual?.end ?? null,
     source: 'SEC frames',
-    ...((ttm && useBasicTtm) || (!ttm && useBasicAnnual) ? { basis: 'basic' as const } : {}),
+    ...((ttm && useBasicTtm) || (annual && useBasicAnnual) ? { basis: 'basic' as const } : {}),
   };
 }
 

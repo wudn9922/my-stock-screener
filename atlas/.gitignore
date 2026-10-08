@@ -17,3 +17,7 @@ public/fundamentals/
 public/market-data/
 dist-pages/
 scripts/*.tmp
+# Generated in GitHub Actions (scripts/build-directory.mjs, scripts/build-valuation.mjs); never committed here.
+public/symbols/directory.json
+public/symbols/*.tmp
+public/valuation/
