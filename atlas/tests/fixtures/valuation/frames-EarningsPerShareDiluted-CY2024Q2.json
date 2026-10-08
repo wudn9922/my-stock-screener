@@ -1,0 +1,20 @@
+{
+"taxonomy": "us-gaap",
+"tag": "EarningsPerShareDiluted",
+"ccp": "CY2024Q2",
+"uom": "USD-per-shares",
+"label": "Earnings Per Share, Diluted",
+"description": "\u2026",
+"pts": 1,
+"data": [
+{
+"accn": "0000000000-26-000001",
+"cik": 4444,
+"entityName": "Old Co",
+"loc": "US-CA",
+"start": "2024-04-01",
+"end": "2024-06-30",
+"val": 0.4
+}
+]
+}

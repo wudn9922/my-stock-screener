@@ -1,0 +1,15 @@
+Symbol|Security Name|Market Category|Test Issue|Financial Status|Round Lot Size|ETF|NextShares
+AAPL|Apple Inc. - Common Stock|Q|N|N|100|N|N
+ACAHU|Atlantic Coastal Acquisition Corp. II - Units|G|N|N|100|N|N
+ACAHW|Atlantic Coastal Acquisition Corp. II - Warrant|G|N|N|100|N|N
+AGNCN|AGNC Investment Corp. - Depositary Shares Each Representing a 1/1,000th Interest in a Share of 7.00% Series C Fixed-To-Floating Rate Cumulative Redeemable Preferred Stock|Q|N|N|100|N|N
+ASML|ASML Holding N.V. - New York Registry Shares|Q|N|N|100|N|N
+GOOG|Alphabet Inc. - Class C Capital Stock|Q|N|N|100|N|N
+GOOGL|Alphabet Inc. - Class A Common Stock|Q|N|N|100|N|N
+NVDA|NVIDIA Corporation - Common Stock|Q|N|N|100|N|N
+OXLCZ|Oxford Lane Capital Corp. - 5.00% Notes due 2027|G|N|N|100|N|N
+QQQ|Invesco QQQ Trust, Series 1|G|N|N|100|Y|N
+SBXDR|SilverBox Corp III - Rights|S|N|N|100|N|N
+ZXZZT|NASDAQ TEST STOCK|G|Y|N|100|N|N
+XACQ|Example Acquisition Corp - Class A Ordinary Shares|S|N|N|100|N|N
+File Creation Time: 1008202617:01|||||||

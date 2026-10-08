@@ -1,0 +1,47 @@
+{
+"taxonomy": "us-gaap",
+"tag": "EarningsPerShareDiluted",
+"ccp": "CY2025",
+"uom": "USD-per-shares",
+"label": "Earnings Per Share, Diluted",
+"description": "\u2026",
+"pts": 4,
+"data": [
+{
+"accn": "0000000000-26-000001",
+"cik": 320193,
+"entityName": "Apple Inc.",
+"loc": "US-CA",
+"start": "2024-09-29",
+"end": "2025-09-27",
+"val": 7.46
+},
+{
+"accn": "0000000000-26-000001",
+"cik": 1045810,
+"entityName": "NVIDIA CORP",
+"loc": "US-CA",
+"start": "2025-01-27",
+"end": "2026-01-25",
+"val": 4.9
+},
+{
+"accn": "0000000000-26-000001",
+"cik": 1652044,
+"entityName": "Alphabet Inc.",
+"loc": "US-CA",
+"start": "2025-01-01",
+"end": "2025-12-31",
+"val": 10.13
+},
+{
+"accn": "0000000000-26-000001",
+"cik": 1111,
+"entityName": "Loss Maker Inc",
+"loc": "US-CA",
+"start": "2025-01-01",
+"end": "2025-12-31",
+"val": -1.8
+}
+]
+}

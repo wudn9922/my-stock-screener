@@ -9,16 +9,25 @@ import {
   type AppSettings,
   type SettingsExport,
 } from './schema';
-import { storageName } from '../app/HostingMode';
+import { SCREENER_HOSTING, storageName } from '../app/HostingMode';
 interface AtlasDB extends DBSchema {
   symbols: { key: string; value: SymbolState };
   app: { key: string; value: AppSettings };
 }
-export const defaultApp: AppSettings = appSchema.parse({
-  watchlist: ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMD', 'META', 'GOOGL', 'AMZN'],
-  activeSymbol: 'AAPL',
-  provider: 'demo',
-});
+// The screener site starts on real delayed data for Taiwan + US names; other builds keep Demo.
+export const defaultApp: AppSettings = appSchema.parse(
+  SCREENER_HOSTING
+    ? {
+        watchlist: ['2330.TW', '2317.TW', '2454.TW', 'NVDA', 'AAPL', 'MSFT', 'TSLA', 'GOOGL'],
+        activeSymbol: '2330.TW',
+        provider: 'market',
+      }
+    : {
+        watchlist: ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMD', 'META', 'GOOGL', 'AMZN'],
+        activeSymbol: 'AAPL',
+        provider: 'demo',
+      },
+);
 export class IndexedDBStore {
   private db: Promise<IDBPDatabase<AtlasDB>>;
   constructor(name = storageName('atlas-terminal')) {

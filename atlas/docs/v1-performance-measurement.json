@@ -20,6 +20,6 @@
   "peakDrawingCount": 101,
   "rafSamples": 89,
   "rafGapMedianMs": 16.699999999999818,
-  "rafGapP95Ms": 16.700000000000728,
+  "rafGapP95Ms": 16.799999999999272,
   "runtimeErrors": []
 }

@@ -32,7 +32,7 @@ import type { IndicatorInstance } from '../indicators/IndicatorRegistry';
 import type { Bar, BarResult, Timeframe } from '../market-data/MarketDataProvider';
 import type { StrategyResult } from '../strategy';
 import type { FilingEvent } from '../events/FilingEvents';
-import { coloredVolume, volumeSma } from '../indicators/Volume';
+import { coloredVolume, setVolumeColors, volumeSma } from '../indicators/Volume';
 import { averageTrueRange } from '../indicators/AverageTrueRange';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { marketTimeOptions } from './MarketTimeLabels';
@@ -79,6 +79,7 @@ export class ChartEngine {
   private header: HTMLElement;
   private sourceLabel: HTMLElement;
   private legend: HTMLElement | null;
+  private upDown = { up: '#39baa0', down: '#ef6b7b' };
   constructor(
     readonly host: HTMLElement,
     header: HTMLElement,
@@ -92,25 +93,25 @@ export class ChartEngine {
     this.chart = createChart(host, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: '#0e1521' },
-        textColor: '#8290a5',
+        background: { type: ColorType.Solid, color: '#0f1319' },
+        textColor: '#8a93a3',
         fontFamily: COMPACT_AXIS_FONT_FAMILY,
         fontSize: COMPACT_AXIS_FONT_SIZE,
         attributionLogo: true,
       },
-      grid: { vertLines: { color: '#1a2332' }, horzLines: { color: '#1a2332' } },
+      grid: { vertLines: { color: '#1a1f28' }, horzLines: { color: '#1a1f28' } },
       crosshair: {
         mode: CrosshairMode.Normal,
-        vertLine: { color: '#73849b', width: 1, labelBackgroundColor: '#31415a' },
-        horzLine: { color: '#73849b', width: 1, labelBackgroundColor: '#31415a' },
+        vertLine: { color: '#6b7587', width: 1, labelBackgroundColor: '#2b3340' },
+        horzLine: { color: '#6b7587', width: 1, labelBackgroundColor: '#2b3340' },
       },
       rightPriceScale: {
-        borderColor: '#243043',
+        borderColor: '#242b36',
         minimumWidth: 0,
         scaleMargins: { top: 0.05, bottom: 0.22 },
       },
       timeScale: {
-        borderColor: '#243043',
+        borderColor: '#242b36',
         rightOffset: 40,
         barSpacing: 6,
         timeVisible: true,
@@ -131,7 +132,7 @@ export class ChartEngine {
       borderVisible: false,
       wickUpColor: '#39baa0',
       wickDownColor: '#ef6b7b',
-      priceLineColor: '#39baa0',
+      priceLineColor: '#6b7587',
     });
     this.markers = createSeriesMarkers(this.candles, [], { autoScale: false });
     this.volume = this.chart.addSeries(HistogramSeries, {
@@ -166,6 +167,18 @@ export class ChartEngine {
     window.addEventListener('blur', this.clearActivePointers);
     this.chart.timeScale().subscribeVisibleLogicalRangeChange(this.logicalRangeChanged);
     this.chart.timeScale().subscribeSizeChange(this.scaleSizeChanged);
+  }
+  /** Candle, volume and OHLC readout colors (e.g. 紅漲綠跌). Volume recolors on the next load. */
+  setUpDownColors(colors: { up: string; down: string }) {
+    this.upDown = { ...colors };
+    setVolumeColors(colors.up, colors.down);
+    this.candles.applyOptions({
+      upColor: colors.up,
+      downColor: colors.down,
+      wickUpColor: colors.up,
+      wickDownColor: colors.down,
+    });
+    this.renderHeader();
   }
   clear() {
     this.flushView();
@@ -495,7 +508,7 @@ export class ChartEngine {
       previous = index > 0 ? this.bars[index - 1].close : b.open,
       change = b.close - previous;
     this.header.textContent = `O ${b.open.toFixed(2)}   H ${b.high.toFixed(2)}   L ${b.low.toFixed(2)}   C ${b.close.toFixed(2)}   ${change >= 0 ? '+' : ''}${change.toFixed(2)} (${((change / previous) * 100).toFixed(2)}%)`;
-    this.header.style.color = change >= 0 ? '#59cfb7' : '#ef8692';
+    this.header.style.color = change >= 0 ? this.upDown.up : this.upDown.down;
     this.renderLegend();
   }
   private renderLegend() {

@@ -1,0 +1,29 @@
+{
+"taxonomy": "us-gaap",
+"tag": "EarningsPerShareDiluted",
+"ccp": "CY2025Q2",
+"uom": "USD-per-shares",
+"label": "Earnings Per Share, Diluted",
+"description": "\u2026",
+"pts": 2,
+"data": [
+{
+"accn": "0000000000-26-000001",
+"cik": 320193,
+"entityName": "Apple Inc.",
+"loc": "US-CA",
+"start": "2025-03-30",
+"end": "2025-06-28",
+"val": 1.57
+},
+{
+"accn": "0000000000-26-000001",
+"cik": 1045810,
+"entityName": "NVIDIA CORP",
+"loc": "US-CA",
+"start": "2025-04-28",
+"end": "2025-07-27",
+"val": 1.08
+}
+]
+}
