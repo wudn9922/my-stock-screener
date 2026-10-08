@@ -1,0 +1,54 @@
+{
+  "retrievedAt": "2026-10-06T19:30:38.178Z",
+  "endpoint": "local production preview -> SEC EDGAR (no route mocks)",
+  "results": [
+    {
+      "symbol": "AAPL",
+      "count": 73,
+      "issuerName": "Apple Inc.",
+      "cik": "0000320193",
+      "fiscalYear": 2026,
+      "fiscalQuarter": 3,
+      "periodEnd": "2026-06-27",
+      "revenue": 109417000000,
+      "revenueDerived": false,
+      "accession": "0000320193-26-000020"
+    },
+    {
+      "symbol": "JPM",
+      "count": 73,
+      "issuerName": "JPMORGAN CHASE & CO",
+      "cik": "0000019617",
+      "fiscalYear": 2026,
+      "fiscalQuarter": 2,
+      "periodEnd": "2026-06-30",
+      "revenue": 57347000000,
+      "revenueDerived": false,
+      "accession": "0001628280-26-054343"
+    },
+    {
+      "symbol": "WMT",
+      "count": 77,
+      "issuerName": "WALMART INC.",
+      "cik": "0000104169",
+      "fiscalYear": 2027,
+      "fiscalQuarter": 2,
+      "periodEnd": "2026-07-31",
+      "revenue": 186100000000,
+      "revenueDerived": false,
+      "accession": "0000104169-26-000154"
+    },
+    {
+      "symbol": "XOM",
+      "count": 2,
+      "issuerName": "ExxonMobil Holdings Corp",
+      "cik": "0002115436",
+      "fiscalYear": 2026,
+      "fiscalQuarter": 2,
+      "periodEnd": "2026-06-30",
+      "revenue": 116017000000,
+      "revenueDerived": false,
+      "accession": "0000034088-26-000093"
+    }
+  ]
+}

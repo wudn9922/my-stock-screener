@@ -1,0 +1,629 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "TWD",
+          "symbol": "2330.TW",
+          "exchangeName": "TAI",
+          "fullExchangeName": "Taiwan",
+          "instrumentType": "EQUITY",
+          "firstTradeDate": 946947600,
+          "regularMarketTime": 1791437413,
+          "hasPrePostMarketData": false,
+          "gmtoffset": 28800,
+          "timezone": "CST",
+          "exchangeTimezoneName": "Asia/Taipei",
+          "regularMarketPrice": 2550,
+          "regularMarketChangePercent": -1.354,
+          "fulldayPrice": 2550,
+          "fulldayChange": -35,
+          "fulldayChangePercent": -1.354,
+          "fiftyTwoWeekHigh": 2590,
+          "fiftyTwoWeekLow": 1375,
+          "regularMarketDayHigh": 2575,
+          "regularMarketDayLow": 2550,
+          "regularMarketVolume": 22484073,
+          "longName": "Taiwan Semiconductor Manufacturing Company Limited",
+          "shortName": "TAIWAN SEMICONDUCTOR MANUFACTUR",
+          "chartPreviousClose": 2440,
+          "previousClose": 2585,
+          "scale": 3,
+          "priceHint": 2,
+          "currentTradingPeriod": {
+            "pre": {
+              "timezone": "CST",
+              "start": 1791421200,
+              "end": 1791421200,
+              "gmtoffset": 28800
+            },
+            "regular": {
+              "timezone": "CST",
+              "start": 1791421200,
+              "end": 1791437400,
+              "gmtoffset": 28800
+            },
+            "post": {
+              "timezone": "CST",
+              "start": 1791437400,
+              "end": 1791437400,
+              "gmtoffset": 28800
+            }
+          },
+          "tradingPeriods": [
+            [
+              {
+                "timezone": "CST",
+                "start": 1784077200,
+                "end": 1784093400,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1784163600,
+                "end": 1784179800,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1784250000,
+                "end": 1784266200,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1784509200,
+                "end": 1784525400,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1784595600,
+                "end": 1784611800,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1784682000,
+                "end": 1784698200,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1784768400,
+                "end": 1784784600,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1784854800,
+                "end": 1784871000,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1785114000,
+                "end": 1785130200,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1785200400,
+                "end": 1785216600,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1785286800,
+                "end": 1785303000,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1785373200,
+                "end": 1785389400,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1785459600,
+                "end": 1785475800,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1785718800,
+                "end": 1785735000,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1785805200,
+                "end": 1785821400,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1785891600,
+                "end": 1785907800,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1785978000,
+                "end": 1785994200,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1786064400,
+                "end": 1786080600,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1786323600,
+                "end": 1786339800,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1786410000,
+                "end": 1786426200,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1786496400,
+                "end": 1786512600,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1786582800,
+                "end": 1786599000,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1786669200,
+                "end": 1786685400,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1786928400,
+                "end": 1786944600,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1787014800,
+                "end": 1787031000,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1787101200,
+                "end": 1787117400,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1787187600,
+                "end": 1787203800,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1787274000,
+                "end": 1787290200,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1787533200,
+                "end": 1787549400,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1787619600,
+                "end": 1787635800,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1787706000,
+                "end": 1787722200,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1787792400,
+                "end": 1787808600,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1787878800,
+                "end": 1787895000,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1788138000,
+                "end": 1788154200,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1788224400,
+                "end": 1788240600,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1788310800,
+                "end": 1788327000,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1788397200,
+                "end": 1788413400,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1788483600,
+                "end": 1788499800,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1788742800,
+                "end": 1788759000,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1788829200,
+                "end": 1788845400,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1788915600,
+                "end": 1788931800,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1789002000,
+                "end": 1789018200,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1789088400,
+                "end": 1789104600,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1789347600,
+                "end": 1789363800,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1789434000,
+                "end": 1789450200,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1789520400,
+                "end": 1789536600,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1789606800,
+                "end": 1789623000,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1789693200,
+                "end": 1789709400,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1789952400,
+                "end": 1789968600,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1790038800,
+                "end": 1790055000,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1790125200,
+                "end": 1790141400,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1790211600,
+                "end": 1790227800,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1790643600,
+                "end": 1790659800,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1790730000,
+                "end": 1790746200,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1790816400,
+                "end": 1790832600,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1790902800,
+                "end": 1790919000,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1791162000,
+                "end": 1791178200,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1791248400,
+                "end": 1791264600,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1791334800,
+                "end": 1791351000,
+                "gmtoffset": 28800
+              }
+            ],
+            [
+              {
+                "timezone": "CST",
+                "start": 1791421200,
+                "end": 1791437400,
+                "gmtoffset": 28800
+              }
+            ]
+          ],
+          "dataGranularity": "5m",
+          "range": "60d",
+          "validRanges": [
+            "1d",
+            "5d",
+            "1mo",
+            "3mo",
+            "6mo",
+            "1y",
+            "2y",
+            "5y",
+            "10y",
+            "ytd",
+            "max"
+          ]
+        },
+        "timestamp": [
+          1791435300,
+          1791435600,
+          1791435900,
+          1791436200,
+          1791436500,
+          1791436800,
+          1791437100,
+          1791437400
+        ],
+        "events": {
+          "dividends": {
+            "1789520400": {
+              "amount": 7.000001,
+              "date": 1789520400
+            }
+          }
+        },
+        "indicators": {
+          "quote": [
+            {
+              "open": [
+                2555,
+                2555,
+                2560,
+                2560,
+                2560,
+                2560,
+                null,
+                2550
+              ],
+              "volume": [
+                287086,
+                279150,
+                202649,
+                329353,
+                383097,
+                702807,
+                0,
+                0
+              ],
+              "low": [
+                2555,
+                2555,
+                2555,
+                2555,
+                2555,
+                2555,
+                null,
+                2550
+              ],
+              "close": [
+                2555,
+                2560,
+                2560,
+                2560,
+                2560,
+                2560,
+                null,
+                2550
+              ],
+              "high": [
+                2560,
+                2560,
+                2560,
+                2560,
+                2560,
+                2560,
+                null,
+                2550
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "SMCI",
+          "exchangeName": "NMS",
+          "fullExchangeName": "NasdaqGS",
+          "instrumentType": "EQUITY",
+          "firstTradeDate": 1175175000,
+          "regularMarketTime": 1791316800,
+          "hasPrePostMarketData": true,
+          "gmtoffset": -14400,
+          "timezone": "EDT",
+          "exchangeTimezoneName": "America/New_York",
+          "regularMarketPrice": 43.46,
+          "regularMarketChangePercent": 0.625,
+          "fulldayPrice": 42.589,
+          "fulldayChange": -0.871,
+          "fulldayChangePercent": -2.004,
+          "fiftyTwoWeekHigh": 58.78,
+          "fiftyTwoWeekLow": 19.48,
+          "regularMarketDayHigh": 44.74,
+          "regularMarketDayLow": 43.02,
+          "regularMarketVolume": 27776128,
+          "longName": "Super Micro Computer, Inc.",
+          "shortName": "Super Micro Computer, Inc.",
+          "chartPreviousClose": 3.652,
+          "priceHint": 2,
+          "currentTradingPeriod": {
+            "pre": {
+              "timezone": "EDT",
+              "end": 1791379800,
+              "start": 1791360000,
+              "gmtoffset": -14400
+            },
+            "regular": {
+              "timezone": "EDT",
+              "end": 1791403200,
+              "start": 1791379800,
+              "gmtoffset": -14400
+            },
+            "post": {
+              "timezone": "EDT",
+              "end": 1791417600,
+              "start": 1791403200,
+              "gmtoffset": -14400
+            }
+          },
+          "dataGranularity": "1d",
+          "range": "5y",
+          "validRanges": [
+            "1d",
+            "5d",
+            "1mo",
+            "3mo",
+            "6mo",
+            "1y",
+            "2y",
+            "5y",
+            "10y",
+            "ytd",
+            "max"
+          ]
+        },
+        "events": {
+          "splits": {
+            "1727789400": {
+              "date": 1727789400,
+              "numerator": 10.0,
+              "denominator": 1.0,
+              "splitRatio": "10:1"
+            }
+          }
+        },
+        "timestamp": [
+          1727443800,
+          1727703000,
+          1727789400,
+          1727875800,
+          1727962200,
+          1791207000,
+          1791293400
+        ],
+        "indicators": {
+          "quote": [
+            {
+              "low": [
+                40.0,
+                41.24599838256836,
+                40.0,
+                39.84000015258789,
+                41.2599983215332,
+                42.79999923706055,
+                43.02000045776367
+              ],
+              "volume": [
+                107420000,
+                68311000,
+                30604000,
+                22026900,
+                30466100,
+                22119800,
+                27759700
+              ],
+              "open": [
+                40.0,
+                41.3489990234375,
+                41.75,
+                40.0099983215332,
+                41.79999923706055,
+                43.56999969482422,
+                43.869998931884766
+              ],
+              "close": [
+                41.9739990234375,
+                41.63999938964844,
+                40.54999923706055,
+                42.0,
+                41.54999923706055,
+                43.189998626708984,
+                43.459999084472656
+              ],
+              "high": [
+                42.39699935913086,
+                43.79800033569336,
+                42.7400016784668,
+                42.060001373291016,
+                44.22999954223633,
+                44.04999923706055,
+                44.7400016784668
+              ]
+            }
+          ],
+          "adjclose": [
+            {
+              "adjclose": [
+                41.9739990234375,
+                41.63999938964844,
+                40.54999923706055,
+                42.0,
+                41.54999923706055,
+                43.189998626708984,
+                43.459999084472656
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

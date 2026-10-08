@@ -1,0 +1,2118 @@
+{
+  "status": "PASS_WITH_REPORTED_PARTIAL_TAIWAN_COVERAGE",
+  "checkedAt": "2026-10-08T13:38:04.608649+00:00",
+  "url": "https://wudn9922.github.io/lightweight-drawing-lab/",
+  "tlsVerification": "curl ssl_verify_result=0; certificate verification enabled",
+  "sourceCommit": "3feb6337aeab4e686c0f61e259bece7250be3d40",
+  "candidateCommit": "3feb6337aeab4e686c0f61e259bece7250be3d40",
+  "publicationState": {
+    "base": "3feb6337aeab4e686c0f61e259bece7250be3d40",
+    "source_commit": "3feb6337aeab4e686c0f61e259bece7250be3d40",
+    "evidence_commit": "fba599a02585abebdf75a6d421a583c42d9c7999"
+  },
+  "localBuild": {
+    "directory": "/workspace/dist-pages",
+    "indexSha256": "a9d4b29597f68583e9400f833658bdf935b3e8e390a5476074ed7e9dd8abbd65",
+    "indexComparison": "published Pages HTML byte-matches local dist-pages/index.html",
+    "assetsCompared": 6,
+    "assetComparison": "all published assets byte-match the local dist-pages build"
+  },
+  "html": {
+    "url": "https://wudn9922.github.io/lightweight-drawing-lab/",
+    "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/",
+    "status": 200,
+    "tlsVerifyResult": 0,
+    "bytes": 1424,
+    "sha256": "a9d4b29597f68583e9400f833658bdf935b3e8e390a5476074ed7e9dd8abbd65"
+  },
+  "resources": [
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/AtlasNarrowAxis-Regular-cfs3IgyN.ttf",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/assets/AtlasNarrowAxis-Regular-cfs3IgyN.ttf",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 115572,
+      "sha256": "5e465e809833ef0fa73c5a65827e921c0e02aba1facc263d606838c1bd126d1f"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/chart-DeF8ixWn.js",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/assets/chart-DeF8ixWn.js",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 181406,
+      "sha256": "558e3197b515e162be0d6a012695405e63e7832a8988dff7d50d89f4dd9e3182"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/index-C_ebhjyC.css",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/assets/index-C_ebhjyC.css",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 31231,
+      "sha256": "18df16091ac8b78fbfc9e0e6540717e48455dc77889ec7fcebe7199306f1d6cc"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/index-DrWcVxeh.js",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/assets/index-DrWcVxeh.js",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 403071,
+      "sha256": "ba9572c5db230b5acb6f1a0cf7760a2129bdc7b06564eb6d90cd63b82aff9c77"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/react-DPIr46qh.js",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/assets/react-DPIr46qh.js",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 11880,
+      "sha256": "c0e00f50de6c0c4313118305af3b7781b03c48879475014a86ba2bcd056a65f6"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/storage-T3pps3jl.js",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/assets/storage-T3pps3jl.js",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 95263,
+      "sha256": "ca427f0b408fdb48ef2ecf0ad9091ad4ab57ddc72475968adb0ec5768c1ab6bf"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/AAPL.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/AAPL.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 914970,
+      "sha256": "7ee9dcb7bd7627d628052164c30f534105e869b392db7924619cf57f5ae35586"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/AMD.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/AMD.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 772759,
+      "sha256": "46aa3a9473720bd8486184e61655fe93ae9d7228db0f9391f6dbbf7eec535509"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/AMZN.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/AMZN.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 800993,
+      "sha256": "4457a426aeb1fe9efee0225a18038b63d060bdf6b5ecfcf82cba56cf65efe00c"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/AVGO.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/AVGO.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 476381,
+      "sha256": "338407c8612d081240ed96daa332b686b822e9132af3b484a826810dad2bc058"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/GOOGL.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/GOOGL.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 600213,
+      "sha256": "a9c9077b7f40879e3597978767a8481df983441b4a7ce54b2b43e709f749232e"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/JPM.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/JPM.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 427042,
+      "sha256": "76723d28c31901694afc878398e0869ea6ac3be2adc151f46456d6d71ccd3ecd"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/META.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/META.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 783702,
+      "sha256": "cac625aa620f07467008ee934a06781b513c76e08e1828dbd855dd84b3545f47"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/MSFT.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/MSFT.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 800240,
+      "sha256": "cebea9389fbd60525ad2089351a0539d53b44c4f3729d2289a78fe32555c07ed"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/MU.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/MU.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 792977,
+      "sha256": "64045392019dc62511044e2e2bfc0ce3801c80c1743b1458a4052fbc81c0e5d1"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/NFLX.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/NFLX.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 809383,
+      "sha256": "c44704b650ba9748a808e241e4cbe57c55eb22c4c219e2872039a530cb6ab7a7"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/NVDA.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/NVDA.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 841420,
+      "sha256": "0ea52aa3bfe3567ef89b58931d0b8bbf528cac79509906c92d09d6cbe395f5f9"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/PLTR.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/PLTR.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 358352,
+      "sha256": "e7b34a7af5e2d45c02906f3058ffb525a9d9db08b4d772cbdc8eaac672fe58ce"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/SMCI.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/SMCI.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 809509,
+      "sha256": "f9feea2a2ff2b25b05a817576385785d5bd4d34c7e64114d58ff96faae6ec831"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/TSLA.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/TSLA.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 794972,
+      "sha256": "ecd4ce755de62dda249553befc5f5a16fa85512a950f6a2ed7255ef6d6702884"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/WMT.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/WMT.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 927555,
+      "sha256": "a64f170459fde83c5d72aac6d791f71bdbd4f6a6503eb127d841c227cfd8223a"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/XOM.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/XOM.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 7485,
+      "sha256": "18669a218cd3f1a057f1446ff33a2f375ba03f5efdd38e727adb25abefc615fe"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/manifest.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/financial-data/manifest.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 3079,
+      "sha256": "3c2c7a9b8964b6618c4fc556627094ba7517a74970b39c9099be8dec6854902b"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/licenses/atlas-narrow-axis-OFL.txt",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/licenses/atlas-narrow-axis-OFL.txt",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 4377,
+      "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/manifest.webmanifest",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/manifest.webmanifest",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 475,
+      "sha256": "ea21c8a8640d29d6a01dd427c1085087b1c7c7c7c5e4a3171e802b32ab35037a"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/0050.TW.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/0050.TW.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 405382,
+      "sha256": "e71f42bacad87a79de19aa15ddf2812a86284ecd1ef10f603b484760118df1fc"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/2317.TW.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/2317.TW.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 335343,
+      "sha256": "48e6a4c7755958f28d70eb5a71ff6f65f31c271b6adeb983daac38f2d753c76a"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/2330.TW.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/2330.TW.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 325981,
+      "sha256": "9baabd76fe32f9ceb7adb2d78158e0abff567e04a1e96c5ba6436d8be531d6aa"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/2454.TW.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/2454.TW.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 322815,
+      "sha256": "2a0d9ad07638c6c6c67f5c101616eca75237a56fceccec36e419a3af8476a527"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/6488.TWO.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/6488.TWO.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 317041,
+      "sha256": "91e524db8dd1b7d2686f8aae014862f3f7ffc4d935591e64162dfc2f0a384b0b"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/8069.TWO.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/8069.TWO.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 339126,
+      "sha256": "7dac8866dad0ca34d5dfa84b1ace67f0abfca0a70c0a913285d195ace1c0130a"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/manifest.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/manifest.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 28526,
+      "sha256": "43d0e8e859b822882f2a43567fdc78fdc9b1277025fe9c53d14e6f293c80a863"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/sw.js",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/sw.js",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 3732,
+      "sha256": "a550a2c8073152463bbeaed638ad8dabf286e636a888d04b0d2cc0975ddc7da2"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/symbols/taiwan.json",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/symbols/taiwan.json",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 197964,
+      "sha256": "bdfc4ad12c5db570cd882d63f5512217213519e25c91c0b9cdc3b81e0698326f"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/icon-192.png",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/icon-192.png",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 961,
+      "sha256": "be77664cb7eab14d3e7db86f73635a361381d1a58cffa8251b3d433d62cee024"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/icon-512.png",
+      "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/icon-512.png",
+      "status": 200,
+      "tlsVerifyResult": 0,
+      "bytes": 4116,
+      "sha256": "cb891d2b4a31850ffb4cffaf8c1871129ea473d8b4c5cfdb9ae30a87bedc9295"
+    }
+  ],
+  "fontLicenseProof": {
+    "status": "PASS",
+    "path": "licenses/atlas-narrow-axis-OFL.txt",
+    "url": "https://wudn9922.github.io/lightweight-drawing-lab/licenses/atlas-narrow-axis-OFL.txt",
+    "sourcePath": "src/assets/fonts/OFL.txt",
+    "sourceSha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f",
+    "publishedSha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f",
+    "byteMatch": true,
+    "httpStatus": 200,
+    "tlsVerifyResult": 0
+  },
+  "taiwanCatalog": {
+    "version": 1,
+    "fetchedAt": "2026-10-08T13:32:51.820Z",
+    "entryCount": 2251,
+    "knownMappings": [
+      {
+        "symbol": "2330.TW",
+        "ticker": "2330",
+        "name": "台積電",
+        "market": "TWSE",
+        "kind": "stock"
+      },
+      {
+        "symbol": "6488.TWO",
+        "ticker": "6488",
+        "name": "環球晶",
+        "market": "TPEx",
+        "kind": "stock"
+      },
+      {
+        "symbol": "0050.TW",
+        "ticker": "0050",
+        "name": "元大台灣50",
+        "market": "TWSE",
+        "kind": "etf"
+      }
+    ],
+    "sources": [
+      {
+        "market": "TWSE",
+        "kind": "issuer-directory",
+        "url": "https://openapi.twse.com.tw/v1/opendata/t187ap03_L",
+        "fetchedAt": "2026-10-08T13:32:51.820Z",
+        "sourceDate": "1151007"
+      },
+      {
+        "market": "TPEx",
+        "kind": "issuer-directory",
+        "url": "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O",
+        "fetchedAt": "2026-10-08T13:32:51.820Z",
+        "sourceDate": "1151008"
+      },
+      {
+        "market": "TWSE",
+        "kind": "fund-directory",
+        "url": "https://openapi.twse.com.tw/v1/opendata/t187ap47_L",
+        "fetchedAt": "2026-10-08T13:32:51.820Z",
+        "sourceDate": "1151007"
+      }
+    ]
+  },
+  "taiwanSnapshots": [
+    {
+      "symbol": "2330.TW",
+      "manifestStatus": "available",
+      "profile": {
+        "market": "TW",
+        "currency": "TWD",
+        "exchange": "TWSE",
+        "timezone": "Asia/Taipei",
+        "sessionOpenMinutes": 540,
+        "sessionCloseMinutes": 810
+      },
+      "currency": "TWD",
+      "quotePrice": 2550,
+      "quoteAsOf": 1791437413,
+      "quoteLocalSessionDate": "2026-10-08",
+      "latestDailyBar": {
+        "time": 1791421200,
+        "open": 2550,
+        "high": 2575,
+        "low": 2550,
+        "close": 2550,
+        "volume": 22484073
+      },
+      "timeframes": [
+        "15m",
+        "1D",
+        "1H",
+        "1M",
+        "1W",
+        "30m",
+        "5m"
+      ],
+      "weekly": {
+        "status": "available",
+        "currentPeriod": {
+          "time": 1791129600,
+          "open": 2550,
+          "high": 2590,
+          "low": 2545,
+          "close": 2550,
+          "volume": 79502727
+        },
+        "provenance": {
+          "method": "daily-ohlcv",
+          "timeframe": "1W",
+          "periodStart": 1791129600,
+          "firstDailyTime": 1791162000,
+          "lastDailyTime": 1791421200,
+          "dailyCount": 4,
+          "quoteAsOf": 1791437413,
+          "native": {
+            "time": 1791129600,
+            "open": 2550,
+            "high": 2590,
+            "low": 2545,
+            "close": 2585,
+            "volume": 57018654
+          }
+        },
+        "dailyBarsValidated": 4
+      },
+      "monthly": {
+        "status": "available",
+        "currentPeriod": {
+          "time": 1790784000,
+          "open": 2490,
+          "high": 2590,
+          "low": 2485,
+          "close": 2550,
+          "volume": 112045341
+        },
+        "provenance": {
+          "method": "daily-ohlcv",
+          "timeframe": "1M",
+          "periodStart": 1790784000,
+          "firstDailyTime": 1790816400,
+          "lastDailyTime": 1791421200,
+          "dailyCount": 6,
+          "quoteAsOf": 1791437413,
+          "native": {
+            "time": 1790784000,
+            "open": 2490,
+            "high": 2590,
+            "low": 2485,
+            "close": 2585,
+            "volume": 89561268
+          }
+        },
+        "dailyBarsValidated": 6
+      },
+      "source": "Yahoo unofficial prototype · delayed / as-of data"
+    },
+    {
+      "symbol": "0050.TW",
+      "manifestStatus": "partial",
+      "profile": {
+        "market": "TW",
+        "currency": "TWD",
+        "exchange": "TWSE",
+        "timezone": "Asia/Taipei",
+        "sessionOpenMinutes": 540,
+        "sessionCloseMinutes": 810
+      },
+      "currency": "TWD",
+      "quotePrice": 114.95,
+      "quoteAsOf": 1791437404,
+      "quoteLocalSessionDate": "2026-10-08",
+      "latestDailyBar": {
+        "time": 1791421200,
+        "open": 115.3499984741211,
+        "high": 115.55000305175781,
+        "low": 114.9000015258789,
+        "close": 114.94999694824219,
+        "volume": 97713681
+      },
+      "timeframes": [
+        "15m",
+        "1D",
+        "1H",
+        "30m",
+        "5m"
+      ],
+      "weekly": {
+        "status": "unavailable",
+        "reason": "Yahoo daily row has an unhealed null close in the current period"
+      },
+      "monthly": {
+        "status": "unavailable",
+        "reason": "Yahoo daily row has an unhealed null close in the current period"
+      },
+      "source": "Yahoo unofficial prototype · delayed / as-of data"
+    },
+    {
+      "symbol": "2317.TW",
+      "manifestStatus": "available",
+      "profile": {
+        "market": "TW",
+        "currency": "TWD",
+        "exchange": "TWSE",
+        "timezone": "Asia/Taipei",
+        "sessionOpenMinutes": 540,
+        "sessionCloseMinutes": 810
+      },
+      "currency": "TWD",
+      "quotePrice": 249,
+      "quoteAsOf": 1791437406,
+      "quoteLocalSessionDate": "2026-10-08",
+      "latestDailyBar": {
+        "time": 1791421200,
+        "open": 251,
+        "high": 251,
+        "low": 249,
+        "close": 249,
+        "volume": 40050776
+      },
+      "timeframes": [
+        "15m",
+        "1D",
+        "1H",
+        "1M",
+        "1W",
+        "30m",
+        "5m"
+      ],
+      "weekly": {
+        "status": "available",
+        "currentPeriod": {
+          "time": 1791129600,
+          "open": 254,
+          "high": 266.5,
+          "low": 249,
+          "close": 249,
+          "volume": 215242794
+        },
+        "provenance": {
+          "method": "daily-ohlcv",
+          "timeframe": "1W",
+          "periodStart": 1791129600,
+          "firstDailyTime": 1791162000,
+          "lastDailyTime": 1791421200,
+          "dailyCount": 4,
+          "quoteAsOf": 1791437406,
+          "native": {
+            "time": 1791129600,
+            "open": 254,
+            "high": 266.5,
+            "low": 251.5,
+            "close": 252,
+            "volume": 175192018
+          }
+        },
+        "dailyBarsValidated": 4
+      },
+      "monthly": {
+        "status": "available",
+        "currentPeriod": {
+          "time": 1790784000,
+          "open": 253,
+          "high": 266.5,
+          "low": 249,
+          "close": 249,
+          "volume": 269789173
+        },
+        "provenance": {
+          "method": "daily-ohlcv",
+          "timeframe": "1M",
+          "periodStart": 1790784000,
+          "firstDailyTime": 1790816400,
+          "lastDailyTime": 1791421200,
+          "dailyCount": 6,
+          "quoteAsOf": 1791437406,
+          "native": {
+            "time": 1790784000,
+            "open": 253,
+            "high": 266.5,
+            "low": 250.5,
+            "close": 252,
+            "volume": 229738397
+          }
+        },
+        "dailyBarsValidated": 6
+      },
+      "source": "Yahoo unofficial prototype · delayed / as-of data"
+    },
+    {
+      "symbol": "2454.TW",
+      "manifestStatus": "available",
+      "profile": {
+        "market": "TW",
+        "currency": "TWD",
+        "exchange": "TWSE",
+        "timezone": "Asia/Taipei",
+        "sessionOpenMinutes": 540,
+        "sessionCloseMinutes": 810
+      },
+      "currency": "TWD",
+      "quotePrice": 4690,
+      "quoteAsOf": 1791437409,
+      "quoteLocalSessionDate": "2026-10-08",
+      "latestDailyBar": {
+        "time": 1791421200,
+        "open": 4800,
+        "high": 4850,
+        "low": 4690,
+        "close": 4690,
+        "volume": 8706851
+      },
+      "timeframes": [
+        "15m",
+        "1D",
+        "1H",
+        "1M",
+        "1W",
+        "30m",
+        "5m"
+      ],
+      "weekly": {
+        "status": "available",
+        "currentPeriod": {
+          "time": 1791129600,
+          "open": 4980,
+          "high": 5165,
+          "low": 4690,
+          "close": 4690,
+          "volume": 29419653
+        },
+        "provenance": {
+          "method": "daily-ohlcv",
+          "timeframe": "1W",
+          "periodStart": 1791129600,
+          "firstDailyTime": 1791162000,
+          "lastDailyTime": 1791421200,
+          "dailyCount": 4,
+          "quoteAsOf": 1791437409,
+          "native": {
+            "time": 1791129600,
+            "open": 4980,
+            "high": 5165,
+            "low": 4835,
+            "close": 4835,
+            "volume": 20712802
+          }
+        },
+        "dailyBarsValidated": 4
+      },
+      "monthly": {
+        "status": "available",
+        "currentPeriod": {
+          "time": 1790784000,
+          "open": 4875,
+          "high": 5165,
+          "low": 4690,
+          "close": 4690,
+          "volume": 37138396
+        },
+        "provenance": {
+          "method": "daily-ohlcv",
+          "timeframe": "1M",
+          "periodStart": 1790784000,
+          "firstDailyTime": 1790816400,
+          "lastDailyTime": 1791421200,
+          "dailyCount": 6,
+          "quoteAsOf": 1791437409,
+          "native": {
+            "time": 1790784000,
+            "open": 4875,
+            "high": 5165,
+            "low": 4835,
+            "close": 4835,
+            "volume": 28431545
+          }
+        },
+        "dailyBarsValidated": 6
+      },
+      "source": "Yahoo unofficial prototype · delayed / as-of data"
+    },
+    {
+      "symbol": "6488.TWO",
+      "manifestStatus": "available",
+      "profile": {
+        "market": "TW",
+        "currency": "TWD",
+        "exchange": "TPEx",
+        "timezone": "Asia/Taipei",
+        "sessionOpenMinutes": 540,
+        "sessionCloseMinutes": 810
+      },
+      "currency": "TWD",
+      "quotePrice": 1130,
+      "quoteAsOf": 1791437404,
+      "quoteLocalSessionDate": "2026-10-08",
+      "latestDailyBar": {
+        "time": 1791421200,
+        "open": 1180,
+        "high": 1195,
+        "low": 1095,
+        "close": 1130,
+        "volume": 20447776
+      },
+      "timeframes": [
+        "15m",
+        "1D",
+        "1H",
+        "1M",
+        "1W",
+        "30m",
+        "5m"
+      ],
+      "weekly": {
+        "status": "available",
+        "currentPeriod": {
+          "time": 1791129600,
+          "open": 1220,
+          "high": 1260,
+          "low": 1095,
+          "close": 1130,
+          "volume": 65488743
+        },
+        "provenance": {
+          "method": "daily-ohlcv",
+          "timeframe": "1W",
+          "periodStart": 1791129600,
+          "firstDailyTime": 1791162000,
+          "lastDailyTime": 1791421200,
+          "dailyCount": 4,
+          "quoteAsOf": 1791437404,
+          "native": {
+            "time": 1791129600,
+            "open": 1220,
+            "high": 1260,
+            "low": 1145,
+            "close": 1215,
+            "volume": 45040967
+          }
+        },
+        "dailyBarsValidated": 4
+      },
+      "monthly": {
+        "status": "available",
+        "currentPeriod": {
+          "time": 1790784000,
+          "open": 1055,
+          "high": 1260,
+          "low": 1045,
+          "close": 1130,
+          "volume": 104630115
+        },
+        "provenance": {
+          "method": "daily-ohlcv",
+          "timeframe": "1M",
+          "periodStart": 1790784000,
+          "firstDailyTime": 1790816400,
+          "lastDailyTime": 1791421200,
+          "dailyCount": 6,
+          "quoteAsOf": 1791437404,
+          "native": {
+            "time": 1790784000,
+            "open": 1055,
+            "high": 1260,
+            "low": 1045,
+            "close": 1215,
+            "volume": 84182339
+          }
+        },
+        "dailyBarsValidated": 6
+      },
+      "source": "Yahoo unofficial prototype · delayed / as-of data"
+    },
+    {
+      "symbol": "8069.TWO",
+      "manifestStatus": "available",
+      "profile": {
+        "market": "TW",
+        "currency": "TWD",
+        "exchange": "TPEx",
+        "timezone": "Asia/Taipei",
+        "sessionOpenMinutes": 540,
+        "sessionCloseMinutes": 810
+      },
+      "currency": "TWD",
+      "quotePrice": 144,
+      "quoteAsOf": 1791437431,
+      "quoteLocalSessionDate": "2026-10-08",
+      "latestDailyBar": {
+        "time": 1791421200,
+        "open": 145,
+        "high": 147,
+        "low": 144,
+        "close": 144,
+        "volume": 3431597
+      },
+      "timeframes": [
+        "15m",
+        "1D",
+        "1H",
+        "1M",
+        "1W",
+        "30m",
+        "5m"
+      ],
+      "weekly": {
+        "status": "available",
+        "currentPeriod": {
+          "time": 1791129600,
+          "open": 144.5,
+          "high": 151.5,
+          "low": 143.5,
+          "close": 144,
+          "volume": 27826273
+        },
+        "provenance": {
+          "method": "daily-ohlcv",
+          "timeframe": "1W",
+          "periodStart": 1791129600,
+          "firstDailyTime": 1791162000,
+          "lastDailyTime": 1791421200,
+          "dailyCount": 4,
+          "quoteAsOf": 1791437431,
+          "native": {
+            "time": 1791129600,
+            "open": 144.5,
+            "high": 151.5,
+            "low": 143.5,
+            "close": 145,
+            "volume": 24394676
+          }
+        },
+        "dailyBarsValidated": 4
+      },
+      "monthly": {
+        "status": "available",
+        "currentPeriod": {
+          "time": 1790784000,
+          "open": 144,
+          "high": 151.5,
+          "low": 142.5,
+          "close": 144,
+          "volume": 37528845
+        },
+        "provenance": {
+          "method": "daily-ohlcv",
+          "timeframe": "1M",
+          "periodStart": 1790784000,
+          "firstDailyTime": 1790816400,
+          "lastDailyTime": 1791421200,
+          "dailyCount": 6,
+          "quoteAsOf": 1791437431,
+          "native": {
+            "time": 1790784000,
+            "open": 144,
+            "high": 151.5,
+            "low": 142.5,
+            "close": 145,
+            "volume": 34097248
+          }
+        },
+        "dailyBarsValidated": 6
+      },
+      "source": "Yahoo unofficial prototype · delayed / as-of data"
+    }
+  ],
+  "secSnapshots": {
+    "manifestVersion": 1,
+    "manifestAttemptedAt": 1791466536,
+    "symbols": [
+      {
+        "symbol": "AAPL",
+        "status": "fresh",
+        "cik": "0000320193",
+        "issuerName": "Apple Inc.",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "fetchedAt": 1791451154,
+        "generatedAt": 1791451155,
+        "ageSeconds": 15529,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 73,
+        "annualRecords": 19,
+        "nullMetricCells": 32,
+        "rawMetricProvenanceCount": 1083,
+        "derivedMetricProvenanceCount": 265,
+        "provenanceInputCount": 1715,
+        "distinctConceptCount": 18,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-03-29",
+          "periodEnd": "2026-06-27",
+          "filingDate": "2026-07-31",
+          "form": "10-Q",
+          "accession": "0000320193-26-000020"
+        }
+      },
+      {
+        "symbol": "MSFT",
+        "status": "fresh",
+        "cik": "0000789019",
+        "issuerName": "MICROSOFT CORPORATION",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+        "fetchedAt": 1791451156,
+        "generatedAt": 1791451157,
+        "ageSeconds": 15527,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 76,
+        "annualRecords": 19,
+        "nullMetricCells": 123,
+        "rawMetricProvenanceCount": 1123,
+        "derivedMetricProvenanceCount": 179,
+        "provenanceInputCount": 1515,
+        "distinctConceptCount": 18,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-06-30",
+          "filingDate": "2026-07-29",
+          "form": "10-K",
+          "accession": "0001193125-26-323660"
+        }
+      },
+      {
+        "symbol": "NVDA",
+        "status": "fresh",
+        "cik": "0001045810",
+        "issuerName": "NVIDIA CORP",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001045810.json",
+        "fetchedAt": 1791451157,
+        "generatedAt": 1791451157,
+        "ageSeconds": 15527,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 77,
+        "annualRecords": 19,
+        "nullMetricCells": 136,
+        "rawMetricProvenanceCount": 1089,
+        "derivedMetricProvenanceCount": 215,
+        "provenanceInputCount": 1590,
+        "distinctConceptCount": 17,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-04-27",
+          "periodEnd": "2026-07-26",
+          "filingDate": "2026-08-26",
+          "form": "10-Q",
+          "accession": "0001045810-26-000075"
+        }
+      },
+      {
+        "symbol": "TSLA",
+        "status": "fresh",
+        "cik": "0001318605",
+        "issuerName": "Tesla, Inc.",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001318605.json",
+        "fetchedAt": 1791451158,
+        "generatedAt": 1791451158,
+        "ageSeconds": 15526,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 66,
+        "annualRecords": 17,
+        "nullMetricCells": 83,
+        "rawMetricProvenanceCount": 927,
+        "derivedMetricProvenanceCount": 235,
+        "provenanceInputCount": 1489,
+        "distinctConceptCount": 17,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-06-30",
+          "filingDate": "2026-07-23",
+          "form": "10-Q",
+          "accession": "0001628280-26-049270"
+        }
+      },
+      {
+        "symbol": "AMD",
+        "status": "fresh",
+        "cik": "0000002488",
+        "issuerName": "ADVANCED MICRO DEVICES INC",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000002488.json",
+        "fetchedAt": 1791451158,
+        "generatedAt": 1791451158,
+        "ageSeconds": 15526,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 69,
+        "annualRecords": 18,
+        "nullMetricCells": 183,
+        "rawMetricProvenanceCount": 902,
+        "derivedMetricProvenanceCount": 220,
+        "provenanceInputCount": 1444,
+        "distinctConceptCount": 17,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-03-29",
+          "periodEnd": "2026-06-27",
+          "filingDate": "2026-08-05",
+          "form": "10-Q",
+          "accession": "0000002488-26-000123"
+        }
+      },
+      {
+        "symbol": "META",
+        "status": "fresh",
+        "cik": "0001326801",
+        "issuerName": "Meta Platforms, Inc.",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001326801.json",
+        "fetchedAt": 1791451159,
+        "generatedAt": 1791451159,
+        "ageSeconds": 15525,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 61,
+        "annualRecords": 16,
+        "nullMetricCells": 124,
+        "rawMetricProvenanceCount": 730,
+        "derivedMetricProvenanceCount": 301,
+        "provenanceInputCount": 1450,
+        "distinctConceptCount": 13,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-06-30",
+          "filingDate": "2026-07-30",
+          "form": "10-Q",
+          "accession": "0001628280-26-050705"
+        }
+      },
+      {
+        "symbol": "GOOGL",
+        "status": "fresh",
+        "cik": "0001652044",
+        "issuerName": "Alphabet Inc.",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001652044.json",
+        "fetchedAt": 1791451159,
+        "generatedAt": 1791451159,
+        "ageSeconds": 15525,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 48,
+        "annualRecords": 13,
+        "nullMetricCells": 110,
+        "rawMetricProvenanceCount": 580,
+        "derivedMetricProvenanceCount": 225,
+        "provenanceInputCount": 1110,
+        "distinctConceptCount": 13,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-06-30",
+          "filingDate": "2026-07-23",
+          "form": "10-Q",
+          "accession": "0001652044-26-000071"
+        }
+      },
+      {
+        "symbol": "AMZN",
+        "status": "fresh",
+        "cik": "0001018724",
+        "issuerName": "AMAZON COM INC",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001018724.json",
+        "fetchedAt": 1791451160,
+        "generatedAt": 1791451160,
+        "ageSeconds": 15524,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 73,
+        "annualRecords": 19,
+        "nullMetricCells": 192,
+        "rawMetricProvenanceCount": 935,
+        "derivedMetricProvenanceCount": 253,
+        "provenanceInputCount": 1498,
+        "distinctConceptCount": 15,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-06-30",
+          "filingDate": "2026-07-31",
+          "form": "10-Q",
+          "accession": "0001018724-26-000026"
+        }
+      },
+      {
+        "symbol": "SMCI",
+        "status": "fresh",
+        "cik": "0001375365",
+        "issuerName": "Super Micro Computer, Inc.",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001375365.json",
+        "fetchedAt": 1791451161,
+        "generatedAt": 1791451161,
+        "ageSeconds": 15523,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 64,
+        "annualRecords": 17,
+        "nullMetricCells": 32,
+        "rawMetricProvenanceCount": 940,
+        "derivedMetricProvenanceCount": 243,
+        "provenanceInputCount": 1522,
+        "distinctConceptCount": 18,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-06-30",
+          "filingDate": "2026-08-31",
+          "form": "10-K",
+          "accession": "0001375365-26-000022"
+        }
+      },
+      {
+        "symbol": "NFLX",
+        "status": "fresh",
+        "cik": "0001065280",
+        "issuerName": "NETFLIX INC",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001065280.json",
+        "fetchedAt": 1791451162,
+        "generatedAt": 1791451162,
+        "ageSeconds": 15522,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 73,
+        "annualRecords": 19,
+        "nullMetricCells": 94,
+        "rawMetricProvenanceCount": 1072,
+        "derivedMetricProvenanceCount": 214,
+        "provenanceInputCount": 1546,
+        "distinctConceptCount": 14,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-06-30",
+          "filingDate": "2026-07-17",
+          "form": "10-Q",
+          "accession": "0001065280-26-000212"
+        }
+      },
+      {
+        "symbol": "JPM",
+        "status": "fresh",
+        "cik": "0000019617",
+        "issuerName": "JPMORGAN CHASE & CO",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000019617.json",
+        "fetchedAt": 1791451162,
+        "generatedAt": 1791451162,
+        "ageSeconds": 15522,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 73,
+        "annualRecords": 19,
+        "nullMetricCells": 686,
+        "rawMetricProvenanceCount": 615,
+        "derivedMetricProvenanceCount": 79,
+        "provenanceInputCount": 773,
+        "distinctConceptCount": 11,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-06-30",
+          "filingDate": "2026-08-06",
+          "form": "10-Q",
+          "accession": "0001628280-26-054343"
+        }
+      },
+      {
+        "symbol": "WMT",
+        "status": "fresh",
+        "cik": "0000104169",
+        "issuerName": "WALMART INC.",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000104169.json",
+        "fetchedAt": 1791451162,
+        "generatedAt": 1791451162,
+        "ageSeconds": 15522,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 77,
+        "annualRecords": 20,
+        "nullMetricCells": 213,
+        "rawMetricProvenanceCount": 895,
+        "derivedMetricProvenanceCount": 347,
+        "provenanceInputCount": 1717,
+        "distinctConceptCount": 14,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-05-01",
+          "periodEnd": "2026-07-31",
+          "filingDate": "2026-08-28",
+          "form": "10-Q",
+          "accession": "0000104169-26-000154"
+        }
+      },
+      {
+        "symbol": "XOM",
+        "status": "fresh",
+        "cik": "0002115436",
+        "issuerName": "ExxonMobil Holdings Corp",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0002115436.json",
+        "fetchedAt": 1791451163,
+        "generatedAt": 1791451163,
+        "ageSeconds": 15521,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 2,
+        "annualRecords": 0,
+        "nullMetricCells": 17,
+        "rawMetricProvenanceCount": 13,
+        "derivedMetricProvenanceCount": 0,
+        "provenanceInputCount": 13,
+        "distinctConceptCount": 9,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-06-30",
+          "filingDate": "2026-08-03",
+          "form": "10-Q",
+          "accession": "0000034088-26-000093"
+        }
+      },
+      {
+        "symbol": "AVGO",
+        "status": "fresh",
+        "cik": "0001730168",
+        "issuerName": "Broadcom Inc.",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001730168.json",
+        "fetchedAt": 1791451164,
+        "generatedAt": 1791451164,
+        "ageSeconds": 15520,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 39,
+        "annualRecords": 10,
+        "nullMetricCells": 41,
+        "rawMetricProvenanceCount": 557,
+        "derivedMetricProvenanceCount": 137,
+        "provenanceInputCount": 887,
+        "distinctConceptCount": 19,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-05-04",
+          "periodEnd": "2026-08-02",
+          "filingDate": "2026-09-10",
+          "form": "10-Q",
+          "accession": "0001730168-26-000080"
+        }
+      },
+      {
+        "symbol": "PLTR",
+        "status": "fresh",
+        "cik": "0001321655",
+        "issuerName": "Palantir Technologies Inc.",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001321655.json",
+        "fetchedAt": 1791451164,
+        "generatedAt": 1791451164,
+        "ageSeconds": 15520,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 28,
+        "annualRecords": 8,
+        "nullMetricCells": 26,
+        "rawMetricProvenanceCount": 398,
+        "derivedMetricProvenanceCount": 116,
+        "provenanceInputCount": 670,
+        "distinctConceptCount": 15,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-06-30",
+          "filingDate": "2026-08-04",
+          "form": "10-Q",
+          "accession": "0001321655-26-000041"
+        }
+      },
+      {
+        "symbol": "MU",
+        "status": "fresh",
+        "cik": "0000723125",
+        "issuerName": "Micron Technology, Inc.",
+        "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000723125.json",
+        "fetchedAt": 1791451165,
+        "generatedAt": 1791451165,
+        "ageSeconds": 15519,
+        "asOfClassification": "within-24h",
+        "quarterlyRecords": 68,
+        "annualRecords": 17,
+        "nullMetricCells": 106,
+        "rawMetricProvenanceCount": 952,
+        "derivedMetricProvenanceCount": 217,
+        "provenanceInputCount": 1482,
+        "distinctConceptCount": 17,
+        "latestFiling": {
+          "period": "quarterly",
+          "periodStart": "2026-02-27",
+          "periodEnd": "2026-05-28",
+          "filingDate": "2026-06-25",
+          "form": "10-Q",
+          "accession": "0000723125-26-000015"
+        }
+      }
+    ]
+  },
+  "usSplitPriceRegression": {
+    "status": "PASS",
+    "checkedAt": "2026-10-08T13:40:33.077020+00:00",
+    "site": "https://wudn9922.github.io/lightweight-drawing-lab/",
+    "tlsVerification": "curl ssl_verify_result=0; certificate verification enabled",
+    "sourceCommit": "3feb6337aeab4e686c0f61e259bece7250be3d40",
+    "snapshots": [
+      {
+        "symbol": "SMCI",
+        "version": 3,
+        "snapshotSource": null,
+        "generatedAt": 1791466437.29,
+        "fetchedAt": null,
+        "quote": {
+          "symbol": "SMCI",
+          "price": 43.55,
+          "source": "Yahoo unofficial prototype · delayed / as-of data",
+          "dataState": "delayed",
+          "asOf": 1791466434.0,
+          "retrievedAt": 1791466436.534
+        },
+        "timeframes": {
+          "1D": {
+            "source": "Yahoo unofficial prototype · delayed / as-of data",
+            "delayed": true,
+            "asOf": 1791466436.534,
+            "latestBar": {
+              "time": 1791466200,
+              "open": 44.03499984741211,
+              "high": 44.310001373291016,
+              "low": 43.47999954223633,
+              "close": 43.54999923706055,
+              "volume": 2375673
+            },
+            "latestClose": 43.54999923706055,
+            "quotePrice": 43.55,
+            "absoluteDifference": 7.629394502828291e-07,
+            "withinOneCent": true,
+            "nativeRecord": {
+              "time": 1791466200,
+              "open": 44.03499984741211,
+              "high": 44.310001373291016,
+              "low": 43.47999954223633,
+              "close": 43.54999923706055,
+              "volume": 2375673
+            },
+            "derivation": null,
+            "normalization": null
+          },
+          "1W": {
+            "source": "Yahoo unofficial prototype · delayed / as-of data · current period derived from daily OHLCV (2026-10-05–2026-10-08, 4 daily bars)",
+            "delayed": true,
+            "asOf": 1791466437.285,
+            "latestBar": {
+              "time": 1791158400,
+              "open": 43.56999969482422,
+              "high": 45.77000045776367,
+              "low": 42.459999084472656,
+              "close": 43.54999923706055,
+              "volume": 92762273
+            },
+            "latestClose": 43.54999923706055,
+            "quotePrice": 43.55,
+            "absoluteDifference": 7.629394502828291e-07,
+            "withinOneCent": true,
+            "nativeRecord": {
+              "time": 1791158400,
+              "open": 43.56999969482422,
+              "high": 45.77000045776367,
+              "low": 42.459999084472656,
+              "close": 44.939998626708984,
+              "volume": 90386600
+            },
+            "derivation": {
+              "method": "daily-ohlcv",
+              "timeframe": "1W",
+              "periodStart": 1791158400,
+              "firstDailyTime": 1791207000,
+              "lastDailyTime": 1791466200,
+              "dailyCount": 4,
+              "quoteAsOf": 1791466434,
+              "native": {
+                "time": 1791158400,
+                "open": 43.56999969482422,
+                "high": 45.77000045776367,
+                "low": 42.459999084472656,
+                "close": 44.939998626708984,
+                "volume": 90386600
+              }
+            },
+            "normalization": {
+              "currentPeriod": {
+                "method": "daily-ohlcv",
+                "timeframe": "1W",
+                "periodStart": 1791158400,
+                "firstDailyTime": 1791207000,
+                "lastDailyTime": 1791466200,
+                "dailyCount": 4,
+                "quoteAsOf": 1791466434,
+                "native": {
+                  "time": 1791158400,
+                  "open": 43.56999969482422,
+                  "high": 45.77000045776367,
+                  "low": 42.459999084472656,
+                  "close": 44.939998626708984,
+                  "volume": 90386600
+                }
+              }
+            }
+          },
+          "1M": {
+            "source": "Yahoo unofficial prototype · delayed / as-of data · current period derived from daily OHLCV (2026-10-01–2026-10-08, 6 daily bars)",
+            "delayed": true,
+            "asOf": 1791466437.287,
+            "latestBar": {
+              "time": 1790812800,
+              "open": 40.88999938964844,
+              "high": 45.77000045776367,
+              "low": 40.130001068115234,
+              "close": 43.54999923706055,
+              "volume": 163763973
+            },
+            "latestClose": 43.54999923706055,
+            "quotePrice": 43.55,
+            "absoluteDifference": 7.629394502828291e-07,
+            "withinOneCent": true,
+            "nativeRecord": {
+              "time": 1790812800,
+              "open": 40.88999938964844,
+              "high": 45.77000045776367,
+              "low": 40.130001068115234,
+              "close": 44.939998626708984,
+              "volume": 161388300
+            },
+            "derivation": {
+              "method": "daily-ohlcv",
+              "timeframe": "1M",
+              "periodStart": 1790812800,
+              "firstDailyTime": 1790861400,
+              "lastDailyTime": 1791466200,
+              "dailyCount": 6,
+              "quoteAsOf": 1791466434,
+              "native": {
+                "time": 1790812800,
+                "open": 40.88999938964844,
+                "high": 45.77000045776367,
+                "low": 40.130001068115234,
+                "close": 44.939998626708984,
+                "volume": 161388300
+              }
+            },
+            "normalization": {
+              "currentPeriod": {
+                "method": "daily-ohlcv",
+                "timeframe": "1M",
+                "periodStart": 1790812800,
+                "firstDailyTime": 1790861400,
+                "lastDailyTime": 1791466200,
+                "dailyCount": 6,
+                "quoteAsOf": 1791466434,
+                "native": {
+                  "time": 1790812800,
+                  "open": 40.88999938964844,
+                  "high": 45.77000045776367,
+                  "low": 40.130001068115234,
+                  "close": 44.939998626708984,
+                  "volume": 161388300
+                }
+              }
+            }
+          }
+        },
+        "httpsRequest": {
+          "url": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/SMCI.json",
+          "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/SMCI.json",
+          "status": 200,
+          "tlsVerifyResult": 0,
+          "bytes": 678209,
+          "sha256": "78b70bb9524671dd7eecba720c8a129d7d4f0fa936734c6d9bb88cae0252d664"
+        }
+      },
+      {
+        "symbol": "NFLX",
+        "version": 3,
+        "snapshotSource": null,
+        "generatedAt": 1791466443.735,
+        "fetchedAt": null,
+        "quote": {
+          "symbol": "NFLX",
+          "price": 70.09,
+          "source": "Yahoo unofficial prototype · delayed / as-of data",
+          "dataState": "delayed",
+          "asOf": 1791466442.0,
+          "retrievedAt": 1791466442.978
+        },
+        "timeframes": {
+          "1D": {
+            "source": "Yahoo unofficial prototype · delayed / as-of data",
+            "delayed": true,
+            "asOf": 1791466442.978,
+            "latestBar": {
+              "time": 1791466200,
+              "open": 70.08999633789062,
+              "high": 70.19000244140625,
+              "low": 69.72000122070312,
+              "close": 70.08999633789062,
+              "volume": 1196928
+            },
+            "latestClose": 70.08999633789062,
+            "quotePrice": 70.09,
+            "absoluteDifference": 3.662109378410605e-06,
+            "withinOneCent": true,
+            "nativeRecord": {
+              "time": 1791466200,
+              "open": 70.08999633789062,
+              "high": 70.19000244140625,
+              "low": 69.72000122070312,
+              "close": 70.08999633789062,
+              "volume": 1196928
+            },
+            "derivation": null,
+            "normalization": null
+          },
+          "1W": {
+            "source": "Yahoo unofficial prototype · delayed / as-of data · current period derived from daily OHLCV (2026-10-05–2026-10-08, 4 daily bars)",
+            "delayed": true,
+            "asOf": 1791466443.729,
+            "latestBar": {
+              "time": 1791158400,
+              "open": 67.05000305175781,
+              "high": 70.19000244140625,
+              "low": 66.54000091552734,
+              "close": 70.08999633789062,
+              "volume": 103338228
+            },
+            "latestClose": 70.08999633789062,
+            "quotePrice": 70.09,
+            "absoluteDifference": 3.662109378410605e-06,
+            "withinOneCent": true,
+            "nativeRecord": {
+              "time": 1791158400,
+              "open": 67.05000305175781,
+              "high": 69.80000305175781,
+              "low": 66.54000091552734,
+              "close": 69.69999694824219,
+              "volume": 102141300
+            },
+            "derivation": {
+              "method": "daily-ohlcv",
+              "timeframe": "1W",
+              "periodStart": 1791158400,
+              "firstDailyTime": 1791207000,
+              "lastDailyTime": 1791466200,
+              "dailyCount": 4,
+              "quoteAsOf": 1791466442,
+              "native": {
+                "time": 1791158400,
+                "open": 67.05000305175781,
+                "high": 69.80000305175781,
+                "low": 66.54000091552734,
+                "close": 69.69999694824219,
+                "volume": 102141300
+              }
+            },
+            "normalization": {
+              "currentPeriod": {
+                "method": "daily-ohlcv",
+                "timeframe": "1W",
+                "periodStart": 1791158400,
+                "firstDailyTime": 1791207000,
+                "lastDailyTime": 1791466200,
+                "dailyCount": 4,
+                "quoteAsOf": 1791466442,
+                "native": {
+                  "time": 1791158400,
+                  "open": 67.05000305175781,
+                  "high": 69.80000305175781,
+                  "low": 66.54000091552734,
+                  "close": 69.69999694824219,
+                  "volume": 102141300
+                }
+              }
+            }
+          },
+          "1M": {
+            "source": "Yahoo unofficial prototype · delayed / as-of data · current period derived from daily OHLCV (2026-10-01–2026-10-08, 6 daily bars)",
+            "delayed": true,
+            "asOf": 1791466443.731,
+            "latestBar": {
+              "time": 1790812800,
+              "open": 69.41000366210938,
+              "high": 70.19000244140625,
+              "low": 66.54000091552734,
+              "close": 70.08999633789062,
+              "volume": 183595028
+            },
+            "latestClose": 70.08999633789062,
+            "quotePrice": 70.09,
+            "absoluteDifference": 3.662109378410605e-06,
+            "withinOneCent": true,
+            "nativeRecord": {
+              "time": 1790812800,
+              "open": 69.41000366210938,
+              "high": 69.80000305175781,
+              "low": 66.54000091552734,
+              "close": 69.69999694824219,
+              "volume": 182398100
+            },
+            "derivation": {
+              "method": "daily-ohlcv",
+              "timeframe": "1M",
+              "periodStart": 1790812800,
+              "firstDailyTime": 1790861400,
+              "lastDailyTime": 1791466200,
+              "dailyCount": 6,
+              "quoteAsOf": 1791466442,
+              "native": {
+                "time": 1790812800,
+                "open": 69.41000366210938,
+                "high": 69.80000305175781,
+                "low": 66.54000091552734,
+                "close": 69.69999694824219,
+                "volume": 182398100
+              }
+            },
+            "normalization": {
+              "currentPeriod": {
+                "method": "daily-ohlcv",
+                "timeframe": "1M",
+                "periodStart": 1790812800,
+                "firstDailyTime": 1790861400,
+                "lastDailyTime": 1791466200,
+                "dailyCount": 6,
+                "quoteAsOf": 1791466442,
+                "native": {
+                  "time": 1790812800,
+                  "open": 69.41000366210938,
+                  "high": 69.80000305175781,
+                  "low": 66.54000091552734,
+                  "close": 69.69999694824219,
+                  "volume": 182398100
+                }
+              }
+            }
+          }
+        },
+        "httpsRequest": {
+          "url": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/NFLX.json",
+          "effectiveUrl": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/NFLX.json",
+          "status": 200,
+          "tlsVerifyResult": 0,
+          "bytes": 673446,
+          "sha256": "b8111272dd8180a40f94796688906b4e17093828fb685cdaa47be3cb15056a6e"
+        }
+      }
+    ]
+  },
+  "marketSnapshotCoverage": {
+    "status": "VERIFIED_WITH_PARTIAL_AND_RETAINED_STALE_ENTRIES",
+    "checkedAt": "2026-10-08T13:47:07.808597+00:00",
+    "sourceCommit": "3feb6337aeab4e686c0f61e259bece7250be3d40",
+    "manifest": {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/manifest.json",
+      "sha256": "43d0e8e859b822882f2a43567fdc78fdc9b1277025fe9c53d14e6f293c80a863",
+      "matchesExistingHttpProofResourceHash": true,
+      "version": 1,
+      "attemptedAt": 1791466535.683,
+      "source": "Yahoo unofficial prototype. Delayed snapshots, not real-time. Native exchange currency/timezone retained; OHLC already split-adjusted and never divided again."
+    },
+    "symbolCount": 26,
+    "statusCounts": {
+      "available": 20,
+      "partial": 2,
+      "retained-stale": 4
+    },
+    "nonAvailableEntries": [
+      {
+        "symbol": "0050.TW",
+        "status": "partial",
+        "generatedAt": 1791466511.51,
+        "quoteAsOf": 1791437404,
+        "quoteSessionDate": "2026-10-08",
+        "price": 114.95,
+        "market": {
+          "market": "TW",
+          "currency": "TWD",
+          "exchange": "TWSE",
+          "timezone": "Asia/Taipei",
+          "sessionOpenMinutes": 540,
+          "sessionCloseMinutes": 810
+        },
+        "timeframes": [
+          "5m",
+          "15m",
+          "30m",
+          "1H",
+          "1D"
+        ],
+        "results": {
+          "5m": {
+            "status": "available",
+            "asOf": 1791466505.529,
+            "latestBarAt": 1791437400,
+            "freshness": "fresh"
+          },
+          "15m": {
+            "status": "available",
+            "asOf": 1791466506.492,
+            "latestBarAt": 1791437400,
+            "freshness": "fresh"
+          },
+          "30m": {
+            "status": "available",
+            "asOf": 1791466507.367,
+            "latestBarAt": 1791437400,
+            "freshness": "fresh"
+          },
+          "1H": {
+            "status": "available",
+            "asOf": 1791466508.175,
+            "latestBarAt": 1791437400,
+            "freshness": "fresh"
+          },
+          "1D": {
+            "status": "available",
+            "asOf": 1791466510.733,
+            "latestBarAt": 1791421200,
+            "freshness": "fresh"
+          },
+          "1W": {
+            "status": "unavailable",
+            "error": "Yahoo daily row has an unhealed null close in the current period"
+          },
+          "1M": {
+            "status": "unavailable",
+            "error": "Yahoo daily row has an unhealed null close in the current period"
+          }
+        },
+        "errors": {
+          "1W": "Yahoo daily row has an unhealed null close in the current period",
+          "1M": "Yahoo daily row has an unhealed null close in the current period"
+        }
+      },
+      {
+        "symbol": "AMZN",
+        "status": "partial",
+        "generatedAt": 1791466424.833,
+        "quoteAsOf": 1791466422,
+        "quoteSessionDate": "2026-10-08",
+        "price": 258.511,
+        "market": {
+          "market": "US",
+          "currency": "USD",
+          "exchange": "US",
+          "timezone": "America/New_York",
+          "sessionOpenMinutes": 570,
+          "sessionCloseMinutes": 960
+        },
+        "timeframes": [
+          "5m",
+          "15m",
+          "30m",
+          "1H",
+          "1D",
+          "1W"
+        ],
+        "results": {
+          "5m": {
+            "status": "available",
+            "asOf": 1791466419.051,
+            "latestBarAt": 1791466417,
+            "freshness": "fresh"
+          },
+          "15m": {
+            "status": "available",
+            "asOf": 1791466419.892,
+            "latestBarAt": 1791466418,
+            "freshness": "fresh"
+          },
+          "30m": {
+            "status": "available",
+            "asOf": 1791466420.76,
+            "latestBarAt": 1791466418,
+            "freshness": "fresh"
+          },
+          "1H": {
+            "status": "available",
+            "asOf": 1791466421.576,
+            "latestBarAt": 1791466419,
+            "freshness": "fresh"
+          },
+          "1D": {
+            "status": "available",
+            "asOf": 1791466424.076,
+            "latestBarAt": 1791466200,
+            "freshness": "fresh"
+          },
+          "1W": {
+            "status": "available",
+            "asOf": 1791466424.827,
+            "latestBarAt": 1791158400,
+            "freshness": "fresh"
+          },
+          "1M": {
+            "status": "unavailable",
+            "error": "Yahoo daily and native quotes disagree at the same market time"
+          }
+        },
+        "errors": {
+          "1M": "Yahoo daily and native quotes disagree at the same market time"
+        }
+      },
+      {
+        "symbol": "NVO",
+        "status": "retained-stale",
+        "generatedAt": 1791455603.544,
+        "market": {
+          "market": "US",
+          "currency": "USD",
+          "exchange": "US",
+          "timezone": "America/New_York",
+          "sessionOpenMinutes": 570,
+          "sessionCloseMinutes": 960
+        },
+        "timeframes": [
+          "5m",
+          "15m",
+          "30m",
+          "1H",
+          "1D",
+          "1W",
+          "1M"
+        ],
+        "results": {
+          "5m": {
+            "status": "available",
+            "asOf": 1791455597.701,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "15m": {
+            "status": "available",
+            "asOf": 1791455598.56,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "30m": {
+            "status": "available",
+            "asOf": 1791455599.373,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "1H": {
+            "status": "available",
+            "asOf": 1791455600.192,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "1D": {
+            "status": "available",
+            "asOf": 1791455602.79,
+            "latestBarAt": 1791379800,
+            "freshness": "retained-stale",
+            "error": "Invalid Yahoo OHLCV values at 1791466200"
+          },
+          "1W": {
+            "status": "available",
+            "asOf": 1791455603.541,
+            "latestBarAt": 1791158400,
+            "freshness": "retained-stale",
+            "error": "Current period needs freshly validated native and daily data"
+          },
+          "1M": {
+            "status": "available",
+            "asOf": 1791455603.543,
+            "latestBarAt": 1790812800,
+            "freshness": "retained-stale",
+            "error": "Current period needs freshly validated native and daily data"
+          }
+        },
+        "errors": {
+          "1D": "Invalid Yahoo OHLCV values at 1791466200",
+          "1W": "Current period needs freshly validated native and daily data",
+          "1M": "Current period needs freshly validated native and daily data"
+        },
+        "error": "Error: No freshly verified daily quote; preserving last successful snapshot"
+      },
+      {
+        "symbol": "SPY",
+        "status": "retained-stale",
+        "generatedAt": 1791455638.811,
+        "market": {
+          "market": "US",
+          "currency": "USD",
+          "exchange": "US",
+          "timezone": "America/New_York",
+          "sessionOpenMinutes": 570,
+          "sessionCloseMinutes": 960
+        },
+        "timeframes": [
+          "5m",
+          "15m",
+          "30m",
+          "1H",
+          "1D",
+          "1W",
+          "1M"
+        ],
+        "results": {
+          "5m": {
+            "status": "available",
+            "asOf": 1791455632.96,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "15m": {
+            "status": "available",
+            "asOf": 1791455633.787,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "30m": {
+            "status": "available",
+            "asOf": 1791455634.625,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "1H": {
+            "status": "available",
+            "asOf": 1791455635.502,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "1D": {
+            "status": "available",
+            "asOf": 1791455638.057,
+            "latestBarAt": 1791379800,
+            "freshness": "retained-stale",
+            "error": "Invalid Yahoo OHLCV values at 1791466200"
+          },
+          "1W": {
+            "status": "available",
+            "asOf": 1791455638.807,
+            "latestBarAt": 1791158400,
+            "freshness": "retained-stale",
+            "error": "Current period needs freshly validated native and daily data"
+          },
+          "1M": {
+            "status": "available",
+            "asOf": 1791455638.81,
+            "latestBarAt": 1790812800,
+            "freshness": "retained-stale",
+            "error": "Current period needs freshly validated native and daily data"
+          }
+        },
+        "errors": {
+          "1D": "Invalid Yahoo OHLCV values at 1791466200",
+          "1W": "Current period needs freshly validated native and daily data",
+          "1M": "Current period needs freshly validated native and daily data"
+        },
+        "error": "Error: No freshly verified daily quote; preserving last successful snapshot"
+      },
+      {
+        "symbol": "TSM",
+        "status": "retained-stale",
+        "generatedAt": 1791455668.252,
+        "market": {
+          "market": "US",
+          "currency": "USD",
+          "exchange": "US",
+          "timezone": "America/New_York",
+          "sessionOpenMinutes": 570,
+          "sessionCloseMinutes": 960
+        },
+        "timeframes": [
+          "5m",
+          "15m",
+          "30m",
+          "1H",
+          "1D",
+          "1W",
+          "1M"
+        ],
+        "results": {
+          "5m": {
+            "status": "available",
+            "asOf": 1791455662.449,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "15m": {
+            "status": "available",
+            "asOf": 1791455663.304,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "30m": {
+            "status": "available",
+            "asOf": 1791455664.148,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "1H": {
+            "status": "available",
+            "asOf": 1791455664.966,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "1D": {
+            "status": "available",
+            "asOf": 1791455667.495,
+            "latestBarAt": 1791379800,
+            "freshness": "retained-stale",
+            "error": "Invalid Yahoo OHLCV values at 1791466200"
+          },
+          "1W": {
+            "status": "available",
+            "asOf": 1791455668.246,
+            "latestBarAt": 1791158400,
+            "freshness": "retained-stale",
+            "error": "Current period needs freshly validated native and daily data"
+          },
+          "1M": {
+            "status": "available",
+            "asOf": 1791455668.248,
+            "latestBarAt": 1790812800,
+            "freshness": "retained-stale",
+            "error": "Current period needs freshly validated native and daily data"
+          }
+        },
+        "errors": {
+          "1D": "Invalid Yahoo OHLCV values at 1791466200",
+          "1W": "Current period needs freshly validated native and daily data",
+          "1M": "Current period needs freshly validated native and daily data"
+        },
+        "error": "Error: No freshly verified daily quote; preserving last successful snapshot"
+      },
+      {
+        "symbol": "XOM",
+        "status": "retained-stale",
+        "generatedAt": 1791455632.817,
+        "market": {
+          "market": "US",
+          "currency": "USD",
+          "exchange": "US",
+          "timezone": "America/New_York",
+          "sessionOpenMinutes": 570,
+          "sessionCloseMinutes": 960
+        },
+        "timeframes": [
+          "5m",
+          "15m",
+          "30m",
+          "1H",
+          "1D",
+          "1W",
+          "1M"
+        ],
+        "results": {
+          "5m": {
+            "status": "available",
+            "asOf": 1791455627.05,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "15m": {
+            "status": "available",
+            "asOf": 1791455627.872,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "30m": {
+            "status": "available",
+            "asOf": 1791455628.684,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "1H": {
+            "status": "available",
+            "asOf": 1791455629.494,
+            "latestBarAt": 1791403200,
+            "freshness": "retained-stale"
+          },
+          "1D": {
+            "status": "available",
+            "asOf": 1791455632.064,
+            "latestBarAt": 1791379800,
+            "freshness": "retained-stale",
+            "error": "Invalid Yahoo OHLCV values at 1791466200"
+          },
+          "1W": {
+            "status": "available",
+            "asOf": 1791455632.814,
+            "latestBarAt": 1791158400,
+            "freshness": "retained-stale",
+            "error": "Current period needs freshly validated native and daily data"
+          },
+          "1M": {
+            "status": "available",
+            "asOf": 1791455632.816,
+            "latestBarAt": 1790812800,
+            "freshness": "retained-stale",
+            "error": "Current period needs freshly validated native and daily data"
+          }
+        },
+        "errors": {
+          "1D": "Invalid Yahoo OHLCV values at 1791466200",
+          "1W": "Current period needs freshly validated native and daily data",
+          "1M": "Current period needs freshly validated native and daily data"
+        },
+        "error": "Error: No freshly verified daily quote; preserving last successful snapshot"
+      }
+    ]
+  }
+}

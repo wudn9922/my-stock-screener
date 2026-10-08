@@ -1,0 +1,25 @@
+{
+  "environment": "Headless desktop Chromium RAF scheduling only; not device FPS or GPU paint performance.",
+  "bars": 2500,
+  "indicators": 8,
+  "drawings": 100,
+  "lockedDrawings": 50,
+  "types": [
+    "trend",
+    "horizontal",
+    "ray",
+    "rectangle",
+    "fibonacci",
+    "channel",
+    "price-range",
+    "date-range",
+    "price-date-range",
+    "vertical"
+  ],
+  "editWithFullWorkload": true,
+  "peakDrawingCount": 101,
+  "rafSamples": 89,
+  "rafGapMedianMs": 16.699999999999818,
+  "rafGapP95Ms": 16.700000000000728,
+  "runtimeErrors": []
+}

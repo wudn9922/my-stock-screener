@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "AAPL",
+    "cik": 320193,
+    "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+    "retrieved": "2026-10-06",
+    "originalSha256": "73a86c6aedc31f77cac2ea4df5f80f0b3bd7e6eb58bb4e01444fbedf3afb9c43",
+    "fixtureSha256": "0a92f1986fe1ef9ed3268cf9d015933d88db298b7df08c3e52970e9e095eaf86",
+    "filter": "Mapped US-GAAP concepts only; raw facts with end >= 2022-01-01. Values/periods/accessions unchanged. Test-only; UI never imports fixtures."
+  },
+  {
+    "symbol": "MSFT",
+    "cik": 789019,
+    "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+    "retrieved": "2026-10-06",
+    "originalSha256": "f8aae2965b20ad0df44bdf7ccbedf797d275b6b8dc030154a7a311361bb7246f",
+    "fixtureSha256": "f67942704d0fa36023c728d85af4b1ba9e62cfbbf6ed0a186cc5fa703d3f9441",
+    "filter": "Mapped US-GAAP concepts only; raw facts with end >= 2022-01-01. Values/periods/accessions unchanged. Test-only; UI never imports fixtures."
+  },
+  {
+    "symbol": "NVDA",
+    "cik": 1045810,
+    "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001045810.json",
+    "retrieved": "2026-10-06",
+    "originalSha256": "19ef503a5770f5660964b3c3aea6937579d9b359da344afe6a9adf59c63d26ff",
+    "fixtureSha256": "793ff19711b65df665ca24e80872daa25efbae08e72d1a00e66c4d0ca8d1103c",
+    "filter": "Mapped US-GAAP concepts only; raw facts with end >= 2022-01-01. Values/periods/accessions unchanged. Test-only; UI never imports fixtures."
+  },
+  {
+    "symbol": "TSLA",
+    "cik": 1318605,
+    "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001318605.json",
+    "retrieved": "2026-10-06",
+    "originalSha256": "d0c2b9288d027a6d735039a6fe874a348b65a7fdbc6c133130666c777c885204",
+    "fixtureSha256": "36e8e601be8ea50f6027dbc95bea5816d8d321a375d4610ff2ed853d7d1feb04",
+    "filter": "Mapped US-GAAP concepts only; raw facts with end >= 2022-01-01. Values/periods/accessions unchanged. Test-only; UI never imports fixtures."
+  }
+]

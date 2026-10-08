@@ -1,0 +1,93 @@
+{
+  "url": "https://wudn9922.github.io/lightweight-drawing-lab/",
+  "status": "PASS",
+  "html": {
+    "url": "https://wudn9922.github.io/lightweight-drawing-lab/",
+    "status": 200,
+    "bytes": 1271,
+    "sha256": "1336df88522a2802dc3ffaa2eb99ad740dcd24e00c0eb1406436a39011291217"
+  },
+  "resources": [
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/chart-DeF8ixWn.js",
+      "status": 200,
+      "bytes": 181406,
+      "sha256": "558e3197b515e162be0d6a012695405e63e7832a8988dff7d50d89f4dd9e3182"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/index-C_ebhjyC.css",
+      "status": 200,
+      "bytes": 31231,
+      "sha256": "18df16091ac8b78fbfc9e0e6540717e48455dc77889ec7fcebe7199306f1d6cc"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/index-CgkbpnRO.js",
+      "status": 200,
+      "bytes": 373324,
+      "sha256": "ec0c8aa86b21246364c66abe312e30d4172d33c493725bb8fecca064d0d043fe"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/react-DPIr46qh.js",
+      "status": 200,
+      "bytes": 11880,
+      "sha256": "c0e00f50de6c0c4313118305af3b7781b03c48879475014a86ba2bcd056a65f6"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/storage-T3pps3jl.js",
+      "status": 200,
+      "bytes": 95263,
+      "sha256": "ca427f0b408fdb48ef2ecf0ad9091ad4ab57ddc72475968adb0ec5768c1ab6bf"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/icon-192.png",
+      "status": 200,
+      "bytes": 961,
+      "sha256": "be77664cb7eab14d3e7db86f73635a361381d1a58cffa8251b3d433d62cee024"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/icon.svg",
+      "status": 200,
+      "bytes": 519,
+      "sha256": "7a6e9c9b2a21676fb154a7293e9b46a13bfb1a4c6cad48439ed050ae86d2f505"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/manifest.webmanifest",
+      "status": 200,
+      "bytes": 475,
+      "sha256": "ea21c8a8640d29d6a01dd427c1085087b1c7c7c7c5e4a3171e802b32ab35037a"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/icon-512.png",
+      "status": 200,
+      "bytes": 4116,
+      "sha256": "cb891d2b4a31850ffb4cffaf8c1871129ea473d8b4c5cfdb9ae30a87bedc9295"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/NFLX.json",
+      "status": 200,
+      "bytes": 671237,
+      "sha256": "a02fa6d088cd8d3b864a991f695af6627c6edc42e8aac8450d6cd3951effcaaf"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/SMCI.json",
+      "status": 200,
+      "bytes": 676010,
+      "sha256": "224e79d2e5e76f379c9f22b9040879afe0f23a913e6a28d333d6e8681a76131d"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/market-data/manifest.json",
+      "status": 200,
+      "bytes": 3387,
+      "sha256": "9a09f268d88ba82e1fc24b8fb1929b5f71f61a831aa90843446eac1b9a8cd2eb"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/sw.js",
+      "status": 200,
+      "bytes": 3732,
+      "sha256": "01d6d74519233c3dda61d89be99ece9fcd92dc04ffa02a38e962728140c3d7b0"
+    }
+  ],
+  "sourceCommit": "0e4317a108fb9e6acc4b688355d2c55ac7dbaaf1",
+  "tlsVerification": "enabled",
+  "assetComparison": "matches newly tested local production build"
+}

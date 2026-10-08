@@ -1,0 +1,74 @@
+{
+  "SMCI": {
+    "url": "https://query2.finance.yahoo.com/v8/finance/chart/SMCI?interval=1d&range=5y&events=div%2Csplits&includePrePost=false",
+    "capturedAt": "2026-10-07T13:02:05.269715+00:00",
+    "sha256": "b1796546e9dba02e0d57f98112ee319590eb5c09aa5f5cf1353c8722aa7da0ce",
+    "note": "Actual provider response filtered to split-window and latest bars. OHLC preserved. Quote values are as-of, not guaranteed live."
+  },
+  "NFLX": {
+    "url": "https://query2.finance.yahoo.com/v8/finance/chart/NFLX?interval=1d&range=5y&events=div%2Csplits&includePrePost=false",
+    "capturedAt": "2026-10-07T13:02:05.271801+00:00",
+    "sha256": "262feb2eb9b8506ddcd71ae434a533014dba54021145c18927d5f658cfcec579",
+    "note": "Actual provider response filtered to split-window and latest bars. OHLC preserved. Quote values are as-of, not guaranteed live."
+  },
+  "SMCI-1mo": {
+    "url": "https://query2.finance.yahoo.com/v8/finance/chart/SMCI?interval=1mo&range=10y&events=div%2Csplits&includePrePost=false",
+    "capturedAt": "2026-10-07T13:17:38.361634+00:00",
+    "sha256": "52fa0c1ae65f907aad1974d17b8a1ed2925e98ac7da34db47a525509bab40f16",
+    "note": "Actual native period response tail including appended latest-session row; original OHLCV preserved."
+  },
+  "SMCI-1wk": {
+    "url": "https://query2.finance.yahoo.com/v8/finance/chart/SMCI?interval=1wk&range=10y&events=div%2Csplits&includePrePost=false",
+    "capturedAt": "2026-10-07T13:17:38.362620+00:00",
+    "sha256": "f4b5c8752ffd0ca80e882cfcc03ca6c19610b239815a617bd0c2767e9325d43f",
+    "note": "Actual native period response tail including appended latest-session row; original OHLCV preserved."
+  },
+  "NFLX-1mo": {
+    "url": "https://query2.finance.yahoo.com/v8/finance/chart/NFLX?interval=1mo&range=10y&events=div%2Csplits&includePrePost=false",
+    "capturedAt": "2026-10-07T13:17:38.362990+00:00",
+    "sha256": "565ae8510d23a19e05c3b92e92f003e19635d39a81375320ce0e66c0b6d5fa33",
+    "note": "Actual native period response tail including appended latest-session row; original OHLCV preserved."
+  },
+  "NFLX-1wk": {
+    "url": "https://query2.finance.yahoo.com/v8/finance/chart/NFLX?interval=1wk&range=10y&events=div%2Csplits&includePrePost=false",
+    "capturedAt": "2026-10-07T13:17:38.363916+00:00",
+    "sha256": "cbe9f6cc41f3d6963adc4a834d762f4491fd831d9c12642393b76167fee0115d",
+    "note": "Actual native period response tail including appended latest-session row; original OHLCV preserved."
+  },
+  "SMCI-current-1d": {
+    "url": "https://query2.finance.yahoo.com/v8/finance/chart/SMCI?interval=1d&range=10y&events=div%2Csplits&includePrePost=false",
+    "capturedAt": "2026-10-08T00:25:02.299Z",
+    "sha256": "9acbb8621861e6081fb12d94a4b3f16a1ee1080abaf749e2c23ea6424cdaaf57",
+    "note": "Actual Yahoo capture filtered to timestamps on or after 2026-08-01 UTC; meta/events retained and quote/adjclose arrays preserve source nulls."
+  },
+  "SMCI-current-1wk": {
+    "url": "https://query2.finance.yahoo.com/v8/finance/chart/SMCI?interval=1wk&range=10y&events=div%2Csplits&includePrePost=false",
+    "capturedAt": "2026-10-08T00:25:01.865Z",
+    "sha256": "0a5e97664732abba73898fb6b2f3941ef0208b14a53f00e7070387b3a667d546",
+    "note": "Actual Yahoo capture filtered to timestamps on or after 2026-08-01 UTC; meta/events retained and quote/adjclose arrays preserve source nulls."
+  },
+  "SMCI-current-1mo": {
+    "url": "https://query2.finance.yahoo.com/v8/finance/chart/SMCI?interval=1mo&range=10y&events=div%2Csplits&includePrePost=false",
+    "capturedAt": "2026-10-08T00:25:01.428Z",
+    "sha256": "e01b1961d2418f403e2efea0b9a58e70a2a06460210cab716a82c0e1fdff3d64",
+    "note": "Actual Yahoo capture filtered to timestamps on or after 2026-08-01 UTC; meta/events retained and quote/adjclose arrays preserve source nulls."
+  },
+  "NFLX-current-1d": {
+    "url": "https://query2.finance.yahoo.com/v8/finance/chart/NFLX?interval=1d&range=5y&events=div%2Csplits&includePrePost=false",
+    "capturedAt": "2026-10-08T01:01:46.977Z",
+    "sha256": "398d5c24dba3587d391b0dbc1be579700fba1e1e278cecc49f256fdc66abd9be",
+    "note": "Actual Yahoo capture filtered to timestamps on or after 2026-08-01 UTC; meta/events retained and quote/adjclose arrays preserve source nulls."
+  },
+  "NFLX-current-1wk": {
+    "url": "https://query2.finance.yahoo.com/v8/finance/chart/NFLX?interval=1wk&range=10y&events=div%2Csplits&includePrePost=false",
+    "capturedAt": "2026-10-08T01:01:47.192Z",
+    "sha256": "03fd05667a7b09f8dd2b1faa618036629acd2fd865e350150e23250fe1c8e5c8",
+    "note": "Actual Yahoo capture filtered to timestamps on or after 2026-08-01 UTC; meta/events retained and quote/adjclose arrays preserve source nulls."
+  },
+  "NFLX-current-1mo": {
+    "url": "https://query2.finance.yahoo.com/v8/finance/chart/NFLX?interval=1mo&range=10y&events=div%2Csplits&includePrePost=false",
+    "capturedAt": "2026-10-08T01:01:47.465Z",
+    "sha256": "f3b53b46e2377240ab26924c8c24a842d8ae98d8ac28717d24f9c30e3d3e5335",
+    "note": "Actual Yahoo capture filtered to timestamps on or after 2026-08-01 UTC; meta/events retained and quote/adjclose arrays preserve source nulls."
+  }
+}

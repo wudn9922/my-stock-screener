@@ -1,0 +1,14 @@
+{
+  "scope": "Test-only filtered market fixtures; production code never loads this directory.",
+  "source": "Yahoo Finance unofficial chart endpoint, https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+  "probeGeneratedAt": "2026-10-08T09:00:34.167484Z",
+  "probeRetrievedAt": "2026-10-08T08:59:38Z through 2026-10-08T09:00:00Z",
+  "symbolsAndIntervals": [
+    "2330.TW 1d, 1wk, 1mo",
+    "2330.TW 5m (final eight actual rows, including terminal close-only row)",
+    "0050.TW 1d",
+    "6488.TWO 1d"
+  ],
+  "filtering": "Kept source meta, chart timestamps, and quote OHLCV rows from 2026-05-01 onward as needed for current-period normalization. The 2330 5m fixture keeps its last eight actual source rows to cover the 13:25 null row and 13:30 terminal close-only observation. No values were generated or adjusted by this fixture step.",
+  "interpretation": "Yahoo reports TWD and Asia/Taipei; its quote OHLC is split-adjusted. The 2330 5m terminal row is source-reported at 13:30 local with flat OHLC and zero volume; its preceding 13:25 row has null OHLC and is not retained as a bar. The 0050 sample reports no split event. These fixtures are narrow regression samples, not a full market archive or a production allowlist."
+}

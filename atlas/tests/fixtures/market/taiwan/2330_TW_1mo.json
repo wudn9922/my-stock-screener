@@ -1,0 +1,256 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "TWD",
+          "symbol": "2330.TW",
+          "exchangeName": "TAI",
+          "fullExchangeName": "Taiwan",
+          "instrumentType": "EQUITY",
+          "firstTradeDate": 946947600,
+          "regularMarketTime": 1791437413,
+          "hasPrePostMarketData": false,
+          "gmtoffset": 28800,
+          "timezone": "CST",
+          "exchangeTimezoneName": "Asia/Taipei",
+          "regularMarketPrice": 2550,
+          "regularMarketChangePercent": -1.354,
+          "fulldayPrice": 2550,
+          "fulldayChange": -35,
+          "fulldayChangePercent": -1.354,
+          "fiftyTwoWeekHigh": 2590,
+          "fiftyTwoWeekLow": 1375,
+          "regularMarketDayHigh": 2575,
+          "regularMarketDayLow": 2550,
+          "regularMarketVolume": 22484073,
+          "longName": "Taiwan Semiconductor Manufacturing Company Limited",
+          "shortName": "TAIWAN SEMICONDUCTOR MANUFACTUR",
+          "chartPreviousClose": 188,
+          "priceHint": 2,
+          "currentTradingPeriod": {
+            "pre": {
+              "timezone": "CST",
+              "start": 1791421200,
+              "end": 1791421200,
+              "gmtoffset": 28800
+            },
+            "regular": {
+              "timezone": "CST",
+              "start": 1791421200,
+              "end": 1791437400,
+              "gmtoffset": 28800
+            },
+            "post": {
+              "timezone": "CST",
+              "start": 1791437400,
+              "end": 1791437400,
+              "gmtoffset": 28800
+            }
+          },
+          "dataGranularity": "1mo",
+          "range": "10y",
+          "validRanges": [
+            "1d",
+            "5d",
+            "1mo",
+            "3mo",
+            "6mo",
+            "1y",
+            "2y",
+            "5y",
+            "10y",
+            "ytd",
+            "max"
+          ]
+        },
+        "timestamp": [
+          1780243200,
+          1782835200,
+          1785513600,
+          1788192000,
+          1790784000,
+          1791437413
+        ],
+        "indicators": {
+          "quote": [
+            {
+              "low": [
+                2210,
+                2180,
+                2310,
+                2375,
+                2485,
+                2550
+              ],
+              "close": [
+                2410,
+                2425,
+                2405,
+                2480,
+                2585,
+                2550
+              ],
+              "open": [
+                2355,
+                2495,
+                2390,
+                2395,
+                2490,
+                2550
+              ],
+              "high": [
+                2535,
+                2505,
+                2445,
+                2510,
+                2590,
+                2575
+              ],
+              "volume": [
+                728439324,
+                748889180,
+                414445223,
+                385715376,
+                89561268,
+                22484073
+              ]
+            }
+          ]
+        },
+        "events": {
+          "dividends": {
+            "1496246400": {
+              "amount": 7,
+              "date": 1498438800
+            },
+            "1527782400": {
+              "amount": 8,
+              "date": 1529888400
+            },
+            "1559318400": {
+              "amount": 8,
+              "date": 1561338000
+            },
+            "1567267200": {
+              "amount": 2,
+              "date": 1568854800
+            },
+            "1575129600": {
+              "amount": 2.5,
+              "date": 1576717200
+            },
+            "1582992000": {
+              "amount": 2.5,
+              "date": 1584579600
+            },
+            "1590940800": {
+              "amount": 2.5,
+              "date": 1592442000
+            },
+            "1598889600": {
+              "amount": 2.5,
+              "date": 1600304400
+            },
+            "1606752000": {
+              "amount": 2.5,
+              "date": 1608166800
+            },
+            "1614528000": {
+              "amount": 2.5,
+              "date": 1615942800
+            },
+            "1622476800": {
+              "amount": 2.5,
+              "date": 1623891600
+            },
+            "1630425600": {
+              "amount": 2.75,
+              "date": 1631754000
+            },
+            "1638288000": {
+              "amount": 2.75,
+              "date": 1639616400
+            },
+            "1646064000": {
+              "amount": 2.75,
+              "date": 1647392400
+            },
+            "1654012800": {
+              "amount": 2.75,
+              "date": 1655341200
+            },
+            "1661961600": {
+              "amount": 2.75,
+              "date": 1663203600
+            },
+            "1669824000": {
+              "amount": 2.75,
+              "date": 1671066000
+            },
+            "1677600000": {
+              "amount": 2.749821,
+              "date": 1678928400
+            },
+            "1685548800": {
+              "amount": 2.749821,
+              "date": 1686790800
+            },
+            "1693497600": {
+              "amount": 3,
+              "date": 1694653200
+            },
+            "1701360000": {
+              "amount": 3,
+              "date": 1702515600
+            },
+            "1709222400": {
+              "amount": 3.49979,
+              "date": 1710723600
+            },
+            "1717171200": {
+              "amount": 3.49979,
+              "date": 1718240400
+            },
+            "1725120000": {
+              "amount": 4.000138,
+              "date": 1726102800
+            },
+            "1732982400": {
+              "amount": 3.999637,
+              "date": 1733965200
+            },
+            "1740758400": {
+              "amount": 4.50002,
+              "date": 1742259600
+            },
+            "1748707200": {
+              "amount": 4.50002,
+              "date": 1749690000
+            },
+            "1756656000": {
+              "amount": 5.000018,
+              "date": 1757984400
+            },
+            "1764518400": {
+              "amount": 5.000011,
+              "date": 1765414800
+            },
+            "1772294400": {
+              "amount": 6.000036,
+              "date": 1773709200
+            },
+            "1780243200": {
+              "amount": 6.000036,
+              "date": 1781139600
+            },
+            "1788192000": {
+              "amount": 7.000001,
+              "date": 1789520400
+            }
+          }
+        }
+      }
+    ]
+  }
+}

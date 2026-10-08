@@ -1,0 +1,27 @@
+{
+  "url": "https://wudn9922.github.io/lightweight-drawing-lab/",
+  "checkedAt": "2026-10-07T08:50:42.660Z",
+  "reports": [
+    {
+      "profile": "desktop-chromium",
+      "status": "BLOCKED: managed-cloud Chromium CA trust",
+      "error": "Error: page.goto: net::ERR_CERT_AUTHORITY_INVALID at https://wudn9922.github.io/lightweight-drawing-lab/\nCall log:\n\u001b[2m  - navigating to \"https://wudn9922.github.io/lightweight-drawing-lab/\", waiting until \"domcontentloaded\"\u001b[22m\n",
+      "runtimeErrors": [],
+      "navigationAttempt": "FAIL: ERR_CERT_AUTHORITY_INVALID",
+      "limitation": "The cloud proxy CA was not trusted by Chromium. Automatic approval review rejected modifying the global NSS trust store because it changes future trust boundaries beyond this task. No such change was executed. HTTPS requests and iPhone WebKit remote verification passed with TLS verification enabled; local desktop Pages regression also passed."
+    },
+    {
+      "profile": "iphone-webkit",
+      "status": "PASS",
+      "httpsStatus": 200,
+      "demoChart": "PASS",
+      "smaLockReload": "PASS",
+      "staticFinancialUnavailable": "PASS",
+      "serviceWorkerScope": "https://wudn9922.github.io/lightweight-drawing-lab/",
+      "apiRequests": [],
+      "runtimeErrors": [],
+      "tlsVerification": "enabled"
+    }
+  ],
+  "note": "Headless profiles, not physical iPhone Safari UAT."
+}
