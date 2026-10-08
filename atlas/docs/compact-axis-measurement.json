@@ -1,0 +1,658 @@
+{
+  "status": "Local width measurement and 694-glyph geometry passed; public iPhone WebKit visual review passed; physical-device UAT pending",
+  "generatedAt": "2026-10-08T09:59:51.414Z",
+  "measurementTimestamp": "2026-10-08T09:59:51.414Z",
+  "method": "Public createChart, addSeries(CandlestickSeries), createPriceLine, and priceScale(\"right\").width() APIs on an offscreen 640×400 chart. A fresh chart is created for every variant and price sample to avoid width carryover.",
+  "fontSha256": "5e465e809833ef0fa73c5a65827e921c0e02aba1facc263d606838c1bd126d1f",
+  "fontFamily": "Atlas Narrow Axis",
+  "fontPath": "src/assets/fonts/AtlasNarrowAxis-Regular.ttf",
+  "fontTransform": "All composites flattened into outlines before scaling; every glyph outline x-coordinate, horizontal advance, left side bearing, and horizontal extent metadata scaled by 0.70. TrueType glyph instructions and fpgm/prep/cvt hinting tables removed. Vertical coordinates and bounds are unchanged.",
+  "fontPositioning": "GPOS and the absent kern table are omitted; the original cmap and full glyph map are retained.",
+  "fontSource": {
+    "family": "Barlow Condensed Regular",
+    "repository": "https://github.com/google/fonts/tree/main/ofl/barlowcondensed",
+    "fontUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/barlowcondensed/BarlowCondensed-Regular.ttf",
+    "sourceFontSha256": "583cec5da3b84bc4dc7c9c72e2a565c94d34e431518b19d7e250b7830ad5f996",
+    "license": "SIL Open Font License 1.1",
+    "licenseUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/barlowcondensed/OFL.txt",
+    "licenseSha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f"
+  },
+  "invalidatedPreviousProof": {
+    "status": "INVALIDATED",
+    "fontSha256": "b5fc34a0655af71f6e234feae82dbf543b6f09aab052acd2c33aa45d39f92312",
+    "reason": "The prior width proof used a derivative whose glyph outlines remained full width while advances were scaled to 70%, producing glyph overlap; those axis-width measurements are invalid."
+  },
+  "integratedRegression": {
+    "status": "PASS",
+    "passed": 4,
+    "total": 4,
+    "durationSeconds": 16.5,
+    "log": "/tmp/atlas-fin-tw-axis-browser-corrected.log"
+  },
+  "visualWebKitReadability": {
+    "status": "PASS",
+    "reviewedAt": "2026-10-08T10:05:38Z",
+    "scope": "Local WebKit with iPhone 13 emulation only.",
+    "review": "Root and Sol reviewed the corrected screenshot; the 2600, 2550, and 2500 glyphs and date labels appeared coherent.",
+    "log": "/tmp/atlas-axis-local-raster.log",
+    "screenshots": [
+      "/tmp/atlas-axis-corrected-chart.png",
+      "/tmp/atlas-axis-corrected-iphone.png"
+    ],
+    "physicalDeviceUAT": "PENDING",
+    "publicDeploymentVerification": {
+      "status": "PASS",
+      "sourceCommit": "3feb6337aeab4e686c0f61e259bece7250be3d40",
+      "actionsRun": "37785146220",
+      "deploymentCompletedAt": "2026-10-08T13:36:11Z",
+      "httpEvidence": "docs/taiwan-financial-live-http.json",
+      "httpCheckedAt": "2026-10-08T13:38:04.608649+00:00",
+      "browserEvidence": "docs/taiwan-financial-live-browser.json",
+      "browserPassedAt": "2026-10-08T13:37:56.193Z",
+      "scope": "Public GitHub Pages iPhone WebKit smoke; not physical-device UAT.",
+      "review": "Root inspected the public chart and financial-panel screenshots. Price-axis values including 2550 and 2600 and the date labels appeared coherent.",
+      "screenshots": [
+        "/tmp/atlas-tw-live-chart.png",
+        "/tmp/atlas-sec-live-panel.png"
+      ],
+      "physicalDeviceUAT": "PENDING"
+    }
+  },
+  "fontSize": 11,
+  "pricePrecision": 2,
+  "labelPolicy": "Only redundant trailing decimal zeros are removed; no truncated digits or K/M labels.",
+  "baselineVariant": "deployed-baseline",
+  "candidateVariant": "minimum-zero-narrow-70-font-11-lossless-trim",
+  "prices": [
+    275.19,
+    44.94,
+    69.7,
+    114.95,
+    1234.5,
+    2550,
+    4500,
+    1000000
+  ],
+  "ordinaryFivePrices": [
+    275.19,
+    44.94,
+    69.7,
+    114.95,
+    1234.5
+  ],
+  "additionalPrices": [
+    2550,
+    4500,
+    1000000
+  ],
+  "reductionPercentRange": {
+    "minimum": 30.76923076923077,
+    "maximum": 40
+  },
+  "results": [
+    {
+      "profile": "desktop-chromium",
+      "engine": "chromium",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 1,
+      "canvasFontChecks": [
+        {
+          "family": "AtlasNarrowAxis",
+          "baselineFont": "11px Inter, system-ui, sans-serif",
+          "candidateFont": "11px AtlasNarrowAxis",
+          "sample": "275.19",
+          "baselineWidth": 34.40771484375,
+          "candidateWidth": 15
+        }
+      ],
+      "measurements": [
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 275.19,
+          "axisWidthCssPx": 38,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "275.19",
+          "baselineWidthCssPx": 56,
+          "reductionCssPx": 18,
+          "reductionPercent": 32.142857142857146
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 44.94,
+          "axisWidthCssPx": 34,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "44.94",
+          "baselineWidthCssPx": 50,
+          "reductionCssPx": 16,
+          "reductionPercent": 32
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 69.7,
+          "axisWidthCssPx": 34,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "69.7",
+          "baselineWidthCssPx": 50,
+          "reductionCssPx": 16,
+          "reductionPercent": 32
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 114.95,
+          "axisWidthCssPx": 36,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "114.95",
+          "baselineWidthCssPx": 56,
+          "reductionCssPx": 20,
+          "reductionPercent": 35.714285714285715
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 1234.5,
+          "axisWidthCssPx": 40,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "1234.5",
+          "baselineWidthCssPx": 62,
+          "reductionCssPx": 22,
+          "reductionPercent": 35.483870967741936
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 2550,
+          "axisWidthCssPx": 40,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "2550",
+          "baselineWidthCssPx": 62,
+          "reductionCssPx": 22,
+          "reductionPercent": 35.483870967741936
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 4500,
+          "axisWidthCssPx": 40,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "4500",
+          "baselineWidthCssPx": 62,
+          "reductionCssPx": 22,
+          "reductionPercent": 35.483870967741936
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 1000000,
+          "axisWidthCssPx": 48,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "1000000",
+          "baselineWidthCssPx": 80,
+          "reductionCssPx": 32,
+          "reductionPercent": 40
+        }
+      ]
+    },
+    {
+      "profile": "mobile-chromium",
+      "engine": "chromium",
+      "viewport": {
+        "width": 390,
+        "height": 664
+      },
+      "deviceScaleFactor": 3,
+      "canvasFontChecks": [
+        {
+          "family": "AtlasNarrowAxis",
+          "baselineFont": "11px Inter, system-ui, sans-serif",
+          "candidateFont": "11px AtlasNarrowAxis",
+          "sample": "275.19",
+          "baselineWidth": 34.40771484375,
+          "candidateWidth": 15
+        }
+      ],
+      "measurements": [
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 275.19,
+          "axisWidthCssPx": 38,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "275.19",
+          "baselineWidthCssPx": 56,
+          "reductionCssPx": 18,
+          "reductionPercent": 32.142857142857146
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 44.94,
+          "axisWidthCssPx": 34,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "44.94",
+          "baselineWidthCssPx": 50,
+          "reductionCssPx": 16,
+          "reductionPercent": 32
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 69.7,
+          "axisWidthCssPx": 34,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "69.7",
+          "baselineWidthCssPx": 50,
+          "reductionCssPx": 16,
+          "reductionPercent": 32
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 114.95,
+          "axisWidthCssPx": 36,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "114.95",
+          "baselineWidthCssPx": 56,
+          "reductionCssPx": 20,
+          "reductionPercent": 35.714285714285715
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 1234.5,
+          "axisWidthCssPx": 40,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "1234.5",
+          "baselineWidthCssPx": 62,
+          "reductionCssPx": 22,
+          "reductionPercent": 35.483870967741936
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 2550,
+          "axisWidthCssPx": 40,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "2550",
+          "baselineWidthCssPx": 62,
+          "reductionCssPx": 22,
+          "reductionPercent": 35.483870967741936
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 4500,
+          "axisWidthCssPx": 40,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "4500",
+          "baselineWidthCssPx": 62,
+          "reductionCssPx": 22,
+          "reductionPercent": 35.483870967741936
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 1000000,
+          "axisWidthCssPx": 48,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "1000000",
+          "baselineWidthCssPx": 80,
+          "reductionCssPx": 32,
+          "reductionPercent": 40
+        }
+      ]
+    },
+    {
+      "profile": "ipad-webkit",
+      "engine": "webkit",
+      "viewport": {
+        "width": 834,
+        "height": 1194
+      },
+      "deviceScaleFactor": 2,
+      "canvasFontChecks": [
+        {
+          "family": "AtlasNarrowAxis",
+          "baselineFont": "11px Inter, system-ui, sans-serif",
+          "candidateFont": "11px AtlasNarrowAxis",
+          "sample": "275.19",
+          "baselineWidth": 31.305770874023438,
+          "candidateWidth": 15.586868286132812
+        }
+      ],
+      "measurements": [
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 275.19,
+          "axisWidthCssPx": 40,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "275.19",
+          "baselineWidthCssPx": 60,
+          "reductionCssPx": 20,
+          "reductionPercent": 33.33333333333333
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 44.94,
+          "axisWidthCssPx": 36,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "44.94",
+          "baselineWidthCssPx": 52,
+          "reductionCssPx": 16,
+          "reductionPercent": 30.76923076923077
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 69.7,
+          "axisWidthCssPx": 36,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "69.7",
+          "baselineWidthCssPx": 52,
+          "reductionCssPx": 16,
+          "reductionPercent": 30.76923076923077
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 114.95,
+          "axisWidthCssPx": 36,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "114.95",
+          "baselineWidthCssPx": 52,
+          "reductionCssPx": 16,
+          "reductionPercent": 30.76923076923077
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 1234.5,
+          "axisWidthCssPx": 42,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "1234.5",
+          "baselineWidthCssPx": 62,
+          "reductionCssPx": 20,
+          "reductionPercent": 32.25806451612903
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 2550,
+          "axisWidthCssPx": 44,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "2550",
+          "baselineWidthCssPx": 66,
+          "reductionCssPx": 22,
+          "reductionPercent": 33.33333333333333
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 4500,
+          "axisWidthCssPx": 44,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "4500",
+          "baselineWidthCssPx": 66,
+          "reductionCssPx": 22,
+          "reductionPercent": 33.33333333333333
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 1000000,
+          "axisWidthCssPx": 52,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "1000000",
+          "baselineWidthCssPx": 84,
+          "reductionCssPx": 32,
+          "reductionPercent": 38.095238095238095
+        }
+      ]
+    },
+    {
+      "profile": "iphone-webkit",
+      "engine": "webkit",
+      "viewport": {
+        "width": 390,
+        "height": 664
+      },
+      "deviceScaleFactor": 3,
+      "canvasFontChecks": [
+        {
+          "family": "AtlasNarrowAxis",
+          "baselineFont": "11px Inter, system-ui, sans-serif",
+          "candidateFont": "11px AtlasNarrowAxis",
+          "sample": "275.19",
+          "baselineWidth": 31.305770874023438,
+          "candidateWidth": 15.586868286132812
+        }
+      ],
+      "measurements": [
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 275.19,
+          "axisWidthCssPx": 40,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "275.19",
+          "baselineWidthCssPx": 60,
+          "reductionCssPx": 20,
+          "reductionPercent": 33.33333333333333
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 44.94,
+          "axisWidthCssPx": 36,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "44.94",
+          "baselineWidthCssPx": 52,
+          "reductionCssPx": 16,
+          "reductionPercent": 30.76923076923077
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 69.7,
+          "axisWidthCssPx": 36,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "69.7",
+          "baselineWidthCssPx": 52,
+          "reductionCssPx": 16,
+          "reductionPercent": 30.76923076923077
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 114.95,
+          "axisWidthCssPx": 36,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "114.95",
+          "baselineWidthCssPx": 52,
+          "reductionCssPx": 16,
+          "reductionPercent": 30.76923076923077
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 1234.5,
+          "axisWidthCssPx": 42,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "1234.5",
+          "baselineWidthCssPx": 62,
+          "reductionCssPx": 20,
+          "reductionPercent": 32.25806451612903
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 2550,
+          "axisWidthCssPx": 44,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "2550",
+          "baselineWidthCssPx": 66,
+          "reductionCssPx": 22,
+          "reductionPercent": 33.33333333333333
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 4500,
+          "axisWidthCssPx": 44,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "4500",
+          "baselineWidthCssPx": 66,
+          "reductionCssPx": 22,
+          "reductionPercent": 33.33333333333333
+        },
+        {
+          "variant": "minimum-zero-narrow-70-font-11-lossless-trim",
+          "minimumWidth": 0,
+          "fontSize": 11,
+          "fontFamily": "\"AtlasNarrowAxis\"",
+          "formatter": "trim-trailing-zeroes",
+          "minMove": 0.01,
+          "price": 1000000,
+          "axisWidthCssPx": 52,
+          "axisBadgeVisible": true,
+          "formattedProbeValue": "1000000",
+          "baselineWidthCssPx": 84,
+          "reductionCssPx": 32,
+          "reductionPercent": 38.095238095238095
+        }
+      ]
+    }
+  ]
+}

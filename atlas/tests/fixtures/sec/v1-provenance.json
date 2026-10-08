@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-06T10:32:06.755Z",
+  "fixtures": [
+    {
+      "symbol": "JPM",
+      "cik": 19617,
+      "entityName": "JPMORGAN CHASE & CO",
+      "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000019617.json",
+      "retrievedAt": "2026-10-06T10:32:04.696Z",
+      "resolution": "Official SEC ticker map through SecClient",
+      "sourceObjectSha256": "aca9a8075ba86537ff8e67f712ca22770ef2b9a840f69a98ff47037d848fbb44",
+      "fixtureSha256": "2b235a6f3c638cc13e409e69c5a406e0d4e582b50c9998826323a26bd5b40e1b",
+      "sourceObjectHashMethod": "SHA-256 of compact JSON.stringify output from the parsed response object supplied to the filter (SecClient normalizes digit-string CIKs to numbers); this is not a hash of SEC wire bytes.",
+      "filter": "Mapped US-GAAP concepts only; unit rows with end >= 2022-01-01; source fact values, units and filing metadata are preserved. Test-only; UI never imports fixtures."
+    },
+    {
+      "symbol": "WMT",
+      "cik": 104169,
+      "entityName": "WALMART INC.",
+      "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000104169.json",
+      "retrievedAt": "2026-10-06T10:32:05.225Z",
+      "resolution": "Official SEC ticker map through SecClient",
+      "sourceObjectSha256": "54ec3fbf36dc203dd00a0333396b3df2b6695ecdf6cbb19b6ec41b053d86b517",
+      "fixtureSha256": "33faf2b2f07a3d47d29c3c5e9216006daa5bba0a65d3b54306d9c0ebdea3f396",
+      "sourceObjectHashMethod": "SHA-256 of compact JSON.stringify output from the parsed response object supplied to the filter (SecClient normalizes digit-string CIKs to numbers); this is not a hash of SEC wire bytes.",
+      "filter": "Mapped US-GAAP concepts only; unit rows with end >= 2022-01-01; source fact values, units and filing metadata are preserved. Test-only; UI never imports fixtures."
+    },
+    {
+      "symbol": "XOM-current",
+      "cik": 2115436,
+      "entityName": "ExxonMobil Holdings Corp",
+      "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0002115436.json",
+      "retrievedAt": "2026-10-06T10:32:05.688Z",
+      "resolution": "Current official SEC ticker map through SecClient.",
+      "sourceObjectSha256": "83903ba0789fdddb7fedf1d4f6f788b6a0b8e8dafcca8d36d69e731d5b6c2ff0",
+      "fixtureSha256": "9c5608f0368427b506dd11e18b5fbd999ff2ff09d2f2cbfffe0e683a55f588d1",
+      "sourceObjectHashMethod": "SHA-256 of compact JSON.stringify output from the parsed response object supplied to the filter (SecClient normalizes digit-string CIKs to numbers); this is not a hash of SEC wire bytes.",
+      "filter": "Mapped US-GAAP concepts only; unit rows with end >= 2022-01-01; source fact values, units and filing metadata are preserved. Test-only; UI never imports fixtures."
+    },
+    {
+      "symbol": "XOM",
+      "cik": 34088,
+      "entityName": "Exxon Mobil Corporation",
+      "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000034088.json",
+      "retrievedAt": "2026-10-06T10:32:06.577Z",
+      "resolution": "Test-only historical Exxon Mobil Corporation CIK 0000034088; current SEC ticker map resolves XOM to 0002115436 (ExxonMobil Holdings Corp).",
+      "sourceObjectSha256": "9b95535419e5662e3deed01de803e83deead477a4c81316e1c45186368fdd8b8",
+      "fixtureSha256": "a5629d41776959bedf1559cbf2e71fc77bcae7a2ecfe331b8f633a5626719fa1",
+      "sourceObjectHashMethod": "SHA-256 of compact JSON.stringify output from the parsed response object supplied to the filter (SecClient normalizes digit-string CIKs to numbers); this is not a hash of SEC wire bytes.",
+      "filter": "Mapped US-GAAP concepts only; unit rows with end >= 2022-01-01; source fact values, units and filing metadata are preserved. Test-only; UI never imports fixtures."
+    }
+  ]
+}

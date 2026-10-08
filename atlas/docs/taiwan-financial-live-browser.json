@@ -1,0 +1,198 @@
+{
+  "status": "PASS_WITH_REPORTED_0050_PARTIAL_COVERAGE",
+  "checkedAt": "2026-10-08T13:37:56.193Z",
+  "url": "https://wudn9922.github.io/lightweight-drawing-lab/",
+  "profile": "iphone-webkit-emulation",
+  "tlsVerification": "WebKit default certificate validation; ignoreHTTPSErrors not enabled",
+  "sourceCommit": "3feb6337aeab4e686c0f61e259bece7250be3d40",
+  "marketData": "actual same-origin Yahoo delayed snapshots; values remain as-published in TWD",
+  "taiwan": [
+    {
+      "symbol": "2330.TW",
+      "quote": {
+        "symbol": "2330.TW",
+        "price": 2550,
+        "change": -35,
+        "changePercent": -1.3539651837524147,
+        "asOf": 1791437413,
+        "source": "Yahoo unofficial prototype · delayed / as-of data",
+        "dataState": "delayed",
+        "retrievedAt": 1791466504.63,
+        "cacheStatus": "fresh",
+        "market": {
+          "market": "TW",
+          "currency": "TWD",
+          "exchange": "TWSE",
+          "timezone": "Asia/Taipei",
+          "sessionOpenMinutes": 540,
+          "sessionCloseMinutes": 810
+        }
+      },
+      "timeframes": [
+        {
+          "timeframe": "1W",
+          "status": "available",
+          "latest": {
+            "time": 1791129600,
+            "open": 2550,
+            "high": 2590,
+            "low": 2545,
+            "close": 2550,
+            "volume": 79502727
+          },
+          "quoteAsOf": 1791437413
+        },
+        {
+          "timeframe": "1M",
+          "status": "available",
+          "latest": {
+            "time": 1790784000,
+            "open": 2490,
+            "high": 2590,
+            "low": 2485,
+            "close": 2550,
+            "volume": 112045341
+          },
+          "quoteAsOf": 1791437413
+        }
+      ]
+    },
+    {
+      "symbol": "0050.TW",
+      "quote": {
+        "symbol": "0050.TW",
+        "price": 114.95,
+        "change": -1.5499999999999972,
+        "changePercent": -1.3304721030042876,
+        "asOf": 1791437404,
+        "source": "Yahoo unofficial prototype · delayed / as-of data",
+        "dataState": "delayed",
+        "retrievedAt": 1791466510.733,
+        "cacheStatus": "fresh",
+        "market": {
+          "market": "TW",
+          "currency": "TWD",
+          "exchange": "TWSE",
+          "timezone": "Asia/Taipei",
+          "sessionOpenMinutes": 540,
+          "sessionCloseMinutes": 810
+        }
+      },
+      "timeframes": [
+        {
+          "timeframe": "1W",
+          "status": "unavailable",
+          "reason": "Yahoo daily row has an unhealed null close in the current period"
+        },
+        {
+          "timeframe": "1M",
+          "status": "unavailable",
+          "reason": "Yahoo daily row has an unhealed null close in the current period"
+        }
+      ]
+    },
+    {
+      "symbol": "6488.TWO",
+      "quote": {
+        "symbol": "6488.TWO",
+        "price": 1130,
+        "change": -85,
+        "changePercent": -6.995884773662553,
+        "asOf": 1791437404,
+        "source": "Yahoo unofficial prototype · delayed / as-of data",
+        "dataState": "delayed",
+        "retrievedAt": 1791466528.908,
+        "cacheStatus": "fresh",
+        "market": {
+          "market": "TW",
+          "currency": "TWD",
+          "exchange": "TPEx",
+          "timezone": "Asia/Taipei",
+          "sessionOpenMinutes": 540,
+          "sessionCloseMinutes": 810
+        }
+      },
+      "timeframes": [
+        {
+          "timeframe": "1W",
+          "status": "available",
+          "latest": {
+            "time": 1791129600,
+            "open": 1220,
+            "high": 1260,
+            "low": 1095,
+            "close": 1130,
+            "volume": 65488743
+          },
+          "quoteAsOf": 1791437404
+        },
+        {
+          "timeframe": "1M",
+          "status": "available",
+          "latest": {
+            "time": 1790784000,
+            "open": 1055,
+            "high": 1260,
+            "low": 1045,
+            "close": 1130,
+            "volume": 104630115
+          },
+          "quoteAsOf": 1791437404
+        }
+      ]
+    }
+  ],
+  "taiwanFinancialUnsupported": {
+    "symbol": "2330.TW",
+    "label": "SEC 財報不支援台灣上市市場",
+    "explanation": "TWD issuers are outside this SEC source"
+  },
+  "financialSnapshot": {
+    "symbol": "AAPL",
+    "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+    "cik": "0000320193",
+    "generatedAt": 1791451155,
+    "fetchedAt": 1791451154,
+    "asOfClassification": "within-24h",
+    "quarterly": {
+      "periodEnd": "2026-06-27",
+      "latestIncludedFiling": {
+        "filingDate": "2026-07-31",
+        "form": "10-Q",
+        "accession": "0000320193-26-000020"
+      },
+      "revenueDerived": false
+    },
+    "annual": {
+      "periodEnd": "2025-09-27",
+      "latestIncludedFiling": {
+        "filingDate": "2025-10-31",
+        "form": "10-K",
+        "accession": "0000320193-25-000079"
+      },
+      "revenueDerived": false
+    },
+    "uiQuarterlyAndAnnualSourceAudit": "PASS"
+  },
+  "financialPageRequests": [
+    "/lightweight-drawing-lab/financial-data/AAPL.json"
+  ],
+  "persistedState": "three timeframe-owned locked SMAs and future horizontal drawing survive symbol switching, reload, and version 4 export",
+  "apiRequests": [],
+  "staticRequests": [
+    "/lightweight-drawing-lab/financial-data/AAPL.json",
+    "/lightweight-drawing-lab/market-data/0050.TW.json",
+    "/lightweight-drawing-lab/market-data/2330.TW.json",
+    "/lightweight-drawing-lab/market-data/6488.TWO.json",
+    "/lightweight-drawing-lab/market-data/AAPL.json",
+    "/lightweight-drawing-lab/market-data/AMD.json",
+    "/lightweight-drawing-lab/market-data/AMZN.json",
+    "/lightweight-drawing-lab/market-data/GOOGL.json",
+    "/lightweight-drawing-lab/market-data/META.json",
+    "/lightweight-drawing-lab/market-data/MSFT.json",
+    "/lightweight-drawing-lab/market-data/NVDA.json",
+    "/lightweight-drawing-lab/market-data/TSLA.json"
+  ],
+  "runtimeErrors": [],
+  "physicalDevice": "Pending; Playwright WebKit emulation is not physical iPhone Safari."
+}

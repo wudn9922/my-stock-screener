@@ -110,5 +110,13 @@ jobs:
           # -A 才會把「已被清理的過期 CSV」的刪除動作一起提交
           git add -A docs/index.html data
           git commit -m "Auto-update daily data and generate HTML" || echo "No changes to commit"
-          git pull --rebase
-          git push
+          # Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試
+          for attempt in 1 2 3; do
+            git pull --rebase
+            if git push; then
+              exit 0
+            fi
+            echo "推送失敗（第 ${attempt} 次），稍後重試"
+            sleep $((attempt * 15))
+          done
+          exit 1

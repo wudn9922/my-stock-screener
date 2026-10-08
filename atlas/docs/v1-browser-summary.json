@@ -1,0 +1,739 @@
+{
+  "command": "npm run test:browser -- --reporter=list,json",
+  "stats": {
+    "startTime": "2026-10-06T19:29:37.795Z",
+    "duration": 520930.431,
+    "expected": 78,
+    "skipped": 10,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "projects": {
+    "desktop-chromium": {
+      "passed": 21,
+      "skipped": 1,
+      "failed": 0
+    },
+    "mobile-chromium": {
+      "passed": 19,
+      "skipped": 3,
+      "failed": 0
+    },
+    "ipad-webkit": {
+      "passed": 19,
+      "skipped": 3,
+      "failed": 0
+    },
+    "iphone-webkit": {
+      "passed": 19,
+      "skipped": 3,
+      "failed": 0
+    }
+  },
+  "cases": [
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Horizontal Ray: gestures, edits, history, locked pan, future, isolation, reload and export/import",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 6863
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Rectangle: gestures, edits, history, locked pan, future, isolation, reload and export/import",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 8309
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Fibonacci Retracement: gestures, edits, history, locked pan, future, isolation, reload and export/import",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 6868
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Rectangle four corners retain component ownership on desktop and touch",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 3413
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Horizontal Ray: gestures, edits, history, locked pan, future, isolation, reload and export/import",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 8311
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Rectangle: gestures, edits, history, locked pan, future, isolation, reload and export/import",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 7151
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Fibonacci Retracement: gestures, edits, history, locked pan, future, isolation, reload and export/import",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 7517
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Rectangle four corners retain component ownership on desktop and touch",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 2527
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Horizontal Ray: gestures, edits, history, locked pan, future, isolation, reload and export/import",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 12777
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Rectangle: gestures, edits, history, locked pan, future, isolation, reload and export/import",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 12447
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Fibonacci Retracement: gestures, edits, history, locked pan, future, isolation, reload and export/import",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 12296
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Rectangle four corners retain component ownership on desktop and touch",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 7506
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Horizontal Ray: gestures, edits, history, locked pan, future, isolation, reload and export/import",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 10113
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Rectangle: gestures, edits, history, locked pan, future, isolation, reload and export/import",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 11475
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Fibonacci Retracement: gestures, edits, history, locked pan, future, isolation, reload and export/import",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 9892
+    },
+    {
+      "file": "drawing-phase2.spec.ts",
+      "title": "Rectangle four corners retain component ownership on desktop and touch",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 5275
+    },
+    {
+      "file": "drawing-v1.spec.ts",
+      "title": "V1 channel, range measurements and vertical line share chart gestures and storage",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 11411
+    },
+    {
+      "file": "drawing-v1.spec.ts",
+      "title": "V1 channel, range measurements and vertical line share chart gestures and storage",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 11599
+    },
+    {
+      "file": "drawing-v1.spec.ts",
+      "title": "V1 channel, range measurements and vertical line share chart gestures and storage",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 23547
+    },
+    {
+      "file": "drawing-v1.spec.ts",
+      "title": "V1 channel, range measurements and vertical line share chart gestures and storage",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 13388
+    },
+    {
+      "file": "fundamentals.spec.ts",
+      "title": "SEC financial UI: four company patterns, annual/quarterly, statements, provenance and chart isolation",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 4288
+    },
+    {
+      "file": "fundamentals.spec.ts",
+      "title": "SEC unavailable/missing and delayed symbol response never break or contaminate the chart",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 3230
+    },
+    {
+      "file": "fundamentals.spec.ts",
+      "title": "SEC financial UI: four company patterns, annual/quarterly, statements, provenance and chart isolation",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 4187
+    },
+    {
+      "file": "fundamentals.spec.ts",
+      "title": "SEC unavailable/missing and delayed symbol response never break or contaminate the chart",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 3156
+    },
+    {
+      "file": "fundamentals.spec.ts",
+      "title": "SEC financial UI: four company patterns, annual/quarterly, statements, provenance and chart isolation",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 10183
+    },
+    {
+      "file": "fundamentals.spec.ts",
+      "title": "SEC unavailable/missing and delayed symbol response never break or contaminate the chart",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 6908
+    },
+    {
+      "file": "fundamentals.spec.ts",
+      "title": "SEC financial UI: four company patterns, annual/quarterly, statements, provenance and chart isolation",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 7902
+    },
+    {
+      "file": "fundamentals.spec.ts",
+      "title": "SEC unavailable/missing and delayed symbol response never break or contaminate the chart",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 5621
+    },
+    {
+      "file": "offline.spec.ts",
+      "title": "production PWA opens Demo and IndexedDB settings offline after shell caching",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 1239
+    },
+    {
+      "file": "offline.spec.ts",
+      "title": "production PWA opens Demo and IndexedDB settings offline after shell caching",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 1092
+    },
+    {
+      "file": "offline.spec.ts",
+      "title": "production PWA opens Demo and IndexedDB settings offline after shell caching",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 4576
+    },
+    {
+      "file": "offline.spec.ts",
+      "title": "production PWA opens Demo and IndexedDB settings offline after shell caching",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 3295
+    },
+    {
+      "file": "performance.spec.ts",
+      "title": "2,500 bars + 8 SMAs + 100 drawings remain operable; record headless RAF scheduling only",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 4070
+    },
+    {
+      "file": "performance.spec.ts",
+      "title": "2,500 bars + 8 SMAs + 100 drawings remain operable; record headless RAF scheduling only",
+      "project": "mobile-chromium",
+      "status": "skipped",
+      "expectedStatus": "skipped",
+      "durationMs": 101
+    },
+    {
+      "file": "performance.spec.ts",
+      "title": "2,500 bars + 8 SMAs + 100 drawings remain operable; record headless RAF scheduling only",
+      "project": "ipad-webkit",
+      "status": "skipped",
+      "expectedStatus": "skipped",
+      "durationMs": 805
+    },
+    {
+      "file": "performance.spec.ts",
+      "title": "2,500 bars + 8 SMAs + 100 drawings remain operable; record headless RAF scheduling only",
+      "project": "iphone-webkit",
+      "status": "skipped",
+      "expectedStatus": "skipped",
+      "durationMs": 657
+    },
+    {
+      "file": "phase2-load.spec.ts",
+      "title": "Phase 2 mixed geometry: 2,500 bars, 8 SMAs and 100 locked objects keep pan/zoom operable",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 2996
+    },
+    {
+      "file": "phase2-load.spec.ts",
+      "title": "Phase 2 mixed geometry: 2,500 bars, 8 SMAs and 100 locked objects keep pan/zoom operable",
+      "project": "mobile-chromium",
+      "status": "skipped",
+      "expectedStatus": "skipped",
+      "durationMs": 103
+    },
+    {
+      "file": "phase2-load.spec.ts",
+      "title": "Phase 2 mixed geometry: 2,500 bars, 8 SMAs and 100 locked objects keep pan/zoom operable",
+      "project": "ipad-webkit",
+      "status": "skipped",
+      "expectedStatus": "skipped",
+      "durationMs": 763
+    },
+    {
+      "file": "phase2-load.spec.ts",
+      "title": "Phase 2 mixed geometry: 2,500 bars, 8 SMAs and 100 locked objects keep pan/zoom operable",
+      "project": "iphone-webkit",
+      "status": "skipped",
+      "expectedStatus": "skipped",
+      "durationMs": 658
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "per-symbol multiple SMA locks and drawing persistence survive symbol switches and reload",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 4467
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "press-drag-release, endpoint and body edits, undo/redo, locked pan and timeframe mapping",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 4825
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "Horizontal Line, export/import and locked SMA UI guards",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 2567
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "watchlist add, reorder and remove persist",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 2967
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "mobile touch placement loupe, pointer cancel and no page scroll",
+      "project": "desktop-chromium",
+      "status": "skipped",
+      "expectedStatus": "skipped",
+      "durationMs": 1121
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "layout and rendered chart have no runtime errors",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 1477
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "prototype provider failure is explicit and switching back to Demo restores chart",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 1712
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "per-symbol multiple SMA locks and drawing persistence survive symbol switches and reload",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 4163
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "press-drag-release, endpoint and body edits, undo/redo, locked pan and timeframe mapping",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 3670
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "Horizontal Line, export/import and locked SMA UI guards",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 2208
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "watchlist add, reorder and remove persist",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 2522
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "mobile touch placement loupe, pointer cancel and no page scroll",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 2723
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "layout and rendered chart have no runtime errors",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 1352
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "prototype provider failure is explicit and switching back to Demo restores chart",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 1969
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "per-symbol multiple SMA locks and drawing persistence survive symbol switches and reload",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 9320
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "press-drag-release, endpoint and body edits, undo/redo, locked pan and timeframe mapping",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 7059
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "Horizontal Line, export/import and locked SMA UI guards",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 6450
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "watchlist add, reorder and remove persist",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 8759
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "mobile touch placement loupe, pointer cancel and no page scroll",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 3873
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "layout and rendered chart have no runtime errors",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 2722
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "prototype provider failure is explicit and switching back to Demo restores chart",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 2779
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "per-symbol multiple SMA locks and drawing persistence survive symbol switches and reload",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 6807
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "press-drag-release, endpoint and body edits, undo/redo, locked pan and timeframe mapping",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 5338
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "Horizontal Line, export/import and locked SMA UI guards",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 4781
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "watchlist add, reorder and remove persist",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 4857
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "mobile touch placement loupe, pointer cancel and no page scroll",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 3304
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "layout and rendered chart have no runtime errors",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 2361
+    },
+    {
+      "file": "terminal.spec.ts",
+      "title": "prototype provider failure is explicit and switching back to Demo restores chart",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 2396
+    },
+    {
+      "file": "v1-data-alerts.spec.ts",
+      "title": "Yahoo exposes only its six direct intervals and caches normalized delayed bars by symbol and timeframe",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 2970
+    },
+    {
+      "file": "v1-data-alerts.spec.ts",
+      "title": "expired Yahoo bars remain visible with a stale label when refresh fails",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 1780
+    },
+    {
+      "file": "v1-data-alerts.spec.ts",
+      "title": "visible active alerts baseline history, trigger once on a newly closed bar, and persist deduplication",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 2015
+    },
+    {
+      "file": "v1-data-alerts.spec.ts",
+      "title": "Yahoo exposes only its six direct intervals and caches normalized delayed bars by symbol and timeframe",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 3294
+    },
+    {
+      "file": "v1-data-alerts.spec.ts",
+      "title": "expired Yahoo bars remain visible with a stale label when refresh fails",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 1729
+    },
+    {
+      "file": "v1-data-alerts.spec.ts",
+      "title": "visible active alerts baseline history, trigger once on a newly closed bar, and persist deduplication",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 1954
+    },
+    {
+      "file": "v1-data-alerts.spec.ts",
+      "title": "Yahoo exposes only its six direct intervals and caches normalized delayed bars by symbol and timeframe",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 5344
+    },
+    {
+      "file": "v1-data-alerts.spec.ts",
+      "title": "expired Yahoo bars remain visible with a stale label when refresh fails",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 4375
+    },
+    {
+      "file": "v1-data-alerts.spec.ts",
+      "title": "visible active alerts baseline history, trigger once on a newly closed bar, and persist deduplication",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 4225
+    },
+    {
+      "file": "v1-data-alerts.spec.ts",
+      "title": "Yahoo exposes only its six direct intervals and caches normalized delayed bars by symbol and timeframe",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 4298
+    },
+    {
+      "file": "v1-data-alerts.spec.ts",
+      "title": "expired Yahoo bars remain visible with a stale label when refresh fails",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 3182
+    },
+    {
+      "file": "v1-data-alerts.spec.ts",
+      "title": "visible active alerts baseline history, trigger once on a newly closed bar, and persist deduplication",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 3655
+    },
+    {
+      "file": "v1-journey.spec.ts",
+      "title": "V1 research journey keeps per-symbol indicators, drawings, alerts, financials and backups isolated",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 15268
+    },
+    {
+      "file": "v1-journey.spec.ts",
+      "title": "V1 research journey keeps per-symbol indicators, drawings, alerts, financials and backups isolated",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 13192
+    },
+    {
+      "file": "v1-journey.spec.ts",
+      "title": "V1 research journey keeps per-symbol indicators, drawings, alerts, financials and backups isolated",
+      "project": "ipad-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 39722
+    },
+    {
+      "file": "v1-journey.spec.ts",
+      "title": "V1 research journey keeps per-symbol indicators, drawings, alerts, financials and backups isolated",
+      "project": "iphone-webkit",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 31177
+    },
+    {
+      "file": "v1-stress.spec.ts",
+      "title": "V1 stress: 2,500 Demo bars, eight mixed averages and 100 mixed drawings keep chart pan and zoom available",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "expectedStatus": "passed",
+      "durationMs": 6619
+    },
+    {
+      "file": "v1-stress.spec.ts",
+      "title": "V1 stress: 2,500 Demo bars, eight mixed averages and 100 mixed drawings keep chart pan and zoom available",
+      "project": "mobile-chromium",
+      "status": "skipped",
+      "expectedStatus": "skipped",
+      "durationMs": 106
+    },
+    {
+      "file": "v1-stress.spec.ts",
+      "title": "V1 stress: 2,500 Demo bars, eight mixed averages and 100 mixed drawings keep chart pan and zoom available",
+      "project": "ipad-webkit",
+      "status": "skipped",
+      "expectedStatus": "skipped",
+      "durationMs": 700
+    },
+    {
+      "file": "v1-stress.spec.ts",
+      "title": "V1 stress: 2,500 Demo bars, eight mixed averages and 100 mixed drawings keep chart pan and zoom available",
+      "project": "iphone-webkit",
+      "status": "skipped",
+      "expectedStatus": "skipped",
+      "durationMs": 679
+    }
+  ]
+}

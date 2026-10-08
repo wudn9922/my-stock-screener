@@ -1,0 +1,135 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "SMCI",
+          "exchangeName": "NMS",
+          "fullExchangeName": "NasdaqGS",
+          "instrumentType": "EQUITY",
+          "firstTradeDate": 1175175000,
+          "regularMarketTime": 1791316800,
+          "hasPrePostMarketData": true,
+          "gmtoffset": -14400,
+          "timezone": "EDT",
+          "exchangeTimezoneName": "America/New_York",
+          "regularMarketPrice": 43.46,
+          "regularMarketChangePercent": 0.625,
+          "fulldayPrice": 42.54,
+          "fulldayChange": -0.92,
+          "fulldayChangePercent": -2.117,
+          "fiftyTwoWeekHigh": 58.78,
+          "fiftyTwoWeekLow": 19.48,
+          "regularMarketDayHigh": 44.74,
+          "regularMarketDayLow": 43.02,
+          "regularMarketVolume": 27776128,
+          "longName": "Super Micro Computer, Inc.",
+          "shortName": "Super Micro Computer, Inc.",
+          "chartPreviousClose": 2.295,
+          "priceHint": 2,
+          "currentTradingPeriod": {
+            "pre": {
+              "timezone": "EDT",
+              "start": 1791360000,
+              "end": 1791379800,
+              "gmtoffset": -14400
+            },
+            "regular": {
+              "timezone": "EDT",
+              "start": 1791379800,
+              "end": 1791403200,
+              "gmtoffset": -14400
+            },
+            "post": {
+              "timezone": "EDT",
+              "start": 1791403200,
+              "end": 1791417600,
+              "gmtoffset": -14400
+            }
+          },
+          "dataGranularity": "1wk",
+          "range": "10y",
+          "validRanges": [
+            "1d",
+            "5d",
+            "1mo",
+            "3mo",
+            "6mo",
+            "1y",
+            "2y",
+            "5y",
+            "10y",
+            "ytd",
+            "max"
+          ]
+        },
+        "events": {
+          "splits": {
+            "1727668800": {
+              "date": 1727789400,
+              "numerator": 10.0,
+              "denominator": 1.0,
+              "splitRatio": "10:1"
+            }
+          }
+        },
+        "timestamp": [
+          1788753600,
+          1789358400,
+          1789963200,
+          1790568000,
+          1791172800,
+          1791316800
+        ],
+        "indicators": {
+          "quote": [
+            {
+              "close": [
+                40.099998474121094,
+                39.09000015258789,
+                43.2599983215332,
+                43.689998626708984,
+                43.459999084472656,
+                43.459999084472656
+              ],
+              "high": [
+                41.529998779296875,
+                41.0099983215332,
+                43.7599983215332,
+                44.59000015258789,
+                44.7400016784668,
+                44.7400016784668
+              ],
+              "low": [
+                37.369998931884766,
+                35.36000061035156,
+                39.849998474121094,
+                40.130001068115234,
+                42.79999923706055,
+                43.02000045776367
+              ],
+              "open": [
+                39.66999816894531,
+                37.43000030517578,
+                40.630001068115234,
+                42.75,
+                43.56999969482422,
+                43.8849983215332
+              ],
+              "volume": [
+                146861800,
+                208605300,
+                203548500,
+                157716900,
+                49879500,
+                27776128
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

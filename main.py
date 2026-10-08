@@ -4489,6 +4489,74 @@ def generate_custom_group_buttons_html(
 
 
 # =========================================================================
+# Atlas 研究終端：週期對應
+# =========================================================================
+ATLAS_TIMEFRAME_ALIASES = {
+    "5m": "5m",
+    "15m": "15m",
+    "30m": "30m",
+    "60m": "1H",
+    "1h": "1H",
+    "1d": "1D",
+    "d": "1D",
+    "day": "1D",
+    "daily": "1D",
+    "日k": "1D",
+    "日線": "1D",
+    "1w": "1W",
+    "1wk": "1W",
+    "w": "1W",
+    "wk": "1W",
+    "week": "1W",
+    "weekly": "1W",
+    "週k": "1W",
+    "周k": "1W",
+    "週線": "1W",
+    "1mo": "1M",
+    "1mth": "1M",
+    "mo": "1M",
+    "month": "1M",
+    "monthly": "1M",
+    "月k": "1M",
+    "月線": "1M"
+}
+
+
+def get_atlas_timeframe(
+    drawing_timeframe,
+    timeframe_label=""
+):
+    """
+    把圖表卡片的週期（drawing_timeframe：1d / 1w，
+    或顯示用的 日K / 週K）轉成 Atlas 的 tf 參數。
+    無法辨識時一律使用 1D。
+    """
+
+    for value in (
+        drawing_timeframe,
+        timeframe_label
+    ):
+        key = str(
+            value or ""
+        ).strip().lower()
+
+        if key in ATLAS_TIMEFRAME_ALIASES:
+            return ATLAS_TIMEFRAME_ALIASES[key]
+
+    label = str(
+        timeframe_label or ""
+    )
+
+    if "週" in label or "周" in label:
+        return "1W"
+
+    if "月" in label:
+        return "1M"
+
+    return "1D"
+
+
+# =========================================================================
 # 圖表卡片 HTML
 # =========================================================================
 
@@ -4532,6 +4600,11 @@ def generate_chart_card_html(
         or ticker
     ).strip()
 
+    atlas_timeframe = get_atlas_timeframe(
+        timeframe,
+        timeframe_label
+    )
+
     result = f"""
 <div class="chart-card">
     <div class="chart-header">
@@ -4543,6 +4616,17 @@ def generate_chart_card_html(
                 {escape_html(timeframe_label)}
             </span>
         </div>
+        <div class="chart-header-actions">
+            <button
+                type="button"
+                class="atlas-card-btn"
+                data-atlas-symbol="{escape_html(ticker)}"
+                data-atlas-tf="{escape_html(atlas_timeframe)}"
+                title="在 Atlas 研究終端開啟"
+                onclick="openAtlas(this.dataset.atlasSymbol, this.dataset.atlasTf)"
+            >
+                🔬 Atlas
+            </button>
 """
 
     if drawing_enabled:
@@ -4571,7 +4655,9 @@ def generate_chart_card_html(
         </span>
 """
 
+    # 關閉 chart-header-actions 與 chart-header
     result += """
+        </div>
     </div>
 """
 
@@ -5396,6 +5482,169 @@ input {
         margin-bottom: 12px;
     }
 }
+
+/* ===== Atlas 研究終端 ===== */
+.chart-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px 8px;
+    margin-left: auto;
+}
+
+.atlas-card-btn {
+    flex: 0 0 auto;
+    padding: 5px 8px;
+    color: #a5f3fc;
+    background: rgba(14, 116, 144, 0.28);
+    border: 1px solid rgba(34, 211, 238, 0.4);
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.atlas-card-btn:hover,
+.atlas-launch-btn:hover {
+    color: #fff;
+    background: rgba(14, 116, 144, 0.5);
+}
+
+.atlas-launch-btn {
+    padding: 8px 12px;
+    color: #a5f3fc;
+    background: rgba(14, 116, 144, 0.28);
+    border: 1px solid rgba(34, 211, 238, 0.4);
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.atlas-note {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+html.atlas-open,
+html.atlas-open body {
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
+.atlas-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483000;
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    background: var(--background);
+}
+
+.atlas-overlay[hidden] {
+    display: none;
+}
+
+.atlas-overlay-header {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    padding-top: calc(8px + env(safe-area-inset-top, 0px));
+    padding-left: calc(10px + env(safe-area-inset-left, 0px));
+    padding-right: calc(10px + env(safe-area-inset-right, 0px));
+    background: var(--toolbar);
+    border-bottom: 1px solid var(--border);
+}
+
+.atlas-overlay-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 800;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.atlas-overlay-link,
+.atlas-overlay-close {
+    flex: 0 0 auto;
+    padding: 7px 10px;
+    color: #e2e8f0;
+    background: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.atlas-overlay-close {
+    min-width: 40px;
+    color: #fecaca;
+}
+
+.atlas-overlay-body {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--background);
+}
+
+.atlas-overlay-body iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: var(--background);
+}
+
+.atlas-overlay-message {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.7;
+    text-align: center;
+    background: var(--background);
+}
+
+.atlas-overlay-message[hidden] {
+    display: none;
+}
+
+@media (max-width: 600px) {
+    .chart-header-actions {
+        gap: 5px 6px;
+    }
+
+    .atlas-overlay-title {
+        font-size: 13px;
+    }
+
+    .atlas-overlay-link,
+    .atlas-overlay-close {
+        padding: 7px 8px;
+        font-size: 11px;
+    }
+}
 </style>
 </head>
 
@@ -5548,6 +5797,29 @@ input {
     )
 
     html += """
+    </div>
+</div>
+"""
+
+    # Atlas 研究終端入口（不帶代號開啟）
+    html += """
+<div class="category-box" style="border-left-color:#22d3ee;">
+    <div class="category-title">
+        🔬 Atlas 研究終端 · 畫圖、指標、財報、回測
+    </div>
+    <div class="tabs">
+        <button
+            type="button"
+            class="atlas-launch-btn"
+            onclick="openAtlas('', '')"
+        >
+            開啟 Atlas 研究終端
+        </button>
+    </div>
+    <div class="atlas-note">
+        資料為 Yahoo 延遲快照，每日報告產生後更新；
+        SEC 財報僅支援美股。
+        每張圖表右上角的「🔬 Atlas」可直接開啟該檔。
     </div>
 </div>
 """
@@ -7342,6 +7614,426 @@ window.addEventListener(
         );
 
         await initializeLiff();
+    }
+);
+</script>
+
+<!-- ===== Atlas 研究終端：全螢幕浮層（iframe 只在開啟時才載入） ===== -->
+<div
+    id="atlas-overlay"
+    class="atlas-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="atlas-overlay-title"
+    hidden
+>
+    <div class="atlas-overlay-header">
+        <div
+            id="atlas-overlay-title"
+            class="atlas-overlay-title"
+        >
+            🔬 Atlas 研究終端
+        </div>
+        <a
+            id="atlas-overlay-link"
+            class="atlas-overlay-link"
+            href="atlas/"
+            target="_blank"
+            rel="noopener"
+            onclick="openAtlasInNewTab(event)"
+        >
+            在新分頁開啟
+        </a>
+        <button
+            type="button"
+            id="atlas-overlay-close"
+            class="atlas-overlay-close"
+            aria-label="關閉 Atlas"
+            onclick="closeAtlas()"
+        >
+            ✕
+        </button>
+    </div>
+    <div
+        id="atlas-overlay-body"
+        class="atlas-overlay-body"
+    >
+        <div
+            id="atlas-overlay-message"
+            class="atlas-overlay-message"
+            hidden
+        ></div>
+    </div>
+</div>
+
+<script>
+const ATLAS_BASE_PATH = "atlas/";
+const ATLAS_TIMEFRAMES = [
+    "5m", "15m", "30m", "1H", "1D", "1W", "1M"
+];
+const ATLAS_TIMEFRAME_ALIASES = {
+    "1d": "1D",
+    "d": "1D",
+    "1w": "1W",
+    "1wk": "1W",
+    "w": "1W",
+    "1mo": "1M",
+    "mo": "1M",
+    "1h": "1H",
+    "60m": "1H"
+};
+
+let atlasOpenToken = 0;
+let atlasHistoryPushed = false;
+let atlasAvailable = null;
+let atlasLastFocus = null;
+
+function normalizeAtlasSymbol(rawSymbol) {
+    const symbol = String(rawSymbol || "")
+        .trim()
+        .toUpperCase();
+
+    if (!symbol) {
+        return "";
+    }
+
+    // 台股純數字代號（含 00631L 這類 ETF）預設上市 .TW
+    if (/^[0-9]{4,6}[A-Z]?$/.test(symbol)) {
+        return symbol + ".TW";
+    }
+
+    // 美股股權類別 BRK.B → Yahoo 格式 BRK-B
+    if (/^[A-Z]{1,5}[.][A-Z]$/.test(symbol)) {
+        return symbol.replace(".", "-");
+    }
+
+    return symbol;
+}
+
+function normalizeAtlasTimeframe(rawTimeframe) {
+    const value = String(rawTimeframe || "").trim();
+
+    if (!value) {
+        return "1D";
+    }
+
+    if (ATLAS_TIMEFRAMES.indexOf(value) >= 0) {
+        return value;
+    }
+
+    const alias = ATLAS_TIMEFRAME_ALIASES[
+        value.toLowerCase()
+    ];
+
+    if (alias) {
+        return alias;
+    }
+
+    if (
+        value.indexOf("週") >= 0
+        || value.indexOf("周") >= 0
+    ) {
+        return "1W";
+    }
+
+    if (value.indexOf("月") >= 0) {
+        return "1M";
+    }
+
+    return "1D";
+}
+
+function buildAtlasUrl(symbol, timeframe) {
+    if (!symbol) {
+        return ATLAS_BASE_PATH;
+    }
+
+    return (
+        ATLAS_BASE_PATH
+        + "?symbol="
+        + encodeURIComponent(symbol)
+        + "&tf="
+        + encodeURIComponent(timeframe)
+    );
+}
+
+function checkAtlasAvailable() {
+    if (atlasAvailable !== null) {
+        return Promise.resolve(atlasAvailable);
+    }
+
+    if (
+        window.location.protocol === "file:"
+        || typeof fetch !== "function"
+    ) {
+        return Promise.resolve(true);
+    }
+
+    return fetch(
+        ATLAS_BASE_PATH + "index.html",
+        {
+            method: "HEAD",
+            cache: "no-store"
+        }
+    )
+        .then(
+            (response) => {
+                // 只有明確 404 才視為尚未部署；
+                // 其他狀況交給 iframe 自行載入。
+                atlasAvailable = response.status !== 404;
+                return atlasAvailable;
+            }
+        )
+        .catch(
+            () => true
+        );
+}
+
+function setAtlasMessage(text) {
+    const message = document.getElementById(
+        "atlas-overlay-message"
+    );
+
+    if (!message) {
+        return;
+    }
+
+    if (text) {
+        message.textContent = text;
+        message.hidden = false;
+    } else {
+        message.textContent = "";
+        message.hidden = true;
+    }
+}
+
+function removeAtlasFrame() {
+    const frame = document.getElementById(
+        "atlas-frame"
+    );
+
+    if (frame) {
+        // 先清空 src 再移除，釋放 iframe 記憶體
+        try {
+            frame.src = "about:blank";
+        } catch (error) {}
+
+        frame.remove();
+    }
+}
+
+function showAtlasUnavailable() {
+    removeAtlasFrame();
+    setAtlasMessage(
+        "Atlas 研究終端尚未部署或暫時無法連線，"
+        + "請稍後再試。"
+    );
+}
+
+function openAtlas(rawSymbol, rawTimeframe) {
+    const symbol = normalizeAtlasSymbol(rawSymbol);
+    const timeframe = normalizeAtlasTimeframe(
+        rawTimeframe
+    );
+    const url = buildAtlasUrl(symbol, timeframe);
+
+    const overlay = document.getElementById(
+        "atlas-overlay"
+    );
+    const body = document.getElementById(
+        "atlas-overlay-body"
+    );
+    const title = document.getElementById(
+        "atlas-overlay-title"
+    );
+    const link = document.getElementById(
+        "atlas-overlay-link"
+    );
+
+    if (!overlay || !body) {
+        window.open(url, "_blank", "noopener");
+        return;
+    }
+
+    const token = ++atlasOpenToken;
+
+    if (overlay.hidden) {
+        atlasLastFocus = document.activeElement;
+    }
+
+    if (title) {
+        title.textContent = symbol
+            ? "🔬 " + symbol + " · " + timeframe
+            : "🔬 Atlas 研究終端";
+    }
+
+    if (link) {
+        link.setAttribute("href", url);
+    }
+
+    removeAtlasFrame();
+
+    overlay.hidden = false;
+    document.documentElement.classList.add(
+        "atlas-open"
+    );
+
+    if (!atlasHistoryPushed) {
+        try {
+            history.pushState(
+                { atlasOverlay: true },
+                ""
+            );
+            atlasHistoryPushed = true;
+        } catch (error) {}
+    }
+
+    if (atlasAvailable === false) {
+        showAtlasUnavailable();
+    } else {
+        setAtlasMessage("Atlas 載入中……");
+
+        // 每次開啟都建立新的 iframe，
+        // 先設定 src 再插入，避免多出瀏覽紀錄。
+        const frame = document.createElement("iframe");
+        frame.id = "atlas-frame";
+        frame.title = "Atlas 研究終端";
+        frame.setAttribute(
+            "allow",
+            "clipboard-read; clipboard-write; fullscreen"
+        );
+        frame.setAttribute(
+            "referrerpolicy",
+            "same-origin"
+        );
+        frame.addEventListener(
+            "load",
+            () => {
+                if (
+                    token === atlasOpenToken
+                    && atlasAvailable !== false
+                ) {
+                    setAtlasMessage("");
+                }
+            }
+        );
+        frame.src = url;
+        body.appendChild(frame);
+
+        checkAtlasAvailable().then(
+            (available) => {
+                if (
+                    !available
+                    && token === atlasOpenToken
+                    && !overlay.hidden
+                ) {
+                    showAtlasUnavailable();
+                }
+            }
+        );
+    }
+
+    const closeButton = document.getElementById(
+        "atlas-overlay-close"
+    );
+
+    if (closeButton) {
+        try {
+            closeButton.focus({ preventScroll: true });
+        } catch (error) {}
+    }
+}
+
+function closeAtlas(fromHistory) {
+    const overlay = document.getElementById(
+        "atlas-overlay"
+    );
+
+    if (!overlay || overlay.hidden) {
+        return;
+    }
+
+    atlasOpenToken += 1;
+
+    removeAtlasFrame();
+    setAtlasMessage("");
+
+    overlay.hidden = true;
+    document.documentElement.classList.remove(
+        "atlas-open"
+    );
+
+    if (atlasHistoryPushed) {
+        atlasHistoryPushed = false;
+
+        if (fromHistory !== true) {
+            try {
+                history.back();
+            } catch (error) {}
+        }
+    }
+
+    if (
+        atlasLastFocus
+        && typeof atlasLastFocus.focus === "function"
+    ) {
+        try {
+            atlasLastFocus.focus({ preventScroll: true });
+        } catch (error) {}
+    }
+
+    atlasLastFocus = null;
+}
+
+function openAtlasInNewTab(event) {
+    const link = event && event.currentTarget;
+
+    if (!link) {
+        return;
+    }
+
+    // LINE App 內改用外部瀏覽器開啟，空間較大
+    try {
+        if (
+            typeof liff !== "undefined"
+            && typeof liffReady !== "undefined"
+            && liffReady
+            && liff.isInClient()
+        ) {
+            liff.openWindow(
+                {
+                    url: new URL(
+                        link.getAttribute("href"),
+                        window.location.href
+                    ).href,
+                    external: true
+                }
+            );
+            event.preventDefault();
+        }
+    } catch (error) {}
+}
+
+window.addEventListener(
+    "popstate",
+    () => {
+        const overlay = document.getElementById(
+            "atlas-overlay"
+        );
+
+        if (overlay && !overlay.hidden) {
+            atlasHistoryPushed = false;
+            closeAtlas(true);
+        }
+    }
+);
+
+document.addEventListener(
+    "keydown",
+    (event) => {
+        if (event.key === "Escape") {
+            closeAtlas();
+        }
     }
 );
 </script>

@@ -1,0 +1,19 @@
+node_modules/
+dist/
+dist-pages/
+scratch/
+*.zip
+playwright-report/
+test-results/
+*.log
+*.tsbuildinfo
+
+dist-server/
+public/market-data/
+public/financial-data/
+
+# my-stock-screener integration: generated at build time by the workflow
+public/fundamentals/
+public/market-data/
+dist-pages/
+scripts/*.tmp

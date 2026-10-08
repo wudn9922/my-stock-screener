@@ -1,0 +1,154 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "NFLX",
+          "exchangeName": "NMS",
+          "fullExchangeName": "NasdaqGS",
+          "instrumentType": "EQUITY",
+          "firstTradeDate": 1022160600,
+          "regularMarketTime": 1791316800,
+          "hasPrePostMarketData": true,
+          "gmtoffset": -14400,
+          "timezone": "EDT",
+          "exchangeTimezoneName": "America/New_York",
+          "regularMarketPrice": 68.69,
+          "regularMarketChangePercent": 1.763,
+          "fulldayPrice": 68.857,
+          "fulldayChange": 0.167,
+          "fulldayChangePercent": 0.243,
+          "fiftyTwoWeekHigh": 124.86,
+          "fiftyTwoWeekLow": 65.08,
+          "regularMarketDayHigh": 68.78,
+          "regularMarketDayLow": 67.31,
+          "regularMarketVolume": 35156434,
+          "longName": "Netflix, Inc.",
+          "shortName": "Netflix, Inc.",
+          "chartPreviousClose": 63.91,
+          "priceHint": 2,
+          "currentTradingPeriod": {
+            "pre": {
+              "timezone": "EDT",
+              "end": 1791379800,
+              "start": 1791360000,
+              "gmtoffset": -14400
+            },
+            "regular": {
+              "timezone": "EDT",
+              "end": 1791403200,
+              "start": 1791379800,
+              "gmtoffset": -14400
+            },
+            "post": {
+              "timezone": "EDT",
+              "end": 1791417600,
+              "start": 1791403200,
+              "gmtoffset": -14400
+            }
+          },
+          "dataGranularity": "1d",
+          "range": "5y",
+          "validRanges": [
+            "1d",
+            "5d",
+            "1mo",
+            "3mo",
+            "6mo",
+            "1y",
+            "2y",
+            "5y",
+            "10y",
+            "ytd",
+            "max"
+          ]
+        },
+        "events": {
+          "splits": {
+            "1763389800": {
+              "date": 1763389800,
+              "numerator": 10.0,
+              "denominator": 1.0,
+              "splitRatio": "10:1"
+            }
+          }
+        },
+        "timestamp": [
+          1763044200,
+          1763130600,
+          1763389800,
+          1763476200,
+          1763562600,
+          1791207000,
+          1791293400
+        ],
+        "indicators": {
+          "quote": [
+            {
+              "low": [
+                114.56900024414062,
+                110.72100067138672,
+                109.55000305175781,
+                109.19999694824219,
+                108.61000061035156,
+                66.54000091552734,
+                67.30999755859375
+              ],
+              "close": [
+                115.4229965209961,
+                111.21700286865234,
+                110.29000091552734,
+                114.08999633789062,
+                110.0,
+                67.5,
+                68.69000244140625
+              ],
+              "open": [
+                115.8499984741211,
+                114.27300262451172,
+                110.75,
+                110.29000091552734,
+                113.0,
+                67.05000305175781,
+                67.51000213623047
+              ],
+              "high": [
+                116.73300170898438,
+                114.27300262451172,
+                111.8499984741211,
+                115.25,
+                113.33999633789062,
+                67.5,
+                68.77999877929688
+              ],
+              "volume": [
+                40144000,
+                47607000,
+                26082700,
+                43440600,
+                31868100,
+                36820200,
+                35052500
+              ]
+            }
+          ],
+          "adjclose": [
+            {
+              "adjclose": [
+                115.4229965209961,
+                111.21700286865234,
+                110.29000091552734,
+                114.08999633789062,
+                110.0,
+                67.5,
+                68.69000244140625
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "source": "https://github.com/tradingview/lightweight-charts/tree/master/.github/skills",
+  "retrievedDate": "2026-10-06",
+  "installation": "Project-vendored .agent-skills; read-only cloud .agents directory",
+  "files": [
+    {
+      "path": ".agent-skills/lightweight-charts-plugin-authoring/SKILL.md",
+      "sha256": "6e58c14beb1c2462eaa9cd1a3afb2b7c52d5c6c91517b64efa4a388a7977eb3e"
+    },
+    {
+      "path": ".agent-skills/lightweight-charts/SKILL.md",
+      "sha256": "921fd3be89ab169c846c87a360bf100976b3731c7e964667862341acfaf1eb00"
+    },
+    {
+      "path": ".agent-skills/lightweight-charts-plugin-authoring/references/toolkit.md",
+      "sha256": "85565c27d3a0a1d728c1843266688491f4d2b6225a750f42973111c495c516da"
+    },
+    {
+      "path": ".agent-skills/lightweight-charts-plugin-authoring/references/official-plugins.md",
+      "sha256": "a0eb15f58b66b2da3e9ae41958664ee745780e052203d5fe3e93b27d4083df66"
+    },
+    {
+      "path": ".agent-skills/lightweight-charts-plugin-authoring/references/package-contract.md",
+      "sha256": "c6e2e4885fde24c9776ce0fdc08f154e88dfabe6cef862622e8b3b9d7763a5d6"
+    }
+  ]
+}

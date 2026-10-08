@@ -1,0 +1,254 @@
+{
+  "status": "PASS",
+  "url": "https://wudn9922.github.io/lightweight-drawing-lab/",
+  "checkedAt": "2026-10-08T01:18:28.720Z",
+  "profile": "iphone-webkit",
+  "tlsVerification": "enabled",
+  "http": 200,
+  "priceSource": "actual same-origin Yahoo delayed snapshots",
+  "prices": [
+    {
+      "symbol": "SMCI",
+      "quote": {
+        "symbol": "SMCI",
+        "price": 44.94,
+        "change": 1.4800009155273415,
+        "changePercent": 3.405432459054314,
+        "asOf": 1791403200,
+        "source": "Yahoo unofficial prototype \u00b7 delayed / as-of data",
+        "dataState": "delayed",
+        "retrievedAt": 1791421712.925,
+        "cacheStatus": "fresh"
+      },
+      "dailyLatest": {
+        "time": 1791379800,
+        "open": 42.52000045776367,
+        "high": 45.76499938964844,
+        "low": 42.459999084472656,
+        "close": 44.94,
+        "volume": 40358151
+      },
+      "weeklyLatest": {
+        "time": 1791158400,
+        "open": 43.56999969482422,
+        "high": 45.76499938964844,
+        "low": 42.459999084472656,
+        "close": 44.94,
+        "volume": 90284251
+      },
+      "monthlyLatest": {
+        "time": 1790812800,
+        "open": 40.88999938964844,
+        "high": 45.76499938964844,
+        "low": 40.130001068115234,
+        "close": 44.94,
+        "volume": 161285951
+      },
+      "currentPeriods": {
+        "1W": {
+          "time": 1791158400,
+          "open": 43.56999969482422,
+          "high": 45.76499938964844,
+          "low": 42.459999084472656,
+          "close": 44.94,
+          "volume": 90284251,
+          "normalization": {
+            "method": "daily-ohlcv",
+            "timeframe": "1W",
+            "periodStart": 1791158400,
+            "firstDailyTime": 1791207000,
+            "lastDailyTime": 1791379800,
+            "dailyCount": 3,
+            "quoteAsOf": 1791403200,
+            "native": {
+              "time": 1791158400,
+              "open": 43.56999969482422,
+              "high": 44.7400016784668,
+              "low": 42.79999923706055,
+              "close": 43.459999084472656,
+              "volume": 49926100
+            }
+          },
+          "nativeOpeningAggregate": {
+            "time": 1791158400,
+            "open": 43.56999969482422,
+            "high": 44.7400016784668,
+            "low": 42.79999923706055,
+            "close": 43.459999084472656,
+            "volume": 49926100
+          }
+        },
+        "1M": {
+          "time": 1790812800,
+          "open": 40.88999938964844,
+          "high": 45.76499938964844,
+          "low": 40.130001068115234,
+          "close": 44.94,
+          "volume": 161285951,
+          "normalization": {
+            "method": "daily-ohlcv",
+            "timeframe": "1M",
+            "periodStart": 1790812800,
+            "firstDailyTime": 1790861400,
+            "lastDailyTime": 1791379800,
+            "dailyCount": 5,
+            "quoteAsOf": 1791403200,
+            "native": {
+              "time": 1790812800,
+              "open": 40.88999938964844,
+              "high": 44.7400016784668,
+              "low": 40.130001068115234,
+              "close": 43.459999084472656,
+              "volume": 120881200
+            }
+          },
+          "nativeOpeningAggregate": {
+            "time": 1790812800,
+            "open": 40.88999938964844,
+            "high": 44.7400016784668,
+            "low": 40.130001068115234,
+            "close": 43.459999084472656,
+            "volume": 120881200
+          }
+        }
+      },
+      "generatedAt": 1791421713.68,
+      "timeframes": [
+        "5m",
+        "15m",
+        "30m",
+        "1H",
+        "1D",
+        "1W",
+        "1M"
+      ]
+    },
+    {
+      "symbol": "NFLX",
+      "quote": {
+        "symbol": "NFLX",
+        "price": 69.7,
+        "change": 1.0099975585937528,
+        "changePercent": 1.470370538209398,
+        "asOf": 1791403200,
+        "source": "Yahoo unofficial prototype \u00b7 delayed / as-of data",
+        "dataState": "delayed",
+        "retrievedAt": 1791421719.294,
+        "cacheStatus": "fresh"
+      },
+      "dailyLatest": {
+        "time": 1791379800,
+        "open": 68.80000305175781,
+        "high": 69.79000091552734,
+        "low": 68.40499877929688,
+        "close": 69.7,
+        "volume": 29990515
+      },
+      "weeklyLatest": {
+        "time": 1791158400,
+        "open": 67.05000305175781,
+        "high": 69.79000091552734,
+        "low": 66.54000091552734,
+        "close": 69.7,
+        "volume": 102053115
+      },
+      "monthlyLatest": {
+        "time": 1790812800,
+        "open": 69.41000366210938,
+        "high": 69.79000091552734,
+        "low": 66.54000091552734,
+        "close": 69.7,
+        "volume": 182309915
+      },
+      "currentPeriods": {
+        "1W": {
+          "time": 1791158400,
+          "open": 67.05000305175781,
+          "high": 69.79000091552734,
+          "low": 66.54000091552734,
+          "close": 69.7,
+          "volume": 102053115,
+          "normalization": {
+            "method": "daily-ohlcv",
+            "timeframe": "1W",
+            "periodStart": 1791158400,
+            "firstDailyTime": 1791207000,
+            "lastDailyTime": 1791379800,
+            "dailyCount": 3,
+            "quoteAsOf": 1791403200,
+            "native": {
+              "time": 1791158400,
+              "open": 67.05000305175781,
+              "high": 68.77999877929688,
+              "low": 66.54000091552734,
+              "close": 68.69000244140625,
+              "volume": 72062600
+            }
+          },
+          "nativeOpeningAggregate": {
+            "time": 1791158400,
+            "open": 67.05000305175781,
+            "high": 68.77999877929688,
+            "low": 66.54000091552734,
+            "close": 68.69000244140625,
+            "volume": 72062600
+          }
+        },
+        "1M": {
+          "time": 1790812800,
+          "open": 69.41000366210938,
+          "high": 69.79000091552734,
+          "low": 66.54000091552734,
+          "close": 69.7,
+          "volume": 182309915,
+          "normalization": {
+            "method": "daily-ohlcv",
+            "timeframe": "1M",
+            "periodStart": 1790812800,
+            "firstDailyTime": 1790861400,
+            "lastDailyTime": 1791379800,
+            "dailyCount": 5,
+            "quoteAsOf": 1791403200,
+            "native": {
+              "time": 1790812800,
+              "open": 69.41000366210938,
+              "high": 69.66000366210938,
+              "low": 66.54000091552734,
+              "close": 68.69000244140625,
+              "volume": 152129500
+            }
+          },
+          "nativeOpeningAggregate": {
+            "time": 1790812800,
+            "open": 69.41000366210938,
+            "high": 69.66000366210938,
+            "low": 66.54000091552734,
+            "close": 68.69000244140625,
+            "volume": 152129500
+          }
+        }
+      },
+      "generatedAt": 1791421720.047,
+      "timeframes": [
+        "5m",
+        "15m",
+        "30m",
+        "1H",
+        "1D",
+        "1W",
+        "1M"
+      ]
+    }
+  ],
+  "timeframeIsolation": "1D/1W/1M PASS",
+  "lockedMAReload": "PASS",
+  "monthlyFutureDrawingLockedReload": "PASS",
+  "smaTimeframeIsolation": "1D/1W/1M PASS",
+  "settingsExport3": "PASS",
+  "scope": "https://wudn9922.github.io/lightweight-drawing-lab/",
+  "apiRequests": [],
+  "runtimeErrors": [],
+  "physicalDevice": "Pending; Playwright WebKit is not physical Safari.",
+  "sourceCommit": "ee10f6743e92de8cb1eb9bf994ce26235eb3eac0",
+  "deploymentRun": "37711284860"
+}

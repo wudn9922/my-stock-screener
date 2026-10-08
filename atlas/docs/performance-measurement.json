@@ -1,0 +1,10 @@
+{
+  "environment": "Cloud Linux headless Chromium; not physical device FPS or GPU paint benchmark",
+  "bars": 2500,
+  "smas": 8,
+  "drawings": 100,
+  "rafSamples": 119,
+  "rafGapMedianMs": 16.699999999999818,
+  "rafGapP95Ms": 16.799999999999727,
+  "runtimeErrors": []
+}

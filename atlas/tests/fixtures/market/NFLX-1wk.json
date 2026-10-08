@@ -1,0 +1,135 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "NFLX",
+          "exchangeName": "NMS",
+          "fullExchangeName": "NasdaqGS",
+          "instrumentType": "EQUITY",
+          "firstTradeDate": 1022160600,
+          "regularMarketTime": 1791316800,
+          "hasPrePostMarketData": true,
+          "gmtoffset": -14400,
+          "timezone": "EDT",
+          "exchangeTimezoneName": "America/New_York",
+          "regularMarketPrice": 68.69,
+          "regularMarketChangePercent": 1.763,
+          "fulldayPrice": 68.954,
+          "fulldayChange": 0.264,
+          "fulldayChangePercent": 0.385,
+          "fiftyTwoWeekHigh": 124.86,
+          "fiftyTwoWeekLow": 65.08,
+          "regularMarketDayHigh": 68.78,
+          "regularMarketDayLow": 67.31,
+          "regularMarketVolume": 35156434,
+          "longName": "Netflix, Inc.",
+          "shortName": "Netflix, Inc.",
+          "chartPreviousClose": 10.507,
+          "priceHint": 2,
+          "currentTradingPeriod": {
+            "pre": {
+              "timezone": "EDT",
+              "end": 1791379800,
+              "start": 1791360000,
+              "gmtoffset": -14400
+            },
+            "regular": {
+              "timezone": "EDT",
+              "end": 1791403200,
+              "start": 1791379800,
+              "gmtoffset": -14400
+            },
+            "post": {
+              "timezone": "EDT",
+              "end": 1791417600,
+              "start": 1791403200,
+              "gmtoffset": -14400
+            }
+          },
+          "dataGranularity": "1wk",
+          "range": "10y",
+          "validRanges": [
+            "1d",
+            "5d",
+            "1mo",
+            "3mo",
+            "6mo",
+            "1y",
+            "2y",
+            "5y",
+            "10y",
+            "ytd",
+            "max"
+          ]
+        },
+        "events": {
+          "splits": {
+            "1763355600": {
+              "date": 1763389800,
+              "numerator": 10.0,
+              "denominator": 1.0,
+              "splitRatio": "10:1"
+            }
+          }
+        },
+        "timestamp": [
+          1788753600,
+          1789358400,
+          1789963200,
+          1790568000,
+          1791172800,
+          1791316800
+        ],
+        "indicators": {
+          "quote": [
+            {
+              "high": [
+                77.7300033569336,
+                81.0199966430664,
+                73.87000274658203,
+                71.6500015258789,
+                68.77999877929688,
+                68.77999877929688
+              ],
+              "low": [
+                75.02999877929688,
+                70.11000061035156,
+                70.9800033569336,
+                66.75,
+                66.54000091552734,
+                67.30999755859375
+              ],
+              "volume": [
+                98931900,
+                226929900,
+                155555000,
+                194590500,
+                71872700,
+                35156434
+              ],
+              "close": [
+                77.4000015258789,
+                71.79000091552734,
+                71.1500015258789,
+                67.05999755859375,
+                68.69000244140625,
+                68.69000244140625
+              ],
+              "open": [
+                77.55000305175781,
+                78.97000122070312,
+                71.81999969482422,
+                71.55000305175781,
+                67.05000305175781,
+                67.51000213623047
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "testedAt": "2026-10-06T09:26:25.494Z",
+  "source": "Live official SEC through production preview backend; no fixture routes",
+  "symbol": "AAPL",
+  "records": 73,
+  "fiscalYear": 2026,
+  "fiscalQuarter": 3,
+  "periodEnd": "2026-06-27",
+  "revenue": 109417000000,
+  "renderedRevenue": "$109.42B",
+  "runtimeErrors": []
+}

@@ -1,0 +1,36 @@
+{
+  "retrievedAt": "2026-10-06T19:36:04.416Z",
+  "endpoint": "local production preview -> unofficial Yahoo chart endpoint (no mocks)",
+  "results": [
+    {
+      "symbol": "AAPL",
+      "timeframe": "5m",
+      "status": 200,
+      "bars": 1635,
+      "asOf": 1791315363.916,
+      "source": "Yahoo unofficial prototype · delayed / as-of data",
+      "dataState": "delayed",
+      "latestBarAt": 1791315362
+    },
+    {
+      "symbol": "AAPL",
+      "timeframe": "1H",
+      "status": 200,
+      "bars": 457,
+      "asOf": 1791315364.186,
+      "source": "Yahoo unofficial prototype · delayed / as-of data",
+      "dataState": "delayed",
+      "latestBarAt": 1791315362
+    },
+    {
+      "symbol": "AAPL",
+      "timeframe": "1D",
+      "status": 200,
+      "bars": 1255,
+      "asOf": 1791315364.406,
+      "source": "Yahoo unofficial prototype · delayed / as-of data",
+      "dataState": "delayed",
+      "latestBarAt": 1791293400
+    }
+  ]
+}

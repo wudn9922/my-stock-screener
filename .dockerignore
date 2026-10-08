@@ -20,3 +20,6 @@ main.py
 mainnew.py
 main-current.py
 main-before-dynamic-groups.py
+
+# Atlas 研究終端（Vite/React，只部署到 docs/atlas，不進 Cloud Run 映像檔）
+atlas

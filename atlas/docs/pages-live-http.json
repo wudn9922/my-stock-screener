@@ -1,0 +1,74 @@
+{
+  "url": "https://wudn9922.github.io/lightweight-drawing-lab/",
+  "htmlStatus": 200,
+  "title": "Atlas \u2014 Research Terminal",
+  "resources": [
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/chart-DeF8ixWn.js",
+      "status": 200,
+      "bytes": 181406,
+      "sha256": "558e3197b515e162be0d6a012695405e63e7832a8988dff7d50d89f4dd9e3182"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/index-BF6WSGFC.js",
+      "status": 200,
+      "bytes": 341717,
+      "sha256": "9ac6ad8b726daff9baa0c7db5d252b5e66ef709670aa2c11bf355847366d8788"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/index-d2oPdOhQ.css",
+      "status": 200,
+      "bytes": 24424,
+      "sha256": "220886d121463d1e942d4abf144cd3d91816356bbcba73e1c380083e1ccb4c10"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/react-DPIr46qh.js",
+      "status": 200,
+      "bytes": 11880,
+      "sha256": "c0e00f50de6c0c4313118305af3b7781b03c48879475014a86ba2bcd056a65f6"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/assets/storage-q_a8Hn4X.js",
+      "status": 200,
+      "bytes": 95255,
+      "sha256": "860da3541196e6b592bd606f24a838a0b91842b7d572c34530c5c8d1b60f06c7"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/icon-192.png",
+      "status": 200,
+      "bytes": 961,
+      "sha256": "be77664cb7eab14d3e7db86f73635a361381d1a58cffa8251b3d433d62cee024"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/icon.svg",
+      "status": 200,
+      "bytes": 519,
+      "sha256": "7a6e9c9b2a21676fb154a7293e9b46a13bfb1a4c6cad48439ed050ae86d2f505"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/manifest.webmanifest",
+      "status": 200,
+      "bytes": 475,
+      "sha256": "ea21c8a8640d29d6a01dd427c1085087b1c7c7c7c5e4a3171e802b32ab35037a"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/sw.js",
+      "status": 200,
+      "bytes": 3732,
+      "sha256": "03b94144fe2484c3e90733cfedcc9961a2f8a63e21d41314ac80ee75dbfa4e64"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/icon-192.png",
+      "status": 200,
+      "bytes": 961,
+      "sha256": "be77664cb7eab14d3e7db86f73635a361381d1a58cffa8251b3d433d62cee024"
+    },
+    {
+      "url": "https://wudn9922.github.io/lightweight-drawing-lab/icon-512.png",
+      "status": 200,
+      "bytes": 4116,
+      "sha256": "cb891d2b4a31850ffb4cffaf8c1871129ea473d8b4c5cfdb9ae30a87bedc9295"
+    }
+  ],
+  "tlsVerification": "enabled"
+}
