@@ -68,8 +68,9 @@ function reportSymbols(report: Report | null): LocalSymbol[] {
 
 export function Site() {
   const mobile = useSyncExternalStore(subscribeMobile, () => mobileQuery.matches);
-  const { route, id: navId, navigate, syncRoute } = useRoute(DEFAULT_PAGE);
-  const { state: reportState, reload } = useReport();
+  const { route, id: navId, source: navSource, navigate, syncRoute } = useRoute(DEFAULT_PAGE);
+  // Builds without a published report (upstream Atlas) only fetch it when a report page opens.
+  const { state: reportState, reload } = useReport(SCREENER_HOSTING || route.page !== 'chart');
   const report = reportState.status === 'ok' ? reportState.report : null;
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -86,9 +87,13 @@ export function Site() {
     if (route.page !== 'chart' || !route.symbol) return;
     const maList = presets.current.get(route.symbol);
     presets.current.delete(route.symbol);
-    setChartRequest({ id: navId, symbol: route.symbol, timeframe: route.tf, maList: maList ? [...maList] : undefined });
+    setChartRequest({ id: navId, symbol: route.symbol, timeframe: route.tf, source: navSource, maList: maList ? [...maList] : undefined });
     // Only a new navigation id issues a request; the route is read at that moment.
   }, [navId]);
+  // Each page starts at the top (the shell scrolls inside <main>).
+  useEffect(() => {
+    document.getElementById('main')?.scrollTo?.({ top: 0 });
+  }, [route.page, route.page === 'markets' ? route.market : route.page === 'screener' ? route.group : '']);
   useEffect(() => {
     const titles = route.page === 'chart' && route.symbol ? `${route.symbol} · 圖表` : PAGE_TITLES[route.page];
     document.title = `${titles} — Atlas 股市報告`;
@@ -126,7 +131,7 @@ export function Site() {
   );
   const go = (page: Page) => {
     setSearchOpen(false);
-    if (page === route.page && page !== 'chart') return;
+    if (page === route.page) return;
     if (page === 'chart') navigate({ page: 'chart' });
     else if (page === 'markets') navigate({ page, market: route.page === 'markets' ? route.market : 'tw' });
     else navigate({ page } as Route);

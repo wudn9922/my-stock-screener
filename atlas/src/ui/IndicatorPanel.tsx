@@ -116,7 +116,7 @@ export function IndicatorPanel({
   return (
     <section className="indicator-panel">
       <div className="section-heading">
-        <span>MOVING AVERAGES</span>
+        <span>均線與成交量</span>
         <span>{indicators.length}</span>
       </div>
       <p className="muted small" data-testid="indicator-scope">
@@ -140,28 +140,28 @@ export function IndicatorPanel({
         }}
       >
         <label className="sr-only" htmlFor={typeId}>
-          Indicator type
+          指標類型
         </label>
         <select
           id={typeId}
-          aria-label="Indicator type"
+          aria-label="指標類型"
           value={indicatorType}
           onChange={(event) => setIndicatorType(event.target.value as IndicatorType)}
         >
           <option value="SMA">SMA</option>
           <option value="EMA">EMA</option>
-          <option value="Volume">Volume</option>
+          <option value="Volume">成交量</option>
         </select>
         {isVolume ? (
           <span>紅綠量柱 · 均量 MA 20</span>
         ) : (
           <>
             <label className="sr-only" htmlFor={periodId}>
-              {indicatorType} period
+              {indicatorType} 週期
             </label>
             <input
               id={periodId}
-              aria-label={`${indicatorType} period`}
+              aria-label={`${indicatorType} 週期`}
               type="number"
               min="1"
               max="5000"
@@ -171,7 +171,7 @@ export function IndicatorPanel({
             />
           </>
         )}
-        <button className="primary-button" type="submit" aria-label={`Add ${indicatorType}`}>
+        <button className="primary-button" type="submit" aria-label={`新增 ${indicatorType}`}>
           <Plus size={16} />
           新增
         </button>
@@ -179,27 +179,27 @@ export function IndicatorPanel({
       <div className="indicator-presets">
         <form className="ma-settings" onSubmit={savePreset}>
           <label>
-            Preset name
+            指標組合名稱
             <input
-              aria-label="Preset name"
+              aria-label="指標組合名稱"
               maxLength={80}
               value={presetName}
               onChange={(event) => setPresetName(event.target.value)}
             />
           </label>
           <button className="primary-button" type="submit" disabled={!presetName.trim()}>
-            Save preset
+            儲存目前指標為組合
           </button>
         </form>
         <form className="ma-settings" onSubmit={applyPreset}>
           <label>
-            Indicator preset
+            指標組合
             <select
-              aria-label="Indicator preset"
+              aria-label="指標組合"
               value={selectedPreset}
               onChange={(event) => setSelectedPreset(event.target.value)}
             >
-              <option value="">Choose a preset</option>
+              <option value="">選擇組合</option>
               {presets.map((preset) => (
                 <option key={preset.id} value={preset.id}>
                   {preset.name}
@@ -208,7 +208,7 @@ export function IndicatorPanel({
             </select>
           </label>
           <button className="primary-button" type="submit" disabled={!selectedPreset}>
-            Apply preset
+            套用組合
           </button>
         </form>
       </div>
@@ -221,8 +221,8 @@ export function IndicatorPanel({
       )}
       {indicators.map((indicator) => {
         const isIndicatorVolume = indicator.type === 'Volume';
-        const title = isIndicatorVolume ? 'Volume' : `${indicator.type} ${indicator.period}`;
-        const displaySource = isIndicatorVolume ? 'volume' : indicator.source;
+        const title = isIndicatorVolume ? '成交量' : `${indicator.type} ${indicator.period}`;
+        const displaySource = isIndicatorVolume ? '量' : { open: '開盤價', high: '最高價', low: '最低價', close: '收盤價' }[indicator.source];
         return (
           <div
             className="ma-card"
@@ -238,7 +238,7 @@ export function IndicatorPanel({
             </div>
             <div className="ma-actions">
               <IconButton
-                label={`${indicator.visible ? 'Hide' : 'Show'} ${title}`}
+                label={`${indicator.visible ? '隱藏' : '顯示'} ${title}`}
                 onClick={() =>
                   store.updateIndicator(symbol, indicator.id, { visible: !indicator.visible })
                 }
@@ -246,7 +246,7 @@ export function IndicatorPanel({
                 {indicator.visible ? <Eye size={16} /> : <EyeOff size={16} />}
               </IconButton>
               <IconButton
-                label={`${indicator.locked ? 'Unlock' : 'Lock'} ${title}`}
+                label={`${indicator.locked ? '解鎖' : '鎖定'} ${title}`}
                 active={indicator.locked}
                 onClick={() =>
                   store.updateIndicator(symbol, indicator.id, { locked: !indicator.locked })
@@ -255,7 +255,7 @@ export function IndicatorPanel({
                 {indicator.locked ? <LockKeyhole size={16} /> : <UnlockKeyhole size={16} />}
               </IconButton>
               <IconButton
-                label={`Settings ${title}`}
+                label={`設定 ${title}`}
                 disabled={indicator.locked}
                 active={editing === indicator.id}
                 onClick={() => setEditing(editing === indicator.id ? null : indicator.id)}
@@ -263,7 +263,7 @@ export function IndicatorPanel({
                 <Settings2 size={16} />
               </IconButton>
               <IconButton
-                label={`Remove ${title}`}
+                label={`移除 ${title}`}
                 disabled={indicator.locked}
                 onClick={() => store.removeIndicator(symbol, indicator.id)}
               >
@@ -275,7 +275,7 @@ export function IndicatorPanel({
                 {isIndicatorVolume ? null : (
                   <>
                     <label>
-                      Period
+                      週期
                       <input
                         type="number"
                         name="period"
@@ -286,11 +286,11 @@ export function IndicatorPanel({
                       />
                     </label>
                     <label>
-                      Source
+                      價格來源
                       <select name="source" defaultValue={indicator.source}>
                         {(['open', 'high', 'low', 'close'] as const).map((source) => (
                           <option key={source} value={source}>
-                            {source}
+                            {{ open: '開盤價', high: '最高價', low: '最低價', close: '收盤價' }[source]}
                           </option>
                         ))}
                       </select>
@@ -298,7 +298,7 @@ export function IndicatorPanel({
                   </>
                 )}
                 <label>
-                  Color
+                  顏色
                   <input type="color" name="color" defaultValue={indicator.color} />
                 </label>
                 {isIndicatorVolume && (
@@ -306,8 +306,8 @@ export function IndicatorPanel({
                 )}
                 {!isIndicatorVolume && (
                   <label>
-                    Width
-                    <select name="width" aria-label={`${title} width`} defaultValue={indicator.widthMode === 'atr' ? 'atr' : String(indicator.lineWidth)}>
+                    線寬
+                    <select name="width" aria-label={`${title} 線寬`} defaultValue={indicator.widthMode === 'atr' ? 'atr' : String(indicator.lineWidth)}>
                       <option value="atr">0.02 ATR (14)</option>
                       {[1, 2, 3, 4].map((width) => (
                         <option key={width} value={width}>
@@ -324,9 +324,9 @@ export function IndicatorPanel({
         );
       })}
       <p className="small muted">
-        Lock 後仍可隱藏／顯示。
+        鎖定後仍可隱藏／顯示，解鎖後才能修改或刪除。
         <br />
-        解鎖後才能修改或刪除。ATR width maps 0.02 × 14-bar ATR through the price scale; native SMA/EMA strokes round to 1–4 px. Pixel mode uses native 1–4 px. New SMA/EMA instances use ATR, while saved instances keep their current width mode.
+        ATR 線寬＝0.02 × 14 根 K 棒 ATR 換算成像素（1–4 px）；像素模式固定 1–4 px。新增的 SMA／EMA 預設使用 ATR 線寬，已儲存的指標保留原設定。
       </p>
     </section>
   );

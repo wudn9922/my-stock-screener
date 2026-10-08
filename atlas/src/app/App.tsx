@@ -62,7 +62,13 @@ import { SCREENER_HOSTING, STATIC_HOSTING } from './HostingMode';
 import { parseLaunchParams } from './LaunchParams';
 import { legacyVolumeEnabled } from '../storage/schema';
 import { getMarketProfile } from '../market-data/MarketProfile';
-import { loadSymbolCatalog, resolveSymbolInput, type SymbolCatalogEntry } from '../market-data/SymbolCatalog';
+import {
+  getLoadedSymbolDirectory,
+  loadSymbolCatalog,
+  loadSymbolDirectory,
+  resolveSymbolInput,
+  type SymbolCatalogEntry,
+} from '../market-data/SymbolCatalog';
 import { indicatorColors } from '../indicators/IndicatorRegistry';
 import { marketProvider, getPeFigures, type PeFigures } from './dataSources';
 import { sitePreferences, upDownColors } from './sitePreferences';
@@ -110,9 +116,14 @@ const providerLabels: Record<ProviderId, string> = {
   yahoo: STATIC_HOSTING ? 'Yahoo（需要後端）' : 'Yahoo 後端',
   demo: '模擬資料（DEMO）',
 };
-/** Real symbols opened from the site use delayed market data, never Demo's simulated prices. */
+/**
+ * Provider for a symbol opened from the site (search, report lists, deep links). Static deployments
+ * open real delayed data, never Demo's simulated prices; elsewhere the chosen provider is kept.
+ */
 const linkProvider = (current: ProviderId): ProviderId =>
-  SCREENER_HOSTING ? 'market' : STATIC_HOSTING ? 'snapshot' : current === 'demo' ? 'market' : current;
+  SCREENER_HOSTING ? 'market' : STATIC_HOSTING ? 'snapshot' : current;
+/** Demo has no Taiwan listings; a Taiwan symbol switches Demo to real delayed data. */
+const taiwanProvider: ProviderId = SCREENER_HOSTING ? 'market' : 'snapshot';
 const staticHostingText = SCREENER_HOSTING
   ? '行情為延遲資料（非即時），僅供研究參考，非投資建議。'
   : 'GitHub Pages：延遲行情快照，非即時；即時 Yahoo 需要後端。';
@@ -175,17 +186,24 @@ export function App({
   const marketLabel = isIndex
     ? market.market === 'TW' ? '台股指數' : '指數'
     : market.market === 'TW' ? (market.exchange === 'TWSE' ? '上市' : '上櫃') : '美股';
-  const companyName =
-    reportSymbols.find((entry) => entry.symbol === symbol)?.name ??
-    catalogEntries.find((entry) => entry.symbol === symbol)?.name ??
-    companies[symbol];
+  const companyName = [
+    catalogEntries.find((entry) => entry.symbol === symbol)?.name,
+    getLoadedSymbolDirectory()?.entries.find((entry) => entry.symbol === symbol)?.name,
+    reportSymbols.find((entry) => entry.symbol === symbol)?.name,
+    companies[symbol],
+  ].find((name) => !!name && name !== symbol);
   const timeframeKey = `${providerId}:${symbol}`;
   const availableTimeframes = symbolTimeframes?.key === timeframeKey ? symbolTimeframes.values : providers[providerId].supportedTimeframes;
+  const [, setDirectoryLoads] = useState(0);
   useEffect(() => {
     const abort = new AbortController();
     void loadSymbolCatalog(abort.signal).then(setCatalogEntries).catch(() => {
       // Explicit exchange suffixes and US navigation remain usable if the directory is unavailable.
     });
+    // Company names for US symbols come from the full-market directory.
+    void loadSymbolDirectory(abort.signal)
+      .then(() => setDirectoryLoads((n) => n + 1))
+      .catch(() => undefined);
     return () => abort.abort();
   }, []);
   useEffect(() => {
@@ -505,7 +523,7 @@ export function App({
       activeSymbol: symbol,
       ...(provider
         ? { provider }
-        : getMarketProfile(symbol).market === 'TW' && current === 'demo' ? { provider: linkProvider(current) } : {}),
+        : getMarketProfile(symbol).market === 'TW' && current === 'demo' ? { provider: taiwanProvider } : {}),
       recentSymbols: [
         symbol,
         ...store.getSnapshot().app.recentSymbols.filter((x) => x !== symbol),
@@ -547,7 +565,15 @@ export function App({
           setNotice(String(e));
           return;
         }
-        const nextProvider = linkProvider(store.getSnapshot().app.provider as ProviderId);
+        // A reload of the synced URL (same symbol) keeps the user's data source.
+        const currentApp = store.getSnapshot().app;
+        const currentProvider = currentApp.provider as ProviderId;
+        const nextProvider =
+          request.source === 'app' || target === currentApp.activeSymbol
+            ? currentProvider === 'demo' && getMarketProfile(target).market === 'TW'
+              ? taiwanProvider
+              : currentProvider
+            : linkProvider(currentProvider);
         let message = '';
         if (launch.timeframe) {
           const provider: MarketDataProvider = providers[nextProvider];
@@ -963,7 +989,7 @@ export function App({
               className="demo-switch"
               type="button"
               title="改用真實的延遲行情；你的設定仍保留在這台裝置。"
-              onClick={() => store.updateApp({ provider: linkProvider('demo') })}
+              onClick={() => store.updateApp({ provider: SCREENER_HOSTING ? 'market' : 'snapshot' })}
             >
               模擬資料 · 改用真實行情
             </button>
@@ -1032,16 +1058,16 @@ export function App({
         </button>
         {!mobile && (
           <div className="chart-status-quick-actions" aria-label="快速操作">
-            <IconButton label="復原" disabled={!history.canUndo} onClick={undoDrawing}>
+            <IconButton label="復原畫線" disabled={!history.canUndo} onClick={undoDrawing}>
               <Undo2 size={17} />
             </IconButton>
-            <IconButton label="重做" disabled={!history.canRedo} onClick={redoDrawing}>
+            <IconButton label="重做畫線" disabled={!history.canRedo} onClick={redoDrawing}>
               <Redo2 size={17} />
             </IconButton>
-            <IconButton label="放大" onClick={() => engine.current?.zoom(0.8)}>
+            <IconButton label="放大圖表" onClick={() => engine.current?.zoom(0.8)}>
               <ZoomIn size={17} />
             </IconButton>
-            <IconButton label="縮小" onClick={() => engine.current?.zoom(1.25)}>
+            <IconButton label="縮小圖表" onClick={() => engine.current?.zoom(1.25)}>
               <ZoomOut size={17} />
             </IconButton>
           </div>
@@ -1095,7 +1121,7 @@ export function App({
                       >
                         <span className="indicator-name" style={{ color: i.color }}>
                           {i.type === 'Volume'
-                            ? 'Volume'
+                            ? '成交量'
                             : `${i.type} ${i.period}${repeatedPeriod ? ` ${i.source.toUpperCase()}` : ''}`}
                         </span>
                         <span className="indicator-value" data-indicator-value />
@@ -1110,7 +1136,7 @@ export function App({
                   })}
                   {showLegacyVolume && (
                     <div className="legacy-volume-chip" data-legacy-volume>
-                      <span className="indicator-name">Volume</span>
+                      <span className="indicator-name">成交量</span>
                       <span className="indicator-value" data-volume-value />
                       <span className="indicator-average">
                         <span>MA20</span>
@@ -1163,7 +1189,7 @@ export function App({
                 : `${toolNames[tool]} · 每個端點：按住 → 拖曳 → 放開`}
             </span>
             <span className="status-counts">
-              畫線 {activeDrawings.length} <span className="status-divider">/</span> 指標 {activeIndicators.length}
+              畫線 {activeDrawings.length} 條 <span className="status-divider">/</span> 指標 {activeIndicators.length} 個
               <span className="status-divider">/</span>
               <span className={`save-state ${state.storageError ? 'danger-text' : ''}`} data-testid="save-state">
                 {state.storageError ? '儲存失敗' : state.saving ? '儲存中…' : '已儲存於本機'}

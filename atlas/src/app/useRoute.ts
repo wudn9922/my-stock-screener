@@ -5,6 +5,8 @@ export interface NavigationState {
   route: Route;
   /** Increments on every user navigation (push/pop), not on URL syncs (`replace`). */
   id: number;
+  /** `url`: page load or back/forward; `app`: an in-app navigation (search, lists, tabs). */
+  source: 'url' | 'app';
 }
 
 function currentUrl(route: Route) {
@@ -16,11 +18,11 @@ export function useRoute(fallback: Page) {
   const [state, setState] = useState<NavigationState>(() => {
     const parsed = parseRoute(window.location.search, fallback);
     if (parsed.rewrite) window.history.replaceState(window.history.state, '', currentUrl(parsed.route));
-    return { route: parsed.route, id: 1 };
+    return { route: parsed.route, id: 1, source: 'url' };
   });
   useEffect(() => {
     const pop = () =>
-      setState((previous) => ({ route: parseRoute(window.location.search, fallback).route, id: previous.id + 1 }));
+      setState((previous) => ({ route: parseRoute(window.location.search, fallback).route, id: previous.id + 1, source: 'url' }));
     window.addEventListener('popstate', pop);
     return () => window.removeEventListener('popstate', pop);
   }, [fallback]);
@@ -29,15 +31,14 @@ export function useRoute(fallback: Page) {
     const url = currentUrl(route);
     if (options.replace) window.history.replaceState(null, '', url);
     else if (`${window.location.pathname}${window.location.search}` !== url) window.history.pushState(null, '', url);
-    setState((previous) => ({ route, id: previous.id + 1 }));
-    window.scrollTo?.(0, 0);
+    setState((previous) => ({ route, id: previous.id + 1, source: 'app' }));
   }, []);
   /** Keeps the URL in sync with in-page state without a new history entry or navigation id. */
   const syncRoute = useCallback((route: Route) => {
     setState((previous) => {
       if (sameRoute(previous.route, route)) return previous;
       window.history.replaceState(window.history.state, '', currentUrl(route));
-      return { route, id: previous.id };
+      return { ...previous, route };
     });
   }, []);
   return { ...state, navigate, syncRoute };

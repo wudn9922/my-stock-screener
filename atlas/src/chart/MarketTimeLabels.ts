@@ -18,7 +18,7 @@ export function marketTimeOptions(market: MarketProfile, timeframe: Timeframe): 
   });
   const formats = [
     new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric' }),
-    new Intl.DateTimeFormat('en-US', { timeZone, month: 'short' }),
+    new Intl.DateTimeFormat('zh-TW', { timeZone, month: 'short' }),
     new Intl.DateTimeFormat('en-US', { timeZone, day: 'numeric' }),
     new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
     new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }),

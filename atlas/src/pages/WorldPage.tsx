@@ -32,6 +32,7 @@ import { formatDateTime, formatPercent, formatPrice, toneClass } from '../ui/for
 /** Categorical slots validated for the dark chart surface (fixed order; color follows the index). */
 export const SERIES_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
 const DEFAULT_VISIBLE = 6;
+const LEGEND_COLLAPSED = 8;
 const CONCURRENCY = 4;
 
 type Load = { status: 'loading' } | { status: 'ready'; bars: Bar[] } | { status: 'error' };
@@ -159,12 +160,15 @@ const COLUMNS: { key: SortKey; label: string; numeric: boolean }[] = [
 
 function WorldView({ report, openChart }: { report: Report } & Pick<PageProps, 'openChart'>) {
   const indices = report.worldIndices;
-  const [loads, setLoads] = useState<Record<string, Load>>({});
+  const [loads, setLoads] = useState<Record<string, Load>>(() =>
+    Object.fromEntries(indices.map((index) => [index.symbol, { status: 'loading' } as Load])),
+  );
   const [window, setWindow] = useState<PerformanceWindow>('3M');
   const [visible, setVisible] = useState<Set<string>>(
     () => new Set(indices.slice(0, DEFAULT_VISIBLE).map((index) => index.symbol)),
   );
   const [sort, setSort] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'ytd', direction: 'desc' });
+  const [legendExpanded, setLegendExpanded] = useState(false);
   const [hover, setHover] = useState<{ values: Record<string, number> | null; time: number | null }>({ values: null, time: null });
   useEffect(() => {
     let live = true;
@@ -264,6 +268,8 @@ function WorldView({ report, openChart }: { report: Report } & Pick<PageProps, '
         </div>
         <ul className="series-legend" aria-label="圖例（點選顯示或隱藏）">
           {indices.map((index, position) => {
+            // Collapsed: the first rows plus every series currently drawn.
+            if (!legendExpanded && position >= LEGEND_COLLAPSED && !visible.has(index.symbol)) return null;
             const { color, dashed } = seriesStyle(position);
             const load = loads[index.symbol];
             const value = hover.values ? hover.values[index.symbol] : windowReturns[index.symbol];
@@ -277,17 +283,23 @@ function WorldView({ report, openChart }: { report: Report } & Pick<PageProps, '
                   disabled={load?.status === 'error'}
                   onClick={() => toggle(index.symbol)}
                   title={load?.status === 'error' ? '暫無資料' : on ? '點選隱藏' : '點選顯示'}
+                  data-status={load?.status ?? 'loading'}
                 >
                   <i className={dashed ? 'dashed' : ''} style={{ borderColor: color, background: dashed ? 'transparent' : color }} aria-hidden="true" />
                   <span className="legend-name">{index.name}</span>
-                  <span className={`legend-value ${toneClass(value)}`}>
-                    {load?.status === 'error' ? '暫無資料' : on ? formatPercent(value ?? null, 1) : '—'}
+                  <span className={`legend-value ${on ? toneClass(value) : 'flat'}`}>
+                    {load?.status === 'error' ? '暫無資料' : load?.status !== 'ready' ? '…' : on ? formatPercent(value ?? null, 1) : '—'}
                   </span>
                 </button>
               </li>
             );
           })}
         </ul>
+        {indices.length > LEGEND_COLLAPSED && (
+          <button type="button" className="text-button legend-more" onClick={() => setLegendExpanded(!legendExpanded)}>
+            {legendExpanded ? '收合指數清單' : `顯示全部 ${indices.length} 個指數`}
+          </button>
+        )}
       </section>
       <section className="card world-table-card" aria-label="世界指數表現">
         <div className="table-scroll">

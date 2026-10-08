@@ -297,8 +297,13 @@ export class ChartEngine {
     this.ohlcBar = result.bars.at(-1) ?? null;
     this.renderHeader();
     this.scheduleVisualFrame();
-    this.sourceLabel.textContent = `${result.source} · ${market.currency} · ${market.timezone} · ${result.session.toUpperCase()} · ${result.dataState ?? (result.delayed ? 'DELAYED' : 'SIMULATED')} · ${result.cacheStatus ?? 'fresh'} · ${result.priceBasis ?? 'unknown price basis'} · as-of ${result.asOf ? new Date(result.asOf * 1000).toLocaleString() : 'N/A'} · last bar ${new Date(result.bars.at(-1)!.time * 1000).toLocaleString()}`;
-    if (result.sessionCloseObservations?.length) this.sourceLabel.textContent += ` · ${result.sessionCloseObservations.length} source-reported auction-close observations (instant samples)`;
+    const state = result.dataState ?? (result.delayed ? 'delayed' : 'simulated');
+    const stateText = state === 'simulated' ? '模擬' : state === 'live' ? '即時' : '延遲';
+    const cacheText = { fresh: '最新', cached: '快取', stale: '舊資料' }[result.cacheStatus ?? 'fresh'];
+    const basisText = { 'split-adjusted': '分割已調整', unadjusted: '未調整', unknown: '調整方式未知' }[result.priceBasis ?? 'unknown'];
+    const time = (seconds: number) => new Date(seconds * 1000).toLocaleString('zh-TW', { hour12: false });
+    this.sourceLabel.textContent = `${result.source} · ${market.currency} · ${result.session === 'regular' ? '一般交易時段' : '含盤前盤後'} · ${stateText} · ${cacheText} · ${basisText} · 取得 ${result.asOf ? time(result.asOf) : '—'} · 最後 K 棒 ${time(result.bars.at(-1)!.time)}`;
+    if (result.sessionCloseObservations?.length) this.sourceLabel.textContent += ` · ${result.sessionCloseObservations.length} 筆收盤競價觀測點（瞬時樣本）`;
     this.sourceLabel.title = this.sourceLabel.textContent;
   }
   sync(

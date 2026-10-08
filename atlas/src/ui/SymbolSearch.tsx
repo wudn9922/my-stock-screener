@@ -3,6 +3,9 @@ import { ArrowUpRight, Clock, Search, X } from 'lucide-react';
 import { sitePreferences, type RecentSearch } from '../app/sitePreferences';
 import { isCanonicalSymbol } from '../market-data/MarketProfile';
 import { displayTicker } from './format';
+import { matchLocalSymbols, type LocalSymbol } from './searchRanking';
+
+export type { LocalSymbol } from './searchRanking';
 
 // The data layer (directory, providers) loads on first use, keeping it off the shell's critical path.
 const dataSources = () => import('../app/dataSources');
@@ -14,36 +17,11 @@ export interface SearchResult {
   badge: string;
   kind: 'stock' | 'index' | 'recent' | 'direct';
 }
-export interface LocalSymbol {
-  symbol: string;
-  name: string;
-}
 
 function exchangeBadge(exchange: string, market: 'TW' | 'US') {
   const value = exchange.toUpperCase();
   if (market === 'TW') return value === 'TPEX' || value === 'OTC' ? '上櫃' : value === 'TWSE' ? '上市' : '台股';
   return value || '美股';
-}
-
-/** Ranks local (report) symbols: exact ticker, ticker prefix, name prefix, name contains. */
-export function matchLocalSymbols(query: string, symbols: readonly LocalSymbol[], limit = 6): LocalSymbol[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
-  const rank = (item: LocalSymbol) => {
-    const ticker = displayTicker(item.symbol).replace(/^\^/, '').toLowerCase();
-    const name = item.name.toLowerCase();
-    if (ticker === q || item.symbol.toLowerCase() === q) return 0;
-    if (ticker.startsWith(q.replace(/^\^/, ''))) return 1;
-    if (name.startsWith(q)) return 2;
-    if (name.includes(q)) return 3;
-    return -1;
-  };
-  return symbols
-    .map((item) => ({ item, score: rank(item) }))
-    .filter((entry) => entry.score >= 0)
-    .sort((a, b) => a.score - b.score)
-    .slice(0, limit)
-    .map((entry) => entry.item);
 }
 
 /**

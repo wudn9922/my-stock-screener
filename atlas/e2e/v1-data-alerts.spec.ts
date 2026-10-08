@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { openPanel, setProvider } from './site-helpers';
 import type { AlertDefinition } from '../src/storage/schema';
 import type { Bar, BarResult, Timeframe } from '../src/market-data/MarketDataProvider';
 
@@ -196,15 +197,7 @@ async function yahooCacheProviderId(page: Page): Promise<string> {
 }
 
 async function openAlerts(page: Page) {
-  if (await page.locator('.mobile-nav').isVisible()) {
-    await page
-      .locator('.mobile-nav')
-      .getByRole('button', { name: 'Research', exact: true })
-      .click();
-    await page.getByLabel('Research panel', { exact: true }).selectOption('alerts');
-  } else {
-    await page.getByLabel('Research panel', { exact: true }).selectOption('alerts');
-  }
+  await openPanel(page, 'alerts');
   await expect(page.locator('.alert-panel')).toBeVisible();
 }
 
@@ -216,15 +209,15 @@ test('Yahoo exposes its seven direct intervals and caches normalized delayed bar
   await page.goto('/');
   await loaded(page);
 
-  await expect(page.getByLabel('Timeframe 4H', { exact: true })).toHaveCount(1);
-  await page.getByLabel('Market data source', { exact: true }).selectOption('yahoo');
+  await expect(page.getByLabel('週期 4H', { exact: true })).toHaveCount(1);
+  await setProvider(page, 'yahoo');
   await loaded(page);
   const providerId = await yahooCacheProviderId(page);
-  await expect(page.getByLabel('Timeframe 4H', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('週期 4H', { exact: true })).toHaveCount(0);
   await expect(page.locator('.timeframe-buttons button')).toHaveCount(7);
   await expect(page.locator('.data-source')).toContainText('Yahoo normalized browser fixture');
-  await expect(page.locator('.data-source')).toContainText(/delayed/i);
-  await expect(page.locator('.data-source')).toContainText('fresh');
+  await expect(page.locator('.data-source')).toContainText('延遲');
+  await expect(page.locator('.data-source')).toContainText('最新');
 
   const initialDaily = await readMarketCache(page);
   const dailyEntry = initialDaily.find(
@@ -239,8 +232,8 @@ test('Yahoo exposes its seven direct intervals and caches normalized delayed bar
   expect(dailyEntry?.value.source).toContain('Yahoo normalized browser fixture');
 
   for (const timeframe of ['5m', '15m', '30m', '1H', '1D', '1W', '1M'] as const) {
-    await page.getByLabel(`Timeframe ${timeframe}`, { exact: true }).click();
-    await expect(page.getByLabel(`Timeframe ${timeframe}`, { exact: true })).toHaveAttribute(
+    await page.getByLabel(`週期 ${timeframe}`, { exact: true }).click();
+    await expect(page.getByLabel(`週期 ${timeframe}`, { exact: true })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
@@ -251,10 +244,10 @@ test('Yahoo exposes its seven direct intervals and caches normalized delayed bar
   }
 
   const firstFifteenMinuteFetches = counts.get('AAPL:15m');
-  await page.getByLabel('Timeframe 15m', { exact: true }).click();
+  await page.getByLabel('週期 15m', { exact: true }).click();
   await loaded(page);
   expect(counts.get('AAPL:15m')).toBe(firstFifteenMinuteFetches);
-  await expect(page.locator('.data-source')).toContainText('cached');
+  await expect(page.locator('.data-source')).toContainText('快取');
   const cache = await readMarketCache(page);
   expect(
     cache.some(
@@ -279,10 +272,10 @@ test('expired Yahoo bars remain visible with a stale label when refresh fails', 
   );
   await page.goto('/');
   await loaded(page);
-  await page.getByLabel('Market data source', { exact: true }).selectOption('yahoo');
+  await setProvider(page, 'yahoo');
   await loaded(page);
   const providerId = await yahooCacheProviderId(page);
-  await expect(page.locator('.data-source')).toContainText('fresh');
+  await expect(page.locator('.data-source')).toContainText('最新');
   expect(
     (await readMarketCache(page)).some(
       (entry) =>
@@ -295,16 +288,9 @@ test('expired Yahoo bars remain visible with a stale label when refresh fails', 
 
   await page.clock.fastForward(60_001);
   offline = true;
-  if (await page.locator('.mobile-nav').isVisible()) {
-    await page
-      .locator('.mobile-nav')
-      .getByRole('button', { name: 'Research', exact: true })
-      .click();
-    await page.getByLabel('Research panel', { exact: true }).selectOption('settings');
-  }
   await page
-    .getByRole('button', { name: 'Refresh market data', exact: true })
-    .filter({ visible: true })
+    .locator('.ws-header')
+    .getByRole('button', { name: '重新整理行情', exact: true })
     .click();
   await loaded(page);
   await expect(page.locator('.data-source')).toContainText('STALE OFFLINE CACHE');
@@ -320,16 +306,16 @@ test('visible active alerts baseline history, trigger once on a newly closed bar
   const counts = await installYahooRoutes(page, () => mode);
   await page.goto('/');
   await loaded(page);
-  await page.getByLabel('Market data source', { exact: true }).selectOption('yahoo');
+  await setProvider(page, 'yahoo');
   await loaded(page);
   await expect.poll(() => counts.get('AAPL:1D') ?? 0).toBe(2);
 
   await openAlerts(page);
-  await page.getByLabel('Alert price level', { exact: true }).fill('100');
-  await page.getByLabel('Level trigger direction', { exact: true }).selectOption('above');
-  await page.getByRole('button', { name: 'Create alert', exact: true }).click();
+  await page.getByLabel('提醒價格', { exact: true }).fill('100');
+  await page.getByLabel('觸發方向', { exact: true }).selectOption('above');
+  await page.getByRole('button', { name: '建立提醒', exact: true }).click();
   await expect(page.locator('.alert-card')).toHaveCount(1);
-  await expect(page.locator('.alert-state dd').first()).toHaveText('Never');
+  await expect(page.locator('.alert-state dd').first()).toHaveText('尚未');
   const baselineTime = Date.parse('2026-10-02T00:00:00Z') / 1000;
   await expect.poll(async () => (await readAlerts(page))[0]?.lastEvaluated).toBe(baselineTime);
   expect((await readAlerts(page))[0]?.lastTriggered).toBeNull();

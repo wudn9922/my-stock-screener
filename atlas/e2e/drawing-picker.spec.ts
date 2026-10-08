@@ -1,55 +1,56 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
+import { clickExport, searchSymbol } from './site-helpers';
 import { chooseDrawingTool } from './drawing-picker-helper';
 import type { Bar, BarResult, Timeframe } from '../src/market-data/MarketDataProvider';
 import type { SymbolState } from '../src/storage/schema';
 
 const tools = [
-  'Trend Line',
-  'Horizontal Line',
-  'Horizontal Ray',
-  'Parallel Channel',
-  'Rectangle',
-  'Fibonacci Retracement',
-  'Price Range',
-  'Date Range',
-  'Price + Date Range',
-  'Vertical Line',
+  '趨勢線',
+  '水平線',
+  '水平射線',
+  '平行通道',
+  '矩形',
+  '費波那契回撤',
+  '價格區間',
+  '日期區間',
+  '價格與日期區間',
+  '垂直線',
 ] as const;
 
 const categories = [
   {
-    slug: 'common',
-    tools: ['Trend Line', 'Horizontal Line', 'Rectangle', 'Fibonacci Retracement'],
+    slug: '常用',
+    tools: ['趨勢線', '水平線', '矩形', '費波那契回撤'],
   },
-  { slug: 'lines', tools: ['Trend Line', 'Horizontal Line', 'Horizontal Ray', 'Vertical Line'] },
-  { slug: 'channel', tools: ['Parallel Channel'] },
-  { slug: 'shapes', tools: ['Rectangle'] },
-  { slug: 'fibonacci', tools: ['Fibonacci Retracement'] },
-  { slug: 'measurements', tools: ['Price Range', 'Date Range', 'Price + Date Range'] },
+  { slug: '線條', tools: ['趨勢線', '水平線', '水平射線', '垂直線'] },
+  { slug: '通道', tools: ['平行通道'] },
+  { slug: '形狀', tools: ['矩形'] },
+  { slug: '費波那契', tools: ['費波那契回撤'] },
+  { slug: '測量', tools: ['價格區間', '日期區間', '價格與日期區間'] },
 ] as const;
 
 const activeToolValue: Record<(typeof tools)[number], string> = {
-  'Trend Line': 'trend',
-  'Horizontal Line': 'horizontal',
-  'Horizontal Ray': 'ray',
-  'Parallel Channel': 'channel',
-  Rectangle: 'rectangle',
-  'Fibonacci Retracement': 'fibonacci',
-  'Price Range': 'price-range',
-  'Date Range': 'date-range',
-  'Price + Date Range': 'price-date-range',
-  'Vertical Line': 'vertical',
+  '趨勢線': 'trend',
+  '水平線': 'horizontal',
+  '水平射線': 'ray',
+  '平行通道': 'channel',
+  '矩形': 'rectangle',
+  '費波那契回撤': 'fibonacci',
+  '價格區間': 'price-range',
+  '日期區間': 'date-range',
+  '價格與日期區間': 'price-date-range',
+  '垂直線': 'vertical',
 };
 const utilities = [
-  'Select / Pan',
-  'Magnet',
-  'Undo drawing',
-  'Redo drawing',
-  'Zoom in',
-  'Zoom out',
-  'Show future area',
-  'Reset chart view',
+  '選取 / 平移',
+  '磁吸',
+  '復原畫線',
+  '重做畫線',
+  '放大圖表',
+  '縮小圖表',
+  '顯示未來區域',
+  '重設圖表視圖',
 ] as const;
 
 async function loaded(page: Page) {
@@ -75,36 +76,36 @@ async function readSymbol(page: Page, symbol = 'AAPL'): Promise<SymbolState | un
 }
 
 async function openPicker(page: Page) {
-  const dialog = page.getByRole('dialog', { name: 'Drawing tools', exact: true });
+  const dialog = page.getByRole('dialog', { name: '繪圖工具', exact: true });
   if (await dialog.isVisible()) return dialog;
 
-  const launcher = page.getByRole('button', { name: 'Drawing Tools', exact: true });
+  const launcher = page.getByRole('button', { name: '繪圖工具', exact: true });
   await launcher.click();
   await expect(dialog).toBeVisible();
   return dialog;
 }
 
 async function addSma14(page: Page) {
-  await page.getByRole('button', { name: 'Manage indicators', exact: true }).click();
-  await page.getByLabel('Indicator type', { exact: true }).filter({ visible: true }).selectOption('SMA');
-  await page.getByLabel('SMA period', { exact: true }).filter({ visible: true }).fill('14');
-  await page.getByRole('button', { name: 'Add SMA', exact: true }).click();
-  await page.getByRole('button', { name: 'Lock SMA 14', exact: true }).click();
-  const close = page.getByRole('button', { name: 'Close panel', exact: true });
+  await page.getByRole('button', { name: '管理指標', exact: true }).click();
+  await page.getByLabel('指標類型', { exact: true }).filter({ visible: true }).selectOption('SMA');
+  await page.getByLabel('SMA 週期', { exact: true }).filter({ visible: true }).fill('14');
+  await page.getByRole('button', { name: '新增 SMA', exact: true }).click();
+  await page.getByRole('button', { name: '鎖定 SMA 14', exact: true }).click();
+  const close = page.getByRole('button', { name: '關閉面板', exact: true });
   if (await close.isVisible()) await close.click();
 }
 
 async function addVolume(page: Page) {
-  await page.getByRole('button', { name: 'Manage indicators', exact: true }).click();
-  await page.getByLabel('Indicator type', { exact: true }).filter({ visible: true }).selectOption('Volume');
-  await page.getByRole('button', { name: 'Add Volume', exact: true }).click();
-  const close = page.getByRole('button', { name: 'Close panel', exact: true });
+  await page.getByRole('button', { name: '管理指標', exact: true }).click();
+  await page.getByLabel('指標類型', { exact: true }).filter({ visible: true }).selectOption('Volume');
+  await page.getByRole('button', { name: '新增 Volume', exact: true }).click();
+  const close = page.getByRole('button', { name: '關閉面板', exact: true });
   if (await close.isVisible()) await close.click();
 }
 
 async function exportSettings(page: Page) {
   const downloadEvent = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export settings', exact: true }).click();
+  await clickExport(page);
   const download = await downloadEvent;
   const path = await download.path();
   expect(path).not.toBeNull();
@@ -128,7 +129,7 @@ test('Drawing Tools picker keeps the chart clear and supports keyboard, backdrop
   await page.goto('/');
   await loaded(page);
 
-  const launcher = page.getByRole('button', { name: 'Drawing Tools', exact: true });
+  const launcher = page.getByRole('button', { name: '繪圖工具', exact: true });
   const launcherElement = page.locator('.drawing-tools-launcher');
   await expect(launcher).toHaveCount(1);
   const chart = page.getByTestId('chart');
@@ -148,7 +149,7 @@ test('Drawing Tools picker keeps the chart clear and supports keyboard, backdrop
   for (const name of utilities)
     await expect(dialog.getByRole('button', { name, exact: true })).toBeVisible();
   await expect(page.locator('.workspace')).toHaveAttribute('inert', '');
-  await expect(dialog.getByRole('button', { name: 'Close drawing tools', exact: true })).toBeFocused();
+  await expect(dialog.getByRole('button', { name: '關閉繪圖工具', exact: true })).toBeFocused();
   expect((await chart.boundingBox())!.height).toBeCloseTo(chartHeight, 0);
 
   const firstFocusable = dialog.locator('button:not(:disabled)').first();
@@ -163,7 +164,7 @@ test('Drawing Tools picker keeps the chart clear and supports keyboard, backdrop
   for (const category of categories) {
     const picker = await openPicker(page);
     const categoryButton = picker.getByRole('button', {
-      name: `Drawing category ${category.slug}`,
+      name: `繪圖分類 ${category.slug}`,
       exact: true,
     });
     await categoryButton.click();
@@ -185,17 +186,17 @@ test('Drawing Tools picker keeps the chart clear and supports keyboard, backdrop
     await chooseDrawingTool(page, name);
     await expect(launcher).toHaveAttribute('data-active-tool', activeToolValue[name]);
     await expect(launcher).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('dialog', { name: 'Drawing tools', exact: true })).toBeHidden();
+    await expect(page.getByRole('dialog', { name: '繪圖工具', exact: true })).toBeHidden();
   }
   await expect.poll(async () => (await readSymbol(page))?.drawings.length ?? 0).toBe(0);
 
   await openPicker(page);
   await page.locator('.drawing-tool-picker-backdrop').click({ position: { x: 4, y: 4 } });
-  await expect(page.getByRole('dialog', { name: 'Drawing tools', exact: true })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: '繪圖工具', exact: true })).toBeHidden();
   await expect(launcher).toBeFocused();
   expect((await chart.boundingBox())!.height).toBeCloseTo(chartHeight, 0);
 
-  await page.getByRole('button', { name: 'Enter chart fullscreen', exact: true }).click();
+  await page.getByRole('button', { name: '全螢幕圖表', exact: true }).click();
   await expect(page.locator('.app-shell')).toHaveClass(/chart-focus/);
   const fullscreenRoot = (await page.locator('.app-shell').boundingBox())!;
   const fullscreenDialog = await openPicker(page);
@@ -221,7 +222,7 @@ test('new drawing and SMA use ATR width defaults and preserve locked symbol/time
   await addSma14(page);
   await addVolume(page);
 
-  await chooseDrawingTool(page, 'Horizontal Line');
+  await chooseDrawingTool(page, '水平線');
   const chart = (await page.getByTestId('chart').boundingBox())!;
   await drag(
     page,
@@ -231,7 +232,7 @@ test('new drawing and SMA use ATR width defaults and preserve locked symbol/time
     chart.y + chart.height * 0.5,
   );
   await expect.poll(async () => (await readSymbol(page))?.drawings.length).toBe(1);
-  await page.getByRole('button', { name: 'Lock selected drawing', exact: true }).click();
+  await page.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
   await expect.poll(async () => (await readSymbol(page))?.drawings[0]?.locked).toBe(true);
 
   const initial = await readSymbol(page);
@@ -252,26 +253,23 @@ test('new drawing and SMA use ATR width defaults and preserve locked symbol/time
     widthMode: 'pixels',
   });
 
-  await page.getByRole('button', { name: 'Timeframe 1W', exact: true }).click();
+  await page.getByRole('button', { name: '週期 1W', exact: true }).click();
   await loaded(page);
   const weekly = await readSymbol(page);
   expect(weekly!.drawings[0].scope.timeframes).toEqual(['1D']);
   expect(weekly!.indicators[0].scope.timeframe).toBe('1D');
-  await expect(page.locator('.chart-status')).toContainText('0 DRAWINGS');
+  await expect(page.locator('.chart-status')).toContainText('畫線 0 條');
 
-  const search = page.getByLabel('Symbol search', { exact: true });
-  await search.fill('NVDA');
-  await search.press('Enter');
+  await searchSymbol(page, 'NVDA');
   await expect(page.getByTestId('active-symbol')).toHaveText('NVDA');
   await loaded(page);
   expect((await readSymbol(page, 'NVDA'))?.drawings ?? []).toEqual([]);
   expect((await readSymbol(page, 'NVDA'))?.indicators ?? []).toEqual([]);
 
-  await search.fill('AAPL');
-  await search.press('Enter');
+  await searchSymbol(page, 'AAPL');
   await expect(page.getByTestId('active-symbol')).toHaveText('AAPL');
   await loaded(page);
-  await page.getByRole('button', { name: 'Timeframe 1D', exact: true }).click();
+  await page.getByRole('button', { name: '週期 1D', exact: true }).click();
   await loaded(page);
   await page.reload();
   await loaded(page);
@@ -298,10 +296,10 @@ test('short landscape picker keeps category targets reachable without resizing o
   const chartHeight = (await chart.boundingBox())!.height;
   const dialog = await openPicker(page);
   const measurements = dialog.getByRole('button', {
-    name: 'Drawing category measurements',
+    name: '繪圖分類 測量',
     exact: true,
   });
-  const categoryNav = dialog.getByRole('navigation', { name: 'Drawing tool categories', exact: true });
+  const categoryNav = dialog.getByRole('navigation', { name: '繪圖工具分類', exact: true });
   await expect
     .poll(() => categoryNav.evaluate((nav) => nav.scrollHeight > nav.clientHeight))
     .toBe(true);
@@ -313,12 +311,12 @@ test('short landscape picker keeps category targets reachable without resizing o
   expect(target.width).toBeGreaterThanOrEqual(44);
   expect(target.height).toBeGreaterThanOrEqual(44);
   await measurements.click();
-  await expect(dialog.getByRole('button', { name: 'Price Range', exact: true })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Date Range', exact: true })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Price + Date Range', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '價格區間', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '日期區間', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '價格與日期區間', exact: true })).toBeVisible();
   const optionsPanel = dialog.locator('.drawing-tool-options');
   const optionsBox = (await optionsPanel.boundingBox())!;
-  for (const name of ['Price Range', 'Date Range', 'Price + Date Range']) {
+  for (const name of ['價格區間', '日期區間', '價格與日期區間']) {
     const optionBox = (await dialog.getByRole('button', { name, exact: true }).boundingBox())!;
     expect(optionBox.x).toBeGreaterThanOrEqual(optionsBox.x);
     expect(optionBox.y).toBeGreaterThanOrEqual(optionsBox.y);
@@ -338,19 +336,23 @@ test('Escape closes an owned input dialog and passes through ordinary focused in
 }) => {
   await page.goto('/');
   await loaded(page);
-  const search = page.getByLabel('Symbol search', { exact: true });
+  // Escape in the global search box clears the query and keeps focus; the chart is untouched.
+  const phone = await page.locator('.site-tabbar').isVisible();
+  if (phone) await page.locator('.site-tabbar').getByRole('button', { name: '搜尋', exact: true }).click();
+  const search = page.locator(phone ? '.search-sheet' : '.site-topbar').getByRole('combobox', { name: '搜尋股票' });
   await search.fill('AAPL');
   await search.focus();
   await page.keyboard.press('Escape');
   await expect(search).toBeFocused();
-  await expect(search).toHaveValue('AAPL');
+  await expect(search).toHaveValue('');
   await expect(page.getByTestId('active-symbol')).toHaveText('AAPL');
+  if (phone) await page.getByRole('button', { name: '取消', exact: true }).click();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('button', { name: 'Manage indicators', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'indicators panel', exact: true });
+  await page.getByRole('button', { name: '管理指標', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '指標面板', exact: true });
   await expect(dialog).toBeVisible();
-  const input = page.getByLabel('SMA period', { exact: true }).filter({ visible: true });
+  const input = page.getByLabel('SMA 週期', { exact: true }).filter({ visible: true });
   await input.fill('45');
   await input.focus();
   await page.keyboard.press('Escape');
@@ -364,7 +366,7 @@ test('legacy locked pixel widths survive V3 import and V4 export without being r
   await page.goto('/');
   await loaded(page);
   await addSma14(page);
-  await chooseDrawingTool(page, 'Horizontal Line');
+  await chooseDrawingTool(page, '水平線');
   const chart = (await page.getByTestId('chart').boundingBox())!;
   await drag(
     page,
@@ -374,7 +376,7 @@ test('legacy locked pixel widths survive V3 import and V4 export without being r
     chart.y + chart.height * 0.47,
   );
   await expect.poll(async () => (await readSymbol(page))?.drawings.length).toBe(1);
-  await page.getByRole('button', { name: 'Lock selected drawing', exact: true }).click();
+  await page.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
 
   const baseline = await exportSettings(page);
   const aapl = baseline.symbols.find((state) => state.symbol === 'AAPL')!;
@@ -395,7 +397,7 @@ test('legacy locked pixel widths survive V3 import and V4 export without being r
         : state,
     ),
   };
-  await page.getByLabel('Settings file', { exact: true }).setInputFiles({
+  await page.getByLabel('設定檔', { exact: true }).setInputFiles({
     name: 'legacy-pixel-widths-v3.json',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(v3)),

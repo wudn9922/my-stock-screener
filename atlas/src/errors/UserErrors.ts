@@ -1,6 +1,6 @@
 export type ErrorScope = 'market' | 'sec' | 'storage' | 'import' | 'strategy' | 'ui';
 export interface UserError { scope: ErrorScope; message: string; time: string }
-const names: Record<ErrorScope,string> = { market:'Market data',sec:'SEC',storage:'Storage',import:'Import',strategy:'Strategy calculation',ui:'Panel' };
+const names: Record<ErrorScope,string> = { market:'行情資料',sec:'SEC',storage:'儲存',import:'匯入',strategy:'策略計算',ui:'面板' };
 let errors: UserError[] = [];
 const listeners = new Set<()=>void>();
 export const errorLog = {

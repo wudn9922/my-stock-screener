@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { searchSymbol, setProvider } from '../e2e/site-helpers';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
@@ -107,18 +108,16 @@ test('static snapshot keeps the current quote aligned across daily, weekly and m
 
   // Select the fixture symbol while still on Demo so SnapshotProvider does not
   // request an unrelated AAPL snapshot before the test route is exercised.
-  const symbolSearch = page.getByLabel('Symbol search', { exact: true });
-  await symbolSearch.fill('SMCI');
-  await symbolSearch.press('Enter');
+  await searchSymbol(page, 'SMCI');
   await expect(page.getByTestId('active-symbol')).toHaveText('SMCI');
   await expect(page.locator('.chart-loading')).toHaveCount(0);
 
-  await page.getByLabel('Market data source', { exact: true }).selectOption('snapshot');
-  await expect(page.locator('.demo-badge')).toHaveText('DELAYED SNAPSHOT');
+  await setProvider(page, 'snapshot');
+  await expect(page.locator('.demo-badge')).toHaveText('延遲');
   await expect(page.locator('.chart-loading')).toHaveCount(0);
 
   for (const timeframe of ['1D', '1W', '1M'] as const) {
-    const control = page.getByRole('button', { name: `Timeframe ${timeframe}`, exact: true });
+    const control = page.getByRole('button', { name: `週期 ${timeframe}`, exact: true });
     await control.click();
     await expect(control).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.chart-loading')).toHaveCount(0);

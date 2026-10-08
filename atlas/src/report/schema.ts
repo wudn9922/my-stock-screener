@@ -13,23 +13,26 @@ export type MarketKey = (typeof MARKET_KEYS)[number];
 export const TRENDS = ['bull', 'bear', 'neutral', 'unknown'] as const;
 export type Trend = (typeof TRENDS)[number];
 
+// zod 4 treats a bare `unknown().transform()` key as required; `.optional()` keeps missing keys legal.
 const text = (fallback = '') =>
   z
     .unknown()
+    .optional()
     .transform((value) => (typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : fallback));
 const optionalText = z
   .unknown()
+  .optional()
   .transform((value) => (typeof value === 'string' && value.trim() ? value.trim() : null));
-const finiteOrNull = z.unknown().transform((value) => {
+const finiteOrNull = z.unknown().optional().transform((value) => {
   const number = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
   return typeof number === 'number' && Number.isFinite(number) ? number : null;
 });
-const maList = z.unknown().transform((value) =>
+const maList = z.unknown().optional().transform((value) =>
   Array.isArray(value)
     ? [...new Set(value.map(Number).filter((n) => Number.isInteger(n) && n > 0 && n <= 1000))]
     : [],
 );
-const numberRecord = z.unknown().transform((value) => {
+const numberRecord = z.unknown().optional().transform((value) => {
   const out: Record<string, number> = {};
   if (value && typeof value === 'object' && !Array.isArray(value))
     for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
@@ -38,7 +41,7 @@ const numberRecord = z.unknown().transform((value) => {
     }
   return out;
 });
-const trend = z.unknown().transform((value): Trend => {
+const trend = z.unknown().optional().transform((value): Trend => {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
   return (TRENDS as readonly string[]).includes(normalized) ? (normalized as Trend) : 'unknown';
 });
@@ -51,7 +54,7 @@ const symbol = z
 
 /** Keeps the valid entries of a list; anything that is not an array becomes []. */
 function tolerantArray<T extends z.ZodType>(item: T) {
-  return z.unknown().transform((value): z.output<T>[] => {
+  return z.unknown().optional().transform((value): z.output<T>[] => {
     if (!Array.isArray(value)) return [];
     const out: z.output<T>[] = [];
     for (const entry of value) {
@@ -116,10 +119,10 @@ export const reportGroupSchema = z
   .object({
     key: z.string().trim().min(1).max(80),
     name: text(),
-    market: z.unknown().transform((value): 'TW' | 'US' =>
+    market: z.unknown().optional().transform((value): 'TW' | 'US' =>
       typeof value === 'string' && value.trim().toUpperCase() === 'US' ? 'US' : 'TW',
     ),
-    kind: z.unknown().transform((value): GroupKind =>
+    kind: z.unknown().optional().transform((value): GroupKind =>
       typeof value === 'string' && (GROUP_KINDS as readonly string[]).includes(value) ? (value as GroupKind) : 'fixed',
     ),
     maList,
@@ -147,6 +150,7 @@ export const reportSchema = z
     worldIndices: tolerantArray(indexStatusSchema),
     lineMessages: z
       .unknown()
+      .optional()
       .transform((value) => {
         const record = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
         return {

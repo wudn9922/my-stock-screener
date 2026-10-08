@@ -104,43 +104,43 @@ export function DrawingToolPicker({
     action: () => void;
   }[] = [
     {
-      label: 'Select / Pan',
+      label: '選取 / 平移',
       text: '選取 / 平移',
       icon: <MousePointer2 size={17} />,
       active: activeTool === 'select',
       action: () => onChooseTool('select'),
     },
     {
-      label: 'Magnet',
+      label: '磁吸',
       text: '磁吸',
       icon: <Magnet size={17} />,
       active: magnetEnabled,
       action: onToggleMagnet,
     },
     {
-      label: 'Undo drawing',
+      label: '復原畫線',
       text: '復原',
       icon: <Undo2 size={17} />,
       disabled: !canUndo,
       action: onUndo,
     },
     {
-      label: 'Redo drawing',
+      label: '重做畫線',
       text: '重做',
       icon: <Redo2 size={17} />,
       disabled: !canRedo,
       action: onRedo,
     },
-    { label: 'Zoom in', text: '放大', icon: <ZoomIn size={17} />, action: onZoomIn },
-    { label: 'Zoom out', text: '縮小', icon: <ZoomOut size={17} />, action: onZoomOut },
+    { label: '放大圖表', text: '放大', icon: <ZoomIn size={17} />, action: onZoomIn },
+    { label: '縮小圖表', text: '縮小', icon: <ZoomOut size={17} />, action: onZoomOut },
     {
-      label: 'Show future area',
+      label: '顯示未來區域',
       text: '未來區域',
       icon: <ArrowUpRight size={17} />,
       action: onShowFuture,
     },
     {
-      label: 'Reset chart view',
+      label: '重設圖表視圖',
       text: '重設視圖',
       icon: <Expand size={17} />,
       action: onResetView,
@@ -156,7 +156,7 @@ export function DrawingToolPicker({
         className="drawing-tool-picker"
         role="dialog"
         aria-modal="true"
-        aria-label="Drawing tools"
+        aria-label="繪圖工具"
         data-dialog-focus="drawing-tool-picker"
         onClick={(event) => event.stopPropagation()}
       >
@@ -168,15 +168,15 @@ export function DrawingToolPicker({
           <button
             type="button"
             className="icon-button"
-            aria-label="Close drawing tools"
-            title="Close drawing tools"
+            aria-label="關閉繪圖工具"
+            title="關閉繪圖工具"
             onClick={onClose}
           >
             <X size={19} />
           </button>
         </header>
 
-        <div className="drawing-tool-utilities" aria-label="Drawing utility actions">
+        <div className="drawing-tool-utilities" aria-label="繪圖輔助操作">
           {utilities.map((utility) => (
             <button
               key={utility.label}
@@ -195,13 +195,13 @@ export function DrawingToolPicker({
         </div>
 
         <div className="drawing-tool-browser">
-          <nav className="drawing-tool-categories" aria-label="Drawing tool categories">
+          <nav className="drawing-tool-categories" aria-label="繪圖工具分類">
             {categories.map((category) => (
               <button
                 key={category.id}
                 type="button"
                 className={`drawing-tool-category ${activeCategory === category.id ? 'active' : ''}`}
-                aria-label={`Drawing category ${category.id}`}
+                aria-label={`繪圖分類 ${category.name}`}
                 aria-pressed={activeCategory === category.id}
                 onClick={() => setActiveCategory(category.id)}
               >
@@ -209,7 +209,7 @@ export function DrawingToolPicker({
               </button>
             ))}
           </nav>
-          <div className="drawing-tool-options" aria-label={`${categories.find((category) => category.id === activeCategory)?.name ?? ''} tools`}>
+          <div className="drawing-tool-options" aria-label={`${categories.find((category) => category.id === activeCategory)?.name ?? ''}工具`}>
             {categories.find((category) => category.id === activeCategory)?.tools.map((tool) => (
               <button
                 type="button"

@@ -5,6 +5,7 @@ import { ReportGate } from './ReportGate';
 import type { GroupItem, Report, ReportGroup } from '../report/schema';
 import { getPeFigures, type PeFigures } from '../app/dataSources';
 import { mapWithConcurrency } from './worldPerformance';
+import { SORT_LABELS, filterAndSortItems, type SortMode } from './screenerItems';
 import {
   displayTicker,
   formatPercent,
@@ -19,43 +20,7 @@ import { getMarketProfile } from '../market-data/MarketProfile';
 
 const ROW_HEIGHT = 64;
 const OVERSCAN = 8;
-type SortMode = 'default' | 'gain' | 'loss' | 'symbol' | 'ma';
-const SORT_LABELS: Record<SortMode, string> = {
-  default: '報告順序',
-  gain: '漲幅高→低',
-  loss: '跌幅高→低',
-  symbol: '代號',
-  ma: '均線乖離（大→小）',
-};
 const KIND_LABELS: Record<ReportGroup['kind'], string> = { fixed: '精選', custom: '自訂', scan: '掃描' };
-
-/** Filters (ticker / name / note) and sorts a group's rows. Pure; exported for tests. */
-export function filterAndSortItems(items: readonly GroupItem[], query: string, sort: SortMode): GroupItem[] {
-  const q = query.trim().toLowerCase();
-  const filtered = q
-    ? items.filter(
-        (item) =>
-          item.symbol.toLowerCase().includes(q) ||
-          item.name.toLowerCase().includes(q) ||
-          (item.note ?? '').toLowerCase().includes(q),
-      )
-    : [...items];
-  const firstMa = (item: GroupItem) =>
-    item.maList.length ? maDistance(item.close, maValue(item.maValues, item.maList[0]!)) : null;
-  const byNumber = (value: (item: GroupItem) => number | null, direction: 1 | -1) => (a: GroupItem, b: GroupItem) => {
-    const x = value(a),
-      y = value(b);
-    if (x === null && y === null) return 0;
-    if (x === null) return 1;
-    if (y === null) return -1;
-    return direction * (x - y);
-  };
-  if (sort === 'gain') filtered.sort(byNumber((item) => item.changePct, -1));
-  else if (sort === 'loss') filtered.sort(byNumber((item) => item.changePct, 1));
-  else if (sort === 'ma') filtered.sort(byNumber(firstMa, -1));
-  else if (sort === 'symbol') filtered.sort((a, b) => a.symbol.localeCompare(b.symbol));
-  return filtered;
-}
 
 function GroupChips({
   groups,
@@ -239,6 +204,13 @@ function ScreenerView({
         <span className="result-count">
           {items.length === group.items.length ? `${items.length} 檔` : `${items.length} / ${group.items.length} 檔`}
         </span>
+      </div>
+      <div className="screener-head" aria-hidden="true">
+        <span>代號／名稱</span>
+        <span>均線乖離・備註</span>
+        <span className="num">本益比 TTM</span>
+        <span className="num">收盤／漲跌</span>
+        <span />
       </div>
       <div className="screener-list card" ref={listRef} onScroll={onScroll} role="list" aria-label={`${group.name}股票清單`}>
         {items.length ? (

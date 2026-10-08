@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { clickExport, openPanel, searchSymbol } from './site-helpers';
 import { chooseDrawingTool, clickDrawingUtility } from './drawing-picker-helper';
 import type { SymbolState } from '../src/storage/schema';
 async function read(page: Page, symbol = 'AAPL'): Promise<SymbolState> {
@@ -20,9 +21,9 @@ async function ready(page: Page) {
   await expect(page.getByTestId('ohlc-header')).toContainText('O ');
 }
 for (const [name, kind] of [
-  ['Horizontal Ray', 'ray'],
-  ['Rectangle', 'rectangle'],
-  ['Fibonacci Retracement', 'fibonacci'],
+  ['水平射線', 'ray'],
+  ['矩形', 'rectangle'],
+  ['費波那契回撤', 'fibonacci'],
 ] as const) {
   test(`${name}: gestures, edits, history, locked pan, future, isolation, reload and export/import`, async ({
     page,
@@ -99,60 +100,54 @@ for (const [name, kind] of [
     await expect
       .poll(async () => (await read(page)).drawings[0].points[0].price)
       .not.toBe(edited.points[0].price);
-    await clickDrawingUtility(page, 'Undo drawing');
+    await clickDrawingUtility(page, '復原畫線');
     await expect.poll(async () => (await read(page)).drawings[0].points).toEqual(edited.points);
-    await clickDrawingUtility(page, 'Redo drawing');
-    await page.getByRole('button', { name: 'Lock selected drawing', exact: true }).click();
+    await clickDrawingUtility(page, '重做畫線');
+    await page.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
     const locked = (await read(page)).drawings[0];
-    await clickDrawingUtility(page, 'Zoom out');
-    await clickDrawingUtility(page, 'Zoom in');
+    await clickDrawingUtility(page, '縮小圖表');
+    await clickDrawingUtility(page, '放大圖表');
     await expect.poll(async () => (await read(page)).preferences.views['1D']).toBeDefined();
     const range = (await read(page)).preferences.views['1D'];
     await drag(mid + 8, bodyY + 12, mid + 45, bodyY + 12);
     await expect.poll(async () => (await read(page)).preferences.views['1D']).not.toEqual(range);
     expect((await read(page)).drawings[0]).toEqual(locked);
     for (const tf of ['5m', '1H', '1D']) {
-      await page.getByRole('button', { name: `Timeframe ${tf}`, exact: true }).click();
+      await page.getByRole('button', { name: `週期 ${tf}`, exact: true }).click();
       await ready(page);
       expect((await read(page)).drawings[0]).toEqual(locked);
       await expect(page.locator('.chart-status')).toContainText(
-        tf === '1D' ? '1 DRAWINGS' : '0 DRAWINGS',
+        tf === '1D' ? '畫線 1 條' : '畫線 0 條',
       );
     }
     for (const symbol of ['NVDA', 'AAPL']) {
-      await page.getByLabel('Symbol search', { exact: true }).fill(symbol);
-      await page.getByLabel('Symbol search', { exact: true }).press('Enter');
+      await searchSymbol(page, symbol);
       await ready(page);
       await expect(page.getByTestId('active-symbol')).toHaveText(symbol);
       await expect(page.locator('.chart-status')).toContainText(
-        `${symbol === 'NVDA' ? 0 : 1} DRAWINGS`,
+        `畫線 ${symbol === 'NVDA' ? 0 : 1} 條`,
       );
     }
     await page.reload();
     await ready(page);
     expect((await read(page)).drawings[0]).toEqual(locked);
     const downloadEvent = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export settings', exact: true }).click();
+    await clickExport(page);
     const backup = (await (await downloadEvent).path())!;
-    await page.getByLabel('Settings file', { exact: true }).setInputFiles(backup);
+    await page.getByLabel('設定檔', { exact: true }).setInputFiles(backup);
     await expect(page.getByRole('status')).toContainText('設定已還原');
     await ready(page);
     expect((await read(page)).drawings[0]).toEqual(locked);
     // Select through the object list after viewport changes/reload.
-    if (await page.locator('.mobile-nav').isVisible())
-      await page
-        .locator('.mobile-nav')
-        .getByRole('button', { name: 'Drawings', exact: true })
-        .click();
-    else await page.getByRole('button', { name: 'Drawings', exact: true }).click();
-    await page.getByRole('button', { name: 'Unlock drawing 1', exact: true }).click();
-    await page.getByRole('button', { name: 'Delete drawing 1', exact: true }).click();
+    await openPanel(page, 'drawings');
+    await page.getByRole('button', { name: '解鎖畫線 1', exact: true }).click();
+    await page.getByRole('button', { name: '刪除畫線 1', exact: true }).click();
     await expect.poll(async () => (await read(page)).drawings.length).toBe(0);
-    const close = page.getByRole('button', { name: 'Close panel', exact: true });
+    const close = page.getByRole('button', { name: '關閉面板', exact: true });
     if (await close.isVisible()) await close.click();
-    await clickDrawingUtility(page, 'Undo drawing');
+    await clickDrawingUtility(page, '復原畫線');
     await expect.poll(async () => (await read(page)).drawings.length).toBe(1);
-    await clickDrawingUtility(page, 'Redo drawing');
+    await clickDrawingUtility(page, '重做畫線');
     await expect.poll(async () => (await read(page)).drawings.length).toBe(0);
     expect(await page.evaluate(() => scrollY)).toBe(0);
   });
@@ -199,7 +194,7 @@ test('Rectangle four corners retain component ownership on desktop and touch', a
       await page.mouse.up();
     }
   };
-  await chooseDrawingTool(page, 'Rectangle');
+  await chooseDrawingTool(page, '矩形');
   await drag(a.x, a.y, a.x, a.y);
   await drag(b.x, b.y, b.x, b.y);
   await expect.poll(async () => (await read(page))?.drawings.length).toBe(1);
@@ -222,7 +217,7 @@ test('Rectangle four corners retain component ownership on desktop and touch', a
     const changed = (await read(page)).drawings[0];
     expect(changed.points[1 - xIndex].time).toBe(initial.points[1 - xIndex].time);
     expect(changed.points[1 - yIndex].price).toBe(initial.points[1 - yIndex].price);
-    await clickDrawingUtility(page, 'Undo drawing');
+    await clickDrawingUtility(page, '復原畫線');
     await expect.poll(async () => (await read(page)).drawings[0].points).toEqual(initial.points);
   }
   expect(await page.evaluate(() => scrollY)).toBe(0);

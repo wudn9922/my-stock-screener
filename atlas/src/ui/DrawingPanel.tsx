@@ -24,9 +24,9 @@ export function DrawingPanel({
   onVisibility?: (id: string, visible: boolean) => void;
 }) {
   return (
-    <section className="drawing-panel" aria-label="Drawing objects">
+    <section className="drawing-panel" aria-label="畫線物件">
       <div className="section-heading">
-        <span>DRAWING OBJECTS</span>
+        <span>畫線物件</span>
         <span>{drawings.length}</span>
       </div>
       {!drawings.length && (
@@ -46,7 +46,7 @@ export function DrawingPanel({
               {toolNames[d.type]} {i + 1}
               <small>
                 {d.type === 'vertical'
-                  ? new Date(d.points[0].time * 1000).toLocaleDateString()
+                  ? new Date(d.points[0].time * 1000).toLocaleDateString('zh-TW')
                   : d.points[0].price.toFixed(2)}
                 {d.points.length > 1 ? ` → ${d.points[1].price.toFixed(2)}` : ''}
               </small>
@@ -54,21 +54,21 @@ export function DrawingPanel({
           </button>
           {onVisibility && (
             <IconButton
-              label={`${d.visible ? 'Hide' : 'Show'} drawing ${i + 1}`}
+              label={`${d.visible ? '隱藏' : '顯示'}畫線 ${i + 1}`}
               onClick={() => onVisibility(d.id, !d.visible)}
             >
               {d.visible ? <Eye size={16} /> : <EyeOff size={16} />}
             </IconButton>
           )}
           <IconButton
-            label={`${d.locked ? 'Unlock' : 'Lock'} drawing ${i + 1}`}
+            label={`${d.locked ? '解鎖' : '鎖定'}畫線 ${i + 1}`}
             active={d.locked}
             onClick={() => onAction(d.id, 'lock')}
           >
             {d.locked ? <LockKeyhole size={16} /> : <UnlockKeyhole size={16} />}
           </IconButton>
           <IconButton
-            label={`Delete drawing ${i + 1}`}
+            label={`刪除畫線 ${i + 1}`}
             disabled={d.locked}
             onClick={() => onAction(d.id, 'delete')}
           >
@@ -79,7 +79,7 @@ export function DrawingPanel({
       <p className="small muted">
         鎖定線條上拖曳會平移圖表。
         <br />
-        Drawing 只屬於目前股票。
+        畫線只屬於目前股票與週期。
       </p>
     </section>
   );

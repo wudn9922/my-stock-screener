@@ -35,13 +35,13 @@ function IndexCard({ index, onOpen }: { index: IndexStatus; onOpen: () => void }
           <b>{index.name}</b>
           <small>{index.symbol}</small>
         </div>
-        <TrendBadge trend={index.trend} label={index.trendLabel} />
+        <div className={`index-card-quote ${tone}`}>
+          <b>{formatPrice(index.close)}</b>
+          <span>{formatPercent(index.changePct)}</span>
+        </div>
       </div>
-      <div className={`index-card-quote ${tone}`}>
-        <b>{formatPrice(index.close)}</b>
-        <span>{formatPercent(index.changePct)}</span>
-      </div>
-      <MiniChart symbol={index.symbol} maList={index.maList} height={148} />
+      <TrendBadge trend={index.trend} label={index.trendLabel} />
+      <MiniChart symbol={index.symbol} maList={index.maList} height={164} />
       <div className="index-card-foot">
         <span className="ma-legend">
           {index.maList.length ? (
@@ -107,12 +107,12 @@ function MarketView({ report, market, openChart }: { report: Report; market: Mar
             <span className="count-pill">{data.indices.length}</span>
           </h2>
           {data.indices.length > 0 && (
-            <span className="breadth" aria-label={`多頭 ${counts.bull}、空頭 ${counts.bear}、其他 ${counts.other}`}>
+            <span className="breadth" aria-label={`多頭 ${counts.bull}、空頭 ${counts.bear}、中性 ${counts.other}`}>
               <span className="trend-dot bull" />多 {counts.bull}
               <span className="trend-dot bear" />空 {counts.bear}
               {counts.other > 0 && (
                 <>
-                  <span className="trend-dot neutral" />其他 {counts.other}
+                  <span className="trend-dot neutral" />中性 {counts.other}
                 </>
               )}
             </span>

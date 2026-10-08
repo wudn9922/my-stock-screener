@@ -4,7 +4,7 @@ import { loadReport, type ReportLoadResult } from './loadReport';
 export type ReportState = { status: 'loading' } | ReportLoadResult;
 
 /** Shared daily report for all pages; `reload` re-fetches after a failure. */
-export function useReport() {
+export function useReport(enabled = true) {
   const [state, setState] = useState<ReportState>({ status: 'loading' });
   const run = useCallback((refresh: boolean) => {
     let active = true;
@@ -16,7 +16,7 @@ export function useReport() {
       active = false;
     };
   }, []);
-  useEffect(() => run(false), [run]);
+  useEffect(() => (enabled ? run(false) : undefined), [run, enabled]);
   const reload = useCallback(() => {
     run(true);
   }, [run]);

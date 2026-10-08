@@ -54,14 +54,14 @@ test('2,500 bars + 8 SMAs + 100 drawings remain operable; record headless RAF sc
       },
     ],
   });
-  await page.getByLabel('Settings file', { exact: true }).setInputFiles({
+  await page.getByLabel('設定檔', { exact: true }).setInputFiles({
     name: 'stress.json',
     mimeType: 'application/json',
     buffer: Buffer.from(json),
   });
   await expect(page.getByRole('status')).toContainText('設定已還原');
   await expect(page.locator('.chart-loading')).toHaveCount(0);
-  await expect(page.locator('.chart-status')).toContainText('100 DRAWINGS');
+  await expect(page.locator('.chart-status')).toContainText('畫線 100 條');
   await expect(page.locator('.indicator-chip')).toHaveCount(8);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -79,8 +79,8 @@ test('2,500 bars + 8 SMAs + 100 drawings remain operable; record headless RAF sc
   const r = (await page.getByTestId('chart').boundingBox())!;
   for (let i = 0; i < 90; i++)
     await page.mouse.move(r.x + 80 + (i % 50) * 8, r.y + r.height * 0.55 + Math.sin(i / 8) * 40);
-  await clickDrawingUtility(page, 'Zoom in');
-  await clickDrawingUtility(page, 'Zoom out');
+  await clickDrawingUtility(page, '放大圖表');
+  await clickDrawingUtility(page, '縮小圖表');
   await expect
     .poll(() => page.evaluate(() => !!(window as unknown as { __rafGaps?: number[] }).__rafGaps))
     .toBe(true);
