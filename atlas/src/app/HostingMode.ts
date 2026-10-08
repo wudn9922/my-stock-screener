@@ -1,4 +1,4 @@
-export const STATIC_HOSTING = import.meta.env.VITE_STATIC_HOSTING === '1';
+export const STATIC_HOSTING = import.meta.env?.VITE_STATIC_HOSTING === '1';
 
 /** Base path prefix of the my-stock-screener GitHub Pages deployment (see SCREENER_INTEGRATION.md). */
 export const SCREENER_BASE_PREFIX = '/my-stock-screener/';
