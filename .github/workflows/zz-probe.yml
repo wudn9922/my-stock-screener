@@ -1,0 +1,14 @@
+name: zz temporary probe
+on:
+  push:
+    branches: [claude/nice-cray-fs4a9b]
+    paths: ['.github/probe/**', '.github/workflows/zz-probe.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node .github/probe/yahoo.mjs
