@@ -8504,6 +8504,9 @@ TPEX_TRADING_FIELD_ALIASES = {
     "Volume": (
         "成交股數",
         "股數",
+        # 2025 年起欄位改為「成交張數」（1 張 = 1,000 股）
+        "成交張數",
+        "張數",
         "tradevolume",
         "volume"
     )
@@ -8525,7 +8528,8 @@ TPEX_TRADING_POSITIONS = {
 
 # 本次執行中的 TPEx 狀態
 TPEX_RUNTIME = {
-    "index_attempt": None,
+    # 2026-10 實測：新版 inxh 路徑回 404 HTML，舊版 Inx_result.php 回 JSON，先試舊版
+    "index_attempt": "legacy-get",
     "trading_attempt": None,
     "trading_disabled": False,
     "history": None,
@@ -8804,6 +8808,7 @@ def _tpex_volume_multiplier(fields, mapping):
     if (
         "仟" in field
         or "千" in field
+        or "張" in field
     ):
         return 1000.0
 
