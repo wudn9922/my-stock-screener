@@ -179,6 +179,26 @@ export class AppStore {
       action === 'delete' ? 'delete' : d.locked ? 'unlock' : 'lock',
     );
   }
+  /**
+   * Replaces one symbol's drawings with a cloud copy (DrawingSync). Validates everything first and
+   * leaves local data untouched when any record is invalid. Undo history for the symbol is cleared
+   * because its entries refer to the replaced drawings.
+   */
+  applyRemoteDrawings(symbol: string, drawings: unknown[]): boolean {
+    let next: SymbolState;
+    try {
+      const parsed = drawings.map((drawing) => drawingSchema.parse(drawing) as Drawing);
+      if (parsed.some((drawing) => drawing.symbol !== symbol)) return false;
+      next = symbolStateSchema.parse({ ...this.symbol(symbol), drawings: parsed });
+    } catch {
+      return false;
+    }
+    this.publish({ symbols: { ...this.snapshot.symbols, [symbol]: next } });
+    this.persist('symbol:' + symbol, () => this.storage.saveSymbol(next));
+    for (const key of [...this.histories.keys()]) if (key.startsWith(`${symbol}:`)) this.histories.delete(key);
+    this.reconcileAlerts(symbol, next.drawings);
+    return true;
+  }
   private reconcileAlerts(symbol: string, drawings: Drawing[]) {
     const alerts = reconcileDrawingAlerts(this.snapshot.app.alerts, symbol, drawings);
     if (JSON.stringify(alerts) !== JSON.stringify(this.snapshot.app.alerts)) this.updateApp({ alerts });

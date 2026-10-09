@@ -1,6 +1,6 @@
 name: Deploy Supabase Edge Functions
 
-# 部署 Atlas 行情代理 market-chart 與自選股設定頁的 user-settings（supabase/functions/）。
+# 部署 Atlas 行情代理 market-chart、畫線雲端同步 chart-drawings 與自選股設定頁的 user-settings（supabase/functions/）。
 # 需要 repository secret SUPABASE_ACCESS_TOKEN（Supabase 個人存取權杖）；未設定時略過，不會失敗。
 on:
   push:
@@ -8,6 +8,7 @@ on:
     paths:
       - 'supabase/functions/market-chart/**'
       - 'supabase/functions/user-settings/**'
+      - 'supabase/functions/chart-drawings/**'
       - '.github/workflows/supabase-functions.yml'
   workflow_dispatch:
 
@@ -57,6 +58,10 @@ jobs:
         if: steps.token.outputs.available == 'true'
         run: supabase functions deploy user-settings --no-verify-jwt --project-ref "${SUPABASE_PROJECT_REF}"
 
+      - name: Deploy chart-drawings
+        if: steps.token.outputs.available == 'true'
+        run: supabase functions deploy chart-drawings --no-verify-jwt --project-ref "${SUPABASE_PROJECT_REF}"
+
       - name: Smoke test
         # 不論這次是否由本 workflow 部署（例如改用 Supabase connector 部署），都實際呼叫一次函式
         if: always()
@@ -93,6 +98,15 @@ jobs:
           echo "user-settings without token → HTTP ${code}: $(head -c 200 /tmp/settings.json)"
           if [ "${code}" != "401" ]; then
             echo "::warning::user-settings 預期 HTTP 401，得到 ${code}"
+            failed=1
+          fi
+          # chart-drawings：假的 LIFF ID Token 應被 LINE 拒絕並回 401
+          code=$(curl -s -o /tmp/drawings.json -w '%{http_code}' --max-time 30 -X POST \
+            -H 'Content-Type: application/json' -d '{"action":"atlas.list","idToken":"invalid.token.value"}' \
+            "https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/chart-drawings")
+          echo "chart-drawings with invalid token → HTTP ${code}: $(head -c 200 /tmp/drawings.json)"
+          if [ "${code}" != "401" ]; then
+            echo "::warning::chart-drawings 預期 HTTP 401，得到 ${code}"
             failed=1
           fi
           if [ "${failed}" != "0" ]; then
