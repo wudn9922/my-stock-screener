@@ -1,0 +1,18 @@
+name: zz temporary probe 2
+on:
+  push:
+    branches: [claude/nice-cray-fs4a9b]
+    paths: ['.github/workflows/zz-probe2.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          u=https://bxhqpfeberqbtxymghyt.supabase.co/functions/v1/user-settings
+          echo "OPTIONS: $(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS -H 'Origin: https://wudn9922.github.io' "$u")"
+          echo "GET: $(curl -s -w ' %{http_code}' "$u")"
+          echo "no token: $(curl -s -w ' %{http_code}' -X POST -H 'Content-Type: application/json' -d '{"action":"stocks.list"}' "$u")"
+          echo "bad token: $(curl -s -w ' %{http_code}' -X POST -H 'Content-Type: application/json' -d '{"action":"stocks.list","idToken":"eyJhbGciOiJIUzI1NiJ9.e30.x"}' "$u")"
+          echo "bad json: $(curl -s -w ' %{http_code}' -X POST -H 'Content-Type: application/json' -d '{' "$u")"
+          echo "chart-drawings bad token: $(curl -s -w ' %{http_code}' -X POST -H 'Content-Type: application/json' -d '{"action":"load","idToken":"x.y.z","ticker":"AAPL","timeframe":"1d"}' https://bxhqpfeberqbtxymghyt.supabase.co/functions/v1/chart-drawings)"
