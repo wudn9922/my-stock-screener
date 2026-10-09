@@ -423,3 +423,10 @@ entrypoint = "./functions/chart-drawings/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/chart-drawings/*.html" ]
+
+# 自選股設定頁的讀寫入口：自行驗證 LIFF ID Token，所以不需要 Supabase JWT
+[functions.user-settings]
+enabled = true
+verify_jwt = false
+import_map = "./functions/user-settings/deno.json"
+entrypoint = "./functions/user-settings/index.ts"
