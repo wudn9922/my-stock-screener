@@ -1,0 +1,131 @@
+name: Deploy Cloud Run (breakout alert)
+
+# 突破監控（Dockerfile.breakout）與 Discord 查詢（Dockerfile.discord-query）合併到 main 後自動建置並部署。
+# 只更新服務的映像；環境變數、secret、排程等既有設定不變。
+# 用 Workload Identity Federation 登入 Google Cloud（不需要金鑰檔），一次性設定見 scripts/setup-cloud-run-deploy.sh。
+# 需要的 repository variables（Settings → Secrets and variables → Actions → Variables）：
+#   GCP_WIF_PROVIDER、GCP_DEPLOY_SA、GCP_PROJECT_ID、GCP_REGION
+#   CLOUD_RUN_BREAKOUT_SERVICE、CLOUD_RUN_BREAKOUT_IMAGE（不含 tag 的映像路徑）
+#   CLOUD_RUN_DISCORD_SERVICE、CLOUD_RUN_DISCORD_IMAGE（選用，沒設就不部署 Discord 查詢服務）
+# 未設定時會略過，不會失敗。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'breakout_alert/**'
+      - 'Dockerfile.breakout'
+      - 'Dockerfile.discord-query'
+      - 'requirements.txt'
+      - 'requirements.discord-query.txt'
+      - '.github/workflows/cloud-run.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: cloud-run-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: 突破監控
+            dockerfile: Dockerfile.breakout
+            service_var: CLOUD_RUN_BREAKOUT_SERVICE
+            image_var: CLOUD_RUN_BREAKOUT_IMAGE
+          - name: Discord 查詢
+            dockerfile: Dockerfile.discord-query
+            service_var: CLOUD_RUN_DISCORD_SERVICE
+            image_var: CLOUD_RUN_DISCORD_IMAGE
+    env:
+      WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+      DEPLOY_SA: ${{ vars.GCP_DEPLOY_SA }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      SERVICE: ${{ vars[matrix.service_var] }}
+      IMAGE: ${{ vars[matrix.image_var] }}
+    steps:
+      - name: Check configuration
+        id: config
+        run: |
+          missing=""
+          for name in WIF_PROVIDER DEPLOY_SA PROJECT_ID REGION SERVICE IMAGE; do
+            [ -n "${!name}" ] || missing="${missing} ${name}"
+          done
+          if [ -n "${missing}" ]; then
+            echo "::notice::${{ matrix.name }}：缺少設定（${missing# }），略過部署。設定方式見 scripts/setup-cloud-run-deploy.sh"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.config.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        if: steps.config.outputs.ready == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOY_SA }}
+
+      - name: Set up gcloud
+        if: steps.config.outputs.ready == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and push image
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          gcloud auth configure-docker "${IMAGE%%/*}" --quiet
+          docker build --file "${{ matrix.dockerfile }}" \
+            --tag "${IMAGE}:${GITHUB_SHA}" --tag "${IMAGE}:latest" .
+          docker push "${IMAGE}:${GITHUB_SHA}"
+          docker push "${IMAGE}:latest"
+
+      - name: Deploy to Cloud Run
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          gcloud run deploy "${SERVICE}" \
+            --image "${IMAGE}:${GITHUB_SHA}" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --quiet
+          url=$(gcloud run services describe "${SERVICE}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "${url}/health" || true)
+          echo "${{ matrix.name }} 已部署：${url}（/health → HTTP ${code}）"
+          if [ "${code}" != "200" ]; then
+            echo "::warning::${{ matrix.name }} 的 /health 回應 HTTP ${code}（服務若需要驗證才能呼叫，403 屬正常）"
+          fi
+
+      # 不依賴 Claude 的故障通知：部署失敗或逾時時推播 LINE
+      - name: Notify LINE on failure
+        if: failure() || cancelled()
+        env:
+          LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          TITLE: "Cloud Run 部署（${{ matrix.name }}）"
+          RESULT: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${LINE_ACCESS_TOKEN}" ] || [ -z "${LINE_USER_ID}" ]; then
+            echo "::warning::未設定 LINE_ACCESS_TOKEN / LINE_USER_ID，無法推播故障通知"
+            exit 0
+          fi
+          text=$(printf '⚠️ %s %s\n台灣時間 %s\n%s' "${TITLE}" \
+            "$([ "${RESULT}" = cancelled ] && echo '逾時或被取消' || echo '執行失敗')" \
+            "$(TZ=Asia/Taipei date '+%m/%d %H:%M')" "${RUN_URL}")
+          jq -n --arg to "${LINE_USER_ID}" --arg text "${text}" \
+            '{to: $to, messages: [{type: "text", text: $text}]}' |
+            curl -sS --fail-with-body --max-time 30 -X POST https://api.line.me/v2/bot/message/push \
+              -H "Authorization: Bearer ${LINE_ACCESS_TOKEN}" -H 'Content-Type: application/json' -d @- ||
+            echo "::warning::LINE 故障通知推播失敗"

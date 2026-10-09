@@ -14,8 +14,12 @@ curl_cffi (Chrome TLS impersonation, the same library yfinance uses for the dail
 - EPS annual: fundamentals-timeseries annualDilutedEPS (fallback annualBasicEPS), one request per
   symbol, only for symbols whose stored fiscal year is missing or older than ~13 months; the rest keep
   the previous run's value (the workflow seeds public/valuation from the last deployment).
-- Only companies reporting in USD: for ADRs Yahoo's EPS is per ordinary share, not per ADR, so the
-  P/E would be off by the ADR ratio (e.g. TSM). Those symbols get no record rather than a wrong one.
+- Companies reporting in another currency (ADRs such as TSM, NVO, BABA): Yahoo's per-share EPS
+  series are in the home currency and not reliably per ADR, so the ADR ratio is avoided altogether:
+  ADR count = market cap / price, and EPS per ADR = net income (home currency → USD at today's
+  rate) / ADR count. EPS TTM keeps Yahoo's quote value only when it agrees with that (same sign,
+  within 35%); otherwise the symbol gets no record rather than a wrong one. Annual EPS per ADR =
+  latest fiscal-year net income in USD / ADR count. Re-computed every run (a few hundred symbols).
 
 A failure keeps the previous us.json and exits 1 so the workflow shows a warning.
 """
@@ -39,6 +43,9 @@ ANNUAL_RETRY_DAYS = 7
 MAX_CONSECUTIVE_FAILURES = 8
 MIN_US_RECORDS = 1000
 SOURCE = "Yahoo Finance"
+# ADR EPS TTM from the quote must agree with net income / ADR count within this ratio
+ADR_TTM_TOLERANCE = 0.35
+ADR_BUDGET_SECONDS = 300
 
 
 def round4(value):
@@ -67,7 +74,7 @@ def us_symbols_from_directory(document):
 
 
 def parse_quotes(payload):
-    """quoteResponse → {symbol: epsTtm} for USD-reporting equities."""
+    """quoteResponse → {symbol: {eps, currency, marketCap, price}} for equities with EPS TTM."""
     result = {}
     for quote in ((payload or {}).get("quoteResponse") or {}).get("result") or []:
         symbol = quote.get("symbol")
@@ -76,10 +83,76 @@ def parse_quotes(payload):
             continue
         if quote.get("quoteType") not in (None, "EQUITY"):
             continue
-        if quote.get("financialCurrency") not in (None, "USD"):
-            continue
-        result[symbol] = round4(eps)
+        currency = quote.get("financialCurrency") or "USD"
+        result[symbol] = {
+            "eps": round4(eps),
+            "currency": currency if isinstance(currency, str) else "USD",
+            "marketCap": finite_number(quote.get("marketCap")),
+            "price": finite_number(quote.get("regularMarketPrice")),
+        }
     return result
+
+
+def parse_fx(payload):
+    """quotes of '<CUR>=X' (units of CUR per USD) → {CUR: rate}."""
+    rates = {"USD": 1.0}
+    for quote in ((payload or {}).get("quoteResponse") or {}).get("result") or []:
+        symbol = quote.get("symbol")
+        rate = finite_number(quote.get("regularMarketPrice"))
+        if isinstance(symbol, str) and symbol.endswith("=X") and rate and rate > 0:
+            rates[symbol[:-2]] = rate
+    return rates
+
+
+def parse_net_income(payload):
+    """timeseries → {'ttm'|'annual': (value, currency, 'YYYY-MM-DD')} of the latest net income."""
+    kinds = {
+        "trailingNetIncomeCommonStockholders": "ttm",
+        "annualNetIncomeCommonStockholders": "annual",
+    }
+    result = {}
+    for series in ((payload or {}).get("timeseries") or {}).get("result") or []:
+        kind = ((series.get("meta") or {}).get("type") or [None])[0]
+        if kind not in kinds:
+            continue
+        for point in series.get(kind) or []:
+            if not point:
+                continue
+            date = point.get("asOfDate")
+            value = finite_number((point.get("reportedValue") or {}).get("raw"))
+            currency = point.get("currencyCode")
+            if not isinstance(date, str) or value is None or not isinstance(currency, str):
+                continue
+            current = result.get(kinds[kind])
+            if current is None or date > current[2]:
+                result[kinds[kind]] = (value, currency, date)
+    return result
+
+
+def adr_valuation(quote, net_income, rates):
+    """
+    (epsTtm, (epsAnnual, period_end) or None) per ADR in USD, or None when the inputs are missing or
+    Yahoo's EPS TTM disagrees with net income / ADR count.
+    """
+    market_cap, price = quote.get("marketCap"), quote.get("price")
+    ttm = net_income.get("ttm")
+    if not market_cap or not price or market_cap <= 0 or price <= 0 or not ttm:
+        return None
+    rate = rates.get(ttm[1])
+    if not rate:
+        return None
+    adr_count = market_cap / price
+    implied = ttm[0] / rate / adr_count
+    eps = quote["eps"]
+    if implied == 0 or (implied > 0) != (eps > 0):
+        return None
+    if abs(implied - eps) / max(abs(implied), abs(eps)) > ADR_TTM_TOLERANCE:
+        return None
+    annual = None
+    yearly = net_income.get("annual")
+    if yearly and rates.get(yearly[1]):
+        annual = (round4(yearly[0] / rates[yearly[1]] / adr_count), yearly[2])
+    return eps, annual
 
 
 def parse_annual(payload):
@@ -124,8 +197,11 @@ def needs_annual(previous, today):
     return True
 
 
-def build_record(eps_ttm, annual, previous, today_iso, annual_checked):
+def build_record(eps_ttm, annual, previous, today_iso, annual_checked, adr=False):
     previous = previous or {}
+    if adr:
+        # Re-computed every run from net income; never carry over a per-share value
+        previous = {}
     record = {
         "epsTtm": eps_ttm,
         "epsAnnual": previous.get("epsAnnual"),
@@ -133,6 +209,8 @@ def build_record(eps_ttm, annual, previous, today_iso, annual_checked):
         "asOf": today_iso,
         "source": SOURCE,
     }
+    if adr:
+        record["method"] = "net income / ADR count"
     if previous.get("annualPeriodEnd"):
         record["annualPeriodEnd"] = previous["annualPeriodEnd"]
     if annual is not None:
@@ -205,7 +283,7 @@ def main():
     today_iso = today.isoformat()
     yahoo = Yahoo()
 
-    eps_ttm = {}
+    quotes = {}
     failures = 0
     for start in range(0, len(symbols), QUOTE_BATCH):
         batch = symbols[start:start + QUOTE_BATCH]
@@ -214,10 +292,11 @@ def main():
                 QUOTE_URL,
                 {
                     "symbols": ",".join(batch),
-                    "fields": "symbol,epsTrailingTwelveMonths,financialCurrency,quoteType",
+                    "fields": "symbol,epsTrailingTwelveMonths,financialCurrency,quoteType,"
+                              "marketCap,regularMarketPrice",
                 },
             )
-            eps_ttm.update(parse_quotes(payload))
+            quotes.update(parse_quotes(payload))
             failures = 0
         except Exception as error:  # noqa: BLE001 - keep going; the count check decides
             failures += 1
@@ -226,15 +305,58 @@ def main():
                 raise RuntimeError(f"quote requests keep failing: {error}") from error
         time.sleep(QUOTE_DELAY)
 
+    eps_ttm = {symbol: q["eps"] for symbol, q in quotes.items() if q["currency"] == "USD"}
     if len(eps_ttm) < MIN_US_RECORDS:
         raise RuntimeError(f"only {len(eps_ttm)} US quotes with EPS")
+    period2 = int(now.timestamp())
+    period1 = int((now - timedelta(days=5 * 365)).timestamp())
+
+    # ADRs and other companies reporting in a foreign currency
+    foreign = {symbol: q for symbol, q in quotes.items() if q["currency"] != "USD"}
+    adr = {}
+    adr_skipped = 0
+    rates = {"USD": 1.0}
+    if foreign:
+        currencies = sorted({q["currency"] for q in foreign.values()})
+        try:
+            rates = parse_fx(yahoo.get_json(
+                QUOTE_URL,
+                {"symbols": ",".join(f"{c}=X" for c in currencies), "fields": "symbol,regularMarketPrice"},
+            ))
+        except Exception as error:  # noqa: BLE001 - ADRs are optional
+            print(f"::warning::FX quotes failed, ADRs skipped: {error}")
+            foreign = {}
+    adr_deadline = time.monotonic() + ADR_BUDGET_SECONDS
+    failures = 0
+    for symbol, quote in sorted(foreign.items()):
+        if time.monotonic() > adr_deadline or failures >= MAX_CONSECUTIVE_FAILURES:
+            break
+        try:
+            payload = yahoo.get_json(
+                TIMESERIES_URL.format(symbol=symbol),
+                {
+                    "symbol": symbol,
+                    "type": "trailingNetIncomeCommonStockholders,annualNetIncomeCommonStockholders",
+                    "period1": period1,
+                    "period2": period2,
+                },
+            )
+            failures = 0
+        except Exception:  # noqa: BLE001
+            failures += 1
+            continue
+        finally:
+            time.sleep(ANNUAL_DELAY)
+        result = adr_valuation(quote, parse_net_income(payload), rates)
+        if result is None:
+            adr_skipped += 1
+        else:
+            adr[symbol] = result
 
     annual = {}
     checked = set()
     pending = [symbol for symbol in eps_ttm if needs_annual(previous_items.get(symbol), today)]
     deadline = time.monotonic() + budget
-    period2 = int(now.timestamp())
-    period1 = int((now - timedelta(days=5 * 365)).timestamp())
     failures = 0
     stop_reason = None
     for symbol in pending:
@@ -273,6 +395,9 @@ def main():
         )
         for symbol, eps in sorted(eps_ttm.items())
     }
+    for symbol, (eps, adr_annual) in adr.items():
+        items[symbol] = build_record(eps, adr_annual, None, today_iso, True, adr=True)
+    items = dict(sorted(items.items()))
 
     document = {
         "version": 1,
@@ -280,9 +405,10 @@ def main():
         "generatedAt": now.isoformat().replace("+00:00", "Z"),
         "source": f"{SOURCE} (v7 quote epsTrailingTwelveMonths; fundamentals-timeseries annualDilutedEPS)",
         "notes": (
-            "USD-reporting companies only (ADR EPS is per ordinary share). "
             "epsTtm refreshed every run; epsAnnual = latest fiscal year, re-checked after the period "
-            "is over ~13 months old. asOf = data date."
+            "is over ~13 months old. Foreign-currency reporters (ADRs, method field): EPS per ADR = "
+            "net income in USD at today's rate / (market cap / price); epsTtm kept only when Yahoo's "
+            "quote agrees within 35%. asOf = data date."
         ),
         "items": items,
     }
@@ -291,6 +417,9 @@ def main():
         "market": "US",
         "records": len(items),
         "withAnnual": sum(1 for item in items.values() if item.get("epsAnnual") is not None),
+        "adr": len(adr),
+        "adrSkipped": adr_skipped,
+        "adrNotChecked": len(foreign) - len(adr) - adr_skipped,
         "annualRequested": len(checked),
         "annualPending": len(pending) - len(checked),
         "annualStopped": stop_reason,
