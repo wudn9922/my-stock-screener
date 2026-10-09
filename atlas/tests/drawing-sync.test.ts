@@ -14,7 +14,7 @@ import {
   type SyncMeta,
 } from '../src/cloud/DrawingSync';
 import { createDrawingCloudApi } from '../src/cloud/drawingCloudApi';
-import { isLineInAppBrowser } from '../src/cloud/lineIdentity';
+import { claimLoginAttempt, isLineInAppBrowser } from '../src/cloud/lineIdentity';
 import type { Drawing } from '../src/drawing/DrawingModel';
 
 const line = (id: string, price = 100, symbol = 'AAPL'): Drawing => ({
@@ -132,6 +132,8 @@ describe('DrawingSync', () => {
     expect(statuses.at(-1)).toBe('synced');
     // Non-drawing changes (preferences) do not upload again
     store.updateSymbol('AAPL', (s) => ({ ...s, preferences: { ...s.preferences, timeframe: '1W' } }));
+    // Opening another symbol (state created, no drawings) is not an edit either
+    store.updateSymbol('MSFT', (s) => ({ ...s, preferences: { ...s.preferences, timeframe: '1D' } }));
     await vi.runAllTimersAsync();
     expect(api.saves).toHaveLength(1);
     sync.stop();
@@ -188,6 +190,20 @@ describe('cloud sync helpers', () => {
     expect(isLineInAppBrowser('Mozilla/5.0 (Linux; Android 14) Chrome/126.0 Mobile Safari/537.36 Line/14.6.1/IAB')).toBe(true);
     expect(isLineInAppBrowser('Mozilla/5.0 (X11; Linux x86_64) Chrome/126.0 Safari/537.36')).toBe(false);
     expect(isLineInAppBrowser('Mozilla/5.0 Linear/1.0')).toBe(false);
+  });
+
+  it('allows two LINE login attempts per two minutes so a failing login cannot loop the page', () => {
+    const backing = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => backing.get(key) ?? null,
+      setItem: (key: string, value: string) => void backing.set(key, value),
+    } as unknown as Storage;
+    expect(claimLoginAttempt(storage, 1_000)).toBe(true);
+    expect(claimLoginAttempt(storage, 2_000)).toBe(true);
+    expect(claimLoginAttempt(storage, 3_000)).toBe(false);
+    expect(claimLoginAttempt(storage, 122_500)).toBe(true);
+    const blocked = { getItem: () => null, setItem: () => { throw new Error('denied'); } } as unknown as Storage;
+    expect(claimLoginAttempt(blocked, 1)).toBe(false);
   });
 
   it('keeps sync metadata per LINE user and survives blocked storage', () => {
