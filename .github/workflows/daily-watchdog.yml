@@ -1,0 +1,59 @@
+name: Daily Report Watchdog
+
+# 不依賴 Claude 的故障通知（補 schedule.yml 的不足）：
+# schedule.yml 失敗時自己會推播 LINE，但「根本沒執行」（外部排程沒觸發、GitHub cron 被略過）不會。
+# 這裡在台灣時間隔天凌晨檢查前一天是否有成功的每日報告，沒有就推播 LINE。
+# 每日報告在台灣時間週日～週五執行（schedule.yml 的 cron 為 UTC 0-5），所以這裡在台灣週一～週六凌晨檢查。
+on:
+  schedule:
+    - cron: '23 17 * * 0-5'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check yesterday's daily report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          RUNS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/workflows/schedule.yml
+        run: |
+          set -euo pipefail
+          # 報告日 = 台灣時間 6 小時前的日期（凌晨執行時就是前一天；GitHub cron 延遲幾小時也不影響）
+          REPORT_DATE=$(TZ=Asia/Taipei date -d '6 hours ago' +%F)
+          SINCE=$(date -u -d "${REPORT_DATE} 00:00:00 +0800" +%Y-%m-%dT%H:%M:%SZ)
+          UNTIL=$(date -u -d "${REPORT_DATE} 00:00:00 +0800 + 1 day" +%Y-%m-%dT%H:%M:%SZ)
+          runs=$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/workflows/schedule.yml/runs" \
+            -f created="${SINCE}..${UNTIL}" -f per_page=50 \
+            --jq '[.workflow_runs[] | {status, conclusion}]')
+          success=$(jq '[.[] | select(.conclusion == "success")] | length' <<<"${runs}")
+          running=$(jq '[.[] | select(.status != "completed")] | length' <<<"${runs}")
+          total=$(jq 'length' <<<"${runs}")
+          echo "報告日 ${REPORT_DATE}：共 ${total} 次，成功 ${success} 次，執行中 ${running} 次"
+          if [ "${success}" -gt 0 ]; then
+            exit 0
+          fi
+          if [ "${running}" -gt 0 ]; then
+            detail="仍在執行中，尚未完成"
+          elif [ "${total}" -gt 0 ]; then
+            detail="有執行但沒有成功（失敗通知應已另外推播）"
+          else
+            detail="完全沒有執行（外部排程與 GitHub cron 都沒有觸發）"
+          fi
+          echo "::warning::${REPORT_DATE} 的每日報告：${detail}"
+          if [ -z "${LINE_ACCESS_TOKEN}" ] || [ -z "${LINE_USER_ID}" ]; then
+            echo "::warning::未設定 LINE_ACCESS_TOKEN / LINE_USER_ID，無法推播"
+            exit 0
+          fi
+          text=$(printf '⚠️ %s 的每日選股報告%s\n可手動執行：%s' "${REPORT_DATE}" "${detail}" "${RUNS_URL}")
+          jq -n --arg to "${LINE_USER_ID}" --arg text "${text}" \
+            '{to: $to, messages: [{type: "text", text: $text}]}' |
+            curl -sS --fail-with-body --max-time 30 -X POST https://api.line.me/v2/bot/message/push \
+              -H "Authorization: Bearer ${LINE_ACCESS_TOKEN}" -H 'Content-Type: application/json' -d @- ||
+            echo "::warning::LINE 推播失敗"
