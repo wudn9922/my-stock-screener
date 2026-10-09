@@ -1,12 +1,13 @@
 name: Deploy Supabase Edge Functions
 
-# 部署 Atlas 行情代理 market-chart（supabase/functions/market-chart）。
+# 部署 Atlas 行情代理 market-chart 與自選股設定頁的 user-settings（supabase/functions/）。
 # 需要 repository secret SUPABASE_ACCESS_TOKEN（Supabase 個人存取權杖）；未設定時略過，不會失敗。
 on:
   push:
     branches: [main]
     paths:
       - 'supabase/functions/market-chart/**'
+      - 'supabase/functions/user-settings/**'
       - '.github/workflows/supabase-functions.yml'
   workflow_dispatch:
 
@@ -32,7 +33,7 @@ jobs:
         id: token
         run: |
           if [ -z "${SUPABASE_ACCESS_TOKEN}" ]; then
-            echo "::notice::未設定 secret SUPABASE_ACCESS_TOKEN，略過 market-chart 部署（請在 Settings → Secrets and variables → Actions 新增）"
+            echo "::notice::未設定 secret SUPABASE_ACCESS_TOKEN，略過函式部署（請在 Settings → Secrets and variables → Actions 新增）"
             echo "available=false" >> "$GITHUB_OUTPUT"
           else
             echo "available=true" >> "$GITHUB_OUTPUT"
@@ -51,6 +52,10 @@ jobs:
       - name: Deploy market-chart
         if: steps.token.outputs.available == 'true'
         run: supabase functions deploy market-chart --no-verify-jwt --project-ref "${SUPABASE_PROJECT_REF}"
+
+      - name: Deploy user-settings
+        if: steps.token.outputs.available == 'true'
+        run: supabase functions deploy user-settings --no-verify-jwt --project-ref "${SUPABASE_PROJECT_REF}"
 
       - name: Smoke test
         # 不論這次是否由本 workflow 部署（例如改用 Supabase connector 部署），都實際呼叫一次函式
@@ -81,6 +86,15 @@ jobs:
           check "AAPL 1d/1mo" "symbol=AAPL&interval=1d&range=1mo&events=0" 200
           check "NVDA 5m/5d" "symbol=NVDA&interval=5m&range=5d" 200
           check "000001.SS 1d/1mo" "symbol=000001.SS&interval=1d&range=1mo" 200
+          # user-settings：未帶 LIFF ID Token 應回 401（不需要真的登入）
+          code=$(curl -s -o /tmp/settings.json -w '%{http_code}' --max-time 30 -X POST \
+            -H 'Content-Type: application/json' -d '{"action":"stocks.list"}' \
+            "https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/user-settings")
+          echo "user-settings without token → HTTP ${code}: $(head -c 200 /tmp/settings.json)"
+          if [ "${code}" != "401" ]; then
+            echo "::warning::user-settings 預期 HTTP 401，得到 ${code}"
+            failed=1
+          fi
           if [ "${failed}" != "0" ]; then
             echo "::warning::market-chart 有請求未得到預期結果；HTTP 200 以外多半是 Yahoo 封鎖或限流了 Supabase 的出口 IP"
             exit 1

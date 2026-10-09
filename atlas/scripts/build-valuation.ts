@@ -7,6 +7,10 @@
  *        ATLAS_VALUATION_OUT_DIR (default public/valuation), ATLAS_TODAY (YYYY-MM-DD, fixtures/tests),
  *        ATLAS_FIXTURE_DIR (same as --fixtures).
  *
+ * The workflow runs this with --market=tw only: SEC answers 403 to GitHub Actions runners, so
+ * public/valuation/us.json is built by scripts/build_valuation_us.py (Yahoo Finance) instead. The SEC
+ * path is kept for environments SEC does not block.
+ *
  * A market whose sources fail keeps its previous file (the workflow seeds it from the last deployment);
  * the script then exits 1 so the workflow shows a warning.
  */

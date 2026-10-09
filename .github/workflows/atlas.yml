@@ -1,7 +1,7 @@
 name: Atlas Research Terminal
 
 # 建置 Atlas（行情改由 Supabase Edge Function 即時代理，不再產生個股快照檔），
-# 並在建置時產生全市場股票目錄與本益比資料，部署到 docs/atlas/
+# 並在建置時產生全市場股票目錄與本益比資料（美股 Yahoo、台股證交所／櫃買中心），部署到 docs/atlas/
 # （GitHub Pages：/my-stock-screener/atlas/）。只會替換 docs/atlas/。
 on:
   workflow_run:
@@ -81,13 +81,26 @@ jobs:
         working-directory: atlas
         run: node scripts/build-directory.mjs
 
-      - name: Build valuation data (SEC frames / TWSE / TPEx)
+      # 美股本益比改用 Yahoo：SEC 對 GitHub Actions 的 IP 一律回 403（與 User-Agent 無關），
+      # Yahoo 的報價／財報端點則會對 Node fetch 回 429，所以用 Python + curl_cffi（模擬 Chrome TLS）。
+      - name: Set up Python (US valuation)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build US valuation data (Yahoo Finance)
+        id: valuation_us
+        continue-on-error: true
+        working-directory: atlas
+        run: |
+          pip install --quiet 'curl_cffi>=0.7,<1'
+          python scripts/build_valuation_us.py
+
+      - name: Build Taiwan valuation data (TWSE / TPEx)
         id: valuation
         continue-on-error: true
         working-directory: atlas
-        env:
-          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT || 'my-stock-screener-atlas (https://github.com/wudn9922/my-stock-screener)' }}
-        run: node scripts/build-valuation.mjs
+        run: node scripts/build-valuation.mjs --market=tw
 
       - name: Build Atlas for GitHub Pages
         working-directory: atlas
@@ -157,11 +170,15 @@ jobs:
         env:
           DIRECTORY_OUTCOME: ${{ steps.directory.outcome }}
           VALUATION_OUTCOME: ${{ steps.valuation.outcome }}
+          VALUATION_US_OUTCOME: ${{ steps.valuation_us.outcome }}
         run: |
           set -euo pipefail
           if [ "$DIRECTORY_OUTCOME" = "failure" ]; then
             echo "::warning::股票目錄更新失敗，沿用上次部署的 symbols/directory.json（若無則退回台股目錄）"
           fi
+          if [ "$VALUATION_US_OUTCOME" = "failure" ]; then
+            echo "::warning::美股本益比（Yahoo）更新失敗，沿用上次部署的 valuation/us.json"
+          fi
           if [ "$VALUATION_OUTCOME" = "failure" ]; then
-            echo "::warning::本益比資料部分或全部更新失敗，沿用上次部署的 valuation/*.json"
+            echo "::warning::台股本益比部分或全部更新失敗，沿用上次部署的 valuation/tw.json"
           fi

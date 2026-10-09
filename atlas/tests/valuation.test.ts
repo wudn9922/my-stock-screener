@@ -249,6 +249,10 @@ describe('ValuationProvider', () => {
       AAPL: { epsTtm: 7.9, epsAnnual: 7.46, fiscalYear: 2025, asOf: '2026-06-27', source: 'SEC frames' },
       LOSS: { epsTtm: -2, epsAnnual: -1.8, fiscalYear: 2025, asOf: '2026-06-30', source: 'SEC frames' },
       BAD: { epsTtm: 'x', source: 'SEC frames' },
+      MSFT: {
+        epsTtm: 17.95, epsAnnual: 17.95, fiscalYear: 2026, asOf: '2026-10-09', source: 'Yahoo Finance',
+        annualPeriodEnd: '2026-06-30', annualCheckedAt: '2026-10-09',
+      },
     },
   };
   const tw = {
@@ -275,6 +279,10 @@ describe('ValuationProvider', () => {
     expect(summarizeValuation(loss!, 50).peTtm).toEqual({ pe: null, negativeEarnings: true, reason: 'negative-earnings' });
     expect(summarizeValuation(aapl!, 237).peTtm.pe).toBe(30);
     expect(await p.getValuation('2330.TW')).toMatchObject({ market: 'TW', exchangePeTtm: 25.1, epsTtm: 50 });
+    expect(await p.getValuation('MSFT')).toEqual({
+      symbol: 'MSFT', market: 'US', epsTtm: 17.95, epsAnnual: 17.95, fiscalYear: 2026, exchangePeTtm: null,
+      asOf: '2026-10-09', source: 'Yahoo Finance', basis: 'diluted',
+    });
     expect(await p.getValuation('BAD')).toBeNull();
     expect(await p.getValuation('ZZZZ')).toBeNull();
     expect(fetcher).toHaveBeenCalledTimes(2);

@@ -3,23 +3,23 @@ import { getMarketProfile, isIndexSymbol } from '../market-data/MarketProfile';
 import { normalizeSymbol } from '../market-data/MarketDataProvider';
 
 /**
- * EPS for P/E and P/E TTM, from the small per-market files built in GitHub Actions by
- * scripts/build-valuation.mjs: `${BASE_URL}valuation/us.json` (SEC XBRL frames) and
- * `${BASE_URL}valuation/tw.json` (TWSE / TPEx official daily P/E).
+ * EPS for P/E and P/E TTM, from the small per-market files built in GitHub Actions:
+ * `${BASE_URL}valuation/us.json` (scripts/build_valuation_us.py, Yahoo Finance) and
+ * `${BASE_URL}valuation/tw.json` (scripts/build-valuation.mjs, TWSE / TPEx official daily P/E).
  */
 export interface Valuation {
   symbol: string;
   market: 'US' | 'TW';
-  /** Trailing-twelve-month EPS (US: sum of the latest four quarters; TW: close / exchange P/E). */
+  /** Trailing-twelve-month EPS (US: latest four quarters; TW: close / exchange P/E). */
   epsTtm: number | null;
   /** Latest full fiscal-year EPS. */
   epsAnnual: number | null;
   fiscalYear: number | null;
   /** Taiwan only: the exchange's own P/E on `asOf` (TTM basis). */
   exchangePeTtm: number | null;
-  /** YYYY-MM-DD: end of the EPS period (US) or the exchange's data date (TW). */
+  /** YYYY-MM-DD: end of the EPS period (US, SEC) or the data date (US Yahoo, TW). */
   asOf: string | null;
-  source: 'SEC frames' | 'TWSE' | 'TPEx';
+  source: 'SEC frames' | 'Yahoo Finance' | 'TWSE' | 'TPEx';
   /** `basic` when diluted EPS was not reported. */
   basis: 'diluted' | 'basic';
 }
@@ -69,7 +69,7 @@ const recordSchema = z.object({
   fiscalYear: z.number().int().nullable().optional(),
   exchangePeTtm: nullableNumber,
   asOf: z.string().nullable().optional(),
-  source: z.enum(['SEC frames', 'TWSE', 'TPEx']),
+  source: z.enum(['SEC frames', 'Yahoo Finance', 'TWSE', 'TPEx']),
   basis: z.enum(['diluted', 'basic']).optional(),
 });
 const documentSchema = z.object({
