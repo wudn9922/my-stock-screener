@@ -2,14 +2,30 @@ name: zz temporary probe
 on:
   push:
     branches: [claude/nice-cray-fs4a9b]
-    paths: ['.github/probe/**', '.github/workflows/zz-probe.yml']
+    paths: ['.github/workflows/zz-probe.yml', 'atlas/scripts/build_valuation_us.py']
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: '3.10'}
-      - run: pip install -q yfinance
-      - run: python .github/probe/yahoo.py
+        with: {python-version: '3.12'}
+      - name: Run US valuation for real (no commit)
+        working-directory: atlas
+        run: |
+          mkdir -p public/symbols
+          cp ../docs/atlas/symbols/directory.json public/symbols/
+          pip install --quiet 'curl_cffi>=0.7,<1'
+          time python scripts/build_valuation_us.py
+          python - <<'PY'
+          import json
+          d = json.load(open('public/valuation/us.json'))
+          it = d['items']
+          print(len(it), d['generatedAt'])
+          for s in ['AAPL','MSFT','NVDA','BRK-B','INTC','TSM','NVO','SHOP','JPM','AMZN']:
+              print(s, it.get(s))
+          PY
+          ls -la public/valuation
+          # second run: everything fresh, should be quick
+          time python scripts/build_valuation_us.py
