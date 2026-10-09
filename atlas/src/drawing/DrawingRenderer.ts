@@ -44,7 +44,7 @@ function drawMeasurementLabel(
     Math.min(height - boxHeight - 4 * ry, Math.min(a.y, b.y) * ry - boxHeight - 3 * ry),
   );
   ctx.globalAlpha = 0.92;
-  ctx.fillStyle = '#0e1521';
+  ctx.fillStyle = '#0f1319';
   ctx.fillRect(x, y, boxWidth, boxHeight);
   ctx.globalAlpha = 1;
   ctx.fillStyle = '#e5efff';
@@ -167,7 +167,7 @@ export class DrawingRenderer implements IPrimitivePaneRenderer {
               // Drawing opacity affects the object and its fill, while handles stay crisp.
               ctx.globalAlpha = 1;
               ctx.beginPath();
-              ctx.fillStyle = '#0e1521';
+              ctx.fillStyle = '#0f1319';
               ctx.strokeStyle = d.style.color;
               ctx.lineWidth = 1.5 * rx;
               ctx.ellipse(p.x * rx, p.y * ry, 5 * rx, 5 * ry, 0, 0, Math.PI * 2);

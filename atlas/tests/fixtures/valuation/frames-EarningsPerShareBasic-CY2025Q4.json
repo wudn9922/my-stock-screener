@@ -1,0 +1,20 @@
+{
+"taxonomy": "us-gaap",
+"tag": "EarningsPerShareBasic",
+"ccp": "CY2025Q4",
+"uom": "USD-per-shares",
+"label": "Earnings Per Share, Diluted",
+"description": "\u2026",
+"pts": 1,
+"data": [
+{
+"accn": "0000000000-26-000001",
+"cik": 3333,
+"entityName": "Basic Only Corp",
+"loc": "US-CA",
+"start": "2025-10-01",
+"end": "2025-12-31",
+"val": 1.0
+}
+]
+}

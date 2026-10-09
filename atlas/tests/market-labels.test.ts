@@ -46,7 +46,7 @@ describe('market-aware chart and measurement labels', () => {
     const options = labels('2330.TW', '1M');
 
     expect(options.localization?.timeFormatter?.(timestamp)).toBe('01/10/2026');
-    expect(options.timeScale?.tickMarkFormatter?.(timestamp, TickMarkType.Month)).toBe('Oct');
+    expect(options.timeScale?.tickMarkFormatter?.(timestamp, TickMarkType.Month)).toBe('10月');
   });
 
   it('uses Taipei wall time for Taiwan intraday crosshair and time ticks', () => {
@@ -63,7 +63,7 @@ describe('market-aware chart and measurement labels', () => {
     const options = labels('AAPL', '1M');
 
     expect(options.localization?.timeFormatter?.(timestamp)).toBe('01/10/2026');
-    expect(options.timeScale?.tickMarkFormatter?.(timestamp, TickMarkType.Month)).toBe('Oct');
+    expect(options.timeScale?.tickMarkFormatter?.(timestamp, TickMarkType.Month)).toBe('10月');
   });
 
   it('shows TWD on Taiwan measurements and the established dollar label for US measurements', () => {

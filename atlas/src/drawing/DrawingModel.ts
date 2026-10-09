@@ -51,16 +51,16 @@ export function drawingVisible(d: Drawing, symbol: string, timeframe: Timeframe)
 }
 
 export const toolNames: Record<ToolKind, string> = {
-  trend: 'Trend Line',
-  horizontal: 'Horizontal Line',
-  ray: 'Horizontal Ray',
-  rectangle: 'Rectangle',
-  fibonacci: 'Fibonacci Retracement',
-  channel: 'Parallel Channel',
-  'price-range': 'Price Range',
-  'date-range': 'Date Range',
-  'price-date-range': 'Price + Date Range',
-  vertical: 'Vertical Line',
+  trend: '趨勢線',
+  horizontal: '水平線',
+  ray: '水平射線',
+  rectangle: '矩形',
+  fibonacci: '費波那契回撤',
+  channel: '平行通道',
+  'price-range': '價格區間',
+  'date-range': '日期區間',
+  'price-date-range': '價格與日期區間',
+  vertical: '垂直線',
 };
 
 export type ControlPart = 0 | 1 | 2 | 3;

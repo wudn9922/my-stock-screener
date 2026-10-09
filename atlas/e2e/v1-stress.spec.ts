@@ -187,14 +187,14 @@ test('V1 stress: 2,500 Demo bars, eight mixed averages and 100 mixed drawings ke
     scope: { timeframe: '1D' },
   }));
 
-  await page.getByLabel('Settings file', { exact: true }).setInputFiles({
+  await page.getByLabel('設定檔', { exact: true }).setInputFiles({
     name: 'v1-mixed-stress.json',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(exported)),
   });
   await expect(page.getByRole('status')).toContainText('設定已還原');
   await loaded(page);
-  await expect(page.locator('.chart-status')).toContainText('100 DRAWINGS');
+  await expect(page.locator('.chart-status')).toContainText('畫線 100 條');
   await expect(page.locator('.indicator-chip')).toHaveCount(8);
 
   const types = [
@@ -227,9 +227,9 @@ test('V1 stress: 2,500 Demo bars, eight mixed averages and 100 mixed drawings ke
     ),
   ).toBe(true);
 
-  await clickDrawingUtility(page, 'Select / Pan');
-  await clickDrawingUtility(page, 'Zoom in');
-  await clickDrawingUtility(page, 'Zoom out');
+  await clickDrawingUtility(page, '選取 / 平移');
+  await clickDrawingUtility(page, '放大圖表');
+  await clickDrawingUtility(page, '縮小圖表');
   await expect.poll(async () => (await readSymbol(page))?.preferences.views['1D']).toBeDefined();
   const beforePan = (await readSymbol(page))!.preferences.views['1D'];
   const chart = (await page.getByTestId('chart').locator('canvas').first().boundingBox())!;
@@ -242,8 +242,8 @@ test('V1 stress: 2,500 Demo bars, eight mixed averages and 100 mixed drawings ke
   await expect
     .poll(async () => (await readSymbol(page))?.preferences.views['1D'])
     .not.toEqual(beforePan);
-  await clickDrawingUtility(page, 'Zoom in');
-  await clickDrawingUtility(page, 'Zoom out');
+  await clickDrawingUtility(page, '放大圖表');
+  await clickDrawingUtility(page, '縮小圖表');
   await expect(page.locator('.chart-loading')).toHaveCount(0);
   expect((await readSymbol(page))!.drawings).toEqual(migratedDrawings);
 
@@ -257,7 +257,7 @@ test('V1 stress: 2,500 Demo bars, eight mixed averages and 100 mixed drawings ke
     x: editingPlot.x + editingPlot.width * 0.6,
     y: editingPlot.y + editingPlot.height * 0.74,
   };
-  await chooseDrawingTool(page, 'Trend Line');
+  await chooseDrawingTool(page, '趨勢線');
   for (const point of [first, second]) {
     await page.mouse.move(point.x - 6, point.y - 6);
     await page.mouse.down();
@@ -274,7 +274,7 @@ test('V1 stress: 2,500 Demo bars, eight mixed averages and 100 mixed drawings ke
     .poll(async () => (await readSymbol(page))?.drawings[100]?.points[0].price)
     .not.toBe(editable.points[0].price);
   expect((await readSymbol(page))!.drawings.slice(0, 100)).toEqual(migratedDrawings);
-  await page.getByRole('button', { name: 'Delete selected drawing', exact: true }).click();
+  await page.getByRole('button', { name: '刪除所選畫線', exact: true }).click();
   await expect.poll(async () => (await readSymbol(page))?.drawings.length).toBe(100);
 
   const gaps = await page.evaluate(

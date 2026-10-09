@@ -5,11 +5,13 @@
 import html as html_module
 import io
 import json
+import math
 import os
 import re
 import subprocess
+import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pandas as pd
 import requests
@@ -38,6 +40,75 @@ MAX_DAYS = 201
 STALE_CSV_DAYS = 45
 # 單次最多刪除全部 CSV 的比例，超過視為異常不刪
 STALE_CSV_MAX_DELETE_RATIO = 0.5
+
+
+def _env_flag(name, default=False):
+    raw_value = os.environ.get(name)
+
+    if raw_value is None:
+        return default
+
+    return raw_value.strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on"
+    }
+
+
+# =========================================================================
+# Atlas 報告 JSON（docs/report/，網址 /my-stock-screener/report/）
+# =========================================================================
+REPORT_DIR = os.path.join(DOCS_DIR, "report")
+REPORT_SERIES_DIR = os.path.join(REPORT_DIR, "series")
+REPORT_JSON_VERSION = 1
+
+# 舊版 24 MB docs/index.html 報告：預設關閉，設 LEGACY_HTML_REPORT=1 才產生
+LEGACY_HTML_REPORT = _env_flag(
+    "LEGACY_HTML_REPORT",
+    False
+)
+
+# =========================================================================
+# 櫃買指數（^TWOII）：Yahoo 沒有可用資料，改用櫃買中心官方日資料
+# =========================================================================
+TPEX_OTC_SYMBOL = "^TWOII"
+TPEX_OTC_NAME = "櫃買指數"
+TPEX_SOURCE_LABEL = "TPEx 櫃買中心"
+# analyze_index_trend 需要至少 750 根日 K，約 37 個月，初次建檔抓 42 個月
+TPEX_BOOTSTRAP_MONTHS = 42
+# CSV 最多保留的日 K 數（約 6 年）
+TPEX_MAX_ROWS = 1500
+TPEX_REQUEST_TIMEOUT = 20
+TPEX_REQUEST_DELAY = 1.2
+# 單次執行最多送出的月份請求數，避免來源異常時拖太久
+TPEX_MAX_MONTH_REQUESTS = 60
+# 連續失敗幾次就停止本次抓取
+TPEX_MAX_CONSECUTIVE_FAILURES = 3
+# 最後一根 K 線超過此天數視為過期，改回 Yahoo 舊流程
+TPEX_STALE_DAYS = 10
+# 新版網站（tables/fields/data 格式，日期參數為西元 YYYY/MM/01）
+TPEX_INDEX_HISTORY_URL = (
+    "https://www.tpex.org.tw/www/zh-tw/indexInfo/inxh"
+)
+# 舊版網站（aaData 格式，日期參數為民國 YYY/MM）
+TPEX_INDEX_HISTORY_LEGACY_URL = (
+    "https://www.tpex.org.tw/web/stock/iNdex_info/"
+    "inxh/Inx_result.php"
+)
+# 成交量值（選用，用來補 Volume；失敗不影響指數）
+TPEX_TRADING_INDEX_URL = (
+    "https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingIndex"
+)
+TPEX_TRADING_INDEX_LEGACY_URL = (
+    "https://www.tpex.org.tw/web/stock/aftertrading/"
+    "daily_trading_index/st41_result.php"
+)
+
+# prune_stale_csv 不會刪除的 CSV（長期歷史快取，不是掃描用的個股）
+STALE_CSV_EXCLUDE = {
+    f"{TPEX_OTC_SYMBOL}.csv"
+}
 
 # =========================================================================
 # LIFF、報告與畫線同步
@@ -2471,6 +2542,7 @@ def scan_market(
                     "volume": int(
                         latest_volume
                     ),
+                    "ma_list": [20],
                     "chart_data": chart_data
                 }
             )
@@ -2874,6 +2946,7 @@ def process_custom_groups(
                     "volume": int(
                         latest_volume
                     ),
+                    "ma_list": ma_list,
                     "chart_data": chart_data
                 }
             )
@@ -3016,7 +3089,8 @@ def process_index_charts(index_configs):
                 f"MA={ma_list}"
             )
 
-            downloaded = yf.download(
+            # ^TWOII 優先使用櫃買中心資料，其餘照舊走 Yahoo
+            downloaded = download_index_history(
                 ticker,
                 period="4y",
                 progress=False,
@@ -3996,7 +4070,8 @@ def analyze_index_trend(
         )
 
     try:
-        df = yf.download(
+        # ^TWOII 優先使用櫃買中心資料，其餘照舊走 Yahoo
+        df = download_index_history(
             ticker,
             period="10y",
             progress=False,
@@ -8200,6 +8275,7 @@ def prune_stale_csv(
         os.path.join(data_dir, name)
         for name in os.listdir(data_dir)
         if name.endswith(".csv")
+        and name not in STALE_CSV_EXCLUDE
     ]
 
     stale_paths = []
@@ -8273,13 +8349,36 @@ def push_report_to_github():
         ]
     )
 
+    # docs/report：Atlas 報告 JSON；docs/index.html 只有舊版報告開啟時才提交
+    add_paths = [
+        path
+        for path in [
+            "docs/report",
+            "data"
+        ]
+        if os.path.exists(path)
+    ]
+
+    if (
+        LEGACY_HTML_REPORT
+        and os.path.exists("docs/index.html")
+    ):
+        add_paths.insert(0, "docs/index.html")
+
+    if not add_paths:
+        print(
+            "ℹ️ 沒有需要提交的報告路徑"
+        )
+        return True
+
     add_result = run_git_command(
         [
             "git",
             "add",
-            "docs/index.html",
-            "data"
+            "-A",
+            "--"
         ]
+        + add_paths
     )
 
     if add_result != 0:
@@ -8333,6 +8432,2370 @@ def push_report_to_github():
 
     print("❌ git push 失敗")
     return False
+
+
+# =========================================================================
+# 櫃買指數（^TWOII）：櫃買中心官方日資料
+#
+# 來源（依序嘗試，成功的方式會記住，下個月份優先使用）：
+# 1. 新版網站 GET  /www/zh-tw/indexInfo/inxh?date=YYYY/MM/01&response=json
+# 2. 新版網站 POST 同上（部分頁面只接受 POST）
+# 3. 舊版網站 GET  /web/stock/iNdex_info/inxh/Inx_result.php?l=zh-tw&d=YYY/MM&o=json
+#
+# 回應格式兩種都支援：
+# - {"tables":[{"title":..,"fields":["日期","開市","最高","最低","收市",..],
+#               "data":[["115/10/08","268.12",..], ..]}], "stat":"ok"}
+# - {"reportDate":"115/10","iTotalRecords":n,"aaData":[["115/10/08",..], ..]}
+# 另外也接受 OpenAPI 風格的 [{"Date":"1151008","Close":"..."}, ..]。
+# 日期可為民國（115/10/08、1151008）或西元，數字可含千分位逗號。
+# =========================================================================
+TPEX_HTTP_HEADERS = {
+    **HTTP_HEADERS,
+    "Accept": (
+        "application/json, text/javascript, */*; q=0.01"
+    ),
+    "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+    "Referer": "https://www.tpex.org.tw/"
+}
+
+TPEX_EMPTY_TEXT = {
+    "",
+    "-",
+    "--",
+    "---",
+    "x",
+    "n/a",
+    "null",
+    "none"
+}
+
+# 欄位名稱關鍵字（小寫、去空白後做「包含」比對，依序優先）
+TPEX_INDEX_FIELD_ALIASES = {
+    "Date": (
+        "日期",
+        "date"
+    ),
+    "Open": (
+        "開市",
+        "開盤",
+        "open"
+    ),
+    "High": (
+        "最高",
+        "high"
+    ),
+    "Low": (
+        "最低",
+        "low"
+    ),
+    "Close": (
+        "收市",
+        "收盤",
+        "close",
+        "櫃買指數"
+    )
+}
+
+TPEX_TRADING_FIELD_ALIASES = {
+    "Date": (
+        "日期",
+        "date"
+    ),
+    "Volume": (
+        "成交股數",
+        "股數",
+        "tradevolume",
+        "volume"
+    )
+}
+
+# 沒有欄位名稱時使用的位置
+TPEX_INDEX_POSITIONS = {
+    "Date": 0,
+    "Open": 1,
+    "High": 2,
+    "Low": 3,
+    "Close": 4
+}
+
+TPEX_TRADING_POSITIONS = {
+    "Date": 0,
+    "Volume": 1
+}
+
+# 本次執行中的 TPEx 狀態
+TPEX_RUNTIME = {
+    "index_attempt": None,
+    "trading_attempt": None,
+    "trading_disabled": False,
+    "history": None,
+    "history_loaded": False
+}
+
+# 指數歷史快取：ticker → {"df": 清理後 DataFrame, "source": "TPEx|Yahoo"}
+INDEX_HISTORY_CACHE = {}
+
+
+def parse_tpex_number(value):
+    """'1,234.56' → 1234.56；'--'、空字串等 → None。"""
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return None
+
+    if isinstance(value, (int, float)):
+        number = float(value)
+        return number if math.isfinite(number) else None
+
+    text = re.sub(
+        r"<[^>]*>",
+        "",
+        str(value)
+    )
+
+    text = (
+        text.replace(",", "")
+        .replace("，", "")
+        .replace("　", "")
+        .strip()
+    )
+
+    if text.lower() in TPEX_EMPTY_TEXT:
+        return None
+
+    try:
+        number = float(text)
+    except ValueError:
+        return None
+
+    return number if math.isfinite(number) else None
+
+
+def parse_tpex_date(value):
+    """
+    民國或西元日期 → pd.Timestamp，無法解析回傳 None。
+    支援 115/10/08、115/10/08＊、1151008、2026/10/08、
+    2026-10-08、20261008。
+    """
+    text = re.sub(
+        r"[^0-9/\-.]",
+        "",
+        str(value or "")
+    )
+
+    year = month = day = None
+
+    match = re.fullmatch(
+        r"(\d{2,4})[/\-.](\d{1,2})[/\-.](\d{1,2})",
+        text
+    )
+
+    if match:
+        year, month, day = (
+            int(part)
+            for part in match.groups()
+        )
+
+    elif re.fullmatch(r"\d{7}", text):
+        year = int(text[:3])
+        month = int(text[3:5])
+        day = int(text[5:7])
+
+    elif re.fullmatch(r"\d{8}", text):
+        year = int(text[:4])
+        month = int(text[4:6])
+        day = int(text[6:8])
+
+    else:
+        return None
+
+    if year < 1911:
+        year += 1911
+
+    try:
+        return pd.Timestamp(
+            year=year,
+            month=month,
+            day=day
+        )
+    except (ValueError, OverflowError):
+        return None
+
+
+def _normalize_tpex_field(name):
+    return re.sub(
+        r"\s+",
+        "",
+        str(name or "")
+    ).lower()
+
+
+def _match_tpex_fields(fields, aliases):
+    """回傳 {欄位: 位置}，每個位置只會被用一次。"""
+    normalized = [
+        _normalize_tpex_field(field)
+        for field in fields
+    ]
+
+    used = set()
+    result = {}
+
+    for column, keywords in aliases.items():
+        for keyword in keywords:
+            keyword = keyword.lower()
+
+            found = next(
+                (
+                    position
+                    for position, field in enumerate(
+                        normalized
+                    )
+                    if position not in used
+                    and keyword in field
+                ),
+                None
+            )
+
+            if found is not None:
+                result[column] = found
+                used.add(found)
+                break
+
+    return result
+
+
+def extract_tpex_tables(payload):
+    """
+    將 TPEx 各種回應整理成 [(title, fields, rows)]。
+    rows 可能是 list[list] 或 list[dict]。
+    """
+    tables = []
+
+    if isinstance(payload, list):
+        if payload:
+            tables.append(("", None, payload))
+        return tables
+
+    if not isinstance(payload, dict):
+        return tables
+
+    for table in payload.get("tables") or []:
+        if not isinstance(table, dict):
+            continue
+
+        rows = table.get("data") or []
+
+        if rows:
+            tables.append(
+                (
+                    str(table.get("title") or ""),
+                    table.get("fields"),
+                    rows
+                )
+            )
+
+    if payload.get("aaData"):
+        tables.append(
+            (
+                str(payload.get("reportTitle") or ""),
+                payload.get("fields")
+                or payload.get("aaFields"),
+                payload["aaData"]
+            )
+        )
+
+    if (
+        not tables
+        and isinstance(payload.get("data"), list)
+        and payload["data"]
+    ):
+        tables.append(
+            (
+                str(payload.get("title") or ""),
+                payload.get("fields"),
+                payload["data"]
+            )
+        )
+
+    return tables
+
+
+def _tpex_table_rows_to_records(
+    fields,
+    rows,
+    aliases,
+    positions,
+    required
+):
+    records = []
+
+    if rows and isinstance(rows[0], dict):
+        keys = list(rows[0].keys())
+        mapping = _match_tpex_fields(
+            keys,
+            aliases
+        )
+
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+
+            records.append(
+                {
+                    column: row.get(
+                        keys[position]
+                    )
+                    for column, position in (
+                        mapping.items()
+                    )
+                }
+            )
+
+        return records, mapping
+
+    mapping = {}
+
+    if fields:
+        mapping = _match_tpex_fields(
+            fields,
+            aliases
+        )
+
+    # 沒有欄位名稱、或必要欄位（日期與數值）對不上時改用固定位置
+    if not all(
+        column in mapping
+        for column in required
+    ):
+        mapping = dict(positions)
+
+    for row in rows:
+        if not isinstance(row, (list, tuple)):
+            continue
+
+        records.append(
+            {
+                column: (
+                    row[position]
+                    if position < len(row)
+                    else None
+                )
+                for column, position in (
+                    mapping.items()
+                )
+            }
+        )
+
+    return records, mapping
+
+
+def _tpex_volume_multiplier(fields, mapping):
+    position = mapping.get("Volume")
+
+    if (
+        position is None
+        or not fields
+        or position >= len(fields)
+    ):
+        return 1000.0
+
+    field = str(fields[position])
+
+    if (
+        "仟" in field
+        or "千" in field
+    ):
+        return 1000.0
+
+    return 1.0
+
+
+def parse_tpex_index_payload(payload):
+    """
+    解析櫃買指數月資料 → DataFrame(index=Date, Open/High/Low/Close/Volume)。
+    多個表格時優先使用標題含「櫃買指數」且不含「報酬」的表格。
+    """
+    tables = extract_tpex_tables(payload)
+
+    def table_rank(table):
+        title = table[0]
+
+        if "報酬" in title:
+            return 2
+
+        if "櫃買指數" in title or not title:
+            return 0
+
+        return 1
+
+    for title, fields, rows in sorted(
+        tables,
+        key=table_rank
+    ):
+        records, mapping = (
+            _tpex_table_rows_to_records(
+                fields,
+                rows,
+                TPEX_INDEX_FIELD_ALIASES,
+                TPEX_INDEX_POSITIONS,
+                ("Date", "Close")
+            )
+        )
+
+        parsed_rows = []
+
+        for record in records:
+            trade_date = parse_tpex_date(
+                record.get("Date")
+            )
+
+            close_value = parse_tpex_number(
+                record.get("Close")
+            )
+
+            if (
+                trade_date is None
+                or close_value is None
+                or close_value <= 0
+            ):
+                continue
+
+            open_value = parse_tpex_number(
+                record.get("Open")
+            )
+            high_value = parse_tpex_number(
+                record.get("High")
+            )
+            low_value = parse_tpex_number(
+                record.get("Low")
+            )
+
+            open_value = (
+                open_value
+                if open_value and open_value > 0
+                else close_value
+            )
+            high_value = (
+                high_value
+                if high_value and high_value > 0
+                else max(open_value, close_value)
+            )
+            low_value = (
+                low_value
+                if low_value and low_value > 0
+                else min(open_value, close_value)
+            )
+
+            parsed_rows.append(
+                {
+                    "Date": trade_date,
+                    "Open": open_value,
+                    "High": max(
+                        high_value,
+                        open_value,
+                        close_value
+                    ),
+                    "Low": min(
+                        low_value,
+                        open_value,
+                        close_value
+                    ),
+                    "Close": close_value,
+                    "Volume": 0.0
+                }
+            )
+
+        if parsed_rows:
+            df = pd.DataFrame(
+                parsed_rows
+            ).set_index("Date")
+
+            df.index.name = "Date"
+
+            return df[
+                ~df.index.duplicated(
+                    keep="last"
+                )
+            ].sort_index()
+
+    return pd.DataFrame(
+        columns=[
+            "Open",
+            "High",
+            "Low",
+            "Close",
+            "Volume"
+        ]
+    )
+
+
+def parse_tpex_trading_payload(payload):
+    """解析櫃買市場每日成交量值 → Series(index=Date, 成交股數)。"""
+    for title, fields, rows in extract_tpex_tables(
+        payload
+    ):
+        records, mapping = (
+            _tpex_table_rows_to_records(
+                fields,
+                rows,
+                TPEX_TRADING_FIELD_ALIASES,
+                TPEX_TRADING_POSITIONS,
+                ("Date", "Volume")
+            )
+        )
+
+        multiplier = _tpex_volume_multiplier(
+            fields,
+            mapping
+        )
+
+        values = {}
+
+        for record in records:
+            trade_date = parse_tpex_date(
+                record.get("Date")
+            )
+
+            volume = parse_tpex_number(
+                record.get("Volume")
+            )
+
+            if (
+                trade_date is None
+                or volume is None
+                or volume < 0
+            ):
+                continue
+
+            values[trade_date] = (
+                volume * multiplier
+            )
+
+        if values:
+            series = pd.Series(
+                values,
+                dtype="float64"
+            ).sort_index()
+
+            series.index.name = "Date"
+
+            return series
+
+    return pd.Series(dtype="float64")
+
+
+def _tpex_request_json(
+    url,
+    params,
+    method="get"
+):
+    if method == "post":
+        response = requests.post(
+            url,
+            data=params,
+            headers=TPEX_HTTP_HEADERS,
+            timeout=TPEX_REQUEST_TIMEOUT
+        )
+    else:
+        response = requests.get(
+            url,
+            params=params,
+            headers=TPEX_HTTP_HEADERS,
+            timeout=TPEX_REQUEST_TIMEOUT
+        )
+
+    response.raise_for_status()
+
+    text = response.text.lstrip("﻿").strip()
+
+    if not text or text[0] not in "[{":
+        raise ValueError(
+            "非 JSON 回應："
+            f"{text[:80]!r}"
+        )
+
+    return json.loads(text)
+
+
+def _tpex_month_attempts(
+    year,
+    month,
+    new_url,
+    legacy_url
+):
+    western = f"{year}/{month:02d}/01"
+    roc = f"{year - 1911}/{month:02d}"
+
+    return [
+        (
+            "new-get",
+            new_url,
+            {
+                "date": western,
+                "response": "json"
+            },
+            "get"
+        ),
+        (
+            "new-post",
+            new_url,
+            {
+                "date": western,
+                "response": "json"
+            },
+            "post"
+        ),
+        (
+            "legacy-get",
+            legacy_url,
+            {
+                "l": "zh-tw",
+                "d": roc,
+                "o": "json"
+            },
+            "get"
+        )
+    ]
+
+
+def _tpex_fetch_month(
+    year,
+    month,
+    new_url,
+    legacy_url,
+    parser,
+    state_key,
+    label,
+    sleep=time.sleep
+):
+    """
+    依序嘗試各個端點，回傳 (結果, 使用的方式)。
+    上次成功的方式會排在第一個。全部失敗時拋出最後一個錯誤。
+    """
+    attempts = _tpex_month_attempts(
+        year,
+        month,
+        new_url,
+        legacy_url
+    )
+
+    preferred = TPEX_RUNTIME.get(state_key)
+
+    attempts.sort(
+        key=lambda attempt: (
+            0
+            if attempt[0] == preferred
+            else 1
+        )
+    )
+
+    last_error = None
+
+    for index, (
+        attempt_name,
+        url,
+        params,
+        method
+    ) in enumerate(attempts):
+        if index > 0:
+            sleep(TPEX_REQUEST_DELAY)
+
+        try:
+            payload = _tpex_request_json(
+                url,
+                params,
+                method=method
+            )
+
+            result = parser(payload)
+
+        except Exception as exc:
+            last_error = exc
+
+            print(
+                f"⚠️ TPEx {label} "
+                f"{year}/{month:02d} "
+                f"[{attempt_name}] 失敗："
+                f"{type(exc).__name__}: {exc}"
+            )
+            continue
+
+        if len(result) > 0:
+            result_in_month = result[
+                (result.index.year == year)
+                & (result.index.month == month)
+            ].copy()
+        else:
+            result_in_month = result
+
+        if len(result_in_month) > 0:
+            TPEX_RUNTIME[state_key] = (
+                attempt_name
+            )
+            return result_in_month, attempt_name
+
+        last_error = ValueError(
+            "回應中沒有該月份資料"
+        )
+
+        print(
+            f"ℹ️ TPEx {label} "
+            f"{year}/{month:02d} "
+            f"[{attempt_name}] 沒有資料"
+        )
+
+    raise last_error or ValueError(
+        "沒有可用的 TPEx 端點"
+    )
+
+
+def fetch_tpex_otc_index_month(
+    year,
+    month,
+    sleep=time.sleep
+):
+    df, _ = _tpex_fetch_month(
+        year,
+        month,
+        TPEX_INDEX_HISTORY_URL,
+        TPEX_INDEX_HISTORY_LEGACY_URL,
+        parse_tpex_index_payload,
+        "index_attempt",
+        "櫃買指數",
+        sleep=sleep
+    )
+
+    return df
+
+
+def fetch_tpex_otc_volume_month(
+    year,
+    month,
+    sleep=time.sleep
+):
+    series, _ = _tpex_fetch_month(
+        year,
+        month,
+        TPEX_TRADING_INDEX_URL,
+        TPEX_TRADING_INDEX_LEGACY_URL,
+        parse_tpex_trading_payload,
+        "trading_attempt",
+        "成交量值",
+        sleep=sleep
+    )
+
+    return series
+
+
+def load_ohlcv_csv(csv_path):
+    if not os.path.exists(csv_path):
+        return pd.DataFrame()
+
+    try:
+        local_data = pd.read_csv(
+            csv_path,
+            index_col=0,
+            parse_dates=True
+        )
+    except Exception as exc:
+        print(
+            f"⚠️ 讀取 {csv_path} 失敗："
+            f"{type(exc).__name__}: {exc}"
+        )
+        return pd.DataFrame()
+
+    return clean_ohlcv_dataframe(
+        local_data
+    )
+
+
+def merge_ohlcv_history(
+    local_df,
+    new_frames,
+    max_rows=TPEX_MAX_ROWS
+):
+    """
+    合併本地 CSV 與新抓到的資料：同一天以新資料為準，
+    但新資料沒有成交量（0）時保留舊的成交量。
+    """
+    frames = [
+        frame
+        for frame in new_frames
+        if frame is not None
+        and not frame.empty
+    ]
+
+    local_df = (
+        local_df
+        if local_df is not None
+        else pd.DataFrame()
+    )
+
+    if not frames:
+        return clean_ohlcv_dataframe(
+            local_df
+        ).tail(max_rows)
+
+    new_df = clean_ohlcv_dataframe(
+        pd.concat(frames)
+    )
+
+    if not local_df.empty and not new_df.empty:
+        old_volume = local_df["Volume"].reindex(
+            new_df.index
+        )
+
+        keep_old = (
+            (new_df["Volume"] <= 0)
+            & (old_volume.fillna(0) > 0)
+        )
+
+        new_df.loc[
+            keep_old,
+            "Volume"
+        ] = old_volume[keep_old]
+
+    combined = clean_ohlcv_dataframe(
+        pd.concat(
+            [
+                local_df,
+                new_df
+            ]
+        )
+    )
+
+    combined.index.name = "Date"
+
+    return combined.tail(max_rows)
+
+
+def plan_tpex_months(
+    local_df,
+    today=None,
+    bootstrap_months=TPEX_BOOTSTRAP_MONTHS
+):
+    """
+    決定要抓哪些月份（新到舊）：
+    1. 最後一根 K 線所在月份到本月（每日更新只會是本月，月初多一個上月）。
+    2. 近 bootstrap_months 個月內本地完全沒有資料的月份（初次建檔或補洞）。
+    """
+    today = pd.Timestamp(
+        today or datetime.now()
+    ).normalize()
+
+    current = (today.year, today.month)
+
+    def shift(year_month, offset):
+        index = (
+            year_month[0] * 12
+            + year_month[1] - 1
+            + offset
+        )
+        return (index // 12, index % 12 + 1)
+
+    window = [
+        shift(current, -offset)
+        for offset in range(
+            bootstrap_months
+        )
+    ]
+
+    existing = set()
+    last_month = None
+
+    if local_df is not None and not local_df.empty:
+        existing = {
+            (stamp.year, stamp.month)
+            for stamp in local_df.index
+        }
+
+        last_stamp = local_df.index.max()
+        last_month = (
+            last_stamp.year,
+            last_stamp.month
+        )
+
+    months = []
+
+    if last_month is not None:
+        cursor = current
+
+        while cursor >= last_month:
+            months.append(cursor)
+            cursor = shift(cursor, -1)
+
+    for year_month in window:
+        if (
+            year_month not in existing
+            and year_month not in months
+        ):
+            months.append(year_month)
+
+    return months
+
+
+def write_ohlcv_csv_atomic(df, csv_path):
+    directory = os.path.dirname(csv_path) or "."
+
+    os.makedirs(directory, exist_ok=True)
+
+    output = df[
+        [
+            "Open",
+            "High",
+            "Low",
+            "Close",
+            "Volume"
+        ]
+    ].copy()
+
+    output.index.name = "Date"
+
+    file_descriptor, tmp_path = tempfile.mkstemp(
+        prefix=".tmp-",
+        suffix=".csv",
+        dir=directory
+    )
+
+    try:
+        with os.fdopen(
+            file_descriptor,
+            "w",
+            encoding="utf-8",
+            newline=""
+        ) as file:
+            output.to_csv(
+                file,
+                date_format="%Y-%m-%d"
+            )
+
+        os.replace(tmp_path, csv_path)
+
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
+
+
+def update_tpex_otc_index_history(
+    data_dir=DATA_DIR,
+    today=None,
+    sleep=time.sleep
+):
+    """
+    更新 data/^TWOII.csv（Date,Open,High,Low,Close,Volume）。
+    每日只抓本月（月初多抓上月）；第一次執行回補約 42 個月。
+    任何失敗都只記錄，不會拋出；回傳最新的完整歷史 DataFrame。
+    """
+    csv_path = os.path.join(
+        data_dir,
+        f"{TPEX_OTC_SYMBOL}.csv"
+    )
+
+    local_df = load_ohlcv_csv(csv_path)
+
+    months = plan_tpex_months(
+        local_df,
+        today=today
+    )
+
+    if len(months) > TPEX_MAX_MONTH_REQUESTS:
+        print(
+            f"ℹ️ TPEx 需要 {len(months)} 個月份，"
+            f"本次先抓 {TPEX_MAX_MONTH_REQUESTS} 個"
+        )
+        months = months[:TPEX_MAX_MONTH_REQUESTS]
+
+    print(
+        f"🏦 TPEx 櫃買指數：本地 {len(local_df)} 筆，"
+        f"本次抓取 {len(months)} 個月份"
+    )
+
+    current_month = months[0] if months else None
+    new_frames = []
+    consecutive_failures = 0
+
+    for request_index, (year, month) in enumerate(
+        months
+    ):
+        if request_index > 0:
+            sleep(TPEX_REQUEST_DELAY)
+
+        try:
+            month_df = fetch_tpex_otc_index_month(
+                year,
+                month,
+                sleep=sleep
+            )
+
+        except Exception as exc:
+            # 本月月初（尚未開盤）沒有資料是正常的，不計入失敗
+            if (year, month) == current_month:
+                print(
+                    f"ℹ️ TPEx 本月 {year}/{month:02d} "
+                    f"尚無資料：{exc}"
+                )
+                continue
+
+            consecutive_failures += 1
+
+            if (
+                consecutive_failures
+                >= TPEX_MAX_CONSECUTIVE_FAILURES
+            ):
+                print(
+                    "❌ TPEx 連續失敗 "
+                    f"{consecutive_failures} 次，"
+                    "停止本次抓取"
+                )
+                break
+
+            continue
+
+        consecutive_failures = 0
+
+        if not TPEX_RUNTIME["trading_disabled"]:
+            sleep(TPEX_REQUEST_DELAY)
+
+            try:
+                volume_series = (
+                    fetch_tpex_otc_volume_month(
+                        year,
+                        month,
+                        sleep=sleep
+                    )
+                )
+
+                month_df["Volume"] = (
+                    volume_series
+                    .reindex(month_df.index)
+                    .fillna(0.0)
+                    .astype(float)
+                )
+
+            except Exception as exc:
+                # 成交量為選用資料，失敗一次就不再嘗試
+                TPEX_RUNTIME["trading_disabled"] = True
+
+                print(
+                    "⚠️ TPEx 成交量值無法取得，"
+                    "本次 Volume 以 0 記錄："
+                    f"{type(exc).__name__}: {exc}"
+                )
+
+        print(
+            f"✅ TPEx 櫃買指數 {year}/{month:02d}："
+            f"{len(month_df)} 筆，最後 "
+            f"{month_df.index[-1]:%Y-%m-%d} "
+            f"收 {month_df['Close'].iloc[-1]:,.2f}"
+        )
+
+        new_frames.append(month_df)
+
+    merged = merge_ohlcv_history(
+        local_df,
+        new_frames
+    )
+
+    if new_frames and not merged.empty:
+        try:
+            write_ohlcv_csv_atomic(
+                merged,
+                csv_path
+            )
+
+            print(
+                f"💾 {csv_path} 已更新："
+                f"{len(merged)} 筆，最新 "
+                f"{merged.index[-1]:%Y-%m-%d}"
+            )
+
+        except Exception as exc:
+            print(
+                f"❌ 寫入 {csv_path} 失敗："
+                f"{type(exc).__name__}: {exc}"
+            )
+
+    elif not new_frames:
+        print(
+            "⚠️ TPEx 本次沒有取得新資料，"
+            "沿用本地 CSV"
+        )
+
+    TPEX_RUNTIME["history"] = merged
+    TPEX_RUNTIME["history_loaded"] = True
+
+    return merged
+
+
+def get_tpex_otc_full_history(data_dir=DATA_DIR):
+    """回傳完整的 ^TWOII 歷史（不檢查新舊）。"""
+    if not TPEX_RUNTIME["history_loaded"]:
+        TPEX_RUNTIME["history"] = load_ohlcv_csv(
+            os.path.join(
+                data_dir,
+                f"{TPEX_OTC_SYMBOL}.csv"
+            )
+        )
+        TPEX_RUNTIME["history_loaded"] = True
+
+    history = TPEX_RUNTIME["history"]
+
+    if history is None:
+        return pd.DataFrame()
+
+    return history
+
+
+def get_tpex_otc_history(now=None):
+    """
+    回傳可用於分析的 ^TWOII 歷史；
+    沒有資料或最後一根 K 線超過 TPEX_STALE_DAYS 天時回傳空表，
+    呼叫端會改回原本的 Yahoo 流程。
+    """
+    history = get_tpex_otc_full_history()
+
+    if history.empty:
+        return pd.DataFrame()
+
+    now = pd.Timestamp(now or datetime.now())
+    age_days = (now - history.index[-1]).days
+
+    if age_days > TPEX_STALE_DAYS:
+        print(
+            "⚠️ TPEx 櫃買指數資料已過期"
+            f"（最後 {history.index[-1]:%Y-%m-%d}），"
+            "改用 Yahoo"
+        )
+        return pd.DataFrame()
+
+    return history
+
+
+def download_index_history(
+    ticker,
+    **yf_kwargs
+):
+    """
+    指數日 K 下載入口：
+    - ^TWOII 有新鮮的櫃買中心資料時直接使用；
+    - 其他指數（或 TPEx 不可用時）照舊呼叫 yf.download(ticker, **yf_kwargs)。
+    下載結果會清理後存入 INDEX_HISTORY_CACHE，供報告 JSON 讀取收盤、漲跌與均線。
+    """
+    normalized_ticker = str(
+        ticker
+    ).strip().upper()
+
+    if normalized_ticker == TPEX_OTC_SYMBOL:
+        try:
+            tpex_df = get_tpex_otc_history()
+        except Exception as exc:
+            print(
+                "⚠️ 讀取 TPEx 櫃買指數失敗："
+                f"{type(exc).__name__}: {exc}"
+            )
+            tpex_df = pd.DataFrame()
+
+        if not tpex_df.empty:
+            INDEX_HISTORY_CACHE[
+                normalized_ticker
+            ] = {
+                "df": tpex_df.copy(),
+                "source": "TPEx"
+            }
+
+            return tpex_df.copy()
+
+    downloaded = yf.download(
+        ticker,
+        **yf_kwargs
+    )
+
+    try:
+        INDEX_HISTORY_CACHE[
+            normalized_ticker
+        ] = {
+            "df": clean_ohlcv_dataframe(
+                extract_yfinance_data(
+                    downloaded,
+                    ticker
+                )
+            ),
+            "source": "Yahoo"
+        }
+    except Exception:
+        pass
+
+    return downloaded
+
+
+# =========================================================================
+# Atlas 報告 JSON：docs/report/latest.json 與 docs/report/series/*.json
+# =========================================================================
+
+# LINE 訊息的「亞洲市場」在 JSON 拆成日本、韓國
+REPORT_MARKETS = [
+    {
+        "key": "tw",
+        "name": "台灣",
+        "flag": "🇹🇼"
+    },
+    {
+        "key": "jp",
+        "name": "日本",
+        "flag": "🇯🇵"
+    },
+    {
+        "key": "kr",
+        "name": "韓國",
+        "flag": "🇰🇷"
+    },
+    {
+        "key": "eu",
+        "name": "歐洲",
+        "flag": "🇪🇺"
+    },
+    {
+        "key": "us",
+        "name": "美國",
+        "flag": "🇺🇸"
+    }
+]
+
+# 只出現在 JSON 的世界指數（不加入 LINE 訊息）
+REPORT_EXTRA_INDEX_MA_LIST = [20, 60]
+
+WORLD_EXTRA_INDEX_CONFIGS = [
+    {
+        "ticker": "^HSI",
+        "name": "香港恆生指數",
+        "market": "hk"
+    },
+    {
+        "ticker": "000001.SS",
+        "name": "上證綜合指數",
+        "market": "cn"
+    },
+    {
+        "ticker": "^BSESN",
+        "name": "印度孟買SENSEX",
+        "market": "in"
+    },
+    {
+        "ticker": "^AXJO",
+        "name": "澳洲ASX 200",
+        "market": "au"
+    },
+    {
+        "ticker": "^STOXX50E",
+        "name": "歐洲斯托克50",
+        "market": "eu"
+    },
+    {
+        "ticker": "^GSPTSE",
+        "name": "加拿大S&P/TSX",
+        "market": "ca"
+    },
+    {
+        "ticker": "^BVSP",
+        "name": "巴西聖保羅指數",
+        "market": "br"
+    }
+]
+
+# LINE 指數清單中，Supabase 未啟用時在 worldIndices 顯示的名稱
+REPORT_CORE_INDEX_NAMES = {
+    "^TWII": "台灣加權指數",
+    "^TWOII": "台灣櫃買指數(OTC)",
+    "^GSPC": "美國標普500",
+    "^DJI": "美國道瓊工業",
+    "^IXIC": "美國那斯達克",
+    "^RUT": "美國羅素2000",
+    "^SOX": "美國費城半導體",
+    "^FCHI": "法國CAC40",
+    "^FTSE": "英國富時100",
+    "^GDAXI": "德國DAX",
+    "^N225": "日經225",
+    "^KS11": "韓國綜合指數"
+}
+
+REPORT_SCAN_GROUP_NAMES = {
+    "tw_all": "台股-全市場潛伏",
+    "us_all": "美股-全市場潛伏"
+}
+
+# 趨勢圖示 → bull / bear / neutral
+# 🔺 多頭趨勢中的多頭走勢、🔻 空頭趨勢中的空頭走勢、
+# 💡 多頭趨勢中的空頭走勢（回檔）、⚡ 空頭趨勢中的多頭走勢（反彈）
+INDEX_TREND_ICON_MAP = {
+    "🔺": "bull",
+    "🟢": "bull",
+    "📈": "bull",
+    "🔻": "bear",
+    "🔴": "bear",
+    "📉": "bear",
+    "💡": "neutral",
+    "⚡": "neutral",
+    "🟡": "neutral"
+}
+
+
+def round_report_number(value, digits=2):
+    number = safe_float(value, None)
+
+    if number is None:
+        return None
+
+    if number != 0 and abs(number) < 1:
+        digits = max(digits, 4)
+
+    return round(number, digits)
+
+
+def parse_index_trend_text(text):
+    """
+    從 analyze_index_trend 的 LINE 文字讀出結構化欄位，不重算趨勢。
+    例：
+        🔺 台灣加權指數
+           ├ 均線: 看多 (3/3MA - 23/29/62)
+           └  多頭趨勢中的多頭走勢
+    失敗時的單行文字（⚪ 名稱: 數據不足無法分析）→ trend=unknown。
+    """
+    text = str(text or "").strip()
+
+    result = {
+        "trend": "unknown",
+        "trendLabel": "",
+        "score": None,
+        "scoreMax": None,
+        "scoreLabel": None,
+        "macroTrend": None,
+        "microTrend": None
+    }
+
+    if not text:
+        return result
+
+    lines = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip()
+    ]
+
+    first_line = lines[0]
+    icon = first_line.split(" ", 1)[0]
+
+    if len(lines) == 1:
+        message = (
+            first_line.split(":", 1)[1].strip()
+            if ":" in first_line
+            else first_line
+        )
+
+        result["trendLabel"] = (
+            f"{icon} {message}".strip()
+        )
+        return result
+
+    status_text = re.sub(
+        r"^[├└│\s]+",
+        "",
+        lines[-1]
+    ).strip()
+
+    result["trendLabel"] = (
+        f"{icon} {status_text}".strip()
+    )
+
+    score_match = re.search(
+        r"均線[:：]\s*(\S+)\s*\((-?\d+)\s*/\s*(\d+)\s*MA",
+        text
+    )
+
+    if score_match:
+        result["scoreLabel"] = score_match.group(1)
+        result["score"] = int(score_match.group(2))
+        result["scoreMax"] = int(score_match.group(3))
+
+    phase_match = re.search(
+        r"(多頭|空頭)趨勢中的(多頭|空頭)走勢",
+        text
+    )
+
+    if phase_match:
+        result["macroTrend"] = (
+            "bull"
+            if phase_match.group(1) == "多頭"
+            else "bear"
+        )
+        result["microTrend"] = (
+            "bull"
+            if phase_match.group(2) == "多頭"
+            else "bear"
+        )
+
+    if icon in INDEX_TREND_ICON_MAP:
+        result["trend"] = INDEX_TREND_ICON_MAP[icon]
+
+    elif result["macroTrend"]:
+        result["trend"] = (
+            result["macroTrend"]
+            if result["macroTrend"]
+            == result["microTrend"]
+            else "neutral"
+        )
+
+    elif "多頭" in status_text and "空頭" not in status_text:
+        result["trend"] = "bull"
+
+    elif "空頭" in status_text and "多頭" not in status_text:
+        result["trend"] = "bear"
+
+    else:
+        result["trend"] = "neutral"
+
+    return result
+
+
+def build_index_snapshot(ticker, ma_list):
+    """從 INDEX_HISTORY_CACHE 讀出收盤、漲跌幅、均線值與日期。"""
+    cached = INDEX_HISTORY_CACHE.get(
+        str(ticker).strip().upper()
+    ) or {}
+
+    df = cached.get("df")
+
+    snapshot = {
+        "close": None,
+        "changePct": None,
+        "maValues": {},
+        "asOf": None,
+        "source": cached.get("source")
+    }
+
+    if df is None or df.empty:
+        return snapshot
+
+    close_series = df["Close"].dropna()
+
+    if close_series.empty:
+        return snapshot
+
+    latest_close = safe_float(
+        close_series.iloc[-1],
+        None
+    )
+
+    snapshot["close"] = round_report_number(
+        latest_close
+    )
+
+    snapshot["asOf"] = (
+        pd.Timestamp(
+            close_series.index[-1]
+        ).strftime("%Y-%m-%d")
+    )
+
+    if len(close_series) >= 2:
+        previous_close = safe_float(
+            close_series.iloc[-2],
+            None
+        )
+
+        if previous_close:
+            snapshot["changePct"] = round(
+                (latest_close / previous_close - 1)
+                * 100,
+                2
+            )
+
+    for ma_window in ma_list:
+        if len(close_series) < ma_window:
+            continue
+
+        snapshot["maValues"][
+            str(ma_window)
+        ] = round_report_number(
+            close_series.tail(ma_window).mean()
+        )
+
+    return snapshot
+
+
+def build_index_status(
+    ticker,
+    name,
+    market,
+    ma_list,
+    line_text,
+    configured=True
+):
+    ma_list = [
+        int(value)
+        for value in ma_list
+    ]
+
+    snapshot = build_index_snapshot(
+        ticker,
+        ma_list
+    )
+
+    parsed = parse_index_trend_text(
+        line_text
+    )
+
+    return {
+        "symbol": ticker,
+        "name": name,
+        "market": market,
+        "maList": ma_list,
+        "close": snapshot["close"],
+        "changePct": snapshot["changePct"],
+        "trend": parsed["trend"],
+        "trendLabel": parsed["trendLabel"],
+        "score": parsed["score"],
+        "scoreMax": parsed["scoreMax"],
+        "scoreLabel": parsed["scoreLabel"],
+        "macroTrend": parsed["macroTrend"],
+        "microTrend": parsed["microTrend"],
+        "maValues": snapshot["maValues"],
+        "asOf": snapshot["asOf"],
+        "source": snapshot["source"],
+        "configured": bool(configured),
+        "lineText": str(line_text or "")
+    }
+
+
+def analyze_index_for_report(
+    ticker,
+    name,
+    ma_list
+):
+    """JSON 專用的額外指數分析；任何錯誤只影響該指數。"""
+    try:
+        return analyze_index_trend(
+            ticker,
+            name,
+            ma_list
+        )
+    except Exception as exc:
+        print(
+            f"⚠️ {ticker} 報告指數分析失敗："
+            f"{type(exc).__name__}: {exc}"
+        )
+        return f"⚪ {name}: 分析發生異常"
+
+
+def build_report_indices(
+    index_map,
+    market_tickers,
+    captured_index_lines,
+    market_line_texts,
+    extra_index_configs=None,
+    analyze=analyze_index_for_report
+):
+    """
+    回傳 (markets, world_indices)。
+    markets 與 LINE 指數訊息一致（只含 Supabase 啟用的指數）；
+    world_indices 另外加上：其他已啟用的 index_configs、
+    LINE 清單中未啟用的指數（configured=false，預設 MA）、
+    以及 WORLD_EXTRA_INDEX_CONFIGS。
+    """
+    if extra_index_configs is None:
+        extra_index_configs = (
+            WORLD_EXTRA_INDEX_CONFIGS
+        )
+
+    markets = []
+    world_indices = []
+    seen = set()
+
+    for market_meta in REPORT_MARKETS:
+        market_key = market_meta["key"]
+        statuses = []
+
+        for raw_ticker in market_tickers.get(
+            market_key,
+            []
+        ):
+            ticker = str(raw_ticker).strip().upper()
+            item = index_map.get(ticker)
+
+            if not item:
+                continue
+
+            name = item.get("name", ticker)
+            ma_list = get_ma_list_from_item(item)
+
+            line_text = captured_index_lines.get(
+                ticker
+            )
+
+            if line_text is None:
+                line_text = analyze(
+                    ticker,
+                    name,
+                    ma_list
+                )
+
+            try:
+                status = build_index_status(
+                    ticker,
+                    name,
+                    market_key,
+                    ma_list,
+                    line_text
+                )
+            except Exception as exc:
+                print(
+                    f"⚠️ {ticker} 報告指數整理失敗："
+                    f"{type(exc).__name__}: {exc}"
+                )
+                continue
+
+            statuses.append(status)
+            world_indices.append(status)
+            seen.add(ticker)
+
+        markets.append(
+            {
+                "key": market_key,
+                "name": market_meta["name"],
+                "flag": market_meta["flag"],
+                "lineText": str(
+                    market_line_texts.get(
+                        market_key,
+                        ""
+                    )
+                ),
+                "indices": statuses
+            }
+        )
+
+    ticker_market = {
+        str(ticker).strip().upper(): market_key
+        for market_key, tickers in (
+            market_tickers.items()
+        )
+        for ticker in tickers
+    }
+
+    pending = []
+
+    # 其他已啟用、但不在 LINE 清單的 index_configs
+    for ticker, item in index_map.items():
+        if ticker in seen:
+            continue
+
+        pending.append(
+            (
+                ticker,
+                item.get("name", ticker),
+                ticker_market.get(
+                    ticker,
+                    "world"
+                ),
+                get_ma_list_from_item(item),
+                True
+            )
+        )
+
+    # LINE 清單中 Supabase 未啟用的指數（只供比較）
+    for ticker, market_key in ticker_market.items():
+        if ticker in seen or ticker in index_map:
+            continue
+
+        pending.append(
+            (
+                ticker,
+                REPORT_CORE_INDEX_NAMES.get(
+                    ticker,
+                    ticker
+                ),
+                market_key,
+                list(REPORT_EXTRA_INDEX_MA_LIST),
+                False
+            )
+        )
+
+    for config in extra_index_configs:
+        ticker = str(
+            config.get("ticker", "")
+        ).strip().upper()
+
+        if not ticker:
+            continue
+
+        pending.append(
+            (
+                ticker,
+                config.get("name", ticker),
+                config.get("market", "world"),
+                list(
+                    config.get("ma_list")
+                    or REPORT_EXTRA_INDEX_MA_LIST
+                ),
+                False
+            )
+        )
+
+    for (
+        ticker,
+        name,
+        market_key,
+        ma_list,
+        configured
+    ) in pending:
+        if ticker in seen:
+            continue
+
+        seen.add(ticker)
+
+        try:
+            line_text = analyze(
+                ticker,
+                name,
+                ma_list
+            )
+
+            world_indices.append(
+                build_index_status(
+                    ticker,
+                    name,
+                    market_key,
+                    ma_list,
+                    line_text,
+                    configured=configured
+                )
+            )
+
+        except Exception as exc:
+            print(
+                f"⚠️ {ticker} 世界指數失敗："
+                f"{type(exc).__name__}: {exc}"
+            )
+
+    return markets, world_indices
+
+
+def _chart_last_ma_values(chart_data):
+    candles = chart_data.get("candles") or []
+
+    if not candles:
+        return {}
+
+    last_time = candles[-1].get("time")
+    values = {}
+
+    for ma_config in (
+        chart_data.get("moving_averages") or []
+    ):
+        points = ma_config.get("data") or []
+
+        if (
+            not points
+            or points[-1].get("time") != last_time
+        ):
+            continue
+
+        window = safe_int(
+            ma_config.get("window")
+        )
+
+        if window is None:
+            continue
+
+        values[str(window)] = round_report_number(
+            points[-1].get("value")
+        )
+
+    return values
+
+
+def _chart_close_change(chart_data):
+    candles = chart_data.get("candles") or []
+
+    close_value = safe_float(
+        chart_data.get("latest_close"),
+        None
+    )
+
+    if close_value is None and candles:
+        close_value = safe_float(
+            candles[-1].get("close"),
+            None
+        )
+
+    change_pct = None
+
+    if len(candles) >= 2 and close_value is not None:
+        previous_close = safe_float(
+            candles[-2].get("close"),
+            None
+        )
+
+        if previous_close:
+            change_pct = round(
+                (close_value / previous_close - 1)
+                * 100,
+                2
+            )
+
+    as_of = (
+        candles[-1].get("time")
+        if candles
+        else None
+    )
+
+    return (
+        round_report_number(close_value),
+        change_pct,
+        as_of
+    )
+
+
+def _strip_title_parentheses(text):
+    text = str(text or "").strip()
+
+    if text.startswith("(") and text.endswith(")"):
+        text = text[1:-1].strip()
+
+    return text
+
+
+def build_report_group_item(item, market):
+    chart_data = item.get("chart_data") or {}
+
+    symbol = str(
+        item.get("ticker")
+        or chart_data.get("ticker")
+        or ""
+    ).strip().upper()
+
+    name = str(
+        item.get("name")
+        or chart_data.get("display_name")
+        or ""
+    ).strip()
+
+    if not name and (
+        symbol.endswith(".TW")
+        or symbol.endswith(".TWO")
+    ):
+        name = get_tw_stock_name(symbol)
+
+    ma_list = [
+        int(value)
+        for value in (
+            item.get("ma_list")
+            or [
+                ma_config.get("window")
+                for ma_config in (
+                    chart_data.get(
+                        "moving_averages"
+                    )
+                    or []
+                )
+                if safe_int(
+                    ma_config.get("window")
+                )
+            ]
+            or [20]
+        )
+    ]
+
+    (
+        close_value,
+        change_pct,
+        as_of
+    ) = _chart_close_change(chart_data)
+
+    return {
+        "symbol": symbol,
+        "name": name,
+        "maList": ma_list,
+        "close": close_value,
+        "changePct": change_pct,
+        "maValues": _chart_last_ma_values(
+            chart_data
+        ),
+        "note": _strip_title_parentheses(
+            chart_data.get("title_suffix")
+        ),
+        "volume": int(
+            safe_float(item.get("volume"), 0)
+        ),
+        "asOf": as_of
+    }
+
+
+def build_report_groups(
+    data_dict,
+    group_metadata,
+    display_order
+):
+    groups = []
+
+    for group_key in display_order:
+        if group_key in {"indices", "sectors"}:
+            continue
+
+        metadata = group_metadata.get(
+            group_key,
+            {}
+        )
+
+        market = str(
+            metadata.get("market")
+            or (
+                "tw"
+                if group_key.startswith("tw_")
+                else "us"
+                if group_key.startswith("us_")
+                else ""
+            )
+        ).upper()
+
+        if group_key in REPORT_SCAN_GROUP_NAMES:
+            kind = "scan"
+        elif (
+            group_key.startswith("custom_")
+            or metadata.get("is_custom")
+        ):
+            kind = "custom"
+        else:
+            kind = "fixed"
+
+        name = normalize_group_name(
+            metadata.get("name")
+            or REPORT_SCAN_GROUP_NAMES.get(
+                group_key
+            )
+            or group_key
+        )
+
+        items = []
+
+        for item in data_dict.get(
+            group_key,
+            []
+        ) or []:
+            try:
+                items.append(
+                    build_report_group_item(
+                        item,
+                        market
+                    )
+                )
+            except Exception as exc:
+                print(
+                    f"⚠️ {group_key} 報告項目略過："
+                    f"{type(exc).__name__}: {exc}"
+                )
+
+        group_ma_list = [
+            int(value)
+            for value in (
+                metadata.get("ma_list")
+                or [20]
+            )
+        ]
+
+        groups.append(
+            {
+                "key": group_key,
+                "name": name,
+                "market": market,
+                "kind": kind,
+                "maList": group_ma_list,
+                "count": len(items),
+                "items": items
+            }
+        )
+
+    return groups
+
+
+def build_report_sectors(sector_items):
+    sectors = []
+
+    for item in sorted(
+        sector_items or [],
+        key=lambda value: safe_int(
+            value.get("rank"),
+            9999
+        )
+    ):
+        chart_data = item.get("chart_data") or {}
+        candles = chart_data.get("candles") or []
+
+        sectors.append(
+            {
+                "symbol": item.get("ticker"),
+                "name": item.get("name"),
+                "trend": item.get("trend_status"),
+                "status": item.get("volume_status"),
+                "rank": safe_int(item.get("rank")),
+                "changePct": round_report_number(
+                    item.get("return_1w")
+                ),
+                "return4w": round_report_number(
+                    item.get("return_4w")
+                ),
+                "return13w": round_report_number(
+                    item.get("return_13w")
+                ),
+                "relativeStrength13w": (
+                    round_report_number(
+                        item.get(
+                            "relative_strength_13w"
+                        )
+                    )
+                ),
+                "momentumScore": round_report_number(
+                    item.get("momentum_score")
+                ),
+                "strength": item.get(
+                    "strength_group"
+                ),
+                "strengthLabel": item.get(
+                    "strength_label"
+                ),
+                "close": round_report_number(
+                    item.get("latest_close")
+                ),
+                "volumeChangePct": round_report_number(
+                    item.get("volume_change_pct")
+                ),
+                "timeframe": "1W",
+                "maList": [
+                    int(value)
+                    for value in (
+                        item.get("ma_list")
+                        or SECTOR_WEEKLY_MA_LIST
+                    )
+                ],
+                "maValues": _chart_last_ma_values(
+                    chart_data
+                ),
+                "asOf": (
+                    candles[-1].get("time")
+                    if candles
+                    else None
+                )
+            }
+        )
+
+    return sectors
+
+
+def build_report_payload(
+    report_date,
+    data_dict,
+    group_metadata,
+    display_order,
+    index_map,
+    market_tickers,
+    captured_index_lines,
+    market_line_texts,
+    line_messages,
+    generated_at=None,
+    extra_index_configs=None,
+    analyze=analyze_index_for_report
+):
+    generated_at = generated_at or (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+    )
+
+    markets, world_indices = build_report_indices(
+        index_map,
+        market_tickers,
+        captured_index_lines,
+        market_line_texts,
+        extra_index_configs=extra_index_configs,
+        analyze=analyze
+    )
+
+    return {
+        "version": REPORT_JSON_VERSION,
+        "generatedAt": generated_at,
+        "reportDate": report_date,
+        "markets": markets,
+        "worldIndices": world_indices,
+        "lineMessages": {
+            "index": line_messages.get("index"),
+            "sectors": line_messages.get("sectors"),
+            "stocks": line_messages.get("stocks")
+        },
+        "groups": build_report_groups(
+            data_dict,
+            group_metadata,
+            display_order
+        ),
+        "sectors": build_report_sectors(
+            data_dict.get("sectors")
+        )
+    }
+
+
+def _json_default(value):
+    if hasattr(value, "item"):
+        return value.item()
+
+    if isinstance(value, pd.Timestamp):
+        return value.strftime("%Y-%m-%d")
+
+    return str(value)
+
+
+def write_json_atomic(path, payload):
+    """寫到同目錄暫存檔後 os.replace，避免網站讀到寫到一半的檔案。"""
+    directory = os.path.dirname(path) or "."
+
+    os.makedirs(directory, exist_ok=True)
+
+    file_descriptor, tmp_path = tempfile.mkstemp(
+        prefix=".tmp-",
+        suffix=".json",
+        dir=directory
+    )
+
+    try:
+        with os.fdopen(
+            file_descriptor,
+            "w",
+            encoding="utf-8"
+        ) as file:
+            json.dump(
+                clean_json_value(payload),
+                file,
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+                default=_json_default
+            )
+
+        os.replace(tmp_path, path)
+
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
+
+    return path
+
+
+def write_report_json(
+    payload,
+    report_dir=REPORT_DIR
+):
+    path = os.path.join(
+        report_dir,
+        "latest.json"
+    )
+
+    write_json_atomic(path, payload)
+
+    print(
+        f"✅ Atlas 報告 JSON 已產生：{path}"
+        f"（{os.path.getsize(path) / 1024:,.1f} KB）"
+    )
+
+    return path
+
+
+def build_series_payload(
+    symbol,
+    df,
+    name,
+    source,
+    interval="1D",
+    as_of=None
+):
+    df = clean_ohlcv_dataframe(df)
+
+    bars = []
+
+    for stamp, row in df.iterrows():
+        open_value = safe_float(row["Open"], None)
+        high_value = safe_float(row["High"], None)
+        low_value = safe_float(row["Low"], None)
+        close_value = safe_float(row["Close"], None)
+
+        if (
+            None in (
+                open_value,
+                high_value,
+                low_value,
+                close_value
+            )
+            or min(
+                open_value,
+                high_value,
+                low_value,
+                close_value
+            ) <= 0
+        ):
+            continue
+
+        volume = safe_float(row["Volume"], 0.0)
+
+        bars.append(
+            {
+                "time": int(
+                    pd.Timestamp(
+                        stamp.year,
+                        stamp.month,
+                        stamp.day,
+                        tz="UTC"
+                    ).timestamp()
+                ),
+                "open": round_report_number(
+                    open_value,
+                    4
+                ),
+                "high": round_report_number(
+                    max(
+                        high_value,
+                        open_value,
+                        close_value
+                    ),
+                    4
+                ),
+                "low": round_report_number(
+                    min(
+                        low_value,
+                        open_value,
+                        close_value
+                    ),
+                    4
+                ),
+                "close": round_report_number(
+                    close_value,
+                    4
+                ),
+                "volume": (
+                    int(volume)
+                    if float(volume).is_integer()
+                    else round(volume, 2)
+                )
+            }
+        )
+
+    return {
+        "symbol": symbol,
+        "name": name,
+        "source": source,
+        "interval": interval,
+        "asOf": int(
+            as_of
+            if as_of is not None
+            else time.time()
+        ),
+        "bars": bars
+    }
+
+
+def write_report_series(
+    symbol,
+    df,
+    name,
+    source,
+    interval="1D",
+    series_dir=REPORT_SERIES_DIR,
+    as_of=None
+):
+    """
+    寫出 docs/report/series/<SYMBOL>.json（原始代號，例如 ^TWOII.json），
+    並更新 series/index.json 的 symbols 清單。
+    """
+    payload = build_series_payload(
+        symbol,
+        df,
+        name,
+        source,
+        interval=interval,
+        as_of=as_of
+    )
+
+    if not payload["bars"]:
+        print(
+            f"⚠️ {symbol} 沒有可用 K 線，"
+            "不寫出 series JSON"
+        )
+        return None
+
+    path = os.path.join(
+        series_dir,
+        f"{symbol}.json"
+    )
+
+    write_json_atomic(path, payload)
+
+    index_path = os.path.join(
+        series_dir,
+        "index.json"
+    )
+
+    symbols = {symbol}
+
+    try:
+        with open(
+            index_path,
+            encoding="utf-8"
+        ) as file:
+            symbols.update(
+                json.load(file).get(
+                    "symbols",
+                    []
+                )
+            )
+    except (OSError, ValueError, AttributeError):
+        pass
+
+    symbols = sorted(
+        value
+        for value in symbols
+        if isinstance(value, str)
+        and os.path.exists(
+            os.path.join(
+                series_dir,
+                f"{value}.json"
+            )
+        )
+    )
+
+    write_json_atomic(
+        index_path,
+        {"symbols": symbols}
+    )
+
+    print(
+        f"✅ series JSON 已產生：{path}"
+        f"（{len(payload['bars'])} 根）"
+    )
+
+    return path
+
+
+def write_tpex_otc_series():
+    history = get_tpex_otc_full_history()
+
+    if history.empty:
+        print(
+            "⚠️ 沒有 TPEx 櫃買指數歷史，"
+            "略過 series JSON"
+        )
+        return None
+
+    return write_report_series(
+        TPEX_OTC_SYMBOL,
+        history,
+        TPEX_OTC_NAME,
+        TPEX_SOURCE_LABEL
+    )
 
 
 # =========================================================================
@@ -8396,8 +10859,18 @@ def append_index_market_report(
     lines,
     market_title,
     tickers,
-    index_map
+    index_map,
+    captured_lines=None
 ):
+    """
+    將單一市場的指數分析加入 LINE 訊息 lines。
+
+    captured_lines（選用 dict）會收到「ticker → 該指數的分析文字」，
+    供 Atlas 報告 JSON 使用；傳入與否都不會改變 lines 的內容。
+    回傳本次加入 lines 的區塊（list）。
+    """
+    block_start = len(lines)
+
     lines.append(market_title)
 
     found_count = 0
@@ -8416,18 +10889,23 @@ def append_index_market_report(
 
         found_count += 1
 
-        lines.append(
-            analyze_index_trend(
-                normalized_ticker,
-                item.get(
-                    "name",
-                    normalized_ticker
-                ),
-                get_ma_list_from_item(
-                    item
-                )
+        index_line = analyze_index_trend(
+            normalized_ticker,
+            item.get(
+                "name",
+                normalized_ticker
+            ),
+            get_ma_list_from_item(
+                item
             )
         )
+
+        if captured_lines is not None:
+            captured_lines[
+                normalized_ticker
+            ] = index_line
+
+        lines.append(index_line)
 
     if found_count == 0:
         lines.append(
@@ -8435,6 +10913,8 @@ def append_index_market_report(
         )
 
     lines.append("")
+
+    return lines[block_start:]
 
 
 # =========================================================================
@@ -8542,6 +11022,22 @@ def main():
         us_tickers,
         min_volume=US_MIN_VOLUME
     )
+
+    # -----------------------------------------------------------------
+    # 櫃買指數（^TWOII）：更新櫃買中心官方日資料
+    # 失敗時 ^TWOII 會自動退回原本的 Yahoo 流程
+    # -----------------------------------------------------------------
+    print(
+        "🏦 開始更新櫃買指數（TPEx）"
+    )
+
+    try:
+        update_tpex_otc_index_history()
+    except Exception as exc:
+        print(
+            "❌ TPEx 櫃買指數更新失敗："
+            f"{type(exc).__name__}: {exc}"
+        )
 
     # -----------------------------------------------------------------
     # 全球大盤圖表
@@ -8692,14 +11188,21 @@ def main():
     )
 
     # -----------------------------------------------------------------
-    # 產生 GitHub Pages HTML
+    # 產生 GitHub Pages HTML（舊版 24 MB 報告，預設關閉）
+    # 新網站改讀 docs/report/latest.json；設定 LEGACY_HTML_REPORT=1 才產生
     # -----------------------------------------------------------------
-    generate_html(
-        data_dict,
-        today_str,
-        sector_summary=sector_summary,
-        group_metadata=group_metadata
-    )
+    if LEGACY_HTML_REPORT:
+        generate_html(
+            data_dict,
+            today_str,
+            sector_summary=sector_summary,
+            group_metadata=group_metadata
+        )
+    else:
+        print(
+            "⏭️ 未啟用 LEGACY_HTML_REPORT，"
+            "略過舊版 docs/index.html"
+        )
 
     # -----------------------------------------------------------------
     # 報告與控制台網址
@@ -8813,6 +11316,9 @@ def main():
         db_index_configs
     )
 
+    # 每個指數的 LINE 分析文字，供 Atlas 報告 JSON 使用
+    captured_index_lines = {}
+
     index_lines = [
         (
             f"🌍 {today_str} "
@@ -8827,36 +11333,44 @@ def main():
         ""
     ]
 
-    append_index_market_report(
+    tw_index_block = append_index_market_report(
         index_lines,
         "【 🇹🇼 台灣市場 】",
         tw_indices,
-        index_map
+        index_map,
+        captured_lines=captured_index_lines
     )
 
-    append_index_market_report(
+    us_index_block = append_index_market_report(
         index_lines,
         "【 🇺🇸 美國市場 】",
         us_indices,
-        index_map
+        index_map,
+        captured_lines=captured_index_lines
     )
 
-    append_index_market_report(
+    eu_index_block = append_index_market_report(
         index_lines,
         "【 🇪🇺 歐洲市場 】",
         eu_indices,
-        index_map
+        index_map,
+        captured_lines=captured_index_lines
     )
 
     append_index_market_report(
         index_lines,
         "【 🌏 亞洲市場 】",
         asia_indices,
-        index_map
+        index_map,
+        captured_lines=captured_index_lines
     )
 
+    index_message = "\n".join(
+        index_lines
+    ).rstrip()
+
     send_line_message(
-        "\n".join(index_lines).rstrip(),
+        index_message,
         access_token,
         line_push_user_id
     )
@@ -8864,6 +11378,8 @@ def main():
     # -----------------------------------------------------------------
     # 每週一限定類股週線輪動摘要
     # -----------------------------------------------------------------
+    sectors_message = None
+
     if weekday == 0:
         sectors_message = (
             build_sector_monday_message(
@@ -8880,7 +11396,76 @@ def main():
         )
 
     # -----------------------------------------------------------------
-    # 推送最新 HTML 與 CSV 到 GitHub Pages
+    # Atlas 報告 JSON（docs/report/latest.json）
+    # 失敗只記錄，不影響 CSV 清理與推送
+    # -----------------------------------------------------------------
+    try:
+        report_payload = build_report_payload(
+            today_str,
+            data_dict,
+            group_metadata,
+            display_order,
+            index_map,
+            {
+                "tw": tw_indices,
+                "jp": [
+                    ticker
+                    for ticker in asia_indices
+                    if ticker == "^N225"
+                ],
+                "kr": [
+                    ticker
+                    for ticker in asia_indices
+                    if ticker == "^KS11"
+                ],
+                "eu": eu_indices,
+                "us": us_indices
+            },
+            captured_index_lines,
+            {
+                "tw": "\n".join(
+                    tw_index_block
+                ).rstrip(),
+                "jp": captured_index_lines.get(
+                    "^N225",
+                    ""
+                ),
+                "kr": captured_index_lines.get(
+                    "^KS11",
+                    ""
+                ),
+                "eu": "\n".join(
+                    eu_index_block
+                ).rstrip(),
+                "us": "\n".join(
+                    us_index_block
+                ).rstrip()
+            },
+            {
+                "index": index_message,
+                "sectors": sectors_message,
+                "stocks": line_message_stocks
+            }
+        )
+
+        write_report_json(report_payload)
+
+    except Exception as exc:
+        print(
+            "❌ Atlas 報告 JSON 產生失敗："
+            f"{type(exc).__name__}: {exc}"
+        )
+
+    try:
+        write_tpex_otc_series()
+    except Exception as exc:
+        print(
+            "❌ 櫃買指數 series JSON 產生失敗："
+            f"{type(exc).__name__}: {exc}"
+        )
+
+    # -----------------------------------------------------------------
+    # 推送最新報告 JSON 與 CSV 到 GitHub Pages
     # -----------------------------------------------------------------
     prune_stale_csv()
     push_report_to_github()

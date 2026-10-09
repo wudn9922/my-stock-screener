@@ -1,0 +1,1763 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-05T17:05:00+00:00",
+  "reportDate": "2026-10-05",
+  "markets": [
+    {
+      "key": "tw",
+      "name": "台灣",
+      "flag": "🇹🇼",
+      "lineText": "【 🇹🇼 台灣市場 】\n💡 台灣加權指數\n   ├ 均線: 偏空 (-2/3MA - 23/29/61)\n   └  多頭趨勢中的空頭走勢\n💡 台灣櫃買指數(OTC)\n   ├ 均線: 看空 (-3/3MA - 20/60/120)\n   └  多頭趨勢中的空頭走勢",
+      "indices": [
+        {
+          "symbol": "^TWII",
+          "name": "台灣加權指數",
+          "market": "tw",
+          "maList": [
+            23,
+            29,
+            61
+          ],
+          "close": 498.61,
+          "changePct": 1.45,
+          "trend": "neutral",
+          "trendLabel": "💡 多頭趨勢中的空頭走勢",
+          "score": -2,
+          "scoreMax": 3,
+          "scoreLabel": "偏空",
+          "macroTrend": "bull",
+          "microTrend": "bear",
+          "maValues": {
+            "23": 502.63,
+            "29": 498.62,
+            "61": 504.64
+          },
+          "asOf": "2026-10-08",
+          "source": "Yahoo",
+          "configured": true,
+          "lineText": "💡 台灣加權指數\n   ├ 均線: 偏空 (-2/3MA - 23/29/61)\n   └  多頭趨勢中的空頭走勢"
+        },
+        {
+          "symbol": "^TWOII",
+          "name": "台灣櫃買指數(OTC)",
+          "market": "tw",
+          "maList": [
+            20,
+            60,
+            120
+          ],
+          "close": 303.07,
+          "changePct": -0.09,
+          "trend": "neutral",
+          "trendLabel": "💡 多頭趨勢中的空頭走勢",
+          "score": -3,
+          "scoreMax": 3,
+          "scoreLabel": "看空",
+          "macroTrend": "bull",
+          "microTrend": "bear",
+          "maValues": {
+            "20": 306.2,
+            "60": 309.67,
+            "120": 305.68
+          },
+          "asOf": "2026-10-08",
+          "source": "TPEx",
+          "configured": true,
+          "lineText": "💡 台灣櫃買指數(OTC)\n   ├ 均線: 看空 (-3/3MA - 20/60/120)\n   └  多頭趨勢中的空頭走勢"
+        }
+      ]
+    },
+    {
+      "key": "jp",
+      "name": "日本",
+      "flag": "🇯🇵",
+      "lineText": "💡 日經225\n   ├ 均線: 看空 (-2/2MA - 25/75)\n   └  多頭趨勢中的空頭走勢",
+      "indices": [
+        {
+          "symbol": "^N225",
+          "name": "日經225",
+          "market": "jp",
+          "maList": [
+            25,
+            75
+          ],
+          "close": 342.23,
+          "changePct": 0.55,
+          "trend": "neutral",
+          "trendLabel": "💡 多頭趨勢中的空頭走勢",
+          "score": -2,
+          "scoreMax": 2,
+          "scoreLabel": "看空",
+          "macroTrend": "bull",
+          "microTrend": "bear",
+          "maValues": {
+            "25": 357.0,
+            "75": 382.36
+          },
+          "asOf": "2026-10-08",
+          "source": "Yahoo",
+          "configured": true,
+          "lineText": "💡 日經225\n   ├ 均線: 看空 (-2/2MA - 25/75)\n   └  多頭趨勢中的空頭走勢"
+        }
+      ]
+    },
+    {
+      "key": "kr",
+      "name": "韓國",
+      "flag": "🇰🇷",
+      "lineText": "💡 韓國綜合\n   ├ 均線: 多空不明 (0/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢",
+      "indices": [
+        {
+          "symbol": "^KS11",
+          "name": "韓國綜合",
+          "market": "kr",
+          "maList": [
+            20,
+            60
+          ],
+          "close": 599.9,
+          "changePct": -1.08,
+          "trend": "neutral",
+          "trendLabel": "💡 多頭趨勢中的空頭走勢",
+          "score": 0,
+          "scoreMax": 2,
+          "scoreLabel": "多空不明",
+          "macroTrend": "bull",
+          "microTrend": "bear",
+          "maValues": {
+            "20": 603.98,
+            "60": 588.87
+          },
+          "asOf": "2026-10-08",
+          "source": "Yahoo",
+          "configured": true,
+          "lineText": "💡 韓國綜合\n   ├ 均線: 多空不明 (0/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢"
+        }
+      ]
+    },
+    {
+      "key": "eu",
+      "name": "歐洲",
+      "flag": "🇪🇺",
+      "lineText": "【 🇪🇺 歐洲市場 】\n💡 法國CAC40\n   ├ 均線: 看空 (-2/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢\n💡 德國DAX\n   ├ 均線: 看多 (3/3MA - 20/60/120)\n   └  多頭趨勢中的空頭走勢",
+      "indices": [
+        {
+          "symbol": "^FCHI",
+          "name": "法國CAC40",
+          "market": "eu",
+          "maList": [
+            20,
+            60
+          ],
+          "close": 406.71,
+          "changePct": 0.55,
+          "trend": "neutral",
+          "trendLabel": "💡 多頭趨勢中的空頭走勢",
+          "score": -2,
+          "scoreMax": 2,
+          "scoreLabel": "看空",
+          "macroTrend": "bull",
+          "microTrend": "bear",
+          "maValues": {
+            "20": 419.82,
+            "60": 426.5
+          },
+          "asOf": "2026-10-08",
+          "source": "Yahoo",
+          "configured": true,
+          "lineText": "💡 法國CAC40\n   ├ 均線: 看空 (-2/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢"
+        },
+        {
+          "symbol": "^GDAXI",
+          "name": "德國DAX",
+          "market": "eu",
+          "maList": [
+            20,
+            60,
+            120
+          ],
+          "close": 760.42,
+          "changePct": 1.12,
+          "trend": "neutral",
+          "trendLabel": "💡 多頭趨勢中的空頭走勢",
+          "score": 3,
+          "scoreMax": 3,
+          "scoreLabel": "看多",
+          "macroTrend": "bull",
+          "microTrend": "bear",
+          "maValues": {
+            "20": 728.19,
+            "60": 669.31,
+            "120": 626.19
+          },
+          "asOf": "2026-10-08",
+          "source": "Yahoo",
+          "configured": true,
+          "lineText": "💡 德國DAX\n   ├ 均線: 看多 (3/3MA - 20/60/120)\n   └  多頭趨勢中的空頭走勢"
+        }
+      ]
+    },
+    {
+      "key": "us",
+      "name": "美國",
+      "flag": "🇺🇸",
+      "lineText": "【 🇺🇸 美國市場 】\n💡 美國標普500\n   ├ 均線: 看多 (2/2MA - 23/60)\n   └  多頭趨勢中的空頭走勢\n🔺 美國道瓊工業\n   ├ 均線: 看多 (3/3MA - 20/23/55)\n   └  多頭趨勢中的多頭走勢\n💡 美國那斯達克\n   ├ 均線: 看空 (-1/1MA - 29)\n   └  多頭趨勢中的空頭走勢\n💡 美國羅素2000\n   ├ 均線: 看空 (-2/2MA - 21/56)\n   └  多頭趨勢中的空頭走勢\n💡 美國費城半導體\n   ├ 均線: 看空 (-3/3MA - 20/58/108)\n   └  多頭趨勢中的空頭走勢",
+      "indices": [
+        {
+          "symbol": "^GSPC",
+          "name": "美國標普500",
+          "market": "us",
+          "maList": [
+            23,
+            60
+          ],
+          "close": 600.71,
+          "changePct": -0.71,
+          "trend": "neutral",
+          "trendLabel": "💡 多頭趨勢中的空頭走勢",
+          "score": 2,
+          "scoreMax": 2,
+          "scoreLabel": "看多",
+          "macroTrend": "bull",
+          "microTrend": "bear",
+          "maValues": {
+            "23": 586.95,
+            "60": 578.05
+          },
+          "asOf": "2026-10-08",
+          "source": "Yahoo",
+          "configured": true,
+          "lineText": "💡 美國標普500\n   ├ 均線: 看多 (2/2MA - 23/60)\n   └  多頭趨勢中的空頭走勢"
+        },
+        {
+          "symbol": "^DJI",
+          "name": "美國道瓊工業",
+          "market": "us",
+          "maList": [
+            20,
+            23,
+            55
+          ],
+          "close": 3697.88,
+          "changePct": -0.25,
+          "trend": "bull",
+          "trendLabel": "🔺 多頭趨勢中的多頭走勢",
+          "score": 3,
+          "scoreMax": 3,
+          "scoreLabel": "看多",
+          "macroTrend": "bull",
+          "microTrend": "bull",
+          "maValues": {
+            "20": 3289.12,
+            "23": 3258.1,
+            "55": 3102.76
+          },
+          "asOf": "2026-10-08",
+          "source": "Yahoo",
+          "configured": true,
+          "lineText": "🔺 美國道瓊工業\n   ├ 均線: 看多 (3/3MA - 20/23/55)\n   └  多頭趨勢中的多頭走勢"
+        },
+        {
+          "symbol": "^IXIC",
+          "name": "美國那斯達克",
+          "market": "us",
+          "maList": [
+            29
+          ],
+          "close": 1815.66,
+          "changePct": 0.67,
+          "trend": "neutral",
+          "trendLabel": "💡 多頭趨勢中的空頭走勢",
+          "score": -1,
+          "scoreMax": 1,
+          "scoreLabel": "看空",
+          "macroTrend": "bull",
+          "microTrend": "bear",
+          "maValues": {
+            "29": 1914.9
+          },
+          "asOf": "2026-10-08",
+          "source": "Yahoo",
+          "configured": true,
+          "lineText": "💡 美國那斯達克\n   ├ 均線: 看空 (-1/1MA - 29)\n   └  多頭趨勢中的空頭走勢"
+        },
+        {
+          "symbol": "^RUT",
+          "name": "美國羅素2000",
+          "market": "us",
+          "maList": [
+            21,
+            56
+          ],
+          "close": 635.55,
+          "changePct": 0.62,
+          "trend": "neutral",
+          "trendLabel": "💡 多頭趨勢中的空頭走勢",
+          "score": -2,
+          "scoreMax": 2,
+          "scoreLabel": "看空",
+          "macroTrend": "bull",
+          "microTrend": "bear",
+          "maValues": {
+            "21": 646.67,
+            "56": 726.07
+          },
+          "asOf": "2026-10-08",
+          "source": "Yahoo",
+          "configured": true,
+          "lineText": "💡 美國羅素2000\n   ├ 均線: 看空 (-2/2MA - 21/56)\n   └  多頭趨勢中的空頭走勢"
+        },
+        {
+          "symbol": "^SOX",
+          "name": "美國費城半導體",
+          "market": "us",
+          "maList": [
+            20,
+            58,
+            108
+          ],
+          "close": 98.78,
+          "changePct": 0.21,
+          "trend": "neutral",
+          "trendLabel": "💡 多頭趨勢中的空頭走勢",
+          "score": -3,
+          "scoreMax": 3,
+          "scoreLabel": "看空",
+          "macroTrend": "bull",
+          "microTrend": "bear",
+          "maValues": {
+            "20": 101.49,
+            "58": 102.56,
+            "108": 101.57
+          },
+          "asOf": "2026-10-08",
+          "source": "Yahoo",
+          "configured": true,
+          "lineText": "💡 美國費城半導體\n   ├ 均線: 看空 (-3/3MA - 20/58/108)\n   └  多頭趨勢中的空頭走勢"
+        }
+      ]
+    }
+  ],
+  "worldIndices": [
+    {
+      "symbol": "^TWII",
+      "name": "台灣加權指數",
+      "market": "tw",
+      "maList": [
+        23,
+        29,
+        61
+      ],
+      "close": 498.61,
+      "changePct": 1.45,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": -2,
+      "scoreMax": 3,
+      "scoreLabel": "偏空",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "23": 502.63,
+        "29": 498.62,
+        "61": 504.64
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": true,
+      "lineText": "💡 台灣加權指數\n   ├ 均線: 偏空 (-2/3MA - 23/29/61)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^TWOII",
+      "name": "台灣櫃買指數(OTC)",
+      "market": "tw",
+      "maList": [
+        20,
+        60,
+        120
+      ],
+      "close": 303.07,
+      "changePct": -0.09,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": -3,
+      "scoreMax": 3,
+      "scoreLabel": "看空",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "20": 306.2,
+        "60": 309.67,
+        "120": 305.68
+      },
+      "asOf": "2026-10-08",
+      "source": "TPEx",
+      "configured": true,
+      "lineText": "💡 台灣櫃買指數(OTC)\n   ├ 均線: 看空 (-3/3MA - 20/60/120)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^N225",
+      "name": "日經225",
+      "market": "jp",
+      "maList": [
+        25,
+        75
+      ],
+      "close": 342.23,
+      "changePct": 0.55,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": -2,
+      "scoreMax": 2,
+      "scoreLabel": "看空",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "25": 357.0,
+        "75": 382.36
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": true,
+      "lineText": "💡 日經225\n   ├ 均線: 看空 (-2/2MA - 25/75)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^KS11",
+      "name": "韓國綜合",
+      "market": "kr",
+      "maList": [
+        20,
+        60
+      ],
+      "close": 599.9,
+      "changePct": -1.08,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": 0,
+      "scoreMax": 2,
+      "scoreLabel": "多空不明",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "20": 603.98,
+        "60": 588.87
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": true,
+      "lineText": "💡 韓國綜合\n   ├ 均線: 多空不明 (0/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^FCHI",
+      "name": "法國CAC40",
+      "market": "eu",
+      "maList": [
+        20,
+        60
+      ],
+      "close": 406.71,
+      "changePct": 0.55,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": -2,
+      "scoreMax": 2,
+      "scoreLabel": "看空",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "20": 419.82,
+        "60": 426.5
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": true,
+      "lineText": "💡 法國CAC40\n   ├ 均線: 看空 (-2/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^GDAXI",
+      "name": "德國DAX",
+      "market": "eu",
+      "maList": [
+        20,
+        60,
+        120
+      ],
+      "close": 760.42,
+      "changePct": 1.12,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": 3,
+      "scoreMax": 3,
+      "scoreLabel": "看多",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "20": 728.19,
+        "60": 669.31,
+        "120": 626.19
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": true,
+      "lineText": "💡 德國DAX\n   ├ 均線: 看多 (3/3MA - 20/60/120)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^GSPC",
+      "name": "美國標普500",
+      "market": "us",
+      "maList": [
+        23,
+        60
+      ],
+      "close": 600.71,
+      "changePct": -0.71,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": 2,
+      "scoreMax": 2,
+      "scoreLabel": "看多",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "23": 586.95,
+        "60": 578.05
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": true,
+      "lineText": "💡 美國標普500\n   ├ 均線: 看多 (2/2MA - 23/60)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^DJI",
+      "name": "美國道瓊工業",
+      "market": "us",
+      "maList": [
+        20,
+        23,
+        55
+      ],
+      "close": 3697.88,
+      "changePct": -0.25,
+      "trend": "bull",
+      "trendLabel": "🔺 多頭趨勢中的多頭走勢",
+      "score": 3,
+      "scoreMax": 3,
+      "scoreLabel": "看多",
+      "macroTrend": "bull",
+      "microTrend": "bull",
+      "maValues": {
+        "20": 3289.12,
+        "23": 3258.1,
+        "55": 3102.76
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": true,
+      "lineText": "🔺 美國道瓊工業\n   ├ 均線: 看多 (3/3MA - 20/23/55)\n   └  多頭趨勢中的多頭走勢"
+    },
+    {
+      "symbol": "^IXIC",
+      "name": "美國那斯達克",
+      "market": "us",
+      "maList": [
+        29
+      ],
+      "close": 1815.66,
+      "changePct": 0.67,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": -1,
+      "scoreMax": 1,
+      "scoreLabel": "看空",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "29": 1914.9
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": true,
+      "lineText": "💡 美國那斯達克\n   ├ 均線: 看空 (-1/1MA - 29)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^RUT",
+      "name": "美國羅素2000",
+      "market": "us",
+      "maList": [
+        21,
+        56
+      ],
+      "close": 635.55,
+      "changePct": 0.62,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": -2,
+      "scoreMax": 2,
+      "scoreLabel": "看空",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "21": 646.67,
+        "56": 726.07
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": true,
+      "lineText": "💡 美國羅素2000\n   ├ 均線: 看空 (-2/2MA - 21/56)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^SOX",
+      "name": "美國費城半導體",
+      "market": "us",
+      "maList": [
+        20,
+        58,
+        108
+      ],
+      "close": 98.78,
+      "changePct": 0.21,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": -3,
+      "scoreMax": 3,
+      "scoreLabel": "看空",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "20": 101.49,
+        "58": 102.56,
+        "108": 101.57
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": true,
+      "lineText": "💡 美國費城半導體\n   ├ 均線: 看空 (-3/3MA - 20/58/108)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^VIX",
+      "name": "VIX恐慌指數",
+      "market": "world",
+      "maList": [
+        10
+      ],
+      "close": 250.33,
+      "changePct": 2.92,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": 1,
+      "scoreMax": 1,
+      "scoreLabel": "看多",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "10": 247.8
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": true,
+      "lineText": "💡 VIX恐慌指數\n   ├ 均線: 看多 (1/1MA - 10)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^FTSE",
+      "name": "英國富時100",
+      "market": "eu",
+      "maList": [
+        20,
+        60
+      ],
+      "close": 809.51,
+      "changePct": 0.72,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": -1,
+      "scoreMax": 2,
+      "scoreLabel": "偏空",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "20": 801.46,
+        "60": 843.93
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": false,
+      "lineText": "💡 英國富時100\n   ├ 均線: 偏空 (-1/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^HSI",
+      "name": "香港恆生指數",
+      "market": "hk",
+      "maList": [
+        20,
+        60
+      ],
+      "close": 400.85,
+      "changePct": 0.12,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": 0,
+      "scoreMax": 2,
+      "scoreLabel": "多空不明",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "20": 404.06,
+        "60": 381.68
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": false,
+      "lineText": "💡 香港恆生指數\n   ├ 均線: 多空不明 (0/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "000001.SS",
+      "name": "上證綜合指數",
+      "market": "cn",
+      "maList": [
+        20,
+        60
+      ],
+      "close": 978.6,
+      "changePct": 1.38,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": 2,
+      "scoreMax": 2,
+      "scoreLabel": "看多",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "20": 936.17,
+        "60": 938.61
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": false,
+      "lineText": "💡 上證綜合指數\n   ├ 均線: 看多 (2/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^BSESN",
+      "name": "印度孟買SENSEX",
+      "market": "in",
+      "maList": [
+        20,
+        60
+      ],
+      "close": 2085.8,
+      "changePct": -0.19,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": 0,
+      "scoreMax": 2,
+      "scoreLabel": "多空不明",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "20": 2068.66,
+        "60": 2102.62
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": false,
+      "lineText": "💡 印度孟買SENSEX\n   ├ 均線: 多空不明 (0/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^AXJO",
+      "name": "澳洲ASX 200",
+      "market": "au",
+      "maList": [
+        20,
+        60
+      ],
+      "close": 52.48,
+      "changePct": -1.38,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": 0,
+      "scoreMax": 2,
+      "scoreLabel": "多空不明",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "20": 53.92,
+        "60": 52.39
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": false,
+      "lineText": "💡 澳洲ASX 200\n   ├ 均線: 多空不明 (0/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^STOXX50E",
+      "name": "歐洲斯托克50",
+      "market": "eu",
+      "maList": [
+        20,
+        60
+      ],
+      "close": 350.1,
+      "changePct": 1.37,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": -2,
+      "scoreMax": 2,
+      "scoreLabel": "看空",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "20": 351.69,
+        "60": 358.77
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": false,
+      "lineText": "💡 歐洲斯托克50\n   ├ 均線: 看空 (-2/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^GSPTSE",
+      "name": "加拿大S&P/TSX",
+      "market": "ca",
+      "maList": [
+        20,
+        60
+      ],
+      "close": 737.52,
+      "changePct": -0.27,
+      "trend": "neutral",
+      "trendLabel": "💡 多頭趨勢中的空頭走勢",
+      "score": 2,
+      "scoreMax": 2,
+      "scoreLabel": "看多",
+      "macroTrend": "bull",
+      "microTrend": "bear",
+      "maValues": {
+        "20": 713.77,
+        "60": 713.02
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": false,
+      "lineText": "💡 加拿大S&P/TSX\n   ├ 均線: 看多 (2/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢"
+    },
+    {
+      "symbol": "^BVSP",
+      "name": "巴西聖保羅指數",
+      "market": "br",
+      "maList": [
+        20,
+        60
+      ],
+      "close": 454.82,
+      "changePct": -0.05,
+      "trend": "bull",
+      "trendLabel": "🔺 多頭趨勢中的多頭走勢",
+      "score": -2,
+      "scoreMax": 2,
+      "scoreLabel": "看空",
+      "macroTrend": "bull",
+      "microTrend": "bull",
+      "maValues": {
+        "20": 461.57,
+        "60": 460.88
+      },
+      "asOf": "2026-10-08",
+      "source": "Yahoo",
+      "configured": false,
+      "lineText": "🔺 巴西聖保羅指數\n   ├ 均線: 看空 (-2/2MA - 20/60)\n   └  多頭趨勢中的多頭走勢"
+    }
+  ],
+  "lineMessages": {
+    "index": "🌍 2026-10-05 全球大盤多空量化報告\n📊 評分標準: 均線糾纏自適應/0.1%過濾機制\n========================\n\n【 🇹🇼 台灣市場 】\n💡 台灣加權指數\n   ├ 均線: 偏空 (-2/3MA - 23/29/61)\n   └  多頭趨勢中的空頭走勢\n💡 台灣櫃買指數(OTC)\n   ├ 均線: 看空 (-3/3MA - 20/60/120)\n   └  多頭趨勢中的空頭走勢\n\n【 🇺🇸 美國市場 】\n💡 美國標普500\n   ├ 均線: 看多 (2/2MA - 23/60)\n   └  多頭趨勢中的空頭走勢\n🔺 美國道瓊工業\n   ├ 均線: 看多 (3/3MA - 20/23/55)\n   └  多頭趨勢中的多頭走勢\n💡 美國那斯達克\n   ├ 均線: 看空 (-1/1MA - 29)\n   └  多頭趨勢中的空頭走勢\n💡 美國羅素2000\n   ├ 均線: 看空 (-2/2MA - 21/56)\n   └  多頭趨勢中的空頭走勢\n💡 美國費城半導體\n   ├ 均線: 看空 (-3/3MA - 20/58/108)\n   └  多頭趨勢中的空頭走勢\n\n【 🇪🇺 歐洲市場 】\n💡 法國CAC40\n   ├ 均線: 看空 (-2/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢\n💡 德國DAX\n   ├ 均線: 看多 (3/3MA - 20/60/120)\n   └  多頭趨勢中的空頭走勢\n\n【 🌏 亞洲市場 】\n💡 日經225\n   ├ 均線: 看空 (-2/2MA - 25/75)\n   └  多頭趨勢中的空頭走勢\n💡 韓國綜合\n   ├ 均線: 多空不明 (0/2MA - 20/60)\n   └  多頭趨勢中的空頭走勢",
+    "sectors": "📅 2026-10-05 美股類股週線輪動\n📊 週均線：MA20 / MA60\n📌 排名依據：1週、4週、13週與相對SPY強弱\n\n🟢 【強勢前三名】\n1. XLU 公用事業\n   ├ 13週：+25.93%\n   ├ 相對SPY：+30.53%\n   └ 週線多頭｜上漲縮量，動能普通\n2. XLRE 房地產\n   ├ 13週：+19.39%\n   ├ 相對SPY：+23.99%\n   └ 週線多頭｜上漲縮量，動能普通\n3. XLC 通訊服務\n   ├ 13週：+13.89%\n   ├ 相對SPY：+18.49%\n   └ 週線多頭｜上漲縮量，動能普通\n\n🔴 【弱勢後三名】\n9. XLP 必需消費\n   ├ 13週：-5.87%\n   ├ 相對SPY：-1.27%\n   └ 週線空頭｜上漲縮量，動能普通\n10. XLI 工業類股\n   ├ 13週：-8.75%\n   ├ 相對SPY：-4.15%\n   └ 週線空頭｜量價中性\n11. XLK 科技類股\n   ├ 13週：-17.09%\n   ├ 相對SPY：-12.49%\n   └ 週線空頭｜下跌縮量，賣壓減弱\n\n💰 【量價資金狀態】\n資金流入：能源類股、非必需消費\n資金流出：目前無明顯類股\n\n🔗 查看完整類股週K：\nhttps://liff.line.me/2010330411-6JhrotT9",
+    "stocks": "🎯 2026-10-05 專屬量化看盤網頁！\n\n🌍 【全球指數區塊】\n └ 指數圖表：12 張\n\n🧭 【美股類股週K】\n └ 類股圖表：11 張\n\n🇹🇼 【台灣股市區塊】\n ├ 1. 全市場符合：8 檔\n ├ 2. 權值精選符合：3 檔\n └ 3. 熱門符合：2 檔\n\n🇺🇸 【美國股市區塊】\n ├ 1. 全市場符合：9 檔\n ├ 2. 權值精選符合：3 檔\n ├ 3. 低本益比符合：1 檔\n ├ 4. 超級績效符合：1 檔\n └ 5. 熱門符合：0 檔\n\n🔗 1. 專屬潛伏圖表網頁：\nhttps://liff.line.me/2010330411-6JhrotT9\n\n⚙️ 2. 手機自訂參數控制台：\nhttps://liff.line.me/2010330411-SbwvRXRN\n\n💰 3. 自動交易參數控制台：\nhttps://liff.line.me/2010535859-y3CoAWaC"
+  },
+  "groups": [
+    {
+      "key": "tw_all",
+      "name": "台股-全市場潛伏",
+      "market": "TW",
+      "kind": "scan",
+      "maList": [
+        20
+      ],
+      "count": 8,
+      "items": [
+        {
+          "symbol": "4904.TW",
+          "name": "遠傳",
+          "maList": [
+            20
+          ],
+          "close": 753.12,
+          "changePct": -0.05,
+          "maValues": {
+            "20": 753.42
+          },
+          "note": "現價:753.12 | 距MA20:-0.04%",
+          "volume": 29102075,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "2317.TW",
+          "name": "鴻海",
+          "maList": [
+            20
+          ],
+          "close": 150.7,
+          "changePct": 0.65,
+          "maValues": {
+            "20": 150.52
+          },
+          "note": "現價:150.70 | 距MA20:0.12%",
+          "volume": 29094141,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "8069.TWO",
+          "name": "元太",
+          "maList": [
+            20
+          ],
+          "close": 719.84,
+          "changePct": 1.41,
+          "maValues": {
+            "20": 720.98
+          },
+          "note": "現價:719.84 | 距MA20:-0.16%",
+          "volume": 28045179,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "1101.TW",
+          "name": "台泥",
+          "maList": [
+            20
+          ],
+          "close": 681.93,
+          "changePct": 0.74,
+          "maValues": {
+            "20": 676.82
+          },
+          "note": "現價:681.93 | 距MA20:0.76%",
+          "volume": 27174666,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "2303.TW",
+          "name": "聯電",
+          "maList": [
+            20
+          ],
+          "close": 393.75,
+          "changePct": -0.18,
+          "maValues": {
+            "20": 394.64
+          },
+          "note": "現價:393.75 | 距MA20:-0.23%",
+          "volume": 24598520,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "2603.TW",
+          "name": "長榮",
+          "maList": [
+            20
+          ],
+          "close": 358.57,
+          "changePct": -2.62,
+          "maValues": {
+            "20": 364.16
+          },
+          "note": "現價:358.57 | 距MA20:-1.53%",
+          "volume": 19146547,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "6488.TWO",
+          "name": "環球晶",
+          "maList": [
+            20
+          ],
+          "close": 260.86,
+          "changePct": 0.81,
+          "maValues": {
+            "20": 265.84
+          },
+          "note": "現價:260.86 | 距MA20:-1.87%",
+          "volume": 13551743,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "2308.TW",
+          "name": "台達電",
+          "maList": [
+            20
+          ],
+          "close": 280.78,
+          "changePct": 0.13,
+          "maValues": {
+            "20": 280.61
+          },
+          "note": "現價:280.78 | 距MA20:0.06%",
+          "volume": 6465657,
+          "asOf": "2026-10-08"
+        }
+      ]
+    },
+    {
+      "key": "tw_g1",
+      "name": "台股-權值精選",
+      "market": "TW",
+      "kind": "fixed",
+      "maList": [
+        20
+      ],
+      "count": 3,
+      "items": [
+        {
+          "symbol": "2454.TW",
+          "name": "聯發科",
+          "maList": [
+            20,
+            60
+          ],
+          "close": 447.66,
+          "changePct": -3.27,
+          "maValues": {
+            "20": 453.5,
+            "60": 477.87
+          },
+          "note": "Supabase測試模式 | 現價:447.66 | MA20差距(-1.29%) / MA60差距(-6.32%) | MA20:453.50 | MA60:477.87",
+          "volume": 29271098,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "2330.TW",
+          "name": "台積電",
+          "maList": [
+            26,
+            65
+          ],
+          "close": 169.14,
+          "changePct": 2.0,
+          "maValues": {
+            "26": 173.98,
+            "65": 181.06
+          },
+          "note": "Supabase測試模式 | 現價:169.14 | MA26差距(-2.78%) / MA65差距(-6.59%) | MA26:173.98 | MA65:181.06",
+          "volume": 15810960,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "2317.TW",
+          "name": "鴻海",
+          "maList": [
+            20
+          ],
+          "close": 153.61,
+          "changePct": 0.08,
+          "maValues": {
+            "20": 151.37
+          },
+          "note": "Supabase測試模式 | 現價:153.61 | MA20差距(1.48%) | MA20:151.37",
+          "volume": 8286431,
+          "asOf": "2026-10-08"
+        }
+      ]
+    },
+    {
+      "key": "tw_g2",
+      "name": "台股-熱門",
+      "market": "TW",
+      "kind": "fixed",
+      "maList": [
+        20
+      ],
+      "count": 2,
+      "items": [
+        {
+          "symbol": "3008.TW",
+          "name": "大立光",
+          "maList": [
+            10,
+            20
+          ],
+          "close": 318.62,
+          "changePct": 1.19,
+          "maValues": {
+            "10": 324.2,
+            "20": 322.86
+          },
+          "note": "Supabase測試模式 | 現價:318.62 | MA10差距(-1.72%) / MA20差距(-1.31%) | MA10:324.20 | MA20:322.86",
+          "volume": 27553097,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "2603.TW",
+          "name": "長榮",
+          "maList": [
+            20
+          ],
+          "close": 347.68,
+          "changePct": 2.54,
+          "maValues": {
+            "20": 335.81
+          },
+          "note": "Supabase測試模式 | 現價:347.68 | MA20差距(3.53%) | MA20:335.81",
+          "volume": 7526292,
+          "asOf": "2026-10-08"
+        }
+      ]
+    },
+    {
+      "key": "custom_22",
+      "name": "🇹🇼台股-矽晶圓",
+      "market": "TW",
+      "kind": "custom",
+      "maList": [
+        20,
+        60
+      ],
+      "count": 2,
+      "items": [
+        {
+          "symbol": "3105.TWO",
+          "name": "穩懋",
+          "maList": [
+            20
+          ],
+          "close": 1118.75,
+          "changePct": 2.01,
+          "maValues": {
+            "20": 1078.44
+          },
+          "note": "Supabase測試模式 | 現價:1118.75 | MA20差距(3.74%) | MA20:1078.44",
+          "volume": 15212483,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "6488.TWO",
+          "name": "環球晶",
+          "maList": [
+            20,
+            60
+          ],
+          "close": 239.8,
+          "changePct": 1.37,
+          "maValues": {
+            "20": 239.1,
+            "60": 234.6
+          },
+          "note": "Supabase測試模式 | 現價:239.80 | MA20差距(0.29%) / MA60差距(2.21%) | MA20:239.10 | MA60:234.60",
+          "volume": 12985115,
+          "asOf": "2026-10-08"
+        }
+      ]
+    },
+    {
+      "key": "us_all",
+      "name": "美股-全市場潛伏",
+      "market": "US",
+      "kind": "scan",
+      "maList": [
+        20
+      ],
+      "count": 9,
+      "items": [
+        {
+          "symbol": "MSFT",
+          "name": "",
+          "maList": [
+            20
+          ],
+          "close": 858.71,
+          "changePct": -1.44,
+          "maValues": {
+            "20": 864.95
+          },
+          "note": "現價:858.71 | 距MA20:-0.72%",
+          "volume": 29176478,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "AMZN",
+          "name": "",
+          "maList": [
+            20
+          ],
+          "close": 436.91,
+          "changePct": 1.06,
+          "maValues": {
+            "20": 435.86
+          },
+          "note": "現價:436.91 | 距MA20:0.24%",
+          "volume": 23436385,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "META",
+          "name": "",
+          "maList": [
+            20
+          ],
+          "close": 183.29,
+          "changePct": -0.13,
+          "maValues": {
+            "20": 186.75
+          },
+          "note": "現價:183.29 | 距MA20:-1.86%",
+          "volume": 23416469,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "INTC",
+          "name": "",
+          "maList": [
+            20
+          ],
+          "close": 1096.29,
+          "changePct": -0.08,
+          "maValues": {
+            "20": 1092.98
+          },
+          "note": "現價:1096.29 | 距MA20:0.30%",
+          "volume": 20840951,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "NFLX",
+          "name": "",
+          "maList": [
+            20
+          ],
+          "close": 309.04,
+          "changePct": 0.58,
+          "maValues": {
+            "20": 307.74
+          },
+          "note": "現價:309.04 | 距MA20:0.42%",
+          "volume": 16412622,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "AAPL",
+          "name": "",
+          "maList": [
+            20
+          ],
+          "close": 459.05,
+          "changePct": -0.62,
+          "maValues": {
+            "20": 463.69
+          },
+          "note": "現價:459.05 | 距MA20:-1.00%",
+          "volume": 14862571,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "GOOGL",
+          "name": "",
+          "maList": [
+            20
+          ],
+          "close": 1093.83,
+          "changePct": -1.67,
+          "maValues": {
+            "20": 1086.61
+          },
+          "note": "現價:1093.83 | 距MA20:0.66%",
+          "volume": 13580039,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "NVDA",
+          "name": "",
+          "maList": [
+            20
+          ],
+          "close": 417.0,
+          "changePct": -0.0,
+          "maValues": {
+            "20": 414.94
+          },
+          "note": "現價:417.00 | 距MA20:0.50%",
+          "volume": 10038478,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "JPM",
+          "name": "",
+          "maList": [
+            20
+          ],
+          "close": 422.58,
+          "changePct": -0.9,
+          "maValues": {
+            "20": 422.66
+          },
+          "note": "現價:422.58 | 距MA20:-0.02%",
+          "volume": 8822777,
+          "asOf": "2026-10-08"
+        }
+      ]
+    },
+    {
+      "key": "us_g1",
+      "name": "美股-權值精選",
+      "market": "US",
+      "kind": "fixed",
+      "maList": [
+        20
+      ],
+      "count": 3,
+      "items": [
+        {
+          "symbol": "MSFT",
+          "name": "",
+          "maList": [
+            20
+          ],
+          "close": 981.07,
+          "changePct": -2.39,
+          "maValues": {
+            "20": 957.94
+          },
+          "note": "Supabase測試模式 | 現價:981.07 | MA20差距(2.41%) | MA20:957.94",
+          "volume": 25343495,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "BRK-B",
+          "name": "",
+          "maList": [
+            20
+          ],
+          "close": 1229.19,
+          "changePct": -0.36,
+          "maValues": {
+            "20": 1265.08
+          },
+          "note": "Supabase測試模式 | 現價:1229.19 | MA20差距(-2.84%) | MA20:1265.08",
+          "volume": 23630817,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "AAPL",
+          "name": "",
+          "maList": [
+            20,
+            50
+          ],
+          "close": 652.51,
+          "changePct": -2.8,
+          "maValues": {
+            "20": 678.45,
+            "50": 687.83
+          },
+          "note": "Supabase測試模式 | 現價:652.51 | MA20差距(-3.82%) / MA50差距(-5.14%) | MA20:678.45 | MA50:687.83",
+          "volume": 5561985,
+          "asOf": "2026-10-08"
+        }
+      ]
+    },
+    {
+      "key": "us_g2",
+      "name": "美股-低本益比",
+      "market": "US",
+      "kind": "fixed",
+      "maList": [
+        20
+      ],
+      "count": 1,
+      "items": [
+        {
+          "symbol": "INTC",
+          "name": "",
+          "maList": [
+            20
+          ],
+          "close": 1244.1,
+          "changePct": 0.81,
+          "maValues": {
+            "20": 1218.31
+          },
+          "note": "Supabase測試模式 | 現價:1244.10 | MA20差距(2.12%) | MA20:1218.31",
+          "volume": 17266797,
+          "asOf": "2026-10-08"
+        }
+      ]
+    },
+    {
+      "key": "us_g3",
+      "name": "美股-超級績效",
+      "market": "US",
+      "kind": "fixed",
+      "maList": [
+        20
+      ],
+      "count": 1,
+      "items": [
+        {
+          "symbol": "NVDA",
+          "name": "",
+          "maList": [
+            10,
+            20
+          ],
+          "close": 518.65,
+          "changePct": -1.06,
+          "maValues": {
+            "10": 520.82,
+            "20": 521.98
+          },
+          "note": "Supabase測試模式 | 現價:518.65 | MA10差距(-0.42%) / MA20差距(-0.64%) | MA10:520.82 | MA20:521.98",
+          "volume": 11745502,
+          "asOf": "2026-10-08"
+        }
+      ]
+    },
+    {
+      "key": "us_g4",
+      "name": "美股-熱門",
+      "market": "US",
+      "kind": "fixed",
+      "maList": [
+        20
+      ],
+      "count": 0,
+      "items": []
+    },
+    {
+      "key": "custom_31",
+      "name": "🇺🇸美股-電動車",
+      "market": "US",
+      "kind": "custom",
+      "maList": [
+        20
+      ],
+      "count": 2,
+      "items": [
+        {
+          "symbol": "RIVN",
+          "name": "",
+          "maList": [
+            20,
+            60
+          ],
+          "close": 183.16,
+          "changePct": -0.37,
+          "maValues": {
+            "20": 187.95,
+            "60": 189.82
+          },
+          "note": "Supabase測試模式 | 現價:183.16 | MA20差距(-2.55%) / MA60差距(-3.51%) | MA20:187.95 | MA60:189.82",
+          "volume": 7559558,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "TSLA",
+          "name": "",
+          "maList": [
+            20
+          ],
+          "close": 589.71,
+          "changePct": -2.33,
+          "maValues": {
+            "20": 641.12
+          },
+          "note": "Supabase測試模式 | 現價:589.71 | MA20差距(-8.02%) | MA20:641.12",
+          "volume": 5541983,
+          "asOf": "2026-10-08"
+        }
+      ]
+    }
+  ],
+  "sectors": [
+    {
+      "symbol": "XLU",
+      "name": "公用事業",
+      "trend": "週線多頭",
+      "status": "上漲縮量，動能普通",
+      "rank": 1,
+      "changePct": 3.36,
+      "return4w": 11.3,
+      "return13w": 25.93,
+      "relativeStrength13w": 30.53,
+      "momentumScore": 18.91,
+      "strength": "strong",
+      "strengthLabel": "強勢領先",
+      "close": 1400.77,
+      "volumeChangePct": -17.02,
+      "timeframe": "1W",
+      "maList": [
+        20,
+        60
+      ],
+      "maValues": {
+        "20": 1217.12,
+        "60": 1060.21
+      },
+      "asOf": "2026-10-02"
+    },
+    {
+      "symbol": "XLRE",
+      "name": "房地產",
+      "trend": "週線多頭",
+      "status": "上漲縮量，動能普通",
+      "rank": 2,
+      "changePct": 4.3,
+      "return4w": 8.72,
+      "return13w": 19.39,
+      "relativeStrength13w": 23.99,
+      "momentumScore": 14.86,
+      "strength": "strong",
+      "strengthLabel": "強勢領先",
+      "close": 4531.34,
+      "volumeChangePct": -29.03,
+      "timeframe": "1W",
+      "maList": [
+        20,
+        60
+      ],
+      "maValues": {
+        "20": 4006.3,
+        "60": 3776.97
+      },
+      "asOf": "2026-10-02"
+    },
+    {
+      "symbol": "XLC",
+      "name": "通訊服務",
+      "trend": "週線多頭",
+      "status": "上漲縮量，動能普通",
+      "rank": 3,
+      "changePct": 3.42,
+      "return4w": 3.34,
+      "return13w": 13.89,
+      "relativeStrength13w": 18.49,
+      "momentumScore": 10.31,
+      "strength": "strong",
+      "strengthLabel": "強勢領先",
+      "close": 524.95,
+      "volumeChangePct": -64.54,
+      "timeframe": "1W",
+      "maList": [
+        20,
+        60
+      ],
+      "maValues": {
+        "20": 484.98,
+        "60": 492.77
+      },
+      "asOf": "2026-10-02"
+    },
+    {
+      "symbol": "XLB",
+      "name": "原物料",
+      "trend": "週線多頭",
+      "status": "量價中性",
+      "rank": 4,
+      "changePct": 2.59,
+      "return4w": 7.82,
+      "return13w": 9.02,
+      "relativeStrength13w": 13.62,
+      "momentumScore": 8.59,
+      "strength": "neutral",
+      "strengthLabel": "中性輪動",
+      "close": 13168.36,
+      "volumeChangePct": -1.12,
+      "timeframe": "1W",
+      "maList": [
+        20,
+        60
+      ],
+      "maValues": {
+        "20": 12204.9,
+        "60": 11240.8
+      },
+      "asOf": "2026-10-02"
+    },
+    {
+      "symbol": "XLE",
+      "name": "能源類股",
+      "trend": "週線多頭",
+      "status": "上漲放量，資金流入",
+      "rank": 5,
+      "changePct": 2.2,
+      "return4w": 2.3,
+      "return13w": 9.44,
+      "relativeStrength13w": 14.04,
+      "momentumScore": 7.35,
+      "strength": "neutral",
+      "strengthLabel": "中性輪動",
+      "close": 184.59,
+      "volumeChangePct": 16.58,
+      "timeframe": "1W",
+      "maList": [
+        20,
+        60
+      ],
+      "maValues": {
+        "20": 172.89,
+        "60": 160.83
+      },
+      "asOf": "2026-10-02"
+    },
+    {
+      "symbol": "XLV",
+      "name": "醫療保健",
+      "trend": "週線多頭",
+      "status": "上漲縮量，動能普通",
+      "rank": 6,
+      "changePct": 0.9632,
+      "return4w": 4.42,
+      "return13w": 7.26,
+      "relativeStrength13w": 11.86,
+      "momentumScore": 6.44,
+      "strength": "neutral",
+      "strengthLabel": "中性輪動",
+      "close": 566.44,
+      "volumeChangePct": -15.26,
+      "timeframe": "1W",
+      "maList": [
+        20,
+        60
+      ],
+      "maValues": {
+        "20": 534.31,
+        "60": 514.81
+      },
+      "asOf": "2026-10-02"
+    },
+    {
+      "symbol": "XLF",
+      "name": "金融類股",
+      "trend": "週線多頭",
+      "status": "上漲縮量，動能普通",
+      "rank": 7,
+      "changePct": 1.3,
+      "return4w": 1.54,
+      "return13w": 6.73,
+      "relativeStrength13w": 11.33,
+      "momentumScore": 5.5,
+      "strength": "neutral",
+      "strengthLabel": "中性輪動",
+      "close": 55.01,
+      "volumeChangePct": -41.76,
+      "timeframe": "1W",
+      "maList": [
+        20,
+        60
+      ],
+      "maValues": {
+        "20": 52.33,
+        "60": 51.02
+      },
+      "asOf": "2026-10-02"
+    },
+    {
+      "symbol": "XLY",
+      "name": "非必需消費",
+      "trend": "空頭反彈",
+      "status": "上漲放量，資金流入",
+      "rank": 8,
+      "changePct": 3.44,
+      "return4w": 4.29,
+      "return13w": 0.5071,
+      "relativeStrength13w": 5.11,
+      "momentumScore": 3.19,
+      "strength": "neutral",
+      "strengthLabel": "中性輪動",
+      "close": 582.44,
+      "volumeChangePct": 39.69,
+      "timeframe": "1W",
+      "maList": [
+        20,
+        60
+      ],
+      "maValues": {
+        "20": 563.76,
+        "60": 600.9
+      },
+      "asOf": "2026-10-02"
+    },
+    {
+      "symbol": "XLP",
+      "name": "必需消費",
+      "trend": "週線空頭",
+      "status": "上漲縮量，動能普通",
+      "rank": 9,
+      "changePct": 4.08,
+      "return4w": -0.5675,
+      "return13w": -5.87,
+      "relativeStrength13w": -1.27,
+      "momentumScore": -1.4,
+      "strength": "weak",
+      "strengthLabel": "弱勢落後",
+      "close": 728.22,
+      "volumeChangePct": -10.06,
+      "timeframe": "1W",
+      "maList": [
+        20,
+        60
+      ],
+      "maValues": {
+        "20": 764.53,
+        "60": 740.69
+      },
+      "asOf": "2026-10-02"
+    },
+    {
+      "symbol": "XLI",
+      "name": "工業類股",
+      "trend": "週線空頭",
+      "status": "量價中性",
+      "rank": 10,
+      "changePct": -1.19,
+      "return4w": -5.21,
+      "return13w": -8.75,
+      "relativeStrength13w": -4.15,
+      "momentumScore": -5.21,
+      "strength": "weak",
+      "strengthLabel": "弱勢落後",
+      "close": 18.38,
+      "volumeChangePct": -1.35,
+      "timeframe": "1W",
+      "maList": [
+        20,
+        60
+      ],
+      "maValues": {
+        "20": 19.3,
+        "60": 23.62
+      },
+      "asOf": "2026-10-02"
+    },
+    {
+      "symbol": "XLK",
+      "name": "科技類股",
+      "trend": "週線空頭",
+      "status": "下跌縮量，賣壓減弱",
+      "rank": 11,
+      "changePct": -2.44,
+      "return4w": -3.25,
+      "return13w": -17.09,
+      "relativeStrength13w": -12.49,
+      "momentumScore": -9.55,
+      "strength": "weak",
+      "strengthLabel": "弱勢落後",
+      "close": 143.9,
+      "volumeChangePct": -25.29,
+      "timeframe": "1W",
+      "maList": [
+        20,
+        60
+      ],
+      "maValues": {
+        "20": 160.38,
+        "60": 181.28
+      },
+      "asOf": "2026-10-02"
+    }
+  ]
+}

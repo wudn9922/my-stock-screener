@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client';
-import { App } from './app/App';
-import { ensureAxisFont } from './chart/AxisAppearance';
+import { Site } from './app/Site';
+import { applyColorConvention } from './app/sitePreferences';
 import './styles.css';
 // Packaged native builds use their bundled assets, independent of PWA shell updates.
 if (
@@ -14,6 +14,6 @@ if (
       .catch(console.error);
   });
 
-void ensureAxisFont().then(() => {
-  createRoot(document.getElementById('root')!).render(<App />);
-});
+applyColorConvention();
+// The chart workspace loads its axis font itself; the landing page renders immediately.
+createRoot(document.getElementById('root')!).render(<Site />);

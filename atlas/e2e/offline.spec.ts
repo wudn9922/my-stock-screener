@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectProvider, openPanel, saveState } from './site-helpers';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { resolve } from 'node:path';
 import { once } from 'node:events';
@@ -42,13 +43,12 @@ test('production PWA opens Demo and IndexedDB settings offline after shell cachi
       await navigator.serviceWorker.ready;
     });
     await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
-    if (await page.locator('.mobile-nav').isVisible())
-      await page.locator('.mobile-nav').getByRole('button', { name: 'SMA', exact: true }).click();
-    await page.getByLabel('SMA period', { exact: true }).fill('24');
-    await page.getByRole('button', { name: 'Add SMA', exact: true }).click();
-    const close = page.getByRole('button', { name: 'Close panel', exact: true });
+    await openPanel(page, 'indicators');
+    await page.getByLabel('SMA 週期', { exact: true }).fill('24');
+    await page.getByRole('button', { name: '新增 SMA', exact: true }).click();
+    const close = page.getByRole('button', { name: '關閉面板', exact: true });
     if (await close.isVisible()) await close.click();
-    await expect(page.locator('.app-footer')).toContainText('WORKSPACE SAVED');
+    await expect(saveState(page)).toHaveText('已儲存於本機');
     if (server) {
       const exited = once(server, 'exit');
       server.kill('SIGTERM');
@@ -59,7 +59,7 @@ test('production PWA opens Demo and IndexedDB settings offline after shell cachi
     await expect(page.getByTestId('ohlc-header')).toContainText('O ');
     await expect(page.locator('.chart-loading')).toHaveCount(0);
     await expect(page.locator('.indicator-chip')).toContainText('SMA 24');
-    await expect(page.getByLabel('Market data source', { exact: true })).toHaveValue('demo');
+    await expectProvider(page, 'demo');
   } finally {
     server?.kill('SIGTERM');
     await context.setOffline(false);

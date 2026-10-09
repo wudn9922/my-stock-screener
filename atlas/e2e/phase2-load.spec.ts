@@ -57,7 +57,7 @@ test('Phase 2 mixed geometry: 2,500 bars, 8 SMAs and 100 locked objects keep pan
     ...drawing,
     scope: { timeframes: [drawing.points[0].timeframe] },
   }));
-  await page.getByLabel('Settings file', { exact: true }).setInputFiles({
+  await page.getByLabel('設定檔', { exact: true }).setInputFiles({
     name: 'mixed-load.json',
     mimeType: 'application/json',
     buffer: Buffer.from(
@@ -78,7 +78,7 @@ test('Phase 2 mixed geometry: 2,500 bars, 8 SMAs and 100 locked objects keep pan
   });
   await expect(page.getByRole('status')).toContainText('設定已還原');
   await expect(page.locator('.chart-loading')).toHaveCount(0);
-  await expect(page.locator('.chart-status')).toContainText('100 DRAWINGS');
+  await expect(page.locator('.chart-status')).toContainText('畫線 100 條');
   await expect(page.locator('.indicator-chip')).toHaveCount(8);
   const r = (await page.getByTestId('chart').boundingBox())!;
   for (let i = 0; i < 40; i++) await page.mouse.move(r.x + 80 + i * 8, r.y + r.height * 0.55);
@@ -86,8 +86,8 @@ test('Phase 2 mixed geometry: 2,500 bars, 8 SMAs and 100 locked objects keep pan
   await page.mouse.down();
   await page.mouse.move(r.x + r.width * 0.55 + 50, r.y + r.height * 0.55, { steps: 12 });
   await page.mouse.up();
-  await clickDrawingUtility(page, 'Zoom in');
-  await clickDrawingUtility(page, 'Zoom out');
+  await clickDrawingUtility(page, '放大圖表');
+  await clickDrawingUtility(page, '縮小圖表');
   await expect(page.locator('.chart-loading')).toHaveCount(0);
   const stored = await page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve) => {

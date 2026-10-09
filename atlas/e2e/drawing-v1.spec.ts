@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { clickExport, openPanel, searchSymbol } from './site-helpers';
 import { chooseDrawingTool, clickDrawingUtility, type DrawingToolName } from './drawing-picker-helper';
 import { readFile } from 'node:fs/promises';
 import type { SymbolState } from '../src/storage/schema';
@@ -93,7 +94,7 @@ test('V1 channel, range measurements and vertical line share chart gestures and 
   const x = (fraction: number) => plot.x + plot.width * fraction;
   const y = (fraction: number) => plot.y + plot.height * fraction;
 
-  await chooseDrawingTool(page, 'Parallel Channel');
+  await chooseDrawingTool(page, '平行通道');
   await drag(x(0.18) - 6, y(0.48) - 6, x(0.18), y(0.48));
   await drag(x(0.92) - 6, y(0.6) - 6, x(0.92), y(0.6));
   await drag(x(0.48) - 6, y(0.35) - 6, x(0.48), y(0.35));
@@ -110,16 +111,16 @@ test('V1 channel, range measurements and vertical line share chart gestures and 
   await drag(x(0.49), y(0.42), x(0.52), y(0.44));
   const channelMoved = (await readDrawings(page)).find((d) => d.type === 'channel')!;
   expect(channelMoved.points.every((point, i) => point.time !== channelEndpointEdit.points[i].time)).toBe(true);
-  await clickDrawingUtility(page, 'Undo drawing');
+  await clickDrawingUtility(page, '復原畫線');
   await expect
     .poll(async () => (await readDrawings(page)).find((d) => d.type === 'channel')?.points)
     .toEqual(channelEndpointEdit.points);
-  await clickDrawingUtility(page, 'Redo drawing');
+  await clickDrawingUtility(page, '重做畫線');
   await expect
     .poll(async () => (await readDrawings(page)).find((d) => d.type === 'channel')?.points)
     .toEqual(channelMoved.points);
 
-  await placeTwo('Price Range', [x(0.24), y(0.37)], [x(0.62), y(0.62)]);
+  await placeTwo('價格區間', [x(0.24), y(0.37)], [x(0.62), y(0.62)]);
   await expect
     .poll(async () => (await readDrawings(page)).find((drawing) => drawing.type === 'price-range')?.points.length)
     .toBe(2);
@@ -131,7 +132,7 @@ test('V1 channel, range measurements and vertical line share chart gestures and 
   const priceRangeEdited = (await readDrawings(page)).find((drawing) => drawing.type === 'price-range')!;
   expect(priceRangeEdited.points[0]).toEqual(priceRange.points[0]);
 
-  await placeTwo('Date Range', [x(0.24), y(0.4)], [x(0.62), y(0.57)]);
+  await placeTwo('日期區間', [x(0.24), y(0.4)], [x(0.62), y(0.57)]);
   await expect
     .poll(async () => (await readDrawings(page)).find((drawing) => drawing.type === 'date-range')?.points.length)
     .toBe(2);
@@ -143,12 +144,12 @@ test('V1 channel, range measurements and vertical line share chart gestures and 
   const dateRangeMoved = (await readDrawings(page)).find((drawing) => drawing.type === 'date-range')!;
   expect(dateRangeMoved.points[1].time).not.toBe(dateRange.points[1].time);
 
-  await placeTwo('Price + Date Range', [x(0.56), y(0.35)], [x(0.84), y(0.64)]);
+  await placeTwo('價格與日期區間', [x(0.56), y(0.35)], [x(0.84), y(0.64)]);
   await expect
     .poll(async () => (await readDrawings(page)).find((drawing) => drawing.type === 'price-date-range')?.points.length)
     .toBe(2);
   const combined = (await readDrawings(page)).find((drawing) => drawing.type === 'price-date-range')!;
-  await page.getByRole('button', { name: 'Lock selected drawing', exact: true }).click();
+  await page.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
   const locked = (await readDrawings(page)).find((drawing) => drawing.type === 'price-date-range')!;
   expect(locked.locked).toBe(true);
   const beforePan = (await readState(page))!.preferences.views['1D'];
@@ -159,7 +160,7 @@ test('V1 channel, range measurements and vertical line share chart gestures and 
   expect((await readDrawings(page)).find((drawing) => drawing.type === 'price-date-range')).toEqual(locked);
   expect(combined.points).toEqual(locked.points);
 
-  await placeOne('Vertical Line', [x(0.76) - 6, y(0.42) - 6], [x(0.76), y(0.42)]);
+  await placeOne('垂直線', [x(0.76) - 6, y(0.42) - 6], [x(0.76), y(0.42)]);
   await expect
     .poll(async () => (await readDrawings(page)).find((drawing) => drawing.type === 'vertical')?.points.length)
     .toBe(1);
@@ -184,21 +185,19 @@ test('V1 channel, range measurements and vertical line share chart gestures and 
   expect(await page.evaluate(() => scrollY)).toBe(0);
 
   const openDrawingPanel = async () => {
-    if (await page.locator('.mobile-nav').isVisible())
-      await page.locator('.mobile-nav').getByRole('button', { name: 'Drawings', exact: true }).click();
-    else await page.getByLabel('Research panel', { exact: true }).selectOption('drawings');
-    await expect(page.getByRole('region', { name: 'Drawing objects' })).toBeVisible();
+    await openPanel(page, 'drawings');
+    await expect(page.getByRole('region', { name: '畫線物件' })).toBeVisible();
   };
   const closeDrawingPanel = async () => {
-    const close = page.getByRole('button', { name: 'Close panel', exact: true });
+    const close = page.getByRole('button', { name: '關閉面板', exact: true });
     if (await close.isVisible()) await close.click();
   };
 
   // Verify the channel remains selectable while locked, delegates body drags to chart pan,
   // and can be unlocked again before capturing the locked state of every new tool.
   await openDrawingPanel();
-  await page.getByRole('button', { name: /Parallel Channel 1/ }).click();
-  await page.getByRole('button', { name: 'Lock drawing 1', exact: true }).click();
+  await page.getByRole('button', { name: /平行通道 1/ }).click();
+  await page.getByRole('button', { name: '鎖定畫線 1', exact: true }).click();
   const channelLocked = (await readDrawings(page))[0]!;
   expect(channelLocked.locked).toBe(true);
   const beforeChannelPan = (await readState(page))!.preferences.views['1D'];
@@ -210,7 +209,7 @@ test('V1 channel, range measurements and vertical line share chart gestures and 
   expect((await readDrawings(page))[0]).toEqual(channelLocked);
 
   await openDrawingPanel();
-  await page.getByRole('button', { name: 'Unlock drawing 1', exact: true }).click();
+  await page.getByRole('button', { name: '解鎖畫線 1', exact: true }).click();
   await expect.poll(async () => (await readDrawings(page))[0]?.locked).toBe(false);
 
   const requiredTypes = [
@@ -225,7 +224,7 @@ test('V1 channel, range measurements and vertical line share chart gestures and 
     let drawing = (await readDrawings(page))[index]!;
     expect(drawing.type).toBe(type);
     if (!drawing.locked) {
-      await page.getByRole('button', { name: `Lock drawing ${index + 1}`, exact: true }).click();
+      await page.getByRole('button', { name: `鎖定畫線 ${index + 1}`, exact: true }).click();
       await expect.poll(async () => (await readDrawings(page))[index]?.locked).toBe(true);
       drawing = (await readDrawings(page))[index]!;
     }
@@ -234,27 +233,23 @@ test('V1 channel, range measurements and vertical line share chart gestures and 
   expect(lockedSnapshots.map((drawing) => drawing.type)).toEqual(requiredTypes);
   expect(lockedSnapshots.every((drawing) => drawing.locked)).toBe(true);
   await closeDrawingPanel();
-
-  const search = page.getByLabel('Symbol search', { exact: true });
-  await search.fill('NVDA');
-  await search.press('Enter');
+  await searchSymbol(page, 'NVDA');
   await expect(page.getByTestId('active-symbol')).toHaveText('NVDA');
   await ready(page);
   expect(await readDrawings(page, 'NVDA')).toEqual([]);
 
-  await search.fill('AAPL');
-  await search.press('Enter');
+  await searchSymbol(page, 'AAPL');
   await expect(page.getByTestId('active-symbol')).toHaveText('AAPL');
   await ready(page);
   expect(canonicalDrawingSnapshot(await readDrawings(page))).toEqual(lockedSnapshots);
 
   for (const timeframe of ['5m', '1H', '1D'] as const) {
-    await page.getByRole('button', { name: `Timeframe ${timeframe}`, exact: true }).click();
+    await page.getByRole('button', { name: `週期 ${timeframe}`, exact: true }).click();
     await ready(page);
     expect((await readState(page))!.preferences.timeframe).toBe(timeframe);
     expect(canonicalDrawingSnapshot(await readDrawings(page))).toEqual(lockedSnapshots);
     await expect(page.locator('.chart-status')).toContainText(
-      timeframe === '1D' ? '5 DRAWINGS' : '0 DRAWINGS',
+      timeframe === '1D' ? '畫線 5 條' : '畫線 0 條',
     );
   }
 
@@ -263,7 +258,7 @@ test('V1 channel, range measurements and vertical line share chart gestures and 
   expect(canonicalDrawingSnapshot(await readDrawings(page))).toEqual(lockedSnapshots);
 
   const downloadEvent = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export settings', exact: true }).click();
+  await clickExport(page);
   const backup = await downloadEvent;
   const backupPath = await backup.path();
   expect(backupPath).not.toBeNull();
@@ -277,10 +272,10 @@ test('V1 channel, range measurements and vertical line share chart gestures and 
   expect(canonicalDrawingSnapshot(exportedAapl!.drawings)).toEqual(lockedSnapshots);
 
   await openDrawingPanel();
-  await page.getByRole('button', { name: 'Unlock drawing 1', exact: true }).click();
+  await page.getByRole('button', { name: '解鎖畫線 1', exact: true }).click();
   await expect.poll(async () => (await readDrawings(page))[0]?.locked).toBe(false);
   await closeDrawingPanel();
-  await page.getByLabel('Settings file', { exact: true }).setInputFiles(backupPath!);
+  await page.getByLabel('設定檔', { exact: true }).setInputFiles(backupPath!);
   await expect(page.getByRole('status')).toContainText('設定已還原');
   await ready(page);
   expect(canonicalDrawingSnapshot(await readDrawings(page))).toEqual(lockedSnapshots);

@@ -208,7 +208,8 @@ const workspaceSchema = z.object({
 const appFields = {
   watchlist: z.array(symbol).max(1000),
   activeSymbol: symbol,
-  provider: z.enum(['demo', 'yahoo', 'snapshot']),
+  // `market`: delayed data for any TW/US symbol via the screener site's edge-function proxy.
+  provider: z.enum(['demo', 'yahoo', 'snapshot', 'market']),
   recentSymbols: z.array(symbol).max(20).default([]),
   drawingDefaults: z.partialRecord(tool, drawingStyleSchema).default({}),
   alerts: z.array(alertSchema).max(1000).default([]),

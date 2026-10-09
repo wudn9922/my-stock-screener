@@ -1,0 +1,20 @@
+{
+"taxonomy": "us-gaap",
+"tag": "EarningsPerShareDiluted",
+"ccp": "CY2024Q4",
+"uom": "USD-per-shares",
+"label": "Earnings Per Share, Diluted",
+"description": "\u2026",
+"pts": 1,
+"data": [
+{
+"accn": "0000000000-26-000001",
+"cik": 320193,
+"entityName": "Apple Inc.",
+"loc": "US-CA",
+"start": "2024-09-29",
+"end": "2024-12-28",
+"val": 2.4
+}
+]
+}

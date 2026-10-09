@@ -5,8 +5,10 @@ export const US_SYMBOL_REGEX = /^[A-Z][A-Z0-9.^-]{0,14}$/;
 export const TAIWAN_SYMBOL_REGEX = /^[0-9]{4,6}[A-Z]?\.(?:TW|TWO)$/;
 /** Yahoo index symbols such as ^TWII, ^TWOII, ^GSPC, ^SOX (my-stock-screener integration). */
 export const INDEX_SYMBOL_REGEX = /^\^[A-Z0-9][A-Z0-9.-]{0,14}$/;
+/** Shanghai/Shenzhen index codes as Yahoo quotes them (000001.SS 上證, 399001.SZ 深證), used by the world-index page. */
+export const CHINA_INDEX_SYMBOL_REGEX = /^[0-9]{6}\.(?:SS|SZ)$/;
 export const CANONICAL_SYMBOL_REGEX =
-  /^(?:[A-Z][A-Z0-9.^-]{0,14}|[0-9]{4,6}[A-Z]?\.(?:TW|TWO)|\^[A-Z0-9][A-Z0-9.-]{0,14})$/;
+  /^(?:[A-Z][A-Z0-9.^-]{0,14}|[0-9]{4,6}[A-Z]?\.(?:TW|TWO)|\^[A-Z0-9][A-Z0-9.-]{0,14}|[0-9]{6}\.(?:SS|SZ))$/;
 /**
  * Taiwan indices quoted by Yahoo in TWD on Asia/Taipei session time. Every other `^` index keeps the
  * US profile; an index whose Yahoo metadata disagrees with its profile is rejected, never relabelled.
@@ -17,7 +19,8 @@ export const TAIWAN_INDEX_EXCHANGES: Readonly<Record<string, 'TWSE' | 'TPEx'>> =
 });
 
 export function isIndexSymbol(symbol: string): boolean {
-  return INDEX_SYMBOL_REGEX.test(symbol.trim().toUpperCase());
+  const normalized = symbol.trim().toUpperCase();
+  return INDEX_SYMBOL_REGEX.test(normalized) || CHINA_INDEX_SYMBOL_REGEX.test(normalized);
 }
 
 export interface MarketProfile {

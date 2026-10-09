@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { AppStore } from '../app/AppStore';
-import type { Drawing, DrawingStyle } from '../drawing/DrawingModel';
+import { toolNames, type Drawing, type DrawingStyle } from '../drawing/DrawingModel';
 import { DEFAULT_FIB_LEVELS } from '../tools/Fibonacci';
 
 const defaultFibLevels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
@@ -56,12 +56,12 @@ export function DrawingSettings({
     setError('');
     try {
       if (locked) return;
-      if (!/^#[0-9a-fA-F]{6}$/.test(draft.color)) throw new Error('Color must be a six-digit hex value.');
-      if (!Number.isFinite(draft.lineWidth) || draft.lineWidth < 1 || draft.lineWidth > 4) throw new Error('Line width must be from 1 through 4.');
-      if (draft.widthMode !== undefined && draft.widthMode !== 'pixels' && draft.widthMode !== 'atr') throw new Error('Line width mode is invalid.');
-      if (!Number.isFinite(draft.opacity) || draft.opacity! < 0 || draft.opacity! > 1) throw new Error('Opacity must be from 0 through 1.');
-      if (filled && (!Number.isFinite(draft.fillOpacity) || draft.fillOpacity! < 0 || draft.fillOpacity! > 0.3)) throw new Error('Fill opacity must be from 0 through 0.3.');
-      if (!levelsValid) throw new Error('Fibonacci levels must contain 2–32 distinct numbers from 0 through 1.');
+      if (!/^#[0-9a-fA-F]{6}$/.test(draft.color)) throw new Error('顏色必須是六位數的十六進位色碼。');
+      if (!Number.isFinite(draft.lineWidth) || draft.lineWidth < 1 || draft.lineWidth > 4) throw new Error('線寬必須介於 1 到 4。');
+      if (draft.widthMode !== undefined && draft.widthMode !== 'pixels' && draft.widthMode !== 'atr') throw new Error('線寬模式無效。');
+      if (!Number.isFinite(draft.opacity) || draft.opacity! < 0 || draft.opacity! > 1) throw new Error('不透明度必須介於 0 到 1。');
+      if (filled && (!Number.isFinite(draft.fillOpacity) || draft.fillOpacity! < 0 || draft.fillOpacity! > 0.3)) throw new Error('填色不透明度必須介於 0 到 0.3。');
+      if (!levelsValid) throw new Error('費波那契層級需為 2–32 個介於 0 到 1 的不重複數值。');
       onCancelGesture();
       const style = structuredClone(draft);
       if (fib) style.hiddenLevels = parsedLevels.filter((level) => draft.hiddenLevels?.includes(level));
@@ -93,20 +93,20 @@ export function DrawingSettings({
   };
 
   return (
-    <section className="research-panel drawing-settings" aria-label="Drawing settings">
+    <section className="research-panel drawing-settings" aria-label="畫線設定">
       <div className="section-heading">
-        <span>DRAWING SETTINGS</span>
-        <span>{drawing.type}</span>
+        <span>畫線設定</span>
+        <span>{toolNames[drawing.type]}</span>
       </div>
-      {locked && <p className="research-disclaimer">This drawing is locked. Style and level settings are disabled; visibility and unlock remain available.</p>}
+      {locked && <p className="research-disclaimer">此畫線已鎖定：樣式與層級設定停用，仍可隱藏／顯示或解鎖。</p>}
       <form className="research-form" onSubmit={save}>
         <label>
-          Line color
-          <input aria-label="Drawing line color" type="color" value={draft.color} disabled={locked} onChange={(event) => setDraft({ ...draft, color: event.target.value })} />
+          線條顏色
+          <input aria-label="線條顏色" type="color" value={draft.color} disabled={locked} onChange={(event) => setDraft({ ...draft, color: event.target.value })} />
         </label>
         <label>
-          Line width
-          <select aria-label="Drawing line width" value={draft.widthMode === 'atr' ? 'atr' : String(draft.lineWidth)} disabled={locked} onChange={(event) => {
+          線寬
+          <select aria-label="線寬" value={draft.widthMode === 'atr' ? 'atr' : String(draft.lineWidth)} disabled={locked} onChange={(event) => {
             const selected = event.target.value;
             setDraft({ ...draft, widthMode: selected === 'atr' ? 'atr' : 'pixels', lineWidth: selected === 'atr' ? 1 : Number(selected) });
           }}>
@@ -115,44 +115,44 @@ export function DrawingSettings({
           </select>
         </label>
         <label>
-          Line style
-          <select aria-label="Drawing line style" value={draft.lineStyle} disabled={locked} onChange={(event) => setDraft({ ...draft, lineStyle: event.target.value as DrawingStyle['lineStyle'] })}>
-            <option value="solid">Solid</option>
-            <option value="dashed">Dashed</option>
-            <option value="dotted">Dotted</option>
+          線條樣式
+          <select aria-label="線條樣式" value={draft.lineStyle} disabled={locked} onChange={(event) => setDraft({ ...draft, lineStyle: event.target.value as DrawingStyle['lineStyle'] })}>
+            <option value="solid">實線</option>
+            <option value="dashed">虛線</option>
+            <option value="dotted">點線</option>
           </select>
         </label>
         <label>
-          Line opacity · {(draft.opacity ?? 1).toFixed(2)}
-          <input aria-label="Drawing opacity" type="range" min="0" max="1" step="0.05" value={draft.opacity ?? 1} disabled={locked} onChange={(event) => setDraft({ ...draft, opacity: Number(event.target.value) })} />
+          線條不透明度 · {(draft.opacity ?? 1).toFixed(2)}
+          <input aria-label="線條不透明度" type="range" min="0" max="1" step="0.05" value={draft.opacity ?? 1} disabled={locked} onChange={(event) => setDraft({ ...draft, opacity: Number(event.target.value) })} />
         </label>
         {filled && (
           <label>
-            Fill opacity · {(draft.fillOpacity ?? 0.08).toFixed(2)}
-            <input aria-label="Drawing fill opacity" type="range" min="0" max="0.3" step="0.01" value={draft.fillOpacity ?? 0.08} disabled={locked} onChange={(event) => setDraft({ ...draft, fillOpacity: Number(event.target.value) })} />
+            填色不透明度 · {(draft.fillOpacity ?? 0.08).toFixed(2)}
+            <input aria-label="填色不透明度" type="range" min="0" max="0.3" step="0.01" value={draft.fillOpacity ?? 0.08} disabled={locked} onChange={(event) => setDraft({ ...draft, fillOpacity: Number(event.target.value) })} />
           </label>
         )}
         {fib && (
           <>
             <label>
-              Fibonacci levels · comma-separated
-              <input aria-label="Fibonacci levels" aria-invalid={!levelsValid} value={levels} disabled={locked} onChange={(event) => setLevels(event.target.value)} />
+              費波那契層級（以逗號分隔）
+              <input aria-label="費波那契層級" aria-invalid={!levelsValid} value={levels} disabled={locked} onChange={(event) => setLevels(event.target.value)} />
             </label>
-            <p className="small muted">Enter 2–32 distinct values from 0 to 1. Unchecked levels remain hidden.</p>
+            <p className="small muted">輸入 2–32 個介於 0 到 1 的不重複數值；未勾選的層級會隱藏。</p>
             {levelsValid && parsedLevels.map((level) => (
               <label className="research-checkbox" key={level}>
-                <input type="checkbox" aria-label={`Show Fibonacci label ${level}`} checked={!draft.hiddenLevels?.includes(level)} disabled={locked} onChange={(event) => setHidden(level, !event.target.checked)} />
-                <span>Show level and label {level}</span>
+                <input type="checkbox" aria-label={`顯示費波那契層級 ${level}`} checked={!draft.hiddenLevels?.includes(level)} disabled={locked} onChange={(event) => setHidden(level, !event.target.checked)} />
+                <span>顯示層級與標籤 {level}</span>
               </label>
             ))}
             <label className="research-checkbox">
-              <input type="checkbox" aria-label="Show Fibonacci labels" checked={draft.labelsVisible !== false} disabled={locked} onChange={(event) => setDraft({ ...draft, labelsVisible: event.target.checked })} />
-              <span>Show Fibonacci labels</span>
+              <input type="checkbox" aria-label="顯示費波那契標籤" checked={draft.labelsVisible !== false} disabled={locked} onChange={(event) => setDraft({ ...draft, labelsVisible: event.target.checked })} />
+              <span>顯示費波那契標籤</span>
             </label>
           </>
         )}
         <label className="research-checkbox">
-          <input aria-label="Drawing visible" type="checkbox" checked={visible} onChange={(event) => {
+          <input aria-label="顯示畫線" type="checkbox" checked={visible} onChange={(event) => {
             const next = event.target.checked;
             setVisible(next);
             if (locked) {
@@ -160,19 +160,19 @@ export function DrawingSettings({
               store.updateDrawing(drawing.id, { visible: next });
             }
           }} />
-          <span>Visible</span>
+          <span>顯示</span>
         </label>
         {error && <p className="research-error" role="alert">{error}</p>}
         {!locked ? (
           <>
-            <button className="primary-button" type="submit" style={{ minHeight: 44 }}>Save drawing</button>
-            <button type="button" onClick={updateDefault} style={{ minHeight: 44 }}>Save style as default for new {drawing.type} drawings</button>
+            <button className="primary-button" type="submit" style={{ minHeight: 44 }}>儲存畫線</button>
+            <button type="button" onClick={updateDefault} style={{ minHeight: 44 }} className="ghost-button">將此樣式設為新{toolNames[drawing.type]}的預設</button>
           </>
         ) : (
-          <button type="button" onClick={() => { onCancelGesture(); store.mutateDrawing(drawing.id, 'lock'); }} style={{ minHeight: 44 }}>Unlock drawing</button>
+          <button type="button" onClick={() => { onCancelGesture(); store.mutateDrawing(drawing.id, 'lock'); }} style={{ minHeight: 44 }} className="ghost-button">解鎖畫線</button>
         )}
       </form>
-      <p className="small muted">ATR width maps 0.02 × 14-bar ATR through the price scale to a 0.5–4 CSS-pixel stroke, with at least one raster pixel. Native chart lines round to 1–4 px. New drawings use ATR by default, while saved drawings keep their current width mode. Style defaults apply to future drawings only; Fibonacci defaults keep the standard seven levels, and only matching default levels can be hidden.</p>
+      <p className="small muted">ATR 線寬＝0.02 × 14 根 K 棒 ATR 換算成 0.5–4 像素（至少 1 個實體像素）。新畫線預設使用 ATR 線寬，已儲存的畫線保留原設定。預設樣式只套用於之後的新畫線；費波那契預設維持標準七個層級。</p>
     </section>
   );
 }

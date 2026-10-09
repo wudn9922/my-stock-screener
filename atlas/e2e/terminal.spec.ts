@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { chooseDrawingTool, clickDrawingUtility } from './drawing-picker-helper';
+import { expectProvider, openPanel, searchSymbol, setProvider } from './site-helpers';
 import type { SymbolState } from '../src/storage/schema';
 async function readSymbol(page: Page, symbol = 'AAPL'): Promise<SymbolState | undefined> {
   return page.evaluate(async (s) => {
@@ -28,21 +29,16 @@ async function drag(page: Page, x: number, y: number, toX: number, toY: number) 
   await page.mouse.up();
 }
 async function addMA(page: Page, period: number) {
-  if (
-    (await page.locator('.mobile-nav').isVisible()) &&
-    !(await page.getByRole('dialog', { name: 'indicators panel', exact: true }).isVisible())
-  )
-    await page.locator('.mobile-nav').getByRole('button', { name: 'SMA', exact: true }).click();
-  await page.getByLabel('SMA period', { exact: true }).fill(String(period));
-  await page.getByRole('button', { name: 'Add SMA', exact: true }).click();
+  await openPanel(page, 'indicators');
+  await page.getByLabel('SMA 週期', { exact: true }).fill(String(period));
+  await page.getByRole('button', { name: '新增 SMA', exact: true }).click();
 }
 async function closeSheet(page: Page) {
-  const close = page.getByRole('button', { name: 'Close panel', exact: true });
+  const close = page.getByRole('button', { name: '關閉面板', exact: true });
   if (await close.isVisible()) await close.click();
 }
 async function switchTo(page: Page, symbol: string) {
-  await page.getByLabel('Symbol search', { exact: true }).fill(symbol);
-  await page.getByLabel('Symbol search', { exact: true }).press('Enter');
+  await searchSymbol(page, symbol);
   await expect(page.getByTestId('active-symbol')).toHaveText(symbol);
   await loaded(page);
 }
@@ -54,10 +50,10 @@ test('per-symbol multiple SMA locks and drawing persistence survive symbol switc
   page,
 }) => {
   await addMA(page, 24);
-  await page.getByRole('button', { name: 'Lock SMA 24', exact: true }).click();
+  await page.getByRole('button', { name: '鎖定 SMA 24', exact: true }).click();
   await addMA(page, 58);
   await closeSheet(page);
-  await chooseDrawingTool(page, 'Trend Line');
+  await chooseDrawingTool(page, '趨勢線');
   const r = (await page.getByTestId('chart').boundingBox())!;
   const x = r.x + Math.min(130, r.width * 0.3),
     y = r.y + r.height * 0.45;
@@ -65,7 +61,7 @@ test('per-symbol multiple SMA locks and drawing persistence survive symbol switc
   await expect.poll(async () => (await readSymbol(page))?.drawings.length ?? 0).toBe(0);
   await drag(page, r.x + r.width * 0.8, y + 60, r.x + r.width * 0.82, y + 55);
   await expect.poll(async () => (await readSymbol(page))?.drawings.length).toBe(1);
-  await page.getByRole('button', { name: 'Lock selected drawing', exact: true }).click();
+  await page.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
   await expect.poll(async () => (await readSymbol(page))?.drawings[0].locked).toBe(true);
   const aapl = await readSymbol(page);
   expect(aapl!.drawings[0].points[1].logical).toBeGreaterThan(2499);
@@ -74,9 +70,9 @@ test('per-symbol multiple SMA locks and drawing persistence survive symbol switc
   await addMA(page, 56);
   await closeSheet(page);
   expect((await readSymbol(page, 'NVDA'))!.drawings).toEqual([]);
-  await expect(page.locator('.chart-status')).toContainText('0 DRAWINGS');
+  await expect(page.locator('.chart-status')).toContainText('畫線 0 條');
   await switchTo(page, 'AAPL');
-  await expect(page.locator('.chart-status')).toContainText('1 DRAWINGS');
+  await expect(page.locator('.chart-status')).toContainText('畫線 1 條');
   expect((await readSymbol(page))!.indicators.map((i) => i.period)).toEqual([24, 58]);
   await page.reload();
   await loaded(page);
@@ -92,7 +88,7 @@ test('press-drag-release, endpoint and body edits, undo/redo, locked pan and tim
   const r = (await page.getByTestId('chart').boundingBox())!,
     a = { x: r.x + r.width * 0.35, y: r.y + r.height * 0.5 },
     b = { x: r.x + r.width * 0.65, y: r.y + r.height * 0.63 };
-  await chooseDrawingTool(page, 'Trend Line');
+  await chooseDrawingTool(page, '趨勢線');
   await drag(page, a.x - 20, a.y - 20, a.x, a.y);
   await drag(page, b.x - 20, b.y - 20, b.x, b.y);
   await expect.poll(async () => (await readSymbol(page))?.drawings.length).toBe(1);
@@ -112,15 +108,15 @@ test('press-drag-release, endpoint and body edits, undo/redo, locked pan and tim
   await expect
     .poll(async () => (await readSymbol(page))?.drawings[0].points[1].price)
     .not.toBe(edited.points[1].price);
-  await clickDrawingUtility(page, 'Undo drawing');
+  await clickDrawingUtility(page, '復原畫線');
   await expect
     .poll(async () => (await readSymbol(page))?.drawings[0].points)
     .toEqual(edited.points);
-  await clickDrawingUtility(page, 'Redo drawing');
+  await clickDrawingUtility(page, '重做畫線');
   await expect
     .poll(async () => (await readSymbol(page))?.drawings[0].points[1].price)
     .not.toBe(edited.points[1].price);
-  await page.getByRole('button', { name: 'Lock selected drawing', exact: true }).click();
+  await page.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
   const locked = (await readSymbol(page))!.drawings[0];
   await drag(
     page,
@@ -132,23 +128,23 @@ test('press-drag-release, endpoint and body edits, undo/redo, locked pan and tim
   await expect.poll(async () => (await readSymbol(page))?.preferences.views['1D']).toBeDefined();
   expect((await readSymbol(page))!.drawings[0].points).toEqual(locked.points);
   for (const tf of ['5m', '1H', '1D']) {
-    await page.getByRole('button', { name: `Timeframe ${tf}`, exact: true }).click();
+    await page.getByRole('button', { name: `週期 ${tf}`, exact: true }).click();
     await loaded(page);
     expect((await readSymbol(page))!.drawings[0].points).toEqual(locked.points);
     await expect(page.locator('.chart-status')).toContainText(
-      tf === '1D' ? '1 DRAWINGS' : '0 DRAWINGS',
+      tf === '1D' ? '畫線 1 條' : '畫線 0 條',
     );
   }
 });
 test('Horizontal Line, export/import and locked SMA UI guards', async ({ page }) => {
   await addMA(page, 24);
-  await page.getByRole('button', { name: 'Lock SMA 24', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Settings SMA 24', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Remove SMA 24', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'Hide SMA 24', exact: true }).click();
+  await page.getByRole('button', { name: '鎖定 SMA 24', exact: true }).click();
+  await expect(page.getByRole('button', { name: '設定 SMA 24', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '移除 SMA 24', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '隱藏 SMA 24', exact: true }).click();
   await closeSheet(page);
   const r = (await page.getByTestId('chart').boundingBox())!;
-  await chooseDrawingTool(page, 'Horizontal Line');
+  await chooseDrawingTool(page, '水平線');
   await drag(
     page,
     r.x + r.width * 0.7,
@@ -157,41 +153,34 @@ test('Horizontal Line, export/import and locked SMA UI guards', async ({ page })
     r.y + r.height * 0.6,
   );
   await expect.poll(async () => (await readSymbol(page))?.drawings[0].type).toBe('horizontal');
+  await openPanel(page, 'settings');
   const pending = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export settings', exact: true }).click();
+  await page.getByRole('button', { name: '匯出設定', exact: true }).click();
   const download = await pending;
+  await closeSheet(page);
   expect(download.suggestedFilename()).toMatch(/atlas-settings.*json/);
   const path = await download.path();
   expect(path).not.toBeNull();
-  await page.getByRole('button', { name: 'Lock selected drawing', exact: true }).click();
-  await page.getByLabel('Settings file', { exact: true }).setInputFiles(path!);
+  await page.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
+  await page.getByLabel('設定檔', { exact: true }).setInputFiles(path!);
   await expect(page.getByRole('status')).toContainText('設定已還原');
   await expect.poll(async () => (await readSymbol(page))?.drawings[0].locked).toBe(false);
 });
 test('watchlist add, reorder and remove persist', async ({ page }) => {
-  const mobile = await page.locator('.mobile-nav').isVisible();
-  if (mobile)
-    await page
-      .locator('.mobile-nav')
-      .getByRole('button', { name: 'Watchlist', exact: true })
-      .click();
-  await page.getByRole('button', { name: 'Add watchlist symbol', exact: true }).click();
-  await page.getByLabel('Watchlist ticker', { exact: true }).fill('NVO');
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Select NVO', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Manage watchlist', exact: true }).click();
-  await page.getByRole('button', { name: 'Move NVO up', exact: true }).click();
-  await page.getByRole('button', { name: 'Remove AMD from watchlist', exact: true }).click();
+  await openPanel(page, 'watchlist');
+  await page.getByRole('button', { name: '新增自選股', exact: true }).click();
+  await page.getByLabel('自選股代號', { exact: true }).fill('NVO');
+  await page.getByRole('button', { name: '加入', exact: true }).click();
+  await expect(page.getByRole('button', { name: '選擇 NVO', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '管理自選清單', exact: true }).click();
+  await page.getByRole('button', { name: '上移 NVO', exact: true }).click();
+  await page.getByRole('button', { name: '從自選清單移除 AMD', exact: true }).click();
   await closeSheet(page);
   await page.reload();
   await loaded(page);
-  if (mobile)
-    await page
-      .locator('.mobile-nav')
-      .getByRole('button', { name: 'Watchlist', exact: true })
-      .click();
-  await expect(page.getByRole('button', { name: 'Select NVO', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Select AMD', exact: true })).toHaveCount(0);
+  await openPanel(page, 'watchlist');
+  await expect(page.getByRole('button', { name: '選擇 NVO', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '選擇 AMD', exact: true })).toHaveCount(0);
 });
 test('mobile touch placement loupe, pointer cancel and no page scroll', async ({
   page,
@@ -202,7 +191,7 @@ test('mobile touch placement loupe, pointer cancel and no page scroll', async ({
   const r = (await page.getByTestId('chart').boundingBox())!,
     x = r.x + r.width * 0.35,
     y = r.y + r.height * 0.5;
-  await chooseDrawingTool(page, 'Trend Line');
+  await chooseDrawingTool(page, '趨勢線');
   if (browserName === 'chromium') {
     const cdp = await page.context().newCDPSession(page);
     const touch = async (
@@ -232,11 +221,11 @@ test('mobile touch placement loupe, pointer cancel and no page scroll', async ({
     await touch('touchCancel');
     await expect(page.getByTestId('loupe')).toBeHidden();
     const drawingBeforePinch = (await readSymbol(page))!.drawings;
-    await clickDrawingUtility(page, 'Zoom out');
-    await clickDrawingUtility(page, 'Zoom in');
+    await clickDrawingUtility(page, '縮小圖表');
+    await clickDrawingUtility(page, '放大圖表');
     await expect.poll(async () => (await readSymbol(page))?.preferences.views['1D']).toBeDefined();
     const rangeBeforePinch = (await readSymbol(page))!.preferences.views['1D']!;
-    await chooseDrawingTool(page, 'Trend Line');
+    await chooseDrawingTool(page, '趨勢線');
     await touch('touchStart', x - 25, y);
     await expect(page.getByTestId('loupe')).toBeVisible();
     await cdp.send('Input.dispatchTouchEvent', {
@@ -299,9 +288,9 @@ test('prototype provider failure is explicit and switching back to Demo restores
       body: JSON.stringify({ error: 'Prototype provider unavailable' }),
     }),
   );
-  await page.getByLabel('Market data source', { exact: true }).selectOption('yahoo');
-  await expect(page.locator('.chart-loading.error')).toContainText('資料來源暫時無法使用');
-  await page.getByRole('button', { name: '使用離線 Demo', exact: true }).click();
+  await setProvider(page, 'yahoo');
+  await expect(page.locator('.chart-loading.error')).toContainText('行情資料暫時無法取得');
+  await page.getByRole('button', { name: '改看離線模擬資料', exact: true }).click();
   await loaded(page);
-  await expect(page.getByLabel('Market data source', { exact: true })).toHaveValue('demo');
+  await expectProvider(page, 'demo');
 });

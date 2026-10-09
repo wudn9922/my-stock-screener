@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { clickExport, searchSymbol } from './site-helpers';
 import { chooseDrawingTool } from './drawing-picker-helper';
 import { DemoProvider } from '../src/market-data/DemoProvider';
 import type { SymbolState } from '../src/storage/schema';
@@ -8,20 +9,20 @@ async function loaded(page: Page) {
   await expect(page.getByTestId('ohlc-header')).toContainText('O ');
 }
 async function closePanel(page: Page) {
-  const close = page.getByRole('button', { name: 'Close panel', exact: true });
+  const close = page.getByRole('button', { name: '關閉面板', exact: true });
   if (await close.isVisible()) await close.click();
 }
 async function addMA(page: Page, period: number) {
-  await page.getByRole('button', { name: 'Manage indicators', exact: true }).click();
+  await page.getByRole('button', { name: '管理指標', exact: true }).click();
   await page
-    .getByLabel('Indicator type', { exact: true })
+    .getByLabel('指標類型', { exact: true })
     .filter({ visible: true })
     .selectOption('SMA');
   await page
-    .getByLabel('SMA period', { exact: true })
+    .getByLabel('SMA 週期', { exact: true })
     .filter({ visible: true })
     .fill(String(period));
-  await page.getByRole('button', { name: 'Add SMA', exact: true }).click();
+  await page.getByRole('button', { name: '新增 SMA', exact: true }).click();
   await closePanel(page);
 }
 async function saved(page: Page): Promise<SymbolState> {
@@ -79,21 +80,22 @@ test('passive numeric legend, directional volume MA20 and zoom actions preserve 
     compact.format(mean(bars.slice(-20).map((b) => b.volume))),
   );
   if (!isMobile) {
-    for (const label of ['Zoom in', 'Zoom out']) {
+    for (const label of ['放大圖表', '縮小圖表']) {
       const box = (await page.getByRole('button', { name: label, exact: true }).boundingBox())!;
       const host = (await chart.boundingBox())!;
-      expect(box.width).toBeGreaterThanOrEqual(44);
-      expect(box.height).toBeGreaterThanOrEqual(44);
+      // Desktop toolbar targets are 40 px (pointer); touch layouts keep 44 px.
+      expect(box.width).toBeGreaterThanOrEqual(40);
+      expect(box.height).toBeGreaterThanOrEqual(40);
       expect(
         box.x + box.width <= host.x || box.y + box.height <= host.y || box.y >= host.y + host.height,
       ).toBe(true);
     }
   } else {
     const chartHeight = (await chart.boundingBox())!.height;
-    await page.getByRole('button', { name: 'Drawing Tools', exact: true }).click();
-    const picker = page.getByRole('dialog', { name: 'Drawing tools', exact: true });
+    await page.getByRole('button', { name: '繪圖工具', exact: true }).click();
+    const picker = page.getByRole('dialog', { name: '繪圖工具', exact: true });
     await expect(picker).toBeVisible();
-    for (const label of ['Zoom in', 'Zoom out']) {
+    for (const label of ['放大圖表', '縮小圖表']) {
       const button = picker.getByRole('button', { name: label, exact: true });
       await expect(button).toBeVisible();
       const box = (await button.boundingBox())!;
@@ -105,27 +107,27 @@ test('passive numeric legend, directional volume MA20 and zoom actions preserve 
     await expect(picker).toBeHidden();
     expect((await chart.boundingBox())!.height).toBeCloseTo(chartHeight, 0);
     await expect(page.locator('.chart-status-quick-actions')).toBeHidden();
-    for (const label of ['Zoom in', 'Zoom out'])
+    for (const label of ['放大圖表', '縮小圖表'])
       await expect(page.getByRole('button', { name: label, exact: true })).toHaveCount(0);
   }
   for (const period of [8, 12, 20, 32, 43, 100]) await addMA(page, period);
   await expect(page.locator('.indicator-chip')).toHaveCount(8);
   expect((await chart.boundingBox())!.height).toBeCloseTo(twoHeight, 0);
   expect((await page.locator('.indicator-chips').boundingBox())!.height).toBeLessThanOrEqual(44);
-  await page.getByRole('button', { name: 'Manage indicators', exact: true }).click();
+  await page.getByRole('button', { name: '管理指標', exact: true }).click();
   await page
-    .getByLabel('Indicator type', { exact: true })
+    .getByLabel('指標類型', { exact: true })
     .filter({ visible: true })
     .selectOption('Volume');
-  await page.getByRole('button', { name: 'Add Volume', exact: true }).click();
+  await page.getByRole('button', { name: '新增 Volume', exact: true }).click();
   await closePanel(page);
   await expect(legacy).toHaveCount(0);
-  const vol = page.locator('.indicator-chip').filter({ hasText: 'Volume' });
+  const vol = page.locator('.indicator-chip').filter({ hasText: '成交量' });
   await expect(vol.locator('[data-volume-average]')).toHaveText(
     compact.format(mean(bars.slice(-20).map((b) => b.volume))),
   );
-  await page.getByRole('button', { name: 'Manage indicators', exact: true }).click();
-  await page.getByRole('button', { name: 'Hide Volume', exact: true }).click();
+  await page.getByRole('button', { name: '管理指標', exact: true }).click();
+  await page.getByRole('button', { name: '隱藏 成交量', exact: true }).click();
   await closePanel(page);
   await expect(vol.locator('[data-volume-average]')).toHaveText('Hidden');
   await expect(legacy).toHaveCount(0);
@@ -148,8 +150,8 @@ test('chart focus fallback keeps the engine, dialogs, drawing locks and viewport
   await addMA(page, 24);
   const before = (await page.getByTestId('chart').boundingBox())!;
   const host = await page.getByTestId('chart').elementHandle();
-  await page.getByRole('button', { name: 'Enter chart fullscreen', exact: true }).click();
-  const exit = page.getByRole('button', { name: 'Exit chart fullscreen', exact: true });
+  await page.getByRole('button', { name: '全螢幕圖表', exact: true }).click();
+  const exit = page.getByRole('button', { name: '離開全螢幕', exact: true });
   await expect(exit).toBeVisible();
   await expect
     .poll(async () => (await page.getByTestId('chart').boundingBox())!.height)
@@ -157,13 +159,13 @@ test('chart focus fallback keeps the engine, dialogs, drawing locks and viewport
   expect(await host!.evaluate((el) => el === document.querySelector('[data-testid="chart"]'))).toBe(
     true,
   );
-  await page.getByRole('button', { name: 'Manage indicators', exact: true }).click();
+  await page.getByRole('button', { name: '管理指標', exact: true }).click();
   await expect(
-    page.getByLabel('SMA period', { exact: true }).filter({ visible: true }),
+    page.getByLabel('SMA 週期', { exact: true }).filter({ visible: true }),
   ).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(exit).toBeVisible();
-  await chooseDrawingTool(page, 'Horizontal Line');
+  await chooseDrawingTool(page, '水平線');
   const box = (await page.getByTestId('chart').boundingBox())!;
   const x = box.x + box.width * 0.4,
     y = box.y + box.height * 0.4;
@@ -195,7 +197,7 @@ test('chart focus fallback keeps the engine, dialogs, drawing locks and viewport
     await page.mouse.up();
   }
   await expect.poll(async () => (await saved(page))?.drawings.length).toBe(1);
-  await page.getByRole('button', { name: 'Lock selected drawing', exact: true }).click();
+  await page.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
   await expect.poll(async () => (await saved(page))?.drawings[0].locked).toBe(true);
   // Selection/actions must never resize the plot beneath its original anchors.
   expect((await page.getByTestId('chart').boundingBox())!.height).toBeCloseTo(box.height, 0);
@@ -207,21 +209,21 @@ test('chart focus fallback keeps the engine, dialogs, drawing locks and viewport
   }
   await exit.click();
   await expect(
-    page.getByRole('button', { name: 'Enter chart fullscreen', exact: true }),
+    page.getByRole('button', { name: '全螢幕圖表', exact: true }),
   ).toBeVisible();
   expect(await host!.evaluate((el) => el === document.querySelector('[data-testid="chart"]'))).toBe(
     true,
   );
   const downloading = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export settings', exact: true }).click();
+  await clickExport(page);
   await downloading;
   await expect(page.locator('.notice')).toHaveCSS('pointer-events', 'none');
   await expect(
-    page.getByRole('button', { name: 'Dismiss notification', exact: true }),
+    page.getByRole('button', { name: '關閉通知', exact: true }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Lock selected drawing', exact: true }).click();
+  await page.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
   await expect.poll(async () => (await saved(page))?.drawings[0].locked).toBe(false);
-  await page.getByRole('button', { name: 'Lock selected drawing', exact: true }).click();
+  await page.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
   await expect.poll(async () => (await saved(page))?.drawings[0].locked).toBe(true);
   await page.reload();
   await loaded(page);
@@ -235,13 +237,13 @@ test('fullscreen exit and crosshair numeric readouts use current candle then lat
   await page.goto('/');
   await loaded(page);
   await addMA(page, 24);
-  await page.getByRole('button', { name: 'Enter chart fullscreen', exact: true }).click();
+  await page.getByRole('button', { name: '全螢幕圖表', exact: true }).click();
   await expect(
-    page.getByRole('button', { name: 'Exit chart fullscreen', exact: true }),
+    page.getByRole('button', { name: '離開全螢幕', exact: true }),
   ).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(
-    page.getByRole('button', { name: 'Enter chart fullscreen', exact: true }),
+    page.getByRole('button', { name: '全螢幕圖表', exact: true }),
   ).toBeVisible();
   const readout = page.locator('.indicator-chip [data-indicator-value]');
   const { bars } = await new DemoProvider().getBars('AAPL', '1D');
@@ -260,21 +262,20 @@ test('fullscreen exit and crosshair numeric readouts use current candle then lat
     await page.mouse.move(0, 0);
     await expect(readout).toHaveText(latest);
   }
-  const search = page.getByLabel('Symbol search', { exact: true });
-  await search.fill('NVDA');
-  await search.press('Enter');
+  // An ordinary input outside dialogs: the workspace Escape handler must leave its key event alone.
+  const plainInput = page.getByLabel('設定檔', { exact: true });
+  await searchSymbol(page, 'NVDA');
   await loaded(page);
   await expect(page.locator('.indicator-chip')).toHaveCount(0);
   const nvda = await new DemoProvider().getBars('NVDA', '1D');
   await expect(page.locator('[data-legacy-volume] [data-volume-value]')).toHaveText(
     compact.format(nvda.bars.at(-1)!.volume),
   );
-  await search.fill('AAPL');
-  await search.press('Enter');
+  await searchSymbol(page, 'AAPL');
   await loaded(page);
   await expect(readout).toHaveText(latest);
   expect(
-    await search.evaluate((input) => {
+    await plainInput.evaluate((input) => {
       const event = new KeyboardEvent('keydown', {
         key: 'Escape',
         bubbles: true,
@@ -284,7 +285,7 @@ test('fullscreen exit and crosshair numeric readouts use current candle then lat
       return event.defaultPrevented;
     }),
   ).toBe(false);
-  await page.getByRole('button', { name: 'Timeframe 1H', exact: true }).click();
+  await page.getByRole('button', { name: '週期 1H', exact: true }).click();
   await loaded(page);
   await expect(page.locator('.indicator-chip')).toHaveCount(0);
   expect((await saved(page)).indicators.map((indicator) => indicator.scope.timeframe)).toEqual([
@@ -299,7 +300,7 @@ test('fullscreen exit and crosshair numeric readouts use current candle then lat
     '1D',
     '1H',
   ]);
-  await page.getByRole('button', { name: 'Timeframe 1D', exact: true }).click();
+  await page.getByRole('button', { name: '週期 1D', exact: true }).click();
   await loaded(page);
   await expect(page.locator('.indicator-chip')).toHaveCount(1);
   await expect(readout).toHaveText(latest);
@@ -317,12 +318,12 @@ test('denied browser fullscreen falls back to chart focus without losing indicat
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
   await loaded(page);
-  await page.getByRole('button', { name: 'Enter chart fullscreen', exact: true }).click();
+  await page.getByRole('button', { name: '全螢幕圖表', exact: true }).click();
   await expect(
-    page.getByRole('button', { name: 'Exit chart fullscreen', exact: true }),
+    page.getByRole('button', { name: '離開全螢幕', exact: true }),
   ).toBeVisible();
   await addMA(page, 24);
   await expect(page.locator('.indicator-chip [data-indicator-value]')).toHaveText(/\d+\.\d{2}/);
-  await page.getByRole('button', { name: 'Exit chart fullscreen', exact: true }).click();
+  await page.getByRole('button', { name: '離開全螢幕', exact: true }).click();
   expect(errors).toEqual([]);
 });

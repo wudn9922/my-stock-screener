@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { normalizeSymbol } from '../src/market-data/MarketDataProvider';
 import { getMarketProfile, isIndexSymbol, CANONICAL_SYMBOL_REGEX } from '../src/market-data/MarketProfile';
 import { isSecEligibleSymbol } from '../src/fundamentals/SecEligibility';
@@ -15,7 +12,6 @@ import {
 import { parseLaunchParams, parseLaunchTimeframe } from '../src/app/LaunchParams';
 import { isScreenerBase, storageName } from '../src/app/HostingMode';
 import { parseAtlasTimeframes } from '../scripts/atlas-timeframes.ts';
-import { buildFundamentals } from '../scripts/build-fundamentals.ts';
 import {
   collectSymbols,
   fetchScreenerSymbols,
@@ -27,7 +23,6 @@ import {
 const rawNvda = JSON.parse(readFileSync('tests/fixtures/sec/NVDA.json', 'utf8'));
 const normalizer = new FinancialNormalizer();
 const nvdaAnnual = normalizer.normalize(rawNvda, 'NVDA', 'annual');
-const nvdaQuarterly = normalizer.normalize(rawNvda, 'NVDA', 'quarterly');
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -311,94 +306,4 @@ describe('screener-symbols normalization', () => {
     ).rejects.toThrow('no valid stock tickers');
     await expect(fetchScreenerSymbols({ SUPABASE_URL: 'https://x' }, vi.fn() as unknown as typeof fetch)).rejects.toThrow('KEY');
   });
-});
-
-describe('build-fundamentals', () => {
-  const nvdaFacts = { cik: '0001045810', data: rawNvda };
-
-  async function withDir<T>(fn: (dir: string) => Promise<T>) {
-    const dir = await mkdtemp(join(tmpdir(), 'atlas-fundamentals-'));
-    try {
-      return await fn(dir);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-
-  it('writes /api/fundamentals-identical per-period files, skips non-SEC symbols and keeps unchanged files', async () =>
-    withDir(async (dir) => {
-      const companyFacts = vi.fn(async (symbol: string) => (symbol === 'NVDA' ? nvdaFacts : null));
-      const options = {
-        symbols: ['NVDA', 'ZZZZ', '2330.TW', '^TWII', '^GSPC'],
-        outDir: dir,
-        seedDirectory: join(dir, 'no-seeds'),
-        client: { companyFacts },
-        closeClient: () => undefined,
-        log: () => undefined,
-        maxAgeSeconds: 0,
-      };
-      const manifest = await buildFundamentals(options);
-      expect(companyFacts.mock.calls.map(([symbol]) => symbol)).toEqual(['NVDA', 'ZZZZ']);
-      expect(JSON.parse(await readFile(join(dir, 'NVDA-annual.json'), 'utf8'))).toEqual(nvdaAnnual);
-      expect(JSON.parse(await readFile(join(dir, 'NVDA-quarterly.json'), 'utf8'))).toEqual(nvdaQuarterly);
-      expect(manifest.symbols.NVDA).toMatchObject({ status: 'fresh', changed: true, cik: '0001045810', annualRecords: nvdaAnnual.length });
-      expect(manifest.symbols.ZZZZ.status).toBe('no-cik');
-      expect(manifest.symbols['2330.TW'].status).toBe('skipped');
-      expect(manifest.symbols['^TWII'].status).toBe('skipped');
-      expect(manifest.symbols['^GSPC'].status).toBe('skipped');
-      await expect(stat(join(dir, 'ZZZZ-annual.json'))).rejects.toThrow();
-      expect(JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')).symbols.NVDA.status).toBe('fresh');
-
-      const before = (await stat(join(dir, 'NVDA-annual.json'))).mtimeMs;
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      const second = await buildFundamentals(options);
-      expect(second.symbols.NVDA).toMatchObject({ status: 'fresh', changed: false });
-      expect((await stat(join(dir, 'NVDA-annual.json'))).mtimeMs).toBe(before);
-    }));
-
-  it('reuses a recent check without calling SEC', async () =>
-    withDir(async (dir) => {
-      const companyFacts = vi.fn(async () => nvdaFacts);
-      const base = { symbols: ['NVDA'], outDir: dir, seedDirectory: dir, client: { companyFacts }, log: () => undefined };
-      await buildFundamentals(base);
-      await buildFundamentals(base);
-      expect(companyFacts).toHaveBeenCalledTimes(1);
-    }));
-
-  it('retains previous files on failure, falls back to versioned seeds, and never aborts the run', async () =>
-    withDir(async (dir) => {
-      await buildFundamentals({
-        symbols: ['NVDA'], outDir: dir, seedDirectory: dir, maxAgeSeconds: 0, log: () => undefined,
-        client: { companyFacts: async () => nvdaFacts },
-      });
-      const previous = await readFile(join(dir, 'NVDA-annual.json'), 'utf8');
-      const failing = vi.fn(async () => {
-        throw new Error('SEC returned 403');
-      });
-      const manifest = await buildFundamentals({
-        symbols: ['NVDA', 'AAPL', 'QQQ'], outDir: dir, seedDirectory: 'data/financial-snapshots',
-        maxAgeSeconds: 0, log: () => undefined, client: { companyFacts: failing },
-      });
-      expect(failing).toHaveBeenCalledTimes(3);
-      expect(manifest.symbols.NVDA).toMatchObject({ status: 'retained', error: 'SEC returned 403' });
-      expect(await readFile(join(dir, 'NVDA-annual.json'), 'utf8')).toBe(previous);
-      expect(manifest.symbols.AAPL.status).toBe('seed');
-      const seed = JSON.parse(await readFile('data/financial-snapshots/AAPL.json', 'utf8'));
-      expect(JSON.parse(await readFile(join(dir, 'AAPL-quarterly.json'), 'utf8'))).toEqual(seed.quarterly);
-      expect(manifest.symbols.AAPL.fetchedAt).toBe(seed.fetchedAt);
-      expect(manifest.symbols.QQQ.status).toBe('unavailable');
-    }));
-
-  it('reads the allowlist file and skips invalid entries', async () =>
-    withDir(async (dir) => {
-      const symbolsFile = join(dir, 'symbols.json');
-      await writeFile(symbolsFile, JSON.stringify(['NVDA', 'not valid!', '2330.TW']));
-      const log = vi.fn();
-      const manifest = await buildFundamentals({
-        symbolsFile, outDir: join(dir, 'out'), seedDirectory: dir, log,
-        client: { companyFacts: async () => nvdaFacts },
-      });
-      expect(Object.keys(manifest.symbols).sort()).toEqual(['2330.TW', 'NVDA']);
-      expect(log).toHaveBeenCalledWith(expect.stringContaining('not valid!'));
-    }));
 });

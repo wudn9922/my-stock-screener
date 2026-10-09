@@ -14,7 +14,8 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -b",
     "serve:fundamentals": "node dist-server/fundamentals.mjs",
-    "test:sec-live": "node scripts/sec-smoke.mjs"
+    "test:sec-live": "node scripts/sec-smoke.mjs",
+    "test:site": "playwright test --config e2e-site/playwright.config.ts"
   },
   "dependencies": {
     "@tradingview/lwc-toolkit": "1.0.0",

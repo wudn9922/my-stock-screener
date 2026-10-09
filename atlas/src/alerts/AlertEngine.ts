@@ -60,7 +60,7 @@ export function evaluateAlerts(definitions: readonly AlertDefinition[], bars: re
       const up = previous !== null && next !== null && previous <= 0 && next > 0;
       const down = previous !== null && next !== null && previous >= 0 && next < 0;
       if ((alert.direction === 'cross' && (up || down)) || (alert.direction === 'above' && up) || (alert.direction === 'below' && down)) {
-        events.push({ id: alert.id, symbol: alert.symbol, time: bar.time, price: bar.close, message: `${alert.symbol} ${alert.kind} ${up ? 'crossed above' : 'crossed below'} · ${bar.close.toFixed(2)}` });
+        events.push({ id: alert.id, symbol: alert.symbol, time: bar.time, price: bar.close, message: `${alert.symbol} ${alert.kind === 'level' ? '價格' : alert.kind === 'ma' ? `${alert.maType} ${alert.period}` : '畫線'}提醒：收盤${up ? '向上' : '向下'}穿越 · ${bar.close.toFixed(2)}` });
         alert.lastTriggered = bar.time;
       }
       alert = { ...alert, lastEvaluated: bar.time, baseline: next };

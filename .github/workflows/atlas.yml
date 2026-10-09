@@ -1,7 +1,8 @@
 name: Atlas Research Terminal
 
-# 每日報告（Daily Stock Screener）成功後，重新抓取 Atlas 的行情 / 財報快照，
-# 建置 atlas/ 並部署到 docs/atlas/（GitHub Pages：/my-stock-screener/atlas/）。
+# 建置 Atlas（行情改由 Supabase Edge Function 即時代理，不再產生個股快照檔），
+# 並在建置時產生全市場股票目錄與本益比資料，部署到 docs/atlas/
+# （GitHub Pages：/my-stock-screener/atlas/）。只會替換 docs/atlas/。
 on:
   workflow_run:
     workflows: ["Daily Stock Screener"]
@@ -19,9 +20,8 @@ env:
 permissions:
   contents: write
 
-# 使用獨立群組：若與 schedule.yml 共用，排隊中的 Atlas 執行可能取代
-# 排隊中的每日報告，導致當天報告與 LINE 推播被取消。
-# 與每日報告同時推送的衝突由下方 pull --rebase + 重試處理。
+# 獨立群組：若與 schedule.yml 共用，排隊中的 Atlas 執行可能取代排隊中的每日報告。
+# 與每日報告同時推送的衝突由下方 pull --rebase --autostash + 重試處理。
 concurrency:
   group: atlas-research-terminal
   cancel-in-progress: false
@@ -33,7 +33,7 @@ jobs:
       github.event_name != 'workflow_run'
       || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash
@@ -59,49 +59,41 @@ jobs:
         working-directory: atlas
         run: npm test
 
-      - name: Generate symbol list from screener groups (Supabase)
-        id: symbols
-        continue-on-error: true
-        working-directory: atlas
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_USER_ID: ${{ secrets.SUPABASE_USER_ID }}
-        run: node scripts/screener-symbols.mjs
-
-      - name: Seed data from last deployment (keep last good data)
+      # 產生的資料只放在 git-ignored 路徑（atlas/public/symbols/directory.json、atlas/public/valuation/），
+      # 先帶入上次部署的版本：來源暫時失敗時仍保留最後一次成功的資料。
+      - name: Seed generated data from the last deployment
         run: |
           set -euo pipefail
-          for dir in market-data fundamentals; do
-            if [ -d "docs/atlas/${dir}" ]; then
-              mkdir -p "atlas/public/${dir}"
-              cp -a "docs/atlas/${dir}/." "atlas/public/${dir}/"
-              echo "已從 docs/atlas/${dir} 帶入上次部署的資料"
-            else
-              echo "docs/atlas/${dir} 不存在，略過"
-            fi
-          done
+          if [ -f docs/atlas/symbols/directory.json ]; then
+            mkdir -p atlas/public/symbols
+            cp docs/atlas/symbols/directory.json atlas/public/symbols/directory.json
+            echo "已帶入上次部署的股票目錄"
+          fi
+          if [ -d docs/atlas/valuation ]; then
+            mkdir -p atlas/public/valuation
+            cp -a docs/atlas/valuation/. atlas/public/valuation/
+            echo "已帶入上次部署的本益比資料"
+          fi
 
-      - name: Refresh market data (Yahoo snapshot)
-        id: market
+      - name: Build full-market symbol directory (TWSE / TPEx / US)
+        id: directory
         continue-on-error: true
         working-directory: atlas
-        env:
-          ATLAS_TIMEFRAMES: 1D,1W,1M
-        run: node scripts/refresh-market.mjs
+        run: node scripts/build-directory.mjs
 
-      - name: Build SEC fundamentals (US only)
-        id: fundamentals
+      - name: Build valuation data (SEC frames / TWSE / TPEx)
+        id: valuation
         continue-on-error: true
         working-directory: atlas
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT || 'my-stock-screener-atlas (https://github.com/wudn9922/my-stock-screener)' }}
-        run: node scripts/build-fundamentals.mjs
+        run: node scripts/build-valuation.mjs
 
       - name: Build Atlas for GitHub Pages
         working-directory: atlas
         env:
           VITE_PUBLIC_BASE: /my-stock-screener/atlas/
+          VITE_MARKET_PROXY_URL: ${{ vars.MARKET_PROXY_URL || 'https://bxhqpfeberqbtxymghyt.supabase.co/functions/v1/market-chart' }}
         run: npm run build:pages
 
       - name: Replace docs/atlas with build output
@@ -111,23 +103,34 @@ jobs:
             echo "::error::atlas/dist-pages/index.html 不存在，停止部署"
             exit 1
           fi
-          # 只動 docs/atlas，其他 docs 檔案（index.html、截圖）一律不碰
+          for file in symbols/directory.json valuation/us.json valuation/tw.json; do
+            if [ ! -f "atlas/dist-pages/${file}" ]; then
+              echo "::warning::建置結果缺少 ${file}（搜尋或本益比會降級顯示）"
+            fi
+          done
+          # 只動 docs/atlas；docs/report/、docs/index.html、docs/*.png 一律不碰
           rm -rf docs/atlas
           mkdir -p docs/atlas
           cp -a atlas/dist-pages/. docs/atlas/
-          # GitHub Pages 的 Jekyll 會略過底線開頭的檔案；
-          # 若建置結果有這類檔案，補上 docs/.nojekyll（只新增，不影響既有頁面）
+          # GitHub Pages 的 Jekyll 會略過底線開頭的檔案；若有這類檔案，補上 docs/.nojekyll
           if find docs/atlas -name '_*' -print -quit | grep -q .; then
             echo "偵測到底線開頭的檔案，建立 docs/.nojekyll"
             touch docs/.nojekyll
           fi
           du -sh docs/atlas
+          du -sh docs/atlas/symbols docs/atlas/valuation 2>/dev/null || true
 
       - name: Commit and push docs/atlas
         run: |
           set -euo pipefail
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          # 建置不應修改任何受版本控制的檔案；若有，還原它們，避免 pull --rebase 被擋下。
+          if ! git diff --quiet -- atlas; then
+            echo "::warning::建置修改了受版本控制的檔案，已還原："
+            git diff --name-only -- atlas
+            git checkout -- atlas
+          fi
           git add -A docs/atlas
           if [ -f docs/.nojekyll ]; then
             git add docs/.nojekyll
@@ -138,11 +141,11 @@ jobs:
           fi
           git commit -m "Auto-update Atlas research terminal"
           for attempt in 1 2 3; do
-            git pull --rebase origin main
-            if git push origin HEAD:main; then
+            if git pull --rebase --autostash origin main && git push origin HEAD:main; then
               echo "推送成功（第 ${attempt} 次）"
               exit 0
             fi
+            git rebase --abort 2>/dev/null || true
             echo "推送失敗（第 ${attempt} 次），稍後重試"
             sleep $((attempt * 15))
           done
@@ -152,18 +155,13 @@ jobs:
       - name: Report data refresh problems
         if: always()
         env:
-          SYMBOLS_OUTCOME: ${{ steps.symbols.outcome }}
-          MARKET_OUTCOME: ${{ steps.market.outcome }}
-          FUNDAMENTALS_OUTCOME: ${{ steps.fundamentals.outcome }}
+          DIRECTORY_OUTCOME: ${{ steps.directory.outcome }}
+          VALUATION_OUTCOME: ${{ steps.valuation.outcome }}
         run: |
           set -euo pipefail
-          if [ "$SYMBOLS_OUTCOME" = "failure" ]; then
-            echo "::warning::股票清單（Supabase）產生失敗，沿用 repo 內的 atlas/scripts/market-symbols.json"
+          if [ "$DIRECTORY_OUTCOME" = "failure" ]; then
+            echo "::warning::股票目錄更新失敗，沿用上次部署的 symbols/directory.json（若無則退回台股目錄）"
           fi
-          if [ "$FUNDAMENTALS_OUTCOME" = "failure" ]; then
-            echo "::warning::SEC 財報更新失敗，沿用上次部署的財報資料"
-          fi
-          if [ "$MARKET_OUTCOME" = "failure" ]; then
-            echo "::error::行情資料更新失敗；已部署上次的行情資料，請檢查 refresh-market 步驟"
-            exit 1
+          if [ "$VALUATION_OUTCOME" = "failure" ]; then
+            echo "::warning::本益比資料部分或全部更新失敗，沿用上次部署的 valuation/*.json"
           fi

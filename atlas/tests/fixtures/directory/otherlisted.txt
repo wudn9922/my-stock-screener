@@ -1,0 +1,17 @@
+ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue|NASDAQ Symbol
+A|Agilent Technologies, Inc. Common Stock|N|A|N|100|N|A
+AAM.U|AA Mission Acquisition Corp. Units, each consisting of one Class A ordinary share and one-half of one redeemable warrant|N|AAM.U|N|100|N|AAM=
+AAM.WS|AA Mission Acquisition Corp. Warrants, each whole warrant exercisable for one Class A ordinary share|N|AAM.WS|N|100|N|AAM+
+ABR$D|Arbor Realty Trust 6.375% Series D Cumulative Redeemable Preferred Stock|N|ABRpD|N|100|N|ABR-D
+BRK.B|Berkshire Hathaway Inc. New Common Stock|N|BRK.B|N|100|N|BRK/B
+BST|BlackRock Science and Technology Trust Common Shares of Beneficial Interest|N|BST|N|100|N|BST
+EPD|Enterprise Products Partners L.P. Common Units representing Limited Partner Interests|N|EPD|N|100|N|EPD
+FRT|Federal Realty Investment Trust Common Shares of Beneficial Interest|N|FRT|N|100|N|FRT
+IMO|Imperial Oil Limited Common Stock|A|IMO|N|100|N|IMO
+NVO|Novo Nordisk A/S Common Stock|N|NVO|N|100|N|NVO
+PDI|PIMCO Dynamic Income Fund Common Stock|N|PDI|N|100|N|PDI
+SPY|SPDR S&P 500 ETF Trust|P|SPY|Y|100|N|SPY
+TSM|Taiwan Semiconductor Manufacturing Company Ltd.|N|TSM|N|100|N|TSM
+CBOEX|Cboe Test Issue|Z|CBOEX|N|100|Y|CBOEX
+XYZ|Block, Inc. Class A Common Stock|N|XYZ|N|100|N|XYZ
+File Creation Time: 1008202617:01|||||||

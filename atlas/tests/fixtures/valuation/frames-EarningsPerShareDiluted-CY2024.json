@@ -1,0 +1,29 @@
+{
+"taxonomy": "us-gaap",
+"tag": "EarningsPerShareDiluted",
+"ccp": "CY2024",
+"uom": "USD-per-shares",
+"label": "Earnings Per Share, Diluted",
+"description": "\u2026",
+"pts": 2,
+"data": [
+{
+"accn": "0000000000-26-000001",
+"cik": 320193,
+"entityName": "Apple Inc.",
+"loc": "US-CA",
+"start": "2023-10-01",
+"end": "2024-09-28",
+"val": 6.08
+},
+{
+"accn": "0000000000-26-000001",
+"cik": 2222,
+"entityName": "Gap Co",
+"loc": "US-CA",
+"start": "2024-01-01",
+"end": "2024-12-31",
+"val": 3.0
+}
+]
+}

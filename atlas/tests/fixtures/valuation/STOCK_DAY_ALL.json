@@ -1,0 +1,27 @@
+[
+{
+"Date": "1151007",
+"Code": "2330",
+"Name": "台積電",
+"TradeVolume": "30000000",
+"TradeValue": "0",
+"OpeningPrice": "1250.00",
+"HighestPrice": "1260.00",
+"LowestPrice": "1245.00",
+"ClosingPrice": "1,255.00",
+"Change": "5.00",
+"Transaction": "50000"
+},
+{
+"Date": "1151007",
+"Code": "2881",
+"Name": "富邦金",
+"ClosingPrice": "95.50"
+},
+{
+"Date": "1151007",
+"Code": "2498",
+"Name": "宏達電",
+"ClosingPrice": "45.20"
+}
+]

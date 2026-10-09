@@ -4,6 +4,7 @@ import type { Quote } from '../market-data/MarketDataProvider';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { resolveSymbolInput, type SymbolCatalogEntry } from '../market-data/SymbolCatalog';
 import { IconButton } from './IconButton';
+import { formatPercent, toneClass } from './format';
 export const companies: Record<string, string> = {
   AAPL: 'Apple Inc.',
   MSFT: 'Microsoft',
@@ -45,10 +46,9 @@ export function Watchlist({
     <>
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">YOUR MARKET</span>
-          <h2>Watchlist</h2>
+          <h2>自選清單</h2>
         </div>
-        <IconButton label="Add watchlist symbol" onClick={() => setAdding(!adding)}>
+        <IconButton label="新增自選股" onClick={() => setAdding(!adding)}>
           <Plus size={18} />
         </IconButton>
       </div>
@@ -70,19 +70,19 @@ export function Watchlist({
         >
           <Search size={16} />
           <input
-            aria-label="Watchlist ticker"
-            placeholder="Ticker"
+            aria-label="自選股代號"
+            placeholder="代號，例如 2330 或 NVDA"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             required
           />
-          <button type="submit">Add</button>
+          <button type="submit" className="primary-button">加入</button>
         </form>
       )}
       {error && <p role="alert">{error}</p>}
       <div className="watchlist-label">
-        <span>SYMBOL / COMPANY</span>
-        <IconButton label="Manage watchlist" active={manage} onClick={() => setManage(!manage)}>
+        <span>代號／名稱</span>
+        <IconButton label="管理自選清單" active={manage} onClick={() => setManage(!manage)}>
           <Settings2 size={16} />
         </IconButton>
       </div>
@@ -96,18 +96,18 @@ export function Watchlist({
             entry?.name ??
             companies[symbol] ??
             (profile.market === 'TW'
-              ? `Taiwan listed equity · ${exchange} · ${profile.currency}`
-              : 'US listed equity');
+              ? `台股 · ${exchange === 'TWSE' ? '上市' : '上櫃'}`
+              : '美股');
           const companyLabel =
             entry && profile.market === 'TW'
-              ? `${company} · ${exchange} · ${profile.currency}`
+              ? `${company} · ${exchange === 'TWSE' ? '上市' : '上櫃'}`
               : company;
 
           return (
             <div key={symbol} className={`watch-row ${symbol === active ? 'selected' : ''}`}>
               <button
                 className="watch-symbol"
-                aria-label={`Select ${symbol}`}
+                aria-label={`選擇 ${symbol}`}
                 onClick={() => onSelect(symbol)}
               >
                 <span className={`ticker-icon ticker-${index % 4}`}>{symbol.slice(0, 1)}</span>
@@ -118,13 +118,13 @@ export function Watchlist({
                 {quote && (
                   <span
                     className="watch-quote"
-                    title={`${quote.source ?? ''} · last bar ${new Date(quote.asOf * 1000).toLocaleString()}`}
+                    title={`${quote.source ?? ''} · 最後一根 K 棒 ${new Date(quote.asOf * 1000).toLocaleString('zh-TW')}`}
                   >
-                    {profile.currency} {quote.price.toFixed(2)}
-                    <small>
-                      {quote.changePercent.toFixed(2)}% ·{' '}
-                      {quote.dataState === 'simulated' ? 'SIM' : 'delayed'}
-                      {quote.cacheStatus === 'stale' ? ' · STALE' : ''}
+                    {quote.price.toFixed(2)}
+                    <small className={toneClass(quote.changePercent)}>
+                      {formatPercent(quote.changePercent)} ·{' '}
+                      {quote.dataState === 'simulated' ? '模擬' : '延遲'}
+                      {quote.cacheStatus === 'stale' ? ' · 舊資料' : ''}
                     </small>
                   </span>
                 )}
@@ -132,21 +132,21 @@ export function Watchlist({
               </button>
               <div className="watch-actions">
                 <IconButton
-                  label={`Move ${symbol} up`}
+                  label={`上移 ${symbol}`}
                   disabled={index === 0}
                   onClick={() => reorder(index, -1)}
                 >
                   <ChevronUp size={13} />
                 </IconButton>
                 <IconButton
-                  label={`Move ${symbol} down`}
+                  label={`下移 ${symbol}`}
                   disabled={index === symbols.length - 1}
                   onClick={() => reorder(index, 1)}
                 >
                   <ChevronDown size={13} />
                 </IconButton>
                 <IconButton
-                  label={`Remove ${symbol} from watchlist`}
+                  label={`從自選清單移除 ${symbol}`}
                   onClick={() => onChange(symbols.filter((s) => s !== symbol))}
                 >
                   <X size={13} />
@@ -159,9 +159,9 @@ export function Watchlist({
       <div className="watch-footer">
         <span className="status-dot" />
         <span>
-          Local workspace
+          自選清單只儲存在這台裝置
           <br />
-          <small>設定儲存於此裝置</small>
+          <small>可在「工作區設定」匯出備份</small>
         </span>
       </div>
     </>

@@ -44,7 +44,7 @@ export class Loupe {
     const snapshot = this.chart.takeScreenshot(true, true),
       ratio = snapshot.width / this.host.clientWidth;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#0e1521';
+    ctx.fillStyle = '#0f1319';
     ctx.fillRect(0, 0, width, height);
     ctx.save();
     ctx.beginPath();

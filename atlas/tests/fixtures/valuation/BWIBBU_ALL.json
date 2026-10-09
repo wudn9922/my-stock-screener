@@ -1,0 +1,32 @@
+[
+{
+"Date": "1151007",
+"Code": "2330",
+"Name": "台積電",
+"PEratio": "25.10",
+"DividendYield": "1.45",
+"PBratio": "7.80"
+},
+{
+"Date": "1151007",
+"Code": "2881",
+"Name": "富邦金",
+"PEratio": "12.50",
+"DividendYield": "4.20",
+"PBratio": "1.60"
+},
+{
+"Date": "1151007",
+"Code": "2498",
+"Name": "宏達電",
+"PEratio": "",
+"DividendYield": "0.00",
+"PBratio": "1.20"
+},
+{
+"Date": "1151007",
+"Code": "030001",
+"Name": "權證",
+"PEratio": "10.00"
+}
+]
