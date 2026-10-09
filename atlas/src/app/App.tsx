@@ -28,6 +28,7 @@ import {
   Search,
 } from 'lucide-react';
 import { AppStore } from './AppStore';
+import { cloudSyncState, startDrawingSync, type CloudSyncState } from '../cloud/startDrawingSync';
 import { ChartEngine } from '../chart/ChartEngine';
 import { DemoProvider } from '../market-data/DemoProvider';
 import { YahooProvider } from '../market-data/YahooProvider';
@@ -96,6 +97,20 @@ const dockTabs: { id: DockTab; icon: typeof List }[] = [
   { id: 'settings', icon: Settings2 },
 ];
 const store = new AppStore();
+const cloudLabels: Record<CloudSyncState, string> = {
+  off: '已儲存於本機',
+  syncing: '同步雲端中…',
+  synced: '已同步雲端',
+  error: '已存本機・雲端失敗',
+  expired: '已存本機・登入過期',
+};
+const cloudTitles: Record<CloudSyncState, string | undefined> = {
+  off: undefined,
+  syncing: '畫線正在上傳到雲端',
+  synced: '畫線已同步到雲端（LINE 帳號）',
+  error: '雲端同步失敗，畫線已存在這台裝置，稍後會自動重試',
+  expired: 'LINE 登入已過期，畫線已存在這台裝置；從 LINE 重新開啟即可同步',
+};
 let storeInitialized = false;
 const mobileMedia = window.matchMedia('(max-width:1099px)');
 const subscribeMobile = (cb: () => void) => {
@@ -151,6 +166,7 @@ export function App({
 }: ChartWorkspaceProps = {}) {
   const mobile = useSyncExternalStore(subscribeMobile, () => mobileMedia.matches);
   const preferences = useSyncExternalStore(sitePreferences.subscribe, sitePreferences.get);
+  const cloud = useSyncExternalStore(cloudSyncState.subscribe, cloudSyncState.get);
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot),
     symbol = state.app.activeSymbol,
     s = store.symbol(symbol),
@@ -297,6 +313,8 @@ export function App({
       // providers that the static site no longer publishes.
       const provider = store.getSnapshot().app.provider;
       if (SCREENER_HOSTING && provider !== 'market' && provider !== 'demo') store.updateApp({ provider: 'market' });
+      // Cloud drawing sync: only inside LINE (report LIFF); elsewhere drawings stay on this device.
+      if (SCREENER_HOSTING) void startDrawingSync(store);
     });
   }, []);
   useEffect(() => {
@@ -1191,8 +1209,12 @@ export function App({
             <span className="status-counts">
               畫線 {activeDrawings.length} 條 <span className="status-divider">/</span> 指標 {activeIndicators.length} 個
               <span className="status-divider">/</span>
-              <span className={`save-state ${state.storageError ? 'danger-text' : ''}`} data-testid="save-state">
-                {state.storageError ? '儲存失敗' : state.saving ? '儲存中…' : '已儲存於本機'}
+              <span
+                className={`save-state ${state.storageError || cloud === 'error' ? 'danger-text' : ''}`}
+                data-testid="save-state"
+                title={cloudTitles[cloud]}
+              >
+                {state.storageError ? '儲存失敗' : state.saving ? '儲存中…' : cloudLabels[cloud]}
               </span>
             </span>
             {mobile && drawingControls && (
