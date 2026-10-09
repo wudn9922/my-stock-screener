@@ -53,17 +53,35 @@ jobs:
         run: supabase functions deploy market-chart --no-verify-jwt --project-ref "${SUPABASE_PROJECT_REF}"
 
       - name: Smoke test
-        if: steps.token.outputs.available == 'true'
+        # 不論這次是否由本 workflow 部署（例如改用 Supabase connector 部署），都實際呼叫一次函式
+        if: always()
         run: |
-          set -euo pipefail
+          set -uo pipefail
           url="https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/market-chart"
-          code=$(curl -s -o /dev/null -w '%{http_code}' "${url}?symbol=NVDA&interval=99x&range=5y")
-          echo "invalid request → HTTP ${code}"
-          if [ "${code}" != "400" ]; then
-            echo "::warning::market-chart 未回應預期的 400（得到 ${code}）"
-          fi
-          code=$(curl -s -o /tmp/chart.json -w '%{http_code}' "${url}?symbol=AAPL&interval=1d&range=1mo&events=0")
-          echo "AAPL 1d/1mo → HTTP ${code} ($(wc -c < /tmp/chart.json) bytes)"
-          if [ "${code}" != "200" ]; then
-            echo "::warning::market-chart 無法取得 Yahoo 行情（HTTP ${code}）；可能是 Yahoo 封鎖了 Supabase 的出口 IP"
+          failed=0
+          check() {
+            local label="$1" query="$2" expect="$3"
+            local code bars
+            code=$(curl -s -o /tmp/chart.json -w '%{http_code}' --max-time 30 "${url}?${query}")
+            bars=$(python3 -c 'import json,sys
+          try:
+              d=json.load(open("/tmp/chart.json")); r=(d.get("chart") or {}).get("result") or []
+              print(len(r[0].get("timestamp") or []) if r else "-")
+          except Exception: print("-")')
+            echo "${label} → HTTP ${code}, bars=${bars}, $(wc -c < /tmp/chart.json) bytes"
+            if [ "${code}" != "${expect}" ]; then
+              echo "::warning::${label}: 預期 HTTP ${expect}，得到 ${code}：$(head -c 300 /tmp/chart.json)"
+              failed=1
+            fi
+          }
+          check "invalid interval" "symbol=NVDA&interval=99x&range=5y" 400
+          check "2330.TW 1d/1mo" "symbol=2330.TW&interval=1d&range=1mo" 200
+          check "6488.TWO 1d/1mo" "symbol=6488.TWO&interval=1d&range=1mo" 200
+          check "^TWII 1d/1mo" "symbol=%5ETWII&interval=1d&range=1mo" 200
+          check "AAPL 1d/1mo" "symbol=AAPL&interval=1d&range=1mo&events=0" 200
+          check "NVDA 5m/5d" "symbol=NVDA&interval=5m&range=5d" 200
+          check "000001.SS 1d/1mo" "symbol=000001.SS&interval=1d&range=1mo" 200
+          if [ "${failed}" != "0" ]; then
+            echo "::warning::market-chart 有請求未得到預期結果；HTTP 200 以外多半是 Yahoo 封鎖或限流了 Supabase 的出口 IP"
+            exit 1
           fi
