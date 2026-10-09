@@ -81,6 +81,8 @@ TPEX_BOOTSTRAP_MONTHS = 42
 TPEX_MAX_ROWS = 1500
 TPEX_REQUEST_TIMEOUT = 20
 TPEX_REQUEST_DELAY = 1.2
+# 暫時錯誤（HTTP 5xx、連線失敗、逾時）的重試間隔（秒）
+TPEX_RETRY_DELAYS = (3, 8)
 # 單次執行最多送出的月份請求數，避免來源異常時拖太久
 TPEX_MAX_MONTH_REQUESTS = 60
 # 連續失敗幾次就停止本次抓取
@@ -8989,25 +8991,52 @@ def parse_tpex_trading_payload(payload):
     return pd.Series(dtype="float64")
 
 
-def _tpex_request_json(
-    url,
-    params,
-    method="get"
-):
+def _tpex_send(url, params, method):
     if method == "post":
-        response = requests.post(
+        return requests.post(
             url,
             data=params,
             headers=TPEX_HTTP_HEADERS,
             timeout=TPEX_REQUEST_TIMEOUT
         )
-    else:
-        response = requests.get(
-            url,
-            params=params,
-            headers=TPEX_HTTP_HEADERS,
-            timeout=TPEX_REQUEST_TIMEOUT
-        )
+
+    return requests.get(
+        url,
+        params=params,
+        headers=TPEX_HTTP_HEADERS,
+        timeout=TPEX_REQUEST_TIMEOUT
+    )
+
+
+def _tpex_request_json(
+    url,
+    params,
+    method="get",
+    sleep=time.sleep
+):
+    # 櫃買中心偶爾回 HTTP 520／502／503 或逾時（2026-10-09 實測），屬暫時錯誤，稍候重試
+    for attempt, delay in enumerate(
+        TPEX_RETRY_DELAYS + (None,)
+    ):
+        try:
+            response = _tpex_send(url, params, method)
+        except (
+            requests.ConnectionError,
+            requests.Timeout
+        ):
+            if delay is None:
+                raise
+            sleep(delay)
+            continue
+
+        if (
+            response.status_code >= 500
+            and delay is not None
+        ):
+            sleep(delay)
+            continue
+
+        break
 
     response.raise_for_status()
 
@@ -9109,7 +9138,8 @@ def _tpex_fetch_month(
             payload = _tpex_request_json(
                 url,
                 params,
-                method=method
+                method=method,
+                sleep=sleep
             )
 
             result = parser(payload)
@@ -9434,12 +9464,22 @@ def update_tpex_otc_index_history(
             )
 
         except Exception as exc:
-            # 本月月初（尚未開盤）沒有資料是正常的，不計入失敗
+            # 本月月初（尚未開盤）沒有資料是正常的，不計入失敗；
+            # 但若月中仍失敗，代表今天的櫃買指數會沿用舊資料，要明確警告
             if (year, month) == current_month:
-                print(
-                    f"ℹ️ TPEx 本月 {year}/{month:02d} "
-                    f"尚無資料：{exc}"
-                )
+                if pd.Timestamp(
+                    today or datetime.now()
+                ).day > 5:
+                    print(
+                        f"⚠️ TPEx 本月 {year}/{month:02d} "
+                        "取得失敗，櫃買指數將沿用上月資料："
+                        f"{exc}"
+                    )
+                else:
+                    print(
+                        f"ℹ️ TPEx 本月 {year}/{month:02d} "
+                        f"尚無資料：{exc}"
+                    )
                 continue
 
             consecutive_failures += 1
