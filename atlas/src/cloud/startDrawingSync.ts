@@ -1,6 +1,6 @@
 import { DrawingSync, createLocalSyncMetaStore, type DrawingSyncStatus, type SyncStore } from './DrawingSync';
 import { DEFAULT_DRAWINGS_URL, createDrawingCloudApi } from './drawingCloudApi';
-import { DEFAULT_LIFF_ID, getLineIdentity } from './lineIdentity';
+import { DEFAULT_LIFF_ID, startLineIdentity } from './lineIdentity';
 
 /** `off`: not inside LINE / not logged in; drawings are stored on this device only. */
 export type CloudSyncState = DrawingSyncStatus | 'off';
@@ -37,7 +37,7 @@ export async function startDrawingSync(store: SyncStore) {
   if (started) return;
   started = true;
   const env = import.meta.env ?? {};
-  const identity = await getLineIdentity(env.VITE_LIFF_ID || DEFAULT_LIFF_ID);
+  const identity = await startLineIdentity(env.VITE_LIFF_ID || DEFAULT_LIFF_ID);
   if (!identity) return;
   const sync = new DrawingSync(
     store,

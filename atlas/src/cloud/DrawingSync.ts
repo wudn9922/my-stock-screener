@@ -181,9 +181,10 @@ export class DrawingSync {
     if (this.applyingRemote || this.stopped) return;
     for (const [symbol, state] of Object.entries(this.store.getSnapshot().symbols)) {
       if (this.seen.get(symbol) === state.drawings) continue;
-      const previous = this.seen.get(symbol);
+      const previous = this.seen.get(symbol) ?? [];
       this.seen.set(symbol, state.drawings);
-      if (previous && serialize(previous) === serialize(state.drawings)) continue;
+      // A symbol opened for the first time has no drawings yet; that is not an edit
+      if (serialize(previous) === serialize(state.drawings)) continue;
       this.meta.set(symbol, { ...this.meta.get(symbol), editedAt: this.now() });
       this.schedule(symbol, this.debounceMs);
     }
