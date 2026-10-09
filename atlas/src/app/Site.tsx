@@ -15,13 +15,8 @@ import type { Timeframe } from '../market-data/MarketDataProvider';
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
 const ScreenerPage = lazy(() => import('../pages/ScreenerPage'));
-// The workspace (engine, drawings, panels) and its axis font load only when the chart opens.
-const ChartPage = lazy(() =>
-  Promise.all([
-    import('./ChartPage'),
-    import('../chart/AxisAppearance').then((module) => module.ensureAxisFont()),
-  ]).then(([module]) => module),
-);
+// The workspace (engine, drawings, panels) loads only when the chart opens.
+const ChartPage = lazy(() => import('./ChartPage'));
 
 /** The report pages exist only where the daily report is published (the screener site). */
 const DEFAULT_PAGE: Page =

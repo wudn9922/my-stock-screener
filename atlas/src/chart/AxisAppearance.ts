@@ -1,50 +1,24 @@
-import compactAxisFontUrl from '../assets/fonts/AtlasNarrowAxis-Regular.ttf?url';
+/**
+ * Price/time axis text. Readability first: the platform UI font (heavier strokes than the former
+ * 70%-width Atlas Narrow Axis face, which was too thin on phones), a larger size on narrow screens
+ * and a brighter colour. Width is still kept small with minimumWidth 0 and trimmed trailing zeros.
+ */
+export const AXIS_FONT_FAMILY =
+  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans TC", Arial, sans-serif';
+export const AXIS_TEXT_COLOR = '#c3cad5';
+export const AXIS_FONT_SIZE = 12;
+export const AXIS_FONT_SIZE_NARROW = 13;
+const NARROW_QUERY = '(max-width: 640px)';
 
-export const COMPACT_AXIS_FONT_FAMILY = 'AtlasNarrowAxis, sans-serif';
-export const COMPACT_AXIS_FONT_SIZE = 11;
+/** Axis font size for the current viewport (phones get the larger size). */
+export function axisFontSize(matches: (query: string) => boolean = defaultMatches): number {
+  return matches(NARROW_QUERY) ? AXIS_FONT_SIZE_NARROW : AXIS_FONT_SIZE;
+}
 
-const fontFaceFamily = 'AtlasNarrowAxis';
-const fontStartupTimeoutMs = 5_000;
-let axisFontPromise: Promise<boolean> | undefined;
+function defaultMatches(query: string): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
+}
 
 export function compactAxisPrice(price: number): string {
   return price.toFixed(2).replace(/\.00$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
-}
-
-async function loadAxisFont(): Promise<boolean> {
-  try {
-    if (typeof document === 'undefined' || typeof FontFace === 'undefined' || !document.fonts) {
-      return false;
-    }
-
-    const face = new FontFace(
-      fontFaceFamily,
-      `url(${JSON.stringify(compactAxisFontUrl)}) format("truetype")`,
-      { style: 'normal', weight: '400' },
-    );
-    await face.load();
-    document.fonts.add(face);
-    await document.fonts.load(`${COMPACT_AXIS_FONT_SIZE}px "${fontFaceFamily}"`);
-    return document.fonts.check(`${COMPACT_AXIS_FONT_SIZE}px "${fontFaceFamily}"`);
-  } catch {
-    return false;
-  }
-}
-
-export function ensureAxisFont(): Promise<boolean> {
-  axisFontPromise ??= (async () => {
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<boolean>((resolve) => {
-      timeoutId = setTimeout(() => resolve(false), fontStartupTimeoutMs);
-    });
-
-    try {
-      return await Promise.race([loadAxisFont(), timeout]);
-    } catch {
-      return false;
-    } finally {
-      if (timeoutId !== undefined) clearTimeout(timeoutId);
-    }
-  })();
-  return axisFontPromise;
 }
