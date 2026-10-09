@@ -1,0 +1,29 @@
+name: zz temporary probe
+on:
+  push:
+    branches: [claude/nice-cray-fs4a9b]
+    paths: ['.github/probe/**', '.github/workflows/zz-probe.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.10'}
+      - run: pip install -q -r requirements.txt
+      - name: TPEx
+        run: python .github/probe/tpex_probe.py
+      - name: SEC user agents
+        if: always()
+        run: |
+          for ua in \
+            "my-stock-screener-atlas (https://github.com/wudn9922/my-stock-screener)" \
+            "my-stock-screener-atlas wudn9922@users.noreply.github.com" \
+            "Mozilla/5.0 (compatible; my-stock-screener; +https://github.com/wudn9922) contact@example.com"; do
+            for u in https://www.sec.gov/files/company_tickers.json \
+                     https://data.sec.gov/api/xbrl/frames/us-gaap/EarningsPerShareDiluted/USD-per-shares/CY2025Q3.json; do
+              code=$(curl -s -o /tmp/o -w '%{http_code}' -A "$ua" -H 'Accept-Encoding: gzip, deflate' --compressed "$u")
+              echo "$code $(wc -c </tmp/o)B UA=[$ua] $u"
+            done
+          done
