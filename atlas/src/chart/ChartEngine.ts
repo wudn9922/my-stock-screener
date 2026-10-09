@@ -36,7 +36,7 @@ import { coloredVolume, setVolumeColors, volumeSma } from '../indicators/Volume'
 import { averageTrueRange } from '../indicators/AverageTrueRange';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { marketTimeOptions } from './MarketTimeLabels';
-import { COMPACT_AXIS_FONT_FAMILY, COMPACT_AXIS_FONT_SIZE, compactAxisPrice } from './AxisAppearance';
+import { AXIS_FONT_FAMILY, AXIS_TEXT_COLOR, axisFontSize, compactAxisPrice } from './AxisAppearance';
 const compactVolume = new Intl.NumberFormat('en-US', {
   notation: 'compact',
   maximumFractionDigits: 2,
@@ -94,9 +94,9 @@ export class ChartEngine {
       autoSize: true,
       layout: {
         background: { type: ColorType.Solid, color: '#0f1319' },
-        textColor: '#8a93a3',
-        fontFamily: COMPACT_AXIS_FONT_FAMILY,
-        fontSize: COMPACT_AXIS_FONT_SIZE,
+        textColor: AXIS_TEXT_COLOR,
+        fontFamily: AXIS_FONT_FAMILY,
+        fontSize: axisFontSize(),
         attributionLogo: true,
       },
       grid: { vertLines: { color: '#1a1f28' }, horzLines: { color: '#1a1f28' } },

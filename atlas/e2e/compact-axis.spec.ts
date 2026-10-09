@@ -11,7 +11,7 @@ const samples = [
   { id: 'price-million', price: 1_000_000, label: '1000000', ordinary: false },
 ] as const;
 
-test('compact price axis saves ordinary width and preserves native chart geometry and crosshair input', async ({
+test('readable price axis shows full labels and preserves native chart geometry and crosshair input', async ({
   page,
 }) => {
   await page.goto('/');
@@ -28,16 +28,14 @@ test('compact price axis saves ordinary width and preserves native chart geometr
         '/node_modules/.vite/deps/lightweight-charts.js',
         location.origin,
       ).href;
-      const [{ ChartEngine }, { ensureAxisFont }, { marketTimeOptions }, { getMarketProfile }, chartLibrary] = await Promise.all([
+      const [{ ChartEngine }, axis, { marketTimeOptions }, { getMarketProfile }, chartLibrary] = await Promise.all([
         import(engineUrl) as Promise<typeof import('../src/chart/ChartEngine')>,
         import(axisUrl) as Promise<typeof import('../src/chart/AxisAppearance')>,
         import(labelsUrl) as Promise<typeof import('../src/chart/MarketTimeLabels')>,
         import(marketUrl) as Promise<typeof import('../src/market-data/MarketProfile')>,
         import(chartLibraryUrl) as Promise<typeof import('lightweight-charts')>,
       ]);
-      const fontLoaded = await ensureAxisFont();
       await document.fonts.ready;
-      const fontAvailable = document.fonts.check('11px "AtlasNarrowAxis"');
       const width = Math.max(320, Math.min(720, window.innerWidth - 24));
       const height = 360;
       const start = Date.parse('2026-01-05T00:00:00Z') / 1000;
@@ -206,6 +204,8 @@ test('compact price axis saves ordinary width and preserves native chart geometr
       const y = candidateEngine.candles.priceToCoordinate(anchor.close);
       const rect = candidateHost.getBoundingClientRect();
       const priceFormatter = candidateOptions.localization.priceFormatter;
+      const measure = document.createElement('canvas').getContext('2d')!;
+      measure.font = `${candidateOptions.layout.fontSize}px ${candidateOptions.layout.fontFamily}`;
       const candidate = {
         axisWidth: candidateEngine.candles.priceScale().width(),
         paneWidth: candidateEngine.chart.paneSize().width,
@@ -221,6 +221,11 @@ test('compact price axis saves ordinary width and preserves native chart geometr
         priceCoordinate: y,
         mousePoint: { x: rect.left + (x ?? 0), y: rect.top + (y ?? 0) },
         anchorClose: anchor.close.toFixed(2),
+        labelWidth: measure.measureText(caseData.label).width,
+        expectedFontFamily: axis.AXIS_FONT_FAMILY,
+        expectedFontSize: axis.axisFontSize(),
+        textColor: candidateOptions.layout.textColor,
+        expectedTextColor: axis.AXIS_TEXT_COLOR,
       };
       Object.assign(candidateHost, {
         cleanupAxisTest: () => {
@@ -228,18 +233,18 @@ test('compact price axis saves ordinary width and preserves native chart geometr
           crosshairReadout.remove();
         },
       });
-      return { baseline, candidate, fontLoaded, fontAvailable };
+      return { baseline, candidate };
     }, sample);
 
-    expect(measurement.fontLoaded, 'the compact axis font asset should load').toBe(true);
-    expect(measurement.fontAvailable).toBe(true);
     expect(measurement.baseline.minimumWidth).toBe(40);
     expect(measurement.baseline.fontFamily).toContain('Inter');
     expect(measurement.baseline.fontSize).toBe(11);
     expect(measurement.baseline.priceFormatterAbsent).toBe(true);
     expect(measurement.candidate.minimumWidth).toBe(0);
-    expect(measurement.candidate.fontFamily).toContain('AtlasNarrowAxis');
-    expect(measurement.candidate.fontSize).toBe(11);
+    expect(measurement.candidate.fontFamily).toBe(measurement.candidate.expectedFontFamily);
+    expect(measurement.candidate.fontSize).toBe(measurement.candidate.expectedFontSize);
+    expect(measurement.candidate.fontSize).toBeGreaterThanOrEqual(12);
+    expect(measurement.candidate.textColor).toBe(measurement.candidate.expectedTextColor);
     expect(measurement.candidate.priceFormatter).toBe(sample.label);
     expect(measurement.candidate.hostWidth).toBe(measurement.baseline.hostWidth);
     expect(measurement.candidate.hostHeight).toBe(measurement.baseline.hostHeight);
@@ -253,10 +258,9 @@ test('compact price axis saves ordinary width and preserves native chart geometr
     expect(
       Math.abs(measurement.candidate.priceCoordinate! - measurement.baseline.priceCoordinate!),
     ).toBeLessThanOrEqual(1);
+    // The readable font may widen the axis, but every label must fit without clipping
+    expect(measurement.candidate.axisWidth).toBeGreaterThanOrEqual(measurement.candidate.labelWidth);
     if (sample.ordinary) {
-      expect(measurement.candidate.axisWidth).toBeLessThanOrEqual(
-        measurement.baseline.axisWidth * 0.7,
-      );
       ordinaryAxisWidth ??= measurement.candidate.axisWidth;
     } else {
       expect(ordinaryAxisWidth).toBeDefined();
