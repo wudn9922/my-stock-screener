@@ -1,0 +1,14 @@
+name: zz temporary probe
+on:
+  push:
+    branches: [claude/nice-cray-fs4a9b]
+    paths: ['.github/probe/**', '.github/workflows/zz-probe.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -q 'curl_cffi>=0.7,<1' && python .github/probe/adr.py
