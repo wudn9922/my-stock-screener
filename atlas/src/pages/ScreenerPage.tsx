@@ -103,10 +103,14 @@ function Row({
         {item.note && <span className="row-note">{item.note}</span>}
       </span>
       <span className="row-pe" title={pe?.reason ?? (pe ? `本益比 ${formatRatio(pe.pe)} · TTM ${formatRatio(pe.peTtm)}` : '')}>
-        {pe && (pe.pe !== null || pe.peTtm !== null) ? (
+        {pe && (pe.pe !== null || pe.peTtm !== null || pe.peTtmLoss || pe.peLoss) ? (
           <>
             <small>本益比</small>
-            {formatRatio(pe.peTtm ?? pe.pe)}
+            {pe.peTtmLoss || (pe.peTtm === null && pe.pe === null) ? (
+              <span className="pe-loss">虧損</span>
+            ) : (
+              formatRatio(pe.peTtm ?? pe.pe)
+            )}
           </>
         ) : null}
       </span>

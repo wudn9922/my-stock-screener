@@ -58,6 +58,10 @@ export interface PeFigures {
   pe: number | null;
   /** Price / TTM EPS (Taiwan: the exchange-published TTM P/E when present). */
   peTtm: number | null;
+  /** True when annual EPS is zero or negative (P/E not meaningful: show 「虧損」). */
+  peLoss: boolean;
+  /** True when TTM EPS is zero or negative. */
+  peTtmLoss: boolean;
   /** Why a figure is missing, for the tooltip. */
   reason: string | null;
   fiscalYear: number | null;
@@ -66,7 +70,16 @@ export interface PeFigures {
 }
 
 export async function getPeFigures(symbol: string, price: number | null | undefined): Promise<PeFigures> {
-  const empty = (reason: string): PeFigures => ({ pe: null, peTtm: null, reason, fiscalYear: null, source: null, asOf: null });
+  const empty = (reason: string): PeFigures => ({
+    pe: null,
+    peTtm: null,
+    peLoss: false,
+    peTtmLoss: false,
+    reason,
+    fiscalYear: null,
+    source: null,
+    asOf: null,
+  });
   if (symbol.startsWith('^')) return empty('指數不適用本益比');
   // Not memoized here: the provider caches (and periodically reloads) its market files itself.
   const valuation: Valuation | null = await getValuation(symbol).catch(() => null);
@@ -77,12 +90,22 @@ export async function getPeFigures(symbol: string, price: number | null | undefi
       ? valuation.exchangePeTtm
       : null;
   const ttm = exchangeTtm !== null ? { pe: exchangeTtm, negativeEarnings: false } : describePe(price, valuation.epsTtm);
+  // Taiwan: the exchange leaves its TTM P/E blank when the last four quarters lost money. A stock that has a
+  // full-year EPS on record but no TTM figure at all is therefore treated as loss-making over the last four quarters.
+  const ttmLoss =
+    ttm.negativeEarnings ||
+    (getMarketProfile(symbol).market === 'TW' &&
+      valuation.exchangePeTtm == null &&
+      valuation.epsTtm == null &&
+      valuation.epsAnnual != null);
   const reasonOf = (result: { pe: number | null; negativeEarnings: boolean; reason?: string }) =>
     result.pe !== null ? null : result.negativeEarnings ? '虧損，本益比不適用' : result.reason === 'missing-price' ? '暫無股價' : '暫無 EPS 資料';
   return {
     pe: annual.pe,
     peTtm: ttm.pe,
-    reason: reasonOf(annual) ?? reasonOf(ttm),
+    peLoss: annual.negativeEarnings,
+    peTtmLoss: ttmLoss,
+    reason: annual.negativeEarnings || ttmLoss ? '虧損，本益比不適用' : reasonOf(annual) ?? reasonOf(ttm),
     fiscalYear: valuation.fiscalYear,
     source: valuation.source,
     asOf: valuation.asOf,

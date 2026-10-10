@@ -26,6 +26,11 @@ export function formatRatio(value: number | null | undefined): string {
   return value >= 1000 ? '>999' : value.toFixed(1);
 }
 
+/** P/E cell text: 「虧損」 when earnings are not positive, otherwise the ratio (or an em dash when unknown). */
+export function formatPe(value: number | null | undefined, loss: boolean): string {
+  return loss ? '虧損' : formatRatio(value);
+}
+
 /** CSS tone class for a signed change; colors follow the 紅漲綠跌 / 綠漲紅跌 preference. */
 export function toneClass(value: number | null | undefined): 'up' | 'down' | 'flat' {
   if (value === null || value === undefined || !Number.isFinite(value) || Math.abs(value) < 1e-9) return 'flat';

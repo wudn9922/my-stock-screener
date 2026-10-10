@@ -73,7 +73,7 @@ import {
 import { indicatorColors } from '../indicators/IndicatorRegistry';
 import { marketProvider, getPeFigures, type PeFigures } from './dataSources';
 import { sitePreferences, upDownColors } from './sitePreferences';
-import { displayTicker, formatPercent, formatPrice, formatRatio, toneClass } from '../ui/format';
+import { displayTicker, formatPercent, formatPe, formatPrice, toneClass } from '../ui/format';
 import type { ChartRequest } from './chartRequest';
 import type { LocalSymbol } from '../ui/SymbolSearch';
 import '../ui/workspace.css';
@@ -993,11 +993,11 @@ export function App({
           <dl className="ws-valuation" data-testid="valuation">
             <div title={peTitle(`本益比（${peFigures?.fiscalYear ?? '年度'} EPS）`, peFigures?.pe ?? null)}>
               <dt>本益比</dt>
-              <dd>{formatRatio(peFigures?.pe)}</dd>
+              <dd className={peFigures?.peLoss ? 'pe-loss' : undefined}>{formatPe(peFigures?.pe, !!peFigures?.peLoss)}</dd>
             </div>
             <div title={peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}>
               <dt>本益比 TTM</dt>
-              <dd>{formatRatio(peFigures?.peTtm)}</dd>
+              <dd className={peFigures?.peTtmLoss ? 'pe-loss' : undefined}>{formatPe(peFigures?.peTtm, !!peFigures?.peTtmLoss)}</dd>
             </div>
           </dl>
         )}

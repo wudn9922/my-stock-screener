@@ -1106,6 +1106,10 @@
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
+.pe-loss {
+  color: var(--text-3);
+  font-weight: 600;
+}
 .ws-header-actions {
   margin-left: auto;
   display: flex;
