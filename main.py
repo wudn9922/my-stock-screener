@@ -3740,6 +3740,58 @@ def process_sector_weekly_charts():
     )
 
 
+def build_sector_line_message(
+    today_str,
+    sector_summary
+):
+    """LINE 用的精簡類股週線輪動（無連結）；網頁沿用 build_sector_monday_message。"""
+    if not sector_summary:
+        return (
+            f"📅 {today_str} 美股類股週線\n"
+            "⚠️ 本週類股資料不足"
+        )
+
+    def describe(item):
+        return (
+            f"{item['ticker']} "
+            f"{item['name']} "
+            f"{item['return_13w']:+.1f}%"
+        )
+
+    strongest = sector_summary[:3]
+    weakest = sector_summary[-3:]
+
+    inflow = [
+        item["name"]
+        for item in sector_summary
+        if "資金流入" in item["volume_status"]
+    ]
+
+    outflow = [
+        item["name"]
+        for item in sector_summary
+        if "資金流出" in item["volume_status"]
+    ]
+
+    lines = [
+        f"📅 {today_str} 美股類股週線（13週）",
+        "🟢 強：" + "、".join(
+            describe(item)
+            for item in strongest
+        ),
+        "🔴 弱：" + "、".join(
+            describe(item)
+            for item in weakest
+        ),
+        "💰 流入："
+        + ("、".join(inflow) if inflow else "無")
+        + "｜流出："
+        + ("、".join(outflow) if outflow else "無")
+    ]
+
+    return "\n".join(lines)
+
+
 def build_sector_monday_message(
     today_str,
     sector_summary,
@@ -7002,23 +7054,99 @@ def build_index_map(index_configs):
     return index_map
 
 
+INDEX_SHORT_NAMES = {
+    "^TWII": "加權",
+    "^TWOII": "櫃買",
+    "^GSPC": "標普500",
+    "^DJI": "道瓊",
+    "^IXIC": "那斯達克",
+    "^RUT": "羅素2000",
+    "^SOX": "費半",
+    "^FCHI": "CAC40",
+    "^FTSE": "富時100",
+    "^GDAXI": "DAX",
+    "^N225": "日經225",
+    "^KS11": "KOSPI"
+}
+
+INDEX_LINE_LEGEND = (
+    "均線：🔺多 🔻空 ➖不明｜"
+    "道氏：🔺多 🔻空 💡大多小空 ⚡大空小多"
+)
+
+
+def build_index_line_short(
+    ticker,
+    name,
+    index_line
+):
+    """
+    LINE 用的單行大盤摘要：「簡稱 均線符號 道氏符號」。
+    只依 analyze_index_trend 的文字解析，不改變網頁使用的原文。
+    """
+    short_name = INDEX_SHORT_NAMES.get(
+        ticker,
+        str(name or ticker)
+    )
+
+    parsed = parse_index_trend_text(
+        index_line
+    )
+
+    score = parsed.get("score")
+
+    if (
+        score is None
+        and parsed.get("macroTrend") is None
+    ):
+        return f"{short_name} ⚪分析異常"
+
+    if score is None or score == 0:
+        ma_symbol = "➖"
+    elif score > 0:
+        ma_symbol = "🔺"
+    else:
+        ma_symbol = "🔻"
+
+    macro = parsed.get("macroTrend")
+    micro = parsed.get("microTrend")
+
+    if macro == "bull" and micro == "bull":
+        dow_symbol = "🔺"
+    elif macro == "bear" and micro == "bear":
+        dow_symbol = "🔻"
+    elif macro == "bull":
+        dow_symbol = "💡"
+    elif macro == "bear":
+        dow_symbol = "⚡"
+    else:
+        dow_symbol = "➖"
+
+    return f"{short_name} {ma_symbol}{dow_symbol}"
+
+
 def append_index_market_report(
     lines,
     market_title,
     tickers,
     index_map,
-    captured_lines=None
+    captured_lines=None,
+    short_lines=None
 ):
     """
-    將單一市場的指數分析加入 LINE 訊息 lines。
+    將單一市場的指數分析加入 lines（完整文字，Atlas 報告 JSON 使用）。
 
     captured_lines（選用 dict）會收到「ticker → 該指數的分析文字」，
     供 Atlas 報告 JSON 使用；傳入與否都不會改變 lines 的內容。
+    short_lines（選用 list）會收到 LINE 用的精簡單行摘要。
     回傳本次加入 lines 的區塊（list）。
     """
     block_start = len(lines)
 
     lines.append(market_title)
+
+    if short_lines is not None:
+        short_lines.append(market_title)
 
     found_count = 0
 
@@ -7054,12 +7182,32 @@ def append_index_market_report(
 
         lines.append(index_line)
 
+        if short_lines is not None:
+            short_lines.append(
+                build_index_line_short(
+                    normalized_ticker,
+                    item.get(
+                        "name",
+                        normalized_ticker
+                    ),
+                    index_line
+                )
+            )
+
     if found_count == 0:
         lines.append(
             "⚪ 此市場目前沒有啟用的指數設定"
         )
 
+        if short_lines is not None:
+            short_lines.append(
+                "⚪ 沒有啟用的指數設定"
+            )
+
     lines.append("")
+
+    if short_lines is not None:
+        short_lines.append("")
 
     return lines[block_start:]
 
@@ -7335,21 +7483,9 @@ def main():
     )
 
     # -----------------------------------------------------------------
-    # 報告與控制台網址
+    # 報告網址（LINE 訊息不再附連結，只留給網頁報告 JSON 使用）
     # -----------------------------------------------------------------
     report_url = REPORT_LIFF_URL
-
-    # 原本參數控制台：
-    # 2010330411-SbwvRXRN
-    # → my-stock-backend
-    liff_setting_url = (
-        SETTING_LIFF_URL
-    )
-
-    # 另一套原有系統，維持不變
-    bitget_setting_url = (
-        BITGET_SETTING_URL
-    )
 
     # -----------------------------------------------------------------
     # LINE 個股與網頁報告推播
@@ -7357,56 +7493,21 @@ def main():
     # 依需求：動態自訂群組不加入 LINE 統計，
     # 避免未來新增大量群組後訊息過長。
     # -----------------------------------------------------------------
+    def stock_count(group_key):
+        return len(data_dict.get(group_key, []))
+
     line_message_stocks = (
-        f"🎯 {today_str} "
-        "專屬量化看盤網頁！\n\n"
-
-        "🌍 【全球指數區塊】\n"
-        " └ 指數圖表："
-        f"{len(data_dict.get('indices', []))} "
-        "張\n\n"
-
-        "🧭 【美股類股週K】\n"
-        " └ 類股圖表："
-        f"{len(data_dict.get('sectors', []))} "
-        "張\n\n"
-
-        "🇹🇼 【台灣股市區塊】\n"
-        " ├ 1. 全市場符合："
-        f"{len(data_dict.get('tw_all', []))} "
-        "檔\n"
-        " ├ 2. 權值精選符合："
-        f"{len(data_dict.get('tw_g1', []))} "
-        "檔\n"
-        " └ 3. 熱門符合："
-        f"{len(data_dict.get('tw_g2', []))} "
-        "檔\n\n"
-
-        "🇺🇸 【美國股市區塊】\n"
-        " ├ 1. 全市場符合："
-        f"{len(data_dict.get('us_all', []))} "
-        "檔\n"
-        " ├ 2. 權值精選符合："
-        f"{len(data_dict.get('us_g1', []))} "
-        "檔\n"
-        " ├ 3. 低本益比符合："
-        f"{len(data_dict.get('us_g2', []))} "
-        "檔\n"
-        " ├ 4. 超級績效符合："
-        f"{len(data_dict.get('us_g3', []))} "
-        "檔\n"
-        " └ 5. 熱門符合："
-        f"{len(data_dict.get('us_g4', []))} "
-        "檔\n\n"
-
-        "🔗 1. 專屬潛伏圖表網頁：\n"
-        f"{report_url}\n\n"
-
-        "⚙️ 2. 手機自訂參數控制台：\n"
-        f"{liff_setting_url}\n\n"
-
-        "💰 3. 自動交易參數控制台：\n"
-        f"{bitget_setting_url}"
+        f"🎯 {today_str} 量化日報\n"
+        "🇹🇼 符合檔數："
+        f"全市場 {stock_count('tw_all')}"
+        f"｜權值 {stock_count('tw_g1')}"
+        f"｜熱門 {stock_count('tw_g2')}\n"
+        "🇺🇸 符合檔數："
+        f"全市場 {stock_count('us_all')}"
+        f"｜權值 {stock_count('us_g1')}"
+        f"｜低本益 {stock_count('us_g2')}"
+        f"｜績效 {stock_count('us_g3')}"
+        f"｜熱門 {stock_count('us_g4')}"
     )
 
     send_line_message(
@@ -7463,12 +7564,19 @@ def main():
         ""
     ]
 
+    # LINE 只送精簡版；index_lines 的完整文字留給網頁（Atlas 報告 JSON）
+    line_index_lines = [
+        f"🌍 {today_str} 全球大盤多空",
+        ""
+    ]
+
     tw_index_block = append_index_market_report(
         index_lines,
         "【 🇹🇼 台灣市場 】",
         tw_indices,
         index_map,
-        captured_lines=captured_index_lines
+        captured_lines=captured_index_lines,
+        short_lines=line_index_lines
     )
 
     us_index_block = append_index_market_report(
@@ -7476,7 +7584,8 @@ def main():
         "【 🇺🇸 美國市場 】",
         us_indices,
         index_map,
-        captured_lines=captured_index_lines
+        captured_lines=captured_index_lines,
+        short_lines=line_index_lines
     )
 
     eu_index_block = append_index_market_report(
@@ -7484,7 +7593,8 @@ def main():
         "【 🇪🇺 歐洲市場 】",
         eu_indices,
         index_map,
-        captured_lines=captured_index_lines
+        captured_lines=captured_index_lines,
+        short_lines=line_index_lines
     )
 
     append_index_market_report(
@@ -7492,15 +7602,22 @@ def main():
         "【 🌏 亞洲市場 】",
         asia_indices,
         index_map,
-        captured_lines=captured_index_lines
+        captured_lines=captured_index_lines,
+        short_lines=line_index_lines
     )
 
     index_message = "\n".join(
         index_lines
     ).rstrip()
 
+    line_index_lines.append(
+        INDEX_LINE_LEGEND
+    )
+
     send_line_message(
-        index_message,
+        "\n".join(
+            line_index_lines
+        ),
         access_token,
         line_push_user_id
     )
@@ -7519,8 +7636,12 @@ def main():
             )
         )
 
+        # LINE 送精簡版；sectors_message 的完整文字留給網頁（Atlas 報告 JSON）
         send_line_message(
-            sectors_message,
+            build_sector_line_message(
+                today_str,
+                sector_summary
+            ),
             access_token,
             line_push_user_id
         )
