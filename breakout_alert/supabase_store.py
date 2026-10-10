@@ -37,6 +37,35 @@ VALID_GROUP_KEYS = set(
     GROUP_DISPLAY_NAMES
 )
 
+# Atlas 畫線警示的狀態列使用 atlas_ 開頭的 group_id，
+# 均線孤兒清理與 Discord /量比 都必須排除這些列。
+ATLAS_STATE_GROUP_PREFIX = "atlas_"
+ATLAS_LINES_GROUP_ID = "atlas_lines"
+
+# 狀態表寫入遭拒（4xx）時的後備位置：
+# chart_drawings 的一列；Atlas 的 atlas.list 只讀 timeframe='atlas'。
+DRAWING_STATE_FALLBACK_TICKER = "_ALERTSTATE"
+DRAWING_STATE_FALLBACK_TIMEFRAME = "alert-state"
+
+
+class SupabaseRequestError(RuntimeError):
+    """
+    Supabase 回傳 HTTP 錯誤。
+
+    繼承 RuntimeError，既有的錯誤處理與訊息不變；
+    另外保留 status_code 供呼叫端區分 4xx 與 5xx。
+    """
+
+    def __init__(self, message, status_code=None):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def is_atlas_state_row(row):
+    return str(
+        (row or {}).get("group_id") or ""
+    ).startswith(ATLAS_STATE_GROUP_PREFIX)
+
 
 def utc_now_string():
     return (
@@ -242,11 +271,12 @@ class SupabaseStore:
         )
 
         if response.status_code >= 400:
-            raise RuntimeError(
+            raise SupabaseRequestError(
                 f"Supabase {table_name} "
                 f"{method.upper()} 失敗，"
                 f"HTTP {response.status_code}："
-                f"{response.text[:500]}"
+                f"{response.text[:500]}",
+                status_code=response.status_code
             )
 
         if response.status_code == 204:
@@ -906,6 +936,10 @@ class SupabaseStore:
                     f"eq.{self.user_id}"
                 ),
                 "ticker": f"eq.{ticker}",
+                # Atlas 畫線狀態列不是均線快取
+                "group_id": (
+                    f"not.like.{ATLAS_STATE_GROUP_PREFIX}*"
+                ),
                 "order": (
                     "group_id.asc,"
                     "ma_period.asc"
@@ -913,10 +947,15 @@ class SupabaseStore:
             }
         )
 
-        return rows if isinstance(
-            rows,
-            list
-        ) else []
+        if not isinstance(rows, list):
+            return []
+
+        return [
+            row
+            for row in rows
+            if isinstance(row, dict)
+            and not is_atlas_state_row(row)
+        ]
 
 
     def prune_orphan_states(
@@ -962,7 +1001,19 @@ class SupabaseStore:
             }
         )
 
-        if not isinstance(rows, list) or not rows:
+        if not isinstance(rows, list):
+            return 0
+
+        # Atlas 畫線狀態列由 prune_drawing_states 管理，
+        # 不列入均線孤兒判斷與刪除比例。
+        rows = [
+            row
+            for row in rows
+            if isinstance(row, dict)
+            and not is_atlas_state_row(row)
+        ]
+
+        if not rows:
             return 0
 
         orphan_ids = []
@@ -1012,6 +1063,229 @@ class SupabaseStore:
 
         print(
             f"🧹 已清除孤兒狀態列：{len(orphan_ids)} 筆"
+        )
+
+        return len(orphan_ids)
+
+    def get_atlas_drawings(self):
+        """
+        讀取 Atlas 的畫線（每檔股票一列，timeframe='atlas'）。
+        """
+        rows = self._request(
+            "GET",
+            "chart_drawings",
+            params={
+                "select": (
+                    "ticker,drawings,updated_at"
+                ),
+                "line_user_id": (
+                    f"eq.{self.user_id}"
+                ),
+                "timeframe": "eq.atlas",
+                "limit": "2000"
+            }
+        )
+
+        return rows if isinstance(
+            rows,
+            list
+        ) else []
+
+    def get_drawing_states(self):
+        rows = self._request(
+            "GET",
+            "breakout_alert_state",
+            params={
+                "select": (
+                    "id,ticker,market,metadata,"
+                    "last_checked_at"
+                ),
+                "line_user_id": (
+                    f"eq.{self.user_id}"
+                ),
+                "group_id": (
+                    f"eq.{ATLAS_LINES_GROUP_ID}"
+                )
+            }
+        )
+
+        return rows if isinstance(
+            rows,
+            list
+        ) else []
+
+    def upsert_drawing_states(self, payloads):
+        """
+        一次寫入多檔的畫線狀態列。
+
+        payload 由 drawing_alerts 建立；
+        line_user_id 一律由這裡填入。
+        """
+        rows = []
+
+        for payload in payloads:
+            row = dict(payload)
+            row["line_user_id"] = self.user_id
+            rows.append(row)
+
+        if not rows:
+            return None
+
+        return self._request(
+            "POST",
+            "breakout_alert_state",
+            params={
+                "on_conflict": (
+                    "line_user_id,"
+                    "group_id,"
+                    "ticker,"
+                    "ma_period"
+                )
+            },
+            json_body=rows,
+            extra_headers={
+                "Prefer": (
+                    "resolution=merge-duplicates,"
+                    "return=minimal"
+                )
+            }
+        )
+
+    def get_drawing_state_fallback(self):
+        rows = self._request(
+            "GET",
+            "chart_drawings",
+            params={
+                "select": "drawings,updated_at",
+                "line_user_id": (
+                    f"eq.{self.user_id}"
+                ),
+                "ticker": (
+                    f"eq.{DRAWING_STATE_FALLBACK_TICKER}"
+                ),
+                "timeframe": (
+                    f"eq.{DRAWING_STATE_FALLBACK_TIMEFRAME}"
+                ),
+                "limit": "1"
+            }
+        )
+
+        if not isinstance(rows, list) or not rows:
+            return None
+
+        drawings = (rows[0] or {}).get(
+            "drawings"
+        )
+
+        # 以單一元素陣列保存，與畫線欄位的陣列格式一致
+        if (
+            isinstance(drawings, list)
+            and drawings
+            and isinstance(drawings[0], dict)
+        ):
+            return drawings[0]
+
+        if isinstance(drawings, dict):
+            return drawings
+
+        return None
+
+    def save_drawing_state_fallback(self, state):
+        return self._request(
+            "POST",
+            "chart_drawings",
+            params={
+                "on_conflict": (
+                    "line_user_id,"
+                    "ticker,"
+                    "timeframe"
+                )
+            },
+            json_body={
+                "line_user_id": self.user_id,
+                "ticker": (
+                    DRAWING_STATE_FALLBACK_TICKER
+                ),
+                "timeframe": (
+                    DRAWING_STATE_FALLBACK_TIMEFRAME
+                ),
+                "market_key": None,
+                "drawings": [state],
+                "updated_at": utc_now_string()
+            },
+            extra_headers={
+                "Prefer": (
+                    "resolution=merge-duplicates,"
+                    "return=minimal"
+                )
+            }
+        )
+
+    def prune_drawing_states(self, valid_tickers):
+        """
+        刪除已沒有可提醒畫線的股票狀態列。
+
+        只能在 chart_drawings 讀取成功且至少一列時呼叫，
+        valid_tickers 必須包含「全部市場」的畫線股票。
+        """
+        valid_tickers = {
+            str(ticker)
+            for ticker in valid_tickers
+        }
+
+        rows = self._request(
+            "GET",
+            "breakout_alert_state",
+            params={
+                "select": "id,ticker",
+                "line_user_id": (
+                    f"eq.{self.user_id}"
+                ),
+                "group_id": (
+                    f"eq.{ATLAS_LINES_GROUP_ID}"
+                )
+            }
+        )
+
+        if not isinstance(rows, list) or not rows:
+            return 0
+
+        orphan_ids = [
+            row["id"]
+            for row in rows
+            if isinstance(row, dict)
+            and row.get("id") is not None
+            and str(row.get("ticker") or "")
+            not in valid_tickers
+        ]
+
+        if not orphan_ids:
+            return 0
+
+        id_list = ",".join(
+            str(row_id)
+            for row_id in orphan_ids
+        )
+
+        self._request(
+            "DELETE",
+            "breakout_alert_state",
+            params={
+                "id": f"in.({id_list})",
+                "line_user_id": (
+                    f"eq.{self.user_id}"
+                ),
+                "group_id": (
+                    f"eq.{ATLAS_LINES_GROUP_ID}"
+                )
+            },
+            extra_headers={
+                "Prefer": "return=minimal"
+            }
+        )
+
+        print(
+            f"🧹 已清除畫線狀態列：{len(orphan_ids)} 筆"
         )
 
         return len(orphan_ids)

@@ -1,0 +1,186 @@
+[
+  {
+    "ticker": "2330.TW",
+    "updated_at": "2026-10-08T05:00:00+00:00",
+    "drawings": [
+      {
+        "id": "h1", "symbol": "2330.TW", "type": "horizontal",
+        "points": [{"time": 1790640000, "logical": 120, "price": 1085, "timeframe": "1D"}],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      },
+      {
+        "id": "h-hidden", "symbol": "2330.TW", "type": "horizontal",
+        "points": [{"time": 1790640000, "logical": 120, "price": 990, "timeframe": "1D"}],
+        "locked": false, "visible": false, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      },
+      {
+        "id": "ray-right", "symbol": "2330.TW", "type": "ray",
+        "points": [
+          {"time": 1788912000, "logical": 100, "price": 1120, "timeframe": "1W"},
+          {"time": 1791072000, "logical": 124, "price": 1120, "timeframe": "1W"}
+        ],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1W"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      },
+      {
+        "id": "ray-left", "symbol": "2330.TW", "type": "ray",
+        "points": [
+          {"time": 1791072000, "logical": 124, "price": 1150, "timeframe": "1D"},
+          {"time": 1788912000, "logical": 100, "price": 1150, "timeframe": "1D"}
+        ],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      },
+      {
+        "id": "box-new", "symbol": "2330.TW", "type": "rectangle",
+        "points": [
+          {"time": 1783728000, "logical": 60, "price": 1040, "timeframe": "1D"},
+          {"time": 1790640000, "logical": 110, "price": 1070, "timeframe": "1D"}
+        ],
+        "locked": false, "visible": true, "scope": "all",
+        "style": {"color": "#f0b90b", "lineWidth": 1, "fillOpacity": 0.1}
+      },
+      {
+        "id": "box-old", "symbol": "2330.TW", "type": "rectangle",
+        "points": [
+          {"time": 1780000000, "logical": 40, "price": 900, "timeframe": "1D"},
+          {"time": 1783728000, "logical": 60, "price": 950, "timeframe": "1D"}
+        ],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      },
+      {
+        "id": "fib1", "symbol": "2330.TW", "type": "fibonacci",
+        "points": [
+          {"time": 1783728000, "logical": 60, "price": 1200, "timeframe": "1D"},
+          {"time": 1790640000, "logical": 110, "price": 1000, "timeframe": "1D"}
+        ],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1, "hiddenLevels": [0.5]}
+      },
+      {
+        "id": "trend1", "symbol": "2330.TW", "type": "trend",
+        "points": [
+          {"time": 1783728000, "logical": 60, "price": 1000, "timeframe": "1D"},
+          {"time": 1790640000, "logical": 110, "price": 1100, "timeframe": "1D"}
+        ],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      },
+      {
+        "id": "channel1", "symbol": "2330.TW", "type": "channel",
+        "points": [
+          {"time": 1783728000, "logical": 60, "price": 1000, "timeframe": "1D"},
+          {"time": 1790640000, "logical": 110, "price": 1100, "timeframe": "1D"},
+          {"time": 1790640000, "logical": 110, "price": 1050, "timeframe": "1D"}
+        ],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      },
+      {
+        "id": "vertical1", "symbol": "2330.TW", "type": "vertical",
+        "points": [{"time": 1790640000, "logical": 110, "price": 1060, "timeframe": "1D"}],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      },
+      {
+        "id": "range1", "symbol": "2330.TW", "type": "price-range",
+        "points": [
+          {"time": 1783728000, "logical": 60, "price": 1000, "timeframe": "1D"},
+          {"time": 1790640000, "logical": 110, "price": 1100, "timeframe": "1D"}
+        ],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      },
+      {
+        "id": "wrong-symbol", "symbol": "2317.TW", "type": "horizontal",
+        "points": [{"time": 1790640000, "logical": 120, "price": 200, "timeframe": "1D"}],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      },
+      {"id": "broken-no-points", "symbol": "2330.TW", "type": "horizontal", "visible": true},
+      {
+        "id": "broken-price", "symbol": "2330.TW", "type": "horizontal",
+        "points": [{"time": 1790640000, "logical": 120, "price": "1085", "timeframe": "1D"}],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      },
+      {
+        "id": "broken-negative", "symbol": "2330.TW", "type": "horizontal",
+        "points": [{"time": 1790640000, "logical": 120, "price": -5, "timeframe": "1D"}],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      },
+      "not-a-drawing",
+      null
+    ]
+  },
+  {
+    "ticker": "^TWII",
+    "updated_at": "2026-10-08T05:00:00+00:00",
+    "drawings": [
+      {
+        "id": "idx1", "symbol": "^TWII", "type": "horizontal",
+        "points": [{"time": 1790640000, "logical": 120, "price": 23000, "timeframe": "1D"}],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      }
+    ]
+  },
+  {
+    "ticker": "000001.SS",
+    "updated_at": "2026-10-08T05:00:00+00:00",
+    "drawings": [
+      {
+        "id": "ss1", "symbol": "000001.SS", "type": "horizontal",
+        "points": [{"time": 1790640000, "logical": 120, "price": 3300, "timeframe": "1D"}],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      }
+    ]
+  },
+  {
+    "ticker": "BRK.B",
+    "updated_at": "2026-10-08T05:00:00+00:00",
+    "drawings": [
+      {
+        "id": "brk1", "symbol": "BRK.B", "type": "horizontal",
+        "points": [{"time": 1790640000, "logical": 120, "price": 480.5, "timeframe": "1D"}],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      }
+    ]
+  },
+  {
+    "ticker": "6488.TWO",
+    "updated_at": "2026-10-08T05:00:00+00:00",
+    "drawings": [
+      {
+        "id": "otc1", "symbol": "6488.TWO", "type": "horizontal",
+        "points": [{"time": 1790640000, "logical": 120, "price": 410, "timeframe": "1D"}],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      }
+    ]
+  },
+  {
+    "ticker": "NVDA",
+    "updated_at": "2026-10-08T05:00:00+00:00",
+    "drawings": [
+      {
+        "id": "nv-trend", "symbol": "NVDA", "type": "trend",
+        "points": [
+          {"time": 1783728000, "logical": 60, "price": 150, "timeframe": "1D"},
+          {"time": 1790640000, "logical": 110, "price": 190, "timeframe": "1D"}
+        ],
+        "locked": false, "visible": true, "scope": {"timeframes": ["1D"]},
+        "style": {"color": "#f0b90b", "lineWidth": 1}
+      }
+    ]
+  },
+  {"ticker": "AAPL", "updated_at": "2026-10-08T05:00:00+00:00", "drawings": {"not": "a list"}},
+  {"ticker": null, "drawings": []},
+  "garbage-row"
+]
