@@ -115,6 +115,16 @@ jobs:
         working-directory: atlas
         run: node scripts/build-valuation.mjs --market=tw
 
+      # 美股財報倒數：Yahoo 報價的 earningsTimestamp → valuation/us-events.json（個股列表的「N 天後財報」徽章）。
+      # 台股不做：證交所／櫃買中心沒有逐公司事先公告的財報日。
+      - name: Build US earnings dates (Yahoo Finance)
+        id: events_us
+        continue-on-error: true
+        working-directory: atlas
+        run: |
+          pip install --quiet 'curl_cffi>=0.7,<1'
+          python scripts/build_events_us.py
+
       - name: Build Atlas for GitHub Pages
         working-directory: atlas
         env:
@@ -185,6 +195,7 @@ jobs:
           VALUATION_OUTCOME: ${{ steps.valuation.outcome }}
           VALUATION_US_OUTCOME: ${{ steps.valuation_us.outcome }}
           VALUATION_TW_ANNUAL_OUTCOME: ${{ steps.valuation_tw_annual.outcome }}
+          EVENTS_US_OUTCOME: ${{ steps.events_us.outcome }}
         run: |
           set -euo pipefail
           if [ "$DIRECTORY_OUTCOME" = "failure" ]; then
@@ -198,6 +209,9 @@ jobs:
           fi
           if [ "$VALUATION_OUTCOME" = "failure" ]; then
             echo "::warning::台股本益比部分或全部更新失敗，沿用上次部署的 valuation/tw.json"
+          fi
+          if [ "$EVENTS_US_OUTCOME" = "failure" ]; then
+            echo "::warning::美股財報日（Yahoo）更新失敗，沿用上次部署的 valuation/us-events.json"
           fi
 
       # 不依賴 Claude 的故障通知：本 job 失敗或逾時（取消）時推播 LINE
