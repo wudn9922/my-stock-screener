@@ -86,10 +86,10 @@ jobs:
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
           SUPABASE_USER_ID: ${{ secrets.SUPABASE_USER_ID }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          # 讀取設定表用 service role（鎖定匿名讀取後 anon key 讀不到）；未設定時退回 anon key
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           CUSTOM_GROUP_TEST_MODE: "false"
-          # 舊版 24 MB docs/index.html 報告；改成 "true" 才會重新產生
-          LEGACY_HTML_REPORT: "false"
         run: python main.py
 
       # ✨ 已修改：注入 Imgur 金鑰，讓自動截圖流能順利上傳並傳入 LINE
@@ -110,8 +110,8 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           # -A 才會把「已被清理的過期 CSV」的刪除動作一起提交
-          # docs/report：Atlas 報告 JSON；docs/index.html 只有 LEGACY_HTML_REPORT=1 時才會變動
-          git add -A docs/report data docs/index.html
+          # docs/report：Atlas 報告 JSON；data：歷史資料
+          git add -A docs/report data
           git commit -m "Auto-update daily data and report JSON" || echo "No changes to commit"
           # Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試
           for attempt in 1 2 3; do
