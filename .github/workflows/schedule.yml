@@ -104,6 +104,13 @@ jobs:
           FED_TARGET_UPPER_FALLBACK: ${{ vars.FED_TARGET_UPPER_FALLBACK }}
         run: python dify_report.py
 
+      # 美股題材（類股輪動）：下載成分股日線並產生 docs/report/themes.json。
+      # 失敗只保留上次的檔案，不影響主流程。
+      - name: Build theme rotation
+        if: steps.guard.outputs.skip != 'true'
+        continue-on-error: true
+        run: python scripts/build_themes.py
+
       - name: Commit and Push changes
         if: steps.guard.outputs.skip != 'true'
         run: |

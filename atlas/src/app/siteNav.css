@@ -1,0 +1,12 @@
+/* Phone tab bar with six buttons (大盤 世界 題材 選股 圖表 搜尋); styles.css sizes it for five. */
+@media (max-width: 1099px) {
+  .site .site-tabbar {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .site .site-tabbar button {
+    gap: 2px;
+    padding: 0;
+    font-size: 11px;
+    letter-spacing: 0;
+  }
+}
