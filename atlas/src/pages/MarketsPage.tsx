@@ -4,6 +4,7 @@ import type { PageProps } from './pageProps';
 import { ChartAttribution, ReportGate, TrendBadge } from './ReportGate';
 import { MARKET_KEYS, type IndexStatus, type MarketKey, type Report } from '../report/schema';
 import { LineTextCard } from '../ui/LineTextCard';
+import { BreadthCard } from '../ui/BreadthCard';
 import { MiniChart } from '../ui/MiniChart';
 import { indicatorColors } from '../indicators/IndicatorRegistry';
 import { formatDateTime, formatPercent, formatPrice, maDistance, maValue, toneClass } from '../ui/format';
@@ -133,6 +134,7 @@ function MarketView({ report, market, openChart }: { report: Report; market: Mar
         )}
       </section>
       <aside className="markets-side">
+        {(market === 'tw' || market === 'us') && <BreadthCard market={market} />}
         <LineTextCard title={`${data.flag || meta.flag} ${data.name || meta.name} LINE 摘要`} text={data.lineText} />
         <p className="source-note">
           資料來源：{sources.length ? sources.join('、') : '每日量化報告'}
