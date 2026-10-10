@@ -15,6 +15,8 @@ export interface ValuationRecord {
   epsTtm: number | null;
   epsAnnual: number | null;
   fiscalYear: number | null;
+  /** Taiwan only: set when `epsAnnual` came from tw-annual.json instead of the exchange statement. */
+  annualSource?: 'Yahoo Finance';
   /** Taiwan only: the exchange's own P/E (TTM basis) on `asOf`. */
   exchangePeTtm?: number | null;
   asOf: string | null;
@@ -357,13 +359,37 @@ export function parseTaiwanAnnualEps(raw: unknown): Map<string, { eps: number; f
   return map;
 }
 
+/**
+ * public/valuation/tw-annual.json (scripts/build_valuation_tw_annual.py, Yahoo Finance annual EPS in TWD)
+ * → symbol ("2330.TW") → latest full fiscal year EPS. Entries without a number are skipped.
+ */
+export function parseTaiwanSupplementalAnnual(raw: unknown): Map<string, { eps: number; fiscalYear: number }> {
+  const map = new Map<string, { eps: number; fiscalYear: number }>();
+  const items = (raw as { items?: unknown } | null | undefined)?.items;
+  if (!items || typeof items !== 'object') return map;
+  for (const [symbol, value] of Object.entries(items as Record<string, unknown>)) {
+    if (!/^[0-9]{4}\.TWO?$/.test(symbol) || !value || typeof value !== 'object') continue;
+    const { epsAnnual, fiscalYear } = value as { epsAnnual?: unknown; fiscalYear?: unknown };
+    if (typeof epsAnnual !== 'number' || !Number.isFinite(epsAnnual)) continue;
+    if (typeof fiscalYear !== 'number' || !Number.isInteger(fiscalYear)) continue;
+    map.set(symbol, { eps: round(epsAnnual, 2), fiscalYear });
+  }
+  return map;
+}
+
 export interface TaiwanBuildInput {
   exchange: 'TWSE' | 'TPEx';
   pe: readonly TaiwanPeRow[];
   close: ReadonlyMap<string, { close: number; date: string | null }>;
+  /** Full-year EPS from the exchanges' latest statements (present only while that is a Q4 statement). */
   annual: ReadonlyMap<string, { eps: number; fiscalYear: number }>;
   /** Previous tw.json items, so a full-year EPS published in spring survives until the next one. */
   previous: Readonly<Record<string, ValuationRecord>>;
+  /**
+   * Full-year EPS by symbol from tw-annual.json, used when neither the exchange statement nor the
+   * previous file has the same or a later fiscal year (e.g. the first build after spring).
+   */
+  supplementalAnnual?: ReadonlyMap<string, { eps: number; fiscalYear: number }>;
   fallbackDate: string;
 }
 
@@ -375,16 +401,24 @@ export function buildTaiwanRecords(input: TaiwanBuildInput): Record<string, Valu
     const close = input.close.get(row.code);
     const sameDay = !close?.date || !row.date || close.date === row.date;
     const epsTtm = row.pe !== null && close && sameDay ? round(close.close / row.pe, 2) : null;
-    const annual = input.annual.get(row.code);
+    const official = input.annual.get(row.code);
     const previous = input.previous[symbol];
-    const epsAnnual = annual?.eps ?? previous?.epsAnnual ?? null;
-    const fiscalYear = annual?.fiscalYear ?? (previous?.epsAnnual !== null && previous?.epsAnnual !== undefined ? previous.fiscalYear : null);
+    const stored =
+      previous && typeof previous.epsAnnual === 'number' && typeof previous.fiscalYear === 'number'
+        ? { eps: previous.epsAnnual, fiscalYear: previous.fiscalYear, annualSource: previous.annualSource }
+        : undefined;
+    const supplement = input.supplementalAnnual?.get(symbol);
+    // Latest fiscal year wins; on a tie the exchange's own statement, then the stored value.
+    let annual: { eps: number; fiscalYear: number; annualSource?: 'Yahoo Finance' } | undefined = official ?? stored;
+    if (supplement && (!annual || supplement.fiscalYear > annual.fiscalYear)) annual = { ...supplement, annualSource: 'Yahoo Finance' };
+    const epsAnnual = annual?.eps ?? null;
     // A row without any usable figure (loss-making or suspended: the exchange leaves P/E blank) is omitted.
     if (epsTtm === null && epsAnnual === null && row.pe === null) continue;
     items[symbol] = {
       epsTtm,
       epsAnnual,
-      fiscalYear: epsAnnual === null ? null : fiscalYear ?? null,
+      fiscalYear: annual?.fiscalYear ?? null,
+      ...(annual?.annualSource ? { annualSource: annual.annualSource } : {}),
       exchangePeTtm: row.pe,
       asOf: row.date ?? close?.date ?? input.fallbackDate,
       source: input.exchange,

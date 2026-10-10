@@ -14,6 +14,7 @@ import {
   parseTaiwanAnnualEps,
   parseTaiwanClose,
   parseTaiwanPe,
+  parseTaiwanSupplementalAnnual,
   quarterSlotsToFetch,
   slotFromDate,
   slotFromFrameName,
@@ -222,6 +223,76 @@ describe('Taiwan official P/E', () => {
     expect(items['2498.TW']).toMatchObject({ epsTtm: null, epsAnnual: -1.25, exchangePeTtm: null });
     expect(items['1101.TW']).toBeUndefined();
   });
+
+  // Regression: between May and the next March the exchanges' latest statements are Q1–Q3 (year-to-date),
+  // so a build without a carried-over Q4 value had epsAnnual = null for every Taiwan stock and the
+  // 「本益比」 (annual EPS) field was always empty. Annual EPS from tw-annual.json fills that gap.
+  it('fills annual EPS from tw-annual.json when the exchanges only publish a year-to-date quarter', () => {
+    const pe = parseTaiwanPe([
+      { Date: '1151008', Code: '2330', PEratio: '29.56' },
+      { Date: '1151008', Code: '2317', PEratio: '16.41' },
+      { Date: '1151008', Code: '2881', PEratio: '12.50' },
+    ]);
+    const close = parseTaiwanClose([
+      { Date: '1151008', Code: '2330', ClosingPrice: '2,550.00' },
+      { Date: '1151008', Code: '2317', ClosingPrice: '249.00' },
+    ]);
+    // October: t187ap14_L holds 2026 Q2 (year-to-date), which is not a full year.
+    const annual = parseTaiwanAnnualEps([{ 年度: '115', 季別: '2', 公司代號: '2330', '基本每股盈餘(元)': '41.20' }]);
+    expect(annual.size).toBe(0);
+    const base = { exchange: 'TWSE' as const, pe, close, annual, fallbackDate: '2026-10-08' };
+    const withoutSupplement = buildTaiwanRecords({ ...base, previous: {} });
+    expect(withoutSupplement['2330.TW']).toMatchObject({ epsAnnual: null, fiscalYear: null });
+
+    const items = buildTaiwanRecords({
+      ...base,
+      // An official Q4 value already stored for 2881 wins over the supplement for the same year.
+      previous: { '2881.TW': { epsTtm: 9, epsAnnual: 8.88, fiscalYear: 2025, exchangePeTtm: 12, asOf: '2026-04-01', source: 'TWSE' } },
+      supplementalAnnual: new Map([
+        ['2330.TW', { eps: 64.11, fiscalYear: 2025 }],
+        ['2881.TW', { eps: 8.9, fiscalYear: 2025 }],
+        ['9999.TW', { eps: 1, fiscalYear: 2025 }],
+      ]),
+    });
+    expect(items['2330.TW']).toEqual({
+      epsTtm: 86.27, epsAnnual: 64.11, fiscalYear: 2025, annualSource: 'Yahoo Finance',
+      exchangePeTtm: 29.56, asOf: '2026-10-08', source: 'TWSE',
+    });
+    expect(items['2317.TW']).toMatchObject({ epsAnnual: null, fiscalYear: null });
+    expect(items['2881.TW']).toMatchObject({ epsAnnual: 8.88, fiscalYear: 2025 });
+    expect(items['2881.TW']).not.toHaveProperty('annualSource');
+    expect(items['9999.TW']).toBeUndefined();
+
+    // A newer official full year replaces the supplement; an older one does not.
+    const spring = buildTaiwanRecords({
+      ...base,
+      annual: new Map([['2330', { eps: 70.5, fiscalYear: 2026 }], ['2317', { eps: 10, fiscalYear: 2024 }]]),
+      previous: {},
+      supplementalAnnual: new Map([['2330.TW', { eps: 64.11, fiscalYear: 2025 }], ['2317.TW', { eps: 12.5, fiscalYear: 2025 }]]),
+    });
+    expect(spring['2330.TW']).toMatchObject({ epsAnnual: 70.5, fiscalYear: 2026 });
+    expect(spring['2330.TW']).not.toHaveProperty('annualSource');
+    expect(spring['2317.TW']).toMatchObject({ epsAnnual: 12.5, fiscalYear: 2025, annualSource: 'Yahoo Finance' });
+  });
+
+  it('parses tw-annual.json into a symbol map and ignores malformed entries', () => {
+    expect([
+      ...parseTaiwanSupplementalAnnual({
+        version: 1,
+        items: {
+          '2330.TW': { epsAnnual: 64.11, fiscalYear: 2025, annualPeriodEnd: '2025-12-31', annualCheckedAt: '2026-10-10' },
+          '6488.TWO': { epsAnnual: -1.5, fiscalYear: 2025 },
+          '2317.TW': { epsAnnual: null, fiscalYear: null, annualCheckedAt: '2026-10-10' },
+          AAPL: { epsAnnual: 7, fiscalYear: 2025 },
+          '1101.TW': { epsAnnual: 'x', fiscalYear: 2025 },
+        },
+      }).entries(),
+    ]).toEqual([
+      ['2330.TW', { eps: 64.11, fiscalYear: 2025 }],
+      ['6488.TWO', { eps: -1.5, fiscalYear: 2025 }],
+    ]);
+    expect(parseTaiwanSupplementalAnnual(undefined).size).toBe(0);
+  });
 });
 
 describe('computePe', () => {
@@ -300,5 +371,51 @@ describe('ValuationProvider', () => {
     now = 61_000;
     expect(await p.getValuation('NVDA')).toBeNull();
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('accepts the deployed record shapes (ADR method, Taiwan without annual EPS)', async () => {
+    // Verbatim from docs/atlas/valuation/{us,tw}.json (2026-10-09).
+    const { provider: p } = provider({
+      '/base/valuation/us.json': {
+        version: 1,
+        market: 'US',
+        items: {
+          TSM: {
+            epsTtm: 13.76, epsAnnual: 10.2465, fiscalYear: 2025, asOf: '2026-10-09', source: 'Yahoo Finance',
+            method: 'net income / ADR count', annualPeriodEnd: '2025-12-31', annualCheckedAt: '2026-10-09',
+          },
+        },
+      },
+      '/base/valuation/tw.json': {
+        version: 1,
+        market: 'TW',
+        items: { '2330.TW': { epsTtm: 86.27, epsAnnual: null, fiscalYear: null, exchangePeTtm: 29.56, asOf: '2026-10-08', source: 'TWSE' } },
+      },
+    });
+    expect(await p.getValuation('TSM')).toMatchObject({ market: 'US', epsTtm: 13.76, epsAnnual: 10.2465 });
+    expect(await p.getValuation('2330.TW')).toMatchObject({ market: 'TW', epsAnnual: null, exchangePeTtm: 29.56 });
+  });
+
+  it('reloads a loaded file after its lifetime and keeps the last good copy when the reload fails', async () => {
+    let now = 0;
+    const files: Record<string, unknown> = { '/base/valuation/us.json': { version: 1, market: 'US', items: {} } };
+    const { provider: p, fetcher } = provider(files, () => now);
+    // A tab opened before TSM was added to us.json.
+    expect(await p.getValuation('TSM')).toBeNull();
+    files['/base/valuation/us.json'] = {
+      version: 1,
+      market: 'US',
+      items: { TSM: { epsTtm: 13.76, epsAnnual: 10.2465, fiscalYear: 2025, asOf: '2026-10-09', source: 'Yahoo Finance' } },
+    };
+    now = 10 * 60_000;
+    expect(await p.getValuation('TSM')).toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    now = 31 * 60_000;
+    expect(await p.getValuation('TSM')).toMatchObject({ epsAnnual: 10.2465 });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    delete files['/base/valuation/us.json'];
+    now = 62 * 60_000;
+    expect(await p.getValuation('TSM')).toMatchObject({ epsAnnual: 10.2465 });
+    expect(fetcher).toHaveBeenCalledTimes(3);
   });
 });

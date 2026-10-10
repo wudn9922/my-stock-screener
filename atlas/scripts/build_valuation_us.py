@@ -155,12 +155,12 @@ def adr_valuation(quote, net_income, rates):
     return eps, annual
 
 
-def parse_annual(payload):
-    """timeseries → (eps, period_end 'YYYY-MM-DD') of the latest USD fiscal year, or None."""
+def parse_annual(payload, currency="USD", prefer=("annualDilutedEPS", "annualBasicEPS")):
+    """timeseries → (eps, period_end 'YYYY-MM-DD') of the latest fiscal year in `currency`, or None."""
     best = {}
     for series in ((payload or {}).get("timeseries") or {}).get("result") or []:
         kind = ((series.get("meta") or {}).get("type") or [None])[0]
-        if kind not in ("annualDilutedEPS", "annualBasicEPS"):
+        if kind not in prefer:
             continue
         for point in series.get(kind) or []:
             if not point:
@@ -169,12 +169,15 @@ def parse_annual(payload):
             value = finite_number((point.get("reportedValue") or {}).get("raw"))
             if not isinstance(date, str) or value is None:
                 continue
-            if point.get("currencyCode") not in (None, "USD"):
+            if point.get("currencyCode") not in (None, currency):
                 continue
             current = best.get(kind)
             if current is None or date > current[1]:
                 best[kind] = (round4(value), date)
-    return best.get("annualDilutedEPS") or best.get("annualBasicEPS")
+    for kind in prefer:
+        if best.get(kind):
+            return best[kind]
+    return None
 
 
 def needs_annual(previous, today):
