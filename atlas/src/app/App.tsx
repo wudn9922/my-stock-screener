@@ -1200,12 +1200,16 @@ export function App({
               )}
             </div>
           </div>
-          <div className={`chart-status ${mobile && drawingControls ? 'has-drawing-controls' : ''}`}>
-            <span>
-              {tool === 'select'
-                ? mobile ? '拖曳平移 · 雙指縮放' : '拖曳平移 · 滾輪縮放 · Esc 取消'
-                : `${toolNames[tool]} · 每個端點：按住 → 拖曳 → 放開`}
-            </span>
+          <div
+            className={`chart-status ${mobile && drawingControls ? 'has-drawing-controls' : ''} ${
+              tool === 'select' && !(mobile && drawingControls) ? 'chart-status-idle' : ''
+            }`}
+          >
+            {tool === 'select' ? (
+              <span aria-hidden="true" />
+            ) : (
+              <span>{`${toolNames[tool]} · 每個端點：按住 → 拖曳 → 放開`}</span>
+            )}
             <span className="status-counts">
               畫線 {activeDrawings.length} 條 <span className="status-divider">/</span> 指標 {activeIndicators.length} 個
               <span className="status-divider">/</span>

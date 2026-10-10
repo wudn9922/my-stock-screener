@@ -16,6 +16,7 @@ import { createClient } from "@supabase/supabase-js";
  *   stocks.save   { id?, ticker, groupId, mas: number[] }  有 id 為修改，否則新增（同代號同分組則覆蓋均線）
  *                 groupId：tw_g1…us_g4 或 custom_<groups.id>
  *   stocks.delete { id }
+ *   admin.index.list                                      僅管理員（回傳目前已設定的大盤均線）
  *   admin.index.save { ticker, name, mas: number[] }      僅管理員
  */
 
@@ -474,6 +475,26 @@ Deno.serve(async (request: Request) => {
         .eq("line_user_id", lineUserId)
         .neq("group_id", ADMIN_GROUP_ID)
         .select("id");
+
+      if (error) {
+        throw error;
+      }
+
+      return jsonResponse({ ok: true, data: data ?? [] });
+    }
+
+    if (action === "admin.index.list") {
+      const adminId = (
+        Deno.env.get("ADMIN_LINE_USER_ID") || DEFAULT_ADMIN_LINE_ID
+      ).trim();
+
+      if (lineUserId !== adminId) {
+        throw new HttpError(403, "僅管理員可查看大盤參數");
+      }
+
+      const { data, error } = await supabase
+        .from("index_configs")
+        .select("ticker,name,ma1,ma2,ma3,ma4");
 
       if (error) {
         throw error;

@@ -65,22 +65,11 @@ export interface PeFigures {
   asOf: string | null;
 }
 
-const valuations = new Map<string, Promise<Valuation | null>>();
 export async function getPeFigures(symbol: string, price: number | null | undefined): Promise<PeFigures> {
   const empty = (reason: string): PeFigures => ({ pe: null, peTtm: null, reason, fiscalYear: null, source: null, asOf: null });
   if (symbol.startsWith('^')) return empty('指數不適用本益比');
-  let request = valuations.get(symbol);
-  if (!request) {
-    // A missing valuation is not memoized here; the provider caches its market files itself.
-    request = getValuation(symbol)
-      .catch(() => null)
-      .then((value) => {
-        if (!value) valuations.delete(symbol);
-        return value;
-      });
-    valuations.set(symbol, request);
-  }
-  const valuation = await request;
+  // Not memoized here: the provider caches (and periodically reloads) its market files itself.
+  const valuation: Valuation | null = await getValuation(symbol).catch(() => null);
   if (!valuation) return empty('暫無 EPS 資料');
   const annual = describePe(price, valuation.epsAnnual);
   const exchangeTtm =

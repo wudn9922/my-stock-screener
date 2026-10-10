@@ -1544,6 +1544,10 @@
 .app-shell.chart-focus .chart-status {
   min-height: 28px;
 }
+/* Full-screen chart: nothing under the plot unless a drawing tool is active. */
+.app-shell.chart-focus .chart-status-idle {
+  display: none;
+}
 
 /* ---- Tablet & phone */
 @media (min-width: 1600px) {
@@ -1709,6 +1713,10 @@
     padding: 0 8px;
   }
   .chart-status > .status-counts {
+    display: none;
+  }
+  /* Phone: no hint text any more, so an idle status bar is just empty space. */
+  .chart-status-idle {
     display: none;
   }
   .chart-status.has-drawing-controls > span {

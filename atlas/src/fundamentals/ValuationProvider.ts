@@ -91,12 +91,25 @@ export interface ValuationProviderOptions {
 }
 
 const RETRY_AFTER_FAILURE_MS = 60_000;
+/**
+ * A loaded file is reused for this long, then fetched again: the files are rebuilt several times a
+ * day, and a tab (e.g. LINE's in-app browser) can stay open across rebuilds.
+ */
+const RELOAD_AFTER_MS = 30 * 60_000;
+
+interface FileEntry {
+  at: number;
+  failed: boolean;
+  promise: Promise<ValuationFile | null>;
+}
 
 export class ValuationProvider {
   readonly base: string;
   private readonly fetcher: typeof fetch;
   private readonly now: () => number;
-  private readonly files = new Map<'US' | 'TW', { at: number; failed: boolean; promise: Promise<ValuationFile | null> }>();
+  private readonly files = new Map<'US' | 'TW', FileEntry>();
+  /** Last successfully loaded file per market, served while a reload fails. */
+  private readonly lastGood = new Map<'US' | 'TW', ValuationFile>();
 
   constructor(base = `${import.meta.env?.BASE_URL ?? '/'}valuation/`, options: ValuationProviderOptions = {}) {
     this.base = base.endsWith('/') ? base : `${base}/`;
@@ -106,7 +119,7 @@ export class ValuationProvider {
 
   /**
    * Valuation for a US or Taiwan stock, or null (index, unknown symbol, file missing). Each market file is
-   * loaded once and cached; a failed load is retried after a minute.
+   * loaded once and reused for 30 minutes; a failed load is retried after a minute.
    */
   async getValuation(symbolInput: string, signal?: AbortSignal): Promise<Valuation | null> {
     signal?.throwIfAborted();
@@ -140,24 +153,22 @@ export class ValuationProvider {
   /** The raw market file (for diagnostics such as its `generatedAt`). */
   loadFile(market: 'US' | 'TW'): Promise<ValuationFile | null> {
     const cached = this.files.get(market);
-    if (cached && (!cached.failed || this.now() - cached.at < RETRY_AFTER_FAILURE_MS)) return cached.promise;
-    const entry: { at: number; failed: boolean; promise: Promise<ValuationFile | null> } = {
-      at: this.now(),
-      failed: false,
-      promise: Promise.resolve(null),
-    };
+    if (cached && this.now() - cached.at < (cached.failed ? RETRY_AFTER_FAILURE_MS : RELOAD_AFTER_MS)) return cached.promise;
+    const entry: FileEntry = { at: this.now(), failed: false, promise: Promise.resolve(null) };
     entry.promise = (async (): Promise<ValuationFile | null> => {
       try {
         const response = await this.fetcher(`${this.base}${market === 'US' ? 'us' : 'tw'}.json`, { cache: 'no-cache' });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const document = documentSchema.parse(await response.json());
         if (document.market !== market) throw new Error('Valuation market mismatch');
-        return { market, ...(document.generatedAt ? { generatedAt: document.generatedAt } : {}), items: document.items };
+        const file: ValuationFile = { market, ...(document.generatedAt ? { generatedAt: document.generatedAt } : {}), items: document.items };
+        this.lastGood.set(market, file);
+        return file;
       } catch {
-        // Not built yet, offline or invalid: report "no valuation" and retry after a minute.
+        // Not built yet, offline or invalid: keep the last good copy (if any) and retry after a minute.
         entry.failed = true;
         entry.at = this.now();
-        return null;
+        return this.lastGood.get(market) ?? null;
       }
     })();
     this.files.set(market, entry);

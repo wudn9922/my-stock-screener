@@ -11,6 +11,10 @@
  * public/valuation/us.json is built by scripts/build_valuation_us.py (Yahoo Finance) instead. The SEC
  * path is kept for environments SEC does not block.
  *
+ * Taiwan annual EPS: the exchanges' statements give a full year only while their latest filing is Q4
+ * (spring), so public/valuation/tw-annual.json (scripts/build_valuation_tw_annual.py, run just before
+ * this) fills epsAnnual for the rest of the year; see buildTaiwanRecords for the precedence.
+ *
  * A market whose sources fail keeps its previous file (the workflow seeds it from the last deployment);
  * the script then exits 1 so the workflow shows a warning.
  */
@@ -29,6 +33,7 @@ import {
   parseTaiwanAnnualEps,
   parseTaiwanClose,
   parseTaiwanPe,
+  parseTaiwanSupplementalAnnual,
   quarterSlotsToFetch,
   type CompanyEpsFacts,
   type ValuationDocument,
@@ -105,6 +110,7 @@ async function buildTaiwanExchange(
   fetcher: SourceFetcher,
   exchange: 'TWSE' | 'TPEx',
   previous: Record<string, ValuationRecord>,
+  supplementalAnnual: ReadonlyMap<string, { eps: number; fiscalYear: number }>,
   fallbackDate: string,
 ) {
   const urls = exchange === 'TWSE'
@@ -124,7 +130,7 @@ async function buildTaiwanExchange(
   const annual = await fetcher.json(urls.eps[0]!, { fixture: urls.eps[1]! }).then(parseTaiwanAnnualEps, () => new Map());
   const previousForExchange = Object.fromEntries(Object.entries(previous).filter(([, record]) => record.source === exchange));
   return {
-    items: buildTaiwanRecords({ exchange, pe, close, annual, previous: previousForExchange, fallbackDate }),
+    items: buildTaiwanRecords({ exchange, pe, close, annual, previous: previousForExchange, supplementalAnnual, fallbackDate }),
     stats: { pe: pe.length, close: close.size, annualEps: annual.size },
   };
 }
@@ -172,11 +178,14 @@ async function main() {
     try {
       const previousDocument = (await readJson(join(OUT_DIR, 'tw.json'))) as Partial<ValuationDocument> | undefined;
       const previous = (previousDocument?.items ?? {}) as Record<string, ValuationRecord>;
+      // Full-year EPS for the months when the exchanges' latest statement is not a Q4 one
+      // (scripts/build_valuation_tw_annual.py; optional).
+      const supplementalAnnual = parseTaiwanSupplementalAnnual(await readJson(join(OUT_DIR, 'tw-annual.json')));
       const items: Record<string, ValuationRecord> = {};
       const stats: Record<string, unknown> = {};
       for (const exchange of ['TWSE', 'TPEx'] as const) {
         try {
-          const result = await buildTaiwanExchange(fetcher, exchange, previous, todayIso);
+          const result = await buildTaiwanExchange(fetcher, exchange, previous, supplementalAnnual, todayIso);
           const count = Object.keys(result.items).length;
           if (count < (offline ? 1 : 500)) throw new Error(`only ${count} records`);
           Object.assign(items, result.items);
@@ -194,12 +203,13 @@ async function main() {
         version: 1,
         market: 'TW',
         generatedAt,
-        source: 'TWSE OpenAPI BWIBBU_ALL / STOCK_DAY_ALL / t187ap14_L; TPEx OpenAPI tpex_mainboard_peratio_analysis / daily_close_quotes / mopsfin_t187ap14_O',
-        notes: 'exchangePeTtm is the exchange P/E (latest four quarters); epsTtm = close / exchangePeTtm; epsAnnual only when a full-year (Q4) statement was published, kept until the next one.',
+        source: 'TWSE OpenAPI BWIBBU_ALL / STOCK_DAY_ALL / t187ap14_L; TPEx OpenAPI tpex_mainboard_peratio_analysis / daily_close_quotes / mopsfin_t187ap14_O; Yahoo Finance annual EPS (tw-annual.json)',
+        notes: 'exchangePeTtm is the exchange P/E (latest four quarters); epsTtm = close / exchangePeTtm; epsAnnual from a full-year (Q4) exchange statement, kept until the next one, or from Yahoo Finance annual EPS in TWD (annualSource) when no exchange statement for that or a later year is stored.',
         items,
       };
       const bytes = await writeAtomic(join(OUT_DIR, 'tw.json'), document);
-      console.log(JSON.stringify({ market: 'TW', records: Object.keys(items).length, stats, bytes }));
+      const withAnnual = Object.values(items).filter((record) => record.epsAnnual !== null).length;
+      console.log(JSON.stringify({ market: 'TW', records: Object.keys(items).length, withAnnual, supplementalAnnual: supplementalAnnual.size, stats, bytes }));
     } catch (error) {
       failed = true;
       console.log(`::warning::Taiwan valuation not rebuilt (previous file kept): ${error instanceof Error ? error.message : String(error)}`);
