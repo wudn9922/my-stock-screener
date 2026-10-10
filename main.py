@@ -652,15 +652,25 @@ def get_supabase_settings():
         ""
     ).strip().rstrip("/")
 
+    service_key = os.environ.get(
+        "SUPABASE_SERVICE_ROLE_KEY",
+        ""
+    ).strip()
+
     api_key = (
-        os.environ.get(
-            "SUPABASE_SERVICE_ROLE_KEY"
-        )
+        service_key
         or os.environ.get(
             "SUPABASE_ANON_KEY"
         )
         or ""
     ).strip()
+
+    if api_key and not service_key:
+        print(
+            "⚠️ 未設定 SUPABASE_SERVICE_ROLE_KEY，"
+            "改用 anon key 讀取；若資料表已鎖定匿名讀取，"
+            "將讀不到自選股與大盤設定"
+        )
 
     if not base_url:
         print("❌ 未設定 SUPABASE_URL")

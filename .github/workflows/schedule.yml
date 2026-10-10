@@ -86,6 +86,8 @@ jobs:
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
           SUPABASE_USER_ID: ${{ secrets.SUPABASE_USER_ID }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          # 讀取設定表用 service role（鎖定匿名讀取後 anon key 讀不到）；未設定時退回 anon key
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           CUSTOM_GROUP_TEST_MODE: "false"
         run: python main.py
