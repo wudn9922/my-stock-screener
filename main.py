@@ -7357,56 +7357,24 @@ def main():
     # 依需求：動態自訂群組不加入 LINE 統計，
     # 避免未來新增大量群組後訊息過長。
     # -----------------------------------------------------------------
+    def stock_count(group_key):
+        return len(data_dict.get(group_key, []))
+
     line_message_stocks = (
-        f"🎯 {today_str} "
-        "專屬量化看盤網頁！\n\n"
-
-        "🌍 【全球指數區塊】\n"
-        " └ 指數圖表："
-        f"{len(data_dict.get('indices', []))} "
-        "張\n\n"
-
-        "🧭 【美股類股週K】\n"
-        " └ 類股圖表："
-        f"{len(data_dict.get('sectors', []))} "
-        "張\n\n"
-
-        "🇹🇼 【台灣股市區塊】\n"
-        " ├ 1. 全市場符合："
-        f"{len(data_dict.get('tw_all', []))} "
-        "檔\n"
-        " ├ 2. 權值精選符合："
-        f"{len(data_dict.get('tw_g1', []))} "
-        "檔\n"
-        " └ 3. 熱門符合："
-        f"{len(data_dict.get('tw_g2', []))} "
-        "檔\n\n"
-
-        "🇺🇸 【美國股市區塊】\n"
-        " ├ 1. 全市場符合："
-        f"{len(data_dict.get('us_all', []))} "
-        "檔\n"
-        " ├ 2. 權值精選符合："
-        f"{len(data_dict.get('us_g1', []))} "
-        "檔\n"
-        " ├ 3. 低本益比符合："
-        f"{len(data_dict.get('us_g2', []))} "
-        "檔\n"
-        " ├ 4. 超級績效符合："
-        f"{len(data_dict.get('us_g3', []))} "
-        "檔\n"
-        " └ 5. 熱門符合："
-        f"{len(data_dict.get('us_g4', []))} "
-        "檔\n\n"
-
-        "🔗 1. 專屬潛伏圖表網頁：\n"
-        f"{report_url}\n\n"
-
-        "⚙️ 2. 手機自訂參數控制台：\n"
-        f"{liff_setting_url}\n\n"
-
-        "💰 3. 自動交易參數控制台：\n"
-        f"{bitget_setting_url}"
+        f"🎯 {today_str} 量化日報\n"
+        "🇹🇼 符合檔數："
+        f"全市場 {stock_count('tw_all')}"
+        f"｜權值 {stock_count('tw_g1')}"
+        f"｜熱門 {stock_count('tw_g2')}\n"
+        "🇺🇸 符合檔數："
+        f"全市場 {stock_count('us_all')}"
+        f"｜權值 {stock_count('us_g1')}"
+        f"｜低本益 {stock_count('us_g2')}"
+        f"｜績效 {stock_count('us_g3')}"
+        f"｜熱門 {stock_count('us_g4')}\n\n"
+        f"📈 圖表：{report_url}\n"
+        f"⚙️ 參數：{liff_setting_url}\n"
+        f"💰 交易：{bitget_setting_url}"
     )
 
     send_line_message(
@@ -7450,16 +7418,7 @@ def main():
     captured_index_lines = {}
 
     index_lines = [
-        (
-            f"🌍 {today_str} "
-            "全球大盤多空量化報告"
-        ),
-        (
-            "📊 評分標準: "
-            "均線糾纏自適應/"
-            "0.1%過濾機制"
-        ),
-        "========================",
+        f"🌍 {today_str} 全球大盤多空",
         ""
     ]
 
