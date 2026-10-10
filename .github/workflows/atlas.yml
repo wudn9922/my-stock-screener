@@ -96,6 +96,18 @@ jobs:
           pip install --quiet 'curl_cffi>=0.7,<1'
           python scripts/build_valuation_us.py
 
+      # 選股篩選器的美股基本面（季 EPS／營收 YoY）：股票來源為 docs/report 的 universe／報告群組／題材，
+      # 沒有時退回 data/*.csv；與上次部署的 us-growth.json 依季度合併（最多 12 季），只重抓過期的股票。
+      - name: Build US growth data (Yahoo Finance)
+        id: valuation_growth
+        continue-on-error: true
+        working-directory: atlas
+        env:
+          YAHOO_GROWTH_BUDGET_SECONDS: '600'
+        run: |
+          pip install --quiet 'curl_cffi>=0.7,<1'
+          python scripts/build_fundamentals_us.py
+
       # 證交所／櫃買中心的財報開放資料只有「最新一季」（累計），只有 3～5 月是全年度（Q4），
       # 其餘月份台股年度 EPS 全部是 null，「本益比」欄位就一直空白。改由 Yahoo 補年度 EPS（新台幣），
       # 寫入 valuation/tw-annual.json，下一步建 tw.json 時合併（同一年度仍以官方 Q4 為準）。
@@ -185,6 +197,7 @@ jobs:
           VALUATION_OUTCOME: ${{ steps.valuation.outcome }}
           VALUATION_US_OUTCOME: ${{ steps.valuation_us.outcome }}
           VALUATION_TW_ANNUAL_OUTCOME: ${{ steps.valuation_tw_annual.outcome }}
+          VALUATION_GROWTH_OUTCOME: ${{ steps.valuation_growth.outcome }}
         run: |
           set -euo pipefail
           if [ "$DIRECTORY_OUTCOME" = "failure" ]; then
@@ -192,6 +205,9 @@ jobs:
           fi
           if [ "$VALUATION_US_OUTCOME" = "failure" ]; then
             echo "::warning::美股本益比（Yahoo）更新失敗，沿用上次部署的 valuation/us.json"
+          fi
+          if [ "$VALUATION_GROWTH_OUTCOME" = "failure" ]; then
+            echo "::warning::美股基本面成長（Yahoo）更新失敗或未完成，沿用上次部署的 valuation/us-growth.json"
           fi
           if [ "$VALUATION_TW_ANNUAL_OUTCOME" = "failure" ]; then
             echo "::warning::台股年度 EPS（Yahoo）更新失敗，沿用上次部署的 valuation/tw-annual.json"
