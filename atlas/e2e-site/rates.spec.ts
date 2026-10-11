@@ -1,0 +1,110 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { expect, test, type Page } from '@playwright/test';
+import { mockSite } from './mocks';
+
+// Synthetic contract fixtures (not market data): rates.json / rates-history.json.
+const fixtures = resolve(import.meta.dirname, '../tests/fixtures/rates');
+const ratesBody = readFileSync(resolve(fixtures, 'rates.sample.json'), 'utf8');
+const historyBody = readFileSync(resolve(fixtures, 'rates-history.sample.json'), 'utf8');
+
+type Mode = 'ok' | 'missing' | 'broken' | 'history-down';
+
+async function mockRates(page: Page, mode: Mode = 'ok') {
+  // The daily report is unavailable on purpose: the rates view must not depend on it.
+  await mockSite(page, { report: 'missing' });
+  await page.route('**/my-stock-screener/report/rates.json', (route) =>
+    mode === 'missing'
+      ? route.fulfill({ status: 404, body: 'not found' })
+      : mode === 'broken'
+        ? route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>x</title>' })
+        : route.fulfill({ status: 200, contentType: 'application/json', body: ratesBody }),
+  );
+  await page.route('**/my-stock-screener/report/rates-history.json', (route) =>
+    mode === 'history-down'
+      ? route.fulfill({ status: 503, body: 'unavailable' })
+      : route.fulfill({ status: 200, contentType: 'application/json', body: historyBody }),
+  );
+}
+
+const card = (page: Page, title: string | RegExp) => page.locator('section.rates-card', { has: page.getByRole('heading', { name: title }) });
+
+test('rates view renders every section without the daily report', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(String(error)));
+  await mockRates(page);
+  await page.goto('./?page=rates');
+  await expect(page).toHaveURL(/page=world&view=rates/);
+  await expect(page.locator('.rates-key')).toHaveCount(6);
+  await expect(page.locator('.rates-key').first()).toContainText('%');
+  for (const title of [/殖利率曲線/, /^利差/, /實質利率與通膨預期/, /存續期間情境分析/, /長天期美債 ETF 比較/, /白話說明/])
+    await expect(card(page, title)).toBeVisible();
+  // History-driven charts render (lightweight-charts canvases).
+  await expect(card(page, '利差').locator('canvas').first()).toBeVisible();
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+  expect(errors).toEqual([]);
+});
+
+test('yield curve: comparison chips, tenor readout, real toggle and replay', async ({ page }) => {
+  await mockRates(page);
+  await page.goto('./?page=world&view=rates');
+  const curve = card(page, '殖利率曲線');
+  await expect(curve.locator('svg path[stroke]')).toHaveCount(3);
+  await curve.getByRole('button', { name: '1週前' }).click();
+  await expect(curve.locator('svg path[stroke]')).toHaveCount(4);
+  await curve.locator('rect.rates-hit').nth(8).click({ force: true });
+  await expect(curve.locator('.rates-readout')).toContainText('10Y');
+  await curve.getByRole('slider', { name: '歷史回放週次' }).fill('200');
+  await expect(curve.locator('.rates-replay-label')).toContainText('10Y−2Y');
+  await expect(curve.getByRole('heading')).toContainText('回放');
+  await curve.getByRole('button', { name: '回到今日' }).click();
+  await expect(curve.getByRole('heading')).not.toContainText('回放');
+  await curve.getByRole('group', { name: '名目或實質' }).getByRole('button', { name: '實質' }).click();
+  await expect(curve.locator('svg text', { hasText: '1M' })).toHaveCount(0);
+});
+
+test('spreads, scenario slider and ETF comparison respond to controls', async ({ page }) => {
+  await mockRates(page);
+  await page.goto('./?page=world&view=rates');
+  const spread = card(page, '利差');
+  await spread.getByRole('button', { name: /2Y−3M/ }).click();
+  await expect(spread.locator('.rates-summary')).toContainText('目前倒掛');
+  await expect(spread.locator('.rates-badge.warn')).toBeVisible();
+
+  const scenario = card(page, '存續期間情境分析');
+  const tlt = scenario.locator('.rates-bar-row', { hasText: 'TLT' });
+  const before = await tlt.locator('.rates-bar-value').textContent();
+  await scenario.getByRole('button', { name: '-200bp' }).click();
+  await expect(tlt.locator('.rates-bar-value')).not.toHaveText(before ?? '');
+  await expect(tlt.locator('.rates-bar-value')).toContainText('+');
+  await expect(scenario.locator('.rates-note.warn')).toContainText('單日');
+  await expect(scenario.locator('table tbody tr')).toHaveCount(5);
+  await expect(scenario.locator('.rates-formula')).toContainText('½');
+
+  const etf = card(page, '長天期美債 ETF 比較');
+  await expect(etf.locator('.rates-compare-row')).toHaveCount(5);
+  await etf.getByRole('group', { name: '比較項目' }).getByRole('button', { name: '成本' }).click();
+  await expect(etf.locator('.rates-static').first()).toContainText('待核對');
+  await etf.getByRole('group', { name: '比較項目' }).getByRole('button', { name: '利率敏感度' }).click();
+  await expect(etf.locator('.rates-compare-row').first()).toContainText('年');
+  await etf.getByRole('button', { name: '開啟 TLT 圖表' }).click();
+  await expect(page).toHaveURL(/page=chart&symbol=TLT/);
+});
+
+test('history failure leaves the summary sections usable', async ({ page }) => {
+  await mockRates(page, 'history-down');
+  await page.goto('./?page=world&view=rates');
+  await expect(page.locator('.rates-key')).toHaveCount(6);
+  await expect(card(page, '利差').locator('.rates-section-state')).toContainText('暫時無法顯示');
+  await expect(card(page, '存續期間情境分析').locator('.rates-bar-row')).toHaveCount(5);
+  await expect(card(page, '殖利率曲線').getByRole('slider', { name: '歷史回放週次' })).toBeDisabled();
+});
+
+test('missing and unreadable rates.json show friendly states', async ({ page }) => {
+  await mockRates(page, 'missing');
+  await page.goto('./?page=world&view=rates');
+  await expect(page.getByText('資料尚未產生')).toBeVisible();
+  await mockRates(page, 'broken');
+  await page.goto('./?page=world&view=rates');
+  await expect(page.getByText('美債利率資料暫時無法顯示')).toBeVisible();
+});

@@ -1,0 +1,728 @@
+/* US Treasury rates research view (world page → 美債利率). Single column on phones, two on wide screens. */
+.rates-view {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.rates-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.rates-alert {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(224, 164, 58, 0.12);
+  color: var(--warn);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.rates-alert svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.rates-muted {
+  color: var(--text-3);
+}
+
+/* -- Key-number chips */
+.rates-keys {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 2px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.rates-keys::-webkit-scrollbar {
+  display: none;
+}
+.rates-key {
+  flex: 0 0 auto;
+  min-width: 100px;
+  display: grid;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.rates-key-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.rates-key-value {
+  font-size: 18px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.rates-chg {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.rates-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.rates-badge.warn {
+  color: var(--warn);
+  background: rgba(224, 164, 58, 0.16);
+}
+.rates-badge.lev {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+
+/* -- Cards */
+.rates-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+@media (min-width: 1100px) {
+  .rates-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .rates-wide {
+    grid-column: 1 / -1;
+  }
+}
+.rates-card {
+  min-width: 0;
+}
+.rates-card-body {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  min-width: 0;
+}
+.rates-card .card-head h2 small {
+  font-weight: 500;
+}
+.rates-chip-row {
+  margin: 0 -2px;
+}
+.rates-chip {
+  min-height: 36px;
+  padding: 0 11px;
+  font-size: 12px;
+}
+.rates-chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.rates-chip i {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  opacity: 0.45;
+}
+.rates-chip.active i {
+  opacity: 1;
+}
+.rates-seg > button:disabled {
+  opacity: 0.45;
+}
+.rates-seg-wide {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%;
+}
+.rates-seg-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rates-hint,
+.rates-replay-label {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+.rates-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.rates-note.warn {
+  color: var(--warn);
+  background: rgba(224, 164, 58, 0.1);
+}
+.rates-section-state {
+  margin: 0;
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+/* -- Yield curve (SVG) */
+.rates-curve {
+  margin: 0;
+}
+.rates-curve svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 340px;
+  overflow: visible;
+  touch-action: manipulation;
+}
+.rates-grid-line {
+  stroke: #1b212b;
+  stroke-width: 1;
+}
+.rates-zero-line {
+  stroke: #4a5363;
+  stroke-dasharray: 2 3;
+}
+.rates-guide {
+  stroke: #6b7587;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.rates-axis {
+  fill: #8a93a3;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.rates-axis.on {
+  fill: var(--text);
+  font-weight: 700;
+}
+.rates-hit {
+  cursor: pointer;
+}
+.rates-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.rates-readout b {
+  color: var(--text);
+  font-size: 13px;
+}
+.rates-readout span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.rates-readout i,
+.rates-legend i {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.rates-readout small {
+  color: var(--text-3);
+}
+.rates-replay {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rates-replay input[type='range'],
+.rates-slider input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  accent-color: var(--accent);
+}
+.rates-replay .icon-button:disabled {
+  opacity: 0.4;
+}
+
+/* -- Time-series charts */
+.rates-chart-wrap {
+  position: relative;
+  height: 220px;
+}
+.rates-chart-wrap.tall {
+  height: 260px;
+}
+.rates-time-chart {
+  width: 100%;
+  height: 100%;
+}
+.rates-headline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.rates-headline > b {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.rates-headline > b.rates-inverted {
+  color: var(--warn);
+}
+.rates-headline .rates-muted {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.rates-warn-icon {
+  color: var(--warn);
+}
+.rates-summary {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 3px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.rates-episodes {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.rates-episodes summary {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--accent-text);
+  font-weight: 600;
+  font-size: 12px;
+}
+.rates-episodes ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.rates-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.rates-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  min-width: 0;
+}
+.rates-legend span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rates-legend b {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+.rates-legend i.dashed {
+  height: 0;
+  border-top: 2px dashed;
+  border-radius: 0;
+}
+.rates-identity {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.rates-identity b {
+  color: var(--text);
+}
+.rates-identity small {
+  display: block;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+/* -- Tables (read-only: no row hover/click affordance) */
+.rates-table tbody tr {
+  cursor: default;
+}
+.rates-table tbody tr:hover {
+  background: transparent;
+}
+.rates-table td:last-child {
+  text-align: right;
+}
+.rates-table td,
+.rates-table tbody th {
+  padding: 8px 8px;
+}
+.rates-scenario-table th.sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+  box-shadow: 1px 0 0 var(--border);
+}
+.rates-scenario-table thead th.sticky-col {
+  z-index: 2;
+  padding-left: 8px;
+}
+
+/* -- Scenario */
+.rates-slider {
+  display: grid;
+  gap: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.rates-slider b {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.rates-slider small {
+  color: var(--text-3);
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.rates-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.rates-bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px;
+  grid-template-areas:
+    'label value'
+    'track track';
+  align-items: center;
+  gap: 4px 8px;
+}
+.rates-bar-label {
+  grid-area: label;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  min-width: 0;
+}
+.rates-bar-label small {
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.rates-bar-row .rates-bar-track {
+  grid-area: track;
+}
+.rates-bar-row .rates-bar-value {
+  grid-area: value;
+  text-align: right;
+}
+.rates-bar-track {
+  position: relative;
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.rates-bar-track.centered::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-strong);
+}
+.rates-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.15s var(--ease);
+}
+.rates-bar.up {
+  background: var(--up);
+}
+.rates-bar.down {
+  background: var(--down);
+}
+.rates-bar.flat {
+  background: var(--text-3);
+}
+.rates-bar-value {
+  font-size: 14px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.rates-bar-value small {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+.rates-static-line {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.rates-static {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--warn);
+  white-space: nowrap;
+}
+a.rates-static {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.rates-formula {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.rates-formula b {
+  color: var(--text);
+  font-size: 13px;
+}
+.rates-formula code {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.rates-formula p {
+  margin: 2px 0 0;
+  color: var(--text-3);
+}
+
+/* -- ETF comparison */
+.rates-compare {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.rates-compare-row {
+  display: grid;
+  gap: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.rates-compare-row:last-child {
+  border-bottom: 0;
+}
+.rates-compare-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.rates-compare-head > i {
+  width: 4px;
+  height: 18px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.rates-compare-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rates-open {
+  width: 36px;
+  height: 36px;
+  margin: -6px -4px -6px 0;
+}
+.rates-compare-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  align-items: center;
+  gap: 8px;
+}
+.rates-compare-bar .rates-bar-value {
+  text-align: right;
+}
+.rates-compare-detail {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.rates-facts {
+  margin: 2px 0 0;
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+}
+.rates-facts div {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 8px;
+}
+.rates-facts dt {
+  color: var(--text-3);
+}
+.rates-facts dd {
+  margin: 0;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.rates-subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.rates-subhead h3 {
+  font-size: 14px;
+}
+.rates-subhead h3 small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3);
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* -- Learn */
+.rates-learn details {
+  border-bottom: 1px solid var(--border);
+}
+.rates-learn details:last-of-type {
+  border-bottom: 0;
+}
+.rates-learn summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+.rates-learn details p,
+.rates-learn details ul {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--text-2);
+}
+.rates-learn details ul {
+  padding-left: 18px;
+}
+.rates-disclaimer {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-3);
+}
+.rates-sources {
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.6;
+}
+.rates-sources p {
+  margin: 0;
+}
+.rates-sources ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+@media (max-width: 767px) {
+  .rates-card-body {
+    padding: 10px 12px 12px;
+  }
+  .rates-chart-wrap {
+    height: 200px;
+  }
+  .rates-chart-wrap.tall {
+    height: 240px;
+  }
+}
+
+/* Disclosure markers for the collapsible sections. */
+.rates-learn summary,
+.rates-episodes summary {
+  list-style: none;
+  gap: 8px;
+}
+.rates-learn summary::-webkit-details-marker,
+.rates-episodes summary::-webkit-details-marker {
+  display: none;
+}
+.rates-learn summary::after,
+.rates-episodes summary::after {
+  content: '＋';
+  margin-left: auto;
+  color: var(--text-3);
+  font-weight: 500;
+}
+.rates-learn details[open] > summary::after,
+.rates-episodes[open] > summary::after {
+  content: '－';
+}
