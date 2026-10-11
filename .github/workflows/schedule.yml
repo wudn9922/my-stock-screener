@@ -96,6 +96,7 @@ jobs:
       - name: Build market breadth
         if: steps.guard.outputs.skip != 'true'
         continue-on-error: true
+        timeout-minutes: 15
         run: python scripts/build_breadth.py
 
       # ✨ 已修改：注入 Imgur 金鑰，讓自動截圖流能順利上傳並傳入 LINE
@@ -115,6 +116,7 @@ jobs:
       - name: Build theme rotation
         if: steps.guard.outputs.skip != 'true'
         continue-on-error: true
+        timeout-minutes: 15
         run: python scripts/build_themes.py
 
       - name: Commit and Push changes
