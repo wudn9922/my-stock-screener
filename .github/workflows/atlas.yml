@@ -33,7 +33,9 @@ jobs:
       github.event_name != 'workflow_run'
       || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Yahoo budgets can add up to ~38 min (valuation 300 + 900, growth 600, TW annual 480 s) plus build and
+    # deploy steps; 45 min could cancel the job before docs/atlas is replaced.
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
