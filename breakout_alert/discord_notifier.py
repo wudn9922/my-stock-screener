@@ -256,5 +256,73 @@ class DiscordNotifier:
             "超過重試次數"
         )
 
+    def send_drawing_breakout(self, content):
+        """
+        發送 Atlas 畫線警示。
+
+        content 由 drawing_alerts 組好（單則或合併多則）；
+        失敗時拋出例外，由呼叫端回復狀態。
+        """
+        payload = {
+            "content": str(content)[:1990],
+            "allowed_mentions": {
+                "parse": []
+            }
+        }
+
+        for attempt in range(3):
+            response = self.session.post(
+                self.webhook_url,
+                json=payload,
+                timeout=15
+            )
+
+            if response.status_code in {200, 204}:
+                print("✅ Discord 畫線提醒成功")
+
+                return True
+
+            if response.status_code == 429:
+                retry_after = 1.0
+
+                try:
+                    response_data = (
+                        response.json()
+                    )
+
+                    retry_after = float(
+                        response_data.get(
+                            "retry_after",
+                            1.0
+                        )
+                    )
+
+                except (
+                    ValueError,
+                    TypeError,
+                    AttributeError
+                ):
+                    retry_after = 1.0
+
+                time.sleep(
+                    min(
+                        max(retry_after, 1.0),
+                        10.0
+                    )
+                )
+
+                continue
+
+            raise RuntimeError(
+                "Discord 畫線提醒發送失敗，"
+                f"HTTP {response.status_code}："
+                f"{response.text[:300]}"
+            )
+
+        raise RuntimeError(
+            "Discord 畫線提醒發送失敗："
+            "超過重試次數"
+        )
+
     def close(self):
         self.session.close()
