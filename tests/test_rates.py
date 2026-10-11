@@ -102,39 +102,101 @@ class FredFallbackTest(unittest.TestCase):
             series, origin = build_rates.load_series(["DGS10", "DGS2"], fetchers, previous or {})
         return series, origin, out.getvalue()
 
-    def test_csv_first(self):
+    def test_csv_only_without_key(self):
         calls = []
 
         def http_get(url, params, timeout):
             calls.append(url)
             return 200, self.CSV.format(id=params["id"])
 
-        series, origin, _ = self.run_load(http_get, SECRET)
+        series, origin, _ = self.run_load(http_get, None)
         self.assertEqual(origin, {"DGS10": "csv", "DGS2": "csv"})
         self.assertEqual(series["DGS10"][-1], ("2024-01-03", 4.0))
         self.assertTrue(all("fredgraph.csv" in url for url in calls))
 
-    def test_api_fallback_and_key_never_printed(self):
+    def test_api_first_with_key(self):
+        calls = []
+
+        def http_get(url, params, timeout):
+            calls.append(url)
+            return 200, json.dumps({"observations": [{"date": "2024-01-02", "value": "3.9"}]})
+
+        series, origin, _ = self.run_load(http_get, SECRET)
+        self.assertEqual(origin, {"DGS10": "api", "DGS2": "api"})
+        self.assertTrue(all("fredgraph" not in url for url in calls))
+
+    def test_csv_fallback_and_key_never_printed(self):
         def http_get(url, params, timeout):
             if "fredgraph" in url:
                 if params["id"] == "DGS10":
-                    return 503, "unavailable"
+                    return 200, self.CSV.format(id="DGS10")
                 raise ConnectionError("Max retries exceeded with url: /graph/fredgraph.csv?id=DGS2")
             # requests puts the full URL (including api_key) into exception messages
             if params["series_id"] == "DGS2":
                 raise ConnectionError(f"Max retries exceeded with url: /fred/series/observations?api_key={params['api_key']}")
-            return 200, json.dumps({"observations": [{"date": "2024-01-02", "value": "3.9"}]})
+            return 503, "unavailable"
 
         previous = {"DGS2": [("2023-12-29", 4.2)]}
         series, origin, output = self.run_load(http_get, SECRET, previous)
-        self.assertEqual(origin["DGS10"], "api")
-        self.assertEqual(series["DGS10"], [("2024-01-02", 3.9)])
+        self.assertEqual(origin["DGS10"], "csv")
+        self.assertEqual(series["DGS10"][-1], ("2024-01-03", 4.0))
         self.assertEqual(origin["DGS2"], "previous")
         self.assertEqual(series["DGS2"], [("2023-12-29", 4.2)])
         self.assertNotIn(SECRET, output)
         self.assertNotIn("api_key", output)
         self.assertIn("DGS10", output)
         self.assertIn("503", output)
+
+    def test_breaker_skips_failing_source(self):
+        calls = []
+
+        def http_get(url, params, timeout):
+            calls.append(url)
+            raise TimeoutError("read timed out")
+
+        ids = ["DGS1", "DGS2", "DGS3", "DGS5", "DGS7"]
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            fetchers = build_rates.make_fetchers(http_get, None, sleep=lambda _s: None)
+            series, origin = build_rates.load_series(ids, fetchers, {})
+        self.assertEqual(set(origin.values()), {None})
+        # BREAKER_LIMIT series x FETCH_ATTEMPTS requests, then the source is skipped without a request
+        self.assertEqual(len(calls), build_rates.BREAKER_LIMIT * build_rates.FETCH_ATTEMPTS)
+        self.assertIn("skipping it from now on", out.getvalue())
+
+    def test_success_resets_breaker(self):
+        # two failed series, one success (resets the count), one failed series, one success
+        outcomes = iter([TimeoutError] * 4 + ["ok"] + [TimeoutError] * 2 + ["ok"])
+
+        def http_get(url, params, timeout):
+            outcome = next(outcomes)
+            if outcome == "ok":
+                return 200, self.CSV.format(id=params["id"])
+            raise outcome("x")
+
+        ids = ["DGS1", "DGS2", "DGS3", "DGS5", "DGS7"]
+        with contextlib.redirect_stdout(io.StringIO()):
+            fetchers = build_rates.make_fetchers(http_get, None, sleep=lambda _s: None)
+            _, origin = build_rates.load_series(ids, fetchers, {})
+        self.assertEqual([origin[i] for i in ids], [None, None, "csv", None, "csv"])
+
+    def test_time_budget_stops_requests(self):
+        now = [0.0]
+        calls = []
+
+        def http_get(url, params, timeout):
+            calls.append(params["id"])
+            now[0] += 100
+            return 200, self.CSV.format(id=params["id"])
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            fetchers = build_rates.make_fetchers(
+                http_get, None, sleep=lambda _s: None, clock=lambda: now[0], budget=150
+            )
+            _, origin = build_rates.load_series(["DGS1", "DGS2", "DGS3"], fetchers, {"DGS3": [("2024-01-02", 1.0)]})
+        self.assertEqual(origin, {"DGS1": "csv", "DGS2": "csv", "DGS3": "previous"})
+        self.assertEqual(calls, ["DGS1", "DGS2"])
 
     def test_http_error_body_with_key_not_printed(self):
         def http_get(url, params, timeout):
