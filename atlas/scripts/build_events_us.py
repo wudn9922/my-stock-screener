@@ -11,7 +11,11 @@ the next earnings date of each US stock, shown as the countdown badge on the scr
   per request. Yahoo's EPS / ADR logic is not needed here: only dates.
 - Dates are US Eastern calendar dates, whatever time zone the runner uses. session: bmo (before the
   09:30 open) or amc (at or after the 16:00 close) for a confirmed time of day; null for estimates,
-  for midnight (date only) and for times during the session.
+  for midnight (date only) and for times during the session. A timestamp exactly at 00:00 UTC is a
+  date-only placeholder: its UTC date is kept (the Eastern date would be the evening before).
+- earningsTimestamp can still hold the last report (already past) while earningsTimestampStart/End
+  already describe the next one: a past earningsTimestamp falls back to the start of that range (an
+  estimate); when nothing is today or later the stock is left out.
 - Taiwan is not covered: TWSE / TPEx publish no per-company earnings date in advance.
 
 A failure keeps the previous us-events.json and exits 1 so the workflow shows a warning.
@@ -35,6 +39,9 @@ QUOTE_DELAY = 0.5
 MAX_CONSECUTIVE_FAILURES = 3
 # Yahoo must answer for at least this share of the stocks, or the file is kept as it was
 MIN_QUOTE_COVERAGE = 0.6
+# ... and at least this share of the equity quotes must carry a timestamp at all (Yahoo renaming the
+# fields would otherwise replace a good file with an almost empty one)
+MIN_DATED_SHARE = 0.5
 SOURCE = "Yahoo Finance"
 EASTERN = ZoneInfo("America/New_York")
 OPEN_MINUTES = 9 * 60 + 30
@@ -111,6 +118,18 @@ def eastern_date(timestamp):
     return eastern_moment(timestamp).date().isoformat()
 
 
+def is_date_only(timestamp):
+    """Exactly 00:00 UTC: a date without a time of day (the Eastern date would be the evening before)."""
+    return int(timestamp) % 86400 == 0
+
+
+def market_date(timestamp):
+    """Calendar date of an earnings timestamp: the UTC date for a date-only placeholder, else Eastern."""
+    if is_date_only(timestamp):
+        return datetime.fromtimestamp(timestamp, timezone.utc).date().isoformat()
+    return eastern_date(timestamp)
+
+
 def session_of(moment, estimate):
     """bmo / amc for a confirmed time of day in US Eastern time; null when it is unknown."""
     if estimate:
@@ -126,23 +145,38 @@ def session_of(moment, estimate):
     return None
 
 
-def build_item(raw):
-    """One earnings record for the file, or None when the quote has no usable date."""
-    if raw.get("quoteType") not in (None, "EQUITY") or raw.get("at") is None:
+def build_item(raw, now=None):
+    """
+    One earnings record for the file, or None when the quote has no usable date.
+    now (aware datetime): when given, a date before today (US Eastern) is not "next" any more and the
+    start of Yahoo's range is used instead; None when nothing is upcoming.
+    """
+    if raw.get("quoteType") not in (None, "EQUITY"):
         return None
-    moment = eastern_moment(raw["at"])
+    at, start, end = raw.get("at"), raw.get("start"), raw.get("end")
     estimate = raw["estimate"]
+    if now is not None:
+        today = now.astimezone(EASTERN).date().isoformat()
+        if at is None or market_date(at) < today:
+            # The last report can linger in earningsTimestamp while the range already points ahead
+            if start is None or market_date(start) < today:
+                return None
+            at = start
+            estimate = estimate or end is None or market_date(end) != market_date(start)
+    if at is None:
+        return None
     window = None
-    if raw.get("start") is not None and raw.get("end") is not None:
-        first, last = sorted((eastern_date(raw["start"]), eastern_date(raw["end"])))
+    if start is not None and end is not None:
+        first, last = sorted((market_date(start), market_date(end)))
         if first != last:
             window = [first, last]
+    date_only = is_date_only(at)
     return {
-        "earningsDate": moment.date().isoformat(),
-        "earningsAt": int(raw["at"]),
+        "earningsDate": market_date(at),
+        "earningsAt": int(at),
         "window": window,
         "estimate": estimate,
-        "session": session_of(moment, estimate),
+        "session": None if date_only else session_of(eastern_moment(at), estimate),
     }
 
 
@@ -164,21 +198,25 @@ def fetch_quotes(yahoo, symbols):
     return quotes
 
 
-def main(report_dir=REPORT_DIR, data_dir=DATA_DIR, out_dir=None):
+def main(report_dir=REPORT_DIR, data_dir=DATA_DIR, out_dir=None, now=None):
     out_dir = out_dir or os.environ.get("ATLAS_VALUATION_OUT_DIR") or "public/valuation"
     out_path = os.path.join(out_dir, "us-events.json")
 
     symbols = us_tickers(report_dir, data_dir)
     if not symbols:
         raise RuntimeError("no US tickers in docs/report or data/")
-    now = datetime.now(timezone.utc).replace(microsecond=0)
+    now = (now or datetime.now(timezone.utc)).replace(microsecond=0)
     quotes = fetch_quotes(Yahoo(), symbols)
     if len(quotes) < MIN_QUOTE_COVERAGE * len(symbols):
         raise RuntimeError(f"only {len(quotes)} of {len(symbols)} US quotes returned")
+    equities = [raw for raw in quotes.values() if raw.get("quoteType") in (None, "EQUITY")]
+    dated = [raw for raw in equities if raw.get("at") is not None or raw.get("start") is not None]
+    if len(dated) < MIN_DATED_SHARE * len(equities):
+        raise RuntimeError(f"only {len(dated)} of {len(equities)} equity quotes carry an earnings timestamp")
 
     items = {}
     for symbol, raw in sorted(quotes.items()):
-        item = build_item(raw)
+        item = build_item(raw, now)
         if item is not None:
             items[symbol] = item
     if not items:

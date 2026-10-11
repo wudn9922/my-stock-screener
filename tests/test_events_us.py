@@ -16,6 +16,8 @@ sys.path.insert(0, os.path.join(ROOT, "atlas", "scripts"))
 import build_events_us as events  # noqa: E402
 
 FIXTURES = os.path.join(ROOT, "tests", "fixtures", "events")
+# The fixture dates are in Oct-Dec 2026: pin "now" so the tests do not age
+NOW = datetime(2026, 10, 11, 12, 0, tzinfo=timezone.utc)
 EASTERN = events.EASTERN
 
 
@@ -106,7 +108,7 @@ class ParseEventsTest(unittest.TestCase):
 
 class BuildItemTest(unittest.TestCase):
     def build(self, symbol):
-        return events.build_item(events.parse_events(load_quote_response())[symbol])
+        return events.build_item(events.parse_events(load_quote_response())[symbol], NOW)
 
     def test_confirmed_after_close(self):
         self.assertEqual(self.build("AAPL"), {
@@ -148,10 +150,45 @@ class BuildItemTest(unittest.TestCase):
         self.assertEqual(self.build("AMD")["session"], "amc")
         self.assertEqual(self.build("AMD")["earningsDate"], "2026-10-27")
 
+    def test_utc_midnight_placeholder_keeps_the_utc_date(self):
+        # 2026-11-10 00:00 UTC is 2026-11-09 19:00 in New York: the placeholder means 11-10, no session.
+        raw = {"quoteType": "EQUITY", "at": 1794268800.0, "start": None, "end": None, "estimate": False}
+        item = events.build_item(raw, NOW)
+        self.assertEqual(item["earningsDate"], "2026-11-10")
+        self.assertIsNone(item["session"])
+
+    def test_daylight_saving_switch_moves_the_session(self):
+        # 20:00 UTC is 16:00 EDT on 10-30 (after the close) but 15:00 EST on 11-02 (still in session).
+        edt = {"quoteType": "EQUITY", "at": 1793390400.0, "start": None, "end": None, "estimate": False}
+        est = {"quoteType": "EQUITY", "at": 1793649600.0, "start": None, "end": None, "estimate": False}
+        self.assertEqual(events.build_item(edt, NOW)["session"], "amc")
+        self.assertIsNone(events.build_item(est, NOW)["session"])
+
+    def test_past_timestamp_falls_back_to_the_upcoming_range(self):
+        # earningsTimestamp = last report (2026-09-15), range = next (estimated) report
+        raw = {"quoteType": "EQUITY", "at": 1789504200.0, "start": 1795021200.0, "end": 1795539600.0, "estimate": False}
+        item = events.build_item(raw, NOW)
+        self.assertEqual(item["earningsDate"], "2026-11-18")
+        self.assertEqual(item["window"], ["2026-11-18", "2026-11-24"])
+        self.assertTrue(item["estimate"])
+        self.assertIsNone(item["session"])
+
+    def test_nothing_upcoming_is_left_out(self):
+        past = 1789504200.0
+        self.assertIsNone(events.build_item({"quoteType": "EQUITY", "at": past, "start": past, "end": past, "estimate": False}, NOW))
+        self.assertIsNone(events.build_item({"quoteType": "EQUITY", "at": past, "start": None, "end": None, "estimate": False}, NOW))
+
+    def test_today_in_new_york_still_counts(self):
+        # 2026-10-20 12:00 UTC = 08:00 EDT; now = 2026-10-20 03:00 UTC is still 10-19 in New York
+        raw = {"quoteType": "EQUITY", "at": 1792497600.0, "start": None, "end": None, "estimate": False}
+        late = datetime(2026, 10, 21, 3, 0, tzinfo=timezone.utc)  # 10-20 23:00 EDT
+        self.assertEqual(events.build_item(raw, late)["earningsDate"], "2026-10-20")
+        self.assertIsNone(events.build_item(raw, datetime(2026, 10, 21, 5, 0, tzinfo=timezone.utc)))
+
     def test_skips_missing_dates_and_non_equities(self):
         for symbol in ("BADX", "NOEVT", "SMH", "VFIAX"):
             with self.subTest(symbol=symbol):
-                self.assertIsNone(events.build_item(events.parse_events(load_quote_response())[symbol]))
+                self.assertIsNone(events.build_item(events.parse_events(load_quote_response())[symbol], NOW))
 
 
 class UsTickersTest(unittest.TestCase):
@@ -246,7 +283,7 @@ class MainTest(unittest.TestCase):
     def run_main(self, yahoo_cls=FakeYahoo):
         with mock.patch.object(events, "Yahoo", yahoo_cls), mock.patch.object(events.time, "sleep"), \
                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            events.main(report_dir=self.report, data_dir=self.data, out_dir=self.out)
+            events.main(report_dir=self.report, data_dir=self.data, out_dir=self.out, now=NOW)
 
     def read_out(self):
         with open(os.path.join(self.out, "us-events.json"), encoding="utf-8") as file:
@@ -290,11 +327,26 @@ class MainTest(unittest.TestCase):
             def get_json(self, url, params):
                 payload = super().get_json(url, params)
                 for quote in payload["quoteResponse"]["result"]:
-                    quote.pop("earningsTimestamp", None)
+                    for key in ("earningsTimestamp", "earningsTimestampStart", "earningsTimestampEnd"):
+                        quote.pop(key, None)
                 return payload
 
         with self.assertRaises(RuntimeError):
             self.run_main(NoDates)
+        self.assertFalse(os.path.exists(os.path.join(self.out, "us-events.json")))
+
+    def test_mostly_undated_equities_are_rejected_even_if_one_has_a_date(self):
+        class MostlyUndated(FakeYahoo):
+            def get_json(self, url, params):
+                payload = super().get_json(url, params)
+                for quote in payload["quoteResponse"]["result"]:
+                    if quote["symbol"] != "AAPL":
+                        for key in ("earningsTimestamp", "earningsTimestampStart", "earningsTimestampEnd"):
+                            quote.pop(key, None)
+                return payload
+
+        with self.assertRaises(RuntimeError):
+            self.run_main(MostlyUndated)
         self.assertFalse(os.path.exists(os.path.join(self.out, "us-events.json")))
 
 
