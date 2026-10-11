@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ChartCandlestick, Globe, LayoutDashboard, ListFilter, Search, Settings, X } from 'lucide-react';
+import { ChartCandlestick, Flame, Globe, LayoutDashboard, ListFilter, Search, Settings, X } from 'lucide-react';
 import { useRoute } from './useRoute';
 import type { Page, Route } from './routes';
 import { SCREENER_HOSTING } from './HostingMode';
@@ -11,9 +11,11 @@ import { formatDateTime } from '../ui/format';
 import { PageState } from '../ui/PageState';
 import type { ChartRequest } from './chartRequest';
 import type { Timeframe } from '../market-data/MarketDataProvider';
+import './siteNav.css';
 
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
+const ThemesPage = lazy(() => import('../pages/ThemesPage'));
 const ScreenerPage = lazy(() => import('../pages/ScreenerPage'));
 // The workspace (engine, drawings, panels) loads only when the chart opens.
 const ChartPage = lazy(() => import('./ChartPage'));
@@ -27,12 +29,14 @@ const DEFAULT_PAGE: Page =
 const NAV: { page: Page; label: string; icon: typeof Globe }[] = [
   { page: 'markets', label: '大盤', icon: LayoutDashboard },
   { page: 'world', label: '世界', icon: Globe },
+  { page: 'themes', label: '題材', icon: Flame },
   { page: 'screener', label: '選股', icon: ListFilter },
   { page: 'chart', label: '圖表', icon: ChartCandlestick },
 ];
 const PAGE_TITLES: Record<Page, string> = {
   markets: '大盤',
   world: '世界指數',
+  themes: '題材輪動',
   screener: '選股',
   chart: '圖表',
 };
@@ -190,6 +194,7 @@ export function Site() {
         <Suspense fallback={pageFallback}>
           {route.page === 'markets' && <MarketsPage {...pageProps} market={route.market} />}
           {route.page === 'world' && <WorldPage {...pageProps} />}
+          {route.page === 'themes' && <ThemesPage {...pageProps} theme={route.theme} />}
           {route.page === 'screener' && <ScreenerPage {...pageProps} group={route.group} />}
         </Suspense>
         {chartVisited.current && (
