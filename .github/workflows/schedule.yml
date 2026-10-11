@@ -92,6 +92,13 @@ jobs:
           CUSTOM_GROUP_TEST_MODE: "false"
         run: python main.py
 
+      # 市場寬度（F5）：只讀 data/ 的日 K，失敗不影響報告與其他步驟
+      - name: Build market breadth
+        if: steps.guard.outputs.skip != 'true'
+        continue-on-error: true
+        timeout-minutes: 15
+        run: python scripts/build_breadth.py
+
       # ✨ 已修改：注入 Imgur 金鑰，讓自動截圖流能順利上傳並傳入 LINE
       - name: Run Dify Wall Street Report
         if: steps.guard.outputs.skip != 'true'
@@ -103,6 +110,14 @@ jobs:
           FED_TARGET_LOWER_FALLBACK: ${{ vars.FED_TARGET_LOWER_FALLBACK }}
           FED_TARGET_UPPER_FALLBACK: ${{ vars.FED_TARGET_UPPER_FALLBACK }}
         run: python dify_report.py
+
+      # 美股題材（類股輪動）：下載成分股日線並產生 docs/report/themes.json。
+      # 失敗只保留上次的檔案，不影響主流程。
+      - name: Build theme rotation
+        if: steps.guard.outputs.skip != 'true'
+        continue-on-error: true
+        timeout-minutes: 15
+        run: python scripts/build_themes.py
 
       - name: Commit and Push changes
         if: steps.guard.outputs.skip != 'true'

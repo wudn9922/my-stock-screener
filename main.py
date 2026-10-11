@@ -33,7 +33,13 @@ HTTP_HEADERS = {
 
 DATA_DIR = "data"
 DOCS_DIR = "docs"
-MAX_DAYS = 201
+# 252 根可算 52 週高點；新 CSV 初始化下載 250d，既有 CSV 每天累積一根
+MAX_DAYS = 260
+
+# 少於此根數的 CSV 由 backfill_short_csvs 下載 1 年日 K 補齊（預設不啟用）
+BACKFILL_ENABLED = False
+BACKFILL_MIN_ROWS = 240
+BACKFILL_MAX_PER_RUN = 200
 
 # 超過此天數沒有新 K 線的 CSV 會被自動清除
 STALE_CSV_DAYS = 45
@@ -2532,6 +2538,125 @@ def scan_market(
     )
 
     return matched_list
+
+
+def backfill_short_csvs(
+    tickers,
+    max_per_run=BACKFILL_MAX_PER_RUN,
+    data_dir=DATA_DIR
+):
+    """
+    少於 BACKFILL_MIN_ROWS 根的 CSV 下載 1 年日 K 合併（同日期以本地資料為準），
+    每次最多 max_per_run 檔、最短的優先，約 8 天補完全部。
+    只在 BACKFILL_ENABLED 時由 main() 呼叫；回傳實際更新的股票。
+    """
+    short_list = []
+
+    for ticker in dict.fromkeys(tickers or []):
+        csv_path = os.path.join(
+            data_dir,
+            f"{ticker}.csv"
+        )
+
+        if not os.path.exists(csv_path):
+            continue
+
+        try:
+            local_data = clean_ohlcv_dataframe(
+                pd.read_csv(
+                    csv_path,
+                    index_col=0,
+                    parse_dates=True
+                )
+            )
+        except Exception:
+            continue
+
+        if len(local_data) < BACKFILL_MIN_ROWS:
+            short_list.append(
+                (len(local_data), ticker)
+            )
+
+    short_list.sort()
+
+    targets = [
+        ticker
+        for _, ticker in short_list[:max_per_run]
+    ]
+
+    updated = []
+    chunk_size = 40
+
+    for start in range(
+        0,
+        len(targets),
+        chunk_size
+    ):
+        chunk = targets[
+            start:start + chunk_size
+        ]
+
+        downloaded = download_market_data(
+            chunk,
+            "1y"
+        )
+
+        if downloaded.empty:
+            continue
+
+        for ticker in chunk:
+            try:
+                history = clean_ohlcv_dataframe(
+                    extract_yfinance_data(
+                        downloaded,
+                        ticker
+                    )
+                )
+
+                if history.empty:
+                    continue
+
+                csv_path = os.path.join(
+                    data_dir,
+                    f"{ticker}.csv"
+                )
+
+                local_data = clean_ohlcv_dataframe(
+                    pd.read_csv(
+                        csv_path,
+                        index_col=0,
+                        parse_dates=True
+                    )
+                )
+
+                # 後者優先：同日期保留本地 CSV 的資料
+                combined = clean_ohlcv_dataframe(
+                    pd.concat(
+                        [
+                            history,
+                            local_data
+                        ]
+                    )
+                ).tail(MAX_DAYS)
+
+                if len(combined) <= len(local_data):
+                    continue
+
+                combined.to_csv(csv_path)
+                updated.append(ticker)
+
+            except Exception as exc:
+                print(
+                    f"⚠️ {ticker} 歷史回補失敗："
+                    f"{type(exc).__name__}: {exc}"
+                )
+
+    print(
+        f"📥 CSV 歷史回補：{len(updated)} 檔"
+        f"（待補 {len(short_list)} 檔）"
+    )
+
+    return updated
 
 # =========================================================================
 # Supabase 固定與動態自訂群組
@@ -6462,7 +6587,7 @@ def _strip_title_parentheses(text):
     return text
 
 
-def build_report_group_item(item, market):
+def build_report_group_item(item, market, metrics_lookup=None):
     chart_data = item.get("chart_data") or {}
 
     symbol = str(
@@ -6509,7 +6634,7 @@ def build_report_group_item(item, market):
         as_of
     ) = _chart_close_change(chart_data)
 
-    return {
+    report_item = {
         "symbol": symbol,
         "name": name,
         "maList": ma_list,
@@ -6527,11 +6652,27 @@ def build_report_group_item(item, market):
         "asOf": as_of
     }
 
+    # 選股篩選器指標（report_metrics.py）；沒有 lookup 時輸出維持原樣
+    if metrics_lookup is not None:
+        try:
+            report_item["metrics"] = metrics_lookup(
+                symbol
+            )
+        except Exception as exc:
+            print(
+                f"⚠️ {symbol} 篩選指標略過："
+                f"{type(exc).__name__}: {exc}"
+            )
+            report_item["metrics"] = None
+
+    return report_item
+
 
 def build_report_groups(
     data_dict,
     group_metadata,
-    display_order
+    display_order,
+    metrics_lookup=None
 ):
     groups = []
 
@@ -6583,7 +6724,8 @@ def build_report_groups(
                 items.append(
                     build_report_group_item(
                         item,
-                        market
+                        market,
+                        metrics_lookup=metrics_lookup
                     )
                 )
             except Exception as exc:
@@ -6700,7 +6842,8 @@ def build_report_payload(
     line_messages,
     generated_at=None,
     extra_index_configs=None,
-    analyze=analyze_index_for_report
+    analyze=analyze_index_for_report,
+    metrics_lookup=None
 ):
     generated_at = generated_at or (
         datetime.now(timezone.utc)
@@ -6731,7 +6874,8 @@ def build_report_payload(
         "groups": build_report_groups(
             data_dict,
             group_metadata,
-            display_order
+            display_order,
+            metrics_lookup=metrics_lookup
         ),
         "sectors": build_report_sectors(
             data_dict.get("sectors")
@@ -6803,6 +6947,84 @@ def write_report_json(
     )
 
     return path
+
+
+# =========================================================================
+# Atlas 選股篩選器：全市場 universe（docs/report/universe.json）與群組指標
+# 計算邏輯在 report_metrics.py；台股基準 ^TWII 優先取 INDEX_HISTORY_CACHE
+# =========================================================================
+def build_report_universe(
+    tw_tickers,
+    us_tickers,
+    data_dir=DATA_DIR,
+    downloader=None
+):
+    import report_metrics
+
+    tw_cache = (
+        INDEX_HISTORY_CACHE.get("^TWII")
+        or {}
+    ).get("df")
+
+    bench_map = {
+        "TW": {
+            "symbol": "^TWII",
+            "close": report_metrics.load_benchmark(
+                "^TWII",
+                cache_df=tw_cache,
+                downloader=downloader
+            )
+        },
+        "US": {
+            "symbol": "SPY",
+            "close": report_metrics.load_benchmark(
+                "SPY",
+                downloader=downloader
+            )
+        }
+    }
+
+    universes = {
+        "TW": report_metrics.build_universe(
+            tw_tickers,
+            "TW",
+            data_dir,
+            bench_map["TW"],
+            name_fn=get_tw_stock_name
+        ),
+        "US": report_metrics.build_universe(
+            us_tickers,
+            "US",
+            data_dir,
+            bench_map["US"]
+        )
+    }
+
+    lookup = report_metrics.make_lookup(
+        universes,
+        data_dir,
+        bench_map
+    )
+
+    return universes, lookup
+
+
+def write_report_universe(
+    universes,
+    report_date,
+    report_dir=REPORT_DIR
+):
+    import report_metrics
+
+    payload = report_metrics.build_universe_payload(
+        universes,
+        report_date=report_date
+    )
+
+    return report_metrics.write_universe_json(
+        payload,
+        report_dir
+    )
 
 
 def build_series_payload(
@@ -7319,6 +7541,21 @@ def main():
     )
 
     # -----------------------------------------------------------------
+    # 選用：補齊歷史不足 240 根的 CSV（52 週高點需要 252 根）
+    # 預設不啟用（BACKFILL_ENABLED），失敗不影響其他流程
+    # -----------------------------------------------------------------
+    if BACKFILL_ENABLED:
+        try:
+            backfill_short_csvs(
+                list(tw_tickers) + list(us_tickers)
+            )
+        except Exception as exc:
+            print(
+                "❌ CSV 歷史回補失敗："
+                f"{type(exc).__name__}: {exc}"
+            )
+
+    # -----------------------------------------------------------------
     # 櫃買指數（^TWOII）：更新櫃買中心官方日資料
     # 失敗時 ^TWOII 會自動退回原本的 Yahoo 流程
     # -----------------------------------------------------------------
@@ -7647,6 +7884,27 @@ def main():
         )
 
     # -----------------------------------------------------------------
+    # 選股篩選器：全市場 universe 與群組指標（report_metrics.py）
+    # 失敗時報告照舊產生，只是沒有 metrics 與 universe.json
+    # -----------------------------------------------------------------
+    report_universes = None
+    metrics_lookup = None
+
+    try:
+        (
+            report_universes,
+            metrics_lookup
+        ) = build_report_universe(
+            tw_tickers,
+            us_tickers
+        )
+    except Exception as exc:
+        print(
+            "❌ 選股篩選器指標產生失敗："
+            f"{type(exc).__name__}: {exc}"
+        )
+
+    # -----------------------------------------------------------------
     # Atlas 報告 JSON（docs/report/latest.json）
     # 失敗只記錄，不影響 CSV 清理與推送
     # -----------------------------------------------------------------
@@ -7696,7 +7954,8 @@ def main():
                 "index": index_message,
                 "sectors": sectors_message,
                 "stocks": line_message_stocks
-            }
+            },
+            metrics_lookup=metrics_lookup
         )
 
         write_report_json(report_payload)
@@ -7706,6 +7965,18 @@ def main():
             "❌ Atlas 報告 JSON 產生失敗："
             f"{type(exc).__name__}: {exc}"
         )
+
+    if report_universes is not None:
+        try:
+            write_report_universe(
+                report_universes,
+                today_str
+            )
+        except Exception as exc:
+            print(
+                "❌ 全市場 universe JSON 產生失敗："
+                f"{type(exc).__name__}: {exc}"
+            )
 
     try:
         write_tpex_otc_series()

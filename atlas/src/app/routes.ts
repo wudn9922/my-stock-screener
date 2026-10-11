@@ -4,27 +4,33 @@ import type { Timeframe } from '../market-data/MarketDataProvider';
 
 /**
  * Site routes live in the query string so the static GitHub Pages deployment needs no rewrites:
- * `?page=markets&market=tw`, `?page=world`, `?page=screener&group=tw_g1`,
+ * `?page=markets&market=tw`, `?page=world`, `?page=themes&theme=ai-chips`, `?page=screener&group=tw_g1`,
  * `?page=chart&symbol=2330.TW&tf=1D`. Legacy report links (`?symbol=…&tf=…`) open the chart.
  * LINE LIFF wraps the original path and query in `liff.state`, which is unwrapped first.
  */
-export const PAGES = ['markets', 'world', 'screener', 'chart'] as const;
+export const PAGES = ['markets', 'world', 'themes', 'screener', 'chart'] as const;
 export type Page = (typeof PAGES)[number];
 
 export type Route =
   | { page: 'markets'; market: MarketKey }
   | { page: 'world' }
-  | { page: 'screener'; group?: string }
+  | { page: 'themes'; theme?: string }
+  | { page: 'screener'; group?: string; f?: string }
   | { page: 'chart'; symbol?: string; tf?: Timeframe };
 
 export const DEFAULT_MARKET: MarketKey = 'tw';
 const GROUP_KEY = /^[A-Za-z0-9_.:-]{1,80}$/;
+const THEME_KEY = /^[a-z0-9-]{1,40}$/;
+/** Screener filter conditions (pages/screenerFilters.ts encoding). */
+const FILTER_PARAM = /^[A-Za-z0-9:.,;_~-]{1,300}$/;
 const MAX_SYMBOL = 32;
 const pageAliases: Record<string, Page> = {
   markets: 'markets',
   market: 'markets',
   index: 'markets',
   world: 'world',
+  themes: 'themes',
+  theme: 'themes',
   screener: 'screener',
   groups: 'screener',
   chart: 'chart',
@@ -35,6 +41,8 @@ export function defaultRoute(page: Page): Route {
     case 'markets':
       return { page, market: DEFAULT_MARKET };
     case 'world':
+      return { page };
+    case 'themes':
       return { page };
     case 'screener':
       return { page };
@@ -110,9 +118,13 @@ export function parseRoute(search: string, fallback: Page = 'markets'): ParsedRo
       page,
       market: (MARKET_KEYS as readonly string[]).includes(market ?? '') ? (market as MarketKey) : DEFAULT_MARKET,
     };
+  } else if (page === 'themes') {
+    const theme = params.get('theme')?.trim().toLowerCase();
+    route = theme && THEME_KEY.test(theme) ? { page, theme } : { page };
   } else if (page === 'screener') {
     const group = params.get('group')?.trim();
-    route = group && GROUP_KEY.test(group) ? { page, group } : { page };
+    const f = params.get('f')?.trim();
+    route = { page, ...(group && GROUP_KEY.test(group) ? { group } : {}), ...(f && FILTER_PARAM.test(f) ? { f } : {}) };
   } else if (page === 'chart') {
     const tf = parseLaunchTimeframe(params.get('tf') ?? params.get('timeframe'));
     route = { page, ...(symbol ? { symbol } : {}), ...(tf ? { tf } : {}) };
@@ -130,7 +142,9 @@ export function serializeRoute(route: Route): string {
   const params = new URLSearchParams();
   params.set('page', route.page);
   if (route.page === 'markets') params.set('market', route.market);
+  if (route.page === 'themes' && route.theme) params.set('theme', route.theme);
   if (route.page === 'screener' && route.group) params.set('group', route.group);
+  if (route.page === 'screener' && route.f) params.set('f', route.f);
   if (route.page === 'chart') {
     if (route.symbol) params.set('symbol', route.symbol);
     if (route.tf) params.set('tf', route.tf);

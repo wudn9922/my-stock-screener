@@ -23,10 +23,12 @@ const optionalText = z
   .unknown()
   .optional()
   .transform((value) => (typeof value === 'string' && value.trim() ? value.trim() : null));
-const finiteOrNull = z.unknown().optional().transform((value) => {
+/** Finite number from a number or numeric string, else null. */
+export const toFinite = (value: unknown): number | null => {
   const number = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
   return typeof number === 'number' && Number.isFinite(number) ? number : null;
-});
+};
+const finiteOrNull = z.unknown().optional().transform(toFinite);
 const maList = z.unknown().optional().transform((value) =>
   Array.isArray(value)
     ? [...new Set(value.map(Number).filter((n) => Number.isInteger(n) && n > 0 && n <= 1000))]
@@ -100,6 +102,73 @@ export const reportMarketSchema = z
   });
 export type ReportMarket = z.output<typeof reportMarketSchema>;
 
+/** Moving averages covered by the screener metrics (`metrics.ma`) and the full-market universe. */
+export const METRIC_MAS = [20, 50, 200] as const;
+export type MetricMa = (typeof METRIC_MAS)[number];
+export type MetricTrend = 'up' | 'down' | 'mixed';
+
+/**
+ * Screener metrics per stock (`groups[].items[].metrics`, `report/universe.json`). Percentages are in %;
+ * `ma` holds the close's distance from each SMA, `fromHi52` is ≤ 0, `rsRank` is a 1–99 percentile
+ * within the market's universe. Any field can be null when the history is too short.
+ */
+export interface StockMetrics {
+  bars: number;
+  r5: number | null;
+  r21: number | null;
+  r63: number | null;
+  ma: Record<`${MetricMa}`, number | null>;
+  ma20Slope5: number | null;
+  trend: MetricTrend | null;
+  hi52: number | null;
+  fromHi52: number | null;
+  /** Bars in the 52-week-high window: min(bars, 252). Below ~240 the "52-week" high is a shorter one. */
+  hiBars: number;
+  rs21: number | null;
+  rs63: number | null;
+  rsBench: 'SPY' | '^TWII' | null;
+  rsRank: number | null;
+  volRatio: number | null;
+  turnover20: number | null;
+}
+
+const toCount = (value: unknown) => {
+  const number = toFinite(value);
+  return number !== null && number > 0 ? Math.floor(number) : 0;
+};
+
+/** Tolerant metrics parser: anything but an object becomes null; bad fields become null (counts 0). */
+export function parseMetrics(value: unknown): StockMetrics | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  const maRaw = raw.ma && typeof raw.ma === 'object' && !Array.isArray(raw.ma) ? (raw.ma as Record<string, unknown>) : {};
+  const trendText = typeof raw.trend === 'string' ? raw.trend.trim().toLowerCase() : '';
+  const bench = typeof raw.rsBench === 'string' ? raw.rsBench.trim().toUpperCase() : '';
+  const rank = toFinite(raw.rsRank);
+  const fromHi = toFinite(raw.fromHi52);
+  const metrics: StockMetrics = {
+    bars: toCount(raw.bars),
+    r5: toFinite(raw.r5),
+    r21: toFinite(raw.r21),
+    r63: toFinite(raw.r63),
+    ma: { '20': toFinite(maRaw['20']), '50': toFinite(maRaw['50']), '200': toFinite(maRaw['200']) },
+    ma20Slope5: toFinite(raw.ma20Slope5),
+    trend: trendText === 'up' || trendText === 'down' || trendText === 'mixed' ? trendText : null,
+    hi52: toFinite(raw.hi52),
+    // The close can never be above the window high; clamp rounding noise.
+    fromHi52: fromHi === null ? null : Math.min(0, fromHi),
+    hiBars: toCount(raw.hiBars),
+    rs21: toFinite(raw.rs21),
+    rs63: toFinite(raw.rs63),
+    rsBench: bench === 'SPY' || bench === '^TWII' ? bench : null,
+    rsRank: rank === null ? null : Math.min(99, Math.max(1, Math.round(rank))),
+    volRatio: toFinite(raw.volRatio),
+    turnover20: toFinite(raw.turnover20),
+  };
+  return metrics;
+}
+const metrics = z.unknown().optional().transform(parseMetrics);
+
 export const groupItemSchema = z
   .object({
     symbol,
@@ -109,6 +178,9 @@ export const groupItemSchema = z
     changePct: finiteOrNull,
     maValues: numberRecord,
     note: optionalText,
+    volume: finiteOrNull,
+    asOf: optionalText,
+    metrics,
   })
   .transform((value) => ({ ...value, name: value.name || value.symbol }));
 export type GroupItem = z.output<typeof groupItemSchema>;

@@ -1,0 +1,57 @@
+{
+ "timeseries": {
+  "result": [
+   {
+    "meta": {
+     "symbol": [
+      "TSM"
+     ],
+     "type": [
+      "quarterlyDilutedEPS"
+     ]
+    },
+    "timestamp": [
+     1
+    ],
+    "quarterlyDilutedEPS": [
+     {
+      "dataId": 1,
+      "asOfDate": "2026-06-30",
+      "periodType": "3M",
+      "reportedValue": {
+       "raw": 15.36,
+       "fmt": "15.36"
+      },
+      "currencyCode": "TWD"
+     }
+    ]
+   },
+   {
+    "meta": {
+     "symbol": [
+      "TSM"
+     ],
+     "type": [
+      "quarterlyTotalRevenue"
+     ]
+    },
+    "timestamp": [
+     1
+    ],
+    "quarterlyTotalRevenue": [
+     {
+      "dataId": 1,
+      "asOfDate": "2026-06-30",
+      "periodType": "3M",
+      "reportedValue": {
+       "raw": 933792000000,
+       "fmt": "933792000000"
+      },
+      "currencyCode": "TWD"
+     }
+    ]
+   }
+  ],
+  "error": null
+ }
+}

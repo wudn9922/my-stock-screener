@@ -1,0 +1,27 @@
+{
+ "timeseries": {
+  "result": [
+   {
+    "meta": {
+     "symbol": [
+      "XYZ"
+     ],
+     "type": [
+      "quarterlyDilutedEPS"
+     ]
+    }
+   },
+   {
+    "meta": {
+     "symbol": [
+      "XYZ"
+     ],
+     "type": [
+      "quarterlyTotalRevenue"
+     ]
+    }
+   }
+  ],
+  "error": null
+ }
+}
