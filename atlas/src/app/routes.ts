@@ -15,12 +15,14 @@ export type Route =
   | { page: 'markets'; market: MarketKey }
   | { page: 'world' }
   | { page: 'themes'; theme?: string }
-  | { page: 'screener'; group?: string }
+  | { page: 'screener'; group?: string; f?: string }
   | { page: 'chart'; symbol?: string; tf?: Timeframe };
 
 export const DEFAULT_MARKET: MarketKey = 'tw';
 const GROUP_KEY = /^[A-Za-z0-9_.:-]{1,80}$/;
 const THEME_KEY = /^[a-z0-9-]{1,40}$/;
+/** Screener filter conditions (pages/screenerFilters.ts encoding). */
+const FILTER_PARAM = /^[A-Za-z0-9:.,;_~-]{1,300}$/;
 const MAX_SYMBOL = 32;
 const pageAliases: Record<string, Page> = {
   markets: 'markets',
@@ -121,7 +123,8 @@ export function parseRoute(search: string, fallback: Page = 'markets'): ParsedRo
     route = theme && THEME_KEY.test(theme) ? { page, theme } : { page };
   } else if (page === 'screener') {
     const group = params.get('group')?.trim();
-    route = group && GROUP_KEY.test(group) ? { page, group } : { page };
+    const f = params.get('f')?.trim();
+    route = { page, ...(group && GROUP_KEY.test(group) ? { group } : {}), ...(f && FILTER_PARAM.test(f) ? { f } : {}) };
   } else if (page === 'chart') {
     const tf = parseLaunchTimeframe(params.get('tf') ?? params.get('timeframe'));
     route = { page, ...(symbol ? { symbol } : {}), ...(tf ? { tf } : {}) };
@@ -141,6 +144,7 @@ export function serializeRoute(route: Route): string {
   if (route.page === 'markets') params.set('market', route.market);
   if (route.page === 'themes' && route.theme) params.set('theme', route.theme);
   if (route.page === 'screener' && route.group) params.set('group', route.group);
+  if (route.page === 'screener' && route.f) params.set('f', route.f);
   if (route.page === 'chart') {
     if (route.symbol) params.set('symbol', route.symbol);
     if (route.tf) params.set('tf', route.tf);
