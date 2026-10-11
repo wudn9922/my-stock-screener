@@ -723,9 +723,12 @@ def advance_line(
 
     pending = previous.get("pending")
 
+    # 確認只算同一交易日內的連續執行：前一日最後一次
+    # 加上今天開盤第一筆（常是集合競價）不算確認。
     if (
         isinstance(pending, dict)
         and pending.get("side") == zone
+        and pending.get("session") == session_date
     ):
         count = safe_count(pending.get("count")) + 1
         since = pending.get("since") or now_iso
@@ -739,7 +742,8 @@ def advance_line(
             pending={
                 "side": zone,
                 "count": count,
-                "since": since
+                "since": since,
+                "session": session_date
             }
         )
 
