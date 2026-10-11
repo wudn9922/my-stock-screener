@@ -1,0 +1,4 @@
+{"_synthetic": "SYNTHETIC test data: made-up numbers in the shape of a Yahoo Finance response","timeseries":{"error":null,"result":[
+{"meta": {"symbol": ["XYZ"], "type": ["annualTotalRevenue"]}},
+{"meta": {"symbol": ["XYZ"], "type": ["quarterlyNetIncome"]}, "timestamp": null}
+]}}

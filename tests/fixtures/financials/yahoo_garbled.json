@@ -1,0 +1,8 @@
+{"_synthetic": "SYNTHETIC test data: made-up numbers in the shape of a Yahoo Finance response","timeseries":{"error":null,"result":[
+null,
+5,
+{"meta": null},
+{"meta": {"type": "annualTotalRevenue"}, "annualTotalRevenue": [{"asOfDate": "2025-12-31"}]},
+{"meta": {"type": ["annualTotalRevenue"]}, "annualTotalRevenue": {"asOfDate": "x"}},
+{"meta": {"type": ["annualNetIncome"]}, "annualNetIncome": [{"asOfDate": 20251231, "periodType": "12M", "reportedValue": {"raw": 5}}, {"asOfDate": "2025-12-31", "periodType": "12M", "reportedValue": {"raw": NaN}}, {"asOfDate": "2025-12-31", "periodType": "12M", "reportedValue": {"raw": true}}, {"asOfDate": "2025-12-31", "periodType": "12M", "reportedValue": null}, {"asOfDate": "2099-12-31", "periodType": "12M", "reportedValue": {"raw": 5}}]}
+]}}
