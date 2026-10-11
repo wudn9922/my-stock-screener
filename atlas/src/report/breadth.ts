@@ -185,7 +185,14 @@ let shared: Promise<BreadthLoadResult> | null = null;
 
 /** One shared load per page session; `refresh` forces a new request. */
 export function loadBreadth(refresh = false): Promise<BreadthLoadResult> {
-  if (!shared || refresh) shared = fetchBreadth();
+  if (!shared || refresh) {
+    const request = fetchBreadth().then((result) => {
+      // Do not pin a transient failure for the rest of the session; the next card mount retries.
+      if (result.status === 'error' && shared === request) shared = null;
+      return result;
+    });
+    shared = request;
+  }
   return shared;
 }
 

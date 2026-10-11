@@ -62,15 +62,16 @@ def naive_market(frames, last_n=120):
     as_of = max(counts.items(), key=lambda item: (item[1], item[0]))[0]
 
     all_dates = sorted({day for frame in frames.values() for day in frame.index if day <= as_of})
-    kept = []
-    for day in all_dates:
-        present = sum(
-            1
-            for frame in frames.values()
-            if day in frame.index and frame.loc[day, "Volume"] > 0
-        )
-        if present / len(frames) >= 0.5:
-            kept.append(day)
+    present_counts = {
+        day: sum(1 for frame in frames.values() if day in frame.index and frame.loc[day, "Volume"] > 0)
+        for day in all_dates
+    }
+    recent = sorted(present_counts[day] for day in all_dates[-20:])
+    position = 0.25 * (len(recent) - 1)  # 線性內插的下四分位數（與 pandas 預設一致）
+    low = int(position)
+    high = min(low + 1, len(recent) - 1)
+    reference = recent[low] + (recent[high] - recent[low]) * (position - low)
+    kept = [day for day in all_dates if present_counts[day] > 0 and present_counts[day] >= 0.5 * reference]
     kept = kept[-last_n:]
 
     pcts = {20: [], 60: []}
@@ -246,6 +247,29 @@ class HistoryTest(unittest.TestCase):
         self.assertIn("2026-10-08", history["dates"])
         self.assertEqual(len(history["ma20Pct"]), len(history["dates"]))
         self.assertEqual(len(history["ma60Pct"]), len(history["dates"]))
+
+    def test_stale_csvs_do_not_shrink_the_coverage_denominator(self):
+        # 12 檔裡 7 檔陸續停更（最後日期分散在 09-21～10-08）：asOf 當日只剩 5 檔，
+        # 5/12 低於「總檔數一半」，但相對近期有資料檔數仍應保留。
+        frames = {f"L{k}.TW": make_frame([100 + k + i * 0.1 for i in range(30)]) for k in range(5)}
+        stale_last = ["2026-09-21", "2026-09-24", "2026-09-28", "2026-10-01", "2026-10-05", "2026-10-07", "2026-10-08"]
+        for k, last in enumerate(stale_last):
+            frames[f"S{k}.TW"] = make_frame([100 + k + i * 0.1 for i in range(30)], last=last)
+        market = bb.build_market(frames, "test")
+        self.assertEqual(market["asOf"], "2026-10-09")
+        self.assertEqual(market["history"]["dates"][-1], "2026-10-09")
+        self.assertEqual(market["segments"]["all"]["count"], 5)
+        as_of, dates, pcts = naive_market(frames)
+        self.assertEqual(market["history"]["dates"], dates)
+
+    def test_partial_day_far_below_recent_level_is_dropped(self):
+        frames = {f"S{k}.TW": make_frame([100 + k + i * 0.1 for i in range(30)]) for k in range(10)}
+        partial = pd.Timestamp("2026-10-02")
+        for symbol in list(frames)[2:]:
+            frames[symbol] = frames[symbol].drop(index=partial)
+        history = bb.build_market(frames, "test")["history"]
+        self.assertNotIn("2026-10-02", history["dates"])
+        self.assertIn("2026-10-01", history["dates"])
 
     def test_capped_at_120_dates_and_ends_on_as_of(self):
         frames = {f"S{s}.TW": make_frame([100 + s + b * 0.01 for b in range(130)]) for s in range(3)}

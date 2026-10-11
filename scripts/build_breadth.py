@@ -11,7 +11,8 @@ F5 市場寬度：站上 MA20 / MA60 的股票比例 → docs/report/breadth.jso
 - 某日「有效」：該日有 K 線且成交量 > 0；最後一根早於 asOf 的股票不列入當日 count。
 - 站上 = 收盤 > SMA_n（嚴格大於）；只有至少 n 根K 的股票才進入該均線的分母。
 - asOf = 各檔最後日期的眾數（同次數取較晚者）。
-- 歷史：asOf 以前、至少半數 universe 有資料的日期，取最後 120 個，逐日重算。
+- 歷史：asOf 以前、有資料檔數不少於「近 20 個交易日有資料檔數的下四分位數」一半的日期，取最後 120 個，逐日重算。
+  （不用 universe 總檔數當分母：部分 CSV 長期沒更新時，總檔數會讓覆蓋率門檻失真。）
 - 注意：universe 是「現在」的名單，回推的歷史含存活者偏差。
 """
 
@@ -30,7 +31,11 @@ BREADTH_JSON_VERSION = 1
 MA_PERIODS = (20, 60)
 SEGMENT_NAMES = ("twse", "tpex")
 HISTORY_DAYS = 120
+# 歷史日期的覆蓋率門檻：該日有資料檔數 / 近 REF_WINDOW 日（含 asOf）有資料檔數的下四分位數
 HISTORY_MIN_COVERAGE = 0.5
+HISTORY_REF_WINDOW = 20
+# 用下四分位數而不是中位數：停更的 CSV 讓近期檔數逐日下滑時，asOf 當日仍要能達標；單日缺資料的異常日仍遠低於它
+HISTORY_REF_QUANTILE = 0.25
 # S&P 500 名單少於這個數量視為抓取失敗（main.get_us_tickers 失敗時會回傳 3 檔預設名單）
 US_UNIVERSE_MIN = 400
 
@@ -144,8 +149,12 @@ def build_market(frames, universe_label, segment_of=None):
             members = [symbol for symbol in symbols if segment_of.get(symbol) == name]
             segments[name] = _segment(_tally(flags, members).loc[as_of])
 
-    coverage = flags["present"].sum(axis=1) / len(frames)
-    dates = coverage.index[(coverage >= HISTORY_MIN_COVERAGE) & (coverage.index <= as_of)][-HISTORY_DAYS:]
+    # 以近期有資料檔數為基準，而不是 universe 總檔數：停更的 CSV 會讓總檔數遠大於實際可用檔數
+    counts = flags["present"].sum(axis=1)
+    counts = counts[counts.index <= as_of]
+    reference = float(counts.iloc[-HISTORY_REF_WINDOW:].quantile(HISTORY_REF_QUANTILE))
+    keep = (counts > 0) & (counts >= HISTORY_MIN_COVERAGE * reference)
+    dates = counts.index[keep.values][-HISTORY_DAYS:]
     history_tally = tally.loc[dates]
     history = {
         "dates": [day.strftime("%Y-%m-%d") for day in dates],
