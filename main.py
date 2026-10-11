@@ -7292,8 +7292,8 @@ INDEX_SHORT_NAMES = {
 }
 
 INDEX_LINE_LEGEND = (
-    "均線：🔺多 🔻空 ➖不明｜"
-    "道氏：🔺多 🔻空 💡大多小空 ⚡大空小多"
+    "均線：🔺多 🟢空 ➖不明｜"
+    "道氏：🔺多 🟢空 💡大多小空 ⚡大空小多"
 )
 
 
@@ -7328,7 +7328,7 @@ def build_index_line_short(
     elif score > 0:
         ma_symbol = "🔺"
     else:
-        ma_symbol = "🔻"
+        ma_symbol = "🟢"
 
     macro = parsed.get("macroTrend")
     micro = parsed.get("microTrend")
@@ -7336,7 +7336,7 @@ def build_index_line_short(
     if macro == "bull" and micro == "bull":
         dow_symbol = "🔺"
     elif macro == "bear" and micro == "bear":
-        dow_symbol = "🔻"
+        dow_symbol = "🟢"
     elif macro == "bull":
         dow_symbol = "💡"
     elif macro == "bear":
