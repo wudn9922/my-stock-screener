@@ -47,6 +47,10 @@ MESSAGE_MAX_LENGTH = 1950
 # 畫線股票數上限，避免報價時間過長
 MAX_DRAWING_TICKERS = 200
 
+# 報價時間比現在早超過這個分鐘數就視為過期，略過該檔
+# （例如沒有成交的股票只剩前一天的 1 分鐘 K），避免用舊價確認突破。
+MAX_QUOTE_AGE_MINUTES = 60
+
 # 狀態列（breakout_alert_state，每檔一列）
 STATE_GROUP_ID = "atlas_lines"
 STATE_MA_PERIOD = 1
@@ -162,6 +166,33 @@ def safe_price(value):
 
     except (TypeError, ValueError):
         return None
+
+
+def quote_is_stale(quote, now):
+    """
+    報價時間（quoted_at，ISO 字串）早於現在超過 MAX_QUOTE_AGE_MINUTES
+    才算過期；缺少或無法解析時視為新鮮，與均線提醒的行為一致。
+    """
+    quoted_at = getattr(quote, "quoted_at", None)
+
+    if not isinstance(quoted_at, str) or not quoted_at.strip():
+        return False
+
+    try:
+        parsed = datetime.fromisoformat(
+            quoted_at.strip().replace("Z", "+00:00")
+        )
+
+    except ValueError:
+        return False
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+
+    return (
+        now - parsed
+        > timedelta(minutes=MAX_QUOTE_AGE_MINUTES)
+    )
 
 
 def map_atlas_symbol(symbol):
@@ -1116,13 +1147,26 @@ class DrawingAlertEngine:
         record,
         now_iso,
         alert_budget,
-        summary
+        summary,
+        now=None
     ):
         price = safe_price(
             getattr(quote, "price", None)
         )
 
         if price is None:
+            return None, alert_budget
+
+        if quote_is_stale(
+            quote,
+            now or datetime.now(timezone.utc)
+        ):
+            summary["stale"] = summary.get("stale", 0) + 1
+            print(
+                f"⚠️ {entry.ticker}"
+                "｜報價時間過舊，略過畫線判斷"
+            )
+
             return None, alert_budget
 
         previous_lines = (
@@ -1157,6 +1201,16 @@ class DrawingAlertEngine:
                 now_iso=now_iso,
                 session_date=session_date
             )
+
+            if event == "alert" and any(
+                other.direction == state["lastAlertDirection"]
+                and abs(other.line.level - line.level)
+                <= LEVEL_EPSILON
+                for other in plan.alerts
+            ):
+                # 同一檔同價位的重疊畫線只發一則；
+                # 這條線的狀態照常記為已提醒。
+                event = "duplicate"
 
             if event == "alert":
                 if alert_budget > 0:
@@ -1255,7 +1309,8 @@ class DrawingAlertEngine:
                     record=states.get(entry.ticker),
                     now_iso=now_iso,
                     alert_budget=alert_budget,
-                    summary=summary
+                    summary=summary,
+                    now=now
                 )
 
             except Exception as exc:

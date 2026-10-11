@@ -549,6 +549,66 @@ class EngineTest(unittest.TestCase):
         self.assertIn("上方最近畫線 110.00（+7.8%）｜下方 90.00（−11.8%）", self.notifier.messages[0])
 
 
+class ReviewFixTest(unittest.TestCase):
+    def setUp(self):
+        self.store = FakeStore()
+        self.notifier = FakeNotifier()
+        self.engine = da.DrawingAlertEngine(store=self.store, notifier=self.notifier)
+
+    def cycle_quote(self, wl, quote_obj, ticker="2330.TW"):
+        return self.engine.process(
+            watchlist=wl,
+            quotes={ticker: quote_obj},
+            due_decisions={"TW": decision(), "US": decision()},
+            now=NOW,
+        )
+
+    def test_overlapping_lines_at_same_level_send_one_alert(self):
+        wl = watchlist_for([{"ticker": "2330.TW", "drawings": [
+            horizontal("a", 100.0), horizontal("b", 100.0)]}])
+        run(self.engine, wl, {"2330.TW": 98})
+        run(self.engine, wl, {"2330.TW": 101})
+        summary = run(self.engine, wl, {"2330.TW": 101.2})
+        self.assertEqual(summary["alert_sent"], 1)
+        self.assertEqual(summary["duplicate"], 1)
+        self.assertEqual(len(self.notifier.messages), 1)
+        # both lines are recorded as alerted, so nothing repeats later
+        for _ in range(3):
+            run(self.engine, wl, {"2330.TW": 101.5})
+        self.assertEqual(len(self.notifier.messages), 1)
+        lines = self.store.lines("2330.TW")
+        self.assertEqual(lines["a#h"]["lastAlertDirection"], da.DIRECTION_UP)
+        self.assertEqual(lines["b#h"]["lastAlertDirection"], da.DIRECTION_UP)
+
+    def test_near_but_distinct_levels_still_alert_separately(self):
+        wl = watchlist_for([{"ticker": "2330.TW", "drawings": [
+            horizontal("a", 100.0), horizontal("b", 100.01)]}])
+        run(self.engine, wl, {"2330.TW": 98})
+        run(self.engine, wl, {"2330.TW": 101})
+        summary = run(self.engine, wl, {"2330.TW": 101.2})
+        self.assertEqual(summary["alert_sent"], 2)
+
+    def test_stale_quote_is_skipped(self):
+        wl = watchlist_for([{"ticker": "2330.TW", "drawings": [horizontal("a", 100.0)]}])
+        old = SimpleNamespace(price=101, display_name="x", source="yahoo_1m",
+                              quoted_at="2026-10-08T05:30:00+00:00")
+        summary = self.cycle_quote(wl, old)
+        self.assertEqual(summary["stale"], 1)
+        self.assertEqual(summary["skipped"], 1)
+        self.assertEqual(self.store.upsert_calls, [])
+
+    def test_recent_or_unparseable_quote_time_is_used(self):
+        wl = watchlist_for([{"ticker": "2330.TW", "drawings": [horizontal("a", 100.0)]}])
+        fresh = SimpleNamespace(price=98, display_name="x", source="twse_mis",
+                                quoted_at="2026-10-09T01:30:00+00:00")
+        self.assertEqual(self.cycle_quote(wl, fresh)["baseline"], 1)
+        self.assertFalse(da.quote_is_stale(SimpleNamespace(quoted_at="garbage"), NOW))
+        self.assertFalse(da.quote_is_stale(SimpleNamespace(quoted_at=None), NOW))
+        self.assertFalse(da.quote_is_stale(SimpleNamespace(), NOW))
+        self.assertTrue(da.quote_is_stale(
+            SimpleNamespace(quoted_at="2026-10-09T00:30:00Z"), NOW))
+
+
 class StoreFilterTest(unittest.TestCase):
     def make_store(self, responses):
         store = SupabaseStore.__new__(SupabaseStore)
