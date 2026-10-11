@@ -135,6 +135,35 @@ describe('parseRates', () => {
   });
 });
 
+describe('backend sample files (written by scripts/build_rates.py on synthetic input)', () => {
+  const backendRates = fixture('backend-sample-rates.json');
+  const backendHistory = fixture('backend-sample-rates-history.json');
+
+  it('parse without dropping entries', () => {
+    const rates = okRates(backendRates);
+    expect(rates.etfs).toHaveLength((backendRates.etfs as unknown[]).length);
+    expect(rates.spreads).toHaveLength((backendRates.spreads as unknown[]).length);
+    expect(rates.curves.nominal.map((curve) => curve.key)).toEqual(['now', '1w', '1m', '3m', '1y', '2y']);
+    for (const spread of rates.spreads) {
+      // Legs are FRED IDs that exist in the history.
+      expect(spread.long && spread.short).toBeTruthy();
+    }
+    const tmf = rates.etfs.find((etf) => etf.symbol === 'TMF')!;
+    expect(tmf.leverage).toBe(3);
+    // The model describes the unlevered ladder; the scenario applies the leverage.
+    expect(tmf.model!.duration).toBeLessThan(35);
+    expect(rates.etfs.every((etf) => etf.risk.mdd5y === null || typeof etf.risk.mdd5y === 'number')).toBe(true);
+    expect(rates.inflation['30Y']).toMatchObject({ derived: true });
+    const history = okHistory(backendHistory);
+    for (const spread of rates.spreads) {
+      expect(history.weekly.series[spread.long!]).toBeDefined();
+      expect(history.weekly.series[spread.short!]).toBeDefined();
+    }
+    expect(history.etf.series.TLT![0]).toBe(100);
+    expect(history.weekly.series.DFII30!.some((value) => value === null)).toBe(true);
+  });
+});
+
 describe('parseRatesHistory', () => {
   it('reads the weekly, daily and ETF blocks', () => {
     const history = okHistory();

@@ -194,7 +194,8 @@ export function spreadSummary(spread: RatesSpread, label: string): string[] {
   const value = spread.valueBp;
   if (value === null) lines.push(`${label} 目前沒有資料。`);
   else if (spread.inverted) {
-    const days = spread.invertedDays !== null && spread.invertedDays > 0 ? `，已持續 ${spread.invertedDays} 天` : '';
+    // invertedDays counts trading days (observations) of the current episode.
+    const days = spread.invertedDays !== null && spread.invertedDays > 0 ? `，已持續 ${spread.invertedDays} 個交易日` : '';
     const since = spread.lastInversion && spread.lastInversion.end === null ? `（自 ${slash(spread.lastInversion.start)} 起）` : '';
     lines.push(`目前倒掛 ${Math.round(value)}bp${days}${since}。`);
   } else lines.push(`目前未倒掛（${value > 0 ? '+' : ''}${Math.round(value)}bp）。`);

@@ -185,7 +185,7 @@ describe('spreadSummary', () => {
       { ...base, valueBp: -35, inverted: true, invertedDays: 120, lastInversion: { start: '2026-06-11', end: null, minBp: -48, minDate: '2026-08-01' }, pct5y: null },
       '10Y−2Y',
     );
-    expect(lines[0]).toBe('目前倒掛 -35bp，已持續 120 天（自 2026/06/11 起）。');
+    expect(lines[0]).toBe('目前倒掛 -35bp，已持續 120 個交易日（自 2026/06/11 起）。');
     expect(lines[1]).toBe('這段倒掛最深 -48bp（2026/08/01）。');
     expect(lines).toHaveLength(2);
   });

@@ -90,7 +90,7 @@ export interface RatesSpread {
   valueBp: number | null;
   chg1mBp: number | null;
   inverted: boolean;
-  /** Length of the current inversion as written by the generator (0 when not inverted). */
+  /** Trading days (observations) in the current inversion; 0 when not inverted. */
   invertedDays: number | null;
   lastInversion: InversionEpisode | null;
   /** Percentile of today's value within the last five years, 0–100. */
