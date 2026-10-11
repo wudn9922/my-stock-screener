@@ -17,6 +17,8 @@ const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
 const ThemesPage = lazy(() => import('../pages/ThemesPage'));
 const ScreenerPage = lazy(() => import('../pages/ScreenerPage'));
+// Not in the bottom bar; opened from the chart header (financials of the chart's symbol).
+const FinancialsPage = lazy(() => import('../pages/FinancialsPage'));
 // The workspace (engine, drawings, panels) loads only when the chart opens.
 const ChartPage = lazy(() => import('./ChartPage'));
 
@@ -39,7 +41,13 @@ const PAGE_TITLES: Record<Page, string> = {
   themes: '題材輪動',
   screener: '選股',
   chart: '圖表',
+  financials: '財報分析',
 };
+const RATES_TITLE = '美債與利率';
+
+/** The bottom bar has no financials item: that page belongs to the chart and lights 「圖表」. */
+const navPageOf = (page: Page): Page => (page === 'financials' ? 'chart' : page);
+const pageTitleOf = (route: Route) => (route.page === 'world' && route.view === 'rates' ? RATES_TITLE : PAGE_TITLES[route.page]);
 
 const mobileQuery = window.matchMedia('(max-width: 1099px)');
 const subscribeMobile = (callback: () => void) => {
@@ -92,9 +100,17 @@ export function Site() {
   // Each page starts at the top (the shell scrolls inside <main>).
   useEffect(() => {
     document.getElementById('main')?.scrollTo?.({ top: 0 });
-  }, [route.page, route.page === 'markets' ? route.market : route.page === 'screener' ? route.group : '']);
+  }, [
+    route.page,
+    route.page === 'markets' ? route.market : route.page === 'screener' ? route.group : route.page === 'world' ? route.view : '',
+  ]);
   useEffect(() => {
-    const titles = route.page === 'chart' && route.symbol ? `${route.symbol} · 圖表` : PAGE_TITLES[route.page];
+    const titles =
+      route.page === 'chart' && route.symbol
+        ? `${route.symbol} · 圖表`
+        : route.page === 'financials' && route.symbol
+          ? `${route.symbol} · 財報`
+          : pageTitleOf(route);
     document.title = `${titles} — Atlas 股市報告`;
   }, [route]);
   // `/` focuses the desktop search box.
@@ -128,10 +144,12 @@ export function Site() {
     },
     [syncRoute],
   );
+  const openFinancials = useCallback((symbol: string) => navigate({ page: 'financials', symbol }), [navigate]);
   const go = (page: Page) => {
     setSearchOpen(false);
     if (page === route.page) return;
-    if (page === 'chart') navigate({ page: 'chart' });
+    // Back from financials to the chart of the same symbol.
+    if (page === 'chart') navigate(route.page === 'financials' && route.symbol ? { page: 'chart', symbol: route.symbol } : { page: 'chart' });
     else if (page === 'markets') navigate({ page, market: route.page === 'markets' ? route.market : 'tw' });
     else navigate({ page } as Route);
   };
@@ -159,7 +177,7 @@ export function Site() {
           <b>Atlas</b>
           <span className="brand-sub">股市報告</span>
         </a>
-        <h1 className="site-page-title">{PAGE_TITLES[route.page]}</h1>
+        <h1 className="site-page-title">{pageTitleOf(route)}</h1>
         {!mobile && (
           <div className="site-search">
             <SymbolSearch mode="dropdown" localSymbols={localSymbols} onSelect={onSearchSelect} />
@@ -181,8 +199,8 @@ export function Site() {
           <button
             key={page}
             type="button"
-            className={route.page === page ? 'active' : ''}
-            aria-current={route.page === page ? 'page' : undefined}
+            className={navPageOf(route.page) === page ? 'active' : ''}
+            aria-current={navPageOf(route.page) === page ? 'page' : undefined}
             onClick={() => go(page)}
           >
             <Icon size={20} aria-hidden="true" />
@@ -193,9 +211,10 @@ export function Site() {
       <main className="site-main" id="main">
         <Suspense fallback={pageFallback}>
           {route.page === 'markets' && <MarketsPage {...pageProps} market={route.market} />}
-          {route.page === 'world' && <WorldPage {...pageProps} />}
+          {route.page === 'world' && <WorldPage {...pageProps} view={route.view} />}
           {route.page === 'themes' && <ThemesPage {...pageProps} theme={route.theme} />}
           {route.page === 'screener' && <ScreenerPage {...pageProps} group={route.group} />}
+          {route.page === 'financials' && <FinancialsPage {...pageProps} symbol={route.symbol} p={route.p} />}
         </Suspense>
         {chartVisited.current && (
           <Suspense fallback={route.page === 'chart' ? <PageState kind="loading" title="載入圖表工作台…" /> : null}>
@@ -205,6 +224,7 @@ export function Site() {
                 request={chartRequest}
                 onStateChange={onChartState}
                 onOpenSearch={() => setSearchOpen(true)}
+                onOpenFinancials={openFinancials}
                 reportSymbols={localSymbols}
               />
             </div>
@@ -216,8 +236,8 @@ export function Site() {
           <button
             key={page}
             type="button"
-            className={route.page === page && !searchOpen ? 'active' : ''}
-            aria-current={route.page === page ? 'page' : undefined}
+            className={navPageOf(route.page) === page && !searchOpen ? 'active' : ''}
+            aria-current={navPageOf(route.page) === page ? 'page' : undefined}
             onClick={() => go(page)}
           >
             <Icon size={21} aria-hidden="true" />
