@@ -306,7 +306,7 @@ export function EtfCompareCard({ etfs, history, openChart }: { etfs: readonly Ra
           <p className="rates-hint">總報酬含配息再投入；1 年為累積報酬，3 年以上為年化報酬。過去報酬不代表未來表現。</p>
         )}
         {segment === 'risk' && (
-          <p className="rates-hint">波動度＝日對數報酬的年化標準差；回撤＝從前高到低點的跌幅。槓桿 ETF 的波動與回撤約為 3 倍以上。</p>
+          <p className="rates-hint">波動度＝日對數報酬的年化標準差；回撤＝從前高到低點的跌幅。3 倍槓桿 ETF 的波動約為標的的 3 倍；回撤不會剛好是 3 倍（最多就是 −100%），但通常深得多、也更難回到前高。</p>
         )}
         {segment === 'sensitivity' && (
           <p className="rates-note">實證存續期間＝ETF 報酬對殖利率變動的迴歸斜率 ×(−100)，是過去樣本的平均關係，不是保證。殖利率約在美東 15:30 取價、ETF 在 16:00 收盤，時間不同步會讓日資料的估計偏小，所以預設看週資料。TMF 的數字已含 3 倍槓桿。</p>
