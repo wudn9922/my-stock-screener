@@ -3900,11 +3900,11 @@ def build_sector_line_message(
 
     lines = [
         f"📅 {today_str} 美股類股週線（13週）",
-        "🟢 強：" + "、".join(
+        "🔴 強：" + "、".join(
             describe(item)
             for item in strongest
         ),
-        "🔴 弱：" + "、".join(
+        "🟢 弱：" + "、".join(
             describe(item)
             for item in weakest
         ),
