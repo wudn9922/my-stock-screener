@@ -155,8 +155,47 @@ describe('parseFinancials', () => {
     expect(data.currency).toBe('TWD');
     expect(data.fyEndMonth).toBeNull();
     expect(data.checkedAt).toBeNull();
-    expect(data.quality).toEqual({ level: null, annualYears: null, quarters: null, issues: ['short-history'] });
+    expect(data.quality).toEqual({ level: null, annualYears: null, quarters: null, issues: ['short-history'], revisions: [] });
     expect(data.split).toEqual({ adjusted: false, events: [{ date: '2024-06-10', ratio: 10 }] });
+  });
+
+  it('keeps valid quality.revisions and ignores unknown fields', () => {
+    const data = ok({
+      futureField: { anything: true },
+      quality: {
+        level: 'good',
+        issues: ['restated', 'currency-changed'],
+        revisions: [
+          { kind: 'restated', period: 'annual', end: '2024-12-31', field: 'revenue', old: 100, new: '103', seen: '2026-10-11', extra: 1 },
+          { kind: 'yahoo-differs', period: 'quarterly', end: '2024-09-30', field: 'netIncome', old: 5, new: 6 },
+          { kind: 'other', period: 'annual', end: '2024-12-31', field: 'revenue' },
+          { kind: 'restated', period: 'annual', end: 'bad', field: 'revenue' },
+          { kind: 'restated', period: 'annual', end: '2024-12-31', field: 'notAField' },
+          'junk',
+        ],
+      },
+      annual: { end: ['2024-12-31'], values: {} },
+    });
+    expect(data.quality.issues).toEqual(['restated', 'currency-changed']);
+    expect(data.quality.revisions).toEqual([
+      { kind: 'restated', period: 'annual', end: '2024-12-31', field: 'revenue', old: 100, new: 103, seen: '2026-10-11' },
+      { kind: 'yahoo-differs', period: 'quarterly', end: '2024-09-30', field: 'netIncome', old: 5, new: 6, seen: null },
+    ]);
+  });
+
+  it('parses the samples written by the real builder (claude/financials-backend)', () => {
+    for (const [name, symbol, annual, quarters] of [
+      ['backend-sample-AAPL.json', 'AAPL', 5, 9],
+      ['backend-sample-2330.TW.json', '2330.TW', 4, 6],
+    ] as const) {
+      const data = ok(fixture(name));
+      expect(data.symbol).toBe(symbol);
+      expect(data.annual.end).toHaveLength(annual);
+      expect(data.quarterly.end).toHaveLength(quarters);
+      expect(data.annual.src.every((src) => src === 'yahoo')).toBe(true);
+      expect(data.quarterly.fq.every((fq) => fq !== null)).toBe(true);
+      expect(data.quality.revisions).toEqual([]);
+    }
   });
 
   it('reports garbled and empty files', () => {

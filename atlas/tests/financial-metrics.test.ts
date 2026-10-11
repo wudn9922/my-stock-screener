@@ -382,6 +382,13 @@ describe('fiscal labels', () => {
     expect(fiscalQuarterOf('2024-11-30', 12)).toBe(4); // m = 11 → round(3.67) = 4 → Q4
   });
 
+  it('a quarter drifting past the fiscal year end still belongs to that year (same as the builder)', () => {
+    // Q4 (m = 1 → round(1/3) = 0) ending a month after a December year end is FY of the year before.
+    expect(fiscalQuarterOf('2025-01-31', 12)).toBe(4);
+    expect(fiscalYearOf('2025-01-31', 12, 'quarterly')).toBe(2024);
+    expect(fiscalYearOf('2024-11-30', 12, 'quarterly')).toBe(2024);
+  });
+
   it('fyEndMonth is the most frequent annual end month', () => {
     expect(inferFyEndMonth(['2021-01-02', '2021-12-31', '2022-12-30', '2023-12-29'])).toBe(12);
     expect(inferFyEndMonth(['2022-09-24', '2023-09-30', '2024-09-28'])).toBe(9);
@@ -400,6 +407,43 @@ describe('fiscal labels', () => {
     expect(periodLabels(tsmc, 'quarterly').map((q) => q.long).slice(-2)).toEqual(['FY2025 Q1', 'FY2025 Q2']);
     const noMonth = history([{ end: '2023-12-30' }, { end: '2025-01-04' }], [], { fyEndMonth: null });
     expect(periodLabels(noMonth, 'annual').map((p) => p.fy)).toEqual([2023, 2024]);
+  });
+});
+
+describe('reconciliation with the real builder samples', () => {
+  it('computed fiscal year and quarter equal the fy / fq written by build_financials.py', () => {
+    for (const name of ['backend-sample-AAPL.json', 'backend-sample-2330.TW.json', 'us-full.json', 'tsmc-twd.json']) {
+      const data = fixture(name);
+      for (const kind of ['annual', 'quarterly'] as const) {
+        const labels = periodLabels(data, kind);
+        expect(labels.map((label) => label.fy), `${name} ${kind}`).toEqual(data[kind].fy);
+        if (kind === 'quarterly') expect(labels.map((label) => label.fq), name).toEqual(data.quarterly.fq);
+      }
+      expect(inferFyEndMonth(data.annual.end)).toBe(data.fyEndMonth);
+    }
+  });
+
+  it('quarters without any annual data use calendar labels (fyEndMonth 12 is only a placeholder)', () => {
+    const data = history([], [{ end: '2025-03-31', revenue: 1 }, { end: '2025-06-30', revenue: 2 }], { fyEndMonth: 12 });
+    expect(periodLabels(data, 'quarterly').map((label) => label.long)).toEqual(['CY2025 Q1', 'CY2025 Q2']);
+    const tw = history([], [{ end: '2025-03-31', revenue: 1 }], { symbol: '2330.TW', market: 'TW', fyEndMonth: 12 });
+    expect(periodLabels(tw, 'quarterly')[0]!.long).toBe('FY2025 Q1');
+  });
+
+  it('every metric of the builder samples is finite or explained', () => {
+    for (const name of ['backend-sample-AAPL.json', 'backend-sample-2330.TW.json']) {
+      const data = fixture(name);
+      for (const kind of ['annual', 'quarterly'] as const)
+        for (const id of Object.keys(METRICS) as (keyof typeof METRICS)[])
+          for (const item of metricSeries(contextOf(data, kind), id)) {
+            if (item.value === null) expect(item.reason, `${name} ${kind} ${id}`).toBeTruthy();
+            else expect(Number.isFinite(item.value)).toBe(true);
+          }
+      // Both samples have full statements: margins, ROE and ROIC are available for the latest year.
+      const annual = contextOf(data, 'annual');
+      for (const id of ['grossMargin', 'operatingMargin', 'roe', 'roic', 'freeCashFlow'] as const)
+        expect(metricSeries(annual, id).at(-1)!.value, `${name} ${id}`).not.toBeNull();
+    }
   });
 });
 

@@ -136,13 +136,17 @@ export function fyEndMonthOf(history: FinancialHistory): number {
 
 /**
  * Fiscal year of a period. Annual: the (effective) calendar year of the end date. Quarterly: the fiscal
- * year the quarter belongs to, i.e. the year of the next fiscal year end (Apple's December quarter is
- * FY+1 Q1).
+ * year the quarter belongs to, i.e. the year of its fiscal year end (Apple's December quarter is FY+1 Q1).
  */
 export function fiscalYearOf(end: string, fyEndMonth: number, kind: PeriodKind = 'annual'): number {
   const { year, month } = effectiveMonth(end);
   if (kind === 'annual') return year;
-  return month <= fyEndMonth ? year : year + 1;
+  // Same rule as fiscal_quarter() in build_financials.py: walk forward or back to the fiscal year end
+  // whose distance best matches the quarter number (Q1 ends 9 months before it, Q4 at it).
+  const target = (4 - fiscalQuarterOf(end, fyEndMonth)) * 3;
+  const ahead = (((fyEndMonth - month) % 12) + 12) % 12;
+  const toYearEnd = Math.abs(ahead - target) <= Math.abs(ahead - 12 - target) ? ahead : ahead - 12;
+  return Math.floor((year * 12 + (month - 1) + toYearEnd) / 12);
 }
 
 /** m = (end month − fyEndMonth + 12) % 12; round(m / 3): 0 → Q4, 1 → Q1, 2 → Q2, 3 → Q3 (4 → Q4). */
@@ -162,13 +166,23 @@ export interface PeriodLabel {
   long: string;
 }
 
+/**
+ * True when nothing tells the fiscal calendar: no annual periods and the builder left every fq null
+ * (it then writes fyEndMonth 12 as a placeholder). Taiwan companies always close in December.
+ */
+export function calendarQuartersOnly(history: FinancialHistory): boolean {
+  return history.market !== 'TW' && !history.annual.end.length && history.quarterly.fq.every((fq) => fq === null);
+}
+
 export function periodLabels(history: FinancialHistory, kind: PeriodKind): PeriodLabel[] {
-  const month = fyEndMonthOf(history);
+  const calendar = kind === 'quarterly' && calendarQuartersOnly(history);
+  const month = calendar ? 12 : fyEndMonthOf(history);
+  const prefix = calendar ? 'CY' : 'FY';
   return history[kind].end.map((end) => {
     const fy = fiscalYearOf(end, month, kind);
     if (kind === 'annual') return { end, fy, fq: null, short: String(fy), long: `FY${fy}` };
     const fq = fiscalQuarterOf(end, month);
-    return { end, fy, fq, short: `Q${fq}`, long: `FY${fy} Q${fq}` };
+    return { end, fy, fq, short: `Q${fq}`, long: `${prefix}${fy} Q${fq}` };
   });
 }
 
@@ -252,11 +266,11 @@ const ABNORMAL_TAX = { min: 0, max: 60 };
 
 // ------------------------------------------------------------------ plain lines
 
-const raw = (field: RawField, unit: MetricUnit = 'money') => (ctx: MetricContext, index: number) => {
+const raw = (field: RawField) => (ctx: MetricContext, index: number) => {
   const value = at(ctx, field, index);
   return value === null
     ? missing(FIELD_LABELS[field], [], `缺${FIELD_LABELS[field]}`)
-    : result(value, FIELD_LABELS[field], [input(FIELD_LABELS[field], value, unit)]);
+    : result(value, `財報原始數字（${FIELD_LABELS[field]}）`, []);
 };
 export const revenue = raw('revenue');
 export const netIncome = raw('netIncome');

@@ -65,6 +65,7 @@ export interface FinancialHistory {
   /** Files annual reports as a foreign private issuer (ADR): EPS is per ordinary share. */
   foreignReporter: boolean;
   generatedAt: string | null;
+  /** Last day the builder changed this file's data (it does not rewrite unchanged files): 「資料更新日」. */
   checkedAt: string | null;
   source: string | null;
   /** Fiscal year-end month 1–12 from the file; null when absent or invalid. */
@@ -72,7 +73,40 @@ export interface FinancialHistory {
   annual: FinancialSeries;
   quarterly: FinancialSeries;
   split: { adjusted: boolean; events: { date: string; ratio: number }[] };
-  quality: { level: QualityLevel | null; annualYears: number | null; quarters: number | null; issues: string[] };
+  quality: {
+    level: QualityLevel | null;
+    annualYears: number | null;
+    quarters: number | null;
+    issues: string[];
+    /** Values the builder saw change (restated) or kept from SEC over a differing Yahoo value; newest last. */
+    revisions: Revision[];
+  };
+}
+
+export interface Revision {
+  kind: 'restated' | 'yahoo-differs';
+  period: PeriodKind;
+  end: string;
+  field: RawField;
+  old: number | null;
+  new: number | null;
+  /** When the builder saw the change (YYYY-MM-DD), if given. */
+  seen: string | null;
+}
+
+const MAX_REVISIONS = 50;
+function parseRevisions(value: unknown): Revision[] {
+  return arrayOf(value)
+    .flatMap((item): Revision[] => {
+      const raw = recordOf(item);
+      const end = validDate(raw.end);
+      const kind = raw.kind === 'restated' || raw.kind === 'yahoo-differs' ? raw.kind : null;
+      const period = raw.period === 'annual' || raw.period === 'quarterly' ? raw.period : null;
+      const field = (RAW_FIELDS as readonly unknown[]).includes(raw.field) ? (raw.field as RawField) : null;
+      if (!end || !kind || !period || !field) return [];
+      return [{ kind, period, end, field, old: finiteOrNull(raw.old), new: finiteOrNull(raw.new), seen: validDate(raw.seen) }];
+    })
+    .slice(-MAX_REVISIONS);
 }
 
 export type FinancialsLoadResult =
@@ -201,6 +235,7 @@ const historySchema = z
             arrayOf(quality.issues).filter((issue): issue is string => typeof issue === 'string' && ISSUE.test(issue)),
           ),
         ],
+        revisions: parseRevisions(quality.revisions),
       },
     };
     return history;
