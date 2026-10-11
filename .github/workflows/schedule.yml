@@ -119,6 +119,16 @@ jobs:
         timeout-minutes: 15
         run: python scripts/build_themes.py
 
+      # 美債與利率研究：FRED 殖利率（免金鑰 CSV 優先，FRED_API_KEY 只當備援）＋長天期美債 ETF 還原收盤，
+      # 產生 docs/report/rates.json 與 rates-history.json。失敗只保留上次的檔案，不影響主流程。
+      - name: Build US rates research
+        if: steps.guard.outputs.skip != 'true'
+        continue-on-error: true
+        timeout-minutes: 15
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python scripts/build_rates.py
+
       - name: Commit and Push changes
         if: steps.guard.outputs.skip != 'true'
         run: |
