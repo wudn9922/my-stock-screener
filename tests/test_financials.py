@@ -809,6 +809,28 @@ class RunTest(unittest.TestCase):
         self.assertIn("AAPL", self.index()["items"])
         self.assertEqual(self.index()["misses"], {})
 
+    def test_failing_symbols_do_not_block_the_queue(self):
+        # Eight never-fetched symbols that always fail (e.g. HTTP 404) sit first in priority order:
+        # without remembering them they would use up the failure limit again on every run.
+        table = {"F%d" % n: RuntimeError("HTTP 404") for n in range(fin.MAX_CONSECUTIVE_FAILURES)}
+        table["AAPL"] = "yahoo_us_full.json"
+        fetch = Fetcher(table)
+        symbols = ["F%d" % n for n in range(fin.MAX_CONSECUTIVE_FAILURES)] + ["AAPL"]
+        stats = self.run_once(symbols, fetch)
+        self.assertTrue(stats["failed"])
+        self.assertNotIn("AAPL", fetch.calls)
+        self.assertEqual(sorted(self.index()["failures"]), symbols[:-1])
+        fetch.calls.clear()
+        stats = self.run_once(symbols, fetch, now=NOW + timedelta(days=1))
+        self.assertEqual(fetch.calls[0], "AAPL")
+        self.assertIn("AAPL.json", self.files())
+        self.assertNotIn("AAPL", self.index()["failures"])
+        # A symbol that recovers leaves the failure list
+        fetch.table["F0"] = "yahoo_bank.json"
+        self.run_once(symbols, fetch, now=NOW + timedelta(days=2))
+        self.assertNotIn("F0", self.index()["failures"])
+        self.assertIn("F1", self.index()["failures"])
+
     def test_failure_counter_resets(self):
         table = {"A%d" % n: RuntimeError("x") for n in range(7)}
         table["OK"] = "yahoo_tw_2330.json"

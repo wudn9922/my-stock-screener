@@ -28,7 +28,8 @@ does not load it). Runs in the daily schedule workflow; the files are committed 
   period (±25%) were not restated by Yahoo and are adjusted (shares × k, EPS ÷ k). Ratios under 1.5
   (Taiwan stock dividends) are ignored.
 - Refetch: no file (a miss is retried after 7 days); latest period over 100 days old and checked more
-  than 3 days ago; checked more than 45 days ago. Never-fetched stocks first, then the oldest check.
+  than 3 days ago; checked more than 45 days ago. Never-fetched stocks first, then the oldest check;
+  stocks whose request or payload failed on an earlier run (index.json "failures") go last.
 - Budget 600 s, 0.15 s between requests; 8 consecutive failed requests stop the run: files already
   written are kept, index.json is written, and the script exits 1. Each file is written atomically,
   and only when its data changed (a check that finds nothing new only updates index.json, so the
@@ -979,6 +980,7 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
         key: item for key, item in (index.get("items") or {}).items() if isinstance(item, dict)
     } if isinstance(index.get("items"), dict) else {}
     previous_misses = index.get("misses") if isinstance(index.get("misses"), dict) else {}
+    previous_failures = index.get("failures") if isinstance(index.get("failures"), dict) else {}
 
     listed = []
     for symbol in symbols:
@@ -1004,12 +1006,19 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
         key: day for key, day in previous_misses.items()
         if key in listed_set and key not in documents and isinstance(day, str)
     }
+    # Stocks whose request or payload failed on an earlier run (HTTP 404, a payload that does not parse…)
+    # go last, so a handful of them can never use up the consecutive-failure limit before anything else
+    failed = {
+        key: day for key, day in previous_failures.items()
+        if key in listed_set and key not in corrupt and isinstance(day, str)
+    }
     pending = [
         key for key in listed
         if key not in corrupt and needs_refresh(items.get(key), today, misses.get(key))
     ]
-    # Never fetched first (priority order), then the oldest check
+    # Never fetched first (priority order), then the oldest check; earlier failures after everything else
     pending.sort(key=lambda key: (
+        key in failed,
         key in items or key in misses,
         (items.get(key) or {}).get("checkedAt") or misses.get(key) or "",
         priority[key],
@@ -1031,6 +1040,7 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
             payload = fetch(key)
             failures = 0
         except Exception as error:  # noqa: BLE001 - keep the stored file
+            failed[key] = today_iso
             failures += 1
             if failures >= MAX_CONSECUTIVE_FAILURES:
                 stats["stopped"] = f"{failures} consecutive failures ({error})"
@@ -1054,9 +1064,11 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
                 documents.get(key), payload, key, now, fetch_splits if fetch_chart else None
             )
         except Exception as error:  # noqa: BLE001 - one bad payload must not stop the run
+            failed[key] = today_iso
             stats["errors"].append(key)
             print(f"::warning::{key}: not updated ({type(error).__name__}: {error})")
             continue
+        failed.pop(key, None)
         if document is None:
             if key in documents:
                 items[key]["checkedAt"] = today_iso
@@ -1103,6 +1115,7 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
         "generatedAt": now.isoformat().replace("+00:00", "Z"),
         "items": final,
         "misses": dict(sorted(misses.items())),
+        "failures": dict(sorted(failed.items())),
     })
     return stats
 
