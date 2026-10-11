@@ -139,6 +139,20 @@
   color: var(--down-text);
   background: var(--down-soft);
 }
+/* Rows with extra pills can run out of room (full-market rows add RS and 52-week-high pills to three MA pills):
+   wrap and hide the second line so whole pills drop off instead of being cut in half. */
+.row-mas.has-metrics {
+  flex-wrap: wrap;
+  align-content: flex-start;
+  max-height: 24px;
+}
+.row-mas.has-metrics > * {
+  flex: none;
+}
+.row-mas.has-metrics > .row-note {
+  flex: 1 1 0;
+  min-width: 4em;
+}
 
 /* ------------------------------------------------------------ sheet */
 .fs-backdrop {

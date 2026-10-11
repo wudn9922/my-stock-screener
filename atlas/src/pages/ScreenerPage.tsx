@@ -132,6 +132,10 @@ function Row({
   onOpen: () => void;
 }) {
   const tone = toneClass(item.changePct);
+  const metricPills = pills.flatMap((key) => {
+    const pill = metricPill(item, key, growth);
+    return pill ? [{ key, pill }] : [];
+  });
   return (
     <a
       className="screener-row"
@@ -147,15 +151,12 @@ function Row({
         <b>{displayTicker(item.symbol)}</b>
         <small>{item.name !== item.symbol ? item.name : getMarketProfile(item.symbol).market === 'TW' ? '台股' : '美股'}</small>
       </span>
-      <span className="row-mas">
-        {pills.map((key) => {
-          const pill = metricPill(item, key, growth);
-          return pill ? (
-            <span key={key} className={`metric-pill ${pill.tone}`} title={pill.title}>
-              {pill.text}
-            </span>
-          ) : null;
-        })}
+      <span className={metricPills.length ? 'row-mas has-metrics' : 'row-mas'}>
+        {metricPills.map(({ key, pill }) => (
+          <span key={key} className={`metric-pill ${pill.tone}`} title={pill.title}>
+            {pill.text}
+          </span>
+        ))}
         {item.maList.slice(0, 3).map((period) => {
           const distance = maDistance(item.close, maValue(item.maValues, period));
           return (
