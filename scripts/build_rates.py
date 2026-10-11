@@ -550,17 +550,24 @@ def build_etfs(prices, etfs, data, previous_rates, previous_history):
             return entries, old_block, old_sources.get("etf"), old_sources.get("etfAsOf")
         return entries, {"dates": [], "series": {e["symbol"]: [] for e in etfs}}, None, None
 
-    dates = ra.weekly_sample(sorted({p[0] for points in cleaned.values() for p in points}))
     old_dates = old_block.get("dates") or []
     old_series = old_block.get("series") or {}
+    days = {p[0] for points in cleaned.values() for p in points}
+    reused = [etf["symbol"] for etf in etfs if etf["symbol"] not in cleaned]
+    if reused:
+        # Funds kept from the previous file must keep their whole history even when the fresh ones
+        # cover a shorter span (a partial download); their weekly values are matched by ISO week.
+        days |= {day for day in old_dates if isinstance(day, str) and ra.valid_iso(day)}
+    dates = ra.weekly_sample(sorted(days))
     series = {}
     for etf in etfs:
         symbol = etf["symbol"]
         if symbol in cleaned:
             series[symbol] = weekly_index(cleaned[symbol], dates)
         else:
-            by_date = dict(zip(old_dates, old_series.get(symbol) or []))
-            series[symbol] = [by_date.get(day) for day in dates]
+            by_week = {ra.iso_week(day): value for day, value in zip(old_dates, old_series.get(symbol) or [])
+                       if isinstance(day, str) and ra.valid_iso(day)}
+            series[symbol] = [by_week.get(ra.iso_week(day)) for day in dates]
     as_of = max(points[-1][0] for points in cleaned.values())
     return entries, {"dates": dates, "series": series}, ETF_SOURCE, as_of
 

@@ -111,12 +111,25 @@ def shift_years(day, years):
 # --------------------------------------------------------------------------- sampling and snapshots
 
 
+def valid_iso(day):
+    """True for a real YYYY-MM-DD date string."""
+    try:
+        return len(day) == 10 and date.fromisoformat(day).isoformat() == day
+    except (TypeError, ValueError):
+        return False
+
+
+def iso_week(day):
+    """(ISO year, ISO week) of a date."""
+    return tuple(to_date(day).isocalendar()[:2])
+
+
 def weekly_sample(dates):
     """Last date of every ISO week (a holiday Friday falls back to Thursday; the current partial week is kept)."""
     out = []
     previous_week = None
     for day in sorted(dates):
-        week = tuple(to_date(day).isocalendar()[:2])
+        week = iso_week(day)
         if week == previous_week:
             out[-1] = day
         else:

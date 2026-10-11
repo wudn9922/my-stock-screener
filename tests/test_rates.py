@@ -644,6 +644,23 @@ class PayloadTest(unittest.TestCase):
         self.assertEqual(again["etfs"][1]["returns"], self.rates["etfs"][1]["returns"])
         self.assertEqual(again_history["etf"]["series"]["EDV"], self.history["etf"]["series"]["EDV"])
 
+    def test_short_partial_download_keeps_reused_history(self):
+        # Only GOVZ came back, and only its last 300 days: the other funds keep their whole weekly
+        # history from the previous file (inception = 100) instead of being cut to GOVZ's span.
+        _, prices = market()
+        partial = {"GOVZ": prices["GOVZ"][-300:]}
+        _, again_history = build(prices=partial, previous_rates=self.rates, previous_history=self.history)
+        old, new = self.history["etf"], again_history["etf"]
+        self.assertEqual(new["dates"][0], old["dates"][0])
+        for symbol in ("TLT", "EDV", "ZROZ", "TMF"):
+            old_values = dict(zip(old["dates"], old["series"][symbol]))
+            new_values = dict(zip(new["dates"], new["series"][symbol]))
+            self.assertEqual(new_values[new["dates"][0]], 100)
+            self.assertEqual({d: v for d, v in new_values.items() if d in old_values}, old_values)
+        govz = [v for v in new["series"]["GOVZ"] if v is not None]
+        self.assertEqual(govz[0], 100)
+        self.assertEqual(len(govz), len(ra.weekly_sample([d for d, _, _ in partial["GOVZ"]])))
+
     def test_etf_failure_without_previous(self):
         rates, history = build(prices={})
         self.assertIsNone(rates["sources"]["etf"])
