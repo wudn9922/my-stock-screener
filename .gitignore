@@ -22,3 +22,6 @@ venv/
 # 作業系統
 .DS_Store
 Thumbs.db
+
+# 產生器中斷時留下的暫存檔（不要隨 docs/report 一起提交）
+docs/report/**/*.tmp

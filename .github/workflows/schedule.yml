@@ -99,17 +99,6 @@ jobs:
         timeout-minutes: 15
         run: python scripts/build_breadth.py
 
-      # 財報分析中心：Yahoo fundamentals-timeseries 逐檔累積年度／季度財報到 docs/report/financials/
-      # （股票來自 latest／themes／universe，只重抓到期的，約 600 秒預算）。失敗只保留已寫入的檔案。
-      - name: Build financial statement history
-        if: steps.guard.outputs.skip != 'true'
-        continue-on-error: true
-        timeout-minutes: 20
-        working-directory: atlas
-        run: |
-          python -c "import curl_cffi" 2>/dev/null || pip install --quiet 'curl_cffi>=0.7,<1'
-          python scripts/build_financials.py
-
       # ✨ 已修改：注入 Imgur 金鑰，讓自動截圖流能順利上傳並傳入 LINE
       - name: Run Dify Wall Street Report
         if: steps.guard.outputs.skip != 'true'
@@ -139,6 +128,19 @@ jobs:
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python scripts/build_rates.py
+
+      # 財報分析中心：Yahoo fundamentals-timeseries 逐檔累積年度／季度財報到 docs/report/financials/
+      # （股票來自 latest／themes／universe，只重抓到期的，約 600 秒預算）。失敗只保留已寫入的檔案。
+      # 放在最後：約 10 分鐘、上千次 Yahoo 請求，不延後 LINE 報告，也不讓前面的題材／利率步驟先被 Yahoo 限流；
+      # 這時 themes.json 也已是今天的版本。逐季累積的資料晚一天補抓也無妨。
+      - name: Build financial statement history
+        if: steps.guard.outputs.skip != 'true'
+        continue-on-error: true
+        timeout-minutes: 20
+        working-directory: atlas
+        run: |
+          python -c "import curl_cffi" 2>/dev/null || pip install --quiet 'curl_cffi>=0.7,<1'
+          python scripts/build_financials.py
 
       - name: Commit and Push changes
         if: steps.guard.outputs.skip != 'true'
