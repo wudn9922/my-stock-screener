@@ -7292,9 +7292,18 @@ INDEX_SHORT_NAMES = {
 }
 
 INDEX_LINE_LEGEND = (
-    "▲多 ▼空 －不明｜"
-    "道氏兩格＝大趨勢、小走勢"
+    "均線：▲▲看多 ▲偏多 －不明 ▼偏空 ▼▼看空｜"
+    "道氏：🔺多 🔻空 💡大多小空 ⚡大空小多"
 )
+
+# 均線五個等級，對應 analyze_index_trend 的 看多／偏多／多空不明／偏空／看空
+INDEX_MA_SYMBOLS = {
+    "看多": "▲▲",
+    "偏多": "▲",
+    "多空不明": "－",
+    "偏空": "▼",
+    "看空": "▼▼"
+}
 
 
 def build_index_line_short(
@@ -7303,8 +7312,9 @@ def build_index_line_short(
     index_line
 ):
     """
-    LINE 用的單行大盤摘要：「簡稱 均線▲ 道氏▲▼」。
-    ▲ 多、▼ 空、－ 不明；道氏兩個符號依序是大趨勢與小走勢。
+    LINE 用的單行大盤摘要：「簡稱 均線符號 道氏符號」。
+    均線五級：▲▲看多、▲偏多、－不明、▼偏空、▼▼看空。
+    道氏單一符號：🔺多、🔻空、💡大多小空、⚡大空小多、➖不明。
     只依 analyze_index_trend 的文字解析，不改變網頁使用的原文。
     """
     short_name = INDEX_SHORT_NAMES.get(
@@ -7324,31 +7334,37 @@ def build_index_line_short(
     ):
         return f"{short_name} 分析異常"
 
-    if score is None or score == 0:
-        ma_symbol = "－"
-    elif score > 0:
-        ma_symbol = "▲"
+    ma_symbol = INDEX_MA_SYMBOLS.get(
+        parsed.get("scoreLabel")
+    )
+
+    if ma_symbol is None:
+        score_max = parsed.get("scoreMax")
+
+        if score is None or score == 0:
+            ma_symbol = "－"
+        elif score_max and abs(score) >= score_max:
+            ma_symbol = "▲▲" if score > 0 else "▼▼"
+        else:
+            ma_symbol = "▲" if score > 0 else "▼"
+
+    macro = parsed.get("macroTrend")
+    micro = parsed.get("microTrend")
+
+    if macro == "bull" and micro == "bull":
+        dow_symbol = "🔺"
+    elif macro == "bear" and micro == "bear":
+        dow_symbol = "🔻"
+    elif macro == "bull":
+        dow_symbol = "💡"
+    elif macro == "bear":
+        dow_symbol = "⚡"
     else:
-        ma_symbol = "▼"
-
-    arrows = {
-        "bull": "▲",
-        "bear": "▼"
-    }
-
-    macro = arrows.get(
-        parsed.get("macroTrend"),
-        "－"
-    )
-
-    micro = arrows.get(
-        parsed.get("microTrend"),
-        "－"
-    )
+        dow_symbol = "➖"
 
     return (
         f"{short_name} 均線{ma_symbol} "
-        f"道氏{macro}{micro}"
+        f"道氏{dow_symbol}"
     )
 
 
