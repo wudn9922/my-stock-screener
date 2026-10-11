@@ -216,6 +216,13 @@ class SymbolSourcesTest(unittest.TestCase):
             symbols = growth.collect_symbols(report_dir, data_dir)
             self.assertEqual(symbols, ["AAPL", "BRK-B", "MSFT", "NVDA", "PLTR"])
 
+    def test_class_share_dots_become_dashes(self):
+        # Yahoo timeseries and the screener's growth lookup both use BRK-B, never BRK.B
+        with tempfile.TemporaryDirectory() as report_dir, tempfile.TemporaryDirectory() as data_dir:
+            with open(os.path.join(report_dir, "latest.json"), "w", encoding="utf-8") as file:
+                json.dump({"groups": [{"market": "US", "items": [{"symbol": "brk.b"}, {"symbol": "BF-B"}]}]}, file)
+            self.assertEqual(growth.collect_symbols(report_dir, data_dir), ["BF-B", "BRK-B"])
+
     def test_csv_stands_in_for_missing_universe(self):
         with tempfile.TemporaryDirectory() as report_dir, tempfile.TemporaryDirectory() as data_dir:
             with open(os.path.join(report_dir, "latest.json"), "w", encoding="utf-8") as file:

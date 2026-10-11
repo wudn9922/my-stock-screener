@@ -86,7 +86,9 @@ def us_symbol(value):
     symbol = value.strip().upper()
     if not symbol or symbol.startswith("^") or symbol.endswith(TW_SUFFIXES):
         return None
-    if len(symbol) > 12 or not all(ch.isalnum() or ch in ".-" for ch in symbol):
+    # Class shares: Yahoo and the screener's lookup (growthKey) both use BRK-B, not BRK.B
+    symbol = symbol.replace(".", "-")
+    if len(symbol) > 12 or not all(ch.isalnum() or ch == "-" for ch in symbol):
         return None
     return symbol
 
