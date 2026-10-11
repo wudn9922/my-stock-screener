@@ -20,3 +20,19 @@
   color: var(--warn);
   background: rgba(224, 164, 58, 0.14);
 }
+
+/* Desktop rows are 64px tall and stack ticker / name: put the badge beside the ticker instead of a third line. */
+@media (min-width: 768px) {
+  .row-id:has(> .earn-badge) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
+  }
+  .row-id:has(> .earn-badge) > .earn-badge {
+    justify-self: start;
+  }
+  .row-id:has(> .earn-badge) > small {
+    grid-column: 1 / -1;
+  }
+}
