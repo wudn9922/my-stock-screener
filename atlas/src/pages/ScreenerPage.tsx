@@ -53,6 +53,7 @@ import { parseRoute, serializeRoute } from '../app/routes';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { PageState } from '../ui/PageState';
 import '../ui/filter-sheet.css';
+import { EarningsBadge } from '../ui/EarningsBadge';
 
 const ROW_HEIGHT = 64;
 const OVERSCAN = 8;
@@ -149,6 +150,7 @@ function Row({
     >
       <span className="row-id">
         <b>{displayTicker(item.symbol)}</b>
+        <EarningsBadge symbol={item.symbol} />
         <small>{item.name !== item.symbol ? item.name : getMarketProfile(item.symbol).market === 'TW' ? '台股' : '美股'}</small>
       </span>
       <span className={metricPills.length ? 'row-mas has-metrics' : 'row-mas'}>

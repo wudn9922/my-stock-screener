@@ -1,0 +1,91 @@
+{
+  "quoteResponse": {
+    "result": [
+      {
+        "symbol": "AAPL",
+        "quoteType": "EQUITY",
+        "earningsTimestamp": 1793305800,
+        "earningsTimestampStart": 1793305800,
+        "earningsTimestampEnd": 1793305800,
+        "isEarningsDateEstimate": false,
+        "earningsCallTimestampStart": 1793305800
+      },
+      {
+        "symbol": "MSFT",
+        "quoteType": "EQUITY",
+        "earningsTimestamp": 1793185200,
+        "earningsTimestampStart": 1793185200,
+        "earningsTimestampEnd": 1793185200,
+        "isEarningsDateEstimate": false
+      },
+      {
+        "symbol": "NVDA",
+        "quoteType": "EQUITY",
+        "earningsTimestamp": 1795089600,
+        "earningsTimestampStart": 1795021200,
+        "earningsTimestampEnd": 1795539600,
+        "isEarningsDateEstimate": true
+      },
+      {
+        "symbol": "INTC",
+        "quoteType": "EQUITY",
+        "earningsTimestamp": 1792684800,
+        "earningsTimestampStart": 1792684800,
+        "earningsTimestampEnd": 1792684800,
+        "isEarningsDateEstimate": false
+      },
+      {
+        "symbol": "ORCL",
+        "quoteType": "EQUITY",
+        "earningsTimestamp": 1796878800,
+        "earningsTimestampStart": 1796878800,
+        "earningsTimestampEnd": 1796878800,
+        "isEarningsDateEstimate": false
+      },
+      {
+        "symbol": "CSCO",
+        "quoteType": "EQUITY",
+        "earningsTimestamp": 1793887200,
+        "earningsTimestampStart": 1793887200,
+        "earningsTimestampEnd": 1793887200,
+        "isEarningsDateEstimate": false
+      },
+      {
+        "symbol": "SNOW",
+        "quoteType": "EQUITY",
+        "earningsTimestamp": 1793241000,
+        "earningsTimestampStart": 1793241000,
+        "earningsTimestampEnd": 1793241000,
+        "isEarningsDateEstimate": false
+      },
+      {
+        "symbol": "AMD",
+        "quoteType": "EQUITY",
+        "earningsTimestamp": 1793131200,
+        "earningsTimestampStart": 1793131200,
+        "earningsTimestampEnd": 1793131200,
+        "isEarningsDateEstimate": false
+      },
+      {
+        "symbol": "BADX",
+        "quoteType": "EQUITY",
+        "earningsTimestamp": "soon",
+        "isEarningsDateEstimate": "maybe"
+      },
+      {
+        "symbol": "NOEVT",
+        "quoteType": "EQUITY"
+      },
+      {
+        "symbol": "SMH",
+        "quoteType": "ETF"
+      },
+      {
+        "symbol": "VFIAX",
+        "quoteType": "MUTUALFUND",
+        "earningsTimestamp": 1793305800
+      }
+    ],
+    "error": null
+  }
+}
