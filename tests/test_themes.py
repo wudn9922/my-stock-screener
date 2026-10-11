@@ -193,6 +193,24 @@ class PayloadTest(unittest.TestCase):
         with self.assertRaises(build_themes.InsufficientData):
             build_themes.build_payload({"SPY": series[:50]}, config, TODAY)
 
+    def test_mostly_stale_data_does_not_pass_coverage(self):
+        symbols = [f"T{i}" for i in range(10)]
+        config = mini_config({"t": symbols})
+        fresh = geometric(self.calendar, 100, 0.001)
+        old = fresh[:-6]
+        prices = self.prices(**{s: (fresh if i < 5 else old) for i, s in enumerate(symbols)})
+        with self.assertRaises(build_themes.InsufficientData):
+            build_themes.build_payload(prices, config, TODAY)
+
+    def test_open_session_bar_is_dropped_until_after_the_close(self):
+        bars = [("2026-10-08", 1.0), ("2026-10-09", 2.0)]
+        during = datetime(2026, 10, 9, 16, 47, tzinfo=timezone.utc)  # 12:47 New York
+        after = datetime(2026, 10, 9, 22, 30, tzinfo=timezone.utc)  # 18:30 New York
+        self.assertEqual(build_themes.drop_open_session({"A": bars}, during), {"A": bars[:1]})
+        self.assertEqual(build_themes.drop_open_session({"A": bars}, after), {"A": bars})
+        weekend = datetime(2026, 10, 10, 16, 47, tzinfo=timezone.utc)
+        self.assertEqual(build_themes.drop_open_session({"A": bars}, weekend), {"A": bars})
+
     def test_theme_with_too_few_valid_names_is_unranked_and_last(self):
         config = mini_config({"thin": ["X1", "X2", "X3"], "full": ["Y1", "Y2", "Y3"]})
         prices = self.prices(

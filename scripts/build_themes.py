@@ -162,13 +162,6 @@ def build_payload(prices, config, today):
     last_day = parse_date(last_date)
 
     constituent_symbols = sorted({t[0] for theme in config["themes"] for t in theme["tickers"]})
-    with_data = [s for s in constituent_symbols if prices.get(s)]
-    coverage = len(with_data) / len(constituent_symbols) if constituent_symbols else 0.0
-    if coverage < MIN_COVERAGE:
-        raise InsufficientData(
-            f"only {len(with_data)}/{len(constituent_symbols)} constituents have data ({coverage:.0%})"
-        )
-
     bench_values = align(bench_bars, calendar, last_date)
     bench_returns = all_returns(bench_values, calendar)
     dates = calendar[-SERIES_POINTS:]
@@ -189,6 +182,15 @@ def build_payload(prices, config, today):
         cache[symbol] = values
         if values is None:
             skipped[reason].append(symbol)
+
+    # Coverage counts only constituents that are usable (present and fresh), so a run where most
+    # tickers came back stale cannot overwrite a good file either.
+    usable_count = len(constituent_symbols) - len(skipped["missing"]) - len(skipped["stale"])
+    coverage = usable_count / len(constituent_symbols) if constituent_symbols else 0.0
+    if coverage < MIN_COVERAGE:
+        raise InsufficientData(
+            f"only {usable_count}/{len(constituent_symbols)} constituents have fresh data ({coverage:.0%})"
+        )
 
     themes = []
     for theme in config["themes"]:
@@ -352,6 +354,23 @@ def download_prices(symbols, downloader=None, sleep=time.sleep):
     return prices
 
 
+def drop_open_session(prices, now):
+    """Removes today's bar while the US session may still be open (a delayed run would see partial prices)."""
+    try:
+        from zoneinfo import ZoneInfo
+
+        eastern = now.astimezone(ZoneInfo("America/New_York"))
+    except Exception:  # noqa: BLE001 - no tz database: keep the data as downloaded
+        return prices
+    if eastern.weekday() >= 5 or (eastern.hour, eastern.minute) >= (16, 15):
+        return prices
+    today = eastern.date().isoformat()
+    trimmed = {}
+    for symbol, bars in prices.items():
+        trimmed[symbol] = bars[:-1] if bars and bars[-1][0] == today else bars
+    return trimmed
+
+
 def write_atomic(path, value):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     body = json.dumps(value, ensure_ascii=False, separators=(",", ":")) + "\n"
@@ -376,8 +395,10 @@ def main():
     symbols = all_symbols(config)
     print(f"downloading {len(symbols)} symbols")
     prices = download_prices(symbols)
+    now = datetime.now(timezone.utc)
+    prices = drop_open_session(prices, now)
     try:
-        payload = build_payload(prices, config, datetime.now(timezone.utc))
+        payload = build_payload(prices, config, now)
     except InsufficientData as exc:
         print(f"themes.json not updated: {exc}")
         return 1
