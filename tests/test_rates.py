@@ -399,6 +399,17 @@ class EmpiricalDurationTest(unittest.TestCase):
         self.assertAlmostEqual(dy[0], 0.1)
         self.assertAlmostEqual(r[0], -0.02)
 
+    def test_near_zero_beta_has_no_negative_zero(self):
+        # A fund that barely moves with yields: beta and durEmp round to zero and must not print as -0.0
+        days = daily_calendar(date(2025, 1, 6), 140)
+        for sign in (1, -1):
+            fred = [(d, 4.0 + (0.05 if i % 2 else 0.0)) for i, d in enumerate(days)]
+            etf = [(d, 100.0 * (1 + sign * (1e-9 if i % 2 else 0.0))) for i, d in enumerate(days)]
+            result = ra.regress_beta(etf, fred, date(2024, 1, 1), "daily")
+            text = json.dumps(result)
+            self.assertNotIn("-0.0", text, result)
+            self.assertEqual(result["durEmp"], 0)
+
     def test_too_few_points(self):
         fred, etf = regression_market(16.5, 1, days=30)
         self.assertIsNone(ra.regress_beta(etf, fred, date(2023, 1, 1), "daily"))

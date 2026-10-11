@@ -75,6 +75,13 @@ class KeyTest(unittest.TestCase):
         self.assertEqual(fin.market_of("6488.TWO"), "TW")
         self.assertEqual(fin.market_of("BRK-B"), "US")
 
+    def test_clean_value_never_negative_zero(self):
+        for raw in (-0.00001, -0.0, 0.00001):
+            value = fin.clean_value(raw)
+            self.assertEqual(value, 0)
+            self.assertNotIn("-", json.dumps(value))
+        self.assertEqual(fin.clean_value(-1.23456), -1.2346)
+
 
 class ParseTest(unittest.TestCase):
     def test_us_full_filters_period_types_currency_and_garbage(self):

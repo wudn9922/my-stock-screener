@@ -433,7 +433,8 @@ def regress_beta(etf, yields, start, freq):
     if fit is None:
         return None
     beta, _, r2 = fit
-    return {"beta": round(beta, 5), "durEmp": round(-100 * beta, 2), "r2": round(r2, 3), "n": len(dy)}
+    # + 0.0 turns a rounded -0.0 into 0.0 (strict output never carries -0.0)
+    return {"beta": round(beta, 5) + 0.0, "durEmp": round(-100 * beta, 2) + 0.0, "r2": round(r2, 3) + 0.0, "n": len(dy)}
 
 
 # --------------------------------------------------------------------------- model duration / convexity

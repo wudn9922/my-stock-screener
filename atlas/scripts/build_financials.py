@@ -143,7 +143,8 @@ def clean_value(value):
         return None
     if value.is_integer() and abs(value) < 2 ** 53:
         return int(value)
-    return round(value, 4)
+    # + 0.0 turns a rounded -0.0 into 0.0
+    return round(value, 4) + 0.0
 
 
 def clean_ratio(value):
@@ -568,7 +569,7 @@ def adjust_splits(sections, events):
                 values["dilutedShares"] = clean_value(shares * best)
                 for field in ("epsDiluted", "epsBasic"):
                     if values.get(field) is not None:
-                        values[field] = round(values[field] / best, 4)
+                        values[field] = round(values[field] / best, 4) + 0.0
                 changed = True
         reference = shares_of(item)
     return changed
