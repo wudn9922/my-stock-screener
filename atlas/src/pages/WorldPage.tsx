@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import {
   ColorType,
@@ -28,6 +28,10 @@ import {
 } from './worldPerformance';
 import type { Bar } from '../market-data/MarketDataProvider';
 import { formatDateTime, formatPercent, formatPrice, toneClass } from '../ui/format';
+import { PageState } from '../ui/PageState';
+
+// The rates research view loads only when opened; it has its own data and does not use the daily report.
+const RatesView = lazy(() => import('./RatesView'));
 
 /** Categorical slots validated for the dark chart surface (fixed order; color follows the index). */
 export const SERIES_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
@@ -380,24 +384,45 @@ function WorldView({ report, openChart }: { report: Report } & Pick<PageProps, '
   );
 }
 
-export default function WorldPage({ report, reload, openChart }: PageProps) {
+export default function WorldPage({ report, reload, navigate, openChart, view }: PageProps & { view?: 'rates' }) {
+  const rates = view === 'rates';
   return (
     <div className="page world-page">
       <div className="page-head">
         <div>
-          <h2 className="page-title">世界指數</h2>
-          {report.status === 'ok' && (
+          <h2 className="page-title">{rates ? '美債與利率' : '世界指數'}</h2>
+          {!rates && report.status === 'ok' && (
             <p className="page-sub">
               報告日 {formatDateTime(report.report.reportDate, false)} · 延遲行情
             </p>
           )}
         </div>
+        <div className="segmented compact" role="group" aria-label="世界頁面">
+          <button type="button" className={!rates ? 'active' : ''} aria-pressed={!rates} onClick={() => navigate({ page: 'world' })}>
+            指數
+          </button>
+          <button
+            type="button"
+            className={rates ? 'active' : ''}
+            aria-pressed={rates}
+            onClick={() => navigate({ page: 'world', view: 'rates' })}
+          >
+            美債利率
+          </button>
+        </div>
       </div>
-      <ReportGate report={report} reload={reload}>
-        {(data) => <WorldView report={data} openChart={openChart} />}
-      </ReportGate>
+      {rates ? (
+        // Outside ReportGate: the rates data is separate from the daily report.
+        <Suspense fallback={<PageState kind="loading" title="載入中…" />}>
+          <RatesView navigate={navigate} openChart={openChart} />
+        </Suspense>
+      ) : (
+        <ReportGate report={report} reload={reload}>
+          {(data) => <WorldView report={data} openChart={openChart} />}
+        </ReportGate>
+      )}
       <footer className="page-foot">
-        <span>延遲行情，僅供研究參考，非投資建議。</span>
+        <span>{rates ? '利率資料為每日更新，僅供研究參考，非投資建議。' : '延遲行情，僅供研究參考，非投資建議。'}</span>
         <ChartAttribution />
       </footer>
     </div>

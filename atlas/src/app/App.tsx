@@ -26,6 +26,7 @@ import {
   FlaskConical,
   RefreshCw,
   Search,
+  FileBarChart,
 } from 'lucide-react';
 import { AppStore } from './AppStore';
 import { cloudSyncState, startDrawingSync, type CloudSyncState } from '../cloud/startDrawingSync';
@@ -154,6 +155,8 @@ export interface ChartWorkspaceProps {
   request?: ChartRequest | null;
   onStateChange?: (symbol: string, timeframe: Timeframe) => void;
   onOpenSearch?: () => void;
+  /** Opens the financials page for a symbol; the header shows 「財報」 only when provided. */
+  onOpenFinancials?: (symbol: string) => void;
   reportSymbols?: readonly LocalSymbol[];
 }
 
@@ -162,6 +165,7 @@ export function App({
   request = null,
   onStateChange,
   onOpenSearch,
+  onOpenFinancials,
   reportSymbols = [],
 }: ChartWorkspaceProps = {}) {
   const mobile = useSyncExternalStore(subscribeMobile, () => mobileMedia.matches);
@@ -1020,6 +1024,11 @@ export function App({
           >
             <span className="star-glyph" aria-hidden="true">{inWatchlist ? '★' : '☆'}</span>
           </IconButton>
+          {onOpenFinancials && !isIndex && providerId !== 'demo' && (
+            <IconButton label="財報" onClick={() => onOpenFinancials(symbol)}>
+              <FileBarChart size={17} />
+            </IconButton>
+          )}
           <IconButton label="重新整理行情" onClick={() => setReloadToken((n) => n + 1)}>
             <RefreshCw size={17} />
           </IconButton>

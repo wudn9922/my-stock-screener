@@ -1,0 +1,44 @@
+{
+ "_synthetic": "SYNTHETIC test data: made-up numbers in the shape of a Yahoo Finance response",
+ "chart": {
+  "result": [
+   {
+    "meta": {
+     "symbol": "SPLT",
+     "currency": "USD",
+     "dataGranularity": "1mo",
+     "range": "max"
+    },
+    "timestamp": [
+     1700000000
+    ],
+    "events": {
+     "splits": {
+      "1781098200": {
+       "date": 1781098200,
+       "numerator": 10.0,
+       "denominator": 1.0,
+       "splitRatio": "10:1"
+      },
+      "1560173400": {
+       "date": 1560173400,
+       "numerator": 11.0,
+       "denominator": 10.0,
+       "splitRatio": "11:10"
+      }
+     }
+    },
+    "indicators": {
+     "quote": [
+      {
+       "close": [
+        100.0
+       ]
+      }
+     ]
+    }
+   }
+  ],
+  "error": null
+ }
+}
