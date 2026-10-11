@@ -306,19 +306,19 @@
 .themes-table tbody tr:hover > * {
   background: var(--surface-2);
 }
-.breadth {
+.theme-breadth {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
-.breadth-bar {
+.theme-breadth-bar {
   width: 44px;
   height: 6px;
   border-radius: 3px;
   background: var(--surface-3);
   overflow: hidden;
 }
-.breadth-bar i {
+.theme-breadth-bar i {
   display: block;
   height: 100%;
   background: var(--accent);

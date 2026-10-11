@@ -139,8 +139,8 @@ function Value({ value, digits = 1 }: { value: number | null; digits?: number })
 function BreadthBar({ value }: { value: number | null }) {
   if (value === null) return <span className="num muted">—</span>;
   return (
-    <span className="breadth" title={breadthLabel(value)}>
-      <span className="breadth-bar" aria-hidden="true">
+    <span className="theme-breadth" title={breadthLabel(value)}>
+      <span className="theme-breadth-bar" aria-hidden="true">
         <i style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
       </span>
       <span className="num">{Math.round(value)}%</span>
