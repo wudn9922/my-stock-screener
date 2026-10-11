@@ -71,8 +71,12 @@ ETF_WEEKLY_LOOKBACK_DAYS = 7
 
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 FRED_API_URL = "https://api.stlouisfed.org/fred/series/observations"
-HTTP_TIMEOUT = (10, 30)
+HTTP_TIMEOUT = (10, 20)
 FETCH_ATTEMPTS = 2
+# A source that failed this many series in a row is skipped for the rest of the run.
+BREAKER_LIMIT = 3
+# Wall-clock budget for all FRED requests; series left over fall back on the previous file.
+FETCH_BUDGET_SECONDS = 420
 REQUEST_PAUSE = 0.3
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -82,7 +86,7 @@ SOURCE_LABELS = {"csv": "FRED fredgraph.csv", "api": "FRED API"}
 ETF_SOURCE = "Yahoo Finance adjusted close"
 
 NOTES = {
-    "rates": "殖利率來自 FRED（美國財政部 H.15 每日固定期限殖利率，約美東 15:30 取價）；免金鑰 CSV 優先，失敗才用 FRED API，"
+    "rates": "殖利率來自 FRED（美國財政部 H.15 每日固定期限殖利率，約美東 15:30 取價）；有 FRED_API_KEY 時以 FRED API 優先、免金鑰 CSV 為備援（沒有金鑰就只用 CSV），"
              "都失敗沿用上次檔案的數值並列在 missing。10Y−2Y 等利差由各期限相減，不另抓 T10Y2Y。",
     "curves": "快照日＝目標日當天或之前最近一個 10Y 有值的日子；個別期限缺值最多往回找 5 天，找不到為 null。",
     "spreads": "利差單位 bp。倒掛＝利差小於 0；相隔 10 個交易日內的倒掛視為同一段。invertedDays 為目前這段倒掛的交易日數；"
@@ -187,30 +191,46 @@ def default_http_get():
     return http_get
 
 
-def make_fetchers(http_get, api_key, sleep=time.sleep):
-    """[(origin, fetch(series_id) -> points)] in the order they are tried. fetch raises FetchError."""
+def make_fetchers(http_get, api_key, sleep=time.sleep, clock=time.monotonic, budget=None):
+    """[(origin, fetch(series_id) -> points)] in the order they are tried. fetch raises FetchError.
+
+    The API (when a key is set) goes first: it answers reliably from CI runners, while fredgraph.csv can hang
+    there. A source that fails BREAKER_LIMIT series in a row is skipped from then on, and no request starts
+    after `budget` seconds (measured from this call) have passed.
+    """
+    deadline = None if budget is None else clock() + budget
+    failures = {}
 
     def attempt(series_id, label, call, parse):
+        if failures.get(label, 0) >= BREAKER_LIMIT:
+            raise FetchError(f"{series_id}: {label} skipped after {BREAKER_LIMIT} failed series")
         problem = None
         for number in range(1, FETCH_ATTEMPTS + 1):
+            if deadline is not None and clock() > deadline:
+                raise FetchError(f"{series_id}: {label} time budget used up")
             sleep(REQUEST_PAUSE if number == 1 else 3 * number)
             try:
                 status, body = call()
             except Exception as exc:  # noqa: BLE001 - requests puts the URL (with api_key) in the message
                 problem = type(exc).__name__
-                print(f"{series_id}: {label} attempt {number} failed ({problem})")
+                print(f"{series_id}: {label} attempt {number} failed ({problem})", flush=True)
                 continue
             if status == 200:
                 try:
-                    return parse(body)
+                    points = parse(body)
                 except Exception as exc:  # noqa: BLE001 - malformed body; never echo it
                     problem = f"unparseable response ({type(exc).__name__})"
-                    print(f"{series_id}: {label} {problem}")
+                    print(f"{series_id}: {label} {problem}", flush=True)
                     break
+                failures[label] = 0
+                return points
             problem = f"HTTP {status}"
-            print(f"{series_id}: {label} attempt {number} failed ({problem})")
+            print(f"{series_id}: {label} attempt {number} failed ({problem})", flush=True)
             if status not in (429,) and status < 500:
                 break
+        failures[label] = failures.get(label, 0) + 1
+        if failures[label] == BREAKER_LIMIT:
+            print(f"{label}: {BREAKER_LIMIT} series failed in a row, skipping it from now on", flush=True)
         raise FetchError(f"{series_id}: {label} {problem}")
 
     def fetch_csv(series_id):
@@ -227,9 +247,8 @@ def make_fetchers(http_get, api_key, sleep=time.sleep):
             lambda body: parse_fred_api(json.loads(body)),
         )
 
-    fetchers = [("csv", fetch_csv)]
-    if api_key:
-        fetchers.append(("api", fetch_api))
+    fetchers = [("api", fetch_api)] if api_key else []
+    fetchers.append(("csv", fetch_csv))
     return fetchers
 
 
@@ -665,7 +684,7 @@ def run(out_dir, http_get=None, price_source=None, api_key=None, today=None, now
     previous_rates = read_json(rates_path)
     previous_history = read_json(history_path)
 
-    fetchers = make_fetchers(http_get or default_http_get(), api_key, sleep)
+    fetchers = make_fetchers(http_get or default_http_get(), api_key, sleep, budget=FETCH_BUDGET_SECONDS)
     series, origin = load_series(FRED_IDS, fetchers, series_from_history(previous_history))
     try:
         check_rates(series, origin, today)
@@ -701,6 +720,8 @@ def run(out_dir, http_get=None, price_source=None, api_key=None, today=None, now
 
 
 def main():
+    # a step killed by its timeout must still leave its progress in the log
+    sys.stdout.reconfigure(line_buffering=True)
     out_dir = os.environ.get("RATES_OUT_DIR") or DEFAULT_OUT_DIR
     api_key = (os.environ.get("FRED_API_KEY") or "").strip() or None
     return run(out_dir, api_key=api_key)

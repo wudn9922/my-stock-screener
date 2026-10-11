@@ -1,0 +1,65 @@
+name: Financial Statement History
+
+# 財報分析中心：Yahoo fundamentals-timeseries 逐檔累積年度／季度財報到 docs/report/financials/
+# （股票來自 latest／themes／universe，只重抓到期的，約 600 秒預算）。
+# 獨立成一個 workflow：用全新的 runner（乾淨的 Yahoo 限流狀態），也不拖慢每日報告與 LINE 推播。
+# 失敗只保留已寫入的檔案，下一次接著補。
+on:
+  workflow_run:
+    workflows: ["Daily Stock Screener"]
+    types: [completed]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: financials-history
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # workflow_run 只有在每日報告成功時才繼續
+    if: >-
+      github.event_name != 'workflow_run'
+      || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install --quiet 'curl_cffi>=0.7,<1'
+
+      - name: Build financial statement history
+        working-directory: atlas
+        run: python -u scripts/build_financials.py
+
+      - name: Commit and Push changes
+        if: always()
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A docs/report/financials
+          git commit -m "Auto-update financial statement history" || { echo "No changes to commit"; exit 0; }
+          # 每日報告與 Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試
+          for attempt in 1 2 3; do
+            git pull --rebase
+            if git push; then
+              exit 0
+            fi
+            echo "推送失敗（第 ${attempt} 次），稍後重試"
+            sleep $((attempt * 15))
+          done
+          exit 1

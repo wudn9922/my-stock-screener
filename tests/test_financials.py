@@ -944,5 +944,33 @@ class SampleTest(unittest.TestCase):
             self.assertIn("_fixture", value)
 
 
+class ConnectYahooTest(unittest.TestCase):
+    def factory(self, failures):
+        calls = []
+
+        def make():
+            calls.append(1)
+            if len(calls) <= failures:
+                raise RuntimeError("Yahoo crumb HTTP 429: 'Too Many Requests'")
+            return "session"
+
+        return make, calls
+
+    def test_retries_then_succeeds(self):
+        make, calls = self.factory(2)
+        waits = []
+        self.assertEqual(fin.connect_yahoo(make, sleep=waits.append, delays=(1, 2, 3)), "session")
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(waits, [1, 2])
+
+    def test_gives_up_after_the_last_delay(self):
+        make, calls = self.factory(99)
+        waits = []
+        with self.assertRaises(RuntimeError):
+            fin.connect_yahoo(make, sleep=waits.append, delays=(1, 2, 3))
+        self.assertEqual(len(calls), 4)
+        self.assertEqual(waits, [1, 2, 3])
+
+
 if __name__ == "__main__":
     unittest.main()

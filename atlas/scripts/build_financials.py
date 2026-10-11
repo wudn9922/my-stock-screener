@@ -1120,6 +1120,23 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
     return stats
 
 
+CONNECT_DELAYS = (30, 60, 120)
+
+
+def connect_yahoo(factory=None, sleep=None, delays=CONNECT_DELAYS):
+    """Yahoo() with a few patient retries: the crumb request is the first one rate limited (HTTP 429)."""
+    factory = factory or Yahoo
+    sleep = sleep or time.sleep
+    for number in range(len(delays) + 1):
+        try:
+            return factory()
+        except Exception as error:  # noqa: BLE001 - the message is a short status line, never a URL
+            if number == len(delays):
+                raise
+            print(f"Yahoo connect attempt {number + 1} failed ({error}); retrying in {delays[number]} s", flush=True)
+            sleep(delays[number])
+
+
 def main():
     report_dir = os.environ.get("ATLAS_REPORT_DIR") or "../docs/report"
     data_dir = os.environ.get("ATLAS_DATA_DIR") or "../data"
@@ -1131,7 +1148,7 @@ def main():
     now = datetime.now(timezone.utc).replace(microsecond=0)
     period2 = int(now.timestamp())
     period1 = int((now - timedelta(days=HISTORY_YEARS * 366)).timestamp())
-    yahoo = Yahoo()
+    yahoo = connect_yahoo()
 
     def fetch(key):
         return yahoo.get_json(
