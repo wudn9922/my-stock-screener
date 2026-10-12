@@ -1,0 +1,105 @@
+name: Refresh US Rates
+
+# Rebuild the Treasury JSON as soon as its generator/contract changes, independently of Atlas.
+# This avoids a deployed Atlas UI referencing columns that the daily data job has not emitted.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/refresh-us-rates.yml'
+      - 'scripts/build_rates.py'
+      - 'scripts/rates_analytics.py'
+      - 'scripts/rates_config.py'
+      - 'tests/test_rates.py'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-us-rates
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install rate builder dependencies
+        run: pip install --quiet requests yfinance pandas
+
+      - name: Test US rates builder
+        run: python -m unittest discover -s tests -p test_rates.py
+
+      - name: Rebuild US Treasury reports
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python -u scripts/build_rates.py
+
+      - name: Verify the published rate-spread contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          reports = Path("docs/report")
+          rates = json.loads((reports / "rates.json").read_text(encoding="utf-8"))
+          history = json.loads((reports / "rates-history.json").read_text(encoding="utf-8"))
+          required = ["10yfed", "10y3m"]
+          observed = [s["key"] for s in rates["spreads"]]
+          assert observed == required, (observed, required)
+
+          fed = rates["spreads"][0]
+          assert fed["long"] == "DGS10" and fed["short"] == "FEDTARGETMID"
+          assert fed["valueBp"] is not None, "Fed midpoint spread has no recent value"
+
+          for kind in ("weekly", "daily"):
+              block = history[kind]
+              for symbol in ("DGS10", "DFEDTARU", "DFEDTARL", "FEDTARGETMID"):
+                  series = block["series"].get(symbol)
+                  assert series is not None, f"{kind} missing {symbol}"
+                  assert len(series) == len(block["dates"]), f"{kind} malformed {symbol}"
+              midpoint = block["series"]["FEDTARGETMID"]
+              assert any(value is not None for value in midpoint), f"{kind} has no Fed midpoint values"
+              for upper, lower, mid in zip(
+                  block["series"]["DFEDTARU"],
+                  block["series"]["DFEDTARL"],
+                  midpoint,
+              ):
+                  if mid is not None:
+                      assert upper is not None and lower is not None
+                      assert abs(mid - (upper + lower) / 2) <= 0.0011
+          print("PASS: 10Y-Fed / 10Y-3M summary and midpoint history are available")
+          PY
+
+      - name: Commit updated US Treasury reports
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -- docs/report/rates.json docs/report/rates-history.json
+          if git diff --cached --quiet; then
+            echo "Rates reports unchanged; nothing to commit."
+            exit 0
+          fi
+          git commit -m "Refresh US rates with Fed midpoint history"
+          for attempt in 1 2 3; do
+            if git pull --rebase --autostash origin main && git push origin HEAD:main; then
+              echo "US rates reports pushed successfully."
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            echo "Push retry ${attempt}/3"
+            sleep $((attempt * 10))
+          done
+          exit 1
