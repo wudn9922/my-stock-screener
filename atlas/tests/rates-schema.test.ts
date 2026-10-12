@@ -51,7 +51,7 @@ describe('parseRates', () => {
     const now = rates.curves.nominal.find((curve) => curve.key === 'now')!;
     expect(now.values).toHaveLength(11);
     expect(rates.curves.real.find((curve) => curve.key === 'now')!.values).toHaveLength(5);
-    expect(rates.spreads.map((spread) => spread.key)).toEqual(['10y2y', '10y3m', '30y5y', '30y10y', '2y3m']);
+    expect(rates.spreads.map((spread) => spread.key)).toEqual(['10yfed', '10y3m']);
     expect(rates.etfs.map((etf) => etf.symbol)).toEqual(['TLT', 'EDV', 'ZROZ', 'GOVZ', 'TMF']);
     const tmf = rates.etfs.find((etf) => etf.symbol === 'TMF')!;
     expect(tmf.leverage).toBe(3);
@@ -85,7 +85,7 @@ describe('parseRates', () => {
     raw.spreads.push({ valueBp: 3 }, 42);
     const rates = okRates(raw);
     expect(rates.etfs).toHaveLength(5);
-    expect(rates.spreads).toHaveLength(5);
+    expect(rates.spreads).toHaveLength(2);
   });
 
   it('fills defaults for missing optional blocks', () => {
@@ -171,6 +171,8 @@ describe('parseRatesHistory', () => {
     expect(history.weekly.dates[0]!.startsWith('2003-01')).toBe(true);
     expect(history.daily.dates).toHaveLength(260);
     expect(history.weekly.series.DGS10).toHaveLength(history.weekly.dates.length);
+    expect(history.weekly.series.FEDTARGETMID).toHaveLength(history.weekly.dates.length);
+    expect(history.weekly.series.FEDTARGETMID![0]).toBeNull();
     // DFII30 was discontinued before 2010: leading nulls survive.
     expect(history.weekly.series.DFII30![0]).toBeNull();
     expect(history.etf.series.TLT).toHaveLength(history.etf.dates.length);
