@@ -604,7 +604,7 @@ class PayloadTest(unittest.TestCase):
         self.assertEqual(set(rates["inflation"]), {"5Y", "10Y", "5y5y", "20Y", "30Y"})
         self.assertTrue(rates["inflation"]["20Y"]["derived"])
         self.assertNotIn("derived", rates["inflation"]["10Y"])
-        self.assertEqual([s["key"] for s in rates["spreads"]], ["10y2y", "10y3m", "30y5y", "30y10y", "2y3m"])
+        self.assertEqual([s["key"] for s in rates["spreads"]], ["10yfed", "10y3m"])
         for spread in rates["spreads"]:
             self.assertEqual(set(spread), SPREAD_KEYS)
             self.assertIsInstance(spread["valueBp"], int)
@@ -629,6 +629,15 @@ class PayloadTest(unittest.TestCase):
             for values in history[block]["series"].values():
                 self.assertEqual(len(values), len(history[block]["dates"]))
 
+    def test_fed_midpoint_requires_same_day_upper_and_lower(self):
+        source = {
+            "DFEDTARU": ra.Series([("2026-01-02", 4.25), ("2026-01-05", 4.5)]),
+            "DFEDTARL": ra.Series([("2026-01-02", 4.0)]),
+        }
+        middle = build_rates.fed_target_midpoint(source)
+        self.assertEqual(middle.points(), [("2026-01-02", 4.125)])
+        self.assertEqual(build_rates.fed_target_midpoint({"DFEDTARU": source["DFEDTARU"]}).points(), [])
+
     def test_values_and_units(self):
         rates, history = self.rates, self.history
         series, prices = market()
@@ -638,13 +647,13 @@ class PayloadTest(unittest.TestCase):
         self.assertEqual(now["date"], last10[0])
         self.assertEqual(now["values"][8], last10[1])
         spread = rates["spreads"][0]
-        self.assertEqual(spread["valueBp"], round((series["DGS10"][-1][1] - series["DGS2"][-1][1]) * 100))
-        # the synthetic 10Y-2Y inversion: 2022-07-05..2024-09-04, deepest -100bp in the middle
-        last = spread["lastInversion"]
-        self.assertEqual(last["start"][:7], "2022-07")
-        self.assertEqual(last["end"][:7], "2024-09")
-        self.assertTrue(-102 <= last["minBp"] <= -98, last)
+        self.assertEqual(spread["short"], "FEDTARGETMID")
+        self.assertEqual(spread["valueBp"], round((series["DGS10"][-1][1] -
+                         (series["DFEDTARU"][-1][1] + series["DFEDTARL"][-1][1]) / 2) * 100))
+        self.assertEqual(history["daily"]["series"]["FEDTARGETMID"][-1], 4.125)
         self.assertFalse(spread["inverted"])
+        self.assertEqual(rates["spreads"][1]["key"], "10y3m")
+        self.assertEqual(rates["spreads"][1]["valueBp"], round((series["DGS10"][-1][1] - series["DGS3MO"][-1][1]) * 100))
         self.assertEqual(rates["policy"], {"lower": 4.0, "upper": 4.25, "date": series["DFEDTARU"][-1][0]})
         infl20 = rates["inflation"]["20Y"]
         self.assertAlmostEqual(infl20["value"], round(series["DGS20"][-1][1] - series["DFII20"][-1][1], 3))
