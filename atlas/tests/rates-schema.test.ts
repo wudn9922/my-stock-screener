@@ -172,6 +172,7 @@ describe('parseRatesHistory', () => {
     expect(history.daily.dates).toHaveLength(260);
     expect(history.weekly.series.DGS10).toHaveLength(history.weekly.dates.length);
     expect(history.weekly.series.FEDTARGETMID).toHaveLength(history.weekly.dates.length);
+    expect(history.weekly.series.DFEDTARL).toHaveLength(history.weekly.dates.length);
     expect(history.weekly.series.FEDTARGETMID![0]).toBeNull();
     // DFII30 was discontinued before 2010: leading nulls survive.
     expect(history.weekly.series.DFII30![0]).toBeNull();
