@@ -50,9 +50,13 @@ test('spreads, scenario slider and ETF comparison respond to controls', async ({
   await mockRates(page);
   await page.goto('./?page=world&view=rates');
   const spread = card(page, '利差');
-  await spread.getByRole('button', { name: /2Y−3M/ }).click();
-  await expect(spread.locator('.rates-summary')).toContainText('目前倒掛');
-  await expect(spread.locator('.rates-badge.warn')).toBeVisible();
+  const selectors = spread.getByRole('group', { name: '選擇利差' });
+  await expect(selectors.getByRole('button')).toHaveCount(2);
+  await expect(selectors.getByRole('button', { name: '10Y−Fed' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(spread).toContainText('Fed 目標區間中點');
+  await selectors.getByRole('button', { name: '10Y−3M' }).click();
+  await expect(selectors.getByRole('button', { name: '10Y−3M' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(spread.locator('.rates-summary')).toContainText('10Y−3M');
 
   const scenario = card(page, '存續期間情境分析');
   const tlt = scenario.locator('.rates-bar-row', { hasText: 'TLT' });
