@@ -11,13 +11,10 @@ export interface SpreadDef {
   long: string;
   short: string;
 }
-/** The five spreads of rates.json, with the FRED legs used to rebuild their history. */
+/** Only the two visible spreads; FEDTARGETMID = (DFEDTARU + DFEDTARL) / 2. */
 export const SPREAD_DEFS: readonly SpreadDef[] = [
-  { key: '10y2y', label: '10Y−2Y', long: 'DGS10', short: 'DGS2' },
+  { key: '10yfed', label: '10Y−Fed', long: 'DGS10', short: 'FEDTARGETMID' },
   { key: '10y3m', label: '10Y−3M', long: 'DGS10', short: 'DGS3MO' },
-  { key: '30y5y', label: '30Y−5Y', long: 'DGS30', short: 'DGS5' },
-  { key: '30y10y', label: '30Y−10Y', long: 'DGS30', short: 'DGS10' },
-  { key: '2y3m', label: '2Y−3M', long: 'DGS2', short: 'DGS3MO' },
 ];
 
 const finite = (value: number | null | undefined): value is number => typeof value === 'number' && Number.isFinite(value);
