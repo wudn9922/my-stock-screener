@@ -37,9 +37,10 @@ test('rates view renders every section without the daily report', async ({ page 
   await expect(page).toHaveURL(/page=world&view=rates/);
   await expect(page.locator('.rates-key')).toHaveCount(6);
   await expect(page.locator('.rates-key').first()).toContainText('%');
-  for (const title of [/^利差/, /實質利率與通膨預期/, /存續期間情境分析/, /長天期美債 ETF 比較/, /白話說明/])
+  for (const title of [/^利差/, /存續期間情境分析/, /長天期美債 ETF 比較/])
     await expect(card(page, title)).toBeVisible();
-  await expect(card(page, '殖利率曲線')).toHaveCount(0);
+  for (const title of ['殖利率曲線', '實質利率與通膨預期', '白話說明'])
+    await expect(card(page, title)).toHaveCount(0);
   // History-driven charts render (lightweight-charts canvases).
   await expect(card(page, '利差').locator('canvas').first()).toBeVisible();
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
@@ -64,21 +65,19 @@ test('spreads, scenario slider and ETF comparison respond to controls', async ({
   await scenario.getByRole('button', { name: '-200bp' }).click();
   await expect(tlt.locator('.rates-bar-value')).not.toHaveText(before ?? '');
   await expect(tlt.locator('.rates-bar-value')).toContainText('+');
-  await expect(scenario.locator('.rates-note.warn')).toContainText('單日');
+  await expect(scenario.locator('.rates-note.warn')).toHaveCount(0);
+  await expect(scenario.locator('tbody tr', { hasText: 'TMF' })).toContainText('單日');
   await expect(scenario.locator('table tbody tr')).toHaveCount(5);
   await expect(scenario.locator('.rates-formula')).toContainText('½');
 
   const etf = card(page, '長天期美債 ETF 比較');
   await expect(etf.locator('.rates-compare-row')).toHaveCount(5);
-  await expect(etf.getByRole('group', { name: '比較項目' }).getByRole('button')).toHaveCount(2);
-  await expect(etf.getByRole('button', { name: '報酬', exact: true })).toHaveCount(0);
-  await expect(etf.getByRole('button', { name: '風險', exact: true })).toHaveCount(0);
+  await expect(etf.getByRole('group', { name: '比較項目' })).toHaveCount(0);
+  await expect(etf.getByRole('button', { name: '利率敏感度' })).toHaveCount(0);
   await expect(etf.getByRole('heading', { name: '總報酬走勢' })).toHaveCount(0);
-  await expect(etf.locator('.rates-compare-row').first()).toContainText('年');
-  await etf.getByRole('group', { name: '比較項目' }).getByRole('button', { name: '成本' }).click();
+  await expect(etf.locator('.rates-compare-row').first()).toContainText('%');
+  await expect(etf.locator('.rates-facts')).toHaveCount(5);
   await expect(etf.locator('.rates-static').first()).toContainText('待核對');
-  await etf.getByRole('group', { name: '比較項目' }).getByRole('button', { name: '利率敏感度' }).click();
-  await expect(etf.locator('.rates-compare-row').first()).toContainText('年');
   await etf.getByRole('button', { name: '開啟 TLT 圖表' }).click();
   await expect(page).toHaveURL(/page=chart&symbol=TLT/);
 });
