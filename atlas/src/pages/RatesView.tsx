@@ -80,7 +80,7 @@ export default function RatesView({ openChart }: RatesViewProps) {
         <SpreadCard rates={data} history={history} />
         <RealYieldCard rates={data} history={history} />
         {data.etfs.length > 0 && <ScenarioCard etfs={data.etfs} />}
-        {data.etfs.length > 0 && <EtfCompareCard etfs={data.etfs} history={history} openChart={openChart} />}
+        {data.etfs.length > 0 && <EtfCompareCard etfs={data.etfs} openChart={openChart} />}
         <RatesLearn />
       </div>
       <footer className="rates-sources">
