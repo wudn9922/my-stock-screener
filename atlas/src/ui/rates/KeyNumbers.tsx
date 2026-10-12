@@ -21,12 +21,12 @@ function monthBefore(date: string): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(Math.min(d, 28)).padStart(2, '0')}`;
 }
 
-/** Horizontally scrolling key-number chips: 10Y, 2Y, 10Y−2Y, 10Y real, 10Y breakeven, Fed target range. */
+/** Horizontally scrolling key-number chips: 10Y, 2Y, 10Y−Fed, 10Y real, breakeven, Fed target range. */
 export function KeyNumbers({ rates, history }: { rates: Rates; history: HistoryState }) {
   const ten = curveValue(rates, 'nominal', 'now', '10Y');
   const two = curveValue(rates, 'nominal', 'now', '2Y');
   const real = curveValue(rates, 'real', 'now', '10Y');
-  const spread = rates.spreads.find((item) => item.key === '10y2y');
+  const spread = rates.spreads.find((item) => item.key === '10yfed');
   const breakeven = rates.inflation['10Y'];
   const policy = rates.policy;
   let policyChange: number | null = null;
@@ -48,8 +48,8 @@ export function KeyNumbers({ rates, history }: { rates: Rates; history: HistoryS
       change: changeBp(two, curveValue(rates, 'nominal', '1m', '2Y')),
     },
     {
-      key: '10y2y',
-      label: '10Y−2Y 利差',
+      key: '10yfed',
+      label: '10Y−Fed 利差',
       value: fmtBp(spread?.valueBp ?? null),
       change: spread?.chg1mBp ?? null,
       badge: spread?.inverted ? '倒掛' : null,
