@@ -23,7 +23,6 @@ export function ScenarioCard({ etfs }: { etfs: readonly RatesEtf[] }) {
   const rows = useMemo(() => scenarioTable(inputs, [bp], basis), [inputs, bp, basis]);
   const table = useMemo(() => scenarioTable(inputs, SCENARIO_SHOCKS_BP, basis), [inputs, basis]);
   const scale = Math.max(5, ...rows.map((row) => Math.abs(row.cells[0]?.pct ?? 0)));
-  const hasLeveraged = rows.some((row) => row.singleDayOnly);
   const example = rows.find((row) => !row.singleDayOnly && row.duration !== null && row.convexity !== null);
   const exampleBp = bp === 0 ? 100 : bp;
   const parts = example ? formulaParts(example.duration!, example.convexity!, exampleBp) : null;
@@ -97,9 +96,6 @@ export function ScenarioCard({ etfs }: { etfs: readonly RatesEtf[] }) {
             );
           })}
         </ul>
-        {hasLeveraged && (
-          <p className="rates-note warn">TMF 是 3 倍槓桿、每日重置的商品：上面的數字只適用「單日內瞬間」的殖利率變動。持有超過一天，結果會受每日路徑、波動耗損與融資成本影響，可能與 3 倍相差很多。</p>
-        )}
         <div className="table-scroll rates-scenario-scroll">
           <table className="data-table rates-table rates-scenario-table">
             <caption className="sr-only">各 ETF 在不同殖利率變動下的估計價格變動（%）</caption>
