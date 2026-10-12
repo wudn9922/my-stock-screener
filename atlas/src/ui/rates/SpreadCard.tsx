@@ -16,11 +16,12 @@ const MAX_EPISODES = 4;
 
 /** Yield spreads: baseline chart (inverted stretch in the warning hue), summary and past inversions. */
 export function SpreadCard({ rates, history }: { rates: Rates; history: HistoryState }) {
-  const [key, setKey] = useState('10y2y');
+  const [key, setKey] = useState('10yfed');
   const [range, setRange] = useState<Range>('5y');
   const [hover, setHover] = useState<{ value: number | null; time: string | null }>({ value: null, time: null });
   const def = SPREAD_DEFS.find((item) => item.key === key) ?? SPREAD_DEFS[0]!;
   const spread = rates.spreads.find((item) => item.key === def.key) ?? null;
+  const missingFedHistory = def.key === '10yfed' && history.status === 'ok' && !history.data.weekly.series.FEDTARGETMID?.some((v) => v !== null);
 
   const lines = useMemo((): ChartLine[] => {
     if (history.status !== 'ok') return [];
@@ -53,7 +54,7 @@ export function SpreadCard({ rates, history }: { rates: Rates; history: HistoryS
       <header className="card-head">
         <h2 id="rates-spread-title">
           利差
-          <small>長天期減短天期</small>
+          <small>{def.key === '10yfed' ? '10 年殖利率減 Fed 目標區間中點' : '10 年殖利率減 3 個月殖利率'}</small>
         </h2>
         <Segmented label="利差區間" value={range} onChange={setRange} options={RANGES} />
       </header>
@@ -67,7 +68,10 @@ export function SpreadCard({ rates, history }: { rates: Rates; history: HistoryS
                 type="button"
                 className={`chip rates-chip ${item.key === def.key ? 'active' : ''}`}
                 aria-pressed={item.key === def.key}
-                onClick={() => setKey(item.key)}
+                onClick={() => {
+                  setKey(item.key);
+                  setHover({ value: null, time: null });
+                }}
               >
                 {item.label}
                 {entry?.inverted && <AlertTriangle size={12} className="rates-warn-icon" aria-label="倒掛" />}
@@ -85,7 +89,9 @@ export function SpreadCard({ rates, history }: { rates: Rates; history: HistoryS
             </span>
           )}
         </div>
-        {history.status === 'ok' ? (
+        {missingFedHistory ? (
+          <p className="rates-section-state">Fed 目標區間中點的歷史資料尚未產生；下次利率資料更新後即可顯示走勢。</p>
+        ) : history.status === 'ok' ? (
           <div className="rates-chart-wrap">
             <TimeChart
               lines={lines}
@@ -105,7 +111,7 @@ export function SpreadCard({ rates, history }: { rates: Rates; history: HistoryS
         </ul>
         {episodes.length > 0 && (
           <details className="rates-episodes">
-            <summary>2003 年以來的倒掛段落（週資料，{episodes.length} 段）</summary>
+            <summary>{def.key === '10yfed' ? '2008 年底' : '2003 年'}以來的倒掛段落（週資料，{episodes.length} 段）</summary>
             <ul>
               {episodes.slice(0, MAX_EPISODES).map((episode) => (
                 <li key={episode.start}>
@@ -117,7 +123,7 @@ export function SpreadCard({ rates, history }: { rates: Rates; history: HistoryS
           </details>
         )}
         <p className="source-note">
-          {range === '1y' ? '近 1 年為日資料' : '週資料（每週最後一個有值的交易日）'}；低於 0（倒掛）的區段以橘色標示。倒掛不是衰退時間表，詳見下方說明。
+          {range === '1y' ? '近 1 年為日資料' : '週資料（每週最後一個有值的交易日）'}；{def.key === '10yfed' ? 'Fed 指目標區間上下限平均值，並非有效聯邦基金利率；2008 年底以前無此區間序列。' : ''}低於 0（倒掛）的區段以橘色標示。倒掛不是衰退時間表。
         </p>
       </div>
     </section>
