@@ -66,6 +66,11 @@ test('spreads, scenario slider and ETF comparison respond to controls', async ({
 
   const etf = card(page, '長天期美債 ETF 比較');
   await expect(etf.locator('.rates-compare-row')).toHaveCount(5);
+  await expect(etf.getByRole('group', { name: '比較項目' }).getByRole('button')).toHaveCount(2);
+  await expect(etf.getByRole('button', { name: '報酬', exact: true })).toHaveCount(0);
+  await expect(etf.getByRole('button', { name: '風險', exact: true })).toHaveCount(0);
+  await expect(etf.getByRole('heading', { name: '總報酬走勢' })).toHaveCount(0);
+  await expect(etf.locator('.rates-compare-row').first()).toContainText('年');
   await etf.getByRole('group', { name: '比較項目' }).getByRole('button', { name: '成本' }).click();
   await expect(etf.locator('.rates-static').first()).toContainText('待核對');
   await etf.getByRole('group', { name: '比較項目' }).getByRole('button', { name: '利率敏感度' }).click();
