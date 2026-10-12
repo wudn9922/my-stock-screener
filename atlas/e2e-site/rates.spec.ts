@@ -37,30 +37,13 @@ test('rates view renders every section without the daily report', async ({ page 
   await expect(page).toHaveURL(/page=world&view=rates/);
   await expect(page.locator('.rates-key')).toHaveCount(6);
   await expect(page.locator('.rates-key').first()).toContainText('%');
-  for (const title of [/殖利率曲線/, /^利差/, /實質利率與通膨預期/, /存續期間情境分析/, /長天期美債 ETF 比較/, /白話說明/])
+  for (const title of [/^利差/, /實質利率與通膨預期/, /存續期間情境分析/, /長天期美債 ETF 比較/, /白話說明/])
     await expect(card(page, title)).toBeVisible();
+  await expect(card(page, '殖利率曲線')).toHaveCount(0);
   // History-driven charts render (lightweight-charts canvases).
   await expect(card(page, '利差').locator('canvas').first()).toBeVisible();
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   expect(errors).toEqual([]);
-});
-
-test('yield curve: comparison chips, tenor readout, real toggle and replay', async ({ page }) => {
-  await mockRates(page);
-  await page.goto('./?page=world&view=rates');
-  const curve = card(page, '殖利率曲線');
-  await expect(curve.locator('svg path[stroke]')).toHaveCount(3);
-  await curve.getByRole('button', { name: '1週前' }).click();
-  await expect(curve.locator('svg path[stroke]')).toHaveCount(4);
-  await curve.locator('rect.rates-hit').nth(8).click({ force: true });
-  await expect(curve.locator('.rates-readout')).toContainText('10Y');
-  await curve.getByRole('slider', { name: '歷史回放週次' }).fill('200');
-  await expect(curve.locator('.rates-replay-label')).toContainText('10Y−2Y');
-  await expect(curve.getByRole('heading')).toContainText('回放');
-  await curve.getByRole('button', { name: '回到今日' }).click();
-  await expect(curve.getByRole('heading')).not.toContainText('回放');
-  await curve.getByRole('group', { name: '名目或實質' }).getByRole('button', { name: '實質' }).click();
-  await expect(curve.locator('svg text', { hasText: '1M' })).toHaveCount(0);
 });
 
 test('spreads, scenario slider and ETF comparison respond to controls', async ({ page }) => {
@@ -97,7 +80,6 @@ test('history failure leaves the summary sections usable', async ({ page }) => {
   await expect(page.locator('.rates-key')).toHaveCount(6);
   await expect(card(page, '利差').locator('.rates-section-state')).toContainText('暫時無法顯示');
   await expect(card(page, '存續期間情境分析').locator('.rates-bar-row')).toHaveCount(5);
-  await expect(card(page, '殖利率曲線').getByRole('slider', { name: '歷史回放週次' })).toBeDisabled();
 });
 
 test('missing and unreadable rates.json show friendly states', async ({ page }) => {
