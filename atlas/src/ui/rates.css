@@ -146,7 +146,7 @@
 }
 .rates-seg-wide {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
 }
 .rates-seg-pair {
@@ -276,9 +276,6 @@
 .rates-chart-wrap {
   position: relative;
   height: 220px;
-}
-.rates-chart-wrap.tall {
-  height: 260px;
 }
 .rates-time-chart {
   width: 100%;
@@ -626,26 +623,6 @@ a.rates-static {
   color: var(--text-2);
   overflow-wrap: anywhere;
 }
-.rates-subhead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-.rates-subhead h3 {
-  font-size: 14px;
-}
-.rates-subhead h3 small {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-3);
-  margin-left: 4px;
-  font-variant-numeric: tabular-nums;
-}
-
 /* -- Learn */
 .rates-learn details {
   border-bottom: 1px solid var(--border);
@@ -699,9 +676,6 @@ a.rates-static {
   }
   .rates-chart-wrap {
     height: 200px;
-  }
-  .rates-chart-wrap.tall {
-    height: 240px;
   }
 }
 
