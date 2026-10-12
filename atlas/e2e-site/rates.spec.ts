@@ -56,7 +56,7 @@ test('spreads, scenario slider and ETF comparison respond to controls', async ({
   await expect(spread).toContainText('Fed 目標區間中點');
   await selectors.getByRole('button', { name: '10Y−3M' }).click();
   await expect(selectors.getByRole('button', { name: '10Y−3M' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(spread.locator('.rates-summary')).toContainText('10Y−3M');
+  await expect(spread.locator('.card-head small')).toContainText('10 年殖利率減 3 個月殖利率');
 
   const scenario = card(page, '存續期間情境分析');
   const tlt = scenario.locator('.rates-bar-row', { hasText: 'TLT' });
