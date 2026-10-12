@@ -5,7 +5,6 @@ import { loadRates, loadRatesHistory, type CachedResult, type Rates } from '../r
 import { PageState } from '../ui/PageState';
 import { formatDateTime } from '../ui/format';
 import { KeyNumbers } from '../ui/rates/KeyNumbers';
-import { YieldCurveCard } from '../ui/rates/YieldCurveCard';
 import { SpreadCard } from '../ui/rates/SpreadCard';
 import { RealYieldCard } from '../ui/rates/RealYieldCard';
 import { ScenarioCard } from '../ui/rates/ScenarioCard';
@@ -78,7 +77,6 @@ export default function RatesView({ openChart }: RatesViewProps) {
       )}
       <KeyNumbers rates={data} history={history} />
       <div className="rates-grid">
-        <YieldCurveCard rates={data} history={history} />
         <SpreadCard rates={data} history={history} />
         <RealYieldCard rates={data} history={history} />
         {data.etfs.length > 0 && <ScenarioCard etfs={data.etfs} />}
