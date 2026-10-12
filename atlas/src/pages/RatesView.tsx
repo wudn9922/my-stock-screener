@@ -6,10 +6,8 @@ import { PageState } from '../ui/PageState';
 import { formatDateTime } from '../ui/format';
 import { KeyNumbers } from '../ui/rates/KeyNumbers';
 import { SpreadCard } from '../ui/rates/SpreadCard';
-import { RealYieldCard } from '../ui/rates/RealYieldCard';
 import { ScenarioCard } from '../ui/rates/ScenarioCard';
 import { EtfCompareCard } from '../ui/rates/EtfCompareCard';
-import { RatesLearn } from '../ui/rates/RatesLearn';
 import { slashDate, type HistoryState } from '../ui/rates/shared';
 import '../ui/rates.css';
 
@@ -78,10 +76,8 @@ export default function RatesView({ openChart }: RatesViewProps) {
       <KeyNumbers rates={data} history={history} />
       <div className="rates-grid">
         <SpreadCard rates={data} history={history} />
-        <RealYieldCard rates={data} history={history} />
         {data.etfs.length > 0 && <ScenarioCard etfs={data.etfs} />}
         {data.etfs.length > 0 && <EtfCompareCard etfs={data.etfs} openChart={openChart} />}
-        <RatesLearn />
       </div>
       <footer className="rates-sources">
         <p>
