@@ -35,9 +35,20 @@ describe('spreadSeries', () => {
     expect(spreadSeries(data, 'DGS10', 'NOPE').values).toEqual([null, null, null]);
   });
 
-  it('defines all five contract spreads', () => {
-    expect(SPREAD_DEFS.map((spread) => spread.key)).toEqual(['10y2y', '10y3m', '30y5y', '30y10y', '2y3m']);
-    for (const spread of SPREAD_DEFS) expect(history.weekly.series[spread.long] && history.weekly.series[spread.short]).toBeTruthy();
+  it('exposes only 10Y−Fed (default) and 10Y−3M spreads', () => {
+    expect(SPREAD_DEFS.map((spread) => spread.key)).toEqual(['10yfed', '10y3m']);
+    expect(SPREAD_DEFS[0]).toMatchObject({ long: 'DGS10', short: 'FEDTARGETMID' });
+    expect(SPREAD_DEFS[1]).toMatchObject({ long: 'DGS10', short: 'DGS3MO' });
+  });
+
+  it('computes 10Y minus the Fed target midpoint, without a fallback to the upper bound', () => {
+    const data = block(['2026-10-08', '2026-10-09', '2026-10-12'], {
+      DGS10: [5.0, 5.1, 5.2],
+      FEDTARGETMID: [4.125, null, 3.875],
+      DFEDTARU: [4.25, 4.25, 4.0],
+    });
+    expect(spreadSeries(data, 'DGS10', 'FEDTARGETMID').values).toEqual([87.5, null, 132.5]);
+    expect(spreadSeries(data, 'DGS10', 'MISSING').values).toEqual([null, null, null]);
   });
 });
 
