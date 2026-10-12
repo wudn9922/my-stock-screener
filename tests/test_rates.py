@@ -651,7 +651,7 @@ class PayloadTest(unittest.TestCase):
         self.assertEqual(spread["valueBp"], round((series["DGS10"][-1][1] -
                          (series["DFEDTARU"][-1][1] + series["DFEDTARL"][-1][1]) / 2) * 100))
         self.assertEqual(history["daily"]["series"]["FEDTARGETMID"][-1], 4.125)
-        self.assertFalse(spread["inverted"])
+        self.assertEqual(spread["inverted"], spread["valueBp"] < 0)
         self.assertEqual(rates["spreads"][1]["key"], "10y3m")
         self.assertEqual(rates["spreads"][1]["valueBp"], round((series["DGS10"][-1][1] - series["DGS3MO"][-1][1]) * 100))
         self.assertEqual(rates["policy"], {"lower": 4.0, "upper": 4.25, "date": series["DFEDTARU"][-1][0]})
