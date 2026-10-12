@@ -631,24 +631,20 @@ a.rates-static {
   }
 }
 
-/* Disclosure markers for the collapsible sections. */
-.rates-learn summary,
+/* Disclosure marker for the remaining inversion-episodes section. */
 .rates-episodes summary {
   list-style: none;
   gap: 8px;
 }
-.rates-learn summary::-webkit-details-marker,
 .rates-episodes summary::-webkit-details-marker {
   display: none;
 }
-.rates-learn summary::after,
 .rates-episodes summary::after {
   content: '＋';
   margin-left: auto;
   color: var(--text-3);
   font-weight: 500;
 }
-.rates-learn details[open] > summary::after,
 .rates-episodes[open] > summary::after {
   content: '－';
 }
