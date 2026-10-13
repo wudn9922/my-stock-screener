@@ -56,6 +56,20 @@ def _clean(value):
     return str(value or "").strip()
 
 
+def decode_csv(response):
+    # 證交所 CSV 通常是 UTF-8（可能帶 BOM），舊資料可能是 Big5。
+    for encoding in ("utf-8-sig", "cp950"):
+        try:
+            return response.content.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+
+    return response.content.decode(
+        "utf-8-sig",
+        errors="replace"
+    )
+
+
 def parse_twse_csv(text):
     """解析上市 STOCK_DAY_ALL CSV，回傳 {代號: 名稱}。"""
     names = {}
@@ -137,7 +151,14 @@ def _fetch_source(http, url, parser, label):
             )
             return None
 
-        return parser(response)
+        result = parser(response)
+
+        if not result:
+            print(
+                f"⚠️ {label}名稱資料格式不符或沒有內容"
+            )
+
+        return result
 
     except Exception as exc:
         print(
@@ -155,10 +176,7 @@ def refresh_names(http):
         http,
         TWSE_NAMES_URL,
         lambda response: parse_twse_csv(
-            response.content.decode(
-                "utf-8-sig",
-                errors="replace"
-            )
+            decode_csv(response)
         ),
         "上市"
     )

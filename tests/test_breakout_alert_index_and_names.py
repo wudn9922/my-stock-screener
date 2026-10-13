@@ -6,6 +6,11 @@
 """
 
 import os
+import pathlib
+import shutil
+import subprocess
+import sys
+import tempfile
 import types
 import unittest
 
@@ -274,6 +279,42 @@ class IndexConfigTests(unittest.TestCase):
         deleted = self.prune(store, self.state_rows(), self.stock_configs())
         self.assertEqual(deleted, ["in.(6)"])  # 只刪真正的孤兒
 
+    def test_empty_stock_configs_never_prune_even_with_index_configs(self):
+        store = self.make_store(rows=[])
+        store.index_configs_loaded = True
+        configs = [
+            {"group_id": "admin_index", "ticker": "^TWII", "ma_list": [23]},
+        ]
+        deleted = self.prune(store, self.state_rows(), configs)
+        self.assertEqual(deleted, [])
+
+    def test_guards_are_separate_for_stocks_and_indices(self):
+        store = self.make_store(rows=[])
+        store.index_configs_loaded = True
+        rows = [
+            {"id": i, "group_id": "tw_g1", "ticker": f"{i}.TW", "ma_period": 5}
+            for i in range(1, 7)
+        ] + [
+            {"id": 100 + i, "group_id": "admin_index",
+             "ticker": f"^X{i}", "ma_period": 23}
+            for i in range(1, 21)
+        ]
+        # 6 檔股票有 4 檔孤兒（67%）：股票端應略過；
+        # 若與 20 列指數合併計算只有 15%，會被誤刪。
+        configs = [
+            {"group_id": "tw_g1", "ticker": "1.TW", "ma_list": [5]},
+            {"group_id": "tw_g1", "ticker": "2.TW", "ma_list": [5]},
+            {"group_id": "admin_index", "ticker": "^X1", "ma_list": [23]},
+        ]
+        # 另外 19 個指數狀態列也是孤兒（95%）→ 指數端也略過
+        deleted = self.prune(store, rows, configs)
+        self.assertEqual(deleted, [])
+
+    def test_none_index_body_is_load_failure(self):
+        store = self.make_store(rows=None)
+        self.assertEqual(store.get_index_monitor_configs(), [])
+        self.assertFalse(store.index_configs_loaded)
+
     def test_prune_keeps_index_rows_in_configs(self):
         store = self.make_store(rows=[])
         store.index_configs_loaded = True
@@ -283,6 +324,44 @@ class IndexConfigTests(unittest.TestCase):
         ]
         deleted = self.prune(store, self.state_rows(), configs)
         self.assertEqual(deleted, ["in.(6)"])
+
+
+class DiscordQueryImageTests(unittest.TestCase):
+    """Dockerfile.discord-query 只複製少數檔案，supabase_store 不能依賴其他模組。"""
+
+    def test_store_imports_with_discord_query_files_only(self):
+        root = pathlib.Path(__file__).resolve().parents[1]
+        copied = [
+            "__init__.py",
+            "config.py",
+            "supabase_store.py",
+            "cache_query.py",
+            "discord_app.py",
+        ]
+        dockerfile = (root / "Dockerfile.discord-query").read_text(
+            encoding="utf-8-sig"
+        )
+        for name in copied:
+            self.assertIn(f"breakout_alert/{name}", dockerfile)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            package = pathlib.Path(tmp) / "breakout_alert"
+            package.mkdir()
+            for name in copied:
+                shutil.copy(root / "breakout_alert" / name, package / name)
+
+            result = subprocess.run(
+                [
+                    sys.executable, "-I", "-c",
+                    "import sys; sys.path.insert(0, sys.argv[1]);"
+                    "import breakout_alert.supabase_store",
+                    tmp,
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 class FakeStore:

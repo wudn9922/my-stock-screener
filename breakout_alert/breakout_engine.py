@@ -9,11 +9,6 @@ BREAKOUT_UP_RATIO = 0.01
 # 向下跌破需低於均線 1.5%
 BREAKOUT_DOWN_RATIO = 0.015
 
-# 大盤指數（config 帶 breakout_up_ratio／breakout_down_ratio 時）
-# 使用較窄的門檻：突破 0.3%、跌破 0.5%。
-INDEX_BREAKOUT_UP_RATIO = 0.003
-INDEX_BREAKOUT_DOWN_RATIO = 0.005
-
 @dataclass
 class BreakoutResult:
     ticker: str
@@ -58,7 +53,7 @@ def get_config_ratios(config):
 
     股票沿用預設（突破 1%、跌破 1.5%）；
     設定內有有效的 breakout_up_ratio／breakout_down_ratio
-    （例如大盤指數）時改用設定值。
+    （大盤指數：0.3%／0.5%，由 supabase_store 帶入）時改用設定值。
     """
     up_ratio = safe_float(
         (config or {}).get("breakout_up_ratio")

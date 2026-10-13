@@ -2,10 +2,6 @@
 
 import requests
 
-from breakout_alert.breakout_engine import (
-    INDEX_BREAKOUT_DOWN_RATIO,
-    INDEX_BREAKOUT_UP_RATIO,
-)
 from breakout_alert.config import (
     get_supabase_rest_url,
     get_supabase_service_key,
@@ -45,6 +41,11 @@ VALID_GROUP_KEYS = set(
 # 目前監控時段只有台股與美股，其他市場的指數（歐洲、日韓）略過。
 ADMIN_INDEX_GROUP_ID = "admin_index"
 ADMIN_INDEX_GROUP_NAME = "大盤指數"
+# 大盤指數的確認門檻：突破 0.3%、跌破 0.5%（股票為 1%／1.5%）。
+# 放在這裡而不是 breakout_engine：Discord 查詢服務的映像
+# 只複製 supabase_store 等少數檔案，不含 breakout_engine。
+INDEX_BREAKOUT_UP_RATIO = 0.003
+INDEX_BREAKOUT_DOWN_RATIO = 0.005
 INDEX_MARKETS = {
     "^TWII": "TW",
     "^TWOII": "TW",
@@ -230,6 +231,10 @@ def get_ma_list(stock):
 
 
 class SupabaseStore:
+    # index_configs 本次是否成功載入；
+    # 失敗時不能把大盤指數的狀態列當成孤兒清掉。
+    index_configs_loaded = False
+
     def __init__(self):
         self.rest_url = (
             get_supabase_rest_url()
@@ -259,10 +264,6 @@ class SupabaseStore:
             )
 
         self.session.headers.update(headers)
-
-        # index_configs 本次是否成功載入；
-        # 失敗時不能把大盤指數的狀態列當成孤兒清掉。
-        self.index_configs_loaded = False
 
 
 
@@ -505,10 +506,14 @@ class SupabaseStore:
             }
         )
 
-        return rows if isinstance(
-            rows,
-            list
-        ) else []
+        # 空回應（None）不能當成「沒有指數」，
+        # 否則會把既有指數狀態列全部當成孤兒。
+        if not isinstance(rows, list):
+            raise RuntimeError(
+                "index_configs 回傳非清單格式"
+            )
+
+        return rows
 
     def get_index_monitor_configs(self):
         """
@@ -1105,18 +1110,37 @@ class SupabaseStore:
         monitor_configs 必須是「全部市場」的設定，
         不能只傳入本次到執行時間的市場。
         """
-        valid_keys = {
-            (
-                str(config["group_id"]),
-                str(config["ticker"]),
-                int(ma_period)
-            )
-            for config in monitor_configs
-            for ma_period in config["ma_list"]
-        }
+        def build_keys(configs):
+            return {
+                (
+                    str(config["group_id"]),
+                    str(config["ticker"]),
+                    int(ma_period)
+                )
+                for config in configs
+                for ma_period in config["ma_list"]
+            }
 
-        # 設定載入異常時不要把整張表清空
-        if not valid_keys:
+        stock_configs = [
+            config
+            for config in monitor_configs
+            if config["group_id"]
+            != ADMIN_INDEX_GROUP_ID
+        ]
+
+        index_configs = [
+            config
+            for config in monitor_configs
+            if config["group_id"]
+            == ADMIN_INDEX_GROUP_ID
+        ]
+
+        stock_keys = build_keys(stock_configs)
+        index_keys = build_keys(index_configs)
+
+        # 股票設定載入異常（空）時不要把整張表清空。
+        # 大盤指數的設定不能掩蓋這個保護。
+        if not stock_keys:
             return 0
 
         rows = self._request(
@@ -1144,16 +1168,47 @@ class SupabaseStore:
             and not is_atlas_state_row(row)
         ]
 
+        index_rows = [
+            row
+            for row in rows
+            if row.get("group_id")
+            == ADMIN_INDEX_GROUP_ID
+        ]
+
+        stock_rows = [
+            row
+            for row in rows
+            if row.get("group_id")
+            != ADMIN_INDEX_GROUP_ID
+        ]
+
+        deleted = self._delete_orphan_rows(
+            stock_rows,
+            stock_keys,
+            max_delete_ratio,
+            "股票"
+        )
+
         # 大盤指數設定本次沒載入成功時，
         # 不能把它們的狀態列視為孤兒。
-        if not self.index_configs_loaded:
-            rows = [
-                row
-                for row in rows
-                if row.get("group_id")
-                != ADMIN_INDEX_GROUP_ID
-            ]
+        # 股票與指數各自計算刪除比例，互不稀釋。
+        if self.index_configs_loaded:
+            deleted += self._delete_orphan_rows(
+                index_rows,
+                index_keys,
+                max_delete_ratio,
+                "大盤指數"
+            )
 
+        return deleted
+
+    def _delete_orphan_rows(
+        self,
+        rows,
+        valid_keys,
+        max_delete_ratio,
+        label
+    ):
         if not rows:
             return 0
 
@@ -1177,7 +1232,7 @@ class SupabaseStore:
 
         if len(orphan_ids) > len(rows) * max_delete_ratio:
             print(
-                "⚠️ 孤兒狀態列數量異常"
+                f"⚠️ {label}孤兒狀態列數量異常"
                 f"（{len(orphan_ids)}/{len(rows)}），"
                 "略過清理"
             )
@@ -1203,7 +1258,8 @@ class SupabaseStore:
         )
 
         print(
-            f"🧹 已清除孤兒狀態列：{len(orphan_ids)} 筆"
+            f"🧹 已清除孤兒狀態列（{label}）："
+            f"{len(orphan_ids)} 筆"
         )
 
         return len(orphan_ids)
