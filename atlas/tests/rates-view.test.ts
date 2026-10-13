@@ -37,17 +37,18 @@ describe('spreadSeries', () => {
 
   it('exposes only 10Y−Fed (default) and 10Y−3M spreads', () => {
     expect(SPREAD_DEFS.map((spread) => spread.key)).toEqual(['10yfed', '10y3m']);
-    expect(SPREAD_DEFS[0]).toMatchObject({ long: 'DGS10', short: 'FEDTARGETMID' });
+    expect(SPREAD_DEFS[0]).toMatchObject({ long: 'DGS10', short: 'DFEDTARU' });
     expect(SPREAD_DEFS[1]).toMatchObject({ long: 'DGS10', short: 'DGS3MO' });
   });
 
-  it('computes 10Y minus the Fed target midpoint, without a fallback to the upper bound', () => {
+  it('computes the upper and lower target spreads separately, preserving missing lower-bound history', () => {
     const data = block(['2026-10-08', '2026-10-09', '2026-10-12'], {
       DGS10: [5.0, 5.1, 5.2],
-      FEDTARGETMID: [4.125, null, 3.875],
       DFEDTARU: [4.25, 4.25, 4.0],
+      DFEDTARL: [4.0, null, 3.75],
     });
-    expect(spreadSeries(data, 'DGS10', 'FEDTARGETMID').values).toEqual([87.5, null, 132.5]);
+    expect(spreadSeries(data, 'DGS10', 'DFEDTARU').values).toEqual([75, 85, 120]);
+    expect(spreadSeries(data, 'DGS10', 'DFEDTARL').values).toEqual([100, null, 145]);
     expect(spreadSeries(data, 'DGS10', 'MISSING').values).toEqual([null, null, null]);
   });
 });
@@ -186,8 +187,8 @@ describe('spreadSummary', () => {
   };
   it('describes a normal curve with the last inversion and percentile', () => {
     expect(spreadSummary(base, '10Y−2Y')).toEqual([
-      '目前未倒掛（+52bp）。',
-      '最近一次倒掛 2022/07–2024/09，最深 -108bp（2023/07/03）。',
+      '目前未倒掛（+0.52%）。',
+      '最近一次倒掛 2022/07–2024/09，最深 -1.08%（2023/07/03）。',
       '目前利差位於近 5 年第 88 百分位（0＝最低、100＝最高）。',
     ]);
   });
@@ -196,8 +197,8 @@ describe('spreadSummary', () => {
       { ...base, valueBp: -35, inverted: true, invertedDays: 120, lastInversion: { start: '2026-06-11', end: null, minBp: -48, minDate: '2026-08-01' }, pct5y: null },
       '10Y−2Y',
     );
-    expect(lines[0]).toBe('目前倒掛 -35bp，已持續 120 個交易日（自 2026/06/11 起）。');
-    expect(lines[1]).toBe('這段倒掛最深 -48bp（2026/08/01）。');
+    expect(lines[0]).toBe('目前倒掛 -0.35%，已持續 120 個交易日（自 2026/06/11 起）。');
+    expect(lines[1]).toBe('這段倒掛最深 -0.48%（2026/08/01）。');
     expect(lines).toHaveLength(2);
   });
   it('handles no data and no inversion history', () => {
