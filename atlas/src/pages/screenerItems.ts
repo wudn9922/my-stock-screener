@@ -121,7 +121,7 @@ export function metricPill(item: GroupItem, key: MetricPill, growth?: GrowthFile
     case 'vr':
       if (m?.volVsPrev == null) return null;
       return {
-        text: `量比 ${m.volVsPrev.toFixed(m.volVsPrev >= 10 ? 0 : 1)}x`,
+        text: `量比 ${m.volVsPrev.toFixed(m.volVsPrev >= 10 ? 0 : 1)}`,
         title: `今日成交量 ÷ 前一交易日成交量 = ${m.volVsPrev.toFixed(2)}`,
         tone: 'flat',
       };

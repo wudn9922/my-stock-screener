@@ -311,7 +311,8 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
     if bars >= 2:
         previous_volume = float(volume[-2])
 
-        if previous_volume > 0:
+        # a last bar with no volume yet (the data source has not filled it) is "unknown", not 0
+        if previous_volume > 0 and volume[-1] > 0:
             vol_vs_prev = volume[-1] / previous_volume
 
     turnover = None

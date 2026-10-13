@@ -194,6 +194,14 @@ class ComputeStockMetricsTest(unittest.TestCase):
         )
         self.assertIsNone(metrics["volVsPrev"])
 
+    def test_last_bar_without_volume_gives_none(self):
+        for last in (0.0, float("nan")):
+            volumes = [1000.0] * 30 + [last]
+            metrics = report_metrics.compute_stock_metrics(
+                make_prices([10] * 31, volumes=volumes), None, "SPY"
+            )
+            self.assertIsNone(metrics["volVsPrev"], last)
+
     def test_missing_previous_volume_gives_none(self):
         volumes = [1000.0] * 29 + [float("nan"), 500.0]
         metrics = report_metrics.compute_stock_metrics(

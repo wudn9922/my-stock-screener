@@ -336,7 +336,7 @@ describe('screener sorting and row pills', () => {
     const row = item('AAPL', { rsRank: 87, rs63: 12.3, rsBench: 'SPY', fromHi52: -4.26, hiBars: 201, volVsPrev: 2.345, ema20: 3.14, r21: 6.1 });
     expect(metricPill(row, 'rs')).toMatchObject({ text: 'RS 87', tone: 'up' });
     expect(metricPill(row, 'hi')).toMatchObject({ text: '距高 -4.3%', title: expect.stringContaining('近201日高點') });
-    expect(metricPill(row, 'vr')?.text).toBe('量比 2.3x');
+    expect(metricPill(row, 'vr')?.text).toBe('量比 2.3');
     expect(metricPill(row, 'vr')?.title).toContain('前一交易日');
     expect(metricPill(row, 'ema20')).toMatchObject({ text: 'EMA20 +3.1%', tone: 'up' });
     expect(metricPill(item('X', null), 'ema20')).toBeNull();
