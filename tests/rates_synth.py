@@ -1,12 +1,12 @@
 """
-Synthetic FRED series and ETF prices for the US rates tests and the committed fixtures.
+Synthetic FRED series for the US rates tests and the committed fixtures.
 
   python3 tests/rates_synth.py   # rewrites tests/fixtures/rates/sample-rates*.json
 
 Deterministic (seeded). Everything is made up: a 10Y random walk, a curve slope that inverts from
-2022-07-05 to 2024-09-04 (deepest -100bp in the middle), TIPS = nominal minus a breakeven walk, a
-step-shaped Fed target range and five ETFs whose daily returns are -D·Δy/100 plus carry and noise.
-Bond-market-only holidays (Columbus Day, Veterans Day) have no FRED value but ETF prices, like real data.
+2022-07-05 to 2024-09-04 (deepest -100bp in the middle) and a step-shaped Fed target range. Only the
+series scripts/build_rates.py fetches are generated (DGS3MO, DGS10, DGS20, DGS30, DFEDTARU, DFEDTARL).
+Bond-market holidays (Columbus Day, Veterans Day, New Year, July 4, Christmas) have no FRED value.
 """
 import math
 import os
@@ -25,37 +25,28 @@ TODAY = date(2026, 10, 9)
 NOW = datetime(2026, 10, 9, 22, 30, tzinfo=timezone.utc)
 INVERSION = (date(2022, 7, 5), date(2024, 9, 4))
 
-# Tenor loading on the 10Y-2Y slope s: y_T = y10 + LOADING[T] * s (so DGS10 - DGS2 = s).
-LOADING = {
-    "DGS1MO": -1.4, "DGS3MO": -1.3, "DGS6MO": -1.2, "DGS1": -1.1, "DGS2": -1.0, "DGS3": -0.8,
-    "DGS5": -0.5, "DGS7": -0.25, "DGS10": 0.0, "DGS20": 0.3, "DGS30": 0.4,
-}
-REAL = {"DFII5": "DGS5", "DFII7": "DGS7", "DFII10": "DGS10", "DFII20": "DGS20", "DFII30": "DGS30"}
-# Synthetic durations used to generate prices (not the static config values).
-ETF_DURATION = {"TLT": 16.5, "EDV": 24.0, "GOVZ": 27.0, "ZROZ": 27.0}
-ETF_START = {"GOVZ": date(2020, 9, 22)}
+# Tenor loading on the slope s: y_T = y10 + LOADING[T] * s (s is the 10Y minus 2Y spread of a curve that is not output).
+LOADING = {"DGS3MO": -1.3, "DGS10": 0.0, "DGS20": 0.3, "DGS30": 0.4}
 
 
-def calendar_days(start=START, end=END):
-    """(weekdays, stock-closed days, bond-only-closed days)."""
-    days, stock_closed, bond_closed = [], set(), set()
+def holidays(start=START, end=END):
+    """(weekdays, bond-market holidays)."""
+    days, closed = [], set()
     cursor = start
     while cursor <= end:
         if cursor.weekday() < 5:
             days.append(cursor)
-            if (cursor.month, cursor.day) in ((1, 1), (7, 4), (12, 25)):
-                stock_closed.add(cursor)
-            # Columbus Day (2nd Monday of October) and Veterans Day: bond market closed, stocks open
+            if (cursor.month, cursor.day) in ((1, 1), (7, 4), (12, 25), (11, 11)):
+                closed.add(cursor)
+            # Columbus Day (2nd Monday of October)
             if cursor.month == 10 and cursor.weekday() == 0 and 8 <= cursor.day <= 14:
-                bond_closed.add(cursor)
-            if (cursor.month, cursor.day) == (11, 11):
-                bond_closed.add(cursor)
+                closed.add(cursor)
         cursor += timedelta(days=1)
-    return days, stock_closed, bond_closed
+    return days, closed
 
 
 def slope(day):
-    """10Y-2Y in percentage points: +0.9 outside the inversion, a half sine down to -1.0 inside."""
+    """Slope in percentage points: +0.9 outside the inversion, a half sine down to -1.0 inside."""
     start, end = INVERSION
     if start <= day <= end:
         phase = (day - start).days / (end - start).days
@@ -74,26 +65,21 @@ def fed_range(day):
 
 
 def synthetic_market(seed=7):
-    """({FRED id: [(date, value)]}, {symbol: [(date, close, adjClose)]}) on the synthetic calendar."""
+    """{FRED id: [(date, value)]} on the synthetic calendar."""
     rng = random.Random(seed)
-    days, stock_closed, bond_closed = calendar_days()
+    days, closed = holidays()
     y10 = 0.70
-    breakeven = 1.6
-    true_curve = []
+    curves = []
     for index, day in enumerate(days):
         if index:
             y10 += rng.gauss(0.0012, 0.055)
-            breakeven += rng.gauss(0.0004, 0.02)
         y10 = min(max(y10, 0.5), 5.2)
-        breakeven = min(max(breakeven, 1.4), 3.0)
         s = slope(day)
-        curve = {key: max(y10 + loading * s, 0.02) for key, loading in LOADING.items()}
-        curve["breakeven"] = breakeven
-        true_curve.append(curve)
+        curves.append({key: max(y10 + loading * s, 0.02) for key, loading in LOADING.items()})
 
-    series = {key: [] for key in list(LOADING) + list(REAL) + ["T5YIE", "T10YIE", "T5YIFR", "DFEDTARU", "DFEDTARL"]}
-    for day, curve in zip(days, true_curve):
-        if day in bond_closed or day in stock_closed:
+    series = {key: [] for key in list(LOADING) + ["DFEDTARU", "DFEDTARL"]}
+    for day, curve in zip(days, curves):
+        if day in closed:
             continue
         iso = day.isoformat()
         for key in LOADING:
@@ -101,46 +87,10 @@ def synthetic_market(seed=7):
             if rng.random() < 0.004:
                 continue
             series[key].append((iso, round(curve[key], 2)))
-        for real, nominal in REAL.items():
-            if real == "DFII30" and date(2021, 3, 1) <= day <= date(2021, 4, 15):
-                continue  # a gap, like the real DFII30 history
-            series[real].append((iso, round(curve[nominal] - curve["breakeven"] - 0.05, 2)))
-        series["T5YIE"].append((iso, round(curve["breakeven"] - 0.1, 2)))
-        series["T10YIE"].append((iso, round(curve["breakeven"], 2)))
-        series["T5YIFR"].append((iso, round(curve["breakeven"] + 0.1, 2)))
         lower, upper = fed_range(day)
         series["DFEDTARL"].append((iso, lower))
         series["DFEDTARU"].append((iso, upper))
-
-    prices = {symbol: [] for symbol in ("TLT", "EDV", "GOVZ", "ZROZ", "TMF")}
-    level = {symbol: 100.0 for symbol in prices}
-    previous = None
-    for day, curve in zip(days, true_curve):
-        if day in stock_closed:
-            continue
-        if previous is not None:
-            dy20 = curve["DGS20"] - previous["DGS20"]
-            dy30 = curve["DGS30"] - previous["DGS30"]
-            common = rng.gauss(0, 0.0008)
-            tlt_r = -ETF_DURATION["TLT"] * dy20 / 100 + curve["DGS20"] / 100 / 252 + common
-            returns = {
-                "TLT": tlt_r,
-                "EDV": -ETF_DURATION["EDV"] * (dy20 + dy30) / 200 + curve["DGS20"] / 100 / 252 + rng.gauss(0, 0.0008),
-                "GOVZ": -ETF_DURATION["GOVZ"] * dy30 / 100 + curve["DGS30"] / 100 / 252 + rng.gauss(0, 0.0008),
-                "ZROZ": -ETF_DURATION["ZROZ"] * dy30 / 100 + curve["DGS30"] / 100 / 252 + rng.gauss(0, 0.0008),
-                "TMF": 3 * tlt_r - 2 * curve["DGS3MO"] / 100 / 252 - 0.0101 / 252,
-            }
-            for symbol, ret in returns.items():
-                level[symbol] *= 1 + ret
-        previous = curve
-        for symbol in prices:
-            if day < ETF_START.get(symbol, START):
-                continue
-            adj = round(level[symbol], 4)
-            # Close above Adj Close (distributions not yet added back), converging at the end
-            close = round(adj * (1 + 0.035 * (END - day).days / 365.25), 4)
-            prices[symbol].append((day.isoformat(), close, adj))
-    return series, prices
+    return series
 
 
 def origins_all(series, origin="csv"):
@@ -151,9 +101,9 @@ def build_fixture_payloads():
     import build_rates
     import rates_config
 
-    series, prices = synthetic_market()
+    series = synthetic_market()
     rates, history = build_rates.build_payloads(
-        series, origins_all(series), prices, rates_config.ETFS, None, None, TODAY, NOW
+        series, origins_all(series), rates_config.ETFS, TODAY, NOW
     )
     return {"_fixture": FIXTURE_NOTE, **rates}, {"_fixture": FIXTURE_NOTE, **history}
 

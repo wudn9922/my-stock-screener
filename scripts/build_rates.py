@@ -1,22 +1,23 @@
 """
-Builds docs/report/rates.json and docs/report/rates-history.json: US Treasury curve, spreads, real yields,
-breakevens, the Fed target range and five long-Treasury ETFs (TLT, EDV, GOVZ, ZROZ, TMF).
+Builds docs/report/rates.json and docs/report/rates-history.json for the US rates page: the 10Y and 3M
+Treasury yields, the Fed target range, the 10Y-Fed and 10Y-3M spreads and the static table of five
+long-Treasury ETFs (TLT, EDV, GOVZ, ZROZ, TMF) with duration / convexity from a model ladder.
 
   python scripts/build_rates.py
   Env: RATES_OUT_DIR (default docs/report), FRED_API_KEY (optional, fallback only)
 
-Sources, per series: FRED fredgraph.csv (no key) -> FRED API (only when FRED_API_KEY is set) -> the
+Sources, per series: FRED API (only when FRED_API_KEY is set) -> FRED fredgraph.csv (no key) -> the
 values already in the previous rates-history.json (reported in `missing`). Messages only ever name
 the series and the HTTP status: URLs and exception texts are never printed because the API URL
-carries api_key. ETF prices are Yahoo Finance adjusted closes (yfinance, imported lazily); when the
-download fails the previous ETF blocks are kept.
+carries api_key. No ETF prices are downloaded: the page only needs the ETFs' static fields and the
+model duration / convexity, which come from today's DGS20 / DGS30.
 
-Nothing is written (old files kept, exit 1) when DGS2/DGS10/DGS30 are not fresh, fewer than 8 of the
-11 tenors are fresh, or the latest DGS10 is more than 10 days old. build_payloads() is a pure function
-so the whole payload can be tested offline (tests/test_rates.py).
+Nothing is written (old files kept, exit 1) when one of DGS3MO / DGS10 / DGS20 / DGS30 is not fresh or
+the latest DGS10 is more than 10 days old. build_payloads() is a pure function so the whole payload
+can be tested offline (tests/test_rates.py).
 
-Units: yields %, spreads bp (int), returns / volatility / drawdowns %, durations years, convexity
-years² (ΔP/P ≈ −D·Δy + ½·C·Δy², Δy decimal; an iShares-published 3.6 is 360 here).
+Units: yields %, spreads bp (int), durations years, convexity years² (ΔP/P ≈ −D·Δy + ½·C·Δy²,
+Δy decimal; an iShares-published 3.6 is 360 here).
 """
 import csv
 import io
@@ -38,33 +39,22 @@ RATES_FILE = "rates.json"
 HISTORY_FILE = "rates-history.json"
 VERSION = 1
 
-TENOR_IDS = ["DGS1MO", "DGS3MO", "DGS6MO", "DGS1", "DGS2", "DGS3", "DGS5", "DGS7", "DGS10", "DGS20", "DGS30"]
-TENORS = ["1M", "3M", "6M", "1Y", "2Y", "3Y", "5Y", "7Y", "10Y", "20Y", "30Y"]
-TENOR_YEARS = [0.0833, 0.25, 0.5, 1, 2, 3, 5, 7, 10, 20, 30]
-REAL_IDS = ["DFII5", "DFII7", "DFII10", "DFII20", "DFII30"]
-REAL_TENORS = ["5Y", "7Y", "10Y", "20Y", "30Y"]
-INFLATION_IDS = ["T5YIE", "T10YIE", "T5YIFR"]
+# Only the tenors the page reads: 3M (10Y-3M spread), 10Y (headline and spreads), 20Y / 30Y (model ladders).
+TENOR_IDS = ["DGS3MO", "DGS10", "DGS20", "DGS30"]
+TENORS = ["3M", "10Y", "20Y", "30Y"]
+TENOR_YEARS = [0.25, 10, 20, 30]
 POLICY_IDS = ["DFEDTARU", "DFEDTARL"]
-FRED_IDS = TENOR_IDS + REAL_IDS + INFLATION_IDS + POLICY_IDS
-HISTORY_IDS = TENOR_IDS + REAL_IDS + INFLATION_IDS + ["DFEDTARU", "DFEDTARL", "FEDTARGETMID"]
-CORE_IDS = ("DGS2", "DGS10", "DGS30")
+FRED_IDS = TENOR_IDS + POLICY_IDS
+# DGS20 / DGS30 only feed the model; the page charts just these.
+HISTORY_IDS = ["DGS3MO", "DGS10", "DFEDTARU", "DFEDTARL"]
 FRESH = ("csv", "api")
-MIN_FRESH_TENORS = 8
 MAX_STALE_DAYS = 10
 HISTORY_START = "2003-01-01"
 DAILY_POINTS = 260
-# (key, long, short): internally in bp; 10Y−Fed defaults to target range upper bound.
+# (key, long, short): internally in bp. 10Y-Fed is derived by the page from the 10Y yield and the policy range.
 SPREADS = [
-    ("10yfed", "DGS10", "DFEDTARU"),
     ("10y3m", "DGS10", "DGS3MO"),
 ]
-# (key, FRED id) for published breakevens; 20Y / 30Y are derived as DGS - DFII.
-INFLATION = [("5Y", "T5YIE"), ("10Y", "T10YIE"), ("5y5y", "T5YIFR")]
-DERIVED_INFLATION = [("20Y", "DGS20", "DFII20"), ("30Y", "DGS30", "DFII30")]
-# One-day |return| above this is a bad point unless the next days confirm the new level.
-BAD_POINT_LIMIT = {1: 0.25, 3: 0.60}
-# Weekly ETF index value may come from a close up to this many days before the week's sample date.
-ETF_WEEKLY_LOOKBACK_DAYS = 7
 
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 FRED_API_URL = "https://api.stlouisfed.org/fred/series/observations"
@@ -80,23 +70,14 @@ USER_AGENT = (
     "Chrome/120.0.0.0 Safari/537.36"
 )
 SOURCE_LABELS = {"csv": "FRED fredgraph.csv", "api": "FRED API"}
-ETF_SOURCE = "Yahoo Finance adjusted close"
 
 NOTES = {
     "rates": "殖利率來自 FRED（美國財政部 H.15 每日固定期限殖利率，約美東 15:30 取價）；有 FRED_API_KEY 時以 FRED API 優先、免金鑰 CSV 為備援（沒有金鑰就只用 CSV），"
              "都失敗沿用上次檔案的數值並列在 missing。10Y−3M 由殖利率相減，10Y−Fed 預設使用政策目標區間上限。",
-    "curves": "快照日＝目標日當天或之前最近一個 10Y 有值的日子；個別期限缺值最多往回找 5 天，找不到為 null。",
     "spreads": "利差畫面以百分點表示。10Y−Fed 預設為 10 年殖利率減聯準會目標區間上限，"
                "可切換下限；並非有效聯邦基金利率。目標區間序列自 2008 年底才有。"
                "10Y−3M 為 10 年殖利率減 3 個月殖利率；倒掛＝差值小於 0。"
                "相隔 10 個交易日內的倒掛視為同一段；pct5y 為近 5 年百分位。倒掛不是衰退時間表。",
-    "inflation": "5Y、10Y 為 FRED 的平衡通膨率（T5YIE、T10YIE），5y5y 為 5 年後 5 年遠期（T5YIFR）；"
-                 "20Y、30Y 為名目減 TIPS 實質殖利率的推算值（derived）。",
-    "etf": "ETF 報酬以 Yahoo Finance 還原收盤價（Adj Close，含配息再投入）計算；1 年報酬不年化，3 年以上為年化（CAGR）；"
-           "波動度為日對數報酬標準差 ×√252；資料起點晚於區間起點 7 天以上時該區間為 null。",
-    "sensitivity": "實證存續期間 durEmp = −100 × beta，beta 為 ETF 日（或週）報酬對 20 年／30 年殖利率變動（百分點）的迴歸斜率，"
-                   "只用兩者都有資料的日子（債市休市、股市開市的日子會併入下一段）。H.15 約 15:30 取價、ETF 16:00 收盤，"
-                   "日資料的 beta 會偏小，建議以週資料（3 年）為主。TMF 的 durEmp 已含 3 倍槓桿。",
     "model": "模型存續期間與凸性以今日 DGS20／DGS30 線性內插、半年複利計算的等面額債券梯形為代理（TLT 與 TMF＝20–30 年平價附息債；"
              "EDV＝20–30 年零息債；ZROZ、GOVZ＝25–30 年零息債）。凸性單位為「年²」（ΔP/P ≈ −D·Δy + ½·C·Δy²，Δy 用小數）；"
              "iShares 網站公布的凸性（例如 3.6）要 ×100 才是這裡的單位。TMF 的模型值是未槓桿的標的，情境計算時再乘 3。",
@@ -292,88 +273,6 @@ def series_from_history(history):
     return out
 
 
-# --------------------------------------------------------------------------- ETF prices
-
-
-def extract_etf_points(frame, symbol):
-    """[(date, close, adjClose)] for one symbol from a yfinance frame (either column-level order)."""
-    if frame is None or getattr(frame, "empty", True):
-        return []
-    columns = frame.columns
-    try:
-        if getattr(columns, "nlevels", 1) > 1:
-            if symbol in set(columns.get_level_values(0)):
-                close, adj = frame[symbol]["Close"], frame[symbol]["Adj Close"]
-            elif symbol in set(columns.get_level_values(1)):
-                close, adj = frame["Close"][symbol], frame["Adj Close"][symbol]
-            else:
-                return []
-        else:
-            close, adj = frame["Close"], frame["Adj Close"]
-    except KeyError:
-        return []
-    points = []
-    for index, raw_close in close.items():
-        raw_adj = adj.get(index)
-        try:
-            c, a = float(raw_close), float(raw_adj)
-        except (TypeError, ValueError):
-            continue
-        if math.isfinite(c) and math.isfinite(a) and c > 0 and a > 0:
-            points.append((index.strftime("%Y-%m-%d"), c, a))
-    points.sort()
-    return points
-
-
-def download_etf_prices(symbols, downloader=None, sleep=time.sleep):
-    """{symbol: [(date, close, adjClose)]}; up to 3 attempts, then one more for symbols still empty."""
-    if downloader is None:
-        def downloader(batch):
-            import yfinance as yf
-
-            return yf.download(
-                batch, period="max", interval="1d", auto_adjust=False, actions=False,
-                threads=False, progress=False, group_by="ticker", timeout=30,
-            )
-
-    prices = {}
-
-    def run(pending):
-        frame = None
-        for number in range(1, 4):
-            try:
-                frame = downloader(pending)
-                break
-            except Exception as exc:  # noqa: BLE001 - network errors vary by library version
-                print(f"ETF download attempt {number} failed ({type(exc).__name__})")
-                sleep(5 * number)
-        for symbol in pending:
-            points = extract_etf_points(frame, symbol) if frame is not None else []
-            if points:
-                prices[symbol] = points
-
-    run(list(symbols))
-    missing = [s for s in symbols if s not in prices]
-    if missing and len(missing) < len(symbols):
-        print(f"retrying ETF prices for {' '.join(missing)}")
-        run(missing)
-    return prices
-
-
-def drop_open_session(prices, now):
-    """Removes today's bar while the US session may still be open (a delayed run would see a partial bar)."""
-    try:
-        from zoneinfo import ZoneInfo
-
-        eastern = now.astimezone(ZoneInfo("America/New_York"))
-    except Exception:  # noqa: BLE001 - no tz database: keep the data as downloaded
-        return prices
-    if eastern.weekday() >= 5 or (eastern.hour, eastern.minute) >= (16, 15):
-        return prices
-    today = eastern.date().isoformat()
-    return {symbol: (points[:-1] if points and points[-1][0] == today else points) for symbol, points in prices.items()}
-
-
 # --------------------------------------------------------------------------- payloads
 
 
@@ -389,12 +288,9 @@ def fresh_series(series, origin):
 
 def check_rates(series, origin, today):
     """Raises InsufficientData when the core of the payload is not fresh enough to publish."""
-    stale_core = [i for i in CORE_IDS if origin.get(i) not in FRESH or not series.get(i)]
-    if stale_core:
-        raise InsufficientData(f"core series not fresh: {' '.join(stale_core)}")
-    fresh_tenors = sum(1 for i in TENOR_IDS if origin.get(i) in FRESH and series.get(i))
-    if fresh_tenors < MIN_FRESH_TENORS:
-        raise InsufficientData(f"only {fresh_tenors} of {len(TENOR_IDS)} tenors fresh")
+    stale = [i for i in TENOR_IDS if origin.get(i) not in FRESH or not series.get(i)]
+    if stale:
+        raise InsufficientData(f"core series not fresh: {' '.join(stale)}")
     as_of = max(d for d, _ in series["DGS10"])
     age = (today - date.fromisoformat(as_of)).days
     if age > MAX_STALE_DAYS:
@@ -409,22 +305,14 @@ def rates_source(origin):
     return "mixed" if used else None
 
 
-def change_1m(series, day, value, digits=3):
-    prior = series.on_or_before(ra.shift_months(day, -1))
-    return round_or_none(value - prior[1], digits) if prior else None
-
-
 def build_curves(data, as_of):
     anchor = data["DGS10"]
-    nominal, real = [], []
+    nominal = []
     for key, target in ra.snapshot_targets(as_of):
         snap = ra.snapshot_curve(data, TENOR_IDS, anchor, target)
-        if snap is None:
-            continue
-        nominal.append({"key": key, **snap})
-        real_snap = ra.snapshot_curve(data, REAL_IDS, anchor, target)
-        real.append({"key": key, **real_snap})
-    return {"nominal": nominal, "real": real}
+        if snap is not None:
+            nominal.append({"key": key, **snap})
+    return {"nominal": nominal}
 
 
 def build_policy(data):
@@ -436,39 +324,6 @@ def build_policy(data):
     if low is None:
         return None
     return {"lower": round_or_none(low[1], 3), "upper": round_or_none(high, 3), "date": day}
-
-
-def build_inflation(data):
-    out = {}
-    for key, series_id in INFLATION:
-        series = data.get(series_id)
-        if not series:
-            out[key] = {"value": None, "date": None, "chg1m": None}
-            continue
-        day, value = series.last()
-        out[key] = {"value": round_or_none(value, 3), "date": day, "chg1m": change_1m(series, day, value)}
-    for key, nominal_id, real_id in DERIVED_INFLATION:
-        nominal, real = data.get(nominal_id), data.get(real_id)
-        # spread_points is in bp; breakevens stay in %
-        points = ra.Series([(d, bp / 100) for d, bp in ra.spread_points(nominal, real)] if nominal and real else [])
-        if not points:
-            out[key] = {"value": None, "date": None, "chg1m": None, "derived": True}
-            continue
-        day, value = points.last()
-        out[key] = {"value": round_or_none(value, 3), "date": day, "chg1m": change_1m(points, day, value), "derived": True}
-    return out
-
-
-def fed_target_midpoint(data):
-    """Daily Fed target-range midpoint, only when upper and lower have an observation on the same date.
-
-    It is not the effective federal funds rate. Missing dates stay missing; no future-value backfill.
-    """
-    upper, lower = data.get("DFEDTARU"), data.get("DFEDTARL")
-    if not upper or not lower:
-        return ra.Series([])
-    lows = dict(lower.points())
-    return ra.Series([(day, (high + lows[day]) / 2) for day, high in upper.points() if day in lows])
 
 
 def build_spreads(data):
@@ -486,120 +341,17 @@ def build_spreads(data):
     return out
 
 
-def clean_etf_points(symbol, points, leverage):
-    """Drops bad adjusted-close points (isolated spikes); prints what was dropped."""
-    limit = BAD_POINT_LIMIT.get(leverage, BAD_POINT_LIMIT[3])
-    _, dropped = ra.filter_bad_points([(d, a) for d, _, a in points], limit)
-    if dropped:
-        print(f"{symbol}: dropped {len(dropped)} bad price points ({' '.join(dropped[:5])})")
-        bad = set(dropped)
-        points = [p for p in points if p[0] not in bad]
-    return points
-
-
-def etf_metrics(points, data):
-    """price / returns / risk / sensitivity blocks from [(date, close, adjClose)]."""
-    adj = ra.Series([(d, a) for d, _, a in points])
-    last_day, close, adj_close = points[-1]
-    end = date.fromisoformat(last_day)
-    returns = ra.period_returns(adj) or {}
-    rounded = {}
-    for key in ("1y", "3y", "5y", "10y", "inception"):
-        block = returns.get(key)
-        rounded[key] = None if block is None else {
-            k: (round_or_none(v, 2) if k != "start" else v) for k, v in block.items()
-        }
-    mdd = ra.max_drawdown(adj)
-    mdd5 = ra.max_drawdown(adj, ra.shift_years(end, -5))
-    risk = {
-        "vol1y": round_or_none(ra.ann_vol(adj, ra.shift_years(end, -1)), 2),
-        "vol3y": round_or_none(ra.ann_vol(adj, ra.shift_years(end, -3)), 2),
-        "vol5y": round_or_none(ra.ann_vol(adj, ra.shift_years(end, -5)), 2),
-        "maxDrawdown": dict(mdd, value=round_or_none(mdd["value"], 2)),
-        "mdd5y": round_or_none(mdd5["value"], 2) if mdd5 else None,
-        "currentDrawdown": round_or_none(ra.current_drawdown(adj), 2),
-    }
-    sensitivity = {}
-    for key, series_id in (("dgs20", "DGS20"), ("dgs30", "DGS30")):
-        yields = data.get(series_id)
-        if not yields:
-            sensitivity[key] = {"daily1y": None, "weekly3y": None}
-            continue
-        sensitivity[key] = {
-            "daily1y": ra.regress_beta(adj, yields, ra.shift_years(end, -1), "daily"),
-            "weekly3y": ra.regress_beta(adj, yields, ra.shift_years(end, -3), "weekly"),
-        }
-    price = {"asOf": last_day, "close": round_or_none(close, 2), "adjClose": round_or_none(adj_close, 4)}
-    return {"price": price, "returns": rounded, "risk": risk, "sensitivity": sensitivity}
-
-
-def weekly_index(points, dates):
-    """Adjusted close on (or up to a week before) each date, rebased so the first value is 100."""
-    adj = ra.Series([(d, a) for d, _, a in points])
-    raw = []
-    for day in dates:
-        found = adj.on_or_before(day, ETF_WEEKLY_LOOKBACK_DAYS)
-        raw.append(found[1] if found else None)
-    base = next((v for v in raw if v is not None), None)
-    return [None if v is None else round(v / base * 100, 3) + 0.0 for v in raw]
-
-
-def build_etfs(prices, etfs, data, previous_rates, previous_history):
-    """(etf entries, history etf block, source label, etfAsOf). Missing symbols reuse the previous file."""
+def build_etfs(etfs, data):
+    """ETF entries: the static fields plus the model duration / convexity from today's DGS20 / DGS30."""
     dgs20, dgs30 = data.get("DGS20"), data.get("DGS30")
     y20 = dgs20.last()[1] if dgs20 else None
     y30 = dgs30.last()[1] if dgs30 else None
-    old_entries = {e.get("symbol"): e for e in ((previous_rates or {}).get("etfs") or []) if isinstance(e, dict)}
-    old_block = (previous_history or {}).get("etf") or {}
-    old_sources = (previous_rates or {}).get("sources") or {}
-
-    cleaned = {}
-    for etf in etfs:
-        points = prices.get(etf["symbol"]) or []
-        points = clean_etf_points(etf["symbol"], points, etf["leverage"]) if points else []
-        if len(points) >= 2:
-            cleaned[etf["symbol"]] = points
-
     entries = []
     for etf in etfs:
-        symbol = etf["symbol"]
         entry = {k: v for k, v in etf.items() if k != "modelProxy"}
         entry["model"] = ra.model_duration_convexity(etf["modelProxy"], y20, y30)
-        if symbol in cleaned:
-            entry.update(etf_metrics(cleaned[symbol], data))
-        else:
-            old = old_entries.get(symbol) or {}
-            for key in ("price", "returns", "risk", "sensitivity"):
-                entry[key] = old.get(key)
-            if old:
-                print(f"{symbol}: no fresh prices, keeping the previous blocks")
         entries.append(entry)
-
-    if not cleaned:
-        if old_block.get("dates"):
-            return entries, old_block, old_sources.get("etf"), old_sources.get("etfAsOf")
-        return entries, {"dates": [], "series": {e["symbol"]: [] for e in etfs}}, None, None
-
-    old_dates = old_block.get("dates") or []
-    old_series = old_block.get("series") or {}
-    days = {p[0] for points in cleaned.values() for p in points}
-    reused = [etf["symbol"] for etf in etfs if etf["symbol"] not in cleaned]
-    if reused:
-        # Funds kept from the previous file must keep their whole history even when the fresh ones
-        # cover a shorter span (a partial download); their weekly values are matched by ISO week.
-        days |= {day for day in old_dates if isinstance(day, str) and ra.valid_iso(day)}
-    dates = ra.weekly_sample(sorted(days))
-    series = {}
-    for etf in etfs:
-        symbol = etf["symbol"]
-        if symbol in cleaned:
-            series[symbol] = weekly_index(cleaned[symbol], dates)
-        else:
-            by_week = {ra.iso_week(day): value for day, value in zip(old_dates, old_series.get(symbol) or [])
-                       if isinstance(day, str) and ra.valid_iso(day)}
-            series[symbol] = [by_week.get(ra.iso_week(day)) for day in dates]
-    as_of = max(points[-1][0] for points in cleaned.values())
-    return entries, {"dates": dates, "series": series}, ETF_SOURCE, as_of
+    return entries
 
 
 def history_block(data, dates, lookback):
@@ -620,30 +372,25 @@ def history_block(data, dates, lookback):
     return {"dates": dates, "series": out}
 
 
-def build_payloads(series, origin, prices, etfs, previous_rates, previous_history, today, now):
+def build_payloads(series, origin, etfs, today, now):
     """Pure: (rates, history) payloads. Raises InsufficientData when the old files must be kept."""
     as_of = check_rates(series, origin, today)
     data = fresh_series(series, origin)
-    data["FEDTARGETMID"] = fed_target_midpoint(data)
     generated = now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     missing = [i for i in FRED_IDS if origin.get(i) not in FRESH]
-
-    entries, etf_history, etf_source, etf_as_of = build_etfs(prices, etfs, data, previous_rates, previous_history)
 
     rates = {
         "version": VERSION,
         "generatedAt": generated,
         "asOf": as_of,
-        "sources": {"rates": rates_source(origin), "etf": etf_source, "etfAsOf": etf_as_of},
+        "sources": {"rates": rates_source(origin)},
         "missing": missing,
         "tenors": TENORS,
         "tenorYears": TENOR_YEARS,
-        "realTenors": REAL_TENORS,
         "curves": build_curves(data, as_of),
         "policy": build_policy(data),
-        "inflation": build_inflation(data),
         "spreads": build_spreads(data),
-        "etfs": entries,
+        "etfs": build_etfs(etfs, data),
         "notes": NOTES,
     }
     dgs10_dates = data["DGS10"].dates
@@ -653,7 +400,6 @@ def build_payloads(series, origin, prices, etfs, previous_rates, previous_histor
         "asOf": as_of,
         "weekly": history_block(data, ra.weekly_sample(dgs10_dates), ra.SNAPSHOT_LOOKBACK_DAYS),
         "daily": history_block(data, dgs10_dates[-DAILY_POINTS:], 0),
-        "etf": etf_history,
     }
     return rates, history
 
@@ -686,37 +432,19 @@ def write_atomic(path, value):
     return len(body.encode("utf-8"))
 
 
-def run(out_dir, http_get=None, price_source=None, api_key=None, today=None, now=None, sleep=time.sleep, etfs=None):
+def run(out_dir, http_get=None, api_key=None, today=None, now=None, sleep=time.sleep, etfs=None):
     """Fetches everything, builds and writes both files. Returns the process exit code."""
     etfs = ETFS if etfs is None else etfs
     now = now or datetime.now(timezone.utc)
     today = today or now.date()
     rates_path = os.path.join(out_dir, RATES_FILE)
     history_path = os.path.join(out_dir, HISTORY_FILE)
-    previous_rates = read_json(rates_path)
     previous_history = read_json(history_path)
 
     fetchers = make_fetchers(http_get or default_http_get(), api_key, sleep, budget=FETCH_BUDGET_SECONDS)
     series, origin = load_series(FRED_IDS, fetchers, series_from_history(previous_history))
     try:
-        check_rates(series, origin, today)
-    except InsufficientData as exc:
-        print(f"rates.json not updated: {exc}")
-        return 1
-
-    symbols = [etf["symbol"] for etf in etfs]
-    if price_source is None:
-        def price_source(batch):
-            return download_etf_prices(batch, sleep=sleep)
-    try:
-        prices = price_source(symbols) or {}
-    except Exception as exc:  # noqa: BLE001 - keep the previous ETF blocks
-        print(f"ETF prices unavailable ({type(exc).__name__})")
-        prices = {}
-    prices = drop_open_session(prices, now)
-
-    try:
-        rates, history = build_payloads(series, origin, prices, etfs, previous_rates, previous_history, today, now)
+        rates, history = build_payloads(series, origin, etfs, today, now)
     except InsufficientData as exc:
         print(f"rates.json not updated: {exc}")
         return 1
@@ -725,8 +453,7 @@ def run(out_dir, http_get=None, price_source=None, api_key=None, today=None, now
     size_rates = write_atomic(rates_path, rates)
     print(
         f"wrote {rates_path} ({size_rates} bytes) and {history_path} ({size_history} bytes); "
-        f"asOf {rates['asOf']}, rates {rates['sources']['rates']}, missing {' '.join(rates['missing']) or 'none'}, "
-        f"etfAsOf {rates['sources']['etfAsOf']}"
+        f"asOf {rates['asOf']}, rates {rates['sources']['rates']}, missing {' '.join(rates['missing']) or 'none'}"
     )
     return 0
 
