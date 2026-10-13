@@ -71,12 +71,13 @@ test('spreads, scenario slider and ETF comparison respond to controls', async ({
   await expect(scenario.locator('.rates-formula')).toContainText('½');
 
   const etf = card(page, '長天期美債 ETF 比較');
-  await expect(etf.locator('.rates-compare-row')).toHaveCount(5);
+  const etfTable = etf.getByRole('region', { name: '長天期美債 ETF 比較表' });
+  await expect(etfTable.getByRole('row')).toHaveCount(6);
+  await expect(etfTable.getByRole('columnheader')).toHaveCount(9);
   await expect(etf.getByRole('group', { name: '比較項目' })).toHaveCount(0);
   await expect(etf.getByRole('button', { name: '利率敏感度' })).toHaveCount(0);
   await expect(etf.getByRole('heading', { name: '總報酬走勢' })).toHaveCount(0);
-  await expect(etf.locator('.rates-compare-row').first()).toContainText('%');
-  await expect(etf.locator('.rates-facts')).toHaveCount(5);
+  await expect(etfTable.locator('tbody tr').first()).toContainText('%');
   await expect(etf.locator('.rates-static').first()).toContainText('待核對');
   await etf.getByRole('button', { name: '開啟 TLT 圖表' }).click();
   await expect(page).toHaveURL(/page=chart&symbol=TLT/);

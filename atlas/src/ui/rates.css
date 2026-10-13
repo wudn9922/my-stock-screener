@@ -533,81 +533,110 @@ a.rates-static {
   color: var(--text-3);
 }
 
-/* -- ETF comparison */
-.rates-compare {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
+/* -- ETF comparison: one row per fund; scrolls sideways on phones */
+.rates-etf-table-wrap {
+  position: relative;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
-.rates-compare-row {
-  display: grid;
-  gap: 4px;
-  padding: 8px 0;
+.rates-etf-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.rates-etf-table th,
+.rates-etf-table td {
+  padding: 10px;
   border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+  font-weight: 400;
+  color: var(--text-2);
+  overflow-wrap: break-word;
 }
-.rates-compare-row:last-child {
+.rates-etf-table thead th {
+  padding-top: 6px;
+  padding-bottom: 8px;
+  border-bottom-color: var(--border-strong);
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rates-etf-table tbody tr:last-child th,
+.rates-etf-table tbody tr:last-child td {
   border-bottom: 0;
 }
-.rates-compare-head {
+.rates-etf-table tbody th {
+  min-width: 150px;
+  color: var(--text);
+}
+.rates-etf-table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+.rates-etf-table td:last-child {
+  width: 1%;
+  text-align: right;
+}
+.rates-etf-fund-head {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
 }
-.rates-compare-head > i {
+.rates-etf-fund-head > i {
   width: 4px;
-  height: 18px;
+  height: 16px;
   border-radius: 3px;
   flex-shrink: 0;
 }
-.rates-compare-name {
-  flex: 1;
-  min-width: 0;
+.rates-etf-fund-head > b {
+  font-size: 14px;
+  font-weight: 650;
+}
+.rates-etf-fund-name {
+  display: block;
+  margin-top: 2px;
   font-size: 12px;
+  line-height: 1.4;
   color: var(--text-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
-.rates-open {
-  width: 36px;
-  height: 36px;
-  margin: -6px -4px -6px 0;
+.rates-etf-expense {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 2px 8px;
 }
-.rates-compare-bar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px;
-  align-items: center;
-  gap: 8px;
+.rates-etf-expense > b {
+  color: var(--text);
+  font-weight: 650;
 }
-.rates-compare-bar .rates-bar-value {
-  text-align: right;
-}
-.rates-compare-detail {
+.rates-etf-note {
+  display: block;
+  margin-top: 2px;
   font-size: 11px;
-  color: var(--text-3);
   line-height: 1.5;
-  font-variant-numeric: tabular-nums;
-}
-.rates-facts {
-  margin: 2px 0 0;
-  display: grid;
-  gap: 2px;
-  font-size: 12px;
-}
-.rates-facts div {
-  display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
-  gap: 8px;
-}
-.rates-facts dt {
   color: var(--text-3);
+  white-space: normal;
 }
-.rates-facts dd {
-  margin: 0;
-  color: var(--text-2);
-  overflow-wrap: anywhere;
+@media (max-width: 640px) {
+  .rates-etf-table {
+    min-width: 720px;
+  }
+  .rates-etf-table th:first-child,
+  .rates-etf-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--surface);
+    box-shadow: 1px 0 0 var(--border);
+  }
 }
 .rates-sources {
   font-size: 12px;
