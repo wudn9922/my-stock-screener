@@ -60,7 +60,7 @@ jobs:
           assert observed == required, (observed, required)
 
           fed = rates["spreads"][0]
-          assert fed["long"] == "DGS10" and fed["short"] == "FEDTARGETMID"
+          assert fed["long"] == "DGS10" and fed["short"] == "DFEDTARU"
           assert fed["valueBp"] is not None, "Fed midpoint spread has no recent value"
 
           for kind in ("weekly", "daily"):
