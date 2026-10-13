@@ -24,11 +24,9 @@ function monthBefore(date: string): string {
 /** Three headline chips: 10Y yield, 10Y−Fed at the selected bound, Fed target range. */
 export function KeyNumbers({ rates, history, fedBound }: { rates: Rates; history: HistoryState; fedBound: 'upper' | 'lower' }) {
   const ten = curveValue(rates, 'nominal', 'now', '10Y');
-  const activeKey = fedBound === 'upper' ? '10yfed' : '10yfedlower';
-  const spread = rates.spreads.find((item) => item.key === activeKey);
   const fedRate = rates.policy?.[fedBound] ?? null;
-  const fallbackBp = finite(ten) && finite(fedRate) ? (ten - fedRate) * 100 : null;
-  const spreadBp = spread?.valueBp ?? fallbackBp;
+  // Calculate from live chart yield and selected policy bound; never reuse an older midpoint summary.
+  const spreadBp = finite(ten) && finite(fedRate) ? (ten - fedRate) * 100 : null;
   const policy = rates.policy;
   let policyChange: number | null = null;
   if (policy && finite(policy.upper) && history.status === 'ok' && rates.asOf) {
@@ -46,7 +44,7 @@ export function KeyNumbers({ rates, history, fedBound }: { rates: Rates; history
       key: '10yfed',
       label: `10Y−Fed（${fedBound === 'upper' ? '上限' : '下限'}）`,
       value: fmtBp(spreadBp),
-      change: spread?.chg1mBp ?? null,
+      change: null,
       badge: finite(spreadBp) && spreadBp < 0 ? '倒掛' : null,
     },
     {
