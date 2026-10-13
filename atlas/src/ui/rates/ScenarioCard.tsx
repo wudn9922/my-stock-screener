@@ -12,7 +12,7 @@ import { formatPercent, toneClass } from '../format';
 import { LeverageBadge, Segmented, StaticMark, fmtNum } from './shared';
 
 const QUICK = [-200, -100, -50, -25, 0, 25, 50, 100, 200] as const;
-const signedBp = (bp: number) => `${bp > 0 ? '+' : ''}${bp}bp`;
+const signedShock = (bp: number) => `${bp > 0 ? '+' : ''}${(bp / 100).toFixed(2)}%`;
 const pctText = (value: number) => `${value < 0 ? '−' : ''}${Math.abs(value).toFixed(2)}%`;
 
 /** Instant parallel-shift scenarios: L·(−D·Δy + ½·C·Δy²) per ETF, bars for the slider value plus a fixed-shock table. */
@@ -49,8 +49,7 @@ export function ScenarioCard({ etfs }: { etfs: readonly RatesEtf[] }) {
       <div className="rates-card-body">
         <label className="rates-slider">
           <span>
-            長天期殖利率變動 <b className={toneClass(bp)}>{signedBp(bp)}</b>
-            <small>（{bp > 0 ? '+' : ''}{(bp / 100).toFixed(2)} 個百分點）</small>
+            長天期殖利率變動 <b className={toneClass(bp)}>{signedShock(bp)}</b>
           </span>
           <input
             type="range"
@@ -58,18 +57,18 @@ export function ScenarioCard({ etfs }: { etfs: readonly RatesEtf[] }) {
             max={SCENARIO_RANGE_BP.max}
             step={SCENARIO_RANGE_BP.step}
             value={bp}
-            aria-valuetext={signedBp(bp)}
+            aria-valuetext={signedShock(bp)}
             onChange={(event) => setBp(Number(event.target.value))}
           />
         </label>
         <div className="chip-row rates-chip-row" role="group" aria-label="快速選擇">
           {QUICK.map((value) => (
             <button key={value} type="button" className={`chip rates-chip ${bp === value ? 'active' : ''}`} aria-pressed={bp === value} onClick={() => setBp(value)}>
-              {value === 0 ? '0' : signedBp(value)}
+              {signedShock(value)}
             </button>
           ))}
         </div>
-        <ul className="rates-bars" aria-label={`殖利率 ${signedBp(bp)} 時各 ETF 的估計價格變動`}>
+        <ul className="rates-bars" aria-label={`殖利率 ${signedShock(bp)} 時各 ETF 的估計價格變動`}>
           {rows.map((row) => {
             const cell = row.cells[0]!;
             const width = cell.pct === null ? 0 : (Math.abs(cell.pct) / scale) * 50;
@@ -104,7 +103,7 @@ export function ScenarioCard({ etfs }: { etfs: readonly RatesEtf[] }) {
                 <th scope="col" className="sticky-col">ETF</th>
                 {SCENARIO_SHOCKS_BP.map((shock) => (
                   <th key={shock} scope="col" className="num">
-                    {signedBp(shock)}
+                    {signedShock(shock)}
                   </th>
                 ))}
                 <th scope="col" className="num">D 公布</th>
@@ -135,6 +134,9 @@ export function ScenarioCard({ etfs }: { etfs: readonly RatesEtf[] }) {
             </tbody>
           </table>
         </div>
+        <details className="rates-disclosure">
+          <summary>情境計算說明與公式</summary>
+          <div className="rates-disclosure-body">
         <p className="rates-muted rates-static-line">
           D 公布＝發行商公布的有效存續期間
           {publishedSource && (
@@ -146,7 +148,7 @@ export function ScenarioCard({ etfs }: { etfs: readonly RatesEtf[] }) {
         </p>
         {parts && example && (
           <div className="rates-formula">
-            <b>公式範例（{example.symbol}，殖利率 {signedBp(exampleBp)}）</b>
+            <b>公式範例（{example.symbol}，殖利率 {signedShock(exampleBp)}）</b>
             <code>
               −D×Δy + ½×C×Δy² = −{example.duration!.toFixed(2)} × {parts.dyPct.toFixed(2)}% + ½ × {example.convexity!.toFixed(0)} × ({parts.dyPct.toFixed(2)}%)²
             </code>
@@ -162,11 +164,13 @@ export function ScenarioCard({ etfs }: { etfs: readonly RatesEtf[] }) {
             )}
             <p>
               D＝存續期間（年），Δy＝殖利率變動（{parts.dyPct.toFixed(2)}% ＝ {(parts.dyPct / 100).toFixed(4)}），C＝凸性（年²）。發行商常把凸性寫成每
-              100bp² 的數字（例如 {parts.publishedConvexity.toFixed(2)}），要乘以 100 才是這裡的 C（{example.convexity!.toFixed(0)}）。
+              1% 殖利率變動平方的數字（例如 {parts.publishedConvexity.toFixed(2)}），要乘以 100 才是這裡的 C（{example.convexity!.toFixed(0)}）。
             </p>
-            <p>這是二階近似：±100bp 內誤差通常小於 0.5 個百分點；±200bp 以上可能差到幾個百分點。只看價格、不含利息收入與費用，也假設整條曲線平行移動。</p>
+            <p>這是二階近似：±1.00% 內誤差通常小於 0.5 個百分點；±2.00% 以上可能差到幾個百分點。只看價格、不含利息收入與費用，也假設整條曲線平行移動。</p>
           </div>
         )}
+          </div>
+        </details>
       </div>
     </section>
   );
