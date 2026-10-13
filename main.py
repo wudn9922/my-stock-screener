@@ -2734,12 +2734,221 @@ def download_custom_stock(
     return None, pd.DataFrame()
 
 
+def _failed_stock_symbol(
+    raw_ticker,
+    group_key=None,
+    group_market=None
+):
+    """
+    下載失敗時要顯示的代號：純數字台股有 .TW／.TWO 兩個候選，
+    優先用 data/ 已經有 CSV 的那個（過去成功過的後綴），否則取第一個。
+    """
+    candidates = (
+        get_ticker_candidates(
+            raw_ticker,
+            group_key=group_key,
+            group_market=group_market
+        )
+        or [str(raw_ticker).strip().upper()]
+    )
+
+    for candidate in candidates:
+        if os.path.exists(
+            os.path.join(
+                DATA_DIR,
+                f"{candidate}.csv"
+            )
+        ):
+            return candidate
+
+    return candidates[0]
+
+
+def _record_failed_stock(
+    unmatched_out,
+    ticker,
+    group_key,
+    reason,
+    raw_ma_list=None,
+    group_market=None
+):
+    """
+    未成功股票（沒有行情）：只給網頁報告列出，不影響 matched_list。
+    unmatched_out 為 None 時什麼都不做；任何錯誤只記錄，絕不讓日報中斷
+    （這個函式會在 except 區塊裡被呼叫）。
+    """
+    if unmatched_out is None:
+        return
+
+    try:
+        unmatched_out.append(
+            {
+                "status": "failed",
+                "ticker": str(ticker),
+                "name": (
+                    get_tw_stock_name(str(ticker))
+                    if group_market == "tw"
+                    else ""
+                ),
+                "group_key": group_key,
+                "ma_list": sorted(
+                    {
+                        ma_value
+                        for ma_value in (
+                            safe_int(raw_ma)
+                            for raw_ma in (raw_ma_list or [])
+                        )
+                        if ma_value is not None
+                        and ma_value > 0
+                    }
+                ),
+                "volume": 0,
+                "close": None,
+                "change_pct": None,
+                "ma_values": {},
+                "as_of": None,
+                "note": reason
+            }
+        )
+
+    except Exception as exc:
+        print(
+            f"⚠️ {ticker} 失敗項目略過："
+            f"{type(exc).__name__}: {exc}"
+        )
+
+
+def _record_unmatched_stock(
+    unmatched_out,
+    ticker,
+    group_key,
+    group_market,
+    ma_list,
+    combined
+):
+    """
+    未成功股票（有行情但未符合均線條件）：直接由 combined 算出
+    收盤、漲跌、均線值與備註，不建立圖表。失敗只記錄，不影響主流程。
+    """
+    if unmatched_out is None:
+        return
+
+    try:
+        price = safe_float(
+            combined["Close"].iloc[-1],
+            None
+        )
+
+        previous_close = (
+            safe_float(
+                combined["Close"].iloc[-2],
+                None
+            )
+            if len(combined) >= 2
+            else None
+        )
+
+        change_pct = (
+            round(
+                (price / previous_close - 1) * 100,
+                2
+            )
+            if price is not None and previous_close
+            else None
+        )
+
+        ma_values = {}
+        diff_info = []
+        ma_status_list = []
+
+        for ma_window in ma_list:
+            ma_value = safe_float(
+                combined[f"MA{ma_window}"].iloc[-1],
+                None
+            )
+
+            if ma_value is None or price is None:
+                continue
+
+            ma_values[str(ma_window)] = (
+                round_report_number(ma_value)
+            )
+
+            diff_info.append(
+                f"MA{ma_window}差距"
+                f"({(price / ma_value - 1) * 100:.2f}%)"
+            )
+
+            ma_status_list.append(
+                f"MA{ma_window}:{ma_value:.2f}"
+            )
+
+        note = " | ".join(
+            [
+                "未符合均線條件",
+                f"現價:{price:.2f}",
+                " / ".join(diff_info)
+                if diff_info
+                else "均線資料不足"
+            ]
+            + (
+                [" | ".join(ma_status_list)]
+                if ma_status_list
+                else []
+            )
+        )
+
+        unmatched_out.append(
+            {
+                "status": "unmatched",
+                "ticker": ticker,
+                "name": (
+                    get_tw_stock_name(ticker)
+                    if group_market == "tw"
+                    else ""
+                ),
+                "group_key": group_key,
+                "ma_list": list(ma_list),
+                "volume": int(
+                    safe_float(
+                        combined["Volume"].iloc[-1]
+                    )
+                ),
+                "close": round_report_number(price),
+                "change_pct": change_pct,
+                "ma_values": ma_values,
+                "as_of": pd.Timestamp(
+                    combined.index[-1]
+                ).strftime("%Y-%m-%d"),
+                "note": note
+            }
+        )
+
+    except Exception as exc:
+        print(
+            f"⚠️ {ticker} 未成功項目改記為失敗："
+            f"{type(exc).__name__}: {exc}"
+        )
+
+        _record_failed_stock(
+            unmatched_out,
+            ticker,
+            group_key,
+            "處理失敗",
+            ma_list,
+            group_market=group_market
+        )
+
+
 def process_custom_groups(
     group_dict,
     group_key,
     test_mode=CUSTOM_GROUP_TEST_MODE,
-    group_metadata=None
+    group_metadata=None,
+    unmatched_out=None
 ):
+    # unmatched_out（選用 list）會收到未成功股票（unmatched／failed），
+    # 只供網頁報告使用；matched_list 與回傳值不受影響。
     matched_list = []
 
     group_metadata = (
@@ -2790,6 +2999,8 @@ def process_custom_groups(
         raw_ticker,
         raw_ma_list
     ) in group_dict.items():
+        actual_ticker = None
+
         try:
             print(
                 f"\n🔍 開始處理："
@@ -2810,6 +3021,18 @@ def process_custom_groups(
                 not actual_ticker
                 or downloaded.empty
             ):
+                _record_failed_stock(
+                    unmatched_out,
+                    _failed_stock_symbol(
+                        raw_ticker,
+                        group_key=group_key,
+                        group_market=group_market
+                    ),
+                    group_key,
+                    "下載失敗",
+                    raw_ma_list,
+                    group_market=group_market
+                )
                 continue
 
             csv_path = os.path.join(
@@ -2855,6 +3078,14 @@ def process_custom_groups(
             )
 
             if combined.empty:
+                _record_failed_stock(
+                    unmatched_out,
+                    actual_ticker,
+                    group_key,
+                    "資料不足",
+                    raw_ma_list,
+                    group_market=group_market
+                )
                 continue
 
             ma_list = []
@@ -2972,6 +3203,14 @@ def process_custom_groups(
                     f"⏭️ {actual_ticker} "
                     "未符合均線條件"
                 )
+                _record_unmatched_stock(
+                    unmatched_out,
+                    actual_ticker,
+                    group_key,
+                    group_market,
+                    ma_list,
+                    combined
+                )
                 continue
 
             ma_status_list = []
@@ -3058,6 +3297,20 @@ def process_custom_groups(
                 f"{raw_ticker} 處理失敗："
                 f"{type(exc).__name__}: "
                 f"{exc}"
+            )
+
+            _record_failed_stock(
+                unmatched_out,
+                actual_ticker
+                or _failed_stock_symbol(
+                    raw_ticker,
+                    group_key=group_key,
+                    group_market=group_market
+                ),
+                group_key,
+                "處理失敗",
+                raw_ma_list,
+                group_market=group_market
             )
 
     matched_list.sort(
@@ -6668,11 +6921,62 @@ def build_report_group_item(item, market, metrics_lookup=None):
     return report_item
 
 
+def build_report_unmatched_item(record, metrics_lookup=None):
+    """
+    未成功股票的報告項目（status = unmatched／failed）。
+    價格欄位已在 process_custom_groups 算好；failed 沒有價格也不查指標。
+    """
+    symbol = str(
+        record.get("ticker") or ""
+    ).strip().upper()
+
+    status = (
+        "failed"
+        if record.get("status") == "failed"
+        else "unmatched"
+    )
+
+    report_item = {
+        "symbol": symbol,
+        "name": str(record.get("name") or ""),
+        "maList": [
+            int(value)
+            for value in (record.get("ma_list") or [])
+        ],
+        "close": record.get("close"),
+        "changePct": record.get("change_pct"),
+        "maValues": dict(record.get("ma_values") or {}),
+        "note": str(record.get("note") or ""),
+        "volume": int(
+            safe_float(record.get("volume"), 0)
+        ),
+        "asOf": record.get("as_of"),
+        "status": status
+    }
+
+    if metrics_lookup is not None:
+        metrics = None
+
+        if status == "unmatched":
+            try:
+                metrics = metrics_lookup(symbol)
+            except Exception as exc:
+                print(
+                    f"⚠️ {symbol} 篩選指標略過："
+                    f"{type(exc).__name__}: {exc}"
+                )
+
+        report_item["metrics"] = metrics
+
+    return report_item
+
+
 def build_report_groups(
     data_dict,
     group_metadata,
     display_order,
-    metrics_lookup=None
+    metrics_lookup=None,
+    unmatched_by_group=None
 ):
     groups = []
 
@@ -6734,6 +7038,54 @@ def build_report_groups(
                     f"{type(exc).__name__}: {exc}"
                 )
 
+        # 未成功股票（scan 群組不輸出）：先 unmatched 再 failed，各依代號排序；
+        # 已在成功清單或前面出現過的代號不重複列出
+        unmatched_items = []
+
+        if kind != "scan":
+            seen_symbols = {
+                report_item["symbol"]
+                for report_item in items
+            }
+
+            for status in ("unmatched", "failed"):
+                records = sorted(
+                    (
+                        record
+                        for record in (
+                            (unmatched_by_group or {}).get(
+                                group_key
+                            )
+                            or []
+                        )
+                        if record.get("status") == status
+                    ),
+                    key=lambda record: str(
+                        record.get("ticker")
+                    ).strip().upper()
+                )
+
+                for record in records:
+                    try:
+                        report_item = (
+                            build_report_unmatched_item(
+                                record,
+                                metrics_lookup=metrics_lookup
+                            )
+                        )
+                    except Exception as exc:
+                        print(
+                            f"⚠️ {group_key} 未成功項目略過："
+                            f"{type(exc).__name__}: {exc}"
+                        )
+                        continue
+
+                    if report_item["symbol"] in seen_symbols:
+                        continue
+
+                    seen_symbols.add(report_item["symbol"])
+                    unmatched_items.append(report_item)
+
         group_ma_list = [
             int(value)
             for value in (
@@ -6750,7 +7102,8 @@ def build_report_groups(
                 "kind": kind,
                 "maList": group_ma_list,
                 "count": len(items),
-                "items": items
+                "unmatchedCount": len(unmatched_items),
+                "items": items + unmatched_items
             }
         )
 
@@ -6843,7 +7196,8 @@ def build_report_payload(
     generated_at=None,
     extra_index_configs=None,
     analyze=analyze_index_for_report,
-    metrics_lookup=None
+    metrics_lookup=None,
+    unmatched_by_group=None
 ):
     generated_at = generated_at or (
         datetime.now(timezone.utc)
@@ -6875,7 +7229,8 @@ def build_report_payload(
             data_dict,
             group_metadata,
             display_order,
-            metrics_lookup=metrics_lookup
+            metrics_lookup=metrics_lookup,
+            unmatched_by_group=unmatched_by_group
         ),
         "sectors": build_report_sectors(
             data_dict.get("sectors")
@@ -7226,7 +7581,8 @@ def process_group_for_data_dict(
     data_dict,
     user_configs,
     group_metadata,
-    group_key
+    group_key,
+    unmatched_by_group=None
 ):
     group_dict = user_configs.get(
         group_key,
@@ -7238,6 +7594,12 @@ def process_group_for_data_dict(
         {}
     )
 
+    unmatched_bucket = (
+        []
+        if unmatched_by_group is not None
+        else None
+    )
+
     data_dict[group_key] = (
         process_custom_groups(
             group_dict,
@@ -7245,9 +7607,15 @@ def process_group_for_data_dict(
             test_mode=(
                 CUSTOM_GROUP_TEST_MODE
             ),
-            group_metadata=metadata
+            group_metadata=metadata,
+            unmatched_out=unmatched_bucket
         )
     )
+
+    if unmatched_by_group is not None:
+        unmatched_by_group[group_key] = (
+            unmatched_bucket
+        )
 
 
 def build_index_map(index_configs):
@@ -7626,6 +7994,9 @@ def main():
         "us_all": us_all
     }
 
+    # 未成功股票（unmatched／failed）：只給網頁報告，LINE／圖表／Dify 不使用
+    unmatched_by_group = {}
+
     fixed_group_keys = [
         "tw_g1",
         "tw_g2",
@@ -7640,7 +8011,8 @@ def main():
             data_dict,
             user_configs,
             group_metadata,
-            group_key
+            group_key,
+            unmatched_by_group=unmatched_by_group
         )
 
     # -----------------------------------------------------------------
@@ -7666,7 +8038,8 @@ def main():
             data_dict,
             user_configs,
             group_metadata,
-            group_key
+            group_key,
+            unmatched_by_group=unmatched_by_group
         )
 
     # -----------------------------------------------------------------
@@ -7976,7 +8349,8 @@ def main():
                 "sectors": sectors_message,
                 "stocks": line_message_stocks
             },
-            metrics_lookup=metrics_lookup
+            metrics_lookup=metrics_lookup,
+            unmatched_by_group=unmatched_by_group
         )
 
         write_report_json(report_payload)

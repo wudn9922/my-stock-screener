@@ -69,7 +69,7 @@ function reportSymbols(report: Report | null): LocalSymbol[] {
   for (const market of report.markets) for (const index of market.indices) map.set(index.symbol, index.name);
   for (const index of report.worldIndices) if (!map.has(index.symbol)) map.set(index.symbol, index.name);
   for (const group of report.groups)
-    for (const item of group.items) if (!map.has(item.symbol)) map.set(item.symbol, item.name);
+    for (const item of group.items) if (item.status !== 'failed' && !map.has(item.symbol)) map.set(item.symbol, item.name);
   return [...map].map(([symbol, name]) => ({ symbol, name }));
 }
 

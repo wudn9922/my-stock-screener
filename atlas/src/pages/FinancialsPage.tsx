@@ -40,7 +40,7 @@ const writeMode = (mode: DisplayMode) => {
 function reportSymbols(report: Report | null): LocalSymbol[] {
   if (!report) return [];
   const map = new Map<string, string>();
-  for (const group of report.groups) for (const item of group.items) if (!map.has(item.symbol)) map.set(item.symbol, item.name);
+  for (const group of report.groups) for (const item of group.items) if (item.status !== 'failed' && !map.has(item.symbol)) map.set(item.symbol, item.name);
   return [...map].map(([symbol, name]) => ({ symbol, name }));
 }
 

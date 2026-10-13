@@ -234,7 +234,7 @@ def symbols_from_report(document):
         if not isinstance(group, dict) or str(group.get("market") or "").upper() == "TW":
             continue
         for item in group.get("items") or []:
-            if isinstance(item, dict):
+            if isinstance(item, dict) and item.get("status") != "failed":
                 symbols.append(item.get("symbol"))
     return symbols
 

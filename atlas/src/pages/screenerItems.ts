@@ -1,4 +1,4 @@
-import type { GroupItem } from '../report/schema';
+import { itemStatusOf, type GroupItem } from '../report/schema';
 import type { GrowthFile } from '../fundamentals/GrowthProvider';
 import { formatPercent, maDistance, maValue, toneClass } from '../ui/format';
 import { growthRecordFor, maDeviation, type FilterState } from './screenerFilters';
@@ -70,7 +70,40 @@ export function filterAndSortItems(
   else if (sort === 'ma50') filtered.sort(byNumber((item) => maDeviation(item, 50), -1));
   else if (sort === 'r21') filtered.sort(byNumber((item) => item.metrics?.r21, -1));
   else if (sort === 'eps') filtered.sort(byNumber((item) => epsYoY(item, context.growth), -1));
-  return filtered;
+  // Failed rows have no prices or metrics: they always close the list, whatever the sort.
+  return filtered.some((item) => item.status === 'failed')
+    ? [...filtered.filter((item) => item.status !== 'failed'), ...filtered.filter((item) => item.status === 'failed')]
+    : filtered;
+}
+
+// ---------------------------------------------------------------- matched / unmatched view
+
+/** Which rows of a fixed or custom group are listed: all, only the matched ("成功") or only the rest. */
+export type StatusView = 'all' | 'matched' | 'unmatched';
+export const STATUS_VIEWS: readonly StatusView[] = ['all', 'matched', 'unmatched'];
+export const STATUS_VIEW_LABELS: Record<StatusView, string> = { all: '全部', matched: '成功', unmatched: '未成功' };
+export const STATUS_BADGE_LABELS = { unmatched: '未符合', failed: '失敗' } as const;
+
+/** Matched rows ("成功股票") and unmatched + failed rows ("未成功股票") of a group. */
+export function statusCounts(items: readonly GroupItem[]): { matched: number; unmatched: number } {
+  let unmatched = 0;
+  for (const item of items) if (itemStatusOf(item) !== 'matched') unmatched += 1;
+  return { matched: items.length - unmatched, unmatched };
+}
+
+/** The rows of a group for the chosen view; the report's order (matched, unmatched, failed) is kept. */
+export function itemsForView(items: readonly GroupItem[], view: StatusView): readonly GroupItem[] {
+  if (view === 'all') return items;
+  return items.filter((item) => (itemStatusOf(item) === 'matched') === (view === 'matched'));
+}
+
+/** `result-count` text: the "7 檔成功＋2 檔未成功" form for the all-rows view of a group that has unmatched rows. */
+export function resultCountText(shown: readonly GroupItem[], total: number, view: StatusView, hasUnmatched: boolean): string {
+  if (view === 'all' && hasUnmatched) {
+    const { matched, unmatched } = statusCounts(shown);
+    return `${matched} 檔成功＋${unmatched} 檔未成功`;
+  }
+  return shown.length === total ? `${shown.length} 檔` : `${shown.length} / ${total} 檔`;
 }
 
 // ---------------------------------------------------------------- row pills

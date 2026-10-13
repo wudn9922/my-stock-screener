@@ -10,7 +10,8 @@ describe('group item metrics', () => {
     const result = parseReport(sample);
     expect(result.status).toBe('ok');
     if (result.status !== 'ok') return;
-    const items = result.report.groups.flatMap((group) => group.items);
+    // Unmatched / failed rows of the sample carry no metrics; this test is about the matched ones.
+    const items = result.report.groups.flatMap((group) => group.items).filter((item) => item.status === undefined);
     expect(items.length).toBeGreaterThan(10);
     for (const item of items) {
       expect(item.volume).toBeTypeOf('number');

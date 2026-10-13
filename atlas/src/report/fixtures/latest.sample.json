@@ -1315,8 +1315,57 @@
             "volVsPrev": 0.66,
             "turnover20": 1535556695.73
           }
+        },
+        {
+          "symbol": "2412.TW",
+          "name": "中華電",
+          "status": "unmatched",
+          "maList": [
+            20
+          ],
+          "close": 129.5,
+          "changePct": -0.38,
+          "maValues": {
+            "20": 124.1
+          },
+          "note": "未符合均線條件 | 現價:129.50 | MA20差距(4.35%) | MA20:124.10",
+          "volume": 6120450,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "2882.TW",
+          "name": "國泰金",
+          "status": "unmatched",
+          "maList": [
+            20,
+            60
+          ],
+          "close": 58.4,
+          "changePct": 1.21,
+          "maValues": {
+            "20": 65.9,
+            "60": 63.2
+          },
+          "note": "未符合均線條件 | 現價:58.40 | MA20差距(-11.38%) / MA60差距(-7.59%) | MA20:65.90 | MA60:63.20",
+          "volume": 18340212,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "6505.TW",
+          "name": "台塑化",
+          "status": "failed",
+          "maList": [
+            20
+          ],
+          "close": null,
+          "changePct": null,
+          "maValues": {},
+          "note": "下載失敗",
+          "volume": 0,
+          "asOf": null
         }
-      ]
+      ],
+      "unmatchedCount": 3
     },
     {
       "key": "tw_g2",
@@ -1406,7 +1455,8 @@
             "turnover20": 3617965711.76
           }
         }
-      ]
+      ],
+      "unmatchedCount": 0
     },
     {
       "key": "custom_22",
@@ -1497,7 +1547,8 @@
             "turnover20": 2320364383.47
           }
         }
-      ]
+      ],
+      "unmatchedCount": 0
     },
     {
       "key": "us_all",
@@ -1979,7 +2030,8 @@
             "turnover20": 7384010076.41
           }
         }
-      ]
+      ],
+      "unmatchedCount": 0
     },
     {
       "key": "us_g2",
@@ -2029,7 +2081,8 @@
             "turnover20": 12841490125.9
           }
         }
-      ]
+      ],
+      "unmatchedCount": 0
     },
     {
       "key": "us_g3",
@@ -2081,7 +2134,8 @@
             "turnover20": 6037097368.43
           }
         }
-      ]
+      ],
+      "unmatchedCount": 0
     },
     {
       "key": "us_g4",
@@ -2092,7 +2146,8 @@
         20
       ],
       "count": 0,
-      "items": []
+      "items": [],
+      "unmatchedCount": 0
     },
     {
       "key": "custom_31",
@@ -2181,8 +2236,40 @@
             "volVsPrev": 1.07,
             "turnover20": 6384548473.16
           }
+        },
+        {
+          "symbol": "F",
+          "name": "",
+          "status": "unmatched",
+          "maList": [
+            20
+          ],
+          "close": 11.82,
+          "changePct": 0.43,
+          "maValues": {
+            "20": 10.6
+          },
+          "note": "未符合均線條件 | 現價:11.82 | MA20差距(11.51%) | MA20:10.60",
+          "volume": 42210330,
+          "asOf": "2026-10-08"
+        },
+        {
+          "symbol": "XYZQ",
+          "name": "",
+          "status": "failed",
+          "maList": [
+            20,
+            60
+          ],
+          "close": null,
+          "changePct": null,
+          "maValues": {},
+          "note": "資料不足",
+          "volume": 0,
+          "asOf": null
         }
-      ]
+      ],
+      "unmatchedCount": 2
     }
   ],
   "sectors": [
