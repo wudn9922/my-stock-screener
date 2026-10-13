@@ -14,11 +14,12 @@ const finite = (value: number | null | undefined): value is number => typeof val
 export function fmtYield(value: number | null | undefined, digits = 2): string {
   return finite(value) ? `${value.toFixed(digits)}%` : '—';
 }
-/** Basis points, signed by default (`+12bp`, `-40bp`). */
+/** Stored rates are in basis points; present their size in percentage points for the user. */
 export function fmtBp(value: number | null | undefined, signed = true): string {
   if (!finite(value)) return '—';
-  const rounded = Math.round(value);
-  return `${signed && rounded > 0 ? '+' : ''}${rounded}bp`;
+  const percent = value / 100;
+  const rounded = Number(percent.toFixed(2));
+  return `${signed && rounded > 0 ? '+' : ''}${rounded.toFixed(2)}%`;
 }
 /** Plain number with fixed decimals (durations, ratios). */
 export function fmtNum(value: number | null | undefined, digits = 1): string {
@@ -29,7 +30,7 @@ export const slashDate = (date: string | null | undefined) => (date ? date.repla
 /** `2024-01-05` → `2024/01`. */
 export const slashMonth = (date: string | null | undefined) => (date ? `${date.slice(0, 4)}/${date.slice(5, 7)}` : '—');
 
-/** A signed change in basis points, colored by direction (follows the 紅漲綠跌 preference). */
+/** A signed rate change in percentage points, colored by direction. */
 export function ChangeBp({ bp, label = '1月' }: { bp: number | null | undefined; label?: string }) {
   return (
     <span className={`rates-chg ${toneClass(finite(bp) ? Math.round(bp) : null)}`}>
