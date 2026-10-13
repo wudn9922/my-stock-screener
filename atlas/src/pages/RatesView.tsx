@@ -30,6 +30,7 @@ export default function RatesView({ openChart }: RatesViewProps) {
   const [rates, setRates] = useState<CachedResult<Rates> | null>(null);
   const [history, setHistory] = useState<HistoryState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  const [fedBound, setFedBound] = useState<'upper' | 'lower'>('upper');
   useEffect(() => {
     let live = true;
     const refresh = attempt > 0;
@@ -73,13 +74,16 @@ export default function RatesView({ openChart }: RatesViewProps) {
           </span>
         </div>
       )}
-      <KeyNumbers rates={data} history={history} />
+      <KeyNumbers rates={data} history={history} fedBound={fedBound} />
       <div className="rates-grid">
-        <SpreadCard rates={data} history={history} />
+        <SpreadCard rates={data} history={history} fedBound={fedBound} onFedBoundChange={setFedBound} />
         {data.etfs.length > 0 && <ScenarioCard etfs={data.etfs} />}
         {data.etfs.length > 0 && <EtfCompareCard etfs={data.etfs} openChart={openChart} />}
       </div>
       <footer className="rates-sources">
+        <details className="rates-disclosure">
+          <summary>資料來源與備註</summary>
+          <div className="rates-disclosure-body">
         <p>
           來源：{data.sources.rates ?? 'FRED'}（美國聯準會 H.15 與 TIPS 資料）{data.sources.etf ? `；${data.sources.etf}` : ''}。
         </p>
@@ -90,6 +94,8 @@ export default function RatesView({ openChart }: RatesViewProps) {
             ))}
           </ul>
         )}
+          </div>
+        </details>
       </footer>
     </div>
   );
