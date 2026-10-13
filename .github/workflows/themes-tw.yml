@@ -49,6 +49,8 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          # 沒有產生檔案（建置失敗且從未成功過）時沒有東西可提交
+          if [ ! -f docs/report/themes-tw.json ]; then echo "No themes-tw.json to commit"; exit 0; fi
           git add -A docs/report/themes-tw.json
           git commit -m "Auto-update Taiwan theme rotation" || { echo "No changes to commit"; exit 0; }
           # 每日報告與 Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試
