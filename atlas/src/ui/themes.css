@@ -529,7 +529,7 @@
 }
 .stat-row {
   display: grid;
-  grid-template-columns: 34px repeat(6, minmax(0, 1fr));
+  grid-template-columns: var(--stat-label, 34px) repeat(6, minmax(0, 1fr));
   align-items: center;
   min-height: 26px;
   text-align: right;

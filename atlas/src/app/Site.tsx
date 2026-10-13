@@ -102,7 +102,15 @@ export function Site() {
     document.getElementById('main')?.scrollTo?.({ top: 0 });
   }, [
     route.page,
-    route.page === 'markets' ? route.market : route.page === 'screener' ? route.group : route.page === 'world' ? route.view : '',
+    route.page === 'markets'
+      ? route.market
+      : route.page === 'screener'
+        ? route.group
+        : route.page === 'world'
+          ? route.view
+          : route.page === 'themes'
+            ? route.market
+            : '',
   ]);
   useEffect(() => {
     const titles =
@@ -212,7 +220,7 @@ export function Site() {
         <Suspense fallback={pageFallback}>
           {route.page === 'markets' && <MarketsPage {...pageProps} market={route.market} />}
           {route.page === 'world' && <WorldPage {...pageProps} view={route.view} />}
-          {route.page === 'themes' && <ThemesPage {...pageProps} theme={route.theme} />}
+          {route.page === 'themes' && <ThemesPage {...pageProps} theme={route.theme} market={route.market} />}
           {route.page === 'screener' && <ScreenerPage {...pageProps} group={route.group} />}
           {route.page === 'financials' && <FinancialsPage {...pageProps} symbol={route.symbol} p={route.p} />}
         </Suspense>
