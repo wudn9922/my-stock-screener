@@ -1,9 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
 import type { PageProps } from './pageProps';
 import { PageState } from '../ui/PageState';
 import { ThemeDetail } from '../ui/ThemeDetail';
-import { PERIODS, PERIOD_LABELS, useThemes, type PeriodKey, type Theme, type ThemesData } from '../report/themes';
+import {
+  PERIODS,
+  PERIOD_LABELS,
+  THEMES_MARKETS,
+  THEMES_MARKET_META,
+  useThemes,
+  type PeriodKey,
+  type Theme,
+  type ThemesData,
+  type ThemesMarket,
+} from '../report/themes';
 import {
   MIN_VALID_FOR_RANK,
   breadthLabel,
@@ -89,7 +99,7 @@ function Tile({
     () => sparkValues(theme, data, sparkLength(period, data.dates), mode),
     [theme, data, period, mode],
   );
-  const label = `${theme.name}，${PERIOD_LABELS[period]}${mode === 'rel' ? '相對 SPY' : '報酬'} ${formatPercent(value, 1)}${
+  const label = `${theme.name}，${PERIOD_LABELS[period]}${mode === 'rel' ? `相對 ${data.benchmark.label}` : '報酬'} ${formatPercent(value, 1)}${
     isRanked(theme) ? `，動能排名第 ${theme.rank}` : ''
   }`;
   return (
@@ -111,7 +121,7 @@ function Tile({
           `資料不足（${theme.validCount}/${theme.count} 檔）`
         ) : (
           <>
-            {mode === 'return' ? '相對 SPY ' : '報酬 '}
+            {mode === 'return' ? `相對 ${data.benchmark.label} ` : '報酬 '}
             <b>{formatPercent(mode === 'return' ? relativeTo(theme.returns[period], data.benchmark.returns[period]) : other, 1)}</b>
           </>
         )}
@@ -120,17 +130,19 @@ function Tile({
   );
 }
 
-const COLUMNS: { key: ListSortKey; label: string; hint?: string }[] = [
-  { key: 'd1', label: PERIOD_LABELS.d1 },
-  { key: 'w1', label: PERIOD_LABELS.w1 },
-  { key: 'm1', label: PERIOD_LABELS.m1 },
-  { key: 'm3', label: PERIOD_LABELS.m3 },
-  { key: 'm6', label: PERIOD_LABELS.m6 },
-  { key: 'ytd', label: PERIOD_LABELS.ytd },
-  { key: 'rs3m', label: '3月相對SPY', hint: '近 3 個月報酬比 SPY 多（少）賺多少' },
-  { key: 'breadth', label: '站上50日線', hint: '題材內有幾成的股票股價在 50 日均線之上，越高代表漲勢越普遍' },
-  { key: 'momentum', label: '動能', hint: '綜合 1 週、1 月、3 月報酬與相對 SPY 的分數，用來排名' },
-];
+function columnsFor(label: string): { key: ListSortKey; label: string; hint?: string }[] {
+  return [
+    { key: 'd1', label: PERIOD_LABELS.d1 },
+    { key: 'w1', label: PERIOD_LABELS.w1 },
+    { key: 'm1', label: PERIOD_LABELS.m1 },
+    { key: 'm3', label: PERIOD_LABELS.m3 },
+    { key: 'm6', label: PERIOD_LABELS.m6 },
+    { key: 'ytd', label: PERIOD_LABELS.ytd },
+    { key: 'rs3m', label: `3月相對${label}`, hint: `近 3 個月報酬比${label}多（少）賺多少` },
+    { key: 'breadth', label: '站上50日線', hint: '題材內有幾成的股票股價在 50 日均線之上，越高代表漲勢越普遍' },
+    { key: 'momentum', label: '動能', hint: `綜合 1 週、1 月、3 月報酬與相對${label}的分數，用來排名` },
+  ];
+}
 
 function Value({ value, digits = 1 }: { value: number | null; digits?: number }) {
   return <span className={`num ${toneClass(value)}`}>{formatPercent(value, digits)}</span>;
@@ -154,12 +166,14 @@ function ThemeTable({
   sort,
   onSort,
   onOpen,
+  columns,
 }: {
   themes: Theme[];
   data: ThemesData;
   sort: { key: ListSortKey; direction: Direction };
   onSort: (key: ListSortKey) => void;
   onOpen: (key: string) => void;
+  columns: ReturnType<typeof columnsFor>;
 }) {
   const header = (key: ListSortKey, label: string, className = '', hint?: string) => {
     const active = sort.key === key;
@@ -178,7 +192,7 @@ function ThemeTable({
         <tr>
           {header('rank', '#', 'col-rank')}
           {header('name', '題材', 'col-name')}
-          {COLUMNS.map((column) => header(column.key, column.label, '', column.hint))}
+          {columns.map((column) => header(column.key, column.label, '', column.hint))}
         </tr>
       </thead>
       <tbody>
@@ -210,7 +224,7 @@ function ThemeTable({
   );
 }
 
-function ThemeCards({ themes, onOpen }: { themes: Theme[]; onOpen: (key: string) => void }) {
+function ThemeCards({ themes, label, onOpen }: { themes: Theme[]; label: string; onOpen: (key: string) => void }) {
   return (
     <ul className="themes-cards">
       {themes.map((theme) => (
@@ -233,7 +247,7 @@ function ThemeCards({ themes, onOpen }: { themes: Theme[]; onOpen: (key: string)
             </span>
             <span className="card-foot">
               <span>
-                3月相對 SPY <Value value={theme.rs.m3} />
+                3月相對 {label} <Value value={theme.rs.m3} />
               </span>
               <span>
                 站上50日線 <b className="num">{theme.breadth50 === null ? '—' : `${Math.round(theme.breadth50)}%`}</b>
@@ -247,6 +261,9 @@ function ThemeCards({ themes, onOpen }: { themes: Theme[]; onOpen: (key: string)
 }
 
 function ThemesView({ data, theme, navigate, openChart }: { data: ThemesData; theme?: string } & Pick<PageProps, 'navigate' | 'openChart'>) {
+  const market = data.market;
+  const label = data.benchmark.label;
+  const columns = useMemo(() => columnsFor(label), [label]);
   const [prefs, setPrefs] = useState<ViewPrefs>(readPrefs);
   const [parent, setParent] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: ListSortKey; direction: Direction }>({ key: 'rank', direction: 'asc' });
@@ -259,10 +276,10 @@ function ThemesView({ data, theme, navigate, openChart }: { data: ThemesData; th
   const selected = themeByKey(data, theme);
   // A link to a theme the file does not have (renamed or removed) falls back to the plain page.
   useEffect(() => {
-    if (theme && !selected) navigate({ page: 'themes' }, { replace: true });
-  }, [theme, selected, navigate]);
-  const open = useCallback((key: string) => navigate({ page: 'themes', theme: key }), [navigate]);
-  const close = useCallback(() => navigate({ page: 'themes' }), [navigate]);
+    if (theme && !selected) navigate(themesRoute(market), { replace: true });
+  }, [theme, selected, navigate, market]);
+  const open = useCallback((key: string) => navigate({ ...themesRoute(market), theme: key }), [navigate, market]);
+  const close = useCallback(() => navigate(themesRoute(market)), [navigate, market]);
   const visible = useMemo(() => filterByParent(data.themes, parent), [data, parent]);
   const tiles = useMemo(() => tileOrder(visible, data, period, mode), [visible, data, period, mode]);
   const rows = useMemo(() => sortThemes(visible, data, sort.key, sort.direction), [visible, data, sort]);
@@ -298,7 +315,7 @@ function ThemesView({ data, theme, navigate, openChart }: { data: ThemesData; th
               報酬
             </button>
             <button type="button" className={mode === 'rel' ? 'active' : ''} aria-pressed={mode === 'rel'} onClick={() => update({ mode: 'rel' })}>
-              相對 SPY
+              相對 {label}
             </button>
           </div>
         </div>
@@ -323,7 +340,7 @@ function ThemesView({ data, theme, navigate, openChart }: { data: ThemesData; th
 
       <div className="themes-legend" aria-hidden="true">
         <span>
-          大盤 {data.benchmark.symbol} {PERIOD_LABELS[period]} <Value value={benchValue} />
+          大盤 {label} {PERIOD_LABELS[period]} <Value value={benchValue} />
         </span>
         <span className="legend-scale">
           <i className="swatch-down" />
@@ -354,7 +371,7 @@ function ThemesView({ data, theme, navigate, openChart }: { data: ThemesData; th
               }}
             >
               <option value="rank">動能排名</option>
-              {COLUMNS.map((column) => (
+              {columns.map((column) => (
                 <option key={column.key} value={column.key}>
                   {column.label}
                 </option>
@@ -363,14 +380,14 @@ function ThemesView({ data, theme, navigate, openChart }: { data: ThemesData; th
             </select>
           </label>
         </div>
-        <ThemeTable themes={rows} data={data} sort={sort} onSort={onSort} onOpen={open} />
-        <ThemeCards themes={rows} onOpen={open} />
+        <ThemeTable themes={rows} data={data} sort={sort} onSort={onSort} onOpen={open} columns={columns} />
+        <ThemeCards themes={rows} label={label} onOpen={open} />
       </section>
 
       <footer className="page-foot">
         <span>
           資料日 {formatDateTime(data.asOf, false)}
-          {age !== null && age > 6 ? `（已 ${age} 天未更新）` : ''} · 題材報酬為成分股等權平均 · 每個交易日更新一次
+          {age !== null && age > 6 ? `（已 ${age} 天未更新）` : ''} · 題材報酬為成分股等權平均 · 基準 {label} · 每個交易日更新一次
         </span>
         <span>題材成分股由人工挑選，僅供研究參考，非投資建議。</span>
       </footer>
@@ -389,8 +406,31 @@ function ThemesView({ data, theme, navigate, openChart }: { data: ThemesData; th
   );
 }
 
-export default function ThemesPage({ navigate, openChart, theme }: PageProps & { theme?: string }) {
-  const { state, reload } = useThemes();
+/** The themes route of a market: Taiwan carries `market`, the US one is the plain page. */
+function themesRoute(market: ThemesMarket) {
+  return market === 'tw' ? ({ page: 'themes', market } as const) : ({ page: 'themes' } as const);
+}
+
+const HELP: Record<ThemesMarket, ReactElement> = {
+  us: (
+    <p>
+      「題材」是把同一個故事的美股放成一籃子，例如「AI晶片」、「核能」。數字是這籃子股票的
+      <b>等權平均</b>漲跌幅（每檔占一樣重）。顏色越深代表漲跌越多；切到「相對 SPY」可以看誰跑贏大盤（SPY
+      是追蹤標普 500 的 ETF，可當作美股大盤）。點任一方塊會看到白話說明、走勢圖與成分股。
+    </p>
+  ),
+  tw: (
+    <p>
+      「題材」是把同一個故事的台股放成一籃子，例如「晶圓代工」、「散熱」。數字是這籃子股票的
+      <b>等權平均</b>漲跌幅（每檔占一樣重）。顏色越深代表漲跌越多；切到「相對 加權指數」可以看誰跑贏大盤（加權指數是台灣上市股票的整體走勢）。
+      點任一方塊會看到白話說明、走勢圖與成分股。
+    </p>
+  ),
+};
+
+export default function ThemesPage({ navigate, openChart, theme, market = 'us' }: PageProps & { theme?: string; market?: ThemesMarket }) {
+  const { state, reload } = useThemes(market);
+  const meta = THEMES_MARKET_META[market];
   return (
     <div className="page themes-page">
       <div className="page-head">
@@ -398,23 +438,37 @@ export default function ThemesPage({ navigate, openChart, theme }: PageProps & {
           <h2 className="page-title">題材輪動</h2>
           <p className="page-sub">
             {state.status === 'ok'
-              ? `美股 ${state.data.themes.length} 個題材 · 資料日 ${formatDateTime(state.data.asOf, false)}`
-              : '美股產業題材 · 看資金現在流向哪裡'}
+              ? `${meta.name} ${state.data.themes.length} 個題材 · 資料日 ${formatDateTime(state.data.asOf, false)} · 基準 ${state.data.benchmark.label}`
+              : `${meta.name}產業題材 · 看資金現在流向哪裡`}
           </p>
         </div>
       </div>
+      <div className="tabs market-tabs themes-market" role="tablist" aria-label="市場">
+        {THEMES_MARKETS.map((key) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={market === key}
+            className={market === key ? 'active' : ''}
+            onClick={() => market !== key && navigate(themesRoute(key))}
+          >
+            <span aria-hidden="true" className="flag">
+              {THEMES_MARKET_META[key].flag}
+            </span>
+            {THEMES_MARKET_META[key].name}
+          </button>
+        ))}
+      </div>
       <details className="themes-help">
         <summary>這頁怎麼看？</summary>
-        <p>
-          「題材」是把同一個故事的美股放成一籃子，例如「AI晶片」、「核能」。數字是這籃子股票的
-          <b>等權平均</b>漲跌幅（每檔占一樣重）。顏色越深代表漲跌越多；切到「相對 SPY」可以看誰跑贏大盤（SPY
-          是追蹤標普 500 的 ETF，可當作美股大盤）。點任一方塊會看到白話說明、走勢圖與成分股。
-        </p>
+        {HELP[market]}
       </details>
       {state.status === 'loading' ? (
         <PageState kind="loading" title="載入題材資料…" />
       ) : state.status === 'ok' ? (
-        <ThemesView data={state.data} theme={theme} navigate={navigate} openChart={openChart} />
+        // Keyed by market so the parent filter and sort order start over when the market changes.
+        <ThemesView key={market} data={state.data} theme={theme} navigate={navigate} openChart={openChart} />
       ) : (
         <PageState
           kind={state.status === 'error' ? 'error' : 'empty'}

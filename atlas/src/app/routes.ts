@@ -5,7 +5,7 @@ import type { Timeframe } from '../market-data/MarketDataProvider';
 /**
  * Site routes live in the query string so the static GitHub Pages deployment needs no rewrites:
  * `?page=markets&market=tw`, `?page=world`, `?page=world&view=rates` (aliases `?page=rates`, `?page=bonds`),
- * `?page=themes&theme=ai-chips`, `?page=screener&group=tw_g1`, `?page=chart&symbol=2330.TW&tf=1D`,
+ * `?page=themes&theme=ai-chips` (`&market=tw` for the Taiwan themes; the US ones are the default), `?page=screener&group=tw_g1`, `?page=chart&symbol=2330.TW&tf=1D`,
  * `?page=financials&symbol=AAPL&p=q` (not in the bottom bar; opened from the chart header). Legacy report links (`?symbol=…&tf=…`) open the chart.
  * LINE LIFF wraps the original path and query in `liff.state`, which is unwrapped first.
  */
@@ -16,7 +16,8 @@ export type Route =
   | { page: 'markets'; market: MarketKey }
   /** `view` is only present for the rates sub-view; the index view is just `{ page: 'world' }`. */
   | { page: 'world'; view?: 'rates' }
-  | { page: 'themes'; theme?: string }
+  /** `market` is only present for Taiwan (`'tw'`); omitted means the US themes. */
+  | { page: 'themes'; theme?: string; market?: 'tw' }
   | { page: 'screener'; group?: string; f?: string }
   | { page: 'chart'; symbol?: string; tf?: Timeframe }
   /** `p: 'q'` shows quarterly figures; omitted means annual. */
@@ -139,7 +140,9 @@ export function parseRoute(search: string, fallback: Page = 'markets'): ParsedRo
     };
   } else if (page === 'themes') {
     const theme = params.get('theme')?.trim().toLowerCase();
-    route = theme && THEME_KEY.test(theme) ? { page, theme } : { page };
+    // Only `tw` is kept; `us` is the default and anything else falls back to it.
+    const market = params.get('market')?.trim().toLowerCase() === 'tw' ? ({ market: 'tw' } as const) : {};
+    route = { page, ...market, ...(theme && THEME_KEY.test(theme) ? { theme } : {}) };
   } else if (page === 'screener') {
     const group = params.get('group')?.trim();
     const f = params.get('f')?.trim();
@@ -169,6 +172,7 @@ export function serializeRoute(route: Route): string {
   params.set('page', route.page);
   if (route.page === 'markets') params.set('market', route.market);
   if (route.page === 'world' && route.view) params.set('view', route.view);
+  if (route.page === 'themes' && route.market) params.set('market', route.market);
   if (route.page === 'themes' && route.theme) params.set('theme', route.theme);
   if (route.page === 'screener' && route.group) params.set('group', route.group);
   if (route.page === 'screener' && route.f) params.set('f', route.f);

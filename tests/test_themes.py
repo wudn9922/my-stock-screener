@@ -1,8 +1,11 @@
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import sys
 import tempfile
+import types
 import unittest
 from datetime import datetime, timezone
 from unittest import mock
@@ -347,6 +350,256 @@ class MainTest(unittest.TestCase):
         code, written, _ = self.run_main(keep)
         self.assertEqual(code, 1)
         self.assertEqual(written, {"old": True})
+
+
+def fake_themes_tw(config=None):
+    """A stand-in `themes_tw` module (scripts/themes_tw.py is delivered separately)."""
+    config = config or themes_synth.tw_config()
+    module = types.ModuleType("themes_tw")
+    module.PARENTS = config["parents"]
+    module.THEMES = config["themes"]
+    module.BENCHMARK = config["benchmark"]
+    return module
+
+
+def tw_prices(**kwargs):
+    config = themes_synth.tw_config()
+    options = dict(seed=7, drift=themes_synth.TW_THEME_DRIFT, speculative=themes_synth.TW_SPECULATIVE, bench_level=22000.0)
+    options.update(kwargs)
+    return config, themes_synth.synthetic_prices(config, **options)
+
+
+class UsRegressionTest(unittest.TestCase):
+    """The US file must stay exactly what it was before the Taiwan market was added."""
+
+    def test_us_sample_payload_is_byte_identical_to_the_committed_fixture(self):
+        body = json.dumps(themes_synth.us_fixture_payload(), ensure_ascii=False, separators=(",", ":")) + "\n"
+        path = os.path.join(ROOT, "atlas", "src", "report", "fixtures", "themes.sample.json")
+        with open(path, encoding="utf-8") as file:
+            self.assertEqual(body, file.read())
+
+    def test_us_config_and_payload_carry_no_market_keys(self):
+        config = build_themes.load_config("us")
+        self.assertEqual(config, build_themes.default_config())
+        self.assertEqual(set(config), {"parents", "themes", "benchmark"})
+        payload = themes_synth.us_fixture_payload()
+        self.assertNotIn("market", payload)
+        self.assertEqual(set(payload["benchmark"]), {"symbol", "returns", "series"})
+        self.assertEqual(payload["benchmark"]["symbol"], "SPY")
+
+    def test_us_session_cutoff_is_unchanged_by_default(self):
+        bars = [("2026-10-08", 1.0), ("2026-10-09", 2.0)]
+        during = datetime(2026, 10, 9, 16, 47, tzinfo=timezone.utc)
+        self.assertEqual(build_themes.drop_open_session({"A": bars}, during), {"A": bars[:1]})
+        self.assertEqual(build_themes.drop_open_session({"A": bars}, during, "us"), {"A": bars[:1]})
+
+    def test_us_main_still_writes_themes_json_without_arguments(self):
+        prices = themes_synth.synthetic_prices(build_themes.default_config())
+        with tempfile.TemporaryDirectory() as folder:
+            default_out = os.path.join(folder, "docs", "report", "themes.json")
+            with mock.patch.dict(os.environ), mock.patch.object(build_themes, "DEFAULT_OUT", default_out), mock.patch.object(
+                build_themes, "download_prices", return_value=prices
+            ):
+                os.environ.pop("THEMES_OUT_PATH", None)
+                os.environ.pop("THEMES_MARKET", None)
+                self.assertEqual(build_themes.main(), 0)
+            self.assertEqual(sorted(os.listdir(os.path.dirname(default_out))), ["themes.json"])
+            with open(default_out, encoding="utf-8") as file:
+                self.assertEqual(json.load(file)["benchmark"]["symbol"], "SPY")
+
+
+class TaiwanPayloadTest(unittest.TestCase):
+    def test_payload_uses_the_taiwan_benchmark_and_keeps_the_structure(self):
+        config, prices = tw_prices(drop={"2605.TW", "2606.TW", "2609.TW"}, stale={"8150.TW"})
+        payload = build_themes.build_payload(prices, config, TODAY)
+        self.assertEqual(payload["market"], "tw")
+        self.assertEqual(payload["benchmark"]["symbol"], "^TWII")
+        self.assertEqual(payload["benchmark"]["name"], "加權指數")
+        self.assertEqual(payload["asOf"], "2026-10-09")
+        self.assertEqual(len(payload["dates"]), 126)
+        self.assertEqual(len(payload["benchmark"]["series"]), 126)
+        self.assertEqual(payload["skipped"], {"missing": ["2605.TW", "2606.TW", "2609.TW"], "stale": ["8150.TW"]})
+        self.assertEqual(len(payload["themes"]), len(config["themes"]))
+        symbols = {c["symbol"] for t in payload["themes"] for c in t["constituents"]}
+        self.assertTrue(all(s.endswith((".TW", ".TWO")) for s in symbols))
+        self.assertIn("5347.TWO", symbols)
+        ranks = [t["rank"] for t in payload["themes"] if t["rank"] is not None]
+        self.assertEqual(ranks, list(range(1, len(ranks) + 1)))
+        momentum = [t["momentum"] for t in payload["themes"] if t["rank"] is not None]
+        self.assertEqual(momentum, sorted(momentum, reverse=True))
+        thin = payload["themes"][-1]
+        self.assertEqual((thin["key"], thin["validCount"], thin["rank"], thin["momentum"]), ("shipping", 2, None, None))
+        finance = next(t for t in payload["themes"] if t["key"] == "finance")
+        self.assertEqual(finance["etf"]["symbol"], "0055.TW")
+        json.dumps(payload, allow_nan=False)
+        self.assertEqual(set(payload) - {"market"}, set(themes_synth.us_fixture_payload()))
+
+    def test_relative_strength_is_measured_against_the_taiwan_benchmark(self):
+        calendar = themes_synth.business_days("2026-10-09", 260)
+        config = mini_config({"t": ["1101.TW", "1102.TW", "1216.TW"]})
+        config["benchmark"] = "^TWII"
+        index = geometric(calendar, 22000.0, 0.001)
+        flat = geometric(calendar, 50.0, 0.0)
+        payload = build_themes.build_payload({"^TWII": index, "1101.TW": flat, "1102.TW": flat, "1216.TW": flat}, config, TODAY)
+        theme = payload["themes"][0]
+        self.assertAlmostEqual(payload["benchmark"]["returns"]["m3"], (1.001**63 - 1) * 100, places=2)
+        expected = ((1 / 1.001**63) - 1) * 100
+        self.assertAlmostEqual(theme["rs"]["m3"], expected, places=2)
+        self.assertNotIn("market", payload)  # only configs that name a market add the key
+
+    def test_bars_follow_the_benchmark_calendar(self):
+        # ^TWII has no bar on the 2026-10-06 holiday; a stray bar on that day in a stock is ignored,
+        # and the stock is forward-filled on days it did not trade (a halt).
+        calendar = [d for d in themes_synth.business_days("2026-10-09", 260) if d != "2026-10-06"]
+        config = mini_config({"t": ["2330.TW", "2317.TW", "2454.TW"]})
+        config["benchmark"] = "^TWII"
+        index = geometric(calendar, 22000.0, 0.0)
+        stock = geometric(calendar, 100.0, 0.001)
+        halted = [bar for bar in stock if bar[0] != "2026-10-08"]
+        stray = sorted(stock + [("2026-10-06", 999.0)])
+        prices = {"^TWII": index, "2330.TW": stock, "2317.TW": halted, "2454.TW": stray}
+        payload = build_themes.build_payload(prices, config, TODAY)
+        self.assertNotIn("2026-10-06", payload["dates"])
+        by_symbol = {c["symbol"]: c for c in payload["themes"][0]["constituents"]}
+        self.assertAlmostEqual(by_symbol["2330.TW"]["returns"]["d1"], 0.1, places=2)
+        # No bar on 10-08: forward-filled, so the last day's move is measured from the 10-07 close.
+        self.assertAlmostEqual(by_symbol["2317.TW"]["returns"]["d1"], (1.001**2 - 1) * 100, places=2)
+        self.assertAlmostEqual(by_symbol["2454.TW"]["returns"]["d1"], 0.1, places=2)
+        self.assertLess(by_symbol["2454.TW"]["close"], 200)
+
+    def test_coverage_threshold_applies_to_taiwan_too(self):
+        config, prices = tw_prices()
+        symbols = sorted({t[0] for theme in config["themes"] for t in theme["tickers"]})
+        keep = {"^TWII": prices["^TWII"]}
+        keep.update({s: prices[s] for s in symbols[: int(len(symbols) * 0.5)]})
+        with self.assertRaises(build_themes.InsufficientData):
+            build_themes.build_payload(keep, config, TODAY)
+
+    def test_taiwan_session_cutoff(self):
+        bars = [("2026-10-08", 1.0), ("2026-10-09", 2.0)]
+        during = datetime(2026, 10, 9, 4, 0, tzinfo=timezone.utc)  # 12:00 Taipei
+        after = datetime(2026, 10, 9, 6, 30, tzinfo=timezone.utc)  # 14:30 Taipei
+        weekend = datetime(2026, 10, 10, 4, 0, tzinfo=timezone.utc)
+        self.assertEqual(build_themes.drop_open_session({"A": bars}, during, "tw"), {"A": bars[:1]})
+        self.assertEqual(build_themes.drop_open_session({"A": bars}, after, "tw"), {"A": bars})
+        self.assertEqual(build_themes.drop_open_session({"A": bars}, weekend, "tw"), {"A": bars})
+        # The same instant is still the middle of the US previous session's evening: nothing to drop there.
+        self.assertEqual(build_themes.drop_open_session({"A": bars}, after), {"A": bars[:1]})
+
+    def test_all_symbols_include_the_benchmark_and_etfs(self):
+        symbols = build_themes.all_symbols(themes_synth.tw_config())
+        self.assertIn("^TWII", symbols)
+        self.assertIn("0055.TW", symbols)
+        self.assertIn("5347.TWO", symbols)
+
+
+class MarketSelectionTest(unittest.TestCase):
+    def run_main(self, argv, prices, env=None, module=None):
+        with tempfile.TemporaryDirectory() as folder:
+            report = os.path.join(folder, "docs", "report")
+            os.makedirs(report)
+            for name in ("themes.json", "themes-tw.json"):
+                with open(os.path.join(report, name), "w", encoding="utf-8") as file:
+                    file.write('{"old":"%s"}' % name)
+            with mock.patch.dict(os.environ), mock.patch.object(
+                build_themes, "DEFAULT_OUT", os.path.join(report, "themes.json")
+            ), mock.patch.object(build_themes, "download_prices", return_value=prices) as download, mock.patch.dict(
+                sys.modules, {"themes_tw": None if module == "missing" else module} if module is not None else {}
+            ):
+                os.environ.pop("THEMES_OUT_PATH", None)
+                os.environ.pop("THEMES_MARKET", None)
+                os.environ.update(env or {})
+                code = build_themes.main(argv)
+            written = {}
+            for name in os.listdir(report):
+                with open(os.path.join(report, name), encoding="utf-8") as file:
+                    written[name] = json.load(file)
+            return code, written, download
+
+    def test_market_tw_writes_themes_tw_json_and_leaves_the_us_file_alone(self):
+        _config, prices = tw_prices()
+        code, written, download = self.run_main(["--market", "tw"], prices, module=fake_themes_tw())
+        self.assertEqual(code, 0)
+        self.assertEqual(written["themes.json"], {"old": "themes.json"})
+        self.assertEqual(written["themes-tw.json"]["benchmark"]["symbol"], "^TWII")
+        self.assertEqual(written["themes-tw.json"]["benchmark"]["name"], "加權指數")
+        self.assertIn("^TWII", download.call_args[0][0])
+
+    def test_environment_variable_selects_the_market_and_the_flag_wins(self):
+        _config, prices = tw_prices()
+        code, written, _ = self.run_main([], prices, env={"THEMES_MARKET": "tw"}, module=fake_themes_tw())
+        self.assertEqual(code, 0)
+        self.assertEqual(written["themes-tw.json"]["market"], "tw")
+        us_prices = themes_synth.synthetic_prices(build_themes.default_config())
+        code, written, _ = self.run_main(["--market", "us"], us_prices, env={"THEMES_MARKET": "tw"})
+        self.assertEqual(code, 0)
+        self.assertEqual(written["themes-tw.json"], {"old": "themes-tw.json"})
+        self.assertEqual(written["themes.json"]["benchmark"]["symbol"], "SPY")
+
+    def test_taiwan_failure_keeps_the_old_file(self):
+        _config, prices = tw_prices()
+        thin = {"^TWII": prices["^TWII"]}
+        code, written, _ = self.run_main(["--market", "tw"], thin, module=fake_themes_tw())
+        self.assertEqual(code, 1)
+        self.assertEqual(written["themes-tw.json"], {"old": "themes-tw.json"})
+        self.assertEqual(written["themes.json"], {"old": "themes.json"})
+
+    def test_missing_themes_tw_gives_a_clear_error_and_downloads_nothing(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            code, written, download = self.run_main(["--market", "tw"], {}, module="missing")
+        self.assertEqual(code, 1)
+        self.assertIn("themes_tw.py not found", stdout.getvalue())
+        download.assert_not_called()
+        self.assertEqual(written["themes-tw.json"], {"old": "themes-tw.json"})
+
+    def test_load_config_reports_a_missing_or_incomplete_module(self):
+        with mock.patch.dict(sys.modules, {"themes_tw": None}):
+            with self.assertRaisesRegex(build_themes.ConfigError, "themes_tw.py not found"):
+                build_themes.load_config("tw")
+        incomplete = types.ModuleType("themes_tw")
+        incomplete.THEMES = []
+        with mock.patch.dict(sys.modules, {"themes_tw": incomplete}):
+            with self.assertRaisesRegex(build_themes.ConfigError, "PARENTS, THEMES and BENCHMARK"):
+                build_themes.load_config("tw")
+        with self.assertRaises(build_themes.ConfigError):
+            build_themes.load_config("jp")
+
+    def test_load_config_reads_the_module_and_names_the_default_benchmark(self):
+        with mock.patch.dict(sys.modules, {"themes_tw": fake_themes_tw()}):
+            config = build_themes.load_config("tw")
+        self.assertEqual(config["benchmark"], "^TWII")
+        self.assertEqual(config["benchmark_name"], "加權指數")
+        self.assertEqual(config["market"], "tw")
+        named = fake_themes_tw()
+        named.BENCHMARK_NAME = "自訂名稱"
+        with mock.patch.dict(sys.modules, {"themes_tw": named}):
+            self.assertEqual(build_themes.load_config("tw")["benchmark_name"], "自訂名稱")
+
+    def test_load_config_accepts_a_benchmark_pair_or_mapping(self):
+        pair = fake_themes_tw()
+        pair.BENCHMARK = ("^TWII", "台灣加權")
+        with mock.patch.dict(sys.modules, {"themes_tw": pair}):
+            config = build_themes.load_config("tw")
+        self.assertEqual((config["benchmark"], config["benchmark_name"]), ("^TWII", "台灣加權"))
+        mapping = fake_themes_tw()
+        mapping.BENCHMARK = {"symbol": "^TWII", "name": "加權"}
+        with mock.patch.dict(sys.modules, {"themes_tw": mapping}):
+            self.assertEqual(build_themes.load_config("tw")["benchmark_name"], "加權")
+        broken = fake_themes_tw()
+        broken.BENCHMARK = None
+        with mock.patch.dict(sys.modules, {"themes_tw": broken}):
+            with self.assertRaisesRegex(build_themes.ConfigError, "BENCHMARK must be"):
+                build_themes.load_config("tw")
+
+    def test_unknown_market_is_rejected(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as raised:
+            build_themes.main(["--market", "jp"])
+        self.assertEqual(raised.exception.code, 2)
+        stdout = io.StringIO()
+        with mock.patch.dict(os.environ, {"THEMES_MARKET": "jp"}), contextlib.redirect_stdout(stdout):
+            self.assertEqual(build_themes.main([]), 1)
+        self.assertIn("unknown market", stdout.getvalue())
 
 
 if __name__ == "__main__":

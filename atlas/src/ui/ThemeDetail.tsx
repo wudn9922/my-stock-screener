@@ -25,7 +25,7 @@ function pct(index: number) {
   return `${index > 0 ? '+' : ''}${index.toFixed(1)}%`;
 }
 
-/** Theme index versus SPY, both rebased to 0% on the first visible day. Drag or hover to read a day. */
+/** Theme index versus the benchmark (SPY or 加權指數), both rebased to 0% on the first visible day. Drag or hover to read a day. */
 function VersusChart({ theme, data }: { theme: Theme; data: ThemesData }) {
   const [range, setRange] = useState<ChartRange>('3m');
   const [hover, setHover] = useState<number | null>(null);
@@ -69,7 +69,7 @@ function VersusChart({ theme, data }: { theme: Theme; data: ThemesData }) {
           </span>
           <span>
             <i className="dashed" style={{ borderColor: BENCH_COLOR }} />
-            {data.benchmark.symbol}
+            {data.benchmark.label}
             <b className={`num ${toneClass(b)}`}>{pct(b)}</b>
           </span>
           <span className="versus-date">{formatDateTime(chart.dates[shown], false)}</span>
@@ -86,7 +86,7 @@ function VersusChart({ theme, data }: { theme: Theme; data: ThemesData }) {
         className="versus-svg"
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label={`題材指數與 ${data.benchmark.symbol} 走勢比較，區間起點為 0%`}
+        aria-label={`題材指數與 ${data.benchmark.label} 走勢比較，區間起點為 0%`}
         onPointerMove={move}
         onPointerDown={move}
         onPointerLeave={() => setHover(null)}
@@ -118,11 +118,17 @@ function VersusChart({ theme, data }: { theme: Theme; data: ThemesData }) {
 function StatTable({ theme, data }: { theme: Theme; data: ThemesData }) {
   const rows: { label: string; values: (number | null)[]; tone: boolean }[] = [
     { label: '題材', values: PERIODS.map((p) => theme.returns[p]), tone: true },
-    { label: data.benchmark.symbol, values: PERIODS.map((p) => data.benchmark.returns[p]), tone: true },
+    { label: data.benchmark.label, values: PERIODS.map((p) => data.benchmark.returns[p]), tone: true },
     { label: '相對', values: PERIODS.map((p) => relativeTo(theme.returns[p], data.benchmark.returns[p])), tone: true },
   ];
   return (
-    <div className="stat-table" role="table" aria-label="各期間報酬">
+    <div
+      className="stat-table"
+      role="table"
+      aria-label="各期間報酬"
+      // Wider label column for names such as 加權指數 (SPY fits the default 34px).
+      style={data.benchmark.label.length > 3 ? { ['--stat-label' as string]: `${Math.ceil(data.benchmark.label.length * 12.5)}px` } : undefined}
+    >
       <div className="stat-row head" role="row">
         <span role="columnheader">%</span>
         {PERIODS.map((p) => (
@@ -149,12 +155,14 @@ function StatTable({ theme, data }: { theme: Theme; data: ThemesData }) {
 
 function ConstituentRow({
   item,
+  benchmark,
   period,
   expanded,
   onToggle,
   openChart,
 }: {
   item: ThemeConstituent;
+  benchmark: string;
   period: PeriodKey;
   expanded: boolean;
   onToggle: () => void;
@@ -188,7 +196,7 @@ function ConstituentRow({
             ))}
           </div>
           <p className="constituent-facts">
-            收盤 {formatPrice(item.close)} · 3月相對 SPY <b className={`num ${toneClass(item.rs3m)}`}>{formatPercent(item.rs3m, 1)}</b> ·{' '}
+            收盤 {formatPrice(item.close)} · 3月相對 {benchmark} <b className={`num ${toneClass(item.rs3m)}`}>{formatPercent(item.rs3m, 1)}</b> ·{' '}
             {item.aboveMa50 === null ? '50日線資料不足' : item.aboveMa50 ? '站上50日線' : '跌破50日線'}
           </p>
           <MiniChart symbol={item.symbol} maList={[20, 50]} height={150} />
@@ -348,6 +356,7 @@ export function ThemeDetail({
                 <ConstituentRow
                   key={item.symbol}
                   item={item}
+                  benchmark={data.benchmark.label}
                   period={period}
                   expanded={expanded === item.symbol}
                   onToggle={() => setExpanded(expanded === item.symbol ? null : item.symbol)}

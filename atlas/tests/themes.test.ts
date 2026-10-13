@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { fetchThemes, parseThemes, themesUrl, type ThemesData } from '../src/report/themes';
+import { fetchThemes, loadThemes, parseThemes, themesUrl, type ThemesData } from '../src/report/themes';
 import {
   MIN_VALID_FOR_RANK,
   chartData,
@@ -19,6 +19,7 @@ import {
 } from '../src/pages/themesView';
 
 const sample: unknown = JSON.parse(readFileSync('src/report/fixtures/themes.sample.json', 'utf8'));
+const sampleTw: unknown = JSON.parse(readFileSync('src/report/fixtures/themes-tw.sample.json', 'utf8'));
 
 function load(): ThemesData {
   const result = parseThemes(sample);
@@ -109,6 +110,94 @@ describe('themes.json schema', () => {
 
   it('derives the file URL next to latest.json', () => {
     expect(themesUrl()).toMatch(/\/report\/themes\.json$/);
+    expect(themesUrl('us')).toBe(themesUrl());
+    expect(themesUrl('tw')).toMatch(/\/report\/themes-tw\.json$/);
+  });
+});
+
+describe('Taiwan themes (themes-tw.json)', () => {
+  function loadTw(): ThemesData {
+    const result = parseThemes(sampleTw, '', 'tw');
+    if (result.status !== 'ok') throw new Error('Taiwan fixture must parse');
+    return result.data;
+  }
+
+  it('parses the synthetic Taiwan sample with the same schema', () => {
+    expect((sampleTw as { synthetic?: boolean }).synthetic).toBe(true);
+    const data = loadTw();
+    expect(data.market).toBe('tw');
+    expect(data.themes).toHaveLength(8);
+    expect(data.asOf).toBe('2026-10-09');
+    expect(data.dates).toHaveLength(126);
+    expect(data.benchmark).toMatchObject({ symbol: '^TWII', label: '加權指數' });
+    expect(data.benchmark.series).toHaveLength(126);
+    const symbols = data.themes.flatMap((t) => t.constituents.map((c) => c.symbol));
+    expect(symbols.every((symbol) => /^\d{4}\.(TW|TWO)$/.test(symbol))).toBe(true);
+    expect(symbols).toContain('5347.TWO');
+    expect(data.themes.at(-1)).toMatchObject({ key: 'shipping', validCount: 2, rank: null });
+    expect(data.themes.find((t) => t.key === 'finance')?.etf?.symbol).toBe('0055.TW');
+  });
+
+  it('keeps the US data reading as before (benchmark SPY labelled SPY)', () => {
+    const data = load();
+    expect(data.market).toBe('us');
+    expect(data.benchmark).toMatchObject({ symbol: 'SPY', label: 'SPY' });
+  });
+
+  it('names the benchmark from the file, a known symbol or the market default', () => {
+    const base = { themes: [{ key: 'a', name: 'A' }] };
+    const label = (raw: unknown, market: 'us' | 'tw') => {
+      const result = parseThemes(raw, '', market);
+      if (result.status !== 'ok') throw new Error('must parse');
+      return result.data.benchmark;
+    };
+    expect(label({ ...base, benchmark: { symbol: '^TWII', name: '自訂' } }, 'tw')).toMatchObject({ symbol: '^TWII', label: '自訂' });
+    expect(label({ ...base, benchmark: { symbol: '^TWII' } }, 'tw')).toMatchObject({ label: '加權指數' });
+    expect(label(base, 'tw')).toMatchObject({ symbol: '^TWII', label: '加權指數' });
+    expect(label(base, 'us')).toMatchObject({ symbol: 'SPY', label: 'SPY' });
+    expect(label({ ...base, benchmark: { symbol: '' } }, 'tw').symbol).toBe('^TWII');
+  });
+
+  it('reuses the view helpers: relative strength is measured against the Taiwan benchmark', () => {
+    const data = loadTw();
+    const foundry = data.themes.find((t) => t.key === 'foundry')!;
+    expect(metricValue(foundry, data, 'm3', 'rel')!).toBeCloseTo(foundry.rs.m3!, 1);
+    const order = tileOrder(data.themes, data, 'm1', 'return');
+    expect(order.at(-1)!.key).toBe('shipping'); // too few valid names: last
+    expect(sortThemes(data.themes, data, 'rank', 'asc')[0]!.rank).toBe(1);
+    expect(chartData(foundry, data, '3m').theme[0]).toBe(100);
+  });
+
+  it('shows the not-generated state for a missing Taiwan file without touching the US one', async () => {
+    const url = 'http://localhost/report/themes-tw.json';
+    const fetcher = vi.fn(async (input: RequestInfo | URL) =>
+      String(input).endsWith('themes-tw.json') ? response('not found', 404) : response(JSON.stringify(sample)),
+    );
+    expect((await fetchThemes(url, fetcher, undefined, 'tw')).status).toBe('missing');
+    expect((await fetchThemes('http://localhost/report/themes.json', fetcher)).status).toBe('ok');
+    const tw = await fetchThemes(url, vi.fn(async () => response(JSON.stringify(sampleTw))), undefined, 'tw');
+    expect(tw.status === 'ok' && tw.data.market).toBe('tw');
+  });
+
+  it('loads each market from its own file and caches them separately', async () => {
+    const seen: string[] = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      seen.push(String(input));
+      return response(JSON.stringify(String(input).endsWith('themes-tw.json') ? sampleTw : sample));
+    });
+    vi.stubGlobal('fetch', fetcher);
+    try {
+      const us = await loadThemes(true, 'us');
+      const tw = await loadThemes(true, 'tw');
+      expect(us.status === 'ok' && us.data.benchmark.symbol).toBe('SPY');
+      expect(tw.status === 'ok' && tw.data.benchmark.symbol).toBe('^TWII');
+      expect(seen.map((url) => url.split('/').at(-1))).toEqual(['themes.json', 'themes-tw.json']);
+      await loadThemes(false, 'us');
+      await loadThemes(false, 'tw');
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

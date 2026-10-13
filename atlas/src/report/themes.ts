@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { reportUrl } from './loadReport';
 
 /**
- * US theme rotation (`report/themes.json`, written by scripts/build_themes.py).
+ * Theme rotation: US (`report/themes.json`) and Taiwan (`report/themes-tw.json`), both written by
+ * scripts/build_themes.py with the same structure.
  *
  * Tolerant like the daily report: unknown fields are ignored, numbers are finite or null, and a
  * malformed theme or constituent is dropped instead of rejecting the file.
@@ -22,6 +23,15 @@ export const PERIOD_LABELS: Record<PeriodKey, string> = {
 export type Returns = Record<PeriodKey, number | null>;
 
 export const THEME_KEY = /^[a-z0-9-]{1,40}$/;
+
+export const THEMES_MARKETS = ['us', 'tw'] as const;
+export type ThemesMarket = (typeof THEMES_MARKETS)[number];
+export const THEMES_MARKET_META: Record<ThemesMarket, { name: string; flag: string; file: string; benchmark: string }> = {
+  us: { name: '美股', flag: '🇺🇸', file: 'themes.json', benchmark: 'SPY' },
+  tw: { name: '台股', flag: '🇹🇼', file: 'themes-tw.json', benchmark: '^TWII' },
+};
+/** Names for benchmark symbols whose ticker is unreadable; a file may also carry `benchmark.name`. */
+const BENCHMARK_NAMES: Record<string, string> = { '^TWII': '加權指數' };
 
 function toFinite(value: unknown): number | null {
   const number = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
@@ -123,13 +133,15 @@ const parentSchema = z.object({
 });
 export type ThemeParent = { key: string; name: string; order: number };
 
-const benchmarkSchema = z.object({ symbol: text, returns, series });
+const benchmarkSchema = z.object({ symbol: text, name: text, returns, series });
 
 export type ThemesData = {
+  market: ThemesMarket;
   generatedAt: string | null;
   asOf: string | null;
   dates: string[];
-  benchmark: { symbol: string; returns: Returns; series: number[] };
+  /** `label` is what the page shows for the benchmark: the file's name, a known name, or the symbol. */
+  benchmark: { symbol: string; label: string; returns: Returns; series: number[] };
   parents: ThemeParent[];
   themes: Theme[];
 };
@@ -138,15 +150,15 @@ export type ThemesLoadResult =
   | { status: 'ok'; data: ThemesData; url: string }
   | { status: 'missing' | 'invalid' | 'error'; message: string; url: string };
 
-/** Sibling of `report/latest.json`: `/my-stock-screener/report/themes.json`. */
-export function themesUrl(): string {
-  return new URL('themes.json', reportUrl()).href;
+/** Sibling of `report/latest.json`: `/my-stock-screener/report/themes.json` (`themes-tw.json` for Taiwan). */
+export function themesUrl(market: ThemesMarket = 'us'): string {
+  return new URL(THEMES_MARKET_META[market].file, reportUrl()).href;
 }
 
 const MISSING_MESSAGE = '資料會在每個交易日的報告更新後出現，請稍後再試。';
 
 /** Parses an already-fetched body. Never throws. */
-export function parseThemes(raw: unknown, url = ''): ThemesLoadResult {
+export function parseThemes(raw: unknown, url = '', market: ThemesMarket = 'us'): ThemesLoadResult {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw))
     return { status: 'invalid', message: '題材資料格式無法辨識。', url };
   const source = raw as Record<string, unknown>;
@@ -171,16 +183,20 @@ export function parseThemes(raw: unknown, url = ''): ThemesLoadResult {
   const benchmark = benchmarkSchema.safeParse(source.benchmark);
   const emptyReturns = Object.fromEntries(PERIODS.map((key) => [key, null])) as Returns;
   const dates = Array.isArray(source.dates) ? source.dates.filter((d): d is string => typeof d === 'string') : [];
+  const fallbackSymbol = THEMES_MARKET_META[market].benchmark;
+  const symbol = (benchmark.success && benchmark.data.symbol) || fallbackSymbol;
+  const label = (benchmark.success && benchmark.data.name) || BENCHMARK_NAMES[symbol] || symbol;
   return {
     status: 'ok',
     url,
     data: {
+      market,
       generatedAt: typeof source.generatedAt === 'string' ? source.generatedAt : null,
       asOf: typeof source.asOf === 'string' ? source.asOf : (dates.at(-1) ?? null),
       dates,
       benchmark: benchmark.success
-        ? { symbol: benchmark.data.symbol || 'SPY', returns: benchmark.data.returns, series: benchmark.data.series }
-        : { symbol: 'SPY', returns: emptyReturns, series: [] },
+        ? { symbol, label, returns: benchmark.data.returns, series: benchmark.data.series }
+        : { symbol, label, returns: emptyReturns, series: [] },
       parents,
       themes,
     },
@@ -191,6 +207,7 @@ export async function fetchThemes(
   url = themesUrl(),
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal,
+  market: ThemesMarket = 'us',
 ): Promise<ThemesLoadResult> {
   let response: Response;
   try {
@@ -207,34 +224,39 @@ export async function fetchThemes(
   } catch {
     return { status: 'missing', message: MISSING_MESSAGE, url };
   }
-  return parseThemes(data, url);
+  return parseThemes(data, url, market);
 }
 
-let shared: Promise<ThemesLoadResult> | null = null;
+const shared: Partial<Record<ThemesMarket, Promise<ThemesLoadResult>>> = {};
 
-/** One shared load per page session; `refresh` forces a new request. */
-export function loadThemes(refresh = false): Promise<ThemesLoadResult> {
-  if (!shared || refresh) shared = fetchThemes();
-  return shared;
+/** One shared load per market and page session; `refresh` forces a new request. */
+export function loadThemes(refresh = false, market: ThemesMarket = 'us'): Promise<ThemesLoadResult> {
+  if (!shared[market] || refresh) shared[market] = fetchThemes(themesUrl(market), fetch, undefined, market);
+  return shared[market]!;
 }
 
 export type ThemesState = { status: 'loading' } | ThemesLoadResult;
 
-export function useThemes() {
-  const [state, setState] = useState<ThemesState>({ status: 'loading' });
-  const run = useCallback((refresh: boolean) => {
-    let active = true;
-    if (refresh) setState({ status: 'loading' });
-    void loadThemes(refresh).then((result) => {
-      if (active) setState(result);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
+export function useThemes(market: ThemesMarket = 'us') {
+  // The result is stored with its market, so a switch shows "loading" at once instead of the other market's data.
+  const [loaded, setLoaded] = useState<{ market: ThemesMarket; result: ThemesLoadResult } | null>(null);
+  const run = useCallback(
+    (refresh: boolean) => {
+      let active = true;
+      if (refresh) setLoaded(null);
+      void loadThemes(refresh, market).then((result) => {
+        if (active) setLoaded({ market, result });
+      });
+      return () => {
+        active = false;
+      };
+    },
+    [market],
+  );
   useEffect(() => run(false), [run]);
   const reload = useCallback(() => {
     run(true);
   }, [run]);
+  const state: ThemesState = loaded && loaded.market === market ? loaded.result : { status: 'loading' };
   return { state, reload };
 }

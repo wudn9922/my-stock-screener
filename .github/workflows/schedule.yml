@@ -115,13 +115,18 @@ jobs:
           FED_TARGET_UPPER_FALLBACK: ${{ vars.FED_TARGET_UPPER_FALLBACK }}
         run: python dify_report.py
 
-      # 美股題材（類股輪動）：下載成分股日線並產生 docs/report/themes.json。
-      # 失敗只保留上次的檔案，不影響主流程。
+      # 題材輪動（類股輪動）：下載成分股日線，美股產生 docs/report/themes.json、台股產生 docs/report/themes-tw.json。
+      # 兩個市場依序各跑一次、各自失敗各自保留上次的檔案（互不拖累），最後有任一失敗才讓此步驟標為失敗；
+      # 不影響主流程。
       - name: Build theme rotation
         if: steps.guard.outputs.skip != 'true'
         continue-on-error: true
-        timeout-minutes: 15
-        run: python scripts/build_themes.py
+        timeout-minutes: 20
+        run: |
+          rc=0
+          python scripts/build_themes.py --market us || rc=$?
+          python scripts/build_themes.py --market tw || rc=$?
+          exit $rc
 
       # 美債與利率研究：FRED 殖利率（免金鑰 CSV 優先，FRED_API_KEY 只當備援）＋長天期美債 ETF 還原收盤，
       # 產生 docs/report/rates.json 與 rates-history.json。失敗只保留上次的檔案，不影響主流程。

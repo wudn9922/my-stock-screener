@@ -1,15 +1,21 @@
 """
-Builds docs/report/themes.json: US theme rotation (等權題材報酬、相對 SPY、寬度、動能排名).
+Builds the theme rotation files (等權題材報酬、相對基準、寬度、動能排名):
 
-  python scripts/build_themes.py
-  Env: THEMES_OUT_PATH (default docs/report/themes.json)
+  python scripts/build_themes.py               # US  -> docs/report/themes.json (benchmark SPY)
+  python scripts/build_themes.py --market tw   # TW  -> docs/report/themes-tw.json (benchmark ^TWII)
+  Env: THEMES_MARKET (us|tw, default us; --market wins),
+       THEMES_OUT_PATH (output path of the market being built, default per market)
 
 Runs in GitHub Actions after the daily report (Yahoo Finance via yfinance, 1 year of daily bars for
-every constituent, the reference ETFs and SPY). build_payload() is a pure function over already
-downloaded prices so it can be tested offline. Failure keeps the previous themes.json (exit 1).
+every constituent, the reference ETFs and the benchmark). build_payload() is a pure function over
+already downloaded prices so it can be tested offline. Failure keeps the previous file (exit 1).
+The US definitions live in themes_us.py; the TW ones in themes_tw.py, which is only imported when
+--market tw is chosen. Yahoo symbols are used as written (`2330.TW`, `6488.TWO`, `^TWII`).
 
 Prices are plain `{symbol: [(YYYY-MM-DD, close), ...]}` lists in ascending date order.
 """
+import argparse
+import importlib
 import json
 import os
 import statistics
@@ -23,29 +29,77 @@ from themes_us import BENCHMARK, PARENTS, THEMES  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_OUT = os.path.join(ROOT, "docs", "report", "themes.json")
+MARKETS = ("us", "tw")
+OUT_FILES = {"us": "themes.json", "tw": "themes-tw.json"}
+# Where a market's regular session ends (zone, local hour/minute plus a small delay for data vendors).
+# Bars dated "today" are partial before that time and are dropped by drop_open_session().
+SESSION_CLOSE = {"us": ("America/New_York", (16, 15)), "tw": ("Asia/Taipei", (13, 45))}
 
 PERIOD_BARS = {"d1": 1, "w1": 5, "m1": 21, "m3": 63, "m6": 126}
 PERIOD_KEYS = ["d1", "w1", "m1", "m3", "m6", "ytd"]
 SERIES_POINTS = 126
 HIGH_WINDOW = 252
 MA_WINDOW = 50
-# A constituent whose last bar is this many days older than SPY's last bar is treated as stale.
+# A constituent whose last bar is this many days older than the benchmark's last bar is treated as stale.
 STALE_DAYS = 3
 # Theme needs at least this many valid constituents to be ranked.
 MIN_VALID = 3
-# Below this share of tickers with data the old file is kept.
+# Below this share of tickers with data the old file is kept. The same 0.6 applies to Taiwan: trading
+# halts and the odd failed Yahoo symbol are common there, but a run under 60% is more likely a bad
+# download than a real market, and keeping yesterday's file is the safer outcome.
 MIN_COVERAGE = 0.6
 BATCH_SIZE = 40
-# Momentum score weights: w1, m1, m3 and 3-month strength relative to SPY.
+# Momentum score weights: w1, m1, m3 and 3-month strength relative to the benchmark.
 MOMENTUM_WEIGHTS = {"w1": 0.2, "m1": 0.25, "m3": 0.3, "rs3m": 0.25}
+
+
+# Display name of the Taiwan benchmark when themes_tw.py does not give one.
+TW_BENCHMARK_NAMES = {"^TWII": "加權指數"}
 
 
 class InsufficientData(Exception):
     pass
 
 
+class ConfigError(Exception):
+    pass
+
+
 def default_config():
     return {"parents": PARENTS, "themes": THEMES, "benchmark": BENCHMARK}
+
+
+def load_config(market="us"):
+    """Theme definitions for a market. `tw` is imported lazily so the US job never needs themes_tw."""
+    if market == "us":
+        return default_config()
+    if market != "tw":
+        raise ConfigError(f"unknown market {market!r} (expected one of {', '.join(MARKETS)})")
+    try:
+        module = importlib.import_module("themes_tw")
+    except ModuleNotFoundError as exc:
+        if exc.name != "themes_tw":
+            raise
+        raise ConfigError("scripts/themes_tw.py not found: the Taiwan theme definitions are required for --market tw") from exc
+    try:
+        benchmark, parents, themes = module.BENCHMARK, module.PARENTS, module.THEMES
+    except AttributeError as exc:
+        raise ConfigError(f"themes_tw.py must define PARENTS, THEMES and BENCHMARK ({exc})") from exc
+    name = getattr(module, "BENCHMARK_NAME", None)
+    # BENCHMARK is a plain symbol like the US file; a (symbol, name) pair or {"symbol", "name"} also works.
+    if isinstance(benchmark, dict):
+        benchmark, name = benchmark.get("symbol"), name or benchmark.get("name")
+    elif isinstance(benchmark, (tuple, list)):
+        benchmark, name = benchmark[0], name or (benchmark[1] if len(benchmark) > 1 else None)
+    if not isinstance(benchmark, str) or not benchmark:
+        raise ConfigError("themes_tw.py BENCHMARK must be a Yahoo symbol such as '^TWII'")
+    return {
+        "parents": parents,
+        "themes": themes,
+        "benchmark": benchmark,
+        "market": "tw",
+        "benchmark_name": name or TW_BENCHMARK_NAMES.get(benchmark),
+    }
 
 
 def round2(value):
@@ -262,7 +316,7 @@ def build_payload(prices, config, today):
 
     bench_series = equal_weight_series([bench_values], SERIES_POINTS)
     generated = today.astimezone(timezone.utc) if today.tzinfo else today.replace(tzinfo=timezone.utc)
-    return {
+    payload = {
         "version": 1,
         "generatedAt": generated.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "asOf": last_date,
@@ -277,6 +331,12 @@ def build_payload(prices, config, today):
         "skipped": {key: sorted(value) for key, value in skipped.items()},
         "coverage": round(coverage, 3),
     }
+    # Only non-US configs carry these keys, so the US file stays byte-for-byte what it always was.
+    if config.get("market"):
+        payload["market"] = config["market"]
+    if config.get("benchmark_name"):
+        payload["benchmark"]["name"] = config["benchmark_name"]
+    return payload
 
 
 # --------------------------------------------------------------------------- download
@@ -354,17 +414,18 @@ def download_prices(symbols, downloader=None, sleep=time.sleep):
     return prices
 
 
-def drop_open_session(prices, now):
-    """Removes today's bar while the US session may still be open (a delayed run would see partial prices)."""
+def drop_open_session(prices, now, market="us"):
+    """Removes today's bar while the market's session may still be open (a delayed run would see partial prices)."""
+    zone_name, cutoff = SESSION_CLOSE[market]
     try:
         from zoneinfo import ZoneInfo
 
-        eastern = now.astimezone(ZoneInfo("America/New_York"))
+        local = now.astimezone(ZoneInfo(zone_name))
     except Exception:  # noqa: BLE001 - no tz database: keep the data as downloaded
         return prices
-    if eastern.weekday() >= 5 or (eastern.hour, eastern.minute) >= (16, 15):
+    if local.weekday() >= 5 or (local.hour, local.minute) >= cutoff:
         return prices
-    today = eastern.date().isoformat()
+    today = local.date().isoformat()
     trimmed = {}
     for symbol, bars in prices.items():
         trimmed[symbol] = bars[:-1] if bars and bars[-1][0] == today else bars
@@ -389,18 +450,31 @@ def all_symbols(config):
     return sorted(symbols)
 
 
-def main():
-    config = default_config()
-    out_path = os.environ.get("THEMES_OUT_PATH") or DEFAULT_OUT
+def parse_args(argv):
+    parser = argparse.ArgumentParser(description="Build the theme rotation file for one market.")
+    parser.add_argument("--market", choices=MARKETS, help="us (default) or tw; env THEMES_MARKET is the fallback")
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args([] if argv is None else argv)
+    market = args.market or os.environ.get("THEMES_MARKET") or "us"
+    try:
+        config = load_config(market)
+    except ConfigError as exc:
+        print(f"{OUT_FILES.get(market, 'themes file')} not updated: {exc}")
+        return 1
+    out_name = OUT_FILES[market]
+    out_path = os.environ.get("THEMES_OUT_PATH") or os.path.join(os.path.dirname(DEFAULT_OUT), out_name)
     symbols = all_symbols(config)
-    print(f"downloading {len(symbols)} symbols")
+    print(f"[{market}] downloading {len(symbols)} symbols")
     prices = download_prices(symbols)
     now = datetime.now(timezone.utc)
-    prices = drop_open_session(prices, now)
+    prices = drop_open_session(prices, now, market)
     try:
         payload = build_payload(prices, config, now)
     except InsufficientData as exc:
-        print(f"themes.json not updated: {exc}")
+        print(f"{out_name} not updated: {exc}")
         return 1
     skipped = payload["skipped"]
     if skipped["missing"] or skipped["stale"]:
@@ -411,4 +485,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
