@@ -2,6 +2,10 @@
 
 import requests
 
+from breakout_alert.breakout_engine import (
+    INDEX_BREAKOUT_DOWN_RATIO,
+    INDEX_BREAKOUT_UP_RATIO,
+)
 from breakout_alert.config import (
     get_supabase_rest_url,
     get_supabase_service_key,
@@ -36,6 +40,20 @@ GROUP_DISPLAY_NAMES = {
 VALID_GROUP_KEYS = set(
     GROUP_DISPLAY_NAMES
 )
+
+# 大盤指數（index_configs 表）的均線提醒使用固定群組。
+# 目前監控時段只有台股與美股，其他市場的指數（歐洲、日韓）略過。
+ADMIN_INDEX_GROUP_ID = "admin_index"
+ADMIN_INDEX_GROUP_NAME = "大盤指數"
+INDEX_MARKETS = {
+    "^TWII": "TW",
+    "^TWOII": "TW",
+    "^GSPC": "US",
+    "^DJI": "US",
+    "^IXIC": "US",
+    "^RUT": "US",
+    "^SOX": "US"
+}
 
 # Atlas 畫線警示的狀態列使用 atlas_ 開頭的 group_id，
 # 均線孤兒清理與 Discord /量比 都必須排除這些列。
@@ -241,6 +259,10 @@ class SupabaseStore:
             )
 
         self.session.headers.update(headers)
+
+        # index_configs 本次是否成功載入；
+        # 失敗時不能把大盤指數的狀態列當成孤兒清掉。
+        self.index_configs_loaded = False
 
 
 
@@ -471,6 +493,111 @@ class SupabaseStore:
 
         return group_mapping
 
+    def get_index_configs(self):
+        rows = self._request(
+            "GET",
+            "index_configs",
+            params={
+                "select": (
+                    "ticker,name,ma1,ma2,ma3,ma4"
+                ),
+                "order": "ticker.asc"
+            }
+        )
+
+        return rows if isinstance(
+            rows,
+            list
+        ) else []
+
+    def get_index_monitor_configs(self):
+        """
+        把 index_configs 中有均線參數的大盤指數
+        轉成監控設定。
+
+        載入失敗時回傳空清單並保留既有狀態列
+        （index_configs_loaded 維持 False）。
+        """
+        self.index_configs_loaded = False
+
+        try:
+            rows = self.get_index_configs()
+
+        except Exception as exc:
+            print(
+                "⚠️ 大盤指數設定載入失敗，"
+                "本次略過指數提醒："
+                f"{type(exc).__name__}: {exc}"
+            )
+
+            return []
+
+        self.index_configs_loaded = True
+
+        configs = []
+        skipped_markets = []
+
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+
+            ticker = str(
+                row.get("ticker") or ""
+            ).strip().upper()
+
+            if not ticker:
+                continue
+
+            ma_list = get_ma_list(row)
+
+            if not ma_list:
+                continue
+
+            market = INDEX_MARKETS.get(ticker)
+
+            if market is None:
+                skipped_markets.append(ticker)
+                continue
+
+            configs.append(
+                {
+                    "stock_id": None,
+                    "line_user_id": self.user_id,
+                    "group_id": ADMIN_INDEX_GROUP_ID,
+                    "raw_group_id": (
+                        ADMIN_INDEX_GROUP_ID
+                    ),
+                    "group_name": (
+                        ADMIN_INDEX_GROUP_NAME
+                    ),
+                    "ticker": ticker,
+                    "market": market,
+                    "ma_list": ma_list,
+                    "is_dynamic_group": False,
+                    "display_name": str(
+                        row.get("name") or ""
+                    ).strip(),
+                    "breakout_up_ratio": (
+                        INDEX_BREAKOUT_UP_RATIO
+                    ),
+                    "breakout_down_ratio": (
+                        INDEX_BREAKOUT_DOWN_RATIO
+                    )
+                }
+            )
+
+        if skipped_markets:
+            print(
+                "ℹ️ 略過尚未支援交易時段的指數："
+                + "、".join(skipped_markets)
+            )
+
+        print(
+            f"📊 載入大盤指數監控設定：{len(configs)} 檔"
+        )
+
+        return configs
+
     def get_monitor_configs(self):
         groups = self.get_groups()
         stocks = self.get_user_stocks()
@@ -667,6 +794,10 @@ class SupabaseStore:
                     f"｜{market}"
                     f"｜MA={ma_list}"
                 )
+
+        monitor_configs.extend(
+            self.get_index_monitor_configs()
+        )
 
         return monitor_configs
 
@@ -1012,6 +1143,16 @@ class SupabaseStore:
             if isinstance(row, dict)
             and not is_atlas_state_row(row)
         ]
+
+        # 大盤指數設定本次沒載入成功時，
+        # 不能把它們的狀態列視為孤兒。
+        if not self.index_configs_loaded:
+            rows = [
+                row
+                for row in rows
+                if row.get("group_id")
+                != ADMIN_INDEX_GROUP_ID
+            ]
 
         if not rows:
             return 0

@@ -7,6 +7,8 @@ import pandas as pd
 import requests
 import yfinance as yf
 
+from breakout_alert.tw_names import fill_missing_names
+
 
 TWSE_MIS_URL = (
     "https://mis.twse.com.tw/"
@@ -748,6 +750,20 @@ class PriceProvider:
             if fast_info_quote:
                 quotes[ticker] = (
                     fast_info_quote
+                )
+
+        # MIS 沒有成交價而改用 Yahoo 時沒有中文名稱，
+        # 這裡用證交所／櫃買公開資料補上。
+        if market == "TW":
+            try:
+                quotes = fill_missing_names(
+                    self.http,
+                    quotes
+                )
+            except Exception as exc:
+                print(
+                    "⚠️ 補台股中文名稱失敗，已略過："
+                    f"{type(exc).__name__}: {exc}"
                 )
 
         return quotes
