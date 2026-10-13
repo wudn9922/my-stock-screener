@@ -7,8 +7,11 @@ import {
   EMPTY_FILTERS,
   TREND_FLAGS,
   TREND_LABELS,
+  VOLUME_PRESETS,
   formatRange,
+  isCustomVolume,
   needsGrowth,
+  toggleVolume,
   trendFlagUnavailable,
   type FilterAvailability,
   type FilterRange,
@@ -306,24 +309,10 @@ export function FilterSheet(props: FilterSheetProps) {
 
           <Section
             title="均線乖離"
-            hint="收盤價高於（+）或低於（−）均線的百分比；滑到兩端代表不限。"
-            unavailable={availability.ma20 && availability.ma50 && availability.ma200 ? availability.ma20 : null}
+            hint="收盤價高於（+）或低於（−）EMA20（20 日指數移動平均）的百分比；滑到兩端代表不限。"
+            unavailable={availability.ema20}
           >
-            {(['20', '50', '200'] as const).map((period) =>
-              availability[`ma${period}`] ? null : (
-                <RangeSlider
-                  key={period}
-                  label={`MA${period}`}
-                  value={draft.ma[period]}
-                  onChange={(range) => {
-                    const ma = { ...draft.ma };
-                    if (range) ma[period] = range;
-                    else delete ma[period];
-                    update({ ma });
-                  }}
-                />
-              ),
-            )}
+            <RangeSlider label="EMA20" value={draft.ema20 ?? undefined} onChange={(range) => update({ ema20: range ?? null })} />
           </Section>
 
           <Section
@@ -402,17 +391,19 @@ export function FilterSheet(props: FilterSheetProps) {
             )}
           </Section>
 
-          <Section title="量比" unavailable={availability.vr} hint="今日成交量 ÷ 前 20 日平均量（不含今日）。">
+          <Section title="量比" unavailable={availability.vr} hint="今日成交量 ÷ 前一交易日成交量。">
             <Choice
               label="量比"
               value={draft.vr}
-              onChange={(vr) => update({ vr })}
+              onChange={(vr) => update({ vr: toggleVolume(draft.vr, vr) })}
               options={[
                 { value: null, label: '不限' },
-                { value: 1.5, label: '≥1.5x' },
-                { value: 2, label: '≥2x' },
+                ...VOLUME_PRESETS.map((preset) => ({ value: preset, label: `≥${preset}` })),
               ]}
             />
+            {isCustomVolume(draft.vr) && (
+              <p className="fs-hint fs-current">目前條件：≥{Number(draft.vr.toFixed(2))}</p>
+            )}
           </Section>
 
           <Section title="基本面（美股限定）" unavailable={fundamentalsBlocked}>
@@ -473,7 +464,7 @@ export function FilterSheet(props: FilterSheetProps) {
           </Section>
         </div>
         <footer className="fs-foot">
-          <button type="button" className="ghost-button" onClick={() => setDraft({ ...EMPTY_FILTERS, ma: {}, tr: [] })}>
+          <button type="button" className="ghost-button" onClick={() => setDraft({ ...EMPTY_FILTERS, tr: [] })}>
             重設
           </button>
           <button type="button" className="primary-button fs-apply" onClick={() => props.onApply(draft)}>

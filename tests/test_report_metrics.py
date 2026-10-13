@@ -21,8 +21,8 @@ import report_metrics  # noqa: E402
 
 UNIVERSE_FIELDS = [
     "symbol", "name", "close", "changePct", "volume", "r5", "r21", "r63",
-    "ma20", "ma50", "ma200", "ma20Slope5", "trend", "hi52", "fromHi52", "hiBars",
-    "rs21", "rs63", "rsRank", "volRatio", "turnover20",
+    "ma20", "ma50", "ma200", "ema20", "ma20Slope5", "trend", "hi52", "fromHi52", "hiBars",
+    "rs21", "rs63", "rsRank", "volVsPrev", "turnover20",
 ]
 
 
@@ -90,7 +90,11 @@ class ComputeStockMetricsTest(unittest.TestCase):
         self.assertEqual(metrics["rsBench"], "SPY")
         self.assertIsNone(metrics["rs21"])
         self.assertIsNone(metrics["rsRank"])
-        self.assertEqual(metrics["volRatio"], 1.0)
+        self.assertEqual(metrics["volVsPrev"], 1.0)
+        self.assertNotIn("volRatio", metrics)
+        # EMA20 reacts faster than SMA20, so a steady riser sits closer to its EMA
+        self.assertGreater(metrics["ema20"], 0)
+        self.assertLess(metrics["ema20"], metrics["ma"]["20"])
         self.assertEqual(
             metrics["turnover20"],
             round(float((df["Close"] * df["Volume"]).tail(20).mean())),
@@ -134,27 +138,76 @@ class ComputeStockMetricsTest(unittest.TestCase):
         self.assertEqual(metrics["hi52"], 130.0)
         self.assertAlmostEqual(metrics["fromHi52"], round((100 / 130 - 1) * 100, 2))
 
-    def test_vol_ratio_excludes_today(self):
-        volumes = [1000.0] * 40 + [3000.0]
+    def test_ema20_hand_calculated(self):
+        # 19 flat closes of 10 then 20: EMA = 10 + (20 - 10) * 2/21 = 10.952381
         metrics = report_metrics.compute_stock_metrics(
-            make_prices([10] * 41, volumes=volumes), None, "SPY"
+            make_prices([10] * 19 + [20]), None, "SPY"
         )
-        # Previous 20 sessions average 1000 → 3.0 (2.73 if today were included)
-        self.assertEqual(metrics["volRatio"], 3.0)
+        self.assertEqual(metrics["ema20"], 82.61)  # (20 / 10.952381 - 1) * 100
+        # the SMA distance is a different number: (20 / 10.5 - 1) * 100
+        self.assertEqual(metrics["ma"]["20"], 90.48)
 
-    def test_low_volume(self):
-        volumes = [2000.0] * 30 + [500.0]
+    def test_ema20_matches_recursion(self):
+        closes = [100 + (i % 7) * 3 - i * 0.5 for i in range(60)]
+        alpha = 2 / 21
+        ema = closes[0]
+        for value in closes[1:]:
+            ema = alpha * value + (1 - alpha) * ema
+        metrics = report_metrics.compute_stock_metrics(make_prices(closes), None, "SPY")
+        self.assertAlmostEqual(metrics["ema20"], round((closes[-1] / ema - 1) * 100, 2))
+
+    def test_ema20_flat_and_insufficient_history(self):
+        flat = report_metrics.compute_stock_metrics(make_prices([50] * 30), None, "SPY")
+        self.assertEqual(flat["ema20"], 0)
+        short = report_metrics.compute_stock_metrics(make_prices([50] * 19), None, "SPY")
+        self.assertIsNone(short["ema20"])
+        strict_json(short)
+
+    def test_vol_vs_prev_uses_previous_session_only(self):
+        # Only yesterday matters: 20-day history of 1000 does not dilute the 4000 day
+        volumes = [1000.0] * 38 + [4000.0, 6000.0]
         metrics = report_metrics.compute_stock_metrics(
-            make_prices([10] * 31, volumes=volumes), None, "SPY"
+            make_prices([10] * 40, volumes=volumes), None, "SPY"
         )
-        self.assertEqual(metrics["volRatio"], 0.25)
+        self.assertEqual(metrics["volVsPrev"], 1.5)
+
+    def test_vol_vs_prev_spike_and_drop(self):
+        spike = report_metrics.compute_stock_metrics(
+            make_prices([10] * 41, volumes=[1000.0] * 40 + [3000.0]), None, "SPY"
+        )
+        self.assertEqual(spike["volVsPrev"], 3.0)
+        low = report_metrics.compute_stock_metrics(
+            make_prices([10] * 31, volumes=[2000.0] * 30 + [500.0]), None, "SPY"
+        )
+        self.assertEqual(low["volVsPrev"], 0.25)
+
+    def test_vol_vs_prev_works_with_two_bars(self):
+        metrics = report_metrics.compute_stock_metrics(
+            make_prices([10, 10], volumes=[800.0, 1200.0]), None, "SPY"
+        )
+        self.assertEqual(metrics["volVsPrev"], 1.5)
 
     def test_zero_previous_volume_gives_none(self):
         volumes = [0.0] * 30 + [500.0]
         metrics = report_metrics.compute_stock_metrics(
             make_prices([10] * 31, volumes=volumes), None, "SPY"
         )
-        self.assertIsNone(metrics["volRatio"])
+        self.assertIsNone(metrics["volVsPrev"])
+
+    def test_last_bar_without_volume_gives_none(self):
+        for last in (0.0, float("nan")):
+            volumes = [1000.0] * 30 + [last]
+            metrics = report_metrics.compute_stock_metrics(
+                make_prices([10] * 31, volumes=volumes), None, "SPY"
+            )
+            self.assertIsNone(metrics["volVsPrev"], last)
+
+    def test_missing_previous_volume_gives_none(self):
+        volumes = [1000.0] * 29 + [float("nan"), 500.0]
+        metrics = report_metrics.compute_stock_metrics(
+            make_prices([10] * 31, volumes=volumes), None, "SPY"
+        )
+        self.assertIsNone(metrics["volVsPrev"])
 
     def test_short_history(self):
         metrics = report_metrics.compute_stock_metrics(
@@ -164,6 +217,7 @@ class ComputeStockMetricsTest(unittest.TestCase):
         self.assertIsNotNone(metrics["r21"])
         self.assertIsNone(metrics["r63"])
         self.assertIsNotNone(metrics["ma"]["20"])
+        self.assertIsNotNone(metrics["ema20"])
         self.assertIsNone(metrics["ma"]["50"])
         self.assertIsNone(metrics["ma"]["200"])
         self.assertIsNotNone(metrics["ma20Slope5"])
@@ -177,7 +231,7 @@ class ComputeStockMetricsTest(unittest.TestCase):
         metrics = report_metrics.compute_stock_metrics(make_prices([10]), None, "SPY")
         self.assertEqual(metrics["bars"], 1)
         self.assertEqual(metrics["hiBars"], 1)
-        for key in ("r5", "r21", "r63", "ma20Slope5", "trend", "volRatio", "turnover20"):
+        for key in ("r5", "r21", "r63", "ma20Slope5", "trend", "ema20", "volVsPrev", "turnover20"):
             self.assertIsNone(metrics[key], key)
         self.assertEqual(metrics["ma"], {"20": None, "50": None, "200": None})
         strict_json(metrics)

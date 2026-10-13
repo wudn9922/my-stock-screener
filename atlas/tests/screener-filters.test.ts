@@ -3,17 +3,21 @@ import { describe, expect, it } from 'vitest';
 import {
   EMPTY_FILTERS,
   FILTER_STORAGE_KEY,
+  NO_METRICS_REASON,
   TW_FUNDAMENTALS_REASON,
+  VOLUME_PRESETS,
   activeChips,
   applyFilters,
   countFilters,
   filterAvailability,
   growthGatePasses,
+  isCustomVolume,
   maDeviation,
   parseFilters,
   readStoredFilters,
   removeFilter,
   serializeFilters,
+  toggleVolume,
   writeStoredFilters,
   type FilterState,
 } from '../src/pages/screenerFilters';
@@ -35,10 +39,10 @@ const item = (symbol: string, metrics: Record<string, unknown> | null, extra: Re
 
 describe('filter encoding', () => {
   it('parses the documented example and serializes it canonically', () => {
-    const parsed = state('chg:0:3;ma50:-5:5;tr:a20,a50,stack;hi:10;rs:80;vr:1.5;eps:2:20;rev:10');
+    const parsed = state('chg:0:3;ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;vr:1.5;eps:2:20;rev:10');
     expect(parsed).toEqual({
       chg: { min: 0, max: 3 },
-      ma: { 50: { min: -5, max: 5 } },
+      ema20: { min: -5, max: 5 },
       tr: ['a20', 'a50', 'stack'],
       hi: 10,
       rs: 80,
@@ -48,31 +52,44 @@ describe('filter encoding', () => {
       rev: { quarters: 1, min: 10 },
       keepMissing: false,
     });
-    expect(serializeFilters(parsed)).toBe('chg:0:3;ma50:-5:5;tr:a20,a50,stack;hi:10;rs:80;vr:1.5;eps:2:20;rev:1:10');
+    expect(serializeFilters(parsed)).toBe('chg:0:3;ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;vr:1.5;eps:2:20;rev:1:10');
   });
 
   it('round-trips open ranges, every flag and the missing-data switch', () => {
-    const text = 'chg::-3;ma20:2:;ma200:-20:20;tr:a20,a50,a200,slope,stack,nobear;rs3:0;eps:3:0;nd:keep';
+    const text = 'chg::-3;ema20:2:;tr:a20,a50,a200,slope,stack,nobear;rs3:0;eps:3:0;nd:keep';
     const parsed = state(text);
     expect(parsed.chg).toEqual({ min: null, max: -3 });
-    expect(parsed.ma['20']).toEqual({ min: 2, max: null });
+    expect(parsed.ema20).toEqual({ min: 2, max: null });
     expect(parsed.keepMissing).toBe(true);
     expect(serializeFilters(parsed)).toBe(text);
     expect(serializeFilters(state(serializeFilters(parsed)))).toBe(text);
     expect(state('chg:~:-3').chg).toEqual({ min: null, max: -3 });
   });
 
+  it('drops the retired MA20 / MA50 / MA200 ranges instead of migrating them', () => {
+    expect(state('ma20:-5:5;ma50:-5:5;ma200:-20:20')).toEqual(EMPTY_FILTERS);
+    const mixed = state('chg:0:3;ma50:-5:5;ema20:1:4;ma200::;vr:1.1');
+    expect(mixed).toEqual({ ...EMPTY_FILTERS, chg: { min: 0, max: 3 }, ema20: { min: 1, max: 4 }, vr: 1.1 });
+    expect(serializeFilters(mixed)).toBe('chg:0:3;ema20:1:4;vr:1.1');
+    expect(serializeFilters(mixed)).not.toMatch(/(^|;)ma\d/);
+    // Stored (localStorage) values go through the same parser.
+    const store = { getItem: () => JSON.stringify({ TW: 'ma50:-5:5;hi:10' }) } as unknown as Storage;
+    expect(state(readStoredFilters('TW', store))).toEqual({ ...EMPTY_FILTERS, hi: 10 });
+    // An old volume-ratio number is kept, with the new meaning.
+    expect(state('vr:2').vr).toBe(2);
+  });
+
   it('ignores junk without throwing and keeps the parameter within the route limits', () => {
     expect(state('')).toEqual(EMPTY_FILTERS);
     expect(state(null)).toEqual(EMPTY_FILTERS);
-    const junk = state('zzz:1;chg:a:b;hi:0;hi:500;rs:0;rs:150;vr:-1;eps:9:20;eps:x;tr:up,a20,A50;ma50::;;:;rev:1:x');
+    const junk = state('zzz:1;chg:a:b;hi:0;hi:500;rs:0;rs:150;vr:-1;eps:9:20;eps:x;tr:up,a20,A50;ema20::;;:;rev:1:x');
     expect(junk).toEqual({ ...EMPTY_FILTERS, tr: ['a20', 'a50'] });
     // Reversed bounds are swapped; the last duplicate wins.
     expect(state('chg:5:-2;hi:5;hi:20')).toMatchObject({ chg: { min: -2, max: 5 }, hi: 20 });
     expect(serializeFilters(EMPTY_FILTERS)).toBe('');
     // nd only matters with a fundamental gate.
     expect(serializeFilters({ ...EMPTY_FILTERS, keepMissing: true })).toBe('');
-    const full = serializeFilters(state('chg:-12.345:99.999;ma20:-20:20;ma50:-20:20;ma200:-20:20;tr:a20,a50,a200,slope,stack,nobear;hi:20;rs:90;rs3:0;vr:2;eps:3:25;rev:3:20;nd:keep'));
+    const full = serializeFilters(state('chg:-12.345:99.999;ema20:-20:20;tr:a20,a50,a200,slope,stack,nobear;hi:20;rs:90;rs3:0;vr:2;eps:3:25;rev:3:20;nd:keep'));
     expect(full.length).toBeLessThanOrEqual(300);
     expect(full).toMatch(/^[A-Za-z0-9:.,;_~-]+$/);
     expect(full.startsWith('chg:-12.35:100;')).toBe(true);
@@ -107,7 +124,7 @@ describe('applyFilters', () => {
     };
     check('chg:0:3', (i) => i.changePct! >= 0 && i.changePct! <= 3);
     check('chg::-3', (i) => i.changePct! <= -3);
-    check('ma50:-5:5', (i) => i.metrics!.ma['50'] !== null && Math.abs(i.metrics!.ma['50']) <= 5);
+    check('ema20:-5:5', (i) => i.metrics!.ema20 !== null && Math.abs(i.metrics!.ema20) <= 5);
     check('tr:a20', (i) => i.metrics!.ma['20']! > 0);
     check('tr:a200', (i) => (i.metrics!.ma['200'] ?? -1) > 0);
     check('tr:slope', (i) => i.metrics!.ma20Slope5! > 0);
@@ -119,7 +136,7 @@ describe('applyFilters', () => {
     check('hi:10', (i) => i.metrics!.fromHi52 !== null && i.metrics!.fromHi52 >= -10);
     check('rs:80', (i) => (i.metrics!.rsRank ?? 0) >= 80);
     check('rs3:0', (i) => (i.metrics!.rs63 ?? -1) > 0);
-    check('vr:1.5', (i) => (i.metrics!.volRatio ?? 0) >= 1.5);
+    check('vr:1.2', (i) => (i.metrics!.volVsPrev ?? 0) >= 1.2);
   });
 
   it('combines conditions with AND', () => {
@@ -131,10 +148,10 @@ describe('applyFilters', () => {
   });
 
   it('excludes stocks without the needed value (short history) except for 「排除空頭」', () => {
-    const young = item('9999.TW', { ma: { 20: 3, 50: 4, 200: null }, trend: null, hiBars: 80 });
-    const old = item('1111.TW', { ma: { 20: 3, 50: 4, 200: 6 }, trend: 'up', hiBars: 201, fromHi52: -2 });
+    const young = item('9999.TW', { ma: { 20: 3, 50: 4, 200: null }, ema20: null, trend: null, hiBars: 80 });
+    const old = item('1111.TW', { ma: { 20: 3, 50: 4, 200: 6 }, ema20: 2, trend: 'up', hiBars: 201, fromHi52: -2 });
     expect(applyFilters([young, old], state('tr:stack'), tw)).toEqual([old]);
-    expect(applyFilters([young, old], state('ma200:-20:20'), tw)).toEqual([old]);
+    expect(applyFilters([young, old], state('ema20:-20:20'), tw)).toEqual([old]);
     expect(applyFilters([young, old], state('hi:5'), tw)).toEqual([old]);
     expect(applyFilters([young, old], state('tr:nobear'), tw)).toEqual([young, old]);
   });
@@ -154,6 +171,58 @@ describe('applyFilters', () => {
       ['tr:slope', true],
       ['rs', true],
     ]);
+  });
+
+  it('filters the EMA20 distance and the volume-vs-previous-day thresholds', () => {
+    const rows = [
+      item('A', { ema20: 2, volVsPrev: 1.1 }),
+      item('B', { ema20: -3, volVsPrev: 1.2 }),
+      item('C', { ema20: 6.5, volVsPrev: 1.49 }),
+      item('D', { ema20: null, volVsPrev: null }),
+    ];
+    const symbols = (f: string) => applyFilters(rows, state(f), tw).map((row) => row.symbol);
+    expect(symbols('ema20:-5:5')).toEqual(['A', 'B']);
+    expect(symbols('ema20:5:')).toEqual(['C']);
+    expect(symbols('ema20::0')).toEqual(['B']);
+    expect(symbols('vr:1.1')).toEqual(['A', 'B', 'C']);
+    expect(symbols('vr:1.2')).toEqual(['B', 'C']);
+    expect(symbols('vr:1.5')).toEqual([]);
+    expect(symbols('ema20:0:;vr:1.2')).toEqual(['C']);
+  });
+
+  it('offers 1.1 / 1.2 / 1.5 as single-choice presets that toggle off', () => {
+    expect(VOLUME_PRESETS).toEqual([1.1, 1.2, 1.5]);
+    expect(toggleVolume(null, 1.2)).toBe(1.2);
+    expect(toggleVolume(1.2, 1.2)).toBeNull(); // tap the applied preset again
+    expect(toggleVolume(1.2, 1.5)).toBe(1.5); // single choice: replaces
+    expect(toggleVolume(1.5, null)).toBeNull(); // 「不限」
+    expect(toggleVolume(null, null)).toBeNull();
+    // A number from an old link stays applied but lights no preset.
+    expect(isCustomVolume(state('vr:2').vr)).toBe(true);
+    expect(isCustomVolume(state('vr:1.2').vr)).toBe(false);
+    expect(isCustomVolume(null)).toBe(false);
+    expect(toggleVolume(2, 1.1)).toBe(1.1);
+  });
+
+  it('skips EMA20 / volume conditions that old reports cannot evaluate, and flags them', () => {
+    // A report written before ema20 / volVsPrev existed (its volRatio meant something else).
+    const old = item('OLD', { ma: { 20: 3, 50: 4, 200: 6 }, volRatio: 5, trend: 'up' });
+    expect(old.metrics!.ema20).toBeNull();
+    expect(old.metrics!.volVsPrev).toBeNull();
+    const availability = filterAvailability([old], tw);
+    expect(availability.ema20).toBe(NO_METRICS_REASON);
+    expect(availability.vr).toBe(NO_METRICS_REASON);
+    expect(availability.ma20).toBeNull(); // trend flags keep working on the SMA distances
+    expect(applyFilters([old], state('ema20:-1:1;vr:1.5;tr:a20'), tw)).toEqual([old]);
+    expect(activeChips(state('ema20:-1:1;vr:1.5'), availability).map((chip) => [chip.id, !!chip.unavailable])).toEqual([
+      ['ema20', true],
+      ['vr', true],
+    ]);
+    // Once some row has the data the condition applies, and rows without a value drop out.
+    const fresh = item('NEW', { ema20: 0.5, volVsPrev: 1.0 });
+    expect(filterAvailability([old, fresh], tw)).toMatchObject({ ema20: null, vr: null });
+    expect(applyFilters([old, fresh], state('ema20:-1:1'), tw)).toEqual([fresh]);
+    expect(applyFilters([old, fresh], state('vr:1.1'), tw)).toEqual([]);
   });
 
   it('applies EPS / revenue gates to US stocks only', () => {
@@ -195,18 +264,24 @@ describe('applyFilters', () => {
 });
 
 describe('active chips', () => {
+  it('labels a legacy volume threshold plainly', () => {
+    expect(activeChips(state('vr:1.3')).map((chip) => chip.label)).toEqual(['量比 ≥1.3']);
+    expect(activeChips(state('vr:1.1')).map((chip) => chip.label)).toEqual(['量比 ≥1.1']);
+    expect(removeFilter(state('vr:1.3;ema20:1:2'), 'ema20').ema20).toBeNull();
+  });
+
   it('lists one removable chip per condition', () => {
-    const s = state('chg:0:3;ma50:-5:5;tr:a20,stack;hi:10;rs:80;rs3:0;vr:1.5;eps:2:20;rev:1:10;nd:keep');
+    const s = state('chg:0:3;ema20:-5:5;tr:a20,stack;hi:10;rs:80;rs3:0;vr:1.5;eps:2:20;rev:1:10;nd:keep');
     const chips = activeChips(s);
     expect(chips.map((chip) => chip.label)).toEqual([
       '今日漲跌 0～+3%',
-      'MA50 乖離 -5～+5%',
+      'EMA20 乖離 -5～+5%',
       '站上MA20',
       '多頭排列',
       '距52週高 ≤10%',
       'RS 百分位 ≥80',
       '3月強於大盤',
-      '量比 ≥1.5x',
+      '量比 ≥1.5',
       'EPS YoY 近2季皆≥20%',
       '營收 YoY ≥10%',
     ]);
@@ -231,7 +306,7 @@ describe('screener sorting and row pills', () => {
     const ma50 = filterAndSortItems(TW, '', 'ma50').map((row) => row.metrics!.ma['50']);
     const firstNull = ma50.indexOf(null);
     if (firstNull >= 0) expect(ma50.slice(firstNull).every((value) => value === null)).toBe(true);
-    expect(filterAndSortItems(TW, '', 'vr')[0]!.metrics!.volRatio).toBe(Math.max(...TW.map((row) => row.metrics!.volRatio ?? 0)));
+    expect(filterAndSortItems(TW, '', 'vr')[0]!.metrics!.volVsPrev).toBe(Math.max(...TW.map((row) => row.metrics!.volVsPrev ?? 0)));
     expect(filterAndSortItems(TW, '', 'r21')[0]!.metrics!.r21).toBe(Math.max(...TW.map((row) => row.metrics!.r21 ?? -Infinity)));
     const eps = symbols(filterAndSortItems(US, '', 'eps', { growth }));
     expect(eps[0]).toBe('INTC'); // the loss-to-profit turn sorts first
@@ -250,16 +325,21 @@ describe('screener sorting and row pills', () => {
   it('chooses at most two metric pills: the sort first, then the filters', () => {
     expect(rowMetricPills('rs', EMPTY_FILTERS, [20])).toEqual(['rs']);
     expect(rowMetricPills('default', state('hi:10;vr:2;rs:80'), [20])).toEqual(['rs', 'hi']);
+    expect(rowMetricPills('default', state('ema20:-5:5'), [20])).toEqual(['ema20']);
+    expect(rowMetricPills('rs', state('ema20::5;vr:1.2'), [20])).toEqual(['rs', 'vr']);
     expect(rowMetricPills('eps', state('rev:1:10'), [20])).toEqual(['eps', 'rev']);
     expect(rowMetricPills('ma50', EMPTY_FILTERS, [20, 50, 200])).toEqual([]);
     expect(rowMetricPills('gain', EMPTY_FILTERS, [20])).toEqual([]);
   });
 
   it('formats the pills', () => {
-    const row = item('AAPL', { rsRank: 87, rs63: 12.3, rsBench: 'SPY', fromHi52: -4.26, hiBars: 201, volRatio: 2.345, r21: 6.1 });
+    const row = item('AAPL', { rsRank: 87, rs63: 12.3, rsBench: 'SPY', fromHi52: -4.26, hiBars: 201, volVsPrev: 2.345, ema20: 3.14, r21: 6.1 });
     expect(metricPill(row, 'rs')).toMatchObject({ text: 'RS 87', tone: 'up' });
     expect(metricPill(row, 'hi')).toMatchObject({ text: '距高 -4.3%', title: expect.stringContaining('近201日高點') });
-    expect(metricPill(row, 'vr')?.text).toBe('量比 2.3x');
+    expect(metricPill(row, 'vr')?.text).toBe('量比 2.3');
+    expect(metricPill(row, 'vr')?.title).toContain('前一交易日');
+    expect(metricPill(row, 'ema20')).toMatchObject({ text: 'EMA20 +3.1%', tone: 'up' });
+    expect(metricPill(item('X', null), 'ema20')).toBeNull();
     expect(metricPill(row, 'r21')?.text).toBe('1月 +6.1%');
     expect(metricPill(row, 'ma50')).toBeNull();
     expect(metricPill(item('X', null), 'rs')).toBeNull();

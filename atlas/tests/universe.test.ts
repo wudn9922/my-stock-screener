@@ -35,7 +35,9 @@ describe('universe.json', () => {
     const raw = fixture.markets.TW!.rows[0]!;
     const item = TW!.items[0]!;
     expect(item).toMatchObject({ symbol: raw[0], name: raw[1], close: raw[2], changePct: raw[3], volume: raw[4], maList: [20, 50, 200], note: null, asOf: '2026-10-08' });
-    expect(item.metrics).toMatchObject({ r5: raw[5], rs63: raw[17], rsRank: raw[18], hiBars: raw[15], bars: raw[15], rsBench: '^TWII' });
+    const col = (field: string) => raw[fixture.fields.indexOf(field)];
+    expect(item.metrics).toMatchObject({ r5: raw[5], rs63: col('rs63'), rsRank: col('rsRank'), hiBars: col('hiBars'), bars: col('hiBars'), rsBench: '^TWII', ema20: col('ema20'), volVsPrev: col('volVsPrev') });
+    expect(item.metrics).not.toHaveProperty('volRatio');
     // MA values are derived back from the distances, so the row pills show the same numbers.
     for (const [period, column] of [[20, 8], [50, 9], [200, 10]] as const) {
       const distance = maDistance(item.close, maValue(item.maValues, period));
@@ -63,7 +65,7 @@ describe('universe.json', () => {
       markets: {
         TW: {
           rows: [
-            ['2330.tw', '台積電', 1000, 1.2, 3e7, null, null, null, 5, null, null, null, 'weird', null, null, 120],
+            ['2330.tw', '台積電', 1000, 1.2, 3e7, null, null, null, 5, null, null, null, null, 'weird', null, null, 120],
             ['2330.TW', 'dup'],
             ['<script>', 'x'],
             'not a row',

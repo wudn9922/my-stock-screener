@@ -43,6 +43,7 @@ describe('group item metrics', () => {
       r21: 'n/a',
       r63: Infinity,
       ma: { 20: 2.1, 50: 'bad', 200: '-3' },
+      ema20: '1.2',
       ma20Slope5: 0.4,
       trend: ' UP ',
       hi52: 120,
@@ -52,7 +53,8 @@ describe('group item metrics', () => {
       rs63: 12,
       rsBench: 'spy',
       rsRank: 140,
-      volRatio: 1.8,
+      volVsPrev: 1.8,
+      volRatio: 9.9, // retired field of old reports: other meaning, never read
       turnover20: 1e9,
       unknown: 'ignored',
     })!;
@@ -62,6 +64,7 @@ describe('group item metrics', () => {
       r21: null,
       r63: null,
       ma: { 20: 2.1, 50: null, 200: -3 },
+      ema20: 1.2,
       ma20Slope5: 0.4,
       trend: 'up',
       hi52: 120,
@@ -71,13 +74,15 @@ describe('group item metrics', () => {
       rs63: 12,
       rsBench: 'SPY',
       rsRank: 99,
-      volRatio: 1.8,
+      volVsPrev: 1.8,
       turnover20: 1e9,
     });
     expect(parseMetrics({ trend: 'sideways', rsBench: 'QQQ', ma: 'x', bars: -5 })).toMatchObject({
       trend: null,
       rsBench: null,
       ma: { 20: null, 50: null, 200: null },
+      ema20: null,
+      volVsPrev: null,
       bars: 0,
       hiBars: 0,
     });
