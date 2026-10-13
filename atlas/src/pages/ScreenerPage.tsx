@@ -2,17 +2,24 @@ import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from 
 import { ChevronRight, Globe2, Search, SlidersHorizontal, X } from 'lucide-react';
 import type { PageProps } from './pageProps';
 import { ReportGate } from './ReportGate';
-import type { GroupItem, Report, ReportGroup } from '../report/schema';
+import { itemStatusOf, type GroupItem, type Report, type ReportGroup } from '../report/schema';
 import { getPeFigures, type PeFigures } from '../app/dataSources';
 import { mapWithConcurrency } from './worldPerformance';
 import {
   METRIC_SORTS,
   SORT_LABELS,
+  STATUS_BADGE_LABELS,
+  STATUS_VIEWS,
+  STATUS_VIEW_LABELS,
   filterAndSortItems,
+  itemsForView,
   metricPill,
+  resultCountText,
   rowMetricPills,
+  statusCounts,
   type MetricPill,
   type SortMode,
+  type StatusView,
 } from './screenerItems';
 import {
   activeChips,
@@ -53,6 +60,7 @@ import { parseRoute, serializeRoute } from '../app/routes';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { PageState } from '../ui/PageState';
 import '../ui/filter-sheet.css';
+import '../ui/screener-status.css';
 import { EarningsBadge } from '../ui/EarningsBadge';
 
 const ROW_HEIGHT = 64;
@@ -97,7 +105,10 @@ function GroupChips({
               全市場
               {universeCounts[market] !== undefined && <span className="chip-count">{universeCounts[market]}</span>}
             </button>
-            {list.map((group) => (
+            {list.map((group) => {
+              // The chip counts the matched ("成功") rows; the rest is shown as a faint "+N".
+              const { matched, unmatched } = statusCounts(group.items);
+              return (
               <button
                 key={group.key}
                 type="button"
@@ -106,10 +117,16 @@ function GroupChips({
                 onClick={() => onChange(group.key)}
               >
                 {group.name.replace(/^(?:🇹🇼|🇺🇸)?\s*(?:台股|美股)\s*[-－]?\s*/u, '')}
-                <span className="chip-count">{group.items.length}</span>
+                <span className="chip-count">{matched}</span>
+                {unmatched > 0 && (
+                  <span className="chip-unmatched" title={`另有 ${unmatched} 檔未成功`}>
+                    +{unmatched}
+                  </span>
+                )}
                 {group.kind !== 'fixed' && <span className="chip-kind">{KIND_LABELS[group.kind]}</span>}
               </button>
-            ))}
+              );
+            })}
           </div>
         );
       })}
@@ -133,13 +150,15 @@ function Row({
   onOpen: () => void;
 }) {
   const tone = toneClass(item.changePct);
+  const status = itemStatusOf(item);
+  const ticker = <b>{displayTicker(item.symbol)}</b>;
   const metricPills = pills.flatMap((key) => {
     const pill = metricPill(item, key, growth);
     return pill ? [{ key, pill }] : [];
   });
   return (
     <a
-      className="screener-row"
+      className={status === 'matched' ? 'screener-row' : `screener-row is-${status}`}
       style={{ transform: `translateY(${top}px)` }}
       href={serializeRoute({ page: 'chart', symbol: item.symbol, tf: '1D' })}
       onClick={(event) => {
@@ -149,7 +168,16 @@ function Row({
       }}
     >
       <span className="row-id">
-        <b>{displayTicker(item.symbol)}</b>
+        {status === 'matched' ? (
+          ticker
+        ) : (
+          <span className="row-sym">
+            {ticker}
+            <span className={`status-badge ${status}`} title={status === 'failed' ? '沒有取得行情' : '有行情，但未符合均線條件'}>
+              {STATUS_BADGE_LABELS[status]}
+            </span>
+          </span>
+        )}
         <EarningsBadge symbol={item.symbol} />
         <small>{item.name !== item.symbol ? item.name : getMarketProfile(item.symbol).market === 'TW' ? '台股' : '美股'}</small>
       </span>
@@ -159,7 +187,8 @@ function Row({
             {pill.text}
           </span>
         ))}
-        {item.maList.slice(0, 3).map((period) => {
+        {/* A failed row has no close, so its MA pills would only read "—". */}
+        {(status === 'failed' ? [] : item.maList).slice(0, 3).map((period) => {
           const distance = maDistance(item.close, maValue(item.maValues, period));
           return (
             <span key={period} className={`ma-pill ${toneClass(distance)}`} title={`收盤相對 MA${period} 的乖離`}>
@@ -297,6 +326,7 @@ function ScreenerView({
   };
 
   const [query, setQuery] = useState('');
+  const [view, setView] = useState<StatusView>('all');
   const [sort, setSort] = useState<SortMode>('default');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [draftNeedsGrowth, setDraftNeedsGrowth] = useState(false);
@@ -306,6 +336,11 @@ function ScreenerView({
   const filterButtonRef = useRef<HTMLButtonElement>(null);
 
   const groupItems = group?.items ?? [];
+  // Fixed and custom groups also list their unmatched / failed stocks; full-market lists never do.
+  const counts = useMemo(() => statusCounts(groupItems), [groupItems]);
+  const hasUnmatched = !universeMarket && counts.unmatched > 0;
+  const activeView: StatusView = hasUnmatched ? view : 'all';
+  const viewItems = useMemo(() => itemsForView(groupItems, activeView), [groupItems, activeView]);
   const hasMetrics = useMemo(() => groupItems.some((item) => item.metrics), [groupItems]);
   const sortModes = (Object.keys(SORT_LABELS) as SortMode[]).filter(
     (mode) => (mode !== 'eps' || market === 'US') && (!METRIC_SORTS.includes(mode) || hasMetrics),
@@ -316,21 +351,21 @@ function ScreenerView({
   const context = useMemo<FilterContext>(() => ({ market, growth, growthLoading }), [market, growth, growthLoading]);
   const availability = useMemo(() => filterAvailability(groupItems, context), [groupItems, context]);
   const chips = useMemo(() => activeChips(filters, availability), [filters, availability]);
-  const filtered = useMemo(() => applyFilters(groupItems, filters, context), [groupItems, filters, context]);
+  const filtered = useMemo(() => applyFilters(viewItems, filters, context), [viewItems, filters, context]);
   const items = useMemo(
     () => filterAndSortItems(filtered, query, activeSort, { growth }),
     [filtered, query, activeSort, growth],
   );
   const countFor = useCallback(
-    (draft: FilterState) => filterAndSortItems(applyFilters(groupItems, draft, context), query, 'default').length,
-    [groupItems, context, query],
+    (draft: FilterState) => filterAndSortItems(applyFilters(viewItems, draft, context), query, 'default').length,
+    [viewItems, context, query],
   );
   const pills = useMemo(() => rowMetricPills(activeSort, filters, group?.maList ?? []), [activeSort, filters, group?.maList]);
 
   useEffect(() => {
     listRef.current?.scrollTo?.({ top: 0 });
     setScroll((previous) => ({ ...previous, top: 0 }));
-  }, [group?.key, query, activeSort, filterText]);
+  }, [group?.key, query, activeSort, filterText, activeView]);
   useEffect(() => {
     const list = listRef.current;
     if (!list) return;
@@ -349,7 +384,7 @@ function ScreenerView({
   useEffect(() => {
     let live = true;
     const timer = setTimeout(() => {
-      const wanted = slice.filter((item) => !pe[item.symbol] && !item.symbol.startsWith('^'));
+      const wanted = slice.filter((item) => !pe[item.symbol] && !item.symbol.startsWith('^') && item.status !== 'failed');
       void mapWithConcurrency(wanted, 3, async (item) => {
         const figures = await getPeFigures(item.symbol, item.close);
         if (live) setPe((previous) => ({ ...previous, [item.symbol]: figures }));
@@ -379,6 +414,7 @@ function ScreenerView({
   const changeGroup = (key: string) => {
     const nextMarket = universeMarketOf(key) ?? groups.find((g) => g.key === key)?.market ?? market;
     const text = nextMarket === market ? serializeFilters(filters) : (readStoredFilters(nextMarket) ?? '');
+    setView('all');
     routeTo(key, text, false);
   };
   const universeCounts: Partial<Record<UniverseMarketKey, number>> = {};
@@ -424,14 +460,30 @@ function ScreenerView({
             ))}
           </select>
         </label>
-        <span className="result-count">
-          {items.length === groupItems.length ? `${items.length} 檔` : `${items.length} / ${groupItems.length} 檔`}
-        </span>
+        <span className="result-count">{resultCountText(items, viewItems.length, activeView, hasUnmatched)}</span>
       </div>
+      {hasUnmatched && (
+        <div className="segmented compact status-seg" role="group" aria-label="成功與未成功股票">
+          {STATUS_VIEWS.map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              className={mode === activeView ? 'active' : ''}
+              aria-pressed={mode === activeView}
+              onClick={() => setView(mode)}
+            >
+              {STATUS_VIEW_LABELS[mode]}
+              <span className="seg-count">
+                {mode === 'all' ? groupItems.length : mode === 'matched' ? counts.matched : counts.unmatched}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
       {chips.length > 0 && (
         <div className="active-filters" role="group" aria-label="已套用的篩選條件">
           <span className="active-filters-count" aria-live="polite">
-            符合 <b>{items.length.toLocaleString('en-US')}</b> / {groupItems.length.toLocaleString('en-US')}
+            符合 <b>{items.length.toLocaleString('en-US')}</b> / {viewItems.length.toLocaleString('en-US')}
           </span>
           {chips.map((chip) => (
             <button
@@ -500,7 +552,7 @@ function ScreenerView({
                   </button>
                 </>
               ) : (
-                '此群組今日沒有股票'
+                `此群組今日沒有${activeView === 'matched' ? '成功' : activeView === 'unmatched' ? '未成功' : ''}股票`
               )}
             </div>
           )}

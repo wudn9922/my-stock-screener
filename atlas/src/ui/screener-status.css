@@ -1,0 +1,66 @@
+/* Screener: unmatched / failed rows of fixed and custom groups (rows, badges, chip "+N", the 全部｜成功｜未成功 control). */
+
+/* Group chip: the count is the matched stocks; the faint "+N" is the stocks that did not match. */
+.chip-unmatched {
+  font-size: 11px;
+  color: var(--text-3);
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+/* View control sits under the search row and scrolls sideways instead of wrapping on a narrow phone. */
+.status-seg {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.status-seg::-webkit-scrollbar {
+  display: none;
+}
+.status-seg > button {
+  flex: none;
+}
+.seg-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.status-seg > .active .seg-count {
+  color: var(--text-2);
+}
+
+/* Unmatched / failed rows: the content is dimmed; the status badge keeps its own colour. */
+.screener-row.is-unmatched :is(.row-id b, .row-id small, .row-mas, .row-pe, .row-quote),
+.screener-row.is-failed :is(.row-id b, .row-id small, .row-mas, .row-pe, .row-quote) {
+  opacity: 0.62;
+}
+
+.row-sym {
+  min-width: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.status-badge {
+  flex: none;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+}
+.status-badge.unmatched {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+.status-badge.failed {
+  color: var(--warn);
+  background: rgba(224, 164, 58, 0.14);
+}

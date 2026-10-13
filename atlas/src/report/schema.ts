@@ -173,6 +173,18 @@ export function parseMetrics(value: unknown): StockMetrics | null {
 }
 const metrics = z.unknown().optional().transform(parseMetrics);
 
+/**
+ * Row status in a non-scan group: `matched` passed the group's MA rule (the report's "成功股票"), `unmatched`
+ * has prices but missed the rule, `failed` has no usable prices (`close` / `changePct` are null).
+ * Reports written before this field existed only list matched rows, so a missing status means `matched`.
+ */
+export const ITEM_STATUSES = ['matched', 'unmatched', 'failed'] as const;
+export type ItemStatus = (typeof ITEM_STATUSES)[number];
+const itemStatus = z.unknown().optional().transform((value): Exclude<ItemStatus, 'matched'> | undefined => {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return normalized === 'unmatched' || normalized === 'failed' ? normalized : undefined;
+});
+
 export const groupItemSchema = z
   .object({
     symbol,
@@ -185,9 +197,14 @@ export const groupItemSchema = z
     volume: finiteOrNull,
     asOf: optionalText,
     metrics,
+    status: itemStatus,
   })
   .transform((value) => ({ ...value, name: value.name || value.symbol }));
-export type GroupItem = z.output<typeof groupItemSchema>;
+/** `status` is left out for matched rows (and for full-market rows built outside this schema). */
+export type GroupItem = Omit<z.output<typeof groupItemSchema>, 'status'> & { status?: Exclude<ItemStatus, 'matched'> };
+
+/** The row's status, with the missing value read as `matched`. */
+export const itemStatusOf = (item: Pick<GroupItem, 'status'>): ItemStatus => item.status ?? 'matched';
 
 export const GROUP_KINDS = ['fixed', 'custom', 'scan'] as const;
 export type GroupKind = (typeof GROUP_KINDS)[number];
@@ -204,8 +221,17 @@ export const reportGroupSchema = z
     maList,
     items: tolerantArray(groupItemSchema),
   })
-  .transform((value) => ({ ...value, name: value.name || value.key }));
-export type ReportGroup = z.output<typeof reportGroupSchema>;
+  .transform((value) => {
+    // An unmatched / failed row never repeats a symbol listed before it (matched rows come first).
+    const seen = new Set<string>();
+    const items = value.items.filter((item) => {
+      const keep = item.status === undefined || !seen.has(item.symbol);
+      seen.add(item.symbol);
+      return keep;
+    });
+    return { ...value, name: value.name || value.key, items };
+  });
+export type ReportGroup = Omit<z.output<typeof reportGroupSchema>, 'items'> & { items: GroupItem[] };
 
 export const sectorSchema = z.object({
   symbol,
