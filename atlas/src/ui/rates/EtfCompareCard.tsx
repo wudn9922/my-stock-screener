@@ -79,7 +79,12 @@ export function EtfCompareCard({ etfs, openChart }: { etfs: readonly RatesEtf[] 
             </tbody>
           </table>
         </div>
-        <p className="rates-note">費用率、指數、存續期間等為人工整理的靜態資料，標「待核對」者請以發行商網站為準。TMF 另有交換合約融資成本，不包含在費用率內。</p>
+        <details className="rates-disclosure">
+          <summary>ETF 資料說明</summary>
+          <div className="rates-disclosure-body">
+            <p className="rates-note">費用率、指數、存續期間等為人工整理的靜態資料，標「待核對」者請以發行商網站為準。TMF 另有交換合約融資成本，不包含在費用率內。</p>
+          </div>
+        </details>
       </div>
     </section>
   );
