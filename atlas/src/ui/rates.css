@@ -694,3 +694,52 @@ a.rates-static {
 .rates-episodes[open] > summary::after {
   content: '－';
 }
+
+/* Rate notes are collapsed by default; native details/summary keeps keyboard and touch access. */
+.rates-disclosure {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.rates-disclosure summary {
+  list-style: none;
+  cursor: pointer;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-text);
+}
+.rates-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+.rates-disclosure summary::after {
+  content: '＋';
+  margin-left: auto;
+  color: var(--text-3);
+}
+.rates-disclosure[open] summary::after {
+  content: '－';
+}
+.rates-disclosure summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.rates-disclosure-body {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+  min-width: 0;
+}
+.rates-disclosure-body .rates-note {
+  padding-left: 0;
+  padding-right: 0;
+  background: transparent;
+}
+.rates-sources .rates-disclosure-body {
+  font-size: 12px;
+}
