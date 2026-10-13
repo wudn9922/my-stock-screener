@@ -1,0 +1,63 @@
+name: Taiwan Theme Rotation
+
+# 台股題材輪動：docs/report/themes-tw.json（基準 ^TWII，成分股見 scripts/themes_tw.py）。
+# 獨立成一個 workflow：用全新的 runner、不拖慢每日報告與 LINE 推播，也可以單獨手動重跑。
+# 失敗只保留上次的檔案。
+on:
+  workflow_run:
+    workflows: ["Daily Stock Screener"]
+    types: [completed]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: themes-tw
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # workflow_run 只有在每日報告成功時才繼續
+    if: >-
+      github.event_name != 'workflow_run'
+      || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install --quiet 'yfinance>=0.2.40' pandas
+
+      - name: Build Taiwan theme rotation
+        run: python -u scripts/build_themes.py --market tw
+
+      - name: Commit and Push changes
+        if: always()
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A docs/report/themes-tw.json
+          git commit -m "Auto-update Taiwan theme rotation" || { echo "No changes to commit"; exit 0; }
+          # 每日報告與 Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試
+          for attempt in 1 2 3; do
+            git pull --rebase
+            if git push; then
+              exit 0
+            fi
+            echo "推送失敗（第 ${attempt} 次），稍後重試"
+            sleep $((attempt * 15))
+          done
+          exit 1

@@ -242,8 +242,17 @@ def build_payload(prices, config, today):
     usable_count = len(constituent_symbols) - len(skipped["missing"]) - len(skipped["stale"])
     coverage = usable_count / len(constituent_symbols) if constituent_symbols else 0.0
     if coverage < MIN_COVERAGE:
+        last_days = {}
+        for symbol in constituent_symbols:
+            bars = prices.get(symbol) or []
+            if bars:
+                last_days[bars[-1][0]] = last_days.get(bars[-1][0], 0) + 1
+        common = ", ".join(f"{day} x{count}" for day, count in sorted(last_days.items(), reverse=True)[:5])
         raise InsufficientData(
-            f"only {usable_count}/{len(constituent_symbols)} constituents have fresh data ({coverage:.0%})"
+            f"only {usable_count}/{len(constituent_symbols)} constituents have fresh data ({coverage:.0%}); "
+            f"{bench_symbol} last bar {last_date} ({len(bench_bars)} bars), "
+            f"missing {len(skipped['missing'])}, stale {len(skipped['stale'])}, "
+            f"constituents' last bars: {common or 'none'}"
         )
 
     themes = []
