@@ -27,6 +27,14 @@ export function KeyNumbers({ rates, history, fedBound }: { rates: Rates; history
   const fedRate = rates.policy?.[fedBound] ?? null;
   // Calculate from live chart yield and selected policy bound; never reuse an older midpoint summary.
   const spreadBp = finite(ten) && finite(fedRate) ? (ten - fedRate) * 100 : null;
+  let spreadChange: number | null = null;
+  if (history.status === 'ok' && rates.asOf && finite(spreadBp)) {
+    const past = monthBefore(rates.asOf);
+    const tenThen = valueOnOrBefore(history.data.daily, 'DGS10', past);
+    const fedThen = valueOnOrBefore(history.data.daily, fedBound === 'upper' ? 'DFEDTARU' : 'DFEDTARL', past);
+    if (tenThen && fedThen && tenThen.date === fedThen.date)
+      spreadChange = spreadBp - (tenThen.value - fedThen.value) * 100;
+  }
   const policy = rates.policy;
   let policyChange: number | null = null;
   if (policy && finite(policy.upper) && history.status === 'ok' && rates.asOf) {
@@ -44,7 +52,7 @@ export function KeyNumbers({ rates, history, fedBound }: { rates: Rates; history
       key: '10yfed',
       label: `10Y−Fed（${fedBound === 'upper' ? '上限' : '下限'}）`,
       value: fmtBp(spreadBp),
-      change: null,
+      change: spreadChange,
       badge: finite(spreadBp) && spreadBp < 0 ? '倒掛' : null,
     },
     {
