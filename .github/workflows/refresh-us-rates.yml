@@ -38,6 +38,9 @@ jobs:
       - name: Install rate builder dependencies
         run: pip install --quiet requests yfinance pandas
 
+      - name: Regenerate synthetic test fixtures
+        run: python tests/rates_synth.py
+
       - name: Test US rates builder
         run: python -m unittest discover -s tests -p test_rates.py
 
@@ -87,7 +90,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -- docs/report/rates.json docs/report/rates-history.json
+          git add -- docs/report/rates.json docs/report/rates-history.json tests/fixtures/rates/sample-rates.json tests/fixtures/rates/sample-rates-history.json
           if git diff --cached --quiet; then
             echo "Rates reports unchanged; nothing to commit."
             exit 0
