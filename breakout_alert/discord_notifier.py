@@ -3,6 +3,10 @@ import time
 
 import requests
 
+from breakout_alert.breakout_engine import (
+    BREAKOUT_DOWN_RATIO,
+    BREAKOUT_UP_RATIO,
+)
 from breakout_alert.config import (
     get_discord_webhook_url,
 )
@@ -22,6 +26,13 @@ def safe_float(value, default=None):
 
     except (TypeError, ValueError):
         return default
+
+
+def format_ratio_percent(ratio):
+    # 0.01 → "1%"、0.015 → "1.5%"、0.003 → "0.3%"
+    text = f"{float(ratio) * 100:.2f}".rstrip("0").rstrip(".")
+
+    return f"{text}%"
 
 
 def format_number(value):
@@ -149,14 +160,22 @@ class DiscordNotifier:
         ma_values,
         price,
         volume_ratio,
-        direction
+        direction,
+        up_ratio=BREAKOUT_UP_RATIO,
+        down_ratio=BREAKOUT_DOWN_RATIO
     ):
         if direction == "breakout_up":
             icon = "🚨"
-            direction_text = "向上突破 1%"
+            direction_text = (
+                "向上突破 "
+                f"{format_ratio_percent(up_ratio)}"
+            )
         elif direction == "breakout_down":
             icon = "⚠️"
-            direction_text = "向下跌破 1.5%"
+            direction_text = (
+                "向下跌破 "
+                f"{format_ratio_percent(down_ratio)}"
+            )
         else:
             raise ValueError(
                 f"不支援的提醒方向：{direction}"

@@ -37,6 +37,25 @@ VALID_GROUP_KEYS = set(
     GROUP_DISPLAY_NAMES
 )
 
+# 大盤指數（index_configs 表）的均線提醒使用固定群組。
+# 目前監控時段只有台股與美股，其他市場的指數（歐洲、日韓）略過。
+ADMIN_INDEX_GROUP_ID = "admin_index"
+ADMIN_INDEX_GROUP_NAME = "大盤指數"
+# 大盤指數的確認門檻：突破 0.3%、跌破 0.5%（股票為 1%／1.5%）。
+# 放在這裡而不是 breakout_engine：Discord 查詢服務的映像
+# 只複製 supabase_store 等少數檔案，不含 breakout_engine。
+INDEX_BREAKOUT_UP_RATIO = 0.003
+INDEX_BREAKOUT_DOWN_RATIO = 0.005
+INDEX_MARKETS = {
+    "^TWII": "TW",
+    "^TWOII": "TW",
+    "^GSPC": "US",
+    "^DJI": "US",
+    "^IXIC": "US",
+    "^RUT": "US",
+    "^SOX": "US"
+}
+
 # Atlas 畫線警示的狀態列使用 atlas_ 開頭的 group_id，
 # 均線孤兒清理與 Discord /量比 都必須排除這些列。
 ATLAS_STATE_GROUP_PREFIX = "atlas_"
@@ -212,6 +231,10 @@ def get_ma_list(stock):
 
 
 class SupabaseStore:
+    # index_configs 本次是否成功載入；
+    # 失敗時不能把大盤指數的狀態列當成孤兒清掉。
+    index_configs_loaded = False
+
     def __init__(self):
         self.rest_url = (
             get_supabase_rest_url()
@@ -471,6 +494,115 @@ class SupabaseStore:
 
         return group_mapping
 
+    def get_index_configs(self):
+        rows = self._request(
+            "GET",
+            "index_configs",
+            params={
+                "select": (
+                    "ticker,name,ma1,ma2,ma3,ma4"
+                ),
+                "order": "ticker.asc"
+            }
+        )
+
+        # 空回應（None）不能當成「沒有指數」，
+        # 否則會把既有指數狀態列全部當成孤兒。
+        if not isinstance(rows, list):
+            raise RuntimeError(
+                "index_configs 回傳非清單格式"
+            )
+
+        return rows
+
+    def get_index_monitor_configs(self):
+        """
+        把 index_configs 中有均線參數的大盤指數
+        轉成監控設定。
+
+        載入失敗時回傳空清單並保留既有狀態列
+        （index_configs_loaded 維持 False）。
+        """
+        self.index_configs_loaded = False
+
+        try:
+            rows = self.get_index_configs()
+
+        except Exception as exc:
+            print(
+                "⚠️ 大盤指數設定載入失敗，"
+                "本次略過指數提醒："
+                f"{type(exc).__name__}: {exc}"
+            )
+
+            return []
+
+        self.index_configs_loaded = True
+
+        configs = []
+        skipped_markets = []
+
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+
+            ticker = str(
+                row.get("ticker") or ""
+            ).strip().upper()
+
+            if not ticker:
+                continue
+
+            ma_list = get_ma_list(row)
+
+            if not ma_list:
+                continue
+
+            market = INDEX_MARKETS.get(ticker)
+
+            if market is None:
+                skipped_markets.append(ticker)
+                continue
+
+            configs.append(
+                {
+                    "stock_id": None,
+                    "line_user_id": self.user_id,
+                    "group_id": ADMIN_INDEX_GROUP_ID,
+                    "raw_group_id": (
+                        ADMIN_INDEX_GROUP_ID
+                    ),
+                    "group_name": (
+                        ADMIN_INDEX_GROUP_NAME
+                    ),
+                    "ticker": ticker,
+                    "market": market,
+                    "ma_list": ma_list,
+                    "is_dynamic_group": False,
+                    "display_name": str(
+                        row.get("name") or ""
+                    ).strip(),
+                    "breakout_up_ratio": (
+                        INDEX_BREAKOUT_UP_RATIO
+                    ),
+                    "breakout_down_ratio": (
+                        INDEX_BREAKOUT_DOWN_RATIO
+                    )
+                }
+            )
+
+        if skipped_markets:
+            print(
+                "ℹ️ 略過尚未支援交易時段的指數："
+                + "、".join(skipped_markets)
+            )
+
+        print(
+            f"📊 載入大盤指數監控設定：{len(configs)} 檔"
+        )
+
+        return configs
+
     def get_monitor_configs(self):
         groups = self.get_groups()
         stocks = self.get_user_stocks()
@@ -667,6 +799,10 @@ class SupabaseStore:
                     f"｜{market}"
                     f"｜MA={ma_list}"
                 )
+
+        monitor_configs.extend(
+            self.get_index_monitor_configs()
+        )
 
         return monitor_configs
 
@@ -974,18 +1110,37 @@ class SupabaseStore:
         monitor_configs 必須是「全部市場」的設定，
         不能只傳入本次到執行時間的市場。
         """
-        valid_keys = {
-            (
-                str(config["group_id"]),
-                str(config["ticker"]),
-                int(ma_period)
-            )
-            for config in monitor_configs
-            for ma_period in config["ma_list"]
-        }
+        def build_keys(configs):
+            return {
+                (
+                    str(config["group_id"]),
+                    str(config["ticker"]),
+                    int(ma_period)
+                )
+                for config in configs
+                for ma_period in config["ma_list"]
+            }
 
-        # 設定載入異常時不要把整張表清空
-        if not valid_keys:
+        stock_configs = [
+            config
+            for config in monitor_configs
+            if config["group_id"]
+            != ADMIN_INDEX_GROUP_ID
+        ]
+
+        index_configs = [
+            config
+            for config in monitor_configs
+            if config["group_id"]
+            == ADMIN_INDEX_GROUP_ID
+        ]
+
+        stock_keys = build_keys(stock_configs)
+        index_keys = build_keys(index_configs)
+
+        # 股票設定載入異常（空）時不要把整張表清空。
+        # 大盤指數的設定不能掩蓋這個保護。
+        if not stock_keys:
             return 0
 
         rows = self._request(
@@ -1013,6 +1168,47 @@ class SupabaseStore:
             and not is_atlas_state_row(row)
         ]
 
+        index_rows = [
+            row
+            for row in rows
+            if row.get("group_id")
+            == ADMIN_INDEX_GROUP_ID
+        ]
+
+        stock_rows = [
+            row
+            for row in rows
+            if row.get("group_id")
+            != ADMIN_INDEX_GROUP_ID
+        ]
+
+        deleted = self._delete_orphan_rows(
+            stock_rows,
+            stock_keys,
+            max_delete_ratio,
+            "股票"
+        )
+
+        # 大盤指數設定本次沒載入成功時，
+        # 不能把它們的狀態列視為孤兒。
+        # 股票與指數各自計算刪除比例，互不稀釋。
+        if self.index_configs_loaded:
+            deleted += self._delete_orphan_rows(
+                index_rows,
+                index_keys,
+                max_delete_ratio,
+                "大盤指數"
+            )
+
+        return deleted
+
+    def _delete_orphan_rows(
+        self,
+        rows,
+        valid_keys,
+        max_delete_ratio,
+        label
+    ):
         if not rows:
             return 0
 
@@ -1036,7 +1232,7 @@ class SupabaseStore:
 
         if len(orphan_ids) > len(rows) * max_delete_ratio:
             print(
-                "⚠️ 孤兒狀態列數量異常"
+                f"⚠️ {label}孤兒狀態列數量異常"
                 f"（{len(orphan_ids)}/{len(rows)}），"
                 "略過清理"
             )
@@ -1062,7 +1258,8 @@ class SupabaseStore:
         )
 
         print(
-            f"🧹 已清除孤兒狀態列：{len(orphan_ids)} 筆"
+            f"🧹 已清除孤兒狀態列（{label}）："
+            f"{len(orphan_ids)} 筆"
         )
 
         return len(orphan_ids)

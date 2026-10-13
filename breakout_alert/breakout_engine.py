@@ -47,18 +47,44 @@ def safe_float(value, default=None):
         return default
 
 
+def get_config_ratios(config):
+    """
+    取得該監控設定的確認門檻。
+
+    股票沿用預設（突破 1%、跌破 1.5%）；
+    設定內有有效的 breakout_up_ratio／breakout_down_ratio
+    （大盤指數：0.3%／0.5%，由 supabase_store 帶入）時改用設定值。
+    """
+    up_ratio = safe_float(
+        (config or {}).get("breakout_up_ratio")
+    )
+    down_ratio = safe_float(
+        (config or {}).get("breakout_down_ratio")
+    )
+
+    if up_ratio is None or not 0 < up_ratio < 1:
+        up_ratio = BREAKOUT_UP_RATIO
+
+    if down_ratio is None or not 0 < down_ratio < 1:
+        down_ratio = BREAKOUT_DOWN_RATIO
+
+    return up_ratio, down_ratio
+
+
 def determine_price_side(
     price,
-    ma_value
+    ma_value,
+    up_ratio=BREAKOUT_UP_RATIO,
+    down_ratio=BREAKOUT_DOWN_RATIO
 ):
     """
     使用非對稱確認門檻判斷價格狀態。
 
     above：
-        現價至少高於均線 1%。
+        現價至少高於均線 up_ratio（預設 1%）。
 
     below：
-        現價至少低於均線 1.5%。
+        現價至少低於均線 down_ratio（預設 1.5%）。
 
     equal：
         位於兩個確認門檻之間。
@@ -76,12 +102,12 @@ def determine_price_side(
 
     breakout_up_price = (
         ma_value
-        * (1 + BREAKOUT_UP_RATIO)
+        * (1 + up_ratio)
     )
 
     breakout_down_price = (
         ma_value
-        * (1 - BREAKOUT_DOWN_RATIO)
+        * (1 - down_ratio)
     )
 
     if price >= breakout_up_price:
@@ -176,13 +202,14 @@ def build_state_metadata(
         ),
         "display_name": (
             quote.display_name
+            or config.get("display_name")
             or ""
         ),
         "breakout_up_ratio": (
-            BREAKOUT_UP_RATIO
+            get_config_ratios(config)[0]
         ),
         "breakout_down_ratio": (
-            BREAKOUT_DOWN_RATIO
+            get_config_ratios(config)[1]
         ),
         "quoted_at": quote.quoted_at,
         "price_source": quote.source,
@@ -240,6 +267,9 @@ class BreakoutEngine:
         group_id = config["group_id"]
         group_name = config["group_name"]
         market = config["market"]
+        up_ratio, down_ratio = (
+            get_config_ratios(config)
+        )
 
         existing_states = (
             self.store.get_states_for_stock(
@@ -286,7 +316,9 @@ class BreakoutEngine:
             current_side = (
                 determine_price_side(
                     quote.price,
-                    ma_value
+                    ma_value,
+                    up_ratio,
+                    down_ratio
                 )
             )
 
@@ -442,6 +474,7 @@ class BreakoutEngine:
 
             display_name = (
                 quote.display_name
+                or config.get("display_name")
                 or ""
             )
 
@@ -472,7 +505,9 @@ class BreakoutEngine:
                     volume_ratio=(
                         analysis.volume_ratio
                     ),
-                    direction=direction
+                    direction=direction,
+                    up_ratio=up_ratio,
+                    down_ratio=down_ratio
                 )
 
             except Exception as exc:
