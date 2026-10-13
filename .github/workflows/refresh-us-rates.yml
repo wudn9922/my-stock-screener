@@ -36,10 +36,14 @@ jobs:
           python-version: '3.12'
 
       - name: Install rate builder dependencies
-        run: pip install --quiet requests yfinance pandas
+        run: pip install --quiet requests
 
       - name: Regenerate synthetic test fixtures
-        run: python tests/rates_synth.py
+        run: |
+          python tests/rates_synth.py
+          # the front-end tests read copies of the generated fixtures
+          cp tests/fixtures/rates/sample-rates.json atlas/tests/fixtures/rates/backend-sample-rates.json
+          cp tests/fixtures/rates/sample-rates-history.json atlas/tests/fixtures/rates/backend-sample-rates-history.json
 
       - name: Test US rates builder
         run: python -m unittest discover -s tests -p test_rates.py
@@ -49,40 +53,47 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python -u scripts/build_rates.py
 
-      - name: Verify the published rate-spread contract
+      - name: Verify the published rates contract
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
 
+          # What the Atlas rates page reads: the 10Y yield and policy range, the 10Y-3M spread summary,
+          # the ETF model durations, and four history series (10Y-Fed is derived in the browser).
           reports = Path("docs/report")
           rates = json.loads((reports / "rates.json").read_text(encoding="utf-8"))
           history = json.loads((reports / "rates-history.json").read_text(encoding="utf-8"))
-          required = ["10yfed", "10y3m"]
+
           observed = [s["key"] for s in rates["spreads"]]
-          assert observed == required, (observed, required)
+          assert observed == ["10y3m"], observed
+          assert rates["spreads"][0]["valueBp"] is not None, "10Y-3M spread has no recent value"
 
-          fed = rates["spreads"][0]
-          assert fed["long"] == "DGS10" and fed["short"] == "DFEDTARU"
-          assert fed["valueBp"] is not None, "Fed midpoint spread has no recent value"
+          assert rates["policy"] and rates["policy"]["upper"] is not None and rates["policy"]["lower"] is not None
+          now = next(c for c in rates["curves"]["nominal"] if c["key"] == "now")
+          assert now["values"][rates["tenors"].index("10Y")] is not None, "no current 10Y yield"
+          assert any(c["key"] == "1m" for c in rates["curves"]["nominal"]), "no one-month-ago snapshot (10Y change)"
+          assert rates["etfs"], "no ETFs"
+          # a leveraged fund without its own published duration borrows the unleveraged fund's (same index)
+          def base(index):
+              return (index or "").split("（")[0].strip()
+          for etf in rates["etfs"]:
+              if etf["leverage"] > 1 and etf["effectiveDuration"] is None:
+                  donors = [o for o in rates["etfs"] if o["leverage"] == 1 and o["effectiveDuration"] is not None
+                            and base(o["index"]) and base(o["index"]) == base(etf["index"])]
+                  assert donors, f"{etf['symbol']} cannot borrow a published duration"
+          for etf in rates["etfs"]:
+              model = etf.get("model") or {}
+              assert model.get("duration") and model.get("convexity"), f"{etf['symbol']} has no model duration"
 
+          expected = {"DGS10", "DGS3MO", "DFEDTARU", "DFEDTARL"}
           for kind in ("weekly", "daily"):
               block = history[kind]
-              for symbol in ("DGS10", "DFEDTARU", "DFEDTARL", "FEDTARGETMID"):
-                  series = block["series"].get(symbol)
-                  assert series is not None, f"{kind} missing {symbol}"
+              assert set(block["series"]) == expected, (kind, sorted(block["series"]))
+              for symbol, series in block["series"].items():
                   assert len(series) == len(block["dates"]), f"{kind} malformed {symbol}"
-              midpoint = block["series"]["FEDTARGETMID"]
-              assert any(value is not None for value in midpoint), f"{kind} has no Fed midpoint values"
-              for upper, lower, mid in zip(
-                  block["series"]["DFEDTARU"],
-                  block["series"]["DFEDTARL"],
-                  midpoint,
-              ):
-                  if mid is not None:
-                      assert upper is not None and lower is not None
-                      assert abs(mid - (upper + lower) / 2) <= 0.0011
-          print("PASS: 10Y-Fed / 10Y-3M summary and midpoint history are available")
+                  assert any(value is not None for value in series), f"{kind} has no {symbol} values"
+          print("PASS: rates summary and the four history series are available")
           PY
 
       - name: Commit updated US Treasury reports
@@ -90,12 +101,12 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -- docs/report/rates.json docs/report/rates-history.json tests/fixtures/rates/sample-rates.json tests/fixtures/rates/sample-rates-history.json
+          git add -- docs/report/rates.json docs/report/rates-history.json tests/fixtures/rates/sample-rates.json tests/fixtures/rates/sample-rates-history.json atlas/tests/fixtures/rates/backend-sample-rates.json atlas/tests/fixtures/rates/backend-sample-rates-history.json
           if git diff --cached --quiet; then
             echo "Rates reports unchanged; nothing to commit."
             exit 0
           fi
-          git commit -m "Refresh US rates with Fed midpoint history"
+          git commit -m "Refresh US rates"
           for attempt in 1 2 3; do
             if git pull --rebase --autostash origin main && git push origin HEAD:main; then
               echo "US rates reports pushed successfully."

@@ -93,7 +93,7 @@ export default function RatesView({ openChart }: RatesViewProps) {
           <summary>資料來源與備註</summary>
           <div className="rates-disclosure-body">
         <p>
-          來源：{data.sources.rates ?? 'FRED'}（美國聯準會 H.15 與 TIPS 資料）{data.sources.etf ? `；${data.sources.etf}` : ''}。
+          來源：{data.sources.rates ?? 'FRED'}（美國聯準會 H.15 資料）{data.sources.etf ? `；${data.sources.etf}` : ''}。
         </p>
         {visibleNotes.length > 0 && (
           <ul>

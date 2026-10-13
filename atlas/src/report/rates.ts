@@ -3,14 +3,17 @@ import { reportUrl } from './loadReport';
 
 /**
  * US Treasury rates research data, written by scripts/build_rates.py next to latest.json:
- * - `rates.json`: summary (curve snapshots, spreads, breakevens, the five long-Treasury ETFs);
- * - `rates-history.json`: weekly history since 2003, the last ~260 daily points and weekly ETF
- *   total-return indices (inception = 100).
+ * - `rates.json`: summary (10Y / 3M curve snapshots, the 10Y−3M spread, the Fed target range and the
+ *   five long-Treasury ETFs with their static fields and model duration / convexity);
+ * - `rates-history.json`: weekly history since 2003 and the last ~260 daily points of DGS10, DGS3MO,
+ *   DFEDTARU and DFEDTARL.
  *
  * Tolerant like breadth.ts: unknown fields are ignored (including a legacy `tmf` block), numbers may
  * arrive as strings, a bad ETF / spread / curve entry is dropped instead of failing the file, and
- * missing optional blocks become null / empty. Units follow the data contract: yields and breakevens
- * in percent, spreads in basis points, returns / volatility / drawdowns in percent, durations in
+ * missing optional blocks become null / empty. Files written before the page was trimmed also carry the
+ * full yield curves, real yields, breakevens, other spreads, ETF returns / risk / sensitivity and an ETF
+ * index history; those are still parsed (marked @deprecated below) but a trimmed file may omit every one
+ * of them. Units follow the data contract: yields in percent, spreads in basis points, durations in
  * years, convexity in years² (ΔP/P ≈ −D·Δy + ½·C·Δy² with Δy as a decimal).
  */
 
@@ -69,7 +72,7 @@ function listOf<T>(value: unknown, parse: (item: unknown) => T | null): T[] {
 
 // ---------------------------------------------------------------- rates.json types
 export interface CurveSnapshot {
-  /** `now`, `1w`, `1m`, `3m`, `1y`, `2y` (unknown keys are kept). */
+  /** `now` and `1m` are what the page reads; older files also have `1w`, `3m`, `1y`, `2y` (unknown keys are kept). */
   key: string;
   date: string | null;
   /** Yields in percent aligned with `tenors` (nominal) or `realTenors` (real). */
@@ -96,6 +99,7 @@ export interface RatesSpread {
   /** Percentile of today's value within the last five years, 0–100. */
   pct5y: number | null;
 }
+/** @deprecated No longer written or shown. */
 export interface InflationPoint {
   value: number | null;
   date: string | null;
@@ -104,11 +108,13 @@ export interface InflationPoint {
   /** True for 20Y/30Y: nominal minus TIPS yield, not a published FRED breakeven. */
   derived: boolean;
 }
+/** @deprecated ETF returns are no longer written or shown. */
 export interface WindowReturn {
   total: number | null;
   annualized: number | null;
   start: string | null;
 }
+/** @deprecated ETF sensitivity is no longer written or shown. */
 export interface Regression {
   /** Daily / weekly return (decimal) per 1 percentage point of yield change. */
   beta: number | null;
@@ -117,10 +123,12 @@ export interface Regression {
   r2: number | null;
   n: number | null;
 }
+/** @deprecated */
 export interface Sensitivity {
   daily1y: Regression | null;
   weekly3y: Regression | null;
 }
+/** @deprecated */
 export interface Drawdown {
   value: number | null;
   peak: string | null;
@@ -148,8 +156,11 @@ export interface RatesEtf {
   verified: boolean;
   /** Model duration (years) and convexity (years²) of the unlevered proxy portfolio. */
   model: { duration: number | null; convexity: number | null; proxy: string | null } | null;
+  /** @deprecated Absent from trimmed files (null); not shown. */
   price: { asOf: string | null; close: number | null; adjClose: number | null } | null;
+  /** @deprecated Absent from trimmed files (all null); not shown. */
   returns: Record<'1y' | '3y' | '5y' | '10y' | 'inception', WindowReturn | null>;
+  /** @deprecated Absent from trimmed files (all null); not shown. */
   risk: {
     vol1y: number | null;
     vol3y: number | null;
@@ -158,6 +169,7 @@ export interface RatesEtf {
     mdd5y: number | null;
     currentDrawdown: number | null;
   };
+  /** @deprecated Absent from trimmed files (all null); not shown. */
   sensitivity: { dgs20: Sensitivity | null; dgs30: Sensitivity | null };
 }
 export interface Rates {
@@ -165,14 +177,19 @@ export interface Rates {
   generatedAt: string | null;
   /** Latest DGS10 observation date. */
   asOf: string | null;
+  /** `etf` / `etfAsOf` (ETF price source and date) are @deprecated: null in trimmed files. */
   sources: { rates: string | null; etf: string | null; etfAsOf: string | null };
   /** Series the generator could not refresh (kept from the previous file). */
   missing: string[];
+  /** Tenors of the curve snapshots; trimmed files list only 3M, 10Y, 20Y and 30Y. */
   tenors: string[];
   tenorYears: (number | null)[];
+  /** @deprecated Defaults to the standard TIPS tenors when absent. */
   realTenors: string[];
+  /** `real` is @deprecated: empty in trimmed files. */
   curves: { nominal: CurveSnapshot[]; real: CurveSnapshot[] };
   policy: { lower: number | null; upper: number | null; date: string | null } | null;
+  /** @deprecated Empty in trimmed files. */
   inflation: Record<string, InflationPoint>;
   spreads: RatesSpread[];
   etfs: RatesEtf[];
@@ -362,7 +379,7 @@ export const ratesSchema = z.unknown().transform((value): Rates | null => {
 export interface HistoryBlock {
   /** Ascending YYYY-MM-DD dates. */
   dates: string[];
-  /** Series aligned with `dates` (FRED IDs for yields; ETF symbols for the etf block). */
+  /** Series aligned with `dates` (FRED IDs for yields; ETF symbols in the deprecated etf block). */
   series: Record<string, (number | null)[]>;
 }
 export interface RatesHistory {
@@ -371,7 +388,7 @@ export interface RatesHistory {
   asOf: string | null;
   weekly: HistoryBlock;
   daily: HistoryBlock;
-  /** Weekly total-return indices, inception = 100, null before inception. */
+  /** @deprecated Weekly ETF total-return indices (inception = 100); empty in trimmed files. */
   etf: HistoryBlock;
 }
 

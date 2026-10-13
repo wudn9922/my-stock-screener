@@ -126,7 +126,7 @@ jobs:
 
       # 台股題材輪動改由 themes-tw.yml 在本流程成功後另開 runner 執行（獨立失敗、可單獨手動重跑）。
 
-      # 美債與利率研究：FRED 殖利率（免金鑰 CSV 優先，FRED_API_KEY 只當備援）＋長天期美債 ETF 還原收盤，
+      # 美債與利率研究：FRED 殖利率與聯準會目標區間（有 FRED_API_KEY 時 API 優先，免金鑰 CSV 備援），
       # 產生 docs/report/rates.json 與 rates-history.json。失敗只保留上次的檔案，不影響主流程。
       - name: Build US rates research
         if: steps.guard.outputs.skip != 'true'

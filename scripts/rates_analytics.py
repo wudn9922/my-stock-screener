@@ -4,11 +4,6 @@ Pure-stdlib math for the US rates research page (scripts/build_rates.py).
 Conventions used everywhere in this module:
 - Dates are ISO strings (YYYY-MM-DD); series are ascending [(date, value)] lists or Series objects.
 - Yields and yield changes are in percent / percentage points (FRED units). Spreads are in bp.
-- Returns, volatility and drawdowns are returned in percent and NOT rounded (the builder rounds).
-- Empirical sensitivity: beta = OLS slope of the ETF's simple return (decimal) on the yield change
-  (percentage points) between consecutive dates where BOTH have a value; durEmp = -100 * beta (years).
-  Intersecting the dates first handles bond-market holidays (stocks open, no H.15 value) and stock
-  holidays (H.15 value, no ETF close): the return and the yield change always span the same interval.
 - Model duration / convexity use semiannual compounding with the yield as a decimal:
   dP/P ~= -D * dy + 1/2 * C * dy^2, D in years and C in years^2. iShares publishes convexity in a
   /100 unit (e.g. 3.6); the same number in this unit is 360.
@@ -17,16 +12,11 @@ import bisect
 import math
 from datetime import date, timedelta
 
-# A window whose first observation is this many days after the window start is not reported.
-WINDOW_GRACE_DAYS = 7
 # Per-tenor look-back when a snapshot date has no value for that tenor ('.' or missing).
 SNAPSHOT_LOOKBACK_DAYS = 5
 # Inversion runs separated by at most this many non-inverted observations are one episode
 # (the 10Y-2Y briefly touched zero in 2024 without ending the 2022-2024 inversion).
 INVERSION_MERGE_GAP = 10
-TRADING_DAYS = 252
-MIN_VOL_RETURNS = 20
-MIN_REGRESSION_POINTS = {"daily": 100, "weekly": 52}
 
 # Equal-par ladders with a bond every half year from `low` to `high` years, each priced at the
 # yield linearly interpolated between DGS20 and DGS30 (flat outside 20-30y).
@@ -111,14 +101,6 @@ def shift_years(day, years):
 # --------------------------------------------------------------------------- sampling and snapshots
 
 
-def valid_iso(day):
-    """True for a real YYYY-MM-DD date string."""
-    try:
-        return len(day) == 10 and date.fromisoformat(day).isoformat() == day
-    except (TypeError, ValueError):
-        return False
-
-
 def iso_week(day):
     """(ISO year, ISO week) of a date."""
     return tuple(to_date(day).isocalendar()[:2])
@@ -139,15 +121,9 @@ def weekly_sample(dates):
 
 
 def snapshot_targets(as_of):
+    """The two curve snapshots the page reads: today and one month back."""
     as_of = to_date(as_of)
-    return [
-        ("now", as_of),
-        ("1w", as_of - timedelta(days=7)),
-        ("1m", shift_months(as_of, -1)),
-        ("3m", shift_months(as_of, -3)),
-        ("1y", shift_years(as_of, -1)),
-        ("2y", shift_years(as_of, -2)),
-    ]
+    return [("now", as_of), ("1m", shift_months(as_of, -1))]
 
 
 def snapshot_curve(series_map, ids, anchor, target, lookback=SNAPSHOT_LOOKBACK_DAYS):
@@ -246,195 +222,6 @@ def spread_stats(points, merge_gap=INVERSION_MERGE_GAP):
         "lastInversion": _public_run(last_run, points, open_ended=inverted) if last_run else None,
         "pct5y": int(round(percentile_rank(recent, last_value))),
     }
-
-
-# --------------------------------------------------------------------------- returns and risk
-
-
-def window_base(series, start):
-    """Index of the observation a window starting at `start` is measured from, or None.
-
-    The last observation on or before `start`; if the data begins after `start`, its first observation
-    when that is within WINDOW_GRACE_DAYS.
-    """
-    if not len(series):
-        return None
-    index = series.index_on_or_before(start)
-    if index >= 0:
-        return index
-    if (to_date(series.dates[0]) - to_date(start)).days <= WINDOW_GRACE_DAYS:
-        return 0
-    return None
-
-
-def total_return(series, start):
-    """(base date, total return %, days) from the window base to the last observation, or None."""
-    series = as_series(series)
-    index = window_base(series, start)
-    if index is None or index >= len(series) - 1 or series.values[index] <= 0:
-        return None
-    days = (to_date(series.dates[-1]) - to_date(series.dates[index])).days
-    return series.dates[index], (series.values[-1] / series.values[index] - 1) * 100, days
-
-
-def annualize(total_pct, days):
-    """CAGR in % = (P1/P0)^(365.25/days) - 1."""
-    if days <= 0 or total_pct <= -100:
-        return None
-    return ((1 + total_pct / 100) ** (365.25 / days) - 1) * 100
-
-
-def period_returns(series):
-    """{"1y": {total}, "3y"/"5y"/"10y": {total, annualized} | None, "inception": {start, total, annualized}}."""
-    series = as_series(series)
-    if len(series) < 2:
-        return None
-    end = to_date(series.dates[-1])
-    out = {}
-    for key, years in (("1y", 1), ("3y", 3), ("5y", 5), ("10y", 10)):
-        result = total_return(series, shift_years(end, -years))
-        if result is None:
-            out[key] = None
-        elif years == 1:
-            out[key] = {"total": result[1]}
-        else:
-            out[key] = {"total": result[1], "annualized": annualize(result[1], result[2])}
-    start = series.dates[0]
-    days = (end - to_date(start)).days
-    total = (series.values[-1] / series.values[0] - 1) * 100
-    out["inception"] = {"start": start, "total": total, "annualized": annualize(total, days) if days >= 365 else None}
-    return out
-
-
-def ann_vol(series, start):
-    """Annualized volatility in %: sample stdev of daily log returns since the window base x sqrt(252)."""
-    series = as_series(series)
-    index = window_base(series, start)
-    if index is None:
-        return None
-    values = series.values[index:]
-    logs = [math.log(b / a) for a, b in zip(values, values[1:]) if a > 0 and b > 0]
-    if len(logs) < MIN_VOL_RETURNS:
-        return None
-    mean = sum(logs) / len(logs)
-    variance = sum((x - mean) ** 2 for x in logs) / (len(logs) - 1)
-    return math.sqrt(variance) * math.sqrt(TRADING_DAYS) * 100
-
-
-def max_drawdown(series, start=None):
-    """Deepest peak-to-trough fall in %: {value, peak, trough, recovered (first date back at the peak) | None}."""
-    series = as_series(series)
-    first = 0
-    if start is not None:
-        first = window_base(series, start)
-        if first is None:
-            return None
-    dates, values = series.dates[first:], series.values[first:]
-    if not values:
-        return None
-    worst, worst_peak, worst_trough = 0.0, None, None
-    peak_index = 0
-    for index, value in enumerate(values):
-        if value > values[peak_index]:
-            peak_index = index
-        drawdown = (value / values[peak_index] - 1) * 100
-        if drawdown < worst:
-            worst, worst_peak, worst_trough = drawdown, peak_index, index
-    if worst_peak is None:
-        return {"value": 0.0, "peak": None, "trough": None, "recovered": None}
-    recovered = None
-    for index in range(worst_trough + 1, len(values)):
-        if values[index] >= values[worst_peak]:
-            recovered = dates[index]
-            break
-    return {"value": worst, "peak": dates[worst_peak], "trough": dates[worst_trough], "recovered": recovered}
-
-
-def current_drawdown(series):
-    series = as_series(series)
-    if not len(series):
-        return None
-    return (series.values[-1] / max(series.values) - 1) * 100
-
-
-def filter_bad_points(points, threshold, confirm=2):
-    """Drops isolated price spikes: a one-day move beyond `threshold` (fraction) that the next `confirm`
-    observations do not confirm. A confirmed level change is kept. Returns (kept, dropped dates)."""
-    kept, dropped = [], []
-    for index, (day, value) in enumerate(points):
-        if value is None or not value > 0:
-            dropped.append(day)
-            continue
-        if not kept or abs(value / kept[-1][1] - 1) <= threshold:
-            kept.append((day, value))
-            continue
-        following = [v for _, v in points[index + 1 : index + 1 + confirm] if v is not None and v > 0]
-        level = value
-        confirmed = len(following) == confirm
-        for nxt in following:
-            if abs(nxt / level - 1) > threshold:
-                confirmed = False
-                break
-            level = nxt
-        if confirmed:
-            kept.append((day, value))
-        else:
-            dropped.append(day)
-    return kept, dropped
-
-
-# --------------------------------------------------------------------------- empirical duration
-
-
-def ols(x, y):
-    """(slope, intercept, r2) of y on x, or None when x has no variance."""
-    n = len(x)
-    if n != len(y) or n < 3:
-        return None
-    mean_x, mean_y = sum(x) / n, sum(y) / n
-    sxx = sum((a - mean_x) ** 2 for a in x)
-    syy = sum((b - mean_y) ** 2 for b in y)
-    sxy = sum((a - mean_x) * (b - mean_y) for a, b in zip(x, y))
-    if sxx <= 0:
-        return None
-    slope = sxy / sxx
-    r2 = sxy * sxy / (sxx * syy) if syy > 0 else 0.0
-    return slope, mean_y - slope * mean_x, r2
-
-
-def aligned_changes(etf, yields, start, freq):
-    """(dy in pp, ETF simple returns) between consecutive dates on which both have a value.
-
-    freq "weekly" first keeps the last common date of every ISO week (Friday to Friday, or the last
-    trading day before it). Only intervals starting on or after `start` are used.
-    """
-    etf, yields = as_series(etf), as_series(yields)
-    prices = dict(zip(etf.dates, etf.values))
-    levels = dict(zip(yields.dates, yields.values))
-    common = [day for day in yields.dates if day in prices and prices[day] > 0]
-    if freq == "weekly":
-        common = weekly_sample(common)
-    floor = iso(start)
-    dy, returns = [], []
-    for a, b in zip(common, common[1:]):
-        if a < floor:
-            continue
-        dy.append(levels[b] - levels[a])
-        returns.append(prices[b] / prices[a] - 1)
-    return dy, returns
-
-
-def regress_beta(etf, yields, start, freq):
-    """{"beta", "durEmp", "r2", "n"} of ETF returns on yield changes since `start`, or None if too short."""
-    dy, returns = aligned_changes(etf, yields, start, freq)
-    if len(dy) < MIN_REGRESSION_POINTS[freq]:
-        return None
-    fit = ols(dy, returns)
-    if fit is None:
-        return None
-    beta, _, r2 = fit
-    # + 0.0 turns a rounded -0.0 into 0.0 (strict output never carries -0.0)
-    return {"beta": round(beta, 5) + 0.0, "durEmp": round(-100 * beta, 2) + 0.0, "r2": round(r2, 3) + 0.0, "n": len(dy)}
 
 
 # --------------------------------------------------------------------------- model duration / convexity

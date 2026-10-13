@@ -1,13 +1,11 @@
 import contextlib
 import io
 import json
-import math
 import os
-import random
 import sys
 import tempfile
 import unittest
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
@@ -46,15 +44,10 @@ def market():
     return _MARKET
 
 
-def build(series=None, origin=None, prices=None, previous_rates=None, previous_history=None, today=None):
-    base_series, base_prices = market()
-    series = base_series if series is None else series
-    prices = base_prices if prices is None else prices
+def build(series=None, origin=None, today=None):
+    series = market() if series is None else series
     origin = rates_synth.origins_all(series) if origin is None else origin
-    return build_rates.build_payloads(
-        series, origin, prices, rates_config.ETFS, previous_rates, previous_history,
-        today or rates_synth.TODAY, rates_synth.NOW,
-    )
+    return build_rates.build_payloads(series, origin, rates_config.ETFS, today or rates_synth.TODAY, rates_synth.NOW)
 
 
 # --------------------------------------------------------------------------- FRED parsing
@@ -261,10 +254,9 @@ class SamplingTest(unittest.TestCase):
 
     def test_snapshot_targets(self):
         targets = dict(ra.snapshot_targets(date(2026, 10, 9)))
-        self.assertEqual(list(targets), ["now", "1w", "1m", "3m", "1y", "2y"])
-        self.assertEqual(targets["1w"], date(2026, 10, 2))
+        self.assertEqual(list(targets), ["now", "1m"])
+        self.assertEqual(targets["now"], date(2026, 10, 9))
         self.assertEqual(targets["1m"], date(2026, 9, 9))
-        self.assertEqual(targets["2y"], date(2024, 10, 9))
 
 
 # --------------------------------------------------------------------------- spreads
@@ -328,153 +320,6 @@ class SpreadTest(unittest.TestCase):
         target = ra.shift_months(date.fromisoformat(days[-1]), -1).isoformat()
         prior = [v for d, v in points if d <= target][-1]
         self.assertEqual(stats["chg1mBp"], round(points[-1][1] - prior))
-
-
-# --------------------------------------------------------------------------- returns and risk
-
-
-def geometric_series(start, days, annual):
-    first = date.fromisoformat(start)
-    return ra.Series([((first + timedelta(days=i)).isoformat(), 100 * (1 + annual) ** (i / 365.25)) for i in range(days)])
-
-
-class ReturnRiskTest(unittest.TestCase):
-    def test_cagr_on_geometric_series(self):
-        series = geometric_series("2015-01-01", 4000, 0.10)
-        returns = ra.period_returns(series)
-        self.assertAlmostEqual(returns["3y"]["annualized"], 10.0, places=6)
-        self.assertAlmostEqual(returns["5y"]["annualized"], 10.0, places=6)
-        self.assertAlmostEqual(returns["inception"]["annualized"], 10.0, places=6)
-        end = date.fromisoformat(series.dates[-1])
-        start = ra.shift_years(end, -3)
-        self.assertAlmostEqual(returns["3y"]["total"], (1.1 ** ((end - start).days / 365.25) - 1) * 100, places=6)
-        self.assertNotIn("annualized", returns["1y"])
-        self.assertAlmostEqual(returns["10y"]["annualized"], 10.0, places=6)  # 4000 days ~ 10.95 years
-        self.assertIsNone(ra.period_returns(geometric_series("2015-01-01", 3000, 0.10))["10y"])
-        self.assertEqual(returns["inception"]["start"], "2015-01-01")
-
-    def test_window_start_grace(self):
-        series = geometric_series("2023-10-15", 365 * 3, 0.05)  # 3y window starts a few days before data
-        end = date.fromisoformat(series.dates[-1])
-        self.assertLessEqual((date(2023, 10, 15) - ra.shift_years(end, -3)).days, ra.WINDOW_GRACE_DAYS)
-        self.assertIsNotNone(ra.total_return(series, ra.shift_years(end, -3)))
-        late = geometric_series("2023-11-15", 365 * 3 - 31, 0.05)
-        self.assertIsNone(ra.total_return(late, ra.shift_years(end, -3)))
-
-    def test_short_history_inception_not_annualized(self):
-        returns = ra.period_returns(geometric_series("2026-01-01", 200, 0.10))
-        self.assertIsNone(returns["inception"]["annualized"])
-        self.assertIsNone(returns["1y"])
-
-    def test_vol_of_alternating_log_returns(self):
-        days = daily_calendar(date(2025, 1, 1), 301)  # 300 returns: equal +/- count, mean exactly 0
-        a = 0.01
-        logs = [a if i % 2 == 0 else -a for i in range(len(days) - 1)]
-        values = [100.0]
-        for step in logs:
-            values.append(values[-1] * math.exp(step))
-        series = ra.Series(list(zip(days, values)))
-        start = date.fromisoformat(days[0])
-        n = len(logs)
-        expected = math.sqrt(n / (n - 1)) * a * math.sqrt(252) * 100
-        self.assertAlmostEqual(ra.ann_vol(series, start), expected, places=9)
-
-    def test_max_drawdown_peak_trough_recovery(self):
-        days = daily_calendar(date(2026, 1, 5), 8)
-        series = ra.Series(list(zip(days, [100, 120, 90, 60, 80, 119, 130, 110])))
-        mdd = ra.max_drawdown(series)
-        self.assertEqual(mdd, {"value": -50.0, "peak": days[1], "trough": days[3], "recovered": days[6]})
-        self.assertAlmostEqual(ra.current_drawdown(series), (110 / 130 - 1) * 100, places=9)
-        unrecovered = ra.Series(list(zip(days[:5], [100, 120, 90, 60, 80])))
-        self.assertIsNone(ra.max_drawdown(unrecovered)["recovered"])
-        rising = ra.Series(list(zip(days[:3], [1, 2, 3])))
-        self.assertEqual(ra.max_drawdown(rising), {"value": 0.0, "peak": None, "trough": None, "recovered": None})
-
-    def test_bad_point_filter(self):
-        days = daily_calendar(date(2026, 1, 5), 12)
-        values = [100, 101, 250, 102, 103, 104, 30, 31, 32, 33, 34, 35]
-        kept, dropped = ra.filter_bad_points(list(zip(days, values)), 0.25)
-        self.assertEqual(dropped, [days[2]])  # isolated spike removed
-        # a persistent level change (3+ consistent points) is kept, not erased
-        self.assertEqual([d for d, _ in kept], days[:2] + days[3:])
-        kept, dropped = ra.filter_bad_points(list(zip(days[:5], [100, 101, 102, 103, 300])), 0.25)
-        self.assertEqual(dropped, [days[4]])
-        kept, dropped = ra.filter_bad_points(list(zip(days[:4], [100, 150, 101, 102])), 0.6)
-        self.assertEqual(dropped, [])
-
-
-# --------------------------------------------------------------------------- empirical duration
-
-
-def regression_market(duration, seed, days=900):
-    """True yields every weekday; FRED drops bond holidays, the ETF drops stock holidays."""
-    rng = random.Random(seed)
-    calendar = daily_calendar(date(2023, 1, 2), days)
-    yields, price = [], []
-    y, p = 4.0, 100.0
-    for index, day in enumerate(calendar):
-        if index:
-            dy = rng.gauss(0, 0.06)
-            y += dy
-            p *= 1 - duration * dy / 100 + rng.gauss(0, 0.0005)
-        yields.append((day, round(y, 4)))
-        price.append((day, p))
-    bond_holidays = set(calendar[7::23])   # bond market closed, ETF trades
-    stock_holidays = set(calendar[13::41])  # ETF closed, FRED has a value
-    fred = [(d, v) for d, v in yields if d not in bond_holidays]
-    etf = [(d, v) for d, v in price if d not in stock_holidays]
-    return fred, etf
-
-
-class EmpiricalDurationTest(unittest.TestCase):
-    def test_daily_beta_recovers_duration_with_holiday_gaps(self):
-        for duration, seed in ((16.5, 1), (26.0, 2), (49.5, 3)):
-            fred, etf = regression_market(duration, seed)
-            end = date.fromisoformat(fred[-1][0])
-            result = ra.regress_beta(etf, fred, ra.shift_years(end, -1), "daily")
-            self.assertLess(abs(result["durEmp"] - duration) / duration, 0.02, (duration, result))
-            self.assertAlmostEqual(result["durEmp"], -100 * result["beta"], places=1)
-            self.assertGreater(result["r2"], 0.9)
-            self.assertGreater(result["n"], 230)
-
-    def test_weekly_beta_recovers_duration(self):
-        fred, etf = regression_market(24.0, 4)
-        end = date.fromisoformat(fred[-1][0])
-        result = ra.regress_beta(etf, fred, ra.shift_years(end, -3), "weekly")
-        self.assertLess(abs(result["durEmp"] - 24.0) / 24.0, 0.02, result)
-        self.assertGreater(result["n"], 150)
-
-    def test_positional_alignment_would_fail(self):
-        """Guards the test itself: zipping returns by position (ignoring holidays) gives a wrong answer."""
-        fred, etf = regression_market(16.5, 1)
-        dy = [b[1] - a[1] for a, b in zip(fred, fred[1:])]
-        r = [b[1] / a[1] - 1 for a, b in zip(etf, etf[1:])]
-        n = min(len(dy), len(r))
-        beta = ra.ols(dy[:n][-250:], r[:n][-250:])[0]
-        self.assertGreater(abs(-100 * beta - 16.5) / 16.5, 0.02)
-
-    def test_aligned_changes_span_holidays(self):
-        fred = [("2026-10-09", 4.0), ("2026-10-13", 4.1)]               # 10-12 bond holiday
-        etf = [("2026-10-09", 100.0), ("2026-10-12", 99.0), ("2026-10-13", 98.0)]
-        dy, r = ra.aligned_changes(etf, fred, date(2026, 1, 1), "daily")
-        self.assertEqual(len(dy), 1)
-        self.assertAlmostEqual(dy[0], 0.1)
-        self.assertAlmostEqual(r[0], -0.02)
-
-    def test_near_zero_beta_has_no_negative_zero(self):
-        # A fund that barely moves with yields: beta and durEmp round to zero and must not print as -0.0
-        days = daily_calendar(date(2025, 1, 6), 140)
-        for sign in (1, -1):
-            fred = [(d, 4.0 + (0.05 if i % 2 else 0.0)) for i, d in enumerate(days)]
-            etf = [(d, 100.0 * (1 + sign * (1e-9 if i % 2 else 0.0))) for i, d in enumerate(days)]
-            result = ra.regress_beta(etf, fred, date(2024, 1, 1), "daily")
-            text = json.dumps(result)
-            self.assertNotIn("-0.0", text, result)
-            self.assertEqual(result["durEmp"], 0)
-
-    def test_too_few_points(self):
-        fred, etf = regression_market(16.5, 1, days=30)
-        self.assertIsNone(ra.regress_beta(etf, fred, date(2023, 1, 1), "daily"))
 
 
 # --------------------------------------------------------------------------- model duration / convexity
@@ -569,12 +414,12 @@ class ConfigTest(unittest.TestCase):
 # --------------------------------------------------------------------------- payloads
 
 
-RATES_KEYS = {"version", "generatedAt", "asOf", "sources", "missing", "tenors", "tenorYears", "realTenors",
-              "curves", "policy", "inflation", "spreads", "etfs", "notes"}
+RATES_KEYS = {"version", "generatedAt", "asOf", "sources", "missing", "tenors", "tenorYears", "curves", "policy",
+              "spreads", "etfs", "notes"}
 ETF_KEYS = {"symbol", "name", "issuer", "index", "inception", "leverage", "expenseRatio", "expenseNote",
-            "effectiveDuration", "maturityRange", "holdings", "staticAsOf", "staticSource", "verified",
-            "model", "price", "returns", "risk", "sensitivity"}
+            "effectiveDuration", "maturityRange", "holdings", "staticAsOf", "staticSource", "verified", "model"}
 SPREAD_KEYS = {"key", "long", "short", "valueBp", "chg1mBp", "inverted", "invertedDays", "lastInversion", "pct5y"}
+CORE = ["DGS3MO", "DGS10", "DGS20", "DGS30"]
 
 
 class PayloadTest(unittest.TestCase):
@@ -585,26 +430,18 @@ class PayloadTest(unittest.TestCase):
     def test_contract_keys(self):
         rates, history = self.rates, self.history
         self.assertEqual(set(rates), RATES_KEYS)
-        self.assertNotIn("tmf", rates)
         self.assertEqual(rates["version"], 1)
-        self.assertEqual(rates["tenors"], ["1M", "3M", "6M", "1Y", "2Y", "3Y", "5Y", "7Y", "10Y", "20Y", "30Y"])
-        self.assertEqual(rates["tenorYears"], [0.0833, 0.25, 0.5, 1, 2, 3, 5, 7, 10, 20, 30])
-        self.assertEqual(rates["realTenors"], ["5Y", "7Y", "10Y", "20Y", "30Y"])
-        self.assertEqual(set(rates["sources"]), {"rates", "etf", "etfAsOf"})
-        self.assertEqual(rates["sources"]["rates"], "FRED fredgraph.csv")
-        self.assertEqual(rates["sources"]["etf"], "Yahoo Finance adjusted close")
+        self.assertEqual(rates["tenors"], ["3M", "10Y", "20Y", "30Y"])
+        self.assertEqual(rates["tenorYears"], [0.25, 10, 20, 30])
+        self.assertEqual(rates["sources"], {"rates": "FRED fredgraph.csv"})
         self.assertEqual(rates["missing"], [])
-        self.assertEqual([c["key"] for c in rates["curves"]["nominal"]], ["now", "1w", "1m", "3m", "1y", "2y"])
+        self.assertEqual(set(rates["curves"]), {"nominal"})
+        self.assertEqual([c["key"] for c in rates["curves"]["nominal"]], ["now", "1m"])
         for curve in rates["curves"]["nominal"]:
             self.assertEqual(set(curve), {"key", "date", "values"})
-            self.assertEqual(len(curve["values"]), 11)
-        for curve in rates["curves"]["real"]:
-            self.assertEqual(len(curve["values"]), 5)
+            self.assertEqual(len(curve["values"]), len(rates["tenors"]))
         self.assertEqual(set(rates["policy"]), {"lower", "upper", "date"})
-        self.assertEqual(set(rates["inflation"]), {"5Y", "10Y", "5y5y", "20Y", "30Y"})
-        self.assertTrue(rates["inflation"]["20Y"]["derived"])
-        self.assertNotIn("derived", rates["inflation"]["10Y"])
-        self.assertEqual([s["key"] for s in rates["spreads"]], ["10yfed", "10y3m"])
+        self.assertEqual([s["key"] for s in rates["spreads"]], ["10y3m"])
         for spread in rates["spreads"]:
             self.assertEqual(set(spread), SPREAD_KEYS)
             self.assertIsInstance(spread["valueBp"], int)
@@ -613,88 +450,70 @@ class PayloadTest(unittest.TestCase):
             self.assertEqual(set(etf), ETF_KEYS, etf["symbol"])
             self.assertFalse(etf["verified"])
             self.assertEqual(set(etf["model"]), {"duration", "convexity", "proxy"})
-            self.assertEqual(set(etf["price"]), {"asOf", "close", "adjClose"})
-            self.assertEqual(set(etf["returns"]), {"1y", "3y", "5y", "10y", "inception"})
-            self.assertEqual(set(etf["risk"]), {"vol1y", "vol3y", "vol5y", "maxDrawdown", "mdd5y", "currentDrawdown"})
-            self.assertEqual(set(etf["risk"]["maxDrawdown"]), {"value", "peak", "trough", "recovered"})
-            self.assertEqual(set(etf["sensitivity"]), {"dgs20", "dgs30"})
-            for block in etf["sensitivity"].values():
-                self.assertEqual(set(block), {"daily1y", "weekly3y"})
-                for fit in block.values():
-                    self.assertEqual(set(fit), {"beta", "durEmp", "r2", "n"})
-        self.assertEqual(set(history), {"version", "generatedAt", "asOf", "weekly", "daily", "etf"})
-        self.assertEqual(set(history["weekly"]["series"]), set(build_rates.HISTORY_IDS))
-        self.assertEqual(set(history["etf"]["series"]), {"TLT", "EDV", "GOVZ", "ZROZ", "TMF"})
-        for block in ("weekly", "daily", "etf"):
+        self.assertEqual(set(rates["notes"]), {"rates", "spreads", "model", "static", "tmf", "disclaimer"})
+        self.assertEqual(set(history), {"version", "generatedAt", "asOf", "weekly", "daily"})
+        for block in ("weekly", "daily"):
+            self.assertEqual(set(history[block]), {"dates", "series"})
+            self.assertEqual(set(history[block]["series"]), {"DGS10", "DGS3MO", "DFEDTARU", "DFEDTARL"})
             for values in history[block]["series"].values():
                 self.assertEqual(len(values), len(history[block]["dates"]))
 
-    def test_fed_midpoint_requires_same_day_upper_and_lower(self):
-        source = {
-            "DFEDTARU": ra.Series([("2026-01-02", 4.25), ("2026-01-05", 4.5)]),
-            "DFEDTARL": ra.Series([("2026-01-02", 4.0)]),
-        }
-        middle = build_rates.fed_target_midpoint(source)
-        self.assertEqual(middle.points(), [("2026-01-02", 4.125)])
-        self.assertEqual(build_rates.fed_target_midpoint({"DFEDTARU": source["DFEDTARU"]}).points(), [])
+    def test_only_what_the_page_uses_is_fetched(self):
+        self.assertEqual(build_rates.FRED_IDS, CORE + ["DFEDTARU", "DFEDTARL"])
+        self.assertEqual(build_rates.HISTORY_IDS, ["DGS3MO", "DGS10", "DFEDTARU", "DFEDTARL"])
+        self.assertEqual(set(market()), set(build_rates.FRED_IDS))
 
     def test_values_and_units(self):
         rates, history = self.rates, self.history
-        series, prices = market()
+        series = market()
         last10 = series["DGS10"][-1]
         self.assertEqual(rates["asOf"], last10[0])
         now = rates["curves"]["nominal"][0]
         self.assertEqual(now["date"], last10[0])
-        self.assertEqual(now["values"][8], last10[1])
+        self.assertEqual(now["values"][rates["tenors"].index("10Y")], last10[1])
+        month_ago = rates["curves"]["nominal"][1]
+        target = ra.shift_months(date.fromisoformat(last10[0]), -1).isoformat()
+        self.assertEqual(month_ago["date"], [d for d, _ in series["DGS10"] if d <= target][-1])
         spread = rates["spreads"][0]
-        self.assertEqual(spread["short"], "DFEDTARU")
-        self.assertEqual(spread["valueBp"], round((series["DGS10"][-1][1] -
-                         series["DFEDTARU"][-1][1]) * 100))
-        self.assertEqual(history["daily"]["series"]["FEDTARGETMID"][-1], 4.125)
+        self.assertEqual((spread["long"], spread["short"]), ("DGS10", "DGS3MO"))
+        self.assertEqual(spread["valueBp"], round((last10[1] - series["DGS3MO"][-1][1]) * 100))
         self.assertEqual(spread["inverted"], spread["valueBp"] < 0)
-        self.assertEqual(rates["spreads"][1]["key"], "10y3m")
-        self.assertEqual(rates["spreads"][1]["valueBp"], round((series["DGS10"][-1][1] - series["DGS3MO"][-1][1]) * 100))
         self.assertEqual(rates["policy"], {"lower": 4.0, "upper": 4.25, "date": series["DFEDTARU"][-1][0]})
-        infl20 = rates["inflation"]["20Y"]
-        self.assertAlmostEqual(infl20["value"], round(series["DGS20"][-1][1] - series["DFII20"][-1][1], 3))
         tlt, tmf = rates["etfs"][0], rates["etfs"][4]
         self.assertEqual(tmf["leverage"], 3)
-        self.assertEqual(tlt["price"]["adjClose"], round(prices["TLT"][-1][2], 4))
-        self.assertEqual(tlt["price"]["close"], round(prices["TLT"][-1][1], 2))
-        # synthetic durations come back from the regression (weekly: weaker noise impact, 3y of data)
-        self.assertLess(abs(tlt["sensitivity"]["dgs20"]["weekly3y"]["durEmp"] - 16.5) / 16.5, 0.05)
-        self.assertLess(abs(rates["etfs"][3]["sensitivity"]["dgs30"]["daily1y"]["durEmp"] - 27.0) / 27.0, 0.05)
         self.assertGreater(tlt["model"]["convexity"], 100)  # years², not the published /100 figure
-        self.assertIsNone(tlt["returns"]["10y"])
-        govz = rates["etfs"][2]
-        self.assertEqual(govz["returns"]["inception"]["start"], "2020-09-22")
-        self.assertIsNone(history["etf"]["series"]["GOVZ"][0])
-        first_govz = next(v for v in history["etf"]["series"]["GOVZ"] if v is not None)
-        self.assertEqual(first_govz, 100.0)
         self.assertEqual(history["weekly"]["dates"], ra.weekly_sample([d for d, _ in series["DGS10"]]))
+        self.assertEqual(history["weekly"]["dates"][0][:4], "2020")  # synthetic data starts in 2020
         self.assertEqual(len(history["daily"]["dates"]), build_rates.DAILY_POINTS)
+        self.assertEqual(history["daily"]["series"]["DGS10"][-1], last10[1])
+        self.assertEqual(history["daily"]["series"]["DFEDTARU"][-1], 4.25)
 
-    def test_guard_missing_core_series(self):
-        series, _ = market()
-        origin = rates_synth.origins_all(series)
-        origin["DGS30"] = "previous"
-        with self.assertRaises(build_rates.InsufficientData):
-            build(origin=origin)
-        trimmed = {k: v for k, v in series.items() if k != "DGS2"}
-        with self.assertRaises(build_rates.InsufficientData):
-            build(series=trimmed, origin=rates_synth.origins_all(trimmed))
+    def test_model_block_uses_todays_long_yields(self):
+        series = market()
+        y20, y30 = series["DGS20"][-1][1], series["DGS30"][-1][1]
+        for etf, config in zip(self.rates["etfs"], rates_config.ETFS):
+            self.assertEqual(etf["model"], ra.model_duration_convexity(config["modelProxy"], y20, y30))
+        self.assertEqual(self.rates["etfs"][0]["model"], self.rates["etfs"][4]["model"])  # TMF: unlevered index
 
-    def test_guard_too_few_tenors(self):
-        series, _ = market()
-        origin = rates_synth.origins_all(series)
-        for key in ("DGS1MO", "DGS3MO", "DGS6MO", "DGS1"):
-            origin[key] = None
-        with self.assertRaises(build_rates.InsufficientData):
-            build(origin=origin)
-        origin["DGS1"] = "csv"  # 8 of 11 fresh is enough; the rest is reported as missing
+    def test_guard_each_core_series_must_be_fresh(self):
+        for core in CORE:
+            origin = rates_synth.origins_all(market())
+            origin[core] = "previous"
+            with self.assertRaises(build_rates.InsufficientData, msg=core):
+                build(origin=origin)
+            trimmed = {k: v for k, v in market().items() if k != core}
+            with self.assertRaises(build_rates.InsufficientData, msg=core):
+                build(series=trimmed, origin=rates_synth.origins_all(trimmed))
+
+    def test_policy_series_may_come_from_the_previous_file(self):
+        origin = rates_synth.origins_all(market())
+        origin["DFEDTARU"] = "previous"
         rates, _ = build(origin=origin)
-        self.assertEqual(rates["missing"], ["DGS1MO", "DGS3MO", "DGS6MO"])
+        self.assertEqual(rates["missing"], ["DFEDTARU"])
         self.assertEqual(rates["sources"]["rates"], "FRED fredgraph.csv")
+        origin["DFEDTARL"] = None
+        rates, _ = build(origin=origin)
+        self.assertEqual(rates["missing"], ["DFEDTARU", "DFEDTARL"])
 
     def test_guard_stale(self):
         with self.assertRaises(build_rates.InsufficientData):
@@ -702,81 +521,16 @@ class PayloadTest(unittest.TestCase):
         build(today=rates_synth.TODAY + timedelta(days=10))
 
     def test_mixed_sources(self):
-        series, _ = market()
-        origin = rates_synth.origins_all(series)
-        origin["T5YIFR"] = "api"
+        origin = rates_synth.origins_all(market())
+        origin["DFEDTARL"] = "api"
         rates, _ = build(origin=origin)
         self.assertEqual(rates["sources"]["rates"], "mixed")
-
-    def test_etf_failure_keeps_previous_blocks(self):
-        rates, history = self.rates, self.history
-        again, again_history = build(prices={}, previous_rates=rates, previous_history=history)
-        self.assertEqual(again["sources"]["etf"], rates["sources"]["etf"])
-        self.assertEqual(again["sources"]["etfAsOf"], rates["sources"]["etfAsOf"])
-        self.assertEqual(again_history["etf"], history["etf"])
-        for old, new in zip(rates["etfs"], again["etfs"]):
-            for key in ("price", "returns", "risk", "sensitivity"):
-                self.assertEqual(old[key], new[key])
-            self.assertEqual(old["model"], new["model"])  # model comes from today's curve, same inputs
-
-    def test_partial_etf_failure_reuses_one_symbol(self):
-        _, prices = market()
-        partial = {k: v for k, v in prices.items() if k != "EDV"}
-        again, again_history = build(prices=partial, previous_rates=self.rates, previous_history=self.history)
-        self.assertEqual(again["etfs"][1]["returns"], self.rates["etfs"][1]["returns"])
-        self.assertEqual(again_history["etf"]["series"]["EDV"], self.history["etf"]["series"]["EDV"])
-
-    def test_short_partial_download_keeps_reused_history(self):
-        # Only GOVZ came back, and only its last 300 days: the other funds keep their whole weekly
-        # history from the previous file (inception = 100) instead of being cut to GOVZ's span.
-        _, prices = market()
-        partial = {"GOVZ": prices["GOVZ"][-300:]}
-        _, again_history = build(prices=partial, previous_rates=self.rates, previous_history=self.history)
-        old, new = self.history["etf"], again_history["etf"]
-        self.assertEqual(new["dates"][0], old["dates"][0])
-        for symbol in ("TLT", "EDV", "ZROZ", "TMF"):
-            old_values = dict(zip(old["dates"], old["series"][symbol]))
-            new_values = dict(zip(new["dates"], new["series"][symbol]))
-            self.assertEqual(new_values[new["dates"][0]], 100)
-            self.assertEqual({d: v for d, v in new_values.items() if d in old_values}, old_values)
-        govz = [v for v in new["series"]["GOVZ"] if v is not None]
-        self.assertEqual(govz[0], 100)
-        self.assertEqual(len(govz), len(ra.weekly_sample([d for d, _, _ in partial["GOVZ"]])))
-
-    def test_etf_failure_without_previous(self):
-        rates, history = build(prices={})
-        self.assertIsNone(rates["sources"]["etf"])
-        self.assertIsNone(rates["sources"]["etfAsOf"])
-        self.assertIsNone(rates["etfs"][0]["price"])
-        self.assertEqual(history["etf"]["dates"], [])
-        self.assertIsNotNone(rates["etfs"][0]["model"])
 
     def test_payload_is_strict_json(self):
         for payload in (self.rates, self.history):
             text = json.dumps(payload, allow_nan=False)
             self.assertNotIn("-0.0,", text)
             self.assertNotIn("-0.0]", text)
-
-    def test_price_spike_is_dropped_before_metrics(self):
-        _, prices = market()
-        spiked = dict(prices)
-        points = list(prices["TLT"])
-        day, close, adj = points[-300]
-        points[-300] = (day, close * 0.5, adj * 0.5)  # one bad print, -50%
-        spiked["TLT"] = points
-        rates, _ = build(prices=spiked)
-        clean, got = self.rates["etfs"][0], rates["etfs"][0]
-        self.assertEqual(got["returns"], clean["returns"])
-        self.assertEqual(got["risk"]["maxDrawdown"], clean["risk"]["maxDrawdown"])
-        # the dropped day turns two daily returns into one two-day return: vol moves a hair, not ~50%
-        self.assertLess(abs(got["risk"]["vol5y"] - clean["risk"]["vol5y"]), 0.1)
-
-    def test_model_block_uses_todays_long_yields(self):
-        series, _ = market()
-        y20, y30 = series["DGS20"][-1][1], series["DGS30"][-1][1]
-        for etf, config in zip(self.rates["etfs"], rates_config.ETFS):
-            self.assertEqual(etf["model"], ra.model_duration_convexity(config["modelProxy"], y20, y30))
-        self.assertEqual(self.rates["etfs"][0]["model"], self.rates["etfs"][4]["model"])  # TMF: unlevered index
 
 
 class FixtureTest(unittest.TestCase):
@@ -813,10 +567,12 @@ class FixtureTest(unittest.TestCase):
 
 
 class RunTest(unittest.TestCase):
-    def fred_http(self, broken=()):
-        series, _ = market()
+    def fred_http(self, broken=(), seen=None):
+        series = market()
 
         def http_get(url, params, timeout):
+            if seen is not None:
+                seen.append((url, params.get("id") or params.get("series_id")))
             if "fredgraph" not in url:
                 return 500, f"error for api_key={params.get('api_key')}"
             key = params["id"]
@@ -827,25 +583,18 @@ class RunTest(unittest.TestCase):
 
         return http_get
 
-    def downloader_for(self, prices):
-        def downloader(symbols):
-            return {s: prices[s] for s in symbols if s in prices}
-
-        return downloader
-
-    def run_build(self, out_dir, http_get, prices):
+    def run_build(self, out_dir, http_get):
         out = io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
             code = build_rates.run(
-                out_dir, http_get=http_get, price_source=self.downloader_for(prices), api_key=SECRET,
+                out_dir, http_get=http_get, api_key=SECRET,
                 today=rates_synth.TODAY, now=rates_synth.NOW, sleep=lambda _s: None,
             )
         return code, out.getvalue()
 
     def test_writes_both_files_and_keeps_old_on_failure(self):
-        _, prices = market()
         with tempfile.TemporaryDirectory() as tmp:
-            code, output = self.run_build(tmp, self.fred_http(), prices)
+            code, output = self.run_build(tmp, self.fred_http())
             self.assertEqual(code, 0, output)
             self.assertNotIn(SECRET, output)
             names = sorted(os.listdir(tmp))
@@ -853,61 +602,62 @@ class RunTest(unittest.TestCase):
             with open(os.path.join(tmp, "rates.json"), encoding="utf-8") as file:
                 first = file.read()
             # DGS10 broken: nothing is written, previous files stay byte-identical
-            code, output = self.run_build(tmp, self.fred_http(broken={"DGS10"}), prices)
+            code, output = self.run_build(tmp, self.fred_http(broken={"DGS10"}))
             self.assertEqual(code, 1)
             self.assertNotIn(SECRET, output)
             with open(os.path.join(tmp, "rates.json"), encoding="utf-8") as file:
                 self.assertEqual(file.read(), first)
             self.assertEqual(sorted(os.listdir(tmp)), names)  # no stray .tmp files
 
-    def test_minor_series_falls_back_to_previous_file(self):
-        _, prices = market()
+    def test_requests_only_the_needed_fred_series(self):
+        seen = []
         with tempfile.TemporaryDirectory() as tmp:
-            self.assertEqual(self.run_build(tmp, self.fred_http(), prices)[0], 0)
-            code, output = self.run_build(tmp, self.fred_http(broken={"T5YIFR"}), {})
+            self.assertEqual(self.run_build(tmp, self.fred_http(seen=seen))[0], 0)
+        self.assertEqual({series_id for _, series_id in seen}, set(build_rates.FRED_IDS))
+        self.assertTrue(all("stlouisfed.org" in url for url, _ in seen))
+
+    def test_policy_series_falls_back_to_previous_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(self.run_build(tmp, self.fred_http())[0], 0)
+            code, output = self.run_build(tmp, self.fred_http(broken={"DFEDTARL"}))
             self.assertEqual(code, 0, output)
             with open(os.path.join(tmp, "rates.json"), encoding="utf-8") as file:
                 rates = json.load(file)
-            self.assertEqual(rates["missing"], ["T5YIFR"])
-            self.assertIsNotNone(rates["inflation"]["5y5y"]["value"])
-            self.assertEqual(rates["sources"]["etf"], "Yahoo Finance adjusted close")  # kept from old file
+            self.assertEqual(rates["missing"], ["DFEDTARL"])
+            self.assertEqual(rates["policy"]["lower"], 4.0)
 
-    def test_extract_etf_points_from_dataframe(self):
-        try:
-            import pandas as pd
-        except ImportError:  # pragma: no cover - pandas is in requirements.txt
-            self.skipTest("pandas not installed")
-        index = pd.to_datetime(["2026-10-07", "2026-10-08", "2026-10-09"])
-        columns = pd.MultiIndex.from_product([["TLT", "TMF"], ["Close", "Adj Close"]])
-        frame = pd.DataFrame(
-            [[90.0, 88.0, 40.0, 39.0], [float("nan"), float("nan"), 41.0, 40.0], [91.0, 89.0, 42.0, 41.0]],
-            index=index, columns=columns,
-        )
-        self.assertEqual(build_rates.extract_etf_points(frame, "TLT"), [("2026-10-07", 90.0, 88.0), ("2026-10-09", 91.0, 89.0)])
-        swapped = frame.swaplevel(axis=1)
-        self.assertEqual(build_rates.extract_etf_points(swapped, "TMF")[-1], ("2026-10-09", 42.0, 41.0))
-        self.assertEqual(build_rates.extract_etf_points(frame, "EDV"), [])
+    def test_long_yield_failure_keeps_old_files(self):
+        # DGS20 / DGS30 are not in the history file, so there is no previous value to fall back on
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(self.run_build(tmp, self.fred_http())[0], 0)
+            for broken in ("DGS20", "DGS30"):
+                code, output = self.run_build(tmp, self.fred_http(broken={broken}))
+                self.assertEqual(code, 1, output)
+                self.assertIn(broken, output)
 
-    def test_drop_open_session(self):
-        prices = {"TLT": [("2026-10-08", 1.0, 1.0), ("2026-10-09", 2.0, 2.0)]}
-        during = datetime(2026, 10, 9, 15, 0, tzinfo=timezone.utc)  # 11:00 New York
-        after = datetime(2026, 10, 9, 21, 0, tzinfo=timezone.utc)   # 17:00 New York
-        self.assertEqual(build_rates.drop_open_session(prices, during)["TLT"], prices["TLT"][:1])
-        self.assertEqual(build_rates.drop_open_session(prices, after)["TLT"], prices["TLT"])
+    def test_no_yahoo_dependency(self):
+        for name in ("build_rates.py", "rates_analytics.py", "rates_config.py"):
+            with open(os.path.join(ROOT, "scripts", name), encoding="utf-8") as file:
+                source = file.read()
+            self.assertNotIn("yfinance", source, name)
+            self.assertNotIn("pandas", source, name)
+        for gone in ("download_etf_prices", "drop_open_session", "extract_etf_points"):
+            self.assertFalse(hasattr(build_rates, gone), gone)
 
-    def test_download_uses_injected_downloader(self):
-        calls = []
 
-        def downloader(symbols):
-            calls.append(list(symbols))
-            raise RuntimeError("network down")
+class FixtureCopyTest(unittest.TestCase):
+    """The front-end tests read a copy of the generated fixtures; nothing else keeps the two in step."""
 
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            prices = build_rates.download_etf_prices(["TLT", "TMF"], downloader=downloader, sleep=lambda _s: None)
-        self.assertEqual(prices, {})
-        self.assertGreaterEqual(len(calls), 2)
-
+    def test_atlas_copies_match_the_generated_fixtures(self):
+        pairs = [
+            ("sample-rates.json", "backend-sample-rates.json"),
+            ("sample-rates-history.json", "backend-sample-rates-history.json"),
+        ]
+        for source, copy in pairs:
+            with open(os.path.join(ROOT, "tests", "fixtures", "rates", source), "rb") as handle:
+                expected = handle.read()
+            with open(os.path.join(ROOT, "atlas", "tests", "fixtures", "rates", copy), "rb") as handle:
+                self.assertEqual(handle.read(), expected, f"{copy} is out of date: copy tests/fixtures/rates/{source}")
 
 if __name__ == "__main__":
     unittest.main()

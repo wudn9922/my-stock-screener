@@ -13,6 +13,8 @@ import {
   type Rates,
   type RatesHistory,
 } from '../src/report/rates';
+import { scenarioTable, toScenarioEtf, withBorrowedDuration } from '../src/rates/bondMath';
+import { spreadSeries, valueOnOrBefore } from '../src/rates/ratesView';
 
 // Synthetic fixtures shaped like the docs/report/rates*.json contract (not market data).
 const fixture = (name: string) =>
@@ -143,7 +145,10 @@ describe('backend sample files (written by scripts/build_rates.py on synthetic i
     const rates = okRates(backendRates);
     expect(rates.etfs).toHaveLength((backendRates.etfs as unknown[]).length);
     expect(rates.spreads).toHaveLength((backendRates.spreads as unknown[]).length);
-    expect(rates.curves.nominal.map((curve) => curve.key)).toEqual(['now', '1w', '1m', '3m', '1y', '2y']);
+    expect(rates.tenors).toEqual(['3M', '10Y', '20Y', '30Y']);
+    expect(rates.curves.nominal.map((curve) => curve.key)).toEqual(['now', '1m']);
+    for (const curve of rates.curves.nominal) expect(curve.values).toHaveLength(rates.tenors.length);
+    expect(rates.spreads.map((spread) => spread.key)).toEqual(['10y3m']);
     for (const spread of rates.spreads) {
       // Legs are FRED IDs that exist in the history.
       expect(spread.long && spread.short).toBeTruthy();
@@ -152,15 +157,117 @@ describe('backend sample files (written by scripts/build_rates.py on synthetic i
     expect(tmf.leverage).toBe(3);
     // The model describes the unlevered ladder; the scenario applies the leverage.
     expect(tmf.model!.duration).toBeLessThan(35);
-    expect(rates.etfs.every((etf) => etf.risk.mdd5y === null || typeof etf.risk.mdd5y === 'number')).toBe(true);
-    expect(rates.inflation['30Y']).toMatchObject({ derived: true });
     const history = okHistory(backendHistory);
     for (const spread of rates.spreads) {
       expect(history.weekly.series[spread.long!]).toBeDefined();
       expect(history.weekly.series[spread.short!]).toBeDefined();
     }
-    expect(history.etf.series.TLT![0]).toBe(100);
-    expect(history.weekly.series.DFII30!.some((value) => value === null)).toBe(true);
+    expect(Object.keys(history.weekly.series).sort()).toEqual(['DFEDTARL', 'DFEDTARU', 'DGS10', 'DGS3MO']);
+    expect(Object.keys(history.daily.series).sort()).toEqual(['DFEDTARL', 'DFEDTARU', 'DGS10', 'DGS3MO']);
+  });
+});
+
+describe('trimmed and legacy full files', () => {
+  const trimmedRates = fixture('backend-sample-rates.json');
+  const trimmedHistory = fixture('backend-sample-rates-history.json');
+  /** Fields scripts/build_rates.py stopped writing. */
+  const removedRates = ['realTenors', 'inflation'];
+  const removedEtf = ['price', 'returns', 'risk', 'sensitivity'];
+
+  it('the trimmed files really lack the removed fields', () => {
+    for (const key of removedRates) expect(trimmedRates).not.toHaveProperty(key);
+    expect((trimmedRates.curves as Record<string, unknown>).real).toBeUndefined();
+    expect(trimmedRates.sources).toEqual({ rates: expect.any(String) });
+    for (const etf of trimmedRates.etfs as Record<string, unknown>[]) for (const key of removedEtf) expect(etf).not.toHaveProperty(key);
+    expect(trimmedHistory).not.toHaveProperty('etf');
+  });
+
+  it('parse with defaults for every removed field', () => {
+    const rates = okRates(trimmedRates);
+    expect(rates.asOf).toBe('2026-10-09');
+    expect(rates.sources).toEqual({ rates: 'FRED fredgraph.csv', etf: null, etfAsOf: null });
+    expect(rates.realTenors).toEqual(['5Y', '7Y', '10Y', '20Y', '30Y']);
+    expect(rates.curves.real).toEqual([]);
+    expect(rates.inflation).toEqual({});
+    for (const etf of rates.etfs) {
+      expect(etf.price).toBeNull();
+      expect(Object.values(etf.returns).every((value) => value === null)).toBe(true);
+      expect(etf.risk).toEqual({ vol1y: null, vol3y: null, vol5y: null, maxDrawdown: null, mdd5y: null, currentDrawdown: null });
+      expect(etf.sensitivity).toEqual({ dgs20: null, dgs30: null });
+      expect(etf.model?.duration).toBeGreaterThan(0);
+      expect(etf.model?.convexity).toBeGreaterThan(0);
+    }
+    const history = okHistory(trimmedHistory);
+    expect(history.etf).toEqual({ dates: [], series: {} });
+    expect(history.daily.dates).toHaveLength(260);
+  });
+
+  it('a legacy full file and the same file with the removed fields stripped give the same used fields', () => {
+    const stripped = structuredClone(ratesRaw) as Record<string, unknown> & {
+      curves: { nominal: { key: string }[]; real?: unknown };
+      etfs: Record<string, unknown>[];
+      sources: Record<string, unknown>;
+    };
+    for (const key of removedRates) delete stripped[key];
+    delete stripped.curves.real;
+    stripped.curves.nominal = stripped.curves.nominal.filter((curve) => curve.key === 'now' || curve.key === '1m');
+    stripped.spreads = (stripped.spreads as { key: string }[]).filter((spread) => spread.key === '10y3m');
+    delete stripped.sources.etf;
+    delete stripped.sources.etfAsOf;
+    for (const etf of stripped.etfs) for (const key of removedEtf) delete etf[key];
+    const full = okRates();
+    const lean = okRates(stripped);
+    expect(lean.asOf).toBe(full.asOf);
+    expect(lean.tenors).toEqual(full.tenors);
+    expect(lean.policy).toEqual(full.policy);
+    expect(lean.missing).toEqual(full.missing);
+    expect(lean.notes).toEqual(full.notes);
+    expect(lean.curves.nominal).toEqual(full.curves.nominal.filter((curve) => curve.key === 'now' || curve.key === '1m'));
+    expect(lean.spreads).toEqual(full.spreads.filter((spread) => spread.key === '10y3m'));
+    const used = (etf: Rates['etfs'][number]) => {
+      const rest: Record<string, unknown> = { ...etf };
+      for (const key of removedEtf) delete rest[key];
+      return rest;
+    };
+    expect(lean.etfs.map(used)).toEqual(full.etfs.map(used));
+  });
+
+  it('a history file without the ETF block or the other tenors still feeds the spread and key numbers', () => {
+    const full = okHistory();
+    const raw = structuredClone(historyRaw) as Record<string, unknown> & {
+      weekly: { series: Record<string, unknown> };
+      daily: { series: Record<string, unknown> };
+    };
+    delete raw.etf;
+    for (const block of [raw.weekly, raw.daily])
+      for (const key of Object.keys(block.series)) if (!['DGS10', 'DGS3MO', 'DFEDTARU', 'DFEDTARL'].includes(key)) delete block.series[key];
+    const lean = okHistory(raw);
+    expect(lean.etf).toEqual({ dates: [], series: {} });
+    expect(lean.weekly.dates).toEqual(full.weekly.dates);
+    for (const id of ['DGS10', 'DGS3MO', 'DFEDTARU', 'DFEDTARL']) {
+      expect(lean.weekly.series[id]).toEqual(full.weekly.series[id]);
+      expect(lean.daily.series[id]).toEqual(full.daily.series[id]);
+    }
+    expect(Object.keys(lean.weekly.series)).toHaveLength(4);
+    const spread = spreadSeries(lean.weekly, 'DGS10', 'DGS3MO');
+    expect(spread.values.some((value) => value !== null)).toBe(true);
+    expect(valueOnOrBefore(lean.daily, 'DFEDTARU', lean.daily.dates.at(-1)!)).not.toBeNull();
+  });
+
+  it('the scenario inputs work from a trimmed file', () => {
+    const rates = okRates(trimmedRates);
+    const { etfs } = withBorrowedDuration(rates.etfs);
+    const rows = scenarioTable(etfs.map(toScenarioEtf), [100], 'published');
+    expect(rows).toHaveLength(5);
+    for (const row of rows) {
+      expect(row.duration).toBeGreaterThan(0);
+      expect(row.cells[0]!.pct).toBeLessThan(0);
+    }
+  });
+
+  it('reports missing when a trimmed file has no usable block', () => {
+    expect(parseRates({ version: 1, curves: { nominal: [] }, spreads: [], etfs: [] }).status).toBe('missing');
+    expect(parseRatesHistory({ version: 1, weekly: { dates: [], series: {} }, daily: { dates: [], series: {} } }).status).toBe('missing');
   });
 });
 
