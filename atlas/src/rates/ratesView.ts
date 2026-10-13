@@ -11,14 +11,20 @@ export interface SpreadDef {
   long: string;
   short: string;
 }
-/** Only the two visible spreads; FEDTARGETMID = (DFEDTARU + DFEDTARL) / 2. */
+/** Only the two visible selectors; 10Y−Fed defaults to the policy upper bound. */
 export const SPREAD_DEFS: readonly SpreadDef[] = [
-  { key: '10yfed', label: '10Y−Fed', long: 'DGS10', short: 'FEDTARGETMID' },
+  { key: '10yfed', label: '10Y−Fed', long: 'DGS10', short: 'DFEDTARU' },
   { key: '10y3m', label: '10Y−3M', long: 'DGS10', short: 'DGS3MO' },
 ];
 
 const finite = (value: number | null | undefined): value is number => typeof value === 'number' && Number.isFinite(value);
 const round1 = (value: number) => Math.round(value * 10) / 10;
+const formatSpread = (bp: number) => fmtSpreadBp(bp); 
+/** Stored in basis points; formatted as percentage-point differences. */
+export function fmtSpreadBp(bp: number): string {
+  const pct = Number((bp / 100).toFixed(2));
+  return `${pct > 0 ? '+' : ''}${pct.toFixed(2)}%`;
+}
 
 /** Long minus short leg in basis points (one decimal); null where either leg is missing. */
 export function spreadSeries(block: HistoryBlock, long: string, short: string): { dates: string[]; values: (number | null)[] } {
@@ -194,14 +200,14 @@ export function spreadSummary(spread: RatesSpread, label: string): string[] {
     // invertedDays counts trading days (observations) of the current episode.
     const days = spread.invertedDays !== null && spread.invertedDays > 0 ? `，已持續 ${spread.invertedDays} 個交易日` : '';
     const since = spread.lastInversion && spread.lastInversion.end === null ? `（自 ${slash(spread.lastInversion.start)} 起）` : '';
-    lines.push(`目前倒掛 ${Math.round(value)}bp${days}${since}。`);
-  } else lines.push(`目前未倒掛（${value > 0 ? '+' : ''}${Math.round(value)}bp）。`);
+    lines.push(`目前倒掛 ${formatSpread(value)}${days}${since}。`);
+  } else lines.push(`目前未倒掛（${value > 0 ? '+' : ''}${formatSpread(value)}）。`);
   const last = spread.lastInversion;
   if (last && last.end !== null) {
-    const deepest = last.minBp !== null ? `，最深 ${Math.round(last.minBp)}bp${last.minDate ? `（${slash(last.minDate)}）` : ''}` : '';
+    const deepest = last.minBp !== null ? `，最深 ${formatSpread(last.minBp)}${last.minDate ? `（${slash(last.minDate)}）` : ''}` : '';
     lines.push(`最近一次倒掛 ${month(last.start)}–${month(last.end)}${deepest}。`);
   } else if (last && last.end === null && last.minBp !== null) {
-    lines.push(`這段倒掛最深 ${Math.round(last.minBp)}bp${last.minDate ? `（${slash(last.minDate)}）` : ''}。`);
+    lines.push(`這段倒掛最深 ${formatSpread(last.minBp)}${last.minDate ? `（${slash(last.minDate)}）` : ''}。`);
   } else if (!last) lines.push('資料期間內沒有倒掛紀錄。');
   if (spread.pct5y !== null) lines.push(`目前利差位於近 5 年第 ${Math.round(spread.pct5y)} 百分位（0＝最低、100＝最高）。`);
   return lines;
