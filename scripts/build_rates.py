@@ -53,9 +53,9 @@ MIN_FRESH_TENORS = 8
 MAX_STALE_DAYS = 10
 HISTORY_START = "2003-01-01"
 DAILY_POINTS = 260
-# (key, long, short): two displayed spreads, in bp. FEDTARGETMID is derived, not fetched.
+# (key, long, short): internally in bp; 10Y−Fed defaults to target range upper bound.
 SPREADS = [
-    ("10yfed", "DGS10", "FEDTARGETMID"),
+    ("10yfed", "DGS10", "DFEDTARU"),
     ("10y3m", "DGS10", "DGS3MO"),
 ]
 # (key, FRED id) for published breakevens; 20Y / 30Y are derived as DGS - DFII.
@@ -84,13 +84,12 @@ ETF_SOURCE = "Yahoo Finance adjusted close"
 
 NOTES = {
     "rates": "殖利率來自 FRED（美國財政部 H.15 每日固定期限殖利率，約美東 15:30 取價）；有 FRED_API_KEY 時以 FRED API 優先、免金鑰 CSV 為備援（沒有金鑰就只用 CSV），"
-             "都失敗沿用上次檔案的數值並列在 missing。10Y−3M 由殖利率相減，10Y−Fed 使用政策目標區間中點。",
+             "都失敗沿用上次檔案的數值並列在 missing。10Y−3M 由殖利率相減，10Y−Fed 預設使用政策目標區間上限。",
     "curves": "快照日＝目標日當天或之前最近一個 10Y 有值的日子；個別期限缺值最多往回找 5 天，找不到為 null。",
-    "spreads": "利差單位 bp。10Y−Fed＝10 年殖利率−聯準會目標區間中點（上下限平均），不是有效聯邦基金利率；"
-               "目標區間序列自 2008 年底起才有。10Y−3M＝10 年殖利率−3 個月殖利率。"
-               "倒掛＝利差小於 0；相隔 10 個交易日內的倒掛視為同一段。"
-               "invertedDays 為目前這段倒掛的交易日數；pct5y 為目前值在近 5 年的百分位。"
-               "倒掛不是衰退時間表。",
+    "spreads": "利差畫面以百分點表示。10Y−Fed 預設為 10 年殖利率減聯準會目標區間上限，"
+               "可切換下限；並非有效聯邦基金利率。目標區間序列自 2008 年底才有。"
+               "10Y−3M 為 10 年殖利率減 3 個月殖利率；倒掛＝差值小於 0。"
+               "相隔 10 個交易日內的倒掛視為同一段；pct5y 為近 5 年百分位。倒掛不是衰退時間表。",
     "inflation": "5Y、10Y 為 FRED 的平衡通膨率（T5YIE、T10YIE），5y5y 為 5 年後 5 年遠期（T5YIFR）；"
                  "20Y、30Y 為名目減 TIPS 實質殖利率的推算值（derived）。",
     "etf": "ETF 報酬以 Yahoo Finance 還原收盤價（Adj Close，含配息再投入）計算；1 年報酬不年化，3 年以上為年化（CAGR）；"
