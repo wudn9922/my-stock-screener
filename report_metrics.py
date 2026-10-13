@@ -1,5 +1,5 @@
 """
-Atlas 選股篩選器指標（F2）：由 data/*.csv 日 K 計算報酬、均線乖離、52 週高點、相對強弱與量比，
+Atlas 選股篩選器指標（F2）：由 data/*.csv 日 K 計算報酬、均線乖離（SMA 與 EMA20）、52 週高點、相對強弱與量比（今日 ÷ 前一交易日），
 供 docs/report/latest.json（groups[].items[].metrics）與 docs/report/universe.json 使用。
 
 - 不 import main；yfinance 只在下載基準指數時才延遲 import。
@@ -31,6 +31,7 @@ UNIVERSE_FIELDS = [
     "ma20",
     "ma50",
     "ma200",
+    "ema20",
     "ma20Slope5",
     "trend",
     "hi52",
@@ -39,7 +40,7 @@ UNIVERSE_FIELDS = [
     "rs21",
     "rs63",
     "rsRank",
-    "volRatio",
+    "volVsPrev",
     "turnover20",
 ]
 
@@ -55,9 +56,9 @@ UNIVERSE_LABELS = {
 
 RETURN_PERIODS = (5, 21, 63)
 MA_WINDOWS = (20, 50, 200)
+EMA_SPAN = 20
 SLOPE_BARS = 5
 HI52_BARS = 252
-VOLUME_AVG_BARS = 20
 TURNOVER_BARS = 20
 
 # 基準指數最後一根 K 比個股最後一根早超過此天數，相對強弱給 None
@@ -259,6 +260,13 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
         for window in MA_WINDOWS
     }
 
+    # 收盤相對 EMA20 的乖離 %（EMA：span=20, adjust=False，與 SMA 乖離同樣至少需要 20 根）
+    ema20 = None
+
+    if bars >= EMA_SPAN:
+        ema_last = pd.Series(close).ewm(span=EMA_SPAN, adjust=False).mean().iloc[-1]
+        ema20 = pct_change(last, ema_last)
+
     # MA20 對 5 根前的變化
     slope = None
 
@@ -297,13 +305,14 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
 
         relative[period] = _relative_strength(returns[period], bench_return)
 
-    vol_ratio = None
+    # 量比：今日成交量 ÷ 前一個交易日成交量（前一日為 0 或缺值時為 None）
+    vol_vs_prev = None
 
-    if bars > VOLUME_AVG_BARS:
-        previous_volume = float(volume[-1 - VOLUME_AVG_BARS:-1].mean())
+    if bars >= 2:
+        previous_volume = float(volume[-2])
 
         if previous_volume > 0:
-            vol_ratio = volume[-1] / previous_volume
+            vol_vs_prev = volume[-1] / previous_volume
 
     turnover = None
 
@@ -321,6 +330,7 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
         "r21": round_or_none(returns[21]),
         "r63": round_or_none(returns[63]),
         "ma": ma_deviation,
+        "ema20": round_or_none(ema20),
         "ma20Slope5": round_or_none(slope),
         "trend": trend,
         "hi52": round_or_none(hi52),
@@ -330,7 +340,7 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
         "rs63": round_or_none(relative[63]),
         "rsBench": bench_symbol,
         "rsRank": None,
-        "volRatio": round_or_none(vol_ratio),
+        "volVsPrev": round_or_none(vol_vs_prev),
         "turnover20": turnover
     }
 

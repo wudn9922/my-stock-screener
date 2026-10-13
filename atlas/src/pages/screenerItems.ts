@@ -12,7 +12,7 @@ export const SORT_LABELS: Record<SortMode, string> = {
   ma: '均線乖離（大→小）',
   rs: 'RS 百分位（強→弱）',
   hi: '距52週高（近→遠）',
-  vr: '量比（大→小）',
+  vr: '量比（今日÷昨日，大→小）',
   ma50: 'MA50 乖離（大→小）',
   r21: '1月報酬（高→低）',
   eps: 'EPS YoY（高→低）',
@@ -66,7 +66,7 @@ export function filterAndSortItems(
       rs63 = byNumber((item) => item.metrics?.rs63, -1);
     filtered.sort((a, b) => rank(a, b) || rs63(a, b));
   } else if (sort === 'hi') filtered.sort(byNumber((item) => item.metrics?.fromHi52, -1));
-  else if (sort === 'vr') filtered.sort(byNumber((item) => item.metrics?.volRatio, -1));
+  else if (sort === 'vr') filtered.sort(byNumber((item) => item.metrics?.volVsPrev, -1));
   else if (sort === 'ma50') filtered.sort(byNumber((item) => maDeviation(item, 50), -1));
   else if (sort === 'r21') filtered.sort(byNumber((item) => item.metrics?.r21, -1));
   else if (sort === 'eps') filtered.sort(byNumber((item) => epsYoY(item, context.growth), -1));
@@ -75,7 +75,7 @@ export function filterAndSortItems(
 
 // ---------------------------------------------------------------- row pills
 
-export type MetricPill = 'rs' | 'hi' | 'vr' | 'ma50' | 'r21' | 'eps' | 'rev';
+export type MetricPill = 'rs' | 'hi' | 'vr' | 'ma50' | 'ema20' | 'r21' | 'eps' | 'rev';
 const MAX_PILLS = 2;
 
 /** Extra row pills: the sort's metric first, then the filtered ones (at most two; MA pills follow). */
@@ -90,7 +90,7 @@ export function rowMetricPills(sort: SortMode, state: FilterState, maList: reado
   if (state.vr !== null) add('vr');
   if (state.eps) add('eps');
   if (state.rev) add('rev');
-  if (state.ma['50']) add('ma50');
+  if (state.ema20) add('ema20');
   return keys.slice(0, MAX_PILLS);
 }
 
@@ -119,12 +119,15 @@ export function metricPill(item: GroupItem, key: MetricPill, growth?: GrowthFile
       return { text: `距高 ${formatPercent(m.fromHi52, 1)}`, title: `收盤距${window} ${formatPercent(m.fromHi52, 2)}`, tone: 'flat' };
     }
     case 'vr':
-      if (m?.volRatio == null) return null;
+      if (m?.volVsPrev == null) return null;
       return {
-        text: `量比 ${m.volRatio.toFixed(m.volRatio >= 10 ? 0 : 1)}x`,
-        title: `今日成交量 ÷ 前20日均量 = ${m.volRatio.toFixed(2)}`,
+        text: `量比 ${m.volVsPrev.toFixed(m.volVsPrev >= 10 ? 0 : 1)}x`,
+        title: `今日成交量 ÷ 前一交易日成交量 = ${m.volVsPrev.toFixed(2)}`,
         tone: 'flat',
       };
+    case 'ema20':
+      if (m?.ema20 == null) return null;
+      return { text: `EMA20 ${formatPercent(m.ema20, 1)}`, title: '收盤相對 EMA20 的乖離', tone: toneClass(m.ema20) };
     case 'ma50': {
       const distance = maDeviation(item, 50);
       if (distance === null) return null;

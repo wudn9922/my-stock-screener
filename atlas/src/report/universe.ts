@@ -24,6 +24,7 @@ export const UNIVERSE_FIELDS = [
   'ma20',
   'ma50',
   'ma200',
+  'ema20',
   'ma20Slope5',
   'trend',
   'hi52',
@@ -32,7 +33,7 @@ export const UNIVERSE_FIELDS = [
   'rs21',
   'rs63',
   'rsRank',
-  'volRatio',
+  'volVsPrev',
   'turnover20',
 ] as const;
 
@@ -89,6 +90,7 @@ export function universeRowToItem(
     r21: get('r21'),
     r63: get('r63'),
     ma: { 20: get('ma20'), 50: get('ma50'), 200: get('ma200') },
+    ema20: get('ema20'),
     ma20Slope5: get('ma20Slope5'),
     trend: get('trend'),
     hi52: get('hi52'),
@@ -100,7 +102,7 @@ export function universeRowToItem(
     rs63: get('rs63'),
     rsBench: context.benchmark,
     rsRank: get('rsRank'),
-    volRatio: get('volRatio'),
+    volVsPrev: get('volVsPrev'),
     turnover20: get('turnover20'),
   })!;
   const numeric = (field: string) => toFinite(get(field));

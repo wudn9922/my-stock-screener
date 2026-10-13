@@ -118,6 +118,8 @@ export interface StockMetrics {
   r21: number | null;
   r63: number | null;
   ma: Record<`${MetricMa}`, number | null>;
+  /** Close's distance from the 20-day EMA in % (null on reports older than the EMA20 filter). */
+  ema20: number | null;
   ma20Slope5: number | null;
   trend: MetricTrend | null;
   hi52: number | null;
@@ -128,7 +130,8 @@ export interface StockMetrics {
   rs63: number | null;
   rsBench: 'SPY' | '^TWII' | null;
   rsRank: number | null;
-  volRatio: number | null;
+  /** Today's volume ÷ the previous session's volume (null on older reports, whose `volRatio` meant something else). */
+  volVsPrev: number | null;
   turnover20: number | null;
 }
 
@@ -152,6 +155,7 @@ export function parseMetrics(value: unknown): StockMetrics | null {
     r21: toFinite(raw.r21),
     r63: toFinite(raw.r63),
     ma: { '20': toFinite(maRaw['20']), '50': toFinite(maRaw['50']), '200': toFinite(maRaw['200']) },
+    ema20: toFinite(raw.ema20),
     ma20Slope5: toFinite(raw.ma20Slope5),
     trend: trendText === 'up' || trendText === 'down' || trendText === 'mixed' ? trendText : null,
     hi52: toFinite(raw.hi52),
@@ -162,7 +166,7 @@ export function parseMetrics(value: unknown): StockMetrics | null {
     rs63: toFinite(raw.rs63),
     rsBench: bench === 'SPY' || bench === '^TWII' ? bench : null,
     rsRank: rank === null ? null : Math.min(99, Math.max(1, Math.round(rank))),
-    volRatio: toFinite(raw.volRatio),
+    volVsPrev: toFinite(raw.volVsPrev),
     turnover20: toFinite(raw.turnover20),
   };
   return metrics;

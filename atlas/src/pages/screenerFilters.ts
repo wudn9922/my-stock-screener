@@ -6,13 +6,15 @@ import { growthKey, type GrowthFile, type GrowthRecord } from '../fundamentals/G
  * Screener filter conditions: state, the compact `f` URL encoding and the pure filter itself.
  *
  * Encoding (`;`-separated, canonical order, open range ends left empty, `~` also accepted):
- * `chg:0:3;ma50:-5:5;tr:a20,a50,stack;hi:10;rs:80;rs3:0;vr:1.5;eps:2:20;rev:1:10;nd:keep`
- * - chg / ma20 / ma50 / ma200: inclusive ranges in % (today's change, close vs SMA distance)
+ * `chg:0:3;ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;rs3:0;vr:1.2;eps:2:20;rev:1:10;nd:keep`
+ * - chg / ema20: inclusive ranges in % (today's change, close vs EMA20 distance)
  * - tr: trend flags (above MA20/50/200, MA20 rising, bullish stack 0 < d20 < d50 < d200, no downtrend)
  * - hi: within N% of the 52-week high; rs: RS percentile ≥ N; rs3: 3-month RS vs the benchmark > N%
- * - vr: volume ratio ≥ N; eps / rev: the latest Q quarters all have YoY ≥ N% (US only)
+ * - vr: volume vs the previous session ≥ N (today ÷ yesterday); eps / rev: the latest Q quarters all have YoY ≥ N% (US only)
  * - nd:keep keeps stocks whose fundamentals are missing (the default excludes them)
- * Unknown or malformed tokens are ignored, so old or hand-edited links never break the page.
+ * Unknown or malformed tokens are ignored, so old or hand-edited links never break the page. That includes the
+ * retired `ma20` / `ma50` / `ma200` ranges: they are dropped, not migrated. An old `vr:N` keeps its number
+ * but now means today ÷ yesterday.
  */
 export interface FilterRange {
   min: number | null;
@@ -37,7 +39,7 @@ export const TREND_LABELS: Record<TrendFlag, string> = {
 
 export interface FilterState {
   chg: FilterRange | null;
-  ma: Partial<Record<`${MetricMa}`, FilterRange>>;
+  ema20: FilterRange | null;
   tr: TrendFlag[];
   hi: number | null;
   rs: number | null;
@@ -51,7 +53,7 @@ export interface FilterState {
 
 export const EMPTY_FILTERS: FilterState = Object.freeze({
   chg: null,
-  ma: {},
+  ema20: null,
   tr: [],
   hi: null,
   rs: null,
@@ -62,9 +64,15 @@ export const EMPTY_FILTERS: FilterState = Object.freeze({
   keepMissing: false,
 }) as FilterState;
 
+/** Volume-vs-previous-day thresholds offered by the filter sheet (a link may carry any other positive number). */
+export const VOLUME_PRESETS: readonly number[] = [1.1, 1.2, 1.5];
+/** Tapping the applied preset again clears it. */
+export const toggleVolume = (current: number | null, next: number | null): number | null => (next === current ? null : next);
+/** An applied threshold that is not one of the presets (an old link): shown as 「目前條件」, no preset lit. */
+export const isCustomVolume = (value: number | null): value is number => value !== null && !VOLUME_PRESETS.includes(value);
+
 export const FILTER_PARAM_MAX = 300;
 export const FILTER_PARAM_PATTERN = /^[A-Za-z0-9:.,;_~-]{1,300}$/;
-const MA_KEYS = ['20', '50', '200'] as const;
 
 const number = (text: string | undefined): number | null => {
   if (text === undefined) return null;
@@ -87,19 +95,15 @@ const gateOf = (parts: string[]): GrowthGate | null => {
 
 /** Parses an `f` parameter (or stored filters). Never throws; anything unusable is dropped. */
 export function parseFilters(value: string | null | undefined): FilterState {
-  const state: FilterState = { ...EMPTY_FILTERS, ma: {}, tr: [] };
+  const state: FilterState = { ...EMPTY_FILTERS, tr: [] };
   if (!value || value.length > FILTER_PARAM_MAX * 2) return state;
   for (const token of value.split(';')) {
     const [rawKey, ...parts] = token.split(':');
     const key = rawKey?.trim().toLowerCase();
     if (!key) continue;
     if (key === 'chg') state.chg = rangeOf(number(parts[0]), number(parts[1]));
-    else if (key === 'ma20' || key === 'ma50' || key === 'ma200') {
-      const range = rangeOf(number(parts[0]), number(parts[1]));
-      const period = key.slice(2) as `${MetricMa}`;
-      if (range) state.ma[period] = range;
-      else delete state.ma[period];
-    } else if (key === 'tr') {
+    else if (key === 'ema20') state.ema20 = rangeOf(number(parts[0]), number(parts[1]));
+    else if (key === 'tr') {
       const flags = new Set((parts[0] ?? '').split(',').map((flag) => flag.trim().toLowerCase()));
       state.tr = TREND_FLAGS.filter((flag) => flags.has(flag));
     } else if (key === 'hi') {
@@ -127,10 +131,7 @@ const formatRangeParam = (range: FilterRange) =>
 export function serializeFilters(state: FilterState): string {
   const tokens: string[] = [];
   if (state.chg) tokens.push(`chg:${formatRangeParam(state.chg)}`);
-  for (const period of MA_KEYS) {
-    const range = state.ma[period];
-    if (range) tokens.push(`ma${period}:${formatRangeParam(range)}`);
-  }
+  if (state.ema20) tokens.push(`ema20:${formatRangeParam(state.ema20)}`);
   const flags = TREND_FLAGS.filter((flag) => state.tr.includes(flag));
   if (flags.length) tokens.push(`tr:${flags.join(',')}`);
   if (state.hi !== null) tokens.push(`hi:${formatNumber(state.hi)}`);
@@ -178,8 +179,10 @@ export function growthGatePasses(
 
 // ---------------------------------------------------------- availability
 
-export type FilterKey = 'chg' | 'ma20' | 'ma50' | 'ma200' | 'tr' | 'hi' | 'rs' | 'rs3' | 'vr' | 'eps' | 'rev';
-export const FILTER_KEYS: readonly FilterKey[] = ['chg', 'ma20', 'ma50', 'ma200', 'tr', 'hi', 'rs', 'rs3', 'vr', 'eps', 'rev'];
+export type FilterKey = 'chg' | 'ema20' | 'tr' | 'hi' | 'rs' | 'rs3' | 'vr' | 'eps' | 'rev';
+export const FILTER_KEYS: readonly FilterKey[] = ['chg', 'ema20', 'tr', 'hi', 'rs', 'rs3', 'vr', 'eps', 'rev'];
+/** SMA distances are no longer a filter, but the trend flags still need them; their availability is tracked too. */
+export type TrendMaKey = 'ma20' | 'ma50' | 'ma200';
 
 export interface FilterContext {
   market: 'TW' | 'US';
@@ -190,7 +193,7 @@ export interface FilterContext {
 }
 
 /** Why each filter cannot run on these rows (null = usable). Unusable filters are skipped, not applied. */
-export type FilterAvailability = Record<FilterKey, string | null>;
+export type FilterAvailability = Record<FilterKey | TrendMaKey, string | null>;
 
 export const NO_METRICS_REASON = '此群組的每日報告尚未包含這項指標（新版報告產生後提供）';
 export const TW_FUNDAMENTALS_REASON = '台股基本面篩選尚未提供：官方月營收／季報資料還沒有整合進來，目前只支援美股季度 EPS 與營收。';
@@ -208,6 +211,7 @@ export function filterAvailability(items: readonly GroupItem[], context: FilterC
   else if (!items.some((item) => growthRecordFor(item, context.growth))) fundamentals = '這個群組的股票沒有基本面資料。';
   return {
     chg: items.some((item) => item.changePct !== null) ? null : '此群組沒有漲跌資料',
+    ema20: reason(any((item) => item.metrics?.ema20)),
     ma20: reason(any((item) => maDeviation(item, 20))),
     ma50: reason(any((item) => maDeviation(item, 50))),
     ma200: reason(any((item) => maDeviation(item, 200))),
@@ -215,7 +219,7 @@ export function filterAvailability(items: readonly GroupItem[], context: FilterC
     hi: reason(any((item) => item.metrics?.fromHi52)),
     rs: reason(any((item) => item.metrics?.rsRank)),
     rs3: reason(any((item) => item.metrics?.rs63)),
-    vr: reason(any((item) => item.metrics?.volRatio)),
+    vr: reason(any((item) => item.metrics?.volVsPrev)),
     eps: fundamentals,
     rev: fundamentals,
   };
@@ -259,16 +263,14 @@ export function applyFilters(items: readonly GroupItem[], state: FilterState, co
   const tests: ((item: GroupItem) => boolean)[] = [];
   const chg = state.chg;
   if (chg && !available.chg) tests.push((item) => inRange(item.changePct, chg));
-  for (const period of MA_KEYS) {
-    const range = state.ma[period];
-    if (range && !available[`ma${period}`]) tests.push((item) => inRange(maDeviation(item, Number(period) as MetricMa), range));
-  }
+  const ema20 = state.ema20;
+  if (ema20 && !available.ema20) tests.push((item) => inRange(item.metrics?.ema20 ?? null, ema20));
   for (const flag of state.tr) if (!trendFlagUnavailable(flag, available)) tests.push(TREND_TESTS[flag]);
   const { hi, rs, rs3, vr, eps, rev, keepMissing } = state;
   if (hi !== null && !available.hi) tests.push((item) => (item.metrics?.fromHi52 ?? -Infinity) >= -hi);
   if (rs !== null && !available.rs) tests.push((item) => (item.metrics?.rsRank ?? -Infinity) >= rs);
   if (rs3 !== null && !available.rs3) tests.push((item) => (item.metrics?.rs63 ?? -Infinity) > rs3);
-  if (vr !== null && !available.vr) tests.push((item) => (item.metrics?.volRatio ?? -Infinity) >= vr);
+  if (vr !== null && !available.vr) tests.push((item) => (item.metrics?.volVsPrev ?? -Infinity) >= vr);
   if (eps && !available.eps)
     tests.push((item) => {
       const record = growthRecordFor(item, context.growth);
@@ -303,17 +305,14 @@ export function gateLabel(name: string, gate: GrowthGate): string {
 export function activeChips(state: FilterState, availability?: FilterAvailability): FilterChip[] {
   const chips: Omit<FilterChip, 'unavailable'>[] = [];
   if (state.chg) chips.push({ id: 'chg', key: 'chg', label: `今日漲跌 ${formatRange(state.chg)}` });
-  for (const period of MA_KEYS) {
-    const range = state.ma[period];
-    if (range) chips.push({ id: `ma${period}`, key: `ma${period}`, label: `MA${period} 乖離 ${formatRange(range)}` });
-  }
+  if (state.ema20) chips.push({ id: 'ema20', key: 'ema20', label: `EMA20 乖離 ${formatRange(state.ema20)}` });
   for (const flag of TREND_FLAGS)
     if (state.tr.includes(flag)) chips.push({ id: `tr:${flag}`, key: 'tr', label: TREND_LABELS[flag] });
   if (state.hi !== null) chips.push({ id: 'hi', key: 'hi', label: `距52週高 ≤${formatNumber(state.hi)}%` });
   if (state.rs !== null) chips.push({ id: 'rs', key: 'rs', label: `RS 百分位 ≥${formatNumber(state.rs)}` });
   if (state.rs3 !== null)
     chips.push({ id: 'rs3', key: 'rs3', label: state.rs3 === 0 ? '3月強於大盤' : `3月相對強弱 >${signed(state.rs3)}%` });
-  if (state.vr !== null) chips.push({ id: 'vr', key: 'vr', label: `量比 ≥${formatNumber(state.vr)}x` });
+  if (state.vr !== null) chips.push({ id: 'vr', key: 'vr', label: `量比 ≥${formatNumber(state.vr)}` });
   if (state.eps) chips.push({ id: 'eps', key: 'eps', label: gateLabel('EPS', state.eps) });
   if (state.rev) chips.push({ id: 'rev', key: 'rev', label: gateLabel('營收', state.rev) });
   return chips.map((chip) => ({
@@ -332,10 +331,9 @@ export function countFilters(state: FilterState): number {
 
 /** The state without one chip's condition. */
 export function removeFilter(state: FilterState, id: ChipId): FilterState {
-  const next: FilterState = { ...state, ma: { ...state.ma }, tr: [...state.tr] };
+  const next: FilterState = { ...state, tr: [...state.tr] };
   if (id.startsWith('tr:')) next.tr = next.tr.filter((flag) => `tr:${flag}` !== id);
-  else if (id === 'ma20' || id === 'ma50' || id === 'ma200') delete next.ma[id.slice(2) as `${MetricMa}`];
-  else if (id === 'chg' || id === 'eps' || id === 'rev') next[id] = null;
+  else if (id === 'chg' || id === 'ema20' || id === 'eps' || id === 'rev') next[id] = null;
   else if (id === 'hi' || id === 'rs' || id === 'rs3' || id === 'vr') next[id] = null;
   return next;
 }
