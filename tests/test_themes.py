@@ -170,19 +170,32 @@ class PayloadTest(unittest.TestCase):
         self.assertEqual(bench, [100.0] * 126)
 
     def test_stale_constituents_are_excluded_after_three_days(self):
-        config = mini_config({"t": ["OK", "EDGE", "OLD", "GONE"]})
+        config = mini_config({"t": ["OK", "OK2", "OK3", "EDGE", "OLD", "GONE"]})
         prices = self.prices(
             OK=geometric(self.calendar, 100, 0.001),
+            OK2=geometric(self.calendar, 100, 0.001),
+            OK3=geometric(self.calendar, 100, 0.001),
             EDGE=geometric(self.calendar, 100, 0.001)[:-1],  # ends Thu: 1 day behind
             OLD=geometric(self.calendar, 100, 0.001)[:-3],  # ends Tue: 3 calendar days -> kept
             GONE=geometric(self.calendar, 100, 0.001)[:-4],  # ends Mon: 4 calendar days -> stale
         )
         payload = build_themes.build_payload(prices, config, TODAY)
         theme = payload["themes"][0]
-        self.assertEqual(sorted(c["symbol"] for c in theme["constituents"]), ["EDGE", "OK", "OLD"])
+        self.assertEqual(sorted(c["symbol"] for c in theme["constituents"]), ["EDGE", "OK", "OK2", "OK3", "OLD"])
         self.assertEqual(payload["skipped"]["stale"], ["GONE"])
-        self.assertEqual(theme["validCount"], 3)
-        self.assertEqual(theme["count"], 4)
+        self.assertEqual(theme["validCount"], 5)
+        self.assertEqual(theme["count"], 6)
+
+    def test_benchmark_one_session_ahead_of_all_stocks(self):
+        """Yahoo served ^TWII a session ahead of every stock: the data date is the stocks', and 1-day moves are real."""
+        config = mini_config({"t": ["A", "B", "C"]})
+        stock = geometric(self.calendar, 100, 0.01)
+        ahead = self.prices(A=stock[:-1], B=stock[:-1], C=stock[:-1])
+        payload = build_themes.build_payload(ahead, config, TODAY)
+        self.assertEqual(payload["asOf"], self.calendar[-2])
+        self.assertAlmostEqual(payload["themes"][0]["returns"]["d1"], 1.0, places=1)  # not 0.0 from a forward-fill
+        self.assertEqual(payload["skipped"], {"missing": [], "stale": []})
+        self.assertEqual(payload["dates"][-1], self.calendar[-2])
 
     def test_coverage_threshold(self):
         symbols = [f"T{i}" for i in range(10)]
