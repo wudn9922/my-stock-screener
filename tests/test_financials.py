@@ -972,5 +972,91 @@ class ConnectYahooTest(unittest.TestCase):
         self.assertEqual(waits, [1, 2, 3])
 
 
+class RepairSplitEpsTest(unittest.TestCase):
+    """synthetic: 4:1 split on 2020-08-31, 7:1 on 2014-06-09 (numbers invented, shaped like a real mixed-basis file)"""
+    EVENTS = [["2014-06-09", 7], ["2020-08-31", 4]]
+
+    def doc(self, quarters, src="sec"):
+        # quarters: (end, netIncome, shares, epsDiluted, epsBasic)
+        return {
+            "split": {"adjusted": True, "events": self.EVENTS},
+            "annual": {"end": [], "fy": [], "values": {}},
+            "quarterly": {
+                "end": [q[0] for q in quarters],
+                "fy": [2012] * len(quarters),
+                "fq": [1] * len(quarters),
+                "src": [src] * len(quarters),
+                "values": {
+                    "netIncome": [q[1] for q in quarters],
+                    "dilutedShares": [q[2] for q in quarters],
+                    "epsDiluted": [q[3] for q in quarters],
+                    "epsBasic": [q[4] for q in quarters],
+                },
+            },
+        }
+
+    def test_over_adjusted_quarter_is_rewritten(self):
+        document = self.doc([
+            ("2012-09-29", 8_000_000_000, 26_000_000_000, 0.3077, 0.31),
+            ("2012-12-29", 13_000_000_000, 26_000_000_000, 0.0714, 0.0714),   # 1/7 too small
+            ("2013-03-30", 9_500_000_000, 26_000_000_000, 0.3654, 0.3654),
+        ])
+        self.assertEqual(fin.repair_document(document), 1)
+        values = document["quarterly"]["values"]
+        self.assertEqual(values["epsDiluted"], [0.3077, 0.5, 0.3654])
+        self.assertEqual(values["epsBasic"][1], 0.5)
+
+    def test_q4_without_shares_uses_neighbours(self):
+        document = self.doc([
+            ("2012-06-30", 8_000_000_000, 26_000_000_000, 0.3077, 0.3077),
+            ("2012-09-29", 8_000_000_000, None, 2.1538, 2.1538),               # 7x too large, no share count
+            ("2012-12-29", 8_000_000_000, 26_000_000_000, 0.3077, 0.3077),
+        ])
+        self.assertEqual(fin.repair_document(document), 1)
+        self.assertEqual(document["quarterly"]["values"]["epsDiluted"][1], 0.3077)
+
+    def test_non_split_mismatch_is_left_alone(self):
+        # preferred dividends / minority interest: off by 1.6x, not a split multiple
+        document = self.doc([("2012-09-29", 8_000_000_000, 26_000_000_000, 0.19, 0.19)])
+        self.assertEqual(fin.repair_document(document), 0)
+        self.assertEqual(document["quarterly"]["values"]["epsDiluted"], [0.19])
+
+    def test_yahoo_periods_and_files_without_splits_are_untouched(self):
+        rows = [("2012-12-29", 13_000_000_000, 26_000_000_000, 0.0714, 0.0714)]
+        yahoo = self.doc(rows, src="yahoo")
+        self.assertEqual(fin.repair_document(yahoo), 0)
+        plain = self.doc(rows)
+        plain["split"]["events"] = []
+        self.assertEqual(fin.repair_document(plain), 0)
+
+    def test_later_split_only_counts(self):
+        # period after both splits cannot be off by a split factor
+        document = self.doc([("2021-03-27", 20_000_000_000, 16_900_000_000, 0.2958, 0.2958)])
+        self.assertEqual(fin.repair_document(document), 0)
+
+    def test_repair_is_idempotent(self):
+        document = self.doc([
+            ("2012-09-29", 8_000_000_000, 26_000_000_000, 0.3077, 0.31),
+            ("2012-12-29", 13_000_000_000, 26_000_000_000, 0.0714, 0.0714),
+        ])
+        self.assertEqual(fin.repair_document(document), 1)
+        before = json.dumps(document, sort_keys=True)
+        self.assertEqual(fin.repair_document(document), 0)
+        self.assertEqual(json.dumps(document, sort_keys=True), before)
+
+    def test_repair_all_rewrites_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            document = self.doc([("2012-12-29", 13_000_000_000, 26_000_000_000, 0.0714, 0.0714)])
+            with open(os.path.join(directory, "AAPL.json"), "w", encoding="utf-8") as file:
+                json.dump(document, file)
+            with open(os.path.join(directory, "index.json"), "w", encoding="utf-8") as file:
+                json.dump({"items": {}}, file)
+            with mock.patch("builtins.print"):
+                self.assertEqual(fin.repair_all(directory), (1, 1))
+                self.assertEqual(fin.repair_all(directory), (0, 0))
+            with open(os.path.join(directory, "AAPL.json"), encoding="utf-8") as file:
+                self.assertEqual(json.load(file)["quarterly"]["values"]["epsDiluted"], [0.5])
+
+
 if __name__ == "__main__":
     unittest.main()

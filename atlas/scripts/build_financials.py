@@ -78,6 +78,8 @@ SHARE_JUMP_UP = 1.8
 SHARE_JUMP_DOWN = 0.55
 MIN_SPLIT_RATIO = 1.5
 SPLIT_MATCH = 0.25
+# repair_split_eps: EPS must be this close to a split-factor multiple of net income / shares to be rewritten
+REPAIR_MATCH = 0.2
 TW_SUFFIXES = (".TW", ".TWO")
 HOME_CURRENCY = {"US": "USD", "TW": "TWD"}
 PERIOD_TYPES = {"annual": "12M", "quarterly": "3M"}
@@ -576,6 +578,104 @@ def adjust_splits(sections, events):
     return changed
 
 
+def split_factors(events, end):
+    """Every product of a subset of the split ratios after `end` (without 1), largest first."""
+    ratios = [
+        ratio for day, ratio in events
+        if day > end and (ratio >= MIN_SPLIT_RATIO or ratio <= 1 / MIN_SPLIT_RATIO)
+    ]
+    products = {1.0}
+    for ratio in ratios:
+        products |= {factor * ratio for factor in products}
+    products.discard(1.0)
+    return sorted(products, reverse=True)
+
+
+def reference_shares(periods, index):
+    """Own diluted share count, else the mean of the nearest counts before and after (Q4 has none)."""
+    own = shares_of(periods[index])
+    if own:
+        return own
+    near = []
+    for step in (-1, 1):
+        j = index + step
+        if 0 <= j < len(periods) and shares_of(periods[j]):
+            near.append(shares_of(periods[j]))
+    return sum(near) / len(near) if near else None
+
+
+def repair_split_eps(sections, events):
+    """
+    Rewrite SEC EPS that sits on the wrong side of a split, in place. Returns the number of periods.
+
+    companyfacts EPS is "as reported in the latest filing of that period", so neighbouring periods can
+    carry different split bases (AAPL 2012-12: 0.0704 next to 0.4931 implied by net income / shares;
+    Q4 = annual − Q1..Q3 mixes bases the same way). When EPS differs from net income / shares by a
+    factor that matches a product of the split ratios after the period (within REPAIR_MATCH), EPS is
+    replaced by net income / shares (basic EPS scaled by the same factor). Anything else (preferred
+    dividends, minority interest, share classes) is left alone.
+    """
+    fixed = 0
+    for periods in sections:
+        ordered = sorted(periods, key=lambda p: p["end"])
+        for index, item in enumerate(ordered):
+            if item.get("src") != "sec":
+                continue
+            values = item["values"]
+            eps, income = values.get("epsDiluted"), values.get("netIncome")
+            if eps is None or income is None or eps <= 0 or income <= 0:
+                continue
+            shares = reference_shares(ordered, index)
+            if not shares:
+                continue
+            implied = income / shares
+            ratio = eps / implied
+            if 1 - SPLIT_MATCH / 2 <= ratio <= 1 + SPLIT_MATCH / 2:
+                continue
+            for factor in split_factors(events, item["end"]):
+                if abs(ratio * factor - 1) <= REPAIR_MATCH or abs(ratio / factor - 1) <= REPAIR_MATCH:
+                    new_eps = round(implied, 4) + 0.0
+                    basic = values.get("epsBasic")
+                    if basic is not None:
+                        values["epsBasic"] = round(basic * new_eps / eps, 4) + 0.0
+                    values["epsDiluted"] = new_eps
+                    fixed += 1
+                    break
+    return fixed
+
+
+def repair_document(document):
+    """Apply repair_split_eps to a stored document (dict) in place. Returns the number of periods."""
+    events = (document.get("split") or {}).get("events") or []
+    if not events:
+        return 0
+    sections = []
+    for name in ("annual", "quarterly"):
+        block = document.get(name) or {}
+        ends = block.get("end") or []
+        values = block.get("values") or {}
+        sources = block.get("src") or []
+        periods = [
+            {
+                "end": end,
+                "src": sources[i] if i < len(sources) else "yahoo",
+                "values": {field: (column[i] if i < len(column) else None) for field, column in values.items()},
+            }
+            for i, end in enumerate(ends)
+        ]
+        sections.append((block, periods))
+    fixed = repair_split_eps([periods for _, periods in sections], events)
+    if fixed:
+        for block, periods in sections:
+            for field in ("epsDiluted", "epsBasic"):
+                column = (block.get("values") or {}).get(field)
+                if column is None:
+                    continue
+                for i, item in enumerate(periods):
+                    column[i] = item["values"].get(field)
+    return fixed
+
+
 # ---------------------------------------------------------------------------------------------
 # Fiscal labels, reconciliation, quality
 # ---------------------------------------------------------------------------------------------
@@ -739,6 +839,7 @@ def update_document(previous, payload, key, now, fetch_splits=None):
         else:
             events = merge_events(events, fetched)
             adjusted = adjust_splits([annual, quarterly], events) or adjusted
+    adjusted = repair_split_eps([annual, quarterly], events) > 0 or adjusted
     adjusted = adjusted or stored["adjusted"]
 
     end_month = fy_end_month([p["end"] for p in annual])
@@ -1137,7 +1238,32 @@ def connect_yahoo(factory=None, sleep=None, delays=CONNECT_DELAYS):
             sleep(delays[number])
 
 
+def repair_all(out_dir):
+    """Offline: repair_document on every stored file, no network. Returns (files changed, periods fixed)."""
+    files = periods = 0
+    for name in sorted(os.listdir(out_dir)):
+        if not name.endswith(".json") or name == "index.json":
+            continue
+        path = os.path.join(out_dir, name)
+        document = read_json(path)
+        if not isinstance(document, dict):
+            continue
+        fixed = repair_document(document)
+        if fixed:
+            write_atomic(path, document)
+            files += 1
+            periods += fixed
+            print(f"{name}: {fixed} EPS values rewritten")
+    return files, periods
+
+
 def main():
+    if "--repair" in sys.argv[1:]:
+        report_dir = os.environ.get("ATLAS_REPORT_DIR") or "../docs/report"
+        out_dir = os.environ.get("ATLAS_FINANCIALS_DIR") or os.path.join(report_dir, "financials")
+        files, periods = repair_all(out_dir)
+        print(json.dumps({"repairedFiles": files, "repairedPeriods": periods}))
+        return
     report_dir = os.environ.get("ATLAS_REPORT_DIR") or "../docs/report"
     data_dir = os.environ.get("ATLAS_DATA_DIR") or "../data"
     out_dir = os.environ.get("ATLAS_FINANCIALS_DIR") or os.path.join(report_dir, "financials")
