@@ -484,6 +484,10 @@ def main(argv=None):
         payload = build_payload(prices, config, now)
     except InsufficientData as exc:
         print(f"{out_name} not updated: {exc}")
+        # a few raw series, to tell a data-source problem from a logic problem
+        sample = [config.get("benchmark", BENCHMARK)] + [t[0] for t in config["themes"][0]["tickers"][:3]]
+        for symbol in sample:
+            print(f"  {symbol}: {len(prices.get(symbol) or [])} bars, last 4: {(prices.get(symbol) or [])[-4:]}")
         return 1
     skipped = payload["skipped"]
     if skipped["missing"] or skipped["stale"]:
