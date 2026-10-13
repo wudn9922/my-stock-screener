@@ -19,7 +19,7 @@ export const SPREAD_DEFS: readonly SpreadDef[] = [
 
 const finite = (value: number | null | undefined): value is number => typeof value === 'number' && Number.isFinite(value);
 const round1 = (value: number) => Math.round(value * 10) / 10;
-const formatSpread = (bp: number) => fmtSpreadBp(bp); 
+const formatSpread = (bp: number) => fmtSpreadBp(bp);
 /** Stored in basis points; formatted as percentage-point differences. */
 export function fmtSpreadBp(bp: number): string {
   const pct = Number((bp / 100).toFixed(2));
@@ -201,7 +201,7 @@ export function spreadSummary(spread: RatesSpread, label: string): string[] {
     const days = spread.invertedDays !== null && spread.invertedDays > 0 ? `，已持續 ${spread.invertedDays} 個交易日` : '';
     const since = spread.lastInversion && spread.lastInversion.end === null ? `（自 ${slash(spread.lastInversion.start)} 起）` : '';
     lines.push(`目前倒掛 ${formatSpread(value)}${days}${since}。`);
-  } else lines.push(`目前未倒掛（${value > 0 ? '+' : ''}${formatSpread(value)}）。`);
+  } else lines.push(`目前未倒掛（${formatSpread(value)}）。`);
   const last = spread.lastInversion;
   if (last && last.end !== null) {
     const deepest = last.minBp !== null ? `，最深 ${formatSpread(last.minBp)}${last.minDate ? `（${slash(last.minDate)}）` : ''}` : '';
