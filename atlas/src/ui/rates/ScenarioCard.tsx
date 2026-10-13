@@ -6,6 +6,7 @@ import {
   formulaParts,
   scenarioTable,
   toScenarioEtf,
+  withBorrowedDuration,
   type DurationBasis,
 } from '../../rates/bondMath';
 import { formatPercent, toneClass } from '../format';
@@ -19,7 +20,8 @@ const pctText = (value: number) => `${value < 0 ? '−' : ''}${Math.abs(value).t
 export function ScenarioCard({ etfs }: { etfs: readonly RatesEtf[] }) {
   const [bp, setBp] = useState(100);
   const [basis, setBasis] = useState<DurationBasis>('published');
-  const inputs = useMemo(() => etfs.map(toScenarioEtf), [etfs]);
+  const borrowed = useMemo(() => withBorrowedDuration(etfs), [etfs]);
+  const inputs = useMemo(() => borrowed.etfs.map(toScenarioEtf), [borrowed]);
   const rows = useMemo(() => scenarioTable(inputs, [bp], basis), [inputs, bp, basis]);
   const table = useMemo(() => scenarioTable(inputs, SCENARIO_SHOCKS_BP, basis), [inputs, basis]);
   const scale = Math.max(5, ...rows.map((row) => Math.abs(row.cells[0]?.pct ?? 0)));
@@ -78,7 +80,8 @@ export function ScenarioCard({ etfs }: { etfs: readonly RatesEtf[] }) {
                   <b>{row.symbol}</b>
                   <LeverageBadge leverage={row.leverage} />
                   <small>
-                    D {fmtNum(row.duration)} 年（{row.durationBasis === 'published' ? '公布' : row.durationBasis === 'model' ? '模型' : '—'}）
+                    D {fmtNum(row.duration)} 年（{row.durationBasis === 'published' ? '公布' : row.durationBasis === 'model' ? '模型' : '—'}
+                    {borrowed.borrowedFrom[row.symbol] ? `，同 ${borrowed.borrowedFrom[row.symbol]}` : ''}）
                   </small>
                 </span>
                 <span className="rates-bar-track centered" aria-hidden="true">
@@ -125,7 +128,10 @@ export function ScenarioCard({ etfs }: { etfs: readonly RatesEtf[] }) {
                         {cell.pct === null ? '—' : cell.floored ? '−100%' : formatPercent(cell.pct, 1)}
                       </td>
                     ))}
-                    <td className="num">{fmtNum(inputs[index]!.effectiveDuration)}</td>
+                    <td className="num">
+                      {fmtNum(inputs[index]!.effectiveDuration)}
+                      {borrowed.borrowedFrom[row.symbol] && <small className="rates-muted"> ＊</small>}
+                    </td>
                     <td className="num">{fmtNum(inputs[index]!.model?.duration ?? null)}</td>
                     <td className="num">{fmtNum(row.convexity, 0)}</td>
                   </tr>
@@ -145,6 +151,12 @@ export function ScenarioCard({ etfs }: { etfs: readonly RatesEtf[] }) {
             </>
           )}
           ；沒有公布值時自動改用模型值（以今日 20、30 年殖利率估算的等面額債券梯形）。凸性一律使用模型值。
+          {Object.entries(borrowed.borrowedFrom).map(([symbol, donor]) => (
+            <span key={symbol}>
+              {' '}
+              ＊{symbol} 追蹤與 {donor} 相同的指數，公布值沿用 {donor} 的數字（再乘上槓桿倍數）。
+            </span>
+          ))}
         </p>
         {parts && example && (
           <div className="rates-formula">

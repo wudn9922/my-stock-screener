@@ -91,7 +91,7 @@ export function SpreadCard({
   const isInverted = finite(nowBp) && nowBp < 0;
 
   return (
-    <section className="card rates-card" aria-labelledby="rates-spread-title">
+    <section className="card rates-card rates-wide" aria-labelledby="rates-spread-title">
       <header className="card-head">
         <h2 id="rates-spread-title">
           利差

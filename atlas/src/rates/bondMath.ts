@@ -184,6 +184,28 @@ export function toScenarioEtf(etf: {
   };
 }
 
+/**
+ * A leveraged fund with no published duration of its own (TMF) tracks the same index as an unleveraged one
+ * (TLT): borrow that fund's published duration, so the table reads 3 × TLT instead of mixing a published
+ * and a model duration. Returns the funds with `effectiveDuration` filled in, plus where it came from.
+ */
+export function withBorrowedDuration<T extends { symbol: string; leverage: number; index: string | null; effectiveDuration: number | null }>(
+  etfs: readonly T[],
+): { etfs: T[]; borrowedFrom: Record<string, string> } {
+  const base = (index: string | null) => (index ?? '').replace(/（[^）]*）\s*$/u, '').trim();
+  const borrowedFrom: Record<string, string> = {};
+  const out = etfs.map((etf) => {
+    if (etf.effectiveDuration !== null || !(etf.leverage > 1) || !etf.index) return etf;
+    const donor = etfs.find(
+      (other) => other.leverage === 1 && other.effectiveDuration !== null && base(other.index) === base(etf.index),
+    );
+    if (!donor) return etf;
+    borrowedFrom[etf.symbol] = donor.symbol;
+    return { ...etf, effectiveDuration: donor.effectiveDuration };
+  });
+  return { etfs: out, borrowedFrom };
+}
+
 export interface FormulaParts {
   /** The shock in percentage points (100bp → 1). */
   dyPct: number;
