@@ -39,18 +39,22 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # 以台灣時間的「今天」00:00 為界
-          TODAY=$(TZ=Asia/Taipei date +%F)
-          SINCE=$(date -u -d "${TODAY} 00:00:00 +0800" +%Y-%m-%dT%H:%M:%SZ)
+          # 以「最近 16 小時」為界，而不是台灣時間的日期：
+          # 備援 cron 常被 GitHub 延遲數小時，若剛好跨過午夜，日期界線會讓它在凌晨又完整重跑一次。
+          # 16 小時小於兩個交易日之間的間隔（約 24 小時），所以隔天的正常執行不受影響。
+          # 被略過的執行（幾秒就結束）不算數，否則略過的紀錄會把窗口一路往後推。
+          SINCE=$(date -u -d "16 hours ago" +%Y-%m-%dT%H:%M:%SZ)
           OTHERS=$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/workflows/schedule.yml/runs" \
             -f created=">=${SINCE}" -f per_page=50 \
             --jq "[.workflow_runs[]
                    | select(.id != ${GITHUB_RUN_ID})
-                   | select(.status != \"completed\" or .conclusion == \"success\")]
+                   | select(.status != \"completed\"
+                            or (.conclusion == \"success\"
+                                and ((.updated_at | fromdateiso8601) - (.run_started_at | fromdateiso8601)) > 120))]
                   | length")
-          echo "今天（台灣時間 ${TODAY}）其他執行次數：${OTHERS}"
+          echo "最近 16 小時內其他執行次數：${OTHERS}"
           if [ "${OTHERS:-0}" -gt 0 ]; then
-            echo "今天已經有執行過或正在執行，略過這次。"
+            echo "最近 16 小時內已經有執行過或正在執行，略過這次。"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
