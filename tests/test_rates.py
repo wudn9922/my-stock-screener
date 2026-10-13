@@ -645,5 +645,19 @@ class RunTest(unittest.TestCase):
             self.assertFalse(hasattr(build_rates, gone), gone)
 
 
+class FixtureCopyTest(unittest.TestCase):
+    """The front-end tests read a copy of the generated fixtures; nothing else keeps the two in step."""
+
+    def test_atlas_copies_match_the_generated_fixtures(self):
+        pairs = [
+            ("sample-rates.json", "backend-sample-rates.json"),
+            ("sample-rates-history.json", "backend-sample-rates-history.json"),
+        ]
+        for source, copy in pairs:
+            with open(os.path.join(ROOT, "tests", "fixtures", "rates", source), "rb") as handle:
+                expected = handle.read()
+            with open(os.path.join(ROOT, "atlas", "tests", "fixtures", "rates", copy), "rb") as handle:
+                self.assertEqual(handle.read(), expected, f"{copy} is out of date: copy tests/fixtures/rates/{source}")
+
 if __name__ == "__main__":
     unittest.main()

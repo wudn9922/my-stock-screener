@@ -39,7 +39,11 @@ jobs:
         run: pip install --quiet requests
 
       - name: Regenerate synthetic test fixtures
-        run: python tests/rates_synth.py
+        run: |
+          python tests/rates_synth.py
+          # the front-end tests read copies of the generated fixtures
+          cp tests/fixtures/rates/sample-rates.json atlas/tests/fixtures/rates/backend-sample-rates.json
+          cp tests/fixtures/rates/sample-rates-history.json atlas/tests/fixtures/rates/backend-sample-rates-history.json
 
       - name: Test US rates builder
         run: python -m unittest discover -s tests -p test_rates.py
@@ -68,7 +72,16 @@ jobs:
           assert rates["policy"] and rates["policy"]["upper"] is not None and rates["policy"]["lower"] is not None
           now = next(c for c in rates["curves"]["nominal"] if c["key"] == "now")
           assert now["values"][rates["tenors"].index("10Y")] is not None, "no current 10Y yield"
+          assert any(c["key"] == "1m" for c in rates["curves"]["nominal"]), "no one-month-ago snapshot (10Y change)"
           assert rates["etfs"], "no ETFs"
+          # a leveraged fund without its own published duration borrows the unleveraged fund's (same index)
+          def base(index):
+              return (index or "").split("（")[0].strip()
+          for etf in rates["etfs"]:
+              if etf["leverage"] > 1 and etf["effectiveDuration"] is None:
+                  donors = [o for o in rates["etfs"] if o["leverage"] == 1 and o["effectiveDuration"] is not None
+                            and base(o["index"]) and base(o["index"]) == base(etf["index"])]
+                  assert donors, f"{etf['symbol']} cannot borrow a published duration"
           for etf in rates["etfs"]:
               model = etf.get("model") or {}
               assert model.get("duration") and model.get("convexity"), f"{etf['symbol']} has no model duration"
@@ -88,7 +101,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -- docs/report/rates.json docs/report/rates-history.json tests/fixtures/rates/sample-rates.json tests/fixtures/rates/sample-rates-history.json
+          git add -- docs/report/rates.json docs/report/rates-history.json tests/fixtures/rates/sample-rates.json tests/fixtures/rates/sample-rates-history.json atlas/tests/fixtures/rates/backend-sample-rates.json atlas/tests/fixtures/rates/backend-sample-rates-history.json
           if git diff --cached --quiet; then
             echo "Rates reports unchanged; nothing to commit."
             exit 0
