@@ -58,7 +58,8 @@ export function KeyNumbers({ rates, history, fedBound }: { rates: Rates; history
     {
       key: 'fed',
       label: '聯準會目標區間',
-      value: policy ? `${fmtYield(policy.lower)}–${fmtYield(policy.upper)}` : '—',
+      // "3.75–4.00%": one % sign keeps the chip inside a third of a phone screen
+      value: policy ? `${fmtYield(policy.lower).replace('%', '')}–${fmtYield(policy.upper)}` : '—',
       change: policyChange,
     },
   ];

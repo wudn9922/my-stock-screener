@@ -8,6 +8,7 @@ import {
   scenarioPct,
   scenarioTable,
   toScenarioEtf,
+  withBorrowedDuration,
   type ScenarioEtf,
 } from '../src/rates/bondMath';
 
@@ -218,5 +219,40 @@ describe('formulaParts', () => {
     expect(levered.total).toBeCloseTo(-99.9, 10);
     expect(formulaParts(17, 300, 300, 3).total).toBe(-100);
     expect(formulaParts(17, 300, 300, 3).floored).toBe(true);
+  });
+});
+
+describe('withBorrowedDuration', () => {
+  const tlt = { symbol: 'TLT', leverage: 1, index: 'ICE U.S. Treasury 20+ Year Index', effectiveDuration: 16.5 };
+  const edv = { symbol: 'EDV', leverage: 1, index: 'Bloomberg US Treasury STRIPS 20-30 Year Index', effectiveDuration: 24.5 };
+  const tmf = { symbol: 'TMF', leverage: 3, index: 'ICE U.S. Treasury 20+ Year Index（每日 3 倍）', effectiveDuration: null };
+
+  it('gives a leveraged fund the published duration of the unleveraged fund on the same index', () => {
+    const result = withBorrowedDuration([tlt, edv, tmf]);
+    expect(result.etfs[2]!.effectiveDuration).toBe(16.5);
+    expect(result.borrowedFrom).toEqual({ TMF: 'TLT' });
+    // the other funds are returned untouched
+    expect(result.etfs[0]).toBe(tlt);
+    expect(result.etfs[1]).toBe(edv);
+  });
+
+  it('leaves a fund alone when it has its own number, is not leveraged or has no matching index', () => {
+    const own = { ...tmf, effectiveDuration: 50 };
+    expect(withBorrowedDuration([tlt, own]).etfs[1]).toBe(own);
+    const plain = { ...tmf, leverage: 1 };
+    expect(withBorrowedDuration([tlt, plain]).etfs[1]).toBe(plain);
+    const other = { ...tmf, index: 'Some other index（每日 3 倍）' };
+    const result = withBorrowedDuration([tlt, other]);
+    expect(result.etfs[1]!.effectiveDuration).toBeNull();
+    expect(result.borrowedFrom).toEqual({});
+  });
+
+  it('makes the 3x fund 3 times the unleveraged one in the published scenario table', () => {
+    const { etfs } = withBorrowedDuration([tlt, tmf]);
+    const withModel = etfs.map((etf) =>
+      toScenarioEtf({ ...etf, expenseRatio: null, model: { duration: 13.3, convexity: 258 } }),
+    );
+    const table = scenarioTable(withModel, [100], 'published');
+    expect(table[1]!.cells[0]!.pct!).toBeCloseTo(3 * table[0]!.cells[0]!.pct!, 6);
   });
 });
