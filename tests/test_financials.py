@@ -1058,5 +1058,15 @@ class RepairSplitEpsTest(unittest.TestCase):
                 self.assertEqual(json.load(file)["quarterly"]["values"]["epsDiluted"], [0.5])
 
 
+class NestedSymbolsTest(unittest.TestCase):
+    def test_failed_report_rows_are_skipped(self):
+        document = {"groups": [{"items": [
+            {"symbol": "AAA"},
+            {"symbol": "BBB", "status": "unmatched"},
+            {"symbol": "6488.TW", "status": "failed"},
+        ]}]}
+        self.assertEqual(fin.nested_symbols(document, "groups", "items"), ["AAA", "BBB"])
+
+
 if __name__ == "__main__":
     unittest.main()

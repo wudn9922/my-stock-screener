@@ -2734,45 +2734,88 @@ def download_custom_stock(
     return None, pd.DataFrame()
 
 
+def _failed_stock_symbol(
+    raw_ticker,
+    group_key=None,
+    group_market=None
+):
+    """
+    下載失敗時要顯示的代號：純數字台股有 .TW／.TWO 兩個候選，
+    優先用 data/ 已經有 CSV 的那個（過去成功過的後綴），否則取第一個。
+    """
+    candidates = (
+        get_ticker_candidates(
+            raw_ticker,
+            group_key=group_key,
+            group_market=group_market
+        )
+        or [str(raw_ticker).strip().upper()]
+    )
+
+    for candidate in candidates:
+        if os.path.exists(
+            os.path.join(
+                DATA_DIR,
+                f"{candidate}.csv"
+            )
+        ):
+            return candidate
+
+    return candidates[0]
+
+
 def _record_failed_stock(
     unmatched_out,
     ticker,
     group_key,
     reason,
-    raw_ma_list=None
+    raw_ma_list=None,
+    group_market=None
 ):
     """
     未成功股票（沒有行情）：只給網頁報告列出，不影響 matched_list。
-    unmatched_out 為 None 時什麼都不做。
+    unmatched_out 為 None 時什麼都不做；任何錯誤只記錄，絕不讓日報中斷
+    （這個函式會在 except 區塊裡被呼叫）。
     """
     if unmatched_out is None:
         return
 
-    unmatched_out.append(
-        {
-            "status": "failed",
-            "ticker": str(ticker),
-            "name": "",
-            "group_key": group_key,
-            "ma_list": sorted(
-                {
-                    ma_value
-                    for ma_value in (
-                        safe_int(raw_ma)
-                        for raw_ma in (raw_ma_list or [])
-                    )
-                    if ma_value is not None
-                    and ma_value > 0
-                }
-            ),
-            "volume": 0,
-            "close": None,
-            "change_pct": None,
-            "ma_values": {},
-            "as_of": None,
-            "note": reason
-        }
-    )
+    try:
+        unmatched_out.append(
+            {
+                "status": "failed",
+                "ticker": str(ticker),
+                "name": (
+                    get_tw_stock_name(str(ticker))
+                    if group_market == "tw"
+                    else ""
+                ),
+                "group_key": group_key,
+                "ma_list": sorted(
+                    {
+                        ma_value
+                        for ma_value in (
+                            safe_int(raw_ma)
+                            for raw_ma in (raw_ma_list or [])
+                        )
+                        if ma_value is not None
+                        and ma_value > 0
+                    }
+                ),
+                "volume": 0,
+                "close": None,
+                "change_pct": None,
+                "ma_values": {},
+                "as_of": None,
+                "note": reason
+            }
+        )
+
+    except Exception as exc:
+        print(
+            f"⚠️ {ticker} 失敗項目略過："
+            f"{type(exc).__name__}: {exc}"
+        )
 
 
 def _record_unmatched_stock(
@@ -2883,8 +2926,17 @@ def _record_unmatched_stock(
 
     except Exception as exc:
         print(
-            f"⚠️ {ticker} 未成功項目略過："
+            f"⚠️ {ticker} 未成功項目改記為失敗："
             f"{type(exc).__name__}: {exc}"
+        )
+
+        _record_failed_stock(
+            unmatched_out,
+            ticker,
+            group_key,
+            "處理失敗",
+            ma_list,
+            group_market=group_market
         )
 
 
@@ -2971,17 +3023,15 @@ def process_custom_groups(
             ):
                 _record_failed_stock(
                     unmatched_out,
-                    (
-                        get_ticker_candidates(
-                            raw_ticker,
-                            group_key=group_key,
-                            group_market=group_market
-                        )
-                        or [str(raw_ticker).strip().upper()]
-                    )[0],
+                    _failed_stock_symbol(
+                        raw_ticker,
+                        group_key=group_key,
+                        group_market=group_market
+                    ),
                     group_key,
                     "下載失敗",
-                    raw_ma_list
+                    raw_ma_list,
+                    group_market=group_market
                 )
                 continue
 
@@ -3033,7 +3083,8 @@ def process_custom_groups(
                     actual_ticker,
                     group_key,
                     "資料不足",
-                    raw_ma_list
+                    raw_ma_list,
+                    group_market=group_market
                 )
                 continue
 
@@ -3251,10 +3302,15 @@ def process_custom_groups(
             _record_failed_stock(
                 unmatched_out,
                 actual_ticker
-                or str(raw_ticker).strip().upper(),
+                or _failed_stock_symbol(
+                    raw_ticker,
+                    group_key=group_key,
+                    group_market=group_market
+                ),
                 group_key,
                 "處理失敗",
-                raw_ma_list
+                raw_ma_list,
+                group_market=group_market
             )
 
     matched_list.sort(

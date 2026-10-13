@@ -74,7 +74,7 @@ def us_tickers(report_dir, data_dir):
     for group in latest.get("groups") or []:
         if isinstance(group, dict) and group.get("market") == "US":
             for item in group.get("items") or []:
-                if isinstance(item, dict):
+                if isinstance(item, dict) and item.get("status") != "failed":
                     symbols.add(item.get("symbol"))
     themes = read_json(os.path.join(report_dir, "themes.json")) or {}
     for theme in themes.get("themes") or []:

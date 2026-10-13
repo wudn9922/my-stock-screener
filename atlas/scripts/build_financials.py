@@ -903,7 +903,10 @@ def nested_symbols(document, outer, inner):
     symbols = []
     for entry in entries if isinstance(entries, list) else []:
         if isinstance(entry, dict) and isinstance(entry.get(inner), list):
-            symbols += [item.get("symbol") for item in entry[inner] if isinstance(item, dict)]
+            # latest.json rows with status "failed" have no price and maybe a wrong suffix: skip them
+            symbols += [
+                item.get("symbol") for item in entry[inner] if isinstance(item, dict) and item.get("status") != "failed"
+            ]
     return symbols
 
 

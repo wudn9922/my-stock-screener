@@ -205,6 +205,44 @@ class ProcessCustomGroupsTest(unittest.TestCase):
         self.assertEqual(list(plain), ["custom_1"])
 
 
+class FailedRecordHardeningTest(unittest.TestCase):
+    """Review fixes: recording a failure must never raise, and the failed row shows the right code."""
+
+    def setUp(self):
+        self.main = import_main()
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.saved_dir = self.main.DATA_DIR
+        self.main.DATA_DIR = self.tmp.name
+        self.addCleanup(setattr, self.main, "DATA_DIR", self.saved_dir)
+
+    def test_garbage_ma_list_does_not_raise(self):
+        out = []
+        self.main._record_failed_stock(out, "AAA", "g", "下載失敗", 20)  # int is not iterable
+        self.assertEqual(out, [])
+
+    def test_failed_symbol_prefers_candidate_with_a_csv(self):
+        open(os.path.join(self.tmp.name, "6488.TWO.csv"), "w").close()
+        self.assertEqual(self.main._failed_stock_symbol("6488", group_market="tw"), "6488.TWO")
+
+    def test_failed_symbol_defaults_to_first_candidate(self):
+        self.assertEqual(self.main._failed_stock_symbol("6488", group_market="tw"), "6488.TW")
+        self.assertEqual(self.main._failed_stock_symbol("brk.b", group_market="us"), "BRK-B")
+
+    def test_failed_row_carries_the_taiwan_name(self):
+        out = []
+        self.main._record_failed_stock(out, "2330.TW", "g", "下載失敗", [20], group_market="tw")
+        self.assertEqual(out[0]["status"], "failed")
+        self.assertTrue(out[0]["name"])
+
+    def test_unmatched_calculation_error_is_recorded_as_failed(self):
+        out = []
+        broken = make_df([10.0] * 5)  # no MA column for the requested window
+        self.main._record_unmatched_stock(out, "AAA", "g", "us", [20], broken)
+        self.assertEqual([row["status"] for row in out], ["failed"])
+        self.assertEqual(out[0]["ticker"], "AAA")
+
+
 class BuildReportGroupsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
