@@ -57,6 +57,14 @@ export default function RatesView({ openChart }: RatesViewProps) {
   const data = rates.data;
   const age = daysSince(data.asOf);
   const outdated = age !== null && age > STALE_DAYS;
+  // Older published JSON may still describe the previous midpoint or use bp.
+  const visibleNotes = data.notes.map((note) => {
+    if (note.includes('利差單位 bp') || note.includes('10Y−Fed＝'))
+      return '利差畫面以百分點顯示：10Y−Fed 預設為 10 年殖利率減 Fed 目標區間上限，可切換下限；10Y−3M 為 10 年殖利率減 3 個月殖利率。';
+    return note.replace('10Y−Fed 使用政策目標區間中點', '10Y−Fed 預設使用政策目標區間上限')
+      .replace(/(\d+(?:\.\d+)?)\s*bp/g, (_, amount: string) => `${(Number(amount) / 100).toFixed(2)}%`)
+      .replace(/\bbp\b/g, '百分點');
+  });
   return (
     <div className="rates-view">
       <p className="rates-meta">
@@ -87,9 +95,9 @@ export default function RatesView({ openChart }: RatesViewProps) {
         <p>
           來源：{data.sources.rates ?? 'FRED'}（美國聯準會 H.15 與 TIPS 資料）{data.sources.etf ? `；${data.sources.etf}` : ''}。
         </p>
-        {data.notes.length > 0 && (
+        {visibleNotes.length > 0 && (
           <ul>
-            {data.notes.map((note) => (
+            {visibleNotes.map((note) => (
               <li key={note}>{note}</li>
             ))}
           </ul>
