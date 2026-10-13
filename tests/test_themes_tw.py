@@ -13,6 +13,7 @@ import themes_synth  # noqa: E402
 import themes_tw  # noqa: E402
 
 UNIVERSE_PATH = os.path.join(ROOT, "docs", "report", "universe.json")
+REGISTRY_PATH = os.path.join(ROOT, "atlas", "public", "symbols", "taiwan.json")
 TODAY = datetime(2026, 10, 9, 22, 30, tzinfo=timezone.utc)
 SYMBOL_RE = r"^\d{4}\.TWO?$"
 ETF_RE = r"^\d{4,6}[A-Z]?\.TW$"
@@ -29,6 +30,13 @@ def tw_universe():
         payload = json.load(handle)
     rows = payload["markets"]["TW"]["rows"]
     return {row[0]: clean_name(row[1]) for row in rows}
+
+
+def registry():
+    """{symbol: name} from the TWSE/TPEx company directory (listed -> .TW, OTC -> .TWO), stable across days."""
+    with open(REGISTRY_PATH, encoding="utf-8") as handle:
+        entries = json.load(handle)["entries"]
+    return {entry["symbol"]: clean_name(entry["name"]) for entry in entries}
 
 
 def all_entries():
@@ -85,6 +93,24 @@ class ConfigTest(unittest.TestCase):
             self.assertEqual(len(spellings), 1, (symbol, spellings))
 
 
+@unittest.skipUnless(os.path.exists(REGISTRY_PATH), "atlas/public/symbols/taiwan.json not present")
+class RegistryTest(unittest.TestCase):
+    """Every constituent must exist in the official company directory with the right market suffix and name."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.registry = registry()
+
+    def test_every_constituent_exists_with_its_name(self):
+        problems = []
+        for key, (symbol, name, _note) in all_entries():
+            if symbol not in self.registry:
+                problems.append((key, symbol, name, "not in the directory (wrong code, suffix or delisted)"))
+            elif self.registry[symbol] != name:
+                problems.append((key, symbol, name, f"directory says {self.registry[symbol]}"))
+        self.assertEqual(problems, [])
+
+
 @unittest.skipUnless(os.path.exists(UNIVERSE_PATH), "docs/report/universe.json not present")
 class UniverseTest(unittest.TestCase):
     """Constituents must come from the TW liquidity list (stocks with prices the daily report already fetches).
@@ -118,8 +144,7 @@ class UniverseTest(unittest.TestCase):
     def test_each_theme_keeps_enough_valid_constituents(self):
         for theme in themes_tw.THEMES:
             inside = [t[0] for t in theme["tickers"] if t[0] in self.universe]
-            self.assertGreaterEqual(len(inside), 5, theme["key"])
-            self.assertGreaterEqual(len(inside), build_themes.MIN_VALID, theme["key"])
+            self.assertGreaterEqual(len(inside), build_themes.MIN_VALID + 1, theme["key"])
 
 
 class PayloadSmokeTest(unittest.TestCase):

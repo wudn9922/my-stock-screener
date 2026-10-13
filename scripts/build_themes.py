@@ -458,7 +458,7 @@ def parse_args(argv):
 
 def main(argv=None):
     args = parse_args([] if argv is None else argv)
-    market = args.market or os.environ.get("THEMES_MARKET") or "us"
+    market = args.market or (os.environ.get("THEMES_MARKET") or "us").strip().lower()
     try:
         config = load_config(market)
     except ConfigError as exc:

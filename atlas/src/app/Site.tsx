@@ -102,7 +102,15 @@ export function Site() {
     document.getElementById('main')?.scrollTo?.({ top: 0 });
   }, [
     route.page,
-    route.page === 'markets' ? route.market : route.page === 'screener' ? route.group : route.page === 'world' ? route.view : '',
+    route.page === 'markets'
+      ? route.market
+      : route.page === 'screener'
+        ? route.group
+        : route.page === 'world'
+          ? route.view
+          : route.page === 'themes'
+            ? route.market
+            : '',
   ]);
   useEffect(() => {
     const titles =
