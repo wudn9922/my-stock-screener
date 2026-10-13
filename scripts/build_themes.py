@@ -211,11 +211,21 @@ def build_payload(prices, config, today):
     bench_bars = prices.get(bench_symbol) or []
     if len(bench_bars) < PERIOD_BARS["m6"] + 1:
         raise InsufficientData(f"{bench_symbol} history too short ({len(bench_bars)} bars)")
-    calendar = [day for day, _ in bench_bars]
+    constituent_symbols = sorted({t[0] for theme in config["themes"] for t in theme["tickers"]})
+    # The benchmark sets the calendar, but only days on which most constituents also have a bar count: Yahoo
+    # sometimes serves an index one session ahead of its stocks (^TWII had 10-12, every stock stopped at 10-08),
+    # and forward-filling the stocks over that day would show a 0% one-day move for all of them.
+    present = [symbol for symbol in constituent_symbols if prices.get(symbol)]
+    coverage_by_day = {}
+    for symbol in present:
+        for day, _ in prices[symbol]:
+            coverage_by_day[day] = coverage_by_day.get(day, 0) + 1
+    calendar = [day for day, _ in bench_bars if not present or coverage_by_day.get(day, 0) * 2 >= len(present)]
+    if len(calendar) < PERIOD_BARS["m6"] + 1:
+        raise InsufficientData(f"{bench_symbol} calendar with constituent data too short ({len(calendar)} days)")
     last_date = calendar[-1]
     last_day = parse_date(last_date)
 
-    constituent_symbols = sorted({t[0] for theme in config["themes"] for t in theme["tickers"]})
     bench_values = align(bench_bars, calendar, last_date)
     bench_returns = all_returns(bench_values, calendar)
     dates = calendar[-SERIES_POINTS:]
