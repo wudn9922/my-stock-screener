@@ -627,7 +627,24 @@ a.rates-static {
 }
 @media (max-width: 640px) {
   .rates-etf-table {
-    min-width: 720px;
+    min-width: 1180px;
+  }
+  /* wide enough that long index names and holdings wrap to two lines at most, keeping rows short */
+  .rates-etf-table th:nth-child(2),
+  .rates-etf-table td:nth-child(2) {
+    min-width: 128px;
+  }
+  .rates-etf-table th:nth-child(4),
+  .rates-etf-table td:nth-child(4),
+  .rates-etf-table th:nth-child(8),
+  .rates-etf-table td:nth-child(8) {
+    min-width: 210px;
+  }
+  .rates-etf-table th:nth-child(5),
+  .rates-etf-table td:nth-child(5),
+  .rates-etf-table th:nth-child(7),
+  .rates-etf-table td:nth-child(7) {
+    min-width: 108px;
   }
   .rates-etf-table th:first-child,
   .rates-etf-table td:first-child {
