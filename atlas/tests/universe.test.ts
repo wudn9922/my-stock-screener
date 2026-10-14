@@ -60,6 +60,36 @@ describe('universe.json', () => {
     expect(result.universe.markets.TW).toBeUndefined();
   });
 
+  it('reads the optional profile columns and the full-market scope', () => {
+    const fields = [...UNIVERSE_FIELDS, 'sector', 'industry', 'marketCap'];
+    const base = fixture.markets.US!.rows[0]!.slice(0, UNIVERSE_FIELDS.length);
+    const result = parseUniverse({
+      fields,
+      markets: {
+        US: {
+          benchmark: 'SPY',
+          scope: 'full',
+          rows: [
+            [...base, 'Technology', 'Computer Manufacturing', 3.1e12],
+            ['MSFT', ...base.slice(1), null, '  ', -5],
+          ],
+        },
+      },
+    });
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    const us = result.universe.markets.US!;
+    expect(us.scope).toBe('full');
+    expect(us.items[0]!.profile).toEqual({ sector: 'Technology', industry: 'Computer Manufacturing', marketCap: 3.1e12 });
+    // Blank text and non-positive caps carry no profile at all.
+    expect(us.items[1]!.profile).toBeUndefined();
+    // main.py's files have neither: the liquidity scope and no profiles.
+    const plain = parseUniverse(fixture);
+    if (plain.status !== 'ok') throw new Error('fixture must parse');
+    expect(plain.universe.markets.US!.scope).toBe('liquid');
+    expect(plain.universe.markets.US!.items.every((item) => item.profile === undefined)).toBe(true);
+  });
+
   it('drops bad rows and duplicates, keeps nulls, and defaults missing fields', () => {
     const result = parseUniverse({
       markets: {

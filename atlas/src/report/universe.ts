@@ -36,6 +36,12 @@ export const UNIVERSE_FIELDS = [
   'volVsPrev',
   'turnover20',
 ] as const;
+/**
+ * Optional profile columns written by the full-market build (scripts/build_universe_full.py) after the
+ * metric columns: `sector`, `industry` (text or null) and `marketCap` (market currency or null). Files
+ * without them (the liquidity list written by main.py) parse exactly as before.
+ */
+export const UNIVERSE_PROFILE_FIELDS = ['sector', 'industry', 'marketCap'] as const;
 
 /** Route group keys of the two full-market lists (report group keys use underscores, never this form). */
 export const UNIVERSE_GROUP_KEYS: Record<UniverseMarketKey, string> = { TW: 'universe-tw', US: 'universe-us' };
@@ -51,6 +57,8 @@ export interface UniverseMarket {
   asOf: string | null;
   /** Human description of the list, e.g. 「S&P 500」. */
   universe: string;
+  /** `full` = every listed common stock of the market (build_universe_full.py); `liquid` = main.py's list. */
+  scope: 'full' | 'liquid';
   items: GroupItem[];
 }
 
@@ -114,6 +122,17 @@ export function universeRowToItem(
       maValues[String(period)] = close / (1 + distance / 100);
   }
   const name = typeof get('name') === 'string' ? (get('name') as string).trim() : '';
+  const profileText = (field: string) => {
+    const value = get(field);
+    return typeof value === 'string' && value.trim() ? value.trim().slice(0, 80) : null;
+  };
+  const marketCap = numeric('marketCap');
+  const profile = {
+    sector: profileText('sector'),
+    industry: profileText('industry'),
+    marketCap: marketCap !== null && marketCap > 0 ? marketCap : null,
+  };
+  const hasProfile = profile.sector !== null || profile.industry !== null || profile.marketCap !== null;
   return {
     symbol: symbolText,
     name: name || symbolText,
@@ -125,6 +144,7 @@ export function universeRowToItem(
     volume: numeric('volume'),
     asOf: context.asOf,
     metrics,
+    ...(hasProfile ? { profile } : {}),
   };
 }
 
@@ -168,6 +188,7 @@ export function parseUniverse(data: unknown, url = ''): UniverseLoadResult {
       benchmark,
       asOf,
       universe: textOrNull(entry.universe) ?? (market === 'US' ? 'S&P 500' : '台股'),
+      scope: entry.scope === 'full' ? 'full' : 'liquid',
       items,
     };
   }
