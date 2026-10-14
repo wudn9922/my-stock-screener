@@ -4,6 +4,8 @@ name: Financial Statement History
 # （股票來自 latest／themes／universe，只重抓到期的，約 600 秒預算）。
 # 獨立成一個 workflow：用全新的 runner（乾淨的 Yahoo 限流狀態），也不拖慢每日報告與 LINE 推播。
 # 失敗只保留已寫入的檔案，下一次接著補。
+# 財報歷史建好後，build_growth.py 讀 financials/*.json 產生 docs/report/growth.json（選股頁的 EPS／營收 YoY，
+# 台股與美股、季度與年度），與財報檔在同一個 commit 迴圈提交；內容沒變時不改檔。
 on:
   workflow_run:
     workflows: ["Daily Stock Screener"]
@@ -46,12 +48,19 @@ jobs:
         working-directory: atlas
         run: python -u scripts/build_financials.py
 
+      # 即使上一步中途失敗，也用已寫入的財報檔重建（純離線讀檔，很快）
+      - name: Build screener growth data (EPS / revenue YoY)
+        if: always()
+        working-directory: atlas
+        run: python -u scripts/build_growth.py
+
       - name: Commit and Push changes
         if: always()
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git add -A docs/report/financials
+          [ -f docs/report/growth.json ] && git add docs/report/growth.json
           git commit -m "Auto-update financial statement history" || { echo "No changes to commit"; exit 0; }
           # 每日報告與 Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試
           for attempt in 1 2 3; do

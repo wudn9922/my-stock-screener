@@ -4,7 +4,8 @@ import {
   EMPTY_FILTERS,
   FILTER_STORAGE_KEY,
   NO_METRICS_REASON,
-  TW_FUNDAMENTALS_REASON,
+  NO_GROWTH_REASON,
+  NO_GROWTH_ROWS_REASON,
   VOLUME_PRESETS,
   activeChips,
   applyFilters,
@@ -47,9 +48,14 @@ describe('filter encoding', () => {
       hi: 10,
       rs: 80,
       rs3: null,
+      rs1: null,
       vr: 1.5,
       eps: { quarters: 2, min: 20 },
       rev: { quarters: 1, min: 10 },
+      epsY: null,
+      revY: null,
+      accel: false,
+      turn: true,
       keepMissing: false,
     });
     expect(serializeFilters(parsed)).toBe('chg:0:3;ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;vr:1.5;eps:2:20;rev:1:10');
@@ -225,7 +231,7 @@ describe('applyFilters', () => {
     expect(applyFilters([old, fresh], state('vr:1.1'), tw)).toEqual([]);
   });
 
-  it('applies EPS / revenue gates to US stocks only', () => {
+  it('applies EPS / revenue gates from the growth data', () => {
     const gate = state('eps:2:20');
     const passing = applyFilters(US, gate, us);
     expect(passing.length).toBeGreaterThan(0);
@@ -234,12 +240,12 @@ describe('applyFilters', () => {
       expect(record.epsYoY[0]! >= 20 || (record.epsYoY[0] === null && record.epsTurn)).toBe(true);
       expect(record.epsYoY[1]!).toBeGreaterThanOrEqual(20);
     }
-    // Taiwan: not available → skipped with an explanation.
+    // Taiwan rows have no record in the US file: nothing there to filter on, so the condition is skipped and flagged.
     expect(applyFilters(TW, gate, { market: 'TW', growth })).toHaveLength(TW.length);
-    expect(filterAvailability(TW, { market: 'TW', growth }).eps).toBe(TW_FUNDAMENTALS_REASON);
-    // US file missing or still loading → skipped, flagged.
+    expect(filterAvailability(TW, { market: 'TW', growth }).eps).toBe(NO_GROWTH_ROWS_REASON);
+    // Data missing or still loading → skipped, flagged.
     expect(applyFilters(US, gate, { market: 'US', growth: null })).toHaveLength(US.length);
-    expect(filterAvailability(US, { market: 'US', growth: null }).eps).toMatch(/尚未產生/);
+    expect(filterAvailability(US, { market: 'US', growth: null }).eps).toBe(NO_GROWTH_REASON);
     expect(filterAvailability(US, { market: 'US', growthLoading: true }).rev).toMatch(/載入中/);
     const revenue = applyFilters(US, state('rev:1:10'), us);
     expect(revenue).toEqual(US.filter((row) => (growth.items.get(row.symbol)?.revYoY[0] ?? -1) >= 10));

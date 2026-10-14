@@ -1,5 +1,5 @@
 import { itemStatusOf, type GroupItem } from '../report/schema';
-import type { GrowthFile } from '../fundamentals/GrowthProvider';
+import type { GrowthFile, GrowthRecord } from '../fundamentals/GrowthProvider';
 import { formatPercent, maDistance, maValue, toneClass } from '../ui/format';
 import { growthRecordFor, maDeviation, type FilterState } from './screenerFilters';
 
@@ -108,23 +108,33 @@ export function resultCountText(shown: readonly GroupItem[], total: number, view
 
 // ---------------------------------------------------------------- row pills
 
-export type MetricPill = 'rs' | 'hi' | 'vr' | 'ma50' | 'ema20' | 'r21' | 'eps' | 'rev';
+export type MetricPill = 'rs' | 'hi' | 'vr' | 'ma50' | 'ema20' | 'r21' | 'eps' | 'rev' | 'epsY' | 'revY';
 const MAX_PILLS = 2;
+/** Fundamental pills (EPS / revenue growth) have their own allowance so a growth filter always shows its numbers. */
+const MAX_GROWTH_PILLS = 4;
+const GROWTH_PILLS: readonly MetricPill[] = ['eps', 'rev', 'epsY', 'revY'];
 
-/** Extra row pills: the sort's metric first, then the filtered ones (at most two; MA pills follow). */
+/**
+ * Extra row pills: the sort's metric first, then the filtered ones (at most two technical ones plus the
+ * growth ones of the active growth filters; MA pills follow).
+ */
 export function rowMetricPills(sort: SortMode, state: FilterState, maList: readonly number[]): MetricPill[] {
   const keys: MetricPill[] = [];
   const add = (key: MetricPill) => {
     if (!keys.includes(key) && !(key === 'ma50' && maList.slice(0, 3).includes(50))) keys.push(key);
   };
   if (sort === 'rs' || sort === 'hi' || sort === 'vr' || sort === 'ma50' || sort === 'r21' || sort === 'eps') add(sort);
-  if (state.rs !== null || state.rs3 !== null) add('rs');
+  if (state.rs !== null || state.rs3 !== null || state.rs1 !== null) add('rs');
   if (state.hi !== null) add('hi');
   if (state.vr !== null) add('vr');
-  if (state.eps) add('eps');
+  if (state.eps || state.accel) add('eps');
+  if (state.epsY) add('epsY');
   if (state.rev) add('rev');
+  if (state.revY) add('revY');
   if (state.ema20) add('ema20');
-  return keys.slice(0, MAX_PILLS);
+  const technical = keys.filter((key) => !GROWTH_PILLS.includes(key)).slice(0, MAX_PILLS);
+  const growth = keys.filter((key) => GROWTH_PILLS.includes(key)).slice(0, MAX_GROWTH_PILLS);
+  return keys.filter((key) => technical.includes(key) || growth.includes(key));
 }
 
 export interface PillContent {
@@ -142,7 +152,7 @@ export function metricPill(item: GroupItem, key: MetricPill, growth?: GrowthFile
       const bench = m.rsBench === '^TWII' ? '加權指數' : (m.rsBench ?? '大盤');
       return {
         text: m.rsRank !== null ? `RS ${m.rsRank}` : `RS3M ${formatPercent(m.rs63, 0)}`,
-        title: `相對強弱百分位 ${m.rsRank ?? '—'}（1–99）· 3個月相對${bench} ${formatPercent(m.rs63, 1)}`,
+        title: `相對強弱百分位 ${m.rsRank ?? '—'}（1–99）· 相對${bench}：1個月 ${formatPercent(m.rs21, 1)}、3個月 ${formatPercent(m.rs63, 1)}`,
         tone: m.rs63 === null ? 'flat' : toneClass(m.rs63),
       };
     }
@@ -170,20 +180,42 @@ export function metricPill(item: GroupItem, key: MetricPill, growth?: GrowthFile
       if (m?.r21 == null) return null;
       return { text: `1月 ${formatPercent(m.r21, 1)}`, title: '近 21 個交易日報酬', tone: toneClass(m.r21) };
     case 'eps':
-    case 'rev': {
+    case 'rev':
+    case 'epsY':
+    case 'revY': {
       const record = growthRecordFor(item, growth);
-      const values = key === 'eps' ? record?.epsYoY : record?.revYoY;
-      const latest = values?.[0] ?? null;
-      const name = key === 'eps' ? 'EPS' : '營收';
-      if (key === 'eps' && latest === null && record?.epsTurn)
-        return { text: 'EPS 轉盈', title: '最新一季由虧轉盈', tone: 'up' };
+      if (!record) return null;
+      const annual = key === 'epsY' || key === 'revY';
+      const isEps = key === 'eps' || key === 'epsY';
+      const values = annual ? (isEps ? record.epsYoYAnnual : record.revYoYAnnual) : isEps ? record.epsYoY : record.revYoY;
+      const turns = isEps ? (annual ? record.epsTurnAnnual : record.epsTurnQ) : [];
+      const latest = values[0] ?? null;
+      const name = { eps: 'EPS', rev: '營收', epsY: 'EPS年', revY: '營收年' }[key];
+      const detail = growthDetail(record, isEps);
+      if (latest === null && turns[0])
+        return { text: `${name} 轉盈`, title: `${annual ? '最新一年' : '最新一季'}由虧轉盈（去年同期為虧損，YoY 無法計算）。${detail}`, tone: 'up' };
       if (latest === null) return null;
-      const history = values!.map((value) => (value === null ? '—' : formatPercent(value, 0))).join(' / ');
-      return {
-        text: `${name} ${formatPercent(latest, 0)}`,
-        title: `${name} YoY（最新→較舊）：${history}${record?.latest ? ` · 最新季 ${record.latest}` : ''}`,
-        tone: toneClass(latest),
-      };
+      return { text: `${name} ${formatPercent(latest, 0)}`, title: `${isEps ? 'EPS' : '營收'} YoY ${detail}`, tone: toneClass(latest) };
     }
   }
+}
+
+const QUARTERLY_SOURCES = { yahoo: 'Yahoo Finance', financials: '財報檔' } as const;
+/** `+30% / +20% / — / —`: newest first; a dash is a period without a number, 轉盈 a loss-to-profit turn. */
+const historyText = (values: readonly (number | null)[], turns: readonly boolean[]) =>
+  values.length || turns.some(Boolean)
+    ? Array.from({ length: Math.max(values.length, turns.length) }, (_, slot) =>
+        values[slot] != null ? formatPercent(values[slot]!, 0) : turns[slot] ? '轉盈' : '—',
+      ).join(' / ')
+    : '—';
+
+/** Tooltip text with both quarterly and annual YoY (newest → older), the latest period ends and the sources. */
+function growthDetail(record: GrowthRecord, eps: boolean): string {
+  const quarterly = historyText(eps ? record.epsYoY : record.revYoY, eps ? record.epsTurnQ : []);
+  const annual = historyText(eps ? record.epsYoYAnnual : record.revYoYAnnual, eps ? record.epsTurnAnnual : []);
+  return [
+    `季度（最新→較舊）${quarterly}${record.latest ? `，最新季 ${record.latest}` : ''}`,
+    `年度（最新→較舊）${annual}${record.latestAnnual ? `，最新年度 ${record.latestAnnual}` : ''}`,
+    `來源：季度 ${QUARTERLY_SOURCES[record.source]}、年度 財報檔`,
+  ].join('；');
 }

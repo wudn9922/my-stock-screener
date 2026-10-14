@@ -1,0 +1,444 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  EMPTY_FILTERS,
+  FILTER_PARAM_MAX,
+  GROWTH_PRESETS,
+  accelCoverage,
+  activeChips,
+  applyFilters,
+  epsAccelStatus,
+  filterAvailability,
+  gateCoverage,
+  growthGatePasses,
+  isCustomGrowthMin,
+  needsGrowth,
+  parseFilters,
+  removeFilter,
+  serializeFilters,
+  NO_GROWTH_REASON,
+  type FilterState,
+} from '../src/pages/screenerFilters';
+import { metricPill, rowMetricPills, filterAndSortItems } from '../src/pages/screenerItems';
+import { parseUniverse } from '../src/report/universe';
+import { groupItemSchema, type GroupItem } from '../src/report/schema';
+import {
+  GrowthProvider,
+  growthKey,
+  mergeGrowth,
+  parseGrowthFile,
+  parseReportGrowth,
+  parseReportGrowthRow,
+  type GrowthFile,
+} from '../src/fundamentals/GrowthProvider';
+import { parseRoute, serializeRoute } from '../src/app/routes';
+
+const universe = parseUniverse(JSON.parse(readFileSync('tests/fixtures/screener/universe.json', 'utf8')));
+if (universe.status !== 'ok') throw new Error('universe fixture');
+const TW = universe.universe.markets.TW!.items;
+const US = universe.universe.markets.US!.items;
+const growthText = readFileSync('tests/fixtures/screener/growth.json', 'utf8');
+const reportGrowth = parseReportGrowth(JSON.parse(growthText))!;
+const yahoo = parseGrowthFile(JSON.parse(readFileSync('tests/fixtures/screener/us-growth.json', 'utf8')))!;
+const merged = mergeGrowth(yahoo, reportGrowth)!;
+
+const state = (f: string | null) => parseFilters(f);
+const tw = { market: 'TW' as const, growth: reportGrowth };
+const us = { market: 'US' as const, growth: merged };
+const symbols = (rows: readonly GroupItem[]) => rows.map((row) => row.symbol);
+const row = (symbol: string) => [...TW, ...US].find((item) => item.symbol === symbol)!;
+const plain = (symbol: string): GroupItem => groupItemSchema.parse({ symbol, close: 10, changePct: 1, maList: [20], maValues: {} });
+
+describe('f encoding of the fundamental conditions', () => {
+  it('round-trips annual gates, acceleration, the turnaround switch and the 1-month RS', () => {
+    const text = 'rs3:0;rs1:0;eps:4:30;epsy:2:15;rev:3:10;revy:3:0;acc:1;tn:0;nd:keep';
+    const parsed = state(text);
+    expect(parsed).toMatchObject({
+      rs3: 0,
+      rs1: 0,
+      eps: { quarters: 4, min: 30 },
+      epsY: { years: 2, min: 15 },
+      rev: { quarters: 3, min: 10 },
+      revY: { years: 3, min: 0 },
+      accel: true,
+      turn: false,
+      keepMissing: true,
+    });
+    expect(serializeFilters(parsed)).toBe(text);
+    expect(serializeFilters(state(serializeFilters(parsed)))).toBe(text);
+  });
+
+  it('keeps every old link working and canonical', () => {
+    for (const old of ['eps:2:20;rev:1:10;nd:keep', 'chg:0:3;ema20:-5:5;tr:a20,stack;hi:10;rs:80;rs3:0;vr:1.2;eps:3:0', 'rev:10', 'eps:15']) {
+      const parsed = state(old);
+      expect(parsed.turn).toBe(true); // the default still counts a turnaround
+      expect(parsed.accel).toBe(false);
+      expect(parsed.epsY).toBeNull();
+      expect(serializeFilters(parsed)).toBe(old === 'rev:10' ? 'rev:1:10' : old === 'eps:15' ? 'eps:1:15' : old);
+    }
+    // The documented annual shape with a single number means one year.
+    expect(state('epsy:15').epsY).toEqual({ years: 1, min: 15 });
+    expect(serializeFilters(state('epsy:15'))).toBe('epsy:1:15');
+  });
+
+  it('ignores bad annual / switch tokens and out-of-range periods', () => {
+    expect(state('epsy:0:5').epsY).toBeNull();
+    expect(state('epsy:4:5').epsY).toBeNull(); // only 3 fiscal years are published
+    expect(state('revy:x:5').revY).toBeNull();
+    expect(state('revy:2:').revY).toBeNull();
+    expect(state('eps:5:20').eps).toBeNull();
+    expect(state('eps:4:20').eps).toEqual({ quarters: 4, min: 20 });
+    expect(state('rs1:abc').rs1).toBeNull();
+    expect(state('acc:0').accel).toBe(false);
+    expect(state('tn:1').turn).toBe(true);
+    expect(state('foo:1;epsy:2:10;bar').epsY).toEqual({ years: 2, min: 10 });
+    // Upper case keys and a repeated token: the last one wins.
+    expect(state('EPSY:1:5;epsy:3:7').epsY).toEqual({ years: 3, min: 7 });
+  });
+
+  it('only writes tn / nd when they matter', () => {
+    expect(serializeFilters({ ...EMPTY_FILTERS, turn: false })).toBe('');
+    expect(serializeFilters({ ...EMPTY_FILTERS, turn: false, revY: { years: 1, min: 5 } })).toBe('revy:1:5');
+    expect(serializeFilters({ ...EMPTY_FILTERS, turn: false, accel: true })).toBe('acc:1;tn:0');
+    expect(serializeFilters({ ...EMPTY_FILTERS, keepMissing: true, revY: { years: 1, min: 5 } })).toBe('revy:1:5;nd:keep');
+    expect(serializeFilters({ ...EMPTY_FILTERS, keepMissing: true, accel: true })).toBe('acc:1;nd:keep');
+    expect(serializeFilters({ ...EMPTY_FILTERS, keepMissing: true })).toBe('');
+  });
+
+  it('fits the longest realistic link and never cuts a token in half', () => {
+    const everything = state(
+      'chg:-12.35:100;ema20:-20:20;tr:a20,a50,a200,slope,stack,nobear;hi:20;rs:90;rs3:0;rs1:0;vr:2;eps:4:50;epsy:3:50;rev:4:50;revy:3:50;acc:1;tn:0;nd:keep',
+    );
+    const text = serializeFilters(everything);
+    expect(text.length).toBeLessThanOrEqual(FILTER_PARAM_MAX);
+    expect(state(text)).toEqual(everything);
+    // Absurd numbers overflow the limit: later whole tokens are dropped, the rest stays parseable.
+    const huge = { ...everything, chg: { min: -1e15, max: 1e15 }, ema20: { min: -1e14, max: 1e14 }, vr: 1e15, hi: 99.99 };
+    const long = serializeFilters(huge);
+    expect(long.length).toBeLessThanOrEqual(FILTER_PARAM_MAX);
+    expect(long).toMatch(/^[A-Za-z0-9:.,;_~+-]+$/);
+    for (const token of long.split(';')) expect(token).toMatch(/^(chg|ema20|tr|hi|rs|rs3|rs1|vr|eps|epsy|rev|revy|acc|tn|nd):/);
+    expect(serializeFilters(state(long))).toBe(long);
+  });
+
+  it('is carried by the screener route', () => {
+    const f = 'epsy:2:15;revy:1:0;acc:1;rs1:0';
+    expect(parseRoute(serializeRoute({ page: 'screener', group: 'universe-tw', f })).route).toEqual({ page: 'screener', group: 'universe-tw', f });
+  });
+});
+
+describe('growth gates', () => {
+  it('treats a turnaround per period, with the old boolean meaning the latest one', () => {
+    const gate = { quarters: 3, min: 20 } as const;
+    expect(growthGatePasses([30, 25, 40], gate, false)).toBe(true);
+    expect(growthGatePasses([30, 19.9, 40], gate, false)).toBe(false);
+    expect(growthGatePasses([null, 25, 40], gate, false, true)).toBe(true);
+    expect(growthGatePasses([null, 25, 40], gate, false, [true])).toBe(true);
+    expect(growthGatePasses([30, null, 40], gate, false, [false, true])).toBe(true);
+    expect(growthGatePasses([30, null, 40], gate, false, [true])).toBe(false);
+    expect(growthGatePasses([30, 25], gate, false)).toBe(false); // history too short
+    expect(growthGatePasses([30, 25], gate, true)).toBe(true); // …unless missing data is kept
+    expect(growthGatePasses([30, 5], { years: 1, min: 20 }, false)).toBe(true);
+    expect(growthGatePasses([30, 5], { years: 2, min: 20 }, false)).toBe(false);
+    expect(growthGatePasses([], { years: 1, min: -Infinity }, false)).toBe(false);
+  });
+
+  it('judges acceleration from the latest two quarters', () => {
+    const record = (epsYoY: (number | null)[], epsTurnQ: boolean[] = []) => ({ ...reportGrowth.items.get(growthKey('2330.TW'))!, epsYoY, epsTurnQ });
+    expect(epsAccelStatus(record([25, 10]), true)).toBe('yes');
+    expect(epsAccelStatus(record([10, 25]), true)).toBe('no');
+    expect(epsAccelStatus(record([10, 10]), true)).toBe('no'); // strictly above
+    expect(epsAccelStatus(record([-5, -20]), true)).toBe('yes'); // a smaller decline is still a higher YoY
+    expect(epsAccelStatus(record([25]), true)).toBe('unknown');
+    expect(epsAccelStatus(record([null, 30], [true]), true)).toBe('yes'); // turned to a profit after growth
+    expect(epsAccelStatus(record([null, 30], [true]), false)).toBe('unknown');
+    expect(epsAccelStatus(record([20, null], [false, true]), true)).toBe('no'); // the quarter before was the turnaround
+    expect(epsAccelStatus(record([null, null], [true, true]), true)).toBe('unknown');
+    expect(epsAccelStatus(null, true)).toBe('unknown');
+  });
+});
+
+describe('growth.json', () => {
+  it('parses the contract fixture, masks and quality', () => {
+    expect(reportGrowth.generatedAt).toBe('2026-10-13T16:30:00Z');
+    const tsmc = reportGrowth.items.get('2330-TW')!;
+    expect(tsmc).toMatchObject({
+      epsYoY: [30, 20],
+      revYoY: [28, 15],
+      epsYoYAnnual: [25, 15, 10],
+      revYoYAnnual: [20, 12, 8],
+      latest: '2026-06-30',
+      latestAnnual: '2025-12-31',
+      source: 'financials',
+      quality: 'good',
+      epsTurn: false,
+    });
+    const plastics = reportGrowth.items.get('1301-TW')!;
+    expect(plastics).toMatchObject({ epsTurn: true, epsTurnQ: [true, false, false, false], epsYoY: [null, 80] });
+    expect(reportGrowth.items.get('2454-TW')!.quality).toBe('partial');
+    expect(reportGrowth.items.has('2317-TW')).toBe(false);
+  });
+
+  it('is tolerant per row and strict about the document', () => {
+    expect(parseReportGrowth(null)).toBeNull();
+    expect(parseReportGrowth({ version: 2, rows: [] })).toBeNull();
+    expect(parseReportGrowth({ version: 1, rows: 'x' })).toBeNull();
+    expect(parseReportGrowthRow(['', 'good'])).toBeNull();
+    expect(parseReportGrowthRow('x')).toBeNull();
+    const file = parseReportGrowth({
+      version: 1,
+      fields: ['symbol', 'epsQ', 'tQ', 'lv'],
+      rows: [['6488.TWO', [10, 'x', 5, 6, 7, 8], 6, 'weird'], 7, ['BRK.B', [1]]],
+    })!;
+    expect([...file.items.keys()]).toEqual(['6488-TWO', 'BRK-B']);
+    expect(file.items.get('6488-TWO')).toMatchObject({ epsYoY: [10, null, 5, 6], epsTurnQ: [false, true, true, false], quality: null, revYoY: [] });
+    // Without `fields` the contract order is assumed.
+    expect(parseReportGrowth({ version: 1, rows: [['2330.TW', 'good', 'yahoo', '2026-06-30', '2025-12-31', [9], [8], [7], [6], 0, 0]] })!.items.get('2330-TW')!.epsYoYAnnual).toEqual([7]);
+    expect(growthKey('6488.TWO')).toBe('6488-TWO');
+  });
+
+  it('loads through GrowthProvider with its own url and parser, keeping the last good copy', async () => {
+    let fail = false;
+    let now = 0;
+    const fetcher = vi.fn(async () => (fail ? new Response('down', { status: 503 }) : new Response(growthText)));
+    const provider = new GrowthProvider('', { url: '/my-stock-screener/report/growth.json', parse: parseReportGrowth, fetcher, now: () => now });
+    expect(provider.url).toBe('/my-stock-screener/report/growth.json');
+    const first = (await provider.load())!;
+    expect(first.items.size).toBe(reportGrowth.items.size);
+    fail = true;
+    now = 31 * 60_000;
+    expect(await provider.load()).toBe(first);
+  });
+});
+
+describe('merging the Yahoo and financials-file growth', () => {
+  it('prefers Yahoo quarterly numbers, keeps annual from growth.json and fills the gaps', () => {
+    const aapl = merged.items.get('AAPL')!;
+    expect(aapl.epsYoY).toEqual(yahoo.items.get('AAPL')!.epsYoY); // not the -99 placeholders of the financials row
+    expect(aapl.revYoY).toEqual(yahoo.items.get('AAPL')!.revYoY);
+    expect(aapl.source).toBe('yahoo');
+    expect(aapl.epsYoYAnnual).toEqual(reportGrowth.items.get('AAPL')!.epsYoYAnnual);
+    expect(aapl.latestAnnual).toBe('2025-09-27');
+    expect(aapl.quality).toBe('good');
+    // RIVN is not in the Yahoo file: the financials-file record is used as it is.
+    expect(merged.items.get('RIVN')).toEqual(reportGrowth.items.get('RIVN'));
+    expect(merged.items.get('RIVN')!.source).toBe('financials');
+    // A Yahoo-only stock keeps its record.
+    const onlyYahoo = [...yahoo.items.keys()].find((key) => !reportGrowth.items.has(key));
+    if (onlyYahoo) expect(merged.items.get(onlyYahoo)).toEqual(yahoo.items.get(onlyYahoo));
+    // Taiwan rows are untouched.
+    expect(merged.items.get('2330-TW')).toEqual(reportGrowth.items.get('2330-TW'));
+  });
+
+  it('falls back per metric when Yahoo has nothing for it', () => {
+    const y: GrowthFile = {
+      generatedAt: 'y',
+      source: 'Yahoo Finance',
+      items: new Map([['AAPL', { ...yahoo.items.get('AAPL')!, epsYoY: [null, null], epsTurnQ: [false], epsTurn: false }]]),
+    };
+    const fin: GrowthFile = { generatedAt: 'f', source: 'financials', items: new Map([['AAPL', reportGrowth.items.get('AAPL')!]]) };
+    const result = mergeGrowth(y, fin)!.items.get('AAPL')!;
+    expect(result.epsYoY).toEqual(fin.items.get('AAPL')!.epsYoY); // Yahoo had no EPS numbers
+    expect(result.revYoY).toEqual(y.items.get('AAPL')!.revYoY);
+  });
+
+  it('survives either file missing', () => {
+    expect(mergeGrowth(null, null)).toBeNull();
+    expect(mergeGrowth(yahoo, null)).toBe(yahoo);
+    expect(mergeGrowth(null, reportGrowth)!.items.size).toBe(reportGrowth.items.size);
+    expect(mergeGrowth(undefined, reportGrowth)!.items.get('2330-TW')).toBeDefined();
+  });
+});
+
+describe('fundamental filters on the market lists', () => {
+  const record = (symbol: string) => reportGrowth.items.get(growthKey(symbol))!;
+
+  it('filters Taiwan stocks on quarterly EPS growth', () => {
+    const result = applyFilters(TW, state('eps:2:20'), tw);
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.length).toBeLessThan(TW.length);
+    expect(symbols(result)).toEqual(
+      symbols(TW.filter((item) => {
+        const r = reportGrowth.items.get(growthKey(item.symbol));
+        return !!r && [0, 1].every((slot) => (r.epsYoY[slot] ?? -Infinity) >= 20 || r.epsTurnQ[slot]);
+      })),
+    );
+    expect(symbols(result)).toContain('2330.TW');
+    expect(symbols(result)).not.toContain('2317.TW'); // no financials at all → excluded
+    expect(symbols(result)).not.toContain('2412.TW'); // 5% latest quarter
+  });
+
+  it('filters on annual EPS / revenue growth and reports the periods it needs', () => {
+    expect(symbols(applyFilters(TW, state('epsy:3:10'), tw))).toContain('2330.TW');
+    expect(symbols(applyFilters(TW, state('epsy:3:10'), tw))).not.toContain('2454.TW'); // two fiscal years only
+    expect(symbols(applyFilters(TW, state('epsy:2:20'), tw))).toContain('2454.TW');
+    expect(symbols(applyFilters(TW, state('epsy:1:0;revy:3:0'), tw))).not.toContain('2412.TW');
+    const strict = applyFilters(TW, state('epsy:3:0'), tw);
+    const lenient = applyFilters(TW, state('epsy:3:0;nd:keep'), tw);
+    expect(lenient.length).toBeGreaterThan(strict.length);
+    expect(symbols(lenient)).toContain('2317.TW'); // kept although it has no data
+    for (const kept of strict) expect(symbols(lenient)).toContain(kept.symbol);
+  });
+
+  it('accelerates: latest quarter YoY above the previous quarter', () => {
+    const result = symbols(applyFilters(TW, state('acc:1'), tw));
+    expect(result).toContain('2308.TW'); // 40 vs 10
+    expect(result).toContain('1301.TW'); // turned to a profit after +80%
+    expect(result).not.toContain('2412.TW'); // 5 vs 25
+    expect(result).not.toContain('2454.TW'); // one quarter only
+    expect(symbols(applyFilters(TW, state('acc:1;tn:0'), tw))).not.toContain('1301.TW');
+    expect(symbols(applyFilters(TW, state('acc:1;nd:keep'), tw))).toContain('2454.TW');
+    // Combined with a growth gate: AND.
+    const gate = symbols(applyFilters(TW, state('eps:2:20'), tw));
+    expect(symbols(applyFilters(TW, state('acc:1;eps:2:20'), tw))).toEqual(result.filter((symbol) => gate.includes(symbol)));
+    expect(symbols(applyFilters(TW, state('acc:1;eps:2:20'), tw))).toContain('2330.TW'); // 30 vs 20, both ≥ 20
+  });
+
+  it('counts a loss-to-profit turnaround only while 「含虧轉盈」 is on', () => {
+    expect(record('1301.TW').epsTurnQ[0]).toBe(true);
+    expect(symbols(applyFilters(TW, state('eps:1:25'), tw))).toContain('1301.TW');
+    expect(symbols(applyFilters(TW, state('eps:1:25;tn:0'), tw))).not.toContain('1301.TW');
+    expect(symbols(applyFilters(TW, state('eps:1:25;tn:0;nd:keep'), tw))).toContain('1301.TW'); // unknown → kept
+    // The previous quarter (+80%) passes, the latest one is the turnaround
+    expect(symbols(applyFilters(TW, state('eps:2:50'), tw))).toContain('1301.TW');
+    expect(symbols(applyFilters(TW, state('eps:2:50;tn:0'), tw))).not.toContain('1301.TW');
+    // Revenue gates do not know turnarounds.
+    expect(symbols(applyFilters(TW, state('rev:1:15;tn:0'), tw))).toContain('1301.TW');
+  });
+
+  it('uses the Yahoo quarters for S&P 500 stocks and the financials file for the rest', () => {
+    const result = symbols(applyFilters(US, state('eps:1:20;rev:1:10'), us));
+    // RIVN only exists in growth.json (+45% EPS, +60% revenue)
+    expect(result).toContain('RIVN');
+    // AAPL's financials row says -99%; the Yahoo numbers decide
+    expect(result).not.toContain('AAPL');
+    // Annual growth comes from growth.json for the Yahoo stocks too
+    const annual = symbols(applyFilters(US, state('epsy:3:-1000'), us));
+    expect(annual).toContain('AAPL');
+  });
+
+  it('tells which condition has data and what is missing', () => {
+    const availability = filterAvailability(TW, tw);
+    expect(availability).toMatchObject({ eps: null, rev: null, epsY: null, revY: null, accel: null });
+    expect(filterAvailability(TW, { market: 'TW', growth: undefined }).eps).toMatch(/載入中/);
+    expect(filterAvailability(TW, { market: 'TW', growth: null }).epsY).toBe(NO_GROWTH_REASON);
+    // A group none of whose rows is in the file
+    const unknown = [plain('9999.TW')];
+    expect(filterAvailability(unknown, tw).accel).toMatch(/沒有/);
+    expect(applyFilters(unknown, state('epsy:3:10'), tw)).toEqual(unknown); // skipped, not "exclude all"
+    // Only annual data around: quarterly conditions are flagged, annual ones work
+    const annualOnly: GrowthFile = {
+      generatedAt: null,
+      source: null,
+      items: new Map([['9999-TW', { ...record('2330.TW'), epsYoY: [], revYoY: [], epsTurnQ: [], epsTurn: false }]]),
+    };
+    const partial = filterAvailability(unknown, { market: 'TW', growth: annualOnly });
+    expect(partial.eps).not.toBeNull();
+    expect(partial.accel).not.toBeNull();
+    expect(partial.epsY).toBeNull();
+  });
+
+  it('reports how many rows a condition can actually cover', () => {
+    const covered = (kind: 'eps' | 'rev' | 'epsY' | 'revY', n: number, turn = true) => gateCoverage(TW, reportGrowth, kind, n, turn);
+    expect(covered('eps', 1)).toBeGreaterThan(covered('eps', 2) - 1);
+    expect(covered('eps', 2)).toBeGreaterThan(0);
+    expect(covered('eps', 3)).toBe(0); // Taiwan files only reach two quarters
+    expect(covered('eps', 4)).toBe(0);
+    expect(covered('epsY', 3)).toBeGreaterThan(0);
+    expect(covered('epsY', 1)).toBeGreaterThanOrEqual(covered('epsY', 3));
+    expect(covered('eps', 2, false)).toBeLessThanOrEqual(covered('eps', 2, true)); // turnarounds count as data only when allowed
+    expect(accelCoverage(TW, reportGrowth, true)).toBeGreaterThan(0);
+    expect(accelCoverage(TW, reportGrowth, true)).toBeLessThan(TW.length);
+    expect(gateCoverage(TW, null, 'eps', 1, true)).toBe(0);
+  });
+
+  it('draws chips for the new conditions and removes them one by one', () => {
+    const s = state('rs1:0;eps:2:20;epsy:3:10;rev:1:0;revy:2:5;acc:1;tn:0;nd:keep');
+    const chips = activeChips(s, filterAvailability(TW, tw));
+    expect(chips.map((chip) => chip.label)).toEqual([
+      '1月強於大盤',
+      'EPS YoY 近2季皆≥20%',
+      'EPS 年增 近3年皆≥10%',
+      '營收 YoY ≥0%',
+      '營收 年增 近2年皆≥5%',
+      'EPS 成長加速',
+      '不含虧轉盈',
+    ]);
+    expect(chips.every((chip) => chip.unavailable === null)).toBe(true);
+    let next: FilterState = s;
+    for (const chip of chips) next = removeFilter(next, chip.id);
+    expect(serializeFilters(next)).toBe('');
+    expect(next.turn).toBe(true);
+    expect(needsGrowth(state('epsy:1:0'))).toBe(true);
+    expect(needsGrowth(state('acc:1'))).toBe(true);
+    expect(needsGrowth(state('rs1:0'))).toBe(false);
+    // The turnaround chip is only shown while it changes something
+    expect(activeChips(state('tn:0;rs:80')).map((chip) => chip.id)).toEqual(['rs']);
+    expect(activeChips(state('tn:0;eps:1:5')).map((chip) => chip.id)).toEqual(['eps', 'turn']);
+  });
+
+  it('offers 0 / 10 / 20 / 30 / 50 % and treats other numbers from a link as custom', () => {
+    expect(GROWTH_PRESETS).toEqual([0, 10, 20, 30, 50]);
+    expect(isCustomGrowthMin(25)).toBe(true);
+    expect(isCustomGrowthMin(20)).toBe(false);
+    expect(isCustomGrowthMin(null)).toBe(false);
+  });
+});
+
+describe('1-month relative strength', () => {
+  const rows = [
+    groupItemSchema.parse({ symbol: 'A', close: 1, changePct: 0, maList: [], maValues: {}, metrics: { rs21: 3 } }),
+    groupItemSchema.parse({ symbol: 'B', close: 1, changePct: 0, maList: [], maValues: {}, metrics: { rs21: -2 } }),
+    groupItemSchema.parse({ symbol: 'C', close: 1, changePct: 0, maList: [], maValues: {}, metrics: { rs21: null } }),
+    groupItemSchema.parse({ symbol: 'D', close: 1, changePct: 0, maList: [], maValues: {}, metrics: { rs21: 0 } }),
+  ];
+  it('keeps only stocks that beat the benchmark over one month (strictly above)', () => {
+    expect(symbols(applyFilters(rows, state('rs1:0'), { market: 'TW' }))).toEqual(['A']);
+    expect(symbols(applyFilters(rows, state('rs1:-5'), { market: 'TW' }))).toEqual(['A', 'B', 'D']);
+    expect(symbols(applyFilters(rows, state('rs1:2.5'), { market: 'TW' }))).toEqual(['A']);
+  });
+  it('is skipped and flagged when no row has the value, and works on the full-market lists', () => {
+    expect(filterAvailability([plain('X')], { market: 'TW' }).rs1).not.toBeNull();
+    expect(applyFilters([plain('X')], state('rs1:0'), { market: 'TW' })).toHaveLength(1);
+    const result = applyFilters(TW, state('rs1:0'), tw);
+    expect(result).toEqual(TW.filter((item) => (item.metrics?.rs21 ?? -Infinity) > 0));
+    expect(result.length).toBeGreaterThan(0);
+    expect(applyFilters(US, state('rs1:0'), us)).toEqual(US.filter((item) => (item.metrics?.rs21 ?? -Infinity) > 0));
+  });
+});
+
+describe('pills and sorting with growth', () => {
+  it('shows the growth numbers of the active filters, with annual ones in the tooltip', () => {
+    const tsmc = row('2330.TW');
+    expect(metricPill(tsmc, 'eps', reportGrowth)).toMatchObject({ text: 'EPS +30%', tone: expect.stringMatching(/up|down/) });
+    const eps = metricPill(tsmc, 'eps', reportGrowth)!;
+    expect(eps.title).toContain('季度（最新→較舊）+30% / +20%');
+    expect(eps.title).toContain('最新季 2026-06-30');
+    expect(eps.title).toContain('季度 財報檔');
+    expect(metricPill(tsmc, 'epsY', reportGrowth)).toMatchObject({ text: 'EPS年 +25%' });
+    expect(metricPill(tsmc, 'epsY', reportGrowth)!.title).toContain('年度（最新→較舊）+25% / +15% / +10%');
+    expect(metricPill(tsmc, 'revY', reportGrowth)?.text).toBe('營收年 +20%');
+    expect(metricPill(row('1301.TW'), 'eps', reportGrowth)).toMatchObject({ text: 'EPS 轉盈', tone: 'up' });
+    expect(metricPill(row('2317.TW'), 'eps', reportGrowth)).toBeNull();
+    expect(metricPill(tsmc, 'eps')).toBeNull();
+    expect(metricPill(row('AAPL'), 'eps', merged)!.title).toContain('Yahoo Finance');
+  });
+
+  it('adds pills for the new growth filters without crowding out the technical ones', () => {
+    expect(rowMetricPills('default', state('epsy:2:10'), [20])).toEqual(['epsY']);
+    expect(rowMetricPills('default', state('acc:1'), [20])).toEqual(['eps']);
+    expect(rowMetricPills('default', state('rs:80;hi:10;vr:1.2;eps:2:10;epsy:2:10;rev:1:5;revy:1:5'), [20])).toEqual([
+      'rs', 'hi', 'eps', 'epsY', 'rev', 'revY',
+    ]);
+    expect(rowMetricPills('default', state('rs1:0'), [20])).toEqual(['rs']);
+  });
+
+  it('sorts Taiwan stocks by the latest EPS YoY once the growth data is there', () => {
+    const sorted = symbols(filterAndSortItems(TW, '', 'eps', { growth: reportGrowth }));
+    expect(sorted[0]).toBe('1301.TW'); // the turnaround first
+    const withValue = sorted.filter((symbol) => reportGrowth.items.get(growthKey(symbol))?.epsYoY[0] != null);
+    const values = withValue.map((symbol) => reportGrowth.items.get(growthKey(symbol))!.epsYoY[0]!);
+    expect(values).toEqual([...values].sort((a, b) => b - a));
+    expect(sorted.indexOf('2317.TW')).toBeGreaterThan(sorted.indexOf('2330.TW'));
+  });
+});

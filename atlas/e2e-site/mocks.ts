@@ -132,7 +132,16 @@ export function yahooChart(symbol: string, interval: string) {
 export interface MockOptions {
   report?: Json | 'missing' | 'broken';
   failingSymbols?: string[];
+  /** Serve the full-market lists (report/universe.json) and the growth files from the screener test fixtures. */
+  fundamentals?: boolean | { growth?: 'missing' };
 }
+
+/** Screener fixtures (synthetic): full-market universe, report/growth.json and valuation/us-growth.json. */
+export const screenerFixtures = {
+  universe: () => readJson('tests/fixtures/screener/universe.json'),
+  growth: () => readJson('tests/fixtures/screener/growth.json'),
+  usGrowth: () => readJson('tests/fixtures/screener/us-growth.json'),
+};
 /** Installs all site mocks on the page; returns the list of market symbols requested. */
 export async function mockSite(page: Page, options: MockOptions = {}) {
   const requested: string[] = [];
@@ -149,6 +158,14 @@ export async function mockSite(page: Page, options: MockOptions = {}) {
   await page.route('**/my-stock-screener/atlas/symbols/directory.json', (route) => json(route, directory));
   await page.route('**/my-stock-screener/atlas/valuation/tw.json', (route) => json(route, valuation.TW));
   await page.route('**/my-stock-screener/atlas/valuation/us.json', (route) => json(route, valuation.US));
+  if (options.fundamentals) {
+    const growthMissing = typeof options.fundamentals === 'object' && options.fundamentals.growth === 'missing';
+    await page.route('**/my-stock-screener/report/universe.json', (route) => json(route, screenerFixtures.universe()));
+    await page.route('**/my-stock-screener/report/growth.json', (route) =>
+      growthMissing ? route.fulfill({ status: 404, body: 'not found' }) : json(route, screenerFixtures.growth()),
+    );
+    await page.route('**/my-stock-screener/atlas/valuation/us-growth.json', (route) => json(route, screenerFixtures.usGrowth()));
+  }
   await page.route('https://edge.test/functions/v1/market-chart**', (route) => {
     const url = new URL(route.request().url());
     const symbol = url.searchParams.get('symbol') ?? '';
