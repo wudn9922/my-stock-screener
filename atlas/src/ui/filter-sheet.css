@@ -254,6 +254,32 @@
   font-size: 12px;
   color: var(--text-2);
 }
+/* Fundamentals: one block per growth condition inside the 「基本面」 section. */
+.fs-block {
+  padding: 2px 0 12px;
+  border-bottom: 1px dashed var(--border);
+}
+.fs-block:last-of-type {
+  border-bottom: 0;
+}
+.fs-block > .fs-sub {
+  margin-top: 10px;
+  font-weight: 650;
+  color: var(--text);
+}
+.fs-block .fs-chips + .fs-chips {
+  margin-top: 6px;
+}
+.fs-hint.fs-lead {
+  margin: 0 0 4px;
+}
+.fs-coverage {
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.fs-switch small.fs-coverage {
+  margin-top: 4px;
+}
 .fs-chips {
   display: flex;
   flex-wrap: wrap;
@@ -276,6 +302,14 @@
     background 0.15s,
     border-color 0.15s,
     color 0.15s;
+}
+/* Six short thresholds (不限 ≥0% … ≥50%) on one line, also at phone width. */
+.fs-chips.compact {
+  gap: 5px;
+}
+.fs-chips.compact .fs-chip {
+  padding: 0 9px;
+  font-size: 12.5px;
 }
 .fs-chip:hover {
   color: var(--text);

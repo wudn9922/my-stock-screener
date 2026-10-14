@@ -22,9 +22,11 @@ import {
   type StatusView,
 } from './screenerItems';
 import {
+  accelCoverage,
   activeChips,
   applyFilters,
   filterAvailability,
+  gateCoverage,
   needsGrowth,
   parseFilters,
   readStoredFilters,
@@ -34,6 +36,7 @@ import {
   type ChipId,
   type FilterContext,
   type FilterState,
+  type FundamentalKind,
 } from './screenerFilters';
 import {
   UNIVERSE_GROUP_KEYS,
@@ -44,7 +47,7 @@ import {
   type UniverseLoadResult,
   type UniverseMarketKey,
 } from '../report/universe';
-import { loadGrowth, type GrowthFile } from '../fundamentals/GrowthProvider';
+import { loadMarketGrowth, type GrowthFile } from '../fundamentals/GrowthProvider';
 import { FilterSheet } from '../ui/FilterSheet';
 import {
   displayTicker,
@@ -268,23 +271,26 @@ function useUniverse(market: UniverseMarketKey | null) {
   return { state, retry };
 }
 
-function useGrowth(wanted: boolean) {
-  const [growth, setGrowth] = useState<GrowthFile | null | undefined>(undefined);
+/** Growth data (EPS / revenue YoY) of one market, loaded once a fundamental condition or sort needs it. */
+function useGrowth(wanted: boolean, market: 'TW' | 'US') {
+  const [loaded, setLoaded] = useState<{ market: 'TW' | 'US'; file: GrowthFile | null } | null>(null);
   const [loading, setLoading] = useState(false);
   useEffect(() => {
     if (!wanted) return;
     let live = true;
     setLoading(true);
-    void loadGrowth().then((file) => {
+    void loadMarketGrowth(market).then((file) => {
       if (!live) return;
-      setGrowth(file);
+      setLoaded({ market, file });
       setLoading(false);
     });
     return () => {
       live = false;
       setLoading(false);
     };
-  }, [wanted]);
+  }, [wanted, market]);
+  // Another market's data is never used for these rows.
+  const growth = loaded?.market === market ? loaded.file : undefined;
   return { growth, loading };
 }
 
@@ -343,11 +349,11 @@ function ScreenerView({
   const viewItems = useMemo(() => itemsForView(groupItems, activeView), [groupItems, activeView]);
   const hasMetrics = useMemo(() => groupItems.some((item) => item.metrics), [groupItems]);
   const sortModes = (Object.keys(SORT_LABELS) as SortMode[]).filter(
-    (mode) => (mode !== 'eps' || market === 'US') && (!METRIC_SORTS.includes(mode) || hasMetrics),
+    (mode) => !METRIC_SORTS.includes(mode) || hasMetrics,
   );
   const activeSort = sortModes.includes(sort) ? sort : 'default';
-  const wantGrowth = market === 'US' && (needsGrowth(filters) || activeSort === 'eps' || (sheetOpen && draftNeedsGrowth));
-  const { growth, loading: growthLoading } = useGrowth(wantGrowth);
+  const wantGrowth = needsGrowth(filters) || activeSort === 'eps' || (sheetOpen && draftNeedsGrowth);
+  const { growth, loading: growthLoading } = useGrowth(wantGrowth, market);
   const context = useMemo<FilterContext>(() => ({ market, growth, growthLoading }), [market, growth, growthLoading]);
   const availability = useMemo(() => filterAvailability(groupItems, context), [groupItems, context]);
   const chips = useMemo(() => activeChips(filters, availability), [filters, availability]);
@@ -359,6 +365,13 @@ function ScreenerView({
   const countFor = useCallback(
     (draft: FilterState) => filterAndSortItems(applyFilters(viewItems, draft, context), query, 'default').length,
     [viewItems, context, query],
+  );
+  const coverage = useCallback(
+    (kind: FundamentalKind | 'accel', periods: number, includeTurn: boolean) => ({
+      covered: kind === 'accel' ? accelCoverage(viewItems, growth, includeTurn) : gateCoverage(viewItems, growth, kind, periods, includeTurn),
+      total: viewItems.length,
+    }),
+    [viewItems, growth],
   );
   const pills = useMemo(() => rowMetricPills(activeSort, filters, group?.maList ?? []), [activeSort, filters, group?.maList]);
 
@@ -567,6 +580,7 @@ function ScreenerView({
         countFor={countFor}
         growth={growth}
         growthLoading={growthLoading}
+        coverage={coverage}
         onNeedGrowth={onNeedGrowth}
         shortHighWindow={shortHighWindow(groupItems)}
         onApply={(next) => {

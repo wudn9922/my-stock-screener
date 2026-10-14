@@ -26,9 +26,16 @@ describe('us-growth.json', () => {
       epsYoY: [12, null, 3.5, null],
       revYoY: [],
       epsTurn: false,
+      epsTurnQ: [false],
+      epsYoYAnnual: [],
+      revYoYAnnual: [],
+      epsTurnAnnual: [],
       basis: 'basic',
       latest: null,
+      latestAnnual: null,
       checkedAt: null,
+      source: 'yahoo',
+      quality: null,
     });
     expect(parseGrowthRecord([1])).toBeNull();
     expect(parseGrowthFile({ version: 2, market: 'US', items: {} })).toBeNull();

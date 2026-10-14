@@ -5,10 +5,14 @@ import { formatDateTime } from './format';
 import type { GrowthFile } from '../fundamentals/GrowthProvider';
 import {
   EMPTY_FILTERS,
+  GROWTH_PRESETS,
+  MAX_GATE_QUARTERS,
+  MAX_GATE_YEARS,
   TREND_FLAGS,
   TREND_LABELS,
   VOLUME_PRESETS,
   formatRange,
+  isCustomGrowthMin,
   isCustomVolume,
   needsGrowth,
   toggleVolume,
@@ -16,7 +20,7 @@ import {
   type FilterAvailability,
   type FilterRange,
   type FilterState,
-  type GrowthGate,
+  type FundamentalKind,
 } from '../pages/screenerFilters';
 import './filter-sheet.css';
 
@@ -35,6 +39,8 @@ export interface FilterSheetProps {
   countFor: (state: FilterState) => number;
   growth: GrowthFile | null | undefined;
   growthLoading: boolean;
+  /** How many of the group's rows have the data a growth condition needs (the rest are excluded, or kept with `nd:keep`). */
+  coverage: (kind: FundamentalKind | 'accel', periods: number, includeTurn: boolean) => { covered: number; total: number };
   /** The draft uses a fundamental condition: load the growth file. */
   onNeedGrowth: () => void;
   /** Shortest 52-week window among the rows when it is not a full year yet. */
@@ -70,14 +76,17 @@ function Choice<T extends number>({
   options,
   value,
   onChange,
+  compact = false,
 }: {
   label: string;
   options: readonly { value: T | null; label: string }[];
   value: T | null;
   onChange: (value: T | null) => void;
+  /** Tighter chips so a row of six short options fits one line on a phone. */
+  compact?: boolean;
 }) {
   return (
-    <div className="fs-chips" role="group" aria-label={label}>
+    <div className={compact ? 'fs-chips compact' : 'fs-chips'} role="group" aria-label={label}>
       {options.map((option) => (
         <button
           key={String(option.value)}
@@ -179,17 +188,45 @@ function RangeSlider({ label, value, onChange }: { label: string; value: FilterR
   );
 }
 
+type GateKey = 'eps' | 'rev' | 'epsY' | 'revY';
+/** How many periods each growth block compares; kept per block even while its threshold is 「不限」. */
+type GatePeriods = Record<GateKey, number>;
+const periodsOf = (state: FilterState): GatePeriods => ({
+  eps: state.eps?.quarters ?? 1,
+  rev: state.rev?.quarters ?? 1,
+  epsY: state.epsY?.years ?? 1,
+  revY: state.revY?.years ?? 1,
+});
+const QUARTER_OPTIONS = Array.from({ length: MAX_GATE_QUARTERS }, (_, index) => ({
+  value: index + 1,
+  label: index === 0 ? '最近 1 季' : `近 ${index + 1} 季皆`,
+}));
+const YEAR_OPTIONS = Array.from({ length: MAX_GATE_YEARS }, (_, index) => ({
+  value: index + 1,
+  label: index === 0 ? '最近 1 年' : `近 ${index + 1} 年皆`,
+}));
+const GROWTH_OPTIONS: { value: number | null; label: string }[] = [
+  { value: null, label: '不限' },
+  ...GROWTH_PRESETS.map((preset) => ({ value: preset, label: `≥${preset}%` })),
+];
+const GROWTH_BLOCKS: { key: GateKey; title: string; unit: '季' | '年' }[] = [
+  { key: 'eps', title: '季度 EPS 成長', unit: '季' },
+  { key: 'epsY', title: '年度 EPS 成長', unit: '年' },
+  { key: 'rev', title: '季度營收成長', unit: '季' },
+  { key: 'revY', title: '年度營收成長', unit: '年' },
+];
+
 export function FilterSheet(props: FilterSheetProps) {
   const { open, market, value, availability, growth, growthLoading, onNeedGrowth, onClose } = props;
   const [draft, setDraft] = useState<FilterState>(value);
-  const [quarters, setQuarters] = useState(value.eps?.quarters ?? value.rev?.quarters ?? 1);
+  const [periods, setPeriods] = useState<GatePeriods>(() => periodsOf(value));
   const sheetRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: number; y: number; dy: number } | null>(null);
   // Each opening starts from the applied conditions.
   useEffect(() => {
     if (!open) return;
     setDraft(value);
-    setQuarters(value.eps?.quarters ?? value.rev?.quarters ?? 1);
+    setPeriods(periodsOf(value));
   }, [open]);
   useDialogFocus(open, DIALOG_ID);
   useEffect(() => {
@@ -200,24 +237,33 @@ export function FilterSheet(props: FilterSheetProps) {
     document.addEventListener('keydown', key);
     return () => document.removeEventListener('keydown', key);
   }, [open, onClose]);
-  const wantsGrowth = market === 'US' && needsGrowth(draft);
+  const wantsGrowth = needsGrowth(draft);
+  // The growth data is small; load it as soon as the sheet opens so the coverage notes can show real counts.
   useEffect(() => {
-    if (open && wantsGrowth) onNeedGrowth();
-  }, [open, wantsGrowth, onNeedGrowth]);
+    if (open) onNeedGrowth();
+  }, [open, onNeedGrowth]);
   const count = useMemo(() => (open ? props.countFor(draft) : 0), [open, draft, props.countFor]);
   if (!open) return null;
 
   const update = (patch: Partial<FilterState>) => setDraft((previous) => ({ ...previous, ...patch }));
-  const setGate = (key: 'eps' | 'rev', min: number | null) =>
-    update({ [key]: min === null ? null : ({ quarters, min } satisfies GrowthGate) });
-  const setQuarterCount = (next: number | null) => {
-    const q = next ?? 1;
-    setQuarters(q);
-    setDraft((previous) => ({
-      ...previous,
-      eps: previous.eps ? { ...previous.eps, quarters: q } : null,
-      rev: previous.rev ? { ...previous.rev, quarters: q } : null,
-    }));
+  const gateMin = (key: GateKey): number | null => draft[key]?.min ?? null;
+  const setGateMin = (key: GateKey, min: number | null) =>
+    update({
+      [key]:
+        min === null
+          ? null
+          : key === 'epsY' || key === 'revY'
+            ? { years: periods[key], min }
+            : { quarters: periods[key], min },
+    });
+  const setGatePeriods = (key: GateKey, count: number | null) => {
+    const next = count ?? 1;
+    setPeriods((previous) => ({ ...previous, [key]: next }));
+    setDraft((previous) => {
+      const gate = previous[key];
+      if (!gate) return previous;
+      return { ...previous, [key]: key === 'epsY' || key === 'revY' ? { years: next, min: gate.min } : { quarters: next, min: gate.min } };
+    });
   };
   const toggleTrend = (flag: (typeof TREND_FLAGS)[number]) =>
     setDraft((previous) => ({
@@ -247,8 +293,34 @@ export function FilterSheet(props: FilterSheetProps) {
   };
 
   const growthDate = growth?.generatedAt ? formatDateTime(growth.generatedAt, false) : null;
-  const fundamentalsBlocked = availability.eps && !(market === 'US' && (growth === undefined || growthLoading)) ? availability.eps : null;
-  const benchmark = market === 'US' ? 'S&P 500（SPY）' : '加權指數';
+  const growthPending = growth === undefined || growthLoading;
+  // Nothing at all to filter on (data missing, or none of the rows has any): one explanation for the whole block.
+  const fundamentalsBlocked =
+    !growthPending && availability.eps && availability.rev && availability.epsY && availability.revY && availability.accel
+      ? availability.eps
+      : null;
+  const benchmark = market === 'US' ? 'S&P 500（SPY）' : '加權指數（^TWII）';
+  const marketName = market === 'US' ? '美股' : '台股';
+  /**
+   * Coverage of one condition among this group's rows: a short count while it is not applied, and the
+   * full 「僅涵蓋…其餘會被排除」 warning once it is (so a short financial history is never hidden).
+   */
+  const coverageText = (kind: FundamentalKind | 'accel', count: number, applied: boolean) => {
+    if (growth === undefined) return growthLoading ? '基本面資料載入中…' : null;
+    if (growthLoading) return '基本面資料載入中…';
+    const { covered, total } = props.coverage(kind, count, draft.turn);
+    if (!total) return null;
+    const rest = total - covered;
+    const percent = Math.round((covered / total) * 100);
+    const need = kind === 'accel' ? '最近 2 季 EPS YoY' : `近 ${count} ${kind.endsWith('Y') ? '年' : '季'}${kind.startsWith('eps') ? ' EPS' : '營收'} YoY`;
+    const counts = `${covered.toLocaleString('en-US')} / ${total.toLocaleString('en-US')} 檔（${percent}%）`;
+    if (!applied) return `${marketName}財報資料涵蓋 ${counts} 有${need}。`;
+    return `此條件僅涵蓋 ${counts} 有足夠財報歷史（需有${need}）；${
+      rest
+        ? `其餘 ${rest.toLocaleString('en-US')} 檔${draft.keepMissing ? '會保留（已關閉「資料不足時排除」）' : '會被排除（可到下方關閉「資料不足時排除」保留）'}。`
+        : '沒有被排除的股票。'
+    }`;
+  };
 
   return (
     <div className="fs-backdrop" onClick={onClose}>
@@ -360,20 +432,32 @@ export function FilterSheet(props: FilterSheetProps) {
           </Section>
 
           <Section
-            title="相對強弱"
-            unavailable={availability.rs && availability.rs3 ? availability.rs : null}
-            hint={`與${benchmark}比較近 3 個月的漲跌；RS 百分位是同市場股票中的強弱排名（99 最強）。`}
+            title="相對強弱（對大盤指數）"
+            unavailable={availability.rs && availability.rs3 && availability.rs1 ? availability.rs : null}
+            hint={`大盤基準：${benchmark}。相對報酬＝(1＋個股報酬)÷(1＋大盤報酬)−1，大於 0 代表跑贏大盤。RS 百分位＝個股 3 個月相對報酬，在${marketName}全市場股票中的排名（99 最強、1 最弱）。`}
           >
-            {!availability.rs3 && (
-              <div className="fs-chips" role="group" aria-label="3個月相對強弱">
-                <button
-                  type="button"
-                  className={`fs-chip ${draft.rs3 === 0 ? 'active' : ''}`}
-                  aria-pressed={draft.rs3 === 0}
-                  onClick={() => update({ rs3: draft.rs3 === 0 ? null : 0 })}
-                >
-                  3個月強於大盤（RS3M &gt; 0）
-                </button>
+            {(!availability.rs1 || !availability.rs3) && (
+              <div className="fs-chips" role="group" aria-label="相對大盤報酬">
+                {!availability.rs1 && (
+                  <button
+                    type="button"
+                    className={`fs-chip ${draft.rs1 === 0 ? 'active' : ''}`}
+                    aria-pressed={draft.rs1 === 0}
+                    onClick={() => update({ rs1: draft.rs1 === 0 ? null : 0 })}
+                  >
+                    1個月強於大盤
+                  </button>
+                )}
+                {!availability.rs3 && (
+                  <button
+                    type="button"
+                    className={`fs-chip ${draft.rs3 === 0 ? 'active' : ''}`}
+                    aria-pressed={draft.rs3 === 0}
+                    onClick={() => update({ rs3: draft.rs3 === 0 ? null : 0 })}
+                  >
+                    3個月強於大盤
+                  </button>
+                )}
               </div>
             )}
             {!availability.rs && (
@@ -406,60 +490,98 @@ export function FilterSheet(props: FilterSheetProps) {
             )}
           </Section>
 
-          <Section title="基本面（美股限定）" unavailable={fundamentalsBlocked}>
-            <Choice
-              label="期間"
-              value={quarters}
-              onChange={setQuarterCount}
-              options={[
-                { value: 1, label: '最近 1 季' },
-                { value: 2, label: '近 2 季皆' },
-                { value: 3, label: '近 3 季皆' },
-              ]}
-            />
-            <div className="fs-sub">EPS 年增率（YoY）</div>
-            <Choice
-              label="EPS 年增率"
-              value={draft.eps?.min ?? null}
-              onChange={(min) => setGate('eps', min)}
-              options={[
-                { value: null, label: '不限' },
-                { value: 0, label: '≥0%' },
-                { value: 15, label: '≥15%' },
-                { value: 25, label: '≥25%' },
-              ]}
-            />
-            <div className="fs-sub">營收年增率（YoY）</div>
-            <Choice
-              label="營收年增率"
-              value={draft.rev?.min ?? null}
-              onChange={(min) => setGate('rev', min)}
-              options={[
-                { value: null, label: '不限' },
-                { value: 0, label: '≥0%' },
-                { value: 10, label: '≥10%' },
-                { value: 20, label: '≥20%' },
-              ]}
-            />
-            <label className="fs-switch">
-              <input
-                type="checkbox"
-                role="switch"
-                checked={!draft.keepMissing}
-                onChange={(event) => update({ keepMissing: !event.target.checked })}
-              />
-              <span className="fs-switch-track" aria-hidden="true" />
-              <span>
-                資料不足時排除
-                <small>缺季度資料或前年同季虧損（YoY 無法計算）時；關閉則保留這些股票。最新一季轉盈視為成長。</small>
-              </span>
-            </label>
+          <Section title="基本面（EPS／營收成長）" unavailable={fundamentalsBlocked}>
+            <p className="fs-hint fs-lead">
+              年增率（YoY）一律和「去年同期」比：季度比去年同一季，年度比前一個會計年度。幅度 ≥ X% 且「近 N 期皆」達標才通過。
+              {market === 'TW' && ' 台股財報歷史較短（季度約 5–6 季、年度約 4 年），季度最多比較近 2 季；缺 Q4 EPS 的公司該季算缺資料。'}
+            </p>
+            {GROWTH_BLOCKS.map(({ key, title, unit }) => {
+              const blocked = growthPending ? null : availability[key];
+              const min = gateMin(key);
+              const note = blocked ? null : coverageText(key, periods[key], draft[key] !== null);
+              return (
+                <div key={key} className="fs-block" role="group" aria-label={title}>
+                  <div className="fs-sub">{title}</div>
+                  {blocked ? (
+                    <p className="fs-unavailable">{blocked}</p>
+                  ) : (
+                    <>
+                      <Choice
+                        label={`${title}期數`}
+                        value={periods[key]}
+                        onChange={(count) => setGatePeriods(key, count)}
+                        options={unit === '季' ? QUARTER_OPTIONS : YEAR_OPTIONS}
+                      />
+                      <Choice
+                        label={`${title}幅度`}
+                        value={min}
+                        onChange={(next) => setGateMin(key, next)}
+                        options={GROWTH_OPTIONS}
+                        compact
+                      />
+                      {isCustomGrowthMin(min) && <p className="fs-hint fs-current">目前條件：≥{Number(min.toFixed(2))}%</p>}
+                      {note && <p className="fs-hint fs-coverage">{note}</p>}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+            <div className="fs-block" role="group" aria-label="成長進階選項">
+              <div className="fs-sub">進階</div>
+              {availability.accel && !growthPending ? (
+                <p className="fs-unavailable">EPS 成長加速：{availability.accel}</p>
+              ) : (
+                <label className="fs-switch">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={draft.accel}
+                    aria-label="EPS 成長加速"
+                    onChange={(event) => update({ accel: event.target.checked })}
+                  />
+                  <span className="fs-switch-track" aria-hidden="true" />
+                  <span>
+                    EPS 成長加速
+                    <small>最新一季的 EPS 年增率 ＞ 前一季的年增率（例：前一季 +10%、最新一季 +25%）。</small>
+                    {draft.accel && coverageText('accel', 2, true) && <small className="fs-coverage">{coverageText('accel', 2, true)}</small>}
+                  </span>
+                </label>
+              )}
+              <label className="fs-switch">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={draft.turn}
+                  aria-label="含虧轉盈"
+                  onChange={(event) => update({ turn: event.target.checked })}
+                />
+                <span className="fs-switch-track" aria-hidden="true" />
+                <span>
+                  含虧轉盈
+                  <small>去年同期 EPS ≤ 0、本期轉為獲利時 YoY 無法計算；開啟時視為通過（EPS 成長與加速），關閉則視為缺資料。</small>
+                </span>
+              </label>
+              <label className="fs-switch">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={!draft.keepMissing}
+                  aria-label="資料不足時排除"
+                  onChange={(event) => update({ keepMissing: !event.target.checked })}
+                />
+                <span className="fs-switch-track" aria-hidden="true" />
+                <span>
+                  資料不足時排除
+                  <small>缺財報資料、財報歷史不夠長，或去年同期虧損（YoY 無法計算）時；關閉則保留這些股票。</small>
+                </span>
+              </label>
+            </div>
             <p className="fs-hint">
               {growthLoading
                 ? '基本面資料載入中…'
                 : growth
-                  ? `資料：${growth.source ?? 'Yahoo Finance'}${growthDate ? ` · 更新 ${growthDate}` : ''} · 季度財報公布後數日更新`
-                  : '選擇條件後載入基本面資料（Yahoo Finance 季度 EPS／營收）。'}
+                  ? `資料：${market === 'TW' ? 'Yahoo Finance 財報（逐檔累積）' : '季度 Yahoo Finance（S&P 500）優先，其餘與年度為 SEC／Yahoo 財報檔'}${growthDate ? ` · 更新 ${growthDate}` : ''} · 財報公布後數日更新`
+                  : '開啟面板後載入基本面資料。'}
             </p>
           </Section>
         </div>
