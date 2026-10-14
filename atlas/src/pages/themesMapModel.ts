@@ -46,6 +46,17 @@ export function turnoverLookup(universe: Universe | null | undefined, market: Th
   return values.size ? { values, asOf: entry.asOf } : null;
 }
 
+/** The constituent's own 20-session turnover (themes file), when it carries a positive one. */
+export function ownTurnover(constituent: ThemeConstituent): number | null {
+  const value = constituent.turnover20 ?? null;
+  return value !== null && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/** True when the themes file itself carries turnover for at least one constituent. */
+export function themesHaveTurnover(themes: readonly Theme[]): boolean {
+  return themes.some((theme) => theme.constituents.some((c) => ownTurnover(c) !== null));
+}
+
 export interface MapLeaf {
   /** Unique per theme: a stock can sit in several themes. */
   id: string;
@@ -85,10 +96,11 @@ export interface MapModel {
  * - 等大小, or no usable turnover at all (`lookup` null / empty): every leaf weighs 1.
  */
 export function buildMapModel(themes: readonly Theme[], lookup: Map<string, number> | null, requested: WeightMode): MapModel {
-  const known = (theme: Theme) => theme.constituents.map((c) => lookup?.get(c.symbol) ?? null);
-  const everything = lookup ? themes.flatMap((theme) => known(theme).filter((v): v is number => v !== null)) : [];
+  // The themes file's own turnover wins (it covers every constituent); the full-market universe fills the gaps.
+  const known = (theme: Theme) => theme.constituents.map((c) => ownTurnover(c) ?? lookup?.get(c.symbol) ?? null);
+  const everything = themes.flatMap((theme) => known(theme).filter((v): v is number => v !== null));
   const globalMedian = median(everything);
-  const mode: WeightMode = requested === 'equal' || !lookup || !everything.length ? 'equal' : requested;
+  const mode: WeightMode = requested === 'equal' || !everything.length ? 'equal' : requested;
   let imputed = 0;
   let leafCount = 0;
   const groups = themes.map((theme): MapGroup => {
