@@ -43,6 +43,35 @@ describe('themes route', () => {
     expect(parseRoute('?page=themes').rewrite).toBe(false);
   });
 
+  it('selects the heatmap view with v=map and drops every other value', () => {
+    expect(route('?page=themes&v=map')).toEqual({ page: 'themes', v: 'map' });
+    expect(route('?page=themes&v=MAP')).toEqual({ page: 'themes', v: 'map' });
+    expect(route('?page=themes&market=tw&v=map&theme=foundry')).toEqual({ page: 'themes', market: 'tw', v: 'map', theme: 'foundry' });
+    expect(route('?page=themes&view=map')).toEqual({ page: 'themes', v: 'map' });
+    expect(route('?page=themes&v=list')).toEqual({ page: 'themes' });
+    expect(route('?page=themes&v=')).toEqual({ page: 'themes' });
+    expect(route('?page=themes&v=<script>')).toEqual({ page: 'themes' });
+    expect(route('?page=themes&v=map%20x')).toEqual({ page: 'themes' });
+    // Other pages never carry it.
+    expect(route('?page=screener&v=map')).toEqual({ page: 'screener' });
+  });
+
+  it('serializes the heatmap route canonically, keeps old links intact and rewrites junk', () => {
+    expect(serializeRoute({ page: 'themes', v: 'map' })).toBe('?page=themes&v=map');
+    expect(serializeRoute({ page: 'themes', market: 'tw', v: 'map', theme: 'foundry' })).toBe('?page=themes&market=tw&v=map&theme=foundry');
+    for (const r of [
+      { page: 'themes', v: 'map' },
+      { page: 'themes', market: 'tw', v: 'map' },
+      { page: 'themes', v: 'map', theme: 'nuclear' },
+    ] as const) {
+      expect(parseRoute(serializeRoute(r))).toEqual({ route: r, rewrite: false });
+    }
+    // Links from before the heatmap existed parse and serialize exactly as they did.
+    expect(parseRoute('?page=themes&market=tw&theme=foundry')).toEqual({ route: { page: 'themes', market: 'tw', theme: 'foundry' }, rewrite: false });
+    expect(parseRoute('?page=themes&v=bogus').rewrite).toBe(true);
+    expect(parseRoute('?page=themes&view=map').rewrite).toBe(true);
+  });
+
   it('opens from a LINE liff.state link (query or path)', () => {
     expect(route(`?liff.state=${encodeURIComponent('?page=themes&theme=nuclear')}`)).toEqual({ page: 'themes', theme: 'nuclear' });
     expect(route(`?liff.state=${encodeURIComponent('/my-stock-screener/atlas/themes')}`)).toEqual({ page: 'themes' });

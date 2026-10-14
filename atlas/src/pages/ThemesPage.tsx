@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactElement } from 're
 import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
 import type { PageProps } from './pageProps';
 import { PageState } from '../ui/PageState';
+import ThemesMap from './ThemesMap';
 import { ThemeDetail } from '../ui/ThemeDetail';
 import {
   PERIODS,
@@ -260,7 +261,13 @@ function ThemeCards({ themes, label, onOpen }: { themes: Theme[]; label: string;
   );
 }
 
-function ThemesView({ data, theme, navigate, openChart }: { data: ThemesData; theme?: string } & Pick<PageProps, 'navigate' | 'openChart'>) {
+function ThemesView({
+  data,
+  theme,
+  view,
+  navigate,
+  openChart,
+}: { data: ThemesData; theme?: string; view?: ThemesViewKey } & Pick<PageProps, 'navigate' | 'openChart'>) {
   const market = data.market;
   const label = data.benchmark.label;
   const columns = useMemo(() => columnsFor(label), [label]);
@@ -276,10 +283,11 @@ function ThemesView({ data, theme, navigate, openChart }: { data: ThemesData; th
   const selected = themeByKey(data, theme);
   // A link to a theme the file does not have (renamed or removed) falls back to the plain page.
   useEffect(() => {
-    if (theme && !selected) navigate(themesRoute(market), { replace: true });
-  }, [theme, selected, navigate, market]);
-  const open = useCallback((key: string) => navigate({ ...themesRoute(market), theme: key }), [navigate, market]);
-  const close = useCallback(() => navigate(themesRoute(market)), [navigate, market]);
+    if (theme && !selected) navigate(themesRoute(market, view), { replace: true });
+  }, [theme, selected, navigate, market, view]);
+  const open = useCallback((key: string) => navigate({ ...themesRoute(market, view), theme: key }), [navigate, market, view]);
+  const close = useCallback(() => navigate(themesRoute(market, view)), [navigate, market, view]);
+  const isMap = view === 'map';
   const visible = useMemo(() => filterByParent(data.themes, parent), [data, parent]);
   const tiles = useMemo(() => tileOrder(visible, data, period, mode), [visible, data, period, mode]);
   const rows = useMemo(() => sortThemes(visible, data, sort.key, sort.direction), [visible, data, sort]);
@@ -296,6 +304,14 @@ function ThemesView({ data, theme, navigate, openChart }: { data: ThemesData; th
   return (
     <>
       <div className="themes-bar">
+        <div className="segmented compact themes-view" role="group" aria-label="檢視">
+          <button type="button" className={isMap ? '' : 'active'} aria-pressed={!isMap} onClick={() => !isMap || navigate(themesRoute(market))}>
+            列表
+          </button>
+          <button type="button" className={isMap ? 'active' : ''} aria-pressed={isMap} onClick={() => isMap || navigate(themesRoute(market, 'map'))}>
+            熱力圖
+          </button>
+        </div>
         <div className="themes-controls">
           <div className="segmented compact" role="group" aria-label="期間">
             {PERIODS.map((key) => (
@@ -310,14 +326,16 @@ function ThemesView({ data, theme, navigate, openChart }: { data: ThemesData; th
               </button>
             ))}
           </div>
-          <div className="segmented compact" role="group" aria-label="指標">
-            <button type="button" className={mode === 'return' ? 'active' : ''} aria-pressed={mode === 'return'} onClick={() => update({ mode: 'return' })}>
-              報酬
-            </button>
-            <button type="button" className={mode === 'rel' ? 'active' : ''} aria-pressed={mode === 'rel'} onClick={() => update({ mode: 'rel' })}>
-              相對 {label}
-            </button>
-          </div>
+          {!isMap && (
+            <div className="segmented compact" role="group" aria-label="指標">
+              <button type="button" className={mode === 'return' ? 'active' : ''} aria-pressed={mode === 'return'} onClick={() => update({ mode: 'return' })}>
+                報酬
+              </button>
+              <button type="button" className={mode === 'rel' ? 'active' : ''} aria-pressed={mode === 'rel'} onClick={() => update({ mode: 'rel' })}>
+                相對 {label}
+              </button>
+            </div>
+          )}
         </div>
         <div className="chip-row themes-parents" role="group" aria-label="產業大類">
           <button type="button" className={`chip ${parent === null ? 'active' : ''}`} aria-pressed={parent === null} onClick={() => setParent(null)}>
@@ -338,51 +356,58 @@ function ThemesView({ data, theme, navigate, openChart }: { data: ThemesData; th
         </div>
       </div>
 
-      <div className="themes-legend" aria-hidden="true">
-        <span>
-          大盤 {label} {PERIOD_LABELS[period]} <Value value={benchValue} />
-        </span>
-        <span className="legend-scale">
-          <i className="swatch-down" />
-          <i className="swatch-mid" />
-          <i className="swatch-up" />
-        </span>
-        <span className="legend-note">顏色越深＝{mode === 'rel' ? '比大盤強弱' : '漲跌'}越大</span>
-      </div>
-
-      <div className="themes-grid" role="list" aria-label="題材熱力圖">
-        {tiles.map((item) => (
-          <div role="listitem" key={item.key}>
-            <Tile theme={item} data={data} period={period} mode={mode} onOpen={open} />
-          </div>
-        ))}
-      </div>
-
-      <section className="themes-list" aria-label="題材明細">
-        <div className="section-bar">
-          <h2>全部題材明細</h2>
-          <label className="list-sort">
-            <span className="sr-only">排序</span>
-            <select
-              value={sort.key}
-              onChange={(event) => {
-                const key = event.target.value as ListSortKey;
-                setSort({ key, direction: defaultDirection(key) });
-              }}
-            >
-              <option value="rank">動能排名</option>
-              {columns.map((column) => (
-                <option key={column.key} value={column.key}>
-                  {column.label}
-                </option>
-              ))}
-              <option value="name">名稱</option>
-            </select>
-          </label>
+      {isMap ? (
+        <ThemesMap data={data} themes={visible} period={period} onOpenTheme={open} openChart={openChart} />
+      ) : (
+        <>
+        <div className="themes-legend" aria-hidden="true">
+          <span>
+            大盤 {label} {PERIOD_LABELS[period]} <Value value={benchValue} />
+          </span>
+          <span className="legend-scale">
+            <i className="swatch-down" />
+            <i className="swatch-mid" />
+            <i className="swatch-up" />
+          </span>
+          <span className="legend-note">顏色越深＝{mode === 'rel' ? '比大盤強弱' : '漲跌'}越大</span>
         </div>
-        <ThemeTable themes={rows} data={data} sort={sort} onSort={onSort} onOpen={open} columns={columns} />
-        <ThemeCards themes={rows} label={label} onOpen={open} />
-      </section>
+
+        <div className="themes-grid" role="list" aria-label="題材熱力圖">
+          {tiles.map((item) => (
+            <div role="listitem" key={item.key}>
+              <Tile theme={item} data={data} period={period} mode={mode} onOpen={open} />
+            </div>
+          ))}
+        </div>
+
+        <section className="themes-list" aria-label="題材明細">
+          <div className="section-bar">
+            <h2>全部題材明細</h2>
+            <label className="list-sort">
+              <span className="sr-only">排序</span>
+              <select
+                value={sort.key}
+                onChange={(event) => {
+                  const key = event.target.value as ListSortKey;
+                  setSort({ key, direction: defaultDirection(key) });
+                }}
+              >
+                <option value="rank">動能排名</option>
+                {columns.map((column) => (
+                  <option key={column.key} value={column.key}>
+                    {column.label}
+                  </option>
+                ))}
+                <option value="name">名稱</option>
+              </select>
+            </label>
+          </div>
+          <ThemeTable themes={rows} data={data} sort={sort} onSort={onSort} onOpen={open} columns={columns} />
+          <ThemeCards themes={rows} label={label} onOpen={open} />
+        </section>
+
+        </>
+      )}
 
       <footer className="page-foot">
         <span>
@@ -406,9 +431,15 @@ function ThemesView({ data, theme, navigate, openChart }: { data: ThemesData; th
   );
 }
 
-/** The themes route of a market: Taiwan carries `market`, the US one is the plain page. */
-function themesRoute(market: ThemesMarket) {
-  return market === 'tw' ? ({ page: 'themes', market } as const) : ({ page: 'themes' } as const);
+type ThemesViewKey = 'map';
+
+/** The themes route of a market: Taiwan carries `market`, the US one is the plain page; `map` selects the heatmap view. */
+function themesRoute(market: ThemesMarket, view?: ThemesViewKey) {
+  return {
+    page: 'themes' as const,
+    ...(market === 'tw' ? { market } : {}),
+    ...(view ? { v: view } : {}),
+  };
 }
 
 const HELP: Record<ThemesMarket, ReactElement> = {
@@ -428,7 +459,20 @@ const HELP: Record<ThemesMarket, ReactElement> = {
   ),
 };
 
-export default function ThemesPage({ navigate, openChart, theme, market = 'us' }: PageProps & { theme?: string; market?: ThemesMarket }) {
+const MAP_HELP = (
+  <p>
+    切到「熱力圖」可以一次看到每個題材裡每一檔股票：大區塊是題材，裡面的小方塊是成分股，顏色是所選期間的漲跌。方塊大小是
+    <b>近 20 日平均成交值</b>（不是市值）。市面上的熱力圖常把小型股縮到看不見，這裡預設的「均衡」會壓縮大小差距並保留最小面積；也可以改成「等大小」或原始比例的「成交值」。點股票開圖表，點題材名稱進題材詳情。
+  </p>
+);
+
+export default function ThemesPage({
+  navigate,
+  openChart,
+  theme,
+  market = 'us',
+  view,
+}: PageProps & { theme?: string; market?: ThemesMarket; view?: ThemesViewKey }) {
   const { state, reload } = useThemes(market);
   const meta = THEMES_MARKET_META[market];
   return (
@@ -451,7 +495,7 @@ export default function ThemesPage({ navigate, openChart, theme, market = 'us' }
             role="tab"
             aria-selected={market === key}
             className={market === key ? 'active' : ''}
-            onClick={() => market !== key && navigate(themesRoute(key))}
+            onClick={() => market !== key && navigate(themesRoute(key, view))}
           >
             <span aria-hidden="true" className="flag">
               {THEMES_MARKET_META[key].flag}
@@ -463,12 +507,13 @@ export default function ThemesPage({ navigate, openChart, theme, market = 'us' }
       <details className="themes-help">
         <summary>這頁怎麼看？</summary>
         {HELP[market]}
+        {MAP_HELP}
       </details>
       {state.status === 'loading' ? (
         <PageState kind="loading" title="載入題材資料…" />
       ) : state.status === 'ok' ? (
         // Keyed by market so the parent filter and sort order start over when the market changes.
-        <ThemesView key={market} data={state.data} theme={theme} navigate={navigate} openChart={openChart} />
+        <ThemesView key={market} data={state.data} theme={theme} view={view} navigate={navigate} openChart={openChart} />
       ) : (
         <PageState
           kind={state.status === 'error' ? 'error' : 'empty'}
