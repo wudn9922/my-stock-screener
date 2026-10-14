@@ -7318,7 +7318,8 @@ def build_report_universe(
     tw_tickers,
     us_tickers,
     data_dir=DATA_DIR,
-    downloader=None
+    downloader=None,
+    report_dir=REPORT_DIR
 ):
     import report_metrics
 
@@ -7361,6 +7362,15 @@ def build_report_universe(
         )
     }
 
+    # 已有夠新的全市場檔（scripts/build_universe_full.py）時，RS 百分位改用全市場分布
+    adopted = report_metrics.adopt_full_rs_distribution(
+        universes,
+        report_metrics.read_universe_json(report_dir)
+    )
+
+    if adopted:
+        print(f"📊 RS 百分位改用全市場分布：{', '.join(adopted)}")
+
     lookup = report_metrics.make_lookup(
         universes,
         data_dir,
@@ -7381,6 +7391,15 @@ def write_report_universe(
         universes,
         report_date=report_date
     )
+
+    # 既有檔案中夠新的全市場（scope=full）市場保留，不被流動性名單覆蓋
+    payload, kept = report_metrics.keep_fresh_full_markets(
+        payload,
+        report_metrics.read_universe_json(report_dir)
+    )
+
+    if kept:
+        print(f"📊 保留全市場 universe：{', '.join(kept)}")
 
     return report_metrics.write_universe_json(
         payload,

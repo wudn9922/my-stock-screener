@@ -418,7 +418,8 @@ class UniverseTest(unittest.TestCase):
         tw = payload["markets"]["TW"]
         self.assertEqual(tw["benchmark"], "^TWII")
         self.assertEqual(tw["universe"], "台股流動性名單（當日成交≥100萬股）")
-        self.assertEqual(payload["markets"]["US"]["universe"], "S&P 500")
+        self.assertEqual(payload["markets"]["US"]["universe"], "S&P 500 成分股")
+        self.assertEqual(tw["scope"], "liquid")
         self.assertEqual(payload["markets"]["US"]["benchmark"], "SPY")
         for row in tw["rows"]:
             self.assertEqual(len(row), len(UNIVERSE_FIELDS))
@@ -576,6 +577,7 @@ class MainPlumbingTest(unittest.TestCase):
                     ["AAPL"],
                     data_dir=data_dir,
                     downloader=lambda symbol: make_prices(geometric(500, 1.0004, 500)),
+                    report_dir=out,
                 )
             finally:
                 self.main.INDEX_HISTORY_CACHE.clear()

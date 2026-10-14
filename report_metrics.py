@@ -49,10 +49,16 @@ MARKET_BENCHMARKS = {
     "US": "SPY"
 }
 
+# main.py 的流動性名單（全市場資料 scope=full 建好之前、或它過期時使用）
 UNIVERSE_LABELS = {
     "TW": "台股流動性名單（當日成交≥100萬股）",
-    "US": "S&P 500"
+    "US": "S&P 500 成分股"
 }
+
+# scripts/build_universe_full.py 在指標欄位之後附加的公司資料欄（選填；main.py 的檔案沒有）
+UNIVERSE_PROFILE_FIELDS = ["sector", "industry", "marketCap"]
+# 既有檔案中 scope=full 的市場，asOf 不早於 main.py 同市場 asOf 這麼多天就保留（不被流動性名單覆蓋）
+FULL_FRESH_DAYS = 5
 
 RETURN_PERIODS = (5, 21, 63)
 MA_WINDOWS = (20, 50, 200)
@@ -635,6 +641,7 @@ def build_universe_payload(universes, generated_at=None, report_date=None):
             "benchmark": market_universe.get("benchmark") or bench_symbol,
             "asOf": market_universe.get("asOf"),
             "universe": UNIVERSE_LABELS[market],
+            "scope": "liquid",
             "rows": [
                 record_to_row(record)
                 for record in market_universe.get("records") or []
@@ -705,3 +712,200 @@ def write_universe_json(payload, report_dir):
     )
 
     return path
+
+
+# =========================================================================
+# 與全市場（scope=full）檔案共存：main.py 與 scripts/build_universe_full.py 都寫 universe.json
+# =========================================================================
+def read_universe_json(report_dir):
+    """讀既有 <report_dir>/universe.json；不存在或格式不對回傳 None（絕不丟例外）。"""
+    path = os.path.join(report_dir, UNIVERSE_FILE)
+
+    try:
+        with open(path, encoding="utf-8") as file:
+            document = json.load(file)
+    except (OSError, ValueError):
+        return None
+
+    return document if isinstance(document, dict) else None
+
+
+def _day(value):
+    try:
+        return pd.Timestamp(str(value)[:10]).normalize()
+    except (TypeError, ValueError):
+        return None
+
+
+def fresh_full_market(document, market, reference_as_of=None, today=None):
+    """
+    document 中該市場是 scope=full 且夠新時回傳該市場 dict，否則 None。
+    夠新：asOf 不早於 reference_as_of（main.py 同市場的資料日）FULL_FRESH_DAYS 天；
+    reference_as_of 為 None 時改以 today（預設今天）為準。
+    """
+    markets = (document or {}).get("markets") if isinstance(document, dict) else None
+    entry = (markets or {}).get(market) if isinstance(markets, dict) else None
+
+    if not isinstance(entry, dict) or entry.get("scope") != "full":
+        return None
+
+    if not isinstance(entry.get("rows"), list) or not entry["rows"]:
+        return None
+
+    as_of = _day(entry.get("asOf"))
+    reference = _day(reference_as_of) if reference_as_of else None
+
+    if reference is None:
+        reference = _day(today) if today else pd.Timestamp.now().normalize()
+
+    if as_of is None or reference is None:
+        return None
+
+    if as_of < reference - pd.Timedelta(days=FULL_FRESH_DAYS):
+        return None
+
+    return entry
+
+
+def fields_of(document):
+    fields = document.get("fields") if isinstance(document, dict) else None
+
+    if isinstance(fields, list) and all(isinstance(field, str) for field in fields):
+        return list(fields)
+
+    return list(UNIVERSE_FIELDS)
+
+
+def _remap_rows(rows, source_fields, target_fields):
+    """依欄位名稱把 rows 從 source_fields 的順序轉成 target_fields（缺的欄位補 None）。"""
+    position = {}
+
+    for index, field in enumerate(source_fields):
+        position.setdefault(field, index)
+
+    if list(source_fields) == list(target_fields):
+        return [list(row) + [None] * (len(target_fields) - len(row)) for row in rows if isinstance(row, list)]
+
+    result = []
+
+    for row in rows or []:
+        if not isinstance(row, list):
+            continue
+
+        result.append([
+            row[position[field]] if field in position and position[field] < len(row) else None
+            for field in target_fields
+        ])
+
+    return result
+
+
+def combine_universe_markets(parts, generated_at=None, report_date=None):
+    """
+    parts：{market: (market dict, 該 market rows 的 fields)}。組成一份 universe 文件：
+    任一市場帶公司資料欄（sector / industry / marketCap）時 fields 為完整欄位，其他市場的列補 None；
+    否則 fields 與 main.py 原本相同。
+    """
+    has_profile = any(
+        any(field in UNIVERSE_PROFILE_FIELDS for field in fields)
+        for _, fields in parts.values()
+    )
+    target = list(UNIVERSE_FIELDS) + (list(UNIVERSE_PROFILE_FIELDS) if has_profile else [])
+    markets = {}
+
+    for market in MARKET_BENCHMARKS:
+        if market not in parts:
+            continue
+
+        entry, fields = parts[market]
+        entry = dict(entry)
+        entry["rows"] = _remap_rows(entry.get("rows") or [], fields, target)
+        markets[market] = entry
+
+    return {
+        "version": UNIVERSE_VERSION,
+        "generatedAt": generated_at or (
+            datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        ),
+        "reportDate": report_date,
+        "fields": target,
+        "markets": markets
+    }
+
+
+def keep_fresh_full_markets(payload, existing, today=None):
+    """
+    main.py 寫檔前呼叫：既有檔案中夠新的 scope=full 市場原樣保留，其餘市場用 main.py 的流動性名單。
+    回傳 (新文件, 保留的市場清單)。
+    """
+    payload_fields = fields_of(payload)
+    parts = {}
+    kept = []
+
+    for market, entry in (payload.get("markets") or {}).items():
+        full = fresh_full_market(existing, market, entry.get("asOf"), today=today)
+
+        if full is not None:
+            parts[market] = (full, fields_of(existing))
+            kept.append(market)
+        else:
+            parts[market] = (entry, payload_fields)
+
+    combined = combine_universe_markets(
+        parts,
+        generated_at=payload.get("generatedAt"),
+        report_date=payload.get("reportDate")
+    )
+
+    return combined, kept
+
+
+def full_rs_distribution(document, market, reference_as_of=None, today=None):
+    """夠新的 scope=full 市場的 rs63 排序分布；沒有時回傳 None。"""
+    entry = fresh_full_market(document, market, reference_as_of, today=today)
+
+    if entry is None:
+        return None
+
+    fields = fields_of(document)
+
+    if "rs63" not in fields:
+        return None
+
+    column = fields.index("rs63")
+    values = sorted(
+        value
+        for value in (
+            finite_or_none(row[column]) if isinstance(row, list) and len(row) > column else None
+            for row in entry["rows"]
+        )
+        if value is not None
+    )
+
+    return values if len(values) >= RS_RANK_MIN_COUNT else None
+
+
+def adopt_full_rs_distribution(universes, existing, today=None):
+    """
+    main.py 的流動性名單算完後呼叫：該市場若有夠新的全市場檔，RS 百分位改用全市場的 rs63 分布
+    （報告群組與自選股的 RS 百分位與選股頁全市場一致）。就地修改，回傳改用的市場清單。
+    """
+    adopted = []
+
+    for market, universe in (universes or {}).items():
+        if not isinstance(universe, dict):
+            continue
+
+        distribution = full_rs_distribution(existing, market, universe.get("asOf"), today=today)
+
+        if distribution is None:
+            continue
+
+        for record in universe.get("records") or []:
+            metrics = record.get("metrics") or {}
+            metrics["rsRank"] = rs_rank_from_distribution(metrics.get("rs63"), distribution)
+
+        universe["rsDistribution"] = distribution
+        adopted.append(market)
+
+    return adopted
