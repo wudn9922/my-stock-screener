@@ -1,0 +1,8 @@
+[
+{"Date":"1151013","Code":"0050","Name":"元大台灣50","TradeVolume":"20000000","TradeValue":"4000000000","OpeningPrice":"200.00","HighestPrice":"201.00","LowestPrice":"199.00","ClosingPrice":"200.50","Change":"0.50","Transaction":"30000"},
+{"Date":"1151013","Code":"1101","Name":"台泥","TradeVolume":"12,345,678","TradeValue":"333000000","OpeningPrice":"27.00","HighestPrice":"27.40","LowestPrice":"26.90","ClosingPrice":"27.05","Change":"+0.70","Transaction":"9000"},
+{"Date":"1151013","Code":"2330","Name":"台積電","TradeVolume":"30000000","TradeValue":"0","OpeningPrice":"1,250.00","HighestPrice":"1,260.00","LowestPrice":"1,245.00","ClosingPrice":"1,255.00","Change":"-5.00","Transaction":"50000"},
+{"Date":"1151013","Code":"6666","Name":"未知","TradeVolume":"0","TradeValue":"0","OpeningPrice":"--","HighestPrice":"--","LowestPrice":"--","ClosingPrice":"--","Change":"0.00","Transaction":"0"},
+{"Date":"1151013","Code":"9103","Name":"美德醫療-DR","TradeVolume":"1000","OpeningPrice":"2.00","HighestPrice":"2.00","LowestPrice":"2.00","ClosingPrice":"2.00","Change":"0.00"},
+{"Date":"1151013","Code":"2881A","Name":"富邦特","TradeVolume":"1000","ClosingPrice":"60.00","Change":"0.00"}
+]

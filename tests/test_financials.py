@@ -647,6 +647,19 @@ class SymbolTest(unittest.TestCase):
             "6770.TW", "2303.TW", "NFLX", "BRK-B", "ZS", "A", "AAPL", "2330.TW", "8069.TWO",
         ])
 
+    def test_full_market_universe_keeps_liquid_size(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            report, data = os.path.join(tmp, "report"), os.path.join(tmp, "data")
+            write(os.path.join(data, "AAPL.csv"), "Date,Open,High,Low,Close,Volume\n2026-10-08,1,1,1,10,5\n")
+            fields = ["symbol", "name", "turnover20"]
+            write(os.path.join(report, "universe.json"), {"fields": fields, "markets": {
+                "US": {"scope": "full", "rows": [["ZZZZ", "", 1], ["YYYY", "", 2]]},
+                "TW": {"scope": "full", "rows": [["1101.TW", "台泥", 5], ["2330.TW", "台積電", 100], ["9999.TW", "x", 1]]},
+            }})
+            symbols = fin.collect_symbols(report, data, tw_limit=2)
+        # US from the CSVs (S&P 500 + custom), TW still the top tw_limit by turnover
+        self.assertEqual(symbols, ["AAPL", "2330.TW", "1101.TW"])
+
     def test_csv_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:
             report, data = os.path.join(tmp, "report"), os.path.join(tmp, "data")

@@ -232,6 +232,14 @@ class SymbolSourcesTest(unittest.TestCase):
                 open(os.path.join(data_dir, name), "w").close()
             self.assertEqual(growth.collect_symbols(report_dir, data_dir), ["AAPL", "PLTR"])
 
+    def test_full_market_universe_uses_the_csv_list(self):
+        with tempfile.TemporaryDirectory() as report_dir, tempfile.TemporaryDirectory() as data_dir:
+            with open(os.path.join(report_dir, "universe.json"), "w", encoding="utf-8") as file:
+                json.dump({"fields": ["symbol"], "markets": {"US": {"scope": "full", "rows": [["ZZZZ"], ["YYYY"]]}}}, file)
+            for name in ("AAPL.csv", "2330.TW.csv"):
+                open(os.path.join(data_dir, name), "w").close()
+            self.assertEqual(growth.collect_symbols(report_dir, data_dir), ["AAPL"])
+
     def test_falls_back_to_csv(self):
         with tempfile.TemporaryDirectory() as report_dir, tempfile.TemporaryDirectory() as data_dir:
             for name in ("AAPL.csv", "2330.TW.csv", "6488.TWO.csv", "^TWOII.csv", "MSFT.csv", "notes.txt"):

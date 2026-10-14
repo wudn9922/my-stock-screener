@@ -1,0 +1,96 @@
+name: Full-Market Universe
+
+# 選股頁「全市場篩選」：台股上市＋上櫃普通股、美股 NYSE／NASDAQ／NYSE American 等交易所普通股與 ADR
+# （scripts/build_universe_full.py → docs/report/universe.json 的 scope: "full" 市場）。
+# - 日 K 存在 Actions cache（.cache/universe-full，不提交進 repo）；每天台股用證交所／櫃買全市場行情、
+#   美股用 Yahoo 批次報價各接一根 K，只有缺口、除權／分割與新股票才逐檔向 Yahoo 請求。
+# - 冷啟動（快取還沒建好）每次在 --budget 秒內盡量補，沒補完的下次繼續；某市場完整歷史未達 90% 前不寫入，
+#   選股頁照舊顯示 main.py 的流動性名單。可手動執行（workflow_dispatch）加快冷啟動。
+# - 逐市場寫入：某市場來源失敗時保留檔案裡該市場原本的內容，並讓這次執行標為失敗。
+on:
+  workflow_run:
+    workflows: ["Daily Stock Screener"]
+    types: [completed]
+  # 補跑：前一次失敗或冷啟動未完成時接著補（UTC 03:17＝台北 11:17；台股盤中，當日 K 不會被採用）
+  schedule:
+    - cron: '17 3 * * 1-6'
+  workflow_dispatch:
+    inputs:
+      budget:
+        description: '網路請求時間預算（秒）'
+        default: '2400'
+      markets:
+        description: '市場（TW,US）'
+        default: 'TW,US'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: universe-full
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # workflow_run 只有在每日報告成功時才繼續
+    if: >-
+      github.event_name != 'workflow_run'
+      || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install --quiet pandas requests 'curl_cffi>=0.7,<1'
+
+      # 最近一次保存的日 K 快取（key 每次不同，restore-keys 取最新的一份）
+      - name: Restore daily-bar cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/universe-full
+          key: universe-full-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: universe-full-v1-
+
+      - name: Build full-market universe
+        env:
+          UNIVERSE_CACHE_DIR: .cache/universe-full
+          UNIVERSE_BUDGET_SECONDS: ${{ inputs.budget || '2400' }}
+        run: python -u scripts/build_universe_full.py --markets "${{ inputs.markets || 'TW,US' }}"
+
+      # 即使上一步失敗或時間不夠，也保存已補到的日 K，下次接著補
+      - name: Save daily-bar cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/universe-full
+          key: universe-full-v1-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Commit and Push changes
+        if: always()
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/report/universe.json
+          git commit -m "Auto-update full-market universe" || { echo "No changes to commit"; exit 0; }
+          # 每日報告與 Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試
+          for attempt in 1 2 3; do
+            git pull --rebase
+            if git push; then
+              exit 0
+            fi
+            echo "推送失敗（第 ${attempt} 次），稍後重試"
+            sleep $((attempt * 15))
+          done
+          exit 1

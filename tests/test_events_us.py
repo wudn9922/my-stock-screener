@@ -241,6 +241,18 @@ class UsTickersTest(unittest.TestCase):
                 file.write("Date,Open,High,Low,Close,Volume\n")
         self.assertEqual(events.us_tickers(self.report, self.data), ["AAPL", "BRK-B", "MSFT"])
 
+    def test_full_market_universe_uses_the_csv_list(self):
+        # scope "full" lists every US common stock: the liquid-size CSV list stands in for it
+        self.write(os.path.join(self.report, "universe.json"), {
+            "fields": ["symbol", "name"],
+            "markets": {"US": {"scope": "full", "rows": [["ZZZZ", "x"], ["YYYY", "y"]]}},
+        })
+        self.write(os.path.join(self.report, "latest.json"), {"groups": [{"market": "US", "items": [{"symbol": "AMD"}]}]})
+        for name in ("AAPL.csv", "1101.TW.csv"):
+            with open(os.path.join(self.data, name), "w", encoding="utf-8") as file:
+                file.write("Date,Open,High,Low,Close,Volume\n")
+        self.assertEqual(events.us_tickers(self.report, self.data), ["AAPL", "AMD"])
+
     def test_nothing_found_returns_empty(self):
         self.assertEqual(events.us_tickers(self.report, self.data), [])
 

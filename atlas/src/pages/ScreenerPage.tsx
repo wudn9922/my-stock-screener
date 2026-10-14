@@ -335,6 +335,7 @@ function ScreenerView({
   const [view, setView] = useState<StatusView>('all');
   const [sort, setSort] = useState<SortMode>('default');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
   const [draftNeedsGrowth, setDraftNeedsGrowth] = useState(false);
   const [scroll, setScroll] = useState({ top: 0, height: 600 });
   const [pe, setPe] = useState<Record<string, PeFigures>>({});
@@ -525,6 +526,17 @@ function ScreenerView({
           {universeMarketData.asOf ? ` · 資料日 ${formatDateTime(universeMarketData.asOf, false)}` : ''} · 相對強弱基準{' '}
           {universeMarketData.benchmark === '^TWII' ? '加權指數' : universeMarketData.benchmark} · {universeMarketData.universe}
         </p>
+      )}
+      {universeMarketData?.note && (
+        <button
+          type="button"
+          className={`screener-note ${noteOpen ? 'open' : ''}`}
+          aria-expanded={noteOpen}
+          aria-label={`名單範圍說明：${universeMarketData.note}`}
+          onClick={() => setNoteOpen((open) => !open)}
+        >
+          {universeMarketData.note}
+        </button>
       )}
       <div className="screener-head" aria-hidden="true">
         <span>代號／名稱</span>
