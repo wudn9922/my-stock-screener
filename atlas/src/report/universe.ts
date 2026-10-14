@@ -55,10 +55,12 @@ export interface UniverseMarket {
   market: UniverseMarketKey;
   benchmark: string;
   asOf: string | null;
-  /** Human description of the list, e.g. 「S&P 500」. */
+  /** Human description of the list with its size, e.g. 「台股上市＋上櫃普通股（上市 1,052、上櫃 811 檔）」. */
   universe: string;
   /** `full` = every listed common stock of the market (build_universe_full.py); `liquid` = main.py's list. */
   scope: 'full' | 'liquid';
+  /** What the list leaves out and where the profile columns come from (full lists only), or null. */
+  note: string | null;
   items: GroupItem[];
 }
 
@@ -189,6 +191,7 @@ export function parseUniverse(data: unknown, url = ''): UniverseLoadResult {
       asOf,
       universe: textOrNull(entry.universe) ?? (market === 'US' ? 'S&P 500' : '台股'),
       scope: entry.scope === 'full' ? 'full' : 'liquid',
+      note: textOrNull(entry.note)?.slice(0, 400) ?? null,
       items,
     };
   }

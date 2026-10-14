@@ -155,6 +155,8 @@ export interface MockOptions {
   failingSymbols?: string[];
   /** Serve the full-market lists (report/universe.json) and the growth files from the screener test fixtures. */
   fundamentals?: boolean | { growth?: 'missing' };
+  /** Serve this body as report/universe.json (overrides the screener fixture). */
+  universe?: Json;
 }
 
 /** Screener fixtures (synthetic): full-market universe, report/growth.json and valuation/us-growth.json. */
@@ -186,6 +188,12 @@ export async function mockSite(page: Page, options: MockOptions = {}) {
       growthMissing ? route.fulfill({ status: 404, body: 'not found' }) : json(route, screenerFixtures.growth()),
     );
     await page.route('**/my-stock-screener/atlas/valuation/us-growth.json', (route) => json(route, screenerFixtures.usGrowth()));
+  }
+  if (options.universe !== undefined) {
+    const body = JSON.stringify(options.universe);
+    await page.route('**/my-stock-screener/report/universe.json', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body }),
+    );
   }
   await page.route('https://edge.test/functions/v1/market-chart**', (route) => {
     const url = new URL(route.request().url());

@@ -124,7 +124,7 @@ test('1-month and 3-month strength against the index, with the definitions spell
   const sheet = await openSheet(page);
   const rs = sheet.getByRole('region', { name: '相對強弱（對大盤指數）' });
   await expect(rs).toContainText('加權指數（^TWII）');
-  await expect(rs).toContainText('在台股全市場股票中的排名');
+  await expect(rs).toContainText('在台股「全市場篩選」名單中的排名');
   await expect(rs).toContainText('(1＋個股報酬)÷(1＋大盤報酬)−1');
   await rs.getByRole('button', { name: '1個月強於大盤' }).click();
   await rs.getByRole('button', { name: '3個月強於大盤' }).click();

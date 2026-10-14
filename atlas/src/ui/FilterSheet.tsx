@@ -434,7 +434,7 @@ export function FilterSheet(props: FilterSheetProps) {
           <Section
             title="相對強弱（對大盤指數）"
             unavailable={availability.rs && availability.rs3 && availability.rs1 ? availability.rs : null}
-            hint={`大盤基準：${benchmark}。相對報酬＝(1＋個股報酬)÷(1＋大盤報酬)−1，大於 0 代表跑贏大盤。RS 百分位＝個股 3 個月相對報酬，在${marketName}全市場股票中的排名（99 最強、1 最弱）。`}
+            hint={`大盤基準：${benchmark}。相對報酬＝(1＋個股報酬)÷(1＋大盤報酬)−1，大於 0 代表跑贏大盤。RS 百分位＝個股 3 個月相對報酬，在${marketName}「全市場篩選」名單中的排名（99 最強、1 最弱；名單範圍見全市場篩選頁的說明）。`}
           >
             {(!availability.rs1 || !availability.rs3) && (
               <div className="fs-chips" role="group" aria-label="相對大盤報酬">
