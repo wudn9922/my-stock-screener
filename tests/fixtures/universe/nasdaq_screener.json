@@ -1,0 +1,7 @@
+{"data":{"asof":"Last price as of Oct 13, 2026","headers":{"symbol":"Symbol","name":"Name","lastsale":"Last Sale","netchange":"Net Change","pctchange":"% Change","marketCap":"Market Cap","country":"Country","ipoyear":"IPO Year","volume":"Volume","sector":"Sector","industry":"Industry","url":"Url"},
+"rows":[
+{"symbol":"AAPL","name":"Apple Inc. Common Stock","lastsale":"$250.00","netchange":"1.20","pctchange":"0.48%","volume":"50123456","marketCap":"3,750,000,000,000.00","country":"United States","ipoyear":"1980","industry":"Computer Manufacturing","sector":"Technology","url":"/market-activity/stocks/aapl"},
+{"symbol":"BRK/B","name":"Berkshire Hathaway Inc.","lastsale":"$480.00","netchange":"-2.00","pctchange":"-0.41%","volume":"3000000","marketCap":"1035000000000","country":"United States","ipoyear":"","industry":"Property-Casualty Insurers","sector":"Finance","url":"/market-activity/stocks/brk/b"},
+{"symbol":"ABR^D","name":"Arbor Realty Trust 6.375% Series D Cumulative Redeemable Preferred Stock","lastsale":"$18.00","marketCap":"","sector":"Real Estate","industry":"Real Estate Investment Trusts"},
+{"symbol":"NEWCO","name":"NewCo Inc. Common Stock","lastsale":"$0.00","marketCap":"0","sector":"","industry":""}
+]},"message":null,"status":{"rCode":200,"bCodeMessage":null,"developerMessage":null}}

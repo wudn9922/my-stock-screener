@@ -224,7 +224,12 @@ def needs_refresh(record, today, miss_checked=None):
 def symbols_from_universe(document):
     fields = (document or {}).get("fields") or []
     column = fields.index("symbol") if "symbol" in fields else 0
-    rows = (((document or {}).get("markets") or {}).get("US") or {}).get("rows") or []
+    market = ((document or {}).get("markets") or {}).get("US") or {}
+    # The full-market list (scope "full", every US common stock) is not this script's coverage: the US
+    # CSVs in data/ (S&P 500 + custom stocks) stand in for it, as before the full list existed
+    if market.get("scope") == "full":
+        return []
+    rows = market.get("rows") or []
     return [row[column] for row in rows if isinstance(row, list) and len(row) > column]
 
 

@@ -984,6 +984,10 @@ def collect_symbols(report_dir, data_dir, tw_limit=TW_LIMIT):
     us_rows = [financials_key(symbol) for symbol, _ in universe_rows(universe, "US")]
     tw_rows = [(financials_key(symbol), turnover) for symbol, turnover in universe_rows(universe, "TW")]
     us_rows = [key for key in us_rows if key and market_of(key) == "US"]
+    # The full-market list (scope "full", every US common stock) is not this script's coverage: the US
+    # CSVs in data/ (S&P 500 + custom stocks) stand in for it. Taiwan keeps the top TW_LIMIT by turnover.
+    if (((universe or {}).get("markets") or {}).get("US") or {}).get("scope") == "full":
+        us_rows = []
     tw_rows = [(key, turnover) for key, turnover in tw_rows if key and market_of(key) == "TW"]
     candidates = (
         nested_symbols(read_json(os.path.join(report_dir, "latest.json")), "groups", "items")

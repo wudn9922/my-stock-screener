@@ -67,7 +67,11 @@ def us_tickers(report_dir, data_dir):
     universe = read_json(os.path.join(report_dir, "universe.json")) or {}
     fields = universe.get("fields") if isinstance(universe.get("fields"), list) else []
     column = fields.index("symbol") if "symbol" in fields else 0
-    for row in ((universe.get("markets") or {}).get("US") or {}).get("rows") or []:
+    us_market = (universe.get("markets") or {}).get("US") or {}
+    # The full-market list (scope "full", every US common stock) would multiply the requests: the US CSVs
+    # in data/ (S&P 500 + custom stocks, the liquid list's members) stand in for it
+    full = us_market.get("scope") == "full"
+    for row in [] if full else us_market.get("rows") or []:
         if isinstance(row, list) and len(row) > column:
             symbols.add(row[column])
     latest = read_json(os.path.join(report_dir, "latest.json")) or {}
@@ -81,7 +85,7 @@ def us_tickers(report_dir, data_dir):
         for member in (theme.get("constituents") or []) if isinstance(theme, dict) else []:
             if isinstance(member, dict):
                 symbols.add(member.get("symbol"))
-    if not any(is_us_symbol(symbol) for symbol in symbols):
+    if full or not any(is_us_symbol(symbol) for symbol in symbols):
         try:
             names = os.listdir(data_dir)
         except OSError:
