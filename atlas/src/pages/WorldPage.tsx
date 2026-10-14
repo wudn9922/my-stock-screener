@@ -384,8 +384,9 @@ function WorldView({ report, openChart }: { report: Report } & Pick<PageProps, '
   );
 }
 
-export default function WorldPage({ report, reload, navigate, openChart, view }: PageProps & { view?: 'rates' }) {
-  const rates = view === 'rates';
+export default function WorldPage({ report, reload, navigate, openChart, view }: PageProps & { view?: 'indices' }) {
+  // US Treasuries and rates are the default view; `view: 'indices'` shows the world indices.
+  const rates = view !== 'indices';
   return (
     <div className="page world-page">
       <div className="page-head">
@@ -398,16 +399,16 @@ export default function WorldPage({ report, reload, navigate, openChart, view }:
           )}
         </div>
         <div className="segmented compact" role="group" aria-label="世界頁面">
-          <button type="button" className={!rates ? 'active' : ''} aria-pressed={!rates} onClick={() => navigate({ page: 'world' })}>
-            指數
+          <button type="button" className={rates ? 'active' : ''} aria-pressed={rates} onClick={() => navigate({ page: 'world' })}>
+            美債利率
           </button>
           <button
             type="button"
-            className={rates ? 'active' : ''}
-            aria-pressed={rates}
-            onClick={() => navigate({ page: 'world', view: 'rates' })}
+            className={!rates ? 'active' : ''}
+            aria-pressed={!rates}
+            onClick={() => navigate({ page: 'world', view: 'indices' })}
           >
-            美債利率
+            指數
           </button>
         </div>
       </div>

@@ -47,7 +47,7 @@ const RATES_TITLE = '美債與利率';
 
 /** The bottom bar has no financials item: that page belongs to the chart and lights 「圖表」. */
 const navPageOf = (page: Page): Page => (page === 'financials' ? 'chart' : page);
-const pageTitleOf = (route: Route) => (route.page === 'world' && route.view === 'rates' ? RATES_TITLE : PAGE_TITLES[route.page]);
+const pageTitleOf = (route: Route) => (route.page === 'world' && route.view !== 'indices' ? RATES_TITLE : PAGE_TITLES[route.page]);
 
 const mobileQuery = window.matchMedia('(max-width: 1099px)');
 const subscribeMobile = (callback: () => void) => {

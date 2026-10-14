@@ -57,8 +57,8 @@ test('index card opens the chart workspace with the index MAs', async ({ page })
 
 test('deep links, legacy links and LINE liff.state open the right page', async ({ page }) => {
   await mockSite(page);
-  await page.goto(`./?liff.state=${encodeURIComponent('/atlas/?page=world')}`);
-  await expect(page).toHaveURL(/\?page=world$/);
+  await page.goto(`./?liff.state=${encodeURIComponent('/atlas/?page=world&view=indices')}`);
+  await expect(page).toHaveURL(/\?page=world&view=indices$/);
   await expect(page.locator('.world-table-card')).toBeVisible();
   await page.goto('./?symbol=2330.TW&tf=1D');
   await expect(page).toHaveURL(/page=chart&symbol=2330\.TW&tf=1D/);
@@ -117,7 +117,7 @@ test('screener virtualizes a long list and opens rows with the group MA', async 
 
 test('world page compares indices and isolates per-row failures', async ({ page }) => {
   await mockSite(page, { failingSymbols: ['^FTSE'] });
-  await page.goto('./?page=world');
+  await page.goto('./?page=world&view=indices');
   const ftse = page.locator('.data-table tbody tr').filter({ hasText: '英國富時100' });
   await expect(ftse).toContainText('暫無資料', { timeout: 30000 });
   const twii = page.locator('.data-table tbody tr').filter({ hasText: '台灣加權指數' });
@@ -140,7 +140,7 @@ test('a missing or broken report shows a friendly state and search still works',
   await page.route('**/my-stock-screener/report/latest.json', (route) =>
     route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html>' }),
   );
-  await page.goto('./?page=world');
+  await page.goto('./?page=world&view=indices');
   await expect(page.getByRole('alert')).toContainText('每日報告暫時無法顯示');
   const input = await openSearch(page);
   await input.fill('台積');
