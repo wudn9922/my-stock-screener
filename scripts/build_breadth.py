@@ -50,23 +50,26 @@ DEFAULT_DATA_DIR = os.path.join(REPO_ROOT, "data")
 DEFAULT_OUT = os.path.join(REPO_ROOT, "docs", "report", "breadth.json")
 
 
-def load_daily_bars(csv_path):
-    """讀取日 K CSV，回傳以日期為 index、欄位 Close/Volume 的 DataFrame；格式不符回傳 None。"""
+def load_daily_bars(csv_path, price_columns=("Close",)):
+    """
+    讀取日 K CSV，回傳以日期為 index、欄位為 price_columns＋Volume 的 DataFrame；格式不符回傳 None。
+    price_columns 任一欄缺值的列會被丟棄（市場寬度只需要 Close；突破統計另要 High/Low）。
+    """
     try:
         raw = pd.read_csv(csv_path)
     except Exception:
         return None
-    if not {"Date", "Close", "Volume"}.issubset(raw.columns):
+    if not {"Date", "Volume", *price_columns}.issubset(raw.columns):
         return None
 
     bars = pd.DataFrame(
         {
             "Date": pd.to_datetime(raw["Date"], errors="coerce"),
-            "Close": pd.to_numeric(raw["Close"], errors="coerce"),
+            **{column: pd.to_numeric(raw[column], errors="coerce") for column in price_columns},
             "Volume": pd.to_numeric(raw["Volume"], errors="coerce").fillna(0),
         }
     )
-    bars = bars.dropna(subset=["Date", "Close"])
+    bars = bars.dropna(subset=["Date", *price_columns])
     bars = bars.drop_duplicates("Date", keep="last").sort_values("Date").set_index("Date")
     return bars if len(bars) else None
 
@@ -94,11 +97,30 @@ def _pct(above, total):
     return round(above / total * 100, 1) if total else None
 
 
+def present_matrix(frames):
+    """日期 × 股票的「有效日」旗標（該日有 K 且成交量 > 0），對齊到全部日期。"""
+    closes = pd.DataFrame({symbol: frame["Close"] for symbol, frame in frames.items()})
+    volumes = pd.DataFrame({symbol: frame["Volume"] for symbol, frame in frames.items()})
+    return closes.notna() & (volumes > 0)
+
+
+def trading_days(present, as_of):
+    """
+    asOf 以前（含）可視為市場交易日的日期：有資料檔數 > 0，且不少於「近 HISTORY_REF_WINDOW 日有資料檔數的
+    下四分位數」的 HISTORY_MIN_COVERAGE 倍。只有少數 CSV 有資料的日期（假日誤植、單檔異常）會被排除。
+    """
+    counts = present.sum(axis=1)
+    counts = counts[counts.index <= as_of]
+    # 以近期有資料檔數為基準，而不是 universe 總檔數：停更的 CSV 會讓總檔數遠大於實際可用檔數
+    reference = float(counts.iloc[-HISTORY_REF_WINDOW:].quantile(HISTORY_REF_QUANTILE))
+    keep = (counts > 0) & (counts >= HISTORY_MIN_COVERAGE * reference)
+    return counts.index[keep.values]
+
+
 def _daily_flags(frames):
     """各檔逐日旗標，對齊到全部日期：present（有K且量>0）、valid_n（已有 n 根K）、above_n（站上 SMA_n）。"""
     closes = pd.DataFrame({symbol: frame["Close"] for symbol, frame in frames.items()})
-    volumes = pd.DataFrame({symbol: frame["Volume"] for symbol, frame in frames.items()})
-    present = closes.notna() & (volumes > 0)
+    present = present_matrix(frames)
     flags = {"present": present, "valid": {}, "above": {}}
     for period in MA_PERIODS:
         # 均線要在每檔自己的K線上滾動計算，缺日不會打斷視窗
@@ -126,7 +148,7 @@ def _segment(row):
     return segment
 
 
-def _as_of(frames):
+def as_of_date(frames):
     """各檔最後日期的眾數；次數相同時取較晚的日期。"""
     counts = Counter(frame.index.max() for frame in frames.values())
     return max(counts.items(), key=lambda item: (item[1], item[0]))[0]
@@ -138,7 +160,7 @@ def build_market(frames, universe_label, segment_of=None):
     frames: {symbol: DataFrame（index 為日期，欄位 Close、Volume）}
     segment_of: {symbol: "twse" | "tpex"}，台股才需要；沒有時只輸出 all。
     """
-    as_of = _as_of(frames)
+    as_of = as_of_date(frames)
     flags = _daily_flags(frames)
     symbols = list(frames)
     tally = _tally(flags, symbols)
@@ -149,12 +171,7 @@ def build_market(frames, universe_label, segment_of=None):
             members = [symbol for symbol in symbols if segment_of.get(symbol) == name]
             segments[name] = _segment(_tally(flags, members).loc[as_of])
 
-    # 以近期有資料檔數為基準，而不是 universe 總檔數：停更的 CSV 會讓總檔數遠大於實際可用檔數
-    counts = flags["present"].sum(axis=1)
-    counts = counts[counts.index <= as_of]
-    reference = float(counts.iloc[-HISTORY_REF_WINDOW:].quantile(HISTORY_REF_QUANTILE))
-    keep = (counts > 0) & (counts >= HISTORY_MIN_COVERAGE * reference)
-    dates = counts.index[keep.values][-HISTORY_DAYS:]
+    dates = trading_days(flags["present"], as_of)[-HISTORY_DAYS:]
     history_tally = tally.loc[dates]
     history = {
         "dates": [day.strftime("%Y-%m-%d") for day in dates],
@@ -197,7 +214,7 @@ def write_json_atomic(path, payload):
         raise
 
 
-def _load_sp500(us_tickers_fn):
+def load_sp500(us_tickers_fn):
     """回傳 S&P 500 代號集合；沒有提供函式、拋出例外或名單太短時回傳 None（改用退回規則）。"""
     if us_tickers_fn is None:
         return None
@@ -212,13 +229,30 @@ def _load_sp500(us_tickers_fn):
     return set(tickers)
 
 
-def _load_frames(data_dir, symbols):
+def load_frames(data_dir, symbols, price_columns=("Close",)):
     frames = {}
     for symbol in symbols:
-        bars = load_daily_bars(os.path.join(data_dir, f"{symbol}.csv"))
+        bars = load_daily_bars(os.path.join(data_dir, f"{symbol}.csv"), price_columns)
         if bars is not None:
             frames[symbol] = bars
     return frames
+
+
+def load_market_inputs(data_dir, us_tickers_fn=None, price_columns=("Close",)):
+    """
+    讀 data/ 的台股與美股 universe：{"tw": {"frames", "universe", "segment_of"}, "us": {...}}。
+    市場寬度與突破勝率（build_breakouts.py）共用同一套名單規則。
+    """
+    filenames = sorted(os.listdir(data_dir)) if os.path.isdir(data_dir) else []
+    tw_symbols = select_tw_symbols(filenames)
+    us_symbols, us_label = select_us_symbols(filenames, load_sp500(us_tickers_fn))
+
+    tw_frames = load_frames(data_dir, tw_symbols, price_columns)
+    segment_of = {symbol: ("tpex" if symbol.endswith(".TWO") else "twse") for symbol in tw_frames}
+    return {
+        "tw": {"frames": tw_frames, "universe": TW_UNIVERSE_LABEL, "segment_of": segment_of},
+        "us": {"frames": load_frames(data_dir, us_symbols, price_columns), "universe": us_label, "segment_of": None},
+    }
 
 
 def main(argv=None, us_tickers_fn=None):
@@ -227,20 +261,8 @@ def main(argv=None, us_tickers_fn=None):
     parser.add_argument("--out", default=DEFAULT_OUT, help="輸出路徑（預設 docs/report/breadth.json）")
     args = parser.parse_args(argv)
 
-    filenames = sorted(os.listdir(args.data_dir)) if os.path.isdir(args.data_dir) else []
-    tw_symbols = select_tw_symbols(filenames)
-    sp500 = _load_sp500(us_tickers_fn)
-    us_symbols, us_label = select_us_symbols(filenames, sp500)
-
-    tw_frames = _load_frames(args.data_dir, tw_symbols)
-    segment_of = {symbol: ("tpex" if symbol.endswith(".TWO") else "twse") for symbol in tw_frames}
-    us_frames = _load_frames(args.data_dir, us_symbols)
-
     payload = build_breadth_payload(
-        {
-            "tw": {"frames": tw_frames, "universe": TW_UNIVERSE_LABEL, "segment_of": segment_of},
-            "us": {"frames": us_frames, "universe": us_label, "segment_of": None},
-        },
+        load_market_inputs(args.data_dir, us_tickers_fn),
         datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
     )
     if not payload["markets"]:
@@ -259,7 +281,7 @@ def main(argv=None, us_tickers_fn=None):
     return 0
 
 
-def _us_tickers_from_main():
+def us_tickers_from_main():
     """延遲匯入 main.get_us_tickers：main.py 頂層會 import yfinance，只在實際執行時才載入。"""
     if REPO_ROOT not in sys.path:
         sys.path.insert(0, REPO_ROOT)
@@ -269,4 +291,4 @@ def _us_tickers_from_main():
 
 
 if __name__ == "__main__":
-    sys.exit(main(us_tickers_fn=_us_tickers_from_main))
+    sys.exit(main(us_tickers_fn=us_tickers_from_main))
