@@ -222,12 +222,76 @@ export function fitLayout(groups: readonly GroupInput[], width: number, options:
   return { ...best, satisfied: true };
 }
 
-export type LabelLevel = 'name' | 'full' | 'code' | 'none';
+export type LabelFit = 'full' | 'name' | 'none';
 
-/** How much text a tile of this size can carry; smaller tiles stay clickable and use the tooltip. */
-export function labelLevel(width: number, height: number): LabelLevel {
-  if (width >= 92 && height >= 58) return 'name';
-  if (width >= 52 && height >= 34) return 'full';
-  if (width >= 30 && height >= 18) return 'code';
-  return 'none';
+const isWide = (char: string) => char.charCodeAt(0) >= 0x2e80;
+
+/** Estimated rendered width of `text` in px at `fontSize` (CJK 1.05em, Latin 0.62em per character). */
+export function textWidth(text: string, fontSize: number): number {
+  return [...text].reduce((sum, char) => sum + (isWide(char) ? 1.05 : 0.62), 0) * fontSize;
+}
+
+/** Lines `text` needs at `fontSize` inside `width` px (greedy wrap; CJK breaks anywhere, Latin only at spaces). -1 when a word is wider than the box. */
+export function wrapLines(text: string, width: number, fontSize: number): number {
+  if (!(width > 0)) return -1;
+  const em = (token: string) => textWidth(token, fontSize);
+  const tokens: string[] = [];
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    let latin = '';
+    for (const char of word) {
+      if (isWide(char)) {
+        if (latin) tokens.push(latin);
+        latin = '';
+        tokens.push(char);
+      } else latin += char;
+    }
+    if (latin) tokens.push(latin);
+    tokens.push(' ');
+  }
+  let lines = 1;
+  let used = 0;
+  const space = fontSize * 0.3;
+  for (const token of tokens) {
+    if (token === ' ') {
+      used += space;
+      continue;
+    }
+    const size = em(token);
+    if (size > width) return -1;
+    if (used + size > width && used > 0) {
+      lines++;
+      used = 0;
+    }
+    used += size;
+  }
+  return lines;
+}
+
+/**
+ * How much text an industry cell can carry without clipping: the name wrapped over as many lines as the
+ * cell is tall, plus the return line when there is room. The font shrinks from `preferred` towards 10px
+ * before giving up; `none` cells stay clickable and use the tooltip.
+ */
+export function labelFit(name: string, width: number, height: number, preferred: number): { fit: LabelFit; fontSize: number } {
+  const avail = width - 12;
+  for (let fontSize = Math.round(preferred); fontSize >= 10; fontSize--) {
+    const lines = wrapLines(name, avail, fontSize);
+    if (lines < 0) continue;
+    const textHeight = lines * fontSize * 1.2;
+    if (textHeight + fontSize * 1.1 + 6 <= height) return { fit: 'full', fontSize };
+    if (textHeight + 6 <= height) return { fit: 'name', fontSize };
+  }
+  return { fit: 'none', fontSize: 10 };
+}
+
+/** Where the tooltip for a cell goes: above it, else below it, else inside the cell, always inside the canvas horizontally. */
+export function tipPosition(
+  rect: Rect,
+  canvas: { w: number; h: number },
+  tip: { w: number; h: number },
+): { left: number; top: number; above: boolean } {
+  const left = Math.max(4, Math.min(canvas.w - tip.w - 4, rect.x + rect.w / 2 - tip.w / 2));
+  if (rect.y - 6 >= tip.h) return { left, top: rect.y - 6, above: true };
+  if (rect.y + rect.h + 6 + tip.h <= canvas.h) return { left, top: rect.y + rect.h + 6, above: false };
+  return { left, top: Math.max(4, Math.min(rect.y + 6, canvas.h - tip.h - 4)), above: false };
 }

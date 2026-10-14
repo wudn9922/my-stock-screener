@@ -949,10 +949,7 @@
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
-  cursor: pointer;
-}
-.map-group-head:hover {
-  background: var(--surface-3);
+  pointer-events: none;
 }
 .map-group-name {
   min-width: 0;
@@ -964,7 +961,7 @@
   font-size: 11px;
   font-weight: 600;
 }
-.map-tile {
+.map-cell {
   position: absolute;
   box-sizing: border-box;
   display: flex;
@@ -981,51 +978,46 @@
   background: var(--surface-3);
   line-height: 1.15;
   text-align: center;
-  white-space: nowrap;
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-.map-tile.heat-up {
+.map-cell.heat-up {
   background: var(--up-soft);
 }
-.map-tile.heat-down {
+.map-cell.heat-down {
   background: var(--down-soft);
 }
 @supports (background: color-mix(in srgb, red 10%, blue)) {
-  .map-tile.heat-up {
+  .map-cell.heat-up {
     background: color-mix(in srgb, var(--up) var(--mix), var(--surface-2));
   }
-  .map-tile.heat-down {
+  .map-cell.heat-down {
     background: color-mix(in srgb, var(--down) var(--mix), var(--surface-2));
   }
 }
-.map-tile.heat-na {
+.map-cell.heat-na {
   background: repeating-linear-gradient(135deg, var(--surface-3) 0 4px, var(--surface-2) 4px 8px);
   color: var(--text-3);
 }
-.map-tile:hover,
-.map-tile:focus-visible {
+.map-cell:hover,
+.map-cell:focus-visible {
   z-index: 2;
   outline: 2px solid var(--text);
   outline-offset: -2px;
 }
-.map-tile .map-code {
+.map-cell .map-code {
+  max-width: 100%;
+  padding: 0 3px;
   font-size: 1em;
   font-weight: 700;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
-.map-tile.lv-code .map-code {
-  font-size: 10px;
-}
-.map-tile .map-pct {
-  font-size: 0.82em;
-}
-.map-tile .map-name {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 0.7em;
-  color: var(--text-2);
+.map-cell .map-pct {
+  font-size: 0.9em;
+  line-height: 1.1;
 }
 .map-tip {
   position: absolute;
@@ -1048,6 +1040,36 @@
 }
 .map-tip-theme {
   color: var(--text-3);
+}
+.map-tip-row {
+  display: block;
+}
+.map-tip-stock {
+  display: inline-block;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+.ind-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.ind-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 0;
+  text-align: left;
+}
+.ind-row:hover .constituent-name,
+.ind-row:focus-visible .constituent-name {
+  color: var(--text);
 }
 .map-foot {
   margin: 0;

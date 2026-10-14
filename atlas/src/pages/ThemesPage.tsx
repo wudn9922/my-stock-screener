@@ -3,6 +3,8 @@ import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
 import type { PageProps } from './pageProps';
 import { PageState } from '../ui/PageState';
 import ThemesMap from './ThemesMap';
+import { useMapSource } from './useMapSource';
+import { INDUSTRY_PERIODS, clampIndustryPeriod } from './industryModel';
 import { ThemeDetail } from '../ui/ThemeDetail';
 import {
   PERIODS,
@@ -288,6 +290,11 @@ function ThemesView({
   const open = useCallback((key: string) => navigate({ ...themesRoute(market, view), theme: key }), [navigate, market, view]);
   const close = useCallback(() => navigate(themesRoute(market, view)), [navigate, market, view]);
   const isMap = view === 'map';
+  const mapSource = useMapSource(market, isMap);
+  // The industry map has 1日/1週/1月/3月 only (the universe carries no longer returns); the stored period is kept.
+  const industryMap = isMap && mapSource.kind !== 'themes';
+  const shownPeriods = industryMap ? PERIODS.filter((key) => (INDUSTRY_PERIODS as readonly string[]).includes(key)) : PERIODS;
+  const shownPeriod = industryMap ? clampIndustryPeriod(period) : period;
   const visible = useMemo(() => filterByParent(data.themes, parent), [data, parent]);
   const tiles = useMemo(() => tileOrder(visible, data, period, mode), [visible, data, period, mode]);
   const rows = useMemo(() => sortThemes(visible, data, sort.key, sort.direction), [visible, data, sort]);
@@ -314,12 +321,12 @@ function ThemesView({
         </div>
         <div className="themes-controls">
           <div className="segmented compact" role="group" aria-label="期間">
-            {PERIODS.map((key) => (
+            {shownPeriods.map((key) => (
               <button
                 key={key}
                 type="button"
-                className={key === period ? 'active' : ''}
-                aria-pressed={key === period}
+                className={key === shownPeriod ? 'active' : ''}
+                aria-pressed={key === shownPeriod}
                 onClick={() => update({ period: key })}
               >
                 {PERIOD_LABELS[key]}
@@ -337,6 +344,7 @@ function ThemesView({
             </div>
           )}
         </div>
+        {!industryMap && (
         <div className="chip-row themes-parents" role="group" aria-label="產業大類">
           <button type="button" className={`chip ${parent === null ? 'active' : ''}`} aria-pressed={parent === null} onClick={() => setParent(null)}>
             全部<span className="chip-count">{data.themes.length}</span>
@@ -354,10 +362,11 @@ function ThemesView({
             </button>
           ))}
         </div>
+        )}
       </div>
 
       {isMap ? (
-        <ThemesMap data={data} themes={visible} period={period} onOpenTheme={open} openChart={openChart} />
+        <ThemesMap data={data} themes={visible} source={mapSource} period={period} onOpenTheme={open} openChart={openChart} />
       ) : (
         <>
         <div className="themes-legend" aria-hidden="true">
@@ -410,11 +419,20 @@ function ThemesView({
       )}
 
       <footer className="page-foot">
-        <span>
-          資料日 {formatDateTime(data.asOf, false)}
-          {age !== null && age > 6 ? `（已 ${age} 天未更新）` : ''} · 題材報酬為成分股等權平均 · 基準 {label} · 每個交易日更新一次
-        </span>
-        <span>題材成分股由人工挑選，僅供研究參考，非投資建議。</span>
+        {industryMap ? (
+          <>
+            <span>產業熱力圖依全市場名單計算，口徑見圖下方說明 · 每個交易日更新一次</span>
+            <span>僅供研究參考，非投資建議。</span>
+          </>
+        ) : (
+          <>
+            <span>
+              資料日 {formatDateTime(data.asOf, false)}
+              {age !== null && age > 6 ? `（已 ${age} 天未更新）` : ''} · 題材報酬為成分股等權平均 · 基準 {label} · 每個交易日更新一次
+            </span>
+            <span>題材成分股由人工挑選，僅供研究參考，非投資建議。</span>
+          </>
+        )}
       </footer>
 
       {selected && (
@@ -461,8 +479,8 @@ const HELP: Record<ThemesMarket, ReactElement> = {
 
 const MAP_HELP = (
   <p>
-    切到「熱力圖」可以一次看到每個題材裡每一檔股票：大區塊是題材，裡面的小方塊是成分股，顏色是所選期間的漲跌。方塊大小是
-    <b>近 20 日平均成交值</b>（不是市值）。市面上的熱力圖常把小型股縮到看不見，這裡預設的「均衡」會壓縮大小差距並保留最小面積；也可以改成「等大小」或原始比例的「成交值」。點股票開圖表，點題材名稱進題材詳情。
+    切到「熱力圖」可以一次看到各產業的冷熱：每個方塊是<b>一個產業</b>（美股外層是 sector、裡面是 industry），顏色是產業在所選期間的報酬，預設以
+    <b>市值加權</b>，也可切成每檔一票的<b>等權中位數</b>；方塊大小是產業的市值合計。小產業預設用「均衡」壓縮大小差距並保留最小面積，也可改成「等大小」或原始比例的「市值」。點方塊看該產業的成分股，再點個股開圖表。全市場產業資料還沒產生時，會暫時改用題材分組顯示。
   </p>
 );
 
