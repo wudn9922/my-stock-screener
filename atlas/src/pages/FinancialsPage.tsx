@@ -10,6 +10,8 @@ import { FinancialsHeader, type DisplayMode } from '../ui/financials/FinancialsH
 import { MetricCard } from '../ui/financials/MetricCard';
 import { FinancialsTable } from '../ui/financials/FinancialsTable';
 import { SummaryChips } from '../ui/financials/SummaryChips';
+import { ChipsSection } from '../ui/financials/ChipsCard';
+import { isChipsPageSymbol } from '../report/twChips';
 import { buildView, depthText, provenanceText } from '../ui/financials/financialsView';
 import '../ui/financials.css';
 
@@ -213,6 +215,7 @@ export default function FinancialsPage({ report, navigate, symbol, p }: Financia
         onSymbol={onSymbol}
       />
       {body}
+      {symbol && isChipsPageSymbol(symbol) && <ChipsSection symbol={symbol} />}
       <footer className="page-foot fin-foot">
         <span>
           限制：Yahoo 只提供約 4 年年度、5–8 季季度財報，本站逐季累積、無法往回補（部分美股另以 SEC 申報補歷史）；比率由本頁依公式計算，可能與公司公告口徑不同；有息負債可能含租賃負債。
