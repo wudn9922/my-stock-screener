@@ -40,8 +40,13 @@ export interface Heat {
  * site's color convention through the `--up` / `--down` CSS variables, so only the side is decided here.
  */
 export function heat(value: number | null, period: PeriodKey): Heat {
+  return heatWithCap(value, HEAT_CAP[period]);
+}
+
+/** The same scale for an explicit cap (stock tiles in the heatmap use their own, wider caps). */
+export function heatWithCap(value: number | null, cap: number): Heat {
   if (value === null || !Number.isFinite(value) || Math.abs(value) < 0.005) return { side: 'flat', mix: 0 };
-  const strength = Math.min(Math.abs(value) / HEAT_CAP[period], 1);
+  const strength = Math.min(Math.abs(value) / cap, 1);
   return { side: value > 0 ? 'up' : 'down', mix: Math.round(14 + strength * 56) };
 }
 

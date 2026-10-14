@@ -220,7 +220,7 @@ export function Site() {
         <Suspense fallback={pageFallback}>
           {route.page === 'markets' && <MarketsPage {...pageProps} market={route.market} />}
           {route.page === 'world' && <WorldPage {...pageProps} view={route.view} />}
-          {route.page === 'themes' && <ThemesPage {...pageProps} theme={route.theme} market={route.market} />}
+          {route.page === 'themes' && <ThemesPage {...pageProps} theme={route.theme} market={route.market} view={route.v} />}
           {route.page === 'screener' && <ScreenerPage {...pageProps} group={route.group} />}
           {route.page === 'financials' && <FinancialsPage {...pageProps} symbol={route.symbol} p={route.p} />}
         </Suspense>
