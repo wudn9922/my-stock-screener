@@ -106,8 +106,26 @@ class Network:
 
         self.crumb = None
 
+    def _plain_session(self):
+        """HTTP/1.1 requests session: the fallback when curl_cffi's HTTP/2 stream is reset (seen on TPEx)."""
+        if getattr(self, "plain", None) is None:
+            import requests
+
+            self.plain = requests.Session()
+            self.plain.headers["User-Agent"] = (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+            )
+        return self.plain
+
     def get(self, url, params=None, headers=None, timeout=30):
-        response = self.session.get(url, params=params, headers=headers, timeout=timeout)
+        try:
+            response = self.session.get(url, params=params, headers=headers, timeout=timeout)
+        except Exception as exc:  # noqa: BLE001 - transport errors differ between curl_cffi and requests
+            # A transport failure (no HTTP status at all, e.g. "HTTP/2 stream reset") gets one more try over
+            # plain HTTP/1.1; HTTP errors and rate limits below are not retried here.
+            print(f"↻ {url.split('?')[0]}：{type(exc).__name__}，改用 HTTP/1.1 重試一次")
+            response = self._plain_session().get(url, params=params, headers=headers, timeout=timeout)
 
         if response.status_code == 429:
             raise RateLimited(429, url)

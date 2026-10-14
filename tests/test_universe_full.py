@@ -864,3 +864,47 @@ class CoexistenceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NetworkTransportRetryTest(unittest.TestCase):
+    """A transport error (curl's "HTTP/2 stream reset", seen on TPEx) is retried once over plain HTTP/1.1."""
+
+    class Response:
+        def __init__(self, status=200, body="[]"):
+            self.status_code = status
+            self.text = body
+
+        def json(self):
+            return json.loads(self.text)
+
+    class Session:
+        def __init__(self, outcome):
+            self.outcome = outcome
+            self.calls = 0
+
+        def get(self, url, params=None, headers=None, timeout=30):
+            self.calls += 1
+            if isinstance(self.outcome, Exception):
+                raise self.outcome
+            return self.outcome
+
+    def network(self, primary, plain):
+        net = bu.Network.__new__(bu.Network)
+        net.session = primary
+        net.plain = plain
+        net.crumb = None
+        return net
+
+    def test_transport_error_falls_back_to_http11_once(self):
+        primary = self.Session(RuntimeError("curl: (92) HTTP/2 stream 5 reset by server"))
+        plain = self.Session(self.Response(200, '[{"a": 1}]'))
+        self.assertEqual(self.network(primary, plain).get_json("https://www.tpex.org.tw/x"), [{"a": 1}])
+        self.assertEqual((primary.calls, plain.calls), (1, 1))
+
+    def test_http_errors_and_rate_limits_are_not_retried_over_http11(self):
+        plain = self.Session(self.Response(200))
+        with self.assertRaises(bu.RateLimited):
+            self.network(self.Session(self.Response(429)), plain).get("https://query1.finance.yahoo.com/x")
+        with self.assertRaises(bu.HttpError):
+            self.network(self.Session(self.Response(503)), plain).get("https://www.tpex.org.tw/x")
+        self.assertEqual(plain.calls, 0)
