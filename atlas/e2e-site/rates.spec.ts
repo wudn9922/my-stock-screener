@@ -34,7 +34,7 @@ test('rates view renders every section without the daily report', async ({ page 
   page.on('pageerror', (error) => errors.push(String(error)));
   await mockRates(page);
   await page.goto('./?page=rates');
-  await expect(page).toHaveURL(/page=world&view=rates/);
+  await expect(page).toHaveURL(/page=world$/);
   await expect(page.locator('.rates-key')).toHaveCount(3);
   await expect(page.locator('.rates-key').first()).toContainText('%');
   for (const title of [/^利差/, /存續期間情境分析/, /長天期美債 ETF 比較/])
@@ -53,7 +53,7 @@ test('rates view renders every section without the daily report', async ({ page 
 
 test('spreads, scenario slider and ETF comparison respond to controls', async ({ page }) => {
   await mockRates(page);
-  await page.goto('./?page=world&view=rates');
+  await page.goto('./?page=world');
   const spread = card(page, '利差');
   const selectors = spread.getByRole('group', { name: '選擇利差' });
   await expect(selectors.getByRole('button')).toHaveCount(2);
@@ -75,7 +75,8 @@ test('spreads, scenario slider and ETF comparison respond to controls', async ({
   await expect(spread.locator('.card-head small')).toContainText('10 年殖利率 − 3 個月殖利率');
 
   const scenario = card(page, '存續期間情境分析');
-  const tlt = scenario.locator('.rates-bar-row', { hasText: 'TLT' });
+  // TMF borrows TLT's duration, so its label also contains "TLT": match the symbol itself.
+  const tlt = scenario.locator('.rates-bar-row', { has: page.locator('.rates-bar-label > b', { hasText: /^TLT$/ }) });
   const before = await tlt.locator('.rates-bar-value').textContent();
   await scenario.getByRole('button', { name: '-2.00%' }).click();
   await expect(tlt.locator('.rates-bar-value')).not.toHaveText(before ?? '');
@@ -89,7 +90,7 @@ test('spreads, scenario slider and ETF comparison respond to controls', async ({
 
   const etf = card(page, '長天期美債 ETF 比較');
   const etfTable = etf.getByRole('region', { name: '長天期美債 ETF 比較表' });
-  await expect(etfTable.getByRole('row')).toHaveCount(3);
+  await expect(etfTable.getByRole('row')).toHaveCount(6);
   await expect(etfTable.getByRole('columnheader')).toHaveCount(9);
   await expect(etf.getByRole('group', { name: '比較項目' })).toHaveCount(0);
   await expect(etf.getByRole('button', { name: '利率敏感度' })).toHaveCount(0);
@@ -105,7 +106,7 @@ test('spreads, scenario slider and ETF comparison respond to controls', async ({
 
 test('history failure leaves the summary sections usable', async ({ page }) => {
   await mockRates(page, 'history-down');
-  await page.goto('./?page=world&view=rates');
+  await page.goto('./?page=world');
   await expect(page.locator('.rates-key')).toHaveCount(3);
   await expect(card(page, '利差').locator('.rates-section-state')).toContainText('暫時無法顯示');
   await expect(card(page, '存續期間情境分析').locator('.rates-bar-row')).toHaveCount(5);
@@ -113,9 +114,9 @@ test('history failure leaves the summary sections usable', async ({ page }) => {
 
 test('missing and unreadable rates.json show friendly states', async ({ page }) => {
   await mockRates(page, 'missing');
-  await page.goto('./?page=world&view=rates');
+  await page.goto('./?page=world');
   await expect(page.getByText('資料尚未產生')).toBeVisible();
   await mockRates(page, 'broken');
-  await page.goto('./?page=world&view=rates');
+  await page.goto('./?page=world');
   await expect(page.getByText('美債利率資料暫時無法顯示')).toBeVisible();
 });

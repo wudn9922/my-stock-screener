@@ -5,44 +5,47 @@ const route = (search: string) => parseRoute(search, 'markets').route;
 const liff = (state: string) => `?liff.state=${encodeURIComponent(state)}`;
 
 describe('world rates view route', () => {
-  it('keeps ?page=world unchanged (no view field at all)', () => {
+  it('keeps ?page=world unchanged (rates is the default, no view field at all)', () => {
     const parsed = parseRoute('?page=world');
     expect(parsed).toEqual({ route: { page: 'world' }, rewrite: false });
     expect('view' in parsed.route).toBe(false);
   });
 
-  it('parses the rates view and drops unknown views', () => {
-    expect(route('?page=world&view=rates')).toEqual({ page: 'world', view: 'rates' });
-    expect(route('?page=world&view=RATES')).toEqual({ page: 'world', view: 'rates' });
+  it('parses the indices view, folds the old rates view into the default and drops unknown views', () => {
+    expect(route('?page=world&view=indices')).toEqual({ page: 'world', view: 'indices' });
+    expect(route('?page=world&view=INDICES')).toEqual({ page: 'world', view: 'indices' });
+    expect(route('?page=world&view=rates')).toEqual({ page: 'world' });
     expect(route('?page=world&view=bogus')).toEqual({ page: 'world' });
-    expect(parseRoute('?page=world&view=rates').rewrite).toBe(false);
+    expect(parseRoute('?page=world&view=indices').rewrite).toBe(false);
+    // Old bookmarks and LINE links carrying view=rates are rewritten to the canonical URL.
+    expect(parseRoute('?page=world&view=rates').rewrite).toBe(true);
     expect(parseRoute('?page=world&view=bogus').rewrite).toBe(true);
     // The view only belongs to the world page.
-    expect(route('?page=themes&view=rates')).toEqual({ page: 'themes' });
+    expect(route('?page=themes&view=indices')).toEqual({ page: 'themes' });
   });
 
-  it('maps the rates and bonds aliases to world + rates and rewrites to the canonical URL', () => {
+  it('maps the rates and bonds aliases to the default world route and rewrites to the canonical URL', () => {
     for (const alias of ['rates', 'bonds', 'RATES']) {
       const parsed = parseRoute(`?page=${alias}`);
-      expect(parsed).toEqual({ route: { page: 'world', view: 'rates' }, rewrite: true });
-      expect(serializeRoute(parsed.route)).toBe('?page=world&view=rates');
+      expect(parsed).toEqual({ route: { page: 'world' }, rewrite: true });
+      expect(serializeRoute(parsed.route)).toBe('?page=world');
     }
-    expect(route('?page=bonds&view=nope')).toEqual({ page: 'world', view: 'rates' });
+    expect(route('?page=bonds&view=nope')).toEqual({ page: 'world' });
   });
 
   it('serializes and round-trips', () => {
     expect(serializeRoute({ page: 'world' })).toBe('?page=world');
-    expect(serializeRoute({ page: 'world', view: 'rates' })).toBe('?page=world&view=rates');
-    expect(parseRoute('?page=world&view=rates')).toEqual({ route: { page: 'world', view: 'rates' }, rewrite: false });
-    expect(sameRoute({ page: 'world' }, { page: 'world', view: 'rates' })).toBe(false);
+    expect(serializeRoute({ page: 'world', view: 'indices' })).toBe('?page=world&view=indices');
+    expect(parseRoute('?page=world&view=indices')).toEqual({ route: { page: 'world', view: 'indices' }, rewrite: false });
+    expect(sameRoute({ page: 'world' }, { page: 'world', view: 'indices' })).toBe(false);
   });
 
   it('unwraps LIFF state for the rates alias and path forms', () => {
-    expect(parseRoute(liff('/atlas/?page=rates'))).toEqual({ route: { page: 'world', view: 'rates' }, rewrite: true });
-    expect(parseRoute(liff('?page=world&view=rates'))).toEqual({ route: { page: 'world', view: 'rates' }, rewrite: true });
-    expect(route(liff('/my-stock-screener/atlas/bonds'))).toEqual({ page: 'world', view: 'rates' });
+    expect(parseRoute(liff('/atlas/?page=rates'))).toEqual({ route: { page: 'world' }, rewrite: true });
+    expect(parseRoute(liff('?page=world&view=indices'))).toEqual({ route: { page: 'world', view: 'indices' }, rewrite: true });
+    expect(route(liff('/my-stock-screener/atlas/bonds'))).toEqual({ page: 'world' });
     expect(route(liff('/atlas/?page=world'))).toEqual({ page: 'world' });
-    expect(route(`${liff(encodeURIComponent('/?page=rates'))}&liff.referrer=x`)).toEqual({ page: 'world', view: 'rates' });
+    expect(route(`${liff(encodeURIComponent('/?page=rates'))}&liff.referrer=x`)).toEqual({ page: 'world' });
   });
 });
 

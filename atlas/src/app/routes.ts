@@ -4,7 +4,8 @@ import type { Timeframe } from '../market-data/MarketDataProvider';
 
 /**
  * Site routes live in the query string so the static GitHub Pages deployment needs no rewrites:
- * `?page=markets&market=tw`, `?page=world`, `?page=world&view=rates` (aliases `?page=rates`, `?page=bonds`),
+ * `?page=markets&market=tw`, `?page=world` (US Treasuries and rates, the default; aliases `?page=rates`, `?page=bonds`,
+ * old `&view=rates`), `?page=world&view=indices` (world indices),
  * `?page=themes&theme=ai-chips` (`&market=tw` for the Taiwan themes; the US ones are the default), `?page=screener&group=tw_g1`, `?page=chart&symbol=2330.TW&tf=1D`,
  * `?page=financials&symbol=AAPL&p=q` (not in the bottom bar; opened from the chart header). Legacy report links (`?symbol=…&tf=…`) open the chart.
  * LINE LIFF wraps the original path and query in `liff.state`, which is unwrapped first.
@@ -14,8 +15,8 @@ export type Page = (typeof PAGES)[number];
 
 export type Route =
   | { page: 'markets'; market: MarketKey }
-  /** `view` is only present for the rates sub-view; the index view is just `{ page: 'world' }`. */
-  | { page: 'world'; view?: 'rates' }
+  /** `view` is only present for the world-index sub-view; the default (rates) view is just `{ page: 'world' }`. */
+  | { page: 'world'; view?: 'indices' }
   /** `market` is only present for Taiwan (`'tw'`); omitted means the US themes. */
   | { page: 'themes'; theme?: string; market?: 'tw' }
   | { page: 'screener'; group?: string; f?: string }
@@ -42,13 +43,13 @@ const pageAliases: Record<string, Page> = {
   financials: 'financials',
   financial: 'financials',
 };
-/** Page aliases that also select a sub-view of their page. */
-const viewAliases: Record<string, { page: Page; view: 'rates' }> = {
-  rates: { page: 'world', view: 'rates' },
-  bonds: { page: 'world', view: 'rates' },
+/** Page aliases that also select a sub-view of their page (rates is the world page's default view, so no `view`). */
+const viewAliases: Record<string, { page: Page; view?: 'indices' }> = {
+  rates: { page: 'world' },
+  bonds: { page: 'world' },
 };
 
-function resolveAlias(name: string | undefined): { page: Page; view?: 'rates' } | undefined {
+function resolveAlias(name: string | undefined): { page: Page; view?: 'indices' } | undefined {
   if (!name) return undefined;
   const withView = viewAliases[name];
   if (withView) return withView;
@@ -97,7 +98,7 @@ export function unwrapLiffState(params: URLSearchParams): { params: URLSearchPar
   return { params: merged, path };
 }
 
-function pageFromPath(path: string): { page: Page; view?: 'rates' } | undefined {
+function pageFromPath(path: string): { page: Page; view?: 'indices' } | undefined {
   const segments = path.split('/').filter(Boolean).map((segment) => segment.toLowerCase());
   for (let i = segments.length - 1; i >= 0; i--) {
     const found = resolveAlias(segments[i]!.replace(/\.html?$/, ''));
@@ -151,9 +152,9 @@ export function parseRoute(search: string, fallback: Page = 'markets'): ParsedRo
     const tf = parseLaunchTimeframe(params.get('tf') ?? params.get('timeframe'));
     route = { page, ...(symbol ? { symbol } : {}), ...(tf ? { tf } : {}) };
   } else if (page === 'world') {
-    // `view` is only kept for 'rates'; plain `?page=world` stays `{ page: 'world' }`.
+    // `view` is only kept for 'indices'; rates (including the old `view=rates`) is the default and stays `{ page: 'world' }`.
     const view = resolved?.page === 'world' && resolved.view ? resolved.view : params.get('view')?.trim().toLowerCase();
-    route = view === 'rates' ? { page, view } : { page };
+    route = view === 'indices' ? { page, view } : { page };
   } else if (page === 'financials') {
     const p = params.get('p')?.trim().toLowerCase();
     route = { page, ...(symbol ? { symbol } : {}), ...(p === 'q' ? { p } : {}) };
