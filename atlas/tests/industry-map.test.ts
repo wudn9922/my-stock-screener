@@ -15,6 +15,7 @@ import {
   sizeOf,
   summarize,
   type IndustryStock,
+  sectorLabel,
 } from '../src/pages/industryModel';
 import {
   BALANCED_FLOOR,
@@ -185,15 +186,20 @@ describe('buildIndustryModel', () => {
     expect(model.twoLevel).toBe(true);
     const byGroup = Object.fromEntries(model.groups.map((g) => [g.label, g.cells.map((c) => c.label)]));
     expect(byGroup).toEqual({
-      Technology: ['Semiconductors', 'Software', '其他'],
-      Energy: ['Oil', '其他'],
-      Utilities: ['其他'],
+      '科技 Technology': ['Semiconductors', 'Software', '其他'],
+      '能源 Energy': ['Oil', '其他'],
+      '公用事業 Utilities': ['其他'],
       未分類: ['其他'],
     });
-    const tech = model.groups.find((g) => g.label === 'Technology')!;
+    const tech = model.groups.find((g) => g.label === '科技 Technology')!;
     expect(tech.cells.find((c) => c.merged)!.mergedFrom).toEqual(['Hardware']);
     expect(tech.stocks).toHaveLength(8);
     expect(model.cellCount).toBe(7);
+  });
+
+  it('labels US sectors in Chinese and keeps the source name; unknown sectors stay as they are', () => {
+    expect(sectorLabel('Health Care')).toBe('醫療保健 Health Care');
+    expect(sectorLabel('Something New')).toBe('Something New');
   });
 
   it('returns null for an empty market and keeps every stock exactly once', () => {

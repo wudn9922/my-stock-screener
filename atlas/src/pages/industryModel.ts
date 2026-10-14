@@ -80,6 +80,28 @@ export function stockOf(item: GroupItem): IndustryStock {
   };
 }
 
+/** Chinese names for the Nasdaq screener's US sectors (industries keep the source's English names). */
+export const US_SECTOR_ZH: Readonly<Record<string, string>> = {
+  'Basic Materials': '基礎原物料',
+  'Consumer Discretionary': '非必需消費',
+  'Consumer Staples': '必需消費',
+  Energy: '能源',
+  Finance: '金融',
+  'Health Care': '醫療保健',
+  Industrials: '工業',
+  Miscellaneous: '綜合',
+  'Real Estate': '不動產',
+  Technology: '科技',
+  Telecommunications: '電信',
+  Utilities: '公用事業',
+};
+
+/** Display name of a sector group: Chinese with the source name kept, e.g. 「科技 Technology」. */
+export function sectorLabel(sector: string): string {
+  const zh = US_SECTOR_ZH[sector];
+  return zh ? `${zh} ${sector}` : sector;
+}
+
 /** TW: the industry (官方產業別), else the sector. US: the sector and the industry stay separate. */
 function classify(item: GroupItem, market: UniverseMarketKey): { sector: string | null; industry: string | null } {
   const sector = item.profile?.sector ?? null;
@@ -131,7 +153,7 @@ export function buildIndustryModel(market: UniverseMarket): IndustryModel | null
       }
     }
     if (other.length) cells.push({ id: `${groupId}|${OTHER_LABEL}`, label: OTHER_LABEL, groupId, stocks: other, mergedFrom, merged: true });
-    groups.push({ id: groupId, label: sector, cells, stocks: cells.flatMap((cell) => cell.stocks) });
+    groups.push({ id: groupId, label: sectorLabel(sector), cells, stocks: cells.flatMap((cell) => cell.stocks) });
   }
   return {
     market: key,
