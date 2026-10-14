@@ -201,7 +201,19 @@ export const groupItemSchema = z
   })
   .transform((value) => ({ ...value, name: value.name || value.symbol }));
 /** `status` is left out for matched rows (and for full-market rows built outside this schema). */
-export type GroupItem = Omit<z.output<typeof groupItemSchema>, 'status'> & { status?: Exclude<ItemStatus, 'matched'> };
+/**
+ * Company profile carried by full-market universe rows (`sector`, `industry`, `marketCap` columns of
+ * universe.json). Report group rows have none. `marketCap` is in the market's currency (TWD / USD).
+ */
+export interface StockProfile {
+  sector: string | null;
+  industry: string | null;
+  marketCap: number | null;
+}
+export type GroupItem = Omit<z.output<typeof groupItemSchema>, 'status'> & {
+  status?: Exclude<ItemStatus, 'matched'>;
+  profile?: StockProfile;
+};
 
 /** The row's status, with the missing value read as `matched`. */
 export const itemStatusOf = (item: Pick<GroupItem, 'status'>): ItemStatus => item.status ?? 'matched';
