@@ -113,25 +113,26 @@ class RegistryTest(unittest.TestCase):
 
 @unittest.skipUnless(os.path.exists(UNIVERSE_PATH), "docs/report/universe.json not present")
 class UniverseTest(unittest.TestCase):
-    """Constituents must come from the TW liquidity list (stocks with prices the daily report already fetches).
+    """Constituents must be real listed stocks, and the names must agree with the liquidity list.
 
-    universe.json is rewritten by the daily report; a few names may drop off on a quiet day, so only a
-    large gap (typos) or a theme left with fewer than 5 valid names fails.
+    Membership is checked against the TWSE/TPEx company directory, which is stable. The liquidity list in
+    universe.json is rebuilt daily from that day's turnover (volume >= 1M shares), so on a quiet day dozens of
+    valid small names drop off: checking membership against it made these tests fail without any typo.
     """
 
     @classmethod
     def setUpClass(cls):
         cls.universe = tw_universe()
+        cls.registry = registry()
 
     def test_universe_is_loaded(self):
         self.assertGreater(len(self.universe), 100)
 
-    def test_most_constituents_are_in_the_universe(self):
-        # The list is rebuilt daily from that day's turnover, so a quiet day can drop a few names; a typo in a
-        # ticker shows up as a larger gap, which is what this guards against.
+    def test_constituents_exist_in_the_company_directory(self):
+        # A typo in a ticker (or a delisted name) is not in the directory.
         symbols = {symbol for _key, (symbol, _n, _d) in all_entries()}
-        missing = sorted(symbol for symbol in symbols if symbol not in self.universe)
-        self.assertLessEqual(len(missing), max(5, len(symbols) // 10), missing)
+        missing = sorted(symbol for symbol in symbols if symbol not in self.registry)
+        self.assertLessEqual(len(missing), max(2, len(symbols) // 50), missing)
 
     def test_names_match_the_universe(self):
         mismatched = [
@@ -143,7 +144,7 @@ class UniverseTest(unittest.TestCase):
 
     def test_each_theme_keeps_enough_valid_constituents(self):
         for theme in themes_tw.THEMES:
-            inside = [t[0] for t in theme["tickers"] if t[0] in self.universe]
+            inside = [t[0] for t in theme["tickers"] if t[0] in self.registry]
             self.assertGreaterEqual(len(inside), build_themes.MIN_VALID + 1, theme["key"])
 
 
