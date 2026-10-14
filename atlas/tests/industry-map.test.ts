@@ -197,7 +197,7 @@ describe('buildIndustryModel', () => {
   });
 
   it('returns null for an empty market and keeps every stock exactly once', () => {
-    expect(buildIndustryModel({ market: 'TW', benchmark: '^TWII', asOf: null, universe: 'x', scope: 'full', items: [] })).toBeNull();
+    expect(buildIndustryModel({ market: 'TW', benchmark: '^TWII', asOf: null, universe: 'x', scope: 'full', note: null, items: [] })).toBeNull();
     const m = buildIndustryModel(market(universeBody({ twCount: 300, twIndustries: 12, usCount: 600, usIndustries: 22 }), 'US'))!;
     const symbols = m.groups.flatMap((g) => g.cells.flatMap((c) => c.stocks.map((s) => s.symbol)));
     expect(symbols).toHaveLength(600);
