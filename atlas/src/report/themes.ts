@@ -86,6 +86,8 @@ const constituentSchema = z.object({
   rs3m: finiteOrNull,
   aboveMa50: z.unknown().optional().transform((value) => (typeof value === 'boolean' ? value : null)),
   fromHi52: finiteOrNull,
+  /** 20-session average traded value (close × volume), written by build_themes.py; absent in older files. */
+  turnover20: finiteOrNull,
 });
 export type ThemeConstituent = z.output<typeof constituentSchema>;
 

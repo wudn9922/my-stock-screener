@@ -44,6 +44,9 @@ MA_WINDOW = 50
 STALE_DAYS = 3
 # Theme needs at least this many valid constituents to be ranked.
 MIN_VALID = 3
+# Average turnover (close x volume) per constituent: the latest 20 sessions, at least 15 of them present.
+TURNOVER_WINDOW = 20
+TURNOVER_MIN_DAYS = 15
 # Below this share of tickers with data the old file is kept. The same 0.6 applies to Taiwan: trading
 # halts and the odd failed Yahoo symbol are common there, but a run under 60% is more likely a bad
 # download than a real market, and keeping yesterday's file is the safer outcome.
@@ -205,8 +208,16 @@ def rounded_returns(returns):
     return {key: round2(returns.get(key)) for key in PERIOD_KEYS}
 
 
-def build_payload(prices, config, today):
-    """Theme rotation payload from downloaded prices. Raises InsufficientData instead of guessing."""
+def turnover_field(turnover, symbol, last_date):
+    """{"turnover20": int} when the symbol's average turnover is known, else nothing (old files stay valid)."""
+    average = turnover_average((turnover or {}).get(symbol) or [], last_date)
+    return {"turnover20": int(round(average))} if average else {}
+
+
+def build_payload(prices, config, today, turnover=None):
+    """Theme rotation payload from downloaded prices. Raises InsufficientData instead of guessing.
+
+    `turnover` ({symbol: [(date, close x volume)]}) adds each constituent's 20-session average turnover."""
     bench_symbol = config.get("benchmark", BENCHMARK)
     bench_bars = prices.get(bench_symbol) or []
     if len(bench_bars) < PERIOD_BARS["m6"] + 1:
@@ -321,6 +332,7 @@ def build_payload(prices, config, today):
                         "rs3m": round2(metrics["rs3m"]),
                         "aboveMa50": metrics["aboveMa50"],
                         "fromHi52": round2(metrics["fromHi52"]),
+                        **turnover_field(turnover, symbol, last_date),
                     }
                     for symbol, name, note, _values, metrics in ordered
                 ],
@@ -361,24 +373,29 @@ def build_payload(prices, config, today):
 # --------------------------------------------------------------------------- download
 
 
-def extract_bars(downloaded, symbol, single):
-    """[(YYYY-MM-DD, close)] for one symbol from a yfinance frame (any column layout)."""
+def _field_series(downloaded, symbol, single, field):
+    """One column ("Close" / "Volume") of a yfinance frame for one symbol, any column layout; None when absent."""
     if downloaded is None or getattr(downloaded, "empty", True):
-        return []
+        return None
     columns = downloaded.columns
     try:
         if getattr(columns, "nlevels", 1) > 1:
             if symbol in set(columns.get_level_values(0)):
-                series = downloaded[symbol]["Close"]
-            elif symbol in set(columns.get_level_values(1)):
-                series = downloaded["Close"][symbol]
-            else:
-                return []
-        elif single:
-            series = downloaded["Close"]
-        else:
-            return []
+                return downloaded[symbol][field]
+            if symbol in set(columns.get_level_values(1)):
+                return downloaded[field][symbol]
+            return None
+        if single:
+            return downloaded[field]
     except KeyError:
+        return None
+    return None
+
+
+def extract_bars(downloaded, symbol, single):
+    """[(YYYY-MM-DD, close)] for one symbol from a yfinance frame (any column layout)."""
+    series = _field_series(downloaded, symbol, single, "Close")
+    if series is None:
         return []
     bars = []
     for index, value in series.dropna().items():
@@ -389,8 +406,34 @@ def extract_bars(downloaded, symbol, single):
     return bars
 
 
-def download_prices(symbols, downloader=None, sleep=time.sleep):
-    """Downloads 1y of daily closes in batches; one retry round for symbols that came back empty."""
+def extract_turnover(downloaded, symbol, single):
+    """[(YYYY-MM-DD, close x volume)] for one symbol; days without a positive close and volume are dropped."""
+    closes = _field_series(downloaded, symbol, single, "Close")
+    volumes = _field_series(downloaded, symbol, single, "Volume")
+    if closes is None or volumes is None:
+        return []
+    rows = []
+    for index, close in closes.items():
+        volume = volumes.get(index)
+        if close is None or volume is None:
+            continue
+        close, volume = float(close), float(volume)
+        if close == close and volume == volume and close > 0 and volume > 0:
+            rows.append((index.strftime("%Y-%m-%d"), close * volume))
+    rows.sort()
+    return rows
+
+
+def turnover_average(rows, last_date):
+    """Mean daily turnover over the latest TURNOVER_WINDOW sessions up to last_date; None with too few sessions."""
+    window = [value for day, value in rows if day <= last_date][-TURNOVER_WINDOW:]
+    return sum(window) / len(window) if len(window) >= TURNOVER_MIN_DAYS else None
+
+
+def download_prices(symbols, downloader=None, sleep=time.sleep, turnover=None):
+    """Downloads 1y of daily closes in batches; one retry round for symbols that came back empty.
+
+    When `turnover` is a dict it is filled with {symbol: [(date, close x volume)]} from the same download."""
     if downloader is None:
         import yfinance as yf
 
@@ -424,6 +467,8 @@ def download_prices(symbols, downloader=None, sleep=time.sleep):
                 bars = extract_bars(downloaded, symbol, single=len(batch) == 1)
                 if bars:
                     prices[symbol] = bars
+                    if turnover is not None:
+                        turnover[symbol] = extract_turnover(downloaded, symbol, single=len(batch) == 1)
 
     run(list(symbols))
     missing = [s for s in symbols if s not in prices]
@@ -487,11 +532,12 @@ def main(argv=None):
     out_path = os.environ.get("THEMES_OUT_PATH") or os.path.join(os.path.dirname(DEFAULT_OUT), out_name)
     symbols = all_symbols(config)
     print(f"[{market}] downloading {len(symbols)} symbols")
-    prices = download_prices(symbols)
+    turnover = {}
+    prices = download_prices(symbols, turnover=turnover)
     now = datetime.now(timezone.utc)
     prices = drop_open_session(prices, now, market)
     try:
-        payload = build_payload(prices, config, now)
+        payload = build_payload(prices, config, now, turnover)
     except InsufficientData as exc:
         print(f"{out_name} not updated: {exc}")
         # a few raw series, to tell a data-source problem from a logic problem

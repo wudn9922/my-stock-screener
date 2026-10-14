@@ -18,6 +18,7 @@ import {
   stockHeatCap,
   themeName,
   toGroupInputs,
+  themesHaveTurnover,
   turnoverLookup,
   type MapGroup,
   type MapLeaf,
@@ -233,8 +234,9 @@ export default function ThemesMap({
   };
 
   const cap = stockHeatCap(period);
-  const unavailable = universe !== null && !lookup;
-  const turnoverAsOf = lookup?.asOf ?? null;
+  const hasTurnover = lookup !== null || themesHaveTurnover(usable);
+  const unavailable = universe !== null && !hasTurnover;
+  const turnoverAsOf = lookup?.asOf ?? data.asOf ?? null;
   const currency = market === 'tw' ? '新台幣' : '美元';
 
   return (
@@ -249,7 +251,7 @@ export default function ThemesMap({
                 type="button"
                 className={model.mode === key ? 'active' : ''}
                 aria-pressed={model.mode === key}
-                disabled={needsData && !lookup}
+                disabled={needsData && !hasTurnover}
                 title={WEIGHT_HINTS[key]}
                 onClick={() => choose(key)}
               >

@@ -8,6 +8,8 @@ import {
   formatTurnover,
   parseWeightMode,
   shortSymbol,
+  ownTurnover,
+  themesHaveTurnover,
   toGroupInputs,
   turnoverLookup,
 } from '../src/pages/themesMapModel';
@@ -97,6 +99,22 @@ describe('buildMapModel', () => {
       expect(model.groups.flatMap((g) => g.leaves.map((l) => l.weight))).toEqual(Array(8).fill(1));
       expect(model.imputed).toBe(0);
     }
+  });
+
+  it("prefers a constituent's own turnover20 over the universe lookup and works without a lookup", () => {
+    const own = themes.map((t) => ({
+      ...t,
+      constituents: t.constituents.map((c) => ({ ...c, turnover20: c.symbol === 'B2' ? 50 : c.symbol === 'A1' ? 7 : null })),
+    }));
+    expect(themesHaveTurnover(themes)).toBe(false);
+    expect(themesHaveTurnover(own)).toBe(true);
+    const model = buildMapModel(own, lookup, 'turnover');
+    const leaf = (key: string) => model.groups.flatMap((g) => g.leaves).find((l) => l.symbol === key)!;
+    expect(leaf('A1').turnover).toBe(7); // own value beats the lookup's 10_000
+    expect(leaf('B2').turnover).toBe(50); // fills a symbol the lookup lacks
+    expect(leaf('A2').turnover).toBe(400); // lookup still fills the rest
+    expect(buildMapModel(own, null, 'balanced').mode).toBe('balanced');
+    expect(ownTurnover({ ...own[0]!.constituents[0]!, turnover20: -3 })).toBeNull();
   });
 
   it('is deterministic and handles an empty theme list', () => {

@@ -169,6 +169,22 @@ class PayloadTest(unittest.TestCase):
         bench = build_themes.build_payload(prices, config, TODAY)["benchmark"]["series"]
         self.assertEqual(bench, [100.0] * 126)
 
+    def test_constituents_carry_turnover20_only_when_known(self):
+        config = mini_config({"t": ["AAA", "BBB", "CCC"]})
+        prices = self.prices(
+            AAA=geometric(self.calendar, 100.0, 0.01),
+            BBB=geometric(self.calendar, 100.0, 0.0),
+            CCC=geometric(self.calendar, 100.0, -0.005),
+        )
+        turnover = {"AAA": [(day, 1000.0) for day in self.calendar], "BBB": [(day, 5.0) for day in self.calendar[-3:]]}
+        theme = build_themes.build_payload(prices, config, TODAY, turnover)["themes"][0]
+        by_symbol = {c["symbol"]: c for c in theme["constituents"]}
+        self.assertEqual(by_symbol["AAA"]["turnover20"], 1000)
+        self.assertNotIn("turnover20", by_symbol["BBB"])  # fewer than TURNOVER_MIN_DAYS sessions
+        self.assertNotIn("turnover20", by_symbol["CCC"])
+        plain = build_themes.build_payload(prices, config, TODAY)["themes"][0]["constituents"]
+        self.assertTrue(all("turnover20" not in c for c in plain))
+
     def test_stale_constituents_are_excluded_after_three_days(self):
         config = mini_config({"t": ["OK", "OK2", "OK3", "EDGE", "OLD", "GONE"]})
         prices = self.prices(
@@ -309,6 +325,40 @@ class DownloadTest(unittest.TestCase):
         self.assertEqual(len(build_themes.extract_bars(flat, "AAA", single=True)), 3)
         self.assertEqual(build_themes.extract_bars(flat, "AAA", single=False), [])
         self.assertEqual(build_themes.extract_bars(None, "AAA", single=True), [])
+
+    def test_extract_turnover_is_close_times_volume_and_skips_bad_rows(self):
+        if importlib.util.find_spec("pandas") is None:
+            self.skipTest("pandas not installed")
+        frame = self.frame(["AAA", "NAN"])
+        self.assertEqual(
+            build_themes.extract_turnover(frame, "AAA", single=False),
+            [("2026-10-07", 50.0), ("2026-10-08", 55.0), ("2026-10-09", 60.0)],
+        )
+        self.assertEqual(len(build_themes.extract_turnover(frame, "NAN", single=False)), 2)
+        self.assertEqual(build_themes.extract_turnover(frame, "ZZZ", single=False), [])
+        self.assertEqual(build_themes.extract_turnover(None, "AAA", single=True), [])
+        frame[("AAA", "Volume")] = [0.0, 5.0, float("nan")]
+        self.assertEqual(build_themes.extract_turnover(frame, "AAA", single=False), [("2026-10-08", 55.0)])
+
+    def test_turnover_average_uses_latest_window_up_to_the_date(self):
+        rows = [(f"2026-09-{day:02d}", float(day)) for day in range(1, 29)]
+        window = build_themes.TURNOVER_WINDOW
+        self.assertEqual(build_themes.turnover_average(rows, "2026-09-28"), sum(range(29 - window, 29)) / window)
+        # nothing after last_date leaks in
+        self.assertEqual(build_themes.turnover_average(rows, "2026-09-20"), sum(range(1, 21)) / 20)
+        self.assertIsNone(build_themes.turnover_average(rows[: build_themes.TURNOVER_MIN_DAYS - 1], "2026-09-28"))
+        self.assertIsNone(build_themes.turnover_average([], "2026-09-28"))
+
+    def test_download_prices_collects_turnover_when_asked(self):
+        if importlib.util.find_spec("pandas") is None:
+            self.skipTest("pandas not installed")
+        turnover = {}
+        prices = build_themes.download_prices(
+            ["AAA", "BBB"], downloader=lambda batch: self.frame(list(batch)), sleep=lambda _s: None, turnover=turnover
+        )
+        self.assertEqual(sorted(prices), ["AAA", "BBB"])
+        self.assertEqual(sorted(turnover), ["AAA", "BBB"])
+        self.assertEqual(len(turnover["AAA"]), 3)
 
     def test_download_prices_batches_retries_and_collects(self):
         if importlib.util.find_spec("pandas") is None:
