@@ -1,117 +1,75 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { useMemo, useState } from 'react';
 import { PERIOD_LABELS, type PeriodKey, type Theme, type ThemesData } from '../report/themes';
-import { loadUniverse, type UniverseLoadResult } from '../report/universe';
 import { storageName } from '../app/HostingMode';
 import type { OpenChartOptions } from '../app/Site';
 import { formatDateTime, formatPercent, toneClass } from '../ui/format';
-import { heatWithCap } from './themesView';
+import HeatCanvas, { type HeatGroupView } from './HeatCanvas';
+import { IndustryPanel } from './IndustryPanel';
+import {
+  FALLBACK_NOTICE,
+  MIN_INDUSTRY_STOCKS,
+  clampIndustryPeriod,
+  colorValue,
+  industryGroups,
+  summarize,
+  type IndustryModel,
+  type IndustrySummary,
+  type MapSource,
+} from './industryModel';
 import {
   BALANCED_FLOOR,
+  DEFAULT_AGG_MODE,
   DEFAULT_WEIGHT_MODE,
-  WEIGHT_HINTS,
-  WEIGHT_LABELS,
   WEIGHT_MODES,
   buildMapModel,
-  formatTurnover,
+  formatMoney,
+  parentName,
+  parseAggMode,
   parseWeightMode,
-  shortSymbol,
-  stockHeatCap,
-  themeName,
-  toGroupInputs,
+  themeGroups,
+  themeTurnover,
   themesHaveTurnover,
-  turnoverLookup,
-  type MapGroup,
-  type MapLeaf,
+  universeKey,
+  type AggMode,
   type WeightMode,
 } from './themesMapModel';
-import { DEFAULT_LAYOUT, fitLayout, labelLevel, type Rect } from './treemap';
+import { HEAT_CAP } from './themesView';
 
 /**
- * Treemap view of the 題材 page: outer blocks are themes, inner tiles are their constituents.
- * Size = 20-day average traded value (see themesMapModel), colour = the chosen period's return.
- * Small stocks stay visible: balanced weights with a floor, a minimum tile side that makes the map
- * taller instead of smaller, and a tooltip for tiles too small to carry text.
+ * Heatmap view of the 題材 page. Every cell is an industry: Taiwan one level (官方產業別), the US sector →
+ * industry. Colour = the industry's return in the chosen period (market-cap weighted or equal-weight
+ * median), size = the industry's total market cap. Until the full-market profile data exists the cells are
+ * themes instead (colour = theme average, size = turnover of the members). Single stocks are never cells;
+ * a click opens the industry's constituents (or the theme detail in the fallback).
  */
 
-/** Smallest tile side the layout aims for (CSS px); the map grows taller to honour it. */
-const MIN_TILE_SIDE = 22;
-const MAX_HEIGHT = 9000;
-/** The raw-proportion mode may not stretch the page for ever: past this the small tiles simply stay small. */
-const MAX_HEIGHT_RAW = { phone: 3200, wide: 2000 };
-const LONG_PRESS_MS = 450;
-const TIP_WIDTH = 224;
 const PREFS_KEY = storageName('atlas-themes-map-v1');
 
-function readWeightMode(): WeightMode {
+interface MapPrefs {
+  weight: WeightMode;
+  agg: AggMode;
+}
+
+function readPrefs(): MapPrefs {
   try {
-    const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? 'null') as { weight?: unknown } | null;
-    return parseWeightMode(raw?.weight);
+    const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? 'null') as { weight?: unknown; agg?: unknown } | null;
+    return { weight: parseWeightMode(raw?.weight), agg: parseAggMode(raw?.agg) };
   } catch {
-    return DEFAULT_WEIGHT_MODE;
+    return { weight: DEFAULT_WEIGHT_MODE, agg: DEFAULT_AGG_MODE };
   }
 }
 
-function writeWeightMode(weight: WeightMode) {
+function writePrefs(prefs: MapPrefs) {
   try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ weight }));
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   } catch {
-    /* A remembered size mode is only a convenience. */
+    /* A remembered mode is only a convenience. */
   }
 }
 
-function baseHeightFor(width: number): number {
-  return width < 600 ? 520 : Math.round(Math.min(680, Math.max(460, width * 0.5)));
-}
+const WEIGHT_LABELS = { balanced: '均衡', equal: '等大小' } as const;
 
-function box(rect: Rect, inset: number): CSSProperties {
-  return {
-    left: rect.x + inset,
-    top: rect.y + inset,
-    width: Math.max(0, rect.w - inset * 2),
-    height: Math.max(0, rect.h - inset * 2),
-  };
-}
-
-/** Width of an element, kept current with a ResizeObserver (0 until measured). */
-function useWidth() {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(0);
-  useLayoutEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-    const measure = (next: number) => setWidth((current) => (Math.abs(current - next) < 2 ? current : next));
-    measure(Math.floor(node.getBoundingClientRect().width));
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver((entries) => measure(Math.floor(entries[0]?.contentRect.width ?? 0)));
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-  return { ref, width };
-}
-
-function useUniverse(): UniverseLoadResult | null {
-  const [result, setResult] = useState<UniverseLoadResult | null>(null);
-  useEffect(() => {
-    let active = true;
-    void loadUniverse().then((next) => {
-      if (active) setResult(next);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-  return result;
-}
-
-interface Tip {
-  id: string;
-  leaf: MapLeaf;
-  group: MapGroup;
-  rect: Rect;
-}
-
-function Legend({ period }: { period: PeriodKey }) {
-  const cap = stockHeatCap(period);
+function Legend({ period, cap }: { period: PeriodKey; cap: number }) {
   return (
     <div className="map-legend" aria-label={`顏色圖例：${PERIOD_LABELS[period]}報酬`} role="img">
       <span className="num">≤ -{cap}%</span>
@@ -122,262 +80,366 @@ function Legend({ period }: { period: PeriodKey }) {
   );
 }
 
+function Toolbar({
+  sizeLabel,
+  sizeUsed,
+  sizeEnabled,
+  onSize,
+  agg,
+}: {
+  sizeLabel: string;
+  sizeUsed: WeightMode;
+  sizeEnabled: boolean;
+  onSize: (mode: WeightMode) => void;
+  agg?: { value: AggMode; weightedLabel: string; weightedEnabled: boolean; onChange: (mode: AggMode) => void };
+}) {
+  const hints: Record<WeightMode, string> = {
+    balanced: '大小取平方根壓縮並設最小面積，小產業也看得到、點得到',
+    equal: '每個方塊一樣大',
+    size: `大小與${sizeLabel}成正比，小的會很小`,
+  };
+  const labels: Record<WeightMode, string> = { ...WEIGHT_LABELS, size: sizeLabel };
+  return (
+    <>
+      <div className="segmented compact" role="group" aria-label="大小">
+        {WEIGHT_MODES.map((key) => (
+          <button
+            key={key}
+            type="button"
+            className={sizeUsed === key ? 'active' : ''}
+            aria-pressed={sizeUsed === key}
+            disabled={key !== 'equal' && !sizeEnabled}
+            title={hints[key]}
+            onClick={() => onSize(key)}
+          >
+            {labels[key]}
+          </button>
+        ))}
+      </div>
+      {agg && (
+        <div className="segmented compact" role="group" aria-label="加權方式">
+          <button
+            type="button"
+            className={agg.value === 'weighted' && agg.weightedEnabled ? 'active' : ''}
+            aria-pressed={agg.value === 'weighted' && agg.weightedEnabled}
+            disabled={!agg.weightedEnabled}
+            title="個股報酬依權重平均，大公司影響較大"
+            onClick={() => agg.onChange('weighted')}
+          >
+            {agg.weightedLabel}
+          </button>
+          <button
+            type="button"
+            className={agg.value === 'median' || !agg.weightedEnabled ? 'active' : ''}
+            aria-pressed={agg.value === 'median' || !agg.weightedEnabled}
+            title="每檔一票，取中位數，不受單一股票影響"
+            onClick={() => agg.onChange('median')}
+          >
+            等權（中位數）
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+const pct = (value: number | null) => (value === null ? '—' : `${Math.round(value * 100)}%`);
+
+function IndustryTip({ label, groupLabel, summary, model, period, agg, fellBack, merged }: {
+  label: string;
+  groupLabel: string;
+  summary: IndustrySummary;
+  model: IndustryModel;
+  period: PeriodKey;
+  agg: AggMode;
+  fellBack: boolean;
+  merged: string[];
+}) {
+  const weightName = model.basis === 'turnover' ? '成交值加權' : '市值加權';
+  const up = summary.upShare === null ? 0 : Math.round(summary.upShare * summary.validCount);
+  const list = (items: IndustrySummary['best']) =>
+    items.map((s) => (
+      <span key={s.symbol} className="map-tip-stock">
+        {s.name || s.symbol} <b className={`num ${toneClass(s.value)}`}>{formatPercent(s.value, 1)}</b>
+      </span>
+    ));
+  return (
+    <>
+      <b>{label}</b>
+      <span className="map-tip-theme">{groupLabel ? `${groupLabel} · ` : ''}{summary.count} 檔</span>
+      <span>
+        {PERIOD_LABELS[period]}報酬 {model.basis === 'none' ? null : `${weightName} `}
+        {model.basis !== 'none' && <b className={`num ${toneClass(summary.weighted)}`}>{formatPercent(summary.weighted, 2)}</b>}
+        {model.basis !== 'none' && ' · '}等權中位數 <b className={`num ${toneClass(summary.median)}`}>{formatPercent(summary.median, 2)}</b>
+      </span>
+      {fellBack && agg === 'weighted' && <span className="muted">無權重資料，顏色改用中位數</span>}
+      <span>
+        上漲 {pct(summary.upShare)}（{up}/{summary.validCount} 檔）
+      </span>
+      <span>
+        市值合計 <b className="num">{formatMoney(summary.marketCap, model.market)}</b>
+        {summary.capCount < summary.count ? `（${summary.capCount} 檔有市值）` : ''}
+      </span>
+      {summary.best.length > 0 && <span className="map-tip-row">強：{list(summary.best)}</span>}
+      {summary.worst.length > 0 && <span className="map-tip-row">弱：{list(summary.worst)}</span>}
+      {merged.length > 0 && <span className="muted">含：{merged.slice(0, 5).join('、')}{merged.length > 5 ? ` 等 ${merged.length} 個` : ''}</span>}
+      <span className="muted">點一下查看成分股</span>
+    </>
+  );
+}
+
+function IndustryMap({
+  model,
+  period: requested,
+  prefs,
+  setPrefs,
+  openChart,
+}: {
+  model: IndustryModel;
+  period: PeriodKey;
+  prefs: MapPrefs;
+  setPrefs: (next: MapPrefs) => void;
+  openChart: (options: OpenChartOptions) => void;
+}) {
+  const period = clampIndustryPeriod(requested);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const sizeLabel = model.basis === 'turnover' ? '成交值' : '市值';
+  const weightedEnabled = model.basis !== 'none';
+  const agg: AggMode = weightedEnabled ? prefs.agg : 'median';
+  const mapModel = useMemo(() => buildMapModel(industryGroups(model), prefs.weight), [model, prefs.weight]);
+  const summaries = useMemo(() => {
+    const cells = new Map<string, IndustrySummary>();
+    const groups = new Map<string, IndustrySummary>();
+    for (const group of model.groups) {
+      groups.set(group.id, summarize(group.stocks, period, model.basis));
+      for (const cell of group.cells) cells.set(cell.id, summarize(cell.stocks, period, model.basis));
+    }
+    return { cells, groups };
+  }, [model, period]);
+  const cellById = useMemo(() => new Map(model.groups.flatMap((g) => g.cells.map((c) => [c.id, { cell: c, group: g }] as const))), [model]);
+
+  const views = useMemo(
+    (): HeatGroupView[] =>
+      mapModel.groups.map((group) => {
+        const sector = model.twoLevel ? group.label : '';
+        return {
+          id: group.id,
+          label: group.label,
+          value: model.twoLevel ? colorValue(summaries.groups.get(group.id)!, agg).value : undefined,
+          cells: group.cells.map((mapCell) => {
+            const entry = cellById.get(mapCell.id)!;
+            const summary = summaries.cells.get(mapCell.id)!;
+            const color = colorValue(summary, agg);
+            return {
+              id: mapCell.id,
+              label: mapCell.label,
+              value: color.value,
+              aria: `${sector ? `${sector} ` : ''}${mapCell.label}，${summary.count} 檔，${PERIOD_LABELS[period]}報酬 ${formatPercent(color.value, 1)}，開啟成分股`,
+              tip: (
+                <IndustryTip
+                  label={mapCell.label}
+                  groupLabel={sector}
+                  summary={summary}
+                  model={model}
+                  period={period}
+                  agg={agg}
+                  fellBack={color.fellBack}
+                  merged={entry.cell.mergedFrom}
+                />
+              ),
+              onOpen: () => setOpenId(mapCell.id),
+            };
+          }),
+        };
+      }),
+    [mapModel, model, summaries, cellById, agg, period],
+  );
+
+  const open = openId ? cellById.get(openId) : undefined;
+  const { coverage } = model;
+  const weightText = agg === 'median' ? '等權中位數（每檔一票）' : model.basis === 'turnover' ? '成交值加權平均' : '市值加權平均';
+  const sizeText = model.basis === 'none' || mapModel.mode === 'equal' ? mapModel.mode === 'equal' && model.basis !== 'none' ? '每個方塊一樣大（等大小）' : '每個方塊一樣大（沒有市值或成交值資料）' : `產業${sizeLabel}合計（${model.market === 'TW' ? '新台幣' : '美元'}）`;
+  const modeText =
+    mapModel.mode === 'equal'
+      ? ''
+      : mapModel.mode === 'balanced'
+        ? `；均衡模式取平方根壓縮，每塊至少為中位數方塊的 ${Math.round(BALANCED_FLOOR * 100)}%，小產業才不會縮到看不見`
+        : `；小產業會很小，可切回「均衡」`;
+  return (
+    <section className="themes-map" aria-label="產業熱力圖">
+      <div className="map-toolbar">
+        <Toolbar
+          sizeLabel={sizeLabel}
+          sizeUsed={mapModel.mode}
+          sizeEnabled={model.basis !== 'none'}
+          onSize={(weight) => setPrefs({ ...prefs, weight })}
+          agg={{
+            value: agg,
+            weightedLabel: model.basis === 'turnover' ? '成交值加權' : '市值加權',
+            weightedEnabled,
+            onChange: (next) => setPrefs({ ...prefs, agg: next }),
+          }}
+        />
+        <Legend period={period} cap={HEAT_CAP[period]} />
+      </div>
+      {model.basis === 'turnover' && (
+        <p className="map-note warn" role="status">
+          市值資料不足，大小與加權改用近20日平均成交值
+        </p>
+      )}
+      <HeatCanvas
+        model={mapModel}
+        groups={views}
+        flat={!model.twoLevel}
+        cap={HEAT_CAP[period]}
+        ariaLabel={`產業熱力圖，${mapModel.cellCount} 個產業、${coverage.total} 檔股票`}
+        empty="沒有可顯示的產業。"
+      />
+      <p className="map-foot">
+        資料日 {model.asOf ? formatDateTime(model.asOf, false) : '—'} · {model.universe}
+        {model.scope === 'full' ? '（全市場）' : '（流動性篩選名單，非全市場）'}，涵蓋 {coverage.total.toLocaleString('en-US')} 檔，其中{' '}
+        {coverage.classified.toLocaleString('en-US')} 檔有產業分類。顏色＝{PERIOD_LABELS[period]}報酬，以{weightText}計算。大小＝{sizeText}
+        {modeText}。
+        {model.basis === 'cap' && coverage.withCap < coverage.total ? ` ${coverage.total - coverage.withCap} 檔缺市值，計入大小與加權時視為 0。` : ''}
+        {mapModel.imputed > 0 ? ` ${mapModel.imputed} 個產業沒有大小資料，以中位數代入。` : ''} 成分股少於 {MIN_INDUSTRY_STOCKS} 檔的產業與未分類股票併入「其他」
+        {model.twoLevel ? '（同一 sector 內）' : ''}。方塊太小時不顯示文字，滑過或長按可看詳情。
+      </p>
+      {open && (
+        <IndustryPanel
+          key={open.cell.id}
+          cell={open.cell}
+          groupLabel={model.twoLevel ? open.group.label : ''}
+          model={model}
+          initialPeriod={period}
+          onClose={() => setOpenId(null)}
+          openChart={openChart}
+        />
+      )}
+    </section>
+  );
+}
+
+function ThemeMap({
+  data,
+  themes,
+  period,
+  source,
+  prefs,
+  setPrefs,
+  onOpenTheme,
+}: {
+  data: ThemesData;
+  themes: Theme[];
+  period: PeriodKey;
+  source: Extract<MapSource, { kind: 'themes' }>;
+  prefs: MapPrefs;
+  setPrefs: (next: MapPrefs) => void;
+  onOpenTheme: (key: string) => void;
+}) {
+  const market = data.market;
+  const mkey = universeKey(market);
+  const inputs = useMemo(() => themeGroups(data, themes, source.lookup), [data, themes, source.lookup]);
+  const hasSize = inputs.some((group) => group.cells.some((cell) => cell.size !== null));
+  const mapModel = useMemo(() => buildMapModel(inputs, prefs.weight), [inputs, prefs.weight]);
+  const themeByKey = useMemo(() => new Map(themes.map((t) => [t.key, t])), [themes]);
+  const views = useMemo(
+    (): HeatGroupView[] =>
+      mapModel.groups.map((group) => ({
+        id: group.id,
+        label: group.label,
+        cells: group.cells.map((mapCell) => {
+          const theme = themeByKey.get(mapCell.id)!;
+          const value = theme.returns[period];
+          const turnover = themeTurnover(theme, source.lookup);
+          return {
+            id: mapCell.id,
+            label: mapCell.label,
+            value,
+            aria: `${theme.name}，${PERIOD_LABELS[period]}題材報酬 ${formatPercent(value, 1)}，開啟題材詳情`,
+            tip: (
+              <>
+                <b>{theme.name}</b>
+                <span className="map-tip-theme">{parentName(data, theme) || '題材'} · {theme.constituents.length} 檔</span>
+                <span>
+                  {PERIOD_LABELS[period]}題材報酬（成分股等權平均）{' '}
+                  <b className={`num ${toneClass(value)}`}>{formatPercent(value, 2)}</b>
+                </span>
+                <span>
+                  成分股近20日成交值合計 <b className="num">{formatMoney(turnover.total, mkey)}</b>
+                  {turnover.total !== null && turnover.known < theme.constituents.length ? `（${turnover.known}/${theme.constituents.length} 檔有資料）` : ''}
+                </span>
+                <span className="muted">點一下開啟題材詳情</span>
+              </>
+            ),
+            onOpen: () => onOpenTheme(theme.key),
+          };
+        }),
+      })),
+    [mapModel, themeByKey, period, source.lookup, data, mkey, onOpenTheme],
+  );
+  const asOf = themesHaveTurnover(themes) ? data.asOf : (source.lookupAsOf ?? data.asOf);
+  const currency = market === 'tw' ? '新台幣' : '美元';
+  return (
+    <section className="themes-map" aria-label="題材熱力圖">
+      <div className="map-toolbar">
+        <Toolbar sizeLabel="成交值" sizeUsed={mapModel.mode} sizeEnabled={hasSize} onSize={(weight) => setPrefs({ ...prefs, weight })} />
+        <Legend period={period} cap={HEAT_CAP[period]} />
+      </div>
+      <p className="map-note warn" role="status" data-testid="map-fallback">
+        {FALLBACK_NOTICE}
+        {source.reason === 'failed' ? '（全市場資料載入失敗）' : ''}
+      </p>
+      <HeatCanvas
+        model={mapModel}
+        groups={views}
+        flat={false}
+        cap={HEAT_CAP[period]}
+        ariaLabel={`題材熱力圖，${mapModel.cellCount} 個題材`}
+        empty="沒有可顯示的題材。"
+      />
+      <p className="map-foot">
+        資料日 {formatDateTime(data.asOf, false)} · 每個方塊是一個題材，不是個股；顏色＝{PERIOD_LABELS[period]}題材報酬（成分股等權平均）。
+        {mapModel.mode === 'equal'
+          ? hasSize
+            ? '大小：每個題材一樣大（等大小）。'
+            : '大小：每個題材一樣大（暫無成交值資料）。'
+          : `大小＝題材成分股近20日平均成交值合計（${currency}${asOf ? `，資料日 ${formatDateTime(asOf, false)}` : ''}），不是市值${
+              mapModel.mode === 'balanced' ? `；均衡模式取平方根壓縮，每塊至少為中位數方塊的 ${Math.round(BALANCED_FLOOR * 100)}%` : '；小題材會很小，可切回「均衡」'
+            }。`}
+        {mapModel.imputed > 0 ? ` ${mapModel.imputed} 個題材沒有成交值資料，以中位數代入。` : ''} 方塊太小時不顯示文字，滑過或長按可看詳情。
+      </p>
+    </section>
+  );
+}
+
 export default function ThemesMap({
   data,
   themes,
+  source,
   period,
   onOpenTheme,
   openChart,
 }: {
   data: ThemesData;
   themes: Theme[];
+  source: MapSource;
   period: PeriodKey;
   onOpenTheme: (key: string) => void;
   openChart: (options: OpenChartOptions) => void;
 }) {
-  const [weight, setWeight] = useState<WeightMode>(readWeightMode);
-  const universe = useUniverse();
-  const { ref, width } = useWidth();
-  const market = data.market;
-
-  const lookup = useMemo(() => (universe?.status === 'ok' ? turnoverLookup(universe.universe, market) : null), [universe, market]);
-  const usable = useMemo(() => themes.filter((theme) => theme.constituents.length > 0), [themes]);
-  const model = useMemo(() => buildMapModel(usable, lookup?.values ?? null, weight), [usable, lookup, weight]);
-  const layout = useMemo(
-    () =>
-      width > 0
-        ? fitLayout(toGroupInputs(model), width, { baseHeight: baseHeightFor(width), maxHeight: model.mode === 'turnover' ? (width < 600 ? MAX_HEIGHT_RAW.phone : MAX_HEIGHT_RAW.wide) : MAX_HEIGHT, minSide: MIN_TILE_SIDE, layout: DEFAULT_LAYOUT })
-        : null,
-    [model, width],
-  );
-  const leafById = useMemo(() => {
-    const map = new Map<string, { leaf: MapLeaf; group: MapGroup }>();
-    for (const group of model.groups) for (const leaf of group.leaves) map.set(leaf.id, { leaf, group });
-    return map;
-  }, [model]);
-  const rectById = useMemo(() => {
-    const map = new Map<string, Rect>();
-    for (const group of layout?.groups ?? []) for (const leaf of group.leaves) map.set(leaf.id, leaf.rect);
-    return map;
-  }, [layout]);
-  const groupById = useMemo(() => new Map(model.groups.map((group) => [group.id, group])), [model]);
-
-  const [tip, setTip] = useState<Tip | null>(null);
-  const press = useRef<{ timer: number | null; x: number; y: number; fired: boolean }>({ timer: null, x: 0, y: 0, fired: false });
-  const hideTimer = useRef<number | null>(null);
-  const clearPress = useCallback(() => {
-    if (press.current.timer !== null) window.clearTimeout(press.current.timer);
-    press.current.timer = null;
-  }, []);
-  useEffect(
-    () => () => {
-      clearPress();
-      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
-    },
-    [clearPress],
-  );
-  // A tooltip must not outlive the layout it points into.
-  useEffect(() => setTip(null), [layout, period]);
-
-  const show = useCallback(
-    (id: string) => {
-      const entry = leafById.get(id);
-      const rect = rectById.get(id);
-      if (!entry || !rect) return;
-      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
-      hideTimer.current = null;
-      setTip({ id, leaf: entry.leaf, group: entry.group, rect });
-    },
-    [leafById, rectById],
-  );
-  const hide = useCallback(() => {
-    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
-    hideTimer.current = null;
-    setTip(null);
-  }, []);
-
-  const onPointerDown = (event: ReactPointerEvent<HTMLButtonElement>, id: string) => {
-    clearPress();
-    press.current = { timer: null, x: event.clientX, y: event.clientY, fired: false };
-    if (event.pointerType === 'mouse') return;
-    press.current.timer = window.setTimeout(() => {
-      press.current.fired = true;
-      press.current.timer = null;
-      show(id);
-    }, LONG_PRESS_MS);
+  const [prefs, setPrefsState] = useState<MapPrefs>(readPrefs);
+  const setPrefs = (next: MapPrefs) => {
+    setPrefsState(next);
+    writePrefs(next);
   };
-  const onPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (press.current.timer === null) return;
-    if (Math.hypot(event.clientX - press.current.x, event.clientY - press.current.y) > 8) clearPress();
-  };
-  const onPointerEnd = () => {
-    clearPress();
-    if (press.current.fired) {
-      // Keep the long-press tooltip readable for a moment after the finger lifts.
-      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
-      hideTimer.current = window.setTimeout(hide, 3200);
-    }
-  };
-  const onTileClick = (leaf: MapLeaf) => {
-    if (press.current.fired) {
-      // The click that ends a long press only dismisses nothing and opens nothing.
-      press.current.fired = false;
-      return;
-    }
-    hide();
-    openChart({ symbol: leaf.symbol, name: leaf.name, maList: [20, 50] });
-  };
-
-  const choose = (next: WeightMode) => {
-    setWeight(next);
-    writeWeightMode(next);
-  };
-
-  const cap = stockHeatCap(period);
-  const hasTurnover = lookup !== null || themesHaveTurnover(usable);
-  const unavailable = universe !== null && !hasTurnover;
-  const turnoverAsOf = lookup?.asOf ?? data.asOf ?? null;
-  const currency = market === 'tw' ? '新台幣' : '美元';
-
-  return (
-    <section className="themes-map" aria-label="題材熱力圖">
-      <div className="map-toolbar">
-        <div className="segmented compact" role="group" aria-label="大小">
-          {WEIGHT_MODES.map((key) => {
-            const needsData = key !== 'equal';
-            return (
-              <button
-                key={key}
-                type="button"
-                className={model.mode === key ? 'active' : ''}
-                aria-pressed={model.mode === key}
-                disabled={needsData && !hasTurnover}
-                title={WEIGHT_HINTS[key]}
-                onClick={() => choose(key)}
-              >
-                {WEIGHT_LABELS[key]}
-              </button>
-            );
-          })}
+  if (source.kind === 'loading')
+    return (
+      <section className="themes-map" aria-label="產業熱力圖">
+        <div className="map-loading" role="status">
+          載入全市場產業資料…
         </div>
-        <Legend period={period} />
-      </div>
-      {unavailable && (
-        <p className="map-note warn" role="status">
-          成交值資料暫時無法取得，以等大小顯示
-        </p>
-      )}
-
-      <div ref={ref} className="map-wrap">
-        {universe === null ? (
-          <div className="map-loading" role="status">
-            載入成交值資料…
-          </div>
-        ) : !usable.length ? (
-          <div className="map-loading" role="status">
-            這些題材沒有可顯示的成分股。
-          </div>
-        ) : layout ? (
-          <div className="map-canvas" style={{ height: layout.height }} role="group" aria-label={`題材熱力圖，${usable.length} 個題材、${model.leafCount} 檔股票`}>
-            {layout.groups.map((placed) => {
-              const group = groupById.get(placed.id);
-              if (!group) return null;
-              const value = group.theme.returns[period];
-              const headLabel = `${group.theme.name}，${PERIOD_LABELS[period]}題材報酬 ${formatPercent(value, 1)}，開啟題材詳情`;
-              return (
-                <Fragment key={placed.id}>
-                  <div className="map-group" style={box(placed.rect, 0.5)} aria-hidden="true" />
-                  {placed.leaves.map((placedLeaf) => {
-                    const entry = leafById.get(placedLeaf.id);
-                    if (!entry) return null;
-                    const { leaf } = entry;
-                    const ret = leaf.constituent.returns[period];
-                    const tone = heatWithCap(ret, cap);
-                    const { w, h } = placedLeaf.rect;
-                    const level = labelLevel(w, h);
-                    const fontSize = Math.round(Math.min(18, Math.max(10, Math.sqrt(w * h) / 5.5)));
-                    const label = `${leaf.symbol} ${leaf.name}，${PERIOD_LABELS[period]}報酬 ${formatPercent(ret, 1)}，${group.theme.name}`;
-                    return (
-                      <button
-                        key={leaf.id}
-                        type="button"
-                        className={`map-tile ${ret === null ? 'heat-na' : `heat-${tone.side}`} lv-${level}`}
-                        style={{ ...box(placedLeaf.rect, 0.5), fontSize, ['--mix' as string]: `${tone.mix}%` }}
-                        aria-label={label}
-                        onClick={() => onTileClick(leaf)}
-                        onPointerEnter={(event) => event.pointerType === 'mouse' && show(leaf.id)}
-                        onPointerLeave={(event) => event.pointerType === 'mouse' && hide()}
-                        onFocus={(event) => event.currentTarget.matches(':focus-visible') && show(leaf.id)}
-                        onBlur={hide}
-                        onPointerDown={(event) => onPointerDown(event, leaf.id)}
-                        onPointerMove={onPointerMove}
-                        onPointerUp={onPointerEnd}
-                        onPointerCancel={onPointerEnd}
-                        onContextMenu={(event) => event.preventDefault()}
-                      >
-                        {level !== 'none' && <b className="map-code">{shortSymbol(leaf.symbol)}</b>}
-                        {(level === 'full' || level === 'name') && <span className="map-pct num">{formatPercent(ret, 1)}</span>}
-                        {level === 'name' && leaf.name && <small className="map-name">{leaf.name}</small>}
-                      </button>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    className="map-group-head"
-                    style={{ ...box(placed.header, 0.5), height: placed.header.h }}
-                    aria-label={headLabel}
-                    onClick={() => onOpenTheme(group.theme.key)}
-                  >
-                    <span className="map-group-name">{group.theme.name}</span>
-                    {placed.rect.w >= 92 && <span className={`map-group-value num ${toneClass(value)}`}>{formatPercent(value, 1)}</span>}
-                  </button>
-                </Fragment>
-              );
-            })}
-            {tip && (
-              <div
-                className="map-tip"
-                role="tooltip"
-                style={{
-                  left: Math.max(4, Math.min(layout.width - TIP_WIDTH - 4, tip.rect.x + tip.rect.w / 2 - TIP_WIDTH / 2)),
-                  top: tip.rect.y < 120 ? tip.rect.y + tip.rect.h + 6 : tip.rect.y - 6,
-                  width: TIP_WIDTH,
-                  transform: tip.rect.y < 120 ? undefined : 'translateY(-100%)',
-                }}
-              >
-                <b>
-                  {shortSymbol(tip.leaf.symbol)} {tip.leaf.name}
-                </b>
-                <span className="map-tip-theme">
-                  {tip.group.theme.name}
-                  {themeName(data, tip.group.theme) ? ` · ${themeName(data, tip.group.theme)}` : ''}
-                </span>
-                <span>
-                  {PERIOD_LABELS[period]}報酬{' '}
-                  <b className={`num ${toneClass(tip.leaf.constituent.returns[period])}`}>{formatPercent(tip.leaf.constituent.returns[period], 2)}</b>
-                </span>
-                <span>
-                  近20日均成交值 <b className="num">{formatTurnover(tip.leaf.turnover, market)}</b>
-                  {tip.leaf.imputed ? '（無資料，以題材中位數決定大小）' : ''}
-                </span>
-                <span className="muted">點一下開啟圖表</span>
-              </div>
-            )}
-          </div>
-        ) : null}
-      </div>
-
-      <p className="map-foot">
-        {model.mode === 'equal'
-          ? '大小：每檔一樣大（等大小）。'
-          : `大小＝近20日平均成交值（${currency}${turnoverAsOf ? `，資料日 ${formatDateTime(turnoverAsOf, false)}` : ''}），不是市值${
-              model.mode === 'balanced' ? `；均衡模式取平方根壓縮，每塊至少為題材中位數的 ${Math.round(BALANCED_FLOOR * 100)}%，小型股才不會縮到看不見` : '；小型股會很小，可切回「均衡」'
-            }。`}
-        {model.imputed > 0 ? ` ${model.imputed} 檔找不到成交值，以所屬題材的中位數代入。` : ''}
-        {layout && !layout.satisfied ? ' 部分方塊小於建議點選尺寸，建議切到「均衡」或「等大小」。' : ''}
-        {' '}
-        方塊太小時不顯示文字，滑過或長按可看詳情。
-      </p>
-    </section>
-  );
+      </section>
+    );
+  if (source.kind === 'industry') return <IndustryMap model={source.model} period={period} prefs={prefs} setPrefs={setPrefs} openChart={openChart} />;
+  return <ThemeMap data={data} themes={themes} period={period} source={source} prefs={prefs} setPrefs={setPrefs} onOpenTheme={onOpenTheme} />;
 }

@@ -3,10 +3,12 @@ import {
   DEFAULT_LAYOUT,
   fitLayout,
   floorWeights,
-  labelLevel,
+  labelFit,
   layoutGroups,
   median,
   squarify,
+  tipPosition,
+  wrapLines,
   type GroupInput,
   type Rect,
 } from '../src/pages/treemap';
@@ -190,12 +192,45 @@ describe('fitLayout', () => {
   });
 });
 
-describe('labelLevel', () => {
-  it('shows less text as tiles shrink and none when tiny', () => {
-    expect(labelLevel(120, 80)).toBe('name');
-    expect(labelLevel(60, 40)).toBe('full');
-    expect(labelLevel(36, 24)).toBe('code');
-    expect(labelLevel(22, 22)).toBe('none');
-    expect(labelLevel(0, 0)).toBe('none');
+describe('wrapLines', () => {
+  it('wraps CJK anywhere and Latin at spaces, and refuses a word wider than the box', () => {
+    expect(wrapLines('半導體業', 100, 12)).toBe(1);
+    expect(wrapLines('電子零組件業', 40, 12)).toBe(2);
+    expect(wrapLines('Semiconductors', 200, 12)).toBe(1);
+    expect(wrapLines('Semiconductor Equipment & Materials', 120, 12)).toBeGreaterThan(1);
+    expect(wrapLines('Semiconductors', 30, 12)).toBe(-1);
+    expect(wrapLines('x', 0, 12)).toBe(-1);
+  });
+});
+
+describe('labelFit', () => {
+  it('shows name and return when both fit, the name alone when only it fits, nothing in tiny cells', () => {
+    expect(labelFit('半導體業', 120, 80, 14).fit).toBe('full');
+    expect(labelFit('半導體業', 60, 20, 12).fit).toBe('name');
+    expect(labelFit('半導體業', 22, 22, 12).fit).toBe('none');
+    expect(labelFit('Semiconductor Equipment & Materials', 40, 22, 12).fit).toBe('none');
+    expect(labelFit('x', 0, 0, 12).fit).toBe('none');
+  });
+  it('shrinks the font before giving up, never below 10', () => {
+    const fit = labelFit('電子零組件業', 60, 30, 15);
+    expect(fit.fontSize).toBeGreaterThanOrEqual(10);
+    expect(fit.fontSize).toBeLessThanOrEqual(15);
+  });
+});
+
+describe('tipPosition', () => {
+  const canvas = { w: 400, h: 600 };
+  const tip = { w: 240, h: 200 };
+  it('goes above a cell with room, below one near the top, inside a tall cell at the top', () => {
+    expect(tipPosition({ x: 100, y: 300, w: 50, h: 40 }, canvas, tip)).toMatchObject({ above: true, top: 294 });
+    expect(tipPosition({ x: 100, y: 20, w: 50, h: 40 }, canvas, tip)).toMatchObject({ above: false, top: 66 });
+    const tall = tipPosition({ x: 100, y: 20, w: 50, h: 560 }, canvas, tip);
+    expect(tall.above).toBe(false);
+    expect(tall.top).toBeGreaterThanOrEqual(4);
+    expect(tall.top + tip.h).toBeLessThanOrEqual(canvas.h - 4 + 1e-6);
+  });
+  it('keeps the tooltip inside the canvas horizontally', () => {
+    expect(tipPosition({ x: 0, y: 300, w: 20, h: 20 }, canvas, tip).left).toBe(4);
+    expect(tipPosition({ x: 380, y: 300, w: 20, h: 20 }, canvas, tip).left).toBe(156);
   });
 });
