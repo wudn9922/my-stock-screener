@@ -1,0 +1,73 @@
+name: Taiwan Chips
+
+# 台股籌碼（只有兩項）：外資及陸資持股比率（證交所／櫃買）、總股東人數（集保戶股權分散表）
+# → docs/report/tw-chips.json，格式與假設見 scripts/build_tw_chips.py 頂部說明。
+# 外資持股的當日資料較晚出表，所以排在台灣時間約 19:40（UTC 11:40）、週一至週五各跑一次。
+# 單一來源失敗只會留下 ::warning:: 與 step summary，保留舊檔該來源的欄位，不讓 workflow 變紅。
+# 首次建檔想補約 120 個交易日的外資歷史：手動執行並把 lookback_days 設為 200。
+on:
+  schedule:
+    - cron: '41 11 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      lookback_days:
+        description: '往回補抓外資持股的日曆天數（平常 10；首次建檔補歷史用 200）'
+        required: false
+        default: '10'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tw-chips
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install --quiet requests
+
+      - name: Build Taiwan chips
+        env:
+          LOOKBACK_DAYS: ${{ github.event.inputs.lookback_days || '10' }}
+          # 選填：repo variable，額外的 TPEx 外資持股網址範本（可用 {roc} {ymd} {slash} {iso}），見腳本說明
+          TPEX_QFII_URL: ${{ vars.TPEX_QFII_URL }}
+        run: |
+          # 腳本把各來源的成敗寫進 step summary；來源失敗不應讓 workflow 變紅，連腳本本身的意外也只警告
+          python -u scripts/build_tw_chips.py --lookback-days "$LOOKBACK_DAYS" || echo "::warning::build_tw_chips.py 異常結束（exit $?），保留舊檔"
+
+      - name: Commit and Push changes
+        if: always()
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          # 沒有產生檔案（從未成功過）時沒有東西可提交
+          if [ ! -f docs/report/tw-chips.json ]; then echo "No tw-chips.json to commit"; exit 0; fi
+          git add -A docs/report/tw-chips.json
+          git commit -m "Auto-update Taiwan chips" || { echo "No changes to commit"; exit 0; }
+          # 每日報告與其他 workflow 也會推送到 main，失敗時重新 rebase 後重試
+          for attempt in 1 2 3; do
+            git pull --rebase
+            if git push; then
+              exit 0
+            fi
+            echo "推送失敗（第 ${attempt} 次），稍後重試"
+            sleep $((attempt * 15))
+          done
+          exit 1
