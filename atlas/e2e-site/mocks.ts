@@ -86,9 +86,30 @@ export function dailyBars(symbol: string, count = 600) {
     return { time, open, high: Math.max(open, close) * 1.01, low: Math.min(open, close) * 0.99, close, volume: Math.round(1e6 + rand() * 1e7) };
   });
 }
+/** Split-adjusted first / last weekly close of the long (10y) weekly history, for symbols whose river should look realistic. */
+const WEEKLY_PATH: Record<string, [number, number]> = { AAPL: [26, 341], NVDA: [0.8, 226], '2330.TW': [180, 2500] };
+/** Deterministic Monday-start weekly bars for ten years ending the week of 2026-10-05 (synthetic, split-adjusted basis). */
+export function weeklyBars(symbol: string, count = 522) {
+  let seed = hash(`${symbol}|1wk`) || 1;
+  const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const offset = TAIWAN(symbol) ? 3600 : 13.5 * 3600;
+  const path = WEEKLY_PATH[symbol];
+  const first = path?.[0] ?? 50 + (hash(symbol) % 900);
+  const last = path?.[1] ?? dailyBars(symbol).at(-1)!.close;
+  const monday = Date.UTC(2026, 9, 5) / 1000 + offset;
+  return Array.from({ length: count }, (_, i) => {
+    const time = monday - (count - 1 - i) * 7 * 86400;
+    const trend = first * Math.pow(last / first, i / (count - 1));
+    const wave = 1 + 0.12 * Math.sin(i / 17) + (rand() - 0.5) * 0.04;
+    const close = i === count - 1 ? last : Math.max(0.05, trend * wave);
+    const open = i === 0 ? close : Math.max(0.05, trend * (1 + (rand() - 0.5) * 0.03));
+    return { time, open, high: Math.max(open, close) * 1.01, low: Math.min(open, close) * 0.99, close, volume: Math.round(1e6 + rand() * 1e7) };
+  });
+}
 export function yahooChart(symbol: string, interval: string) {
   const taiwan = TAIWAN(symbol);
   const bars = dailyBars(symbol);
+  const series = interval === '1wk' ? weeklyBars(symbol) : bars;
   const last = bars.at(-1)!;
   const round = (value: number) => Number(value.toFixed(2));
   return {
@@ -108,17 +129,17 @@ export function yahooChart(symbol: string, interval: string) {
             chartPreviousClose: round(bars.at(-2)!.close),
             priceHint: 2,
             dataGranularity: interval,
-            range: '5y',
+            range: interval === '1wk' ? '10y' : '5y',
           },
-          timestamp: bars.map((bar) => Math.round(bar.time)),
+          timestamp: series.map((bar) => Math.round(bar.time)),
           indicators: {
             quote: [
               {
-                open: bars.map((bar) => round(bar.open)),
-                high: bars.map((bar) => round(bar.high)),
-                low: bars.map((bar) => round(bar.low)),
-                close: bars.map((bar) => round(bar.close)),
-                volume: bars.map((bar) => bar.volume),
+                open: series.map((bar) => round(bar.open)),
+                high: series.map((bar) => round(bar.high)),
+                low: series.map((bar) => round(bar.low)),
+                close: series.map((bar) => round(bar.close)),
+                volume: series.map((bar) => bar.volume),
               },
             ],
           },

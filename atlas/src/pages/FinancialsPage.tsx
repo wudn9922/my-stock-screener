@@ -9,6 +9,7 @@ import { formatDateTime } from '../ui/format';
 import { FinancialsHeader, type DisplayMode } from '../ui/financials/FinancialsHeader';
 import { MetricCard } from '../ui/financials/MetricCard';
 import { FinancialsTable } from '../ui/financials/FinancialsTable';
+import { PeRiverCard } from '../ui/financials/PeRiverCard';
 import { SummaryChips } from '../ui/financials/SummaryChips';
 import { ChipsSection } from '../ui/financials/ChipsCard';
 import { isChipsPageSymbol } from '../report/twChips';
@@ -178,6 +179,7 @@ export default function FinancialsPage({ report, navigate, symbol, p }: Financia
           )}
           {(history.foreignReporter || issues.includes('foreign-filer')) && <p>外國發行人：EPS 為每普通股，非每 ADR。</p>}
         </div>
+        <PeRiverCard history={history} />
         {mode === 'table' ? (
           <FinancialsTable history={history} view={view} />
         ) : (
