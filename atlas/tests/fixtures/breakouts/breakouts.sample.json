@@ -1,0 +1,576 @@
+{
+ "version": 1,
+ "generatedAt": "2026-10-09T10:00:00+00:00",
+ "params": {
+  "windows": [
+   {
+    "key": "1w",
+    "days": 5,
+    "label": "近1週"
+   },
+   {
+    "key": "1m",
+    "days": 21,
+    "label": "近1月"
+   }
+  ],
+  "matureDays": 3,
+  "minSample": 20,
+  "cooldownDays": 10,
+  "jumpLimitPct": 30.0,
+  "volumeLookback": 20,
+  "volumeMultiple": 1.5,
+  "boxLookback": 20,
+  "minEvaluated": 200,
+  "entry": "突破日收盤買進",
+  "mark": "asOf 收盤標記",
+  "strategies": [
+   {
+    "key": "high20",
+    "label": "突破20日高",
+    "kind": "high",
+    "lookback": 20,
+    "volume": false,
+    "definition": "收盤 > 前 20 個有效交易日（不含當日）的最高價"
+   },
+   {
+    "key": "high60",
+    "label": "突破60日高",
+    "kind": "high",
+    "lookback": 60,
+    "volume": false,
+    "definition": "收盤 > 前 60 個有效交易日（不含當日）的最高價"
+   },
+   {
+    "key": "high120",
+    "label": "突破120日高",
+    "kind": "high",
+    "lookback": 120,
+    "volume": false,
+    "definition": "收盤 > 前 120 個有效交易日（不含當日）的最高價"
+   },
+   {
+    "key": "box20",
+    "label": "突破20日箱型",
+    "kind": "box",
+    "lookback": 20,
+    "volume": false,
+    "definition": "前 20 個有效交易日（不含當日）高低區間 (最高−最低)/最低 ≤ 門檻，且收盤 > 箱頂"
+   },
+   {
+    "key": "high20Vol",
+    "label": "突破20日高＋放量",
+    "kind": "high",
+    "lookback": 20,
+    "volume": true,
+    "definition": "收盤 > 前 20 個有效交易日（不含當日）的最高價；且當日量 ≥ 前 20 日均量 × 1.5"
+   },
+   {
+    "key": "high60Vol",
+    "label": "突破60日高＋放量",
+    "kind": "high",
+    "lookback": 60,
+    "volume": true,
+    "definition": "收盤 > 前 60 個有效交易日（不含當日）的最高價；且當日量 ≥ 前 20 日均量 × 1.5"
+   },
+   {
+    "key": "high120Vol",
+    "label": "突破120日高＋放量",
+    "kind": "high",
+    "lookback": 120,
+    "volume": true,
+    "definition": "收盤 > 前 120 個有效交易日（不含當日）的最高價；且當日量 ≥ 前 20 日均量 × 1.5"
+   },
+   {
+    "key": "box20Vol",
+    "label": "突破20日箱型＋放量",
+    "kind": "box",
+    "lookback": 20,
+    "volume": true,
+    "definition": "前 20 個有效交易日（不含當日）高低區間 (最高−最低)/最低 ≤ 門檻，且收盤 > 箱頂；且當日量 ≥ 前 20 日均量 × 1.5"
+   }
+  ]
+ },
+ "markets": {
+  "tw": {
+   "asOf": "2026-10-09",
+   "universe": "台股上市櫃普通股（4碼、非0開頭）",
+   "universeCount": 1000,
+   "evaluated": 900,
+   "stale": 100,
+   "weekendBars": 0,
+   "boxMaxWidthPct": 14.0,
+   "anomalies": {
+    "stocks": 3,
+    "days": 4,
+    "recent": [
+     {
+      "symbol": "1234.TW",
+      "date": "2026-09-01",
+      "changePct": -50.0
+     }
+    ]
+   },
+   "windows": {
+    "1w": {
+     "days": 5,
+     "start": "2026-10-05",
+     "maturedThrough": "2026-10-06",
+     "market": {
+      "entryDays": 2,
+      "pairs": 1800,
+      "upRate": 48.0,
+      "avgReturn": -0.3
+     },
+     "strategies": {
+      "high20": {
+       "eligible": 880,
+       "n": 60,
+       "maturedN": 25,
+       "winRate": 40.0,
+       "avgReturn": -1.25,
+       "medianReturn": -0.8,
+       "failRate": 52.0,
+       "avgHoldDays": 3.4,
+       "baseRate": 44.0,
+       "baseAvgReturn": -0.31
+      },
+      "high60": {
+       "eligible": 870,
+       "n": 30,
+       "maturedN": 12,
+       "winRate": 50.0,
+       "avgReturn": 0.4,
+       "medianReturn": 0.1,
+       "failRate": 33.3,
+       "avgHoldDays": 3.5,
+       "baseRate": 45.0,
+       "baseAvgReturn": -0.2
+      },
+      "high120": {
+       "eligible": 860,
+       "n": 9,
+       "maturedN": 0,
+       "winRate": null,
+       "avgReturn": null,
+       "medianReturn": null,
+       "failRate": null,
+       "avgHoldDays": null,
+       "baseRate": null,
+       "baseAvgReturn": null
+      },
+      "box20": {
+       "eligible": 880,
+       "n": 0,
+       "maturedN": 0,
+       "winRate": null,
+       "avgReturn": null,
+       "medianReturn": null,
+       "failRate": null,
+       "avgHoldDays": null,
+       "baseRate": null,
+       "baseAvgReturn": null
+      },
+      "high20Vol": {
+       "eligible": 880,
+       "n": 50,
+       "maturedN": 21,
+       "winRate": 42.9,
+       "avgReturn": -0.7,
+       "medianReturn": -0.5,
+       "failRate": 47.6,
+       "avgHoldDays": 3.4,
+       "baseRate": 44.2,
+       "baseAvgReturn": -0.3
+      },
+      "high60Vol": {
+       "eligible": 870,
+       "n": 20,
+       "maturedN": 8,
+       "winRate": 50.0,
+       "avgReturn": 0.1,
+       "medianReturn": 0.0,
+       "failRate": 37.5,
+       "avgHoldDays": 3.5,
+       "baseRate": 45.1,
+       "baseAvgReturn": -0.2
+      },
+      "high120Vol": {
+       "eligible": 860,
+       "n": 5,
+       "maturedN": 0,
+       "winRate": null,
+       "avgReturn": null,
+       "medianReturn": null,
+       "failRate": null,
+       "avgHoldDays": null,
+       "baseRate": null,
+       "baseAvgReturn": null
+      },
+      "box20Vol": {
+       "eligible": 880,
+       "n": 0,
+       "maturedN": 0,
+       "winRate": null,
+       "avgReturn": null,
+       "medianReturn": null,
+       "failRate": null,
+       "avgHoldDays": null,
+       "baseRate": null,
+       "baseAvgReturn": null
+      }
+     }
+    },
+    "1m": {
+     "days": 21,
+     "start": "2026-09-10",
+     "maturedThrough": "2026-10-06",
+     "market": {
+      "entryDays": 18,
+      "pairs": 16200,
+      "upRate": 63.0,
+      "avgReturn": 5.1
+     },
+     "strategies": {
+      "high20": {
+       "eligible": 880,
+       "n": 300,
+       "maturedN": 250,
+       "winRate": 54.0,
+       "avgReturn": 4.9,
+       "medianReturn": 3.1,
+       "failRate": 35.0,
+       "avgHoldDays": 10.2,
+       "baseRate": 59.0,
+       "baseAvgReturn": 5.0
+      },
+      "high60": {
+       "eligible": 870,
+       "n": 140,
+       "maturedN": 100,
+       "winRate": 52.0,
+       "avgReturn": 6.0,
+       "medianReturn": 4.0,
+       "failRate": 38.5,
+       "avgHoldDays": 9.8,
+       "baseRate": 58.5,
+       "baseAvgReturn": 5.2
+      },
+      "high120": {
+       "eligible": 860,
+       "n": 90,
+       "maturedN": 68,
+       "winRate": 54.4,
+       "avgReturn": 6.8,
+       "medianReturn": 4.4,
+       "failRate": 36.8,
+       "avgHoldDays": 9.1,
+       "baseRate": 60.3,
+       "baseAvgReturn": 5.4
+      },
+      "box20": {
+       "eligible": 880,
+       "n": 130,
+       "maturedN": 95,
+       "winRate": 57.1,
+       "avgReturn": 3.7,
+       "medianReturn": 2.2,
+       "failRate": 33.7,
+       "avgHoldDays": 10.0,
+       "baseRate": 57.8,
+       "baseAvgReturn": 4.9
+      },
+      "high20Vol": {
+       "eligible": 880,
+       "n": 260,
+       "maturedN": 220,
+       "winRate": 56.8,
+       "avgReturn": 5.6,
+       "medianReturn": 3.5,
+       "failRate": 31.8,
+       "avgHoldDays": 10.1,
+       "baseRate": 58.7,
+       "baseAvgReturn": 5.0
+      },
+      "high60Vol": {
+       "eligible": 870,
+       "n": 100,
+       "maturedN": 77,
+       "winRate": 58.4,
+       "avgReturn": 8.1,
+       "medianReturn": 5.0,
+       "failRate": 33.8,
+       "avgHoldDays": 9.9,
+       "baseRate": 58.6,
+       "baseAvgReturn": 5.1
+      },
+      "high120Vol": {
+       "eligible": 860,
+       "n": 60,
+       "maturedN": 44,
+       "winRate": 63.6,
+       "avgReturn": 9.6,
+       "medianReturn": 6.0,
+       "failRate": 29.5,
+       "avgHoldDays": 9.0,
+       "baseRate": 60.6,
+       "baseAvgReturn": 5.5
+      },
+      "box20Vol": {
+       "eligible": 880,
+       "n": 118,
+       "maturedN": 86,
+       "winRate": 60.5,
+       "avgReturn": 4.2,
+       "medianReturn": 2.6,
+       "failRate": 30.2,
+       "avgHoldDays": 10.0,
+       "baseRate": 57.0,
+       "baseAvgReturn": 4.8
+      }
+     }
+    }
+   }
+  },
+  "us": {
+   "asOf": "2026-10-09",
+   "universe": "S&P 500 成分股",
+   "universeCount": 503,
+   "evaluated": 500,
+   "stale": 3,
+   "weekendBars": 0,
+   "boxMaxWidthPct": 10.0,
+   "anomalies": {
+    "stocks": 3,
+    "days": 4,
+    "recent": [
+     {
+      "symbol": "1234.TW",
+      "date": "2026-09-01",
+      "changePct": -50.0
+     }
+    ]
+   },
+   "windows": {
+    "1w": {
+     "days": 5,
+     "start": "2026-10-05",
+     "maturedThrough": "2026-10-06",
+     "market": {
+      "entryDays": 2,
+      "pairs": 1800,
+      "upRate": 48.0,
+      "avgReturn": -0.3
+     },
+     "strategies": {
+      "high20": {
+       "eligible": 495,
+       "n": 40,
+       "maturedN": 14,
+       "winRate": 21.4,
+       "avgReturn": -1.68,
+       "medianReturn": -1.5,
+       "failRate": 50.0,
+       "avgHoldDays": 3.4,
+       "baseRate": 65.4,
+       "baseAvgReturn": 0.9
+      },
+      "high60": {
+       "eligible": 870,
+       "n": 30,
+       "maturedN": 12,
+       "winRate": 50.0,
+       "avgReturn": 0.4,
+       "medianReturn": 0.1,
+       "failRate": 33.3,
+       "avgHoldDays": 3.5,
+       "baseRate": 45.0,
+       "baseAvgReturn": -0.2
+      },
+      "high120": {
+       "eligible": 860,
+       "n": 9,
+       "maturedN": 0,
+       "winRate": null,
+       "avgReturn": null,
+       "medianReturn": null,
+       "failRate": null,
+       "avgHoldDays": null,
+       "baseRate": null,
+       "baseAvgReturn": null
+      },
+      "box20": {
+       "eligible": 880,
+       "n": 0,
+       "maturedN": 0,
+       "winRate": null,
+       "avgReturn": null,
+       "medianReturn": null,
+       "failRate": null,
+       "avgHoldDays": null,
+       "baseRate": null,
+       "baseAvgReturn": null
+      },
+      "high20Vol": {
+       "eligible": 880,
+       "n": 50,
+       "maturedN": 21,
+       "winRate": 42.9,
+       "avgReturn": -0.7,
+       "medianReturn": -0.5,
+       "failRate": 47.6,
+       "avgHoldDays": 3.4,
+       "baseRate": 44.2,
+       "baseAvgReturn": -0.3
+      },
+      "high60Vol": {
+       "eligible": 870,
+       "n": 20,
+       "maturedN": 8,
+       "winRate": 50.0,
+       "avgReturn": 0.1,
+       "medianReturn": 0.0,
+       "failRate": 37.5,
+       "avgHoldDays": 3.5,
+       "baseRate": 45.1,
+       "baseAvgReturn": -0.2
+      },
+      "high120Vol": {
+       "eligible": 860,
+       "n": 5,
+       "maturedN": 0,
+       "winRate": null,
+       "avgReturn": null,
+       "medianReturn": null,
+       "failRate": null,
+       "avgHoldDays": null,
+       "baseRate": null,
+       "baseAvgReturn": null
+      },
+      "box20Vol": {
+       "eligible": 880,
+       "n": 0,
+       "maturedN": 0,
+       "winRate": null,
+       "avgReturn": null,
+       "medianReturn": null,
+       "failRate": null,
+       "avgHoldDays": null,
+       "baseRate": null,
+       "baseAvgReturn": null
+      }
+     }
+    },
+    "1m": {
+     "days": 21,
+     "start": "2026-09-10",
+     "maturedThrough": "2026-10-06",
+     "market": {
+      "entryDays": 18,
+      "pairs": 16200,
+      "upRate": 63.0,
+      "avgReturn": 5.1
+     },
+     "strategies": {
+      "high20": {
+       "eligible": 495,
+       "n": 150,
+       "maturedN": 110,
+       "winRate": 47.3,
+       "avgReturn": -0.6,
+       "medianReturn": -0.4,
+       "failRate": 45.5,
+       "avgHoldDays": 10.0,
+       "baseRate": 58.4,
+       "baseAvgReturn": 0.8
+      },
+      "high60": {
+       "eligible": 870,
+       "n": 140,
+       "maturedN": 100,
+       "winRate": 52.0,
+       "avgReturn": 6.0,
+       "medianReturn": 4.0,
+       "failRate": 38.5,
+       "avgHoldDays": 9.8,
+       "baseRate": 58.5,
+       "baseAvgReturn": 5.2
+      },
+      "high120": {
+       "eligible": 860,
+       "n": 90,
+       "maturedN": 68,
+       "winRate": 54.4,
+       "avgReturn": 6.8,
+       "medianReturn": 4.4,
+       "failRate": 36.8,
+       "avgHoldDays": 9.1,
+       "baseRate": 60.3,
+       "baseAvgReturn": 5.4
+      },
+      "box20": {
+       "eligible": 880,
+       "n": 130,
+       "maturedN": 95,
+       "winRate": 57.1,
+       "avgReturn": 3.7,
+       "medianReturn": 2.2,
+       "failRate": 33.7,
+       "avgHoldDays": 10.0,
+       "baseRate": 57.8,
+       "baseAvgReturn": 4.9
+      },
+      "high20Vol": {
+       "eligible": 880,
+       "n": 260,
+       "maturedN": 220,
+       "winRate": 56.8,
+       "avgReturn": 5.6,
+       "medianReturn": 3.5,
+       "failRate": 31.8,
+       "avgHoldDays": 10.1,
+       "baseRate": 58.7,
+       "baseAvgReturn": 5.0
+      },
+      "high60Vol": {
+       "eligible": 870,
+       "n": 100,
+       "maturedN": 77,
+       "winRate": 58.4,
+       "avgReturn": 8.1,
+       "medianReturn": 5.0,
+       "failRate": 33.8,
+       "avgHoldDays": 9.9,
+       "baseRate": 58.6,
+       "baseAvgReturn": 5.1
+      },
+      "high120Vol": {
+       "eligible": 860,
+       "n": 60,
+       "maturedN": 44,
+       "winRate": 63.6,
+       "avgReturn": 9.6,
+       "medianReturn": 6.0,
+       "failRate": 29.5,
+       "avgHoldDays": 9.0,
+       "baseRate": 60.6,
+       "baseAvgReturn": 5.5
+      },
+      "box20Vol": {
+       "eligible": 880,
+       "n": 118,
+       "maturedN": 86,
+       "winRate": 60.5,
+       "avgReturn": 4.2,
+       "medianReturn": 2.6,
+       "failRate": 30.2,
+       "avgHoldDays": 10.0,
+       "baseRate": 57.0,
+       "baseAvgReturn": 4.8
+      }
+     }
+    }
+   }
+  }
+ }
+}

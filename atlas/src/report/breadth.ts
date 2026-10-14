@@ -12,23 +12,24 @@ import { reportUrl } from './loadReport';
 export const BREADTH_MARKET_KEYS = ['tw', 'us'] as const;
 export type BreadthMarketKey = (typeof BREADTH_MARKET_KEYS)[number];
 
-const finiteOrNull = (value: unknown): number | null => {
+// Tolerant field parsers, shared with the breakout win-rate file (breakouts.ts).
+export const finiteOrNull = (value: unknown): number | null => {
   const number = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
   return typeof number === 'number' && Number.isFinite(number) ? number : null;
 };
-const optionalText = z
+export const optionalText = z
   .unknown()
   .optional()
   .transform((value) => (typeof value === 'string' && value.trim() ? value.trim() : null));
-const text = z
+export const text = z
   .unknown()
   .optional()
   .transform((value) => (typeof value === 'string' ? value.trim() : ''));
-const countOf = z
+export const countOf = z
   .unknown()
   .optional()
   .transform((value) => Math.max(0, Math.floor(finiteOrNull(value) ?? 0)));
-const pctOf = z
+export const pctOf = z
   .unknown()
   .optional()
   .transform((value) => finiteOrNull(value));

@@ -1,0 +1,249 @@
+/* Breakout win-rate card (Markets page, side column above the breadth card). */
+.breakout-card {
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.bo-asof {
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bo-body {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  min-width: 0;
+}
+.bo-body .muted-text {
+  margin: 0;
+}
+
+.bo-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.bo-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.bo-legend i {
+  display: inline-block;
+  flex-shrink: 0;
+}
+.bo-legend i.win {
+  width: 12px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.bo-legend i.base {
+  width: 0;
+  height: 12px;
+  margin-left: 6px;
+  border-left: 2px solid var(--warn);
+}
+
+.bo-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bo-row {
+  display: grid;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  min-width: 0;
+}
+.bo-list > .bo-row:first-child {
+  border-top: 0;
+  padding-top: 2px;
+}
+.bo-row-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+.bo-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.bo-row.muted .bo-label {
+  color: var(--text-2);
+  font-weight: 500;
+}
+.bo-note {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.bo-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.bo-win {
+  margin-left: auto;
+  font-size: 18px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bo-win small {
+  margin-right: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+.bo-row.low .bo-win {
+  font-size: 14px;
+  color: var(--text-3);
+}
+.bo-tag {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  padding: 0 7px;
+  border-radius: 999px;
+  color: var(--warn);
+  background: rgba(224, 164, 58, 0.14);
+  white-space: nowrap;
+}
+
+.bo-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+.bo-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.bo-row.low .bo-bar i {
+  opacity: 0.45;
+}
+.bo-base-mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 0;
+  margin-left: -1px;
+  border-left: 2px solid var(--warn);
+}
+
+.bo-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 10px;
+  margin: 2px 0 0;
+}
+.bo-metrics div {
+  min-width: 0;
+}
+.bo-metrics dt {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bo-metrics dd {
+  margin: 1px 0 0;
+  font-size: 13px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bo-metrics dd.up {
+  color: var(--up-text);
+}
+.bo-metrics dd.down {
+  color: var(--down-text);
+}
+
+.bo-base {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+.bo-base b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.bo-base b.up {
+  color: var(--up-text);
+}
+.bo-base b.down {
+  color: var(--down-text);
+}
+
+.bo-details {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.bo-details > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--accent-text);
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  list-style: none;
+}
+.bo-details > summary::-webkit-details-marker {
+  display: none;
+}
+.bo-details > summary::before {
+  content: '▸';
+  margin-right: 6px;
+  font-size: 11px;
+  transition: transform 0.15s;
+}
+.bo-details[open] > summary::before {
+  transform: rotate(90deg);
+}
+.bo-details > .bo-list {
+  margin-top: 4px;
+}
+.bo-method {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.bo-method b {
+  display: block;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.bo-foot {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
