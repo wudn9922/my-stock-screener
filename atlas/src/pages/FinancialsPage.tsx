@@ -3,6 +3,7 @@ import type { PageProps } from './pageProps';
 import { PageState, Skeleton } from '../ui/PageState';
 import { financialsKey, loadFinancials, type FinancialsLoadResult, type PeriodKind } from '../fundamentals/FinancialHistory';
 import { METRIC_GROUPS, type MetricGroupId, type MetricId } from '../fundamentals/financialMetrics';
+import { twListingForAdr } from '../fundamentals/adrListings';
 import type { Report } from '../report/schema';
 import type { LocalSymbol, SearchResult } from '../ui/SymbolSearch';
 import { formatDateTime } from '../ui/format';
@@ -137,6 +138,8 @@ export default function FinancialsPage({ report, navigate, symbol, p }: Financia
     writeMode(next);
   };
   const onSymbol = (picked: SearchResult) => navigate({ page: 'financials', symbol: picked.symbol, ...(p ? { p } : {}) });
+  const homeListing = twListingForAdr(symbol);
+  const onHomeListing = (listing: { tw: string }) => navigate({ page: 'financials', symbol: listing.tw, ...(p ? { p } : {}) });
   const onBack = () => navigate(symbol ? { page: 'chart', symbol } : { page: 'chart' });
 
   let body;
@@ -211,10 +214,12 @@ export default function FinancialsPage({ report, navigate, symbol, p }: Financia
         kind={kind}
         mode={mode}
         localSymbols={localSymbols}
+        homeListing={homeListing}
         onBack={onBack}
         onKind={onKind}
         onMode={onMode}
         onSymbol={onSymbol}
+        onHomeListing={onHomeListing}
       />
       {body}
       {symbol && isChipsPageSymbol(symbol) && <ChipsSection symbol={symbol} />}

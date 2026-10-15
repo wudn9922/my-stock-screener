@@ -12,6 +12,12 @@ does not load it). Runs in the daily schedule workflow; the files are committed 
 - Symbols, in priority order (duplicates dropped): latest.json groups, themes.json constituents,
   universe.json US rows, universe.json TW rows by turnover20 (top 300, ETFs left out); a market
   missing from universe.json falls back to data/*.csv (TW ranked by 20-day turnover from the CSV).
+- Foreign issuers (ADR, 20-F / 40-F) of the full US list that are not above: a stored file with
+  foreignReporter true or the "foreign-filer" code (universe.json has no country column), or
+  FOREIGN_MANUAL. They refresh in a lane of their own, at most FOREIGN_SHARE of the requests while the
+  list above is due, and are logged as "Foreign issuers outside the core list: …".
+- Yahoo values in another currency than the file's statement currency (e.g. a USD conversion of a TWD
+  statement) are never mixed into the file: left out, counted, and noted in the log.
 - One timeseries request per stock (annual + quarterly types together). Yahoo only returns ~4 years
   and ~5–8 quarters, so every run merges into the stored file and history accumulates:
   * period ends within ±5 days are the same period (the newer date wins); a new non-null value
@@ -80,6 +86,13 @@ MIN_SPLIT_RATIO = 1.5
 SPLIT_MATCH = 0.25
 # repair_split_eps: EPS must be this close to a split-factor multiple of net income / shares to be rewritten
 REPAIR_MATCH = 0.2
+# Foreign issuers (ADR, 20-F / 40-F) of the full US universe that are not in the core list form their own
+# lane: while core stocks are still due they take at most this share of the requests, so the core list
+# is refreshed on schedule even during the first pass over the (several hundred) foreign issuers
+FOREIGN_SHARE = 0.3
+# Foreign issuers that may have no stored file yet (universe.json has no country column). Only counted
+# when they are in the full US universe.
+FOREIGN_MANUAL = ("TSM", "UMC", "ASX", "CHT")
 TW_SUFFIXES = (".TW", ".TWO")
 HOME_CURRENCY = {"US": "USD", "TW": "TWD"}
 PERIOD_TYPES = {"annual": "12M", "quarterly": "3M"}
@@ -220,6 +233,11 @@ def pick(by_currency, kind, currency):
     return None
 
 
+def other_currency(by_currency, currency):
+    """True when some point carries a currency code that is neither `currency` nor blank."""
+    return any(code and code != currency for code in by_currency)
+
+
 def parse_timeseries(payload, today, currency=None, market="US"):
     """
     timeseries payload → {"currency", "detected", "annual": {end: {field: value}}, "quarterly": …,
@@ -255,7 +273,10 @@ def parse_timeseries(payload, today, currency=None, market="US"):
 
     detected = detect_currency(raw, market)
     chosen = currency or detected or HOME_CURRENCY.get(market, "USD")
-    parsed = {"currency": chosen, "detected": detected, "annual": {}, "quarterly": {}, "capexSign": False}
+    parsed = {
+        "currency": chosen, "detected": detected, "annual": {}, "quarterly": {}, "capexSign": False,
+        "skipped": 0,       # fields left out because Yahoo only gave them in another currency
+    }
     for frequency, ends in raw.items():
         for end, kinds in ends.items():
             row = {}
@@ -270,6 +291,10 @@ def parse_timeseries(payload, today, currency=None, market="US"):
                         value = abs(value)
                     row[field] = clean_value(value)
                     break
+                else:
+                    # Never mixed into a series of another currency (e.g. a USD conversion of a TWD statement)
+                    if any(other_currency(kinds.get(kind) or {}, chosen) for kind in sources):
+                        parsed["skipped"] += 1
             # Share counts alone (e.g. every other point in a foreign currency) do not make a period
             if any(field != "dilutedShares" for field in row):
                 parsed[frequency][end] = row
@@ -805,13 +830,18 @@ def update_document(previous, payload, key, now, fetch_splits=None):
     today = now.date()
     today_iso = today.isoformat()
     market = market_of(key)
-    info = {"status": "updated", "restated": 0, "chart": None, "currencyChanged": False}
+    info = {"status": "updated", "restated": 0, "chart": None, "currencyChanged": False, "skipped": 0}
     stored = read_sections(previous) if previous is not None else None
     currency = stored["currency"] if stored else None
     parsed = parse_timeseries(payload, today, currency=currency, market=market)
     currency = parsed["currency"]
     changed = bool(stored and stored["currency"] and parsed["detected"] not in (None, currency))
     info["currencyChanged"] = changed
+    info["skipped"] = parsed["skipped"]
+    if parsed["skipped"] and currency != HOME_CURRENCY[market]:
+        # Foreign reporter: Yahoo's values in other currencies (often USD conversions) are left out
+        print(f"::notice::{key}: {parsed['skipped']} Yahoo values in another currency skipped "
+              f"(statement currency {currency})")
     new_annual = [period(end, values) for end, values in sorted(parsed["annual"].items())]
     new_quarterly = [period(end, values) for end, values in sorted(parsed["quarterly"].items())]
     if not new_annual and not new_quarterly and not changed:
@@ -1010,6 +1040,46 @@ def collect_symbols(report_dir, data_dir, tw_limit=TW_LIMIT):
     return result
 
 
+def universe_us_keys(report_dir):
+    """Keys of the US rows of universe.json (the full US list when its scope is "full"), in file order."""
+    universe = read_json(os.path.join(report_dir, "universe.json"))
+    keys = [financials_key(symbol) for symbol, _ in universe_rows(universe, "US")]
+    return [key for key in dict.fromkeys(keys) if key and market_of(key) == "US"]
+
+
+def foreign_filer(document):
+    """Foreign issuer (ADR, 20-F / 40-F) by its stored file: foreignReporter, or the SEC "foreign-filer" code."""
+    if not isinstance(document, dict):
+        return False
+    quality = document.get("quality") if isinstance(document.get("quality"), dict) else {}
+    issues = quality.get("issues")
+    return document.get("foreignReporter") is True or (isinstance(issues, list) and "foreign-filer" in issues)
+
+
+def foreign_issuers(universe, documents):
+    """US keys of the full universe that are foreign issuers: a stored file says so, or FOREIGN_MANUAL."""
+    flagged = {key for key, document in documents.items() if foreign_filer(document)}
+    return [key for key in universe if key in flagged or key in FOREIGN_MANUAL]
+
+
+def interleave(core, extra, share):
+    """
+    Order two queues: `extra` takes about `share` of the slots while `core` still has entries, the rest
+    of its slots go to `core` in order, and once one queue is empty the other fills the remaining slots.
+    """
+    order, taken = [], 0
+    i = j = 0
+    while i < len(core) or j < len(extra):
+        if j < len(extra) and (i >= len(core) or taken + 1 <= share * (len(order) + 1)):
+            order.append(extra[j])
+            j += 1
+            taken += 1
+        else:
+            order.append(core[i])
+            i += 1
+    return order
+
+
 # ---------------------------------------------------------------------------------------------
 # Refresh
 # ---------------------------------------------------------------------------------------------
@@ -1074,10 +1144,12 @@ def stored_keys(out_dir):
 
 
 def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
-                delay=REQUEST_DELAY, sleep=time.sleep, clock=time.monotonic):
+                delay=REQUEST_DELAY, sleep=time.sleep, clock=time.monotonic, universe=()):
     """
     symbols: keys in priority order; fetch(key) → timeseries payload, fetch_chart(key) → chart payload
     (both raise on failure). Writes <out_dir>/<KEY>.json as it goes and index.json at the end.
+    universe: US keys of the full-market list. Its foreign issuers that are not in symbols are added
+    after them, in their own lane (FOREIGN_SHARE of the requests while core keys are due).
     Returns stats; stats["failed"] is True when consecutive failures stopped the run.
     """
     today = now.date()
@@ -1090,13 +1162,6 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
     previous_misses = index.get("misses") if isinstance(index.get("misses"), dict) else {}
     previous_failures = index.get("failures") if isinstance(index.get("failures"), dict) else {}
 
-    listed = []
-    for symbol in symbols:
-        if symbol not in listed:
-            listed.append(symbol)
-    priority = {key: position for position, key in enumerate(listed)}
-    listed_set = set(listed)
-
     documents, corrupt = {}, []
     for key in stored_keys(out_dir):
         status, value = load_document(os.path.join(out_dir, key + ".json"), key)
@@ -1105,6 +1170,18 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
         elif status == "corrupt":
             corrupt.append(key)
             print(f"::warning::{key}.json cannot be merged into ({value}); left untouched")
+
+    listed = []
+    for symbol in symbols:
+        if symbol not in listed:
+            listed.append(symbol)
+    # Foreign issuers outside the core list come after it (priority) and in a lane of their own
+    core_set = set(listed)
+    foreign = [key for key in foreign_issuers(universe, documents) if key not in core_set]
+    foreign_set = set(foreign)
+    listed += foreign
+    priority = {key: position for position, key in enumerate(listed)}
+    listed_set = set(listed)
 
     items = {
         key: index_item(document, (previous_items.get(key) or {}).get("checkedAt"))
@@ -1131,16 +1208,21 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
         (items.get(key) or {}).get("checkedAt") or misses.get(key) or "",
         priority[key],
     ))
+    # Core keys keep their order; foreign issuers take at most FOREIGN_SHARE of the slots while core is due
+    foreign_due = [key for key in pending if key in foreign_set]
+    order = interleave([key for key in pending if key not in foreign_set], foreign_due, FOREIGN_SHARE)
 
     stats = {
         "symbols": len(listed), "pending": len(pending), "requested": 0, "updated": 0, "unchanged": 0,
         "restated": 0,
         "splitChecks": 0, "misses": 0, "stopped": None, "failed": False, "corrupt": corrupt,
         "errors": [], "deleted": [],
+        "foreign": {"listed": len(foreign), "due": len(foreign_due), "requested": 0, "updated": 0, "errors": 0},
     }
+    foreign_stats = stats["foreign"]
     deadline = clock() + budget_seconds
     failures = 0
-    for key in pending:
+    for key in order:
         if clock() > deadline:
             stats["stopped"] = "time budget"
             break
@@ -1150,6 +1232,8 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
         except Exception as error:  # noqa: BLE001 - keep the stored file
             failed[key] = today_iso
             failures += 1
+            if key in foreign_set:
+                foreign_stats["errors"] += 1
             if failures >= MAX_CONSECUTIVE_FAILURES:
                 stats["stopped"] = f"{failures} consecutive failures ({error})"
                 stats["failed"] = True
@@ -1157,6 +1241,8 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
             continue
         finally:
             stats["requested"] += 1
+            if key in foreign_set:
+                foreign_stats["requested"] += 1
             sleep(delay)
 
         def fetch_splits(key=key):
@@ -1174,6 +1260,8 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
         except Exception as error:  # noqa: BLE001 - one bad payload must not stop the run
             failed[key] = today_iso
             stats["errors"].append(key)
+            if key in foreign_set:
+                foreign_stats["errors"] += 1
             print(f"::warning::{key}: not updated ({type(error).__name__}: {error})")
             continue
         failed.pop(key, None)
@@ -1194,7 +1282,16 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
         items[key] = index_item(document)
         stats["updated"] += 1
         stats["restated"] += info["restated"]
+        if key in foreign_set:
+            foreign_stats["updated"] += 1
 
+    # Foreign-lane totals for the Actions log
+    print(
+        f"Foreign issuers outside the core list: {foreign_stats['listed']} listed, {foreign_stats['due']} due, "
+        f"{foreign_stats['requested']} requests, {foreign_stats['updated']} files written, "
+        f"{foreign_stats['errors']} errors",
+        flush=True,
+    )
     # Index and retention of stocks that are no longer listed
     final = {}
     for key in sorted(set(documents) | set(corrupt)):
@@ -1293,7 +1390,8 @@ def main():
         return yahoo.get_json(CHART_URL.format(symbol=key), {"events": "split", "range": "max", "interval": "1mo"})
 
     stats = run_refresh(
-        symbols, out_dir, fetch, now, DEFAULT_BUDGET_SECONDS, fetch_chart=fetch_chart, sleep=time.sleep
+        symbols, out_dir, fetch, now, DEFAULT_BUDGET_SECONDS, fetch_chart=fetch_chart, sleep=time.sleep,
+        universe=universe_us_keys(report_dir),
     )
     print(json.dumps(stats, ensure_ascii=False))
     if stats["failed"]:

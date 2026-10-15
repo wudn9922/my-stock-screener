@@ -11,6 +11,7 @@ const fixtures: Record<string, string> = Object.fromEntries(
     ['JPM', 'bank.json'],
     ['ZLOS', 'loss-maker.json'],
     ['NVO', 'short-history.json'],
+    ['TSM', 'tsmc-twd.json'],
   ].map(([key, file]) => [key, readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials', file!), 'utf8')]),
 );
 const trackedAAPL = readFileSync(resolve(import.meta.dirname, '../../docs/report/financials/AAPL.json'), 'utf8');
@@ -191,4 +192,20 @@ test('back to the chart and switching stocks from the header search', async ({ p
   await expect(page.locator('.fin-title')).toContainText('2330');
   await page.getByRole('button', { name: '回到圖表' }).click();
   await expect(page).toHaveURL(/page=chart&symbol=2330\.TW/);
+});
+
+test('ADR page links to the Taiwan home listing and keeps the period', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(String(error)));
+  await mockFinancials(page);
+  await page.goto('./?page=financials&symbol=TSM&p=q');
+  await expect(page.locator('.fin-home-listing')).toContainText('也可查看');
+  await expect(page.locator('.fin-home-link')).toHaveText('2330.TW（台股）財報');
+  await expect(page.locator('.fin-home-ratio')).toHaveText('1 ADR ＝ 5 股普通股');
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+  await page.locator('.fin-home-link').click();
+  await expect(page).toHaveURL(/symbol=2330\.TW&p=q/);
+  await expect(page.locator('.fin-title')).toContainText('台積電');
+  await expect(page.locator('.fin-home-link')).toHaveCount(0);
+  expect(errors).toEqual([]);
 });

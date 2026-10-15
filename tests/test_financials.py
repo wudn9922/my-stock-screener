@@ -5,6 +5,7 @@ Offline; every Yahoo payload is synthetic (tests/financials_synth.py writes them
 tests/fixtures/financials/). Run: python3 -m unittest discover -s tests
 """
 import copy
+import itertools
 import json
 import os
 import sys
@@ -1079,6 +1080,182 @@ class NestedSymbolsTest(unittest.TestCase):
             {"symbol": "6488.TW", "status": "failed"},
         ]}]}
         self.assertEqual(fin.nested_symbols(document, "groups", "items"), ["AAA", "BBB"])
+
+
+# ---------------------------------------------------------------------------------------------
+# Foreign issuers (ADR / 20-F): identification, own lane, currency guard, SEC protection
+# ---------------------------------------------------------------------------------------------
+def twd_sec_document():
+    """An ADR file as the IFRS seeder would write it: TWD statements, SEC annual FY2022–FY2024 only."""
+    annual = {
+        "end": ["2022-12-31", "2023-12-31", "2024-12-31"],
+        "fy": [2022, 2023, 2024],
+        "src": ["sec", "sec", "sec"],
+        "values": {
+            # 2023 revenue is ~3% under Yahoo's; 2023 net income is a gap SEC leaves; 2023 EPS is SEC's
+            "revenue": [2264 * BN, 2100 * BN, 2894 * BN],
+            "netIncome": [600 * BN, None, 700 * BN],
+            "epsDiluted": [23.1, 22.0, 27.0],
+            "dilutedShares": [25.93e9, 25.93e9, 25.93e9],
+        },
+    }
+    return {
+        "version": 1, "symbol": "ASX", "market": "US", "currency": "TWD", "foreignReporter": True,
+        "generatedAt": "2026-09-01T00:00:00Z", "checkedAt": "2026-09-01",
+        "source": "SEC EDGAR companyfacts + Yahoo Finance", "fyEndMonth": 12,
+        "annual": annual, "quarterly": {"end": [], "fy": [], "fq": [], "values": {}},
+        "split": {"adjusted": False, "events": []},
+        "quality": {"level": "partial", "annualYears": 3, "quarters": 0,
+                    "issues": ["foreign-filer", "foreign-currency"]},
+    }
+
+
+class ForeignIssuerTest(unittest.TestCase):
+    def test_foreign_filer_by_file_flags(self):
+        self.assertTrue(fin.foreign_filer({"foreignReporter": True}))
+        self.assertTrue(fin.foreign_filer({"quality": {"issues": ["foreign-filer"]}}))
+        self.assertFalse(fin.foreign_filer({"foreignReporter": False, "quality": {"issues": []}}))
+        self.assertFalse(fin.foreign_filer({"quality": {"issues": "foreign-filer"}}))
+        self.assertFalse(fin.foreign_filer(None))
+
+    def test_foreign_issuers_come_from_the_full_universe_only(self):
+        documents = {
+            "BABA": {"foreignReporter": True},
+            "AAPL": {"foreignReporter": False},
+            "NOTLISTED": {"foreignReporter": True},
+        }
+        universe = ["AAPL", "TSM", "BABA", "ASX"]
+        self.assertEqual(fin.foreign_issuers(universe, documents), ["TSM", "BABA", "ASX"])
+
+    def test_universe_us_keys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write(os.path.join(tmp, "universe.json"), {"fields": ["symbol"], "markets": {
+                "US": {"rows": [["brk.b"], ["AAPL"], ["AAPL"], ["2330.TW"], ["^GSPC"], ["NVO"]]},
+            }})
+            self.assertEqual(fin.universe_us_keys(tmp), ["BRK-B", "AAPL", "NVO"])
+            self.assertEqual(fin.universe_us_keys(os.path.join(tmp, "missing")), [])
+
+    def test_interleave_shares_slots(self):
+        self.assertEqual(fin.interleave(["a", "b", "c", "d"], ["x", "y"], 0.5), ["a", "x", "b", "y", "c", "d"])
+        self.assertEqual(fin.interleave(["a"], [], 0.3), ["a"])
+        self.assertEqual(fin.interleave([], ["x"], 0.3), ["x"])
+        core, extra = list(range(100)), list(range(-100, 0))
+        order = fin.interleave(core, extra, 0.3)
+        self.assertEqual(sorted(order), sorted(core + extra))
+        self.assertEqual([item for item in order if item >= 0], core)      # core keeps its order
+        self.assertAlmostEqual(sum(1 for item in order[:100] if item < 0), 30, delta=1)
+
+
+class ForeignLaneTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.out = os.path.join(self.tmp.name, "financials")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_once(self, symbols, fetch, universe, budget=600, clock=None, now=NOW):
+        return fin.run_refresh(
+            symbols, self.out, fetch, now, budget, delay=0, sleep=lambda seconds: None,
+            clock=clock or (lambda: 0.0), universe=universe,
+        )
+
+    def test_core_list_keeps_its_share_while_foreign_issuers_are_due(self):
+        core = ["C%d" % n for n in range(10)]
+        foreign = ["F%d" % n for n in range(40)]
+        fetch = Fetcher({})
+        ticks = itertools.count()
+        with mock.patch.object(fin, "FOREIGN_MANUAL", tuple(foreign)), \
+                mock.patch("builtins.print") as printed:
+            # 14 requests fit the budget: the 10 core keys must all come before the budget runs out
+            stats = self.run_once(core, fetch, foreign, budget=14, clock=lambda: float(next(ticks)))
+        self.assertEqual([key for key in fetch.calls if key.startswith("C")], core)
+        self.assertEqual(stats["stopped"], "time budget")
+        self.assertEqual(len(fetch.calls), 14)
+        self.assertEqual(stats["foreign"], {"listed": 40, "due": 40, "requested": 4, "updated": 0, "errors": 0})
+        printed.assert_any_call(
+            "Foreign issuers outside the core list: 40 listed, 40 due, 4 requests, 0 files written, 0 errors",
+            flush=True,
+        )
+
+    def test_foreign_issuers_take_the_rest_once_core_is_done(self):
+        foreign = ["F%d" % n for n in range(5)]
+        fetch = Fetcher({})
+        with mock.patch.object(fin, "FOREIGN_MANUAL", tuple(foreign)), mock.patch("builtins.print"):
+            stats = self.run_once(["C0"], fetch, foreign)
+        self.assertEqual(fetch.calls, ["C0"] + foreign)
+        self.assertEqual(stats["foreign"]["requested"], 5)
+
+    def test_core_issuer_that_is_also_foreign_stays_in_the_core_lane(self):
+        fetch = Fetcher({})
+        with mock.patch.object(fin, "FOREIGN_MANUAL", ("TSM", "F0")), mock.patch("builtins.print"):
+            stats = self.run_once(["TSM", "C0"], fetch, ["TSM", "F0"])
+        self.assertEqual(fetch.calls, ["TSM", "C0", "F0"])
+        self.assertEqual(stats["foreign"]["listed"], 1)
+
+    def test_flagged_file_joins_the_lane_and_is_listed(self):
+        write(os.path.join(self.out, "ASX.json"), {"version": 1, "symbol": "ASX", "foreignReporter": True})
+        write(os.path.join(self.out, "AAPL.json"), {"version": 1, "symbol": "AAPL", "foreignReporter": False})
+        fetch = Fetcher({})
+        with mock.patch("builtins.print"):
+            stats = self.run_once(["C0"], fetch, ["AAPL", "ASX", "NVO"])
+        self.assertEqual(fetch.calls, ["C0", "ASX"])     # NVO has no file and no flag: not in the lane
+        self.assertEqual(stats["foreign"]["listed"], 1)
+        with open(os.path.join(self.out, "index.json"), encoding="utf-8") as file:
+            index = json.load(file)
+        self.assertEqual(index["items"]["ASX"]["lastListed"], "2026-10-11")
+
+
+class ForeignCurrencyTest(unittest.TestCase):
+    def test_sec_values_are_not_overwritten_by_yahoo(self):
+        yahoo = synth.build("ASX", synth.TW_ANNUAL, [], synth.TW_RATIOS, "TWD")
+        with mock.patch("builtins.print"):
+            document, info = build(yahoo, "ASX", previous=twd_sec_document())
+        annual = document["annual"]
+        self.assertEqual(document["currency"], "TWD")
+        self.assertTrue(document["foreignReporter"])
+        self.assertEqual(annual["src"], ["sec", "sec", "sec", "yahoo"])        # only the newer year is added
+        self.assertEqual(values(annual, "revenue")["2023-12-31"], 2100 * BN)  # SEC value kept
+        self.assertEqual(values(annual, "epsDiluted")["2023-12-31"], 22.0)     # SEC EPS kept, Yahoo's not applied
+        self.assertEqual(values(annual, "revenue")["2025-12-31"], 3600 * BN)
+        # The SEC gap is filled from the same-currency Yahoo value
+        fy23 = statement(synth.TW_ANNUAL, "2023-12-31", synth.TW_RATIOS)
+        self.assertEqual(values(annual, "netIncome")["2023-12-31"], fy23["NetIncomeCommonStockholders"])
+        self.assertEqual(values(annual, "netIncome")["2022-12-31"], 600 * BN)
+        self.assertIn("yahoo-differs", document["quality"]["issues"])
+        kinds = {(r["kind"], r["end"], r["field"]) for r in document["quality"]["revisions"]}
+        self.assertIn(("yahoo-differs", "2023-12-31", "revenue"), kinds)
+        self.assertEqual(info["restated"], 0)
+
+    def test_usd_conversion_is_not_mixed_into_a_twd_file(self):
+        usd = synth.build("ASX", synth.TW_ANNUAL, synth.TW_QUARTERLY, synth.TW_RATIOS, "USD")
+        with mock.patch("builtins.print") as printed:
+            document, info = build(usd, "ASX", previous=twd_sec_document(), now=NOW + timedelta(days=1))
+        self.assertEqual(document["currency"], "TWD")
+        self.assertEqual(document["annual"]["end"], ["2022-12-31", "2023-12-31", "2024-12-31"])
+        self.assertEqual(document["annual"]["values"]["revenue"], [2264 * BN, 2100 * BN, 2894 * BN])
+        self.assertIsNone(values(document["annual"], "netIncome")["2023-12-31"])
+        self.assertEqual(document["quarterly"]["end"], [])
+        self.assertTrue(info["currencyChanged"])
+        self.assertGreater(info["skipped"], 0)
+        self.assertIn("currency-changed", document["quality"]["issues"])
+        notices = [call.args[0] for call in printed.call_args_list if call.args and "::notice::" in str(call.args[0])]
+        self.assertTrue(any("ASX" in text and "skipped" in text and "TWD" in text for text in notices), notices)
+
+    def test_only_the_statement_currency_survives_per_field(self):
+        payload = synth.build("ASX", synth.TW_ANNUAL, [], synth.TW_RATIOS, "TWD")
+        converted = synth.build("ASX", [], synth.TW_QUARTERLY, synth.TW_RATIOS, "USD")
+        payload["timeseries"]["result"] += converted["timeseries"]["result"]
+        parsed = fin.parse_timeseries(payload, TODAY, currency="TWD", market="US")
+        self.assertEqual(parsed["currency"], "TWD")
+        self.assertEqual(sorted(parsed["annual"]), ["2022-12-31", "2023-12-31", "2024-12-31", "2025-12-31"])
+        self.assertEqual(parsed["quarterly"], {})
+        self.assertGreater(parsed["skipped"], 0)
+        # Without a pinned currency the statement currency is the majority, and the other points are left out
+        detected = fin.parse_timeseries(payload, TODAY, market="US")
+        self.assertEqual(detected["currency"], "USD")
+        self.assertEqual(sorted(detected["quarterly"]), [end for end, _, _ in synth.TW_QUARTERLY])
+        self.assertEqual(detected["annual"], {})
 
 
 if __name__ == "__main__":
