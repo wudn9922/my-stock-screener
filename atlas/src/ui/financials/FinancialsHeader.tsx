@@ -3,6 +3,7 @@ import { ArrowLeft, Info, Search, X } from 'lucide-react';
 import type { FinancialHistory, PeriodKind } from '../../fundamentals/FinancialHistory';
 import { SymbolSearch, type LocalSymbol, type SearchResult } from '../SymbolSearch';
 import { displayTicker } from '../format';
+import { adrRatioText, type TwAdrListing } from '../../fundamentals/adrListings';
 import { LEVEL_TEXT, issueText, revisionText } from './financialsView';
 
 export type DisplayMode = 'chart' | 'table';
@@ -14,14 +15,19 @@ export interface FinancialsHeaderProps {
   kind: PeriodKind;
   mode: DisplayMode;
   localSymbols: readonly LocalSymbol[];
+  /** Taiwan listing of the ADR being viewed: the header links to its financials. */
+  homeListing?: TwAdrListing | null;
   onBack: () => void;
   onKind: (kind: PeriodKind) => void;
   onMode: (mode: DisplayMode) => void;
   onSymbol: (result: SearchResult) => void;
+  onHomeListing?: (listing: TwAdrListing) => void;
 }
 
 /** Sticky page head: back to the chart, symbol / name / currency, quality badge, period and view switches, stock search. */
-export function FinancialsHeader({ symbol, name, history, kind, mode, localSymbols, onBack, onKind, onMode, onSymbol }: FinancialsHeaderProps) {
+export function FinancialsHeader({
+  symbol, name, history, kind, mode, localSymbols, homeListing, onBack, onKind, onMode, onSymbol, onHomeListing,
+}: FinancialsHeaderProps) {
   const [searching, setSearching] = useState(!symbol);
   const [qualityOpen, setQualityOpen] = useState(false);
   const level = history?.quality.level ?? null;
@@ -60,6 +66,20 @@ export function FinancialsHeader({ symbol, name, history, kind, mode, localSymbo
           {searching ? <X size={18} /> : <Search size={18} />}
         </button>
       </div>
+      {homeListing && onHomeListing && (
+        <p className="fin-home-listing">
+          也可查看{' '}
+          <button
+            type="button"
+            className="fin-home-link"
+            title={`${homeListing.twName}（台股）`}
+            onClick={() => onHomeListing(homeListing)}
+          >
+            {homeListing.tw}（台股）財報
+          </button>
+          <span className="fin-home-ratio">{adrRatioText(homeListing)}</span>
+        </p>
+      )}
       {searching && (
         <div className="fin-search">
           <SymbolSearch
