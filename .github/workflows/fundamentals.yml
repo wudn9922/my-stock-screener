@@ -11,12 +11,13 @@ name: Official Fundamentals (TW / US)
 # - 最後 build_growth.py 合併 financials/*.json 與上面兩個檔案重建 growth.json（financials.yml 也會用同一套規則重建）。
 # 與 financials.yml 共用 concurrency group，兩者不會同時改 growth.json。
 on:
-  workflow_run:
-    workflows: ["Financial Statement History"]
-    types: [completed]
+  # 暫停（2026-10-15，使用者要求）：財報下載先不自動執行，只保留手動執行。恢復時取消下面的註解。
+  # workflow_run:
+  #   workflows: ["Financial Statement History"]
+  #   types: [completed]
   # 補跑（UTC 19:37＝台北 03:37，觀測站離峰）：第一次回補沒補完、或前一次被擋時接著補
-  schedule:
-    - cron: '37 19 * * *'
+  # schedule:
+  #   - cron: '37 19 * * *'
   workflow_dispatch:
     inputs:
       budget:
