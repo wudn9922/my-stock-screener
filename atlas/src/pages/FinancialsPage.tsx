@@ -17,7 +17,7 @@ import { PeRiverCard } from '../ui/financials/PeRiverCard';
 import { SummaryChips } from '../ui/financials/SummaryChips';
 import { ChipsSection } from '../ui/financials/ChipsCard';
 import { isChipsPageSymbol } from '../report/twChips';
-import { CHART_PERIODS, buildView, depthText, provenanceText } from '../ui/financials/financialsView';
+import { CHART_PERIODS, adrEpsNote, buildView, depthText, provenanceText } from '../ui/financials/financialsView';
 import '../ui/financials.css';
 
 export interface FinancialsPageProps extends PageProps {
@@ -53,12 +53,15 @@ function reportSymbols(report: Report | null): LocalSymbol[] {
   return [...map].map(([symbol, name]) => ({ symbol, name }));
 }
 
-/** Why some cards show less for this company (bank statement format, ADR EPS, cumulative quarters). */
-function cardNote(group: MetricGroupId, issues: readonly string[], foreignReporter: boolean, kind: PeriodKind): string | null {
+/**
+ * Why some cards show less for this company (bank statement format, ADR EPS, cumulative quarters).
+ * adrBasis: the EPS are already per ADR (adrEpsNote), so the per-ordinary-share remark does not apply.
+ */
+function cardNote(group: MetricGroupId, issues: readonly string[], foreignReporter: boolean, kind: PeriodKind, adrBasis: boolean): string | null {
   const bank = issues.includes('financial-sector-format');
   if (group === 'growth') {
     const notes: string[] = [];
-    if (foreignReporter || issues.includes('foreign-filer')) notes.push('外國發行人：EPS 為每普通股，非每 ADR。');
+    if (!adrBasis && (foreignReporter || issues.includes('foreign-filer'))) notes.push('外國發行人：EPS 為每普通股，非每 ADR。');
     if (kind === 'quarterly' && issues.includes('quarterly-ytd-suspected')) notes.push('季度數字疑似為年初累計值，季度長條可能逐季遞增，請以年度為主。');
     return notes.join('') || null;
   }
@@ -178,6 +181,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
   else if (history && view && annualView) {
     const issues = history.quality.issues;
     const splitEvents = history.split.events;
+    const adrNote = adrEpsNote(history);
     body = (
       <>
         <KeyMetrics history={history} view={view} />
@@ -196,7 +200,8 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
               {splitEvents.map((event) => `${formatDateTime(event.date, false)}（${splitText(event.ratio)}）`).join('、')}
             </p>
           )}
-          {(history.foreignReporter || issues.includes('foreign-filer')) && <p>外國發行人：EPS 為每普通股，非每 ADR。</p>}
+          {adrNote && <p>{adrNote}</p>}
+          {!adrNote && (history.foreignReporter || issues.includes('foreign-filer')) && <p>外國發行人：EPS 為每普通股，非每 ADR。</p>}
         </div>
         <PeRiverCard history={history} />
         {mode === 'table' ? (
@@ -218,7 +223,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
                   view={view}
                   metric={metricOf[group.id] ?? group.metrics.find((id) => view.metrics[id].window.some((i) => view.metrics[id].values[i] !== null)) ?? group.metrics[0]!}
                   onMetric={(id) => setMetricOf((current) => ({ ...current, [group.id]: id }))}
-                  note={cardNote(group.id, issues, history.foreignReporter, effectiveKind)}
+                  note={cardNote(group.id, issues, history.foreignReporter, effectiveKind, adrNote !== null)}
                 />
               ))}
             </div>
