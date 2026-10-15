@@ -1379,6 +1379,12 @@ class AdrEpsBasisTest(unittest.TestCase):
             self.assertAlmostEqual(quarterly[end], adr_eps(revenue), delta=0.05)
         self.assertEqual(document["annual"]["src"], ["sec", "sec", "sec", "yahoo"])
 
+    def test_rescale_divides_a_stored_share_count(self):
+        periods = [fin.period("2024-12-31", {"epsBasic": 45.25, "epsDiluted": 45.2, "dilutedShares": 25.93e9})]
+        fin.scale_eps(periods, 5)
+        self.assertEqual(periods[0]["values"]["epsBasic"], 226.25)
+        self.assertEqual(periods[0]["values"]["dilutedShares"], 5.186e9)
+
     def test_rescaling_is_not_repeated_on_the_next_run(self):
         first, _, _ = merge_quietly(sec_file(synth.TW_ANNUAL[:3], ORDINARY), self.adr_payload())
         second, info, notices = merge_quietly(first, self.adr_payload(), now=NOW + timedelta(days=1))

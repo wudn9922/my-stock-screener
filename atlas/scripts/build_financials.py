@@ -617,11 +617,13 @@ def eps_factor(ratios):
 
 
 def scale_eps(periods, factor):
-    """Stored EPS × factor, in place (per ordinary share → per ADR)."""
+    """Stored EPS × factor and share count ÷ factor, in place (per ordinary share → per ADR, as Yahoo)."""
     for item in periods:
         for field in ("epsBasic", "epsDiluted"):
             if item["values"].get(field) is not None:
                 item["values"][field] = clean_value(item["values"][field] * factor)
+        if item["values"].get("dilutedShares") is not None:
+            item["values"]["dilutedShares"] = clean_value(item["values"]["dilutedShares"] / factor)
 
 
 def without_per_share(periods):
