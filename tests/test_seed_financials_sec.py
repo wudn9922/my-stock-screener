@@ -3036,5 +3036,57 @@ class DueRunTest(unittest.TestCase):
             sec.parse_args(["--dry-run"])
 
 
+def section_column(section, field):
+    """{end: value} of one column of a stored section (a dict with end and values)."""
+    return dict(zip(section["end"], section["values"].get(field) or [None] * len(section["end"])))
+
+
+class AdrBasisSeedTest(unittest.TestCase):
+    """
+    A file whose EPS are per ADR (adrRatio epsFactor k): the SEC values merged into it go onto the same basis,
+    EPS × k and the diluted share count ÷ k, so a later rerun cannot put per-ordinary-share EPS back.
+    Synthetic company: 500M ordinary shares, 250M net income a year, EPS 2.00 (calendar years).
+    """
+    def merged(self, factor):
+        result = sec.extract_periods(facts_of(plain_company(years=range(2020, 2025))))
+        previous = yahoo_document({"2023-12-31": 4000 * M, "2024-12-31": 4000 * M})
+        if factor is not None:
+            previous["adrRatio"] = {"epsFactor": factor, "basis": "ADR", "derivedAt": "2026-01-02", "pairs": 4}
+        return sec.merge_into_document(previous, result, "TEST", NOW)
+
+    def test_sec_values_follow_the_adr_basis(self):
+        document, info = self.merged(5)
+        self.assertEqual(info["status"], "ok")
+        annual = document["annual"]
+        self.assertEqual(section_column(annual, "epsDiluted")["2024-12-31"], 10.0)
+        self.assertEqual(section_column(annual, "dilutedShares")["2024-12-31"], 100 * M)
+        self.assertEqual(section_column(annual, "netIncome")["2024-12-31"], 250 * M * 4)
+        self.assertEqual(document["adrRatio"]["epsFactor"], 5)            # carried over unchanged
+        self.assertIn("adr-eps-rescaled", document["quality"]["issues"])
+        self.assertNotIn("eps-inconsistent", document["quality"]["issues"])   # EPS and count stay consistent
+
+    def test_without_an_adr_ratio_the_sec_values_are_unchanged(self):
+        document, _ = self.merged(None)
+        annual = document["annual"]
+        self.assertEqual(section_column(annual, "epsDiluted")["2024-12-31"], 2.0)
+        self.assertEqual(section_column(annual, "dilutedShares")["2024-12-31"], 500 * M)
+        self.assertNotIn("adrRatio", document)
+        self.assertNotIn("adr-eps-rescaled", document["quality"]["issues"])
+
+    def test_unity_ratio_changes_nothing_and_adds_no_note(self):
+        document, _ = self.merged(1)
+        self.assertEqual(section_column(document["annual"], "epsDiluted")["2024-12-31"], 2.0)
+        self.assertEqual(document["adrRatio"]["epsFactor"], 1)
+        self.assertNotIn("adr-eps-rescaled", document["quality"]["issues"])
+
+    def test_rerunning_the_seed_does_not_scale_twice(self):
+        first, _ = self.merged(5)
+        again, _ = sec.merge_into_document(copy.deepcopy(first), sec.extract_periods(
+            facts_of(plain_company(years=range(2020, 2025)))), "TEST", NOW + timedelta(days=1))
+        self.assertEqual(section_column(again["annual"], "epsDiluted"), section_column(first["annual"], "epsDiluted"))
+        self.assertEqual(section_column(again["annual"], "dilutedShares"), section_column(first["annual"], "dilutedShares"))
+        self.assertEqual(again["adrRatio"], first["adrRatio"])
+
+
 if __name__ == "__main__":
     unittest.main()

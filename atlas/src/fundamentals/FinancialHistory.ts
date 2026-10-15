@@ -62,8 +62,10 @@ export interface FinancialHistory {
   symbol: string;
   market: 'US' | 'TW';
   currency: string;
-  /** Files annual reports as a foreign private issuer (ADR): EPS is per ordinary share. */
+  /** Files annual reports as a foreign private issuer (ADR): EPS is per ordinary share unless adrRatio says otherwise. */
   foreignReporter: boolean;
+  /** EPS basis of a foreign reporter whose SEC EPS were put on the ADR basis (see AdrRatio); null otherwise. */
+  adrRatio: AdrRatio | null;
   generatedAt: string | null;
   /** Last day the builder changed this file's data (it does not rewrite unchanged files): 「資料更新日」. */
   checkedAt: string | null;
@@ -81,6 +83,15 @@ export interface FinancialHistory {
     /** Values the builder saw change (restated) or kept from SEC over a differing Yahoo value; newest last. */
     revisions: Revision[];
   };
+}
+
+/** 1 ADR = `epsFactor` ordinary shares: the EPS in this file is per ADR (SEC per-share EPS × epsFactor). */
+export interface AdrRatio {
+  epsFactor: number;
+  /** Day the factor was derived (YYYY-MM-DD), if given. */
+  derivedAt: string | null;
+  /** Number of same-period EPS comparisons the factor was derived from, if given. */
+  pairs: number | null;
 }
 
 export interface Revision {
@@ -107,6 +118,19 @@ function parseRevisions(value: unknown): Revision[] {
       return [{ kind, period, end, field, old: finiteOrNull(raw.old), new: finiteOrNull(raw.new), seen: validDate(raw.seen) }];
     })
     .slice(-MAX_REVISIONS);
+}
+
+/** The builder's adrRatio; anything without a positive epsFactor is ignored (no ADR basis note). */
+function parseAdrRatio(value: unknown): AdrRatio | null {
+  const raw = recordOf(value);
+  const epsFactor = finiteOrNull(raw.epsFactor);
+  if (epsFactor === null || epsFactor <= 0) return null;
+  const pairs = finiteOrNull(raw.pairs);
+  return {
+    epsFactor,
+    derivedAt: validDate(raw.derivedAt),
+    pairs: pairs === null ? null : Math.max(0, Math.floor(pairs)),
+  };
 }
 
 export type FinancialsLoadResult =
@@ -185,6 +209,7 @@ const historySchema = z
     market: z.unknown().optional(),
     currency: optionalText,
     foreignReporter: z.unknown().optional(),
+    adrRatio: z.unknown().optional(),
     generatedAt: optionalText,
     checkedAt: optionalText,
     source: optionalText,
@@ -211,6 +236,7 @@ const historySchema = z
       market,
       currency: (raw.currency ?? (market === 'TW' ? 'TWD' : 'USD')).toUpperCase(),
       foreignReporter: raw.foreignReporter === true,
+      adrRatio: parseAdrRatio(raw.adrRatio),
       generatedAt: raw.generatedAt,
       checkedAt: validDate(raw.checkedAt),
       source: raw.source,

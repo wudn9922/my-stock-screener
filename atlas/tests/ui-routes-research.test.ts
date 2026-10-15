@@ -79,6 +79,13 @@ describe('financials route', () => {
     expect(route('?page=chart&symbol=AAPL&p=q')).toEqual({ page: 'chart', symbol: 'AAPL' });
   });
 
+  it('carries the chart timeframe on the financials route so 「K線｜財務」 can return to it', () => {
+    expect(route('?page=financials&symbol=AAPL&tf=1W&p=q')).toEqual({ page: 'financials', symbol: 'AAPL', tf: '1W', p: 'q' });
+    expect(route('?page=financials&symbol=AAPL&tf=bogus')).toEqual({ page: 'financials', symbol: 'AAPL' });
+    expect(serializeRoute({ page: 'financials', symbol: 'AAPL', tf: '1W', p: 'q' })).toBe('?page=financials&symbol=AAPL&tf=1W&p=q');
+    expect(serializeRoute({ page: 'chart', symbol: 'AAPL', tf: '1W' })).toBe('?page=chart&symbol=AAPL&tf=1W');
+  });
+
   it('unwraps LIFF state for financials', () => {
     expect(parseRoute(liff('/atlas/?page=financials&symbol=AAPL&p=q'))).toEqual({
       route: { page: 'financials', symbol: 'AAPL', p: 'q' },

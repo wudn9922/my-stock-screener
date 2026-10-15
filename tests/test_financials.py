@@ -5,6 +5,7 @@ Offline; every Yahoo payload is synthetic (tests/financials_synth.py writes them
 tests/fixtures/financials/). Run: python3 -m unittest discover -s tests
 """
 import copy
+import itertools
 import json
 import os
 import sys
@@ -1098,6 +1099,375 @@ class NestedSymbolsTest(unittest.TestCase):
             {"symbol": "6488.TW", "status": "failed"},
         ]}]}
         self.assertEqual(fin.nested_symbols(document, "groups", "items"), ["AAA", "BBB"])
+
+
+# ---------------------------------------------------------------------------------------------
+# Foreign issuers (ADR / 20-F): identification, own lane, currency guard, SEC protection
+# ---------------------------------------------------------------------------------------------
+def twd_sec_document():
+    """An ADR file as the IFRS seeder would write it: TWD statements, SEC annual FY2022–FY2024 only."""
+    annual = {
+        "end": ["2022-12-31", "2023-12-31", "2024-12-31"],
+        "fy": [2022, 2023, 2024],
+        "src": ["sec", "sec", "sec"],
+        "values": {
+            # 2023 revenue is ~3% under Yahoo's; 2023 net income is a gap SEC leaves; 2023 EPS is SEC's
+            "revenue": [2264 * BN, 2100 * BN, 2894 * BN],
+            "netIncome": [600 * BN, None, 700 * BN],
+            "epsDiluted": [23.1, 22.0, 27.0],
+            "dilutedShares": [25.93e9, 25.93e9, 25.93e9],
+        },
+    }
+    return {
+        "version": 1, "symbol": "ASX", "market": "US", "currency": "TWD", "foreignReporter": True,
+        "generatedAt": "2026-09-01T00:00:00Z", "checkedAt": "2026-09-01",
+        "source": "SEC EDGAR companyfacts + Yahoo Finance", "fyEndMonth": 12,
+        "annual": annual, "quarterly": {"end": [], "fy": [], "fq": [], "values": {}},
+        "split": {"adjusted": False, "events": []},
+        "quality": {"level": "partial", "annualYears": 3, "quarters": 0,
+                    "issues": ["foreign-filer", "foreign-currency"]},
+    }
+
+
+class ForeignIssuerTest(unittest.TestCase):
+    def test_foreign_filer_by_file_flags(self):
+        self.assertTrue(fin.foreign_filer({"foreignReporter": True}))
+        self.assertTrue(fin.foreign_filer({"quality": {"issues": ["foreign-filer"]}}))
+        self.assertFalse(fin.foreign_filer({"foreignReporter": False, "quality": {"issues": []}}))
+        self.assertFalse(fin.foreign_filer({"quality": {"issues": "foreign-filer"}}))
+        self.assertFalse(fin.foreign_filer(None))
+
+    def test_foreign_issuers_come_from_the_full_universe_only(self):
+        documents = {
+            "BABA": {"foreignReporter": True},
+            "AAPL": {"foreignReporter": False},
+            "NOTLISTED": {"foreignReporter": True},
+        }
+        universe = ["AAPL", "TSM", "BABA", "ASX"]
+        self.assertEqual(fin.foreign_issuers(universe, documents), ["TSM", "BABA", "ASX"])
+
+    def test_universe_us_keys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write(os.path.join(tmp, "universe.json"), {"fields": ["symbol"], "markets": {
+                "US": {"rows": [["brk.b"], ["AAPL"], ["AAPL"], ["2330.TW"], ["^GSPC"], ["NVO"]]},
+            }})
+            self.assertEqual(fin.universe_us_keys(tmp), ["BRK-B", "AAPL", "NVO"])
+            self.assertEqual(fin.universe_us_keys(os.path.join(tmp, "missing")), [])
+
+    def test_interleave_shares_slots(self):
+        self.assertEqual(fin.interleave(["a", "b", "c", "d"], ["x", "y"], 0.5), ["a", "x", "b", "y", "c", "d"])
+        self.assertEqual(fin.interleave(["a"], [], 0.3), ["a"])
+        self.assertEqual(fin.interleave([], ["x"], 0.3), ["x"])
+        core, extra = list(range(100)), list(range(-100, 0))
+        order = fin.interleave(core, extra, 0.3)
+        self.assertEqual(sorted(order), sorted(core + extra))
+        self.assertEqual([item for item in order if item >= 0], core)      # core keeps its order
+        self.assertAlmostEqual(sum(1 for item in order[:100] if item < 0), 30, delta=1)
+
+
+class ForeignLaneTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.out = os.path.join(self.tmp.name, "financials")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_once(self, symbols, fetch, universe, budget=600, clock=None, now=NOW):
+        return fin.run_refresh(
+            symbols, self.out, fetch, now, budget, delay=0, sleep=lambda seconds: None,
+            clock=clock or (lambda: 0.0), universe=universe,
+        )
+
+    def test_core_list_keeps_its_share_while_foreign_issuers_are_due(self):
+        core = ["C%d" % n for n in range(10)]
+        foreign = ["F%d" % n for n in range(40)]
+        fetch = Fetcher({})
+        ticks = itertools.count()
+        with mock.patch.object(fin, "FOREIGN_MANUAL", tuple(foreign)), \
+                mock.patch("builtins.print") as printed:
+            # 14 requests fit the budget: the 10 core keys must all come before the budget runs out
+            stats = self.run_once(core, fetch, foreign, budget=14, clock=lambda: float(next(ticks)))
+        self.assertEqual([key for key in fetch.calls if key.startswith("C")], core)
+        self.assertEqual(stats["stopped"], "time budget")
+        self.assertEqual(len(fetch.calls), 14)
+        self.assertEqual(stats["foreign"], {"listed": 40, "due": 40, "requested": 4, "updated": 0, "errors": 0})
+        printed.assert_any_call(
+            "Foreign issuers outside the core list: 40 listed, 40 due, 4 requests, 0 files written, 0 errors",
+            flush=True,
+        )
+
+    def test_foreign_issuers_take_the_rest_once_core_is_done(self):
+        foreign = ["F%d" % n for n in range(5)]
+        fetch = Fetcher({})
+        with mock.patch.object(fin, "FOREIGN_MANUAL", tuple(foreign)), mock.patch("builtins.print"):
+            stats = self.run_once(["C0"], fetch, foreign)
+        self.assertEqual(fetch.calls, ["C0"] + foreign)
+        self.assertEqual(stats["foreign"]["requested"], 5)
+
+    def test_core_issuer_that_is_also_foreign_stays_in_the_core_lane(self):
+        fetch = Fetcher({})
+        with mock.patch.object(fin, "FOREIGN_MANUAL", ("TSM", "F0")), mock.patch("builtins.print"):
+            stats = self.run_once(["TSM", "C0"], fetch, ["TSM", "F0"])
+        self.assertEqual(fetch.calls, ["TSM", "C0", "F0"])
+        self.assertEqual(stats["foreign"]["listed"], 1)
+
+    def test_flagged_file_joins_the_lane_and_is_listed(self):
+        write(os.path.join(self.out, "ASX.json"), {"version": 1, "symbol": "ASX", "foreignReporter": True})
+        write(os.path.join(self.out, "AAPL.json"), {"version": 1, "symbol": "AAPL", "foreignReporter": False})
+        fetch = Fetcher({})
+        with mock.patch("builtins.print"):
+            stats = self.run_once(["C0"], fetch, ["AAPL", "ASX", "NVO"])
+        self.assertEqual(fetch.calls, ["C0", "ASX"])     # NVO has no file and no flag: not in the lane
+        self.assertEqual(stats["foreign"]["listed"], 1)
+        with open(os.path.join(self.out, "index.json"), encoding="utf-8") as file:
+            index = json.load(file)
+        self.assertEqual(index["items"]["ASX"]["lastListed"], "2026-10-11")
+
+
+class ForeignCurrencyTest(unittest.TestCase):
+    def test_sec_values_are_not_overwritten_by_yahoo(self):
+        yahoo = synth.build("ASX", synth.TW_ANNUAL, [], synth.TW_RATIOS, "TWD")
+        with mock.patch("builtins.print"):
+            document, info = build(yahoo, "ASX", previous=twd_sec_document())
+        annual = document["annual"]
+        self.assertEqual(document["currency"], "TWD")
+        self.assertTrue(document["foreignReporter"])
+        self.assertEqual(annual["src"], ["sec", "sec", "sec", "yahoo"])        # only the newer year is added
+        self.assertEqual(values(annual, "revenue")["2023-12-31"], 2100 * BN)  # SEC value kept
+        self.assertEqual(values(annual, "epsDiluted")["2023-12-31"], 22.0)     # SEC EPS kept, Yahoo's not applied
+        self.assertEqual(values(annual, "revenue")["2025-12-31"], 3600 * BN)
+        # The SEC gap is filled from the same-currency Yahoo value
+        fy23 = statement(synth.TW_ANNUAL, "2023-12-31", synth.TW_RATIOS)
+        self.assertEqual(values(annual, "netIncome")["2023-12-31"], fy23["NetIncomeCommonStockholders"])
+        self.assertEqual(values(annual, "netIncome")["2022-12-31"], 600 * BN)
+        self.assertIn("yahoo-differs", document["quality"]["issues"])
+        kinds = {(r["kind"], r["end"], r["field"]) for r in document["quality"]["revisions"]}
+        self.assertIn(("yahoo-differs", "2023-12-31", "revenue"), kinds)
+        self.assertEqual(info["restated"], 0)
+
+    def test_usd_conversion_is_not_mixed_into_a_twd_file(self):
+        usd = synth.build("ASX", synth.TW_ANNUAL, synth.TW_QUARTERLY, synth.TW_RATIOS, "USD")
+        with mock.patch("builtins.print") as printed:
+            document, info = build(usd, "ASX", previous=twd_sec_document(), now=NOW + timedelta(days=1))
+        self.assertEqual(document["currency"], "TWD")
+        self.assertEqual(document["annual"]["end"], ["2022-12-31", "2023-12-31", "2024-12-31"])
+        self.assertEqual(document["annual"]["values"]["revenue"], [2264 * BN, 2100 * BN, 2894 * BN])
+        self.assertIsNone(values(document["annual"], "netIncome")["2023-12-31"])
+        self.assertEqual(document["quarterly"]["end"], [])
+        self.assertTrue(info["currencyChanged"])
+        self.assertGreater(info["skipped"], 0)
+        self.assertIn("currency-changed", document["quality"]["issues"])
+        notices = [call.args[0] for call in printed.call_args_list if call.args and "::notice::" in str(call.args[0])]
+        self.assertTrue(any("ASX" in text and "skipped" in text and "TWD" in text for text in notices), notices)
+
+    def test_only_the_statement_currency_survives_per_field(self):
+        payload = synth.build("ASX", synth.TW_ANNUAL, [], synth.TW_RATIOS, "TWD")
+        converted = synth.build("ASX", [], synth.TW_QUARTERLY, synth.TW_RATIOS, "USD")
+        payload["timeseries"]["result"] += converted["timeseries"]["result"]
+        parsed = fin.parse_timeseries(payload, TODAY, currency="TWD", market="US")
+        self.assertEqual(parsed["currency"], "TWD")
+        self.assertEqual(sorted(parsed["annual"]), ["2022-12-31", "2023-12-31", "2024-12-31", "2025-12-31"])
+        self.assertEqual(parsed["quarterly"], {})
+        self.assertGreater(parsed["skipped"], 0)
+        # Without a pinned currency the statement currency is the majority, and the other points are left out
+        detected = fin.parse_timeseries(payload, TODAY, market="US")
+        self.assertEqual(detected["currency"], "USD")
+        self.assertEqual(sorted(detected["quarterly"]), [end for end, _, _ in synth.TW_QUARTERLY])
+        self.assertEqual(detected["annual"], {})
+
+
+# ---------------------------------------------------------------------------------------------
+# EPS basis of foreign reporters (adrRatio): SEC IFRS EPS is per ordinary share, Yahoo's per ADR
+# ---------------------------------------------------------------------------------------------
+ORDINARY = 25.93e9          # ordinary shares of the made-up issuer
+PER_ADR = 5                 # 1 ADR = 5 ordinary shares (the TSM type)
+
+
+def adr_eps(revenue, shares=ORDINARY / PER_ADR):
+    """Diluted EPS Yahoo would report per ADR for a period with this revenue (TW_RATIOS)."""
+    return synth.statement(revenue, shares, synth.TW_RATIOS)["DilutedEPS"]
+
+
+def sec_file(rows, shares, adr_ratio=None, quarterly=(), eps_scale=1.0):
+    """
+    SYNTHETIC SEC-seeded file of a foreign reporter: revenue, net income and EPS per ORDINARY share (as
+    sec_ifrs writes them; no share count). rows / quarterly: synth rows (end, revenue, shares);
+    eps_scale multiplies the stored EPS, to store a deliberately different basis.
+    """
+    def section(items):
+        columns = {"revenue": [], "netIncome": [], "epsBasic": [], "epsDiluted": []}
+        for _, revenue, _ in items:
+            values = synth.statement(revenue, shares, synth.TW_RATIOS)
+            columns["revenue"].append(values["TotalRevenue"])
+            columns["netIncome"].append(values["NetIncomeCommonStockholders"])
+            columns["epsBasic"].append(round(values["BasicEPS"] * eps_scale, 2))
+            columns["epsDiluted"].append(round(values["DilutedEPS"] * eps_scale, 2))
+        return {"end": [end for end, _, _ in items], "fy": [int(end[:4]) for end, _, _ in items],
+                "src": ["sec"] * len(items), "values": columns}
+    empty = {"end": [], "fy": [], "fq": [], "values": {}}
+    document = {
+        "version": 1, "symbol": "TSM", "market": "US", "currency": "TWD", "foreignReporter": True,
+        "generatedAt": "2026-09-01T00:00:00Z", "checkedAt": "2026-09-01",
+        "source": "SEC EDGAR companyfacts (IFRS)", "fyEndMonth": 12,
+        "annual": section(rows), "quarterly": section(quarterly) if quarterly else empty,
+        "split": {"adjusted": False, "events": []},
+        "quality": {"level": "good", "annualYears": len(rows), "quarters": len(quarterly), "issues": ["ifrs"]},
+    }
+    if adr_ratio is not None:
+        document["adrRatio"] = adr_ratio
+    return document
+
+
+def merge_quietly(previous, payload, now=NOW):
+    """update_document for TSM with the notices it printed → (document, info, notices)."""
+    with mock.patch("builtins.print") as printed:
+        document, info = build(payload, "TSM", previous=previous, now=now)
+    notices = [call.args[0] for call in printed.call_args_list if call.args and "::notice::" in str(call.args[0])]
+    return document, info, notices
+
+
+class EpsFactorTest(unittest.TestCase):
+    def test_median_snaps_to_a_whole_number_or_its_reciprocal(self):
+        self.assertEqual(fin.eps_factor([4.99, 5.0, 5.02]), (5.0, None))
+        self.assertEqual(fin.snap_factor(5.03), 5.0)
+        self.assertEqual(fin.snap_factor(0.2), 0.2)           # 1 / 0.2 = 5
+        self.assertEqual(fin.snap_factor(0.5), 0.5)           # 1 / 0.5 = 2
+        self.assertEqual(fin.snap_factor(2.5), 2.5)           # neither is within 2%: kept as measured
+
+    def test_within_two_percent_of_one_is_unity(self):
+        self.assertEqual(fin.eps_factor([1.0, 1.01, 0.995]), (1, None))
+
+    def test_disagreeing_or_missing_pairs_give_a_reason(self):
+        factor, reason = fin.eps_factor([5.0, 4.5, 5.0])
+        self.assertIsNone(factor)
+        self.assertEqual(reason, "pair ratios 4.5000 to 5.0000 over 3 EPS values")
+        self.assertEqual(fin.eps_factor([]), (None, "no overlapping EPS period"))
+        self.assertIsNone(fin.eps_factor([-5.0, 5.0])[0])     # opposite signs
+
+    def test_stored_adr_factor_must_be_a_positive_number(self):
+        self.assertEqual(fin.adr_eps_factor({"adrRatio": {"epsFactor": 5, "basis": "ADR"}}), 5)
+        self.assertIsNone(fin.adr_eps_factor({"adrRatio": {"epsFactor": 0}}))
+        self.assertIsNone(fin.adr_eps_factor({"adrRatio": {"epsFactor": "5"}}))
+        self.assertIsNone(fin.adr_eps_factor({}))
+        self.assertIsNone(fin.adr_eps_factor(None))
+
+
+class AdrEpsBasisTest(unittest.TestCase):
+    """Foreign reporter files: the EPS basis is settled once (adrRatio), then Yahoo merges as usual."""
+
+    def adr_payload(self, annual=None, quarterly=()):
+        """Yahoo's view of the issuer: the same periods on the ADR share count, TWD."""
+        annual = synth.TW_ANNUAL if annual is None else annual
+        adr = [(end, revenue, ORDINARY / PER_ADR) for end, revenue, _ in annual]
+        adr_q = [(end, revenue, ORDINARY / PER_ADR) for end, revenue, _ in quarterly]
+        return synth.build("TSM", adr, adr_q, synth.TW_RATIOS, "TWD")
+
+    def test_tsm_type_rescales_sec_eps_and_merges_newer_adr_periods(self):
+        stored = sec_file(synth.TW_ANNUAL[:3], ORDINARY, quarterly=synth.TW_QUARTERLY[:4])
+        document, info, notices = merge_quietly(stored, self.adr_payload(quarterly=synth.TW_QUARTERLY[:4]))
+        self.assertEqual(notices, [])
+        self.assertEqual(info["epsBasis"], "rescaled")
+        self.assertEqual(document["adrRatio"], {"epsFactor": 5, "basis": "ADR", "derivedAt": TODAY.isoformat(), "pairs": 14})
+        self.assertIn("adr-eps-rescaled", document["quality"]["issues"])
+        eps = values(document["annual"], "epsDiluted")
+        for end, revenue, _ in synth.TW_ANNUAL[:3]:
+            self.assertAlmostEqual(eps[end], adr_eps(revenue), delta=0.05)     # 45.25 per share → 226.25 per ADR
+        self.assertEqual(eps["2025-12-31"], adr_eps(3600 * BN))                  # newer period: Yahoo's ADR EPS
+        quarterly = values(document["quarterly"], "epsDiluted")
+        for end, revenue, _ in synth.TW_QUARTERLY[:4]:
+            self.assertAlmostEqual(quarterly[end], adr_eps(revenue), delta=0.05)
+        self.assertEqual(document["annual"]["src"], ["sec", "sec", "sec", "yahoo"])
+
+    def test_rescale_divides_a_stored_share_count(self):
+        periods = [fin.period("2024-12-31", {"epsBasic": 45.25, "epsDiluted": 45.2, "dilutedShares": 25.93e9})]
+        fin.scale_eps(periods, 5)
+        self.assertEqual(periods[0]["values"]["epsBasic"], 226.25)
+        self.assertEqual(periods[0]["values"]["dilutedShares"], 5.186e9)
+
+    def test_rescaling_is_not_repeated_on_the_next_run(self):
+        first, _, _ = merge_quietly(sec_file(synth.TW_ANNUAL[:3], ORDINARY), self.adr_payload())
+        second, info, notices = merge_quietly(first, self.adr_payload(), now=NOW + timedelta(days=1))
+        self.assertEqual(notices, [])
+        self.assertIsNone(info["epsBasis"])
+        self.assertEqual(second["adrRatio"], first["adrRatio"])
+        self.assertEqual(values(second["annual"], "epsDiluted"), values(first["annual"], "epsDiluted"))
+        self.assertIn("adr-eps-rescaled", second["quality"]["issues"])
+
+    def test_asml_type_is_unity_and_nothing_is_rescaled(self):
+        stored = sec_file(synth.TW_ANNUAL[:3], ORDINARY)
+        payload = synth.build("TSM", synth.TW_ANNUAL, [], synth.TW_RATIOS, "TWD")   # one ADR = one share
+        document, info, notices = merge_quietly(stored, payload)
+        self.assertEqual(notices, [])
+        self.assertEqual(info["epsBasis"], "unity")
+        self.assertEqual(document["adrRatio"]["epsFactor"], 1)
+        self.assertNotIn("adr-eps-rescaled", document["quality"]["issues"])
+        self.assertEqual(values(document["annual"], "epsDiluted"), values(stored["annual"], "epsDiluted") | {
+            "2025-12-31": adr_eps(3600 * BN, ORDINARY)})
+
+    def test_disagreeing_ratios_leave_yahoo_eps_and_shares_out_and_keep_the_rest(self):
+        stored = sec_file(synth.TW_ANNUAL[:3], ORDINARY)
+        stored["annual"]["values"]["epsDiluted"][1] = round(stored["annual"]["values"]["epsDiluted"][1] * 1.1, 2)
+        before = copy.deepcopy(stored)
+        document, info, notices = merge_quietly(stored, self.adr_payload())
+        self.assertEqual(info["epsBasis"], "unresolved")
+        self.assertEqual(len(notices), 1)
+        self.assertTrue(notices[0].startswith("::notice::TSM: EPS basis unresolved (pair ratios "), notices[0])
+        self.assertNotIn("adrRatio", document)
+        self.assertEqual(stored, before)                                         # the stored EPS are not rescaled
+        self.assertIsNone(values(document["annual"], "epsDiluted")["2025-12-31"])
+        self.assertIsNone(values(document["annual"], "dilutedShares")["2025-12-31"])
+        self.assertEqual(values(document["annual"], "revenue")["2025-12-31"], 3600 * BN)   # other fields merged
+        self.assertNotIn("adr-eps-rescaled", document["quality"]["issues"])
+
+    def test_no_overlapping_period_leaves_yahoo_eps_out_but_merges_the_rest(self):
+        old = sec_file([("2019-12-31", 1900 * BN, ORDINARY), ("2020-12-31", 1950 * BN, ORDINARY)], ORDINARY)
+        document, info, notices = merge_quietly(old, self.adr_payload())
+        self.assertEqual(info["epsBasis"], "unresolved")
+        self.assertEqual(len(notices), 1)
+        self.assertIn("no overlapping EPS period", notices[0])
+        self.assertNotIn("adrRatio", document)
+        self.assertEqual(document["annual"]["end"], ["2019-12-31", "2020-12-31", "2022-12-31", "2023-12-31",
+                                                     "2024-12-31", "2025-12-31"])
+        self.assertIsNone(values(document["annual"], "epsDiluted")["2023-12-31"])
+        self.assertEqual(values(document["annual"], "revenue")["2023-12-31"], 2162 * BN)
+
+    def test_file_without_eps_is_merged_and_judged_on_the_next_run(self):
+        first, info, notices = merge_quietly(None, self.adr_payload())
+        self.assertEqual((info["epsBasis"], notices), (None, []))
+        self.assertEqual(values(first["annual"], "epsDiluted")["2024-12-31"], adr_eps(2894 * BN))
+        self.assertNotIn("adrRatio", first)
+        second, info, _ = merge_quietly(first, self.adr_payload(), now=NOW + timedelta(days=1))
+        self.assertEqual(info["epsBasis"], "unity")
+        self.assertEqual(second["adrRatio"]["epsFactor"], 1)
+
+    def test_stored_adr_ratio_is_kept_and_not_judged_again(self):
+        # EPS already on the ADR basis, and off by 30% from Yahoo: a new judgement would not pass
+        adr_stored = sec_file(synth.TW_ANNUAL[:3], ORDINARY, eps_scale=PER_ADR * 1.3)
+        adr_stored["adrRatio"] = {"epsFactor": 5, "basis": "ADR", "derivedAt": "2026-01-02", "pairs": 3}
+        before = copy.deepcopy(adr_stored)
+        document, info, notices = merge_quietly(adr_stored, self.adr_payload())
+        self.assertEqual((info["epsBasis"], notices), (None, []))
+        self.assertEqual(document["adrRatio"], before["adrRatio"])
+        for end in before["annual"]["end"]:
+            self.assertEqual(values(document["annual"], "epsDiluted")[end], values(before["annual"], "epsDiluted")[end])
+        self.assertIn("adr-eps-rescaled", document["quality"]["issues"])
+
+    def test_non_foreign_file_is_not_touched(self):
+        payload = synth.build("AAPL", synth.US_ANNUAL, [], synth.US_RATIOS, "USD")
+        document, info = build(payload, "AAPL")
+        self.assertFalse(document["foreignReporter"])
+        self.assertNotIn("adrRatio", document)
+        self.assertIsNone(info["epsBasis"])
+        self.assertNotIn("adr-eps-rescaled", document["quality"]["issues"])
+
+    def test_unresolved_periods_keep_only_their_other_values(self):
+        periods = [
+            fin.period("2024-12-31", {"revenue": 5, "epsDiluted": 2.0, "dilutedShares": 3}),
+            fin.period("2025-12-31", {"epsBasic": 1.0, "dilutedShares": 3}),
+        ]
+        kept = fin.without_per_share(periods)
+        self.assertEqual([(p["end"], p["values"]) for p in kept], [("2024-12-31", {"revenue": 5})])
 
 
 if __name__ == "__main__":
