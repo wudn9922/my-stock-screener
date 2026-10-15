@@ -1,17 +1,17 @@
 name: Financial Statement History
 
 # 財報分析中心：Yahoo fundamentals-timeseries 逐檔累積年度／季度財報到 docs/report/financials/
-# （股票來自 latest／themes／universe，只重抓到期的，約 600 秒預算）。
+# （股票來自 latest／themes／universe，只重抓到期的，約 600 秒預算；全市場名單中的外國發行人 ADR 另成一條佇列，
+# 核心名單仍有到期股票時最多占三成請求，見 build_financials.py 的 FOREIGN_SHARE）。
 # 獨立成一個 workflow：用全新的 runner（乾淨的 Yahoo 限流狀態），也不拖慢每日報告與 LINE 推播。
 # 失敗只保留已寫入的檔案，下一次接著補。
 # 財報歷史建好後，build_growth.py 讀 financials/*.json 與 fundamentals/（官方全市場資料，fundamentals.yml 產生）
 # 產生 docs/report/growth.json（選股頁的 EPS／營收 YoY，台股與美股、季度與年度），與財報檔在同一個 commit 迴圈提交；
 # 內容沒變時不改檔。完成後觸發 fundamentals.yml（同一個 concurrency group）。
 on:
-  # 暫停（2026-10-15，使用者要求）：財報下載先不自動執行，只保留手動執行。恢復時取消下面三行的註解。
-  # workflow_run:
-  #   workflows: ["Daily Stock Screener"]
-  #   types: [completed]
+  workflow_run:
+    workflows: ["Daily Stock Screener"]
+    types: [completed]
   workflow_dispatch:
 
 env:

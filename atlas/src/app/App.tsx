@@ -26,7 +26,6 @@ import {
   FlaskConical,
   RefreshCw,
   Search,
-  FileBarChart,
 } from 'lucide-react';
 import { AppStore } from './AppStore';
 import { cloudSyncState, startDrawingSync, type CloudSyncState } from '../cloud/startDrawingSync';
@@ -46,6 +45,7 @@ import { toolNames, type ActiveTool } from '../drawing/DrawingModel';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { useChartFocus } from '../ui/useChartFocus';
 import { IconButton } from '../ui/IconButton';
+import { StockTabs } from '../ui/StockTabs';
 import { DrawingToolGlyph, DrawingToolPicker } from '../ui/DrawingToolPicker';
 import { Watchlist, companies } from '../ui/Watchlist';
 import { IndicatorPanel } from '../ui/IndicatorPanel';
@@ -155,8 +155,8 @@ export interface ChartWorkspaceProps {
   request?: ChartRequest | null;
   onStateChange?: (symbol: string, timeframe: Timeframe) => void;
   onOpenSearch?: () => void;
-  /** Opens the financials page for a symbol; the header shows 「財報」 only when provided. */
-  onOpenFinancials?: (symbol: string) => void;
+  /** Opens the financials page for a symbol with the chart timeframe; the header shows 「K線｜財務」 only when provided. */
+  onOpenFinancials?: (symbol: string, timeframe: Timeframe) => void;
   reportSymbols?: readonly LocalSymbol[];
 }
 
@@ -1005,6 +1005,9 @@ export function App({
             </div>
           </dl>
         )}
+        {onOpenFinancials && !isIndex && providerId !== 'demo' && (
+          <StockTabs active="chart" onSelect={(tab) => tab === 'financials' && onOpenFinancials(symbol, tf)} />
+        )}
         <div className="ws-header-actions">
           {providerId === 'demo' && (
             <button
@@ -1024,11 +1027,6 @@ export function App({
           >
             <span className="star-glyph" aria-hidden="true">{inWatchlist ? '★' : '☆'}</span>
           </IconButton>
-          {onOpenFinancials && !isIndex && providerId !== 'demo' && (
-            <IconButton label="財報" onClick={() => onOpenFinancials(symbol)}>
-              <FileBarChart size={17} />
-            </IconButton>
-          )}
           <IconButton label="重新整理行情" onClick={() => setReloadToken((n) => n + 1)}>
             <RefreshCw size={17} />
           </IconButton>

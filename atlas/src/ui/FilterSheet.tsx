@@ -7,10 +7,10 @@ import {
   EMPTY_FILTERS,
   GROWTH_PRESETS,
   MAX_GATE_QUARTERS,
-  MAX_GATE_YEARS,
   TREND_FLAGS,
   TREND_LABELS,
   VOLUME_PRESETS,
+  YEAR_PRESETS,
   formatRange,
   isCustomGrowthMin,
   isCustomVolume,
@@ -70,6 +70,14 @@ function Section({ title, hint, unavailable, children }: { title: string; hint?:
   );
 }
 
+interface ChoiceOption<T extends number> {
+  value: T | null;
+  label: string;
+  /** Not offered: no row of this group has the data (the applied option stays clickable). */
+  disabled?: boolean;
+  title?: string;
+}
+
 /** Single-choice toggle chips; `null` is the 「不限」 option. */
 function Choice<T extends number>({
   label,
@@ -79,7 +87,7 @@ function Choice<T extends number>({
   compact = false,
 }: {
   label: string;
-  options: readonly { value: T | null; label: string }[];
+  options: readonly ChoiceOption<T>[];
   value: T | null;
   onChange: (value: T | null) => void;
   /** Tighter chips so a row of six short options fits one line on a phone. */
@@ -93,6 +101,8 @@ function Choice<T extends number>({
           type="button"
           className={`fs-chip ${option.value === value ? 'active' : ''}`}
           aria-pressed={option.value === value}
+          disabled={option.disabled}
+          title={option.title}
           onClick={() => onChange(option.value)}
         >
           {option.label}
@@ -197,14 +207,30 @@ const periodsOf = (state: FilterState): GatePeriods => ({
   epsY: state.epsY?.years ?? 1,
   revY: state.revY?.years ?? 1,
 });
-const QUARTER_OPTIONS = Array.from({ length: MAX_GATE_QUARTERS }, (_, index) => ({
-  value: index + 1,
-  label: index === 0 ? '最近 1 季' : `近 ${index + 1} 季皆`,
-}));
-const YEAR_OPTIONS = Array.from({ length: MAX_GATE_YEARS }, (_, index) => ({
-  value: index + 1,
-  label: index === 0 ? '最近 1 年' : `近 ${index + 1} 年皆`,
-}));
+const QUARTER_PRESETS = Array.from({ length: MAX_GATE_QUARTERS }, (_, index) => index + 1);
+/** Presets plus the applied count when a link carries another one (sorted, unique). */
+const countsWith = (presets: readonly number[], current: number | null): number[] =>
+  [...new Set([...presets, ...(current !== null ? [current] : [])])].sort((a, b) => a - b);
+/**
+ * A choice no row can cover (e.g. 10 years of Taiwan annual data, which has three) is disabled with the reason,
+ * unless it is the applied one. `covered` null = the growth data is still loading: nothing is disabled yet.
+ */
+const coverageChoice = (value: number, current: number | null, label: string, covered: number | null, reason: string): ChoiceOption<number> => {
+  const none = covered === 0;
+  return { value, label, disabled: none && value !== current, title: none ? reason : undefined };
+};
+/** Period choices of a growth block (quarters or years). */
+function periodChoices(unit: '季' | '年', current: number, covered: ((count: number) => number) | null): ChoiceOption<number>[] {
+  return countsWith(unit === '季' ? QUARTER_PRESETS : YEAR_PRESETS, current).map((count) =>
+    coverageChoice(
+      count,
+      current,
+      count === 1 ? `最近 1 ${unit}` : `近 ${count} ${unit}皆`,
+      covered ? covered(count) : null,
+      `本群組沒有足夠 ${count} ${unit}財報資料的股票`,
+    ),
+  );
+}
 const GROWTH_OPTIONS: { value: number | null; label: string }[] = [
   { value: null, label: '不限' },
   ...GROWTH_PRESETS.map((preset) => ({ value: preset, label: `≥${preset}%` })),
@@ -310,6 +336,12 @@ export function FilterSheet(props: FilterSheetProps) {
    * Coverage of one condition among this group's rows: a short count while it is not applied, and the
    * full 「僅涵蓋…其餘會被排除」 warning once it is (so a short financial history is never hidden).
    */
+  /** While no streak is applied: how many rows have each number of years (the rest of the block explains the rule). */
+  const streakCoverageLine = (() => {
+    const { total } = props.coverage('epsY', 1, draft.turn);
+    const counts = YEAR_PRESETS.map((years) => `≥${years} 年 ${props.coverage('epsY', years, draft.turn).covered.toLocaleString('en-US')}`);
+    return `各年數涵蓋檔數：${counts.join(' · ')} 檔（共 ${total.toLocaleString('en-US')} 檔）`;
+  })();
   const coverageText = (kind: FundamentalKind | 'accel', count: number, applied: boolean) => {
     if (growth === undefined) return growthLoading ? '基本面資料載入中…' : null;
     if (growthLoading) return '基本面資料載入中…';
@@ -517,7 +549,7 @@ export function FilterSheet(props: FilterSheetProps) {
                         label={`${title}期數`}
                         value={periods[key]}
                         onChange={(count) => setGatePeriods(key, count)}
-                        options={unit === '季' ? QUARTER_OPTIONS : YEAR_OPTIONS}
+                        options={periodChoices(unit, periods[key], growthPending ? null : (count) => props.coverage(key, count, draft.turn).covered)}
                       />
                       <Choice
                         label={`${title}幅度`}
@@ -533,6 +565,43 @@ export function FilterSheet(props: FilterSheetProps) {
                 </div>
               );
             })}
+            <div className="fs-block" role="group" aria-label="EPS 連續成長年數">
+              <div className="fs-sub">EPS 連續成長年數</div>
+              {availability.epss && !growthPending ? (
+                <p className="fs-unavailable">{availability.epss}</p>
+              ) : (
+                <>
+                  <Choice
+                    label="連續成長年數"
+                    value={draft.epss}
+                    onChange={(years) => update({ epss: years })}
+                    options={[
+                      { value: null, label: '不限' },
+                      ...countsWith(YEAR_PRESETS, draft.epss).map((years) =>
+                        coverageChoice(
+                          years,
+                          draft.epss,
+                          `≥${years} 年`,
+                          growthPending ? null : props.coverage('epsY', years, draft.turn).covered,
+                          `本群組沒有足夠 ${years} 年 EPS 年增率的股票`,
+                        ),
+                      ),
+                    ]}
+                    compact
+                  />
+                  {draft.epss !== null ? (
+                    <p className="fs-hint fs-coverage">{coverageText('epsY', draft.epss, true)}</p>
+                  ) : (
+                    !growthPending && <p className="fs-hint fs-coverage">{streakCoverageLine}</p>
+                  )}
+                  <p className="fs-hint">
+                    從最新年度往回數，年度 EPS 年增率 ＞ 0 的連續年數（上限 10 年）；「含虧轉盈」開啟時，虧轉盈計為成長。
+                    年增率 ≤ 0 會中斷計數；缺資料（去年同期虧損、缺年度）也會中斷，此時依「資料不足時排除」處理。
+                  </p>
+                </>
+              )}
+            </div>
+
             <div className="fs-block" role="group" aria-label="成長進階選項">
               <div className="fs-sub">進階</div>
               {availability.accel && !growthPending ? (

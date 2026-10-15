@@ -146,18 +146,29 @@ export function Site() {
     (result: SearchResult) => openChart({ symbol: result.symbol, name: result.name }),
     [openChart],
   );
+  // 「K線｜財務」 round trips keep the annual/quarterly choice of the financials page. It is remembered here
+  // (the chart URL stays as it was); the financials URL itself carries `p`.
+  const periodMemory = useRef<'q' | undefined>(undefined);
+  useEffect(() => {
+    if (route.page === 'financials') periodMemory.current = route.p;
+  }, [route]);
   const onChartState = useCallback(
     (symbol: string, tf: Timeframe) => {
       syncRoute({ page: 'chart', symbol, tf });
     },
     [syncRoute],
   );
-  const openFinancials = useCallback((symbol: string) => navigate({ page: 'financials', symbol }), [navigate]);
+  const openFinancials = useCallback(
+    (symbol: string, tf?: Timeframe) =>
+      navigate({ page: 'financials', symbol, ...(tf ? { tf } : {}), ...(periodMemory.current ? { p: periodMemory.current } : {}) }),
+    [navigate],
+  );
   const go = (page: Page) => {
     setSearchOpen(false);
     if (page === route.page) return;
-    // Back from financials to the chart of the same symbol.
-    if (page === 'chart') navigate(route.page === 'financials' && route.symbol ? { page: 'chart', symbol: route.symbol } : { page: 'chart' });
+    // Back from financials to the chart of the same symbol, with the timeframe it was opened with.
+    if (page === 'chart')
+      navigate(route.page === 'financials' && route.symbol ? { page: 'chart', symbol: route.symbol, ...(route.tf ? { tf: route.tf } : {}) } : { page: 'chart' });
     else if (page === 'markets') navigate({ page, market: route.page === 'markets' ? route.market : 'tw' });
     else navigate({ page } as Route);
   };
@@ -222,7 +233,7 @@ export function Site() {
           {route.page === 'world' && <WorldPage {...pageProps} view={route.view} />}
           {route.page === 'themes' && <ThemesPage {...pageProps} theme={route.theme} market={route.market} view={route.v} />}
           {route.page === 'screener' && <ScreenerPage {...pageProps} group={route.group} />}
-          {route.page === 'financials' && <FinancialsPage {...pageProps} symbol={route.symbol} p={route.p} />}
+          {route.page === 'financials' && <FinancialsPage {...pageProps} symbol={route.symbol} p={route.p} tf={route.tf} />}
         </Suspense>
         {chartVisited.current && (
           <Suspense fallback={route.page === 'chart' ? <PageState kind="loading" title="載入圖表工作台…" /> : null}>

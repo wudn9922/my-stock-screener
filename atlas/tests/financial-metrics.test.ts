@@ -60,6 +60,26 @@ const fixture = (name: string) => {
 };
 
 describe('margins', () => {
+  it('prefers reported cost and derives only a nonnegative cost from same-period revenue and gross profit', () => {
+    const data = history([
+      { end: '2021-12-31', revenue: 100, grossProfit: 40, costOfRevenue: 75 },
+      { end: '2022-12-31', revenue: 100, grossProfit: 40 },
+      { end: '2023-12-31', revenue: 100, grossProfit: -10 },
+      { end: '2024-12-31', revenue: 100, grossProfit: 120 },
+      { end: '2025-12-31', revenue: -10, grossProfit: -20 },
+      { end: '2026-12-31', revenue: 100 },
+    ]);
+    const ctx = contextOf(data, 'annual');
+    const costs = metricSeries(ctx, 'costOfRevenue');
+    expect(costs.map((item) => item.value)).toEqual([75, 60, 110, null, null, null]);
+    expect(costs.map((item) => item.basis)).toEqual(['reported', 'derived', 'derived', 'reported', 'reported', 'reported']);
+    expect(costs[1]!.notes[0]).toContain('同一期營收減毛利');
+    expect(data.annual.values.costOfRevenue).toEqual([75, null, null, null, null, null]);
+    expect(costs[3]!.reason).toBe('推算營業成本小於 0，不採用');
+    expect(costs[4]!.reason).toBe('營收 < 0，不推算營業成本');
+    expect(costs[5]!.reason).toBe('缺營業成本與毛利，無法推算');
+  });
+
   it('gross margin: gross profit first, then revenue − cost, revenue ≤ 0 → null', () => {
     const ctx = annualCtx([
       { end: '2021-12-31', revenue: 100, grossProfit: 40, costOfRevenue: 99 },
@@ -86,8 +106,23 @@ describe('margins', () => {
     expect(operatingMargin(ctx, 0)).toMatchObject({ value: 25, oiField: 'operatingIncomeReported', notes: [] });
     const fallback = operatingMargin(ctx, 1);
     expect(fallback).toMatchObject({ value: 20, oiField: 'operatingIncome' });
-    expect(fallback.formula).toContain('標準化');
-    expect(fallback.notes[0]).toContain('標準化');
+    expect(fallback.formula).toContain('營業利益欄位');
+    expect(fallback.notes[0]).toContain('一般營業利益欄');
+  });
+
+  it('lists cost of revenue and operating income as raw statement metrics, preserving nulls and line priority', () => {
+    const ctx = annualCtx([
+      { end: '2023-12-31', costOfRevenue: 120, operatingIncomeReported: 35, operatingIncome: 30 },
+      { end: '2024-12-31', costOfRevenue: null, operatingIncome: 25 },
+      { end: '2025-12-31' },
+    ]);
+    expect(metricSeries(ctx, 'costOfRevenue').map((item) => item.value)).toEqual([120, null, null]);
+    expect(metricSeries(ctx, 'operatingIncome').map((item) => item.value)).toEqual([35, 25, null]);
+    expect(metricSeries(ctx, 'operatingIncome')[1]!.notes[0]).toContain('一般營業利益欄');
+    expect(metricSeries(ctx, 'operatingIncome')[2]).toMatchObject({ value: null, reason: '缺營業利益' });
+    expect(METRIC_GROUPS.flatMap((group) => group.metrics)).toEqual(expect.arrayContaining([
+      'eps', 'revenue', 'costOfRevenue', 'nonOperatingIncome', 'grossMargin', 'operatingIncome', 'netMargin',
+    ]));
   });
 
   it('net margin', () => {
@@ -106,7 +141,12 @@ describe('non-operating items and tax', () => {
     { end: '2025-12-31', pretaxIncome: 10 },
   ]);
   it('non-operating income = pretax − operating income, may be negative', () => {
-    expect(nonOperatingIncome(ctx, 0)).toMatchObject({ value: 5, oiField: 'operatingIncomeReported' });
+    expect(nonOperatingIncome(ctx, 0)).toMatchObject({
+      value: 5,
+      basis: 'derived',
+      oiField: 'operatingIncomeReported',
+      notes: ['由稅前淨利減營業利益推算，代表業外損益淨額'],
+    });
     expect(nonOperatingIncome(ctx, 1).value).toBe(-5);
     expect(nonOperatingIncome(ctx, 5).value).toBeNull();
   });
@@ -514,7 +554,8 @@ describe('fixtures', () => {
     expect(roes[0]!.basis).toBe('approx');
     expect(roes.slice(1).every((m) => m.basis === 'reported')).toBe(true);
     expect(metricSeries(ctx, 'interestCoverage').at(-1)!.reason).toBe('缺利息費用');
-    expect(Object.keys(METRICS)).toHaveLength(19);
+    // 22 since gross profit (毛利金額) joined the registry for the profitability chart and the key metrics card.
+    expect(Object.keys(METRICS)).toHaveLength(22);
   });
 
   it('TWD file: quarterly TTM ROE and ROIC from the fifth quarter on', () => {

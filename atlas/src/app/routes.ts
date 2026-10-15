@@ -21,8 +21,8 @@ export type Route =
   | { page: 'themes'; theme?: string; market?: 'tw'; v?: 'map' }
   | { page: 'screener'; group?: string; f?: string }
   | { page: 'chart'; symbol?: string; tf?: Timeframe }
-  /** `p: 'q'` shows quarterly figures; omitted means annual. */
-  | { page: 'financials'; symbol?: string; p?: 'q' };
+  /** `p: 'q'` shows quarterly figures; omitted means annual. `tf` is the chart timeframe to return to. */
+  | { page: 'financials'; symbol?: string; p?: 'q'; tf?: Timeframe };
 
 export const DEFAULT_MARKET: MarketKey = 'tw';
 const GROUP_KEY = /^[A-Za-z0-9_.:-]{1,80}$/;
@@ -159,7 +159,8 @@ export function parseRoute(search: string, fallback: Page = 'markets'): ParsedRo
     route = view === 'indices' ? { page, view } : { page };
   } else if (page === 'financials') {
     const p = params.get('p')?.trim().toLowerCase();
-    route = { page, ...(symbol ? { symbol } : {}), ...(p === 'q' ? { p } : {}) };
+    const tf = parseLaunchTimeframe(params.get('tf') ?? params.get('timeframe'));
+    route = { page, ...(symbol ? { symbol } : {}), ...(tf ? { tf } : {}), ...(p === 'q' ? { p } : {}) };
   } else route = { page };
   const canonical = serializeRoute(route);
   const current = normalizeSearch(search);
@@ -186,6 +187,7 @@ export function serializeRoute(route: Route): string {
   }
   if (route.page === 'financials') {
     if (route.symbol) params.set('symbol', route.symbol);
+    if (route.tf) params.set('tf', route.tf);
     if (route.p) params.set('p', route.p);
   }
   // `^TWII` reads better unescaped and is valid in a query string.

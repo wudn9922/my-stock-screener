@@ -331,8 +331,8 @@ class Runner:
         self.unexpected_yahoo.append(1)
         raise AssertionError("Yahoo must not be contacted in this test")
 
-    def run(self, fake, *args, environ=None, now=NOW, dirs=True, yahoo=None):
-        """yahoo: the injected Yahoo session factory; by default any Yahoo use fails the test."""
+    def run(self, fake, *args, environ=None, now=NOW, dirs=True, yahoo=None, clock=None):
+        """yahoo: the injected Yahoo session factory; by default any Yahoo use fails the test. clock: --budget."""
         argv = list(args)
         if dirs:
             argv += ["--out", self.out, "--report-dir", self.report, "--data-dir", self.data]
@@ -340,7 +340,7 @@ class Runner:
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
             code = sec.main(argv, client=client, now=now, environ={} if environ is None else environ,
-                            yahoo_factory=yahoo or self._no_yahoo, sleep=self.yahoo_sleeps.append)
+                            yahoo_factory=yahoo or self._no_yahoo, sleep=self.yahoo_sleeps.append, clock=clock)
         self.client = client
         if yahoo is None:
             assert not self.unexpected_yahoo, "Yahoo was contacted"
@@ -2806,6 +2806,286 @@ class FollowUpTest(unittest.TestCase):
         self.assertEqual(q["2021-12-31"], 0.5)                            # Q4 of the combined tag
         self.assertIsNone(q["2022-12-31"])                                # never a Q4 of continuing EPS
         self.assertEqual(result.concepts["epsDiluted"], sorted(["EarningsPerShareDiluted", both, cont]))
+
+
+# ---------------------------------------------------------------------------------------------
+# --due: the quarterly re-check of the stored US files. SYNTHETIC stored files and payloads only.
+# ---------------------------------------------------------------------------------------------
+TODAY_DAY = NOW.date()
+
+
+def ago(days):
+    return (TODAY_DAY - timedelta(days=days)).isoformat()
+
+
+def stored_file(key, quarter_ends, annual_ends=("2025-12-31",), src="sec"):
+    """A minimal stored file that read_sections accepts: one revenue value per period."""
+    def section(ends):
+        return {"end": list(ends), "src": [src] * len(ends), "values": {"revenue": [1] * len(ends)}}
+    return {"version": fin.VERSION, "symbol": key, "market": fin.market_of(key),
+            "currency": "TWD" if key.endswith(".TW") else "USD",
+            "annual": section(annual_ends), "quarterly": section(quarter_ends)}
+
+
+class DueRuleTest(unittest.TestCase):
+    """due_reason: the 45 / 100 / 3 day boundaries, with the SEC check date as checkedAt."""
+
+    def reason(self, checked, latest_quarter):
+        state = {"checkedAt": checked, "latestQuarter": latest_quarter, "latestAnnual": None}
+        return sec.due_reason(state, TODAY_DAY)
+
+    def test_never_checked_is_due(self):
+        self.assertEqual(self.reason(None, ago(10)), "never checked")
+
+    def test_last_check_older_than_45_days(self):
+        self.assertIsNone(self.reason(ago(45), ago(10)))                 # 45 days is not older than 45
+        self.assertEqual(self.reason(ago(46), ago(10)), "last check older than 45 days")
+
+    def test_latest_period_older_than_100_days_and_checked_more_than_3_days_ago(self):
+        self.assertIsNone(self.reason(ago(10), ago(100)))                # 100 days is not older than 100
+        self.assertEqual(self.reason(ago(10), ago(101)), "latest period older than 100 days")
+        self.assertIsNone(self.reason(ago(3), ago(101)))                 # checked 3 days ago: not yet
+        self.assertEqual(self.reason(ago(4), ago(101)), "latest period older than 100 days")
+
+    def test_a_finished_run_leaves_nothing_due(self):
+        self.assertIsNone(self.reason(ago(0), ago(400)))
+        self.assertIsNone(self.reason(ago(0), ago(10)))
+
+
+class SelectDueTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="sec-due-test-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.out = os.path.join(self.tmp, "financials")
+        write_json(os.path.join(self.out, "AAPL.json"), stored_file("AAPL", [ago(103)]))
+        write_json(os.path.join(self.out, "MSFT.json"), stored_file("MSFT", [ago(10)]))
+        write_json(os.path.join(self.out, "NVDA.json"), stored_file("NVDA", [ago(10)]))
+        write_json(os.path.join(self.out, "XOM.json"), stored_file("XOM", [ago(10)]))
+        write_json(os.path.join(self.out, "YAHOO.json"), stored_file("YAHOO", [ago(10)], src="yahoo"))
+        write_json(os.path.join(self.out, "1101.TW.json"), stored_file("1101.TW", [ago(10)]))
+        with open(os.path.join(self.out, "BAD.json"), "w", encoding="utf-8") as file:
+            file.write("{")
+        self.items = {
+            "AAPL": {"checkedAt": "2026-09-20", "secCheckedAt": ago(10)},     # Yahoo date is not the SEC one
+            "MSFT": {"secCheckedAt": ago(10)},
+            "XOM": {"secCheckedAt": ago(50)},
+            "1101.TW": {"secCheckedAt": ago(50)},
+        }
+
+    def test_candidates_are_us_files_with_sec_periods_oldest_check_first(self):
+        due, left = sec.select_due(self.out, self.items, TODAY_DAY)
+        self.assertEqual(due, [
+            ("NVDA", "never checked", None),
+            ("XOM", "last check older than 45 days", ago(50)),
+            ("AAPL", "latest period older than 100 days", ago(10)),
+        ])
+        self.assertEqual(dict(left), {"not due": 1, "not US": 1, "no SEC periods": 1, "unreadable": 1})
+
+    def test_only_narrows_the_candidates(self):
+        due, left = sec.select_due(self.out, self.items, TODAY_DAY, only={"AAPL", "1101.TW"})
+        self.assertEqual([key for key, _, _ in due], ["AAPL"])
+        self.assertEqual(dict(left), {"not US": 1})
+
+
+class DueRunTest(unittest.TestCase):
+    """The --due CLI end to end against FakeSec: dry run, resume, 403 stop, index.json."""
+
+    ENTRIES = {
+        "AAPL": (320193, SYNTHETIC_BYTES),
+        "BRK-B": (1067983, SYNTHETIC_BYTES),
+        "MSFT": (789019, SYNTHETIC_BYTES),
+    }
+
+    def seeded(self, runner):
+        """SEC files of the three tickers from a plain seed run, and an index.json without any SEC check date."""
+        runner.run(world(self.ENTRIES), "--tickers", "AAPL,BRK-B,MSFT", "--no-splits")
+        write_json(runner.path("index.json"), {"version": 1, "generatedAt": "2026-10-01T00:00:00Z",
+                                               "items": {}, "misses": {}, "failures": {}})
+
+    def items(self, runner):
+        return read_json(runner.path("index.json"))["items"]
+
+    @staticmethod
+    def facts(cik):
+        return sec.FACTS_URL.format(cik=sec.cik10(cik))
+
+    def test_dry_run_lists_due_files_offline_and_writes_nothing(self):
+        runner = Runner(self)
+        self.seeded(runner)
+        write_json(runner.path("1101.TW.json"), stored_file("1101.TW", [ago(10)]))
+        before = {name: read_bytes(runner.path(name)) for name in runner.files()}
+        fake = world(self.ENTRIES)
+        with mock.patch.object(sec.urllib.request, "urlopen", side_effect=AssertionError("network")):
+            code, text = runner.run(fake, "--due", "--dry-run")
+            code2, text2 = runner.run(fake, "--due", "--dry-run", "--tickers", "MSFT,2330.TW")
+        self.assertEqual((code, code2), (0, 0))
+        self.assertEqual(fake.requests, [])
+        self.assertIn("due now 3 (never checked: 3)", text)
+        self.assertIn("not US 1", text)
+        self.assertIn("AAPL BRK-B MSFT", text)
+        self.assertNotIn("1101.TW", text.split("Dry run")[1])               # Taiwan file is never a candidate
+        self.assertIn("[-] 2330.TW not-us", text2)
+        self.assertIn("due now 1 (never checked: 1)", text2)
+        self.assertEqual(before, {name: read_bytes(runner.path(name)) for name in runner.files()})
+
+    def test_live_run_checks_each_due_file_once_and_the_next_run_has_nothing_due(self):
+        runner = Runner(self)
+        self.seeded(runner)
+        fake = world(self.ENTRIES)
+        before = {name: read_bytes(runner.path(name)) for name in runner.files() if name != "index.json"}
+        code, text = runner.run(fake, "--due", "--no-splits")
+        self.assertEqual(code, 0, text)
+        self.assertIn("3 due file(s) -> ", text)
+        self.assertIn("[1/3] AAPL unchanged", text)
+        self.assertIn("[3/3] MSFT unchanged", text)
+        self.assertIn("due at start: 3", text)
+        self.assertIn("unchanged: 3", text)
+        self.assertIn("remaining due: 0", text)
+        self.assertIn("index.json: updated (3 entries)", text)
+        self.assertEqual(fake.urls(), [sec.TICKERS_URL, self.facts(320193), self.facts(1067983), self.facts(789019)])
+        self.assertEqual({key: item[sec.SEC_CHECKED_KEY] for key, item in self.items(runner).items()},
+                         {"AAPL": TODAY, "BRK-B": TODAY, "MSFT": TODAY})
+        # unchanged files are not rewritten
+        self.assertEqual(before, {name: read_bytes(runner.path(name)) for name in before})
+        self.assertEqual(len(before), 3)
+        # the next run and the offline dry run find nothing due
+        fake2 = world(self.ENTRIES)
+        code, text = runner.run(fake2, "--due", "--no-splits")
+        self.assertEqual(code, 0)
+        self.assertIn("Nothing is due for a re-check.", text)
+        self.assertEqual(fake2.requests, [])
+        code, text = runner.run(fake2, "--due", "--dry-run")
+        self.assertIn("due now 0", text)
+
+    def test_budget_pauses_between_tickers_and_a_rerun_continues(self):
+        runner = Runner(self)
+        self.seeded(runner)
+        ticks = iter([0, 10, 20, 30, 40, 50])               # clock: start, then one reading per ticker
+        code, text = runner.run(world(self.ENTRIES), "--due", "--no-splits", "--budget", "25",
+                                clock=lambda: next(ticks))
+        self.assertEqual(code, 0, text)
+        self.assertIn("[2/3] BRK-B unchanged", text)
+        self.assertNotIn("[3/3]", text)
+        self.assertIn("PAUSED: time budget of 25 s used up; 1 not processed yet", text)
+        self.assertIn("remaining due: 1", text)
+        self.assertEqual(sorted(key for key, item in self.items(runner).items() if sec.SEC_CHECKED_KEY in item),
+                         ["AAPL", "BRK-B"])
+        fake = world(self.ENTRIES)
+        code, text = runner.run(fake, "--due", "--no-splits")
+        self.assertEqual(code, 0, text)
+        self.assertIn("due at start: 1", text)
+        self.assertIn("remaining due: 0", text)
+        self.assertNotIn("PAUSED", text)
+        self.assertEqual(fake.urls(), [sec.TICKERS_URL, self.facts(789019)])
+
+    def test_http_403_stops_at_once_without_retry_and_the_file_in_progress_is_not_recorded(self):
+        runner = Runner(self)
+        self.seeded(runner)
+        entries = dict(self.ENTRIES)
+        entries["BRK-B"] = (1067983, 403)
+        fake = world(entries)
+        sleeps = len(runner.sleeps)
+        code, text = runner.run(fake, "--due", "--no-splits")
+        self.assertEqual(code, 1, text)
+        self.assertIn("[1/3] AAPL unchanged", text)
+        self.assertIn("STOPPED: SEC returned HTTP 403 for " + self.facts(1067983), text)
+        self.assertNotIn("MSFT", text)                       # the stop comes before the third ticker
+        self.assertIn("remaining due: 2", text)
+        self.assertEqual(fake.urls(), [sec.TICKERS_URL, self.facts(320193), self.facts(1067983)])   # no retry
+        self.assertEqual(runner.sleeps[sleeps:], [sec.MIN_INTERVAL] * 3)                           # no backoff
+        self.assertEqual(sorted(key for key, item in self.items(runner).items() if sec.SEC_CHECKED_KEY in item),
+                         ["AAPL"])
+
+    def test_every_answer_but_a_403_is_a_check(self):
+        runner = Runner(self)
+        self.seeded(runner)
+        entries = dict(self.ENTRIES, **{"BRK-B": (1067983, 500), "MSFT": (789019, 404)})
+        code, text = runner.run(world(entries), "--due", "--no-splits")
+        self.assertEqual(code, 0, text)
+        self.assertIn("BRK-B fetch-error", text)
+        self.assertIn("MSFT no-facts", text)
+        self.assertIn("remaining due: 0", text)
+        self.assertEqual(sorted(self.items(runner)), ["AAPL", "BRK-B", "MSFT"])
+        code, text = runner.run(world(entries), "--due", "--no-splits")
+        self.assertIn("Nothing is due for a re-check.", text)
+
+    def test_refuses_without_index_json_and_makes_no_request(self):
+        runner = Runner(self)
+        runner.run(world(self.ENTRIES), "--tickers", "AAPL", "--no-splits")      # no index.json is written
+        fake = world(self.ENTRIES)
+        code, text = runner.run(fake, "--due", "--no-splits")
+        self.assertEqual(code, 2, text)
+        self.assertIn("index.json is absent", text)
+        self.assertEqual(fake.requests, [])
+
+    def test_index_items_keep_their_sec_check_date_unless_checked_again(self):
+        runner = Runner(self)
+        self.seeded(runner)
+        write_json(runner.path("index.json"), {"version": 1, "items": {"AAPL": {
+            "market": "US", "checkedAt": "2026-09-20", "lastListed": "2026-10-01", sec.SEC_CHECKED_KEY: "2026-10-01"}}})
+        documents = {"AAPL": read_json(runner.path("AAPL.json")), "MSFT": read_json(runner.path("MSFT.json"))}
+        self.assertEqual(sec.update_index(runner.out, documents, TODAY), ("updated", 2, mock.ANY))
+        items = self.items(runner)
+        self.assertEqual(items["AAPL"][sec.SEC_CHECKED_KEY], "2026-10-01")       # written, not checked: kept
+        self.assertEqual(items["AAPL"]["lastListed"], "2026-10-01")
+        self.assertNotIn(sec.SEC_CHECKED_KEY, items["MSFT"])
+        self.assertEqual(sec.update_index(runner.out, {}, TODAY), ("unchanged", 0, 0))
+
+    def test_dry_run_needs_due(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            sec.parse_args(["--dry-run"])
+
+
+def section_column(section, field):
+    """{end: value} of one column of a stored section (a dict with end and values)."""
+    return dict(zip(section["end"], section["values"].get(field) or [None] * len(section["end"])))
+
+
+class AdrBasisSeedTest(unittest.TestCase):
+    """
+    A file whose EPS are per ADR (adrRatio epsFactor k): the SEC values merged into it go onto the same basis,
+    EPS × k and the diluted share count ÷ k, so a later rerun cannot put per-ordinary-share EPS back.
+    Synthetic company: 500M ordinary shares, 250M net income a year, EPS 2.00 (calendar years).
+    """
+    def merged(self, factor):
+        result = sec.extract_periods(facts_of(plain_company(years=range(2020, 2025))))
+        previous = yahoo_document({"2023-12-31": 4000 * M, "2024-12-31": 4000 * M})
+        if factor is not None:
+            previous["adrRatio"] = {"epsFactor": factor, "basis": "ADR", "derivedAt": "2026-01-02", "pairs": 4}
+        return sec.merge_into_document(previous, result, "TEST", NOW)
+
+    def test_sec_values_follow_the_adr_basis(self):
+        document, info = self.merged(5)
+        self.assertEqual(info["status"], "ok")
+        annual = document["annual"]
+        self.assertEqual(section_column(annual, "epsDiluted")["2024-12-31"], 10.0)
+        self.assertEqual(section_column(annual, "dilutedShares")["2024-12-31"], 100 * M)
+        self.assertEqual(section_column(annual, "netIncome")["2024-12-31"], 250 * M * 4)
+        self.assertEqual(document["adrRatio"]["epsFactor"], 5)            # carried over unchanged
+        self.assertIn("adr-eps-rescaled", document["quality"]["issues"])
+        self.assertNotIn("eps-inconsistent", document["quality"]["issues"])   # EPS and count stay consistent
+
+    def test_without_an_adr_ratio_the_sec_values_are_unchanged(self):
+        document, _ = self.merged(None)
+        annual = document["annual"]
+        self.assertEqual(section_column(annual, "epsDiluted")["2024-12-31"], 2.0)
+        self.assertEqual(section_column(annual, "dilutedShares")["2024-12-31"], 500 * M)
+        self.assertNotIn("adrRatio", document)
+        self.assertNotIn("adr-eps-rescaled", document["quality"]["issues"])
+
+    def test_unity_ratio_changes_nothing_and_adds_no_note(self):
+        document, _ = self.merged(1)
+        self.assertEqual(section_column(document["annual"], "epsDiluted")["2024-12-31"], 2.0)
+        self.assertEqual(document["adrRatio"]["epsFactor"], 1)
+        self.assertNotIn("adr-eps-rescaled", document["quality"]["issues"])
+
+    def test_rerunning_the_seed_does_not_scale_twice(self):
+        first, _ = self.merged(5)
+        again, _ = sec.merge_into_document(copy.deepcopy(first), sec.extract_periods(
+            facts_of(plain_company(years=range(2020, 2025)))), "TEST", NOW + timedelta(days=1))
+        self.assertEqual(section_column(again["annual"], "epsDiluted"), section_column(first["annual"], "epsDiluted"))
+        self.assertEqual(section_column(again["annual"], "dilutedShares"), section_column(first["annual"], "dilutedShares"))
+        self.assertEqual(again["adrRatio"], first["adrRatio"])
 
 
 if __name__ == "__main__":

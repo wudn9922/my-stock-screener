@@ -47,11 +47,16 @@ Output (compact, rows sorted by symbol; keys as in the financials file names):
   {"version": 1, "generatedAt": "...", "source": "...", "fields": [...], "rows": [[...], ...]}
   fields: symbol, lv (financials quality level good/partial/limited; null for the other sources),
   src (sec|yahoo|mops|frames: of the quarterly block, else of the annual one), qEnd, yEnd (period end
-  of slot 0 for quarterly / annual), epsQ (4), revQ (4), epsY (3), revY (3), tQ, tY (bit i set = EPS
+  of slot 0 for quarterly / annual), epsQ (4), revQ (4), epsY (10), revY (10), tQ, tY (bit i set = EPS
   turnaround in slot i of quarterly / annual), srcY (source of the annual block, null without one),
   dQ (bit i set = quarterly slot i compares a derived Q4). Trailing nulls of the arrays are cut. A
   symbol without any usable value gets no row. The market is the symbol's suffix (.TW / .TWO =
   Taiwan). The file is only rewritten when its content changes, so generatedAt is the last change.
+Annual horizon: up to YEAR_SLOTS (10) YoY values, computed from the financials files (annual history of
+up to 19 years). The Taiwan statements (MOPS) and the SEC frames have only a few annual periods and keep
+RECENT_YEAR_SLOTS (3) values. A source's annual block only competes when it has a YoY value within its
+newest RECENT_YEAR_SLOTS years (the choice is the same as with the 3-year horizon); its older years come
+with it when it wins.
 """
 import json
 import os
@@ -63,7 +68,11 @@ VERSION = 1
 SOURCE = "financials+official"
 FIELDS = ["symbol", "lv", "src", "qEnd", "yEnd", "epsQ", "revQ", "epsY", "revY", "tQ", "tY", "srcY", "dQ"]
 QUARTER_SLOTS = 4
-YEAR_SLOTS = 3
+# Annual YoY values per row from the financials files (each needs the year before it: 11 fiscal years for 10 values).
+YEAR_SLOTS = 10
+# The newest annual values: the whole horizon of the official sources (Taiwan MOPS, SEC frames), and the window
+# that decides whether a source's annual block competes (choose_block).
+RECENT_YEAR_SLOTS = 3
 SAME_PERIOD_MIN_DAYS = 335
 SAME_PERIOD_MAX_DAYS = 395
 STALE_QUARTER_DAYS = 270
@@ -319,9 +328,16 @@ def build_row(key, document, today):
     return None if blocks is None else make_row(key, *blocks)
 
 
-def choose_block(blocks):
-    """The newest block; within FRESHER_DAYS of it the best source (SOURCE_TIERS), then input order."""
-    blocks = [block for block in blocks if block is not None and parse_day(block.get("end"))]
+def has_value(block, slots):
+    """A YoY value or an EPS turnaround within the newest `slots` slots of a block."""
+    values = block["eps"][:slots] + block["rev"][:slots]
+    return any(value is not None for value in values) or bool(block["mask"] & ((1 << slots) - 1))
+
+
+def choose_block(blocks, slots):
+    """The newest block with a value in its newest `slots` slots; within FRESHER_DAYS of it the best source
+    (SOURCE_TIERS), then input order."""
+    blocks = [block for block in blocks if block is not None and parse_day(block.get("end")) and has_value(block, slots)]
     if not blocks:
         return None
     newest = max(parse_day(block["end"]) for block in blocks)
@@ -331,8 +347,8 @@ def choose_block(blocks):
 
 def merge_candidates(key, candidates):
     """candidates: [(quality level or None, quarterly block, annual block)] → one row (or None)."""
-    q = choose_block([candidate[1] for candidate in candidates])
-    y = choose_block([candidate[2] for candidate in candidates])
+    q = choose_block([candidate[1] for candidate in candidates], QUARTER_SLOTS)
+    y = choose_block([candidate[2] for candidate in candidates], RECENT_YEAR_SLOTS)
     level = None
     for candidate in candidates:
         if candidate[0] and ((q is not None and candidate[1] is q) or (y is not None and candidate[2] is y)):
@@ -350,7 +366,7 @@ def block_from_row(fields, row, prefix, today, src):
         return None
     if (today - day).days > (STALE_QUARTER_DAYS if prefix == "Q" else STALE_ANNUAL_DAYS):
         return None
-    slots = QUARTER_SLOTS if prefix == "Q" else YEAR_SLOTS
+    slots = QUARTER_SLOTS if prefix == "Q" else RECENT_YEAR_SLOTS
 
     def values(name):
         raw = get(name)
@@ -408,11 +424,12 @@ def read_documents(directory):
     return documents, bad
 
 
-def leading_count(values, mask):
-    """Consecutive slots from the newest with a YoY value or an EPS turnaround."""
+def leading_count(values, mask, slots):
+    """Consecutive slots from the newest (of `slots`) with a YoY value or an EPS turnaround."""
     count = 0
-    for slot in range(len(values)):
-        if values[slot] is None and not (mask >> slot) & 1:
+    for slot in range(slots):
+        value = values[slot] if slot < len(values) else None
+        if value is None and not (mask >> slot) & 1:
             break
         count += 1
     return count
@@ -427,8 +444,13 @@ def coverage(rows, files):
         entry = stats.setdefault(market_of(row[0]), {"files": 0, "rows": 0})
         entry["rows"] += 1
         r = dict(zip(FIELDS, row))
-        for name, n in (("epsQ", leading_count(r["epsQ"], r["tQ"])), ("epsY", leading_count(r["epsY"], r["tY"])),
-                        ("revQ", leading_count(r["revQ"], 0)), ("revY", leading_count(r["revY"], 0))):
+        counts = (
+            ("epsQ", leading_count(r["epsQ"], r["tQ"], QUARTER_SLOTS)),
+            ("epsY", leading_count(r["epsY"], r["tY"], YEAR_SLOTS)),
+            ("revQ", leading_count(r["revQ"], 0, QUARTER_SLOTS)),
+            ("revY", leading_count(r["revY"], 0, YEAR_SLOTS)),
+        )
+        for name, n in counts:
             for need in range(1, (QUARTER_SLOTS if name.endswith("Q") else YEAR_SLOTS) + 1):
                 if n >= need:
                     entry[f"{name}>={need}"] = entry.get(f"{name}>={need}", 0) + 1

@@ -5,6 +5,7 @@ import { yoy, type MetricGroupId, type MetricId, type MetricInput, type MetricUn
 import { formatDateTime } from '../format';
 import { BarChart } from './BarChart';
 import {
+  CHART_PERIODS,
   averageText,
   cagrText,
   digitsFor,
@@ -32,7 +33,7 @@ export interface MetricCardProps {
 
 const BASIS_TEXT: Record<string, string> = {
   reported: '財報數字',
-  derived: '由其他欄位推算',
+  derived: '推算',
   basic: '基本 EPS',
   approx: '近似值',
   'statutory-tax': '法定稅率',
@@ -56,8 +57,16 @@ export function MetricCard({ group, history, view, metric, onMetric, note }: Met
   const shown = useMemo(() => displayValues(windowValues, data.unit, scale), [windowValues, data.unit, scale]);
   const digits = digitsFor(shown, data.unit);
   const texts = useMemo(() => shown.map((value) => (value === null ? null : formatNumber(value, digits))), [shown, digits]);
+  // Money and EPS get a YoY line over the bars (ratios do not: a percentage of a percentage says little).
+  const growthMetric = data.unit === 'money' || data.unit === 'eps';
+  const yoyValues = useMemo(() => data.window.map((index) => data.changes[index]?.value ?? null), [data]);
+  const overlay = useMemo(
+    () => (growthMetric && yoyValues.some((value) => value !== null) ? { values: yoyValues, label: `${data.label}年增率` } : undefined),
+    [growthMetric, yoyValues, data.label],
+  );
   const [selectedState, setSelected] = useState<{ key: string; index: number } | null>(null);
-  const resetKey = `${history.symbol}|${view.kind}|${metric}`;
+  // The window is part of the key: a new range re-selects the latest bar instead of a shifted position.
+  const resetKey = `${history.symbol}|${view.kind}|${metric}|${data.window[0] ?? ''}|${data.window.length}`;
   const latestInWindow = data.latestIndex !== null ? data.window.indexOf(data.latestIndex) : -1;
   const selected = selectedState?.key === resetKey ? selectedState.index : latestInWindow >= 0 ? latestInWindow : data.window.length - 1;
   const selectedPeriod = data.window[selected];
@@ -67,15 +76,18 @@ export function MetricCard({ group, history, view, metric, onMetric, note }: Met
   const second = data.cagr ? cagrText(data.cagr) : averageText(data.average, data.unit, history.currency);
   const empty = windowValues.every((value) => value === null);
   const quarterly = view.kind === 'quarterly';
+  // More than ten annual bars: two-digit years so neighbouring labels do not collide on a phone.
+  const shortYears = !quarterly && data.window.length > CHART_PERIODS.annual;
   const axis = data.window.map((index, position) => {
     const label = view.labels[index]!;
-    if (!quarterly) return { main: label.short };
+    if (!quarterly) return { main: shortYears ? `'${String(label.fy).slice(2)}` : label.short };
     const showYear = label.fq === 1 || position === 0;
     return { main: label.short, sub: showYear ? `FY${String(label.fy).slice(2)}` : '' };
   });
   const ariaLabels = data.window.map((index) => {
     const value = data.values[index] ?? null;
-    return `${view.labels[index]!.long} ${data.label} ${value === null ? '無資料' : `${formatValue(value, data.unit, scale)} ${unit}`}`;
+    const change = growthMetric ? `，${yoyText(data.changes[index] ?? null, data.unit).text}` : '';
+    return `${view.labels[index]!.long} ${data.label} ${value === null ? '無資料' : `${formatValue(value, data.unit, scale)} ${unit}`}${change}`;
   });
   const oiText = oiFieldText(latest ?? undefined);
   // Same scale and decimals as the chart labels, so the headline matches its bar.
@@ -116,6 +128,20 @@ export function MetricCard({ group, history, view, metric, onMetric, note }: Met
         <p className="fin-chart-title">
           {data.label}（{unit}）· {quarterly ? `近 ${data.window.length} 季` : `近 ${data.window.length} 年`}
         </p>
+        {growthMetric && (
+          <p className="fin-legend">
+            {overlay ? (
+              <>
+                <span className="fin-legend-bar" aria-hidden="true" />
+                {data.label}
+                <span className="fin-legend-line" aria-hidden="true" />
+                年增率（右軸，%）· 同期比較
+              </>
+            ) : (
+              '年增率：此區間沒有可計算的點（去年同期缺值或 ≤ 0）'
+            )}
+          </p>
+        )}
         {empty ? (
           <p className="fin-empty">{data.results[data.results.length - 1]?.reason ?? '沒有資料'}，此指標不顯示。</p>
         ) : (
@@ -128,6 +154,7 @@ export function MetricCard({ group, history, view, metric, onMetric, note }: Met
             selected={selected}
             onSelect={(index) => setSelected({ key: resetKey, index })}
             title={`${data.label}直條圖`}
+            overlay={overlay}
           />
         )}
         {!empty && selectedPeriod !== undefined && (
