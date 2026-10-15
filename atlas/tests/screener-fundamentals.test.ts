@@ -170,6 +170,9 @@ describe('growth.json', () => {
       latest: '2026-06-30',
       latestAnnual: '2025-12-31',
       source: 'financials',
+      originQ: { eps: 'mops', rev: 'mops' },
+      originY: 'mops',
+      derivedQ: [false, true, false, false],
       quality: 'good',
       epsTurn: false,
     });
@@ -211,18 +214,31 @@ describe('growth.json', () => {
   });
 });
 
-describe('merging the Yahoo and financials-file growth', () => {
-  it('prefers Yahoo quarterly numbers, keeps annual from growth.json and fills the gaps', () => {
+describe('merging growth.json with the Yahoo quarters', () => {
+  it('takes growth.json first and the Yahoo quarters only when they are a newer report', () => {
+    // MSFT: both files have the quarter ending in June: growth.json (SEC) wins
+    const msft = merged.items.get('MSFT')!;
+    expect(msft.epsYoY).toEqual(reportGrowth.items.get('MSFT')!.epsYoY);
+    expect(msft.revYoY).toEqual(reportGrowth.items.get('MSFT')!.revYoY);
+    expect(msft.source).toBe('financials');
+    expect(msft.originQ).toEqual({ eps: 'sec', rev: 'sec' });
+    // AAPL: growth.json still ends in March, the Yahoo file already has June (> 45 days newer)
     const aapl = merged.items.get('AAPL')!;
-    expect(aapl.epsYoY).toEqual(yahoo.items.get('AAPL')!.epsYoY); // not the -99 placeholders of the financials row
+    expect(aapl.epsYoY).toEqual(yahoo.items.get('AAPL')!.epsYoY); // not the -99 placeholders of the older quarter
     expect(aapl.revYoY).toEqual(yahoo.items.get('AAPL')!.revYoY);
+    expect(aapl.latest).toBe('2026-06-30');
     expect(aapl.source).toBe('yahoo');
+    expect(aapl.originQ).toEqual({ eps: 'us-growth', rev: 'us-growth' });
+    expect(aapl.originY).toBe('sec');
     expect(aapl.epsYoYAnnual).toEqual(reportGrowth.items.get('AAPL')!.epsYoYAnnual);
     expect(aapl.latestAnnual).toBe('2025-09-27');
     expect(aapl.quality).toBe('good');
-    // RIVN is not in the Yahoo file: the financials-file record is used as it is.
+    // AMZN: growth.json has no EPS numbers for it, Yahoo neither; revenue stays growth.json's
+    expect(merged.items.get('AMZN')!.originQ).toEqual({ eps: 'sec', rev: 'sec' });
+    // RIVN is not in the Yahoo file: the growth.json record is used as it is.
     expect(merged.items.get('RIVN')).toEqual(reportGrowth.items.get('RIVN'));
-    expect(merged.items.get('RIVN')!.source).toBe('financials');
+    expect(merged.items.get('RIVN')!.originQ.eps).toBe('frames');
+    expect(merged.items.get('RIVN')!.derivedQ[0]).toBe(true);
     // A Yahoo-only stock keeps its record.
     const onlyYahoo = [...yahoo.items.keys()].find((key) => !reportGrowth.items.has(key));
     if (onlyYahoo) expect(merged.items.get(onlyYahoo)).toEqual(yahoo.items.get(onlyYahoo));
@@ -230,16 +246,18 @@ describe('merging the Yahoo and financials-file growth', () => {
     expect(merged.items.get('2330-TW')).toEqual(reportGrowth.items.get('2330-TW'));
   });
 
-  it('falls back per metric when Yahoo has nothing for it', () => {
-    const y: GrowthFile = {
-      generatedAt: 'y',
-      source: 'Yahoo Finance',
-      items: new Map([['AAPL', { ...yahoo.items.get('AAPL')!, epsYoY: [null, null], epsTurnQ: [false], epsTurn: false }]]),
-    };
-    const fin: GrowthFile = { generatedAt: 'f', source: 'financials', items: new Map([['AAPL', reportGrowth.items.get('AAPL')!]]) };
-    const result = mergeGrowth(y, fin)!.items.get('AAPL')!;
-    expect(result.epsYoY).toEqual(fin.items.get('AAPL')!.epsYoY); // Yahoo had no EPS numbers
-    expect(result.revYoY).toEqual(y.items.get('AAPL')!.revYoY);
+  it('fills a metric growth.json has nothing for, per metric', () => {
+    const msftYahoo = yahoo.items.get('MSFT')!;
+    const msftFile = reportGrowth.items.get('MSFT')!;
+    const fin: GrowthFile = { generatedAt: 'f', source: 'financials', items: new Map([['MSFT', { ...msftFile, epsYoY: [], epsTurnQ: [false] }]]) };
+    const y: GrowthFile = { generatedAt: 'y', source: 'Yahoo Finance', items: new Map([['MSFT', msftYahoo]]) };
+    const result = mergeGrowth(y, fin)!.items.get('MSFT')!;
+    expect(result.epsYoY).toEqual(msftYahoo.epsYoY); // growth.json had no EPS numbers
+    expect(result.revYoY).toEqual(msftFile.revYoY); // the same quarter: growth.json's revenue stays
+    expect(result.originQ).toEqual({ eps: 'us-growth', rev: 'sec' });
+    // Yahoo without the metric never replaces anything
+    const empty: GrowthFile = { generatedAt: 'y', source: 'Yahoo', items: new Map([['MSFT', { ...msftYahoo, epsYoY: [null], revYoY: [], epsTurnQ: [false] }]]) };
+    expect(mergeGrowth(empty, reportGrowth)!.items.get('MSFT')).toEqual(msftFile);
   });
 
   it('survives either file missing', () => {
@@ -306,11 +324,11 @@ describe('fundamental filters on the market lists', () => {
     expect(symbols(applyFilters(TW, state('rev:1:15;tn:0'), tw))).toContain('1301.TW');
   });
 
-  it('uses the Yahoo quarters for S&P 500 stocks and the financials file for the rest', () => {
+  it('uses growth.json for the US list, the Yahoo quarters where they are newer', () => {
     const result = symbols(applyFilters(US, state('eps:1:20;rev:1:10'), us));
     // RIVN only exists in growth.json (+45% EPS, +60% revenue)
     expect(result).toContain('RIVN');
-    // AAPL's financials row says -99%; the Yahoo numbers decide
+    // AAPL's growth.json quarter is older (-99%); the newer Yahoo numbers decide
     expect(result).not.toContain('AAPL');
     // Annual growth comes from growth.json for the Yahoo stocks too
     const annual = symbols(applyFilters(US, state('epsy:3:-1000'), us));
@@ -414,7 +432,10 @@ describe('pills and sorting with growth', () => {
     const eps = metricPill(tsmc, 'eps', reportGrowth)!;
     expect(eps.title).toContain('季度（最新→較舊）+30% / +20%');
     expect(eps.title).toContain('最新季 2026-06-30');
-    expect(eps.title).toContain('季度 財報檔');
+    expect(eps.title).toContain('來源：季度 公開資訊觀測站（官方財報）、年度 公開資訊觀測站（官方財報）');
+    expect(eps.title).toContain('含以全年減前三季推算的第 4 季');
+    expect(metricPill(row('2454.TW'), 'eps', reportGrowth)!.title).toContain('來源：季度 Yahoo 財報、年度 Yahoo 財報');
+    expect(metricPill(row('2454.TW'), 'eps', reportGrowth)!.title).not.toContain('推算');
     expect(metricPill(tsmc, 'epsY', reportGrowth)).toMatchObject({ text: 'EPS年 +25%' });
     expect(metricPill(tsmc, 'epsY', reportGrowth)!.title).toContain('年度（最新→較舊）+25% / +15% / +10%');
     expect(metricPill(tsmc, 'revY', reportGrowth)?.text).toBe('營收年 +20%');

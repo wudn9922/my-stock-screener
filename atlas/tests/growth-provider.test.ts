@@ -35,6 +35,9 @@ describe('us-growth.json', () => {
       latestAnnual: null,
       checkedAt: null,
       source: 'yahoo',
+      originQ: { eps: 'us-growth', rev: 'us-growth' },
+      originY: null,
+      derivedQ: [],
       quality: null,
     });
     expect(parseGrowthRecord([1])).toBeNull();

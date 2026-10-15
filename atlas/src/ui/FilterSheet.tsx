@@ -209,6 +209,11 @@ const GROWTH_OPTIONS: { value: number | null; label: string }[] = [
   { value: null, label: '不限' },
   ...GROWTH_PRESETS.map((preset) => ({ value: preset, label: `≥${preset}%` })),
 ];
+/** Where each market's growth numbers come from (build_growth.py's source order). */
+const GROWTH_SOURCE_TEXT: Record<'TW' | 'US', string> = {
+  TW: '公開資訊觀測站／證交所・櫃買中心 OpenAPI 綜合損益表（官方，全部上市櫃），缺的才用 Yahoo 財報',
+  US: 'SEC 財報（companyfacts）與 SEC XBRL frames（全市場），其次為 Yahoo 財報／Yahoo 季資料（S&P 500）',
+};
 const GROWTH_BLOCKS: { key: GateKey; title: string; unit: '季' | '年' }[] = [
   { key: 'eps', title: '季度 EPS 成長', unit: '季' },
   { key: 'epsY', title: '年度 EPS 成長', unit: '年' },
@@ -493,7 +498,9 @@ export function FilterSheet(props: FilterSheetProps) {
           <Section title="基本面（EPS／營收成長）" unavailable={fundamentalsBlocked}>
             <p className="fs-hint fs-lead">
               年增率（YoY）一律和「去年同期」比：季度比去年同一季，年度比前一個會計年度。幅度 ≥ X% 且「近 N 期皆」達標才通過。
-              {market === 'TW' && ' 台股財報歷史較短（季度約 5–6 季、年度約 4 年），季度最多比較近 2 季；缺 Q4 EPS 的公司該季算缺資料。'}
+              {market === 'TW'
+                ? ' 台股季度由官方綜合損益表的年度累計數相減而得（第 4 季＝全年－前三季）；股票股利（配股）不追溯調整，配股的公司 EPS 年增率會偏低。'
+                : ' 美股第 4 季多由「全年－前三季」推算；外國發行人（20-F）多只有年度資料，以申報幣別計算。'}
             </p>
             {GROWTH_BLOCKS.map(({ key, title, unit }) => {
               const blocked = growthPending ? null : availability[key];
@@ -580,7 +587,7 @@ export function FilterSheet(props: FilterSheetProps) {
               {growthLoading
                 ? '基本面資料載入中…'
                 : growth
-                  ? `資料：${market === 'TW' ? 'Yahoo Finance 財報（逐檔累積）' : '季度 Yahoo Finance（S&P 500）優先，其餘與年度為 SEC／Yahoo 財報檔'}${growthDate ? ` · 更新 ${growthDate}` : ''} · 財報公布後數日更新`
+                  ? `資料：${GROWTH_SOURCE_TEXT[market]}${growthDate ? ` · 更新 ${growthDate}` : ''} · 財報公布後數日更新`
                   : '開啟面板後載入基本面資料。'}
             </p>
           </Section>

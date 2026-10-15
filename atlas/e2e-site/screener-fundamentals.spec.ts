@@ -38,7 +38,10 @@ test('Taiwan full-market list: fundamental filters are open, annual EPS growth f
   await expect(fundamentals.getByRole('switch', { name: 'EPS 成長加速' })).toBeVisible();
   await expect(fundamentals.getByRole('switch', { name: '含虧轉盈' })).toBeChecked();
   await expect(fundamentals.getByRole('switch', { name: '資料不足時排除' })).toBeChecked();
-  await expect(fundamentals).toContainText('台股財報歷史較短');
+  // The source and how Taiwan quarters are made are spelled out (official statements, year-to-date differences)
+  await expect(fundamentals).toContainText('年度累計數相減');
+  await expect(fundamentals).toContainText('第 4 季＝全年－前三季');
+  await expect(fundamentals).toContainText('公開資訊觀測站／證交所・櫃買中心 OpenAPI 綜合損益表');
 
   // Coverage is stated per condition instead of pretending to be complete.
   const annualEps = fundamentals.getByRole('group', { name: '年度 EPS 成長', exact: true });
@@ -135,25 +138,33 @@ test('1-month and 3-month strength against the index, with the definitions spell
   await expect(chips).toContainText('3月強於大盤');
 });
 
-test('US full-market list: Yahoo quarters first, the financials file fills the rest', async ({ page }) => {
+test('US full-market list: growth.json first, the Yahoo quarters only where they are newer', async ({ page }) => {
   await mockSite(page, { report: buildReport(20), fundamentals: true });
   await page.goto('./?page=screener&group=universe-us&f=eps:1:40');
   const search = page.getByRole('searchbox', { name: '在群組內篩選' });
-  // RIVN has no Yahoo record: its +45% EPS comes from growth.json
+  // RIVN has no Yahoo record: its +45% EPS comes from growth.json (SEC XBRL frames, a derived Q4 in the latest pair)
   await search.fill('RIVN');
   const rivian = page.locator('.screener-row', { hasText: 'RIVN' });
   await expect(rivian.locator('.metric-pill').first()).toHaveText('EPS +45%');
-  await expect(rivian.locator('.metric-pill').first()).toHaveAttribute('title', /季度 財報檔/);
-  // AAPL's financials row is a -99% placeholder; the Yahoo number (not ≥ +40%) decides
+  await expect(rivian.locator('.metric-pill').first()).toHaveAttribute('title', /來源：季度 SEC XBRL frames、年度 SEC XBRL frames/);
+  await expect(rivian.locator('.metric-pill').first()).toHaveAttribute('title', /含以全年減前三季推算的第 4 季/);
+  // AAPL's growth.json quarter is a report behind (-99% placeholder); the newer Yahoo number (not ≥ +40%) decides
   await search.fill('AAPL');
   await expect(page.locator('.screener-row', { hasText: 'AAPL' })).toHaveCount(0);
+  // MSFT: the same quarter in both files: growth.json's +50% (SEC) wins over Yahoo's +6%
+  await search.fill('MSFT');
+  const msft = page.locator('.screener-row', { hasText: 'MSFT' });
+  await expect(msft.locator('.metric-pill').first()).toHaveText('EPS +50%');
+  await expect(msft.locator('.metric-pill').first()).toHaveAttribute('title', /來源：季度 SEC 財報（companyfacts）/);
   await search.fill('');
   const sheet = await openSheet(page);
   await expect(sheet.getByRole('region', { name: '相對強弱（對大盤指數）' })).toContainText('S&P 500（SPY）');
   const quarterly = sheet.getByRole('group', { name: '季度 EPS 成長', exact: true });
   await expect(quarterly).toContainText('此條件僅涵蓋');
-  await expect(sheet.getByRole('region', { name: '基本面（EPS／營收成長）' })).toContainText('季度 Yahoo Finance（S&P 500）優先');
-  await expect(sheet.getByRole('region', { name: '基本面（EPS／營收成長）' })).not.toContainText('台股財報歷史較短');
+  const fundamentals = sheet.getByRole('region', { name: '基本面（EPS／營收成長）' });
+  await expect(fundamentals).toContainText('SEC 財報（companyfacts）與 SEC XBRL frames（全市場）');
+  await expect(fundamentals).toContainText('外國發行人（20-F）多只有年度資料');
+  await expect(fundamentals).not.toContainText('年度累計數相減');
 });
 
 test('a missing growth file blocks only the fundamentals block, the list keeps working', async ({ page }) => {

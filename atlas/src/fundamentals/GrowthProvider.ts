@@ -3,15 +3,21 @@ import { reportUrl } from '../report/loadReport';
 
 /**
  * EPS / revenue growth for the screener's fundamental filters. Two files, merged per stock:
+ * - `report/growth.json` (atlas/scripts/build_growth.py): Taiwan and US, the whole market, quarterly (up to 4)
+ *   and annual (up to 3 years), aligned on the same period a year earlier. Each block says its source
+ *   (`src` / `srcY`): SEC companyfacts or Yahoo financials files, the Taiwan official statements (MOPS) or
+ *   SEC XBRL frames; `dQ` flags the quarterly slots that compare a derived Q4 (full year − first three quarters).
  * - `${BASE_URL}valuation/us-growth.json` (atlas/scripts/build_fundamentals_us.py, Yahoo Finance): quarterly,
- *   US only (the S&P 500 list), up to 4 quarters;
- * - `report/growth.json` (atlas/scripts/build_growth.py, from docs/report/financials): Taiwan and US,
- *   quarterly (up to 4) and annual (up to 3 years), aligned on the same period a year earlier.
- * Quarterly US numbers prefer us-growth (Yahoo) and fall back to growth.json; annual numbers and Taiwan
- * only exist in growth.json (`mergeGrowth`). Loaded only when a fundamental filter or sort is used; reused
- * for 30 minutes and a failed reload keeps the last good copy, like ValuationProvider.
+ *   US only (the S&P 500 list), mostly 1 quarter of YoY.
+ * growth.json comes first; us-growth only fills a quarterly metric growth.json has nothing for, or replaces the
+ * quarterly numbers when its latest quarter is clearly newer (`mergeGrowth`). Loaded only when a fundamental
+ * filter or sort is used; reused for 30 minutes and a failed reload keeps the last good copy, like ValuationProvider.
  */
 export type GrowthSource = 'yahoo' | 'financials';
+/** Where one block of numbers comes from (growth.json `src` / `srcY`, or the us-growth file). */
+export type GrowthOrigin = 'sec' | 'yahoo' | 'mops' | 'frames' | 'us-growth';
+const ORIGINS: readonly GrowthOrigin[] = ['sec', 'yahoo', 'mops', 'frames', 'us-growth'];
+const originOf = (value: unknown): GrowthOrigin | null => ORIGINS.find((origin) => origin === value) ?? null;
 export interface GrowthRecord {
   /** EPS YoY % per quarter, index 0 = latest; null when the year-ago EPS was ≤ 0 or missing. */
   epsYoY: (number | null)[];
@@ -32,9 +38,14 @@ export interface GrowthRecord {
   /** Period end of the latest fiscal year. */
   latestAnnual: string | null;
   checkedAt: string | null;
-  /** Where the quarterly numbers come from (annual ones always come from the financials files). */
+  /** Which file the quarterly numbers come from (annual ones always come from growth.json). */
   source: GrowthSource;
-  /** Quality level of the financials file (growth.json only). */
+  /** Source of the quarterly EPS / revenue numbers and of the annual ones. */
+  originQ: { eps: GrowthOrigin | null; rev: GrowthOrigin | null };
+  originY: GrowthOrigin | null;
+  /** Per quarter slot: the pair compares a derived Q4 (full year − first three quarters). */
+  derivedQ: boolean[];
+  /** Quality level of the financials file (growth.json rows built from one; null otherwise). */
   quality: 'good' | 'partial' | 'limited' | null;
 }
 
@@ -78,6 +89,9 @@ export function parseGrowthRecord(value: unknown): GrowthRecord | null {
     latestAnnual: null,
     checkedAt: dateText(raw.checkedAt),
     source: 'yahoo',
+    originQ: { eps: 'us-growth', rev: 'us-growth' },
+    originY: null,
+    derivedQ: [],
     quality: null,
   };
 }
@@ -103,7 +117,7 @@ export function parseGrowthFile(data: unknown): GrowthFile | null {
 // ---------------------------------------------------------------- report/growth.json
 
 /** Column order of the contract; used when a file omits `fields`. */
-export const REPORT_GROWTH_FIELDS = ['symbol', 'lv', 'src', 'qEnd', 'yEnd', 'epsQ', 'revQ', 'epsY', 'revY', 'tQ', 'tY'] as const;
+export const REPORT_GROWTH_FIELDS = ['symbol', 'lv', 'src', 'qEnd', 'yEnd', 'epsQ', 'revQ', 'epsY', 'revY', 'tQ', 'tY', 'srcY', 'dQ'] as const;
 const QUALITY_LEVELS = ['good', 'partial', 'limited'] as const;
 
 /** One `rows` entry of growth.json → [symbol, record]; null for a row without a usable symbol. */
@@ -117,6 +131,12 @@ export function parseReportGrowthRow(row: unknown, fields: readonly string[] = R
   if (typeof symbol !== 'string' || !symbol.trim()) return null;
   const epsTurnQ = maskFlags(get('tQ'), MAX_QUARTERS);
   const level = QUALITY_LEVELS.find((entry) => entry === get('lv')) ?? null;
+  const latest = dateText(get('qEnd'));
+  const latestAnnual = dateText(get('yEnd'));
+  const src = originOf(get('src'));
+  // `src` is the quarterly block's source (the annual one's without a quarterly block); files before `srcY` had one source.
+  const quarterOrigin = latest ? src : null;
+  const annualOrigin = latestAnnual ? (fields.includes('srcY') ? originOf(get('srcY')) : src) : null;
   return [
     symbol,
     {
@@ -128,10 +148,13 @@ export function parseReportGrowthRow(row: unknown, fields: readonly string[] = R
       revYoYAnnual: yoyList(get('revY'), MAX_YEARS),
       epsTurnAnnual: maskFlags(get('tY'), MAX_YEARS),
       basis: 'diluted',
-      latest: dateText(get('qEnd')),
-      latestAnnual: dateText(get('yEnd')),
+      latest,
+      latestAnnual,
       checkedAt: null,
       source: 'financials',
+      originQ: { eps: quarterOrigin, rev: quarterOrigin },
+      originY: annualOrigin,
+      derivedQ: maskFlags(get('dQ'), MAX_QUARTERS),
       quality: level,
     },
   ];
@@ -162,23 +185,38 @@ export function parseReportGrowth(data: unknown): GrowthFile | null {
 const hasUsable = (values: readonly (number | null)[], turns: readonly boolean[] = []) =>
   values.some((value) => value !== null) || turns.some(Boolean);
 
+/** Days a us-growth quarter must be newer than growth.json's to replace its quarterly numbers (same rule as build_growth.py). */
+export const FRESHER_DAYS = 45;
+const daysBetween = (later: string | null, earlier: string | null): number => {
+  if (!later) return -Infinity;
+  if (!earlier) return Infinity;
+  return (Date.parse(later) - Date.parse(earlier)) / 86_400_000;
+};
+
 /**
- * One record per stock from both files. Quarterly EPS / revenue take the Yahoo (us-growth) numbers when
- * that file has any for the metric, otherwise the financials-file ones; annual numbers always come from
- * growth.json. A stock only in one file keeps that file's record. Either file may be missing.
+ * One record per stock from both files. growth.json (whole market, quarterly and annual, one source per block)
+ * comes first. The us-growth (Yahoo, S&P 500) quarterly numbers are used for a metric when growth.json has none
+ * for it, or for both when its latest quarter ends more than FRESHER_DAYS after growth.json's (a newer report).
+ * Annual numbers always come from growth.json. A stock only in one file keeps that file's record. Either file may
+ * be missing.
  */
 export function mergeGrowth(yahoo: GrowthFile | null | undefined, financials: GrowthFile | null | undefined): GrowthFile | null {
   if (!yahoo && !financials) return null;
   if (!financials) return yahoo ?? null;
   const items = new Map<string, GrowthRecord>(financials.items);
+  let used = 0;
   for (const [key, y] of yahoo?.items ?? []) {
     const f = financials.items.get(key);
     if (!f) {
       items.set(key, y);
+      used += 1;
       continue;
     }
-    const useEps = hasUsable(y.epsYoY, y.epsTurnQ);
-    const useRev = hasUsable(y.revYoY);
+    const newer = daysBetween(y.latest, f.latest) > FRESHER_DAYS;
+    const useEps = hasUsable(y.epsYoY, y.epsTurnQ) && (newer || !hasUsable(f.epsYoY, f.epsTurnQ));
+    const useRev = hasUsable(y.revYoY) && (newer || !hasUsable(f.revYoY));
+    if (!useEps && !useRev) continue;
+    used += 1;
     items.set(key, {
       ...f,
       epsYoY: useEps ? y.epsYoY : f.epsYoY,
@@ -186,14 +224,16 @@ export function mergeGrowth(yahoo: GrowthFile | null | undefined, financials: Gr
       epsTurnQ: useEps ? y.epsTurnQ : f.epsTurnQ,
       revYoY: useRev ? y.revYoY : f.revYoY,
       basis: useEps ? y.basis : f.basis,
-      latest: useEps || useRev ? (y.latest ?? f.latest) : f.latest,
+      latest: (useEps && useRev) || newer ? (y.latest ?? f.latest) : (f.latest ?? y.latest),
       checkedAt: y.checkedAt ?? f.checkedAt,
-      source: useEps || useRev ? 'yahoo' : 'financials',
+      source: 'yahoo',
+      originQ: { eps: useEps ? 'us-growth' : f.originQ.eps, rev: useRev ? 'us-growth' : f.originQ.rev },
+      // derivedQ stays growth.json's: it only describes the metrics whose origin is not 'us-growth'
     });
   }
   return {
-    generatedAt: yahoo?.generatedAt ?? financials.generatedAt,
-    source: `${yahoo?.source ?? 'Yahoo Finance'} + 財報檔`,
+    generatedAt: financials.generatedAt ?? yahoo?.generatedAt ?? null,
+    source: used ? `${financials.source ?? 'growth.json'} + ${yahoo?.source ?? 'Yahoo Finance'}` : financials.source,
     items,
   };
 }
@@ -270,7 +310,7 @@ export function loadReportGrowth(): Promise<GrowthFile | null> {
 }
 
 /**
- * The growth data for a market: Taiwan = growth.json; US = us-growth.json (Yahoo) merged with growth.json.
+ * The growth data for a market: Taiwan = growth.json; US = growth.json merged with us-growth.json (Yahoo).
  * Either source failing only removes its part; null when neither is available.
  */
 export async function loadMarketGrowth(market: 'TW' | 'US'): Promise<GrowthFile | null> {

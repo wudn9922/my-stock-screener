@@ -1,5 +1,5 @@
 import { itemStatusOf, type GroupItem } from '../report/schema';
-import type { GrowthFile, GrowthRecord } from '../fundamentals/GrowthProvider';
+import type { GrowthFile, GrowthOrigin, GrowthRecord } from '../fundamentals/GrowthProvider';
 import { formatPercent, maDistance, maValue, toneClass } from '../ui/format';
 import { growthRecordFor, maDeviation, type FilterState } from './screenerFilters';
 
@@ -200,7 +200,15 @@ export function metricPill(item: GroupItem, key: MetricPill, growth?: GrowthFile
   }
 }
 
-const QUARTERLY_SOURCES = { yahoo: 'Yahoo Finance', financials: '財報檔' } as const;
+/** Plain names of the growth sources (growth.json `src` / `srcY`, the us-growth file). */
+export const GROWTH_ORIGIN_LABELS: Record<GrowthOrigin, string> = {
+  sec: 'SEC 財報（companyfacts）',
+  yahoo: 'Yahoo 財報',
+  mops: '公開資訊觀測站（官方財報）',
+  frames: 'SEC XBRL frames',
+  'us-growth': 'Yahoo Finance 季資料',
+};
+const originText = (origin: GrowthOrigin | null) => (origin ? GROWTH_ORIGIN_LABELS[origin] : '—');
 /** `+30% / +20% / — / —`: newest first; a dash is a period without a number, 轉盈 a loss-to-profit turn. */
 const historyText = (values: readonly (number | null)[], turns: readonly boolean[]) =>
   values.length || turns.some(Boolean)
@@ -209,13 +217,22 @@ const historyText = (values: readonly (number | null)[], turns: readonly boolean
       ).join(' / ')
     : '—';
 
-/** Tooltip text with both quarterly and annual YoY (newest → older), the latest period ends and the sources. */
+/**
+ * Tooltip text with both quarterly and annual YoY (newest → older), the latest period ends, the source of each
+ * block and whether a quarterly slot compares a derived Q4 (full year − first three quarters).
+ */
 function growthDetail(record: GrowthRecord, eps: boolean): string {
-  const quarterly = historyText(eps ? record.epsYoY : record.revYoY, eps ? record.epsTurnQ : []);
+  const quarterlyValues = eps ? record.epsYoY : record.revYoY;
+  const quarterly = historyText(quarterlyValues, eps ? record.epsTurnQ : []);
   const annual = historyText(eps ? record.epsYoYAnnual : record.revYoYAnnual, eps ? record.epsTurnAnnual : []);
+  const origin = eps ? record.originQ.eps : record.originQ.rev;
+  // derivedQ describes growth.json's quarters; the Yahoo quarterly file has no derived Q4 flags
+  const derived =
+    origin !== 'us-growth' &&
+    record.derivedQ.some((flag, slot) => flag && (quarterlyValues[slot] != null || (eps && record.epsTurnQ[slot])));
   return [
-    `季度（最新→較舊）${quarterly}${record.latest ? `，最新季 ${record.latest}` : ''}`,
+    `季度（最新→較舊）${quarterly}${record.latest ? `，最新季 ${record.latest}` : ''}${derived ? '（含以全年減前三季推算的第 4 季）' : ''}`,
     `年度（最新→較舊）${annual}${record.latestAnnual ? `，最新年度 ${record.latestAnnual}` : ''}`,
-    `來源：季度 ${QUARTERLY_SOURCES[record.source]}、年度 財報檔`,
+    `來源：季度 ${originText(origin)}、年度 ${originText(record.originY)}`,
   ].join('；');
 }
