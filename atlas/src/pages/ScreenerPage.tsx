@@ -142,6 +142,7 @@ function Row({
   pe,
   pills,
   growth,
+  includeTurn,
   top,
   onOpen,
 }: {
@@ -149,6 +150,8 @@ function Row({
   pe: PeFigures | undefined;
   pills: readonly MetricPill[];
   growth: GrowthFile | null | undefined;
+  /** 「含虧轉盈」 of the applied conditions: whether a turnaround counts in the EPS streak pill. */
+  includeTurn: boolean;
   top: number;
   onOpen: () => void;
 }) {
@@ -156,7 +159,7 @@ function Row({
   const status = itemStatusOf(item);
   const ticker = <b>{displayTicker(item.symbol)}</b>;
   const metricPills = pills.flatMap((key) => {
-    const pill = metricPill(item, key, growth);
+    const pill = metricPill(item, key, growth, includeTurn);
     return pill ? [{ key, pill }] : [];
   });
   return (
@@ -558,6 +561,7 @@ function ScreenerView({
                     pe={pe[item.symbol]}
                     pills={pills}
                     growth={growth}
+                    includeTurn={filters.turn}
                     top={(start + offset) * ROW_HEIGHT}
                     onOpen={() => openChart({ symbol: item.symbol, name: item.name, tf: '1D', maList: item.maList })}
                   />
