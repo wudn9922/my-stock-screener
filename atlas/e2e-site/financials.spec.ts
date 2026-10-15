@@ -11,6 +11,7 @@ const fixtures: Record<string, string> = Object.fromEntries(
     ['JPM', 'bank.json'],
     ['ZLOS', 'loss-maker.json'],
     ['NVO', 'short-history.json'],
+    ['TSM', 'tsmc-twd.json'],
   ].map(([key, file]) => [key, readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials', file!), 'utf8')]),
 );
 const trackedAAPL = readFileSync(resolve(import.meta.dirname, '../../docs/report/financials/AAPL.json'), 'utf8');
@@ -328,4 +329,20 @@ test('three statements: lines switch between values and YoY, absent lines say �
   await expect(page.locator('.fin-table-note')).toContainText('所有已取得期別');
   await expect(table.locator('.fin-source-row td').last()).toHaveText('SEC');
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+});
+
+test('ADR page links to the Taiwan home listing and keeps the period', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(String(error)));
+  await mockFinancials(page);
+  await page.goto('./?page=financials&symbol=TSM&p=q');
+  await expect(page.locator('.fin-home-listing')).toContainText('也可查看');
+  await expect(page.locator('.fin-home-link')).toHaveText('2330.TW（台股）財報');
+  await expect(page.locator('.fin-home-ratio')).toHaveText('1 ADR ＝ 5 股普通股');
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+  await page.locator('.fin-home-link').click();
+  await expect(page).toHaveURL(/symbol=2330\.TW&p=q/);
+  await expect(page.locator('.fin-title')).toContainText('台積電');
+  await expect(page.locator('.fin-home-link')).toHaveCount(0);
+  expect(errors).toEqual([]);
 });

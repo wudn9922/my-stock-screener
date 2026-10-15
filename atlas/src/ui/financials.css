@@ -80,6 +80,30 @@
   padding: 0 4px;
   flex-shrink: 0;
 }
+.fin-home-listing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.fin-home-link {
+  min-height: 32px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.fin-home-link:hover {
+  background: var(--accent-soft);
+}
+.fin-home-ratio {
+  color: var(--text-3);
+}
 .fin-quality {
   display: inline-flex;
   align-items: center;

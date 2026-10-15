@@ -4,6 +4,7 @@ import { PageState, Skeleton } from '../ui/PageState';
 import { financialsKey, loadFinancials, type FinancialsLoadResult, type PeriodKind } from '../fundamentals/FinancialHistory';
 import { METRIC_GROUPS, type MetricGroupId, type MetricId } from '../fundamentals/financialMetrics';
 import type { Timeframe } from '../market-data/MarketDataProvider';
+import { twListingForAdr } from '../fundamentals/adrListings';
 import type { Report } from '../report/schema';
 import type { LocalSymbol, SearchResult } from '../ui/SymbolSearch';
 import { formatDateTime } from '../ui/format';
@@ -152,6 +153,8 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
   };
   // Changing the stock keeps the period type but not the chart timeframe, which belonged to the previous symbol.
   const onSymbol = (picked: SearchResult) => navigate({ page: 'financials', symbol: picked.symbol, ...(p ? { p } : {}) });
+  const homeListing = twListingForAdr(symbol);
+  const onHomeListing = (listing: { tw: string }) => navigate({ page: 'financials', symbol: listing.tw, ...(p ? { p } : {}) });
   const onBack = () => navigate(symbol ? { page: 'chart', symbol, ...(tf ? { tf } : {}) } : { page: 'chart' });
 
   let body;
@@ -235,10 +238,12 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
         kind={kind}
         mode={mode}
         localSymbols={localSymbols}
+        homeListing={homeListing}
         onBack={onBack}
         onKind={onKind}
         onMode={onMode}
         onSymbol={onSymbol}
+        onHomeListing={onHomeListing}
       />
       {body}
       {symbol && isChipsPageSymbol(symbol) && <ChipsSection symbol={symbol} />}
