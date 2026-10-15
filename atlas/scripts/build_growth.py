@@ -44,11 +44,18 @@ Output (compact, rows sorted by symbol; keys as in the financials file names):
   {"version": 1, "generatedAt": "...", "source": "...", "fields": [...], "rows": [[...], ...]}
   fields: symbol, lv (financials quality level good/partial/limited; null for the other sources),
   src (sec|yahoo|mops|frames: of the quarterly block, else of the annual one), qEnd, yEnd (period end
-  of slot 0 for quarterly / annual), epsQ (4), revQ (4), epsY (3), revY (3), tQ, tY (bit i set = EPS
-  turnaround in slot i of quarterly / annual), srcY (source of the annual block, null without one),
-  dQ (bit i set = quarterly slot i compares a derived Q4). Trailing nulls of the arrays are cut. A
-  symbol without any usable value gets no row. The market is the symbol's suffix (.TW / .TWO =
-  Taiwan). The file is only rewritten when its content changes, so generatedAt is the last change.
+  of slot 0 for quarterly / annual), epsQ (4), revQ (4), epsY (up to 10), revY (up to 10), tQ, tY
+  (bit i set = EPS turnaround in slot i of quarterly / annual), srcY (source of the annual block, null
+  without one), dQ (bit i set = quarterly slot i compares a derived Q4). Trailing nulls of the arrays
+  are cut. A symbol without any usable value gets no row. The market is the symbol's suffix (.TW /
+  .TWO = Taiwan). The file is only rewritten when its content changes, so generatedAt is the last change.
+  Ten annual slots need eleven fiscal years: US SEC companyfacts files and the frames rows have them;
+  Yahoo files (~4-5 years) and the Taiwan sources give fewer, and the arrays are simply shorter.
+
+Consecutive growth years (the screener's 「EPS／營收連續成長」) are not stored: the frontend counts them
+from epsY / revY (atlas/src/pages/screenerFilters.ts growthStreak): from slot 0, years with YoY > 0
+(EPS: or a loss-to-profit turnaround, unless turnarounds are excluded); the first YoY <= 0, null (a
+loss year, a share-basis break, a missing year) or the end of the array stops the count.
 """
 import json
 import os
@@ -60,7 +67,7 @@ VERSION = 1
 SOURCE = "financials+official"
 FIELDS = ["symbol", "lv", "src", "qEnd", "yEnd", "epsQ", "revQ", "epsY", "revY", "tQ", "tY", "srcY", "dQ"]
 QUARTER_SLOTS = 4
-YEAR_SLOTS = 3
+YEAR_SLOTS = 10
 SAME_PERIOD_MIN_DAYS = 335
 SAME_PERIOD_MAX_DAYS = 395
 STALE_QUARTER_DAYS = 270

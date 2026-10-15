@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { reportUrl } from '../report/loadReport';
 import { INDEX_SYMBOL_REGEX, TAIWAN_SYMBOL_REGEX } from '../market-data/MarketProfile';
+// framesHistory imports this module too; only functions cross the cycle, nothing at module load time
+import { FramesHistoryLoader, combineWithFrames, wantsFrames } from './framesHistory';
 
 /**
  * Per-symbol statement history (`report/financials/<KEY>.json`, written by atlas/scripts/build_financials.py
@@ -39,7 +41,8 @@ export const RAW_FIELDS = [
 export type RawField = (typeof RAW_FIELDS)[number];
 
 export type PeriodKind = 'annual' | 'quarterly';
-export type PeriodSource = 'sec' | 'yahoo';
+/** sec = SEC companyfacts (seed_financials_sec.py), yahoo = Yahoo timeseries, frames = SEC XBRL frames history (framesHistory.ts). */
+export type PeriodSource = 'sec' | 'yahoo' | 'frames';
 export type QualityLevel = 'good' | 'partial' | 'limited';
 
 /** Retention limits of the builder (SEC-seeded files keep the longest history). */
@@ -52,7 +55,7 @@ export interface FinancialSeries {
   fy: (number | null)[];
   /** Fiscal quarter as written by the builder; all null for annual periods. */
   fq: (number | null)[];
-  /** Where each period came from; Yahoo unless the file says "sec". */
+  /** Where each period came from; Yahoo unless the file says "sec" or "frames". */
   src: PeriodSource[];
   values: Record<RawField, (number | null)[]>;
 }
@@ -164,7 +167,8 @@ export function parseSeries(raw: unknown, kind: PeriodKind): FinancialSeries {
     out.fy.push(year !== null && Number.isInteger(year) ? year : null);
     const quarter = finiteOrNull(fq[index]);
     out.fq.push(kind === 'quarterly' && quarter !== null && [1, 2, 3, 4].includes(quarter) ? quarter : null);
-    out.src.push(src[index] === 'sec' ? 'sec' : 'yahoo');
+    const source = src[index];
+    out.src.push(source === 'sec' || source === 'frames' ? source : 'yahoo');
     RAW_FIELDS.forEach((field, column) => {
       let value = finiteOrNull(columns[column]![index]);
       // Capex is stored as a positive outflow; a stray sign must not inflate free cash flow.
@@ -305,16 +309,24 @@ export interface FinancialsProviderOptions {
   fetcher?: typeof fetch;
   now?: () => number;
   urlOf?: (key: string) => string;
+  /**
+   * US ~10-year SEC XBRL frames history (framesHistory.ts) for a missing or short file; never throws.
+   * Without it only the financials file is read.
+   */
+  frames?: (key: string) => Promise<{ history: FinancialHistory | null; url: string }>;
 }
 
 /**
  * Per-symbol cache: a result is reused for 30 minutes; a network/HTTP error is never pinned, and when an
- * earlier load of the same file succeeded that copy is returned instead of the error.
+ * earlier load of the same file succeeded that copy is returned instead of the error. A US stock without
+ * a file, or with a short one, also gets the frames history (`combineWithFrames`); a frames failure only
+ * leaves the file's own result.
  */
 export class FinancialsProvider {
   private readonly fetcher: typeof fetch;
   private readonly now: () => number;
   private readonly urlOf: (key: string) => string;
+  private readonly frames: FinancialsProviderOptions['frames'];
   private readonly entries = new Map<string, { at: number; promise: Promise<FinancialsLoadResult> }>();
   private readonly lastGood = new Map<string, FinancialsLoadResult & { status: 'ok' }>();
 
@@ -322,6 +334,17 @@ export class FinancialsProvider {
     this.fetcher = options.fetcher ?? ((input, init) => fetch(input, init));
     this.now = options.now ?? Date.now;
     this.urlOf = options.urlOf ?? ((key) => financialsUrl(key));
+    this.frames = options.frames;
+  }
+
+  private async withFrames(key: string, result: FinancialsLoadResult): Promise<FinancialsLoadResult> {
+    if (!this.frames || !wantsFrames(result, key)) return result;
+    try {
+      const { history, url } = await this.frames(key);
+      return combineWithFrames(result, history, url);
+    } catch {
+      return result;
+    }
   }
 
   load(symbol: string, refresh = false): Promise<FinancialsLoadResult> {
@@ -330,7 +353,9 @@ export class FinancialsProvider {
       return Promise.resolve({ status: 'missing', message: '指數或這種代號沒有個股財報。', url: '' });
     const cached = this.entries.get(key);
     if (!refresh && cached && this.now() - cached.at < RELOAD_AFTER_MS) return cached.promise;
-    const promise: Promise<FinancialsLoadResult> = fetchFinancials(this.urlOf(key), this.fetcher).then((result) => {
+    const promise: Promise<FinancialsLoadResult> = fetchFinancials(this.urlOf(key), this.fetcher)
+      .then((result) => this.withFrames(key, result))
+      .then((result) => {
       if (result.status === 'ok') this.lastGood.set(key, result);
       else if (result.status === 'error') {
         // Do not pin a transient failure: the next load retries.
@@ -348,7 +373,10 @@ let defaultProvider: FinancialsProvider | null = null;
 
 /** Shared loader for the financials page (cached per symbol for 30 minutes). */
 export function loadFinancials(symbol: string, refresh = false): Promise<FinancialsLoadResult> {
-  defaultProvider ??= new FinancialsProvider();
+  if (!defaultProvider) {
+    const frames = new FramesHistoryLoader();
+    defaultProvider = new FinancialsProvider({ frames: (key) => frames.load(key) });
+  }
   return defaultProvider.load(symbol, refresh);
 }
 
@@ -374,3 +402,5 @@ export function provenance(series: FinancialSeries): ProvenanceSpan[] {
 
 export const hasSecHistory = (history: FinancialHistory) =>
   history.annual.src.includes('sec') || history.quarterly.src.includes('sec');
+export const hasFramesHistory = (history: FinancialHistory) =>
+  history.annual.src.includes('frames') || history.quarterly.src.includes('frames');

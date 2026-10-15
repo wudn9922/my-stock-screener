@@ -425,7 +425,7 @@ class RepoDataTest(unittest.TestCase):
         for index, symbol in enumerate(us_symbols):
             pct = lambda: round(rng.uniform(-80, 300), 1)  # noqa: E731
             us_rows.append([symbol.replace(".", "-"), index, "2026-06-30", "2025-12-31", [pct() for _ in range(4)],
-                            [pct() for _ in range(4)], [pct() for _ in range(3)], [pct() for _ in range(3)], 0, 0, 0, 0, None])
+                            [pct() for _ in range(4)], [pct() for _ in range(10)], [pct() for _ in range(10)], 0, 0, 0, 0, None])
         with tempfile.TemporaryDirectory() as tmp:
             fundamentals = os.path.join(tmp, "fundamentals")
             os.makedirs(fundamentals)
@@ -445,8 +445,8 @@ class RepoDataTest(unittest.TestCase):
         self.assertEqual([row[0] for row in data["rows"] if row[0] in listed and row[3] and row[2] != "mops"], [])
         # Sizes of a full market (synthetic values with realistic lengths): reported, and kept in check
         self.assertLess(tw_bytes, 1_400_000)
-        self.assertLess(us_bytes, 900_000)
-        self.assertLess(summary["bytes"], 1_300_000)
+        self.assertLess(us_bytes, 1_500_000)
+        self.assertLess(summary["bytes"], 1_600_000)
         print(f"\n[full-market sizes] tw.json {tw_bytes:,} B, us-sec.json {us_bytes:,} B, "
               f"growth.json {summary['bytes']:,} B for {summary['rows']:,} rows")
 
@@ -465,9 +465,10 @@ class RepoDataTest(unittest.TestCase):
         self.assertEqual(markets, {"TW", "US"})
         for row in data["rows"]:
             self.assertEqual(len(row), len(growth.FIELDS))
-            for value in row[SLOT["epsQ"]:SLOT["revY"] + 1]:
+            for name in ("epsQ", "revQ", "epsY", "revY"):
+                value = row[SLOT[name]]
                 self.assertTrue(all(v is None or isinstance(v, (int, float)) for v in value))
-                self.assertLessEqual(len(value), 4)
+                self.assertLessEqual(len(value), growth.QUARTER_SLOTS if name.endswith("Q") else growth.YEAR_SLOTS)
 
 
 if __name__ == "__main__":

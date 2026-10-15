@@ -87,7 +87,7 @@ export function dailyBars(symbol: string, count = 600) {
   });
 }
 /** Split-adjusted first / last weekly close of the long (10y) weekly history, for symbols whose river should look realistic. */
-const WEEKLY_PATH: Record<string, [number, number]> = { AAPL: [26, 341], NVDA: [0.8, 226], '2330.TW': [180, 2500] };
+const WEEKLY_PATH: Record<string, [number, number]> = { AAPL: [26, 341], NVDA: [0.8, 226], '2330.TW': [180, 2500], ZFRM: [40, 160] };
 /** Deterministic Monday-start weekly bars for ten years ending the week of 2026-10-05 (synthetic, split-adjusted basis). */
 export function weeklyBars(symbol: string, count = 522) {
   let seed = hash(`${symbol}|1wk`) || 1;

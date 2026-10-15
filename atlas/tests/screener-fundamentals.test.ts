@@ -83,7 +83,9 @@ describe('f encoding of the fundamental conditions', () => {
 
   it('ignores bad annual / switch tokens and out-of-range periods', () => {
     expect(state('epsy:0:5').epsY).toBeNull();
-    expect(state('epsy:4:5').epsY).toBeNull(); // only 3 fiscal years are published
+    expect(state('epsy:11:5').epsY).toBeNull(); // at most 10 fiscal years are published
+    expect(state('epsy:10:5').epsY).toEqual({ years: 10, min: 5 });
+    expect(state('epsy:4:5').epsY).toEqual({ years: 4, min: 5 });
     expect(state('revy:x:5').revY).toBeNull();
     expect(state('revy:2:').revY).toBeNull();
     expect(state('eps:5:20').eps).toBeNull();

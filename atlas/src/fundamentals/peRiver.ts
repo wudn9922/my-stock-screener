@@ -131,6 +131,12 @@ export function buildEpsPeriods(history: FinancialHistory): EpsPeriods {
     quarters = [];
     notes.push('季度 EPS 疑似為年初累計值，改用年度 EPS。');
   }
+  const fromFrames = (series: FinancialSeries) =>
+    series.src.some((src, index) => src === 'frames' && (series.values.epsDiluted[index] ?? series.values.epsBasic[index] ?? null) !== null);
+  if (fromFrames(history.quarterly) || fromFrames(history.annual)) {
+    const inferred = history.quality.issues.includes('split-inferred') ? '；股票分割依加權股數推定並換算成最新基準' : '';
+    notes.push(`EPS 含 SEC XBRL frames 資料（第 4 季多為全年減前三季推算${inferred}），與公司公告的 EPS 可能略有差異。`);
+  }
   return { quarters, annuals, notes };
 }
 

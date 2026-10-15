@@ -115,7 +115,7 @@ class PayloadTest(unittest.TestCase):
         self.assertEqual(quarters[-1], "CY2026Q3")
         self.assertEqual(len(quarters), sec.QUARTER_FRAMES)
         self.assertEqual(sorted({request.period for request in core if request.kind == "y"}),
-                         [f"CY{year}" for year in range(2021, 2027)])
+                         [f"CY{year}" for year in range(2015, 2027)])
         urls = {request.url for request in plan}
         self.assertEqual(len(urls), len(plan))         # BasicAndDiluted is fetched once
         self.assertIn("https://data.sec.gov/api/xbrl/frames/us-gaap/EarningsPerShareDiluted/USD-per-shares/CY2026Q2.json", urls)

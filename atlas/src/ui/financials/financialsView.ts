@@ -1,4 +1,12 @@
-import { hasSecHistory, provenance, type FinancialHistory, type PeriodKind, type Revision } from '../../fundamentals/FinancialHistory';
+import {
+  hasFramesHistory,
+  hasSecHistory,
+  provenance,
+  type FinancialHistory,
+  type PeriodKind,
+  type PeriodSource,
+  type Revision,
+} from '../../fundamentals/FinancialHistory';
 import {
   FIELD_LABELS,
   METRICS,
@@ -210,10 +218,19 @@ export const ISSUE_TEXT: Record<string, string> = {
   'debt-approx': '有息負債為 Yahoo 的 TotalDebt，可能包含租賃負債，負債比與 ROIC 為近似值。',
   'foreign-filer': '外國發行人（如 ADR）：EPS 為每普通股，不是每 ADR。',
   'currency-changed': '財報幣別曾經變更，較早期別與最新期別的幣別可能不同，跨期比較請小心。',
+  'frames-only':
+    '本檔財報只來自 SEC XBRL frames（全市場申報資料）：只有營收、淨利（美國申報公司）、EPS 與加權股數；毛利、營業利益、現金流、資產負債等欄位沒有資料，顯示為「—」，不推估。',
+  'frames-extended': '較早的期別由 SEC XBRL frames 補上（只有營收、淨利、EPS、股數），重疊期別已核對與本檔數字一致。',
+  'frames-not-merged': 'SEC XBRL frames 的較早歷史與本檔重疊期別的營收或 EPS 對不上（口徑或股數基準不同），未合併。',
+  'split-inferred': '股票分割由加權股數的跳動推定（倍數接近常見分割比且營收連續），較早期別的 EPS 與股數已換算成最新股數基準。',
+  'eps-basis-break': '加權股數在某期大幅變動但不像股票分割（可能是合併、分拆），該期之前的 EPS 與股數不列出，以免跨基準比較。',
+  'scale-dropped': '部分期別的數字與前後期差約一千或一百萬倍（申報單位錯誤），該值已剔除。',
 };
 export const issueText = (code: string) => ISSUE_TEXT[code] ?? `其他資料提示（${code}）。`;
 
-const SOURCE_NAMES = { sec: 'SEC EDGAR', yahoo: 'Yahoo Finance' } as const;
+export const SOURCE_NAMES: Record<PeriodSource, string> = { sec: 'SEC EDGAR', yahoo: 'Yahoo Finance', frames: 'SEC XBRL frames' };
+/** Short badge text per period source (detail panel, table). */
+export const SOURCE_SHORT: Record<PeriodSource, string> = { sec: 'SEC', yahoo: 'Yahoo', frames: 'SEC frames' };
 
 /** 「資料來源：SEC EDGAR（FY2015–FY2020）＋ Yahoo Finance（FY2021–FY2024）」 */
 export function provenanceText(history: FinancialHistory, kind: PeriodKind): string {
@@ -230,7 +247,7 @@ export function provenanceText(history: FinancialHistory, kind: PeriodKind): str
     else bySource.set(span.source, { from: span.from, to: span.to });
   }
   const parts = [...bySource].map(([source, span]) => {
-    const name = SOURCE_NAMES[source as keyof typeof SOURCE_NAMES];
+    const name = SOURCE_NAMES[source as PeriodSource];
     if (bySource.size === 1) return name;
     const from = labelOf.get(span.from) ?? span.from;
     const to = labelOf.get(span.to) ?? span.to;
@@ -247,7 +264,9 @@ export function depthText(history: FinancialHistory, kind: PeriodKind): string {
   const first = labels[0]?.long ?? '';
   if (kind === 'quarterly') return `目前 ${count} 季（${first} 起）；之後每季自動累積。`;
   const years = count;
-  if (hasSecHistory(history)) return `含 SEC 申報歷史，共約 ${years} 年（${first} 起）；之後每季自動累積。`;
+  if (history.quality.issues.includes('frames-only'))
+    return `SEC XBRL frames 約 ${years} 年（${first} 起），只含營收、淨利、EPS、股數；每天隨 SEC 申報更新。`;
+  if (hasSecHistory(history) || hasFramesHistory(history)) return `含 SEC 申報歷史，共約 ${years} 年（${first} 起）；之後每季自動累積。`;
   return `目前約 ${years} 年（${first} 起）；Yahoo 只回溯約 4 年，之後每季自動累積。`;
 }
 

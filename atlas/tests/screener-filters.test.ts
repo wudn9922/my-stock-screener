@@ -54,6 +54,8 @@ describe('filter encoding', () => {
       rev: { quarters: 1, min: 10 },
       epsY: null,
       revY: null,
+      epsStreak: null,
+      revStreak: null,
       accel: false,
       turn: true,
       keepMissing: false,

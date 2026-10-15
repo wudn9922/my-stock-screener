@@ -4,8 +4,8 @@ import { reportUrl } from '../report/loadReport';
 /**
  * EPS / revenue growth for the screener's fundamental filters. Two files, merged per stock:
  * - `report/growth.json` (atlas/scripts/build_growth.py): Taiwan and US, the whole market, quarterly (up to 4)
- *   and annual (up to 3 years), aligned on the same period a year earlier. Each block says its source
- *   (`src` / `srcY`): SEC companyfacts or Yahoo financials files, the Taiwan official statements (MOPS) or
+ *   and annual (up to 10 years: SEC companyfacts / frames; the Yahoo and Taiwan sources have fewer), aligned on
+ *   the same period a year earlier. Each block says its source (`src` / `srcY`): SEC companyfacts or Yahoo financials files, the Taiwan official statements (MOPS) or
  *   SEC XBRL frames; `dQ` flags the quarterly slots that compare a derived Q4 (full year − first three quarters).
  * - `${BASE_URL}valuation/us-growth.json` (atlas/scripts/build_fundamentals_us.py, Yahoo Finance): quarterly,
  *   US only (the S&P 500 list), mostly 1 quarter of YoY.
@@ -61,7 +61,7 @@ export function growthKey(symbol: string): string {
 }
 
 const MAX_QUARTERS = 4;
-const MAX_YEARS = 3;
+const MAX_YEARS = 10;
 const yoyList = (value: unknown, max = MAX_QUARTERS): (number | null)[] =>
   Array.isArray(value) ? value.slice(0, max).map((entry) => toFinite(entry)) : [];
 /** Bit i of a mask → slot i (growth.json `tQ` / `tY`). */

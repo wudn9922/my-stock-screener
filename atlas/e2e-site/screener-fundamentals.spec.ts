@@ -83,7 +83,7 @@ test('Taiwan full-market list: fundamental filters are open, annual EPS growth f
 
 test('acceleration, turnaround and keep-missing switches go into the link; junk tokens are ignored', async ({ page }) => {
   await mockSite(page, { report: buildReport(20), fundamentals: true });
-  await page.goto('./?page=screener&group=universe-tw&f=zzz:1;epsy:9:9;acc:1;eps:1:25;tn:0;nd:keep');
+  await page.goto('./?page=screener&group=universe-tw&f=zzz:1;epsy:11:9;epss:0;acc:1;eps:1:25;tn:0;nd:keep');
   const chips = page.getByRole('group', { name: '已套用的篩選條件' });
   await expect(chips).toContainText('EPS 成長加速');
   await expect(chips).toContainText('不含虧轉盈');
@@ -162,7 +162,7 @@ test('US full-market list: growth.json first, the Yahoo quarters only where they
   const quarterly = sheet.getByRole('group', { name: '季度 EPS 成長', exact: true });
   await expect(quarterly).toContainText('此條件僅涵蓋');
   const fundamentals = sheet.getByRole('region', { name: '基本面（EPS／營收成長）' });
-  await expect(fundamentals).toContainText('SEC 財報（companyfacts）與 SEC XBRL frames（全市場）');
+  await expect(fundamentals).toContainText('SEC 財報（companyfacts）與 SEC XBRL frames（全市場，年度約 10 年）');
   await expect(fundamentals).toContainText('外國發行人（20-F）多只有年度資料');
   await expect(fundamentals).not.toContainText('年度累計數相減');
 });

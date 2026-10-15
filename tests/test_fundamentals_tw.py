@@ -164,9 +164,9 @@ class QuarterTest(unittest.TestCase):
         self.assertEqual(q["end"], "2026-06-30")
         self.assertEqual(q["src"], "mops")
         self.assertEqual(q["derived"], 0b100)          # slot 2 compares the derived Q4s
-        # Annual: 2025 5.6 / 560 vs 2024 4.6 / 480, 2024 vs 2023, 2023 vs 2022
-        self.assertEqual(y["eps"], [21.7, 15.0, 11.1])
-        self.assertEqual(y["rev"], [16.7, 20.0, 5.3])
+        # Annual: 2025 5.6 / 560 vs 2024 4.6 / 480, 2024 vs 2023, 2023 vs 2022, 2022 vs 2021 (up to 10 years)
+        self.assertEqual(y["eps"], [21.7, 15.0, 11.1, 20.0])
+        self.assertEqual(y["rev"], [16.7, 20.0, 5.3, 8.6])
         self.assertEqual(y["end"], "2025-12-31")
 
     def test_a_stock_dividend_between_two_reports_does_not_distort_the_quarter(self):

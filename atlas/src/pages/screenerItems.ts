@@ -1,7 +1,7 @@
 import { itemStatusOf, type GroupItem } from '../report/schema';
 import type { GrowthFile, GrowthOrigin, GrowthRecord } from '../fundamentals/GrowthProvider';
 import { formatPercent, maDistance, maValue, toneClass } from '../ui/format';
-import { growthRecordFor, maDeviation, type FilterState } from './screenerFilters';
+import { growthRecordFor, growthStreak, maDeviation, type FilterState } from './screenerFilters';
 
 export type SortMode = 'default' | 'gain' | 'loss' | 'symbol' | 'ma' | 'rs' | 'hi' | 'vr' | 'ma50' | 'r21' | 'eps';
 export const SORT_LABELS: Record<SortMode, string> = {
@@ -108,11 +108,11 @@ export function resultCountText(shown: readonly GroupItem[], total: number, view
 
 // ---------------------------------------------------------------- row pills
 
-export type MetricPill = 'rs' | 'hi' | 'vr' | 'ma50' | 'ema20' | 'r21' | 'eps' | 'rev' | 'epsY' | 'revY';
+export type MetricPill = 'rs' | 'hi' | 'vr' | 'ma50' | 'ema20' | 'r21' | 'eps' | 'rev' | 'epsY' | 'revY' | 'epsS' | 'revS';
 const MAX_PILLS = 2;
 /** Fundamental pills (EPS / revenue growth) have their own allowance so a growth filter always shows its numbers. */
 const MAX_GROWTH_PILLS = 4;
-const GROWTH_PILLS: readonly MetricPill[] = ['eps', 'rev', 'epsY', 'revY'];
+const GROWTH_PILLS: readonly MetricPill[] = ['eps', 'rev', 'epsY', 'revY', 'epsS', 'revS'];
 
 /**
  * Extra row pills: the sort's metric first, then the filtered ones (at most two technical ones plus the
@@ -129,8 +129,10 @@ export function rowMetricPills(sort: SortMode, state: FilterState, maList: reado
   if (state.vr !== null) add('vr');
   if (state.eps || state.accel) add('eps');
   if (state.epsY) add('epsY');
+  if (state.epsStreak !== null) add('epsS');
   if (state.rev) add('rev');
   if (state.revY) add('revY');
+  if (state.revStreak !== null) add('revS');
   if (state.ema20) add('ema20');
   const technical = keys.filter((key) => !GROWTH_PILLS.includes(key)).slice(0, MAX_PILLS);
   const growth = keys.filter((key) => GROWTH_PILLS.includes(key)).slice(0, MAX_GROWTH_PILLS);
@@ -197,6 +199,20 @@ export function metricPill(item: GroupItem, key: MetricPill, growth?: GrowthFile
       if (latest === null) return null;
       return { text: `${name} ${formatPercent(latest, 0)}`, title: `${isEps ? 'EPS' : '營收'} YoY ${detail}`, tone: toneClass(latest) };
     }
+    case 'epsS':
+    case 'revS': {
+      const record = growthRecordFor(item, growth);
+      if (!record) return null;
+      const isEps = key === 'epsS';
+      const values = isEps ? record.epsYoYAnnual : record.revYoYAnnual;
+      if (!values.length && !(isEps && record.epsTurnAnnual.some(Boolean))) return null;
+      const years = growthStreak(values, isEps ? record.epsTurnAnnual : []);
+      return {
+        text: `${isEps ? 'EPS' : '營收'}連增 ${years}年`,
+        title: `${isEps ? 'EPS' : '營收'}連續成長 ${years} 年（從最新年度往回，年增率 > 0${isEps ? '，虧轉盈也算成長' : ''}；遇到衰退、虧損或缺資料即停止）。${growthDetail(record, isEps)}`,
+        tone: years > 0 ? 'up' : 'flat',
+      };
+    }
   }
 }
 
@@ -224,15 +240,19 @@ const historyText = (values: readonly (number | null)[], turns: readonly boolean
 function growthDetail(record: GrowthRecord, eps: boolean): string {
   const quarterlyValues = eps ? record.epsYoY : record.revYoY;
   const quarterly = historyText(quarterlyValues, eps ? record.epsTurnQ : []);
-  const annual = historyText(eps ? record.epsYoYAnnual : record.revYoYAnnual, eps ? record.epsTurnAnnual : []);
+  // Annual: up to 10 slots, so only as many as the stock has (the turnaround mask always has 10 bits)
+  const annualTurns = eps ? record.epsTurnAnnual.slice(0, record.epsTurnAnnual.lastIndexOf(true) + 1) : [];
+  const annual = historyText(eps ? record.epsYoYAnnual : record.revYoYAnnual, annualTurns);
   const origin = eps ? record.originQ.eps : record.originQ.rev;
   // derivedQ describes growth.json's quarters; the Yahoo quarterly file has no derived Q4 flags
   const derived =
     origin !== 'us-growth' &&
     record.derivedQ.some((flag, slot) => flag && (quarterlyValues[slot] != null || (eps && record.epsTurnQ[slot])));
+  const annualValues = eps ? record.epsYoYAnnual : record.revYoYAnnual;
+  const streak = growthStreak(annualValues, eps ? record.epsTurnAnnual : []);
   return [
     `季度（最新→較舊）${quarterly}${record.latest ? `，最新季 ${record.latest}` : ''}${derived ? '（含以全年減前三季推算的第 4 季）' : ''}`,
-    `年度（最新→較舊）${annual}${record.latestAnnual ? `，最新年度 ${record.latestAnnual}` : ''}`,
+    `年度（最新→較舊）${annual}${record.latestAnnual ? `，最新年度 ${record.latestAnnual}` : ''}，連續成長 ${streak} 年`,
     `來源：季度 ${originText(origin)}、年度 ${originText(record.originY)}`,
   ].join('；');
 }

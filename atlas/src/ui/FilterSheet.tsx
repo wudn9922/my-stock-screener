@@ -7,10 +7,11 @@ import {
   EMPTY_FILTERS,
   GROWTH_PRESETS,
   MAX_GATE_QUARTERS,
-  MAX_GATE_YEARS,
+  STREAK_PRESETS,
   TREND_FLAGS,
   TREND_LABELS,
   VOLUME_PRESETS,
+  YEAR_PRESETS,
   formatRange,
   isCustomGrowthMin,
   isCustomVolume,
@@ -79,7 +80,7 @@ function Choice<T extends number>({
   compact = false,
 }: {
   label: string;
-  options: readonly { value: T | null; label: string }[];
+  options: readonly { value: T | null; label: string; disabled?: string | null }[];
   value: T | null;
   onChange: (value: T | null) => void;
   /** Tighter chips so a row of six short options fits one line on a phone. */
@@ -93,6 +94,9 @@ function Choice<T extends number>({
           type="button"
           className={`fs-chip ${option.value === value ? 'active' : ''}`}
           aria-pressed={option.value === value}
+          // A disabled option says why (e.g. no stock of the market has that many years); the applied one stays usable.
+          disabled={!!option.disabled && option.value !== value}
+          title={option.disabled ?? undefined}
           onClick={() => onChange(option.value)}
         >
           {option.label}
@@ -201,10 +205,16 @@ const QUARTER_OPTIONS = Array.from({ length: MAX_GATE_QUARTERS }, (_, index) => 
   value: index + 1,
   label: index === 0 ? '最近 1 季' : `近 ${index + 1} 季皆`,
 }));
-const YEAR_OPTIONS = Array.from({ length: MAX_GATE_YEARS }, (_, index) => ({
-  value: index + 1,
-  label: index === 0 ? '最近 1 年' : `近 ${index + 1} 年皆`,
-}));
+const yearOptionLabel = (years: number) => (years === 1 ? '最近 1 年' : `近 ${years} 年皆`);
+const STREAK_OPTIONS: { value: number | null; label: string }[] = [
+  { value: null, label: '不限' },
+  ...STREAK_PRESETS.map((years) => ({ value: years, label: `≥${years}年` })),
+];
+type StreakKey = 'epsStreak' | 'revStreak';
+const STREAK_ROWS: { key: StreakKey; kind: 'epsS' | 'revS'; name: string }[] = [
+  { key: 'epsStreak', kind: 'epsS', name: 'EPS' },
+  { key: 'revStreak', kind: 'revS', name: '營收' },
+];
 const GROWTH_OPTIONS: { value: number | null; label: string }[] = [
   { value: null, label: '不限' },
   ...GROWTH_PRESETS.map((preset) => ({ value: preset, label: `≥${preset}%` })),
@@ -212,7 +222,7 @@ const GROWTH_OPTIONS: { value: number | null; label: string }[] = [
 /** Where each market's growth numbers come from (build_growth.py's source order). */
 const GROWTH_SOURCE_TEXT: Record<'TW' | 'US', string> = {
   TW: '公開資訊觀測站／證交所・櫃買中心 OpenAPI 綜合損益表（官方，全部上市櫃），缺的才用 Yahoo 財報',
-  US: 'SEC 財報（companyfacts）與 SEC XBRL frames（全市場），其次為 Yahoo 財報／Yahoo 季資料（S&P 500）',
+  US: 'SEC 財報（companyfacts）與 SEC XBRL frames（全市場，年度約 10 年），其次為 Yahoo 財報／Yahoo 季資料（S&P 500）',
 };
 const GROWTH_BLOCKS: { key: GateKey; title: string; unit: '季' | '年' }[] = [
   { key: 'eps', title: '季度 EPS 成長', unit: '季' },
@@ -301,7 +311,7 @@ export function FilterSheet(props: FilterSheetProps) {
   const growthPending = growth === undefined || growthLoading;
   // Nothing at all to filter on (data missing, or none of the rows has any): one explanation for the whole block.
   const fundamentalsBlocked =
-    !growthPending && availability.eps && availability.rev && availability.epsY && availability.revY && availability.accel
+    !growthPending && availability.eps && availability.rev && availability.epsY && availability.revY && availability.accel && availability.epsS && availability.revS
       ? availability.eps
       : null;
   const benchmark = market === 'US' ? 'S&P 500（SPY）' : '加權指數（^TWII）';
@@ -317,7 +327,8 @@ export function FilterSheet(props: FilterSheetProps) {
     if (!total) return null;
     const rest = total - covered;
     const percent = Math.round((covered / total) * 100);
-    const need = kind === 'accel' ? '最近 2 季 EPS YoY' : `近 ${count} ${kind.endsWith('Y') ? '年' : '季'}${kind.startsWith('eps') ? ' EPS' : '營收'} YoY`;
+    const annual = kind.endsWith('Y') || kind.endsWith('S');
+    const need = kind === 'accel' ? '最近 2 季 EPS YoY' : `近 ${count} ${annual ? '年' : '季'}${kind.startsWith('eps') ? ' EPS' : '營收'} YoY`;
     const counts = `${covered.toLocaleString('en-US')} / ${total.toLocaleString('en-US')} 檔（${percent}%）`;
     if (!applied) return `${marketName}財報資料涵蓋 ${counts} 有${need}。`;
     return `此條件僅涵蓋 ${counts} 有足夠財報歷史（需有${need}）；${
@@ -326,6 +337,36 @@ export function FilterSheet(props: FilterSheetProps) {
         : '沒有被排除的股票。'
     }`;
   };
+
+  /**
+   * Year choices of an annual block: 1 / 2 / 3 / 5 / 10, plus the applied count when a link carries another one.
+   * Counts no row of this group has data for are disabled (Taiwan: the sources reach only a few years).
+   */
+  const yearChoices = (key: 'epsY' | 'revY') => {
+    const current = periods[key];
+    const options = YEAR_PRESETS.map((years) => ({ value: years, label: yearOptionLabel(years), disabled: yearDisabled(key, years) }));
+    const disabled = growthPending ? [] : YEAR_PRESETS.filter((years) => yearDisabled(key, years));
+    const deepest = YEAR_PRESETS.filter((years) => !disabled.includes(years)).at(-1);
+    return {
+      options,
+      custom: !YEAR_PRESETS.includes(current),
+      limit:
+        disabled.length && deepest !== undefined
+          ? `${marketName}目前最多約 ${maxYears(key === 'epsY' ? 'epsY' : 'revY')} 年有年度 YoY 資料${market === 'TW' ? '（台股來源只回溯數年）' : ''}，${disabled.join('／')} 年暫停用。`
+          : null,
+    };
+  };
+  /** Why an N-year choice is off: no row of the group has N annual YoY values. */
+  function yearDisabled(kind: FundamentalKind, years: number): string | null {
+    if (growthPending || years <= 1) return null;
+    return props.coverage(kind, years, draft.turn).covered === 0 ? `${marketName}這個群組目前沒有股票有 ${years} 年的年度資料` : null;
+  }
+  const streakDisabled = (kind: 'epsS' | 'revS', years: number) => yearDisabled(kind, years);
+  function maxYears(kind: FundamentalKind): number {
+    let deepest = 0;
+    for (let years = 1; years <= 10; years++) if (props.coverage(kind, years, draft.turn).covered > 0) deepest = years;
+    return deepest;
+  }
 
   return (
     <div className="fs-backdrop" onClick={onClose}>
@@ -506,6 +547,7 @@ export function FilterSheet(props: FilterSheetProps) {
               const blocked = growthPending ? null : availability[key];
               const min = gateMin(key);
               const note = blocked ? null : coverageText(key, periods[key], draft[key] !== null);
+              const years = unit === '年' ? yearChoices(key as 'epsY' | 'revY') : null;
               return (
                 <div key={key} className="fs-block" role="group" aria-label={title}>
                   <div className="fs-sub">{title}</div>
@@ -517,8 +559,11 @@ export function FilterSheet(props: FilterSheetProps) {
                         label={`${title}期數`}
                         value={periods[key]}
                         onChange={(count) => setGatePeriods(key, count)}
-                        options={unit === '季' ? QUARTER_OPTIONS : YEAR_OPTIONS}
+                        options={years ? years.options : QUARTER_OPTIONS}
+                        compact={!!years}
                       />
+                      {years?.custom && <p className="fs-hint fs-current">目前條件：{yearOptionLabel(periods[key])}</p>}
+                      {years?.limit && <p className="fs-hint">{years.limit}</p>}
                       <Choice
                         label={`${title}幅度`}
                         value={min}
@@ -533,6 +578,48 @@ export function FilterSheet(props: FilterSheetProps) {
                 </div>
               );
             })}
+            <div className="fs-block" role="group" aria-label="連續成長年數">
+              <div className="fs-sub">連續成長（年度）</div>
+              {growthPending || !availability.epsS || !availability.revS ? (
+                <>
+                  {STREAK_ROWS.map(({ key, kind, name }) =>
+                    !growthPending && availability[kind] ? (
+                      <p key={key} className="fs-unavailable">
+                        {name}：{availability[kind]}
+                      </p>
+                    ) : (
+                      <div key={key} className="fs-streak-row">
+                        <span className="fs-streak-name">{name}</span>
+                        <Choice
+                          label={`${name}連續成長年數`}
+                          value={draft[key]}
+                          onChange={(next) => update({ [key]: next } as Partial<FilterState>)}
+                          options={STREAK_OPTIONS.map((option) => ({ ...option, disabled: option.value === null ? null : streakDisabled(kind, option.value) }))}
+                          compact
+                        />
+                      </div>
+                    ),
+                  )}
+                  {STREAK_ROWS.map(({ key, kind }) => {
+                    const years = draft[key];
+                    if (years === null) return null;
+                    const custom = !STREAK_PRESETS.includes(years);
+                    const note = coverageText(kind, years, true);
+                    return (
+                      <p key={key} className="fs-hint fs-coverage">
+                        {custom ? `目前條件：≥${years} 年。` : ''}
+                        {note}
+                      </p>
+                    );
+                  })}
+                  <p className="fs-hint">
+                    從最新年度往回數，年增率（YoY）&gt; 0 的年數；遇到衰退（YoY ≤ 0）、虧損年（YoY 無法計算）或缺資料就停止。EPS 的虧轉盈依「含虧轉盈」開關計為成長。
+                  </p>
+                </>
+              ) : (
+                <p className="fs-unavailable">{availability.epsS}</p>
+              )}
+            </div>
             <div className="fs-block" role="group" aria-label="成長進階選項">
               <div className="fs-sub">進階</div>
               {availability.accel && !growthPending ? (

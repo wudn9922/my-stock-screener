@@ -13,7 +13,7 @@ import { PeRiverCard } from '../ui/financials/PeRiverCard';
 import { SummaryChips } from '../ui/financials/SummaryChips';
 import { ChipsSection } from '../ui/financials/ChipsCard';
 import { isChipsPageSymbol } from '../report/twChips';
-import { buildView, depthText, provenanceText } from '../ui/financials/financialsView';
+import { buildView, depthText, issueText, provenanceText } from '../ui/financials/financialsView';
 import '../ui/financials.css';
 
 export interface FinancialsPageProps extends PageProps {
@@ -160,6 +160,7 @@ export default function FinancialsPage({ report, navigate, symbol, p }: Financia
   else if (history && view && annualView) {
     const issues = history.quality.issues;
     const splitEvents = history.split.events;
+    const framesOnly = issues.includes('frames-only');
     body = (
       <>
         <SummaryChips history={history} annual={annualView} current={view} />
@@ -173,10 +174,22 @@ export default function FinancialsPage({ report, navigate, symbol, p }: Financia
           {effectiveKind !== kind && <p className="fin-warn">這檔股票沒有{kind === 'annual' ? '年度' : '季度'}資料，先顯示{effectiveKind === 'annual' ? '年度' : '季度'}。</p>}
           {history.split.adjusted && splitEvents.length > 0 && (
             <p>
-              已依股票分割還原 EPS 與股數：
+              {framesOnly
+                ? '依加權股數推定的股票分割（日期為最早換成新股數基準的期別，非實際分割日），EPS 與股數已換算成最新基準：'
+                : '已依股票分割還原 EPS 與股數：'}
               {splitEvents.map((event) => `${formatDateTime(event.date, false)}（${splitText(event.ratio)}）`).join('、')}
             </p>
           )}
+          {framesOnly && (
+            <p className="fin-warn" data-testid="frames-only-note">
+              這檔股票只有 SEC XBRL frames 的資料：營收、淨利、EPS、加權股數；毛利、營業利益、現金流、資產負債等欄位沒有資料，顯示「—」或不顯示，不推估。第 4 季多由「全年－前三季」推算。
+            </p>
+          )}
+          {issues.includes('frames-extended') && (
+            <p data-testid="frames-extended-note">較早期別由 SEC XBRL frames 補上（只有營收、淨利、EPS、股數，其他欄位顯示「—」）；重疊期別已核對與本檔一致。</p>
+          )}
+          {issues.includes('frames-not-merged') && <p className="fin-warn">{issueText('frames-not-merged')}</p>}
+          {issues.includes('eps-basis-break') && <p className="fin-warn">{issueText('eps-basis-break')}</p>}
           {(history.foreignReporter || issues.includes('foreign-filer')) && <p>外國發行人：EPS 為每普通股，非每 ADR。</p>}
         </div>
         <PeRiverCard history={history} />
@@ -220,7 +233,7 @@ export default function FinancialsPage({ report, navigate, symbol, p }: Financia
       {symbol && isChipsPageSymbol(symbol) && <ChipsSection symbol={symbol} />}
       <footer className="page-foot fin-foot">
         <span>
-          限制：Yahoo 只提供約 4 年年度、5–8 季季度財報，本站逐季累積、無法往回補（部分美股另以 SEC 申報補歷史）；比率由本頁依公式計算，可能與公司公告口徑不同；有息負債可能含租賃負債。
+          限制：Yahoo 只提供約 4 年年度、5–8 季季度財報，本站逐季累積；美股另以 SEC 申報補歷史（companyfacts 完整報表，或 SEC XBRL frames 約 10 年的營收、淨利、EPS、股數）；比率由本頁依公式計算，可能與公司公告口徑不同；有息負債可能含租賃負債。
         </span>
         <span>僅供研究參考，非投資建議。</span>
       </footer>

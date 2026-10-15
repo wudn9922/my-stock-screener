@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import type { FinancialHistory } from '../../fundamentals/FinancialHistory';
 import { METRIC_GROUPS } from '../../fundamentals/financialMetrics';
 import { formatDateTime } from '../format';
-import { digitsFor, displayValues, formatNumber, moneyScale, unitText, type FinancialsView } from './financialsView';
+import { SOURCE_SHORT, digitsFor, displayValues, formatNumber, moneyScale, unitText, type FinancialsView } from './financialsView';
 
 /**
  * Every metric × every period: metric names frozen in the first column, latest period on the left,
@@ -74,7 +74,7 @@ export function FinancialsTable({ history, view }: { history: FinancialHistory; 
               </th>
               {order.map((index) => (
                 <td key={series.end[index]} className={series.src[index]}>
-                  {series.src[index] === 'sec' ? 'SEC' : 'Yahoo'}
+                  {SOURCE_SHORT[series.src[index] ?? 'yahoo']}
                 </td>
               ))}
             </tr>

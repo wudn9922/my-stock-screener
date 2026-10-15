@@ -5,9 +5,13 @@ name: Official Fundamentals (TW / US)
 #   證交所／櫃買中心 OpenAPI t187ap06（只有最新一季，補觀測站沒有的公司）
 #   → docs/report/fundamentals/tw.json。歷史季別只抓一次（過了申報期限約一個月即定案），
 #   之後每天只重抓還沒定案的季別；觀測站擋請求時停在原處，下次接著補（--budget 秒內盡量補）。
-# - 美股：SEC XBRL frames（一次一個科目、一個曆季／曆年，全部公司）→ docs/report/fundamentals/us-sec.json。
-#   SEC 過去對 GitHub Actions 的 IP 一律回 403（見 atlas.yml）：第一個請求被拒時只留警告、保留舊檔，
-#   需要時在本機執行 `python atlas/scripts/build_fundamentals_sec.py` 後提交該檔。外國發行人（年度）每 7 天重抓一次。
+# - 美股：SEC XBRL frames（一次一個科目、一個曆季／曆年，全部公司；約 10 年：44 季、12 個曆年）
+#   → docs/report/fundamentals/us-sec.json（選股 YoY，年度最多 10 期）與 us-history/NNN.json（財報頁／本益比河流圖
+#   的 10 年歷史，128 個分片）。每天約 730 個請求（約 4 分鐘）；外國發行人（年度）每 7 天重抓一次，
+#   那天另加約 2,270 個請求（多為 404），全部約 15 分鐘。
+#   SEC 曾對 GitHub Actions 的 IP 回 403（見 atlas.yml）：第一個請求被拒時只留警告、保留舊檔。
+#   首次 10 年回補與備援由使用者在 Codex Cloud／本機手動執行同一支腳本（只用標準函式庫）後提交，
+#   不靠 Actions 分次補；`python atlas/scripts/build_fundamentals_sec.py --summary` 可離線核對已提交的檔案。
 # - 最後 build_growth.py 合併 financials/*.json 與上面兩個檔案重建 growth.json（financials.yml 也會用同一套規則重建）。
 # 與 financials.yml 共用 concurrency group，兩者不會同時改 growth.json。
 on:
@@ -42,7 +46,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # 觀測站預算 15 分鐘＋SEC 外國發行人那天約 15 分鐘（10 年 frames），留餘裕
+    timeout-minutes: 60
     steps:
       - name: Checkout main
         uses: actions/checkout@v4

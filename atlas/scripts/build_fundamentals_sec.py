@@ -7,15 +7,20 @@ market costs a few hundred requests instead of one per company. build_growth.py 
 docs/report/growth.json (src "frames").
 
   python atlas/scripts/build_fundamentals_sec.py [--no-foreign] [--foreign-max-age-days N]
-         [--report-dir docs/report] [--out docs/report/fundamentals/us-sec.json]
+         [--report-dir docs/report] [--out docs/report/fundamentals/us-sec.json] [--history-dir DIR]
+  python atlas/scripts/build_fundamentals_sec.py --summary     (offline: summary of the stored files)
   Env: SEC_USER_AGENT (default: seed_financials_sec.DEFAULT_USER_AGENT, a contact address as SEC asks).
+  Standard library only. Network: data.sec.gov (frames) and www.sec.gov (company_tickers.json).
 
-Where it runs: SEC has answered 403 to GitHub-hosted runners whatever the User-Agent (see atlas.yml).
-The workflow still tries: the first request (company_tickers.json) decides within seconds, and a refusal
-keeps the stored file (exit 0 with a warning). A local run (`python atlas/scripts/build_fundamentals_sec.py`
-from the repository, ~1-2 minutes, ~5 more with the foreign part) followed by a commit of
-docs/report/fundamentals/us-sec.json refreshes it by hand. SEC fair access: User-Agent with contact,
-<= ~7.5 requests per second, backoff on 403 / 429 / 5xx (seed_financials_sec.SecClient).
+Where it runs: SEC has answered 403 to GitHub-hosted runners at times (see atlas.yml). The workflow
+still tries every day: the first request (company_tickers.json) decides within seconds, and a refusal
+keeps the stored files (exit 0 with a warning). A manual run from the repository (local or Codex Cloud)
+followed by a commit of docs/report/fundamentals/us-sec.json and docs/report/fundamentals/us-history/
+refreshes them by hand. Requests (~10 years): 13 core concept-units x (44 quarters + 12 years) = 728,
+plus 206 foreign concept-units x 11 years = 2,266 (most answer 404); ~3,000 in all, about 15 minutes
+at the observed ~0.3 s per request (~4 minutes without the foreign part). SEC fair access: User-Agent
+with contact, <= ~7.5 requests per second, backoff on 403 / 429 / 5xx (seed_financials_sec.SecClient).
+The run ends with a "SUMMARY {...}" line (rows, period ranges, coverage) to check a commit against.
 
 Frames (all us-gaap, USD; "BasicAndDiluted" EPS counts as both diluted and basic):
 - quarterly CY frames (duration ~3 months) of the last QUARTER_FRAMES calendar quarters and annual CY
@@ -50,10 +55,29 @@ Per company (CIK):
 Output (compact): {"version": 1, "generatedAt", "asOf", "source", "foreignAt", "frames": {...},
   "fields": FIELDS, "rows": [[symbol, cik, qEnd, yEnd, epsQ, revQ, epsY, revY, tQ, tY, dQ, f, cur]]}
   f = 1 when the annual block comes from the foreign frames, cur = its currency when not USD.
+  epsY / revY / tY have up to 10 annual slots (growth.YEAR_SLOTS), epsQ / revQ 4.
+
+Statement history (us-history/NNN.json, HISTORY_SHARDS shards; a symbol's shard is FNV-1a 32-bit of
+its key mod HISTORY_SHARDS, computed the same way by atlas/src/fundamentals/framesHistory.ts). The
+financials page reads it for US stocks without docs/report/financials/<KEY>.json, or to add older
+periods to a shorter one. One entry per ticker (share classes repeat their company's entry):
+  {"cik", "cur", "f" (foreign issuer: annual only, reporting currency), "fyEnd" (fiscal-year-end
+   month), "split": [[date, ratio]] (inferred, see adjust_splits), "issues": [...], "c": {field:
+   [concepts used]}, "q": [[end, fy, fq, d, revenue, netIncome, epsDiluted, epsBasic, dilutedShares]],
+   "y": [[end, fy, revenue, netIncome, epsDiluted, epsBasic, dilutedShares]]} (oldest first).
+- Only what the frames have: revenue (the first non-partial REVENUE concept), net income
+  (NetIncomeLoss, US filers), EPS diluted / basic, weighted diluted shares; everything else of a
+  statement (gross profit, cash flow, balance sheet) is absent and the page shows it as missing.
+- d = 1: fiscal Q4 derived as year - (Q1 + Q2 + Q3) (rules above; EPS only on one share basis).
+- Every value is on the newest share basis: inferred splits adjust older EPS / shares, an odd share
+  jump nulls older EPS ("eps-basis-break"); scale errors (10^3 / 10^6 off the neighbours) are dropped.
+- Written with one symbol per line, only the shards whose content changed; a run without the
+  foreign part keeps the stored foreign entries. The YoY rows above are computed from the frames
+  values as filed (their own split / scale rules), not from these adjusted series.
 Safety: the file is not written when a frame failed (other than 404 = no data), when one of the key
 frames (diluted EPS of the four calendar quarters before the newest one: thousands of filers each) is
-empty or missing, or when the row count drops below MIN_ROW_SHARE of the stored one; only
-written when the rows changed. Exit codes: 0 written / unchanged / SEC refused (warning), 1 failed.
+empty or missing, or when the row (history symbol) count drops below MIN_ROW_SHARE of the stored
+one; only written when the rows changed. The same gate holds for the history shards. Exit codes: 0 written / unchanged / SEC refused (warning), 1 failed.
 """
 import argparse
 import json
@@ -63,16 +87,21 @@ from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 
 import build_growth as growth
-from build_financials import financials_key, finite_number, market_of, universe_rows
+from build_financials import (
+    financials_key, finite_number, fiscal_quarter, fiscal_year, fy_end_month, market_of, universe_rows,
+)
 from build_valuation_us import read_json, write_atomic
 
 VERSION = 1
 SOURCE = "SEC EDGAR XBRL frames (data.sec.gov/api/xbrl/frames)"
 FRAMES_URL = "https://data.sec.gov/api/xbrl/frames/{taxonomy}/{concept}/{unit}/{period}.json"
 FIELDS = ["symbol", "cik", "qEnd", "yEnd", "epsQ", "revQ", "epsY", "revY", "tQ", "tY", "dQ", "f", "cur"]
-QUARTER_FRAMES = 11
-ANNUAL_FRAMES = 6
-FOREIGN_YEARS = 4
+# ~10 years: 44 calendar quarters (10 years of TTM EPS for the P/E river plus the year before), 12
+# calendar years (a calendar-year filer's current year has no frame yet, so 12 labels give it 11 fiscal
+# years = 10 annual YoY), foreign issuers 11 years back from last year (10 annual YoY)
+QUARTER_FRAMES = 44
+ANNUAL_FRAMES = 12
+FOREIGN_YEARS = 11
 QUARTER_DAYS = (80, 120)
 ANNUAL_DAYS = (350, 380)
 ALIGN_DAYS = 7
@@ -80,6 +109,18 @@ Q4_SHARE_MATCH = 1.25
 PARTIAL_REVENUE = 0.5
 MIN_ROW_SHARE = 0.5
 KEY_QUARTERS = 4
+
+# Statement history (docs/report/fundamentals/us-history/NNN.json, see the module notes)
+HISTORY_VERSION = 1
+HISTORY_SHARDS = 128
+HISTORY_VALUES = ["revenue", "netIncome", "epsDiluted", "epsBasic", "dilutedShares"]
+HISTORY_FIELDS = {"q": ["end", "fy", "fq", "d"] + HISTORY_VALUES, "y": ["end", "fy"] + HISTORY_VALUES}
+# Inferred splits: neighbouring share counts >= SPLIT_JUMP apart, within SPLIT_TOLERANCE of one of
+# these ratios (or the reverse), revenue ratio inside SPLIT_REVENUE_BAND
+SPLIT_JUMP = 1.4
+NICE_SPLITS = (1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30, 40, 50, 100)
+SPLIT_TOLERANCE = 0.08
+SPLIT_REVENUE_BAND = (0.5, 2.0)
 
 US = "us-gaap"
 IFRS = "ifrs-full"
@@ -95,6 +136,8 @@ CORE_CONCEPTS = {
         f"{US}:RevenuesNetOfInterestExpense",
         f"{US}:RegulatedAndUnregulatedOperatingRevenue",
     ],
+    # net income: only for the statement history (us-history shards), not part of the YoY rows
+    "ni": [f"{US}:NetIncomeLoss"],
     "shares": [
         f"{US}:WeightedAverageNumberOfDilutedSharesOutstanding",
         f"{US}:WeightedAverageNumberOfShareOutstandingBasicAndDiluted",
@@ -356,8 +399,8 @@ def derive_q4(quarters, years):
         if label in quarters:
             continue
         values = {}
-        for role in ("rev", "epsD", "epsB"):
-            if role != "rev":
+        for role in ("rev", "ni", "epsD", "epsB"):
+            if role in ("epsD", "epsB"):
                 shares = [first_shares(p) for p in (year, q1, q2, q3)]
                 if None in shares or max(shares) / min(shares) > Q4_SHARE_MATCH:
                     continue
@@ -435,11 +478,17 @@ def frames_pair(current, base):
     return value, turn, revenue_pair(current.get("rev"), base.get("rev"))
 
 
-def company_blocks(company, today):
-    """One CIK's collected entries → (quarterly block, annual block, foreign flag, currency)."""
+def company_periods(company):
+    """One CIK's collected entries → ({quarter number: period}, {year: period}) with the derived Q4s."""
     quarters = {label: canonical_period(entries) for label, entries in company["q"].items()}
     years = {label: canonical_period(entries) for label, entries in company["y"].items()}
     derive_q4(quarters, {label: year for label, year in years.items() if not year_is_foreign(year)})
+    return quarters, years
+
+
+def company_blocks(company, today, periods=None):
+    """One CIK's collected entries → (quarterly block, annual block, foreign flag, currency)."""
+    quarters, years = periods or company_periods(company)
     q_periods = [as_growth_period(number, period, True) for number, period in quarters.items()]
     y_periods = [as_growth_period(number, period, False) for number, period in years.items()]
     q = growth.yoy_series(q_periods, True, growth.QUARTER_SLOTS, [], today, growth.STALE_QUARTER_DAYS, frames_pair)
@@ -462,14 +511,229 @@ def year_is_foreign(period):
     return True
 
 
-def build_rows(companies, tickers_by_cik, allowed, today):
-    """→ rows (FIELDS) for every ticker of every company with a usable block, sorted by symbol."""
+# ---------------------------------------------------------------------------------------------
+# Statement history (us-history shards: the financials page / P/E river of stocks without a
+# financials/<KEY>.json file, or with a shorter one)
+# ---------------------------------------------------------------------------------------------
+def short_concept(key):
+    return key[len(US) + 1:] if key.startswith(US + ":") else key
+
+
+def pick_value(values, role, currency):
+    """First concept of `role` (ROLE_ORDER) in `currency` → (value, concept) or (None, None)."""
+    found = values.get(role) or {}
+    for key in ROLE_ORDER.get(role, []):
+        if key in found and found[key][1] == currency:
+            return found[key][0], key
+    return None, None
+
+
+def pick_revenue(values, currency):
+    """Revenue of one period: the first REVENUE concept that is not a partial line (as revenue_pair)."""
+    found = {key: value for key, (value, cur) in (values.get("rev") or {}).items() if cur == currency}
+    if not found:
+        return None, None
+    largest = max(found.values())
+    for key in ROLE_ORDER["rev"]:
+        if key in found and not (largest > 0 and found[key] < PARTIAL_REVENUE * largest):
+            return found[key], key
+    return None, None
+
+
+def period_currencies(period):
+    return {currency for role in ("epsD", "epsB", "rev") for _, currency in (period["values"].get(role) or {}).values()}
+
+
+def history_point(period, currency, concepts):
+    """A canonical period → {end, derived, values: HISTORY_VALUES} in `currency`; None when it has none."""
+    values = period["values"]
+    revenue, rev_key = pick_revenue(values, currency)
+    eps_d, d_key = pick_value(values, "epsD", currency)
+    eps_b, b_key = pick_value(values, "epsB", currency)
+    net, ni_key = pick_value(values, "ni", currency)
+    point = {"revenue": revenue, "netIncome": net, "epsDiluted": eps_d, "epsBasic": eps_b,
+             "dilutedShares": first_shares(period)}
+    if all(point[name] is None for name in HISTORY_VALUES if name != "dilutedShares"):
+        return None
+    for name, key in (("revenue", rev_key), ("netIncome", ni_key), ("epsDiluted", d_key), ("epsBasic", b_key)):
+        if key and short_concept(key) not in concepts.setdefault(name, []):
+            concepts[name].append(short_concept(key))
+    return {"end": period["end"], "derived": period["derived"], "values": point}
+
+
+def median(values):
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    return ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+
+
+def drop_scale_errors(points, issues):
+    """
+    A revenue / net income / share count about 10^3 or 10^6 times the median of its (up to four)
+    nearest neighbours in the series was filed in another scale: it becomes None ("scale-dropped").
+    """
+    for name in ("revenue", "netIncome", "dilutedShares"):
+        indices = [i for i, point in enumerate(points) if point["values"][name]]
+        bad = []
+        for position, i in enumerate(indices):
+            around = indices[max(0, position - 2):position] + indices[position + 1:position + 3]
+            if around and growth.scale_suspect(points[i]["values"][name],
+                                               median(abs(points[j]["values"][name]) for j in around)):
+                bad.append(i)
+        for i in bad:
+            points[i]["values"][name] = None
+            issues.add("scale-dropped")
+
+
+def nice_split(ratio):
+    """The usual split (or reverse split) ratio that `ratio` is within SPLIT_TOLERANCE of, else None."""
+    for nice in NICE_SPLITS:
+        for target in (nice, 1 / nice):
+            if abs(ratio / target - 1) <= SPLIT_TOLERANCE:
+                return target
+    return None
+
+
+def same_business(newer, older):
+    """Revenue continuity across a share-count jump (a merger moves revenue too); True without revenue."""
+    now_rev, old_rev = newer["values"]["revenue"], older["values"]["revenue"]
+    if not now_rev or not old_rev or now_rev <= 0 or old_rev <= 0:
+        return True
+    return SPLIT_REVENUE_BAND[0] <= now_rev / old_rev <= SPLIT_REVENUE_BAND[1]
+
+
+def adjust_splits(points, issues):
+    """
+    Frames hold the last filed value of each period: a split restates only the periods that later
+    filings repeat as comparatives (about a year of quarters, three years of annual figures), so a long
+    series jumps from one share basis to another somewhere before the split. Walking from the newest
+    period back, a weighted share count that changes >= SPLIT_JUMP between two neighbouring periods
+    that have one is
+    - an inferred split when the ratio is within SPLIT_TOLERANCE of a usual split ratio (NICE_SPLITS or
+      the reverse) and revenue stays within SPLIT_REVENUE_BAND: every older period is put on the newest
+      basis (EPS / k, shares x k); periods between the two without a share count lose their EPS (their
+      basis is unknown). Event = (end of the first period on the newer basis, k), issue "split-inferred";
+    - otherwise a basis break (merger, spin-off, an odd ratio): EPS and share counts of that period and
+      every older one become None, issue "eps-basis-break". Nothing is guessed.
+    → events [(end date, ratio)], newest first. Modifies `points`.
+    """
+    events, factor, newer, raw = [], 1.0, None, {}
+    for i in range(len(points) - 1, -1, -1):
+        values = points[i]["values"]
+        shares = values["dilutedShares"]
+        if shares and shares > 0:
+            if newer is not None:
+                ratio = raw[newer] / shares
+                if ratio >= SPLIT_JUMP or ratio <= 1 / SPLIT_JUMP:
+                    k = nice_split(ratio)
+                    gap = range(i + 1, newer)
+                    if k is None or not same_business(points[newer], points[i]):
+                        for j in list(range(i + 1)) + list(gap):
+                            values_j = points[j]["values"]
+                            values_j["epsDiluted"] = values_j["epsBasic"] = None
+                            if j <= i:
+                                values_j["dilutedShares"] = None
+                        issues.add("eps-basis-break")
+                        return events
+                    factor *= k
+                    events.append((points[newer]["end"], round(k, 4)))
+                    issues.add("split-inferred")
+                    for j in gap:
+                        points[j]["values"]["epsDiluted"] = points[j]["values"]["epsBasic"] = None
+            raw[i] = shares
+            newer = i
+        if factor != 1.0:
+            for name in ("epsDiluted", "epsBasic"):
+                if values[name] is not None:
+                    values[name] = values[name] / factor
+            if values["dilutedShares"]:
+                values["dilutedShares"] = values["dilutedShares"] * factor
+    return events
+
+
+def clean_number(value, digits):
+    """Rounded for the file: amounts / share counts as integers, EPS to `digits` decimals."""
+    if value is None:
+        return None
+    if digits == 0:
+        return int(round(value))
+    value = round(value, digits)
+    return 0.0 if value == 0 else value
+
+
+def history_series(periods, currency, quarterly, end_month, concepts, issues):
+    """Canonical periods (one kind) → (rows in HISTORY_FIELDS order, split events), oldest first."""
+    points = []
+    for number in sorted(periods):
+        period = periods[number]
+        currencies = period_currencies(period)
+        if currencies and currency not in currencies:
+            issues.add("currency-changed")
+            continue
+        point = history_point(period, currency, concepts)
+        if point is not None:
+            point["number"] = number
+            points.append(point)
+    drop_scale_errors(points, issues)
+    events = adjust_splits(points, issues)
+    rows = []
+    for point in points:
+        end = point["end"].isoformat()
+        values = point["values"]
+        numbers = [clean_number(values["revenue"], 0), clean_number(values["netIncome"], 0),
+                   clean_number(values["epsDiluted"], 4), clean_number(values["epsBasic"], 4),
+                   clean_number(values["dilutedShares"], 0)]
+        if quarterly:
+            fy, fq = fiscal_quarter(end, end_month) if end_month else (point["number"] // 4, point["number"] % 4 + 1)
+            if point["derived"]:
+                issues.add("q4-derived")
+            rows.append([end, fy, fq, 1 if point["derived"] else 0] + numbers)
+        else:
+            rows.append([end, fiscal_year(end)] + numbers)
+    return rows, events
+
+
+def company_history(periods, cik, foreign):
+    """→ one company's history entry (see the module notes), or None without any usable period."""
+    quarters, years = periods
+    currencies = period_currencies(years[max(years)]) if years else set()
+    currency = "USD" if not currencies or "USD" in currencies else sorted(currencies)[0]
+    issues, concepts = set(), {}
+    annual_ends = [period["end"].isoformat() for period in years.values() if currency in period_currencies(period)]
+    end_month = fy_end_month(annual_ends)
+    y_rows, y_events = history_series(years, currency, False, end_month, concepts, issues)
+    q_rows, q_events = history_series({} if foreign else quarters, currency, True, end_month, concepts, issues)
+    if not y_rows and not q_rows:
+        return None
+    events = []
+    for end, ratio in sorted(q_events + y_events):
+        # One split seen in both kinds (at different restatement boundaries) is listed once
+        if not any(ratio == known and abs((end - day).days) <= 3 * 366 for day, known in events):
+            events.append((end, ratio))
+    return {
+        "cik": cik, "cur": currency, "f": 1 if foreign else 0, "fyEnd": end_month,
+        "split": [[day.isoformat(), ratio] for day, ratio in events],
+        "issues": sorted(issues), "c": concepts, "q": q_rows, "y": y_rows,
+    }
+
+
+def build_rows(companies, tickers_by_cik, allowed, today, history=None):
+    """
+    → rows (FIELDS) for every ticker of every company with a usable block, sorted by symbol. A
+    `history` dict is filled with {symbol: history entry} for the same tickers.
+    """
     rows = []
     for cik, company in companies.items():
         keys = [key for key in tickers_by_cik.get(cik, []) if allowed is None or key in allowed]
         if not keys:
             continue
-        q, y, foreign, currency = company_blocks(company, today)
+        periods = company_periods(company)
+        q, y, foreign, currency = company_blocks(company, today, periods)
+        if history is not None:
+            entry = company_history(periods, cik, foreign)
+            if entry is not None:
+                for key in keys:
+                    history[key] = entry
         if q is None and y is None:
             continue
         qb, yb = q or {}, y or {}
@@ -500,14 +764,34 @@ def keep_foreign_rows(rows, previous):
     return sorted(rows + kept, key=lambda row: row[0])
 
 
-def build_document(frame_points, tickers_payload, universe, today, now, previous=None, foreign=True, stats=None):
-    """Pure core of a run → the us-sec.json document."""
+def keep_foreign_history(history, previous_history):
+    """Stored foreign entries (annual blocks from the foreign frames) whose symbol this run did not produce."""
+    for key, entry in (previous_history or {}).items():
+        if key not in history and isinstance(entry, dict) and entry.get("f") == 1:
+            history[key] = entry
+    return history
+
+
+def build_outputs(frame_points, tickers_payload, universe, today, now, previous=None, foreign=True, stats=None,
+                  previous_history=None):
+    """Pure core of a run → (the us-sec.json document, {symbol: history entry})."""
     tickers_by_cik, _ = parse_tickers(tickers_payload)
     companies = collect(frame_points)
-    rows = build_rows(companies, tickers_by_cik, universe_keys(universe), today)
+    history = {}
+    rows = build_rows(companies, tickers_by_cik, universe_keys(universe), today, history)
     foreign_at = today.isoformat() if foreign else (previous or {}).get("foreignAt")
     if not foreign:
         rows = keep_foreign_rows(rows, previous)
+        keep_foreign_history(history, previous_history)
+    return us_sec_document(rows, today, now, foreign_at, stats), history
+
+
+def build_document(frame_points, tickers_payload, universe, today, now, previous=None, foreign=True, stats=None):
+    """Pure core of a run → the us-sec.json document."""
+    return build_outputs(frame_points, tickers_payload, universe, today, now, previous, foreign, stats)[0]
+
+
+def us_sec_document(rows, today, now, foreign_at, stats):
     return {
         "version": VERSION,
         "generatedAt": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -557,6 +841,102 @@ def fetch_frames(client, plan, log=print):
     return results, stats
 
 
+def history_shard(key):
+    """Shard of a symbol key: FNV-1a 32-bit of its ASCII text mod HISTORY_SHARDS (same as the frontend)."""
+    value = 0x811C9DC5
+    for byte in key.encode("ascii", "replace"):
+        value = ((value ^ byte) * 0x01000193) & 0xFFFFFFFF
+    return value % HISTORY_SHARDS
+
+
+def shard_path(directory, index):
+    return os.path.join(directory, f"{index:03d}.json")
+
+
+def read_history(directory):
+    """{symbol: entry} of every readable shard (unreadable / foreign-layout shards are skipped)."""
+    entries = {}
+    for index in range(HISTORY_SHARDS):
+        document = read_json(shard_path(directory, index))
+        if isinstance(document, dict) and document.get("version") == HISTORY_VERSION and isinstance(document.get("symbols"), dict):
+            entries.update({key: entry for key, entry in document["symbols"].items() if isinstance(entry, dict)})
+    return entries
+
+
+def shard_text(index, entries, today, now):
+    """One shard as text: valid JSON with one symbol per line (small diffs when one company changes)."""
+    head = {
+        "version": HISTORY_VERSION, "generatedAt": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "asOf": today.isoformat(),
+        "source": SOURCE, "shard": index, "shards": HISTORY_SHARDS, "fields": HISTORY_FIELDS,
+    }
+    head_text = json.dumps(head, ensure_ascii=False, separators=(",", ":"))[:-1]
+    lines = [f"{json.dumps(key)}:{json.dumps(entries[key], ensure_ascii=False, separators=(',', ':'))}" for key in sorted(entries)]
+    return head_text + ',"symbols":{\n' + ",\n".join(lines) + ("\n" if lines else "") + "}}\n"
+
+
+def write_history(directory, history, today, now):
+    """Writes the shards whose symbols changed → {"written": n, "unchanged": n, "bytes": total size}."""
+    by_shard = {index: {} for index in range(HISTORY_SHARDS)}
+    for key, entry in history.items():
+        by_shard[history_shard(key)][key] = entry
+    os.makedirs(directory, exist_ok=True)
+    written = unchanged = size = 0
+    for index, entries in by_shard.items():
+        path = shard_path(directory, index)
+        stored = read_json(path)
+        if isinstance(stored, dict) and stored.get("version") == HISTORY_VERSION and stored.get("fields") == HISTORY_FIELDS \
+                and stored.get("symbols") == json.loads(json.dumps(entries)):
+            unchanged += 1
+            size += os.path.getsize(path)
+            continue
+        text = shard_text(index, entries, today, now)
+        with open(path + ".tmp", "w", encoding="utf-8") as file:
+            file.write(text)
+        os.replace(path + ".tmp", path)
+        written += 1
+        size += len(text.encode("utf-8"))
+    return {"written": written, "unchanged": unchanged, "bytes": size}
+
+
+def summarize(document, history):
+    """Checkable summary of the outputs (printed after a run, and by --summary for a review)."""
+    rows = (document or {}).get("rows") or []
+    col = {name: index for index, name in enumerate(FIELDS)}
+    leading = Counter()
+    for row in rows:
+        if len(row) != len(FIELDS):
+            continue
+        for name, mask in (("epsY", "tY"), ("revY", "tY")):
+            values = row[col[name]] or []
+            count = 0
+            for slot in range(len(values)):
+                if values[slot] is None and not (name == "epsY" and (row[col[mask]] >> slot) & 1):
+                    break
+                count += 1
+            for need in (1, 3, 5, 10):
+                if count >= need:
+                    leading[f"{name}>={need}"] += 1
+    q_ends, y_ends, issues = [], [], Counter()
+    deep = Counter()
+    for entry in history.values():
+        q_ends += [row[0] for row in entry.get("q") or []]
+        y_ends += [row[0] for row in entry.get("y") or []]
+        issues.update(entry.get("issues") or [])
+        deep["quarters>=40"] += len(entry.get("q") or []) >= 40
+        deep["years>=10"] += len(entry.get("y") or []) >= 10
+        deep["years>=11"] += len(entry.get("y") or []) >= 11
+        deep["foreign"] += entry.get("f") == 1
+    return {
+        "usSec": {"asOf": (document or {}).get("asOf"), "foreignAt": (document or {}).get("foreignAt"),
+                  "rows": len(rows), "frames": (document or {}).get("frames"), "coverage": dict(sorted(leading.items()))},
+        "history": {"symbols": len(history), "companies": len({entry.get("cik") for entry in history.values()}),
+                    "quarterEnds": [min(q_ends), max(q_ends)] if q_ends else None,
+                    "annualEnds": [min(y_ends), max(y_ends)] if y_ends else None,
+                    **{key: deep[key] for key in ("quarters>=40", "years>=10", "years>=11", "foreign")},
+                    "issues": dict(sorted(issues.items()))},
+    }
+
+
 def is_key_frame(frame, plan):
     """Diluted EPS of the KEY_QUARTERS calendar quarters before the newest planned one."""
     newest = max(request.label for request in plan if request.kind == "q")
@@ -571,7 +951,11 @@ def run(args, client=None, now=None, log=print):
     today = now.date()
     report_dir = args.report_dir
     out = args.out or os.path.join(report_dir, "fundamentals", "us-sec.json")
+    history_dir = getattr(args, "history_dir", None) or os.path.join(os.path.dirname(out), "us-history")
     previous = read_json(out)
+    if getattr(args, "summary", False):
+        log(json.dumps(summarize(previous, read_history(history_dir)), ensure_ascii=False))
+        return 0
     universe = read_json(os.path.join(report_dir, "universe.json"))
     foreign = not args.no_foreign and foreign_due(previous, today, args.foreign_max_age_days)
     user_agent = resolve_user_agent(os.environ)
@@ -596,17 +980,26 @@ def run(args, client=None, now=None, log=print):
     if stats["keyFrames"] < KEY_QUARTERS:
         log(f"::warning::only {stats['keyFrames']} of the {KEY_QUARTERS} key diluted-EPS frames had data, us-sec.json kept")
         return 1
-    document = build_document(frame_points, tickers, universe, today, now, previous, foreign, stats)
+    previous_history = read_history(history_dir)
+    document, history = build_outputs(frame_points, tickers, universe, today, now, previous, foreign, stats,
+                                      previous_history)
     old_rows = len(previous.get("rows") or []) if isinstance(previous, dict) else 0
     if old_rows and len(document["rows"]) < MIN_ROW_SHARE * old_rows and not args.force:
         log(f"::warning::{len(document['rows'])} rows against {old_rows} stored: not written (use --force)")
         return 1
+    if previous_history and len(history) < MIN_ROW_SHARE * len(previous_history) and not args.force:
+        log(f"::warning::{len(history)} history symbols against {len(previous_history)} stored: not written (use --force)")
+        return 1
     if same_rows(previous, document):
-        log(json.dumps({"rows": len(document["rows"]), "written": False, **stats}))
-        return 0
-    size = write_atomic(out, document)
-    by_part = Counter("foreign" if row[FIELDS.index("f")] else "us" for row in document["rows"])
-    log(json.dumps({"rows": len(document["rows"]), "written": True, "bytes": size, "parts": by_part, **stats}))
+        result = {"rows": len(document["rows"]), "written": False}
+        document = previous
+    else:
+        size = write_atomic(out, document)
+        by_part = Counter("foreign" if row[FIELDS.index("f")] else "us" for row in document["rows"])
+        result = {"rows": len(document["rows"]), "written": True, "bytes": size, "parts": by_part}
+    result["history"] = write_history(history_dir, history, today, now)
+    log(json.dumps({**result, **stats}))
+    log("SUMMARY " + json.dumps(summarize(document, history), ensure_ascii=False))
     return 0
 
 
@@ -617,7 +1010,11 @@ def parse_args(argv=None):
     parser.add_argument("--no-foreign", action="store_true", help="skip the foreign-issuer annual frames")
     parser.add_argument("--foreign-max-age-days", type=int, default=0,
                         help="re-fetch the foreign part only when the stored one is at least this old (0 = always)")
+    parser.add_argument("--history-dir", default=None,
+                        help="statement history shards (default: us-history/ next to --out)")
     parser.add_argument("--force", action="store_true", help="write even when the row count dropped a lot")
+    parser.add_argument("--summary", action="store_true",
+                        help="only print the summary of the stored files (offline, for reviewing a commit)")
     return parser.parse_args(argv)
 
 
