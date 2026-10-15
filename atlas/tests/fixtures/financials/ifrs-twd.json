@@ -1,0 +1,240 @@
+{
+ "_comment": "SYNTHETIC test fixture: made-up numbers in the shape of docs/report/financials/<KEY>.json written by atlas/scripts/sec_ifrs.py (IFRS foreign filer, TWD); not real financial data.",
+ "version": 1,
+ "symbol": "SYNA",
+ "market": "US",
+ "currency": "TWD",
+ "foreignReporter": true,
+ "generatedAt": "2026-10-15T09:00:00Z",
+ "checkedAt": "2026-10-15",
+ "source": "SEC EDGAR companyfacts (IFRS)",
+ "fyEndMonth": 12,
+ "annual": {
+  "end": [
+   "2020-12-31",
+   "2021-12-31",
+   "2022-12-31",
+   "2023-12-31",
+   "2024-12-31"
+  ],
+  "fy": [
+   2020,
+   2021,
+   2022,
+   2023,
+   2024
+  ],
+  "src": [
+   "sec",
+   "sec",
+   "sec",
+   "sec",
+   "sec"
+  ],
+  "values": {
+   "revenue": [
+    10000000000,
+    20000000000,
+    30300000000,
+    40000000000,
+    50000000000
+   ],
+   "costOfRevenue": [
+    6000000000,
+    12000000000,
+    18000000000,
+    24000000000,
+    30000000000
+   ],
+   "grossProfit": [
+    4000000000,
+    8000000000,
+    12000000000,
+    16000000000,
+    20000000000
+   ],
+   "operatingIncome": [
+    2500000000,
+    5000000000,
+    7500000000,
+    10000000000,
+    12500000000
+   ],
+   "pretaxIncome": [
+    2400000000,
+    4800000000,
+    7200000000,
+    9600000000,
+    12000000000
+   ],
+   "taxProvision": [
+    400000000,
+    800000000,
+    1200000000,
+    1600000000,
+    2000000000
+   ],
+   "netIncome": [
+    2000000000,
+    4000000000,
+    6000000000,
+    8000000000,
+    10500000000
+   ],
+   "epsDiluted": [
+    2.4,
+    4.9,
+    7.4,
+    9.9,
+    12.4
+   ],
+   "epsBasic": [
+    2.5,
+    5,
+    7.5,
+    10,
+    12.5
+   ],
+   "interestExpense": [
+    100000000,
+    200000000,
+    300000000,
+    400000000,
+    500000000
+   ],
+   "operatingCashFlow": [
+    3000000000,
+    6000000000,
+    9000000000,
+    12000000000,
+    15000000000
+   ],
+   "capex": [
+    800000000,
+    1600000000,
+    2400000000,
+    3200000000,
+    4000000000
+   ],
+   "equity": [
+    4000000000,
+    8000000000,
+    12000000000,
+    16000000000,
+    20000000000
+   ],
+   "totalAssets": [
+    20000000000,
+    40000000000,
+    60000000000,
+    80000000000,
+    100000000000
+   ],
+   "dividendsPaid": [
+    500000000,
+    1000000000,
+    1500000000,
+    2000000000,
+    2500000000
+   ]
+  }
+ },
+ "quarterly": {
+  "end": [
+   "2025-03-31",
+   "2025-06-30"
+  ],
+  "fy": [
+   2025,
+   2025
+  ],
+  "fq": [
+   1,
+   2
+  ],
+  "src": [
+   "sec",
+   "sec"
+  ],
+  "values": {
+   "revenue": [
+    14000000000,
+    15000000000
+   ],
+   "netIncome": [
+    2800000000,
+    3000000000
+   ],
+   "totalAssets": [
+    null,
+    130000000000
+   ]
+  }
+ },
+ "split": {
+  "adjusted": false,
+  "events": []
+ },
+ "quality": {
+  "level": "good",
+  "annualYears": 5,
+  "quarters": 2,
+  "issues": [
+   "foreign-currency",
+   "ifrs",
+   "ifrs-fallback"
+  ]
+ },
+ "secConcepts": {
+  "revenue": [
+   "Revenue"
+  ],
+  "costOfRevenue": [
+   "CostOfSales"
+  ],
+  "grossProfit": [
+   "GrossProfit"
+  ],
+  "operatingIncome": [
+   "ProfitLossFromOperatingActivities"
+  ],
+  "pretaxIncome": [
+   "ProfitLossBeforeTax"
+  ],
+  "taxProvision": [
+   "IncomeTaxExpenseContinuingOperations"
+  ],
+  "netIncome": [
+   "ProfitLoss",
+   "ProfitLossAttributableToOwnersOfParent"
+  ],
+  "epsBasic": [
+   "BasicEarningsLossPerShare"
+  ],
+  "epsDiluted": [
+   "DilutedEarningsLossPerShare"
+  ],
+  "interestExpense": [
+   "InterestExpense"
+  ],
+  "operatingCashFlow": [
+   "CashFlowsFromUsedInOperatingActivities"
+  ],
+  "capex": [
+   "PurchaseOfPropertyPlantAndEquipment"
+  ],
+  "dividendsPaid": [
+   "DividendsPaidClassifiedAsFinancingActivities"
+  ],
+  "equity": [
+   "EquityAttributableToOwnersOfParent"
+  ],
+  "totalAssets": [
+   "Assets"
+  ]
+ },
+ "ifrsCurrencies": {
+  "EUR": 2,
+  "TWD": 5
+ }
+}

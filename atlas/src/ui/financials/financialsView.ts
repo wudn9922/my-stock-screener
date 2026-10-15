@@ -210,6 +210,8 @@ export const ISSUE_TEXT: Record<string, string> = {
   'debt-approx': '有息負債為 Yahoo 的 TotalDebt，可能包含租賃負債，負債比與 ROIC 為近似值。',
   'foreign-filer': '外國發行人（如 ADR）：EPS 為每普通股，不是每 ADR。',
   'currency-changed': '財報幣別曾經變更，較早期別與最新期別的幣別可能不同，跨期比較請小心。',
+  ifrs: '外國發行人以 IFRS 申報（SEC 20-F／40-F），科目由 SEC 事實對照而來；淨利與權益以歸屬母公司為準，缺欄位留空、不推算。',
+  'ifrs-fallback': '部分期別缺歸屬母公司的淨利或權益，改用含非控制權益的合併數，跨期比較請小心。',
 };
 export const issueText = (code: string) => ISSUE_TEXT[code] ?? `其他資料提示（${code}）。`;
 

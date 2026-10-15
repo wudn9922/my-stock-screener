@@ -8,6 +8,7 @@ import {
   activeChips,
   applyFilters,
   epsAccelStatus,
+  epsStreak,
   filterAvailability,
   gateCoverage,
   growthGatePasses,
@@ -16,6 +17,7 @@ import {
   parseFilters,
   removeFilter,
   serializeFilters,
+  streakPasses,
   NO_GROWTH_REASON,
   type FilterState,
 } from '../src/pages/screenerFilters';
@@ -83,7 +85,8 @@ describe('f encoding of the fundamental conditions', () => {
 
   it('ignores bad annual / switch tokens and out-of-range periods', () => {
     expect(state('epsy:0:5').epsY).toBeNull();
-    expect(state('epsy:4:5').epsY).toBeNull(); // only 3 fiscal years are published
+    expect(state('epsy:11:5').epsY).toBeNull(); // the stored annual horizon is 10 years
+    expect(state('epsy:10:5').epsY).toEqual({ years: 10, min: 5 });
     expect(state('revy:x:5').revY).toBeNull();
     expect(state('revy:2:').revY).toBeNull();
     expect(state('eps:5:20').eps).toBeNull();
@@ -92,6 +95,14 @@ describe('f encoding of the fundamental conditions', () => {
     expect(state('acc:0').accel).toBe(false);
     expect(state('tn:1').turn).toBe(true);
     expect(state('foo:1;epsy:2:10;bar').epsY).toEqual({ years: 2, min: 10 });
+    expect(state('epss:0').epss).toBeNull();
+    expect(state('epss:11').epss).toBeNull();
+    expect(state('epss:2.5').epss).toBeNull();
+    expect(state('epss:').epss).toBeNull();
+    expect(state('epss').epss).toBeNull();
+    expect(state('epss:3:5').epss).toBeNull(); // one number only
+    expect(state('epss:abc').epss).toBeNull();
+    expect(state('epss:10').epss).toBe(10);
     // Upper case keys and a repeated token: the last one wins.
     expect(state('EPSY:1:5;epsy:3:7').epsY).toEqual({ years: 3, min: 7 });
   });
@@ -461,5 +472,111 @@ describe('pills and sorting with growth', () => {
     const values = withValue.map((symbol) => reportGrowth.items.get(growthKey(symbol))!.epsYoY[0]!);
     expect(values).toEqual([...values].sort((a, b) => b - a));
     expect(sorted.indexOf('2317.TW')).toBeGreaterThan(sorted.indexOf('2330.TW'));
+  });
+});
+
+describe('ten-year annual windows and the EPS growth streak (epss)', () => {
+  const rec = (epsYoYAnnual: (number | null)[], epsTurnAnnual: boolean[] = []) => ({
+    ...reportGrowth.items.get(growthKey('2330.TW'))!,
+    epsYoYAnnual,
+    epsTurnAnnual,
+  });
+
+  it('parses up to ten annual YoY values and their turnaround bits from growth.json', () => {
+    const fields = ['symbol', 'lv', 'src', 'qEnd', 'yEnd', 'epsQ', 'revQ', 'epsY', 'revY', 'tQ', 'tY', 'srcY', 'dQ'];
+    const ten = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const file = parseReportGrowth({
+      version: 1,
+      fields,
+      rows: [['AAA', 'good', 'sec', '2026-06-30', '2025-12-31', [], [], [...ten, 11, 12], ten, 0, 1 << 9, 'sec', 0]],
+    })!;
+    const record = file.items.get('AAA')!;
+    expect(record.epsYoYAnnual).toEqual(ten); // the eleventh value is beyond the horizon
+    expect(record.revYoYAnnual).toEqual(ten);
+    expect(record.epsTurnAnnual).toHaveLength(10);
+    expect(record.epsTurnAnnual[9]).toBe(true);
+    expect(record.epsTurnAnnual.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('serializes the streak token canonically, next to the annual gates', () => {
+    expect(serializeFilters(state('epss:3;epsy:2:10;tn:0'))).toBe('epsy:2:10;epss:3;tn:0');
+    expect(serializeFilters({ ...EMPTY_FILTERS, turn: false, epss: 3 })).toBe('epss:3;tn:0');
+    expect(serializeFilters({ ...EMPTY_FILTERS, keepMissing: true, epss: 10 })).toBe('epss:10;nd:keep');
+    expect(serializeFilters(state('epss:10'))).toBe('epss:10');
+  });
+
+  it('counts the streak from the latest year and stops at the first year that does not grow', () => {
+    expect(epsStreak(rec([30, 12, 5, -3, 40]), true)).toEqual({ years: 3, stop: 'decline' });
+    expect(epsStreak(rec([30, null, 5]), true)).toEqual({ years: 1, stop: 'missing' });
+    expect(epsStreak(rec([0, 5]), true)).toEqual({ years: 0, stop: 'decline' }); // flat is not growth
+    expect(epsStreak(rec([10, 10, 10, 10, 10, 10, 10, 10, 10, 10]), true)).toEqual({ years: 10, stop: null });
+    expect(epsStreak(rec([10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]), true).years).toBe(10); // capped at the horizon
+    // Only three stored years: the fourth is missing, not a decline
+    expect(epsStreak(rec([25, 15, 10]), true)).toEqual({ years: 3, stop: 'missing' });
+    expect(epsStreak(null, true)).toEqual({ years: 0, stop: 'missing' });
+  });
+
+  it('counts a loss-to-profit turn as growth only while 含虧轉盈 is on', () => {
+    // The newest year turned from a loss; the two years before grew
+    expect(epsStreak(rec([null, 20, 10], [true, false, false]), true)).toEqual({ years: 3, stop: 'missing' });
+    expect(epsStreak(rec([null, 20, 10], [true, false, false]), false)).toEqual({ years: 0, stop: 'missing' });
+    // A turn in the middle counts with the turn on; the fourth year is not in the file
+    expect(epsStreak(rec([20, null, 10], [false, true, false]), true)).toEqual({ years: 3, stop: 'missing' });
+    expect(epsStreak(rec([20, null, 10], [false, true, false]), false)).toEqual({ years: 1, stop: 'missing' });
+  });
+
+  it('passes when the streak reaches N; a missing stretch passes only with 資料不足時排除 off', () => {
+    const grown = rec([30, 12, 5, -3]);
+    expect(streakPasses(grown, 3, false, true)).toBe(true);
+    expect(streakPasses(grown, 4, false, true)).toBe(false); // the decline in year 4 ends the streak at 3
+    expect(streakPasses(grown, 4, true, true)).toBe(false); // a decline is never kept
+    const short = rec([30, null, 5]);
+    expect(streakPasses(short, 2, false, true)).toBe(false);
+    expect(streakPasses(short, 2, true, true)).toBe(true); // missing data, kept
+    expect(streakPasses(short, 1, false, true)).toBe(true);
+    expect(streakPasses(rec([-5, null]), 2, true, true)).toBe(false); // the newest year declined
+    expect(streakPasses(null, 1, false, true)).toBe(false);
+    expect(streakPasses(null, 1, true, true)).toBe(true); // no record: missing
+  });
+
+  it('filters the Taiwan list on the streak, and keeps stocks whose history is too short only when asked', () => {
+    // The fixture has three annual years for TSMC (+25 / +15 / +10): a streak of 3, not 4
+    expect(symbols(applyFilters(TW, state('epss:3'), tw))).toContain('2330.TW');
+    expect(symbols(applyFilters(TW, state('epss:4'), tw))).not.toContain('2330.TW');
+    expect(symbols(applyFilters(TW, state('epss:4;nd:keep'), tw))).toContain('2330.TW');
+    // Taiwan has no annual history beyond three years here: a ten-year streak only comes from keeping missing data
+    expect(symbols(applyFilters(TW, state('epss:10'), tw))).toEqual([]);
+    expect(symbols(applyFilters(TW, state('epss:10;nd:keep'), tw)).length).toBeGreaterThan(0);
+    expect(gateCoverage(TW, reportGrowth, 'epsY', 5, true)).toBe(0);
+  });
+
+  it('is a chip, a removable condition and a row pill, and it needs the growth data', () => {
+    const chips = activeChips(state('epss:3;tn:0'));
+    expect(chips.map((chip) => chip.label)).toEqual(['EPS 連續成長 ≥3 年', '不含虧轉盈']);
+    expect(removeFilter(state('epss:3'), 'epss').epss).toBeNull();
+    expect(needsGrowth(state('epss:2'))).toBe(true);
+    expect(filterAvailability(TW, tw).epss).toBeNull();
+    expect(filterAvailability(TW, { market: 'TW', growth: null }).epss).toBe(NO_GROWTH_REASON);
+    expect(rowMetricPills('default', state('epss:3'), [20])).toEqual(['epss']);
+    expect(metricPill(row('2330.TW'), 'epss', reportGrowth)).toMatchObject({ text: 'EPS連增 3年', tone: 'up' });
+    expect(metricPill(row('2330.TW'), 'epss', reportGrowth)!.title).toContain('年度 EPS 連續成長 3 年');
+    expect(metricPill(row('2330.TW'), 'epss', reportGrowth)!.title).toContain('年度（最新→較舊）+25% / +15% / +10%');
+    expect(metricPill(row('2330.TW'), 'epss')).toBeNull();
+  });
+
+  it('shows the streak in the pill with a plus at the stored horizon, and follows the 含虧轉盈 switch', () => {
+    const file: GrowthFile = {
+      generatedAt: null,
+      source: null,
+      items: new Map([
+        ['TEN', rec([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])],
+        ['TURN', rec([null, 20], [true, false])],
+      ]),
+    };
+    expect(metricPill(plain('TEN'), 'epss', file, true)).toMatchObject({ text: 'EPS連增 10+年' });
+    expect(metricPill(plain('TURN'), 'epss', file, true)).toMatchObject({ text: 'EPS連增 2年' });
+    expect(metricPill(plain('TURN'), 'epss', file, false)).toBeNull();
+    // A stock the streak fails still shows its (short) streak, so the list explains the exclusion
+    expect(metricPill(plain('TEN'), 'epss', file)!.title).toContain('含虧轉盈');
   });
 });

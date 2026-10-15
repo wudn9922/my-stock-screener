@@ -61,6 +61,9 @@ CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
 VERSION = 1
 SOURCE = "Yahoo Finance fundamentals-timeseries"
 SOURCE_MIXED = "SEC EDGAR companyfacts + Yahoo Finance"
+# index.json item: date of the last SEC companyfacts check (seed_financials_sec.py --due). Kept apart from
+# checkedAt, which is the Yahoo check date; run_refresh and seed_financials_sec.update_index carry it over
+SEC_CHECKED_KEY = "secCheckedAt"
 REQUEST_DELAY = 0.15
 DEFAULT_BUDGET_SECONDS = 600
 MAX_CONSECUTIVE_FAILURES = 8
@@ -133,6 +136,8 @@ ISSUES = (
     "split-adjusted", "foreign-currency", "restated", "yahoo-differs", "quarter-annual-mismatch",
     "quarterly-ytd-suspected", "negative-equity", "capex-sign", "currency-changed",
 )
+# Quality codes that only sec_ifrs.py writes (SEC IFRS periods); update_document carries them over
+IFRS_ISSUES = ("ifrs", "ifrs-fallback")
 DOCUMENT_KEYS = (
     "version", "symbol", "market", "currency", "foreignReporter", "generatedAt", "checkedAt", "source",
     "fyEndMonth", "annual", "quarterly", "split", "quality",
@@ -891,8 +896,14 @@ def update_document(previous, payload, key, now, fetch_splits=None):
         flags.add("currency-changed")
     if adjusted:
         flags.add("split-adjusted")
-    foreign = currency != HOME_CURRENCY[market]
+    # A foreign reporter stays one: an IFRS 20-F filer may report in USD, which the currency alone does not show
+    foreign = currency != HOME_CURRENCY[market] or (isinstance(previous, dict) and previous.get("foreignReporter") is True)
     grade = quality(annual, quarterly, flags, foreign)
+    # IFRS codes of the SEC periods (sec_ifrs.py) stay while those periods are in the file
+    if isinstance(previous, dict) and isinstance(previous.get("quality"), dict):
+        carried = previous["quality"].get("issues")
+        if isinstance(carried, list):
+            grade["issues"] += sorted(code for code in IFRS_ISSUES if code in carried and code not in grade["issues"])
     if revisions:
         grade["revisions"] = revisions
     mixed = any(p["src"] == "sec" for p in annual + quarterly)
@@ -1311,6 +1322,8 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
         if key in documents:
             item = dict(items[key])
             item["lastListed"] = last_listed
+            if isinstance(previous.get(SEC_CHECKED_KEY), str):
+                item[SEC_CHECKED_KEY] = previous[SEC_CHECKED_KEY]
             final[key] = item
         elif previous:
             final[key] = dict(previous, lastListed=last_listed)

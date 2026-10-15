@@ -443,7 +443,7 @@ def company_blocks(company, today):
     q_periods = [as_growth_period(number, period, True) for number, period in quarters.items()]
     y_periods = [as_growth_period(number, period, False) for number, period in years.items()]
     q = growth.yoy_series(q_periods, True, growth.QUARTER_SLOTS, [], today, growth.STALE_QUARTER_DAYS, frames_pair)
-    y = growth.yoy_series(y_periods, False, growth.YEAR_SLOTS, [], today, growth.STALE_ANNUAL_DAYS, frames_pair)
+    y = growth.yoy_series(y_periods, False, growth.RECENT_YEAR_SLOTS, [], today, growth.STALE_ANNUAL_DAYS, frames_pair)
     foreign, currency = False, None
     if y is not None:
         latest = years[max(number for number, period in years.items() if period["end"].isoformat() == y["end"])]

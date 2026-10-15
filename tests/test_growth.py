@@ -185,6 +185,21 @@ class AnnualTest(unittest.TestCase):
         three = row_of(document(annual=four[1:]))
         self.assertEqual(three["epsY"], [20.0, 100.0])
 
+    def test_ten_years_of_yoy_from_the_financials_file(self):
+        # 11 fiscal years give 10 YoY values: slot 0 = 2025 vs 2024, slot 9 = 2016 vs 2015
+        eps = [1.0, 1.5, 2.0, 2.0, 2.5, 3.0, 3.0, 3.3, 3.6, 4.0, 4.4]
+        result = row_of(document(annual=[y(2015 + i, eps[i], 100 + 10 * i) for i in range(11)]))
+        self.assertEqual(result["epsY"], [10.0, 11.1, 9.1, 10.0, 0.0, 20.0, 25.0, 0.0, 33.3, 50.0])
+        self.assertEqual(len(result["revY"]), 10)
+        self.assertEqual(result["tY"], 0)
+
+    def test_a_turnaround_in_the_oldest_of_ten_years(self):
+        # 2015 loss -> 2016 profit: slot 9 has no number (trailing null cut) but its turn bit is set
+        eps = [-0.5, 1.5, 2.0, 2.0, 2.5, 3.0, 3.0, 3.3, 3.6, 4.0, 4.4]
+        result = row_of(document(annual=[y(2015 + i, eps[i], 100 + 10 * i) for i in range(11)]))
+        self.assertEqual(result["epsY"], [10.0, 11.1, 9.1, 10.0, 0.0, 20.0, 25.0, 0.0, 33.3])
+        self.assertEqual(result["tY"], 1 << 9)
+
     def test_gap_year_breaks_the_chain_and_loss_year_is_a_turn(self):
         rows = [y(2021, 1.0), y(2023, 2.0), y(2024, -1.0), y(2025, 0.5)]
         result = row_of(document(annual=rows))
@@ -299,15 +314,15 @@ class MergeTest(unittest.TestCase):
     def test_newest_period_first_then_the_better_source(self):
         yahoo = block("2026-06-30", "yahoo", eps=(1.0,))
         mops = block("2026-06-30", "mops", eps=(2.0, 3.0, 4.0, 5.0))
-        self.assertIs(growth.choose_block([yahoo, mops]), mops)
+        self.assertIs(growth.choose_block([yahoo, mops], 4), mops)
         # Yahoo already has the next quarter (> FRESHER_DAYS newer): the newest period wins
         newer = block("2026-09-30", "yahoo", eps=(9.0,))
-        self.assertIs(growth.choose_block([newer, mops]), newer)
+        self.assertIs(growth.choose_block([newer, mops], 4), newer)
         # US: SEC companyfacts files > frames > Yahoo files; 52/53-week ends a few days apart are one period
         sec_file, frames, yahoo_file = block("2026-06-27", "sec"), block("2026-06-28", "frames"), block("2026-06-30", "yahoo")
-        self.assertIs(growth.choose_block([yahoo_file, frames, sec_file]), sec_file)
-        self.assertIs(growth.choose_block([yahoo_file, frames]), frames)
-        self.assertIsNone(growth.choose_block([None, {"end": "bad", "src": "sec"}]))
+        self.assertIs(growth.choose_block([yahoo_file, frames, sec_file], 4), sec_file)
+        self.assertIs(growth.choose_block([yahoo_file, frames], 4), frames)
+        self.assertIsNone(growth.choose_block([None, {"end": "bad", "src": "sec"}], 4))
 
     def test_blocks_never_mix_and_lv_only_from_a_used_financials_file(self):
         financials = ("partial", block("2026-06-30", "yahoo", eps=(1.0, 2.0)), block("2025-12-31", "yahoo", eps=(5.0,)))
@@ -321,6 +336,29 @@ class MergeTest(unittest.TestCase):
         self.assertIsNone(only_official["lv"])
         self.assertIsNone(only_official["srcY"])
         self.assertIsNone(growth.merge_candidates("X", [(None, None, None)]))
+
+    def test_an_annual_block_competes_only_with_a_value_in_its_newest_three_years(self):
+        # A financials block whose newest three YoY values are missing does not compete (as with the 3-year
+        # horizon): the official block wins. Its older years come along only when the financials block wins.
+        frames = block("2025-12-31", "frames", eps=(15.4, 17.4))
+        older_only = block("2025-12-31", "sec", eps=(None, None, None, -1276.7, -44.9, -42.6, 3.0))
+        row = dict(zip(growth.FIELDS, growth.merge_candidates("RJET", [(None, None, older_only), (None, None, frames)])))
+        self.assertEqual((row["epsY"], row["srcY"]), ([15.4, 17.4], "frames"))
+        full_eps = [1.0, None, 2.0, -3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+        full = block("2025-12-31", "sec", eps=full_eps)
+        row = dict(zip(growth.FIELDS, growth.merge_candidates("RJET", [(None, None, full), (None, None, frames)])))
+        self.assertEqual((row["epsY"], row["srcY"]), (full_eps, "sec"))
+        self.assertIsNone(growth.choose_block([older_only], growth.RECENT_YEAR_SLOTS))
+
+    def test_coverage_counts_the_ten_year_slots(self):
+        doc = document(annual=[y(2015 + i, 1.0 + i, 100 + 10 * i) for i in range(11)])
+        row = growth.build_row("X", doc, TODAY)
+        stats = growth.coverage([row], [("X", doc)])
+        self.assertEqual((stats["US"]["epsY>=10"], stats["US"]["revY>=10"]), (1, 1))
+        self.assertNotIn("epsY>=11", stats["US"])
+        # A turnaround in the newest year counts as a period even when the EPS list is empty
+        turn = ["T", "good", "sec", None, "2025-12-31", [], [], [], [], 0, 1, "sec", 0]
+        self.assertEqual(growth.coverage([turn], [("T", None)])["US"]["epsY>=1"], 1)
 
     def test_sec_frame_rows_are_checked_again(self):
         fields = ["symbol", "cik", "qEnd", "yEnd", "epsQ", "revQ", "epsY", "revY", "tQ", "tY", "dQ", "f", "cur"]
@@ -458,18 +496,20 @@ class RepoDataTest(unittest.TestCase):
             out = os.path.join(tmp, "growth.json")
             summary = growth.run(directory, out, NOW)
             self.assertEqual(summary["unreadable"], [])
-            # The completed US whole-market backfill adds more real history rows;
-            # keep the real-file output compact while allowing that larger cohort.
-            self.assertLess(summary["bytes"], 600_000)
+            # Annual YoY now runs to 10 years (YEAR_SLOTS): the 2026-10-15 financials give 743,191 B
+            # (571,112 B with the old 3-year arrays, +30%; about 200 KB gzipped). 800,000 B leaves a small margin.
+            self.assertLess(summary["bytes"], 800_000)
             with open(out, encoding="utf-8") as file:
                 data = json.load(file)
         markets = {growth.market_of(row[0]) for row in data["rows"]}
         self.assertEqual(markets, {"TW", "US"})
+        limits = {"epsQ": growth.QUARTER_SLOTS, "revQ": growth.QUARTER_SLOTS, "epsY": growth.YEAR_SLOTS, "revY": growth.YEAR_SLOTS}
         for row in data["rows"]:
             self.assertEqual(len(row), len(growth.FIELDS))
-            for value in row[SLOT["epsQ"]:SLOT["revY"] + 1]:
+            for name, limit in limits.items():
+                value = row[SLOT[name]]
                 self.assertTrue(all(v is None or isinstance(v, (int, float)) for v in value))
-                self.assertLessEqual(len(value), 4)
+                self.assertLessEqual(len(value), limit)
 
 
 if __name__ == "__main__":
