@@ -554,7 +554,8 @@ describe('fixtures', () => {
     expect(roes[0]!.basis).toBe('approx');
     expect(roes.slice(1).every((m) => m.basis === 'reported')).toBe(true);
     expect(metricSeries(ctx, 'interestCoverage').at(-1)!.reason).toBe('缺利息費用');
-    expect(Object.keys(METRICS)).toHaveLength(21);
+    // 22 since gross profit (毛利金額) joined the registry for the profitability chart and the key metrics card.
+    expect(Object.keys(METRICS)).toHaveLength(22);
   });
 
   it('TWD file: quarterly TTM ROE and ROIC from the fifth quarter on', () => {

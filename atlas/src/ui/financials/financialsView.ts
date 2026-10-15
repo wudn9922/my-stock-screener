@@ -9,6 +9,7 @@ import {
   windowAverage,
   windowCagr,
   yoy,
+  type Basis,
   type CagrResult,
   type ChangeResult,
   type MetricId,
@@ -16,6 +17,7 @@ import {
   type MetricUnit,
   type PeriodLabel,
 } from '../../fundamentals/financialMetrics';
+import { toneClass } from '../format';
 
 /**
  * View model and text for the financials page: which periods each chart shows, the headline value,
@@ -23,8 +25,26 @@ import {
  * Pure (no React), so it is unit-tested with the synthetic fixtures.
  */
 
-/** Bars per chart: annual up to 10 years, quarterly up to 12 quarters (the table shows every period). */
+/** Default bars per chart: annual 10 years, quarterly 12 quarters (the table shows every period). */
 export const CHART_PERIODS: Record<PeriodKind, number> = { annual: 10, quarterly: 12 };
+/** Range choices offered on the charts: years for annual, quarters for quarterly. */
+export const SPAN_OPTIONS: Record<PeriodKind, readonly number[]> = { annual: [5, 10, 15], quarterly: [12, 20, 40, 60] };
+
+export interface SpanOption {
+  span: number;
+  /** A range needs at least that many periods in the file. */
+  enabled: boolean;
+}
+export function spanOptions(kind: PeriodKind, count: number): SpanOption[] {
+  return SPAN_OPTIONS[kind].map((span) => ({ span, enabled: count >= span }));
+}
+export const spanLabel = (kind: PeriodKind, span: number) => (kind === 'annual' ? `${span}年` : `${span}季`);
+
+/** Indices (ascending) of the last `span` periods of a block of `count`; every period when there are fewer. */
+export function windowIndices(count: number, span: number): number[] {
+  const shown = Math.max(0, Math.min(count, span));
+  return Array.from({ length: shown }, (_, i) => count - shown + i);
+}
 
 export interface MetricView {
   id: MetricId;
@@ -32,6 +52,8 @@ export interface MetricView {
   unit: MetricUnit;
   results: MetricResult[];
   values: (number | null)[];
+  /** YoY for every period (same alignment as the cards); index-aligned with `values`. */
+  changes: ChangeResult[];
   /** Period indices drawn in the chart (ascending). */
   window: number[];
   /** Latest period with a value (null when none in the whole block). */
@@ -49,12 +71,13 @@ export interface FinancialsView {
   metrics: Record<MetricId, MetricView>;
 }
 
-export function buildView(history: FinancialHistory, kind: PeriodKind): FinancialsView {
+/** `span` is the number of periods drawn (defaults to CHART_PERIODS); the full series stays in every value array. */
+export function buildView(history: FinancialHistory, kind: PeriodKind, span: number = CHART_PERIODS[kind]): FinancialsView {
   const ctx = contextOf(history, kind);
   const labels = periodLabels(history, kind);
   const ends = ctx.series.end;
   const count = ends.length;
-  const window = Array.from({ length: Math.min(count, CHART_PERIODS[kind]) }, (_, i) => count - Math.min(count, CHART_PERIODS[kind]) + i);
+  const window = windowIndices(count, span);
   const quarters = labels.map((label) => label.fq);
   const metrics = {} as Record<MetricId, MetricView>;
   for (const group of METRIC_GROUPS)
@@ -68,6 +91,7 @@ export function buildView(history: FinancialHistory, kind: PeriodKind): Financia
           latestIndex = i;
           break;
         }
+      const changes = values.map((_, index) => yoy(values, ends, index, def.unit));
       // CAGR only where growth means something; ratios and the sign-flipping non-operating line get an average.
       const ratio = def.unit === 'pct' || def.unit === 'times' || id === 'nonOperatingIncome';
       metrics[id] = {
@@ -76,14 +100,100 @@ export function buildView(history: FinancialHistory, kind: PeriodKind): Financia
         unit: def.unit,
         results,
         values,
+        changes,
         window,
         latestIndex,
-        yoy: latestIndex === null ? null : yoy(values, ends, latestIndex, def.unit),
+        yoy: latestIndex === null ? null : changes[latestIndex]!,
         cagr: ratio ? null : windowCagr(values, ends, window, kind === 'quarterly' ? quarters : undefined),
         average: ratio ? windowAverage(values, window) : null,
       };
     }
   return { kind, labels, metrics };
+}
+
+// ------------------------------------------------------------------ key metrics (first screen)
+
+export const KEY_METRIC_IDS: readonly MetricId[] = [
+  'revenue',
+  'grossProfit',
+  'netIncome',
+  'eps',
+  'grossMargin',
+  'operatingMargin',
+  'netMargin',
+];
+/** Mini bars per key metric: the latest eight periods. */
+export const KEY_SPARK_PERIODS = 8;
+
+export interface KeyTile {
+  id: MetricId;
+  label: string;
+  unit: MetricUnit;
+  /** Value at the shared latest period; null when this metric has no value there. */
+  value: number | null;
+  /** How the value was obtained at the latest period (derived shows 「推算」). */
+  basis: Basis | null;
+  /** Why it is missing (shown as the tooltip and under the dash). */
+  reason: string | null;
+  /** YoY at the shared latest period (growth for money and EPS, percentage points for ratios). */
+  change: ChangeResult | null;
+  /** Up to KEY_SPARK_PERIODS periods ending at the shared latest period, oldest first. */
+  spark: { index: number; value: number | null }[];
+}
+
+export interface KeySummary {
+  /** The newest period any key metric has a value for (null when none does). */
+  index: number | null;
+  tiles: KeyTile[];
+}
+
+/** All tiles show the same period so the headline row never mixes quarters: the newest period with data. */
+export function keySummary(view: FinancialsView): KeySummary {
+  let index: number | null = null;
+  for (const id of KEY_METRIC_IDS) {
+    const latest = view.metrics[id].latestIndex;
+    if (latest !== null && (index === null || latest > index)) index = latest;
+  }
+  const tiles = KEY_METRIC_IDS.map((id): KeyTile => {
+    const data = view.metrics[id];
+    if (index === null)
+      return { id, label: data.label, unit: data.unit, value: null, basis: null, reason: '沒有可用的期別', change: null, spark: [] };
+    const value = data.values[index] ?? null;
+    const spark = windowIndices(index + 1, KEY_SPARK_PERIODS).map((i) => ({ index: i, value: data.values[i] ?? null }));
+    return {
+      id,
+      label: data.label,
+      unit: data.unit,
+      value,
+      basis: data.results[index]?.basis ?? null,
+      reason: value === null ? (data.results[index]?.reason ?? '沒有資料') : null,
+      change: data.changes[index] ?? null,
+      spark,
+    };
+  });
+  return { index, tiles };
+}
+
+/** Statement table cell in YoY mode: 「+12.3%」, or 轉盈 / 續虧 / 轉虧 when the base sign flips, or the dash. */
+export function changeCellText(change: ChangeResult | null): ChipText {
+  if (!change) return { text: '—', tone: 'flat' };
+  if (change.label === '轉盈') return { text: '轉盈', tone: 'up' };
+  if (change.label === '續虧') return { text: '續虧', tone: 'down' };
+  if (change.label === '轉虧') return { text: '轉虧', tone: 'down' };
+  if (change.value === null) return { text: '—', tone: 'flat' };
+  return { text: signed(change.value, 1, change.mode === 'diff' ? ' 百分點' : '%'), tone: toneClass(change.value) };
+}
+
+/** 「年增 +12.3%」 for money and EPS, 「年增 +1.3 百分點」 for margins; 轉盈 / 續虧 / 轉虧 when the base sign flips. */
+export function keyChangeText(change: ChangeResult | null): ChipText {
+  if (!change) return { text: '年增 —', tone: 'flat' };
+  if (change.label === '轉盈') return { text: '轉盈', tone: 'up' };
+  if (change.label === '續虧') return { text: '續虧', tone: 'down' };
+  if (change.value === null) return { text: '年增 —', tone: 'flat' };
+  const tone = toneClass(change.value);
+  if (change.mode === 'diff') return { text: `年增 ${signed(change.value, 1, ' 百分點')}`, tone };
+  if (change.label === '轉虧') return { text: `轉虧 ${signed(change.value, 1, '%')}`, tone };
+  return { text: `年增 ${signed(change.value, 1, '%')}`, tone };
 }
 
 // ------------------------------------------------------------------ numbers

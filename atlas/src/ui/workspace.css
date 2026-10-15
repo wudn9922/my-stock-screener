@@ -1573,10 +1573,16 @@
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       'symbol quote'
-      'valuation actions';
+      'valuation actions'
+      'tabs tabs';
     gap: 0 8px;
     padding: 4px 6px 2px 2px;
     min-height: 0;
+  }
+  .ws-header > .stock-tabs {
+    grid-area: tabs;
+    justify-self: start;
+    margin: 0 0 4px 6px;
   }
   .ws-symbol {
     grid-area: symbol;
