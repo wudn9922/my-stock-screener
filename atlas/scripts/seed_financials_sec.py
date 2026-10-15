@@ -116,6 +116,7 @@ from build_financials import (
     SPLIT_MATCH,
     VERSION,
     adjust_splits,
+    adr_eps_factor,
     clean_value,
     days_between,
     effective,
@@ -1849,6 +1850,19 @@ def _implied_shares(annual, quarterly):
     return changed
 
 
+def scale_sec_to_adr(values, factor):
+    """
+    SEC per-ordinary-share values → the basis of a foreign reporter's file (1 ADR = factor ordinary shares):
+    EPS × factor and the diluted share count ÷ factor, so EPS and count stay consistent (NI ÷ count = EPS).
+    In place.
+    """
+    for field in ("epsBasic", "epsDiluted"):
+        if values.get(field) is not None:
+            values[field] = clean_value(values[field] * factor)
+    if values.get("dilutedShares") is not None:
+        values["dilutedShares"] = clean_value(values["dilutedShares"] / factor)
+
+
 def merge_into_document(previous, sec, key, now, fetch_splits=None):
     """
     Merge one SecResult into the stored document (None for a new file) → (document or None, info).
@@ -1876,6 +1890,8 @@ def merge_into_document(previous, sec, key, now, fetch_splits=None):
       merge. splitEvents: number of split events in the document. dropped: SecResult.dropped (values
       left null as implausible). counts also hold droppedOverlap / droppedDuplicate (stored Yahoo
       periods overlapping a SEC period / carrying its fiscal label).
+    A stored adrRatio (foreign reporter, EPS per ADR): the SEC values are put on that basis first (EPS × k,
+    diluted share count ÷ k), so the file keeps one EPS basis across reruns.
     Returns (None, info) when sec.skip is set, the key is not a US key, or the stored file is in
     another currency than USD.
     """
@@ -1916,6 +1932,13 @@ def merge_into_document(previous, sec, key, now, fetch_splits=None):
         frequency: [period(p["end"], p["values"], SRC, p["extra"]) for p in items]
         for frequency, items in new.items()
     }
+    # A foreign reporter's file holds EPS per ADR (adrRatio, see build_financials.resolve_eps_basis): SEC's
+    # per-ordinary-share values go onto that basis too, or the next Yahoo run and this one would mix them
+    adr_factor = adr_eps_factor(previous) if info["previous"] == "ok" else None
+    if adr_factor not in (None, 1):
+        for items in new.values():
+            for item in items:
+                scale_sec_to_adr(item["values"], adr_factor)
     counts = {"secAnnual": len(new["annual"]), "secQuarterly": len(new["quarterly"]),
               "trimmedSec": len(sec.annual) + len(sec.quarterly) - len(new["annual"]) - len(new["quarterly"])}
     # Stored SEC quarters of a calendar this extraction left out (_drop_colliding_quarters) go too,
@@ -1998,6 +2021,8 @@ def merge_into_document(previous, sec, key, now, fetch_splits=None):
         sec_issues.add("eps-inconsistent")
 
     flags = {r["kind"] for r in revisions}
+    if adr_factor not in (None, 1):
+        flags.add("adr-eps-rescaled")
     if "capex-sign" in sec_issues:
         flags.add("capex-sign")
     if adjusted:

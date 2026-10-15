@@ -18,6 +18,14 @@ does not load it). Runs in the daily schedule workflow; the files are committed 
   list above is due, and are logged as "Foreign issuers outside the core list: …".
 - Yahoo values in another currency than the file's statement currency (e.g. a USD conversion of a TWD
   statement) are never mixed into the file: left out, counted, and noted in the log.
+- Foreign reporters (foreignReporter true): Yahoo's EPS and share count are per ADR (1 ADR = k ordinary
+  shares), while SEC IFRS EPS is per ordinary share. Until the file carries an adrRatio {"epsFactor": k},
+  the same-period EPS ratios Yahoo ÷ stored (basic and diluted) are checked: they must agree (±2% of
+  their median) and give k (the median, snapped to a whole number or its reciprocal; 1 when within 2%
+  of 1). With k ≠ 1 the stored EPS are multiplied by k (quality issue "adr-eps-rescaled"). Disagreeing
+  or non-overlapping ratios leave Yahoo's EPS and share count out of that run (notice "EPS basis
+  unresolved"); the check runs again next time. A file with no EPS yet has no second basis: Yahoo's
+  values are merged and judged once it has EPS.
 - One timeseries request per stock (annual + quarterly types together). Yahoo only returns ~4 years
   and ~5–8 quarters, so every run merges into the stored file and history accumulates:
   * period ends within ±5 days are the same period (the newer date wins); a new non-null value
@@ -47,6 +55,7 @@ does not load it). Runs in the daily schedule workflow; the files are committed 
 import json
 import math
 import os
+import statistics
 import sys
 import time
 from collections import Counter
@@ -96,6 +105,13 @@ FOREIGN_SHARE = 0.3
 # Foreign issuers that may have no stored file yet (universe.json has no country column). Only counted
 # when they are in the full US universe.
 FOREIGN_MANUAL = ("TSM", "UMC", "ASX", "CHT")
+# EPS basis of a foreign reporter (adrRatio, see resolve_eps_basis): Yahoo's EPS is per ADR, a stored SEC
+# EPS per ordinary share. The pair ratios must agree within ADR_RATIO_SPREAD of their median; the median
+# is k unless it is within ADR_RATIO_UNITY of 1, and k snaps to a whole number (or its reciprocal) within
+# ADR_RATIO_SNAP
+ADR_RATIO_SPREAD = 0.02
+ADR_RATIO_UNITY = 0.02
+ADR_RATIO_SNAP = 0.02
 TW_SUFFIXES = (".TW", ".TWO")
 HOME_CURRENCY = {"US": "USD", "TW": "TWD"}
 PERIOD_TYPES = {"annual": "12M", "quarterly": "3M"}
@@ -134,7 +150,7 @@ OUTFLOW_FIELDS = ("capex", "dividendsPaid", "buybacks")
 ISSUES = (
     "short-history", "financial-sector-format", "missing-cashflow", "missing-balance",
     "split-adjusted", "foreign-currency", "restated", "yahoo-differs", "quarter-annual-mismatch",
-    "quarterly-ytd-suspected", "negative-equity", "capex-sign", "currency-changed",
+    "quarterly-ytd-suspected", "negative-equity", "capex-sign", "currency-changed", "adr-eps-rescaled",
 )
 # Quality codes that only sec_ifrs.py writes (SEC IFRS periods); update_document carries them over
 IFRS_ISSUES = ("ifrs", "ifrs-fallback")
@@ -453,16 +469,8 @@ def dedupe(periods):
     return result
 
 
-def merge_section(old, new, frequency, today_iso, renamed=None):
-    """
-    Merge new Yahoo periods into stored ones → (periods ascending, revisions).
-    renamed (dict, optional) receives {old end: new end} for periods whose end date moved.
-    """
-    keep = KEEP_ANNUAL if frequency == "annual" else KEEP_QUARTERLY
-    periods = [period(p["end"], p["values"], p["src"], p["extra"]) for p in old]
-    new = dedupe(new)
-    sec_ends = [p["end"] for p in periods if p["src"] == "sec"]
-    latest_sec = max(sec_ends) if sec_ends else None
+def same_period_matches(periods, new):
+    """{index in new: index in periods}: periods within SAME_PERIOD_DAYS, nearest first, one to one."""
     pairs = sorted(
         (abs(days_between(p["end"], item["end"])), i, j)
         for i, p in enumerate(periods)
@@ -474,6 +482,20 @@ def merge_section(old, new, frequency, today_iso, renamed=None):
         if i not in used and j not in match:
             match[j] = i
             used.add(i)
+    return match
+
+
+def merge_section(old, new, frequency, today_iso, renamed=None):
+    """
+    Merge new Yahoo periods into stored ones → (periods ascending, revisions).
+    renamed (dict, optional) receives {old end: new end} for periods whose end date moved.
+    """
+    keep = KEEP_ANNUAL if frequency == "annual" else KEEP_QUARTERLY
+    periods = [period(p["end"], p["values"], p["src"], p["extra"]) for p in old]
+    new = dedupe(new)
+    sec_ends = [p["end"] for p in periods if p["src"] == "sec"]
+    latest_sec = max(sec_ends) if sec_ends else None
+    match = same_period_matches(periods, new)
     revisions = []
     original = len(periods)
     for j, item in enumerate(new):
@@ -540,6 +562,101 @@ def merge_revisions(previous, new, annual, quarterly, renamed):
         result.append(item)
     result.sort(key=lambda r: (str(r.get("seen")), r["period"], r["end"], str(r.get("field")), r["kind"]))
     return result[-KEEP_REVISIONS:]
+
+
+# ---------------------------------------------------------------------------------------------
+# EPS basis of foreign reporters
+# ---------------------------------------------------------------------------------------------
+def adr_eps_factor(document):
+    """k of a stored adrRatio (1 ADR = k ordinary shares, EPS per ADR = k × EPS per share), else None."""
+    ratio = document.get("adrRatio") if isinstance(document, dict) else None
+    factor = finite_number(ratio.get("epsFactor")) if isinstance(ratio, dict) else None
+    return factor if factor is not None and factor > 0 else None
+
+
+def has_eps(periods):
+    return any(item["values"].get(field) is not None for item in periods for field in ("epsBasic", "epsDiluted"))
+
+
+def eps_ratios(stored, new):
+    """Yahoo ÷ stored, for every EPS field (basic, diluted) that both sides hold in a same period; zeros skipped."""
+    ratios = []
+    for j, i in same_period_matches(stored, new).items():
+        old, fetched = stored[i]["values"], new[j]["values"]
+        for field in ("epsBasic", "epsDiluted"):
+            if old.get(field) and fetched.get(field):
+                ratios.append(fetched[field] / old[field])
+    return ratios
+
+
+def snap_factor(value):
+    """value, or the whole number / reciprocal whole number it lies within ADR_RATIO_SNAP of (relative)."""
+    whole = round(value)
+    if whole >= 1 and abs(value - whole) <= ADR_RATIO_SNAP * whole:
+        return float(whole)
+    inverse = round(1 / value)
+    if inverse >= 1 and abs(1 / value - inverse) <= ADR_RATIO_SNAP * inverse:
+        return 1 / inverse
+    return value
+
+
+def eps_factor(ratios):
+    """
+    Pair ratios → (k, None) when they agree (each within ADR_RATIO_SPREAD of the median), else (None, reason).
+    The median is 1 within ADR_RATIO_UNITY → k = 1; otherwise k = median, snapped.
+    """
+    if not ratios:
+        return None, "no overlapping EPS period"
+    median = statistics.median(ratios)
+    low, high = min(ratios), max(ratios)
+    if low <= 0 or any(abs(ratio - median) > ADR_RATIO_SPREAD * median for ratio in ratios):
+        return None, f"pair ratios {low:.4f} to {high:.4f} over {len(ratios)} EPS values"
+    if abs(median - 1) <= ADR_RATIO_UNITY:
+        return 1, None
+    return snap_factor(median), None
+
+
+def scale_eps(periods, factor):
+    """Stored EPS × factor, in place (per ordinary share → per ADR)."""
+    for item in periods:
+        for field in ("epsBasic", "epsDiluted"):
+            if item["values"].get(field) is not None:
+                item["values"][field] = clean_value(item["values"][field] * factor)
+
+
+def without_per_share(periods):
+    """Yahoo periods without their per-share values (EPS, share count); a period left empty is dropped."""
+    kept = []
+    for item in periods:
+        values = {field: value for field, value in item["values"].items() if field not in PER_SHARE_FIELDS}
+        if values:
+            kept.append(period(item["end"], values))
+    return kept
+
+
+def resolve_eps_basis(stored, new, today_iso):
+    """
+    Foreign reporter without a valid adrRatio: Yahoo's EPS (per ADR) against the stored EPS of the same
+    periods (SEC: per ordinary share). stored / new: {"annual": [periods], "quarterly": [periods]}.
+    → (state, adrRatio or None, reason or None, new periods to merge)
+      None: nothing to compare (no Yahoo EPS, or no EPS stored yet: nothing is on a second basis); merged
+            as usual, judged on a later run once both sides carry EPS.
+      "unity": k = 1, adrRatio written, merged as usual.
+      "rescaled": stored EPS × k (in place), adrRatio written, merged as usual.
+      "unresolved": the pairs disagree or none overlap: Yahoo's EPS and share count are left out of this
+            merge (reason says why); no adrRatio, judged again on the next run.
+    """
+    if not any(has_eps(new[name]) for name in new) or not any(has_eps(stored[name]) for name in stored):
+        return None, None, None, new
+    ratios = eps_ratios(stored["annual"], new["annual"]) + eps_ratios(stored["quarterly"], new["quarterly"])
+    factor, reason = eps_factor(ratios)
+    if factor is None:
+        return "unresolved", None, reason, {name: without_per_share(items) for name, items in new.items()}
+    if factor != 1:
+        for items in stored.values():
+            scale_eps(items, factor)
+    ratio = {"epsFactor": clean_ratio(factor), "basis": "ADR", "derivedAt": today_iso, "pairs": len(ratios)}
+    return ("unity" if factor == 1 else "rescaled"), ratio, None, new
 
 
 # ---------------------------------------------------------------------------------------------
@@ -835,7 +952,8 @@ def update_document(previous, payload, key, now, fetch_splits=None):
     today = now.date()
     today_iso = today.isoformat()
     market = market_of(key)
-    info = {"status": "updated", "restated": 0, "chart": None, "currencyChanged": False, "skipped": 0}
+    info = {"status": "updated", "restated": 0, "chart": None, "currencyChanged": False, "skipped": 0,
+            "epsBasis": None}
     stored = read_sections(previous) if previous is not None else None
     currency = stored["currency"] if stored else None
     parsed = parse_timeseries(payload, today, currency=currency, market=market)
@@ -854,6 +972,20 @@ def update_document(previous, payload, key, now, fetch_splits=None):
         return None, info
     if stored is None:
         stored = read_sections({"version": VERSION})
+    # A foreign reporter stays one: an IFRS 20-F filer may report in USD, which the currency alone does not show
+    foreign = currency != HOME_CURRENCY[market] or (isinstance(previous, dict) and previous.get("foreignReporter") is True)
+    adr_ratio = None
+    if foreign and adr_eps_factor(previous) is None:
+        # Yahoo EPS is per ADR; a stored SEC EPS is per ordinary share. Settled once, before the merge
+        state, adr_ratio, reason, merged = resolve_eps_basis(
+            {"annual": stored["annual"], "quarterly": stored["quarterly"]},
+            {"annual": dedupe(new_annual), "quarterly": dedupe(new_quarterly)},
+            today_iso,
+        )
+        info["epsBasis"] = state
+        if reason:
+            print(f"::notice::{key}: EPS basis unresolved ({reason})")
+        new_annual, new_quarterly = merged["annual"], merged["quarterly"]
 
     renamed = {"annual": {}, "quarterly": {}}
     annual, revised_a = merge_section(stored["annual"], new_annual, "annual", today_iso, renamed["annual"])
@@ -896,8 +1028,10 @@ def update_document(previous, payload, key, now, fetch_splits=None):
         flags.add("currency-changed")
     if adjusted:
         flags.add("split-adjusted")
-    # A foreign reporter stays one: an IFRS 20-F filer may report in USD, which the currency alone does not show
-    foreign = currency != HOME_CURRENCY[market] or (isinstance(previous, dict) and previous.get("foreignReporter") is True)
+    # The stored adrRatio stays in the file (carried below); its rescale is a quality note while it is there
+    factor = adr_ratio["epsFactor"] if adr_ratio is not None else adr_eps_factor(previous)
+    if factor not in (None, 1):
+        flags.add("adr-eps-rescaled")
     grade = quality(annual, quarterly, flags, foreign)
     # IFRS codes of the SEC periods (sec_ifrs.py) stay while those periods are in the file
     if isinstance(previous, dict) and isinstance(previous.get("quality"), dict):
@@ -924,6 +1058,8 @@ def update_document(previous, payload, key, now, fetch_splits=None):
     }
     for name, value in stored["other"].items():
         document.setdefault(name, value)
+    if adr_ratio is not None:
+        document["adrRatio"] = adr_ratio
     if changed:
         info["status"] = "currency-changed"
         print(f"::warning::{key}: Yahoo now reports in {parsed['detected']}, file kept in {currency}")
@@ -1229,6 +1365,7 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
         "splitChecks": 0, "misses": 0, "stopped": None, "failed": False, "corrupt": corrupt,
         "errors": [], "deleted": [],
         "foreign": {"listed": len(foreign), "due": len(foreign_due), "requested": 0, "updated": 0, "errors": 0},
+        "epsBasis": {"unity": 0, "rescaled": 0, "unresolved": 0},
     }
     foreign_stats = stats["foreign"]
     deadline = clock() + budget_seconds
@@ -1276,6 +1413,8 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
             print(f"::warning::{key}: not updated ({type(error).__name__}: {error})")
             continue
         failed.pop(key, None)
+        if info["epsBasis"]:
+            stats["epsBasis"][info["epsBasis"]] += 1
         if document is None:
             if key in documents:
                 items[key]["checkedAt"] = today_iso

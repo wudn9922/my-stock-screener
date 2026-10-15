@@ -1277,5 +1277,192 @@ class ForeignCurrencyTest(unittest.TestCase):
         self.assertEqual(detected["annual"], {})
 
 
+# ---------------------------------------------------------------------------------------------
+# EPS basis of foreign reporters (adrRatio): SEC IFRS EPS is per ordinary share, Yahoo's per ADR
+# ---------------------------------------------------------------------------------------------
+ORDINARY = 25.93e9          # ordinary shares of the made-up issuer
+PER_ADR = 5                 # 1 ADR = 5 ordinary shares (the TSM type)
+
+
+def adr_eps(revenue, shares=ORDINARY / PER_ADR):
+    """Diluted EPS Yahoo would report per ADR for a period with this revenue (TW_RATIOS)."""
+    return synth.statement(revenue, shares, synth.TW_RATIOS)["DilutedEPS"]
+
+
+def sec_file(rows, shares, adr_ratio=None, quarterly=(), eps_scale=1.0):
+    """
+    SYNTHETIC SEC-seeded file of a foreign reporter: revenue, net income and EPS per ORDINARY share (as
+    sec_ifrs writes them; no share count). rows / quarterly: synth rows (end, revenue, shares);
+    eps_scale multiplies the stored EPS, to store a deliberately different basis.
+    """
+    def section(items):
+        columns = {"revenue": [], "netIncome": [], "epsBasic": [], "epsDiluted": []}
+        for _, revenue, _ in items:
+            values = synth.statement(revenue, shares, synth.TW_RATIOS)
+            columns["revenue"].append(values["TotalRevenue"])
+            columns["netIncome"].append(values["NetIncomeCommonStockholders"])
+            columns["epsBasic"].append(round(values["BasicEPS"] * eps_scale, 2))
+            columns["epsDiluted"].append(round(values["DilutedEPS"] * eps_scale, 2))
+        return {"end": [end for end, _, _ in items], "fy": [int(end[:4]) for end, _, _ in items],
+                "src": ["sec"] * len(items), "values": columns}
+    empty = {"end": [], "fy": [], "fq": [], "values": {}}
+    document = {
+        "version": 1, "symbol": "TSM", "market": "US", "currency": "TWD", "foreignReporter": True,
+        "generatedAt": "2026-09-01T00:00:00Z", "checkedAt": "2026-09-01",
+        "source": "SEC EDGAR companyfacts (IFRS)", "fyEndMonth": 12,
+        "annual": section(rows), "quarterly": section(quarterly) if quarterly else empty,
+        "split": {"adjusted": False, "events": []},
+        "quality": {"level": "good", "annualYears": len(rows), "quarters": len(quarterly), "issues": ["ifrs"]},
+    }
+    if adr_ratio is not None:
+        document["adrRatio"] = adr_ratio
+    return document
+
+
+def merge_quietly(previous, payload, now=NOW):
+    """update_document for TSM with the notices it printed → (document, info, notices)."""
+    with mock.patch("builtins.print") as printed:
+        document, info = build(payload, "TSM", previous=previous, now=now)
+    notices = [call.args[0] for call in printed.call_args_list if call.args and "::notice::" in str(call.args[0])]
+    return document, info, notices
+
+
+class EpsFactorTest(unittest.TestCase):
+    def test_median_snaps_to_a_whole_number_or_its_reciprocal(self):
+        self.assertEqual(fin.eps_factor([4.99, 5.0, 5.02]), (5.0, None))
+        self.assertEqual(fin.snap_factor(5.03), 5.0)
+        self.assertEqual(fin.snap_factor(0.2), 0.2)           # 1 / 0.2 = 5
+        self.assertEqual(fin.snap_factor(0.5), 0.5)           # 1 / 0.5 = 2
+        self.assertEqual(fin.snap_factor(2.5), 2.5)           # neither is within 2%: kept as measured
+
+    def test_within_two_percent_of_one_is_unity(self):
+        self.assertEqual(fin.eps_factor([1.0, 1.01, 0.995]), (1, None))
+
+    def test_disagreeing_or_missing_pairs_give_a_reason(self):
+        factor, reason = fin.eps_factor([5.0, 4.5, 5.0])
+        self.assertIsNone(factor)
+        self.assertEqual(reason, "pair ratios 4.5000 to 5.0000 over 3 EPS values")
+        self.assertEqual(fin.eps_factor([]), (None, "no overlapping EPS period"))
+        self.assertIsNone(fin.eps_factor([-5.0, 5.0])[0])     # opposite signs
+
+    def test_stored_adr_factor_must_be_a_positive_number(self):
+        self.assertEqual(fin.adr_eps_factor({"adrRatio": {"epsFactor": 5, "basis": "ADR"}}), 5)
+        self.assertIsNone(fin.adr_eps_factor({"adrRatio": {"epsFactor": 0}}))
+        self.assertIsNone(fin.adr_eps_factor({"adrRatio": {"epsFactor": "5"}}))
+        self.assertIsNone(fin.adr_eps_factor({}))
+        self.assertIsNone(fin.adr_eps_factor(None))
+
+
+class AdrEpsBasisTest(unittest.TestCase):
+    """Foreign reporter files: the EPS basis is settled once (adrRatio), then Yahoo merges as usual."""
+
+    def adr_payload(self, annual=None, quarterly=()):
+        """Yahoo's view of the issuer: the same periods on the ADR share count, TWD."""
+        annual = synth.TW_ANNUAL if annual is None else annual
+        adr = [(end, revenue, ORDINARY / PER_ADR) for end, revenue, _ in annual]
+        adr_q = [(end, revenue, ORDINARY / PER_ADR) for end, revenue, _ in quarterly]
+        return synth.build("TSM", adr, adr_q, synth.TW_RATIOS, "TWD")
+
+    def test_tsm_type_rescales_sec_eps_and_merges_newer_adr_periods(self):
+        stored = sec_file(synth.TW_ANNUAL[:3], ORDINARY, quarterly=synth.TW_QUARTERLY[:4])
+        document, info, notices = merge_quietly(stored, self.adr_payload(quarterly=synth.TW_QUARTERLY[:4]))
+        self.assertEqual(notices, [])
+        self.assertEqual(info["epsBasis"], "rescaled")
+        self.assertEqual(document["adrRatio"], {"epsFactor": 5, "basis": "ADR", "derivedAt": TODAY.isoformat(), "pairs": 14})
+        self.assertIn("adr-eps-rescaled", document["quality"]["issues"])
+        eps = values(document["annual"], "epsDiluted")
+        for end, revenue, _ in synth.TW_ANNUAL[:3]:
+            self.assertAlmostEqual(eps[end], adr_eps(revenue), delta=0.05)     # 45.25 per share → 226.25 per ADR
+        self.assertEqual(eps["2025-12-31"], adr_eps(3600 * BN))                  # newer period: Yahoo's ADR EPS
+        quarterly = values(document["quarterly"], "epsDiluted")
+        for end, revenue, _ in synth.TW_QUARTERLY[:4]:
+            self.assertAlmostEqual(quarterly[end], adr_eps(revenue), delta=0.05)
+        self.assertEqual(document["annual"]["src"], ["sec", "sec", "sec", "yahoo"])
+
+    def test_rescaling_is_not_repeated_on_the_next_run(self):
+        first, _, _ = merge_quietly(sec_file(synth.TW_ANNUAL[:3], ORDINARY), self.adr_payload())
+        second, info, notices = merge_quietly(first, self.adr_payload(), now=NOW + timedelta(days=1))
+        self.assertEqual(notices, [])
+        self.assertIsNone(info["epsBasis"])
+        self.assertEqual(second["adrRatio"], first["adrRatio"])
+        self.assertEqual(values(second["annual"], "epsDiluted"), values(first["annual"], "epsDiluted"))
+        self.assertIn("adr-eps-rescaled", second["quality"]["issues"])
+
+    def test_asml_type_is_unity_and_nothing_is_rescaled(self):
+        stored = sec_file(synth.TW_ANNUAL[:3], ORDINARY)
+        payload = synth.build("TSM", synth.TW_ANNUAL, [], synth.TW_RATIOS, "TWD")   # one ADR = one share
+        document, info, notices = merge_quietly(stored, payload)
+        self.assertEqual(notices, [])
+        self.assertEqual(info["epsBasis"], "unity")
+        self.assertEqual(document["adrRatio"]["epsFactor"], 1)
+        self.assertNotIn("adr-eps-rescaled", document["quality"]["issues"])
+        self.assertEqual(values(document["annual"], "epsDiluted"), values(stored["annual"], "epsDiluted") | {
+            "2025-12-31": adr_eps(3600 * BN, ORDINARY)})
+
+    def test_disagreeing_ratios_leave_yahoo_eps_and_shares_out_and_keep_the_rest(self):
+        stored = sec_file(synth.TW_ANNUAL[:3], ORDINARY)
+        stored["annual"]["values"]["epsDiluted"][1] = round(stored["annual"]["values"]["epsDiluted"][1] * 1.1, 2)
+        before = copy.deepcopy(stored)
+        document, info, notices = merge_quietly(stored, self.adr_payload())
+        self.assertEqual(info["epsBasis"], "unresolved")
+        self.assertEqual(len(notices), 1)
+        self.assertTrue(notices[0].startswith("::notice::TSM: EPS basis unresolved (pair ratios "), notices[0])
+        self.assertNotIn("adrRatio", document)
+        self.assertEqual(stored, before)                                         # the stored EPS are not rescaled
+        self.assertIsNone(values(document["annual"], "epsDiluted")["2025-12-31"])
+        self.assertIsNone(values(document["annual"], "dilutedShares")["2025-12-31"])
+        self.assertEqual(values(document["annual"], "revenue")["2025-12-31"], 3600 * BN)   # other fields merged
+        self.assertNotIn("adr-eps-rescaled", document["quality"]["issues"])
+
+    def test_no_overlapping_period_leaves_yahoo_eps_out_but_merges_the_rest(self):
+        old = sec_file([("2019-12-31", 1900 * BN, ORDINARY), ("2020-12-31", 1950 * BN, ORDINARY)], ORDINARY)
+        document, info, notices = merge_quietly(old, self.adr_payload())
+        self.assertEqual(info["epsBasis"], "unresolved")
+        self.assertEqual(len(notices), 1)
+        self.assertIn("no overlapping EPS period", notices[0])
+        self.assertNotIn("adrRatio", document)
+        self.assertEqual(document["annual"]["end"], ["2019-12-31", "2020-12-31", "2022-12-31", "2023-12-31",
+                                                     "2024-12-31", "2025-12-31"])
+        self.assertIsNone(values(document["annual"], "epsDiluted")["2023-12-31"])
+        self.assertEqual(values(document["annual"], "revenue")["2023-12-31"], 2162 * BN)
+
+    def test_file_without_eps_is_merged_and_judged_on_the_next_run(self):
+        first, info, notices = merge_quietly(None, self.adr_payload())
+        self.assertEqual((info["epsBasis"], notices), (None, []))
+        self.assertEqual(values(first["annual"], "epsDiluted")["2024-12-31"], adr_eps(2894 * BN))
+        self.assertNotIn("adrRatio", first)
+        second, info, _ = merge_quietly(first, self.adr_payload(), now=NOW + timedelta(days=1))
+        self.assertEqual(info["epsBasis"], "unity")
+        self.assertEqual(second["adrRatio"]["epsFactor"], 1)
+
+    def test_stored_adr_ratio_is_kept_and_not_judged_again(self):
+        # EPS already on the ADR basis, and off by 30% from Yahoo: a new judgement would not pass
+        adr_stored = sec_file(synth.TW_ANNUAL[:3], ORDINARY, eps_scale=PER_ADR * 1.3)
+        adr_stored["adrRatio"] = {"epsFactor": 5, "basis": "ADR", "derivedAt": "2026-01-02", "pairs": 3}
+        before = copy.deepcopy(adr_stored)
+        document, info, notices = merge_quietly(adr_stored, self.adr_payload())
+        self.assertEqual((info["epsBasis"], notices), (None, []))
+        self.assertEqual(document["adrRatio"], before["adrRatio"])
+        for end in before["annual"]["end"]:
+            self.assertEqual(values(document["annual"], "epsDiluted")[end], values(before["annual"], "epsDiluted")[end])
+        self.assertIn("adr-eps-rescaled", document["quality"]["issues"])
+
+    def test_non_foreign_file_is_not_touched(self):
+        payload = synth.build("AAPL", synth.US_ANNUAL, [], synth.US_RATIOS, "USD")
+        document, info = build(payload, "AAPL")
+        self.assertFalse(document["foreignReporter"])
+        self.assertNotIn("adrRatio", document)
+        self.assertIsNone(info["epsBasis"])
+        self.assertNotIn("adr-eps-rescaled", document["quality"]["issues"])
+
+    def test_unresolved_periods_keep_only_their_other_values(self):
+        periods = [
+            fin.period("2024-12-31", {"revenue": 5, "epsDiluted": 2.0, "dilutedShares": 3}),
+            fin.period("2025-12-31", {"epsBasic": 1.0, "dilutedShares": 3}),
+        ]
+        kept = fin.without_per_share(periods)
+        self.assertEqual([(p["end"], p["values"]) for p in kept], [("2024-12-31", {"revenue": 5})])
+
+
 if __name__ == "__main__":
     unittest.main()

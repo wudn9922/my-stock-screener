@@ -346,3 +346,16 @@ test('ADR page links to the Taiwan home listing and keeps the period', async ({ 
   await expect(page.locator('.fin-home-link')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('foreign file with EPS on the ADR basis: the basis note replaces the per-ordinary-share remark', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(String(error)));
+  await mockFinancials(page, {}, { TSM: readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials/adr-rescaled.json'), 'utf8') });
+  await page.goto('./?page=financials&symbol=TSM');
+  const notes = page.locator('.fin-notes');
+  await expect(notes).toContainText('EPS 以每單位 ADR 計（1 ADR ＝ 5 股普通股，由 SEC 每股數字換算）');
+  await expect(notes).not.toContainText('EPS 為每普通股');
+  await expect(page.locator('.fin-cards')).not.toContainText('EPS 為每普通股');
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+  expect(errors).toEqual([]);
+});
