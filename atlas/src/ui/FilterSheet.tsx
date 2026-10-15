@@ -211,7 +211,7 @@ const GROWTH_OPTIONS: { value: number | null; label: string }[] = [
 ];
 /** Where each market's growth numbers come from (build_growth.py's source order). */
 const GROWTH_SOURCE_TEXT: Record<'TW' | 'US', string> = {
-  TW: '公開資訊觀測站／證交所・櫃買中心 OpenAPI 綜合損益表（官方，全部上市櫃），缺的才用 Yahoo 財報',
+  TW: '公開資訊觀測站／證交所・櫃買中心 OpenAPI 綜合損益表（官方）與 FinMind 歷史財報（源自公開資訊觀測站，約 10 年，全部上市櫃），缺的才用 Yahoo 財報',
   US: 'SEC 財報（companyfacts）與 SEC XBRL frames（全市場），其次為 Yahoo 財報／Yahoo 季資料（S&P 500）',
 };
 const GROWTH_BLOCKS: { key: GateKey; title: string; unit: '季' | '年' }[] = [
@@ -499,7 +499,7 @@ export function FilterSheet(props: FilterSheetProps) {
             <p className="fs-hint fs-lead">
               年增率（YoY）一律和「去年同期」比：季度比去年同一季，年度比前一個會計年度。幅度 ≥ X% 且「近 N 期皆」達標才通過。
               {market === 'TW'
-                ? ' 台股季度由官方綜合損益表的年度累計數相減而得（第 4 季＝全年－前三季）；股票股利（配股）不追溯調整，配股的公司 EPS 年增率會偏低。'
+                ? ' 台股季度取自官方綜合損益表（公開資訊觀測站；FinMind 歷史資料亦源自觀測站），第 4 季＝全年－前三季；股票股利（配股）不追溯調整，配股的公司 EPS 年增率會偏低。'
                 : ' 美股第 4 季多由「全年－前三季」推算；外國發行人（20-F）多只有年度資料，以申報幣別計算。'}
             </p>
             {GROWTH_BLOCKS.map(({ key, title, unit }) => {

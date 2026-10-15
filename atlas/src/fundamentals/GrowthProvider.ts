@@ -5,8 +5,8 @@ import { reportUrl } from '../report/loadReport';
  * EPS / revenue growth for the screener's fundamental filters. Two files, merged per stock:
  * - `report/growth.json` (atlas/scripts/build_growth.py): Taiwan and US, the whole market, quarterly (up to 4)
  *   and annual (up to 3 years), aligned on the same period a year earlier. Each block says its source
- *   (`src` / `srcY`): SEC companyfacts or Yahoo financials files, the Taiwan official statements (MOPS) or
- *   SEC XBRL frames; `dQ` flags the quarterly slots that compare a derived Q4 (full year − first three quarters).
+ *   (`src` / `srcY`): SEC companyfacts or Yahoo financials files, the Taiwan official statements (MOPS), the
+ *   Taiwan history from FinMind (republished MOPS data) or SEC XBRL frames; `dQ` flags the quarterly slots that compare a derived Q4 (full year − first three quarters).
  * - `${BASE_URL}valuation/us-growth.json` (atlas/scripts/build_fundamentals_us.py, Yahoo Finance): quarterly,
  *   US only (the S&P 500 list), mostly 1 quarter of YoY.
  * growth.json comes first; us-growth only fills a quarterly metric growth.json has nothing for, or replaces the
@@ -15,8 +15,8 @@ import { reportUrl } from '../report/loadReport';
  */
 export type GrowthSource = 'yahoo' | 'financials';
 /** Where one block of numbers comes from (growth.json `src` / `srcY`, or the us-growth file). */
-export type GrowthOrigin = 'sec' | 'yahoo' | 'mops' | 'frames' | 'us-growth';
-const ORIGINS: readonly GrowthOrigin[] = ['sec', 'yahoo', 'mops', 'frames', 'us-growth'];
+export type GrowthOrigin = 'sec' | 'yahoo' | 'mops' | 'finmind' | 'frames' | 'us-growth';
+const ORIGINS: readonly GrowthOrigin[] = ['sec', 'yahoo', 'mops', 'finmind', 'frames', 'us-growth'];
 const originOf = (value: unknown): GrowthOrigin | null => ORIGINS.find((origin) => origin === value) ?? null;
 export interface GrowthRecord {
   /** EPS YoY % per quarter, index 0 = latest; null when the year-ago EPS was ≤ 0 or missing. */

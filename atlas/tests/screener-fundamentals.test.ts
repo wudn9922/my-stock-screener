@@ -426,6 +426,18 @@ describe('1-month relative strength', () => {
 });
 
 describe('pills and sorting with growth', () => {
+  it('names the FinMind source of Taiwan blocks (republished MOPS data)', () => {
+    const file = parseReportGrowth({
+      version: 1,
+      fields: ['symbol', 'lv', 'src', 'qEnd', 'yEnd', 'epsQ', 'revQ', 'epsY', 'revY', 'tQ', 'tY', 'srcY', 'dQ'],
+      rows: [['2330.TW', null, 'finmind', '2026-06-30', '2025-12-31', [30, 20], [28], [25, 15, 10, 5, 4, 3, 2, 1, 1], [20], 0, 0, 'finmind', 4]],
+    })!;
+    const record = file.items.get('2330-TW')!;
+    expect(record).toMatchObject({ originQ: { eps: 'finmind', rev: 'finmind' }, originY: 'finmind' });
+    const pill = metricPill(row('2330.TW'), 'eps', file)!;
+    expect(pill.title).toContain('來源：季度 FinMind（源自公開資訊觀測站）、年度 FinMind（源自公開資訊觀測站）');
+  });
+
   it('shows the growth numbers of the active filters, with annual ones in the tooltip', () => {
     const tsmc = row('2330.TW');
     expect(metricPill(tsmc, 'eps', reportGrowth)).toMatchObject({ text: 'EPS +30%', tone: expect.stringMatching(/up|down/) });

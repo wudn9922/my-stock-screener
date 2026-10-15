@@ -1,0 +1,384 @@
+{
+ "msg": "success",
+ "status": 200,
+ "data": [
+  {
+   "date": "2025-03-31",
+   "stock_id": "2881",
+   "type": "EPS",
+   "value": 1.81,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "2881",
+   "type": "InterestNetIncome",
+   "value": 30000000000,
+   "origin_name": "利息淨收益"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "2881",
+   "type": "NetNonInterestIncome",
+   "value": 40000000000,
+   "origin_name": "利息以外淨損益"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "2881",
+   "type": "Revenue",
+   "value": 70000000000,
+   "origin_name": "淨收益"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "2881",
+   "type": "PreTaxIncome",
+   "value": 28000000000,
+   "origin_name": "繼續營業單位稅前淨利（淨損）"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "2881",
+   "type": "IncomeAfterTaxes",
+   "value": 25300000000,
+   "origin_name": "本期稅後淨利（淨損）"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "2881",
+   "type": "EquityAttributableToOwnersOfParent",
+   "value": 25000000000,
+   "origin_name": "母公司業主（淨利／損）"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "2881",
+   "type": "NetIncomeAttributableToOwnersOfParent",
+   "value": 25000000000,
+   "origin_name": "淨利（損）歸屬於母公司業主"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "2881",
+   "type": "TotalConsolidatedProfitForThePeriod",
+   "value": 18000000000,
+   "origin_name": "本期綜合損益總額（稅後）"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "2881",
+   "type": "EPS",
+   "value": 1.92,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "2881",
+   "type": "InterestNetIncome",
+   "value": 31000000000,
+   "origin_name": "利息淨收益"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "2881",
+   "type": "NetNonInterestIncome",
+   "value": 42000000000,
+   "origin_name": "利息以外淨損益"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "2881",
+   "type": "Revenue",
+   "value": 73000000000,
+   "origin_name": "淨收益"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "2881",
+   "type": "PreTaxIncome",
+   "value": 29680000000,
+   "origin_name": "繼續營業單位稅前淨利（淨損）"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "2881",
+   "type": "IncomeAfterTaxes",
+   "value": 26800000000,
+   "origin_name": "本期稅後淨利（淨損）"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "2881",
+   "type": "EquityAttributableToOwnersOfParent",
+   "value": 26500000000,
+   "origin_name": "母公司業主（淨利／損）"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "2881",
+   "type": "NetIncomeAttributableToOwnersOfParent",
+   "value": 26500000000,
+   "origin_name": "淨利（損）歸屬於母公司業主"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "2881",
+   "type": "TotalConsolidatedProfitForThePeriod",
+   "value": 19500000000,
+   "origin_name": "本期綜合損益總額（稅後）"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "2881",
+   "type": "EPS",
+   "value": 2.03,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "2881",
+   "type": "InterestNetIncome",
+   "value": 32000000000,
+   "origin_name": "利息淨收益"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "2881",
+   "type": "NetNonInterestIncome",
+   "value": 44000000000,
+   "origin_name": "利息以外淨損益"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "2881",
+   "type": "Revenue",
+   "value": 76000000000,
+   "origin_name": "淨收益"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "2881",
+   "type": "PreTaxIncome",
+   "value": 31360000000,
+   "origin_name": "繼續營業單位稅前淨利（淨損）"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "2881",
+   "type": "IncomeAfterTaxes",
+   "value": 28300000000,
+   "origin_name": "本期稅後淨利（淨損）"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "2881",
+   "type": "EquityAttributableToOwnersOfParent",
+   "value": 28000000000,
+   "origin_name": "母公司業主（淨利／損）"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "2881",
+   "type": "NetIncomeAttributableToOwnersOfParent",
+   "value": 28000000000,
+   "origin_name": "淨利（損）歸屬於母公司業主"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "2881",
+   "type": "TotalConsolidatedProfitForThePeriod",
+   "value": 21000000000,
+   "origin_name": "本期綜合損益總額（稅後）"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "2881",
+   "type": "EPS",
+   "value": 2.14,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "2881",
+   "type": "InterestNetIncome",
+   "value": 33000000000,
+   "origin_name": "利息淨收益"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "2881",
+   "type": "NetNonInterestIncome",
+   "value": 46000000000,
+   "origin_name": "利息以外淨損益"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "2881",
+   "type": "Revenue",
+   "value": 79000000000,
+   "origin_name": "淨收益"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "2881",
+   "type": "PreTaxIncome",
+   "value": 33040000000,
+   "origin_name": "繼續營業單位稅前淨利（淨損）"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "2881",
+   "type": "IncomeAfterTaxes",
+   "value": 29800000000,
+   "origin_name": "本期稅後淨利（淨損）"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "2881",
+   "type": "EquityAttributableToOwnersOfParent",
+   "value": 29500000000,
+   "origin_name": "母公司業主（淨利／損）"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "2881",
+   "type": "NetIncomeAttributableToOwnersOfParent",
+   "value": 29500000000,
+   "origin_name": "淨利（損）歸屬於母公司業主"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "2881",
+   "type": "TotalConsolidatedProfitForThePeriod",
+   "value": 22500000000,
+   "origin_name": "本期綜合損益總額（稅後）"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "2881",
+   "type": "EPS",
+   "value": 2.25,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "2881",
+   "type": "InterestNetIncome",
+   "value": 34000000000,
+   "origin_name": "利息淨收益"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "2881",
+   "type": "NetNonInterestIncome",
+   "value": 48000000000,
+   "origin_name": "利息以外淨損益"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "2881",
+   "type": "Revenue",
+   "value": 82000000000,
+   "origin_name": "淨收益"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "2881",
+   "type": "PreTaxIncome",
+   "value": 34720000000,
+   "origin_name": "繼續營業單位稅前淨利（淨損）"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "2881",
+   "type": "IncomeAfterTaxes",
+   "value": 31300000000,
+   "origin_name": "本期稅後淨利（淨損）"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "2881",
+   "type": "EquityAttributableToOwnersOfParent",
+   "value": 31000000000,
+   "origin_name": "母公司業主（淨利／損）"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "2881",
+   "type": "NetIncomeAttributableToOwnersOfParent",
+   "value": 31000000000,
+   "origin_name": "淨利（損）歸屬於母公司業主"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "2881",
+   "type": "TotalConsolidatedProfitForThePeriod",
+   "value": 24000000000,
+   "origin_name": "本期綜合損益總額（稅後）"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "2881",
+   "type": "EPS",
+   "value": 2.36,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "2881",
+   "type": "InterestNetIncome",
+   "value": 35000000000,
+   "origin_name": "利息淨收益"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "2881",
+   "type": "NetNonInterestIncome",
+   "value": 50000000000,
+   "origin_name": "利息以外淨損益"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "2881",
+   "type": "Revenue",
+   "value": 85000000000,
+   "origin_name": "淨收益"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "2881",
+   "type": "PreTaxIncome",
+   "value": 36400000000,
+   "origin_name": "繼續營業單位稅前淨利（淨損）"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "2881",
+   "type": "IncomeAfterTaxes",
+   "value": 32800000000,
+   "origin_name": "本期稅後淨利（淨損）"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "2881",
+   "type": "EquityAttributableToOwnersOfParent",
+   "value": 32500000000,
+   "origin_name": "母公司業主（淨利／損）"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "2881",
+   "type": "NetIncomeAttributableToOwnersOfParent",
+   "value": 32500000000,
+   "origin_name": "淨利（損）歸屬於母公司業主"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "2881",
+   "type": "TotalConsolidatedProfitForThePeriod",
+   "value": 25500000000,
+   "origin_name": "本期綜合損益總額（稅後）"
+  }
+ ]
+}

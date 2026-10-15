@@ -15,6 +15,9 @@ Sources. Every row says where each block (quarterly / annual) comes from (src / 
   公開資訊觀測站 綜合損益表彙總報表 / 證交所・櫃買中心 OpenAPI; year-to-date figures turned into quarters).
 - "frames": US SEC XBRL frames, docs/report/fundamentals/us-sec.json (build_fundamentals_sec.py; its
   rows are computed with the rules below by that script, their staleness is checked again here).
+- "finmind": Taiwan history from FinMind (data from 公開資訊觀測站), docs/report/fundamentals/tw-finmind.json
+  (build_fundamentals_tw_finmind.py, which also picks between it and "mops" per block: the newer period,
+  for the same period "mops" unless FinMind has more slots; its annual series is as long as its data).
 Per symbol and block the newest period wins: candidates whose slot-0 period ends within FRESHER_DAYS
 of the newest one count as the same period, and among those the better source wins (SOURCE_TIERS: SEC
 companyfacts files and the official Taiwan statements, then SEC frames, then Yahoo). A block is never
@@ -69,7 +72,7 @@ MIN_SPLIT_RATIO = 1.5
 SPLIT_MATCH = 0.25
 TW_SUFFIXES = (".TW", ".TWO")
 # Merge: lower tier = better source; slot-0 periods this close together are the same period
-SOURCE_TIERS = {"sec": 0, "mops": 0, "frames": 1, "yahoo": 2}
+SOURCE_TIERS = {"sec": 0, "mops": 0, "frames": 1, "finmind": 1, "yahoo": 2}
 FRESHER_DAYS = 45
 # A pair whose ratio is this close to 10^3 / 10^6 (or the inverse) is a value filed in another scale
 SCALE_FACTORS = (1e3, 1e6)
@@ -478,20 +481,37 @@ def official_candidates(fundamentals_dir, universe, today, tw_keys=()):
     import build_fundamentals_tw as tw  # noqa: PLC0415 - that module imports this one
 
     store = read_json(os.path.join(fundamentals_dir, TW_FILE))
+    tw_rows = {}
     if store is not None:
         try:
             tw_rows = tw.growth_candidates(store, tw.symbol_map(universe, tw_keys), today)
         except tw.StoreError as error:
             print(f"::warning::{TW_FILE} ignored: {error}")
-            tw_rows = {}
         summary["tw"] = len(tw_rows)
-        for key, blocks in tw_rows.items():
-            extra.setdefault(key, []).append(blocks)
+    tw_rows = finmind_candidates(fundamentals_dir, tw.symbol_map(universe, tw_keys), today, store, tw_rows, summary)
+    for key, blocks in tw_rows.items():
+        extra.setdefault(key, []).append(blocks)
     frames = sec_frame_candidates(read_json(os.path.join(fundamentals_dir, US_SEC_FILE)), today)
     summary["frames"] = len(frames)
     for key, blocks in frames.items():
         extra.setdefault(key, []).append(blocks)
     return extra, summary
+
+
+def finmind_candidates(fundamentals_dir, symbols, today, official, tw_rows, summary):
+    """tw.json candidates combined with fundamentals/tw-finmind.json (when present) → one per Taiwan symbol."""
+    import build_fundamentals_tw_finmind as finmind  # noqa: PLC0415 - that module imports this one
+
+    document = read_json(os.path.join(fundamentals_dir, finmind.FILE_NAME))
+    if document is None:
+        return tw_rows
+    try:
+        rows, summary["finmind"] = finmind.growth_candidates(document, symbols, today, official)
+    except finmind.StoreError as error:
+        print(f"::warning::{finmind.FILE_NAME} ignored: {error}")
+        summary["finmind"] = {"rows": 0, "error": str(error)}
+        return tw_rows
+    return finmind.combine(tw_rows, rows)
 
 
 def run(financials_dir, out_path, now=None, fundamentals_dir=None, universe_path=None):
