@@ -2131,6 +2131,7 @@ from build_financials import (  # noqa: E402
     CHART_URL, REQUEST_DELAY, collect_symbols, connect_yahoo, has_sec, index_item, load_document, same_content,
 )
 from build_valuation_us import read_json, write_atomic  # noqa: E402
+import sec_ifrs  # noqa: E402
 
 DEFAULT_USER_AGENT = "SecSeed w556087587@gmail.com"
 USER_AGENT_ENV = "SEC_USER_AGENT"
@@ -2149,9 +2150,11 @@ MAX_CHART_FAILURES = 3                  # chart requests failing in a row → no
 PENDING = "split-check-pending"
 # Result labels of one ticker, in summary order
 RESULTS = (
-    "written", "unchanged", "already-sec", "skipped", "no-cik", "no-facts", "not-us", "bad-ticker",
+    "written", "unchanged", "already-sec", "has-file", "skipped", "no-cik", "no-facts", "not-us", "bad-ticker",
     "corrupt-previous", "fetch-error", "extract-error", "not-processed",
 )
+# --foreign: outcomes that are final for a ticker (recorded in the check state, not asked again)
+FOREIGN_FINAL = ("written", "skipped", "no-cik", "no-facts")
 
 
 class UserAgentError(ValueError):
@@ -2446,17 +2449,32 @@ def _outcome(result, detail=None, counts=None, level=None, document=None, size=0
 PREDECESSOR_CIKS = {"XOM": "0000034088"}
 
 
-def seed_ticker(key, cik_map, client, out_dir, force, now, splits=None):
+def _foreign_outcome(path, key, facts, now):
+    """--foreign: the ifrs-full document of a foreign private issuer (sec_ifrs.build_document) → outcome."""
+    document, reason = sec_ifrs.build_document(facts, key, now)
+    if document is None:
+        return _outcome("skipped", reason)
+    size = write_atomic(path, document)
+    counts = {"annual": len(document["annual"]["end"]), "quarterly": len(document["quarterly"]["end"])}
+    return _outcome("written", counts=counts, level=document["quality"]["level"], document=document, size=size,
+                    fresh=True)
+
+
+def seed_ticker(key, cik_map, client, out_dir, force, now, splits=None, foreign=False):
     """
     One ticker end to end → outcome dict (see _outcome). TooManyFailures propagates.
     splits: None (no split checks) or a SplitChecker; outcome["split"] is merge_into_document's
     {"chart", "chartError", "adjusted", "events"} for merged documents.
+    foreign (--foreign): a ticker that already has a file is "has-file" (never touched); a missing file whose
+    us-gaap extraction skips as a foreign filer (FOREIGN_SKIPS) gets the ifrs-full document instead.
     """
     path = os.path.join(out_dir, key + ".json")
     status, stored = load_document(path, key)
     if status == "corrupt":
         return _outcome("corrupt-previous", f"{key}.json left untouched: {stored}")
     previous = stored if status == "ok" else None
+    if foreign and previous is not None:
+        return _outcome("has-file")
     if previous is not None and not force and has_sec(previous):
         return _outcome("already-sec")
     cik = cik_map.get(key)
@@ -2494,6 +2512,8 @@ def seed_ticker(key, cik_map, client, out_dir, force, now, splits=None):
     except Exception as error:  # noqa: BLE001 - one bad payload must not stop the run
         return _outcome("extract-error", f"{type(error).__name__}: {error}")
     if document is None:
+        if foreign and info["reason"] in sec_ifrs.FOREIGN_SKIPS:
+            return _foreign_outcome(path, key, facts, now)
         return _outcome("skipped", info["reason"])
     if info["status"] != "ok":
         return _outcome("corrupt-previous", f"{key}.json left untouched: {info['reason']}")
@@ -2538,6 +2558,15 @@ def parse_args(argv):
     parser.add_argument("--report-dir", help="directory of latest.json / themes.json / universe.json "
                                              "(default <repo>/docs/report)")
     parser.add_argument("--data-dir", help="directory of the CSV fallback (default <repo>/data)")
+    parser.add_argument("--foreign", action="store_true",
+                        help="IFRS filers (20-F / 40-F): tickers that have no file and that the US backfill judged "
+                             "foreign-filer / no-us-gaap / non-usd get an ifrs-full document (sec_ifrs.py); "
+                             "without --tickers the list comes from fundamentals/us-market-progress.json")
+    parser.add_argument("--budget", type=positive, help="stop after N SEC requests in this run (re-run to continue)")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="with --foreign: print the plan from the local files (no network, nothing written)")
+    parser.add_argument("--state", help="--foreign check state, git-ignored "
+                                        "(default <repo>/.cache/sec-ifrs-state.json)")
     return parser.parse_args(argv)
 
 
@@ -2592,10 +2621,40 @@ def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, 
     report_dir = args.report_dir or os.path.join(REPO_ROOT, "docs", "report")
     data_dir = args.data_dir or os.path.join(REPO_ROOT, "data")
     out_dir = args.out or os.path.join(REPO_ROOT, "docs", "report", "financials")
-    client = client or SecClient(user_agent)
+    if args.dry_run and not args.foreign:
+        print("Refusing to run: --dry-run needs --foreign", flush=True)
+        return EXIT_REFUSED
+    progress, state, state_path = None, None, None
+    if args.foreign:
+        try:
+            progress = sec_ifrs.load_progress(os.path.join(report_dir, "fundamentals", "us-market-progress.json"))
+        except ValueError as error:
+            print(f"Refusing to run: {error}", flush=True)
+            return EXIT_REFUSED
+        state_path = args.state or sec_ifrs.default_state_path()
+        state = sec_ifrs.load_state(state_path)
+    # --foreign: one SEC request per ticker and no retries, so the first 403 stops the run (TooManyFailures)
+    client = client or SecClient(user_agent, max_failures=1 if args.foreign else MAX_CONSECUTIVE_FAILURES)
     splits = None if args.no_splits else SplitChecker(yahoo_factory, sleep)
 
-    keys, rejected = choose_symbols(args, report_dir, data_dir)
+    rejected = []
+    if args.foreign:
+        plan_keys = None
+        if args.tickers is not None:
+            plan_keys, rejected = choose_symbols(args, report_dir, data_dir)
+        plan = sec_ifrs.plan_foreign(read_json(os.path.join(report_dir, "universe.json")), progress, out_dir,
+                                     state, keys=plan_keys)
+        keys = [key for key, _ in plan["todo"]]
+        by_status = ", ".join(f"{name} {count}" for name, count in sorted(plan["byStatus"].items())) or "none"
+        print(f"--foreign: {len(plan['candidates'])} candidate ticker(s) ({by_status}); "
+              f"{len(plan['hasFile'])} already have a file; {len(plan['checked'])} checked before "
+              f"(state {state_path}); {len(keys)} to check", flush=True)
+        if args.dry_run:
+            print(f"Dry run: {len(keys)} ticker(s) would be checked against SEC (about {len(keys)} requests, "
+                  f"one per ticker); no network, nothing written.", flush=True)
+            return EXIT_DONE
+    else:
+        keys, rejected = choose_symbols(args, report_dir, data_dir)
     if args.limit:
         keys = keys[:args.limit]
     total = len(keys)
@@ -2615,17 +2674,29 @@ def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, 
 
     written, bytes_written, exit_code, processed = {}, 0, EXIT_DONE, 0
     fetched, with_events, adjusted, pending, nulled = [], [], [], [], Counter()
+    dirty = False
     try:
         try:
-            cik_map = client.ticker_map()
+            # --foreign: the CIKs of the progress file's SEC ticker map (no extra request, works offline)
+            cik_map = sec_ifrs.progress_cik_map(progress) if args.foreign else client.ticker_map()
         except FetchError as error:
             raise TooManyFailures(f"company_tickers.json unavailable: {error}") from error
         print(f"SEC ticker map: {len(cik_map)} US tickers", flush=True)
         for number, key in enumerate(keys, 1):
-            outcome = seed_ticker(key, cik_map, client, out_dir, args.force, now, splits)
+            if args.budget and getattr(client, "requests", 0) >= args.budget:
+                print(f"Budget reached: {client.requests} SEC request(s) (--budget {args.budget}); "
+                      f"re-run to continue with the tickers not checked yet.", flush=True)
+                break
+            outcome = seed_ticker(key, cik_map, client, out_dir, args.force, now, splits, foreign=args.foreign)
             processed += 1
             result = outcome["result"]
             counts[result] += 1
+            if state is not None and result in FOREIGN_FINAL:
+                sec_ifrs.record_checked(state, key, result, outcome["detail"], today_iso)
+                dirty = True
+                if processed % 20 == 0:
+                    sec_ifrs.save_state(state_path, state)
+                    dirty = False
             line = f"[{number}/{total}] {key} {result}"
             if result in ("written", "unchanged"):
                 line += (f" annual={outcome['counts'].get('annual')} quarters={outcome['counts'].get('quarterly')}"
@@ -2668,9 +2739,12 @@ def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, 
     finally:
         index_state, index_count, index_bytes = update_index(out_dir, written, today_iso)
         bytes_written += index_bytes
+        if state is not None and dirty:
+            sec_ifrs.save_state(state_path, state)
 
     counts["not-processed"] += total - processed
     print("Summary", flush=True)
+    print(f"  processed: {processed} of {total} ticker(s)", flush=True)
     for name in RESULTS:
         if counts[name]:
             print(f"  {name}: {counts[name]}", flush=True)
