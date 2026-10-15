@@ -458,7 +458,9 @@ class RepoDataTest(unittest.TestCase):
             out = os.path.join(tmp, "growth.json")
             summary = growth.run(directory, out, NOW)
             self.assertEqual(summary["unreadable"], [])
-            self.assertLess(summary["bytes"], 400_000)
+            # The completed US whole-market backfill adds more real history rows;
+            # keep the real-file output compact while allowing that larger cohort.
+            self.assertLess(summary["bytes"], 600_000)
             with open(out, encoding="utf-8") as file:
                 data = json.load(file)
         markets = {growth.market_of(row[0]) for row in data["rows"]}
