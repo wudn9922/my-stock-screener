@@ -152,8 +152,8 @@ ISSUES = (
     "split-adjusted", "foreign-currency", "restated", "yahoo-differs", "quarter-annual-mismatch",
     "quarterly-ytd-suspected", "negative-equity", "capex-sign", "currency-changed", "adr-eps-rescaled",
 )
-# Quality codes that only sec_ifrs.py writes (SEC IFRS periods); update_document carries them over
-IFRS_ISSUES = ("ifrs", "ifrs-fallback")
+# Quality codes that only sec_ifrs.py writes (its IFRS and US GAAP foreign-filer periods); update_document keeps them
+SEC_FOREIGN_ISSUES = ("ifrs", "ifrs-fallback", "foreign-gaap", "foreign-gaap-fallback")
 DOCUMENT_KEYS = (
     "version", "symbol", "market", "currency", "foreignReporter", "generatedAt", "checkedAt", "source",
     "fyEndMonth", "annual", "quarterly", "split", "quality",
@@ -1035,11 +1035,12 @@ def update_document(previous, payload, key, now, fetch_splits=None):
     if factor not in (None, 1):
         flags.add("adr-eps-rescaled")
     grade = quality(annual, quarterly, flags, foreign)
-    # IFRS codes of the SEC periods (sec_ifrs.py) stay while those periods are in the file
+    # IFRS / US GAAP codes of the SEC periods (sec_ifrs.py) stay while those periods are in the file
     if isinstance(previous, dict) and isinstance(previous.get("quality"), dict):
         carried = previous["quality"].get("issues")
         if isinstance(carried, list):
-            grade["issues"] += sorted(code for code in IFRS_ISSUES if code in carried and code not in grade["issues"])
+            grade["issues"] += sorted(
+                code for code in SEC_FOREIGN_ISSUES if code in carried and code not in grade["issues"])
     if revisions:
         grade["revisions"] = revisions
     mixed = any(p["src"] == "sec" for p in annual + quarterly)

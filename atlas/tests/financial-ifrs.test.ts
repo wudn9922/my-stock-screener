@@ -34,6 +34,22 @@ describe('IFRS foreign-filer history (atlas/scripts/sec_ifrs.py)', () => {
     expect(issueText('ifrs-fallback')).not.toContain('其他資料提示');
   });
 
+  it('explains the US GAAP foreign-filer codes the same way and parses such a document', () => {
+    expect(issueText('foreign-gaap')).toContain('US GAAP');
+    expect(issueText('foreign-gaap-fallback')).toContain('非控制權益');
+    expect(issueText('foreign-gaap')).not.toContain('其他資料提示');
+    expect(issueText('foreign-gaap-fallback')).not.toContain('其他資料提示');
+    const base = fixture('ifrs-twd.json');
+    const quality = {
+      ...(base.quality as Record<string, unknown>),
+      issues: ['foreign-currency', 'foreign-gaap', 'foreign-gaap-fallback'],
+    };
+    const result = parseFinancials({ ...base, source: 'SEC EDGAR companyfacts (US GAAP, foreign filer)', quality });
+    if (result.status !== 'ok') throw new Error(result.status);
+    expect(result.data.foreignReporter).toBe(true);
+    expect(result.data.quality.issues).toEqual(expect.arrayContaining(['foreign-gaap', 'foreign-gaap-fallback']));
+  });
+
   it('labels the sources as SEC and the EPS unit with the reporting currency', () => {
     const result = parseFinancials(fixture('ifrs-twd.json'));
     if (result.status !== 'ok') throw new Error(result.status);

@@ -159,6 +159,123 @@ def us_gaap_payload():
     }}}
 
 
+CNY = "CNY"
+EUR = "EUR"
+RC = "RevenueFromContractWithCustomerExcludingAssessedTax"
+
+
+def foreign_gaap_payload(cik, entity, concepts):
+    """companyfacts shape: {concept: {unit: [points]}} under facts['us-gaap'] (SYNTHETIC)."""
+    block = {concept: {"units": {unit: points for unit, points in units.items()}}
+             for concept, units in concepts.items()}
+    return {"cik": int(cik), "entityName": entity, "facts": {"us-gaap": block}}
+
+
+def cny_us_gaap_concepts():
+    """
+    Synthetic Shenzhen Holdings (BABA-like ADR issuer), US GAAP, CNY; every number is made up. 20-F for
+    FY2020-FY2024, each filing repeating the prior year; FY2022 revenue restated +1% in the FY2023 filing.
+    "Revenues" up to FY2021, the ASC 606 tag from FY2022. NetIncomeLoss except FY2024 (ProfitLoss fallback).
+    USD convenience values of FY2023-FY2024 revenue (another unit, never mixed). 6-K 2025 Q1 and Q2 3-month
+    values next to a 6-month and a nine-month value (both ignored) and a Q4 2024 3-month value that overlaps
+    the FY2024 annual period (dropped).
+    """
+    concepts = defaultdict(lambda: defaultdict(list))
+
+    def add(concept, unit, row):
+        concepts[concept][unit].append(row)
+
+    def base(year):
+        return (year - 2019) * 100_000_000_000
+
+    for filing_year in range(2020, 2025):
+        filed, accn = f"{filing_year + 1}-03-31", f"0009-{filing_year}"
+        for year in (filing_year, filing_year - 1):
+            if year < 2020:
+                continue
+            revenue = base(year)
+            if year == 2022 and filing_year == 2023:
+                revenue = revenue * 101 // 100       # restated in the next 20-F
+            add("Revenues" if year <= 2021 else RC, CNY,
+                point(f"{year}-12-31", revenue, filed, accn, "20-F", start=f"{year}-01-01"))
+            flows = {
+                "CostOfRevenue": base(year) * 6 // 10,
+                "GrossProfit": base(year) * 4 // 10,
+                "OperatingIncomeLoss": base(year) * 25 // 100,
+                "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest":
+                    base(year) * 24 // 100,
+                "IncomeTaxExpenseBenefit": base(year) * 4 // 100,
+                "InterestExpense": base(year) // 100,
+                "NetCashProvidedByUsedInOperatingActivities": base(year) * 3 // 10,
+                "PaymentsToAcquirePropertyPlantAndEquipment": base(year) * 8 // 100,
+                "PaymentsOfDividends": base(year) * 5 // 100,
+                "ProfitLoss": base(year) * 16 // 100,
+            }
+            if year != 2024:
+                flows["NetIncomeLoss"] = base(year) * 15 // 100
+            for concept, value in flows.items():
+                add(concept, CNY, point(f"{year}-12-31", value, filed, accn, "20-F", start=f"{year}-01-01"))
+            for concept, sign in (("EarningsPerShareBasic", 0.0), ("EarningsPerShareDiluted", -0.2)):
+                add(concept, f"{CNY}/shares",
+                    point(f"{year}-12-31", (year - 2019) * 3.0 + sign, filed, accn, "20-F", start=f"{year}-01-01"))
+            add("StockholdersEquity", CNY, point(f"{year}-12-31", base(year) * 4 // 10, filed, accn, "20-F"))
+            add("Assets", CNY, point(f"{year}-12-31", base(year) * 2, filed, accn, "20-F"))
+            add("CashAndCashEquivalentsAtCarryingValue", CNY,
+                point(f"{year}-12-31", base(year) // 10, filed, accn, "20-F"))
+    for year in (2023, 2024):
+        add(RC, "USD", point(f"{year}-12-31", base(year) // 7, f"{year + 1}-03-31", f"0009-{year}", "20-F",
+                             start=f"{year}-01-01"))
+    add(RC, CNY, point("2025-03-31", 130_000_000_000, "2025-05-14", "0010-2025Q1", "6-K", start="2025-01-01"))
+    add(RC, CNY, point("2025-06-30", 140_000_000_000, "2025-08-13", "0010-2025Q2", "6-K", start="2025-04-01"))
+    add(RC, CNY, point("2025-06-30", 290_000_000_000, "2025-08-13", "0010-2025Q2", "6-K", start="2025-01-01"))
+    add(RC, CNY, point("2025-09-30", 440_000_000_000, "2025-11-13", "0011-2025Q3", "6-K", start="2025-01-01"))
+    add(RC, CNY, point("2024-12-31", 170_000_000_000, "2025-02-12", "0010-2024Q4", "6-K", start="2024-10-01"))
+    add("NetIncomeLoss", CNY, point("2025-03-31", 20_000_000_000, "2025-05-14", "0010-2025Q1", "6-K",
+                                    start="2025-01-01"))
+    add("StockholdersEquity", CNY, point("2025-03-31", 220_000_000_000, "2025-05-14", "0010-2025Q1", "6-K"))
+    return foreign_gaap_payload("1010", "Synthetic Shenzhen Holdings", concepts)
+
+
+def eur_us_gaap_concepts():
+    """
+    Synthetic Amsterdam Chips N.V. (ASML-like), US GAAP, EUR; every number is made up. 20-F for FY2021-FY2024,
+    a "shares" unit next to the EUR net income (ignored), a 6-K Q1 2025 and a 10-Q Q2 2025 3-month value
+    (both quarterly forms of the US GAAP basis).
+    """
+    concepts = defaultdict(lambda: defaultdict(list))
+    for year in range(2021, 2025):
+        filed, accn = f"{year + 1}-02-10", f"0011-{year}"
+        rev = (year - 2020) * 500_000_000
+        start = f"{year}-01-01"
+        concepts["Revenues"][EUR].append(point(f"{year}-12-31", rev, filed, accn, "20-F", start=start))
+        concepts["NetIncomeLoss"][EUR].append(point(f"{year}-12-31", rev // 5, filed, accn, "20-F", start=start))
+        concepts["NetIncomeLoss"]["shares"].append(point(f"{year}-12-31", 1, filed, accn, "20-F", start=start))
+        concepts["EarningsPerShareBasic"]["EUR/shares"].append(
+            point(f"{year}-12-31", (year - 2020) * 1.5, filed, accn, "20-F", start=start))
+        concepts["StockholdersEquity"][EUR].append(point(f"{year}-12-31", rev, filed, accn, "20-F"))
+    concepts["Revenues"][EUR].append(point("2025-03-31", 1_300_000_000, "2025-04-29", "0012-2025Q1", "6-K",
+                                           start="2025-01-01"))
+    concepts["Revenues"][EUR].append(point("2025-06-30", 1_400_000_000, "2025-07-29", "0013-2025Q2", "10-Q",
+                                           start="2025-04-01"))
+    return foreign_gaap_payload("1011", "Synthetic Amsterdam Chips", concepts)
+
+
+def revenue_rule_concepts():
+    """
+    Synthetic Rule Holdings, US GAAP: CNY revenue for FY2022-FY2024 (20-F), and USD assets and equity for
+    FY2020-FY2024 only. The currency is picked by the annual revenue / net income periods, so CNY wins.
+    """
+    concepts = defaultdict(lambda: defaultdict(list))
+    for year in range(2020, 2025):
+        filed = f"{year + 1}-03-31"
+        concepts["Assets"]["USD"].append(point(f"{year}-12-31", 1_000, filed, f"0014-{year}", "20-F"))
+        concepts["StockholdersEquity"]["USD"].append(point(f"{year}-12-31", 400, filed, f"0014-{year}", "20-F"))
+    for year in range(2022, 2025):
+        concepts["Revenues"][CNY].append(point(f"{year}-12-31", 10_000, f"{year + 1}-03-31", f"0015-{year}", "20-F",
+                                               start=f"{year}-01-01"))
+    return foreign_gaap_payload("1014", "Synthetic Rule Holdings", concepts)
+
+
 class FakeClient:
     """companyfacts by CIK (SYNTHETIC payloads, None = 404); ticker_map is SYNTHETIC too."""
 
@@ -548,6 +665,259 @@ class DailyJobTests(unittest.TestCase):
         self.assertIn("ifrs", updated["quality"]["issues"])
         self.assertIn("ifrs-fallback", updated["quality"]["issues"])
         self.assertIn("foreign-currency", updated["quality"]["issues"])
+
+
+class UsGaapForeignTests(unittest.TestCase):
+    """The US GAAP basis of sec_ifrs.py: a foreign filer's us-gaap facts, one currency, 20-F / 10-K and 6-K / 10-Q."""
+
+    def setUp(self):
+        self.document, self.reason = ifrs.build_us_gaap_document(cny_us_gaap_concepts(), "BABA", NOW)
+        self.assertIsNone(self.reason)
+
+    def test_one_currency_from_annual_revenue_and_net_income_and_the_others_recorded(self):
+        result = ifrs.extract(cny_us_gaap_concepts(), ifrs.US_GAAP_FOREIGN_BASIS)
+        self.assertIsNone(result.skip)
+        self.assertEqual(result.currency, CNY)
+        self.assertEqual(result.currencies, {CNY: 5, "USD": 2})
+        self.assertEqual([p["end"] for p in result.annual], [f"{y}-12-31" for y in range(2020, 2025)])
+        values = {p["end"]: p["values"] for p in result.annual}
+        self.assertEqual(values["2020-12-31"]["revenue"], 100_000_000_000)          # Revenues
+        self.assertEqual(values["2022-12-31"]["revenue"], 303_000_000_000)          # restated, latest filed wins
+        self.assertEqual(values["2023-12-31"]["revenue"], 400_000_000_000)          # not the USD convenience value
+        self.assertEqual(values["2024-12-31"]["netIncome"], 80_000_000_000)         # ProfitLoss fallback
+        self.assertEqual(values["2024-12-31"]["epsBasic"], 15.0)                     # per ordinary share, CNY
+        self.assertTrue(result.fallback)
+        self.assertEqual(result.concepts["revenue"], sorted(["Revenues", RC]))
+        self.assertEqual(result.concepts["netIncome"], ["NetIncomeLoss", "ProfitLoss"])
+
+    def test_quarters_are_three_month_values_of_the_interim_forms_only(self):
+        result = ifrs.extract(cny_us_gaap_concepts(), ifrs.US_GAAP_FOREIGN_BASIS)
+        self.assertEqual([p["end"] for p in result.quarterly], ["2025-03-31", "2025-06-30"])
+        q1, q2 = result.quarterly
+        self.assertEqual(q1["values"]["revenue"], 130_000_000_000)
+        self.assertEqual(q1["values"]["netIncome"], 20_000_000_000)
+        self.assertEqual(q2["values"]["revenue"], 140_000_000_000)        # not the six-month 290bn
+        self.assertNotIn("netIncome", q2["values"])
+        self.assertEqual(q1["values"]["equity"], 220_000_000_000)        # quarter-end instant of a 6-K
+
+    def test_document_schema_and_codes(self):
+        doc = self.document
+        self.assertEqual(doc["symbol"], "BABA")
+        self.assertEqual(doc["currency"], CNY)
+        self.assertIs(doc["foreignReporter"], True)
+        self.assertEqual(doc["source"], "SEC EDGAR companyfacts (US GAAP, foreign filer)")
+        self.assertEqual(doc["usGaapCurrencies"], {CNY: 5, "USD": 2})
+        self.assertNotIn("ifrsCurrencies", doc)
+        self.assertEqual(set(doc) - set(fin.DOCUMENT_KEYS), {"secConcepts", "usGaapCurrencies"})
+        self.assertEqual(doc["quality"]["issues"], ["foreign-currency", "foreign-gaap", "foreign-gaap-fallback"])
+        self.assertEqual(doc["secConcepts"]["revenue"], sorted(["Revenues", RC]))
+        self.assertEqual(doc["annual"]["values"]["epsDiluted"][-1], 14.8)
+        self.assertEqual(doc["annual"]["src"], ["sec"] * 5)
+        self.assertNotIn("dilutedShares", doc["annual"]["values"])          # not mapped on this basis
+
+    def test_eur_filer_keeps_its_unit_and_takes_10_q_quarters(self):
+        result = ifrs.extract(eur_us_gaap_concepts(), ifrs.US_GAAP_FOREIGN_BASIS)
+        self.assertEqual(result.currency, EUR)
+        self.assertEqual(result.currencies, {EUR: 4})
+        self.assertEqual(len(result.annual), 4)
+        self.assertEqual(result.annual[-1]["values"]["netIncome"], 400_000_000)
+        self.assertEqual(result.annual[-1]["values"]["epsBasic"], 6.0)          # EUR/shares, not converted
+        self.assertEqual([p["end"] for p in result.quarterly], ["2025-03-31", "2025-06-30"])
+        document, reason = ifrs.build_us_gaap_document(eur_us_gaap_concepts(), "ASML", NOW)
+        self.assertIsNone(reason)
+        self.assertEqual(document["currency"], EUR)
+        self.assertNotIn("usGaapCurrencies", document)
+
+    def test_the_currency_rule_counts_revenue_and_net_income_only(self):
+        result = ifrs.extract(revenue_rule_concepts(), ifrs.US_GAAP_FOREIGN_BASIS)
+        self.assertEqual(result.currencies, {CNY: 3})            # the USD balance sheet is not counted
+        self.assertEqual(result.currency, CNY)
+
+    def test_annual_10_k_values_count_on_this_basis(self):
+        ten_k = foreign_gaap_payload("1015", "Synthetic Ten K", {"Revenues": {CNY: [
+            point("2023-12-31", 5, "2024-03-29", "0016", "10-K", start="2023-01-01"),
+            point("2024-12-31", 6, "2025-03-28", "0017", "10-K", start="2024-01-01")]}})
+        document, reason = ifrs.build_us_gaap_document(ten_k, "SYNK", NOW)
+        self.assertIsNone(reason)
+        self.assertEqual(document["annual"]["end"], ["2023-12-31", "2024-12-31"])
+        self.assertEqual(ifrs.build_document(ten_k, "SYNK", NOW), (None, "no-ifrs"))
+
+    def test_skip_reasons_of_the_us_gaap_basis(self):
+        self.assertEqual(ifrs.build_us_gaap_document(twd_concepts(), "SYNA", NOW), (None, "no-us-gaap"))
+        self.assertEqual(ifrs.build_us_gaap_document(None, "SYNA", NOW), (None, "no-us-gaap"))
+        self.assertEqual(ifrs.build_us_gaap_document(cny_us_gaap_concepts(), "2330.TW", NOW), (None, "not-us-key"))
+        short = foreign_gaap_payload("1016", "Synthetic Short", {"Revenues": {CNY: [
+            point("2024-12-31", 5, "2025-03-31", "0018", "20-F", start="2024-01-01")]}})
+        self.assertEqual(ifrs.build_us_gaap_document(short, "SYNE", NOW), (None, "short-history"))
+        junk = foreign_gaap_payload("1017", "Synthetic Junk", {"Revenues": {CNY: [
+            point("2024-12-31", 9, "2025-03-31", "0019", "20-F", start="2024-12-31")]}})
+        self.assertEqual(ifrs.build_us_gaap_document(junk, "SYNJ", NOW), (None, "us-gaap-no-usable-facts"))
+
+    def test_ifrs_basis_still_ignores_us_gaap_facts(self):
+        self.assertEqual(ifrs.build_document(cny_us_gaap_concepts(), "BABA", NOW), (None, "no-ifrs"))
+
+    def test_round_trip_through_the_stored_reader(self):
+        stored = fin.read_sections(json.loads(json.dumps(self.document)))
+        self.assertEqual(stored["currency"], CNY)
+        self.assertEqual(stored["annual"][0]["end"], "2020-12-31")
+
+
+class UsGaapStateTests(unittest.TestCase):
+    """The --foreign check state: answers recorded under older rules and still "no-ifrs" are asked again."""
+
+    def test_only_a_no_ifrs_answer_from_older_rules_is_stale(self):
+        self.assertTrue(ifrs.is_stale({"result": "skipped", "detail": "no-ifrs", "checkedAt": "2026-09-01"}))
+        self.assertFalse(ifrs.is_stale({"result": "skipped", "detail": "no-ifrs", "rules": ifrs.FOREIGN_RULES}))
+        self.assertFalse(ifrs.is_stale({"result": "skipped", "detail": "no-us-gaap"}))
+        self.assertFalse(ifrs.is_stale({"result": "skipped", "detail": "ifrs-no-usable-facts"}))
+        self.assertFalse(ifrs.is_stale({"result": "no-facts", "detail": "404"}))
+        self.assertFalse(ifrs.is_stale("skipped"))
+
+    def test_recorded_answers_carry_the_rules(self):
+        state = {"version": ifrs.STATE_VERSION, "checked": {}}
+        ifrs.record_checked(state, "SYNA", "skipped", "no-us-gaap", "2026-10-15")
+        self.assertEqual(state["checked"]["SYNA"], {"result": "skipped", "detail": "no-us-gaap",
+                                                    "checkedAt": "2026-10-15", "rules": ifrs.FOREIGN_RULES})
+
+    def test_plan_splits_stale_answers_out_as_retry(self):
+        universe = {"markets": {"US": {"fields": ["symbol", "marketCap"], "rows": [
+            ["AAA", 3], ["BBB", 2], ["CCC", 1]]}}}
+        progress = {"issuers": {"0000000001": {"status": "foreign-filer"}, "0000000002": {"status": "foreign-filer"},
+                                "0000000003": {"status": "non-usd"}},
+                    "symbols": {"AAA": {"cik": "0000000001"}, "BBB": {"cik": "0000000002"},
+                                "CCC": {"cik": "0000000003"}}, "tickerMap": {}}
+        out = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, out, True)
+        state = {"version": ifrs.STATE_VERSION, "checked": {
+            "AAA": {"result": "skipped", "detail": "no-ifrs", "checkedAt": "2026-09-01"},
+            "BBB": {"result": "skipped", "detail": "no-ifrs", "checkedAt": "2026-10-01", "rules": ifrs.FOREIGN_RULES},
+            "CCC": {"result": "no-facts", "detail": "404", "checkedAt": "2026-09-01"}}}
+        plan = ifrs.plan_foreign(universe, progress, out, state)
+        self.assertEqual(plan["checked"], ["BBB", "CCC"])
+        self.assertEqual(plan["todo"], [("AAA", "0000000001")])
+        self.assertEqual(plan["retry"], ["AAA"])
+
+
+class ForeignGaapWiringTests(unittest.TestCase):
+    """seed_financials_sec --foreign with the US GAAP fallback, its state, and --due leaving foreign reporters out."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.out = os.path.join(self.tmp, "financials")
+        self.report = os.path.join(self.tmp, "report")
+        self.state_path = os.path.join(self.tmp, "state", "sec-ifrs-state.json")
+        os.makedirs(os.path.join(self.report, "fundamentals"))
+        os.makedirs(os.path.dirname(self.state_path))
+        os.makedirs(self.out)
+        universe = {"markets": {"US": {"fields": ["symbol", "name", "marketCap"], "rows": [
+            ["SYNA", "Synthetic A", 5e9], ["SYNB", "Synthetic B", 1e9], ["SYNC", "C", 2e9], ["USAA", "US A", 7e9]]}}}
+        progress = {
+            "issuers": {"0000001001": {"status": "foreign-filer"}, "0000001002": {"status": "non-usd"},
+                        "0000001003": {"status": "foreign-filer"}, "0000001004": {"status": "short-history"}},
+            "symbols": {"SYNA": {"cik": "0000001001"}, "SYNB": {"cik": "0000001002"},
+                        "SYNC": {"cik": "0000001003"}, "USAA": {"cik": "0000001004"}},
+            "tickerMap": {"SYNA": "0000001001", "SYNB": "0000001002", "SYNC": "0000001003", "USAA": "0000001004"},
+        }
+        with open(os.path.join(self.report, "universe.json"), "w") as file:
+            json.dump(universe, file)
+        with open(os.path.join(self.report, "fundamentals", "us-market-progress.json"), "w") as file:
+            json.dump(progress, file)
+
+    def write_state(self, checked):
+        with open(self.state_path, "w") as file:
+            json.dump({"version": ifrs.STATE_VERSION, "checked": checked}, file)
+
+    def run_main(self, client, args=()):
+        argv = ["--no-splits", "--report-dir", self.report, "--out", self.out, "--state", self.state_path, *args]
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = sec.main(argv, client=client, now=NOW, environ={})
+        return code, buffer.getvalue()
+
+    def test_foreign_run_writes_the_us_gaap_document_when_there_is_no_ifrs(self):
+        client = FakeClient({"0000001001": cny_us_gaap_concepts(), "0000001002": eur_us_gaap_concepts()})
+        code, text = self.run_main(client, ("--foreign", "--tickers", "SYNA,SYNB"))
+        self.assertEqual(code, sec.EXIT_DONE)
+        self.assertEqual(client.requests, 2)
+        doc = load_json(os.path.join(self.out, "SYNA.json"))
+        self.assertEqual((doc["currency"], doc["foreignReporter"]), (CNY, True))
+        self.assertEqual(doc["source"], "SEC EDGAR companyfacts (US GAAP, foreign filer)")
+        self.assertIn("foreign-gaap", doc["quality"]["issues"])
+        self.assertEqual(load_json(os.path.join(self.out, "SYNB.json"))["currency"], EUR)
+        state = load_json(self.state_path)
+        self.assertEqual((state["checked"]["SYNA"]["result"], state["checked"]["SYNA"]["rules"]), ("written", 2))
+        self.assertIn("SYNA written", text)
+
+    def test_ifrs_facts_win_and_unusable_ifrs_is_not_read_as_us_gaap(self):
+        concepts = cny_us_gaap_concepts()
+        concepts["facts"]["ifrs-full"] = {"Revenue": {"units": {CNY: [
+            point("2024-12-31", 9, "2025-03-31", "0008", "20-F", start="2024-12-31")]}}}
+        outcome = sec.seed_ticker("SYNA", {"SYNA": "0000001001"}, FakeClient({"0000001001": concepts}),
+                                  self.out, False, NOW, None, foreign=True)
+        self.assertEqual((outcome["result"], outcome["detail"]), ("skipped", "ifrs-no-usable-facts"))
+        self.assertFalse(os.path.exists(os.path.join(self.out, "SYNA.json")))
+
+    def test_dry_run_counts_the_stale_answers_asked_again(self):
+        self.write_state({"SYNA": {"result": "skipped", "detail": "no-ifrs", "checkedAt": "2026-09-01"},
+                          "SYNB": {"result": "skipped", "detail": "no-us-gaap", "checkedAt": "2026-09-01"}})
+        code, text = self.run_main(NoNetworkClient({}), ("--foreign", "--dry-run"))
+        self.assertEqual(code, sec.EXIT_DONE)
+        self.assertIn("--foreign: 3 candidate ticker(s)", text)
+        self.assertIn("0 already have a file; 1 checked before", text)
+        self.assertIn("2 to check (1 of them asked again, rules 2)", text)
+        self.assertIn("Dry run: 2 ticker(s) would be checked", text)
+
+    def test_stale_answer_is_asked_once_and_then_recorded_under_rules_two(self):
+        self.write_state({"SYNA": {"result": "skipped", "detail": "no-ifrs", "checkedAt": "2026-09-01"},
+                          "SYNB": {"result": "skipped", "detail": "no-ifrs", "checkedAt": "2026-09-01",
+                                   "rules": ifrs.FOREIGN_RULES}})
+        client = FakeClient({"0000001001": cny_us_gaap_concepts()})
+        code, text = self.run_main(client, ("--foreign",))
+        self.assertEqual(code, sec.EXIT_DONE)
+        self.assertEqual(client.asked, ["0000001001", "0000001003"])      # SYNB is final; SYNC has no companyfacts
+        state = load_json(self.state_path)
+        self.assertEqual((state["checked"]["SYNA"]["result"], state["checked"]["SYNA"]["rules"]), ("written", 2))
+        self.assertEqual(state["checked"]["SYNB"]["detail"], "no-ifrs")
+        self.assertEqual(state["checked"]["SYNC"]["result"], "no-facts")
+
+    def test_due_leaves_the_foreign_reporters_out_and_counts_them(self):
+        us_doc, _ = sec.merge_into_document(None, sec.extract_periods(us_gaap_payload()), "USAA", NOW)
+        for key, doc in (("SYNA", ifrs.build_document(twd_concepts(), "SYNA", NOW)[0]), ("USAA", us_doc)):
+            with open(os.path.join(self.out, key + ".json"), "w") as file:
+                json.dump(doc, file)
+        with open(os.path.join(self.out, "index.json"), "w") as file:
+            json.dump({"version": fin.VERSION, "items": {}}, file)
+        code, text = self.run_main(NoNetworkClient({}), ("--due", "--dry-run"))
+        self.assertEqual(code, sec.EXIT_DONE)
+        self.assertIn("due now 1 (never checked: 1)", text)
+        self.assertIn("left out: not US 0, foreign reporter 1, no SEC periods 0, unreadable 0", text)
+        self.assertIn("USAA", text)
+        self.assertNotIn("SYNA", text.split("Dry run:")[1])
+
+    def test_due_run_makes_no_request_for_foreign_reporters_only(self):
+        with open(os.path.join(self.out, "SYNA.json"), "w") as file:
+            json.dump(ifrs.build_document(twd_concepts(), "SYNA", NOW)[0], file)
+        with open(os.path.join(self.out, "index.json"), "w") as file:
+            json.dump({"version": fin.VERSION, "items": {}}, file)
+        code, text = self.run_main(NoNetworkClient({}), ("--due",))
+        self.assertEqual(code, sec.EXIT_DONE)
+        self.assertIn("Nothing is due for a re-check.", text)
+
+
+class DailyForeignCodesTests(unittest.TestCase):
+    """The Yahoo daily run keeps the US GAAP foreign-filer codes like the IFRS ones."""
+
+    def test_daily_run_keeps_the_foreign_flag_and_the_us_gaap_codes(self):
+        with open(os.path.join(ROOT, "tests", "fixtures", "financials", "yahoo_us_full.json"), encoding="utf-8") as file:
+            payload = json.load(file)
+        doc, _ = fin.update_document(None, payload, "AAPL", NOW)
+        doc["foreignReporter"] = True
+        doc["quality"]["issues"] = sorted(set(doc["quality"]["issues"]) | {"foreign-gaap", "foreign-gaap-fallback"})
+        updated, _ = fin.update_document(copy.deepcopy(doc), payload, "AAPL", NOW + timedelta(days=1))
+        self.assertIs(updated["foreignReporter"], True)
+        self.assertIn("foreign-gaap", updated["quality"]["issues"])
+        self.assertIn("foreign-gaap-fallback", updated["quality"]["issues"])
 
 
 if __name__ == "__main__":
