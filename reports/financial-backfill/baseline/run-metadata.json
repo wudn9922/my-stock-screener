@@ -1,0 +1,866 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-15T19:02:33Z",
+  "snapshotType": "baseline",
+  "gitCommit": "52a95f27b654db54b9a544082b4eb0625c7ed5de",
+  "gitBranch": "codex/financial-history-10y",
+  "window": {
+    "fiscalYears": [
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "fiscalQuarters": 40
+  },
+  "marketDirectoryCounts": {
+    "US": 5349,
+    "TW": 1982
+  },
+  "scannerUniverseListedCounts": {
+    "US": 5349,
+    "TW": 1979
+  },
+  "markets": {
+    "US": {
+      "targetCompanies": 5349,
+      "withDetailedFinancialFiles": 4963,
+      "withDetailedFinancialFilesRate": 0.927836978874556,
+      "withTenValidAnnualFiscalPeriods2016_2025": 2824,
+      "tenAnnualPeriodsRate": 0.5279491493737147,
+      "withFortyQuarterlyFiscalPeriods2016_2025": 2344,
+      "fortyQuarterlyPeriodsRate": 0.4382127500467377,
+      "coreAnnualValuesComplete": 1866,
+      "coreAnnualValuesCompleteRate": 0.3488502523836231,
+      "coreAnnualAndQuarterValuesComplete": 491,
+      "coreAnnualAndQuarterValuesCompleteRate": 0.09179285847822023,
+      "qualityAndPointInTimePassed": 0,
+      "qualityAndPointInTimePassedRate": 0.0,
+      "quarterlyForeignReporterReview": 1040,
+      "withAnnualFY2026": 551,
+      "withQuarterlyDataFY2026": 3959,
+      "latestPeriodEnd": "2026-09-30",
+      "tenureAdjustedCompleteness": null,
+      "tenureAdjustedCompletenessReason": "listing/incorporation dates are absent from the checked-in financial schema and current ticker directory",
+      "annualWindowPeriodsExpected": 53490,
+      "quarterWindowPeriodsExpected": 213960,
+      "annualCoverageByFY": [
+        {
+          "fiscalYear": 2016,
+          "companiesWithValidPeriod": 2989,
+          "targetCompanies": 5349,
+          "coverageRate": 0.5587960366423631
+        },
+        {
+          "fiscalYear": 2017,
+          "companiesWithValidPeriod": 3177,
+          "targetCompanies": 5349,
+          "coverageRate": 0.5939427930454291
+        },
+        {
+          "fiscalYear": 2018,
+          "companiesWithValidPeriod": 3360,
+          "targetCompanies": 5349,
+          "coverageRate": 0.628154795288839
+        },
+        {
+          "fiscalYear": 2019,
+          "companiesWithValidPeriod": 3694,
+          "targetCompanies": 5349,
+          "coverageRate": 0.6905963731538606
+        },
+        {
+          "fiscalYear": 2020,
+          "companiesWithValidPeriod": 4002,
+          "targetCompanies": 5349,
+          "coverageRate": 0.7481772293886708
+        },
+        {
+          "fiscalYear": 2021,
+          "companiesWithValidPeriod": 4248,
+          "targetCompanies": 5349,
+          "coverageRate": 0.7941671340437465
+        },
+        {
+          "fiscalYear": 2022,
+          "companiesWithValidPeriod": 4564,
+          "targetCompanies": 5349,
+          "coverageRate": 0.8532435969340063
+        },
+        {
+          "fiscalYear": 2023,
+          "companiesWithValidPeriod": 4796,
+          "targetCompanies": 5349,
+          "coverageRate": 0.8966161899420453
+        },
+        {
+          "fiscalYear": 2024,
+          "companiesWithValidPeriod": 4907,
+          "targetCompanies": 5349,
+          "coverageRate": 0.9173677322864087
+        },
+        {
+          "fiscalYear": 2025,
+          "companiesWithValidPeriod": 4753,
+          "targetCompanies": 5349,
+          "coverageRate": 0.8885773041690036
+        }
+      ],
+      "quarterlyCoverageByFYFQ": [
+        {
+          "fiscalYear": 2016,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 2519,
+          "targetCompanies": 5349,
+          "coverageRate": 0.47092914563469807
+        },
+        {
+          "fiscalYear": 2016,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 2542,
+          "targetCompanies": 5349,
+          "coverageRate": 0.4752290147691157
+        },
+        {
+          "fiscalYear": 2016,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 2549,
+          "targetCompanies": 5349,
+          "coverageRate": 0.47653767059263413
+        },
+        {
+          "fiscalYear": 2016,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 2503,
+          "targetCompanies": 5349,
+          "coverageRate": 0.4679379323237988
+        },
+        {
+          "fiscalYear": 2017,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 2651,
+          "targetCompanies": 5349,
+          "coverageRate": 0.49560665544961674
+        },
+        {
+          "fiscalYear": 2017,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 2712,
+          "targetCompanies": 5349,
+          "coverageRate": 0.50701065619742
+        },
+        {
+          "fiscalYear": 2017,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 2703,
+          "targetCompanies": 5349,
+          "coverageRate": 0.5053280987100393
+        },
+        {
+          "fiscalYear": 2017,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 2650,
+          "targetCompanies": 5349,
+          "coverageRate": 0.49541970461768553
+        },
+        {
+          "fiscalYear": 2018,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 2812,
+          "targetCompanies": 5349,
+          "coverageRate": 0.5257057393905403
+        },
+        {
+          "fiscalYear": 2018,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 2866,
+          "targetCompanies": 5349,
+          "coverageRate": 0.5358010843148252
+        },
+        {
+          "fiscalYear": 2018,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 2838,
+          "targetCompanies": 5349,
+          "coverageRate": 0.5305664610207516
+        },
+        {
+          "fiscalYear": 2018,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 2794,
+          "targetCompanies": 5349,
+          "coverageRate": 0.5223406244157787
+        },
+        {
+          "fiscalYear": 2019,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 2940,
+          "targetCompanies": 5349,
+          "coverageRate": 0.5496354458777342
+        },
+        {
+          "fiscalYear": 2019,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 2993,
+          "targetCompanies": 5349,
+          "coverageRate": 0.5595438399700878
+        },
+        {
+          "fiscalYear": 2019,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 2966,
+          "targetCompanies": 5349,
+          "coverageRate": 0.5544961675079454
+        },
+        {
+          "fiscalYear": 2019,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 2912,
+          "targetCompanies": 5349,
+          "coverageRate": 0.5444008225836605
+        },
+        {
+          "fiscalYear": 2020,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 3206,
+          "targetCompanies": 5349,
+          "coverageRate": 0.5993643671714339
+        },
+        {
+          "fiscalYear": 2020,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 3298,
+          "targetCompanies": 5349,
+          "coverageRate": 0.6165638437091046
+        },
+        {
+          "fiscalYear": 2020,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 3304,
+          "targetCompanies": 5349,
+          "coverageRate": 0.6176855487006917
+        },
+        {
+          "fiscalYear": 2020,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 3239,
+          "targetCompanies": 5349,
+          "coverageRate": 0.6055337446251636
+        },
+        {
+          "fiscalYear": 2021,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 3452,
+          "targetCompanies": 5349,
+          "coverageRate": 0.6453542718265096
+        },
+        {
+          "fiscalYear": 2021,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 3544,
+          "targetCompanies": 5349,
+          "coverageRate": 0.6625537483641802
+        },
+        {
+          "fiscalYear": 2021,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 3514,
+          "targetCompanies": 5349,
+          "coverageRate": 0.6569452234062442
+        },
+        {
+          "fiscalYear": 2021,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 3399,
+          "targetCompanies": 5349,
+          "coverageRate": 0.635445877734156
+        },
+        {
+          "fiscalYear": 2022,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 3582,
+          "targetCompanies": 5349,
+          "coverageRate": 0.6696578799775659
+        },
+        {
+          "fiscalYear": 2022,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 3673,
+          "targetCompanies": 5349,
+          "coverageRate": 0.6866704056833053
+        },
+        {
+          "fiscalYear": 2022,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 3617,
+          "targetCompanies": 5349,
+          "coverageRate": 0.676201159095158
+        },
+        {
+          "fiscalYear": 2022,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 3541,
+          "targetCompanies": 5349,
+          "coverageRate": 0.6619928958683866
+        },
+        {
+          "fiscalYear": 2023,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 3725,
+          "targetCompanies": 5349,
+          "coverageRate": 0.6963918489437279
+        },
+        {
+          "fiscalYear": 2023,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 3798,
+          "targetCompanies": 5349,
+          "coverageRate": 0.7100392596747056
+        },
+        {
+          "fiscalYear": 2023,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 3744,
+          "targetCompanies": 5349,
+          "coverageRate": 0.6999439147504206
+        },
+        {
+          "fiscalYear": 2023,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 3666,
+          "targetCompanies": 5349,
+          "coverageRate": 0.6853617498597869
+        },
+        {
+          "fiscalYear": 2024,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 3860,
+          "targetCompanies": 5349,
+          "coverageRate": 0.72163021125444
+        },
+        {
+          "fiscalYear": 2024,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 3949,
+          "targetCompanies": 5349,
+          "coverageRate": 0.738268835296317
+        },
+        {
+          "fiscalYear": 2024,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 3908,
+          "targetCompanies": 5349,
+          "coverageRate": 0.7306038511871378
+        },
+        {
+          "fiscalYear": 2024,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 3826,
+          "targetCompanies": 5349,
+          "coverageRate": 0.7152738829687793
+        },
+        {
+          "fiscalYear": 2025,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 3963,
+          "targetCompanies": 5349,
+          "coverageRate": 0.7408861469433539
+        },
+        {
+          "fiscalYear": 2025,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 4039,
+          "targetCompanies": 5349,
+          "coverageRate": 0.7550944101701252
+        },
+        {
+          "fiscalYear": 2025,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 3949,
+          "targetCompanies": 5349,
+          "coverageRate": 0.738268835296317
+        },
+        {
+          "fiscalYear": 2025,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 3858,
+          "targetCompanies": 5349,
+          "coverageRate": 0.7212563095905776
+        }
+      ]
+    },
+    "TW": {
+      "targetCompanies": 1982,
+      "withDetailedFinancialFiles": 510,
+      "withDetailedFinancialFilesRate": 0.25731584258324924,
+      "withTenValidAnnualFiscalPeriods2016_2025": 0,
+      "tenAnnualPeriodsRate": 0.0,
+      "withFortyQuarterlyFiscalPeriods2016_2025": 0,
+      "fortyQuarterlyPeriodsRate": 0.0,
+      "coreAnnualValuesComplete": 0,
+      "coreAnnualValuesCompleteRate": 0.0,
+      "coreAnnualAndQuarterValuesComplete": 0,
+      "coreAnnualAndQuarterValuesCompleteRate": 0.0,
+      "qualityAndPointInTimePassed": 0,
+      "qualityAndPointInTimePassedRate": 0.0,
+      "quarterlyForeignReporterReview": 1,
+      "withAnnualFY2026": 0,
+      "withQuarterlyDataFY2026": 494,
+      "latestPeriodEnd": "2026-06-30",
+      "tenureAdjustedCompleteness": null,
+      "tenureAdjustedCompletenessReason": "listing/incorporation dates are absent from the checked-in financial schema and current ticker directory",
+      "annualWindowPeriodsExpected": 19820,
+      "quarterWindowPeriodsExpected": 79280,
+      "annualCoverageByFY": [
+        {
+          "fiscalYear": 2016,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2017,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2018,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2019,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2020,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2021,
+          "companiesWithValidPeriod": 179,
+          "targetCompanies": 1982,
+          "coverageRate": 0.09031281533804238
+        },
+        {
+          "fiscalYear": 2022,
+          "companiesWithValidPeriod": 508,
+          "targetCompanies": 1982,
+          "coverageRate": 0.25630676084762866
+        },
+        {
+          "fiscalYear": 2023,
+          "companiesWithValidPeriod": 508,
+          "targetCompanies": 1982,
+          "coverageRate": 0.25630676084762866
+        },
+        {
+          "fiscalYear": 2024,
+          "companiesWithValidPeriod": 509,
+          "targetCompanies": 1982,
+          "coverageRate": 0.256811301715439
+        },
+        {
+          "fiscalYear": 2025,
+          "companiesWithValidPeriod": 507,
+          "targetCompanies": 1982,
+          "coverageRate": 0.2558022199798184
+        }
+      ],
+      "quarterlyCoverageByFYFQ": [
+        {
+          "fiscalYear": 2016,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2016,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2016,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2016,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2017,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2017,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2017,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2017,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2018,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2018,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2018,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2018,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2019,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2019,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2019,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2019,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2020,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2020,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2020,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2020,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2021,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2021,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2021,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2021,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2022,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2022,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2022,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2022,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2023,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2023,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2023,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2023,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2024,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2024,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2024,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2024,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 0,
+          "targetCompanies": 1982,
+          "coverageRate": 0.0
+        },
+        {
+          "fiscalYear": 2025,
+          "fiscalQuarter": 1,
+          "companiesWithValidPeriod": 508,
+          "targetCompanies": 1982,
+          "coverageRate": 0.25630676084762866
+        },
+        {
+          "fiscalYear": 2025,
+          "fiscalQuarter": 2,
+          "companiesWithValidPeriod": 510,
+          "targetCompanies": 1982,
+          "coverageRate": 0.25731584258324924
+        },
+        {
+          "fiscalYear": 2025,
+          "fiscalQuarter": 3,
+          "companiesWithValidPeriod": 402,
+          "targetCompanies": 1982,
+          "coverageRate": 0.20282542885973764
+        },
+        {
+          "fiscalYear": 2025,
+          "fiscalQuarter": 4,
+          "companiesWithValidPeriod": 505,
+          "targetCompanies": 1982,
+          "coverageRate": 0.2547931382441978
+        }
+      ]
+    }
+  },
+  "unlistedFinancialIndexCandidates": {
+    "US": 4,
+    "TW": 0
+  },
+  "companiesMissingAnyWindowPeriod": {
+    "US": {
+      "annual": 2525,
+      "quarterly": 3005
+    },
+    "TW": {
+      "annual": 1982,
+      "quarterly": 1982
+    }
+  },
+  "qualityIssueCounts": {
+    "P2": 6029,
+    "P1": 4822
+  },
+  "financialIndexGeneratedAt": "2026-10-15T13:41:43Z",
+  "universeGeneratedAt": "2026-10-15T13:44:36+00:00",
+  "directoryGeneratedAt": "2026-10-15T14:47:09.944Z",
+  "inputSha256": {
+    "docs/report/financials/index.json": "f46407da3924d602e027970396bc6f152f7a67d6f31a7b0ad81e4e4064421dc5",
+    "docs/report/universe.json": "f762a09dc41e1a1b4e71b0e396d3bccca4cf8afc020fd1241732f5d25896cf5f",
+    "docs/atlas/symbols/directory.json": "818c9fb80592ab15c6c75081a2d1b99cdc4ba821973d13b12436ed94ba4d15f4",
+    "docs/report/fundamentals/us-market-progress.json": "ad75fc81d5af6f4377269cca1bae83e5cfeaf45486f520a1d0529c417093dbf6"
+  },
+  "financialDataDelta": null,
+  "latestSecRetryBatch": {
+    "batchId": 12,
+    "startedAt": "2026-10-15T09:51:45Z",
+    "finishedAt": "2026-10-15T09:52:41Z",
+    "phase": "metadata_only",
+    "status": "completed",
+    "attemptedIssuers": 83,
+    "decisionCounts": {
+      "seeded_existing_screened_operating_candidate": 83
+    },
+    "secRequests": 83,
+    "responseBytes": 1931108
+  },
+  "capacity": {
+    "githubApiRepoSizeKB": 322540,
+    "localGitDirectoryBytes": 34741715,
+    "localGitIsShallow": true,
+    "gitCountObjects": {
+      "count": "24",
+      "size": "1956",
+      "in-pack": "7840",
+      "packs": "3",
+      "size-pack": "30642",
+      "prune-packable": "0",
+      "garbage": "0",
+      "size-garbage": "0"
+    },
+    "markets": {
+      "US": {
+        "currentFinancialJsonBytes": 48204305,
+        "storedAnnualAndQuarterPeriodRows": 239169,
+        "missingTargetFiscalPeriods": 95356,
+        "averageCurrentJsonBytesPerStoredPeriod": 201.5491347122746,
+        "roughAdditionalJsonBytesToFillEveryTargetWindow": 19218919,
+        "roughEstimateLowBytes": 13453243,
+        "roughEstimateHighBytes": 24984594
+      },
+      "TW": {
+        "currentFinancialJsonBytes": 1508134,
+        "storedAnnualAndQuarterPeriodRows": 5113,
+        "missingTargetFiscalPeriods": 94964,
+        "averageCurrentJsonBytesPerStoredPeriod": 294.9606884412282,
+        "roughAdditionalJsonBytesToFillEveryTargetWindow": 28010646,
+        "roughEstimateLowBytes": 19607452,
+        "roughEstimateHighBytes": 36413839
+      }
+    },
+    "estimateNote": "Rough JSON-only projection: current market file bytes divided by stored annual+quarter rows, multiplied by missing FY2016–FY2025/fiscal-quarter rows. ±30% envelope; does not imply all missing periods are legally obtainable, does not include sidecars, reports, Git compression, or PIT metadata."
+  },
+  "sourceCrosschecks": {
+    "file": null,
+    "fileSha256": null,
+    "source": "SEC Company Facts current CIK response, compared using the existing SEC extractor against stored SEC-labelled values",
+    "staleRows": 0,
+    "staleSymbols": [],
+    "attemptedCurrentCikCompanies": 0,
+    "verifiedCurrentCikCompanies": 0,
+    "verifiedSymbols": [],
+    "currentCikStatuses": {},
+    "comparedNumericValues": 0,
+    "mismatches": 0,
+    "secResponseBytes": 0,
+    "historicalCikOverrideChecks": 0,
+    "identityLineageP0": [],
+    "twRawValueCrosschecks": 0,
+    "twCrosscheckBlockedBy": "MOPS historical result URL fetch returned HTTP 503; no original TW values retrieved",
+    "limitation": "Company Facts is a current facts aggregate, not an independent filing document or complete point-in-time ledger; a match validates stored values against SEC's current aggregate only."
+  },
+  "githubRepoSizeKB": 322540,
+  "financialJsonFiles": 5477,
+  "financialJsonBytes": 50712608,
+  "githubRepoSizeNote": "Use GitHub repository API size for full repository size; local checkout may be sparse/shallow."
+}

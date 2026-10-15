@@ -1,0 +1,36 @@
+{
+  "githubApiRepoSizeKB": 322540,
+  "localGitDirectoryBytes": 34741715,
+  "localGitIsShallow": true,
+  "gitCountObjects": {
+    "count": "24",
+    "size": "1956",
+    "in-pack": "7840",
+    "packs": "3",
+    "size-pack": "30642",
+    "prune-packable": "0",
+    "garbage": "0",
+    "size-garbage": "0"
+  },
+  "markets": {
+    "US": {
+      "currentFinancialJsonBytes": 48204305,
+      "storedAnnualAndQuarterPeriodRows": 239169,
+      "missingTargetFiscalPeriods": 95356,
+      "averageCurrentJsonBytesPerStoredPeriod": 201.5491347122746,
+      "roughAdditionalJsonBytesToFillEveryTargetWindow": 19218919,
+      "roughEstimateLowBytes": 13453243,
+      "roughEstimateHighBytes": 24984594
+    },
+    "TW": {
+      "currentFinancialJsonBytes": 1508134,
+      "storedAnnualAndQuarterPeriodRows": 5113,
+      "missingTargetFiscalPeriods": 94964,
+      "averageCurrentJsonBytesPerStoredPeriod": 294.9606884412282,
+      "roughAdditionalJsonBytesToFillEveryTargetWindow": 28010646,
+      "roughEstimateLowBytes": 19607452,
+      "roughEstimateHighBytes": 36413839
+    }
+  },
+  "estimateNote": "Rough JSON-only projection: current market file bytes divided by stored annual+quarter rows, multiplied by missing FY2016–FY2025/fiscal-quarter rows. ±30% envelope; does not imply all missing periods are legally obtainable, does not include sidecars, reports, Git compression, or PIT metadata."
+}

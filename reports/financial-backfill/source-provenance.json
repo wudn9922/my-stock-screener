@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-15T19:02:39Z",
+  "legacyFinancialSchema": {
+    "version": 1,
+    "perCompanyFilePattern": "docs/report/financials/{symbol}.json",
+    "periodKeys": [
+      "annual.fy",
+      "quarterly.fy",
+      "quarterly.fq",
+      "end"
+    ],
+    "currencyRecorded": true,
+    "unitRecorded": false,
+    "perPeriodSourceLabels": true,
+    "filingDate": false,
+    "acceptedAt": false,
+    "accessionNumber": false,
+    "conceptPerValue": false,
+    "restatementStatus": false,
+    "derivedStatus": "only sparse top-level quarterly derived flags in some files",
+    "qualityFlags": "file-level legacy quality object; not a ten-year completeness grade"
+  },
+  "byMarketSourceCounts": {
+    "US": {
+      "periodLevel": {
+        "sec": 238568,
+        "yahoo": 88
+      },
+      "fileLevelFallback": {
+        "Yahoo Finance fundamentals-timeseries": 381,
+        "SEC EDGAR companyfacts + Yahoo Finance": 1
+      }
+    },
+    "TW": {
+      "periodLevel": {},
+      "fileLevelFallback": {
+        "Yahoo Finance fundamentals-timeseries": 5113
+      }
+    }
+  },
+  "officialAvailabilityAssessment": {
+    "US": "Existing SEC seeder and checkpointed current-market backfill are in repo. SEC companyfacts/submissions bulk ZIPs total about 2.98 GB; existing per-CIK workflow avoids repeatedly downloading full archives. SEC companyfacts are current facts, not complete filing-vintage data for point-in-time backtests.",
+    "TW": "Existing OpenAPI fundamentals do not provide a ten-year three-statement history. MOPS redirectToOld returned HTTP 200/result URLs for 2016Q1 income, balance-sheet, and cash-flow queries, but each historical result fetch returned upstream HTTP 503; no historical values were downloaded. TWSE OpenAPI is licensed under the government open-data license but only serves current seasons. TPEx reuse/republication needs dataset-specific authorization; MOPS historical redistribution terms were not verified."
+  },
+  "limitations": [
+    "Company listing/incorporation dates are not present, so eligibility-adjusted completeness is unknown.",
+    "Legacy financial JSON has period end and fiscal labels, but generally no filingDate, acceptedAt, accession number, or restatement vintage; no legacy period is certified point-in-time usable.",
+    "Null values are not tagged as not-applicable versus missing; field completeness is descriptive, not an error rate.",
+    "A financial JSON file or legacy quality.good label does not certify ten-year coverage.",
+    "Current ticker directories do not form a complete historical delisted-company directory; index-only symbols are candidates only.",
+    "Foreign reporter status alone does not establish whether quarterly filings are required in each jurisdiction."
+  ],
+  "inputSha256": {
+    "docs/report/financials/index.json": "f46407da3924d602e027970396bc6f152f7a67d6f31a7b0ad81e4e4064421dc5",
+    "docs/report/universe.json": "f762a09dc41e1a1b4e71b0e396d3bccca4cf8afc020fd1241732f5d25896cf5f",
+    "docs/atlas/symbols/directory.json": "818c9fb80592ab15c6c75081a2d1b99cdc4ba821973d13b12436ed94ba4d15f4",
+    "docs/report/fundamentals/us-market-progress.json": "ad75fc81d5af6f4377269cca1bae83e5cfeaf45486f520a1d0529c417093dbf6",
+    "reports/financial-backfill/sec-retry-batch-14.json": "d0940c718fbfcc7682ac528423ec134c6f1bd64ff282d9c4b4d7d16a874fb37c"
+  },
+  "financialDataDelta": {
+    "baseRevision": "52a95f27b654db54b9a544082b4eb0625c7ed5de",
+    "changedFinancialFiles": 0,
+    "markets": {
+      "US": {
+        "changedFiles": 0,
+        "annualPeriodsAdded": 0,
+        "annualPeriodsRemoved": 0,
+        "quarterPeriodsAdded": 0,
+        "quarterPeriodsRemoved": 0,
+        "newNonNullValueCells": 0,
+        "removedNonNullValueCells": 0,
+        "changedNonNullValues": 0,
+        "netBytesAdded": 0
+      },
+      "TW": {
+        "changedFiles": 0,
+        "annualPeriodsAdded": 0,
+        "annualPeriodsRemoved": 0,
+        "quarterPeriodsAdded": 0,
+        "quarterPeriodsRemoved": 0,
+        "newNonNullValueCells": 0,
+        "removedNonNullValueCells": 0,
+        "changedNonNullValues": 0,
+        "netBytesAdded": 0
+      }
+    },
+    "method": "compares stored fiscal-period keys and numeric value cells against the specified git revision"
+  },
+  "latestSecRetryBatch": {
+    "batchId": 14,
+    "startedAt": "2026-10-15T17:43:49Z",
+    "finishedAt": "2026-10-15T17:44:22Z",
+    "phase": "financial",
+    "status": "completed",
+    "attemptedIssuers": 66,
+    "decisionCounts": {
+      "unknownmetadata": 63,
+      "failure": 2,
+      "no-us-gaap": 1
+    },
+    "secRequests": 69,
+    "responseBytes": 1194320,
+    "followUpResumeProbe": {
+      "addedSinceFrozenSnapshotSymbols": [
+        "AMRO",
+        "BMMX",
+        "IAM"
+      ],
+      "attemptedCIKs": 0,
+      "command": "python atlas/scripts/backfill_financials_us_market.py --resume --batch-size 10",
+      "currentDirectoryCandidateCount": 5350,
+      "currentlyPresentFrozenSymbols": 5347,
+      "explanation": "The runner validates its frozen NasdaqTrader cohort. Remaining symbol-level pendingmetadata labels resolve to issuer decisions excluded_sic_6770 (85 symbols), unknownmetadata (65), or failure (2); unknownmetadata/failure decisions were explicitly retried in batch 14 and remain unresolved.",
+      "financialCompanyFilesChanged": 0,
+      "finishedAt": "2026-10-15T18:20:57Z",
+      "indexReconciliationState": "updated",
+      "responseBytes": 0,
+      "result": "no_pending_issuers",
+      "secRequests": 0,
+      "startedAt": "2026-10-15T18:20:57Z"
+    }
+  },
+  "secRetryManifest": {
+    "file": "reports/financial-backfill/sec-retry-batch-14.json",
+    "sha256": "d0940c718fbfcc7682ac528423ec134c6f1bd64ff282d9c4b4d7d16a874fb37c"
+  },
+  "sourceCrosschecks": {
+    "file": "source-crosschecks.csv",
+    "fileSha256": "f1330c4b767e948b2fc89e8011b75ed64361961b0a16113460f840ed48dd08aa",
+    "source": "SEC Company Facts current CIK response, compared using the existing SEC extractor against stored SEC-labelled values",
+    "staleRows": 0,
+    "staleSymbols": [],
+    "attemptedCurrentCikCompanies": 33,
+    "verifiedCurrentCikCompanies": 30,
+    "verifiedSymbols": [
+      "AAME",
+      "AAPL",
+      "ACAD",
+      "ADBE",
+      "AMTX",
+      "AMZN",
+      "BAC",
+      "C",
+      "COST",
+      "CVX",
+      "DELL",
+      "F",
+      "GE",
+      "GOOGL",
+      "GS",
+      "JPM",
+      "KO",
+      "META",
+      "MS",
+      "MSFT",
+      "NEE",
+      "NVDA",
+      "ORCL",
+      "PFE",
+      "PNC",
+      "TGT",
+      "UNH",
+      "USB",
+      "WFC",
+      "WMT"
+    ],
+    "currentCikStatuses": {
+      "passed": 30,
+      "no-overlapping-values": 3
+    },
+    "comparedNumericValues": 20346,
+    "mismatches": 0,
+    "secResponseBytes": 10380167,
+    "historicalCikOverrideChecks": 1,
+    "identityLineageP0": [
+      {
+        "symbol": "XOM",
+        "historicalCik": "0000034088",
+        "historicalEntity": "Exxon Mobil Corporation",
+        "currentCik": "0002115436",
+        "currentEntity": "ExxonMobil Holdings Corp"
+      }
+    ],
+    "twRawValueCrosschecks": 0,
+    "twCrosscheckBlockedBy": "MOPS historical result URL fetch returned HTTP 503; no original TW values retrieved",
+    "limitation": "Company Facts is a current facts aggregate, not an independent filing document or complete point-in-time ledger; a match validates stored values against SEC's current aggregate only."
+  }
+}

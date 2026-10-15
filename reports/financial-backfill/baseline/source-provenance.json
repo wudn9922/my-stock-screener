@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-15T19:02:33Z",
+  "legacyFinancialSchema": {
+    "version": 1,
+    "perCompanyFilePattern": "docs/report/financials/{symbol}.json",
+    "periodKeys": [
+      "annual.fy",
+      "quarterly.fy",
+      "quarterly.fq",
+      "end"
+    ],
+    "currencyRecorded": true,
+    "unitRecorded": false,
+    "perPeriodSourceLabels": true,
+    "filingDate": false,
+    "acceptedAt": false,
+    "accessionNumber": false,
+    "conceptPerValue": false,
+    "restatementStatus": false,
+    "derivedStatus": "only sparse top-level quarterly derived flags in some files",
+    "qualityFlags": "file-level legacy quality object; not a ten-year completeness grade"
+  },
+  "byMarketSourceCounts": {
+    "US": {
+      "periodLevel": {
+        "sec": 238568,
+        "yahoo": 88
+      },
+      "fileLevelFallback": {
+        "Yahoo Finance fundamentals-timeseries": 381,
+        "SEC EDGAR companyfacts + Yahoo Finance": 1
+      }
+    },
+    "TW": {
+      "periodLevel": {},
+      "fileLevelFallback": {
+        "Yahoo Finance fundamentals-timeseries": 5113
+      }
+    }
+  },
+  "officialAvailabilityAssessment": {
+    "US": "Existing SEC seeder and checkpointed current-market backfill are in repo. SEC companyfacts/submissions bulk ZIPs total about 2.98 GB; existing per-CIK workflow avoids repeatedly downloading full archives. SEC companyfacts are current facts, not complete filing-vintage data for point-in-time backtests.",
+    "TW": "Existing OpenAPI fundamentals do not provide a ten-year three-statement history. MOPS redirectToOld returned HTTP 200/result URLs for 2016Q1 income, balance-sheet, and cash-flow queries, but each historical result fetch returned upstream HTTP 503; no historical values were downloaded. TWSE OpenAPI is licensed under the government open-data license but only serves current seasons. TPEx reuse/republication needs dataset-specific authorization; MOPS historical redistribution terms were not verified."
+  },
+  "limitations": [
+    "Company listing/incorporation dates are not present, so eligibility-adjusted completeness is unknown.",
+    "Legacy financial JSON has period end and fiscal labels, but generally no filingDate, acceptedAt, accession number, or restatement vintage; no legacy period is certified point-in-time usable.",
+    "Null values are not tagged as not-applicable versus missing; field completeness is descriptive, not an error rate.",
+    "A financial JSON file or legacy quality.good label does not certify ten-year coverage.",
+    "Current ticker directories do not form a complete historical delisted-company directory; index-only symbols are candidates only.",
+    "Foreign reporter status alone does not establish whether quarterly filings are required in each jurisdiction."
+  ],
+  "inputSha256": {
+    "docs/report/financials/index.json": "f46407da3924d602e027970396bc6f152f7a67d6f31a7b0ad81e4e4064421dc5",
+    "docs/report/universe.json": "f762a09dc41e1a1b4e71b0e396d3bccca4cf8afc020fd1241732f5d25896cf5f",
+    "docs/atlas/symbols/directory.json": "818c9fb80592ab15c6c75081a2d1b99cdc4ba821973d13b12436ed94ba4d15f4",
+    "docs/report/fundamentals/us-market-progress.json": "ad75fc81d5af6f4377269cca1bae83e5cfeaf45486f520a1d0529c417093dbf6"
+  },
+  "financialDataDelta": null,
+  "latestSecRetryBatch": {
+    "batchId": 12,
+    "startedAt": "2026-10-15T09:51:45Z",
+    "finishedAt": "2026-10-15T09:52:41Z",
+    "phase": "metadata_only",
+    "status": "completed",
+    "attemptedIssuers": 83,
+    "decisionCounts": {
+      "seeded_existing_screened_operating_candidate": 83
+    },
+    "secRequests": 83,
+    "responseBytes": 1931108
+  },
+  "secRetryManifest": null,
+  "sourceCrosschecks": {
+    "file": null,
+    "fileSha256": null,
+    "source": "SEC Company Facts current CIK response, compared using the existing SEC extractor against stored SEC-labelled values",
+    "staleRows": 0,
+    "staleSymbols": [],
+    "attemptedCurrentCikCompanies": 0,
+    "verifiedCurrentCikCompanies": 0,
+    "verifiedSymbols": [],
+    "currentCikStatuses": {},
+    "comparedNumericValues": 0,
+    "mismatches": 0,
+    "secResponseBytes": 0,
+    "historicalCikOverrideChecks": 0,
+    "identityLineageP0": [],
+    "twRawValueCrosschecks": 0,
+    "twCrosscheckBlockedBy": "MOPS historical result URL fetch returned HTTP 503; no original TW values retrieved",
+    "limitation": "Company Facts is a current facts aggregate, not an independent filing document or complete point-in-time ledger; a match validates stored values against SEC's current aggregate only."
+  }
+}

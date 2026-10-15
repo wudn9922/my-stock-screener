@@ -1,0 +1,29 @@
+{
+  "baseRevision": "52a95f27b654db54b9a544082b4eb0625c7ed5de",
+  "changedFinancialFiles": 0,
+  "markets": {
+    "US": {
+      "changedFiles": 0,
+      "annualPeriodsAdded": 0,
+      "annualPeriodsRemoved": 0,
+      "quarterPeriodsAdded": 0,
+      "quarterPeriodsRemoved": 0,
+      "newNonNullValueCells": 0,
+      "removedNonNullValueCells": 0,
+      "changedNonNullValues": 0,
+      "netBytesAdded": 0
+    },
+    "TW": {
+      "changedFiles": 0,
+      "annualPeriodsAdded": 0,
+      "annualPeriodsRemoved": 0,
+      "quarterPeriodsAdded": 0,
+      "quarterPeriodsRemoved": 0,
+      "newNonNullValueCells": 0,
+      "removedNonNullValueCells": 0,
+      "changedNonNullValues": 0,
+      "netBytesAdded": 0
+    }
+  },
+  "method": "compares stored fiscal-period keys and numeric value cells against the specified git revision"
+}
