@@ -55,6 +55,9 @@ CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
 VERSION = 1
 SOURCE = "Yahoo Finance fundamentals-timeseries"
 SOURCE_MIXED = "SEC EDGAR companyfacts + Yahoo Finance"
+# index.json item: date of the last SEC companyfacts check (seed_financials_sec.py --due). Kept apart from
+# checkedAt, which is the Yahoo check date; run_refresh and seed_financials_sec.update_index carry it over
+SEC_CHECKED_KEY = "secCheckedAt"
 REQUEST_DELAY = 0.15
 DEFAULT_BUDGET_SECONDS = 600
 MAX_CONSECUTIVE_FAILURES = 8
@@ -1214,6 +1217,8 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
         if key in documents:
             item = dict(items[key])
             item["lastListed"] = last_listed
+            if isinstance(previous.get(SEC_CHECKED_KEY), str):
+                item[SEC_CHECKED_KEY] = previous[SEC_CHECKED_KEY]
             final[key] = item
         elif previous:
             final[key] = dict(previous, lastListed=last_listed)
