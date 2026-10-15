@@ -146,6 +146,51 @@ def issuer_screen_summary(progress: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def summarize_split_check_rechecks(rechecks: Any) -> list[dict[str, Any]]:
+    """Summarize persisted split-check retries without replacing the original batch outcomes."""
+    if not isinstance(rechecks, list):
+        return []
+    summaries = []
+    for recheck in rechecks:
+        if not isinstance(recheck, dict):
+            continue
+        outcomes = recheck.get("outcomes") if isinstance(recheck.get("outcomes"), dict) else {}
+        chart_counts = Counter()
+        pending_notes = 0
+        event_count = 0
+        adjusted_count = 0
+        for outcome in outcomes.values():
+            if not isinstance(outcome, dict):
+                continue
+            split = outcome.get("split") if isinstance(outcome.get("split"), dict) else {}
+            chart = split.get("chart")
+            chart_counts[chart if chart in ("fetched", "failed") else "not_requested"] += 1
+            pending_notes += outcome.get("note") == "split-check-pending"
+            event_count += split.get("events", 0) if isinstance(split.get("events"), int) else 0
+            adjusted_count += split.get("adjusted") is True
+        remaining = recheck.get("remainingSymbols")
+        remaining_count = len(remaining) if isinstance(remaining, list) else 0
+        symbols = recheck.get("symbols")
+        summaries.append({
+            "batchId": recheck.get("batchId"),
+            "status": recheck.get("status", "unknown"),
+            "startedAt": recheck.get("startedAt"),
+            "finishedAt": recheck.get("finishedAt"),
+            "requestedSymbols": len(symbols) if isinstance(symbols, list) else len(outcomes),
+            "checkedSymbols": len(outcomes),
+            "chartFetches": chart_counts["fetched"],
+            "chartFailures": chart_counts["failed"],
+            "notRequested": chart_counts["not_requested"],
+            "splitEvents": event_count,
+            "adjustedFiles": adjusted_count,
+            "pendingAfterCheck": remaining_count + pending_notes,
+            "secWireRequests": recheck.get("secWireRequests", 0),
+            "stoppedReason": recheck.get("stoppedReason"),
+            "interpreter": recheck.get("interpreter"),
+        })
+    return summaries
+
+
 def build_report(snapshot: dict[str, Any], progress: dict[str, Any], as_of: date,
                  baseline_revision: str, financials_dir: Path) -> dict[str, Any]:
     cutoff = compute_cutoff(as_of)
@@ -238,6 +283,7 @@ def build_report(snapshot: dict[str, Any], progress: dict[str, Any], as_of: date
     latest_validation = validations[-1] if validations else None
     screen_summary = issuer_screen_summary(progress)
     latest_batch = (progress.get("batches") or [None])[-1]
+    split_rechecks = summarize_split_check_rechecks(progress.get("splitCheckRechecks", []))
     directory = snapshot.get("directoryCounts", {})
     return {
         "version": 1,
@@ -276,6 +322,7 @@ def build_report(snapshot: dict[str, Any], progress: dict[str, Any], as_of: date
             "progressStatus": progress.get("status"),
             "batchCount": len(progress.get("batches", [])),
             "latestBatch": latest_batch,
+            "splitCheckRechecks": split_rechecks,
             "remainingNewIssuerQueue": screen_summary["pendingNewIssuers"],
             "remainingExistingMetadataQueue": screen_summary["existingSeededIssuersPendingScreen"],
             "pendingIndexSymbols": progress.get("pendingIndexSymbols", []),
@@ -327,6 +374,17 @@ def render_markdown(report: dict[str, Any]) -> str:
     if batch:
         lines.append(f"Batch {batch.get('batchId')} ({batch.get('phase', 'unknown')}) attempted {len(batch.get('attemptedCIKs', [])):,} issuer groups; status: {batch.get('status', 'unknown')}. SEC requests this batch: {batch.get('secRequestsAfter', 0) - batch.get('secRequestsBefore', 0)}; raw SEC bytes received: {batch.get('secBytesAfter', 0) - batch.get('secBytesBefore', 0):,}.")
         lines.append(f"The batch checkpoint has {batch.get('remainingNewIssuerQueue', batch.get('remainingPendingNewIssuers', '—'))} new issuer groups pending and {batch.get('remainingPendingMetadataOnlyIssuers', '—')} existing metadata screens pending.")
+    for recheck in queue.get("splitCheckRechecks", []):
+        line = (f"Split-check recheck for batch {recheck.get('batchId')}: {recheck.get('status')}; "
+                f"{recheck.get('checkedSymbols', 0)}/{recheck.get('requestedSymbols', 0)} symbols checked, "
+                f"{recheck.get('chartFetches', 0)} chart responses, {recheck.get('chartFailures', 0)} chart failures, "
+                f"{recheck.get('splitEvents', 0)} split events recorded, {recheck.get('adjustedFiles', 0)} files adjusted, "
+                f"{recheck.get('pendingAfterCheck', 0)} still pending, and {recheck.get('secWireRequests', 0)} SEC wire requests.")
+        if recheck.get("stoppedReason"):
+            line += f" Stop reason: {recheck['stoppedReason']}."
+        if recheck.get("interpreter"):
+            line += f" Interpreter: `{recheck['interpreter']}`."
+        lines.append(line)
     lines.extend([
         "",
         f"Run `{queue['resumeCommand']}` to continue the next stable batch. Add `--retry` only after reviewing failure and unknown-metadata decisions. Each resume fetches both current NasdaqTrader directories again and records any frozen symbol that is no longer present as `not_current_directory`; that label does not assert legal delisting.",
