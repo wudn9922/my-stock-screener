@@ -7,14 +7,14 @@ There are currently 3,946 financial files among those listing symbols: 3,906 SEC
 ## Listing and issuer screening
 
 The NasdaqTrader filters accepted 5,347 unique listing rows and excluded 7,940 rows. The 506 SPAC-name matches are a string heuristic, separate from confirmed blank-check issuers.
-SEC submissions confirmed 85 SIC 6770 blank-check issuers and identified 4,556 active-directory operating candidates. 67 issuer decisions remain unknown or failed. An SIC other than 6770 is a queueing basis and does not certify legal non-shell status; entityType alone is not treated as shell evidence.
-The current resume queue has 0 new issuer groups pending and 583 existing SEC-seeded issuer groups still awaiting a submissions screen. Existing financial files remain available while that metadata queue is pending.
+SEC submissions confirmed 85 SIC 6770 blank-check issuers and identified 5,056 active-directory operating candidates. 67 issuer decisions remain unknown or failed. An SIC other than 6770 is a queueing basis and does not certify legal non-shell status; entityType alone is not treated as shell evidence.
+The current resume queue has 0 new issuer groups pending and 83 existing SEC-seeded issuer groups still awaiting a submissions screen. Existing financial files remain available while that metadata queue is pending.
 Financial index reconciliation pending for 0 symbol files.
 
 ## Current batch and resume
 
-Batch 10 (financial) attempted 206 issuer groups; status: completed. SEC requests this batch: 402; raw SEC bytes received: 26,008,528.
-The batch checkpoint has 0 new issuer groups pending and 583 existing metadata screens pending.
+Batch 11 (metadata_only) attempted 500 issuer groups; status: completed. SEC requests this batch: 500; raw SEC bytes received: 13,356,420.
+The batch checkpoint has 0 new issuer groups pending and 83 existing metadata screens pending.
 Split-check recheck for batch 2: stopped_split_unavailable; 1/174 symbols checked, 0 chart responses, 1 chart failures, 0 split events recorded, 0 files adjusted, 174 still pending, and 0 SEC wire requests. Stop reason: Yahoo connection failed: SplitUnavailable: curl_cffi is not installed (pip install curl_cffi).
 Split-check recheck for batch 2: completed; 174/174 symbols checked, 174 chart responses, 0 chart failures, 236 split events recorded, 74 files adjusted, 0 still pending, and 0 SEC wire requests. Interpreter: `/tmp/tw-mops-backfill-venv/bin/python`.
 
