@@ -1,7 +1,7 @@
 import { itemStatusOf, type GroupItem } from '../report/schema';
 import type { GrowthFile, GrowthOrigin, GrowthRecord } from '../fundamentals/GrowthProvider';
 import { formatPercent, maDistance, maValue, toneClass } from '../ui/format';
-import { growthRecordFor, maDeviation, type FilterState } from './screenerFilters';
+import { epsStreak, growthRecordFor, maDeviation, type FilterState } from './screenerFilters';
 
 export type SortMode = 'default' | 'gain' | 'loss' | 'symbol' | 'ma' | 'rs' | 'hi' | 'vr' | 'ma50' | 'r21' | 'eps';
 export const SORT_LABELS: Record<SortMode, string> = {
@@ -108,11 +108,11 @@ export function resultCountText(shown: readonly GroupItem[], total: number, view
 
 // ---------------------------------------------------------------- row pills
 
-export type MetricPill = 'rs' | 'hi' | 'vr' | 'ma50' | 'ema20' | 'r21' | 'eps' | 'rev' | 'epsY' | 'revY';
+export type MetricPill = 'rs' | 'hi' | 'vr' | 'ma50' | 'ema20' | 'r21' | 'eps' | 'rev' | 'epsY' | 'revY' | 'epss';
 const MAX_PILLS = 2;
 /** Fundamental pills (EPS / revenue growth) have their own allowance so a growth filter always shows its numbers. */
-const MAX_GROWTH_PILLS = 4;
-const GROWTH_PILLS: readonly MetricPill[] = ['eps', 'rev', 'epsY', 'revY'];
+const MAX_GROWTH_PILLS = 5;
+const GROWTH_PILLS: readonly MetricPill[] = ['eps', 'rev', 'epsY', 'revY', 'epss'];
 
 /**
  * Extra row pills: the sort's metric first, then the filtered ones (at most two technical ones plus the
@@ -131,6 +131,7 @@ export function rowMetricPills(sort: SortMode, state: FilterState, maList: reado
   if (state.epsY) add('epsY');
   if (state.rev) add('rev');
   if (state.revY) add('revY');
+  if (state.epss !== null) add('epss');
   if (state.ema20) add('ema20');
   const technical = keys.filter((key) => !GROWTH_PILLS.includes(key)).slice(0, MAX_PILLS);
   const growth = keys.filter((key) => GROWTH_PILLS.includes(key)).slice(0, MAX_GROWTH_PILLS);
@@ -144,7 +145,7 @@ export interface PillContent {
 }
 
 /** Text of one metric pill for a row; null when the row has no value for it. */
-export function metricPill(item: GroupItem, key: MetricPill, growth?: GrowthFile | null): PillContent | null {
+export function metricPill(item: GroupItem, key: MetricPill, growth?: GrowthFile | null, includeTurn = true): PillContent | null {
   const m = item.metrics;
   switch (key) {
     case 'rs': {
@@ -197,6 +198,19 @@ export function metricPill(item: GroupItem, key: MetricPill, growth?: GrowthFile
       if (latest === null) return null;
       return { text: `${name} ${formatPercent(latest, 0)}`, title: `${isEps ? 'EPS' : '營收'} YoY ${detail}`, tone: toneClass(latest) };
     }
+    case 'epss': {
+      const record = growthRecordFor(item, growth);
+      if (!record) return null;
+      const streak = epsStreak(record, includeTurn);
+      if (streak.years < 1) return null;
+      // Ten is the stored horizon: a streak that reaches it may be longer.
+      const count = `${streak.years}${streak.stop === null ? '+' : ''}`;
+      return {
+        text: `EPS連增 ${count}年`,
+        title: `年度 EPS 連續成長 ${count} 年（從最新年度往回數，年增率 > 0${includeTurn ? '，含虧轉盈' : ''}）。${growthDetail(record, true)}`,
+        tone: 'up',
+      };
+    }
   }
 }
 
@@ -209,13 +223,17 @@ export const GROWTH_ORIGIN_LABELS: Record<GrowthOrigin, string> = {
   'us-growth': 'Yahoo Finance 季資料',
 };
 const originText = (origin: GrowthOrigin | null) => (origin ? GROWTH_ORIGIN_LABELS[origin] : '—');
-/** `+30% / +20% / — / —`: newest first; a dash is a period without a number, 轉盈 a loss-to-profit turn. */
-const historyText = (values: readonly (number | null)[], turns: readonly boolean[]) =>
-  values.length || turns.some(Boolean)
-    ? Array.from({ length: Math.max(values.length, turns.length) }, (_, slot) =>
-        values[slot] != null ? formatPercent(values[slot]!, 0) : turns[slot] ? '轉盈' : '—',
-      ).join(' / ')
+/**
+ * `+30% / +20% / —`: newest first; a dash is a period without a number, 轉盈 a loss-to-profit turn. The periods
+ * older than the last one with a number or a turn are left out (the masks always span the whole horizon).
+ */
+const historyText = (values: readonly (number | null)[], turns: readonly boolean[]) => {
+  let count = Math.max(values.length, turns.length);
+  while (count > 0 && values[count - 1] == null && !turns[count - 1]) count -= 1;
+  return count
+    ? Array.from({ length: count }, (_, slot) => (values[slot] != null ? formatPercent(values[slot]!, 0) : turns[slot] ? '轉盈' : '—')).join(' / ')
     : '—';
+};
 
 /**
  * Tooltip text with both quarterly and annual YoY (newest → older), the latest period ends, the source of each

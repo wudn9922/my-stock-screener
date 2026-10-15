@@ -6,13 +6,14 @@ import { growthKey, type GrowthFile, type GrowthRecord } from '../fundamentals/G
  * Screener filter conditions: state, the compact `f` URL encoding and the pure filter itself.
  *
  * Encoding (`;`-separated, canonical order, open range ends left empty, `~` also accepted):
- * `chg:0:3;ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;rs3:0;rs1:0;vr:1.2;eps:2:20;epsy:2:15;rev:1:10;revy:3:0;acc:1;tn:0;nd:keep`
+ * `chg:0:3;ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;rs3:0;rs1:0;vr:1.2;eps:2:20;epsy:2:15;epss:3;rev:1:10;revy:3:0;acc:1;tn:0;nd:keep`
  * - chg / ema20: inclusive ranges in % (today's change, close vs EMA20 distance)
  * - tr: trend flags (above MA20/50/200, MA20 rising, bullish stack 0 < d20 < d50 < d200, no downtrend)
  * - hi: within N% of the 52-week high; rs: RS percentile ≥ N (rank within the market's universe);
  *   rs3 / rs1: 3-month / 1-month relative return vs the market's benchmark index > N%
  * - vr: volume vs the previous session ≥ N (today ÷ yesterday)
- * - eps / rev: the latest Q (1–4) quarters all have YoY ≥ N%; epsy / revy: the latest Y (1–3) fiscal years all do
+ * - eps / rev: the latest Q (1–4) quarters all have YoY ≥ N%; epsy / revy: the latest Y (1–10) fiscal years all do
+ * - epss:N: EPS grew for at least N fiscal years in a row, counting back from the latest one (see `epsStreak`)
  * - acc:1: EPS growth accelerates (the latest quarter's YoY is above the previous quarter's)
  * - tn:0: loss-to-profit turnarounds do NOT count as growth (the default counts them, in any period of the window)
  * - nd:keep keeps stocks whose fundamentals are missing (the default excludes them)
@@ -32,13 +33,18 @@ export interface GrowthGate {
   min: number;
 }
 export interface YearGate {
-  /** Latest N fiscal years (1–3) must all pass. */
+  /** Latest N fiscal years (1–10) must all pass. */
   years: number;
   /** Minimum YoY %. */
   min: number;
 }
 export const MAX_GATE_QUARTERS = 4;
-export const MAX_GATE_YEARS = 3;
+/** Annual YoY values in growth.json (build_growth.py YEAR_SLOTS): the longest annual window. */
+export const MAX_GATE_YEARS = 10;
+/** Periods offered by the filter sheet for the annual windows (a link may carry any 1–10). */
+export const YEAR_PRESETS: readonly number[] = [1, 2, 3, 5, 10];
+/** Longest EPS growth streak that can be counted (the stored annual horizon). */
+export const MAX_STREAK_YEARS = MAX_GATE_YEARS;
 /** Growth thresholds offered by the filter sheet (a link may carry any other number). */
 export const GROWTH_PRESETS: readonly number[] = [0, 10, 20, 30, 50];
 /** An applied threshold that is not one of the presets (an old or hand-made link): shown as 「目前條件」. */
@@ -71,6 +77,8 @@ export interface FilterState {
   /** Annual EPS / revenue YoY. */
   epsY: YearGate | null;
   revY: YearGate | null;
+  /** EPS grew for at least N fiscal years in a row (see `epsStreak`). */
+  epss: number | null;
   /** EPS growth accelerates: the latest quarter's YoY is above the previous quarter's. */
   accel: boolean;
   /** Loss-to-profit turnarounds count as growth (in any period of the window). */
@@ -92,6 +100,7 @@ export const EMPTY_FILTERS: FilterState = Object.freeze({
   rev: null,
   epsY: null,
   revY: null,
+  epss: null,
   accel: false,
   turn: true,
   keepMissing: false,
@@ -134,6 +143,11 @@ const yearGate = (parts: string[]): YearGate | null => {
   const gate = gateOf(parts, MAX_GATE_YEARS);
   return gate && { years: gate.periods, min: gate.min };
 };
+/** `epss:N` → the streak length 1–10 (exactly one number), or null. */
+const streakOf = (parts: string[]): number | null => {
+  const years = parts.length === 1 ? number(parts[0]) : null;
+  return years !== null && Number.isInteger(years) && years >= 1 && years <= MAX_STREAK_YEARS ? years : null;
+};
 
 /** Parses an `f` parameter (or stored filters). Never throws; anything unusable is dropped. */
 export function parseFilters(value: string | null | undefined): FilterState {
@@ -163,6 +177,7 @@ export function parseFilters(value: string | null | undefined): FilterState {
     else if (key === 'rev') state.rev = quarterGate(parts);
     else if (key === 'epsy') state.epsY = yearGate(parts);
     else if (key === 'revy') state.revY = yearGate(parts);
+    else if (key === 'epss') state.epss = streakOf(parts);
     else if (key === 'acc') state.accel = parts[0]?.trim() !== '0';
     else if (key === 'tn') state.turn = parts[0]?.trim() !== '0';
     else if (key === 'nd') state.keepMissing = parts[0]?.trim().toLowerCase() === 'keep';
@@ -188,11 +203,12 @@ export function serializeFilters(state: FilterState): string {
   if (state.vr !== null) tokens.push(`vr:${formatNumber(state.vr)}`);
   if (state.eps) tokens.push(`eps:${state.eps.quarters}:${formatNumber(state.eps.min)}`);
   if (state.epsY) tokens.push(`epsy:${state.epsY.years}:${formatNumber(state.epsY.min)}`);
+  if (state.epss !== null) tokens.push(`epss:${state.epss}`);
   if (state.rev) tokens.push(`rev:${state.rev.quarters}:${formatNumber(state.rev.min)}`);
   if (state.revY) tokens.push(`revy:${state.revY.years}:${formatNumber(state.revY.min)}`);
   if (state.accel) tokens.push('acc:1');
   // `tn` only matters with an EPS condition, `nd` with any fundamental one.
-  if (!state.turn && (state.eps || state.epsY || state.accel)) tokens.push('tn:0');
+  if (!state.turn && (state.eps || state.epsY || state.epss !== null || state.accel)) tokens.push('tn:0');
   if (state.keepMissing && needsGrowth(state)) tokens.push('nd:keep');
   let text = '';
   for (const token of tokens) {
@@ -253,6 +269,39 @@ export function epsAccelStatus(record: GrowthRecord | null, includeTurn: boolean
 
 export type FundamentalKind = 'eps' | 'rev' | 'epsY' | 'revY';
 
+/**
+ * EPS growth streak: how many fiscal years in a row, counting back from the latest one (index 0), have an annual
+ * EPS YoY above 0; a loss-to-profit turn counts as growth when `includeTurn`. The count stops at the first year that
+ * does not grow, and never passes the stored horizon (10 years). `stop` says why: 'decline' = a year with YoY ≤ 0,
+ * 'missing' = no number (no year-ago EPS base, a gap in the years, or a turn while turns do not count), null when
+ * every stored year grew.
+ */
+export function epsStreak(
+  record: GrowthRecord | null | undefined,
+  includeTurn: boolean,
+): { years: number; stop: 'decline' | 'missing' | null } {
+  const values = record?.epsYoYAnnual ?? [];
+  const turns = record?.epsTurnAnnual ?? [];
+  for (let slot = 0; slot < MAX_STREAK_YEARS; slot++) {
+    const value = values[slot] ?? null;
+    if (value === null) {
+      if (includeTurn && turns[slot]) continue;
+      return { years: slot, stop: 'missing' };
+    }
+    if (value <= 0) return { years: slot, stop: 'decline' };
+  }
+  return { years: MAX_STREAK_YEARS, stop: null };
+}
+
+/**
+ * `epss:N`: the streak is at least N years. A streak that stops at missing data before N years is kept only with
+ * `keepMissing` (the same rule as the YoY gates); a year of decline always excludes the stock.
+ */
+export function streakPasses(record: GrowthRecord | null | undefined, years: number, keepMissing: boolean, includeTurn: boolean): boolean {
+  const streak = epsStreak(record, includeTurn);
+  return streak.years >= years || (keepMissing && streak.stop === 'missing');
+}
+
 /** How many of the rows have every one of the latest `periods` values (a turnaround counts when allowed). */
 export function gateCoverage(
   items: readonly GroupItem[],
@@ -281,8 +330,8 @@ export function accelCoverage(items: readonly GroupItem[], growth: GrowthFile | 
 
 // ---------------------------------------------------------- availability
 
-export type FilterKey = 'chg' | 'ema20' | 'tr' | 'hi' | 'rs' | 'rs3' | 'rs1' | 'vr' | 'eps' | 'rev' | 'epsY' | 'revY' | 'accel';
-export const FILTER_KEYS: readonly FilterKey[] = ['chg', 'ema20', 'tr', 'hi', 'rs', 'rs3', 'rs1', 'vr', 'eps', 'rev', 'epsY', 'revY', 'accel'];
+export type FilterKey = 'chg' | 'ema20' | 'tr' | 'hi' | 'rs' | 'rs3' | 'rs1' | 'vr' | 'eps' | 'rev' | 'epsY' | 'revY' | 'epss' | 'accel';
+export const FILTER_KEYS: readonly FilterKey[] = ['chg', 'ema20', 'tr', 'hi', 'rs', 'rs3', 'rs1', 'vr', 'eps', 'rev', 'epsY', 'revY', 'epss', 'accel'];
 /** SMA distances are no longer a filter, but the trend flags still need them; their availability is tracked too. */
 export type TrendMaKey = 'ma20' | 'ma50' | 'ma200';
 
@@ -336,6 +385,7 @@ export function filterAvailability(items: readonly GroupItem[], context: FilterC
     rev: fundamentals((record) => someNumber(record.revYoY)),
     epsY: fundamentals((record) => someNumber(record.epsYoYAnnual, record.epsTurnAnnual)),
     revY: fundamentals((record) => someNumber(record.revYoYAnnual)),
+    epss: fundamentals((record) => someNumber(record.epsYoYAnnual, record.epsTurnAnnual)),
     accel: fundamentals((record) => record.epsYoY.length > 1 || record.epsTurnQ[0] === true),
   };
 }
@@ -381,7 +431,7 @@ export function applyFilters(items: readonly GroupItem[], state: FilterState, co
   const ema20 = state.ema20;
   if (ema20 && !available.ema20) tests.push((item) => inRange(item.metrics?.ema20 ?? null, ema20));
   for (const flag of state.tr) if (!trendFlagUnavailable(flag, available)) tests.push(TREND_TESTS[flag]);
-  const { hi, rs, rs3, rs1, vr, eps, rev, epsY, revY, accel, turn, keepMissing } = state;
+  const { hi, rs, rs3, rs1, vr, eps, rev, epsY, revY, epss, accel, turn, keepMissing } = state;
   if (hi !== null && !available.hi) tests.push((item) => (item.metrics?.fromHi52 ?? -Infinity) >= -hi);
   if (rs !== null && !available.rs) tests.push((item) => (item.metrics?.rsRank ?? -Infinity) >= rs);
   if (rs3 !== null && !available.rs3) tests.push((item) => (item.metrics?.rs63 ?? -Infinity) > rs3);
@@ -398,6 +448,7 @@ export function applyFilters(items: readonly GroupItem[], state: FilterState, co
       const r = record(item);
       return growthGatePasses(r?.epsYoYAnnual, epsY, keepMissing, turn ? (r?.epsTurnAnnual ?? []) : []);
     });
+  if (epss !== null && !available.epss) tests.push((item) => streakPasses(record(item), epss, keepMissing, turn));
   if (rev && !available.rev) tests.push((item) => growthGatePasses(record(item)?.revYoY, rev, keepMissing));
   if (revY && !available.revY) tests.push((item) => growthGatePasses(record(item)?.revYoYAnnual, revY, keepMissing));
   if (accel && !available.accel)
@@ -431,6 +482,7 @@ export function gateLabel(name: string, gate: GrowthGate): string {
 export function yearGateLabel(name: string, gate: YearGate): string {
   return gate.years === 1 ? `${name} 年增 ≥${formatNumber(gate.min)}%` : `${name} 年增 近${gate.years}年皆≥${formatNumber(gate.min)}%`;
 }
+export const streakLabel = (years: number): string => `EPS 連續成長 ≥${years} 年`;
 
 /** One removable chip per condition (each trend flag separately), in the encoding's order. */
 export function activeChips(state: FilterState, availability?: FilterAvailability): FilterChip[] {
@@ -448,10 +500,11 @@ export function activeChips(state: FilterState, availability?: FilterAvailabilit
   if (state.vr !== null) chips.push({ id: 'vr', key: 'vr', label: `量比 ≥${formatNumber(state.vr)}` });
   if (state.eps) chips.push({ id: 'eps', key: 'eps', label: gateLabel('EPS', state.eps) });
   if (state.epsY) chips.push({ id: 'epsY', key: 'epsY', label: yearGateLabel('EPS', state.epsY) });
+  if (state.epss !== null) chips.push({ id: 'epss', key: 'epss', label: streakLabel(state.epss) });
   if (state.rev) chips.push({ id: 'rev', key: 'rev', label: gateLabel('營收', state.rev) });
   if (state.revY) chips.push({ id: 'revY', key: 'revY', label: yearGateLabel('營收', state.revY) });
   if (state.accel) chips.push({ id: 'accel', key: 'accel', label: 'EPS 成長加速' });
-  if (!state.turn && (state.eps || state.epsY || state.accel)) chips.push({ id: 'turn', key: 'eps', label: '不含虧轉盈' });
+  if (!state.turn && (state.eps || state.epsY || state.epss !== null || state.accel)) chips.push({ id: 'turn', key: 'eps', label: '不含虧轉盈' });
   return chips.map((chip) => ({
     ...chip,
     unavailable: !availability
@@ -470,7 +523,7 @@ export function countFilters(state: FilterState): number {
 export function removeFilter(state: FilterState, id: ChipId): FilterState {
   const next: FilterState = { ...state, tr: [...state.tr] };
   if (id.startsWith('tr:')) next.tr = next.tr.filter((flag) => `tr:${flag}` !== id);
-  else if (id === 'chg' || id === 'ema20' || id === 'eps' || id === 'rev' || id === 'epsY' || id === 'revY') next[id] = null;
+  else if (id === 'chg' || id === 'ema20' || id === 'eps' || id === 'rev' || id === 'epsY' || id === 'revY' || id === 'epss') next[id] = null;
   else if (id === 'hi' || id === 'rs' || id === 'rs3' || id === 'rs1' || id === 'vr') next[id] = null;
   else if (id === 'accel') next.accel = false;
   else if (id === 'turn') next.turn = true;
@@ -479,7 +532,7 @@ export function removeFilter(state: FilterState, id: ChipId): FilterState {
 
 /** True when the state needs the growth data. */
 export function needsGrowth(state: FilterState): boolean {
-  return !!(state.eps || state.rev || state.epsY || state.revY || state.accel);
+  return !!(state.eps || state.rev || state.epsY || state.revY || state.epss !== null || state.accel);
 }
 
 // --------------------------------------------------------------- storage

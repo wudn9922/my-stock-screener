@@ -801,6 +801,25 @@ class RunTest(unittest.TestCase):
         # Never fetched first (priority order), then the oldest check / miss
         self.assertEqual(fetch.calls, ["NEW2", "NEW1", "OLDER", "OLD", "RETRY"])
 
+    def test_sec_check_date_of_the_index_survives_the_yahoo_run(self):
+        # seed_financials_sec.py --due keeps its SEC check date (SEC_CHECKED_KEY) in index.json; the Yahoo run
+        # rebuilds every item, so it must carry the date over, whether the file is unchanged or re-merged
+        fetch = Fetcher({"AAPL": "yahoo_us_full.json"})
+        self.run_once(["AAPL"], fetch)
+        index = self.index()
+        index["items"]["AAPL"][fin.SEC_CHECKED_KEY] = "2026-10-01"
+        fin.write_atomic(os.path.join(self.out, "index.json"), index)
+        self.run_once(["AAPL"], fetch, now=NOW + timedelta(days=46))            # Yahoo check 46 days old: due
+        self.assertEqual(self.index()["items"]["AAPL"][fin.SEC_CHECKED_KEY], "2026-10-01")
+        path = os.path.join(self.out, "AAPL.json")
+        with open(path, encoding="utf-8") as file:
+            document = json.load(file)
+        document["quarterly"]["values"]["cash"][-1] = 1
+        fin.write_atomic(path, document)
+        stats = self.run_once(["AAPL"], fetch, now=NOW + timedelta(days=50))
+        self.assertEqual(stats["updated"], 1)
+        self.assertEqual(self.index()["items"]["AAPL"][fin.SEC_CHECKED_KEY], "2026-10-01")
+
     def test_budget_stops_and_keeps_written_files(self):
         ticks = iter([0.0, 0.0, 5.0, 11.0, 12.0, 13.0])
         fetch = Fetcher({"AAPL": "yahoo_us_full.json", "2330.TW": "yahoo_tw_2330.json"})

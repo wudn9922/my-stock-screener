@@ -13,6 +13,30 @@ Results: 71 written, 526 unchanged, 40 skipped. Skip reasons: foreign-filer 32, 
 SEC requests: 639; response bytes: 149231725; financial/index JSON bytes written: 1342417. Unique cached SEC bodies: 635 (148701804 bytes). Split checks: Yahoo connected, 122 chart requests; 40 tickers with split events, 107 adjusted, 0 pending. 516 implausible values in 153 tickers were left null.
 New financial files in this tracked snapshot: BLDR, CTVA, PSKY, TAP, WBD.
 
+## Quarterly re-check (`--due`)
+
+The daily Yahoo run only refreshes the files in its own symbol list, so the other stored US files (the SEC-backed ones) would never see a new 10-Q or 10-K. `seed_financials_sec.py --due` re-checks them from SEC companyfacts, and only the ones that are due:
+
+- never checked (no SEC check date yet), or
+- last SEC check more than 45 days ago, or
+- latest reported period (the latest quarter; the latest annual period for a file without quarters) older than 100 days and last checked more than 3 days ago, because a new 10-Q or 10-K may be out.
+
+These are the rules of `build_financials.needs_refresh` with the SEC check date in place of the Yahoo one. Candidates are US files that carry SEC periods. Taiwan files, Yahoo-only files and unreadable files are never candidates. The oldest check goes first.
+
+The SEC check date is `secCheckedAt` on the file's item in `docs/report/financials/index.json`. Yahoo's `checkedAt`, which `needs_refresh` reads for the daily run, is not touched. Each check applies the same merge, split and quality rules as the seeder, and an unchanged file is not rewritten. The daily Yahoo run and the market backfill keep `secCheckedAt` when they rewrite the index.
+
+```
+python atlas/scripts/seed_financials_sec.py --due --dry-run        # offline: due count and list, nothing fetched or written
+python atlas/scripts/seed_financials_sec.py --due --budget 3000    # repeat until the summary shows "remaining due: 0"
+```
+
+- `--budget SECONDS` stops before the next ticker once that many seconds have passed (exit 0, `PAUSED`). The next run continues with the files still due.
+- The first HTTP 403 from SEC stops a `--due` run at once (exit 1). Nothing is retried, and the file in progress is not recorded as checked. Other answers count as checks: a 404, a 5xx after the retries, an extraction error or a skipped file is listed in the summary and is due again after 45 days or at the next quarterly run.
+- `--due` needs `index.json`; it refuses to run without it. Plain runs (`--tickers`, `--force`) are unchanged and do not write check dates.
+- A `--due` run re-applies the current extraction rules to every file it checks, so the first run may rewrite many files even without new filings. Review the summary before committing.
+
+Suggested cadence: mid-February, May, August and November, after each reporting season, each run repeated until nothing remains due.
+
 ## Offline Yahoo null restoration
 
 The SEC refresh kept its reported values and lineage. An offline pass used the pre-refresh Git snapshot and the standard period matching/null-fill rules to restore only missing cells in retained SEC periods; no period or SEC non-null value was changed. It planned 140 annual and 197 quarterly Yahoo null fills across 12 files. EPS fills additionally require matching fiscal labels, unchanged split metadata, and diluted shares within 1%.

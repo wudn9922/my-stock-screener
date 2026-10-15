@@ -656,7 +656,7 @@ def growth_candidates(document, symbols, today):
             continue
         quarters, annual = company_periods(row)
         q = growth.yoy_series(quarters, True, growth.QUARTER_SLOTS, [], today, growth.STALE_QUARTER_DAYS, tw_pair)
-        y = growth.yoy_series(annual, False, growth.YEAR_SLOTS, [], today, growth.STALE_ANNUAL_DAYS, tw_pair)
+        y = growth.yoy_series(annual, False, growth.RECENT_YEAR_SLOTS, [], today, growth.STALE_ANNUAL_DAYS, tw_pair)
         if q is not None or y is not None:
             result[symbol] = (None, q, y)
     return result

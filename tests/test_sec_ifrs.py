@@ -427,12 +427,12 @@ class SeedWiringTests(unittest.TestCase):
             self.before_sync = file.read()
         self.state_path = os.path.join(self.tmp, "state", "sec-ifrs-state.json")
 
-    def run_main(self, client, extra=()):
+    def run_main(self, client, extra=(), clock=None):
         args = ["--foreign", "--no-splits", "--report-dir", self.report, "--out", self.out,
                 "--state", self.state_path, *extra]
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
-            code = sec.main(args, client=client, now=NOW, environ={})
+            code = sec.main(args, client=client, now=NOW, environ={}, clock=clock)
         return code, buffer.getvalue()
 
     def test_dry_run_is_offline_and_writes_nothing(self):
@@ -445,13 +445,11 @@ class SeedWiringTests(unittest.TestCase):
         self.assertEqual(sorted(os.listdir(self.out)), ["SYNC.json"])
         self.assertFalse(os.path.exists(self.state_path))
 
-    def test_dry_run_needs_foreign(self):
-        buffer = io.StringIO()
-        with contextlib.redirect_stdout(buffer):
-            code = sec.main(["--dry-run", "--no-splits", "--report-dir", self.report, "--out", self.out],
-                            client=NoNetworkClient({}), now=NOW, environ={})
-        self.assertEqual(code, sec.EXIT_REFUSED)
-        self.assertIn("--dry-run needs --foreign", buffer.getvalue())
+    def test_dry_run_needs_foreign_or_due(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            sec.parse_args(["--dry-run", "--no-splits"])
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            sec.parse_args(["--foreign", "--due"])
 
     def test_run_writes_ifrs_files_and_leaves_existing_ones(self):
         client = FakeClient({"0000001001": twd_concepts(), "0000001002": eur_only_concepts()})
@@ -470,10 +468,11 @@ class SeedWiringTests(unittest.TestCase):
 
     def test_budget_stops_between_tickers_and_a_rerun_finishes(self):
         client = FakeClient({"0000001001": twd_concepts(), "0000001002": eur_only_concepts()})
-        code, text = self.run_main(client, extra=("--budget", "1"))
+        ticks = iter([0, 0, 5])                          # start, before SYNA, before SYNB (budget used up)
+        code, text = self.run_main(client, extra=("--budget", "1"), clock=lambda: next(ticks))
         self.assertEqual(code, sec.EXIT_DONE)
         self.assertEqual(client.requests, 1)
-        self.assertIn("Budget reached: 1 SEC request(s)", text)
+        self.assertIn("PAUSED: time budget of 1 s used up", text)
         self.assertEqual(sorted(os.listdir(self.out)), ["SYNA.json", "SYNC.json"])
         code, text = self.run_main(client)
         self.assertEqual(client.requests, 2)                 # only SYNB left
@@ -494,7 +493,7 @@ class SeedWiringTests(unittest.TestCase):
 
     def test_first_403_stops_the_run_at_once(self):
         forbidden = sec.SecClient(sec.DEFAULT_USER_AGENT, opener=lambda request: (403, b""),
-                                  sleeper=lambda seconds: None, max_failures=1)
+                                  sleeper=lambda seconds: None)
         code, text = self.run_main(forbidden)
         self.assertEqual(code, sec.EXIT_STOPPED)
         self.assertEqual(forbidden.requests, 1)

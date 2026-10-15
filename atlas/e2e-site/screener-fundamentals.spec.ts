@@ -18,6 +18,17 @@ const annualPassers = (years: number, min: number) =>
     );
   });
 
+/** Taiwan fixture stocks whose latest `years` fiscal years all grew (a turnaround counts), as the EPS streak counts them. */
+const streakPassers = (years: number) =>
+  fixtureGrowth.rows.filter((row) => {
+    if (!twUniverse.includes(String(row[0]))) return false;
+    const values = row[7] as (number | null)[];
+    const turns = row[10] as number;
+    return Array.from({ length: years }, (_, slot) => slot).every((slot) =>
+      values[slot] !== null && values[slot] !== undefined ? (values[slot] as number) > 0 : ((turns >> slot) & 1) === 1,
+    );
+  });
+
 const openSheet = async (page: Page) => {
   await page.getByRole('button', { name: /篩選條件/ }).click();
   return page.getByRole('dialog', { name: '篩選條件' });
@@ -83,7 +94,7 @@ test('Taiwan full-market list: fundamental filters are open, annual EPS growth f
 
 test('acceleration, turnaround and keep-missing switches go into the link; junk tokens are ignored', async ({ page }) => {
   await mockSite(page, { report: buildReport(20), fundamentals: true });
-  await page.goto('./?page=screener&group=universe-tw&f=zzz:1;epsy:9:9;acc:1;eps:1:25;tn:0;nd:keep');
+  await page.goto('./?page=screener&group=universe-tw&f=zzz:1;epsy:11:9;epss:0;acc:1;eps:1:25;tn:0;nd:keep');
   const chips = page.getByRole('group', { name: '已套用的篩選條件' });
   await expect(chips).toContainText('EPS 成長加速');
   await expect(chips).toContainText('不含虧轉盈');
@@ -178,7 +189,7 @@ test('a missing growth file blocks only the fundamentals block, the list keeps w
 
 test('the filter sheet fits the screen: no sideways overflow in the fundamentals block', async ({ page }, info) => {
   await mockSite(page, { report: buildReport(20), fundamentals: true });
-  await page.goto('./?page=screener&group=universe-tw&f=eps:2:20;epsy:3:10;acc:1');
+  await page.goto('./?page=screener&group=universe-tw&f=eps:2:20;epsy:3:10;epss:2;acc:1');
   await expect(page.locator('.screener-row').first()).toBeVisible();
   const sheet = await openSheet(page);
   const fundamentals = sheet.getByRole('region', { name: '基本面（EPS／營收成長）' });
@@ -197,4 +208,83 @@ test('the filter sheet fits the screen: no sideways overflow in the fundamentals
     await fundamentals.getByRole('group', { name: '成長進階選項' }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${shotDir}/fundamentals-fit-bottom-${info.project.name}.png` });
   }
+});
+
+test('annual windows: the periods a group cannot cover are disabled, and the streak options follow the data', async ({ page }) => {
+  await mockSite(page, { report: buildReport(20), fundamentals: true });
+  await page.goto('./?page=screener&group=universe-tw');
+  await expect(page.locator('.screener-row').first()).toBeVisible();
+  const sheet = await openSheet(page);
+  const annualEps = sheet.getByRole('group', { name: '年度 EPS 成長', exact: true });
+  await annualEps.scrollIntoViewIfNeeded();
+  const periods = annualEps.getByRole('group', { name: '年度 EPS 成長期數' });
+  // Taiwan's annual history in the fixture is three years: 1 / 2 / 3 can be picked, 5 and 10 cannot
+  for (const name of ['最近 1 年', '近 2 年皆', '近 3 年皆']) await expect(periods.getByRole('button', { name })).toBeEnabled();
+  for (const name of ['近 5 年皆', '近 10 年皆']) {
+    await expect(periods.getByRole('button', { name })).toBeDisabled();
+    await expect(periods.getByRole('button', { name })).toHaveAttribute('title', /沒有足夠/);
+  }
+  const streak = sheet.getByRole('group', { name: 'EPS 連續成長年數' });
+  await streak.scrollIntoViewIfNeeded();
+  await expect(streak.getByRole('button', { name: '≥10 年' })).toBeDisabled();
+  await expect(streak).toContainText('各年數涵蓋檔數');
+  await expect(streak).toContainText('從最新年度往回數');
+});
+
+test('ten years of annual EPS growth: the 10-year window applies from the link and in the sheet', async ({ page }) => {
+  await mockSite(page, { report: buildReport(20), fundamentals: true });
+  // The fixture has three annual years per stock: give the first five Taiwan rows ten years, all at +20%
+  const growth = JSON.parse(JSON.stringify(screenerFixtures.growth())) as { rows: unknown[][] };
+  const longRows = growth.rows.filter((row) => twUniverse.includes(String(row[0]))).slice(0, 5);
+  for (const row of longRows) {
+    row[7] = Array.from({ length: 10 }, () => 20);
+    row[8] = Array.from({ length: 10 }, () => 20);
+    row[10] = 0;
+  }
+  await page.route('**/my-stock-screener/report/growth.json', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(growth) }),
+  );
+  await page.goto('./?page=screener&group=universe-tw&f=epsy:10:10');
+  const chips = page.getByRole('group', { name: '已套用的篩選條件' });
+  await expect(chips).toContainText('EPS 年增 近10年皆≥10%');
+  await expect(chips.locator('.active-filters-count')).toContainText(`符合 ${longRows.length} / ${twUniverse.length}`);
+  await expect(page.locator('.screener-row .metric-pill').first()).toHaveAttribute('title', /年度（最新→較舊）\+20% \/ \+20% \/ \+20%/);
+  const sheet = await openSheet(page);
+  const periods = sheet.getByRole('group', { name: '年度 EPS 成長期數' }).first();
+  await expect(periods.getByRole('button', { name: '近 10 年皆' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(periods.getByRole('button', { name: '近 10 年皆' })).toBeEnabled();
+  await expect(periods.getByRole('button', { name: '近 5 年皆' })).toBeEnabled();
+  await expect(periods.getByRole('button', { name: '近 5 年皆' })).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('EPS growth streak: picked in the sheet, applied, shown in the rows and kept in the link', async ({ page }) => {
+  await mockSite(page, { report: buildReport(20), fundamentals: true });
+  await page.goto('./?page=screener&group=universe-tw');
+  await expect(page.locator('.screener-row').first()).toBeVisible();
+  const sheet = await openSheet(page);
+  const streak = sheet.getByRole('group', { name: 'EPS 連續成長年數' });
+  await streak.scrollIntoViewIfNeeded();
+  await streak.getByRole('button', { name: '≥3 年' }).click();
+  await expect(streak).toContainText('此條件僅涵蓋');
+  await expect(streak).toContainText('需有近 3 年 EPS YoY');
+  await sheet.getByRole('button', { name: /^套用/ }).click();
+  const expected = streakPassers(3);
+  expect(expected.length).toBeGreaterThan(0);
+  expect(expected.length).toBeLessThan(twUniverse.length);
+  await expect(page).toHaveURL(/f=epss(%3A|:)3/);
+  const chips = page.getByRole('group', { name: '已套用的篩選條件' });
+  await expect(chips).toContainText('EPS 連續成長 ≥3 年');
+  await expect(chips.locator('.active-filters-count')).toContainText(`符合 ${expected.length} / ${twUniverse.length}`);
+  await expect(page.locator('.screener-row .metric-pill').first()).toContainText('EPS連增');
+
+  // The link reproduces the list and the sheet shows the streak again
+  await page.goto(page.url());
+  await expect(page.getByRole('group', { name: '已套用的篩選條件' }).locator('.active-filters-count')).toContainText(
+    `符合 ${expected.length} / ${twUniverse.length}`,
+  );
+  const again = await openSheet(page);
+  await expect(again.getByRole('group', { name: 'EPS 連續成長年數' }).getByRole('button', { name: '≥3 年' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });
