@@ -52,8 +52,8 @@ export const FIELD_LABELS: Record<RawField, string> = {
   revenue: '營收',
   costOfRevenue: '營業成本',
   grossProfit: '毛利',
-  operatingIncome: '營業利益（標準化）',
-  operatingIncomeReported: '營業利益（財報原始）',
+  operatingIncome: '營業利益欄位',
+  operatingIncomeReported: '列示營業利益欄位',
   pretaxIncome: '稅前淨利',
   taxProvision: '所得稅費用',
   netIncome: '淨利（歸屬普通股）',
@@ -255,7 +255,9 @@ export function operatingIncomeAt(
   return normalized !== null ? { value: normalized, field: 'operatingIncome' } : null;
 }
 const oiNotes = (field: 'operatingIncomeReported' | 'operatingIncome' | undefined) =>
-  field === 'operatingIncome' ? ['財報原始營業利益缺漏，改用 Yahoo 標準化營業利益'] : [];
+  field === 'operatingIncome'
+    ? ['列示營業利益欄缺漏，使用一般營業利益欄']
+    : [];
 const oiLabel = (field: 'operatingIncomeReported' | 'operatingIncome' | undefined) =>
   field === 'operatingIncome' ? FIELD_LABELS.operatingIncome : FIELD_LABELS.operatingIncomeReported;
 
@@ -277,6 +279,34 @@ export const netIncome = raw('netIncome');
 export const operatingCashFlow = raw('operatingCashFlow');
 export const capex = raw('capex');
 export const cash = raw('cash');
+
+/** Cost of revenue stays raw in history; this display value may use a conservative same-period fallback. */
+export function costOfRevenue(ctx: MetricContext, index: number): MetricResult {
+  const reported = at(ctx, 'costOfRevenue', index);
+  if (reported !== null) return result(reported, `財報原始數字（${FIELD_LABELS.costOfRevenue}）`, []);
+  const sales = at(ctx, 'revenue', index);
+  const gross = at(ctx, 'grossProfit', index);
+  const inputs = [input(FIELD_LABELS.revenue, sales), input(FIELD_LABELS.grossProfit, gross)];
+  if (sales === null || gross === null)
+    return missing(FIELD_LABELS.costOfRevenue, inputs, sales === null ? '缺營業成本與營收，無法推算' : '缺營業成本與毛利，無法推算');
+  const estimate = sales - gross;
+  if (sales < 0) return missing(FIELD_LABELS.costOfRevenue, inputs, '營收 < 0，不推算營業成本');
+  if (estimate < 0) return missing(FIELD_LABELS.costOfRevenue, inputs, '推算營業成本小於 0，不採用');
+  return result(estimate, '營收 − 毛利', inputs, {
+    basis: 'derived',
+    notes: ['營業成本缺漏，以同一期營收減毛利推算；可能含不同來源／重編口徑'],
+  });
+}
+
+/** Operating income, preferring the separately listed line when available. */
+export function operatingIncome(ctx: MetricContext, index: number): MetricResult {
+  const found = operatingIncomeAt(ctx, index);
+  if (!found) return missing(FIELD_LABELS.operatingIncome, [], '缺營業利益');
+  return result(found.value, oiLabel(found.field), [input(oiLabel(found.field), found.value)], {
+    oiField: found.field,
+    notes: oiNotes(found.field),
+  });
+}
 
 /** EPS: diluted, else basic (already split-adjusted by the builder). */
 export function eps(ctx: MetricContext, index: number): MetricResult {
@@ -343,7 +373,11 @@ export function nonOperatingIncome(ctx: MetricContext, index: number): MetricRes
   const inputs = [input('稅前淨利', pretax), input(oiLabel(oi?.field), oi?.value ?? null)];
   if (pretax === null) return missing(formula, inputs, '缺稅前淨利');
   if (!oi) return missing(formula, inputs, '沒有營業利益（金融業格式常見）');
-  return result(pretax - oi.value, formula, inputs, { oiField: oi.field, notes: oiNotes(oi.field) });
+  return result(pretax - oi.value, formula, inputs, {
+    basis: 'derived',
+    oiField: oi.field,
+    notes: [...oiNotes(oi.field), '由稅前淨利減營業利益推算，代表業外損益淨額'],
+  });
 }
 
 /** Non-operating income ÷ pretax income, only when pretax income > 0. */
@@ -354,7 +388,11 @@ export function nonOperatingShare(ctx: MetricContext, index: number): MetricResu
   const inputs = [input('業外損益', base.value), input('稅前淨利', pretax)];
   if (base.value === null) return missing(formula, inputs, base.reason ?? '缺業外損益');
   if (pretax === null || pretax <= 0) return missing(formula, inputs, '稅前淨利 ≤ 0，不計算占比');
-  return result(pct(base.value / pretax), formula, inputs, { oiField: base.oiField, notes: base.notes });
+  return result(pct(base.value / pretax), formula, inputs, {
+    basis: 'derived',
+    oiField: base.oiField,
+    notes: base.notes,
+  });
 }
 
 /** Tax provision ÷ pretax income (pretax > 0). Below 0% or above 60% is shown but flagged. */
@@ -646,6 +684,8 @@ export type MetricId =
   | 'revenue'
   | 'eps'
   | 'netIncome'
+  | 'costOfRevenue'
+  | 'operatingIncome'
   | 'grossMargin'
   | 'operatingMargin'
   | 'netMargin'
@@ -674,6 +714,8 @@ export const METRICS: Record<MetricId, MetricDef> = {
   revenue: { id: 'revenue', label: '營收', unit: 'money', compute: revenue },
   eps: { id: 'eps', label: 'EPS', unit: 'eps', compute: eps },
   netIncome: { id: 'netIncome', label: '淨利', unit: 'money', compute: netIncome },
+  costOfRevenue: { id: 'costOfRevenue', label: '營業成本', unit: 'money', compute: costOfRevenue },
+  operatingIncome: { id: 'operatingIncome', label: '營業利益', unit: 'money', compute: operatingIncome },
   grossMargin: { id: 'grossMargin', label: '毛利率', unit: 'pct', compute: grossMargin },
   operatingMargin: { id: 'operatingMargin', label: '營業利益率', unit: 'pct', compute: operatingMargin },
   netMargin: { id: 'netMargin', label: '淨利率', unit: 'pct', compute: netMargin },
@@ -695,7 +737,7 @@ export const METRICS: Record<MetricId, MetricDef> = {
 export type MetricGroupId = 'growth' | 'profitability' | 'nonOperating' | 'cashFlow' | 'returns' | 'strength';
 export const METRIC_GROUPS: { id: MetricGroupId; title: string; metrics: MetricId[] }[] = [
   { id: 'growth', title: '成長', metrics: ['revenue', 'eps', 'netIncome'] },
-  { id: 'profitability', title: '獲利能力', metrics: ['grossMargin', 'operatingMargin', 'netMargin'] },
+  { id: 'profitability', title: '獲利能力', metrics: ['costOfRevenue', 'operatingIncome', 'grossMargin', 'operatingMargin', 'netMargin'] },
   { id: 'nonOperating', title: '業外與稅', metrics: ['nonOperatingIncome', 'nonOperatingShare', 'effectiveTaxRate'] },
   { id: 'cashFlow', title: '現金流', metrics: ['operatingCashFlow', 'capex', 'freeCashFlow', 'fcfMargin', 'fcfToNetIncome'] },
   { id: 'returns', title: '報酬率', metrics: ['roe', 'roic'] },

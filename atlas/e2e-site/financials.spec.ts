@@ -13,13 +13,18 @@ const fixtures: Record<string, string> = Object.fromEntries(
     ['NVO', 'short-history.json'],
   ].map(([key, file]) => [key, readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials', file!), 'utf8')]),
 );
+const trackedAAPL = readFileSync(resolve(import.meta.dirname, '../../docs/report/financials/AAPL.json'), 'utf8');
 
-async function mockFinancials(page: Page, overrides: Record<string, 'missing' | 'garbled'> = {}) {
+async function mockFinancials(
+  page: Page,
+  overrides: Record<string, 'missing' | 'garbled'> = {},
+  trackedFiles: Record<string, string> = {},
+) {
   await mockSite(page);
   await page.route('**/my-stock-screener/report/financials/*.json', (route) => {
     const key = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop()!.replace(/\.json$/, ''));
     if (overrides[key] === 'garbled') return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>x</title>' });
-    const body = fixtures[key];
+    const body = trackedFiles[key] ?? fixtures[key];
     if (!body || overrides[key] === 'missing') return route.fulfill({ status: 404, body: 'not found' });
     return route.fulfill({ status: 200, contentType: 'application/json', body });
   });
@@ -59,10 +64,10 @@ test('annual cards: ten labelled bars, tap shows formula inputs, notes are hones
 
   const profit = page.locator('.fin-card[data-group="profitability"]');
   await profit.getByRole('button', { name: '營業利益率', exact: true }).click();
-  await expect(profit.locator('.fin-sub')).toContainText('財報原始');
-  await expect(profit.locator('.fin-detail')).toContainText('營業利益（財報原始） ÷ 營收');
+  await expect(profit.locator('.fin-sub')).toContainText('優先採列示欄');
+  await expect(profit.locator('.fin-detail')).toContainText('列示營業利益欄位 ÷ 營收');
   await profit.getByRole('button', { name: /^FY2015 營業利益率/ }).click();
-  await expect(profit.locator('.fin-detail')).toContainText('標準化');
+  await expect(profit.locator('.fin-detail')).toContainText('營業利益欄位');
   expect(errors).toEqual([]);
 });
 
@@ -103,6 +108,30 @@ test('table mode: frozen metric column, latest period first, horizontal scroll i
   // The view choice is remembered.
   await page.reload();
   await expect(page.locator('.fin-table')).toBeVisible();
+});
+
+test('tracked US file exposes the 15th annual and 60th quarterly periods in the full table', async ({ page }) => {
+  await mockFinancials(page, {}, { AAPL: trackedAAPL });
+  await page.goto('./?page=financials&symbol=AAPL');
+  await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();
+  const table = page.locator('.fin-table');
+  const annualHeaders = table.locator('thead th');
+  expect(await annualHeaders.count()).toBeGreaterThanOrEqual(16);
+  await annualHeaders.nth(15).scrollIntoViewIfNeeded();
+  await expect(annualHeaders.nth(15)).toContainText(/^FY\d{4}/);
+  await expect(page.locator('.fin-table-note')).toContainText('所有已取得期別');
+
+  await page.getByRole('group', { name: '期間' }).getByRole('button', { name: '季度' }).click();
+  const quarterlyHeaders = table.locator('thead th');
+  expect(await quarterlyHeaders.count()).toBeGreaterThanOrEqual(61);
+  await quarterlyHeaders.nth(60).scrollIntoViewIfNeeded();
+  await expect(quarterlyHeaders.nth(60)).toContainText(/Q[1-4]/);
+  const reachable = await quarterlyHeaders.nth(60).evaluate((node) => {
+    const cell = node.getBoundingClientRect();
+    const viewport = node.closest('.fin-table-scroll')!.getBoundingClientRect();
+    return cell.right > viewport.left && cell.left < viewport.right;
+  });
+  expect(reachable).toBe(true);
 });
 
 test('bank, loss-maker, Taiwan and short-history files', async ({ page }) => {
