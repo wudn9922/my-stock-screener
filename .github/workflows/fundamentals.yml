@@ -1,0 +1,101 @@
+name: Official Fundamentals (TW / US)
+
+# 選股頁基本面（EPS／營收 YoY）的全市場資料來源，結果合併進 docs/report/growth.json：
+# - 台股：公開資訊觀測站「綜合損益表彙總報表」（t163sb04，上市／上櫃／興櫃回補，年度累計數）＋
+#   證交所／櫃買中心 OpenAPI t187ap06（只有最新一季，補觀測站沒有的公司）
+#   → docs/report/fundamentals/tw.json。歷史季別只抓一次（過了申報期限約一個月即定案），
+#   之後每天只重抓還沒定案的季別；觀測站擋請求時停在原處，下次接著補（--budget 秒內盡量補）。
+# - 美股：SEC XBRL frames（一次一個科目、一個曆季／曆年，全部公司）→ docs/report/fundamentals/us-sec.json。
+#   SEC 過去對 GitHub Actions 的 IP 一律回 403（見 atlas.yml）：第一個請求被拒時只留警告、保留舊檔，
+#   需要時在本機執行 `python atlas/scripts/build_fundamentals_sec.py` 後提交該檔。外國發行人（年度）每 7 天重抓一次。
+# - 最後 build_growth.py 合併 financials/*.json 與上面兩個檔案重建 growth.json（financials.yml 也會用同一套規則重建）。
+# 與 financials.yml 共用 concurrency group，兩者不會同時改 growth.json。
+on:
+  workflow_run:
+    workflows: ["Financial Statement History"]
+    types: [completed]
+  # 補跑（UTC 19:37＝台北 03:37，觀測站離峰）：第一次回補沒補完、或前一次被擋時接著補
+  schedule:
+    - cron: '37 19 * * *'
+  workflow_dispatch:
+    inputs:
+      budget:
+        description: '公開資訊觀測站請求時間預算（秒）'
+        default: '900'
+      seasons:
+        description: '強制重抓的台股季別（例：2025Q4,2026Q1；空白＝只抓缺的與未定案的）'
+        default: ''
+      markets:
+        description: '市場（TW,US）'
+        default: 'TW,US'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: financials-history
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install --quiet requests 'curl_cffi>=0.7,<1'
+
+      - name: Taiwan official statements (MOPS / OpenAPI)
+        if: contains(inputs.markets || 'TW,US', 'TW')
+        continue-on-error: true
+        env:
+          TW_FUNDAMENTALS_BUDGET_SECONDS: ${{ inputs.budget || '900' }}
+          FORCE_SEASONS: ${{ inputs.seasons }}
+        run: |
+          if [ -n "$FORCE_SEASONS" ]; then
+            python -u atlas/scripts/build_fundamentals_tw.py --seasons "$FORCE_SEASONS"
+          else
+            python -u atlas/scripts/build_fundamentals_tw.py
+          fi
+
+      - name: US SEC XBRL frames
+        if: contains(inputs.markets || 'TW,US', 'US')
+        continue-on-error: true
+        run: python -u atlas/scripts/build_fundamentals_sec.py --foreign-max-age-days 7
+
+      # 即使上一步失敗，也用 repo 內已有的檔案重建（純離線讀檔，很快）
+      - name: Build screener growth data (EPS / revenue YoY)
+        if: always()
+        working-directory: atlas
+        run: python -u scripts/build_growth.py
+
+      - name: Commit and Push changes
+        if: always()
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          [ -d docs/report/fundamentals ] && git add -A docs/report/fundamentals
+          [ -f docs/report/growth.json ] && git add docs/report/growth.json
+          git commit -m "Auto-update official fundamentals" || { echo "No changes to commit"; exit 0; }
+          # 每日報告與 Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試
+          for attempt in 1 2 3; do
+            git pull --rebase
+            if git push; then
+              exit 0
+            fi
+            echo "推送失敗（第 ${attempt} 次），稍後重試"
+            sleep $((attempt * 15))
+          done
+          exit 1

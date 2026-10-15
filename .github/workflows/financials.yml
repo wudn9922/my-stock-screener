@@ -4,8 +4,9 @@ name: Financial Statement History
 # （股票來自 latest／themes／universe，只重抓到期的，約 600 秒預算）。
 # 獨立成一個 workflow：用全新的 runner（乾淨的 Yahoo 限流狀態），也不拖慢每日報告與 LINE 推播。
 # 失敗只保留已寫入的檔案，下一次接著補。
-# 財報歷史建好後，build_growth.py 讀 financials/*.json 產生 docs/report/growth.json（選股頁的 EPS／營收 YoY，
-# 台股與美股、季度與年度），與財報檔在同一個 commit 迴圈提交；內容沒變時不改檔。
+# 財報歷史建好後，build_growth.py 讀 financials/*.json 與 fundamentals/（官方全市場資料，fundamentals.yml 產生）
+# 產生 docs/report/growth.json（選股頁的 EPS／營收 YoY，台股與美股、季度與年度），與財報檔在同一個 commit 迴圈提交；
+# 內容沒變時不改檔。完成後觸發 fundamentals.yml（同一個 concurrency group）。
 on:
   workflow_run:
     workflows: ["Daily Stock Screener"]
