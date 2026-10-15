@@ -8,10 +8,9 @@ name: Financial Statement History
 # 產生 docs/report/growth.json（選股頁的 EPS／營收 YoY，台股與美股、季度與年度），與財報檔在同一個 commit 迴圈提交；
 # 內容沒變時不改檔。完成後觸發 fundamentals.yml（同一個 concurrency group）。
 on:
-  # 暫停（2026-10-15，使用者要求）：財報下載先不自動執行，只保留手動執行。恢復時取消下面三行的註解。
-  # workflow_run:
-  #   workflows: ["Daily Stock Screener"]
-  #   types: [completed]
+  workflow_run:
+    workflows: ["Daily Stock Screener"]
+    types: [completed]
   workflow_dispatch:
 
 env:
