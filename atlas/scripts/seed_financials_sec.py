@@ -105,10 +105,13 @@ from build_financials import (
     ISSUES,
     KEEP_ANNUAL,
     KEEP_QUARTERLY,
+    MAX_CHECK_AGE_DAYS,
     MIN_SPLIT_RATIO,
     PER_SHARE_FIELDS,
+    REPORT_DUE_DAYS,
     RESTATE_TOLERANCE,
     SAME_PERIOD_DAYS,
+    SEC_CHECKED_KEY,
     SOURCE_MIXED,
     SPLIT_MATCH,
     VERSION,
@@ -124,6 +127,7 @@ from build_financials import (
     market_of,
     merge_events,
     merge_revisions,
+    needs_refresh,
     parse_day,
     parse_splits,
     period,
@@ -2098,7 +2102,18 @@ __all__ = [
 # I/O: SEC access rules, client, CLI.  Local manual use only (never in CI).
 #
 #   python atlas/scripts/seed_financials_sec.py [--limit N] [--tickers AAPL,MSFT] [--force] [--no-splits]
-#          [--out docs/report/financials] [--report-dir docs/report] [--data-dir data]
+#          [--out docs/report/financials] [--report-dir docs/report] [--data-dir data] [--budget SECONDS]
+#   python atlas/scripts/seed_financials_sec.py --due [--budget SECONDS]     (quarterly re-check, see below)
+#   python atlas/scripts/seed_financials_sec.py --due --dry-run               (offline: lists what is due)
+#
+# --due re-checks only the stored US files that already carry SEC periods and are due (select_due, due_reason:
+# never checked, last check older than MAX_CHECK_AGE_DAYS, or latest period older than REPORT_DUE_DAYS and
+# last checked more than RECHECK_DAYS ago). The SEC check date of each file is kept in index.json
+# (items[KEY].secCheckedAt, SEC_CHECKED_KEY), never in the file and never in checkedAt (the Yahoo date).
+# Oldest check first; every checked file is recorded, unchanged ones are not rewritten. --budget stops
+# before the next ticker once SECONDS have passed (exit 0, "PAUSED"); a re-run continues with what is left.
+# The first HTTP 403 of a --due run stops it at once (SecClient.stop_on_forbidden, SecForbidden): nothing is
+# retried or worked around, and the file in progress is not recorded as checked.
 #
 # Split events come from Yahoo's chart endpoint exactly as in build_financials.main() (connect_yahoo,
 # CHART_URL, events=split / range=max / interval=1mo, REQUEST_DELAY after every chart request). The
@@ -2111,7 +2126,8 @@ __all__ = [
 # request (env SEC_USER_AGENT, default DEFAULT_USER_AGENT), at most ~7 requests per second
 # (MIN_INTERVAL after EVERY request, failed ones included), exponential backoff on 429 / 403 / 5xx /
 # network errors, and a hard stop after MAX_CONSECUTIVE_FAILURES failed requests in a row.
-# Exit codes: 0 done, 1 stopped early (too many failures / ticker map unavailable), 2 refused to run.
+# Exit codes: 0 done (also PAUSED by --budget), 1 stopped early (too many failures / HTTP 403 / ticker map
+# unavailable), 2 refused to run.
 # =============================================================================================
 import argparse  # noqa: E402
 import gzip  # noqa: E402
@@ -2119,6 +2135,7 @@ import http.client  # noqa: E402
 import json  # noqa: E402
 import os  # noqa: E402
 import sys  # noqa: E402
+import textwrap  # noqa: E402
 import time  # noqa: E402
 import urllib.error  # noqa: E402
 import urllib.request  # noqa: E402
@@ -2164,6 +2181,14 @@ class FetchError(Exception):
 
 class TooManyFailures(Exception):
     """MAX_CONSECUTIVE_FAILURES failed requests in a row: stop the run, keep the files already written."""
+
+
+class SecForbidden(RuntimeError):
+    """SEC answered HTTP 403 to a request of a --due run (SecClient.stop_on_forbidden): the run stops at once."""
+
+    def __init__(self, url):
+        super().__init__(f"SEC returned HTTP 403 for {url}")
+        self.url = url
 
 
 def resolve_user_agent(environ):
@@ -2231,15 +2256,17 @@ class SecClient:
       other statuses fail at once. A URL gives up with FetchError after len(backoff) + 1 attempts.
     - Every failed attempt counts towards consecutive_failures (across URLs); a good answer (and a
       404 where allowed) resets it. At max_failures → TooManyFailures.
+    - stop_on_forbidden (--due runs): an HTTP 403 is not retried; it raises SecForbidden at once.
     """
 
     def __init__(self, user_agent, opener=None, sleeper=None,
-                 backoff=BACKOFF_DELAYS, max_failures=MAX_CONSECUTIVE_FAILURES):
+                 backoff=BACKOFF_DELAYS, max_failures=MAX_CONSECUTIVE_FAILURES, stop_on_forbidden=False):
         self.user_agent = user_agent
         self.opener = opener or urllib_opener
         self.sleeper = sleeper or time.sleep
         self.backoff = tuple(backoff)
         self.max_failures = max_failures
+        self.stop_on_forbidden = stop_on_forbidden
         self.consecutive_failures = 0
         self.requests = 0
         self.failed_attempts = 0
@@ -2284,6 +2311,8 @@ class SecClient:
                 elif status == 404 and allow_404:
                     self.consecutive_failures = 0
                     return None
+                elif status == 403 and self.stop_on_forbidden:
+                    raise SecForbidden(url)
                 else:
                     problem = f"HTTP {status}"
                     retry = status in (403, 429) or status >= 500
@@ -2409,28 +2438,54 @@ class SplitChecker:
         return drop_pre_epoch_splits(payload)
 
 
-def update_index(out_dir, documents, today_iso):
-    """
-    Update items[KEY] of an EXISTING <out_dir>/index.json for the documents written by this run
-    (build_financials.index_item with the entry's own checkedAt / lastListed); everything else in the
-    file is kept. → (state, count, bytes): state "absent" (never created), "unreadable" (left
-    untouched), "updated" or "unchanged".
-    """
+def read_index(out_dir):
+    """<out_dir>/index.json → (state, index): "ok" (version 1, items an object), "absent" or "unreadable"."""
     path = os.path.join(out_dir, "index.json")
     if not os.path.exists(path):
-        return "absent", 0, 0
+        return "absent", None
     index = read_json(path)
     if not isinstance(index, dict) or index.get("version") != VERSION or not isinstance(index.get("items", {}), dict):
-        return "unreadable", 0, 0
-    if not documents:
+        return "unreadable", None
+    return "ok", index
+
+
+def update_index(out_dir, documents, today_iso, checks=None):
+    """
+    Update items[KEY] of an EXISTING <out_dir>/index.json for the documents written by this run
+    (build_financials.index_item with the entry's own checkedAt / lastListed) and for the --due checks
+    (checks: {KEY: date of the SEC check}, stored as SEC_CHECKED_KEY). Everything else in the file is kept,
+    and an item keeps its SEC check date unless this run sets a new one.
+    → (state, count, bytes): state "absent" (never created), "unreadable" (left untouched), "updated" or
+    "unchanged".
+    """
+    state, index = read_index(out_dir)
+    if state != "ok":
+        return state, 0, 0
+    checks = checks or {}
+    if not documents and not checks:
         return "unchanged", 0, 0
     items = dict(index.get("items") or {})
-    for key, document in documents.items():
+    touched = sorted(set(documents) | set(checks))
+    for key in touched:
         known = items.get(key) if isinstance(items.get(key), dict) else {}
-        listed = known.get("lastListed") if parse_day(known.get("lastListed")) else today_iso
-        items[key] = index_item(document, known.get("checkedAt"), listed)
+        if key in documents:
+            listed = known.get("lastListed") if parse_day(known.get("lastListed")) else today_iso
+            item = index_item(documents[key], known.get("checkedAt"), listed)
+        elif known:
+            item = dict(known)
+        else:
+            # checked without an item yet (the Yahoo run gives every file one): built from the file itself
+            status, document = load_document(os.path.join(out_dir, key + ".json"), key)
+            if status != "ok":
+                continue
+            item = index_item(document, None, today_iso)
+        if key in checks:
+            item[SEC_CHECKED_KEY] = checks[key]
+        elif SEC_CHECKED_KEY in known:
+            item[SEC_CHECKED_KEY] = known[SEC_CHECKED_KEY]
+        items[key] = item
     index["items"] = dict(sorted(items.items()))
-    return "updated", len(documents), write_atomic(path, index)
+    return "updated", len(touched), write_atomic(os.path.join(out_dir, "index.json"), index)
 
 
 def _outcome(result, detail=None, counts=None, level=None, document=None, size=0, fresh=False, note=None,
@@ -2538,7 +2593,18 @@ def parse_args(argv):
     parser.add_argument("--report-dir", help="directory of latest.json / themes.json / universe.json "
                                              "(default <repo>/docs/report)")
     parser.add_argument("--data-dir", help="directory of the CSV fallback (default <repo>/data)")
-    return parser.parse_args(argv)
+    parser.add_argument("--budget", type=positive, metavar="SECONDS",
+                        help="stop before the next ticker once SECONDS have passed (exit 0, PAUSED); "
+                             "re-run the same command to continue")
+    parser.add_argument("--due", action="store_true",
+                        help="quarterly re-check: only the stored US files with SEC periods that are due, oldest "
+                             "check first (needs index.json; SEC check dates are kept there)")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="with --due: list what would be checked, offline (no network, nothing written)")
+    args = parser.parse_args(argv)
+    if args.dry_run and not args.due:
+        parser.error("--dry-run is only meaningful with --due")
+    return args
 
 
 def choose_symbols(args, report_dir, data_dir):
@@ -2565,55 +2631,175 @@ def choose_symbols(args, report_dir, data_dir):
     return keys, rejected
 
 
+# --due: quarterly re-check of the stored US files that carry SEC periods (see the I/O header above)
+DUE_SAVE_EVERY = 100                    # index.json is saved after this many checks, and at the end of the run
+
+
+def due_state(document, checked):
+    """needs_refresh state of a stored file: checkedAt = its SEC check date (None: never checked)."""
+    sections = read_sections(document)
+    return {
+        "checkedAt": checked,
+        "latestQuarter": sections["quarterly"][-1]["end"] if sections["quarterly"] else None,
+        "latestAnnual": sections["annual"][-1]["end"] if sections["annual"] else None,
+    }
+
+
+def due_reason(state, today):
+    """
+    Why a stored US file is due for a re-check, or None. The rules are build_financials.needs_refresh's with
+    the SEC check date in place of the Yahoo one: never checked; last check older than MAX_CHECK_AGE_DAYS
+    (45); or latest reported period older than REPORT_DUE_DAYS (100, a new 10-Q / 10-K may be out) and last
+    checked more than RECHECK_DAYS (3) ago, so that a finished run leaves nothing due.
+    """
+    if not needs_refresh(state, today):
+        return None
+    checked = parse_day(state.get("checkedAt"))
+    if checked is None:
+        return "never checked"
+    if (today - checked).days > MAX_CHECK_AGE_DAYS:
+        return f"last check older than {MAX_CHECK_AGE_DAYS} days"
+    return f"latest period older than {REPORT_DUE_DAYS} days"
+
+
+def select_due(out_dir, items, today, only=None):
+    """
+    The --due candidates → ([(KEY, reason, SEC check date or None)], oldest check first, Counter of the stored
+    files left out). Candidates are US files with SEC periods. Taiwan and other non-US files, Yahoo-only files
+    and unreadable ones are left out and counted. Nothing is fetched or written. only: set of keys or None.
+    """
+    due, left = [], Counter()
+    names = sorted(os.listdir(out_dir)) if os.path.isdir(out_dir) else []
+    for name in names:
+        if not name.endswith(".json") or name == "index.json":
+            continue
+        key = name[:-len(".json")]
+        if only is not None and key not in only:
+            continue
+        if financials_key(key) != key or market_of(key) != "US":
+            left["not US"] += 1
+            continue
+        status, document = load_document(os.path.join(out_dir, name), key)
+        if status != "ok":
+            left["unreadable"] += 1
+            continue
+        if not has_sec(document):
+            left["no SEC periods"] += 1
+            continue
+        known = items.get(key) if isinstance(items.get(key), dict) else {}
+        checked = known.get(SEC_CHECKED_KEY) if parse_day(known.get(SEC_CHECKED_KEY)) else None
+        reason = due_reason(due_state(document, checked), today)
+        if reason is None:
+            left["not due"] += 1
+        else:
+            due.append((key, reason, checked))
+    due.sort(key=lambda item: (item[2] or "", item[0]))
+    return due, left
+
+
+def plan_due(args, out_dir, report_dir, data_dir, today):
+    """
+    The --due plan → (keys in check order, rejected --tickers entries, scan). scan = {"index": state of
+    index.json, "due": select_due's list, "left": Counter}. --tickers narrows the stored files considered.
+    """
+    only, rejected = None, []
+    if args.tickers is not None:
+        keys, rejected = choose_symbols(args, report_dir, data_dir)
+        only = set(keys)
+    state, index = read_index(out_dir)
+    items = (index or {}).get("items") or {}
+    due, left = select_due(out_dir, items, today, only)
+    return [key for key, _, _ in due], rejected, {"index": state, "due": due, "left": left}
+
+
+def print_due_scan(scan, out_dir):
+    due, left = scan["due"], scan["left"]
+    reasons = Counter(reason for _, reason, _ in due)
+    detail = "; ".join(f"{reason}: {count}" for reason, count in sorted(reasons.items()))
+    print(f"Stored files in {out_dir}: index.json {scan['index']}; due now {len(due)}"
+          + (f" ({detail})" if due else ""), flush=True)
+    print(f"  not due {left['not due']}; left out: not US {left['not US']}, no SEC periods "
+          f"{left['no SEC periods']}, unreadable {left['unreadable']}", flush=True)
+
+
 def format_duration(seconds):
     minutes, rest = divmod(int(round(seconds)), 60)
     return f"{minutes} min {rest} s" if minutes else f"{rest} s"
 
 
-def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, sleep=None):
+def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, sleep=None, clock=None):
     """
-    CLI entry → exit code. client / now / environ are injectable for tests, and so are the Yahoo
+    CLI entry → exit code. client / now / environ / clock are injectable for tests, and so are the Yahoo
     session factory (yahoo_factory() → object with get_json(url, params); default
     build_valuation_us.Yahoo) and the sleep used by the split checks (connect retries, REQUEST_DELAY).
+    clock: monotonic seconds for --budget (default time.monotonic). A --dry-run reads local files only.
     """
     environ = os.environ if environ is None else environ
     args = parse_args(argv)
-    reason = refusal_reason(environ)
-    if reason:
-        print(f"Refusing to run: {reason}", flush=True)
-        return EXIT_REFUSED
-    try:
-        user_agent = resolve_user_agent(environ)
-    except UserAgentError as error:
-        print(f"Refusing to run: {error}", flush=True)
-        return EXIT_REFUSED
+    user_agent = None
+    if not args.dry_run:
+        reason = refusal_reason(environ)
+        if reason:
+            print(f"Refusing to run: {reason}", flush=True)
+            return EXIT_REFUSED
+        try:
+            user_agent = resolve_user_agent(environ)
+        except UserAgentError as error:
+            print(f"Refusing to run: {error}", flush=True)
+            return EXIT_REFUSED
     now = now or datetime.now(timezone.utc).replace(microsecond=0)
     today_iso = (now.astimezone(timezone.utc) if now.tzinfo else now).date().isoformat()
     report_dir = args.report_dir or os.path.join(REPO_ROOT, "docs", "report")
     data_dir = args.data_dir or os.path.join(REPO_ROOT, "data")
     out_dir = args.out or os.path.join(REPO_ROOT, "docs", "report", "financials")
-    client = client or SecClient(user_agent)
-    splits = None if args.no_splits else SplitChecker(yahoo_factory, sleep)
+    clock = clock or time.monotonic
 
-    keys, rejected = choose_symbols(args, report_dir, data_dir)
+    scan = None
+    if args.due:
+        keys, rejected, scan = plan_due(args, out_dir, report_dir, data_dir, parse_day(today_iso))
+        print_due_scan(scan, out_dir)
+        if args.dry_run:
+            for text, result in rejected:
+                print(f"[-] {text} {result}", flush=True)
+            if args.limit:
+                keys = keys[:args.limit]
+            print("Dry run: nothing fetched or written. Due files, oldest check first:", flush=True)
+            print(textwrap.fill(" ".join(keys), width=100) if keys else "  (none)", flush=True)
+            return EXIT_DONE
+        if scan["index"] != "ok":
+            print(f"Refusing to run: {os.path.join(out_dir, 'index.json')} is {scan['index']}; the SEC check "
+                  "dates are kept there (run the Yahoo refresh once, or restore the file)", flush=True)
+            return EXIT_REFUSED
+    else:
+        keys, rejected = choose_symbols(args, report_dir, data_dir)
+    due_total = len(keys)
     if args.limit:
         keys = keys[:args.limit]
     total = len(keys)
+    client = client or SecClient(user_agent)
+    client.stop_on_forbidden = bool(args.due)
+    splits = None if args.no_splits else SplitChecker(yahoo_factory, sleep)
+
     counts = {name: 0 for name in RESULTS}
     reasons = Counter()
     for text, result in rejected:
         counts[result] += 1
         print(f"[-] {text} {result}", flush=True)
     if not keys:
-        print("No US symbols to process.", flush=True)
+        print("Nothing is due for a re-check." if args.due else "No US symbols to process.", flush=True)
         return EXIT_DONE
-    estimate = total * 2 * ESTIMATE_SECONDS_PER_REQUEST
-    print(f"{total} tickers -> {out_dir}", flush=True)
-    print(f"Reminder: estimated duration about {format_duration(estimate)} "
-          f"({total} tickers x 2 requests x ~{ESTIMATE_SECONDS_PER_REQUEST} s); local manual use only; "
-          f"stop with Ctrl+C, files already written are kept.", flush=True)
+    if args.due:
+        print(f"{total} due file(s) -> {out_dir}; oldest check first; index.json and written files are saved "
+              f"as the run goes", flush=True)
+    else:
+        estimate = total * 2 * ESTIMATE_SECONDS_PER_REQUEST
+        print(f"{total} tickers -> {out_dir}", flush=True)
+        print(f"Reminder: estimated duration about {format_duration(estimate)} "
+              f"({total} tickers x 2 requests x ~{ESTIMATE_SECONDS_PER_REQUEST} s); local manual use only; "
+              f"stop with Ctrl+C, files already written are kept.", flush=True)
 
     written, bytes_written, exit_code, processed = {}, 0, EXIT_DONE, 0
+    checks, paused, started = {}, None, clock()
     fetched, with_events, adjusted, pending, nulled = [], [], [], [], Counter()
     try:
         try:
@@ -2622,7 +2808,10 @@ def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, 
             raise TooManyFailures(f"company_tickers.json unavailable: {error}") from error
         print(f"SEC ticker map: {len(cik_map)} US tickers", flush=True)
         for number, key in enumerate(keys, 1):
-            outcome = seed_ticker(key, cik_map, client, out_dir, args.force, now, splits)
+            if args.budget is not None and clock() - started >= args.budget:
+                paused = f"time budget of {args.budget} s used up"
+                break
+            outcome = seed_ticker(key, cik_map, client, out_dir, args.force or args.due, now, splits)
             processed += 1
             result = outcome["result"]
             counts[result] += 1
@@ -2658,6 +2847,16 @@ def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, 
             if outcome["document"] is not None:
                 written[key] = outcome["document"]
                 bytes_written += outcome["bytes"]
+            if args.due:
+                # every answer counts as a check (a 404, an unchanged file, a skipped one, a failed fetch):
+                # only a 403 stop and a failure of the whole run leave a file unrecorded
+                checks[key] = today_iso
+                if len(checks) % DUE_SAVE_EVERY == 0:
+                    update_index(out_dir, written, today_iso, checks)
+    except SecForbidden as error:
+        exit_code = EXIT_STOPPED
+        print(f"STOPPED: {error}. Stopped at once: no further SEC request in this run, and the file in progress "
+              "was not recorded as checked. Files already written and checked are kept; re-run later.", flush=True)
     except TooManyFailures as error:
         exit_code = EXIT_STOPPED
         print(f"STOPPED: {error}. Files already written are kept; re-run later (finished tickers are skipped).",
@@ -2666,17 +2865,24 @@ def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, 
         exit_code = EXIT_STOPPED
         print("STOPPED: interrupted. Files already written are kept.", flush=True)
     finally:
-        index_state, index_count, index_bytes = update_index(out_dir, written, today_iso)
+        index_state, index_count, index_bytes = update_index(out_dir, written, today_iso, checks)
         bytes_written += index_bytes
 
     counts["not-processed"] += total - processed
+    if paused:
+        print(f"PAUSED: {paused}; {total - processed} not processed yet, re-run the same command to continue.",
+              flush=True)
     print("Summary", flush=True)
+    if args.due:
+        print(f"  due at start: {due_total}", flush=True)
     for name in RESULTS:
         if counts[name]:
             print(f"  {name}: {counts[name]}", flush=True)
     for reason_text, count in sorted(reasons.items()):
         print(f"  skip reason {reason_text}: {count}", flush=True)
     print(f"  index.json: {index_state}" + (f" ({index_count} entries)" if index_count else ""), flush=True)
+    if args.due:
+        print(f"  remaining due: {due_total - processed}", flush=True)
     print(f"  requests: {getattr(client, 'requests', '?')}, received "
           f"{getattr(client, 'bytes_received', 0)} bytes, written {bytes_written} bytes", flush=True)
     if splits is None:
@@ -2693,9 +2899,10 @@ def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, 
 
 
 __all__ += [
-    "DEFAULT_USER_AGENT", "FetchError", "MIN_INTERVAL", "SecClient", "SplitChecker", "SplitUnavailable",
-    "TooManyFailures", "UserAgentError",
-    "main", "parse_ticker_map", "resolve_user_agent", "seed_ticker", "update_index",
+    "DEFAULT_USER_AGENT", "FetchError", "MIN_INTERVAL", "SecClient", "SecForbidden", "SplitChecker",
+    "SplitUnavailable", "TooManyFailures", "UserAgentError",
+    "due_reason", "main", "parse_ticker_map", "read_index", "resolve_user_agent", "seed_ticker", "select_due",
+    "update_index",
 ]
 
 if __name__ == "__main__":
