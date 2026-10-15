@@ -254,7 +254,7 @@ export function depthText(history: FinancialHistory, kind: PeriodKind): string {
 /** Card subtitle saying which operating income line the latest value used. */
 export function oiFieldText(result: MetricResult | undefined): string | null {
   if (!result?.oiField) return null;
-  return result.oiField === 'operatingIncomeReported' ? '營業利益採財報原始數字' : '營業利益採 Yahoo 標準化數字（原始數字缺漏）';
+  return '營業利益優先採列示欄，缺漏時採一般欄';
 }
 
 /** 「FY2024 營收：1,000億 → 1,030億（重編）」 for the quality panel. */

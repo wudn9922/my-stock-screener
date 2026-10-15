@@ -82,7 +82,7 @@ export function FinancialsTable({ history, view }: { history: FinancialHistory; 
         </table>
       </div>
       <p className="source-note fin-table-note">
-        最新期別在最左側，向右捲動看較早期別。「*」為異常的有效稅率（一次性稅務項目）；「—」為無資料或不適用，長按或滑鼠移上可看原因。
+        圖表顯示近 10 年／12 季；數字表可查看所有已取得期別。最新期別在最左側，向右捲動看較早期別。「*」為異常的有效稅率（一次性稅務項目）；「—」為無資料或不適用，長按或滑鼠移上可看原因。
       </p>
     </div>
   );

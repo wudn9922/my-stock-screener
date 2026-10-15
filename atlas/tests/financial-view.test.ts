@@ -10,6 +10,7 @@ import {
   digitsFor,
   formatValue,
   moneyScale,
+  oiFieldText,
   provenanceText,
   revisionText,
   unitText,
@@ -24,6 +25,14 @@ const fixture = (name: string) => {
 };
 
 describe('financials view model', () => {
+  it('describes operating-income precedence without assigning a source to a mixed-period cell', () => {
+    expect(oiFieldText({ oiField: 'operatingIncome', value: 5, basis: 'reported', formula: '', inputs: [], notes: [] }))
+      .toBe('營業利益優先採列示欄，缺漏時採一般欄');
+    expect(oiFieldText({ oiField: 'operatingIncomeReported', value: 5, basis: 'reported', formula: '', inputs: [], notes: [] }))
+      .toBe('營業利益優先採列示欄，缺漏時採一般欄');
+    expect(oiFieldText(undefined)).toBeNull();
+  });
+
   it('charts the latest 10 years / 12 quarters and keeps every period for the table', () => {
     const us = fixture('us-full.json');
     const annual = buildView(us, 'annual');
