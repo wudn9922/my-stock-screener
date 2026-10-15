@@ -322,6 +322,8 @@ export const ISSUE_TEXT: Record<string, string> = {
   'currency-changed': '財報幣別曾經變更，較早期別與最新期別的幣別可能不同，跨期比較請小心。',
   ifrs: '外國發行人以 IFRS 申報（SEC 20-F／40-F），科目由 SEC 事實對照而來；淨利與權益以歸屬母公司為準，缺欄位留空、不推算。',
   'ifrs-fallback': '部分期別缺歸屬母公司的淨利或權益，改用含非控制權益的合併數，跨期比較請小心。',
+  'foreign-gaap': '外國發行人以美國一般公認會計原則（US GAAP）申報（SEC 20-F／40-F 年報、6-K 或 10-Q 季報），科目由 SEC 事實對照而來；淨利與權益以歸屬母公司為準，缺欄位留空、不推算。',
+  'foreign-gaap-fallback': '部分期別缺歸屬母公司的淨利或權益，改用含非控制權益的合併數，跨期比較請小心。',
   'adr-eps-rescaled': 'SEC 的每股 EPS 與股數已依 ADR 換算（與 Yahoo 同為每 ADR 基準），口徑見財報頁說明。',
 };
 export const issueText = (code: string) => ISSUE_TEXT[code] ?? `其他資料提示（${code}）。`;

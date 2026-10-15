@@ -2131,8 +2131,9 @@ __all__ = [
 #   python atlas/scripts/seed_financials_sec.py --due [--budget SECONDS]     (quarterly re-check, see below)
 #   python atlas/scripts/seed_financials_sec.py --due --dry-run               (offline: lists what is due)
 #
-# --due re-checks only the stored US files that already carry SEC periods and are due (select_due, due_reason:
-# never checked, last check older than MAX_CHECK_AGE_DAYS, or latest period older than REPORT_DUE_DAYS and
+# --due re-checks only the stored US files that already carry SEC periods and are due (select_due; the
+# --foreign IFRS / US GAAP files, i.e. foreign reporters, are left out). due_reason: never checked, last check
+# older than MAX_CHECK_AGE_DAYS, or latest period older than REPORT_DUE_DAYS and
 # last checked more than RECHECK_DAYS ago). The SEC check date of each file is kept in index.json
 # (items[KEY].secCheckedAt, SEC_CHECKED_KEY), never in the file and never in checkedAt (the Yahoo date).
 # Oldest check first; every checked file is recorded, unchanged ones are not rewritten. --budget stops
@@ -2530,8 +2531,14 @@ PREDECESSOR_CIKS = {"XOM": "0000034088"}
 
 
 def _foreign_outcome(path, key, facts, now):
-    """--foreign: the ifrs-full document of a foreign private issuer (sec_ifrs.build_document) → outcome."""
+    """
+    --foreign: the ifrs-full document of a foreign private issuer (sec_ifrs.build_document); a payload without
+    ifrs-full facts at all ("no-ifrs") is read with the US GAAP basis (sec_ifrs.build_us_gaap_document) → outcome.
+    The outcome's detail is the reason of the last basis tried.
+    """
     document, reason = sec_ifrs.build_document(facts, key, now)
+    if document is None and reason == sec_ifrs.IFRS_BASIS.no_facts:
+        document, reason = sec_ifrs.build_us_gaap_document(facts, key, now)
     if document is None:
         return _outcome("skipped", reason)
     size = write_atomic(path, document)
@@ -2546,7 +2553,8 @@ def seed_ticker(key, cik_map, client, out_dir, force, now, splits=None, foreign=
     splits: None (no split checks) or a SplitChecker; outcome["split"] is merge_into_document's
     {"chart", "chartError", "adjusted", "events"} for merged documents.
     foreign (--foreign): a ticker that already has a file is "has-file" (never touched); a missing file whose
-    us-gaap extraction skips as a foreign filer (FOREIGN_SKIPS) gets the ifrs-full document instead.
+    us-gaap extraction skips as a foreign filer (FOREIGN_SKIPS) gets the ifrs-full document instead (or the
+    US GAAP foreign-filer document when it has no ifrs-full facts, see _foreign_outcome).
     """
     path = os.path.join(out_dir, key + ".json")
     status, stored = load_document(path, key)
@@ -2645,8 +2653,9 @@ def parse_args(argv):
                         help="quarterly re-check: only the stored US files with SEC periods that are due, oldest "
                              "check first (needs index.json; SEC check dates are kept there)")
     parser.add_argument("--foreign", action="store_true",
-                        help="IFRS filers (20-F / 40-F): tickers that have no file and that the US backfill judged "
-                             "foreign-filer / no-us-gaap / non-usd get an ifrs-full document (sec_ifrs.py); "
+                        help="foreign filers (20-F / 40-F): tickers that have no file and that the US backfill judged "
+                             "foreign-filer / no-us-gaap / non-usd get an ifrs-full document, or a US GAAP one when "
+                             "they have no ifrs-full facts (sec_ifrs.py); "
                              "without --tickers the list comes from fundamentals/us-market-progress.json")
     parser.add_argument("--dry-run", action="store_true",
                         help="with --due or --foreign: print the plan from the local files, offline (no network, "
@@ -2720,7 +2729,9 @@ def select_due(out_dir, items, today, only=None):
     """
     The --due candidates → ([(KEY, reason, SEC check date or None)], oldest check first, Counter of the stored
     files left out). Candidates are US files with SEC periods. Taiwan and other non-US files, Yahoo-only files
-    and unreadable ones are left out and counted. Nothing is fetched or written. only: set of keys or None.
+    and unreadable ones are left out and counted. Foreign reporters (foreignReporter: the IFRS / US GAAP files
+    of sec_ifrs.py, "foreign reporter") are left out too: the US extraction above answers "skipped" for them,
+    and the Yahoo daily run keeps them. Nothing is fetched or written. only: set of keys or None.
     """
     due, left = [], Counter()
     names = sorted(os.listdir(out_dir)) if os.path.isdir(out_dir) else []
@@ -2739,6 +2750,9 @@ def select_due(out_dir, items, today, only=None):
             continue
         if not has_sec(document):
             left["no SEC periods"] += 1
+            continue
+        if document.get("foreignReporter") is True:
+            left["foreign reporter"] += 1
             continue
         known = items.get(key) if isinstance(items.get(key), dict) else {}
         checked = known.get(SEC_CHECKED_KEY) if parse_day(known.get(SEC_CHECKED_KEY)) else None
@@ -2772,8 +2786,9 @@ def print_due_scan(scan, out_dir):
     detail = "; ".join(f"{reason}: {count}" for reason, count in sorted(reasons.items()))
     print(f"Stored files in {out_dir}: index.json {scan['index']}; due now {len(due)}"
           + (f" ({detail})" if due else ""), flush=True)
-    print(f"  not due {left['not due']}; left out: not US {left['not US']}, no SEC periods "
-          f"{left['no SEC periods']}, unreadable {left['unreadable']}", flush=True)
+    print(f"  not due {left['not due']}; left out: not US {left['not US']}, foreign reporter "
+          f"{left['foreign reporter']}, no SEC periods {left['no SEC periods']}, unreadable {left['unreadable']}",
+          flush=True)
 
 
 def format_duration(seconds):
@@ -2841,9 +2856,11 @@ def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, 
                                      state, keys=plan_keys)
         keys = [key for key, _ in plan["todo"]]
         by_status = ", ".join(f"{name} {count}" for name, count in sorted(plan["byStatus"].items())) or "none"
+        retry = (f" ({len(plan['retry'])} of them asked again, rules {sec_ifrs.FOREIGN_RULES})"
+                 if plan["retry"] else "")
         print(f"--foreign: {len(plan['candidates'])} candidate ticker(s) ({by_status}); "
               f"{len(plan['hasFile'])} already have a file; {len(plan['checked'])} checked before "
-              f"(state {state_path}); {len(keys)} to check", flush=True)
+              f"(state {state_path}); {len(keys)} to check{retry}", flush=True)
         if args.dry_run:
             print(f"Dry run: {len(keys)} ticker(s) would be checked against SEC (about {len(keys)} requests, "
                   f"one per ticker); no network, nothing written.", flush=True)
