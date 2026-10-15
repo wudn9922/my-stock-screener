@@ -69,6 +69,23 @@ File Creation Time: 20261015
 
 
 class CacheAndQueueTests(unittest.TestCase):
+    def test_interrupted_existing_metadata_screen_resumes_without_retry(self):
+        cik = "0000000012"
+        issuer = {"status": "seeded_existing_shell_screen_pending", "symbols": ["ACME"]}
+        progress = {"metadataOnlyIssuerQueue": [cik], "issuers": {cik: issuer}}
+
+        self.assertEqual(market.eligible_metadata_queue(progress, {"ACME"}, retry=False), [cik])
+        issuer["status"] = "pendingmetadata"  # persisted immediately before the SEC request
+        self.assertEqual(market.eligible_metadata_queue(progress, {"ACME"}, retry=False), [cik])
+
+    def test_interrupted_metadata_screen_outside_directory_is_closed(self):
+        cik = "0000000012"
+        issuer = {"status": "pendingmetadata", "symbols": ["ACME"]}
+        progress = {"metadataOnlyIssuerQueue": [cik], "issuers": {cik: issuer}}
+
+        self.assertEqual(market.eligible_metadata_queue(progress, set(), retry=False), [])
+        self.assertEqual(issuer["status"], "not_current_directory")
+
     def test_raw_cache_validates_body_hash_and_requested_cik(self):
         with tempfile.TemporaryDirectory() as tmp:
             cache = market.RawResponseCache(Path(tmp))

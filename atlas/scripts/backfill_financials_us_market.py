@@ -926,6 +926,7 @@ def eligible_queue(progress: dict[str, Any], current_symbols: set[str], retry: b
 
 def eligible_metadata_queue(progress: dict[str, Any], current_symbols: set[str], retry: bool) -> list[str]:
     pending: list[str] = []
+    resumable = {"seeded_existing_shell_screen_pending", "pendingmetadata"}
     for cik in progress.get("metadataOnlyIssuerQueue", []):
         issuer = progress["issuers"][cik]
         status = issuer.get("status")
@@ -934,13 +935,13 @@ def eligible_metadata_queue(progress: dict[str, Any], current_symbols: set[str],
         if missing_classes:
             issuer["notCurrentDirectorySymbols"] = missing_classes
         if not current_classes:
-            if status == "seeded_existing_shell_screen_pending" or (retry and status in ("failure", "unknownmetadata")):
+            if status in resumable or (retry and status in ("failure", "unknownmetadata")):
                 issuer["status"] = "not_current_directory"
                 issuer["screening"] = "not_run"
                 issuer["detail"] = "existing issuer symbols are absent from the latest NasdaqTrader directory validation"
             continue
         issuer["currentSymbols"] = current_classes
-        if status == "seeded_existing_shell_screen_pending" or (retry and status in ("failure", "unknownmetadata")):
+        if status in resumable or (retry and status in ("failure", "unknownmetadata")):
             pending.append(cik)
     return pending
 
