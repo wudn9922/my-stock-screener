@@ -4,6 +4,7 @@ import { buildLargeUniverse } from '../e2e-site/largeUniverse';
 import { activeChips, applyFilters, filterAvailability, parseFilters } from '../src/pages/screenerFilters';
 import { filterAndSortItems } from '../src/pages/screenerItems';
 import { parseUniverse, universeGroup } from '../src/report/universe';
+import { mergeGrowth, parseReportGrowth } from '../src/fundamentals/GrowthProvider';
 
 /**
  * The full-market lists (scripts/build_universe_full.py) hold about 1,850 Taiwan and 6,000 US rows. Parsing,
@@ -60,6 +61,48 @@ describe('full-market universe at real size', () => {
     );
     expect(filterMs + sortMs + searchMs).toBeLessThan(500);
     expect(recountMs / 10).toBeLessThan(100);
+  });
+});
+
+describe('full-market growth.json at real size', () => {
+  /** One growth.json row per universe row (build_growth.py with the official sources: ~7,300 real rows). */
+  const universe = parseUniverse(JSON.parse(JSON.stringify(buildLargeUniverse())));
+  if (universe.status !== 'ok') throw new Error('synthetic universe must parse');
+  let seed = 11;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const pct = () => Math.round((rand() * 380 - 80) * 10) / 10;
+  const symbols = [...universe.universe.markets.TW!.items, ...universe.universe.markets.US!.items].map((item) => item.symbol);
+  const text = JSON.stringify({
+    version: 1,
+    generatedAt: '2026-10-15T00:00:00Z',
+    source: 'financials+official',
+    fields: ['symbol', 'lv', 'src', 'qEnd', 'yEnd', 'epsQ', 'revQ', 'epsY', 'revY', 'tQ', 'tY', 'srcY', 'dQ'],
+    rows: symbols.map((symbol) => {
+      const tw = symbol.endsWith('.TW') || symbol.endsWith('.TWO');
+      return [symbol, null, tw ? 'mops' : 'frames', '2026-06-30', '2025-12-31', [pct(), pct(), pct(), pct()], [pct(), pct(), pct(), pct()],
+        [pct(), pct(), pct()], [pct(), pct(), pct()], rand() < 0.05 ? 1 : 0, 0, tw ? 'mops' : 'frames', rand() < 0.3 ? 1 : 0];
+    }),
+  });
+
+  it('parses, merges and filters ~7,850 rows within the frame budget', () => {
+    const [growth, parseMs] = time(() => parseReportGrowth(JSON.parse(text))!);
+    expect(growth.items.size).toBe(symbols.length);
+    const [merged, mergeMs] = time(() => mergeGrowth(null, growth)!);
+    const items = universeGroup(universe.universe.markets.US!).items;
+    const context = { market: 'US' as const, growth: merged, growthLoading: false };
+    const filters = parseFilters('eps:4:20;epsy:3:10;rev:2:10;acc:1');
+    const [filtered, filterMs] = time(() => applyFilters(items, filters, context));
+    expect(filtered.length).toBeLessThan(items.length);
+    const [, recountMs] = time(() => {
+      for (let i = 0; i < 10; i++) filterAndSortItems(applyFilters(items, filters, context), '', 'eps', { growth: merged });
+    });
+    console.info(
+      `growth.json ${(text.length / 1024).toFixed(0)} KB (synthetic, every slot filled): parse ${parseMs.toFixed(1)} ms, ` +
+        `merge ${mergeMs.toFixed(1)} ms, 4 growth gates on 6,000 US rows ${filterMs.toFixed(1)} ms, 10 recounts + EPS sort ${recountMs.toFixed(1)} ms`,
+    );
+    expect(parseMs).toBeLessThan(1500);
+    expect(filterMs).toBeLessThan(500);
+    expect(recountMs / 10).toBeLessThan(150);
   });
 });
 

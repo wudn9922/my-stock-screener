@@ -291,8 +291,164 @@ class RunTest(unittest.TestCase):
                 self.assertEqual(file.read(), "keep")
 
 
+def block(end, src, eps=(10.0,), rev=(), mask=0, derived=0):
+    return {"eps": list(eps), "rev": list(rev), "mask": mask, "end": end, "src": src, "derived": derived}
+
+
+class MergeTest(unittest.TestCase):
+    def test_newest_period_first_then_the_better_source(self):
+        yahoo = block("2026-06-30", "yahoo", eps=(1.0,))
+        mops = block("2026-06-30", "mops", eps=(2.0, 3.0, 4.0, 5.0))
+        self.assertIs(growth.choose_block([yahoo, mops]), mops)
+        # Yahoo already has the next quarter (> FRESHER_DAYS newer): the newest period wins
+        newer = block("2026-09-30", "yahoo", eps=(9.0,))
+        self.assertIs(growth.choose_block([newer, mops]), newer)
+        # US: SEC companyfacts files > frames > Yahoo files; 52/53-week ends a few days apart are one period
+        sec_file, frames, yahoo_file = block("2026-06-27", "sec"), block("2026-06-28", "frames"), block("2026-06-30", "yahoo")
+        self.assertIs(growth.choose_block([yahoo_file, frames, sec_file]), sec_file)
+        self.assertIs(growth.choose_block([yahoo_file, frames]), frames)
+        self.assertIsNone(growth.choose_block([None, {"end": "bad", "src": "sec"}]))
+
+    def test_blocks_never_mix_and_lv_only_from_a_used_financials_file(self):
+        financials = ("partial", block("2026-06-30", "yahoo", eps=(1.0, 2.0)), block("2025-12-31", "yahoo", eps=(5.0,)))
+        official = (None, block("2026-06-30", "mops", eps=(3.0, 4.0, 5.0, 6.0), derived=0b100), None)
+        row = dict(zip(growth.FIELDS, growth.merge_candidates("2330.TW", [financials, official])))
+        self.assertEqual(row["epsQ"], [3.0, 4.0, 5.0, 6.0])
+        self.assertEqual((row["src"], row["dQ"]), ("mops", 0b100))
+        self.assertEqual((row["epsY"], row["srcY"], row["yEnd"]), ([5.0], "yahoo", "2025-12-31"))
+        self.assertEqual(row["lv"], "partial")                       # the annual block is the file's
+        only_official = dict(zip(growth.FIELDS, growth.merge_candidates("2330.TW", [official])))
+        self.assertIsNone(only_official["lv"])
+        self.assertIsNone(only_official["srcY"])
+        self.assertIsNone(growth.merge_candidates("X", [(None, None, None)]))
+
+    def test_sec_frame_rows_are_checked_again(self):
+        fields = ["symbol", "cik", "qEnd", "yEnd", "epsQ", "revQ", "epsY", "revY", "tQ", "tY", "dQ", "f", "cur"]
+        document = {"version": 1, "fields": fields, "rows": [
+            ["AAA", 1, "2026-06-30", "2025-12-31", [10.0, None, "x"], [5.0], [1.0], [], 0, 0, 0b10, 0, None],
+            ["OLD", 2, "2025-06-30", "2025-12-31", [10.0], [], [], [], 0, 0, 0, 0, None],     # stale quarter, no annual
+            ["TRN", 3, "2026-06-30", None, [], [], [], [], 0b1, 0, 0, 0, None],
+            ["BAD", 4], "junk", [None],
+        ]}
+        candidates = growth.sec_frame_candidates(document, TODAY)
+        self.assertEqual(sorted(candidates), ["AAA", "TRN"])
+        _, q, y = candidates["AAA"]
+        self.assertEqual((q["eps"], q["rev"], q["derived"], q["src"]), ([10.0], [5.0], 0b10, "frames"))
+        self.assertEqual((y["eps"], y["end"]), ([1.0], "2025-12-31"))
+        self.assertEqual(candidates["TRN"][1]["mask"], 1)
+        self.assertEqual(growth.sec_frame_candidates({"version": 2}, TODAY), {})
+        self.assertEqual(growth.sec_frame_candidates(None, TODAY), {})
+
+    def test_run_merges_the_official_files(self):
+        import build_fundamentals_tw as tw
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fin, fundamentals = os.path.join(tmp, "financials"), os.path.join(tmp, "fundamentals")
+            os.makedirs(fin)
+            os.makedirs(fundamentals)
+            # Yahoo file: two quarters a year apart only
+            with open(os.path.join(fin, "2330.TW.json"), "w", encoding="utf-8") as file:
+                json.dump(document([q(2025, 2, 1.0, 100), q(2026, 2, 1.1, 110)]), file)
+            store = {"fetch": {}, "data": {"2330": {}, "6488": {}}}
+            for code in ("2330", "6488"):
+                for year, base in ((2025, 100), (2026, 130)):
+                    for quarter in (1, 2):
+                        store["data"][code][tw.season_key(year, quarter)] = [base * quarter, base * quarter / 100, base * quarter * 10, 0]
+            with open(os.path.join(fundamentals, "tw.json"), "w", encoding="utf-8") as file:
+                json.dump(tw.dump_store(store, tw.target_seasons(TODAY)), file)
+            fields = ["symbol", "cik", "qEnd", "yEnd", "epsQ", "revQ", "epsY", "revY", "tQ", "tY", "dQ", "f", "cur"]
+            with open(os.path.join(fundamentals, "us-sec.json"), "w", encoding="utf-8") as file:
+                json.dump({"version": 1, "fields": fields, "rows": [
+                    ["RIVN", 1, "2026-06-30", "2025-12-31", [45.0], [60.0], [], [12.0], 0, 0, 0, 0, None]]}, file)
+            universe = os.path.join(tmp, "universe.json")
+            with open(universe, "w", encoding="utf-8") as file:
+                json.dump({"fields": ["symbol"], "markets": {"TW": {"rows": [["2330.TW"], ["6488.TWO"]]}}}, file)
+            out = os.path.join(tmp, "growth.json")
+            summary = growth.run(fin, out, NOW, fundamentals, universe)
+            with open(out, encoding="utf-8") as file:
+                data = json.load(file)
+        rows = {row[0]: dict(zip(data["fields"], row)) for row in data["rows"]}
+        self.assertEqual(sorted(rows), ["2330.TW", "6488.TWO", "RIVN"])
+        self.assertEqual(rows["2330.TW"]["src"], "mops")                # official beats the Yahoo file
+        self.assertEqual(rows["2330.TW"]["epsQ"], [30.0, 30.0])
+        self.assertEqual(rows["6488.TWO"]["revQ"], [30.0, 30.0])
+        self.assertEqual((rows["RIVN"]["src"], rows["RIVN"]["srcY"], rows["RIVN"]["epsQ"]), ("frames", "frames", [45.0]))
+        self.assertEqual(summary["official"], {"tw": 2, "frames": 1})
+        self.assertEqual(summary["coverage"]["TW"]["srcQ:mops"], 2)
+        self.assertEqual(data["fields"], growth.FIELDS)
+
+    def test_a_broken_official_file_is_skipped_with_a_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fin, fundamentals = os.path.join(tmp, "financials"), os.path.join(tmp, "fundamentals")
+            os.makedirs(fin)
+            os.makedirs(fundamentals)
+            with open(os.path.join(fin, "AAPL.json"), "w", encoding="utf-8") as file:
+                json.dump(document([q(2025, 2, 1.0), q(2026, 2, 1.5)]), file)
+            with open(os.path.join(fundamentals, "tw.json"), "w", encoding="utf-8") as file:
+                json.dump({"version": 1, "seasons": "bad"}, file)
+            summary = growth.run(fin, os.path.join(tmp, "growth.json"), NOW, fundamentals, None)
+        self.assertEqual(summary["rows"], 1)
+        self.assertEqual(summary["official"]["tw"], 0)
+
+
 class RepoDataTest(unittest.TestCase):
     """The checked-in docs/report/financials (skipped when absent)."""
+
+    def test_full_market_size_with_official_sources(self):
+        """Real financials + synthetic official files for every universe symbol: the size of a full growth.json."""
+        import random
+
+        import build_fundamentals_tw as tw
+
+        directory = os.path.join(ROOT, "docs", "report", "financials")
+        universe_path = os.path.join(ROOT, "docs", "report", "universe.json")
+        if not os.path.isdir(directory) or not os.path.exists(universe_path):
+            self.skipTest("no financials / universe")
+        with open(universe_path, encoding="utf-8") as file:
+            universe = json.load(file)
+        tw_symbols = [row[0] for row in universe["markets"]["TW"]["rows"]]
+        us_symbols = [row[0] for row in universe["markets"]["US"]["rows"]]
+        rng = random.Random(7)
+        store = {"fetch": {}, "data": {}}
+        for symbol in tw_symbols:
+            code = symbol.split(".")[0]
+            row = store["data"][code] = {}
+            for key in tw.target_seasons(TODAY):
+                year, quarter = tw.parse_season(key)
+                if key == "2026Q3":
+                    continue
+                revenue = rng.randint(100_000, 50_000_000) * quarter
+                eps = round(rng.uniform(-1, 8) * quarter, 2)
+                row[key] = [revenue, eps, round(eps * rng.randint(10_000, 2_000_000)), 0]
+        fields = ["symbol", "cik", "qEnd", "yEnd", "epsQ", "revQ", "epsY", "revY", "tQ", "tY", "dQ", "f", "cur"]
+        us_rows = []
+        for index, symbol in enumerate(us_symbols):
+            pct = lambda: round(rng.uniform(-80, 300), 1)  # noqa: E731
+            us_rows.append([symbol.replace(".", "-"), index, "2026-06-30", "2025-12-31", [pct() for _ in range(4)],
+                            [pct() for _ in range(4)], [pct() for _ in range(3)], [pct() for _ in range(3)], 0, 0, 0, 0, None])
+        with tempfile.TemporaryDirectory() as tmp:
+            fundamentals = os.path.join(tmp, "fundamentals")
+            os.makedirs(fundamentals)
+            tw_path = os.path.join(fundamentals, "tw.json")
+            us_path = os.path.join(fundamentals, "us-sec.json")
+            tw_bytes = growth.write_atomic(tw_path, tw.dump_store(store, tw.target_seasons(TODAY)))
+            us_bytes = growth.write_atomic(us_path, {"version": 1, "fields": fields, "rows": sorted(us_rows)})
+            out = os.path.join(tmp, "growth.json")
+            summary = growth.run(directory, out, NOW, fundamentals, universe_path)
+            with open(out, encoding="utf-8") as file:
+                data = json.load(file)
+        keys = {row[0] for row in data["rows"]}
+        self.assertTrue(all(symbol in keys for symbol in tw_symbols))
+        self.assertTrue(all(symbol.replace(".", "-") in keys for symbol in us_symbols))
+        # Official data replaced the Yahoo quarterly block of every listed Taiwan stock (a TDR file outside the list keeps it)
+        listed = set(tw_symbols)
+        self.assertEqual([row[0] for row in data["rows"] if row[0] in listed and row[3] and row[2] != "mops"], [])
+        # Sizes of a full market (synthetic values with realistic lengths): reported, and kept in check
+        self.assertLess(tw_bytes, 1_400_000)
+        self.assertLess(us_bytes, 900_000)
+        self.assertLess(summary["bytes"], 1_300_000)
+        print(f"\n[full-market sizes] tw.json {tw_bytes:,} B, us-sec.json {us_bytes:,} B, "
+              f"growth.json {summary['bytes']:,} B for {summary['rows']:,} rows")
 
     def test_real_files_produce_small_valid_output_for_both_markets(self):
         directory = os.path.join(ROOT, "docs", "report", "financials")
