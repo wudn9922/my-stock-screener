@@ -15,6 +15,7 @@ import tempfile
 import unittest
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlparse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS = os.path.join(ROOT, "atlas", "scripts")
@@ -131,6 +132,14 @@ class ResponseTest(unittest.TestCase):
         with self.assertRaises(fm.FinMindError) as caught:
             fm.parse_response(200, b'{"msg": "success", "status": 200}')
         self.assertIn("no 'data' list", str(caught.exception))
+        # HTTP 200 with an empty list but a msg: a refusal, never "fetched, nothing published"
+        with self.assertRaises(fm.RateLimited):
+            fm.parse_response(200, b'{"msg": "Upper limit reached", "status": 200, "data": []}')
+        with self.assertRaises(fm.AuthError):
+            fm.parse_response(200, b'{"msg": "Token expired", "status": 200, "data": []}')
+        with self.assertRaises(fm.FinMindError) as caught:
+            fm.parse_response(200, b'{"msg": "unknown notice", "status": 200, "data": []}')
+        self.assertFalse(caught.exception.transient)
 
 
 class ParseTest(unittest.TestCase):
@@ -443,9 +452,7 @@ class FakeHttp:
         self.answers, self.clock, self.requests = answers, clock, []
 
     def get(self, url, headers):
-        from urllib.parse import parse_qs, urlparse
-
-        query = {key: values[0] for key, values in parse_qs(urlparse(url).query).items()}
+        query ={key: values[0] for key, values in parse_qs(urlparse(url).query).items()}
         self.requests.append((query, headers))
         self.clock.now += 0.5
         answer = self.answers.get(query["data_id"], [])
@@ -487,7 +494,7 @@ class RunTest(unittest.TestCase):
 
     def args(self, **kwargs):
         values = {"report_dir": self.report, "out": None, "budget": 3600.0, "limit": None, "codes": None,
-                  "only_when_complete": False, "verify": False}
+                  "only_when_complete": False, "verify": False, "summary": False}
         values.update(kwargs)
         return SimpleNamespace(**values)
 
@@ -558,6 +565,32 @@ class RunTest(unittest.TestCase):
         code, http, _, _ = self.go(token="bad")
         self.assertEqual((code, len(http.requests)), (1, 1))
         self.assertFalse(os.path.exists(self.out))
+
+    def test_limit_counts_retries_and_stops_without_a_wait(self):
+        self.answers["1101"] = (503, b"busy")
+        code, http, _, logs = self.go(limit=2)
+        self.assertEqual((code, len(http.requests)), (0, 2))              # the retry is the second request
+        self.assertTrue(any("stopped: --limit 2 requests" in line for line in logs), logs)
+        self.assertFalse(os.path.exists(self.out))                         # nothing fetched, nothing written
+
+    def test_refused_token_after_some_stocks_still_fails_the_run(self):
+        self.answers["1103"] = (401, b'{"msg": "Token is invalid", "status": 401}')
+        code, http, _, logs = self.go(token="abc")
+        self.assertEqual((code, len(http.requests)), (1, 3))
+        self.assertEqual(sorted(self.stored()["fetch"]), ["1101", "1102"])     # progress kept
+        self.assertTrue(any("::warning::FinMind stopped" in line and "refused" in line for line in logs))
+
+    def test_summary_reads_the_stored_file_offline(self):
+        clock, logs = Clock(), []
+        code = fm.run(self.args(summary=True), http=None, now=NOW, sleep=clock.sleep, clock=clock, log=logs.append)
+        self.assertEqual(code, 1)                                              # no file yet
+        self.assertTrue(any("not found" in line for line in logs))
+        self.go(limit=3)
+        clock, logs = Clock(), []
+        code = fm.run(self.args(summary=True), http=None, now=NOW, sleep=clock.sleep, clock=clock, log=logs.append)
+        self.assertEqual((code, clock.slept), (0, []))                         # no request, no wait
+        self.assertTrue(any(line.startswith("FinMind store: ") and '"fetched": 3' in line for line in logs), logs)
+        self.assertTrue(any("NOT DONE: 3/9 stocks fetched, 6 left" in line for line in logs), logs)
 
     def test_transient_errors_are_retried_and_failures_in_a_row_stop(self):
         attempts = []

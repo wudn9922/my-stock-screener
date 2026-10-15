@@ -6,6 +6,7 @@ quarterly / annual EPS and revenue YoY of growth.json (src "finmind").
 
   python atlas/scripts/build_fundamentals_tw_finmind.py --budget 3000      fetch (resumable) for ~50 minutes
   python atlas/scripts/build_fundamentals_tw_finmind.py --verify           offline checks of the stored file
+  python atlas/scripts/build_fundamentals_tw_finmind.py --summary          offline counts of the stored file (no network)
   Options: --codes 2330,2881 (fetch these again, full history), --limit N (at most N requests),
            --only-when-complete (fetch only once the first backfill is done; for the daily workflow),
            --report-dir docs/report, --out <file>.
@@ -60,7 +61,8 @@ Store (compact): {"version": 1, "source", "dataset", "units", "fields": ["rev", 
   "data": {code: [entry | null per season]}}; entry = [rev, eps, ni] or [rev, eps, ni, kind] (values as
   published by FinMind). Rewritten only when it changed; never when the stored file cannot be read.
 Exit codes: 0 done (also: stopped by budget / rate limit with progress saved), 1 nothing could be done
-(unreadable store, no universe, refused token, every request failed) or --verify failed.
+(unreadable store, no universe, refused token at any point, every request failed), --verify failed, or
+--summary without a stored file.
 """
 import argparse
 import gzip
@@ -141,6 +143,10 @@ class AuthError(RuntimeError):
     """FinMind refused the token / the request (HTTP 401 / 403)."""
 
 
+class LimitReached(RuntimeError):
+    """--limit requests are used up (checked before every attempt, retries included)."""
+
+
 class FinMindError(ValueError):
     """An answer this parser does not understand (details for the log); transient = worth a retry."""
 
@@ -209,7 +215,9 @@ def parse_response(status, body):
     else:
         msg, inner = "", None
     data = document.get("data") if isinstance(document, dict) else None
-    if status == 200 and isinstance(data, list) and inner in (None, 200, "200"):
+    # An empty list is a real "no data" only with msg success: any other msg explains a refusal (not a stock
+    # without data), and must not be stored as "fetched, nothing published".
+    if status == 200 and isinstance(data, list) and inner in (None, 200, "200") and (data or msg.strip().lower() in ("", "success")):
         return data
     shown = msg or " ".join(text.split())[:200]
     upper = shown.upper()
@@ -785,12 +793,15 @@ def request_url(code, start_date):
 
 
 def fetch_stock(http, code, start_date, token, sleep, log, counter):
-    """One stock → FinMind rows (transient errors retried RETRIES times); RateLimited / AuthError / FinMindError."""
+    """One stock → FinMind rows (transient errors retried RETRIES times); RateLimited / AuthError / FinMindError /
+    LimitReached (counter["limit"] requests used up)."""
     headers = {"Accept": "application/json", "Accept-Encoding": "gzip", "User-Agent": USER_AGENT}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     problem = None
     for attempt in range(RETRIES + 1):
+        if limit_used(counter):
+            raise LimitReached(f"--limit {counter['limit']} requests")
         counter["requests"] += 1
         try:
             status, body = http.get(request_url(code, start_date), headers)
@@ -804,9 +815,16 @@ def fetch_stock(http, code, start_date, token, sleep, log, counter):
                     raise
                 problem = str(error)
         if attempt < RETRIES:
-            log(f"FinMind {code}: {problem}; retrying in {RETRY_WAIT:.0f}s")
-            sleep(RETRY_WAIT)
+            used_up = limit_used(counter)
+            log(f"FinMind {code}: {problem}" + ("" if used_up else f"; retrying in {RETRY_WAIT:.0f}s"))
+            if not used_up:
+                sleep(RETRY_WAIT)
     raise FinMindError(f"{problem} (after {RETRIES + 1} attempts)", transient=True)
+
+
+def limit_used(counter):
+    """True when the --limit requests are all used (counter["limit"] None: no limit)."""
+    return counter.get("limit") is not None and counter["requests"] >= counter["limit"]
 
 
 def universe_codes(universe):
@@ -845,6 +863,13 @@ def store_summary(store, codes, today):
         "entries": sum(len(row) for row in data.values()), "fields": fields, "kinds": dict(kinds),
         "types": len(store["types"]),
     }
+
+
+def status_line(summary):
+    """Last log line of a run / --summary: DONE once every universe stock has been fetched at least once."""
+    remaining = summary["universe"] - summary["fetched"]
+    return (f"FinMind {'DONE' if not remaining else 'NOT DONE'}: {summary['fetched']}/{summary['universe']} stocks fetched"
+            + (f", {remaining} left: run the same command again" if remaining else ""))
 
 
 def kinds_by_industry(store, codes):
@@ -979,6 +1004,16 @@ def run(args, http=None, now=None, sleep=time.sleep, clock=time.monotonic, log=p
     if not codes:
         log("::error::no Taiwan stocks: universe.json missing or empty (and no --codes)")
         return 1
+    if args.summary:
+        if previous is None:
+            log(f"::error::{out} not found: nothing fetched yet (run without --summary first)")
+            return 1
+        summary = store_summary(store, codes, today)
+        log(f"FinMind store: {json.dumps(summary, ensure_ascii=False)}")
+        for line in describe_modes(detect_modes(store["data"])[1]):
+            log(line)
+        log(status_line(summary))
+        return 0
     if args.verify:
         official = read_json(os.path.join(args.report_dir, "fundamentals", growth.TW_FILE))
         return verify(store, codes, today, official, os.path.join(args.report_dir, "financials"), log)
@@ -994,11 +1029,11 @@ def run(args, http=None, now=None, sleep=time.sleep, clock=time.monotonic, log=p
     log(f"FinMind plan: {len(plan)} stocks ({Counter(reason.split(' ')[0] for _, _, reason in plan)}), "
         f"{'with' if token else 'without'} token, one request every {interval:.1f}s, budget {args.budget:.0f}s")
     http = http or Http()
-    counter = {"requests": 0}
+    counter = {"requests": 0, "limit": args.limit}
     deadline = clock() + args.budget
     done, errors, consecutive, stopped, next_at, halted = 0, 0, 0, None, clock(), False
     types_seen, skipped, conflicts = Counter(), Counter(), 0
-    written, size = False, None
+    written, size, refused = False, None, False
     try:
         for index, (code, start_date, reason) in enumerate(plan):
             if args.limit is not None and counter["requests"] >= args.limit:
@@ -1013,11 +1048,14 @@ def run(args, http=None, now=None, sleep=time.sleep, clock=time.monotonic, log=p
             before = counter["requests"]
             try:
                 rows = fetch_stock(http, code, start_date, token, sleep, log, counter)
+            except LimitReached:
+                stopped = f"--limit {args.limit} requests ({len(plan) - index} stocks left)"
+                break
             except RateLimited as error:
                 stopped, halted = f"{error} ({len(plan) - index} stocks left)", True
                 break
             except AuthError as error:
-                stopped, halted = f"{error}", True
+                stopped, halted, refused = f"{error}", True, True
                 errors += 1
                 break
             except FinMindError as error:
@@ -1067,12 +1105,8 @@ def run(args, http=None, now=None, sleep=time.sleep, clock=time.monotonic, log=p
             log(line)
     if halted:
         log(f"::warning::FinMind stopped: {stopped}; progress saved, run the same command again later")
-    remaining = summary["universe"] - summary["fetched"]
-    log(f"FinMind {'DONE' if not remaining else 'NOT DONE'}: {summary['fetched']}/{summary['universe']} stocks fetched"
-        + (f", {remaining} left: run the same command again" if remaining else ""))
-    if done or not plan:
-        return 0
-    return 1 if errors or (stopped and "refused" in stopped) else 0
+    log(status_line(summary))
+    return 1 if refused or (not done and plan and errors) else 0
 
 
 def parse_args(argv=None):
@@ -1087,6 +1121,7 @@ def parse_args(argv=None):
     parser.add_argument("--only-when-complete", action="store_true",
                         help="do nothing until the first backfill covers 95%% of the stocks (daily workflow)")
     parser.add_argument("--verify", action="store_true", help="offline checks of the stored file; exit 1 on FAIL")
+    parser.add_argument("--summary", action="store_true", help="offline counts of the stored file (no network)")
     return parser.parse_args(argv)
 
 

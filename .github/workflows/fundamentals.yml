@@ -8,6 +8,8 @@ name: Official Fundamentals (TW / US)
 # - 美股：SEC XBRL frames（一次一個科目、一個曆季／曆年，全部公司）→ docs/report/fundamentals/us-sec.json。
 #   SEC 過去對 GitHub Actions 的 IP 一律回 403（見 atlas.yml）：第一個請求被拒時只留警告、保留舊檔，
 #   需要時在本機執行 `python atlas/scripts/build_fundamentals_sec.py` 後提交該檔。外國發行人（年度）每 7 天重抓一次。
+# - 台股歷史（FinMind，資料源自公開資訊觀測站）：docs/report/fundamentals/tw-finmind.json，約 10 年單季，逐檔續跑（每次約 20 分鐘）；
+#   FINMIND_TOKEN（secret，選填）提高每小時請求上限。被限額或被拒時保留進度、本步驟失敗不影響其他步驟。
 # - 最後 build_growth.py 合併 financials/*.json 與上面兩個檔案重建 growth.json（financials.yml 也會用同一套規則重建）。
 # 與 financials.yml 共用 concurrency group，兩者不會同時改 growth.json。
 on:
@@ -43,7 +45,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # 60 分鐘：台股官方 900 秒 + SEC + FinMind 1200 秒 + 重建與提交（原 40 分鐘不夠放下 FinMind 的預算）
+    timeout-minutes: 60
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
@@ -75,6 +78,14 @@ jobs:
         if: contains(inputs.markets || 'TW,US', 'US')
         continue-on-error: true
         run: python -u atlas/scripts/build_fundamentals_sec.py --foreign-max-age-days 7
+
+      # FinMind 逐檔續跑（已抓的歷史不重抓；被限額時停在原處，下次接著）。失敗不擋其他步驟。
+      - name: Taiwan history (FinMind, resumable)
+        if: contains(inputs.markets || 'TW,US', 'TW')
+        continue-on-error: true
+        env:
+          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
+        run: python -u atlas/scripts/build_fundamentals_tw_finmind.py --budget 1200
 
       # 即使上一步失敗，也用 repo 內已有的檔案重建（純離線讀檔，很快）
       - name: Build screener growth data (EPS / revenue YoY)
