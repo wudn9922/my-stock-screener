@@ -94,6 +94,46 @@ export function labelWidth(text: string, fontSize: number): number {
 }
 
 /**
+ * Right-hand % axis for the YoY line drawn over a bar chart. Its domain always contains zero, so the
+ * ticks are the top, zero and bottom of the data. Null when no point can be drawn.
+ */
+export interface OverlayScale {
+  lo: number;
+  hi: number;
+  yOf: (value: number) => number;
+  /** Tick values, top to bottom, without duplicates. */
+  ticks: number[];
+}
+
+export function overlayScale(values: readonly (number | null)[], top: number, bottom: number): OverlayScale | null {
+  const present = values.filter((value): value is number => value !== null && Number.isFinite(value));
+  if (!present.length) return null;
+  const lo = Math.min(0, ...present);
+  const hi = Math.max(0, ...present);
+  const span = hi - lo || 1;
+  const yOf = (value: number) => top + ((hi - value) / span) * (bottom - top);
+  // Zero always labels; a top or bottom tick that would sit on top of it is dropped.
+  const ticks = [hi, 0, lo].filter((tick) => tick === 0 || Math.abs(tick) >= 0.15 * span);
+  return { lo, hi, yOf, ticks: [...new Set(ticks)] };
+}
+
+/** Polyline path that lifts the pen at every null point, so a gap splits the line instead of bridging it. */
+export function linePath(points: readonly ({ x: number; y: number } | null)[]): string {
+  const f = (value: number) => Math.round(value * 10) / 10;
+  let path = '';
+  let down = false;
+  for (const point of points) {
+    if (point === null) {
+      down = false;
+      continue;
+    }
+    path += `${down ? 'L' : 'M'}${f(point.x)},${f(point.y)}`;
+    down = true;
+  }
+  return path;
+}
+
+/**
  * Which bars carry a value label. `all`: every bar (annual) — falling back to the extremes when the
  * labels cannot fit their slots even at 9px; `extremes`: latest, max and min (quarterly). The selected
  * bar is always labelled. Returns the indices and the font size to use.

@@ -29,6 +29,12 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+.fin-head-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
 .fin-back {
   display: inline-flex;
   align-items: center;
@@ -650,5 +656,252 @@
 @media (max-width: 767px) {
   .fin-inputs {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* -- Key metrics (first screen) */
+.fin-key {
+  margin-bottom: 12px;
+  padding: 12px 14px 10px;
+  min-width: 0;
+}
+.fin-key-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.fin-key-head h2 {
+  font-size: 15px;
+  font-weight: 700;
+}
+.fin-key-period {
+  font-size: 13px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.fin-key-period small {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-left: 2px;
+}
+.fin-key-grid {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.fin-key-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.fin-key-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+.fin-key-label {
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fin-key-top .fin-chip.basis {
+  min-height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+.fin-key-value {
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fin-key-value small {
+  margin-left: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.fin-key-value.null {
+  color: var(--text-3);
+}
+.fin-key-reason {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+.fin-key-tile .fin-chip {
+  align-self: flex-start;
+}
+.fin-spark {
+  display: block;
+  width: 100%;
+  height: 36px;
+  margin-top: auto;
+  padding-top: 4px;
+  overflow: visible;
+}
+.fin-spark-zero {
+  stroke: var(--border-strong);
+  stroke-width: 0.6;
+  vector-effect: non-scaling-stroke;
+}
+.fin-spark-bar {
+  fill: var(--accent);
+  opacity: 0.62;
+}
+.fin-spark-bar.negative {
+  fill: var(--down);
+}
+.fin-spark-null {
+  fill: var(--text-3);
+}
+.fin-key-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+
+/* -- Chart range, YoY overlay and legend */
+.fin-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 0 0 12px;
+}
+.fin-range-label {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.fin-range button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.fin-range-note {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.fin-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.fin-legend-bar {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.62;
+}
+.fin-legend-line {
+  display: inline-block;
+  width: 16px;
+  height: 0;
+  margin: 0 4px 0 10px;
+  border-top: 1.5px solid var(--text);
+  opacity: 0.85;
+}
+.fin-yoy-line {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.5;
+  opacity: 0.85;
+  stroke-linejoin: round;
+}
+.fin-yoy-dot {
+  fill: var(--surface);
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+.fin-yoy-rule {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+.fin-yoy-tick {
+  fill: var(--text-3);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* -- Statement tables */
+.fin-statement-tabs {
+  padding-top: 12px;
+}
+.fin-table td.up {
+  color: var(--up-text);
+}
+.fin-table td.down {
+  color: var(--down-text);
+}
+.fin-table td.derived {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.fin-table tbody th.fin-sticky .fin-row-name {
+  display: block;
+}
+.fin-table tbody th small {
+  display: block;
+}
+.fin-row-note {
+  margin-top: 2px;
+  color: var(--warn) !important;
+  white-space: normal;
+}
+.fin-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+}
+.fin-row-toggle {
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.fin-row-toggle:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+.fin-absent-row td {
+  color: var(--text-3);
+}
+
+@media (max-width: 767px) {
+  .fin-key-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fin-key-value {
+    font-size: 19px;
   }
 }

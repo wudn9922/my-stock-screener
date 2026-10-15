@@ -41,11 +41,21 @@ export interface MetricContext {
   kind: PeriodKind;
   series: FinancialSeries;
   market: 'US' | 'TW';
+  /** Bank / insurer statement format: no gross profit concept, so gross profit is not applicable. */
+  financialSector: boolean;
+}
+/**
+ * Financial-sector format, as the builder flags it: the recent periods have no gross profit (or revenue with
+ * cost of revenue) line, or no operating income. Gross profit is then not applicable (banks, insurers).
+ */
+export function isFinancialSector(history: FinancialHistory): boolean {
+  return history.quality.issues.includes('financial-sector-format');
 }
 export const contextOf = (history: FinancialHistory, kind: PeriodKind): MetricContext => ({
   kind,
   series: history[kind],
   market: history.market,
+  financialSector: isFinancialSector(history),
 });
 
 export const FIELD_LABELS: Record<RawField, string> = {
@@ -268,7 +278,7 @@ const ABNORMAL_TAX = { min: 0, max: 60 };
 
 // ------------------------------------------------------------------ plain lines
 
-const raw = (field: RawField) => (ctx: MetricContext, index: number) => {
+export const raw = (field: RawField) => (ctx: MetricContext, index: number) => {
   const value = at(ctx, field, index);
   return value === null
     ? missing(FIELD_LABELS[field], [], `缺${FIELD_LABELS[field]}`)
@@ -279,6 +289,33 @@ export const netIncome = raw('netIncome');
 export const operatingCashFlow = raw('operatingCashFlow');
 export const capex = raw('capex');
 export const cash = raw('cash');
+
+/** Reasons a gross profit cannot be shown; the UI prints them under the dash. */
+export const GROSS_NOT_APPLICABLE = '不適用（金融業不計毛利）';
+export const GROSS_NOT_SEPARATE = '財報未單獨列示營業成本／毛利';
+
+/**
+ * Gross profit: the reported line first; without it, revenue − cost of revenue (both reported), the reverse
+ * of the cost-of-revenue fallback. A derived value below zero is not adopted, like the cost fallback.
+ */
+export function grossProfit(ctx: MetricContext, index: number): MetricResult {
+  const reported = at(ctx, 'grossProfit', index);
+  if (reported !== null) return result(reported, `財報原始數字（${FIELD_LABELS.grossProfit}）`, []);
+  const sales = at(ctx, 'revenue', index);
+  const cost = at(ctx, 'costOfRevenue', index);
+  const formula = '營收 − 營業成本';
+  const inputs = [input(FIELD_LABELS.revenue, sales), input(FIELD_LABELS.costOfRevenue, cost)];
+  if (ctx.financialSector) return missing(FIELD_LABELS.grossProfit, inputs, GROSS_NOT_APPLICABLE);
+  if (sales === null) return missing(FIELD_LABELS.grossProfit, inputs, '缺營收');
+  if (cost === null) return missing(FIELD_LABELS.grossProfit, inputs, GROSS_NOT_SEPARATE);
+  if (sales < 0) return missing(formula, inputs, '營收 < 0，不推算毛利');
+  const estimate = sales - cost;
+  if (estimate < 0) return missing(formula, inputs, '推算毛利小於 0，不採用');
+  return result(estimate, formula, inputs, {
+    basis: 'derived',
+    notes: ['財報沒有毛利欄位，以營收減營業成本推算'],
+  });
+}
 
 /** Cost of revenue stays raw in history; this display value may use a conservative same-period fallback. */
 export function costOfRevenue(ctx: MetricContext, index: number): MetricResult {
@@ -684,6 +721,7 @@ export type MetricId =
   | 'revenue'
   | 'eps'
   | 'netIncome'
+  | 'grossProfit'
   | 'costOfRevenue'
   | 'operatingIncome'
   | 'grossMargin'
@@ -714,6 +752,7 @@ export const METRICS: Record<MetricId, MetricDef> = {
   revenue: { id: 'revenue', label: '營收', unit: 'money', compute: revenue },
   eps: { id: 'eps', label: 'EPS', unit: 'eps', compute: eps },
   netIncome: { id: 'netIncome', label: '淨利', unit: 'money', compute: netIncome },
+  grossProfit: { id: 'grossProfit', label: '毛利', unit: 'money', compute: grossProfit },
   costOfRevenue: { id: 'costOfRevenue', label: '營業成本', unit: 'money', compute: costOfRevenue },
   operatingIncome: { id: 'operatingIncome', label: '營業利益', unit: 'money', compute: operatingIncome },
   grossMargin: { id: 'grossMargin', label: '毛利率', unit: 'pct', compute: grossMargin },
@@ -737,7 +776,7 @@ export const METRICS: Record<MetricId, MetricDef> = {
 export type MetricGroupId = 'growth' | 'profitability' | 'nonOperating' | 'cashFlow' | 'returns' | 'strength';
 export const METRIC_GROUPS: { id: MetricGroupId; title: string; metrics: MetricId[] }[] = [
   { id: 'growth', title: '成長', metrics: ['revenue', 'eps', 'netIncome'] },
-  { id: 'profitability', title: '獲利能力', metrics: ['costOfRevenue', 'operatingIncome', 'grossMargin', 'operatingMargin', 'netMargin'] },
+  { id: 'profitability', title: '獲利能力', metrics: ['grossProfit', 'costOfRevenue', 'operatingIncome', 'grossMargin', 'operatingMargin', 'netMargin'] },
   { id: 'nonOperating', title: '業外與稅', metrics: ['nonOperatingIncome', 'nonOperatingShare', 'effectiveTaxRate'] },
   { id: 'cashFlow', title: '現金流', metrics: ['operatingCashFlow', 'capex', 'freeCashFlow', 'fcfMargin', 'fcfToNetIncome'] },
   { id: 'returns', title: '報酬率', metrics: ['roe', 'roic'] },

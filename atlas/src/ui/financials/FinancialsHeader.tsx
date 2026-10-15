@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft, Info, Search, X } from 'lucide-react';
 import type { FinancialHistory, PeriodKind } from '../../fundamentals/FinancialHistory';
 import { SymbolSearch, type LocalSymbol, type SearchResult } from '../SymbolSearch';
+import { StockTabs } from '../StockTabs';
 import { displayTicker } from '../format';
 import { adrRatioText, type TwAdrListing } from '../../fundamentals/adrListings';
 import { LEVEL_TEXT, issueText, revisionText } from './financialsView';
@@ -24,7 +25,11 @@ export interface FinancialsHeaderProps {
   onHomeListing?: (listing: TwAdrListing) => void;
 }
 
-/** Sticky page head: back to the chart, symbol / name / currency, quality badge, period and view switches, stock search. */
+/**
+ * Sticky page head. Row 1: 「K線｜財務」 switch (or back to the chart without a symbol) and the symbol, name
+ * and currency. Row 2: period and view switches, with the quality badge and stock search at the end. The
+ * search box and quality note open below the rows.
+ */
 export function FinancialsHeader({
   symbol, name, history, kind, mode, localSymbols, homeListing, onBack, onKind, onMode, onSymbol, onHomeListing,
 }: FinancialsHeaderProps) {
@@ -34,37 +39,69 @@ export function FinancialsHeader({
   const issues = history?.quality.issues ?? [];
   return (
     <header className="fin-head">
-      <div className="fin-head-row">
-        <button type="button" className="fin-back" onClick={onBack} aria-label="回到圖表">
-          <ArrowLeft size={18} aria-hidden="true" />
-          <span>圖表</span>
-        </button>
+      <div className="fin-head-row fin-head-main">
+        {symbol ? (
+          <StockTabs active="financials" onSelect={(tab) => tab === 'chart' && onBack()} />
+        ) : (
+          <button type="button" className="fin-back" onClick={onBack} aria-label="回到圖表">
+            <ArrowLeft size={18} aria-hidden="true" />
+            <span>圖表</span>
+          </button>
+        )}
         <div className="fin-title">
           <b>{symbol ? displayTicker(symbol) : '財報分析'}</b>
           {name && symbol && name.toUpperCase() !== symbol && name !== displayTicker(symbol) && <span className="fin-name">{name}</span>}
           {history && <span className="fin-currency">{history.currency}</span>}
         </div>
-        {history && level && (
+      </div>
+      <div className="fin-head-row controls">
+        <div className="segmented compact" role="group" aria-label="期間">
+          {(
+            [
+              ['annual', '年度'],
+              ['quarterly', '季度'],
+            ] as const
+          ).map(([value, label]) => (
+            <button key={value} type="button" className={kind === value ? 'active' : ''} aria-pressed={kind === value} onClick={() => onKind(value)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="segmented compact" role="group" aria-label="顯示方式">
+          {(
+            [
+              ['chart', '圖表'],
+              ['table', '表格'],
+            ] as const
+          ).map(([value, label]) => (
+            <button key={value} type="button" className={mode === value ? 'active' : ''} aria-pressed={mode === value} onClick={() => onMode(value)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="fin-head-tools">
+          {history && level && (
+            <button
+              type="button"
+              className={`fin-quality ${level}`}
+              aria-expanded={qualityOpen}
+              onClick={() => setQualityOpen((open) => !open)}
+              title="資料品質說明"
+            >
+              <Info size={13} aria-hidden="true" />
+              {LEVEL_TEXT[level]}
+            </button>
+          )}
           <button
             type="button"
-            className={`fin-quality ${level}`}
-            aria-expanded={qualityOpen}
-            onClick={() => setQualityOpen((open) => !open)}
-            title="資料品質說明"
+            className={`icon-button${searching ? ' active' : ''}`}
+            aria-label={searching ? '關閉搜尋' : '搜尋其他股票'}
+            aria-expanded={searching}
+            onClick={() => setSearching((open) => !open)}
           >
-            <Info size={13} aria-hidden="true" />
-            {LEVEL_TEXT[level]}
+            {searching ? <X size={18} /> : <Search size={18} />}
           </button>
-        )}
-        <button
-          type="button"
-          className={`icon-button${searching ? ' active' : ''}`}
-          aria-label={searching ? '關閉搜尋' : '搜尋其他股票'}
-          aria-expanded={searching}
-          onClick={() => setSearching((open) => !open)}
-        >
-          {searching ? <X size={18} /> : <Search size={18} />}
-        </button>
+        </div>
       </div>
       {homeListing && onHomeListing && (
         <p className="fin-home-listing">
@@ -123,32 +160,6 @@ export function FinancialsHeader({
           )}
         </div>
       )}
-      <div className="fin-head-row controls">
-        <div className="segmented compact" role="group" aria-label="期間">
-          {(
-            [
-              ['annual', '年度'],
-              ['quarterly', '季度'],
-            ] as const
-          ).map(([value, label]) => (
-            <button key={value} type="button" className={kind === value ? 'active' : ''} aria-pressed={kind === value} onClick={() => onKind(value)}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="segmented compact" role="group" aria-label="顯示方式">
-          {(
-            [
-              ['chart', '圖表'],
-              ['table', '表格'],
-            ] as const
-          ).map(([value, label]) => (
-            <button key={value} type="button" className={mode === value ? 'active' : ''} aria-pressed={mode === value} onClick={() => onMode(value)}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
     </header>
   );
 }

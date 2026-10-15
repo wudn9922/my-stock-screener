@@ -3,18 +3,21 @@ import type { PageProps } from './pageProps';
 import { PageState, Skeleton } from '../ui/PageState';
 import { financialsKey, loadFinancials, type FinancialsLoadResult, type PeriodKind } from '../fundamentals/FinancialHistory';
 import { METRIC_GROUPS, type MetricGroupId, type MetricId } from '../fundamentals/financialMetrics';
+import type { Timeframe } from '../market-data/MarketDataProvider';
 import { twListingForAdr } from '../fundamentals/adrListings';
 import type { Report } from '../report/schema';
 import type { LocalSymbol, SearchResult } from '../ui/SymbolSearch';
 import { formatDateTime } from '../ui/format';
 import { FinancialsHeader, type DisplayMode } from '../ui/financials/FinancialsHeader';
+import { KeyMetrics } from '../ui/financials/KeyMetrics';
 import { MetricCard } from '../ui/financials/MetricCard';
-import { FinancialsTable } from '../ui/financials/FinancialsTable';
+import { SpanControl } from '../ui/financials/SpanControl';
+import { StatementTable } from '../ui/financials/StatementTable';
 import { PeRiverCard } from '../ui/financials/PeRiverCard';
 import { SummaryChips } from '../ui/financials/SummaryChips';
 import { ChipsSection } from '../ui/financials/ChipsCard';
 import { isChipsPageSymbol } from '../report/twChips';
-import { buildView, depthText, provenanceText } from '../ui/financials/financialsView';
+import { CHART_PERIODS, buildView, depthText, provenanceText } from '../ui/financials/financialsView';
 import '../ui/financials.css';
 
 export interface FinancialsPageProps extends PageProps {
@@ -22,6 +25,8 @@ export interface FinancialsPageProps extends PageProps {
   symbol?: string;
   /** `'q'` for quarterly figures (`?p=q`); undefined means annual. */
   p?: 'q';
+  /** Chart timeframe the 「K線」 tab returns to (`?tf=`). */
+  tf?: Timeframe;
 }
 
 const VIEW_KEY = 'atlas-financials-view-v1';
@@ -58,20 +63,21 @@ function cardNote(group: MetricGroupId, issues: readonly string[], foreignReport
     return notes.join('') || null;
   }
   if (!bank) return null;
-  if (group === 'profitability') return '金融業財報沒有毛利與營業利益：毛利率、營業利益率不適用，淨利率照常計算。';
+  if (group === 'profitability') return '金融業財報沒有毛利與營業利益：毛利、毛利率、營業利益率不適用，淨利率照常計算。';
   if (group === 'nonOperating') return '金融業沒有營業利益，業外損益與業外占比不適用；有效稅率照常計算。';
   if (group === 'returns') return 'ROIC 需要營業利益，金融業不適用；請看 ROE。';
   if (group === 'strength') return '銀行的負債多為存款（營運原料），負債權益比不宜與一般公司比較；沒有營業利益，利息保障倍數不適用。';
   return null;
 }
 
-export default function FinancialsPage({ report, navigate, symbol, p }: FinancialsPageProps) {
+export default function FinancialsPage({ report, navigate, symbol, p, tf }: FinancialsPageProps) {
   const kind: PeriodKind = p === 'q' ? 'quarterly' : 'annual';
   const [mode, setMode] = useState<DisplayMode>(readMode);
   const [loaded, setLoaded] = useState<{ symbol: string; result: FinancialsLoadResult } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [directoryName, setDirectoryName] = useState<{ symbol: string; name: string } | null>(null);
   const [metricOf, setMetricOf] = useState<Partial<Record<MetricGroupId, MetricId>>>({});
+  const [spans, setSpans] = useState<Record<PeriodKind, number>>({ annual: CHART_PERIODS.annual, quarterly: CHART_PERIODS.quarterly });
   const localSymbols = useMemo(() => reportSymbols(report.status === 'ok' ? report.report : null), [report]);
   const key = financialsKey(symbol);
 
@@ -123,27 +129,36 @@ export default function FinancialsPage({ report, navigate, symbol, p }: Financia
   const history = result?.status === 'ok' ? result.data : null;
   // A file with only one period type still opens on the other one.
   const effectiveKind: PeriodKind = history && !history[kind].end.length ? (kind === 'annual' ? 'quarterly' : 'annual') : kind;
+  const span = spans[effectiveKind];
   const annualView = useMemo(() => (history ? buildView(history, 'annual') : null), [history]);
-  const view = useMemo(
-    () => (history ? (effectiveKind === 'annual' ? annualView : buildView(history, 'quarterly')) : null),
-    [history, effectiveKind, annualView],
-  );
+  // The chart range applies to the period type on screen; the summary tiles keep the default annual window.
+  const view = useMemo(() => (history ? buildView(history, effectiveKind, span) : null), [history, effectiveKind, span]);
 
   const onKind = useCallback(
-    (next: PeriodKind) => navigate({ page: 'financials', ...(symbol ? { symbol } : {}), ...(next === 'quarterly' ? { p: 'q' as const } : {}) }, { replace: true }),
-    [navigate, symbol],
+    (next: PeriodKind) =>
+      navigate(
+        {
+          page: 'financials',
+          ...(symbol ? { symbol } : {}),
+          ...(tf ? { tf } : {}),
+          ...(next === 'quarterly' ? { p: 'q' as const } : {}),
+        },
+        { replace: true },
+      ),
+    [navigate, symbol, tf],
   );
   const onMode = (next: DisplayMode) => {
     setMode(next);
     writeMode(next);
   };
+  // Changing the stock keeps the period type but not the chart timeframe, which belonged to the previous symbol.
   const onSymbol = (picked: SearchResult) => navigate({ page: 'financials', symbol: picked.symbol, ...(p ? { p } : {}) });
   const homeListing = twListingForAdr(symbol);
   const onHomeListing = (listing: { tw: string }) => navigate({ page: 'financials', symbol: listing.tw, ...(p ? { p } : {}) });
-  const onBack = () => navigate(symbol ? { page: 'chart', symbol } : { page: 'chart' });
+  const onBack = () => navigate(symbol ? { page: 'chart', symbol, ...(tf ? { tf } : {}) } : { page: 'chart' });
 
   let body;
-  if (!symbol) body = <PageState kind="empty" title="選擇一檔股票" message="用上方搜尋輸入代號或名稱，或從圖表頁按「財報」開啟。" />;
+  if (!symbol) body = <PageState kind="empty" title="選擇一檔股票" message="用上方搜尋輸入代號或名稱，或從圖表頁按「財務」開啟。" />;
   else if (!key && !/^\d{4,6}[A-Z]?$/.test(symbol))
     body = <PageState kind="empty" title="沒有個股財報" message={`${symbol} 是指數或不支援的代號，指數沒有財報。`} />;
   else if (!result)
@@ -165,6 +180,7 @@ export default function FinancialsPage({ report, navigate, symbol, p }: Financia
     const splitEvents = history.split.events;
     body = (
       <>
+        <KeyMetrics history={history} view={view} />
         <SummaryChips history={history} annual={annualView} current={view} />
         <div className="fin-notes">
           <p className="fin-depth">{depthText(history, effectiveKind)}</p>
@@ -184,21 +200,29 @@ export default function FinancialsPage({ report, navigate, symbol, p }: Financia
         </div>
         <PeRiverCard history={history} />
         {mode === 'table' ? (
-          <FinancialsTable history={history} view={view} />
+          <StatementTable history={history} view={view} />
         ) : (
-          <div className="fin-cards">
-            {METRIC_GROUPS.map((group) => (
-              <MetricCard
-                key={group.id}
-                group={group}
-                history={history}
-                view={view}
-                metric={metricOf[group.id] ?? group.metrics.find((id) => view.metrics[id].window.some((i) => view.metrics[id].values[i] !== null)) ?? group.metrics[0]!}
-                onMetric={(id) => setMetricOf((current) => ({ ...current, [group.id]: id }))}
-                note={cardNote(group.id, issues, history.foreignReporter, effectiveKind)}
-              />
-            ))}
-          </div>
+          <>
+            <SpanControl
+              kind={effectiveKind}
+              count={history[effectiveKind].end.length}
+              span={span}
+              onSpan={(next) => setSpans((current) => ({ ...current, [effectiveKind]: next }))}
+            />
+            <div className="fin-cards">
+              {METRIC_GROUPS.map((group) => (
+                <MetricCard
+                  key={group.id}
+                  group={group}
+                  history={history}
+                  view={view}
+                  metric={metricOf[group.id] ?? group.metrics.find((id) => view.metrics[id].window.some((i) => view.metrics[id].values[i] !== null)) ?? group.metrics[0]!}
+                  onMetric={(id) => setMetricOf((current) => ({ ...current, [group.id]: id }))}
+                  note={cardNote(group.id, issues, history.foreignReporter, effectiveKind)}
+                />
+              ))}
+            </div>
+          </>
         )}
       </>
     );
