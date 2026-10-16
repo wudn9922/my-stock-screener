@@ -65,6 +65,12 @@ DATASETS = {"pl": "TaiwanStockFinancialStatements", "bs": "TaiwanStockBalanceShe
 DEFAULT_BUDGET_SECONDS = 600
 SAVE_EVERY = 25
 MAX_CONSECUTIVE_ERRORS = 5
+# FinMind's balance sheet repeats every line as "<type>_per": the same origin_name, as % of total assets
+PERCENT_SUFFIX = "_per"
+# Taiwanese cash flow statements are published year to date (Q2 = first half, …) by regulation; the
+# operating cash flow can change sign within a year, so the cumulative test of the income statement
+# cannot decide it from the data (it came out "ambiguous" on the first 15 real stocks)
+CF_MODE = "ytd"
 WARMUP_STOCKS = 15          # the verdicts are decided from this many stocks (held in memory until then)
 WARMUP_LIMIT = 200          # still undecided after this many: stop, the verdicts need a look (see the probe)
 MAX_TYPES_KEPT = 400        # type / origin_name pairs kept in the state file per dataset
@@ -173,6 +179,9 @@ def parse_dataset(dataset, rows, code):
             skipped["other stock_id"] += 1
             continue
         type_name, origin = str(row.get("type") or ""), str(row.get("origin_name") or "")
+        if type_name.endswith(PERCENT_SUFFIX):
+            skipped["percent of total column"] += 1     # common-size % (e.g. CashAndCashEquivalents_per)
+            continue
         types[type_name] += 1
         names.setdefault(type_name, origin)
         hits = hits_of(dataset, type_name, origin)
@@ -264,10 +273,10 @@ def decide(held, modes, official, log):
                    for code, _, parsed in held}
         found = fmo.evidence(cf_quads(cf_data))
         verdict = fmo.verdict_of(found)
-        log(f"FinMind cash flow: verdict {verdict} over {found['n']} company-years with four positive quarters: "
-            f"Q1<Q2<Q3 & Q3>=2xQ1 in {found['ytdQ1Q3']}, Q4>Q3 in {found['q4AboveQ3']}, "
-            f"Q4>=Q1+Q2+Q3 in {found['q4AboveQ1toQ3']}")
-        modes["cf"] = verdict if verdict in fmo.MODES else None
+        log(f"FinMind cash flow: {CF_MODE} (published year to date); the data test says {verdict} over {found['n']} "
+            f"company-years with four positive quarters: Q1<Q2<Q3 & Q3>=2xQ1 in {found['ytdQ1Q3']}, "
+            f"Q4>Q3 in {found['q4AboveQ3']}, Q4>=Q1+Q2+Q3 in {found['q4AboveQ1toQ3']}")
+        modes["cf"] = CF_MODE
         evidence["cf"] = {key: found[key] for key in ("n", "ytdQ1Q3", "q4AboveQ3", "q4AboveQ1toQ3")}
     return modes, evidence
 
@@ -514,6 +523,9 @@ def dump_state(state, now):
 
 def plan(state, codes, today, forced=()):
     """[(code, reason)] for this run, most needed first: never fetched, behind the due quarter, filing window, empty."""
+    if forced:
+        # --tickers: exactly those stocks (full history again), nothing else
+        return [(code, "forced" if code in state["fetch"] else "new") for code in codes if code in forced]
     target, window = fmo.due_season(today), fmo.open_season(today)
     missing, behind, waiting, empty = [], [], [], []
     for code in codes:

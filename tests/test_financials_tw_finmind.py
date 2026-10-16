@@ -103,7 +103,8 @@ class DerivationTest(unittest.TestCase):
     def test_each_publication_style_gives_the_single_quarters(self):
         for mode in ("ytd", "quarter", "q4annual"):
             with self.subTest(mode=mode):
-                self.assertEqual(verdicts_of([(str(1100 + i), i) for i in range(30)], mode), {"pl": mode, "cf": mode})
+                # the income statement verdict follows the data; the cash flow is always year to date (CF_MODE)
+                self.assertEqual(verdicts_of([(str(1100 + i), i) for i in range(30)], mode), {"pl": mode, "cf": "ytd"})
                 parsed, quarters = parsed_of("2330", mode, 7)
                 annual, quarterly, flags = ftw.derive(parsed, {"pl": mode, "cf": mode})
                 for (year, quarter), truth in quarters.items():
@@ -140,7 +141,24 @@ class DerivationTest(unittest.TestCase):
         self.assertNotIn("revenue", annual[2019])                  # four singles needed for the year
 
     def test_too_little_evidence_decides_nothing(self):
-        self.assertEqual(verdicts_of([("1101", 1)], "ytd"), {"pl": None, "cf": None})     # 11 company-years < 20
+        # 11 company-years < 20: no income statement verdict; the cash flow is year to date by regulation
+        self.assertEqual(verdicts_of([("1101", 1)], "ytd"), {"pl": None, "cf": "ytd"})
+
+    def test_percent_of_total_columns_are_skipped(self):
+        rows = [{"stock_id": "2330", "date": "2024-12-31", "type": "TotalAssets", "origin_name": "資產總額",
+                 "value": 6691764700000},
+                {"stock_id": "2330", "date": "2024-12-31", "type": "TotalAssets_per", "origin_name": "資產總額",
+                 "value": 100}]
+        for order in (rows, rows[::-1]):
+            parsed = ftw.parse_dataset("bs", order, "2330")
+            self.assertEqual(parsed["fields"]["2024Q4"]["totalAssets"], 6691764700000)
+            self.assertEqual(parsed["skipped"]["percent of total column"], 1)
+            self.assertEqual(parsed["conflicts"], 0)
+
+    def test_tickers_plan_is_exactly_those_stocks(self):
+        state = {"fetch": {"2330": ["2026-10-01", "2026Q2", "ok"]}}
+        chosen = ftw.plan(state, ["1101", "2317", "2330"], TODAY, {"2330", "2317"})
+        self.assertEqual(chosen, [("2317", "new"), ("2330", "forced")])
 
     def test_eps_of_a_quarter_without_its_cumulative_eps_stays_empty(self):
         self.assertEqual(ftw.eps_singles({1: 1.0, 2: None}, {1: 10.0, 2: 20.0}, "ytd"), {1: 1.0})
