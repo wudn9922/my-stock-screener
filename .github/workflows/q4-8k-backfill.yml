@@ -1,0 +1,87 @@
+name: Q4 EPS from 8-K (manual)
+
+# 手動執行：用 8-K 財報新聞稿（EX-99.1）補美股缺漏的第四季 EPS。
+# backtest：只用已有的第四季 EPS 檢查解析器，不寫檔，報告上傳為 artifact。
+# fill：只補空值，結果提交到分支 backfill/q4-8k，由人工審核後再合併；不會直接改 main。
+# 不呼叫任何 AI 服務，不使用 Claude／Codex 額度。
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "backtest：檢查解析器；fill：補缺漏的第四季 EPS"
+        type: choice
+        options: [backtest, fill]
+        default: backtest
+      tickers:
+        description: "逗號分隔的代號（空白＝全部美股檔）"
+        required: false
+        default: ""
+      budget:
+        description: "每次執行的 SEC 請求上限"
+        required: false
+        default: "1500"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: q4-8k-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MODE: ${{ inputs.mode }}
+      TICKERS: ${{ inputs.tickers }}
+      BUDGET: ${{ inputs.budget }}
+      SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+      BRANCH: backfill/q4-8k
+      REPORT: ${{ runner.temp }}/q4-8k-report.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select branch
+        run: |
+          git fetch -q origin
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            git checkout -q -B "$BRANCH" "origin/$BRANCH"
+          else
+            git checkout -q -B "$BRANCH" origin/main
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run extraction
+        run: |
+          args=(--mode "$MODE" --budget "$BUDGET" --report "$REPORT")
+          if [ -n "$TICKERS" ]; then args+=(--tickers "$TICKERS"); fi
+          python -u atlas/scripts/backfill_q4_eps_8k.py "${args[@]}"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q4-8k-report-${{ inputs.mode }}
+          path: ${{ env.REPORT }}
+          if-no-files-found: ignore
+
+      - name: Commit and push (fill only)
+        if: inputs.mode == 'fill' && always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/report/financials docs/report/fundamentals/q4-8k-state.json
+          git commit -m "Fill missing Q4 EPS from 8-K earnings releases" || { echo "No changes to commit"; exit 0; }
+          for i in 1 2 3 4; do
+            if git push -u origin "$BRANCH"; then exit 0; fi
+            sleep $((2 ** i))
+            git pull --rebase -q origin "$BRANCH" || exit 1
+          done
+          exit 1
