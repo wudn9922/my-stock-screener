@@ -272,6 +272,27 @@ NEXT_YEAR_RELEASE = """
 """
 
 
+class OrphanDiagnosticTests(unittest.TestCase):
+    def test_a_net_income_table_without_its_period_is_counted_with_the_table_before_it(self):
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr></table>"
+                "<table><tr><td>Net income attributable to Acme</td><td>$</td><td>999</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>$</td><td>0.30</td></tr></table>")
+
+        class FakeSec:
+            def get_json(self, url):
+                return {"directory": {"item": [{"name": "ex99-1.htm"}]}}
+
+            def get_text(self, url):
+                return None if url.endswith(("-index.html", "-index.htm")) else html
+
+        filing = {"accessionNumber": "0001-26-000009", "filingDate": "2026-02-05"}
+        debug = []
+        result, reason = bq.from_filing(FakeSec(), 1234, filing, 1_234_000, "2024-12-31", debug)
+        self.assertIsNone(result)
+        self.assertEqual(debug[0]["orphans"]["net_tables_without_period"], 1)
+        self.assertEqual(debug[0]["orphans"]["period_in_previous_table"], 1)
+
+
 class IndependentCheckTests(unittest.TestCase):
     rows = [{"form": "8-K", "items": "2.02", "filingDate": "2026-02-05", "accessionNumber": "0001-26-000001"}]
 
