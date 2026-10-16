@@ -20,7 +20,7 @@ on:
       budget:
         description: "每次執行的 SEC 請求上限"
         required: false
-        default: "1500"
+        default: "6000"
 
 permissions:
   contents: write

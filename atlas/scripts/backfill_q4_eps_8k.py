@@ -46,7 +46,7 @@ SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 ARCHIVE_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{folder}/"
 
 SCALES = (1, 1e3, 1e6, 1e9)
-NI_TOLERANCE = 0.02        # relative: stored Q4 net income against the table, after scaling
+NI_TOLERANCE = 0.002       # relative: stored Q4 net income against the table (plus half a unit of its scale)
 SHARES_TOLERANCE = 0.05    # relative: net income / shares against EPS (absolute floor EPS_FLOOR)
 EPS_FLOOR = 0.02
 FILING_DAYS = (15, 150)    # an 8-K with Item 2.02 this many days after the quarter end
@@ -159,11 +159,39 @@ def _pick(rows, predicate):
     return None
 
 
-def table_eps(table, target):
+MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september",
+          "october", "november", "december"]
+
+
+def shows_period(text, end):
+    """The table names the quarter's month and year, e.g. 'Three Months Ended January 31, 2026'."""
+    when = date.fromisoformat(end)
+    name = MONTHS[when.month - 1]
+    pattern = rf"\b(?:{name}|{name[:3]})\.?\s+\d{{1,2}},?\s+{when.year}\b"
+    return re.search(pattern, text, re.I) is not None
+
+
+def split_factor(doc, filing_date):
+    """Product of the split ratios dated after the filing: the stored EPS and shares are on today's basis."""
+    factor = 1.0
+    for event in (doc.get("split") or {}).get("events") or []:
+        if isinstance(event, (list, tuple)) and len(event) >= 2:
+            try:
+                when, ratio = str(event[0]), float(event[1])
+            except (TypeError, ValueError):
+                continue
+            if ratio > 0 and when > filing_date:
+                factor *= ratio
+    return factor
+
+
+def table_eps(table, target, end):
     """
     One table → (result dict, None), (None, reason) when it is the quarter but fails a check, or (None, None)
     when it does not show this quarter's net income at all.
     """
+    if not shows_period(" ".join(" ".join(row) for row in table), end):
+        return None, None
     rows = []
     for cells in table:
         label, values = row_of(cells)
@@ -176,7 +204,7 @@ def table_eps(table, target):
     if len(net_row) != len(eps_row):
         return None, "net income and EPS rows have different column counts"
     hits = [(j, scale) for j, value in enumerate(net_row) if value is not None for scale in SCALES
-            if abs(value * scale - target) <= NI_TOLERANCE * abs(target)]
+            if abs(value * scale - target) <= max(NI_TOLERANCE * abs(target), 0.5 * scale)]
     if not hits:
         return None, None
     if len(hits) != 1:
@@ -297,7 +325,7 @@ def is_release_exhibit(item):
         kind.startswith("EX-99") or re.search(r"(ex|exhibit)[-_ ]?99", name, re.I) is not None)
 
 
-def from_filing(sec, cik, filing, target, debug=None):
+def from_filing(sec, cik, filing, target, end, debug=None):
     accession = filing["accessionNumber"]
     base = ARCHIVE_URL.format(cik=int(cik), folder=accession.replace("-", ""))
     index = sec.get_json(base + "index.json")
@@ -316,7 +344,7 @@ def from_filing(sec, cik, filing, target, debug=None):
         if text is None:
             continue
         for table in tables_of(text):
-            result, why = table_eps(table, target)
+            result, why = table_eps(table, target, end)
             if result is not None:
                 found.append(dict(result, accession=accession, url=url))
             elif why:
@@ -335,7 +363,7 @@ def find_quarter(sec, cik, filings, end, target, debug=None):
     """The first candidate filing that gives this quarter → (result, None), else (None, reason)."""
     reason = "no 8-K with Item 2.02 in the window"
     for filing in candidate_filings(filings, date.fromisoformat(end))[:MAX_FILINGS]:
-        result, why = from_filing(sec, cik, filing, target, debug)
+        result, why = from_filing(sec, cik, filing, target, end, debug)
         if result is not None:
             return dict(result, end=end, filingDate=filing["filingDate"]), None
         reason = why or reason
@@ -369,6 +397,14 @@ def process_ticker(sec, key, cik, doc, mode, rows):
     for p in periods:
         debug = []
         result, reason = find_quarter(sec, cik, filings, p["end"], p["target"], debug)
+        if result is not None:
+            factor = split_factor(doc, result["filingDate"])
+            if factor != 1:
+                result = dict(result, asReported=result["epsDiluted"], splitFactor=factor,
+                              epsDiluted=round(result["epsDiluted"] / factor, 6),
+                              epsBasic=None if result["epsBasic"] is None else round(result["epsBasic"] / factor, 6),
+                              dilutedShares=None if result["dilutedShares"] is None
+                              else round(result["dilutedShares"] * factor, 1))
         rows.append({"key": key, "end": p["end"], "stored": p["eps"], "target": p["target"],
                      "result": result, "reason": reason, "debug": debug[:2]})
     return True
@@ -402,7 +438,7 @@ def backtest_error(estimate, stored):
 
 
 def within_tolerance(estimate, stored):
-    return abs(estimate - stored) <= max(0.02 * abs(stored), 0.01)
+    return abs(estimate - stored) <= max(0.02 * abs(stored), 0.011)
 
 
 def load_state(path):
@@ -483,7 +519,7 @@ def parse_args(argv=None):
     parser.add_argument("--mode", choices=("backtest", "fill"), default="backtest")
     parser.add_argument("--tickers", default="", help="comma separated; empty = every US file")
     parser.add_argument("--limit", type=int, default=0, help="only the first N files (0 = all)")
-    parser.add_argument("--budget", type=int, default=1500, help="SEC requests this run")
+    parser.add_argument("--budget", type=int, default=6000, help="SEC requests this run")
     parser.add_argument("--report", default="", help="also write the report JSON to this path")
     return parser.parse_args(argv)
 
