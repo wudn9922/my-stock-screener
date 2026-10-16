@@ -1,0 +1,13 @@
+{
+  "schema": "q4-eps-numeric-corrections-report-v1",
+  "sourceSnapshotCommit": "3f9406d8b",
+  "corrections": 174,
+  "byClass": {
+    "baseline-diff-current-value-sec-grade-a-source-verified": 154,
+    "change-over-one-cent": 156,
+    "direct-sec-existing-value-correction": 20,
+    "change-one-cent-or-less": 18
+  },
+  "sourceVerifiedGradeA": 174,
+  "rowLedger": "q4-eps-numeric-corrections.jsonl"
+}

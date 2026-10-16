@@ -42,6 +42,14 @@ export type RawField = (typeof RAW_FIELDS)[number];
 export type PeriodKind = 'annual' | 'quarterly';
 export type PeriodSource = 'sec' | 'finmind' | 'yahoo';
 export type QualityLevel = 'good' | 'partial' | 'limited';
+export type EpsEvidenceGrade = 'A' | 'B' | 'C' | 'D';
+export interface PeriodEpsQuality {
+  epsDiluted?: EpsEvidenceGrade;
+  epsBasic?: EpsEvidenceGrade;
+  /** SEC filing date for this Q4 fact; used to prevent historical look-ahead. */
+  epsDilutedFiled?: string;
+  epsBasicFiled?: string;
+}
 
 /** Retention limits of the builder (SEC-seeded files keep the longest history). */
 export const MAX_PERIODS: Record<PeriodKind, number> = { annual: 20, quarterly: 60 };
@@ -56,6 +64,8 @@ export interface FinancialSeries {
   /** Where each period came from; Yahoo unless the file says "sec" or "finmind" (official sources). */
   src: PeriodSource[];
   values: Record<RawField, (number | null)[]>;
+  /** Per-period EPS grade and source filing dates; only A/B Q4 values are formal TTM inputs. */
+  epsQuality?: (PeriodEpsQuality | null)[];
 }
 
 export interface FinancialHistory {
@@ -163,7 +173,7 @@ const recordOf = (value: unknown): Record<string, unknown> =>
 export function emptySeries(): FinancialSeries {
   const values = {} as Record<RawField, (number | null)[]>;
   for (const field of RAW_FIELDS) values[field] = [];
-  return { end: [], fy: [], fq: [], src: [], values };
+  return { end: [], fy: [], fq: [], src: [], values, epsQuality: [] };
 }
 
 /** Rebuilds one period block: valid ends only, ascending, one period per end date, newest `limit` kept. */
@@ -173,6 +183,7 @@ export function parseSeries(raw: unknown, kind: PeriodKind): FinancialSeries {
   const fy = arrayOf(block.fy);
   const fq = arrayOf(block.fq);
   const src = arrayOf(block.src);
+  const epsQuality = arrayOf(block.epsQuality);
   const rawValues = recordOf(block.values);
   const columns = RAW_FIELDS.map((field) => arrayOf(rawValues[field]));
   const byEnd = new Map<string, number>();
@@ -190,6 +201,17 @@ export function parseSeries(raw: unknown, kind: PeriodKind): FinancialSeries {
     const quarter = finiteOrNull(fq[index]);
     out.fq.push(kind === 'quarterly' && quarter !== null && [1, 2, 3, 4].includes(quarter) ? quarter : null);
     out.src.push(src[index] === 'sec' ? 'sec' : src[index] === 'finmind' ? 'finmind' : 'yahoo');
+    const rawGrade = recordOf(epsQuality[index]);
+    const grade = (value: unknown): EpsEvidenceGrade | undefined =>
+      value === 'A' || value === 'B' || value === 'C' || value === 'D' ? value : undefined;
+    const epsDilutedGrade = grade(rawGrade.epsDiluted);
+    const epsBasicGrade = grade(rawGrade.epsBasic);
+    const epsDilutedFiled = validDate(rawGrade.epsDilutedFiled) ?? undefined;
+    const epsBasicFiled = validDate(rawGrade.epsBasicFiled) ?? undefined;
+    out.epsQuality!.push(epsDilutedGrade || epsBasicGrade
+      ? { epsDiluted: epsDilutedGrade, epsBasic: epsBasicGrade,
+          epsDilutedFiled, epsBasicFiled }
+      : null);
     RAW_FIELDS.forEach((field, column) => {
       let value = finiteOrNull(columns[column]![index]);
       // Capex is stored as a positive outflow; a stray sign must not inflate free cash flow.
@@ -219,6 +241,7 @@ const historySchema = z
     quarterly: z.unknown().optional(),
     split: z.unknown().optional(),
     quality: z.unknown().optional(),
+    secQ4EpsFacts: z.unknown().optional(),
   })
   .transform((raw) => {
     const symbol = (raw.symbol ?? '').toUpperCase();
@@ -231,6 +254,16 @@ const historySchema = z
       const number = finiteOrNull(value);
       return number === null ? null : Math.max(0, Math.floor(number));
     };
+    const quarterly = parseSeries(raw.quarterly, 'quarterly');
+    const q4Facts = recordOf(raw.secQ4EpsFacts);
+    quarterly.epsQuality = quarterly.end.map((end, index) => {
+      const existing = quarterly.epsQuality?.[index] ?? null;
+      const source = recordOf(q4Facts[end]);
+      const dilutedFiled = validDate(recordOf(source.epsDiluted).filed) ?? existing?.epsDilutedFiled;
+      const basicFiled = validDate(recordOf(source.epsBasic).filed) ?? existing?.epsBasicFiled;
+      if (!existing && !dilutedFiled && !basicFiled) return null;
+      return { ...(existing ?? {}), epsDilutedFiled: dilutedFiled, epsBasicFiled: basicFiled };
+    });
     const history: FinancialHistory = {
       version: 1,
       symbol,
@@ -243,7 +276,7 @@ const historySchema = z
       source: raw.source,
       fyEndMonth: month !== null && Number.isInteger(month) && month >= 1 && month <= 12 ? month : null,
       annual: parseSeries(raw.annual, 'annual'),
-      quarterly: parseSeries(raw.quarterly, 'quarterly'),
+      quarterly,
       split: {
         adjusted: split.adjusted === true,
         events: arrayOf(split.events).flatMap((event) => {

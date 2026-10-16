@@ -161,7 +161,7 @@ def normalize_and_check_q4_eps(document, end, q4_income, q3_shares, fact):
     if income is None:
         return None, 1.0, "missing-q4-net-income"
     if shares is None or shares <= 0:
-        return None, 1.0, "missing-q3-diluted-shares"
+        return None, 1.0, "missing-q3-shares"
     if raw is None:
         return None, 1.0, "invalid-sec-value"
     if income == 0:

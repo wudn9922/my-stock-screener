@@ -2362,6 +2362,38 @@ class SecClient:
             self.sleeper(self.backoff[attempt])
         raise FetchError(f"no attempt for {url}")       # unreachable: the loop returns or raises
 
+    def get_bytes(self, url, allow_404=False):
+        """Raw response body using the same fair-access, retry, and 403 policy as get_json."""
+        for attempt in range(len(self.backoff) + 1):
+            retry, problem = True, None
+            try:
+                status, body = self._request(url)
+            except (OSError, http.client.HTTPException) as error:
+                problem = f"{type(error).__name__}: {error}"
+            else:
+                self.bytes_received += len(body or b"")
+                if status == 200:
+                    self.consecutive_failures = 0
+                    if body[:2] == b"\x1f\x8b":
+                        try:
+                            return gzip.decompress(body)
+                        except (OSError, EOFError, zlib.error) as error:
+                            problem = f"bad gzip body: {error}"
+                    else:
+                        return body
+                if status == 404 and allow_404:
+                    self.consecutive_failures = 0
+                    return None
+                if status == 403 and self.stop_on_forbidden:
+                    raise SecForbidden(url)
+                problem = f"HTTP {status}"
+                retry = status in (403, 429) or status >= 500
+            self._failed(url, problem)
+            if not retry or attempt == len(self.backoff):
+                raise FetchError(f"{problem} for {url}")
+            self.sleeper(self.backoff[attempt])
+        raise FetchError(f"no attempt for {url}")
+
     def ticker_map(self):
         """{financials key: 10-digit CIK} from company_tickers.json."""
         return parse_ticker_map(self.get_json(TICKERS_URL))

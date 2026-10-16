@@ -24,6 +24,8 @@ interface Period {
   eps: number | null;
   fq?: number;
   basic?: number | null;
+  grade?: 'A' | 'B' | 'C' | 'D' | 'ungraded';
+  filed?: string;
 }
 interface Spec {
   market?: 'US' | 'TW';
@@ -45,6 +47,10 @@ function history(spec: Spec): FinancialHistory {
       epsDiluted: periods.map((p) => p.eps),
       epsBasic: periods.map((p) => (p.basic === undefined ? p.eps : p.basic)),
     },
+    epsQuality: periods.map((p) => {
+      const grade = p.grade ?? (quarterly && p.fq === 4 ? 'A' : undefined);
+      return grade && grade !== 'ungraded' ? { epsDiluted: grade } : null;
+    }),
   });
   const market = spec.market ?? 'US';
   const result = parseFinancials({
@@ -55,6 +61,9 @@ function history(spec: Spec): FinancialHistory {
     foreignReporter: spec.foreign ?? false,
     annual: block(spec.annuals ?? [], false),
     quarterly: block(spec.quarters ?? [], true),
+    secQ4EpsFacts: Object.fromEntries((spec.quarters ?? []).flatMap((p) => p.filed ? [[p.end, {
+      epsDiluted: { filed: p.filed, grade: p.grade ?? 'A' },
+    }]] : [])),
     split: spec.split ?? { adjusted: false, events: [] },
     quality: { issues: spec.issues ?? [] },
   });
@@ -128,6 +137,41 @@ describe('epsAt: TTM, fallback and the publish delay', () => {
     const periods = buildEpsPeriods(history({ quarters: flatQuarters() }));
     // Published by 2024-08-20: ends up to 2024-06-30 (+45d = 08-14) → Q3'23..Q2'24.
     expect(epsAt(dateToSec('2024-08-20'), periods)).toMatchObject({ eps: 4, basis: 'ttm', periodEnd: '2024-06-30', usedBasic: false });
+  });
+
+  it('excludes grade-C Q4 estimates from formal TTM EPS and uses annual fallback', () => {
+    const quarters = flatQuarters().map((period) =>
+      period.end === '2024-12-31' ? { ...period, grade: 'C' as const } : period,
+    );
+    const periods = buildEpsPeriods(history({ quarters, annuals: [{ end: '2023-12-31', eps: 4 }] }));
+    expect(periods.quarters.at(-1)).toMatchObject({ end: '2024-12-31', eps: null });
+    expect(epsAt(dateToSec('2025-03-01'), periods)).toMatchObject({ eps: 4, basis: 'annual' });
+  });
+
+  it('excludes ungraded Q4 EPS from formal TTM inputs', () => {
+    const quarters = flatQuarters().map((period) =>
+      period.end === '2024-12-31' ? { ...period, grade: 'ungraded' as const } : period,
+    );
+    const periods = buildEpsPeriods(history({ quarters }));
+    expect(periods.quarters.at(-1)).toMatchObject({ end: '2024-12-31', eps: null });
+    expect(epsAt(dateToSec('2025-03-01'), periods)).toBeNull();
+  });
+
+  it('uses the actual SEC filing date for a direct Q4 fact in historical P/E', () => {
+    const quarters = flatQuarters().map((period) => period.end === '2024-12-31'
+      ? { ...period, filed: '2025-03-20' } : period);
+    const parsed = history({ quarters });
+    const periods = buildEpsPeriods(parsed);
+    expect(epsAt(dateToSec('2025-03-19'), periods)).toMatchObject({ eps: 4, basis: 'ttm', periodEnd: '2024-09-30' });
+    expect(epsAt(dateToSec('2025-03-20'), periods)).toMatchObject({ eps: 4, basis: 'ttm', periodEnd: '2024-12-31' });
+  });
+
+  it('excludes grade-D annual EPS conflicts from formal P/E inputs', () => {
+    const parsed = history({ annuals: [{ end: '2023-12-31', eps: 29.25, grade: 'D' }] });
+    parsed.annual.epsQuality![0] = { epsDiluted: 'D', epsBasic: 'D' };
+    const periods = buildEpsPeriods(parsed);
+    expect(periods.annuals[0]).toMatchObject({ end: '2023-12-31', eps: null });
+    expect(epsAt(dateToSec('2024-08-01'), periods)).toBeNull();
   });
 
   it('does not use a quarter before end + delay (no look-ahead)', () => {
@@ -468,7 +512,14 @@ describe('with the financials fixtures', () => {
     return result.data;
   };
   it('US (AAPL): annual EPS before the quarterly history starts, TTM after', () => {
-    const m = okModel(buildPeRiver(fixture('us-full.json'), weekly('2016-01-04', '2025-09-29', () => 150), opts('2025-10-01')));
+    const aapl = fixture('us-full.json');
+    // This legacy fixture predates source grades; model its populated Q4 figures as SEC verified.
+    aapl.quarterly.epsQuality = aapl.quarterly.fq.map((fq, index) =>
+      fq === 4 && aapl.quarterly.values.epsDiluted[index] !== null
+        ? { epsDiluted: 'A', epsBasic: 'A' }
+        : null,
+    );
+    const m = okModel(buildPeRiver(aapl, weekly('2016-01-04', '2025-09-29', () => 150), opts('2025-10-01')));
     expect(m.basisCounts.annual).toBeGreaterThan(0);
     expect(m.basisCounts.ttm).toBeGreaterThan(0);
     const last = m.points.at(-1)!;
