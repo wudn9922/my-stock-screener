@@ -123,6 +123,32 @@ class PerShareHeadingTests(unittest.TestCase):
         self.assertEqual(result["dilutedShares"], 4_936_000)
 
 
+class PerShareHeadingGuardTests(unittest.TestCase):
+    def test_share_counts_under_the_heading_are_not_eps(self):
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
+                "<tr><td>Net income per share:</td></tr>"
+                "<tr><td>Basic</td><td>11,680,033</td></tr>"
+                "<tr><td>Diluted</td><td>12,041,825</td></tr>"
+                "<tr><td>Basic earnings per share</td><td>0.26</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.25</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+
+    def test_the_heading_reaches_only_the_two_rows_under_it(self):
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
+                "<tr><td>Net income per share:</td></tr>"
+                "<tr><td>Revenue</td><td>5,000</td></tr>"
+                "<tr><td>Gross profit</td><td>3,000</td></tr>"
+                "<tr><td>Diluted</td><td>0.99</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.25</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+
+
 class ZeroAndNetRowTests(unittest.TestCase):
     def test_zero_eps_is_never_accepted(self):
         html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
