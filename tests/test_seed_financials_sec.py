@@ -2072,12 +2072,15 @@ class SplitMergeTest(unittest.TestCase):
         self.assertIsNone(q["2016-12-31"]["dilutedShares"])
         self.assertAlmostEqual(q["2010-12-31"]["epsDiluted"],
                                (split_income(2010) - 3 * (split_income(2010) // 4)) / today_shares(2010), delta=0.002)
-        # FY2012 (annual ÷4, quarters ÷28) and FY2019 (annual ×1, quarters ÷4 / ×1): no Q4 EPS at all
+        # FY2012 (annual ÷4, quarters ÷28) and FY2019 (quarters ÷4): as reported the four pieces have no one share
+        # basis, so extraction derives no Q4 EPS. The split adjustment then puts annual and quarterly values on
+        # today's basis, and fill_q4_eps derives the Q4 EPS there (± the cent rounding of the reported EPS)
         raw_q = {p["end"]: p["values"] for p in self.result.quarterly}
         for end in ("2012-12-31", "2019-12-31"):
             self.assertNotIn("epsDiluted", raw_q[end], end)
-            self.assertIsNone(q[end]["epsDiluted"], end)
             self.assertIsNotNone(q[end]["netIncome"], end)
+            self.assertAlmostEqual(q[end]["epsDiluted"], q[end]["netIncome"] / today_shares(int(end[:4])),
+                                   delta=0.0201, msg=end)
         self.assertIn("epsDiluted", raw_q["2022-12-31"])
 
     def test_without_fetch_values_stay_as_reported_and_jump_is_flagged(self):
@@ -2501,6 +2504,83 @@ class ImpliedShareBasisTest(unittest.TestCase):
         self.assertNotIn("epsDiluted", q4["values"])                     # 1.00 − 1.20 < 0 < 25M
         self.assertEqual(result.dropped["epsDiluted"], 1)
         self.assertEqual(q4["extra"]["derived"], 1)                      # net income is still derived
+
+
+NFLX_SPLIT = ("2024-11-20", 10)
+
+
+def nflx_like_companyfacts():
+    """
+    SYNTHETIC NFLX-like filer (10:1 split on 2024-11-20): the FY2024 10-K (filed 2025-02-15) restates FY2023 and
+    FY2024 EPS and share counts on the new basis, while every 2023-2024 quarter was reported before the split.
+    Extraction therefore sees two share bases for each Q4 and derives no Q4 EPS (the NFLX 2023 / 2024 gap).
+    """
+    pre_2023, pre_2024 = 450 * M, 440 * M
+    ni_2023, ni_2024 = [1_300_000_000, 1_490_000_000, 1_680_000_000], [2_330_000_000, 2_150_000_000, 2_360_000_000]
+    eps = lambda income, shares: round(income / shares, 2)     # reported EPS: two decimals
+    # the Q1 2025 10-Q (filed after the split) is the one post-split quarter: it makes the quarterly counts jump
+    post_q1 = k("2025-01-01", "2025-03-31", 4_400_000_000, form="10-Q", filed="2025-05-10", accn="q125")
+    rows = {
+        "NetIncomeLoss": quarters(2023, ni_2023, prefix="ni") + [year(2023, 5_400_000_000, filed="2024-02-15",
+                                                                      accn="k23")]
+        + quarters(2024, ni_2024, prefix="nj") + [year(2024, 8_700_000_000, filed="2025-02-15", accn="k24"),
+                                                  k("2025-01-01", "2025-03-31", 2_500_000_000, form="10-Q",
+                                                    filed="2025-05-10", accn="q125")],
+        "EarningsPerShareDiluted": quarters(2023, [eps(v, pre_2023) for v in ni_2023], prefix="ed")
+        + [year(2023, 12.0, filed="2024-02-15", accn="k23"), year(2023, 1.2, filed="2025-02-15", accn="k24r")]
+        + quarters(2024, [eps(v, pre_2024) for v in ni_2024], prefix="ee")
+        + [year(2024, 1.98, filed="2025-02-15", accn="k24")],
+        SHARES_CONCEPT: quarters(2023, [pre_2023] * 3, prefix="sd") + [year(2023, pre_2023, filed="2024-02-15",
+                                                                              accn="k23"),
+                                                                       year(2023, 10 * pre_2023, filed="2025-02-15",
+                                                                            accn="k24r")]
+        + quarters(2024, [pre_2024] * 3, prefix="se")
+        + [year(2024, 10 * pre_2024 - 40 * M, filed="2025-02-15", accn="k24"), post_q1],
+    }
+    return facts_of(rows, name="Synthetic Netflix-like")
+
+
+class Q4AfterSplitTest(unittest.TestCase):
+    """SYNTHETIC NFLX-like filer: Q4 EPS is derived on the basis the stored periods hold after the split."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = sec.extract_periods(nflx_like_companyfacts())
+
+    def test_extraction_sees_two_share_bases_and_derives_no_q4_eps(self):
+        q = {p["end"]: p["values"] for p in self.result.quarterly}
+        self.assertNotIn("epsDiluted", q["2023-12-31"])
+        self.assertNotIn("epsDiluted", q["2024-12-31"])
+        self.assertEqual(q["2023-12-31"]["netIncome"], 930_000_000)        # Q4 net income is still derived
+        self.assertEqual(q["2024-12-31"]["netIncome"], 1_860_000_000)
+
+    def test_merge_derives_q4_eps_on_the_adjusted_basis(self):
+        fetch = Fetch(chart((NFLX_SPLIT[0], NFLX_SPLIT[1], 1)))
+        doc, info = sec.merge_into_document(None, self.result, "NFX", NOW, fetch)
+        self.assertEqual(fetch.calls, 1)
+        self.assertTrue(info["splitAdjusted"])
+        self.assertFalse(info["shareJump"])
+        q, a = columns(doc, "quarterly"), columns(doc, "annual")
+        # annual EPS − (Q1..Q3 EPS, each adjusted ÷10 to 4 decimals): 1.20 − (0.289 + 0.331 + 0.373) and
+        # 1.98 − (0.530 + 0.489 + 0.536); both lie within a cent of net income ÷ today's share count
+        self.assertEqual(q["2023-12-31"]["epsDiluted"], 0.207)
+        self.assertEqual(q["2024-12-31"]["epsDiluted"], 0.425)
+        for end in ("2023-12-31", "2024-12-31"):
+            self.assertAlmostEqual(q[end]["epsDiluted"], q[end]["netIncome"] / a[end]["dilutedShares"],
+                                   delta=0.0201, msg=end)
+        self.assertIn("q4-derived", doc["quality"]["issues"])
+        self.assertEqual(doc["quarterly"]["derived"][doc["quarterly"]["end"].index("2023-12-31")], 1)
+
+    def test_without_the_split_check_the_q4_eps_stays_null(self):
+        doc, info = sec.merge_into_document(None, self.result, "NFX", NOW)
+        self.assertTrue(info["shareJump"])
+        self.assertIsNone(columns(doc, "quarterly")["2023-12-31"]["epsDiluted"])
+        self.assertIsNone(columns(doc, "quarterly")["2024-12-31"]["epsDiluted"])
+
+    def test_merge_is_idempotent_over_the_derived_q4_eps(self):
+        doc, _ = sec.merge_into_document(None, self.result, "NFX", NOW, Fetch(chart((NFLX_SPLIT[0], NFLX_SPLIT[1], 1))))
+        again, _ = sec.merge_into_document(copy.deepcopy(doc), self.result, "NFX", NOW, Fetch(AssertionError("no fetch")))
+        self.assertTrue(fin.same_content(doc, again))
 
 
 def quarter_doc(annual, quarterly, key="TEST", fy_end=12):

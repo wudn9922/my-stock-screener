@@ -930,6 +930,158 @@ def repair_document(document):
 
 
 # ---------------------------------------------------------------------------------------------
+# Q4 EPS = annual EPS − (Q1 + Q2 + Q3 EPS), shared by seed_financials_sec.py and repair_q4_eps.py
+# ---------------------------------------------------------------------------------------------
+Q4_EPS_FIELDS = ("epsDiluted", "epsBasic")
+Q4_EPS_SOURCE = "sec"           # only SEC periods take a derived Q4 EPS (and only SEC periods are its pieces)
+Q4_ISSUE = "q4-derived"
+DERIVED_COLUMN = "derived"      # per-period quarterly column: 1 when a value of the period was subtracted
+EPS_TOLERANCE = 0.15            # |EPS − net income / diluted shares| / |EPS| above this: the EPS disagrees with its figures
+Q4_EPS_ROUNDING = 0.02          # a derived Q4 EPS (four cent-rounded pieces) may also stray this far, absolute
+
+
+def share_basis(shares, income, eps):
+    """A period's share basis for Q4 EPS: its diluted share count, else |net income / EPS|, else None."""
+    if shares is not None and shares > 0:
+        return shares
+    return abs(income / eps) if income and eps else None
+
+
+def q4_eps(total, pieces, bases):
+    """
+    Annual EPS − (Q1 + Q2 + Q3 EPS) when all four are reported on one share basis, else None.
+
+    total: the annual EPS; pieces: the Q1..Q3 EPS; bases: the four share bases (share_basis, annual first).
+    Every basis must lie within SPLIT_MATCH of the others: a split between the filings mixes bases (an annual
+    EPS restated after a split next to Q1..Q3 that are still pre-split).
+    """
+    if total is None or any(value is None for value in pieces):
+        return None
+    if any(not basis for basis in bases) or max(bases) / min(bases) > 1 + SPLIT_MATCH:
+        return None
+    return total - sum(pieces)
+
+
+def _single(items):
+    return items[0] if items and len(items) == 1 else None
+
+
+def eps_inconsistent(values):
+    """True when |epsDiluted − netIncome / dilutedShares| / |epsDiluted| > EPS_TOLERANCE (False if anything is missing)."""
+    eps, income, shares = (values.get(name) for name in ("epsDiluted", "netIncome", "dilutedShares"))
+    if eps is None or income is None or not shares or eps == 0:
+        return False
+    return abs(eps - income / shares) / abs(eps) > EPS_TOLERANCE
+
+
+def fill_q4_eps(annual, quarterly):
+    """
+    Fill the null Q4 EPS (epsBasic, epsDiluted) of SEC periods, in place, on the basis the periods hold now
+    (after any split adjustment). Items are dicts with end, fy, fq, src, values and extra.
+
+    Q4 (fq 4) = the annual period of its fiscal year − its Q1..Q3 (q4_eps), each field on its own. A field is
+    filled only when it is null, all four pieces are SEC periods (exactly one per fiscal quarter), and:
+    - the annual EPS agrees with its own net income and share count (eps_inconsistent is False): a wrong
+      annual EPS (AMST 2022: −56.04 next to −4.67 implied) would carry its error into Q4;
+    - the Q4 net income is known and the derived value has its sign;
+    - the derived value agrees with the Q4 net income over the annual share basis (within EPS_TOLERANCE, plus
+      Q4_EPS_ROUNDING because the pieces are cent-rounded EPS): otherwise the basis or the version is wrong.
+    A filled period gets extra["derived"] = 1. Nothing else is derived here: net income, share counts and
+    balance-sheet values of a Q4 are never changed.
+    → [(end, field)] of the values filled.
+    """
+    years, quarters = {}, {}
+    for item in annual:
+        if item.get("src") == Q4_EPS_SOURCE:
+            years.setdefault(item.get("fy"), []).append(item)
+    for item in quarterly:
+        if item.get("src") == Q4_EPS_SOURCE and item.get("fq") in (1, 2, 3, 4):
+            quarters.setdefault((item.get("fy"), item["fq"]), []).append(item)
+    filled = []
+    for (fy, fq), found in quarters.items():
+        item = _single(found) if fq == 4 else None
+        year = _single(years.get(fy, []))
+        pieces = [_single(quarters.get((fy, number), [])) for number in (1, 2, 3)]
+        if item is None or year is None or any(piece is None for piece in pieces):
+            continue
+        if eps_inconsistent(year["values"]):
+            continue
+        income = item["values"].get("netIncome")
+        if income is None:
+            continue
+        for field in Q4_EPS_FIELDS:
+            if item["values"].get(field) is not None:
+                continue
+            bases = [
+                share_basis(period["values"].get("dilutedShares"), period["values"].get("netIncome"),
+                            period["values"].get(field))
+                for period in (year, *pieces)
+            ]
+            value = q4_eps(year["values"].get(field), [piece["values"].get(field) for piece in pieces], bases)
+            if value is None or (value and (value > 0) != (income > 0)):
+                continue
+            basis = bases[0]
+            if abs(value - income / basis) > EPS_TOLERANCE * abs(value) + Q4_EPS_ROUNDING:
+                continue
+            item["values"][field] = clean_value(value)
+            item.setdefault("extra", {})[DERIVED_COLUMN] = 1
+            filled.append((item["end"], field))
+    return filled
+
+
+def repair_q4_document(document):
+    """
+    fill_q4_eps on a stored document (dict) in place: the filled quarterly columns and their derived flag are
+    written, and "q4-derived" joins quality.issues (ISSUES order, then the SEC codes sorted, as
+    seed_financials_sec.merge_into_document writes them). Only null values change.
+    → [(end, field)] filled; the document is untouched when there is nothing to fill.
+    """
+    sections = {}
+    for name in ("annual", "quarterly"):
+        block = document.get(name)
+        ends = block.get("end") if isinstance(block, dict) else None
+        if not isinstance(block, dict) or not isinstance(ends, list):
+            return []
+        count = len(ends)
+        sources = block.get("src") or ["yahoo"] * count
+        fys = block.get("fy") or [None] * count
+        fqs = block.get("fq") or [None] * count
+        columns = block.get("values") or {}
+        items = [
+            {
+                "end": end, "fy": fys[index], "fq": fqs[index], "src": sources[index], "extra": {},
+                "values": {field: column[index] for field, column in columns.items()},
+            }
+            for index, end in enumerate(ends)
+        ]
+        sections[name] = (block, items)
+    filled = fill_q4_eps(sections["annual"][1], sections["quarterly"][1])
+    if not filled:
+        return []
+    for name, (block, items) in sections.items():
+        index = {item["end"]: position for position, item in enumerate(items)}
+        touched = [(index[end], field) for end, field in filled if end in index]
+        if name == "quarterly" and touched:
+            count = len(items)
+            flags = block.get(DERIVED_COLUMN) or [None] * count
+            for position in {position for position, _ in touched}:
+                flags[position] = 1
+            block[DERIVED_COLUMN] = flags
+        for position, field in touched:
+            columns = block.setdefault("values", {})
+            column = columns.get(field) or [None] * len(items)
+            column[position] = items[position]["values"][field]
+            columns[field] = column
+    quality = document.get("quality")
+    if not isinstance(quality, dict):
+        quality = document["quality"] = {}
+    codes = set(quality.get("issues") or []) | {Q4_ISSUE}
+    quality["issues"] = [code for code in ISSUES if code in codes] + sorted(
+        code for code in codes if code not in ISSUES)
+    return filled
+
+
+# ---------------------------------------------------------------------------------------------
 # Fiscal labels, reconciliation, quality
 # ---------------------------------------------------------------------------------------------
 def effective(end):
