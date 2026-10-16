@@ -294,10 +294,10 @@ def is_release_exhibit(item):
     name = item.get("name") or ""
     kind = (item.get("type") or "").upper()
     return name.lower().endswith((".htm", ".html")) and (
-        kind.startswith("EX-99") or re.search(r"ex-?99", name, re.I) is not None)
+        kind.startswith("EX-99") or re.search(r"(ex|exhibit)[-_ ]?99", name, re.I) is not None)
 
 
-def from_filing(sec, cik, filing, target):
+def from_filing(sec, cik, filing, target, debug=None):
     accession = filing["accessionNumber"]
     base = ARCHIVE_URL.format(cik=int(cik), folder=accession.replace("-", ""))
     index = sec.get_json(base + "index.json")
@@ -306,6 +306,8 @@ def from_filing(sec, cik, filing, target):
     items = (index.get("directory") or {}).get("item") or []
     exhibits = [item for item in items if is_release_exhibit(item)][:MAX_EXHIBITS]
     if not exhibits:
+        if debug is not None:
+            debug.append({"index_items": [item.get("name") for item in items][:12]})
         return None, "no EX-99 exhibit in the filing"
     found, reason = [], "no table shows this quarter's net income"
     for item in exhibits:
@@ -320,17 +322,20 @@ def from_filing(sec, cik, filing, target):
             elif why:
                 reason = why
     if not found:
+        if debug is not None and reason.startswith("no table"):
+            text = sec.get_text(base + exhibits[0]["name"]) or ""
+            debug.append({"net_like_text": re.findall(r">\s*([^<>]{0,80}net[^<>]{0,60})<", text, re.I)[:6]})
         return None, reason
     if len({item["epsDiluted"] for item in found}) > 1:
         return None, "tables disagree on diluted EPS"
     return found[0], None
 
 
-def find_quarter(sec, cik, filings, end, target):
+def find_quarter(sec, cik, filings, end, target, debug=None):
     """The first candidate filing that gives this quarter → (result, None), else (None, reason)."""
     reason = "no 8-K with Item 2.02 in the window"
     for filing in candidate_filings(filings, date.fromisoformat(end))[:MAX_FILINGS]:
-        result, why = from_filing(sec, cik, filing, target)
+        result, why = from_filing(sec, cik, filing, target, debug)
         if result is not None:
             return dict(result, end=end, filingDate=filing["filingDate"]), None
         reason = why or reason
@@ -362,9 +367,10 @@ def process_ticker(sec, key, cik, doc, mode, rows):
         return True
     filings = filing_rows(sec, cik)
     for p in periods:
-        result, reason = find_quarter(sec, cik, filings, p["end"], p["target"])
+        debug = []
+        result, reason = find_quarter(sec, cik, filings, p["end"], p["target"], debug)
         rows.append({"key": key, "end": p["end"], "stored": p["eps"], "target": p["target"],
-                     "result": result, "reason": reason})
+                     "result": result, "reason": reason, "debug": debug[:2]})
     return True
 
 
@@ -457,7 +463,17 @@ def run(args, sec):
     if args.mode == "fill":
         seed.write_atomic(STATE_PATH, state)
     report = summarize(rows, args.mode)
+    mismatches = [{"key": r["key"], "end": r["end"], "stored": r["stored"], "estimate": r["result"]["epsDiluted"],
+                   "url": r["result"]["url"]}
+                  for r in rows if args.mode == "backtest" and r["result"]
+                  and not within_tolerance(r["result"]["epsDiluted"], r["stored"])]
+    samples = {}
+    for r in rows:
+        kind = (r["reason"] or "").split(":")[0][:40]
+        if r["reason"] and kind not in samples:
+            samples[kind] = {"key": r["key"], "end": r["end"], "stored": r["stored"], "debug": r["debug"]}
     report.update(filled=filled, tickers_done=len(state["done"]), stopped=stop, requests=sec.requests,
+                  mismatches=mismatches[:15], samples=samples,
                   rows=[{k: r[k] for k in ("key", "end", "stored", "result", "reason")} for r in rows])
     return report
 
