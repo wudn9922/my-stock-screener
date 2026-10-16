@@ -108,6 +108,68 @@ class NonGaapTests(unittest.TestCase):
         self.assertEqual(result["epsDiluted"], 0.25)
 
 
+class ZeroAndNetRowTests(unittest.TestCase):
+    def test_zero_eps_is_never_accepted(self):
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                "<tr><td>Net income</td><td>1,234</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>(0.00)</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        self.assertIsNone(result)
+        self.assertEqual(reason, "EPS is zero")
+
+    def test_a_later_net_income_row_can_match_the_stored_value(self):
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                "<tr><td>Net income</td><td>1,500</td></tr>"
+                "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.25</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertEqual(result["netLabel"], "net income attributable to acme")
+
+
+INDEX_PAGE = ("<table><tr><th>Seq</th><th>Description</th><th>Document</th><th>Type</th><th>Size</th></tr>"
+              "<tr><td>1</td><td>8-K</td><td><a>form8k.htm</a></td><td>8-K</td><td>1000</td></tr>"
+              "<tr><td>2</td><td>Press release</td><td><a>ex_309174.htm</a></td><td>EX-99.1</td><td>2000</td></tr>"
+              "</table>")
+
+
+class IndexPageTests(unittest.TestCase):
+    def test_the_type_column_names_the_release_exhibit(self):
+        self.assertEqual(bq.index_exhibits(INDEX_PAGE), ["ex_309174.htm"])
+        self.assertEqual(bq.index_exhibits(None), [])
+
+    def test_a_numbered_exhibit_file_is_read_through_the_index_page(self):
+        class FakeSec:
+            def get_json(self, url):
+                return {"directory": {"item": [{"name": "ex_309174.htm"}, {"name": "form8k.htm"}]}}
+
+            def get_text(self, url):
+                if url.endswith("-index.html"):
+                    return INDEX_PAGE
+                return RELEASE if url.endswith("ex_309174.htm") else "<table></table>"
+
+        filing = {"accessionNumber": "0001-25-000002", "filingDate": "2025-02-05"}
+        result, reason = bq.from_filing(FakeSec(), 1234, filing, 1_234_000, END)
+        self.assertIsNone(reason)
+        self.assertTrue(result["url"].endswith("/ex_309174.htm"))
+
+    def test_release_in_another_document_is_read_when_the_exhibit_has_no_table(self):
+        class FakeSec:
+            def get_json(self, url):
+                return {"directory": {"item": [{"name": "exhibit99.htm"}, {"name": "form8k.htm"}]}}
+
+            def get_text(self, url):
+                if url.endswith("-index.html") or url.endswith("-index.htm"):
+                    return None
+                return RELEASE if url.endswith("form8k.htm") else "<table><tr><td>Revenue</td><td>5</td></tr></table>"
+
+        filing = {"accessionNumber": "0001-25-000003", "filingDate": "2025-02-05"}
+        result, reason = bq.from_filing(FakeSec(), 1234, filing, 1_234_000, END)
+        self.assertIsNone(reason)
+        self.assertTrue(result["url"].endswith("/form8k.htm"))
+
+
 class SplitAndToleranceTests(unittest.TestCase):
     def test_split_factor_counts_only_splits_after_the_filing(self):
         doc = {"split": {"events": [["2000-06-19", 3], ["2021-07-20", 4], ["2024-06-10", 10]]}}
