@@ -96,6 +96,18 @@ class TableEpsTests(unittest.TestCase):
         self.assertFalse(bq.shows_period("Twelve Months Ended December 31, 2023", "2024-12-31"))
 
 
+class NonGaapTests(unittest.TestCase):
+    def test_non_gaap_rows_are_never_used(self):
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                "<tr><td>Non-GAAP net income</td><td>1,500</td></tr>"
+                "<tr><td>Non-GAAP diluted earnings per share</td><td>0.30</td></tr>"
+                "<tr><td>Net income</td><td>1,234</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.25</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+
+
 class SplitAndToleranceTests(unittest.TestCase):
     def test_split_factor_counts_only_splits_after_the_filing(self):
         doc = {"split": {"events": [["2000-06-19", 3], ["2021-07-20", 4], ["2024-06-10", 10]]}}

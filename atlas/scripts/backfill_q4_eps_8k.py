@@ -57,9 +57,11 @@ RETRIES = 3
 DASHES = ("", "-", "--", "—", "–")
 
 NI_RE = re.compile(r"net\s*(\(loss\)\s*|loss\s*)?(income|earnings)|net\s+loss")
+# non-GAAP and adjusted rows sit next to the GAAP rows in most releases and must never be picked
+NON_GAAP = ("non-gaap", "non gaap", "nongaap", "adjusted", "excluding", "pro forma")
 NI_AVOID = ("per share", "noncontrolling", "non-controlling", "minority", "continuing", "discontinued",
-            "before", "comprehensive")
-EPS_AVOID = ("weighted", "shares", "number of", "average")
+            "before", "comprehensive") + NON_GAAP
+EPS_AVOID = ("weighted", "shares", "number of", "average") + NON_GAAP
 
 
 class Forbidden(RuntimeError):
