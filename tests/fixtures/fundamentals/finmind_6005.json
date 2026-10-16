@@ -1,0 +1,174 @@
+{
+ "msg": "success",
+ "status": 200,
+ "data": [
+  {
+   "date": "2025-03-31",
+   "stock_id": "6005",
+   "type": "EPS",
+   "value": 0.5,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "6005",
+   "type": "Revenue",
+   "value": 6001000000,
+   "origin_name": "收益合計"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "6005",
+   "type": "IncomeAfterTaxes",
+   "value": 1600000000,
+   "origin_name": "本期淨利（淨損）"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "6005",
+   "type": "EquityAttributableToOwnersOfParent",
+   "value": 1550000000,
+   "origin_name": "淨利（淨損）歸屬於母公司業主"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "6005",
+   "type": "EPS",
+   "value": 0.5,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "6005",
+   "type": "Revenue",
+   "value": 6002000000,
+   "origin_name": "收益合計"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "6005",
+   "type": "IncomeAfterTaxes",
+   "value": 1600000000,
+   "origin_name": "本期淨利（淨損）"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "6005",
+   "type": "EquityAttributableToOwnersOfParent",
+   "value": 1550000000,
+   "origin_name": "淨利（淨損）歸屬於母公司業主"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "6005",
+   "type": "EPS",
+   "value": 0.5,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "6005",
+   "type": "Revenue",
+   "value": 6003000000,
+   "origin_name": "收益合計"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "6005",
+   "type": "IncomeAfterTaxes",
+   "value": 1600000000,
+   "origin_name": "本期淨利（淨損）"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "6005",
+   "type": "EquityAttributableToOwnersOfParent",
+   "value": 1550000000,
+   "origin_name": "淨利（淨損）歸屬於母公司業主"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "6005",
+   "type": "EPS",
+   "value": 0.5,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "6005",
+   "type": "Revenue",
+   "value": 6004000000,
+   "origin_name": "收益合計"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "6005",
+   "type": "IncomeAfterTaxes",
+   "value": 1600000000,
+   "origin_name": "本期淨利（淨損）"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "6005",
+   "type": "EquityAttributableToOwnersOfParent",
+   "value": 1550000000,
+   "origin_name": "淨利（淨損）歸屬於母公司業主"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "6005",
+   "type": "EPS",
+   "value": 0.5,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "6005",
+   "type": "Revenue",
+   "value": 6001000000,
+   "origin_name": "收益合計"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "6005",
+   "type": "IncomeAfterTaxes",
+   "value": 1600000000,
+   "origin_name": "本期淨利（淨損）"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "6005",
+   "type": "EquityAttributableToOwnersOfParent",
+   "value": 1550000000,
+   "origin_name": "淨利（淨損）歸屬於母公司業主"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "6005",
+   "type": "EPS",
+   "value": 0.5,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "6005",
+   "type": "Revenue",
+   "value": 6002000000,
+   "origin_name": "收益合計"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "6005",
+   "type": "IncomeAfterTaxes",
+   "value": 1600000000,
+   "origin_name": "本期淨利（淨損）"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "6005",
+   "type": "EquityAttributableToOwnersOfParent",
+   "value": 1550000000,
+   "origin_name": "淨利（淨損）歸屬於母公司業主"
+  }
+ ]
+}

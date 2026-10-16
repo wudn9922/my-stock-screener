@@ -1,0 +1,174 @@
+{
+ "msg": "success",
+ "status": 200,
+ "data": [
+  {
+   "date": "2025-03-31",
+   "stock_id": "2801",
+   "type": "EPS",
+   "value": 0.31,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "2801",
+   "type": "InterestNetIncome",
+   "value": 8100000000,
+   "origin_name": "利息淨收益"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "2801",
+   "type": "NetNonInterestIncome",
+   "value": 2000000000,
+   "origin_name": "利息以外淨損益"
+  },
+  {
+   "date": "2025-03-31",
+   "stock_id": "2801",
+   "type": "IncomeAfterTaxes",
+   "value": 3510000000,
+   "origin_name": "本期稅後淨利（淨損）"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "2801",
+   "type": "EPS",
+   "value": 0.32,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "2801",
+   "type": "InterestNetIncome",
+   "value": 8200000000,
+   "origin_name": "利息淨收益"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "2801",
+   "type": "NetNonInterestIncome",
+   "value": 2000000000,
+   "origin_name": "利息以外淨損益"
+  },
+  {
+   "date": "2025-06-30",
+   "stock_id": "2801",
+   "type": "IncomeAfterTaxes",
+   "value": 3520000000,
+   "origin_name": "本期稅後淨利（淨損）"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "2801",
+   "type": "EPS",
+   "value": 0.32999999999999996,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "2801",
+   "type": "InterestNetIncome",
+   "value": 8300000000,
+   "origin_name": "利息淨收益"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "2801",
+   "type": "NetNonInterestIncome",
+   "value": 2000000000,
+   "origin_name": "利息以外淨損益"
+  },
+  {
+   "date": "2025-09-30",
+   "stock_id": "2801",
+   "type": "IncomeAfterTaxes",
+   "value": 3530000000,
+   "origin_name": "本期稅後淨利（淨損）"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "2801",
+   "type": "EPS",
+   "value": 0.33999999999999997,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "2801",
+   "type": "InterestNetIncome",
+   "value": 8400000000,
+   "origin_name": "利息淨收益"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "2801",
+   "type": "NetNonInterestIncome",
+   "value": 2000000000,
+   "origin_name": "利息以外淨損益"
+  },
+  {
+   "date": "2025-12-31",
+   "stock_id": "2801",
+   "type": "IncomeAfterTaxes",
+   "value": 3540000000,
+   "origin_name": "本期稅後淨利（淨損）"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "2801",
+   "type": "EPS",
+   "value": 0.31,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "2801",
+   "type": "InterestNetIncome",
+   "value": 8100000000,
+   "origin_name": "利息淨收益"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "2801",
+   "type": "NetNonInterestIncome",
+   "value": 2000000000,
+   "origin_name": "利息以外淨損益"
+  },
+  {
+   "date": "2026-03-31",
+   "stock_id": "2801",
+   "type": "IncomeAfterTaxes",
+   "value": 3510000000,
+   "origin_name": "本期稅後淨利（淨損）"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "2801",
+   "type": "EPS",
+   "value": 0.32,
+   "origin_name": "基本每股盈餘（元）"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "2801",
+   "type": "InterestNetIncome",
+   "value": 8200000000,
+   "origin_name": "利息淨收益"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "2801",
+   "type": "NetNonInterestIncome",
+   "value": 2000000000,
+   "origin_name": "利息以外淨損益"
+  },
+  {
+   "date": "2026-06-30",
+   "stock_id": "2801",
+   "type": "IncomeAfterTaxes",
+   "value": 3520000000,
+   "origin_name": "本期稅後淨利（淨損）"
+  }
+ ]
+}
