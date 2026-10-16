@@ -410,14 +410,16 @@ def verify_quarter(sec, cik, filings, end, net, eps, doc):
     → {"status": "confirmed" | "conflict" | "unavailable", "epsDiluted": checked EPS on today's basis, "url"}.
     """
     when = date.fromisoformat(end)
+    reason = "no 8-K with Item 2.02 in the next year's window"
     for filing in candidate_filings(filings, when + timedelta(days=365))[:MAX_FILINGS]:
-        result, _ = from_filing(sec, cik, filing, net, end)
+        result, why = from_filing(sec, cik, filing, net, end)
         if result is None:
+            reason = why or reason
             continue
         checked = round(result["epsDiluted"] / split_factor(doc, filing["filingDate"]), 6)
         status = "confirmed" if within_tolerance(checked, eps) else "conflict"
         return {"status": status, "epsDiluted": checked, "url": result["url"]}
-    return {"status": "unavailable"}
+    return {"status": "unavailable", "reason": reason}
 
 
 def q4_periods(doc):
@@ -518,6 +520,9 @@ def summarize(rows, mode):
             out["accepted_on_derived_stored"] = sum(bool(r.get("derived")) for r in accepted)
             checks = Counter((r["result"].get("verified") or {}).get("status", "not run") for r in accepted)
             out["independent_check"] = dict(checks)
+            out["independent_unavailable_reasons"] = dict(Counter(
+                (r["result"].get("verified") or {}).get("reason", "") for r in accepted
+                if (r["result"].get("verified") or {}).get("status") == "unavailable").most_common())
             confirmed, conflict = checks.get("confirmed", 0), checks.get("conflict", 0)
             if confirmed + conflict:
                 out["independent_precision"] = round(confirmed / (confirmed + conflict), 4)

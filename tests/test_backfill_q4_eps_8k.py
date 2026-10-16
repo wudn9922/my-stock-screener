@@ -257,6 +257,7 @@ class IndependentCheckTests(unittest.TestCase):
     def test_no_next_year_release_is_unavailable(self):
         check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, [], END, 1_234_000, 0.25, {})
         self.assertEqual(check["status"], "unavailable")
+        self.assertIn("Item 2.02", check["reason"])
 
 
 class FillTests(unittest.TestCase):
