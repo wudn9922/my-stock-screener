@@ -108,6 +108,21 @@ class NonGaapTests(unittest.TestCase):
         self.assertEqual(result["epsDiluted"], 0.25)
 
 
+class PerShareHeadingTests(unittest.TestCase):
+    def test_basic_and_diluted_rows_under_a_per_share_heading_are_eps_rows(self):
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
+                "<tr><td>Net income per share:</td></tr>"
+                "<tr><td>Basic</td><td>0.26</td></tr>"
+                "<tr><td>Diluted</td><td>0.25</td></tr>"
+                "<tr><td>Diluted weighted average shares outstanding</td><td>4,936</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertEqual(result["epsBasic"], 0.26)
+        self.assertEqual(result["dilutedShares"], 4_936_000)
+
+
 class ZeroAndNetRowTests(unittest.TestCase):
     def test_zero_eps_is_never_accepted(self):
         html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
