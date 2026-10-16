@@ -272,6 +272,24 @@ NEXT_YEAR_RELEASE = """
 """
 
 
+class SplitPeriodHeaderTests(unittest.TestCase):
+    def test_a_period_header_split_over_rows_is_read_column_by_column(self):
+        html = ("<table><tr><td></td><td>Fourth Quarter Ended</td></tr>"
+                "<tr><td>March 29,</td><td>March 29,</td></tr>"
+                "<tr><td>2014</td><td>2013</td></tr>"
+                "<tr><td>Net income</td><td>1,234</td><td>999</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.25</td><td>0.20</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, "2014-03-29")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+
+    def test_the_year_must_match_the_split_header(self):
+        html = ("<table><tr><td>March 29,</td></tr><tr><td>2013</td></tr>"
+                "<tr><td>Net income</td><td>1,234</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.25</td></tr></table>")
+        self.assertFalse(bq.shows_period_by_column(table_of(html), "2014-03-29"))
+
+
 class OrphanDiagnosticTests(unittest.TestCase):
     def test_a_net_income_table_without_its_period_is_counted_with_the_table_before_it(self):
         html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr></table>"
