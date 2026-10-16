@@ -418,6 +418,16 @@ class RunTest(unittest.TestCase):
         self.assertIn("300 per hour without", text)
         self.assertFalse(os.path.exists(os.path.join(self.report, "fundamentals", ftw.STATE_FILE)))
 
+    def test_only_after_backfill_waits_for_the_manual_backfill(self):
+        code, http, logs = self.go(only_after_backfill=True)
+        self.assertEqual((code, http.requests), (0, []))
+        self.assertTrue(any("backfill not finished (0/9 stocks fetched)" in line for line in logs), logs)
+        code, _, _ = self.go()                                                  # the manual backfill
+        self.assertEqual(code, 0)
+        code, http, logs = self.go(only_after_backfill=True)                    # now the daily run goes ahead
+        self.assertEqual(code, 0)
+        self.assertFalse(any("backfill not finished" in line for line in logs), logs)
+
     def test_undecided_verdicts_stop_the_run_and_write_nothing(self):
         ftw.WARMUP_LIMIT = 5
         answers = dict(self.answers)

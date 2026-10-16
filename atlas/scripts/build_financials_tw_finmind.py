@@ -538,6 +538,10 @@ def plan(state, codes, today, forced=()):
     return missing + ordered
 
 
+# --only-after-backfill: the daily run starts once this share of the listed stocks has been fetched
+BACKFILL_SHARE = 0.95
+
+
 def tw_listing(universe):
     """{code: symbol} of the Taiwan rows of universe.json (.TW / .TWO)."""
     result = {}
@@ -649,6 +653,12 @@ def run(args, http=None, now=None, sleep=time.sleep, clock=time.monotonic, log=p
             log(f"::error::probe stopped: {error}")
             return 1
 
+    if getattr(args, "only_after_backfill", False):
+        fetched = sum(1 for code in listing if code in state["fetch"])
+        if fetched < BACKFILL_SHARE * len(listing):
+            log(f"::notice::FinMind statements: backfill not finished ({fetched}/{len(listing)} stocks fetched); "
+                "the daily run waits for it (run the script by hand without --only-after-backfill)")
+            return 0
     codes = sorted(listing)
     forced = set(args.tickers or ())
     unknown = [code for code in sorted(forced) if code not in listing]
@@ -806,6 +816,9 @@ def parse_args(argv=None):
     parser.add_argument("--probe", type=lambda text: [part.strip().upper() for part in text.split(",") if part.strip()],
                         default=None, help="print every type / origin_name of the three datasets for these stocks")
     parser.add_argument("--dry-run", action="store_true", help="offline: stocks and requests the next run would make")
+    parser.add_argument("--only-after-backfill", action="store_true",
+                        help="do nothing until BACKFILL_SHARE of the listed stocks are fetched (the daily workflow: "
+                             "the first full backfill is a manual run and must not race it for the quota or files)")
     return parser.parse_args(argv)
 
 
