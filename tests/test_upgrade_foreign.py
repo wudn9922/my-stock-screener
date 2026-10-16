@@ -192,19 +192,15 @@ class UpgradeMergeTests(unittest.TestCase):
         self.assertEqual(document["adrRatio"]["epsFactor"], ADR)
         self.assertEqual(info["epsBasis"], "rescaled")
 
-    def test_unresolved_eps_basis_leaves_yahoo_eps_and_shares_out(self):
-        """Pair ratios disagree (5 for FY2022, 7 for FY2023): nothing is rescaled; Yahoo's EPS and shares stay out."""
+    def test_one_outlier_year_still_gives_the_ratio(self):
+        """FY2023's Yahoo EPS is off (x7): the other pairs, quarters included, still agree on k = 5 (loose rule)."""
         document, info = sec.upgrade_document(tsm_yahoo(multipliers={2023: 7}), tsm_sec(), "TSM", NOW, None)
-        self.assertEqual(info["epsBasis"], "unresolved")
-        self.assertNotIn("adrRatio", document)
-        self.assertNotIn("adr-eps-rescaled", document["quality"]["issues"])
-        annual, quarterly = document["annual"], document["quarterly"]
-        self.assertAlmostEqual(column(annual, "epsBasic")["2023-12-31"], 10.0)     # SEC value, not rescaled
-        self.assertAlmostEqual(column(annual, "epsBasic")["2022-12-31"], 7.5)
-        self.assertTrue(all(value is None for value in column(annual, "dilutedShares").values()))
-        self.assertIsNone(column(quarterly, "epsBasic")["2025-09-30"])
-        # the rest of Yahoo's periods still merge
-        self.assertEqual(column(quarterly, "revenue")["2026-06-30"], 19_000_000_000)
+        self.assertEqual(info["epsBasis"], "rescaled")
+        self.assertEqual(document["adrRatio"]["epsFactor"], ADR)
+        annual = document["annual"]
+        self.assertAlmostEqual(column(annual, "epsBasic")["2023-12-31"], ADR * 10.0)    # SEC x k, not Yahoo's
+        self.assertAlmostEqual(column(annual, "epsBasic")["2022-12-31"], ADR * 7.5)
+        self.assertNotIn("eps-yahoo-only", document["quality"]["issues"])
 
     def test_no_sec_eps_takes_yahoo_eps_on_one_basis(self):
         """SEC carries no EPS at all: every EPS of the result is Yahoo's (per ADR, one basis), so they merge."""
