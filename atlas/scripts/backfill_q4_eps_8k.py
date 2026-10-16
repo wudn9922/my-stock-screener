@@ -27,7 +27,7 @@ import statistics
 import sys
 import time
 from collections import Counter
-from datetime import date
+from datetime import date, timedelta
 from html.parser import HTMLParser
 from urllib import error, request
 
@@ -240,7 +240,7 @@ def table_eps(table, target, end):
     basic = basic_row[j] if basic_row is not None and len(basic_row) == len(net_row) else None
     per_share_rows = [[label, values] for label, values in rows if "per share" in label or "earnings per" in label]
     return {"epsDiluted": eps, "epsBasic": basic, "dilutedShares": diluted_shares, "scale": scale,
-            "netLabel": net_label, "epsLabel": eps_label, "perShareRows": per_share_rows[:8]}, None
+            "net": net, "netLabel": net_label, "epsLabel": eps_label, "perShareRows": per_share_rows[:8]}, None
 
 
 class Sec:
@@ -404,17 +404,35 @@ def find_quarter(sec, cik, filings, end, target, debug=None):
     return None, reason
 
 
+def verify_quarter(sec, cik, filings, end, net, eps, doc):
+    """
+    Independent check: the next year's release shows this quarter again as its prior-year column.
+    → {"status": "confirmed" | "conflict" | "unavailable", "epsDiluted": checked EPS on today's basis, "url"}.
+    """
+    when = date.fromisoformat(end)
+    for filing in candidate_filings(filings, when + timedelta(days=365))[:MAX_FILINGS]:
+        result, _ = from_filing(sec, cik, filing, net, end)
+        if result is None:
+            continue
+        checked = round(result["epsDiluted"] / split_factor(doc, filing["filingDate"]), 6)
+        status = "confirmed" if within_tolerance(checked, eps) else "conflict"
+        return {"status": status, "epsDiluted": checked, "url": result["url"]}
+    return {"status": "unavailable"}
+
+
 def q4_periods(doc):
-    """Every Q4 quarter that holds net income: index, end, stored net income and stored diluted EPS."""
+    """Every Q4 quarter that holds net income: index, end, stored net income, stored diluted EPS and its derived flag."""
     quarterly = doc.get("quarterly") or {}
     ends, fq = quarterly.get("end") or [], quarterly.get("fq") or []
     values = quarterly.get("values") or {}
+    derived = quarterly.get("derived") or []
 
     def at(field, i):
         column = values.get(field) or []
         return column[i] if i < len(column) else None
 
-    return [{"index": i, "end": end, "target": at("netIncome", i), "eps": at("epsDiluted", i)}
+    return [{"index": i, "end": end, "target": at("netIncome", i), "eps": at("epsDiluted", i),
+             "derived": i < len(derived) and derived[i] == 1}
             for i, end in enumerate(ends) if i < len(fq) and fq[i] == 4 and at("netIncome", i)]
 
 
@@ -439,7 +457,10 @@ def process_ticker(sec, key, cik, doc, mode, rows):
                               epsBasic=None if result["epsBasic"] is None else round(result["epsBasic"] / factor, 6),
                               dilutedShares=None if result["dilutedShares"] is None
                               else round(result["dilutedShares"] * factor, 1))
-        rows.append({"key": key, "end": p["end"], "stored": p["eps"], "target": p["target"],
+        if mode == "backtest" and result is not None:
+            result = dict(result, verified=verify_quarter(sec, cik, filings, p["end"], result["net"],
+                                                          result["epsDiluted"], doc))
+        rows.append({"key": key, "end": p["end"], "stored": p["eps"], "target": p["target"], "derived": p["derived"],
                      "result": result, "reason": reason, "debug": debug[:2]})
     return True
 
@@ -493,6 +514,13 @@ def summarize(rows, mode):
             out["median_error"] = round(statistics.median(errors), 4)
             right = sum(within_tolerance(r["result"]["epsDiluted"], r["stored"]) for r in accepted)
             out["correct_share_of_all_periods"] = round(right / len(rows), 4)
+            # stored Q4 values are mostly derived (annual minus Q1-Q3), so they are a noisy reference
+            out["accepted_on_derived_stored"] = sum(bool(r.get("derived")) for r in accepted)
+            checks = Counter((r["result"].get("verified") or {}).get("status", "not run") for r in accepted)
+            out["independent_check"] = dict(checks)
+            confirmed, conflict = checks.get("confirmed", 0), checks.get("conflict", 0)
+            if confirmed + conflict:
+                out["independent_precision"] = round(confirmed / (confirmed + conflict), 4)
     return out
 
 
@@ -534,7 +562,8 @@ def run(args, sec):
         seed.write_atomic(STATE_PATH, state)
     report = summarize(rows, args.mode)
     mismatches = [{"key": r["key"], "end": r["end"], "stored": r["stored"], "estimate": r["result"]["epsDiluted"],
-                   "basic": r["result"]["epsBasic"], "netLabel": r["result"].get("netLabel"),
+                   "basic": r["result"]["epsBasic"], "derived": r["derived"],
+                   "verified": r["result"].get("verified"), "netLabel": r["result"].get("netLabel"),
                    "epsLabel": r["result"].get("epsLabel"), "perShareRows": r["result"].get("perShareRows"),
                    "url": r["result"]["url"]}
                   for r in rows if args.mode == "backtest" and r["result"]

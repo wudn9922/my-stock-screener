@@ -222,6 +222,43 @@ class FilingTests(unittest.TestCase):
         self.assertTrue(result["url"].endswith("/ex99-1.htm"))
 
 
+NEXT_YEAR_RELEASE = """
+<html><body><table>
+<tr><td></td><td>Three Months Ended December 31, 2025</td><td></td><td>Three Months Ended December 31, 2024</td></tr>
+<tr><td>Net income attributable to Acme</td><td>$</td><td>999</td><td>$</td><td>1,234</td></tr>
+<tr><td>Diluted earnings per share</td><td>$</td><td>0.30</td><td>$</td><td>0.25</td></tr>
+</table></body></html>
+"""
+
+
+class IndependentCheckTests(unittest.TestCase):
+    rows = [{"form": "8-K", "items": "2.02", "filingDate": "2026-02-05", "accessionNumber": "0001-26-000001"}]
+
+    @staticmethod
+    def sec_with(html):
+        class FakeSec:
+            def get_json(self, url):
+                return {"directory": {"item": [{"name": "ex99-1.htm"}]}}
+
+            def get_text(self, url):
+                return None if url.endswith(("-index.html", "-index.htm")) else html
+
+        return FakeSec()
+
+    def test_the_prior_year_column_of_the_next_release_confirms_the_value(self):
+        check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, self.rows, END, 1_234_000, 0.25, {})
+        self.assertEqual(check["status"], "confirmed")
+        self.assertEqual(check["epsDiluted"], 0.25)
+
+    def test_a_different_prior_year_eps_is_a_conflict(self):
+        check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, self.rows, END, 1_234_000, 0.20, {})
+        self.assertEqual(check["status"], "conflict")
+
+    def test_no_next_year_release_is_unavailable(self):
+        check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, [], END, 1_234_000, 0.25, {})
+        self.assertEqual(check["status"], "unavailable")
+
+
 class FillTests(unittest.TestCase):
     def test_fill_writes_only_null_fields_and_records_the_source(self):
         doc = {"quarterly": {"end": ["2024-03-31", "2024-12-31"], "fq": [1, 4],
