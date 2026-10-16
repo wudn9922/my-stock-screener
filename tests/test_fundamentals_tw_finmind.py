@@ -307,8 +307,8 @@ class GrowthTest(unittest.TestCase):
         (q, y), info, result, truths = self.blocks({})
         self.assertIsNone(q)
         block = result["1100.TW"][2]
-        self.assertEqual(len(block["rev"]), 9)        # 2016..2025 → nine YoY years, more than YEAR_SLOTS
-        self.assertGreater(len(block["rev"]), growth.YEAR_SLOTS)
+        self.assertEqual(len(block["rev"]), 9)        # 2016..2025 → nine YoY years: the whole history, not cut
+        self.assertGreater(len(block["rev"]), growth.RECENT_YEAR_SLOTS)
         years = [sum(truths["1100"][(year, q)][0] for q in (1, 2, 3, 4)) for year in (2025, 2024)]
         self.assertEqual(block["rev"][0], growth.growth_pct(*years))
         self.assertEqual(result["1100.TW"][1]["derived"] & 0b1, 0)        # 2026Q2 vs 2025Q2: no Q4
