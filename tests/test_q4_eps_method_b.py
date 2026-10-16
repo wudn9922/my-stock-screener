@@ -1,4 +1,4 @@
-"""Synthetic strict-subgroup validation and null-only Method B fill tests."""
+"""Synthetic strict-subgroup validation and grade-C Method B quarantine tests."""
 import json
 import os
 import sys
@@ -32,7 +32,7 @@ def synthetic_document():
         if year == 2021:
             q4_income, actual = 1, 0.0  # denominator floor makes this a 1% error
         elif year == 2022:
-            actual = None  # a qualifying null should be filled
+            actual = None  # a qualifying null is staged in C quarantine only
         elif year == 2023:
             shares_for_year = [1021, 1000, 1000, 1000]
             for fq, (month, day) in enumerate(((3, 31), (6, 30), (9, 30), (12, 31)), start=1):
@@ -91,7 +91,7 @@ class MethodBStrictSubgroupTests(unittest.TestCase):
         self.assertIsNone(observation)
         self.assertEqual(reason, "q4_income_not_positive")
 
-    def test_floor_normalized_error_passes_and_only_null_is_filled(self):
+    def test_floor_normalized_error_passes_and_estimate_stays_out_of_formal_eps(self):
         document = synthetic_document()
         q4_2021 = document["quarterly"]["end"].index("2021-12-31")
         counts, errors = audit.validate_method_b(document)
@@ -111,21 +111,26 @@ class MethodBStrictSubgroupTests(unittest.TestCase):
             self.assertEqual(skipped["q4_income_not_positive"], 1)
 
             result = audit.apply_method_b(directory, report)
-            self.assertEqual(result["filledPeriods"], 1)
+            self.assertEqual(result["quarantinedPeriods"], 1)
             self.assertEqual(result["fills"][0]["end"], "2022-12-31")
             self.assertEqual(result["fills"][0]["value"], 0.1)
+            self.assertEqual(result["fills"][0]["grade"], "C")
 
             with open(path, encoding="utf-8") as handle:
                 saved = json.load(handle)
             ends = saved["quarterly"]["end"]
             values = saved["quarterly"]["values"]["epsDiluted"]
-            self.assertEqual(values[ends.index("2022-12-31")], 0.1)
+            self.assertIsNone(values[ends.index("2022-12-31")])
             self.assertEqual(values[ends.index("2020-12-31")], 0.1)
             self.assertEqual(values[ends.index("2021-12-31")], 0.0)
             self.assertIsNone(values[ends.index("2023-12-31")])
             self.assertEqual(values[ends.index("2024-12-31")], -0.01)
-            self.assertIn("q4-eps-from-shares", saved["quality"]["issues"])
-            self.assertEqual(saved["quarterly"]["derived"][ends.index("2022-12-31")], 1)
+            self.assertEqual(saved["quality"]["issues"], [])
+            quarantine = os.path.join(directory, "q4-eps-method-b-quarantine-C.jsonl")
+            with open(quarantine, encoding="utf-8") as handle:
+                record = json.loads(handle.readline())
+            self.assertEqual(record["grade"], "C")
+            self.assertEqual(record["status"], "quarantined")
 
 
 if __name__ == "__main__":

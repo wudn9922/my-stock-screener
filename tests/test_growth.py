@@ -43,6 +43,9 @@ def section(rows, quarterly, src=None):
     }
     if quarterly:
         result["fq"] = [r[2] for r in rows]
+        result["epsQuality"] = [
+            {"epsDiluted": "A", "epsBasic": "A"} if r[2] == 4 else None for r in rows
+        ]
     if src:
         result["src"] = [src] * len(rows)
     return result
@@ -73,6 +76,65 @@ def row_of(doc, key="X", today=TODAY):
 
 
 class QuarterlyAlignmentTest(unittest.TestCase):
+    def test_grade_c_eps_is_not_used_for_formal_growth(self):
+        quarters = [q(fy, fq, 1.0 if fq != 4 else 2.0, revenue=100.0)
+                    for fy in (2024, 2025) for fq in (1, 2, 3, 4)]
+        doc = document(quarters)
+        doc["quarterly"]["epsQuality"] = [None] * 7 + [{"epsDiluted": "C", "epsBasic": "C"}]
+
+        result = row_of(doc, today=date(2026, 7, 1))
+
+        self.assertIsNone(result["epsQ"][0])
+        self.assertEqual(result["revQ"][0], 0.0)
+
+    def test_ungraded_q4_eps_is_not_used_for_formal_growth(self):
+        quarters = [q(fy, fq, 1.0 if fq != 4 else 2.0, revenue=100.0)
+                    for fy in (2024, 2025) for fq in (1, 2, 3, 4)]
+        doc = document(quarters)
+        doc["quarterly"]["epsQuality"][-1] = {}
+
+        result = row_of(doc, today=date(2026, 7, 1))
+
+        self.assertIsNone(result["epsQ"][0])
+        self.assertEqual(result["revQ"][0], 0.0)
+
+    def test_ungraded_q4_keeps_sec_revenue_history_and_source_recency(self):
+        quarters = [q(fy, fq, 1.0 if fq != 4 else 2.0,
+                      revenue=100.0 if fy == 2024 else 120.0)
+                    for fy in (2024, 2025) for fq in (1, 2, 3, 4)]
+        sec_doc = document(quarters, src="sec")
+        sec_doc["quarterly"]["epsQuality"][-1] = {}
+        # A shorter CompanyFacts frames block ends on the same Q4 date. SEC has the
+        # better source rank, so its longer revenue history should remain selected.
+        frames_q = {
+            "eps": [10.0], "rev": [15.0], "mask": 0,
+            "end": "2025-12-31", "src": "frames", "derived": 0,
+        }
+
+        built = growth.build_document(
+            [("X", sec_doc)], datetime(2026, 8, 1, tzinfo=timezone.utc),
+            extra={"X": [(None, frames_q, None)]}
+        )
+        result = dict(zip(growth.FIELDS, built["rows"][0]))
+
+        self.assertEqual(result["src"], "sec")
+        self.assertEqual(result["qEnd"], "2025-12-31")
+        self.assertIsNone(result["epsQ"][0])
+        self.assertEqual(result["revQ"][0], 20.0)
+        self.assertGreater(len(result["revQ"]), 1)
+
+    def test_ungraded_taiwan_q4_eps_keeps_existing_growth_behavior(self):
+        quarters = [q(fy, fq, 1.0 if fy == 2024 else 2.0, revenue=100.0)
+                    for fy in (2024, 2025) for fq in (1, 2, 3, 4)]
+        doc = document(quarters)
+        doc["market"] = "TW"
+        doc["quarterly"]["epsQuality"] = [None] * len(quarters)
+
+        result = row_of(doc, today=date(2026, 7, 1))
+
+        self.assertEqual(result["epsQ"][0], 100.0)
+        self.assertEqual(result["revQ"][0], 0.0)
+
     def test_same_quarter_a_year_earlier_not_the_neighbour(self):
         # Seasonal company: Q4 is always big. Neighbour division would show -75%; the same quarter is +50%.
         rows = [

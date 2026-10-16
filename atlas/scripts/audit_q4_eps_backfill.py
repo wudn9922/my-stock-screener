@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Offline audit/backtest for missing Q4 diluted EPS and the share-count estimate.
 
-Default mode is read-only. --apply-method-b fills only null diluted EPS values whose
-matching subgroups pass the median/P90 error gates.
+Default mode is read-only. The historical diluted-shares estimate can only be staged
+as grade-C quarantine evidence; it is never written into formal EPS fields.
 """
 import argparse
 import json
 import math
+import os
 import sys
 from collections import Counter
 from decimal import Decimal, InvalidOperation
@@ -17,7 +18,6 @@ if SCRIPTS not in sys.path:
     sys.path.insert(0, SCRIPTS)
 
 import build_financials as fin  # noqa: E402
-from build_valuation_us import write_atomic  # noqa: E402
 
 
 REASONS = (
@@ -37,7 +37,13 @@ METHOD_B_P90_MAX = Decimal("0.06")
 
 def value(block, field, index):
     values = (block.get("values") or {}).get(field) or []
-    return values[index] if index < len(values) else None
+    result = values[index] if index < len(values) else None
+    if field in {"epsBasic", "epsDiluted"}:
+        grades = block.get("epsQuality") or []
+        grade = grades[index].get(field) if index < len(grades) and isinstance(grades[index], dict) else None
+        if grade in {"C", "D"}:
+            return None
+    return result
 
 
 def annual_rows_by_fy(block):
@@ -326,14 +332,14 @@ def method_b_subgroup_report(errors):
                 and Decimal(str(median)) <= METHOD_B_MEDIAN_MAX
                 and Decimal(str(p90)) <= METHOD_B_P90_MAX
             ),
-            "filled": 0,
+            "quarantined": 0,
         }
     return report
 
 
 def apply_method_b(directory, report, dry_run=False):
-    """Fill null diluted Q4 EPS only when the strict subgroup passes its back-test."""
-    summary = {"fills": [], "skipped": Counter(), "writtenFiles": set()}
+    """Stage eligible diluted-share estimates as grade C, never as formal EPS values."""
+    summary = {"fills": [], "skipped": Counter(), "writtenFiles": 0}
     if not report.get(METHOD_B_GROUP, {}).get("passed", False):
         summary["skipped"]["strict-subgroup-validation-failed"] += 1
         return summary
@@ -353,7 +359,6 @@ def apply_method_b(directory, report, dry_run=False):
         eps_values = (quarterly.get("values") or {}).get("epsDiluted")
         if not isinstance(eps_values, list):
             eps_values = [None] * len(quarterly.get("end") or [])
-        dirty = False
         for index, fq in enumerate(quarterly.get("fq") or []):
             if fq != 4:
                 continue
@@ -367,7 +372,7 @@ def apply_method_b(directory, report, dry_run=False):
             if not math.isfinite(stored) or stored == 0:
                 summary["skipped"]["invalid-rounded-estimate"] += 1
                 continue
-            # Recheck the value immediately before setting it; existing EPS is never replaced.
+            # Recheck that the formal EPS is still null before staging C evidence.
             if index < len(eps_values) and eps_values[index] is not None:
                 summary["skipped"]["value-became-non-null"] += 1
                 continue
@@ -375,36 +380,43 @@ def apply_method_b(directory, report, dry_run=False):
                 "symbol": path.stem,
                 "fy": observation["fy"],
                 "end": observation["end"],
+                "field": "epsDiluted",
                 "value": stored,
+                "grade": "C",
+                "status": "quarantined",
+                "method": "annual-diluted-shares-times-four-minus-q1-q3",
+                "source": {"financialsFile": f"docs/report/financials/{path.stem}.json",
+                           "source": document.get("source"), "accession": None, "url": None},
+                "calculation": {
+                    "formula": "Q4 net income / (annual diluted shares * 4 - Q1 - Q2 - Q3 diluted shares)",
+                    "netIncome": str(observation["netIncome"]),
+                    "annualShares": str(observation["annualShares"]),
+                    "q123Shares": [str(item) for item in observation["q123Shares"]],
+                    "estimatedQ4Shares": str(observation["q4Shares"]),
+                },
+                "validation": {
+                    "passedForHistoricalEstimationOnly": True,
+                    "reasonNotFormalGradeB": "diluted Q4 weighted-average shares were not independently reported or validated",
+                },
             })
-            if dry_run:
-                continue
-
-            while len(eps_values) <= index:
-                eps_values.append(None)
-            eps_values[index] = stored
-            quarterly.setdefault("values", {})["epsDiluted"] = eps_values
-            derived = quarterly.get("derived")
-            if not isinstance(derived, list):
-                derived = []
-            while len(derived) < len(quarterly.get("end") or []):
-                derived.append(None)
-            derived[index] = 1
-            quarterly["derived"] = derived
-            quality = document.setdefault("quality", {})
-            issue_codes = quality.get("issues")
-            codes = set(issue_codes if isinstance(issue_codes, list) else [])
-            codes.add("q4-eps-from-shares")
-            quality["issues"] = [code for code in fin.ISSUES if code in codes] + sorted(
-                code for code in codes if code not in fin.ISSUES
-            )
-            dirty = True
-        if dirty:
-            write_atomic(str(path), document)
-            summary["writtenFiles"].add(path.stem)
-    summary["filledPeriods"] = len({(fill["symbol"], fill["end"]) for fill in summary["fills"]})
-    summary["writtenFiles"] = len(summary["writtenFiles"])
-    report[METHOD_B_GROUP]["filled"] = summary["filledPeriods"]
+    summary["quarantinedPeriods"] = len({(fill["symbol"], fill["end"]) for fill in summary["fills"]})
+    if not dry_run and summary["fills"]:
+        sidecar = Path(directory) / "q4-eps-method-b-quarantine-C.jsonl"
+        existing = []
+        if sidecar.exists():
+            existing = [json.loads(line) for line in sidecar.read_text(encoding="utf-8").splitlines() if line.strip()]
+        by_key = {(item.get("symbol"), item.get("fy"), item.get("end"), item.get("field")): item
+                  for item in existing}
+        for item in summary["fills"]:
+            by_key[(item["symbol"], item["fy"], item["end"], item["field"])] = item
+        temporary = sidecar.with_name(sidecar.name + ".tmp")
+        temporary.write_text("".join(
+            json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n"
+            for _, item in sorted(by_key.items())
+        ), encoding="utf-8")
+        os.replace(temporary, sidecar)
+        summary["sidecar"] = str(sidecar)
+    report[METHOD_B_GROUP]["quarantined"] = summary["quarantinedPeriods"]
     return summary
 
 
@@ -447,8 +459,8 @@ def main(argv=None):
         default=str(Path(__file__).resolve().parents[2] / "docs" / "report" / "financials"),
         help="financial JSON directory (default: docs/report/financials)",
     )
-    parser.add_argument("--apply-method-b", action="store_true", help="fill null diluted Q4 EPS if the strict subgroup passes")
-    parser.add_argument("--dry-run", action="store_true", help="preview Method B fills without writing files")
+    parser.add_argument("--apply-method-b", action="store_true", help="stage eligible diluted-share estimates as grade-C quarantine records")
+    parser.add_argument("--dry-run", action="store_true", help="preview grade-C quarantine records without writing files")
     args = parser.parse_args(argv)
     if args.dry_run and not args.apply_method_b:
         parser.error("--dry-run requires --apply-method-b")
@@ -487,7 +499,7 @@ def main(argv=None):
     summary = None
     if args.apply_method_b:
         if not item["passed"]:
-            print("Method B stopped: strict-subgroup validation threshold failed; no EPS values were written.")
+            print("Method B stopped: strict-subgroup validation threshold failed; no records were staged.")
             return 2
         summary = apply_method_b(args.dir, subgroup_report, dry_run=args.dry_run)
     if subgroup_skipped:
@@ -495,15 +507,16 @@ def main(argv=None):
             f"{reason} {count}" for reason, count in sorted(subgroup_skipped.items())
         ))
     if summary is not None:
-        mode = "would fill" if args.dry_run else "filled"
-        print(f"Method B {mode}: {summary['filledPeriods']} unique Q4 quarters "
-              f"({len(summary['fills'])} subgroup-quarter memberships; "
-              f"{summary['writtenFiles']} files written).")
+        mode = "would quarantine" if args.dry_run else "quarantined"
+        print(f"Method B {mode}: {summary['quarantinedPeriods']} unique Q4 quarters "
+              f"({len(summary['fills'])} grade-C estimates; formal EPS files unchanged).")
+        if summary.get("sidecar"):
+            print(f"grade-C sidecar: {summary['sidecar']}")
         if summary["skipped"]:
             print("Method B candidates skipped: " + ", ".join(
                 f"{reason} {count}" for reason, count in sorted(summary["skipped"].items())
             ))
-        print(f"  strict subgroup filled quarters: {item['filled']}")
+        print(f"  strict subgroup quarantined quarters: {item['quarantined']}")
     return 0
 
 

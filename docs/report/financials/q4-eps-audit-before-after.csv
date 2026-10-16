@@ -1,0 +1,13 @@
+baseline_snapshot,current_snapshot,scope,category,reason,baseline_periods,baseline_files_nonexclusive,current_periods,current_files_nonexclusive,delta_periods
+3f9406d8b,2026-10-16,top-level,缺年度 EPS,缺年度 EPS,2045,609,2125,615,80
+3f9406d8b,2026-10-16,top-level,缺 Q1–Q3 EPS,缺 Q1–Q3 EPS,1467,1165,1506,1181,39
+3f9406d8b,2026-10-16,top-level,年度與季度股數差超過25%,年度與季度股數差超過25%,1235,802,1235,802,0
+3f9406d8b,2026-10-16,top-level,其他,其他,2617,1146,2681,1177,64
+3f9406d8b,2026-10-16,other-detail,其他,年度 EPS 與淨利／股數不一致,290,207,337,232,47
+3f9406d8b,2026-10-16,other-detail,其他,年度或季度來源非 SEC,4,4,6,6,2
+3f9406d8b,2026-10-16,other-detail,其他,年度／季度期別缺漏、重複或不唯一,26,24,26,24,0
+3f9406d8b,2026-10-16,other-detail,其他,方法 A 推算 EPS 與 Q4 淨利符號不一致,110,99,121,109,11
+3f9406d8b,2026-10-16,other-detail,其他,方法 A 推算值未通過 Q4 淨利／股數檢查,95,89,99,93,4
+3f9406d8b,2026-10-16,other-detail,其他,方法 A 股數基準差超過 25%,1791,901,1791,901,0
+3f9406d8b,2026-10-16,other-detail,其他,缺股數且 EPS 無效，無法推算股數,299,153,299,153,0
+3f9406d8b,2026-10-16,other-detail,其他,缺股數且缺淨利，無法推算股數,2,2,2,2,0

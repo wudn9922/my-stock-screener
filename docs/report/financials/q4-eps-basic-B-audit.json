@@ -1,0 +1,127 @@
+{
+  "schema": "q4-eps-basic-reconstruction-audit-v1",
+  "status": "companyfacts-only-screen-with-separately-validated-raw-filing-grade-Bs",
+  "scope": "This report audits CompanyFacts-only inputs; raw SEC filing decisions are maintained in the companion source-audit report.",
+  "rawFilingSourceValidatedGradeB": 14,
+  "reason": "CompanyFacts-only input sets omit filing contexts needed to verify noncontrolling-interest and preferred treatment, share-class identity, and consistent split basis. The companion raw-filing audit separately approves only periods with direct source-context verification.",
+  "metrics": {
+    "currently_stored_grade_B_basic_q4": 14,
+    "basic_q4_missing_or_quarantined": 7683,
+    "matching_common_income_and_basic_share_input_sets": 1534,
+    "records": 7683,
+    "companyFactsOnlyStrictGradeBValidated": 0
+  },
+  "failureReasons": {
+    "no-annual-common-income-fact": 4476,
+    "annual-basic-shares-missing;nine-month-common-income-missing;nine-month-basic-shares-missing": 271,
+    "noncontrolling-interest-treatment-not-verified-from-companyfacts;preferred-dividend-treatment-not-verified-from-context;common-share-class-count-not-exposed-by-companyfacts;annual-and-nine-month-split-basis-not-provable-from-entity-wide-facts": 1534,
+    "annual-basic-shares-missing;nine-month-basic-shares-missing": 535,
+    "nine-month-income-share-filing-version-mismatch": 47,
+    "nine-month-basic-shares-missing": 75,
+    "annual-income-share-filing-version-mismatch": 90,
+    "nine-month-common-income-missing": 233,
+    "nine-month-common-income-missing;nine-month-basic-shares-missing": 111,
+    "nine-month-basic-shares-missing;annual-income-share-filing-version-mismatch": 40,
+    "annual-basic-shares-missing;nine-month-common-income-missing": 11,
+    "nine-month-common-income-missing;annual-income-share-filing-version-mismatch": 46,
+    "annual-basic-shares-missing;nine-month-income-share-filing-version-mismatch": 17,
+    "annual-basic-shares-missing": 41,
+    "annual-income-share-filing-version-mismatch;nine-month-income-share-filing-version-mismatch": 31,
+    "nine-month-common-income-missing;nine-month-basic-shares-missing;annual-income-share-filing-version-mismatch;nine-month-filing-after-annual-version": 13,
+    "no-companyfacts-cache": 98,
+    "nine-month-common-income-missing;nine-month-basic-shares-missing;annual-income-share-filing-version-mismatch": 8,
+    "nine-month-common-income-missing;nine-month-basic-shares-missing;nine-month-filing-after-annual-version": 1,
+    "annual-basic-shares-missing;nine-month-common-income-missing;nine-month-basic-shares-missing;nine-month-filing-after-annual-version": 5
+  },
+  "byFiscalYear": {
+    "2009": {
+      "target": 8,
+      "incompleteInputSets": 8
+    },
+    "2010": {
+      "target": 12,
+      "incompleteInputSets": 12
+    },
+    "2011": {
+      "target": 400,
+      "completeInputSets": 45,
+      "incompleteInputSets": 355
+    },
+    "2012": {
+      "target": 293,
+      "completeInputSets": 24,
+      "incompleteInputSets": 269
+    },
+    "2013": {
+      "target": 315,
+      "incompleteInputSets": 283,
+      "completeInputSets": 32
+    },
+    "2014": {
+      "target": 311,
+      "incompleteInputSets": 286,
+      "completeInputSets": 25
+    },
+    "2015": {
+      "target": 333,
+      "incompleteInputSets": 308,
+      "completeInputSets": 25
+    },
+    "2016": {
+      "target": 337,
+      "incompleteInputSets": 308,
+      "completeInputSets": 29
+    },
+    "2017": {
+      "target": 403,
+      "incompleteInputSets": 367,
+      "completeInputSets": 36
+    },
+    "2018": {
+      "target": 448,
+      "incompleteInputSets": 397,
+      "completeInputSets": 51
+    },
+    "2019": {
+      "target": 471,
+      "incompleteInputSets": 427,
+      "completeInputSets": 44
+    },
+    "2020": {
+      "target": 732,
+      "completeInputSets": 151,
+      "incompleteInputSets": 581
+    },
+    "2021": {
+      "target": 763,
+      "incompleteInputSets": 549,
+      "completeInputSets": 214
+    },
+    "2022": {
+      "target": 630,
+      "incompleteInputSets": 477,
+      "completeInputSets": 153
+    },
+    "2023": {
+      "target": 629,
+      "completeInputSets": 178,
+      "incompleteInputSets": 451
+    },
+    "2024": {
+      "target": 764,
+      "incompleteInputSets": 509,
+      "completeInputSets": 255
+    },
+    "2025": {
+      "target": 766,
+      "incompleteInputSets": 508,
+      "completeInputSets": 258
+    },
+    "2026": {
+      "target": 68,
+      "incompleteInputSets": 54,
+      "completeInputSets": 14
+    }
+  },
+  "decisionFile": "/workspace/my-stock-screener/docs/report/financials/q4-eps-basic-B-decisions.jsonl"
+}

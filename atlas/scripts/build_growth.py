@@ -119,7 +119,7 @@ def column(values, name, count):
     return [finite_number(raw[i]) if i < len(raw) else None for i in range(count)]
 
 
-def read_periods(section, quarterly):
+def read_periods(section, quarterly, market=None):
     """→ [{end, fy, fq, epsD, epsB, rev, shares, src}] for the periods with a valid end date and fy."""
     if not isinstance(section, dict) or not isinstance(section.get("end"), list):
         return []
@@ -130,6 +130,7 @@ def read_periods(section, quarterly):
     fqs = section.get("fq") if isinstance(section.get("fq"), list) else []
     srcs = section.get("src") if isinstance(section.get("src"), list) else []
     eps_d, eps_b = column(values, "epsDiluted", count), column(values, "epsBasic", count)
+    eps_quality = section.get("epsQuality") if isinstance(section.get("epsQuality"), list) else []
     revenue, shares = column(values, "revenue", count), column(values, "dilutedShares", count)
     periods = []
     for i, end in enumerate(ends):
@@ -140,10 +141,26 @@ def read_periods(section, quarterly):
             continue
         if quarterly and (isinstance(fq, bool) or not isinstance(fq, int) or not 1 <= fq <= 4):
             continue
+        grade = eps_quality[i] if i < len(eps_quality) and isinstance(eps_quality[i], dict) else {}
+        us_q4 = quarterly and fq == 4 and market != "TW"
+        has_ungraded_q4_eps = (us_q4 and
+                               (eps_d[i] is not None or eps_b[i] is not None) and
+                               (grade.get("epsDiluted") not in {"A", "B"} and
+                                grade.get("epsBasic") not in {"A", "B"}))
+        if (market != "TW" and (grade.get("epsDiluted") in {"C", "D"} or
+                                 (us_q4 and grade.get("epsDiluted") not in {"A", "B"}))):
+            eps_d[i] = None
+        if (market != "TW" and (grade.get("epsBasic") in {"C", "D"} or
+                                 (us_q4 and grade.get("epsBasic") not in {"A", "B"}))):
+            eps_b[i] = None
         src = srcs[i] if i < len(srcs) and isinstance(srcs[i], str) else "yahoo"
         periods.append({
             "end": end, "day": day, "fy": fy, "fq": fq,
             "epsD": eps_d[i], "epsB": eps_b[i], "rev": revenue[i], "shares": shares[i],
+            # A stored but ungraded Q4 still anchors this filing block's period/source recency.
+            # Its EPS remains unusable; dropping the period entirely could switch to a shorter
+            # frames block and remove unrelated revenue history.
+            "ungradedQ4Eps": bool(has_ungraded_q4_eps),
             "src": src if src in ("sec", "finmind") else "yahoo",
         })
     return periods
@@ -265,7 +282,8 @@ def yoy_series(periods, quarterly, slots, events, today, stale_days, pair=None):
     (EPS yoy, turnaround, revenue yoy) (default: default_pair with the split events). A period dict
     with "derived": True sets the slot's bit in `derived`.
     """
-    candidates = [period for period in periods if usable(period)]
+    candidates = [period for period in periods if usable(period) or
+                  (quarterly and period.get("ungradedQ4Eps"))]
     if not candidates:
         return None
     latest = max(candidates, key=lambda p: period_number(p, quarterly))
@@ -317,7 +335,7 @@ def financials_blocks(document, today):
     if not isinstance(document, dict):
         return None
     events = split_events(document)
-    quarterly = read_periods(document.get("quarterly"), True)
+    quarterly = read_periods(document.get("quarterly"), True, document.get("market"))
     annual = read_periods(document.get("annual"), False)
     q = yoy_series(quarterly, True, QUARTER_SLOTS, events, today, STALE_QUARTER_DAYS)
     y = yoy_series(annual, False, YEAR_SLOTS, events, today, STALE_ANNUAL_DAYS)
@@ -419,7 +437,8 @@ def read_documents(directory):
     except OSError:
         return [], []
     for name in names:
-        if not name.endswith(".json") or name == "index.json":
+        if (not name.endswith(".json") or name == "index.json" or
+                name.startswith("q4-eps-")):
             continue
         key = name[:-5]
         document = read_json(os.path.join(directory, name))

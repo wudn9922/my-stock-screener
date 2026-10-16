@@ -97,12 +97,20 @@ function periodsOf(series: FinancialSeries, kind: 'quarter' | 'annual', market: 
   const out: EpsPeriod[] = [];
   series.end.forEach((end, index) => {
     if (cutoff !== null && end < cutoff) return;
-    const diluted = series.values.epsDiluted[index] ?? null;
-    const basicValue = series.values.epsBasic[index] ?? null;
+    const evidence = series.epsQuality?.[index];
+    const isQ4 = market === 'US' && kind === 'quarter' && series.fq[index] === 4;
+    const gradeDisallowsSelection = (grade: string | undefined) => market === 'US' &&
+      (grade === 'C' || grade === 'D' || (isQ4 && grade !== 'A' && grade !== 'B'));
+    const diluted = gradeDisallowsSelection(evidence?.epsDiluted) ? null : (series.values.epsDiluted[index] ?? null);
+    const basicValue = gradeDisallowsSelection(evidence?.epsBasic) ? null : (series.values.epsBasic[index] ?? null);
     const eps = diluted ?? basicValue;
+    const filed = diluted !== null ? evidence?.epsDilutedFiled : evidence?.epsBasicFiled;
     const delay = publishDelayDays(market, kind, kind === 'quarter' ? (series.fq[index] ?? null) : null, annualEnds.has(end));
     const endSec = dateToSec(end);
-    out.push({ end, endSec, availSec: endSec + delay * DAY_SECONDS, eps, basic: diluted === null && basicValue !== null });
+    const filingSec = filed ? dateToSec(filed) : NaN;
+    const defaultAvailableSec = endSec + delay * DAY_SECONDS;
+    const availSec = Number.isFinite(filingSec) ? Math.max(defaultAvailableSec, filingSec) : defaultAvailableSec;
+    out.push({ end, endSec, availSec, eps, basic: diluted === null && basicValue !== null });
   });
   return out.sort((a, b) => a.endSec - b.endSec);
 }

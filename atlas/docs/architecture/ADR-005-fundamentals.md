@@ -45,3 +45,12 @@ SEC APIs: https://www.sec.gov/search-filings/edgar-application-programming-inter
 
 ## V1 hardening (2026-10-06)
 Expanded official issuer fixtures cover JPM/WMT/XOM as well as AAPL/MSFT/NVDA/TSLA. RevenuesNetOfInterestExpense is an explicit lower-priority bank total revenue fallback; overlapping interest subcomponents are never guessed/summed. SEC numeric-string CIKs are accepted only after exact numeric identity validation and normalized behind the provider. The official ticker map determines current issuer routing: XOM's current holding entity and historical Exxon CIK are distinct, audited fixture sources, never silently substituted. Normalized records expose issuer name/CIK for UI audit. All quarter/EPS/null and provenance rules remain conservative.
+
+## Q4 EPS audit extension (2026-10-16)
+
+The default rule remains: do not derive Q4 EPS by subtracting annual EPS from cumulative Q1–Q3 EPS. A missing standalone SEC EPS fact remains null unless the separate financial-history backfill passes the following Grade B gate. This exception applies only to Basic EPS; it does not infer Diluted EPS from annual diluted shares and does not alter `FinancialNormalizer`'s normalized SEC-provider contract.
+
+- Use annual and nine-month ordinary-common-attributable income from the same filing vintage, with the same currency, fiscal-year boundary, and consecutive period definitions. Verify preferred dividends, noncontrolling interests, participating securities, and share-class treatment from filing evidence; unresolved allocations stay null.
+- Reconstruct Q4 basic weighted-average shares from the annual and nine-month weighted-average share facts using their actual covered-day counts. Require a positive result, a consistent split basis, and a result within 15% of Q3 shares. Do not substitute annual diluted shares or subtract cumulative EPS.
+- A candidate is usable only if the hidden-period Grade A backtest passes the approved subgroup thresholds and its sign and per-share precision checks. Stored Grade B values carry `epsQuality.epsBasic: B` and `q4-eps-from-shares`; filing-level inputs and the formula are retained in the Q4 decision ledger. Candidates that fail any evidence or validation gate remain null/D.
+- Historical valuation and growth consumers use only Grade A/B US Q4 inputs and respect the source filing date. This does not change the existing screener strategy rules. The full audit and reproducible evidence are documented in `docs/report/financials/q4-eps-evidence.md`.
