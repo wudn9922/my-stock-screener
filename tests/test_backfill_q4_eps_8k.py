@@ -254,6 +254,12 @@ class IndependentCheckTests(unittest.TestCase):
         check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, self.rows, END, 1_234_000, 0.20, {})
         self.assertEqual(check["status"], "conflict")
 
+    def test_a_restated_prior_year_net_income_is_kept_as_a_diagnostic(self):
+        check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, self.rows, END, 1_200_000, 0.25, {})
+        self.assertEqual(check["status"], "unavailable")
+        self.assertEqual(check["reason"], "no table shows this quarter's net income")
+        self.assertEqual(check["debug"][0]["period_net_rows"], [["net income attributable to acme", [999.0, 1234.0]]])
+
     def test_no_next_year_release_is_unavailable(self):
         check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, [], END, 1_234_000, 0.25, {})
         self.assertEqual(check["status"], "unavailable")

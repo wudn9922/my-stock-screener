@@ -368,7 +368,7 @@ def from_filing(sec, cik, filing, target, end, debug=None):
         if debug is not None:
             debug.append({"index_items": [item.get("name") for item in items][:12]})
         return None, "no EX-99 exhibit in the filing"
-    found = []
+    found, shown = [], []
     reason = "no table shows this quarter's net income"
     for position, name in enumerate(exhibits + extra):
         if position >= len(exhibits) and found:
@@ -383,8 +383,12 @@ def from_filing(sec, cik, filing, target, end, debug=None):
                 found.append(dict(result, accession=accession, url=url))
             elif why:
                 reason = why
+            elif debug is not None and shows_period(" ".join(" ".join(row) for row in table), end):
+                shown += [[label.lower(), values] for label, values in (row_of(cells) for cells in table)
+                          if label and is_net_income(label.lower())]
     if not found:
         if debug is not None:
+            debug.append({"target": target, "period_net_rows": shown[:4]})
             text = sec.get_text(base + (exhibits + extra)[0]) or ""
             debug.append({"net_like_text": re.findall(r">\s*([^<>]{0,80}net[^<>]{0,60})<", text, re.I)[:6]})
         return None, reason
@@ -410,16 +414,16 @@ def verify_quarter(sec, cik, filings, end, net, eps, doc):
     → {"status": "confirmed" | "conflict" | "unavailable", "epsDiluted": checked EPS on today's basis, "url"}.
     """
     when = date.fromisoformat(end)
-    reason = "no 8-K with Item 2.02 in the next year's window"
+    reason, debug = "no 8-K with Item 2.02 in the next year's window", []
     for filing in candidate_filings(filings, when + timedelta(days=365))[:MAX_FILINGS]:
-        result, why = from_filing(sec, cik, filing, net, end)
+        result, why = from_filing(sec, cik, filing, net, end, debug)
         if result is None:
             reason = why or reason
             continue
         checked = round(result["epsDiluted"] / split_factor(doc, filing["filingDate"]), 6)
         status = "confirmed" if within_tolerance(checked, eps) else "conflict"
         return {"status": status, "epsDiluted": checked, "url": result["url"]}
-    return {"status": "unavailable", "reason": reason}
+    return {"status": "unavailable", "reason": reason, "debug": debug[:2]}
 
 
 def q4_periods(doc):
@@ -520,6 +524,9 @@ def summarize(rows, mode):
             out["accepted_on_derived_stored"] = sum(bool(r.get("derived")) for r in accepted)
             checks = Counter((r["result"].get("verified") or {}).get("status", "not run") for r in accepted)
             out["independent_check"] = dict(checks)
+            out["independent_samples"] = [
+                {"key": r["key"], "end": r["end"], "target": r["target"], "debug": r["result"]["verified"]["debug"]}
+                for r in accepted if (r["result"].get("verified") or {}).get("reason", "").startswith("no table")][:3]
             out["independent_unavailable_reasons"] = dict(Counter(
                 (r["result"].get("verified") or {}).get("reason", "") for r in accepted
                 if (r["result"].get("verified") or {}).get("status") == "unavailable").most_common())
