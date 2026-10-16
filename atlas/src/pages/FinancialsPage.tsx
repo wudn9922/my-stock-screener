@@ -11,13 +11,14 @@ import { formatDateTime } from '../ui/format';
 import { FinancialsHeader, type DisplayMode } from '../ui/financials/FinancialsHeader';
 import { KeyMetrics } from '../ui/financials/KeyMetrics';
 import { MetricCard } from '../ui/financials/MetricCard';
+import { QuarterStrip } from '../ui/financials/QuarterStrip';
 import { SpanControl } from '../ui/financials/SpanControl';
 import { StatementTable } from '../ui/financials/StatementTable';
 import { PeRiverCard } from '../ui/financials/PeRiverCard';
 import { SummaryChips } from '../ui/financials/SummaryChips';
 import { ChipsSection } from '../ui/financials/ChipsCard';
 import { isChipsPageSymbol } from '../report/twChips';
-import { CHART_PERIODS, adrEpsNote, buildView, depthText, provenanceText } from '../ui/financials/financialsView';
+import { CHART_PERIODS, adrEpsNote, buildView, cardSummaryLine, depthText, provenanceText } from '../ui/financials/financialsView';
 import '../ui/financials.css';
 
 export interface FinancialsPageProps extends PageProps {
@@ -44,6 +45,9 @@ const writeMode = (mode: DisplayMode) => {
     /* Remembering the view is only a convenience. */
   }
 };
+
+/** Cards open at first render: growth and profitability. Every other section starts folded. */
+const OPEN_GROUPS: readonly MetricGroupId[] = ['growth', 'profitability'];
 
 /** Names the report already knows (index members, scan groups); the symbol directory is the fallback. */
 function reportSymbols(report: Report | null): LocalSymbol[] {
@@ -134,6 +138,8 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
   const effectiveKind: PeriodKind = history && !history[kind].end.length ? (kind === 'annual' ? 'quarterly' : 'annual') : kind;
   const span = spans[effectiveKind];
   const annualView = useMemo(() => (history ? buildView(history, 'annual') : null), [history]);
+  // The 「當季財報」 strip always shows the newest quarter, whatever period type the rest of the page is on.
+  const quarterlyView = useMemo(() => (history ? buildView(history, 'quarterly') : null), [history]);
   // The chart range applies to the period type on screen; the summary tiles keep the default annual window.
   const view = useMemo(() => (history ? buildView(history, effectiveKind, span) : null), [history, effectiveKind, span]);
 
@@ -178,14 +184,47 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
     );
   else if (result.status !== 'ok')
     body = <PageState kind="error" title={result.status === 'invalid' ? '財報資料無法辨識' : '財報資料載入失敗'} message={result.message} onRetry={() => setAttempt((n) => n + 1)} />;
-  else if (history && view && annualView) {
+  else if (history && view && annualView && quarterlyView) {
     const issues = history.quality.issues;
     const splitEvents = history.split.events;
     const adrNote = adrEpsNote(history);
+    const metricCard = (group: (typeof METRIC_GROUPS)[number]) => (
+      <MetricCard
+        key={group.id}
+        group={group}
+        history={history}
+        view={view}
+        metric={metricOf[group.id] ?? group.metrics.find((id) => view.metrics[id].window.some((i) => view.metrics[id].values[i] !== null)) ?? group.metrics[0]!}
+        onMetric={(id) => setMetricOf((current) => ({ ...current, [group.id]: id }))}
+        note={cardNote(group.id, issues, history.foreignReporter, effectiveKind, adrNote !== null)}
+        defaultOpen={OPEN_GROUPS.includes(group.id)}
+        summary={cardSummaryLine(view, group.metrics, history.currency)}
+      />
+    );
+    const leading = METRIC_GROUPS.filter((group) => OPEN_GROUPS.includes(group.id));
+    const folded = METRIC_GROUPS.filter((group) => !OPEN_GROUPS.includes(group.id));
     body = (
       <>
-        <KeyMetrics history={history} view={view} />
-        <SummaryChips history={history} annual={annualView} current={view} />
+        <QuarterStrip history={history} quarterly={quarterlyView} />
+        {mode === 'table' ? (
+          <StatementTable history={history} view={view} />
+        ) : (
+          <>
+            <SpanControl
+              kind={effectiveKind}
+              count={history[effectiveKind].end.length}
+              span={span}
+              onSpan={(next) => setSpans((current) => ({ ...current, [effectiveKind]: next }))}
+            />
+            <div className="fin-cards">{leading.map(metricCard)}</div>
+          </>
+        )}
+        <div className="fin-folds">
+          <KeyMetrics history={history} view={view} />
+          <SummaryChips history={history} annual={annualView} current={view} />
+          <PeRiverCard history={history} />
+          {mode === 'table' ? null : folded.map(metricCard)}
+        </div>
         <div className="fin-notes">
           <p className="fin-depth">{depthText(history, effectiveKind)}</p>
           <p>
@@ -203,32 +242,6 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
           {adrNote && <p>{adrNote}</p>}
           {!adrNote && (history.foreignReporter || issues.includes('foreign-filer')) && <p>外國發行人：EPS 為每普通股，非每 ADR。</p>}
         </div>
-        <PeRiverCard history={history} />
-        {mode === 'table' ? (
-          <StatementTable history={history} view={view} />
-        ) : (
-          <>
-            <SpanControl
-              kind={effectiveKind}
-              count={history[effectiveKind].end.length}
-              span={span}
-              onSpan={(next) => setSpans((current) => ({ ...current, [effectiveKind]: next }))}
-            />
-            <div className="fin-cards">
-              {METRIC_GROUPS.map((group) => (
-                <MetricCard
-                  key={group.id}
-                  group={group}
-                  history={history}
-                  view={view}
-                  metric={metricOf[group.id] ?? group.metrics.find((id) => view.metrics[id].window.some((i) => view.metrics[id].values[i] !== null)) ?? group.metrics[0]!}
-                  onMetric={(id) => setMetricOf((current) => ({ ...current, [group.id]: id }))}
-                  note={cardNote(group.id, issues, history.foreignReporter, effectiveKind, adrNote !== null)}
-                />
-              ))}
-            </div>
-          </>
-        )}
       </>
     );
   }

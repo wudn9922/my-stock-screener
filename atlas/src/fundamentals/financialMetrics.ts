@@ -774,9 +774,13 @@ export const METRICS: Record<MetricId, MetricDef> = {
 };
 
 export type MetricGroupId = 'growth' | 'profitability' | 'nonOperating' | 'cashFlow' | 'returns' | 'strength';
+/**
+ * Card order on the financials page. Growth leads with EPS, then revenue. Profitability lists the ratios
+ * (margins) before the amounts they come from.
+ */
 export const METRIC_GROUPS: { id: MetricGroupId; title: string; metrics: MetricId[] }[] = [
-  { id: 'growth', title: '成長', metrics: ['revenue', 'eps', 'netIncome'] },
-  { id: 'profitability', title: '獲利能力', metrics: ['grossProfit', 'costOfRevenue', 'operatingIncome', 'grossMargin', 'operatingMargin', 'netMargin'] },
+  { id: 'growth', title: '成長', metrics: ['eps', 'revenue', 'netIncome'] },
+  { id: 'profitability', title: '獲利能力', metrics: ['grossMargin', 'operatingMargin', 'netMargin', 'grossProfit', 'costOfRevenue', 'operatingIncome'] },
   { id: 'nonOperating', title: '業外與稅', metrics: ['nonOperatingIncome', 'nonOperatingShare', 'effectiveTaxRate'] },
   { id: 'cashFlow', title: '現金流', metrics: ['operatingCashFlow', 'capex', 'freeCashFlow', 'fcfMargin', 'fcfToNetIncome'] },
   { id: 'returns', title: '報酬率', metrics: ['roe', 'roic'] },

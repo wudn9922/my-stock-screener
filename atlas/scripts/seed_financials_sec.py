@@ -60,7 +60,9 @@ Extraction rules (see CONCEPTS for the us-gaap concepts per field):
   Per-share fields are never subtracted except Q4 EPS = annual EPS − (Q1+Q2+Q3 EPS) when all four
   are reported on one share basis (diluted shares, else net income / EPS, within SPLIT_MATCH) and the
   result has the sign of the Q4 net income; dilutedShares has no derived Q4. Nothing is derived unless
-  every piece exists.
+  every piece exists. After the split adjustment (below) a Q4 EPS still missing is derived once more, on the
+  basis the periods now hold (build_financials.fill_q4_eps: the same rule, also used by repair_q4_eps.py on
+  stored files), so a split restated in a later filing no longer blocks it.
 - EPS fallbacks only fill periods without EarningsPerShareDiluted / -Basic: the combined
   EarningsPerShareBasicAndDiluted tag, then continuing-operations EPS where it equals net income /
   diluted shares (within 3%, i.e. no discontinued operations; never a derived Q4).
@@ -118,12 +120,15 @@ from build_financials import (
     adjust_splits,
     adr_eps_factor,
     SEC_FOREIGN_ISSUES,
+    Q4_ISSUE,
     clean_value,
     dedupe,
     days_between,
     effective,
+    eps_inconsistent,
     financials_key,
     finite_number,
+    fill_q4_eps,
     fiscal_quarter,
     fiscal_year,
     fy_end_month,
@@ -135,12 +140,14 @@ from build_financials import (
     parse_day,
     parse_splits,
     period,
+    q4_eps,
     quality,
     read_sections,
     relative_change,
     repair_split_eps,
     resolve_eps_basis,
     revision,
+    share_basis,
     share_jump,
     shares_of,
     write_section,
@@ -162,7 +169,6 @@ YTD_DAYS = (160, 295)          # 6- and 9-month year-to-date values (24-28 and 3
 MIN_ANNUAL_PERIODS = 2         # fewer annual 10-K periods → no document
 GATE_YEARS = 4                 # quality gate: annual points needed of each GATE_FIELDS field
 GATE_FIELDS = ("revenue", "netIncome", "operatingCashFlow", "equity")
-EPS_TOLERANCE = 0.15           # |EPS - net income / diluted shares| / |EPS|
 CONTINUING_TOLERANCE = 0.03    # the same, for a continuing-operations EPS standing in for the EPS
 # SEC-only quality codes, appended (sorted) after build_financials' ISSUES codes
 SEC_ISSUES = ("debt-approx", "eps-inconsistent", "foreign-filer", "q4-derived")
@@ -859,10 +865,7 @@ class _Facts:
     def basis(self, table, end, eps):
         """Share basis of one EPS piece: its diluted share count, else net income / EPS, else None."""
         count = getattr(self, table).get(SHARES_CONCEPT, {}).get(end)
-        if count is not None and count.value > 0:
-            return count.value
-        profit = self.net_income(table, end)
-        return abs(profit / eps) if profit and eps else None
+        return share_basis(count.value if count is not None else None, self.net_income(table, end), eps)
 
     # ------------------------------------------------------------------------------- durations
     def previous_quarter(self, end):
@@ -1031,12 +1034,10 @@ class _Facts:
         parts = [self.quarter.get(concept, {}).get(day) for day in ends]
         if any(part is None for part in parts) or parts[0].start != total.start:
             return None
-        counts = [self.basis("annual", end, total.value)] + [
+        bases = [self.basis("annual", end, total.value)] + [
             self.basis("quarter", day, part.value) for day, part in zip(ends, parts)
         ]
-        if any(not count for count in counts) or max(counts) / min(counts) > 1 + SPLIT_MATCH:
-            return None
-        return total.value - sum(part.value for part in parts)
+        return q4_eps(total.value, [part.value for part in parts], bases)
 
     def _starts_with(self, concept, end, start):
         """The reported 3-month value of the quarter ending on `end` starts on `start` (as filed)."""
@@ -1190,14 +1191,6 @@ def _store(name, value, values, issues, derived=False):
     value = clean_value(value)
     if value is not None:
         values[name] = value
-
-
-def eps_inconsistent(values):
-    """True when |epsDiluted − netIncome / dilutedShares| / |epsDiluted| > 15% (False if anything is missing)."""
-    eps, income, shares = (values.get(name) for name in ("epsDiluted", "netIncome", "dilutedShares"))
-    if eps is None or income is None or not shares or eps == 0:
-        return False
-    return abs(eps - income / shares) / abs(eps) > EPS_TOLERANCE
 
 
 # ---------------------------------------------------------------------------------------------
@@ -2003,6 +1996,10 @@ def merge_into_document(previous, sec, key, now, fetch_splits=None):
         else:
             item["fy"], item["fq"] = fiscal_quarter(item["end"], end_month)
     counts["droppedDuplicate"] = _dedupe_labels(annual, quarterly)
+    # Q4 EPS on the basis the periods hold now (split adjusted, fiscal labels set): extraction could not derive
+    # it across a split (an annual EPS restated after the split next to Q1..Q3 still pre-split, NFLX 2023-2024),
+    # and the same rule as repair_q4_eps.py applies to the stored file (build_financials.fill_q4_eps)
+    q4_filled = bool(fill_q4_eps(annual, quarterly))
 
     revisions = merge_revisions(stored["revisions"], revised, annual, quarterly, renamed)
     # (frequency, SEC end) of the SEC periods written: an aligned period counts under its SEC end
@@ -2016,6 +2013,8 @@ def merge_into_document(previous, sec, key, now, fetch_splits=None):
         sec_issues |= sec.period_issues.get(identity, set())
     if "foreign-filer" in sec.issues:
         sec_issues.add("foreign-filer")
+    if q4_filled:
+        sec_issues.add(Q4_ISSUE)
     # Stored SEC periods this run did not produce keep the SEC codes the stored file reported
     retained = bool(kept - fresh)
     previous_quality = previous.get("quality") if info["previous"] == "ok" else None

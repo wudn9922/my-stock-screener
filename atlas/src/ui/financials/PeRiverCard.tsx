@@ -1,9 +1,10 @@
 import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ChevronDown, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import type { FinancialHistory } from '../../fundamentals/FinancialHistory';
 import { ZONE_TEXT, buildPeRiver, formatMultiple, zoneOf, type PriceBar } from '../../fundamentals/peRiver';
 import { calendarDate, getMarketProfile } from '../../market-data/MarketProfile';
 import { PanelBoundary } from '../PanelBoundary';
+import { FoldCard } from './FoldCard';
 import { Skeleton } from '../PageState';
 import { BAND_COLORS, buildRiverChartData } from './peRiverChartData';
 import { coverageText, delayText, epsBasisText, excludedText, percentileText, premiumText, shortWarning, unavailableDetail } from './peRiverText';
@@ -36,8 +37,8 @@ async function loadWeeklyPrices(symbol: string, signal: AbortSignal): Promise<Pr
   }
 }
 
-/** Fetches the weekly price history for the file's symbol and shows the P/E river. */
-export function PeRiverCard({ history }: { history: FinancialHistory }) {
+/** Fetches the weekly price history for the file's symbol and shows the P/E river (folded by default). */
+export function PeRiverCard({ history, defaultOpen = false }: { history: FinancialHistory; defaultOpen?: boolean }) {
   const symbol = history.symbol;
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState<{ symbol: string; attempt: number; load: PriceLoad } | null>(null);
@@ -49,11 +50,21 @@ export function PeRiverCard({ history }: { history: FinancialHistory }) {
     return () => controller.abort();
   }, [symbol, attempt]);
   const load: PriceLoad = loaded && loaded.symbol === symbol && loaded.attempt === attempt ? loaded.load : { status: 'loading' };
-  return <PeRiverPanel history={history} load={load} onRetry={() => setAttempt((n) => n + 1)} />;
+  return <PeRiverPanel history={history} load={load} onRetry={() => setAttempt((n) => n + 1)} defaultOpen={defaultOpen} />;
 }
 
-/** The card itself (no fetching), so every state can be rendered and tested. */
-export function PeRiverPanel({ history, load, onRetry }: { history: FinancialHistory; load: PriceLoad; onRetry?: () => void }) {
+/** The card itself (no fetching), so every state can be rendered and tested. The chart mounts once it is opened. */
+export function PeRiverPanel({
+  history,
+  load,
+  onRetry,
+  defaultOpen = false,
+}: {
+  history: FinancialHistory;
+  load: PriceLoad;
+  onRetry?: () => void;
+  defaultOpen?: boolean;
+}) {
   const market = useMemo(() => getMarketProfile(history.symbol), [history.symbol]);
   const result = useMemo(
     () => (load.status === 'ok' ? buildPeRiver(history, load.bars, { asOfSec: load.asOfSec, priceBasis: load.priceBasis }) : null),
@@ -176,14 +187,28 @@ export function PeRiverPanel({ history, load, onRetry }: { history: FinancialHis
   }
 
   return (
-    <details className="card pe-river" open data-group="pe-river" data-state={state}>
-      <summary className="fin-card-head">
-        <h2>本益比河流圖</h2>
-        <ChevronDown size={18} className="fin-chevron" aria-hidden="true" />
-      </summary>
+    <FoldCard
+      className="pe-river"
+      title="本益比河流圖"
+      summary={riverSummary(load, result)}
+      defaultOpen={defaultOpen}
+      lazy
+      dataAttributes={{ 'data-group': 'pe-river', 'data-state': state }}
+    >
       {body}
-    </details>
+    </FoldCard>
   );
+}
+
+/** One line in the folded head: the current multiple once the prices are in, else the state. */
+function riverSummary(load: PriceLoad, result: ReturnType<typeof buildPeRiver> | null): string {
+  if (load.status === 'loading') return '載入股價與本益比中';
+  if (load.status === 'error') return '股價資料暫時無法載入，展開後可重試';
+  if (result && result.status === 'ok') {
+    const current = result.model.current;
+    return current ? `目前本益比 ${formatMultiple(current.pe)} · ${percentileText(current)}` : '河流圖已計算，目前沒有可用的本益比';
+  }
+  return result?.message ?? '資料不足，無法計算河流圖';
 }
 
 /** Chunk-load or chart errors become a short message inside the card instead of taking the page down. */

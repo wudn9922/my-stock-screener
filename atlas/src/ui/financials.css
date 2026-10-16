@@ -248,10 +248,12 @@
   color: var(--text-3);
   transition: transform 0.15s;
 }
-.fin-card:not([open]) .fin-chevron {
+.fin-card:not([open]) .fin-chevron,
+.fin-fold:not([open]) .fin-chevron {
   transform: rotate(-90deg);
 }
-.fin-card[open] .fin-card-head {
+.fin-card[open] .fin-card-head,
+.fin-fold[open] > .fin-card-head {
   border-bottom: 1px solid var(--border);
 }
 .fin-card-note {
@@ -663,9 +665,10 @@
 
 /* -- Key metrics (first screen) */
 .fin-key {
-  margin-bottom: 12px;
-  padding: 12px 14px 10px;
   min-width: 0;
+}
+.fin-key .fin-fold-body {
+  padding: 10px 14px 12px;
 }
 .fin-key-head {
   display: flex;
@@ -906,4 +909,211 @@
   .fin-key-value {
     font-size: 19px;
   }
+}
+
+/* -- Collapsible sections (FoldCard): the title and a one-line summary stay visible while folded */
+.fin-fold {
+  min-width: 0;
+}
+.fin-fold-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title chevron'
+    'summary chevron';
+  align-items: center;
+  column-gap: 10px;
+  min-height: 46px;
+  padding: 8px 14px;
+}
+.fin-fold-head > h2 {
+  grid-area: title;
+  margin: 0;
+}
+.fin-fold-head > .fin-chevron {
+  grid-area: chevron;
+}
+.fin-fold-summary {
+  grid-area: summary;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.fin-fold[open] > .fin-fold-head .fin-fold-summary {
+  color: var(--text-2);
+}
+.fin-folds {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 14px;
+  align-items: start;
+  margin-top: 14px;
+}
+@media (max-width: 767px) {
+  .fin-folds {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+.fin-folds > .fin-fold + .fin-fold,
+.fin-cards > .fin-fold + .fin-fold {
+  margin-top: 0;
+}
+
+/* -- Latest quarter strip (当季财报): one compact row of small cells, like the rates page key numbers */
+.fin-quarter {
+  margin: 0 0 12px;
+  padding: 10px 14px 10px;
+  min-width: 0;
+}
+.fin-quarter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+.fin-quarter-head h2 {
+  font-size: 14px;
+  font-weight: 700;
+}
+.fin-quarter-period {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.fin-quarter-cells {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.fin-quarter-cell {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  align-content: start;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.fin-quarter-label {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fin-quarter-value {
+  font-size: clamp(15px, 4.2vw, 18px);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.fin-quarter-value small {
+  margin-left: 1px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+.fin-quarter-value.null {
+  color: var(--text-3);
+}
+.fin-quarter-change {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.fin-quarter-change.up {
+  color: var(--up-text);
+}
+.fin-quarter-change.down {
+  color: var(--down-text);
+}
+.fin-quarter-caption {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+
+/* -- Statement table: value with its year-over-year change underneath, one switch for all lines */
+.fin-statement-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding-right: 12px;
+}
+.fin-statement-bar .fin-statement-tabs {
+  padding-right: 0;
+}
+.fin-yoy-switch {
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.fin-yoy-switch:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+.fin-yoy-switch[aria-pressed='true'] {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.fin-cell-value {
+  display: block;
+}
+.fin-cell-yoy {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+.fin-cell-yoy.up {
+  color: var(--up-text);
+}
+.fin-cell-yoy.down {
+  color: var(--down-text);
+}
+
+@media (max-width: 767px) {
+  .fin-quarter {
+    padding: 10px 12px 10px;
+  }
+  .fin-quarter-cells {
+    gap: 5px;
+  }
+  .fin-quarter-cell {
+    padding: 7px 7px;
+  }
+  .fin-fold-head {
+    padding: 8px 12px;
+  }
+  .fin-key .fin-fold-body {
+    padding: 10px 12px 12px;
+  }
+  .fin-statement-bar {
+    padding-right: 0;
+  }
+}
+.fin-sumfold .fin-fold-body {
+  padding: 10px 14px 12px;
 }

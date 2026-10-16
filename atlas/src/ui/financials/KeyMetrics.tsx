@@ -2,10 +2,12 @@ import { useMemo } from 'react';
 import type { FinancialHistory } from '../../fundamentals/FinancialHistory';
 import { formatDateTime } from '../format';
 import { barLayout, barPath } from './barGeometry';
+import { FoldCard } from './FoldCard';
 import {
   KEY_SPARK_PERIODS,
   formatValue,
   keyChangeText,
+  keyMetricsSummary,
   keySummary,
   moneyScale,
   unitText,
@@ -14,23 +16,22 @@ import {
 } from './financialsView';
 
 /**
- * First-screen summary: the newest period (annual or quarterly, as selected) for revenue, gross profit,
- * net income, EPS and the three margins. Each tile shows the value, its year-over-year change and the last
- * eight periods as mini bars. Pure formatting lives in financialsView.ts.
+ * Folded by default: the newest period (annual or quarterly, as selected) for revenue, gross profit, net income,
+ * EPS and the three margins. Each tile shows the value, its year-over-year change and the last eight periods as
+ * mini bars. Pure formatting lives in financialsView.ts.
  */
 export function KeyMetrics({ history, view }: { history: FinancialHistory; view: FinancialsView }) {
   const summary = useMemo(() => keySummary(view), [view]);
   const period = summary.index === null ? null : (view.labels[summary.index] ?? null);
   return (
-    <section className="card fin-key" aria-labelledby="fin-key-title">
-      <div className="fin-key-head">
-        <h2 id="fin-key-title">關鍵指標</h2>
-        {period && (
+    <FoldCard className="fin-key" title="關鍵指標" summary={keyMetricsSummary(view, history.currency)}>
+      {period && (
+        <div className="fin-key-head">
           <span className="fin-key-period">
             {period.long} <small>最新期</small>
           </span>
-        )}
-      </div>
+        </div>
+      )}
       {summary.index === null ? (
         <p className="fin-empty">這檔股票沒有可用的期別。</p>
       ) : (
@@ -45,7 +46,7 @@ export function KeyMetrics({ history, view }: { history: FinancialHistory; view:
         毛利財報未列示時，以營收減營業成本推算（標示「推算」）。資料更新日{' '}
         {history.checkedAt ? formatDateTime(history.checkedAt, false) : '—'}，僅供研究參考。
       </p>
-    </section>
+    </FoldCard>
   );
 }
 
