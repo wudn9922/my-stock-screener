@@ -117,7 +117,9 @@ from build_financials import (
     VERSION,
     adjust_splits,
     adr_eps_factor,
+    SEC_FOREIGN_ISSUES,
     clean_value,
+    dedupe,
     days_between,
     effective,
     financials_key,
@@ -125,9 +127,11 @@ from build_financials import (
     fiscal_quarter,
     fiscal_year,
     fy_end_month,
+    has_eps,
     market_of,
     merge_events,
     merge_revisions,
+    merge_section,
     needs_refresh,
     parse_day,
     parse_splits,
@@ -135,9 +139,12 @@ from build_financials import (
     quality,
     read_sections,
     relative_change,
+    repair_split_eps,
+    resolve_eps_basis,
     revision,
     share_jump,
     shares_of,
+    without_per_share,
     write_section,
 )
 
@@ -2130,6 +2137,8 @@ __all__ = [
 #          [--out docs/report/financials] [--report-dir docs/report] [--data-dir data] [--budget SECONDS]
 #   python atlas/scripts/seed_financials_sec.py --due [--budget SECONDS]     (quarterly re-check, see below)
 #   python atlas/scripts/seed_financials_sec.py --due --dry-run               (offline: lists what is due)
+#   python atlas/scripts/seed_financials_sec.py --foreign [--upgrade] [--dry-run]   (foreign filers, see sec_ifrs.py;
+#          --upgrade merges the SEC document into the Yahoo-only foreign files, see upgrade_document)
 #
 # --due re-checks only the stored US files that already carry SEC periods and are due (select_due; the
 # --foreign IFRS / US GAAP files, i.e. foreign reporters, are left out). due_reason: never checked, last check
@@ -2194,10 +2203,15 @@ PENDING = "split-check-pending"
 # Result labels of one ticker, in summary order
 RESULTS = (
     "written", "unchanged", "already-sec", "has-file", "skipped", "no-cik", "no-facts", "not-us", "bad-ticker",
-    "corrupt-previous", "fetch-error", "extract-error", "not-processed",
+    "corrupt-previous", "fetch-error", "extract-error", "upgraded", "currency-changed", "no-sec-data",
+    "not-yahoo-only", "not-processed",
 )
 # --foreign: outcomes that are final for a ticker (recorded in the check state, not asked again)
 FOREIGN_FINAL = ("written", "skipped", "no-cik", "no-facts")
+# --upgrade: the outcomes that wrote a merged file (no state record: the file itself is the answer) ...
+UPGRADE_RESULTS = ("upgraded", "currency-changed")
+# ... and the answers that leave the file untouched, recorded in state["upgraded"] (sec_ifrs.UPGRADE_FINAL)
+UPGRADE_FINAL = sec_ifrs.UPGRADE_FINAL
 
 
 class UserAgentError(ValueError):
@@ -2536,9 +2550,7 @@ def _foreign_outcome(path, key, facts, now):
     ifrs-full facts at all ("no-ifrs") is read with the US GAAP basis (sec_ifrs.build_us_gaap_document) → outcome.
     The outcome's detail is the reason of the last basis tried.
     """
-    document, reason = sec_ifrs.build_document(facts, key, now)
-    if document is None and reason == sec_ifrs.IFRS_BASIS.no_facts:
-        document, reason = sec_ifrs.build_us_gaap_document(facts, key, now)
+    document, reason = sec_ifrs.build_foreign_document(facts, key, now)
     if document is None:
         return _outcome("skipped", reason)
     size = write_atomic(path, document)
@@ -2621,6 +2633,187 @@ def seed_ticker(key, cik_map, client, out_dir, force, now, splits=None, foreign=
                     fresh=previous is None, note=note, split=split, dropped=dropped)
 
 
+def _eps_detail(state, ratio, reason):
+    """The EPS basis of an --upgrade merge, as the log says it."""
+    if state == "rescaled":
+        text = f"EPS basis: SEC EPS x {ratio['epsFactor']:g} (per ADR)"
+    elif state == "unity":
+        text = "EPS basis: ADR ratio 1, SEC and Yahoo EPS agree"
+    elif state == "unresolved":
+        text = "EPS basis unresolved: Yahoo EPS and share counts left out"
+    else:
+        text = "EPS: nothing to compare"
+    return text + (f" ({reason})" if reason else "")
+
+
+def upgrade_document(previous, sec, key, now, fetch_splits=None):
+    """
+    --upgrade: the stored Yahoo-only file (previous) merged with the SEC document of the same ticker (sec: the
+    sec_ifrs.build_foreign_document result) → (document, info). Nothing is written here.
+
+    info: status ("upgraded" or "currency-changed"), epsBasis (resolve_eps_basis state, None: nothing to compare),
+    adrRatio, detail (the log text), counts, level, splitAdjusted, shareJump, chart, chartError.
+
+    - Currency differs from the Yahoo file's: the SEC document alone, with quality "currency-changed"; Yahoo's
+      amounts are not merged (the detail says so).
+    - EPS basis: build_financials.resolve_eps_basis on the SEC periods (stored) against the Yahoo periods (new).
+      k != 1 rescales the SEC EPS (x k) and share counts (/ k) and writes adrRatio. Unresolved, or the SEC side has
+      no EPS to compare with, leaves Yahoo's EPS and share counts out. The Yahoo file's own adrRatio is not carried:
+      until SEC EPS are there it only compares Yahoo with Yahoo, which says nothing about the ADR ratio.
+    - Periods: build_financials.merge_section (SEC non-null values first, Yahoo fills nulls and adds newer
+      periods). Split events, revisions and the Yahoo-only keys (SEC has none) are carried from the Yahoo file;
+      checkedAt stays the Yahoo check date, since build_financials schedules its refresh by it.
+    - Quality: the merge's flags (revision kinds, capex-sign, split-adjusted, adr-eps-rescaled), the SEC codes of
+      both sides, then build_financials.quality(), which recomputes the codes derived from the periods (short
+      history, missing fields, quarter/annual mismatch) from the merged file instead of copying either side's,
+      and the coverage gate of sec_ifrs.
+    """
+    today_iso = now.date().isoformat()
+    yahoo = read_sections(previous)
+    sec_stored = read_sections(sec)
+    checked = previous["checkedAt"] if parse_day(previous.get("checkedAt")) else today_iso
+    sec_grade = sec.get("quality") if isinstance(sec.get("quality"), dict) else {}
+    previous_grade = previous.get("quality") if isinstance(previous.get("quality"), dict) else {}
+    carried_codes = set(previous_grade.get("issues") or []) | set(sec_grade.get("issues") or [])
+    counts = {"annual": len(sec["annual"]["end"]), "quarterly": len(sec["quarterly"]["end"])}
+    info = {"status": "upgraded", "epsBasis": None, "adrRatio": None, "detail": None, "counts": counts,
+            "level": None, "splitAdjusted": False, "shareJump": False, "chart": None, "chartError": None}
+    if yahoo["currency"] and sec["currency"] != yahoo["currency"]:
+        document = dict(sec)
+        grade = dict(sec_grade)
+        grade["issues"] = list(sec_grade.get("issues") or [])
+        if "currency-changed" not in grade["issues"]:
+            grade["issues"].append("currency-changed")
+        document["quality"] = grade
+        document["checkedAt"] = checked
+        info.update(status="currency-changed", level=grade.get("level"),
+                    detail=f"SEC reports in {sec['currency']}, the Yahoo file in {yahoo['currency']}: Yahoo amounts "
+                           "not merged, SEC document kept")
+        return document, info
+
+    stored = {"annual": sec_stored["annual"], "quarterly": sec_stored["quarterly"]}
+    new = {"annual": dedupe(yahoo["annual"]), "quarterly": dedupe(yahoo["quarterly"])}
+    eps_state, ratio, reason, new = resolve_eps_basis(stored, new, today_iso)
+    if eps_state is None and any(has_eps(items) for items in new.values()):
+        # Yahoo's EPS are per ADR and nothing on the SEC side says by how much: they are not merged
+        new = {name: without_per_share(items) for name, items in new.items()}
+        reason = "the SEC side has no EPS to compare with"
+    info.update(epsBasis=eps_state, adrRatio=ratio, detail=_eps_detail(eps_state, ratio, reason))
+
+    renamed = {"annual": {}, "quarterly": {}}
+    annual, revised_a = merge_section(stored["annual"], new["annual"], "annual", today_iso, renamed["annual"])
+    quarterly, revised_q = merge_section(
+        stored["quarterly"], new["quarterly"], "quarterly", today_iso, renamed["quarterly"]
+    )
+
+    events = yahoo["events"]
+    adjusted = adjust_splits([annual, quarterly], events)
+    if fetch_splits is not None and share_jump([annual, quarterly]):
+        try:
+            fetched = parse_splits(fetch_splits())
+        except Exception as error:  # noqa: BLE001 - leave the merged data as it is
+            info["chart"], info["chartError"] = "failed", str(error)
+        else:
+            info["chart"] = "fetched"
+            events = merge_events(events, fetched)
+            adjusted = adjust_splits([annual, quarterly], events) or adjusted
+    adjusted = repair_split_eps([annual, quarterly], events) > 0 or adjusted
+    adjusted = adjusted or yahoo["adjusted"]
+    info["shareJump"] = share_jump([annual, quarterly])
+    info["splitAdjusted"] = adjusted
+
+    end_month = fy_end_month([p["end"] for p in annual]) or 12
+    for item in annual:
+        item["fy"] = fiscal_year(item["end"])
+    for item in quarterly:
+        item["fy"], item["fq"] = fiscal_quarter(item["end"], end_month)
+
+    revisions = merge_revisions(yahoo["revisions"], revised_a + revised_q, annual, quarterly, renamed)
+    flags = {item["kind"] for item in revisions}
+    if "capex-sign" in carried_codes:
+        flags.add("capex-sign")
+    if adjusted:
+        flags.add("split-adjusted")
+    factor = ratio["epsFactor"] if ratio is not None else None
+    if factor not in (None, 1):
+        flags.add("adr-eps-rescaled")
+    grade = quality(annual, quarterly, flags, True)
+    grade["issues"] += sorted(
+        code for code in SEC_FOREIGN_ISSUES if code in carried_codes and code not in grade["issues"])
+    sec_ifrs.apply_gate(grade, annual)
+    if revisions:
+        grade["revisions"] = revisions
+
+    def extras(name):
+        merged = dict(sec_stored["extras"][name])
+        for key_name, value in yahoo["extras"][name].items():
+            merged.setdefault(key_name, value)
+        return merged
+
+    document = {
+        "version": VERSION,
+        "symbol": key,
+        "market": "US",
+        "currency": sec["currency"],
+        "foreignReporter": True,
+        "generatedAt": now.isoformat().replace("+00:00", "Z"),
+        "checkedAt": checked,
+        "source": sec["source"],
+        "fyEndMonth": end_month,
+        "annual": write_section(annual, extras("annual"), False),
+        "quarterly": write_section(quarterly, extras("quarterly"), True),
+        "split": {"adjusted": adjusted, "events": events},
+        "quality": grade,
+    }
+    for name, value in sec_stored["other"].items():
+        document.setdefault(name, value)
+    for name, value in yahoo["other"].items():
+        if name != "adrRatio":
+            document.setdefault(name, value)
+    if ratio is not None:
+        document["adrRatio"] = ratio
+    info.update(counts={"annual": len(annual), "quarterly": len(quarterly)}, level=grade["level"])
+    return document, info
+
+
+def seed_upgrade(key, cik_map, client, out_dir, now, splits=None):
+    """
+    --upgrade, one Yahoo-only foreign ticker → outcome dict (see _outcome). The stored file is merged with its SEC
+    document (sec_ifrs.build_foreign_document: IFRS, else US GAAP) and written; a ticker without SEC periods keeps
+    its file untouched. TooManyFailures and SecForbidden propagate (see main).
+    """
+    path = os.path.join(out_dir, key + ".json")
+    status, previous = load_document(path, key)
+    if status == "corrupt":
+        return _outcome("corrupt-previous", f"{key}.json left untouched: {previous}")
+    if status == "missing":
+        return _outcome("not-yahoo-only", "no stored file")
+    if not sec_ifrs.is_yahoo_only(previous):
+        return _outcome("not-yahoo-only", "the file already holds SEC periods")
+    cik = cik_map.get(key)
+    if cik is None:
+        return _outcome("no-cik")
+    try:
+        facts = client.company_facts(cik)
+    except FetchError as error:
+        return _outcome("fetch-error", str(error))
+    if facts is None:
+        return _outcome("no-facts", "SEC has no companyfacts for this CIK (404)")
+    sec, reason = sec_ifrs.build_foreign_document(facts, key, now)
+    if sec is None:
+        return _outcome("no-sec-data", reason)
+    fetch_splits = (lambda: splits.fetch_chart(key)) if splits is not None else None
+    try:
+        document, info = upgrade_document(previous, sec, key, now, fetch_splits)
+    except Exception as error:  # noqa: BLE001 - one bad payload must not stop the run
+        return _outcome("extract-error", f"{type(error).__name__}: {error}")
+    size = write_atomic(path, document)
+    split = {"chart": info["chart"], "chartError": info["chartError"], "adjusted": info["splitAdjusted"],
+             "events": document["split"]["events"]}
+    return _outcome(info["status"], info["detail"], counts=info["counts"], level=info["level"], document=document,
+                    size=size, note=PENDING if info["shareJump"] else None, split=split)
+
+
 def parse_args(argv):
     def positive(text):
         try:
@@ -2657,6 +2850,11 @@ def parse_args(argv):
                              "foreign-filer / no-us-gaap / non-usd get an ifrs-full document, or a US GAAP one when "
                              "they have no ifrs-full facts (sec_ifrs.py); "
                              "without --tickers the list comes from fundamentals/us-market-progress.json")
+    parser.add_argument("--upgrade", action="store_true",
+                        help="with --foreign: the foreign files that hold only Yahoo periods (no SEC source) are "
+                             "merged with their SEC document (IFRS, else US GAAP): SEC values first, Yahoo fills the "
+                             "gaps and adds newer periods; currency or EPS basis mismatches are handled as "
+                             "described in upgrade_document")
     parser.add_argument("--dry-run", action="store_true",
                         help="with --due or --foreign: print the plan from the local files, offline (no network, "
                              "nothing written)")
@@ -2665,6 +2863,8 @@ def parse_args(argv):
     args = parser.parse_args(argv)
     if args.due and args.foreign:
         parser.error("--due and --foreign cannot be combined")
+    if args.upgrade and not args.foreign:
+        parser.error("--upgrade needs --foreign")
     if args.dry_run and not (args.due or args.foreign):
         parser.error("--dry-run is only meaningful with --due or --foreign")
     return args
@@ -2848,6 +3048,25 @@ def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, 
             print(f"Refusing to run: {os.path.join(out_dir, 'index.json')} is {scan['index']}; the SEC check "
                   "dates are kept there (run the Yahoo refresh once, or restore the file)", flush=True)
             return EXIT_REFUSED
+    elif args.foreign and args.upgrade:
+        plan_keys, rejected = None, []
+        if args.tickers is not None:
+            plan_keys, rejected = choose_symbols(args, report_dir, data_dir)
+        plan = sec_ifrs.plan_upgrade(read_json(os.path.join(report_dir, "universe.json")), progress, out_dir, state,
+                                     keys=plan_keys)
+        keys = [key for key, _ in plan["todo"]]
+        by_status = ", ".join(f"{name} {count}" for name, count in sorted(plan["byStatus"].items())) or "none"
+        print(f"--foreign --upgrade: {len(plan['candidates'])} candidate ticker(s) ({by_status}); "
+              f"{len(plan['noFile'])} without a file (run --foreign first); {len(plan['upgraded'])} already hold SEC "
+              f"periods; {len(plan['checked'])} answered earlier with no SEC data (state {state_path}); "
+              f"{len(plan['unreadable'])} unreadable; {len(keys)} Yahoo-only to merge with SEC", flush=True)
+        if plan["unreadable"]:
+            print(f"  unreadable: {', '.join(plan['unreadable'])}", flush=True)
+        if args.dry_run:
+            print(f"Dry run: {len(keys)} ticker(s) would be merged with their SEC document (about {len(keys)} "
+                  f"requests, one per ticker); no network, nothing written. Tickers:", flush=True)
+            print(textwrap.fill(" ".join(keys), width=100) if keys else "  (none)", flush=True)
+            return EXIT_DONE
     elif args.foreign:
         plan_keys, rejected = None, []
         if args.tickers is not None:
@@ -2882,7 +3101,8 @@ def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, 
         counts[result] += 1
         print(f"[-] {text} {result}", flush=True)
     if not keys:
-        print("Nothing is due for a re-check." if args.due else "No US symbols to process.", flush=True)
+        print("Nothing is due for a re-check." if args.due else
+              ("Nothing to upgrade." if args.upgrade else "No US symbols to process."), flush=True)
         return EXIT_DONE
     if args.due:
         print(f"{total} due file(s) -> {out_dir}; oldest check first; index.json and written files are saved "
@@ -2909,23 +3129,32 @@ def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, 
             if args.budget is not None and clock() - started >= args.budget:
                 paused = f"time budget of {args.budget} s used up"
                 break
-            outcome = seed_ticker(key, cik_map, client, out_dir, args.force or args.due, now, splits,
-                                  foreign=args.foreign)
+            if args.upgrade:
+                outcome = seed_upgrade(key, cik_map, client, out_dir, now, splits)
+            else:
+                outcome = seed_ticker(key, cik_map, client, out_dir, args.force or args.due, now, splits,
+                                      foreign=args.foreign)
             processed += 1
             result = outcome["result"]
             counts[result] += 1
-            if state is not None and result in FOREIGN_FINAL:
-                sec_ifrs.record_checked(state, key, result, outcome["detail"], today_iso)
+            recorded = UPGRADE_FINAL if args.upgrade else FOREIGN_FINAL
+            if state is not None and result in recorded:
+                if args.upgrade:
+                    sec_ifrs.record_upgrade(state, key, result, outcome["detail"], today_iso)
+                else:
+                    sec_ifrs.record_checked(state, key, result, outcome["detail"], today_iso)
                 dirty = True
                 if processed % 20 == 0:
                     sec_ifrs.save_state(state_path, state)
                     dirty = False
             line = f"[{number}/{total}] {key} {result}"
-            if result in ("written", "unchanged"):
+            if result in ("written", "unchanged") + UPGRADE_RESULTS:
                 line += (f" annual={outcome['counts'].get('annual')} quarters={outcome['counts'].get('quarterly')}"
                          f" level={outcome['level']}")
                 if result == "written":
                     line += " (new file)" if outcome["new"] else " (merged into existing file)"
+                if result in UPGRADE_RESULTS:
+                    line += f" ({outcome['detail']})"
                 implausible = sum(count for name, count in outcome["dropped"].items() if name != "unitRefiled")
                 if implausible:
                     nulled[key] = implausible

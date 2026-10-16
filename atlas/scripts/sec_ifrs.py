@@ -3,7 +3,9 @@ Foreign private issuers (20-F / 40-F filers) → docs/report/financials/<KEY>.js
 companyfacts. seed_financials_sec.py --foreign calls build_document for the tickers its us-gaap extraction
 skips as "foreign-filer", "no-us-gaap" or "non-usd" (see seed_ticker). A ticker whose payload has no
 ifrs-full facts at all ("no-ifrs") is then read with build_us_gaap_document (foreign filers that report
-US GAAP: BABA, ASML, PDD, JD, BIDU, NTES, TCOM, BEKE, ...). A file that already exists is never touched.
+US GAAP: BABA, ASML, PDD, JD, BIDU, NTES, TCOM, BEKE, ...). A file that already exists is never touched by
+--foreign. --foreign --upgrade merges the same documents into the Yahoo-only foreign files instead
+(seed_financials_sec.upgrade_document); plan_upgrade / is_yahoo_only and the UPGRADE_FINAL answers are here.
 
 Both reporting bases run through one extraction (extract, parameterised by a Basis):
 - IFRS (taxonomy "ifrs-full", IFRS_BASIS): annual = 20-F / 40-F facts, quarterly = 6-K facts.
@@ -381,6 +383,19 @@ def extract(companyfacts, basis=IFRS_BASIS):
     return result
 
 
+def apply_gate(grade, annual):
+    """
+    The coverage gate of the foreign documents, in place: fewer than GATE_YEARS annual points of a GATE_FIELDS
+    field caps the level at partial (limited with fewer than 2 years or a quarter-annual mismatch). Also used by
+    seed_financials_sec's --upgrade on the merged periods.
+    """
+    short = any(sum(1 for item in annual if item["values"].get(name) is not None) < GATE_YEARS for name in GATE_FIELDS)
+    if short:
+        gate = "limited" if len(annual) < 2 or "quarter-annual-mismatch" in grade["issues"] else "partial"
+        if LEVEL_RANK[gate] < LEVEL_RANK[grade["level"]]:
+            grade["level"] = gate
+
+
 def _document(result, key, now, basis=IFRS_BASIS):
     now = now.replace(tzinfo=timezone.utc) if now.tzinfo is None else now.astimezone(timezone.utc)
     annual = [period(p["end"], p["values"], SRC) for p in result.annual[-KEEP_ANNUAL:]]
@@ -393,11 +408,7 @@ def _document(result, key, now, basis=IFRS_BASIS):
     grade = quality(annual, quarterly, set(), True)
     codes = {basis.code} | ({basis.code + "-fallback"} if result.fallback else set())
     grade["issues"] += sorted(code for code in codes if code not in ISSUES)
-    short = any(sum(1 for item in annual if item["values"].get(name) is not None) < GATE_YEARS for name in GATE_FIELDS)
-    if short:
-        gate = "limited" if len(annual) < 2 or "quarter-annual-mismatch" in grade["issues"] else "partial"
-        if LEVEL_RANK[gate] < LEVEL_RANK[grade["level"]]:
-            grade["level"] = gate
+    apply_gate(grade, annual)
     document = {
         "version": VERSION,
         "symbol": key,
@@ -442,6 +453,17 @@ def build_us_gaap_document(companyfacts, key, now):
     (document, None) or (None, skip reason). Same arguments as build_document.
     """
     return _build(companyfacts, key, now, US_GAAP_FOREIGN_BASIS)
+
+
+def build_foreign_document(companyfacts, key, now):
+    """
+    The foreign document of one ticker (--foreign and --upgrade): the IFRS document, or the US GAAP one when the
+    payload has no ifrs-full facts at all ("no-ifrs") → (document, None) or (None, reason of the last basis tried).
+    """
+    document, reason = build_document(companyfacts, key, now)
+    if document is None and reason == IFRS_BASIS.no_facts:
+        document, reason = build_us_gaap_document(companyfacts, key, now)
+    return document, reason
 
 
 # ---------------------------------------------------------------------------------------------
@@ -508,8 +530,10 @@ def universe_us_keys(universe):
 def load_state(path):
     data = read_json(path)
     if isinstance(data, dict) and data.get("version") == STATE_VERSION and isinstance(data.get("checked"), dict):
+        if not isinstance(data.get("upgraded"), dict):
+            data["upgraded"] = {}
         return data
-    return {"version": STATE_VERSION, "checked": {}}
+    return {"version": STATE_VERSION, "checked": {}, "upgraded": {}}
 
 
 def save_state(path, state):
@@ -522,17 +546,12 @@ def is_stale(entry):
             and entry.get("detail") in RETRY_UNDER_OLDER_RULES)
 
 
-def plan_foreign(universe, progress, out_dir, state, keys=None):
+def foreign_candidates(universe, progress, keys=None):
     """
-    Which tickers a --foreign run still has to check.
+    The tickers the --foreign family considers → [(key, cik, status)].
 
     keys None: the US universe ordered by market cap, restricted to the issuers the US backfill judged
     "foreign-filer", "no-us-gaap" or "non-usd". keys given (--tickers): exactly those, any status.
-    A state entry recorded under older rules and still answering "no-ifrs" (is_stale) is checked again
-    (its ticker is in "retry" too), the others stay checked.
-    → {"candidates": [(key, cik, status)], "hasFile": [key], "checked": [key], "todo": [(key, cik)],
-       "retry": [key], "byStatus": {status: count}} (candidates: every ticker considered, before the file /
-       state filters).
     """
     issuers = progress["issuers"]
     symbols = progress["symbols"]
@@ -550,6 +569,20 @@ def plan_foreign(universe, progress, out_dir, state, keys=None):
         for key in keys:
             cik = cik_of.get(key)
             candidates.append((key, cik, (issuers.get(cik) or {}).get("status") if cik else None))
+    return candidates
+
+
+def plan_foreign(universe, progress, out_dir, state, keys=None):
+    """
+    Which tickers a --foreign run still has to check.
+
+    keys: see foreign_candidates. A state entry recorded under older rules and still answering "no-ifrs"
+    (is_stale) is checked again (its ticker is in "retry" too), the others stay checked.
+    → {"candidates": [(key, cik, status)], "hasFile": [key], "checked": [key], "todo": [(key, cik)],
+       "retry": [key], "byStatus": {status: count}} (candidates: every ticker considered, before the file /
+       state filters).
+    """
+    candidates = foreign_candidates(universe, progress, keys)
     has_file, checked, todo, retry = [], [], [], []
     for key, cik, _ in candidates:
         if os.path.exists(os.path.join(out_dir, key + ".json")):
@@ -573,3 +606,59 @@ def plan_foreign(universe, progress, out_dir, state, keys=None):
 def record_checked(state, key, result, detail, today_iso):
     """Remember a ticker whose answer is final (written, skipped, no companyfacts, no CIK), under FOREIGN_RULES."""
     state["checked"][key] = {"result": result, "detail": detail, "checkedAt": today_iso, "rules": FOREIGN_RULES}
+
+
+# --upgrade: a Yahoo-only foreign file is merged with its SEC document (seed_financials_sec.upgrade_document).
+# Its answers live in state["upgraded"], apart from the --foreign ones. A file that is merged (or got a currency
+# note) is no longer Yahoo-only, so the file itself decides whether it is still to do; only the answers that leave
+# the file untouched are recorded (UPGRADE_FINAL).
+UPGRADE_FINAL = ("no-sec-data", "no-facts", "no-cik")
+
+
+def is_yahoo_only(document):
+    """A stored file with no SEC source: its source names no SEC and no annual period came from SEC."""
+    source = document.get("source")
+    annual = document.get("annual") if isinstance(document.get("annual"), dict) else {}
+    sources = annual.get("src") or []
+    return "SEC" not in str(source or "") and "sec" not in sources
+
+
+def plan_upgrade(universe, progress, out_dir, state, keys=None):
+    """
+    Which foreign tickers --upgrade still has to merge (local files and state only, no network).
+
+    candidates: foreign_candidates. noFile: no stored file (left to --foreign). upgraded: the stored file already
+    holds SEC periods. checked: Yahoo-only, with a final answer in state["upgraded"]. unreadable: the stored file
+    cannot be read. todo: Yahoo-only, still to merge → [(key, cik)]. byStatus: counts of the candidates' statuses.
+    """
+    candidates = foreign_candidates(universe, progress, keys)
+    recorded = state.get("upgraded") or {}
+    no_file, upgraded, checked, unreadable, todo = [], [], [], [], []
+    for key, cik, _ in candidates:
+        path = os.path.join(out_dir, key + ".json")
+        if not os.path.exists(path):
+            no_file.append(key)
+            continue
+        document = read_json(path)
+        if not isinstance(document, dict):
+            unreadable.append(key)
+        elif not is_yahoo_only(document):
+            upgraded.append(key)
+        elif (recorded.get(key) or {}).get("result") in UPGRADE_FINAL:
+            checked.append(key)
+        else:
+            todo.append((key, cik))
+    return {
+        "candidates": candidates,
+        "noFile": no_file,
+        "upgraded": upgraded,
+        "checked": checked,
+        "unreadable": unreadable,
+        "todo": todo,
+        "byStatus": dict(Counter(status for _, _, status in candidates)),
+    }
+
+
+def record_upgrade(state, key, result, detail, today_iso):
+    """Remember a --upgrade answer that leaves the file untouched (UPGRADE_FINAL)."""
+    state.setdefault("upgraded", {})[key] = {"result": result, "detail": detail, "checkedAt": today_iso}
