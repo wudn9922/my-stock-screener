@@ -307,6 +307,37 @@ class IndependentCheckTests(unittest.TestCase):
         self.assertIn("Item 2.02", check["reason"])
 
 
+class FillGradeTests(unittest.TestCase):
+    def test_a_confirmed_value_is_grade_a_and_an_unconfirmed_one_is_grade_c(self):
+        doc = {"quarterly": {"end": ["2024-12-31", "2023-12-31"], "fq": [4, 4],
+                             "values": {"netIncome": [1234000, 5], "epsDiluted": [None, None]}}}
+        found = {
+            "2024-12-31": {"epsDiluted": 0.25, "epsBasic": None, "dilutedShares": None, "accession": "a",
+                           "url": "u", "filingDate": "2025-02-05", "verified": {"status": "confirmed"}},
+            "2023-12-31": {"epsDiluted": 0.10, "epsBasic": None, "dilutedShares": None, "accession": "b",
+                           "url": "v", "filingDate": "2024-02-05", "verified": {"status": "unavailable"}},
+        }
+        bq.apply_fill(doc, found)
+        quality = doc["quarterly"]["epsQuality"]
+        self.assertEqual(quality[0]["epsDiluted"], "A")
+        self.assertEqual(quality[0]["epsDilutedFiled"], "2025-02-05")
+        self.assertEqual(quality[1]["epsDiluted"], "C")
+        self.assertEqual(doc["q4EpsSources"]["2024-12-31"]["grade"], "A")
+        self.assertEqual(doc["quarterly"]["values"]["epsDiluted"], [0.25, 0.10])
+
+    def test_an_existing_eps_keeps_its_own_grade(self):
+        doc = {"quarterly": {"end": ["2024-12-31"], "fq": [4], "values": {"netIncome": [1234000],
+                                                                     "epsDiluted": [None], "epsBasic": [0.26]},
+                             "epsQuality": [{"epsBasic": "A"}]}}
+        found = {"2024-12-31": {"epsDiluted": 0.25, "epsBasic": 0.27, "dilutedShares": None, "accession": "a",
+                                "url": "u", "filingDate": "2025-02-05", "verified": {"status": "confirmed"}}}
+        bq.apply_fill(doc, found)
+        entry = doc["quarterly"]["epsQuality"][0]
+        self.assertEqual(entry["epsBasic"], "A")
+        self.assertEqual(entry["epsDiluted"], "A")
+        self.assertEqual(doc["quarterly"]["values"]["epsBasic"], [0.26])
+
+
 class FillTests(unittest.TestCase):
     def test_fill_writes_only_null_fields_and_records_the_source(self):
         doc = {"quarterly": {"end": ["2024-03-31", "2024-12-31"], "fq": [1, 4],

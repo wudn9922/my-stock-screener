@@ -473,7 +473,7 @@ def process_ticker(sec, key, cik, doc, mode, rows):
                               epsBasic=None if result["epsBasic"] is None else round(result["epsBasic"] / factor, 6),
                               dilutedShares=None if result["dilutedShares"] is None
                               else round(result["dilutedShares"] * factor, 1))
-        if mode == "backtest" and result is not None:
+        if mode in ("backtest", "fill") and result is not None:
             result = dict(result, verified=verify_quarter(sec, cik, filings, p["end"], result["net"],
                                                           result["epsDiluted"], doc))
         rows.append({"key": key, "end": p["end"], "stored": p["eps"], "target": p["target"], "derived": p["derived"],
@@ -482,7 +482,11 @@ def process_ticker(sec, key, cik, doc, mode, rows):
 
 
 def apply_fill(doc, found):
-    """Writes accepted values into null fields only; records the source of every filled quarter."""
+    """
+    Writes accepted values into null fields only; records the source of every filled quarter and a quality grade
+    per written EPS field (the grade is what the consumers read): "A" when the next year's release confirms the
+    value, "C" otherwise. C is never selected as a US Q4 EPS.
+    """
     quarterly = doc["quarterly"]
     ends = quarterly["end"]
     values = quarterly.setdefault("values", {})
@@ -491,6 +495,8 @@ def apply_fill(doc, found):
         result = found.get(end)
         if not result:
             continue
+        grade = "A" if (result.get("verified") or {}).get("status") == "confirmed" else "C"
+        written = []
         for field in ("epsDiluted", "epsBasic", "dilutedShares"):
             value = result.get(field)
             if value is None:
@@ -500,8 +506,19 @@ def apply_fill(doc, found):
                 column.extend([None] * (len(ends) - len(column)))
             if column[i] is None:
                 column[i] = value
+                written.append(field)
+        eps_fields = [field for field in written if field in ("epsDiluted", "epsBasic")]
+        if eps_fields:
+            quality = quarterly.setdefault("epsQuality", [])
+            if len(quality) < len(ends):
+                quality.extend([None] * (len(ends) - len(quality)))
+            entry = dict(quality[i] or {})
+            for field in eps_fields:
+                entry[field] = grade
+                entry[field + "Filed"] = result["filingDate"]
+            quality[i] = entry
         sources[end] = {"method": "8-K EX-99.1", "accession": result["accession"], "url": result["url"],
-                        "filingDate": result["filingDate"]}
+                        "filingDate": result["filingDate"], "grade": grade}
 
 
 def backtest_error(estimate, stored):
