@@ -1235,7 +1235,10 @@ class ForeignCurrencyTest(unittest.TestCase):
         self.assertTrue(document["foreignReporter"])
         self.assertEqual(annual["src"], ["sec", "sec", "sec", "yahoo"])        # only the newer year is added
         self.assertEqual(values(annual, "revenue")["2023-12-31"], 2100 * BN)  # SEC value kept
-        self.assertEqual(values(annual, "epsDiluted")["2023-12-31"], 22.0)     # SEC EPS kept, Yahoo's not applied
+        # the synthetic SEC EPS give no ADR ratio against Yahoo's: one basis kept, Yahoo's (per ADR)
+        self.assertEqual(info["epsBasis"], "replaced")
+        self.assertEqual(document["adrRatio"]["basis"], "Yahoo")
+        self.assertIn("eps-yahoo-only", document["quality"]["issues"])
         self.assertEqual(values(annual, "revenue")["2025-12-31"], 3600 * BN)
         # The SEC gap is filled from the same-currency Yahoo value
         fy23 = statement(synth.TW_ANNUAL, "2023-12-31", synth.TW_RATIOS)
@@ -1339,9 +1342,19 @@ class EpsFactorTest(unittest.TestCase):
         self.assertEqual(fin.eps_factor([1.0, 1.01, 0.995]), (1, None))
 
     def test_disagreeing_or_missing_pairs_give_a_reason(self):
-        factor, reason = fin.eps_factor([5.0, 4.5, 5.0])
+        factor, reason = fin.eps_factor([5.0, 3.5, 7.0])
         self.assertIsNone(factor)
-        self.assertEqual(reason, "pair ratios 4.5000 to 5.0000 over 3 EPS values")
+        self.assertEqual(reason, "pair ratios 3.5000 to 7.0000 over 3 EPS values")
+        self.assertEqual(fin.eps_factor([2.5, 2.5, 1.0]), (None, "pair ratios 1.0000 to 2.5000 over 3 EPS values"))
+
+    def test_loose_ratio_snaps_to_a_whole_number_with_half_the_pairs_close(self):
+        # TSM: local GAAP against IFRS EPS; UMC; ASML with two stale Yahoo years
+        self.assertEqual(fin.eps_factor([5.119, 4.922, 5.064]), (5, None))
+        self.assertEqual(fin.eps_factor([4.791, 5.01, 4.738]), (5, None))
+        self.assertEqual(fin.eps_factor([1.137, 1.137, 1.035, 1.035, 1.0, 1.0, 1.0, 1.0]), (1, None))
+        self.assertEqual(fin.eps_factor([5.0, 4.5, 5.0]), (5, None))
+        self.assertEqual(fin.eps_factor([0.5, 0.52, 0.8]), (0.5, None))
+        self.assertIsNone(fin.eps_factor([5.0, 4.4, 4.3])[0])           # only one pair close to 5 of three
         self.assertEqual(fin.eps_factor([]), (None, "no overlapping EPS period"))
         self.assertIsNone(fin.eps_factor([-5.0, 5.0])[0])     # opposite signs
 
@@ -1405,32 +1418,48 @@ class AdrEpsBasisTest(unittest.TestCase):
         self.assertEqual(values(document["annual"], "epsDiluted"), values(stored["annual"], "epsDiluted") | {
             "2025-12-31": adr_eps(3600 * BN, ORDINARY)})
 
-    def test_disagreeing_ratios_leave_yahoo_eps_and_shares_out_and_keep_the_rest(self):
+    def test_disagreeing_ratios_drop_the_sec_eps_and_keep_yahoos(self):
         stored = sec_file(synth.TW_ANNUAL[:3], ORDINARY)
-        stored["annual"]["values"]["epsDiluted"][1] = round(stored["annual"]["values"]["epsDiluted"][1] * 1.1, 2)
-        before = copy.deepcopy(stored)
-        document, info, notices = merge_quietly(stored, self.adr_payload())
-        self.assertEqual(info["epsBasis"], "unresolved")
+        for field in ("epsBasic", "epsDiluted"):
+            column = stored["annual"]["values"][field]
+            column[1] = round(column[1] * 1.6, 2)
+            column[2] = round(column[2] * 0.6, 2)
+        payload = self.adr_payload()
+        document, info, notices = merge_quietly(stored, payload)
+        self.assertEqual(info["epsBasis"], "replaced")
         self.assertEqual(len(notices), 1)
-        self.assertTrue(notices[0].startswith("::notice::TSM: EPS basis unresolved (pair ratios "), notices[0])
-        self.assertNotIn("adrRatio", document)
-        self.assertEqual(stored, before)                                         # the stored EPS are not rescaled
-        self.assertIsNone(values(document["annual"], "epsDiluted")["2025-12-31"])
-        self.assertIsNone(values(document["annual"], "dilutedShares")["2025-12-31"])
-        self.assertEqual(values(document["annual"], "revenue")["2025-12-31"], 3600 * BN)   # other fields merged
+        self.assertTrue(notices[0].startswith("::notice::TSM: EPS basis: SEC EPS dropped, Yahoo EPS kept (pair "),
+                        notices[0])
+        self.assertEqual(document["adrRatio"]["basis"], "Yahoo")
+        self.assertEqual(document["adrRatio"]["epsFactor"], 1)
+        self.assertIn("eps-yahoo-only", document["quality"]["issues"])
         self.assertNotIn("adr-eps-rescaled", document["quality"]["issues"])
+        eps = values(document["annual"], "epsDiluted")
+        for end, revenue, _ in synth.TW_ANNUAL[:3]:                              # every EPS is Yahoo's, per ADR
+            self.assertAlmostEqual(eps[end], adr_eps(revenue), delta=0.05)
+        self.assertEqual(eps["2025-12-31"], adr_eps(3600 * BN))
+        self.assertEqual(values(document["annual"], "revenue")["2025-12-31"], 3600 * BN)   # other fields merged
 
-    def test_no_overlapping_period_leaves_yahoo_eps_out_but_merges_the_rest(self):
+    def test_no_overlapping_period_takes_k_from_the_implied_share_counts(self):
         old = sec_file([("2019-12-31", 1900 * BN, ORDINARY), ("2020-12-31", 1950 * BN, ORDINARY)], ORDINARY)
+        sec_2020 = values(old["annual"], "epsDiluted")["2020-12-31"]
         document, info, notices = merge_quietly(old, self.adr_payload())
-        self.assertEqual(info["epsBasis"], "unresolved")
-        self.assertEqual(len(notices), 1)
-        self.assertIn("no overlapping EPS period", notices[0])
-        self.assertNotIn("adrRatio", document)
+        self.assertEqual(notices, [])
+        self.assertEqual(info["epsBasis"], "rescaled")
+        self.assertEqual(document["adrRatio"]["epsFactor"], 5)
         self.assertEqual(document["annual"]["end"], ["2019-12-31", "2020-12-31", "2022-12-31", "2023-12-31",
                                                      "2024-12-31", "2025-12-31"])
-        self.assertIsNone(values(document["annual"], "epsDiluted")["2023-12-31"])
+        self.assertAlmostEqual(values(document["annual"], "epsDiluted")["2020-12-31"], sec_2020 * 5, delta=0.05)
         self.assertEqual(values(document["annual"], "revenue")["2023-12-31"], 2162 * BN)
+
+    def test_no_overlap_and_no_share_count_ratio_drops_the_sec_eps(self):
+        old = sec_file([("2019-12-31", 1900 * BN, ORDINARY), ("2020-12-31", 1950 * BN, ORDINARY)], ORDINARY,
+                       eps_scale=3.7)                                       # implied shares off by 3.7: no k
+        document, info, notices = merge_quietly(old, self.adr_payload())
+        self.assertEqual(info["epsBasis"], "replaced")
+        self.assertIn("implied share counts give no ADR ratio", notices[0])
+        self.assertIsNone(values(document["annual"], "epsDiluted")["2020-12-31"])
+        self.assertIsNotNone(values(document["annual"], "epsDiluted")["2023-12-31"])
 
     def test_file_without_eps_is_merged_and_judged_on_the_next_run(self):
         first, info, notices = merge_quietly(None, self.adr_payload())

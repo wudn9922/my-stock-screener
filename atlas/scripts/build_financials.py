@@ -20,12 +20,13 @@ does not load it). Runs in the daily schedule workflow; the files are committed 
   statement) are never mixed into the file: left out, counted, and noted in the log.
 - Foreign reporters (foreignReporter true): Yahoo's EPS and share count are per ADR (1 ADR = k ordinary
   shares), while SEC IFRS EPS is per ordinary share. Until the file carries an adrRatio {"epsFactor": k},
-  the same-period EPS ratios Yahoo ÷ stored (basic and diluted) are checked: they must agree (±2% of
-  their median) and give k (the median, snapped to a whole number or its reciprocal; 1 when within 2%
-  of 1). With k ≠ 1 the stored EPS are multiplied by k (quality issue "adr-eps-rescaled"). Disagreeing
-  or non-overlapping ratios leave Yahoo's EPS and share count out of that run (notice "EPS basis
-  unresolved"); the check runs again next time. A file with no EPS yet has no second basis: Yahoo's
-  values are merged and judged once it has EPS.
+  the same-period EPS ratios Yahoo ÷ stored (basic and diluted) give k: all within ±2% of their median
+  (snapped to a whole number or its reciprocal; 1 when within 2% of 1), or, looser, a median within 6%
+  of a whole number with at least half of the pairs that close; without an overlapping period, the
+  implied share counts (net income ÷ EPS) give it. With k ≠ 1 the stored EPS are multiplied by k
+  (quality issue "adr-eps-rescaled"). With no k the stored EPS and share counts are dropped and Yahoo's
+  kept, one basis (adrRatio basis "Yahoo", quality issue "eps-yahoo-only"). A file with no EPS yet has
+  no second basis: Yahoo's values are merged and judged once it has EPS.
 - One timeseries request per stock (annual + quarterly types together). Yahoo only returns ~4 years
   and ~5–8 quarters, so every run merges into the stored file and history accumulates:
   * period ends within ±5 days are the same period (the newer date wins); a new non-null value
@@ -112,6 +113,12 @@ FOREIGN_MANUAL = ("TSM", "UMC", "ASX", "CHT")
 ADR_RATIO_SPREAD = 0.02
 ADR_RATIO_UNITY = 0.02
 ADR_RATIO_SNAP = 0.02
+# When the pairs do not all agree (a restated year, local GAAP against IFRS EPS, a stale Yahoo value), k is
+# still taken when the median lies within ADR_RATIO_LOOSE of a whole number (or its reciprocal) and at
+# least half of the pairs lie that close to it. Without an overlapping period, k comes from the implied
+# share counts (net income ÷ EPS) of the nearest stored and Yahoo periods, with the same snap
+ADR_RATIO_LOOSE = 0.06
+SHARE_GAP_DAYS = 800                     # implied share counts are compared at most ~2 years apart
 TW_SUFFIXES = (".TW", ".TWO")
 HOME_CURRENCY = {"US": "USD", "TW": "TWD"}
 PERIOD_TYPES = {"annual": "12M", "quarterly": "3M"}
@@ -151,6 +158,7 @@ ISSUES = (
     "short-history", "financial-sector-format", "missing-cashflow", "missing-balance",
     "split-adjusted", "foreign-currency", "restated", "yahoo-differs", "quarter-annual-mismatch",
     "quarterly-ytd-suspected", "negative-equity", "capex-sign", "currency-changed", "adr-eps-rescaled",
+    "eps-yahoo-only",
 )
 # Quality codes that only sec_ifrs.py writes (its IFRS and US GAAP foreign-filer periods); update_document keeps them
 SEC_FOREIGN_ISSUES = ("ifrs", "ifrs-fallback", "foreign-gaap", "foreign-gaap-fallback")
@@ -600,20 +608,75 @@ def snap_factor(value):
     return value
 
 
+def whole_factor(value, tolerance=ADR_RATIO_LOOSE):
+    """The whole number (or reciprocal whole number) within `tolerance` (relative) of value, else None."""
+    if value is None or value <= 0:
+        return None
+    whole = round(value)
+    if whole >= 1 and abs(value - whole) <= tolerance * whole:
+        return whole
+    inverse = round(1 / value)
+    if inverse >= 1 and abs(1 / value - inverse) <= tolerance * inverse:
+        return 1 / inverse
+    return None
+
+
 def eps_factor(ratios):
     """
-    Pair ratios → (k, None) when they agree (each within ADR_RATIO_SPREAD of the median), else (None, reason).
-    The median is 1 within ADR_RATIO_UNITY → k = 1; otherwise k = median, snapped.
+    Pair ratios → (k, None), else (None, reason).
+    Strict: every pair within ADR_RATIO_SPREAD of the median; the median is 1 within ADR_RATIO_UNITY → k = 1,
+    otherwise k = median, snapped. Loose (two pairs or more): the median within ADR_RATIO_LOOSE of a whole
+    number (or reciprocal) k, and at least half of the pairs within ADR_RATIO_LOOSE of k.
     """
     if not ratios:
         return None, "no overlapping EPS period"
     median = statistics.median(ratios)
     low, high = min(ratios), max(ratios)
-    if low <= 0 or any(abs(ratio - median) > ADR_RATIO_SPREAD * median for ratio in ratios):
-        return None, f"pair ratios {low:.4f} to {high:.4f} over {len(ratios)} EPS values"
-    if abs(median - 1) <= ADR_RATIO_UNITY:
-        return 1, None
-    return snap_factor(median), None
+    if low > 0 and all(abs(ratio - median) <= ADR_RATIO_SPREAD * median for ratio in ratios):
+        if abs(median - 1) <= ADR_RATIO_UNITY:
+            return 1, None
+        return snap_factor(median), None
+    whole = whole_factor(median) if low > 0 and len(ratios) >= 2 else None
+    if whole is not None:
+        close = sum(1 for ratio in ratios if abs(ratio - whole) <= ADR_RATIO_LOOSE * whole)
+        if 2 * close >= len(ratios):
+            return whole, None
+    return None, f"pair ratios {low:.4f} to {high:.4f} over {len(ratios)} EPS values"
+
+
+def implied_shares(item):
+    """Net income ÷ basic (else diluted) EPS of one period, or None."""
+    values = item["values"]
+    income, eps = values.get("netIncome"), values.get("epsBasic") or values.get("epsDiluted")
+    if not income or not eps or income * eps <= 0:
+        return None
+    return income / eps
+
+
+def share_count_factor(stored, new):
+    """
+    No overlapping EPS period: k from the implied share counts of the newest stored period and the oldest
+    Yahoo period (annual first, then quarterly) when they are at most SHARE_GAP_DAYS apart, snapped within
+    ADR_RATIO_LOOSE; None when that fails.
+    """
+    for name in ("annual", "quarterly"):
+        old = [item for item in stored[name] if implied_shares(item)]
+        fresh = [item for item in new[name] if implied_shares(item)]
+        if old and fresh:
+            older = max(old, key=lambda item: item["end"])
+            newer = min(fresh, key=lambda item: item["end"])
+            gap = (parse_day(newer["end"]) - parse_day(older["end"])).days
+            if gap > SHARE_GAP_DAYS:
+                return None        # share counts drift (issuance, buybacks, mergers): too far apart to compare
+            return whole_factor(implied_shares(older) / implied_shares(newer))
+    return None
+
+
+def drop_per_share(periods):
+    """Stored EPS and share count removed, in place (they cannot be put on Yahoo's basis)."""
+    for item in periods:
+        for field in PER_SHARE_FIELDS:
+            item["values"].pop(field, None)
 
 
 def scale_eps(periods, factor):
@@ -645,15 +708,23 @@ def resolve_eps_basis(stored, new, today_iso):
             as usual, judged on a later run once both sides carry EPS.
       "unity": k = 1, adrRatio written, merged as usual.
       "rescaled": stored EPS × k (in place), adrRatio written, merged as usual.
-      "unresolved": the pairs disagree or none overlap: Yahoo's EPS and share count are left out of this
-            merge (reason says why); no adrRatio, judged again on the next run.
+      "replaced": no k (the pairs disagree, or none overlap and the implied share counts give none): the
+            stored EPS and share counts are dropped (in place) and Yahoo's are merged, so the file keeps one
+            basis, Yahoo's per-ADR EPS that matches the quoted price; adrRatio {"epsFactor": 1, "basis":
+            "Yahoo"} settles it (reason says why).
     """
     if not any(has_eps(new[name]) for name in new) or not any(has_eps(stored[name]) for name in stored):
         return None, None, None, new
     ratios = eps_ratios(stored["annual"], new["annual"]) + eps_ratios(stored["quarterly"], new["quarterly"])
     factor, reason = eps_factor(ratios)
+    if factor is None and not ratios:
+        factor = share_count_factor(stored, new)
+        reason = None if factor is not None else "no overlapping EPS period; implied share counts give no ADR ratio"
     if factor is None:
-        return "unresolved", None, reason, {name: without_per_share(items) for name, items in new.items()}
+        for items in stored.values():
+            drop_per_share(items)
+        ratio = {"epsFactor": 1, "basis": "Yahoo", "derivedAt": today_iso, "pairs": len(ratios)}
+        return "replaced", ratio, reason, new
     if factor != 1:
         for items in stored.values():
             scale_eps(items, factor)
@@ -986,7 +1057,7 @@ def update_document(previous, payload, key, now, fetch_splits=None):
         )
         info["epsBasis"] = state
         if reason:
-            print(f"::notice::{key}: EPS basis unresolved ({reason})")
+            print(f"::notice::{key}: EPS basis: SEC EPS dropped, Yahoo EPS kept ({reason})")
         new_annual, new_quarterly = merged["annual"], merged["quarterly"]
 
     renamed = {"annual": {}, "quarterly": {}}
@@ -1034,6 +1105,9 @@ def update_document(previous, payload, key, now, fetch_splits=None):
     factor = adr_ratio["epsFactor"] if adr_ratio is not None else adr_eps_factor(previous)
     if factor not in (None, 1):
         flags.add("adr-eps-rescaled")
+    settled = adr_ratio if adr_ratio is not None else (previous or {}).get("adrRatio")
+    if isinstance(settled, dict) and settled.get("basis") == "Yahoo":
+        flags.add("eps-yahoo-only")
     grade = quality(annual, quarterly, flags, foreign)
     # IFRS / US GAAP codes of the SEC periods (sec_ifrs.py) stay while those periods are in the file
     if isinstance(previous, dict) and isinstance(previous.get("quality"), dict):
@@ -1368,7 +1442,7 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
         "splitChecks": 0, "misses": 0, "stopped": None, "failed": False, "corrupt": corrupt,
         "errors": [], "deleted": [],
         "foreign": {"listed": len(foreign), "due": len(foreign_due), "requested": 0, "updated": 0, "errors": 0},
-        "epsBasis": {"unity": 0, "rescaled": 0, "unresolved": 0},
+        "epsBasis": {"unity": 0, "rescaled": 0, "replaced": 0},
     }
     foreign_stats = stats["foreign"]
     deadline = clock() + budget_seconds

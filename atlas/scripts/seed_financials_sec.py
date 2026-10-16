@@ -2637,8 +2637,8 @@ def _eps_detail(state, ratio, reason):
         text = f"EPS basis: SEC EPS x {ratio['epsFactor']:g} (per ADR)"
     elif state == "unity":
         text = "EPS basis: ADR ratio 1, SEC and Yahoo EPS agree"
-    elif state == "unresolved":
-        text = "EPS basis unresolved: Yahoo EPS and share counts left out"
+    elif state == "replaced":
+        text = "EPS basis: no ADR ratio, SEC EPS and share counts dropped, Yahoo's kept"
     else:
         text = "EPS: nothing to compare"
     return text + (f" ({reason})" if reason else "")
@@ -2732,6 +2732,8 @@ def upgrade_document(previous, sec, key, now, fetch_splits=None):
     factor = ratio["epsFactor"] if ratio is not None else None
     if factor not in (None, 1):
         flags.add("adr-eps-rescaled")
+    if ratio is not None and ratio.get("basis") == "Yahoo":
+        flags.add("eps-yahoo-only")
     grade = quality(annual, quarterly, flags, True)
     grade["issues"] += sorted(
         code for code in SEC_FOREIGN_ISSUES if code in carried_codes and code not in grade["issues"])
