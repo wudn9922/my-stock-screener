@@ -4,7 +4,7 @@ const scopePath = scopeURL.pathname.endsWith('/')
   : `${scopeURL.pathname}/`;
 const scopeRoot = new URL(scopePath, scopeURL.origin);
 const CACHE_PREFIX = `atlas-shell-${encodeURIComponent(self.registration.scope)}-`;
-const CACHE = `${CACHE_PREFIX}atlas-shell-v1-e38aae0a499e`;
+const CACHE = `${CACHE_PREFIX}atlas-shell-v1-6d7da91b5513`;
 const manifestURL = new URL('manifest.webmanifest', scopeRoot);
 const iconURLs = ['icon.svg', 'icon-192.png', 'icon-512.png'].map(
   (path) => new URL(path, scopeRoot),
