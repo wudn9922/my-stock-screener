@@ -7,10 +7,17 @@ back-tests method B against existing Q4 diluted EPS. It never edits financial fi
 import argparse
 import json
 import math
+import sys
 from collections import Counter
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
+
+SCRIPTS = str(Path(__file__).resolve().parent)
+if SCRIPTS not in sys.path:
+    sys.path.insert(0, SCRIPTS)
+
+import build_financials as fin  # noqa: E402
 
 
 REASONS = (
@@ -39,6 +46,80 @@ def quarter_rows_by_fy(block):
         if fq in (1, 2, 3, 4):
             result.setdefault(fy, {}).setdefault(fq, []).append(index)
     return result
+
+
+def period_item(block, index):
+    count = len(block.get("end") or [])
+    values = {
+        field: value(block, field, index)
+        for field in (block.get("values") or {})
+    }
+    return {
+        "end": (block.get("end") or [None] * count)[index],
+        "fy": (block.get("fy") or [None] * count)[index],
+        "fq": (block.get("fq") or [None] * count)[index] if block.get("fq") else None,
+        "src": (block.get("src") or ["yahoo"] * count)[index],
+        "values": values,
+    }
+
+
+def method_a_rejection(document, fy):
+    """Explain why build_financials.fill_q4_eps would leave diluted Q4 EPS null."""
+    annual = document.get("annual") or {}
+    quarterly = document.get("quarterly") or {}
+    annual_matches = annual_rows_by_fy(annual).get(fy, [])
+    by_quarter = quarter_rows_by_fy(quarterly).get(fy, {})
+    q4_matches = by_quarter.get(4, [])
+    q123_matches = [by_quarter.get(q, []) for q in (1, 2, 3)]
+    if len(annual_matches) != 1 or len(q4_matches) != 1 or any(len(rows) != 1 for rows in q123_matches):
+        return "年度／季度期別缺漏、重複或不唯一"
+
+    year = period_item(annual, annual_matches[0])
+    q4 = period_item(quarterly, q4_matches[0])
+    pieces = [period_item(quarterly, rows[0]) for rows in q123_matches]
+    if any(item.get("src") != "sec" for item in (year, q4, *pieces)):
+        return "年度或季度來源非 SEC"
+    if year["values"].get("epsDiluted") is None:
+        return "年度 diluted EPS 缺漏"
+    if any(item["values"].get("epsDiluted") is None for item in pieces):
+        return "Q1–Q3 diluted EPS 缺漏"
+    if fin.eps_inconsistent(year["values"]):
+        return "年度 EPS 與淨利／股數不一致"
+    if q4["values"].get("netIncome") is None:
+        return "Q4 淨利缺漏"
+
+    periods = (year, *pieces)
+    bases = [
+        fin.share_basis(item["values"].get("dilutedShares"), item["values"].get("netIncome"),
+                        item["values"].get("epsDiluted"))
+        for item in periods
+    ]
+    for item, basis in zip(periods, bases):
+        if basis is not None and basis > 0:
+            continue
+        if item["values"].get("dilutedShares") is None:
+            if item["values"].get("netIncome") is None:
+                return "缺股數且缺淨利，無法推算股數"
+            if not item["values"].get("epsDiluted"):
+                return "缺股數且 EPS 無效，無法推算股數"
+            return "缺少可用股數"
+        return "股數非正值"
+    if max(bases) / min(bases) > 1 + fin.SPLIT_MATCH:
+        return "方法 A 股數基準差超過 25%"
+
+    estimate = fin.q4_eps(
+        year["values"].get("epsDiluted"),
+        [item["values"].get("epsDiluted") for item in pieces],
+        bases,
+    )
+    if estimate is None:
+        return "方法 A 缺少可計算輸入"
+    income = q4["values"]["netIncome"]
+    if estimate and (estimate > 0) != (income > 0):
+        return "方法 A 推算 EPS 與 Q4 淨利符號不一致"
+    if abs(estimate - income / bases[0]) > fin.EPS_TOLERANCE * abs(estimate) + fin.Q4_EPS_ROUNDING:
+        return "方法 A 推算值未通過 Q4 淨利／股數檢查"
+    return "方法 A 通過檢查但仍未填值（需檢查資料形狀）"
 
 
 def classify_missing_q4(document, symbol):
@@ -88,7 +169,8 @@ def classify_missing_q4(document, symbol):
             reason = REASONS[2]
         else:
             reason = REASONS[3]
-        rows.append((symbol, fy, (quarterly.get("end") or [None] * (index + 1))[index], reason))
+        detail = method_a_rejection(document, fy) if reason == REASONS[3] else None
+        rows.append((symbol, fy, (quarterly.get("end") or [None] * (index + 1))[index], reason, detail))
     return rows
 
 
@@ -204,6 +286,7 @@ def audit(directory):
     periods = []
     q4_counts = Counter()
     method_b_errors = []
+    q4_missing_income = 0
     for path in sorted(Path(directory).glob("*.json")):
         if path.name == "index.json":
             continue
@@ -213,6 +296,12 @@ def audit(directory):
             continue
         if document.get("market") != "US":
             continue
+        quarterly = document.get("quarterly") or {}
+        q4_missing_income += sum(
+            1 for index, fq in enumerate(quarterly.get("fq") or [])
+            if fq == 4 and value(quarterly, "netIncome", index) is None
+            and value(quarterly, "epsDiluted", index) is None
+        )
         missing = classify_missing_q4(document, path.stem)
         periods.extend(missing)
         if missing:
@@ -222,7 +311,7 @@ def audit(directory):
         for reason, count in counts.items():
             q4_counts[f"method_b:{reason}"] += count
 
-    return periods, q4_counts, method_b_errors
+    return periods, q4_counts, method_b_errors, q4_missing_income
 
 
 def main(argv=None):
@@ -233,15 +322,22 @@ def main(argv=None):
         help="financial JSON directory (default: docs/report/financials)",
     )
     args = parser.parse_args(argv)
-    periods, counts, errors = audit(args.dir)
-    unique_files = {symbol for symbol, _fy, _end, _reason in periods}
-    reason_periods = Counter(reason for _symbol, _fy, _end, reason in periods)
+    periods, counts, errors, q4_missing_income = audit(args.dir)
+    unique_files = {symbol for symbol, _fy, _end, _reason, _detail in periods}
+    reason_periods = Counter(reason for _symbol, _fy, _end, reason, _detail in periods)
 
     print(f"missing diluted EPS Q4 periods={len(periods)} files={len(unique_files)}")
     print("reason\tperiods\tfiles (non-exclusive)")
     for reason in REASONS:
-        files = {symbol for symbol, _fy, _end, row_reason in periods if row_reason == reason}
+        files = {symbol for symbol, _fy, _end, row_reason, _detail in periods if row_reason == reason}
         print(f"{reason}\t{reason_periods[reason]}\t{len(files)}")
+    other = [(symbol, fy, end, detail) for symbol, fy, end, reason, detail in periods if reason == REASONS[3]]
+    other_periods = Counter(detail for _symbol, _fy, _end, detail in other)
+    print(f"Q4 with null epsDiluted but missing netIncome (outside target): {q4_missing_income}")
+    print("other bucket breakdown\tperiods\tfiles (non-exclusive)")
+    for detail in sorted(other_periods):
+        files = {symbol for symbol, _fy, _end, row_detail in other if row_detail == detail}
+        print(f"{detail}\t{other_periods[detail]}\t{len(files)}")
     print("method B validation (existing Q4 diluted EPS, all sources):")
     for name in (
         "existing_q4_eps", "eligible_compared", "no_q4_income", "missing_annual_or_q123",
