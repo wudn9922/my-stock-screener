@@ -99,6 +99,9 @@ OPEN_AFTER_DAYS = 30
 # Filing deadline of a quarter (banks / financial holdings included) + about a week for FinMind (Q4: next year)
 DUE_DATES = {1: (5, 22), 2: (9, 7), 3: (11, 21), 4: (4, 7)}
 MIN_EVIDENCE = 20
+# The newest quarters a Taiwan quarterly block is judged on when MOPS and FinMind both have the period (see pick_block):
+# the four the screener always showed, so the longer history never costs one of them.
+RECENT_QUARTERS = 4
 DECISIVE = 0.8
 MODES = ("ytd", "quarter", "q4annual")
 CROSS_CHECK_MIN = 20
@@ -677,13 +680,35 @@ def filled(block):
                or (mask >> slot) & 1)
 
 
-def pick_block(official, finmind):
-    """The newer period wins; for the same period the official (MOPS) block unless FinMind has more slots."""
+def leading_run(values, mask, slots):
+    """Consecutive slots from the newest (of the first `slots`) with a YoY value or a turnaround: the run a gate can use."""
+    count = 0
+    for slot in range(slots):
+        if (slot < len(values) and values[slot] is not None) or (mask >> slot) & 1:
+            count += 1
+        else:
+            break
+    return count
+
+
+def recent_key(block):
+    """Quarterly order of two blocks for the same period: the longer EPS run in the newest RECENT_QUARTERS, then revenue."""
+    eps, rev, mask = block.get("eps") or [], block.get("rev") or [], block.get("mask") or 0
+    return leading_run(eps, mask, RECENT_QUARTERS), leading_run(rev, 0, RECENT_QUARTERS)
+
+
+def pick_block(official, finmind, quarterly=False):
+    """The newer period wins; for the same period the official (MOPS) block unless FinMind is better. Quarterly blocks:
+    better means the longer run of EPS YoY in the newest RECENT_QUARTERS (the four quarters the screener always showed,
+    so a longer FinMind history never empties one of them), then revenue; the official block wins a tie, and only then
+    the block with more slots overall decides (the longer history, for the quarters beyond those four)."""
     if official is None or finmind is None:
         return official if finmind is None else finmind
     official_end, finmind_end = growth.parse_day(official["end"]), growth.parse_day(finmind["end"])
     if official_end != finmind_end:
         return official if official_end > finmind_end else finmind
+    if quarterly and recent_key(official) != recent_key(finmind):
+        return official if recent_key(official) > recent_key(finmind) else finmind
     return official if filled(official) >= filled(finmind) else finmind
 
 
@@ -692,7 +717,7 @@ def combine(official_rows, finmind_rows):
     result = {}
     for symbol in set(official_rows) | set(finmind_rows):
         mine, theirs = official_rows.get(symbol, (None, None, None)), finmind_rows.get(symbol, (None, None, None))
-        result[symbol] = (None, pick_block(mine[1], theirs[1]), pick_block(mine[2], theirs[2]))
+        result[symbol] = (None, pick_block(mine[1], theirs[1], quarterly=True), pick_block(mine[2], theirs[2]))
     return result
 
 

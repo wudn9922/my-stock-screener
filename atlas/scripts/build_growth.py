@@ -46,12 +46,17 @@ three quarters); dQ marks the quarterly slots whose pair contains such a derived
 Output (compact, rows sorted by symbol; keys as in the financials file names):
   {"version": 1, "generatedAt": "...", "source": "...", "fields": [...], "rows": [[...], ...]}
   fields: symbol, lv (financials quality level good/partial/limited; null for the other sources),
-  src (sec|yahoo|mops|frames: of the quarterly block, else of the annual one), qEnd, yEnd (period end
-  of slot 0 for quarterly / annual), epsQ (4), revQ (4), epsY (10), revY (10), tQ, tY (bit i set = EPS
-  turnaround in slot i of quarterly / annual), srcY (source of the annual block, null without one),
-  dQ (bit i set = quarterly slot i compares a derived Q4). Trailing nulls of the arrays are cut. A
-  symbol without any usable value gets no row. The market is the symbol's suffix (.TW / .TWO =
-  Taiwan). The file is only rewritten when its content changes, so generatedAt is the last change.
+  src (sec|yahoo|mops|frames|finmind: of the quarterly block, else of the annual one), qEnd, yEnd (period end
+  of slot 0 for quarterly / annual), epsQ (up to 12), revQ (up to 12), epsY (up to 10), revY (up to 10),
+  tQ, tY (bit i set = EPS turnaround in slot i of quarterly / annual), srcY (source of the annual block,
+  null without one), dQ (bit i set = quarterly slot i compares a derived Q4). Trailing nulls of the arrays
+  are cut, so a row carries as many quarters as its source has (a file written with the old 4-slot horizon
+  is still valid: its arrays are just shorter). A symbol without any usable value gets no row. The market
+  is the symbol's suffix (.TW / .TWO = Taiwan). The file is only rewritten when its content changes, so
+  generatedAt is the last change.
+Quarterly horizon: up to QUARTER_SLOTS (12) YoY values, i.e. 16 quarters of history for the newest one.
+The financials files, FinMind's Taiwan history and the SEC companyfacts files have that much; the Taiwan
+statements (MOPS, RECENT_SEASONS) and the SEC frames (QUARTER_FRAMES) fetch fewer seasons and give fewer.
 Annual horizon: up to YEAR_SLOTS (10) YoY values, computed from the financials files (annual history of
 up to 19 years). The Taiwan statements (MOPS) and the SEC frames have only a few annual periods and keep
 RECENT_YEAR_SLOTS (3) values. A source's annual block only competes when it has a YoY value within its
@@ -67,7 +72,8 @@ from build_valuation_us import finite_number, read_json, write_atomic
 VERSION = 1
 SOURCE = "financials+official"
 FIELDS = ["symbol", "lv", "src", "qEnd", "yEnd", "epsQ", "revQ", "epsY", "revY", "tQ", "tY", "srcY", "dQ"]
-QUARTER_SLOTS = 4
+# Quarterly YoY values per row: the newest 12 quarters (each needs the same quarter a year earlier, so 16 quarters of history).
+QUARTER_SLOTS = 12
 # Annual YoY values per row from the financials files (each needs the year before it: 11 fiscal years for 10 values).
 YEAR_SLOTS = 10
 # The newest annual values: the whole horizon of the official sources (Taiwan MOPS, SEC frames), and the window

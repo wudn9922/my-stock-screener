@@ -349,6 +349,123 @@
   background: var(--accent-soft);
   color: var(--text);
 }
+/* Growth terms: periods, threshold X and 成長佔比 P each get a name line, their quick chips and a typed number. */
+.fs-term {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 10px;
+}
+.fs-term-name {
+  flex: 0 0 100%;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.fs-term-input {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 12px;
+  color: var(--text-3);
+}
+.fs-term-input:focus-within {
+  border-color: var(--accent);
+}
+.fs-term-input.is-invalid {
+  border-color: var(--warn);
+}
+.fs-term-input input {
+  width: 4.6em;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: none;
+  outline: none;
+  text-align: right;
+  color: var(--text);
+  /* 16px keeps iOS / LINE from zooming on focus. */
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.fs-term-input input::placeholder {
+  color: var(--text-3);
+}
+.fs-term-error {
+  flex: 0 0 100%;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.fs-rule {
+  margin: 10px 0 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+  line-height: 1.5;
+}
+/* 營收: a block that opens on a button (aria-expanded). */
+.fs-disclosure {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+.fs-disclosure-head {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+.fs-disclosure-title {
+  flex: none;
+}
+.fs-disclosure-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fs-disclosure-count {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.fs-chevron {
+  flex: none;
+  color: var(--text-3);
+  transition: transform 0.15s;
+}
+.fs-chevron.open {
+  transform: rotate(180deg);
+}
+.fs-disclosure-summary {
+  margin: 0 0 4px;
+}
+.fs-disclosure-body {
+  padding-top: 2px;
+}
+.fs-disclosure-body[hidden] {
+  display: none;
+}
 .fs-number-row {
   display: flex;
   align-items: center;

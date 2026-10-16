@@ -3,7 +3,8 @@ import { reportUrl } from '../report/loadReport';
 
 /**
  * EPS / revenue growth for the screener's fundamental filters. Two files, merged per stock:
- * - `report/growth.json` (atlas/scripts/build_growth.py): Taiwan and US, the whole market, quarterly (up to 4)
+ * - `report/growth.json` (atlas/scripts/build_growth.py): Taiwan and US, the whole market, quarterly (up to 12;
+ *   older files with 4 are still read: missing slots are simply unknown)
  *   and annual (up to 10 years; Taiwan and the SEC frames have fewer), aligned on the same period a year earlier. Each block says its source
  *   (`src` / `srcY`): SEC companyfacts or Yahoo financials files, the Taiwan official statements (MOPS), the
  *   Taiwan history from FinMind (republished MOPS data) or SEC XBRL frames; `dQ` flags the quarterly slots that compare a derived Q4 (full year − first three quarters).
@@ -19,9 +20,9 @@ export type GrowthOrigin = 'sec' | 'yahoo' | 'mops' | 'finmind' | 'frames' | 'us
 const ORIGINS: readonly GrowthOrigin[] = ['sec', 'yahoo', 'mops', 'finmind', 'frames', 'us-growth'];
 const originOf = (value: unknown): GrowthOrigin | null => ORIGINS.find((origin) => origin === value) ?? null;
 export interface GrowthRecord {
-  /** EPS YoY % per quarter, index 0 = latest; null when the year-ago EPS was ≤ 0 or missing. */
+  /** EPS YoY % per quarter (up to 12), index 0 = latest; null when the year-ago EPS was ≤ 0 or missing. */
   epsYoY: (number | null)[];
-  /** Revenue YoY % per quarter, index 0 = latest. */
+  /** Revenue YoY % per quarter (up to 12), index 0 = latest. */
   revYoY: (number | null)[];
   /** Latest quarter turned from a loss (year-ago EPS ≤ 0) to a profit. */
   epsTurn: boolean;
@@ -60,7 +61,8 @@ export function growthKey(symbol: string): string {
   return symbol.trim().toUpperCase().replace(/\./g, '-');
 }
 
-const MAX_QUARTERS = 4;
+/** Quarterly YoY values in growth.json (build_growth.py QUARTER_SLOTS). */
+export const MAX_QUARTERS = 12;
 /** Annual YoY values in growth.json (build_growth.py YEAR_SLOTS). */
 export const MAX_YEARS = 10;
 const yoyList = (value: unknown, max = MAX_QUARTERS): (number | null)[] =>

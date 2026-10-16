@@ -1,26 +1,34 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import { X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { useDialogFocus } from './useDialogFocus';
 import { formatDateTime } from './format';
 import type { GrowthFile } from '../fundamentals/GrowthProvider';
 import {
   EMPTY_FILTERS,
   GROWTH_PRESETS,
-  MAX_GATE_QUARTERS,
+  QUARTER_PRESETS,
+  SHARE_DEFAULT,
+  SHARE_PRESETS,
   TREND_FLAGS,
   TREND_LABELS,
   VOLUME_PRESETS,
   YEAR_PRESETS,
+  enoughPeriods,
   formatRange,
-  isCustomGrowthMin,
+  gateCountText,
+  gateLabel,
+  gateSentence,
   isCustomVolume,
   needsGrowth,
   toggleVolume,
   trendFlagUnavailable,
+  yearGateLabel,
   type FilterAvailability,
   type FilterRange,
   type FilterState,
   type FundamentalKind,
+  type GrowthGate,
+  type YearGate,
 } from '../pages/screenerFilters';
 import './filter-sheet.css';
 
@@ -40,7 +48,7 @@ export interface FilterSheetProps {
   growth: GrowthFile | null | undefined;
   growthLoading: boolean;
   /** How many of the group's rows have the data a growth condition needs (the rest are excluded, or kept with `nd:keep`). */
-  coverage: (kind: FundamentalKind | 'accel', periods: number, includeTurn: boolean) => { covered: number; total: number };
+  coverage: (kind: FundamentalKind | 'accel' | 'streak', periods: number, includeTurn: boolean) => { covered: number; total: number };
   /** The draft uses a fundamental condition: load the growth file. */
   onNeedGrowth: () => void;
   /** Shortest 52-week window among the rows when it is not a full year yet. */
@@ -199,15 +207,22 @@ function RangeSlider({ label, value, onChange }: { label: string; value: FilterR
 }
 
 type GateKey = 'eps' | 'rev' | 'epsY' | 'revY';
-/** How many periods each growth block compares; kept per block even while its threshold is 「不限」. */
-type GatePeriods = Record<GateKey, number>;
-const periodsOf = (state: FilterState): GatePeriods => ({
-  eps: state.eps?.quarters ?? 1,
-  rev: state.rev?.quarters ?? 1,
-  epsY: state.epsY?.years ?? 1,
-  revY: state.revY?.years ?? 1,
+/** The terms of one growth block: how many periods, and the 成長佔比 P. Kept while its threshold is 「不限」. */
+interface GateTerms {
+  periods: number;
+  share: number;
+}
+type GateTermsMap = Record<GateKey, GateTerms>;
+const isAnnualGate = (key: GateKey) => key === 'epsY' || key === 'revY';
+const termsOf = (state: FilterState): GateTermsMap => ({
+  eps: { periods: state.eps?.quarters ?? 1, share: state.eps?.share ?? SHARE_DEFAULT },
+  rev: { periods: state.rev?.quarters ?? 1, share: state.rev?.share ?? SHARE_DEFAULT },
+  epsY: { periods: state.epsY?.years ?? 1, share: state.epsY?.share ?? SHARE_DEFAULT },
+  revY: { periods: state.revY?.years ?? 1, share: state.revY?.share ?? SHARE_DEFAULT },
 });
-const QUARTER_PRESETS = Array.from({ length: MAX_GATE_QUARTERS }, (_, index) => index + 1);
+/** The gate a block applies once it has a threshold. */
+const gateFor = (key: GateKey, terms: GateTerms, min: number): GrowthGate | YearGate =>
+  isAnnualGate(key) ? { years: terms.periods, min, share: terms.share } : { quarters: terms.periods, min, share: terms.share };
 /** Presets plus the applied count when a link carries another one (sorted, unique). */
 const countsWith = (presets: readonly number[], current: number | null): number[] =>
   [...new Set([...presets, ...(current !== null ? [current] : [])])].sort((a, b) => a - b);
@@ -219,15 +234,16 @@ const coverageChoice = (value: number, current: number | null, label: string, co
   const none = covered === 0;
   return { value, label, disabled: none && value !== current, title: none ? reason : undefined };
 };
-/** Period choices of a growth block (quarters or years). */
+/** Period choices of a growth block (quarters or years), with the rows that have enough of them. */
 function periodChoices(unit: '季' | '年', current: number, covered: ((count: number) => number) | null): ChoiceOption<number>[] {
-  return countsWith(unit === '季' ? QUARTER_PRESETS : YEAR_PRESETS, current).map((count) =>
+  const presets = unit === '季' ? QUARTER_PRESETS : YEAR_PRESETS;
+  return countsWith(presets, current).map((count) =>
     coverageChoice(
       count,
       current,
-      count === 1 ? `最近 1 ${unit}` : `近 ${count} ${unit}皆`,
+      count === 1 ? `最近 1 ${unit}` : `近 ${count} ${unit}`,
       covered ? covered(count) : null,
-      `本群組沒有足夠 ${count} ${unit}財報資料的股票`,
+      `本群組沒有足夠 ${enoughPeriods(count)} ${unit}財報資料的股票`,
     ),
   );
 }
@@ -235,29 +251,224 @@ const GROWTH_OPTIONS: { value: number | null; label: string }[] = [
   { value: null, label: '不限' },
   ...GROWTH_PRESETS.map((preset) => ({ value: preset, label: `≥${preset}%` })),
 ];
+const SHARE_OPTIONS: ChoiceOption<number>[] = SHARE_PRESETS.map((share) => ({
+  value: share,
+  label: `${share}%`,
+  title: share === SHARE_DEFAULT ? '每一期都要成長（預設）' : `有資料的期數中至少 ${share}% 要成長`,
+}));
 /** Where each market's growth numbers come from (build_growth.py's source order). */
 const GROWTH_SOURCE_TEXT: Record<'TW' | 'US', string> = {
   TW: '公開資訊觀測站／證交所・櫃買中心 OpenAPI 綜合損益表（官方）與 FinMind 歷史財報（源自公開資訊觀測站，約 10 年，全部上市櫃），缺的才用 Yahoo 財報',
   US: 'SEC 財報（companyfacts）與 SEC XBRL frames（全市場），其次為 Yahoo 財報／Yahoo 季資料（S&P 500）',
 };
-const GROWTH_BLOCKS: { key: GateKey; title: string; unit: '季' | '年' }[] = [
-  { key: 'eps', title: '季度 EPS 成長', unit: '季' },
-  { key: 'epsY', title: '年度 EPS 成長', unit: '年' },
-  { key: 'rev', title: '季度營收成長', unit: '季' },
-  { key: 'revY', title: '年度營收成長', unit: '年' },
-];
+
+/**
+ * A typed number of a growth term (periods, threshold or share). Only a valid value is committed; partial input such
+ * as `-` stays on screen with the hint. An empty threshold is 「不限」 (`allowEmpty`).
+ */
+function TermInput({
+  label,
+  value,
+  unit,
+  min,
+  max,
+  integer = false,
+  allowEmpty = false,
+  hint,
+  onCommit,
+}: {
+  label: string;
+  value: number | null;
+  unit: string;
+  min: number;
+  max: number;
+  integer?: boolean;
+  allowEmpty?: boolean;
+  hint: string;
+  onCommit: (value: number | null) => void;
+}) {
+  const [text, setText] = useState(value === null ? '' : String(value));
+  const [invalid, setInvalid] = useState(false);
+  const parse = (raw: string): { ok: true; value: number | null } | { ok: false } => {
+    const trimmed = raw.trim();
+    if (trimmed === '') return allowEmpty ? { ok: true, value: null } : { ok: false };
+    const number = Number(trimmed);
+    if (!Number.isFinite(number) || (integer && !Number.isInteger(number)) || number < min || number > max) return { ok: false };
+    return { ok: true, value: number };
+  };
+  // An outside change (a preset, a reset, another link) rewrites the text; the value just committed does not,
+  // so a typed 「1.」 or 「-」 survives its own commit.
+  useEffect(() => {
+    const current = parse(text);
+    if (current.ok && current.value === value) return;
+    setText(value === null ? '' : String(value));
+    setInvalid(false);
+  }, [value]);
+  return (
+    <label className={`fs-term-input ${invalid ? 'is-invalid' : ''}`}>
+      <input
+        type="text"
+        inputMode="decimal"
+        enterKeyHint="done"
+        placeholder={allowEmpty ? '不限' : undefined}
+        value={text}
+        aria-label={label}
+        aria-invalid={invalid}
+        onChange={(event) => {
+          const next = event.target.value.replace(/[^\d.+-]/g, '').slice(0, 7);
+          setText(next);
+          const parsed = parse(next);
+          setInvalid(!parsed.ok);
+          if (parsed.ok && parsed.value !== value) onCommit(parsed.value);
+        }}
+      />
+      <span className="fs-unit">{unit}</span>
+      {invalid && <span className="fs-term-error">{hint}</span>}
+    </label>
+  );
+}
+
+/** One growth block (EPS or revenue, quarterly or annual): periods, threshold X, 成長佔比 P, and the rule in words. */
+function GrowthGateBlock({
+  title,
+  unit,
+  subject,
+  terms,
+  gate,
+  blocked,
+  note,
+  coveredOf,
+  onTerms,
+  onMin,
+}: {
+  title: string;
+  unit: '季' | '年';
+  /** The indicator in the sentence, e.g. 「EPS 年增」. */
+  subject: string;
+  terms: GateTerms;
+  /** The applied gate (null while its threshold is 「不限」). */
+  gate: GrowthGate | YearGate | null;
+  blocked: string | null;
+  note: string | null;
+  /** Rows with enough periods for a period count (null while loading). */
+  coveredOf: ((count: number) => number) | null;
+  onTerms: (patch: Partial<GateTerms>) => void;
+  onMin: (min: number | null) => void;
+}) {
+  if (blocked)
+    return (
+      <div className="fs-block" role="group" aria-label={title}>
+        <div className="fs-sub">{title}</div>
+        <p className="fs-unavailable">{blocked}</p>
+      </div>
+    );
+  const maxPeriods = unit === '季' ? 12 : 10;
+  const { periods, share } = terms;
+  const min = gate?.min ?? null;
+  return (
+    <div className="fs-block" role="group" aria-label={title}>
+      <div className="fs-sub">{title}</div>
+      <div className="fs-term">
+        <span className="fs-term-name">期數</span>
+        <Choice label={`${title} · 期數`} value={periods} onChange={(count) => onTerms({ periods: count ?? 1 })} options={periodChoices(unit, periods, coveredOf)} compact />
+        <TermInput
+          label={`${title} · 期數（${unit}）`}
+          value={periods}
+          unit={unit}
+          min={1}
+          max={maxPeriods}
+          integer
+          hint={`請輸入 1–${maxPeriods} 的整數`}
+          onCommit={(count) => count !== null && onTerms({ periods: count })}
+        />
+      </div>
+      <div className="fs-term">
+        <span className="fs-term-name">幅度 X</span>
+        <Choice label={`${title} · 幅度`} value={min} onChange={onMin} options={GROWTH_OPTIONS} compact />
+        <TermInput
+          label={`${title} · 幅度 X（%）`}
+          value={min}
+          unit="%"
+          min={-10000}
+          max={10000}
+          allowEmpty
+          hint="請輸入數字（可負數、小數），留空即不限"
+          onCommit={onMin}
+        />
+      </div>
+      <div className="fs-term">
+        <span className="fs-term-name">成長佔比 P</span>
+        <Choice label={`${title} · 成長佔比`} value={share} onChange={(next) => onTerms({ share: next ?? SHARE_DEFAULT })} options={SHARE_OPTIONS} compact />
+        <TermInput
+          label={`${title} · 成長佔比 P（%）`}
+          value={share}
+          unit="%"
+          min={1}
+          max={SHARE_DEFAULT}
+          hint="請輸入 1–100（預設 100＝每一期都要成長）"
+          onCommit={(next) => next !== null && onTerms({ share: next })}
+        />
+      </div>
+      {gate ? (
+        <>
+          <p className="fs-rule">{gateSentence(subject, unit, periods, gate.min, share)}</p>
+          <p className="fs-hint">
+            每一期 YoY ≥ {Number(gate.min.toFixed(2))}% 記為成長，低於則為衰退；{gateCountText(periods, share)}即通過（{periods} {unit}皆有資料時）。
+            缺資料的期數不計入；有資料的期數不足 {enoughPeriods(periods)} 期時依「資料不足時排除」處理。
+          </p>
+        </>
+      ) : (
+        <p className="fs-hint">選擇或輸入幅度 X 後才會套用（期數與成長佔比 P 會保留）。</p>
+      )}
+      {note && <p className="fs-hint fs-coverage">{note}</p>}
+    </div>
+  );
+}
+
+/** A block that opens with a button (aria-expanded). Closed by default; its applied conditions stay visible in the head. */
+function Disclosure({
+  id,
+  title,
+  count,
+  summary,
+  children,
+}: {
+  id: string;
+  title: string;
+  /** Applied conditions in the block (shown as a count in the head). */
+  count: number;
+  summary: string | null;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="fs-disclosure">
+      <button type="button" className="fs-disclosure-head" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
+        <span className="fs-disclosure-title">{title}</span>
+        <span className="fs-disclosure-end">
+          {count > 0 && <span className="fs-disclosure-count">已啟用 {count} 項</span>}
+          <ChevronDown size={18} aria-hidden="true" className={`fs-chevron ${open ? 'open' : ''}`} />
+        </span>
+      </button>
+      {!open && count > 0 && summary && <p className="fs-hint fs-disclosure-summary">{summary}</p>}
+      <div id={id} className="fs-disclosure-body" hidden={!open}>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export function FilterSheet(props: FilterSheetProps) {
   const { open, market, value, availability, growth, growthLoading, onNeedGrowth, onClose } = props;
   const [draft, setDraft] = useState<FilterState>(value);
-  const [periods, setPeriods] = useState<GatePeriods>(() => periodsOf(value));
+  const [terms, setTerms] = useState<GateTermsMap>(() => termsOf(value));
   const sheetRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: number; y: number; dy: number } | null>(null);
   // Each opening starts from the applied conditions.
   useEffect(() => {
     if (!open) return;
     setDraft(value);
-    setPeriods(periodsOf(value));
+    setTerms(termsOf(value));
   }, [open]);
   useDialogFocus(open, DIALOG_ID);
   useEffect(() => {
@@ -277,24 +488,13 @@ export function FilterSheet(props: FilterSheetProps) {
   if (!open) return null;
 
   const update = (patch: Partial<FilterState>) => setDraft((previous) => ({ ...previous, ...patch }));
-  const gateMin = (key: GateKey): number | null => draft[key]?.min ?? null;
-  const setGateMin = (key: GateKey, min: number | null) =>
-    update({
-      [key]:
-        min === null
-          ? null
-          : key === 'epsY' || key === 'revY'
-            ? { years: periods[key], min }
-            : { quarters: periods[key], min },
-    });
-  const setGatePeriods = (key: GateKey, count: number | null) => {
-    const next = count ?? 1;
-    setPeriods((previous) => ({ ...previous, [key]: next }));
-    setDraft((previous) => {
-      const gate = previous[key];
-      if (!gate) return previous;
-      return { ...previous, [key]: key === 'epsY' || key === 'revY' ? { years: next, min: gate.min } : { quarters: next, min: gate.min } };
-    });
+  const setGateMin = (key: GateKey, min: number | null) => update({ [key]: min === null ? null : gateFor(key, terms[key], min) });
+  /** Periods or 成長佔比 of a block: kept for later, and applied at once when the block already has a threshold. */
+  const setGateTerms = (key: GateKey, patch: Partial<GateTerms>) => {
+    const next = { ...terms[key], ...patch };
+    setTerms((previous) => ({ ...previous, [key]: next }));
+    const gate = draft[key];
+    if (gate) update({ [key]: gateFor(key, next, gate.min) });
   };
   const toggleTrend = (flag: (typeof TREND_FLAGS)[number]) =>
     setDraft((previous) => ({
@@ -338,26 +538,56 @@ export function FilterSheet(props: FilterSheetProps) {
    */
   /** While no streak is applied: how many rows have each number of years (the rest of the block explains the rule). */
   const streakCoverageLine = (() => {
-    const { total } = props.coverage('epsY', 1, draft.turn);
-    const counts = YEAR_PRESETS.map((years) => `≥${years} 年 ${props.coverage('epsY', years, draft.turn).covered.toLocaleString('en-US')}`);
+    const { total } = props.coverage('streak', 1, draft.turn);
+    const counts = YEAR_PRESETS.map((years) => `≥${years} 年 ${props.coverage('streak', years, draft.turn).covered.toLocaleString('en-US')}`);
     return `各年數涵蓋檔數：${counts.join(' · ')} 檔（共 ${total.toLocaleString('en-US')} 檔）`;
   })();
-  const coverageText = (kind: FundamentalKind | 'accel', count: number, applied: boolean) => {
+  const coverageText = (kind: FundamentalKind | 'accel' | 'streak', count: number, applied: boolean) => {
     if (growth === undefined) return growthLoading ? '基本面資料載入中…' : null;
     if (growthLoading) return '基本面資料載入中…';
     const { covered, total } = props.coverage(kind, count, draft.turn);
     if (!total) return null;
     const rest = total - covered;
     const percent = Math.round((covered / total) * 100);
-    const need = kind === 'accel' ? '最近 2 季 EPS YoY' : `近 ${count} ${kind.endsWith('Y') ? '年' : '季'}${kind.startsWith('eps') ? ' EPS' : '營收'} YoY`;
+    const unit = kind.endsWith('Y') || kind === 'streak' ? '年' : '季';
+    const metric = kind.startsWith('eps') || kind === 'streak' ? 'EPS' : '營收';
+    // A streak needs every one of its years (no gap); a growth block needs ceil(N / 2) of its N periods with data.
+    const need =
+      kind === 'accel'
+        ? '最近 2 季的 EPS YoY'
+        : kind === 'streak'
+          ? `最近 ${count} 年每一年都有 ${metric} YoY`
+          : `近 ${count} ${unit}中至少 ${enoughPeriods(count)} ${unit}的 ${metric} YoY`;
     const counts = `${covered.toLocaleString('en-US')} / ${total.toLocaleString('en-US')} 檔（${percent}%）`;
-    if (!applied) return `${marketName}財報資料涵蓋 ${counts} 有${need}。`;
-    return `此條件僅涵蓋 ${counts} 有足夠財報歷史（需有${need}）；${
+    if (!applied) return `${marketName}財報資料涵蓋 ${counts}，足以判斷：${need}。`;
+    return `此條件僅涵蓋 ${counts} 有足夠財報歷史（${need}）；${
       rest
         ? `其餘 ${rest.toLocaleString('en-US')} 檔${draft.keepMissing ? '會保留（已關閉「資料不足時排除」）' : '會被排除（可到下方關閉「資料不足時排除」保留）'}。`
         : '沒有被排除的股票。'
     }`;
   };
+
+  const gateBlock = (key: GateKey, title: string, unit: '季' | '年', subject: string) => {
+    const blocked = growthPending ? null : availability[key];
+    return (
+      <GrowthGateBlock
+        title={title}
+        unit={unit}
+        subject={subject}
+        terms={terms[key]}
+        gate={draft[key]}
+        blocked={blocked}
+        note={blocked ? null : coverageText(key, terms[key].periods, draft[key] !== null)}
+        coveredOf={growthPending ? null : (periods) => props.coverage(key, periods, draft.turn).covered}
+        onTerms={(patch) => setGateTerms(key, patch)}
+        onMin={(min) => setGateMin(key, min)}
+      />
+    );
+  };
+  const revenueCount = (draft.rev ? 1 : 0) + (draft.revY ? 1 : 0);
+  const revenueSummary = [draft.rev ? gateLabel('營收', draft.rev) : null, draft.revY ? yearGateLabel('營收', draft.revY) : null]
+    .filter((text): text is string => text !== null)
+    .join('；');
 
   return (
     <div className="fs-backdrop" onClick={onClose}>
@@ -529,42 +759,14 @@ export function FilterSheet(props: FilterSheetProps) {
 
           <Section title="基本面（EPS／營收成長）" unavailable={fundamentalsBlocked}>
             <p className="fs-hint fs-lead">
-              年增率（YoY）一律和「去年同期」比：季度比去年同一季，年度比前一個會計年度。幅度 ≥ X% 且「近 N 期皆」達標才通過。
+              年增率（YoY）一律和「去年同期」比：季度比去年同一季，年度比前一個會計年度。每一期 YoY ≥ 幅度 X% 記為成長，低於則為衰退；
+              近 N 期中，成長期數 ÷ 有資料的期數 ≥ 成長佔比 P% 才通過（P 預設 100%，即每一期都要成長）。缺資料的期數不計入。
               {market === 'TW'
                 ? ' 台股季度由官方綜合損益表的年度累計數相減而得（第 4 季＝全年－前三季）；FinMind 歷史資料同樣源自觀測站，單季或累計由其數字判定；股票股利（配股）不追溯調整，配股的公司 EPS 年增率會偏低。'
                 : ' 美股第 4 季多由「全年－前三季」推算；外國發行人（20-F）多只有年度資料，以申報幣別計算。'}
             </p>
-            {GROWTH_BLOCKS.map(({ key, title, unit }) => {
-              const blocked = growthPending ? null : availability[key];
-              const min = gateMin(key);
-              const note = blocked ? null : coverageText(key, periods[key], draft[key] !== null);
-              return (
-                <div key={key} className="fs-block" role="group" aria-label={title}>
-                  <div className="fs-sub">{title}</div>
-                  {blocked ? (
-                    <p className="fs-unavailable">{blocked}</p>
-                  ) : (
-                    <>
-                      <Choice
-                        label={`${title}期數`}
-                        value={periods[key]}
-                        onChange={(count) => setGatePeriods(key, count)}
-                        options={periodChoices(unit, periods[key], growthPending ? null : (count) => props.coverage(key, count, draft.turn).covered)}
-                      />
-                      <Choice
-                        label={`${title}幅度`}
-                        value={min}
-                        onChange={(next) => setGateMin(key, next)}
-                        options={GROWTH_OPTIONS}
-                        compact
-                      />
-                      {isCustomGrowthMin(min) && <p className="fs-hint fs-current">目前條件：≥{Number(min.toFixed(2))}%</p>}
-                      {note && <p className="fs-hint fs-coverage">{note}</p>}
-                    </>
-                  )}
-                </div>
-              );
-            })}
+            {gateBlock('eps', '季度 EPS 成長', '季', 'EPS 年增')}
+            {gateBlock('epsY', '年度 EPS 成長', '年', 'EPS 年增')}
             <div className="fs-block" role="group" aria-label="EPS 連續成長年數">
               <div className="fs-sub">EPS 連續成長年數</div>
               {availability.epss && !growthPending ? (
@@ -582,7 +784,7 @@ export function FilterSheet(props: FilterSheetProps) {
                           years,
                           draft.epss,
                           `≥${years} 年`,
-                          growthPending ? null : props.coverage('epsY', years, draft.turn).covered,
+                          growthPending ? null : props.coverage('streak', years, draft.turn).covered,
                           `本群組沒有足夠 ${years} 年 EPS 年增率的股票`,
                         ),
                       ),
@@ -590,7 +792,7 @@ export function FilterSheet(props: FilterSheetProps) {
                     compact
                   />
                   {draft.epss !== null ? (
-                    <p className="fs-hint fs-coverage">{coverageText('epsY', draft.epss, true)}</p>
+                    <p className="fs-hint fs-coverage">{coverageText('streak', draft.epss, true)}</p>
                   ) : (
                     !growthPending && <p className="fs-hint fs-coverage">{streakCoverageLine}</p>
                   )}
@@ -634,9 +836,16 @@ export function FilterSheet(props: FilterSheetProps) {
                 <span className="fs-switch-track" aria-hidden="true" />
                 <span>
                   含虧轉盈
-                  <small>去年同期 EPS ≤ 0、本期轉為獲利時 YoY 無法計算；開啟時視為通過（EPS 成長與加速），關閉則視為缺資料。</small>
+                  <small>去年同期 EPS ≤ 0、本期轉為獲利時 YoY 無法計算；開啟時計為成長，關閉時在成長期數中計為衰退（連續成長年數與加速則視為缺資料）。</small>
                 </span>
               </label>
+            </div>
+            <Disclosure id="screener-revenue-growth" title="營收" count={revenueCount} summary={revenueSummary}>
+              {gateBlock('rev', '季度營收成長', '季', '營收 年增')}
+              {gateBlock('revY', '年度營收成長', '年', '營收 年增')}
+            </Disclosure>
+            <div className="fs-block" role="group" aria-label="資料不足的處理">
+              <div className="fs-sub">資料不足</div>
               <label className="fs-switch">
                 <input
                   type="checkbox"
@@ -648,7 +857,7 @@ export function FilterSheet(props: FilterSheetProps) {
                 <span className="fs-switch-track" aria-hidden="true" />
                 <span>
                   資料不足時排除
-                  <small>缺財報資料、財報歷史不夠長，或去年同期虧損（YoY 無法計算）時；關閉則保留這些股票。</small>
+                  <small>有財報資料的期數少於 ⌈N÷2⌉ 期、財報歷史不夠長，或去年同期虧損（YoY 無法計算）時；關閉則保留這些股票。</small>
                 </span>
               </label>
             </div>
