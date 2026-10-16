@@ -348,6 +348,17 @@ class CombineTest(unittest.TestCase):
         combined = fm.combine({"A.TW": (None, mops, None)}, {"A.TW": (None, same, older), "B.TW": (None, None, older)})
         self.assertEqual(combined, {"A.TW": (None, mops, older), "B.TW": (None, None, older)})
 
+    def test_quarterly_pick_keeps_the_newest_four_quarters_the_screener_showed(self):
+        mops = {"eps": [10.0, 9.0, 8.0, 7.0], "rev": [5.0], "mask": 0, "end": "2026-06-30", "src": "mops", "derived": 0}
+        # FinMind has more slots, but its newest EPS YoY is empty where MOPS has one
+        gap_now = {"eps": [None, 9.5, 8.5, 7.5, 6.0, 5.0, 4.0], "rev": [5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0], "mask": 0,
+                   "end": "2026-06-30", "src": "finmind", "derived": 0}
+        longer = {"eps": [11.0, 10.0, 9.0, 8.0, 7.0, 6.0], "rev": [5.0, 6.0, 7.0, 8.0, 9.0, 10.0], "mask": 0,
+                  "end": "2026-06-30", "src": "finmind", "derived": 0}
+        self.assertIs(fm.pick_block(mops, gap_now), gap_now)  # the annual rule: more slots overall
+        self.assertIs(fm.pick_block(mops, gap_now, quarterly=True), mops)
+        self.assertIs(fm.pick_block(mops, longer, quarterly=True), longer)  # both have the newest four: the longer one
+
     def test_build_growth_merges_finmind_over_yahoo_and_one_season_mops(self):
         truths, store = market("quarter", count=25)
         store["data"]["2330"] = store_of({"2330": publish(truth(99), "quarter")})["data"]["2330"]
@@ -376,7 +387,7 @@ class CombineTest(unittest.TestCase):
         rows = {row[0]: dict(zip(data["fields"], row)) for row in data["rows"]}
         self.assertEqual((rows["2330.TW"]["src"], rows["2330.TW"]["srcY"]), ("finmind", "finmind"))
         self.assertIsNone(rows["2330.TW"]["lv"])                # the Yahoo file's level only when its block is used
-        self.assertEqual(len(rows["2330.TW"]["epsQ"]), 4)
+        self.assertEqual(len(rows["2330.TW"]["epsQ"]), growth.QUARTER_SLOTS)  # 25 FinMind quarters fill the 12-quarter horizon
         self.assertEqual(len(rows["2330.TW"]["revY"]), 9)
         self.assertEqual(rows["9999.TW"]["src"], "yahoo")       # not in FinMind: the Yahoo file stays
         self.assertEqual(summary["official"]["finmind"]["rows"], 26)

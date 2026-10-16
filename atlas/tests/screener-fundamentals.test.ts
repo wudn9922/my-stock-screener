@@ -4,15 +4,22 @@ import {
   EMPTY_FILTERS,
   FILTER_PARAM_MAX,
   GROWTH_PRESETS,
+  QUARTER_PRESETS,
+  YEAR_PRESETS,
   accelCoverage,
   activeChips,
   applyFilters,
+  enoughPeriods,
   epsAccelStatus,
   epsStreak,
   filterAvailability,
+  gateCountText,
   gateCoverage,
+  gateSentence,
+  gateTally,
   growthGatePasses,
   isCustomGrowthMin,
+  streakCoverage,
   needsGrowth,
   parseFilters,
   removeFilter,
@@ -79,22 +86,24 @@ describe('f encoding of the fundamental conditions', () => {
       expect(serializeFilters(parsed)).toBe(old === 'rev:10' ? 'rev:1:10' : old === 'eps:15' ? 'eps:1:15' : old);
     }
     // The documented annual shape with a single number means one year.
-    expect(state('epsy:15').epsY).toEqual({ years: 1, min: 15 });
+    expect(state('epsy:15').epsY).toEqual({ years: 1, min: 15, share: 100 });
     expect(serializeFilters(state('epsy:15'))).toBe('epsy:1:15');
   });
 
   it('ignores bad annual / switch tokens and out-of-range periods', () => {
     expect(state('epsy:0:5').epsY).toBeNull();
     expect(state('epsy:11:5').epsY).toBeNull(); // the stored annual horizon is 10 years
-    expect(state('epsy:10:5').epsY).toEqual({ years: 10, min: 5 });
+    expect(state('epsy:10:5').epsY).toEqual({ years: 10, min: 5, share: 100 });
     expect(state('revy:x:5').revY).toBeNull();
     expect(state('revy:2:').revY).toBeNull();
-    expect(state('eps:5:20').eps).toBeNull();
-    expect(state('eps:4:20').eps).toEqual({ quarters: 4, min: 20 });
+    expect(state('eps:13:20').eps).toBeNull(); // the stored quarterly horizon is 12 quarters
+    expect(state('eps:0:20').eps).toBeNull();
+    expect(state('eps:5:20').eps).toEqual({ quarters: 5, min: 20, share: 100 }); // any 1–12 can be typed
+    expect(state('eps:4:20').eps).toEqual({ quarters: 4, min: 20, share: 100 });
     expect(state('rs1:abc').rs1).toBeNull();
     expect(state('acc:0').accel).toBe(false);
     expect(state('tn:1').turn).toBe(true);
-    expect(state('foo:1;epsy:2:10;bar').epsY).toEqual({ years: 2, min: 10 });
+    expect(state('foo:1;epsy:2:10;bar').epsY).toEqual({ years: 2, min: 10, share: 100 });
     expect(state('epss:0').epss).toBeNull();
     expect(state('epss:11').epss).toBeNull();
     expect(state('epss:2.5').epss).toBeNull();
@@ -104,14 +113,14 @@ describe('f encoding of the fundamental conditions', () => {
     expect(state('epss:abc').epss).toBeNull();
     expect(state('epss:10').epss).toBe(10);
     // Upper case keys and a repeated token: the last one wins.
-    expect(state('EPSY:1:5;epsy:3:7').epsY).toEqual({ years: 3, min: 7 });
+    expect(state('EPSY:1:5;epsy:3:7').epsY).toEqual({ years: 3, min: 7, share: 100 });
   });
 
   it('only writes tn / nd when they matter', () => {
     expect(serializeFilters({ ...EMPTY_FILTERS, turn: false })).toBe('');
-    expect(serializeFilters({ ...EMPTY_FILTERS, turn: false, revY: { years: 1, min: 5 } })).toBe('revy:1:5');
+    expect(serializeFilters({ ...EMPTY_FILTERS, turn: false, revY: { years: 1, min: 5, share: 100 } })).toBe('revy:1:5');
     expect(serializeFilters({ ...EMPTY_FILTERS, turn: false, accel: true })).toBe('acc:1;tn:0');
-    expect(serializeFilters({ ...EMPTY_FILTERS, keepMissing: true, revY: { years: 1, min: 5 } })).toBe('revy:1:5;nd:keep');
+    expect(serializeFilters({ ...EMPTY_FILTERS, keepMissing: true, revY: { years: 1, min: 5, share: 100 } })).toBe('revy:1:5;nd:keep');
     expect(serializeFilters({ ...EMPTY_FILTERS, keepMissing: true, accel: true })).toBe('acc:1;nd:keep');
     expect(serializeFilters({ ...EMPTY_FILTERS, keepMissing: true })).toBe('');
   });
@@ -139,19 +148,54 @@ describe('f encoding of the fundamental conditions', () => {
 });
 
 describe('growth gates', () => {
-  it('treats a turnaround per period, with the old boolean meaning the latest one', () => {
+  it('judges the periods with data, and a turnaround follows the 含虧轉盈 switch', () => {
     const gate = { quarters: 3, min: 20 } as const;
     expect(growthGatePasses([30, 25, 40], gate, false)).toBe(true);
     expect(growthGatePasses([30, 19.9, 40], gate, false)).toBe(false);
-    expect(growthGatePasses([null, 25, 40], gate, false, true)).toBe(true);
-    expect(growthGatePasses([null, 25, 40], gate, false, [true])).toBe(true);
-    expect(growthGatePasses([30, null, 40], gate, false, [false, true])).toBe(true);
-    expect(growthGatePasses([30, null, 40], gate, false, [true])).toBe(false);
-    expect(growthGatePasses([30, 25], gate, false)).toBe(false); // history too short
-    expect(growthGatePasses([30, 25], gate, true)).toBe(true); // …unless missing data is kept
+    // a turnaround in the latest quarter: growth with the switch on, a decline with it off
+    expect(growthGatePasses([null, 25, 40], gate, false, [true], true)).toBe(true);
+    expect(growthGatePasses([null, 25, 40], gate, false, [true], false)).toBe(false);
+    expect(growthGatePasses([30, null, 40], gate, false, [false, true], true)).toBe(true);
+    // a missing quarter leaves the count: the two with data both grow
+    expect(growthGatePasses([30, null, 40], gate, false)).toBe(true);
+    expect(growthGatePasses([30, null, 40], gate, false, [false, true], false)).toBe(false); // 2 of 3 grow, 100% needed
+    // two of three with data is enough (ceil(3 / 2)); one of three is 「資料不足」
+    expect(growthGatePasses([30, 25], gate, false)).toBe(true);
+    expect(growthGatePasses([30, null], gate, false)).toBe(false);
+    expect(growthGatePasses([30, null], gate, true)).toBe(true); // …unless missing data is kept
     expect(growthGatePasses([30, 5], { years: 1, min: 20 }, false)).toBe(true);
     expect(growthGatePasses([30, 5], { years: 2, min: 20 }, false)).toBe(false);
     expect(growthGatePasses([], { years: 1, min: -Infinity }, false)).toBe(false);
+  });
+
+  it('counts growth periods over the periods with data against the share P', () => {
+    const four = { quarters: 4, min: 15 } as const;
+    const share = (values: (number | null)[], p: number, keep = false) => growthGatePasses(values, { ...four, share: p }, keep);
+    // 3 of 4 grow: 75% passes at P = 75 (the boundary is inclusive) and fails at P = 76
+    expect(share([30, 30, 30, 10], 75)).toBe(true);
+    expect(share([30, 30, 30, 10], 76)).toBe(false);
+    expect(share([30, 30, 10, 10], 50)).toBe(true);
+    expect(share([30, 30, 10, 10], 51)).toBe(false);
+    // 3 of 3 with data (one missing): 100% of the data, so P = 100 passes; P = 100 with a decline does not
+    expect(share([30, 30, 30, null], 100)).toBe(true);
+    expect(share([30, 30, 10, null], 100)).toBe(false);
+    // 2 of 3 grow with one missing: 66.7% is below 75
+    expect(share([30, null, 30, 10], 75)).toBe(false);
+    expect(share([30, null, 30, 10], 66)).toBe(true);
+    // Fewer than 2 of 4 with data: insufficient, excluded unless missing data is kept
+    expect(share([30, null, null, null], 50)).toBe(false);
+    expect(share([30, null, null, null], 50, true)).toBe(true);
+    // A growing run with a decline past the boundary fails even though most periods grow
+    expect(share([30, 30, 30, -5], 80)).toBe(false);
+  });
+
+  it('keeps the old P = 100 rule when every period has data, and sets the threshold inclusively', () => {
+    const old = { quarters: 2, min: 20 } as const;
+    const withShare = { quarters: 2, min: 20, share: 100 } as const;
+    for (const values of [[20, 20], [19.9, 40], [30, 10], [null, 40]] as const) {
+      expect(growthGatePasses([...values], withShare, false)).toBe(growthGatePasses([...values], old, false));
+    }
+    expect(growthGatePasses([20, 20], withShare, false)).toBe(true); // ≥ X counts as growth
   });
 
   it('judges acceleration from the latest two quarters', () => {
@@ -183,12 +227,16 @@ describe('growth.json', () => {
       source: 'financials',
       originQ: { eps: 'mops', rev: 'mops' },
       originY: 'mops',
-      derivedQ: [false, true, false, false],
       quality: 'good',
       epsTurn: false,
     });
+    // The bit masks cover the whole quarterly horizon (12 slots); the file's own four are the first ones
+    expect(tsmc.derivedQ).toHaveLength(12);
+    expect(tsmc.derivedQ.slice(0, 4)).toEqual([false, true, false, false]);
+    expect(tsmc.derivedQ.slice(4).every((flag) => !flag)).toBe(true);
     const plastics = reportGrowth.items.get('1301-TW')!;
-    expect(plastics).toMatchObject({ epsTurn: true, epsTurnQ: [true, false, false, false], epsYoY: [null, 80] });
+    expect(plastics).toMatchObject({ epsTurn: true, epsYoY: [null, 80] });
+    expect(plastics.epsTurnQ.slice(0, 4)).toEqual([true, false, false, false]);
     expect(reportGrowth.items.get('2454-TW')!.quality).toBe('partial');
     expect(reportGrowth.items.has('2317-TW')).toBe(false);
   });
@@ -205,7 +253,9 @@ describe('growth.json', () => {
       rows: [['6488.TWO', [10, 'x', 5, 6, 7, 8], 6, 'weird'], 7, ['BRK.B', [1]]],
     })!;
     expect([...file.items.keys()]).toEqual(['6488-TWO', 'BRK-B']);
-    expect(file.items.get('6488-TWO')).toMatchObject({ epsYoY: [10, null, 5, 6], epsTurnQ: [false, true, true, false], quality: null, revYoY: [] });
+    // six quarterly values now fit the 12-slot horizon; the bad one is a null
+    expect(file.items.get('6488-TWO')).toMatchObject({ epsYoY: [10, null, 5, 6, 7, 8], quality: null, revYoY: [] });
+    expect(file.items.get('6488-TWO')!.epsTurnQ.slice(0, 4)).toEqual([false, true, true, false]);
     // Without `fields` the contract order is assumed.
     expect(parseReportGrowth({ version: 1, rows: [['2330.TW', 'good', 'yahoo', '2026-06-30', '2025-12-31', [9], [8], [7], [6], 0, 0]] })!.items.get('2330-TW')!.epsYoYAnnual).toEqual([7]);
     expect(growthKey('6488.TWO')).toBe('6488-TWO');
@@ -286,10 +336,13 @@ describe('fundamental filters on the market lists', () => {
     const result = applyFilters(TW, state('eps:2:20'), tw);
     expect(result.length).toBeGreaterThan(0);
     expect(result.length).toBeLessThan(TW.length);
+    // The latest two quarters with data (at least one): each grows 20% or more, a turnaround counts as growth
     expect(symbols(result)).toEqual(
       symbols(TW.filter((item) => {
         const r = reportGrowth.items.get(growthKey(item.symbol));
-        return !!r && [0, 1].every((slot) => (r.epsYoY[slot] ?? -Infinity) >= 20 || r.epsTurnQ[slot]);
+        if (!r) return false;
+        const judged = [0, 1].filter((slot) => (r.epsYoY[slot] ?? null) !== null || r.epsTurnQ[slot]);
+        return judged.length >= 1 && judged.every((slot) => (r.epsYoY[slot] ?? -Infinity) >= 20 || r.epsTurnQ[slot]);
       })),
     );
     expect(symbols(result)).toContain('2330.TW');
@@ -299,9 +352,14 @@ describe('fundamental filters on the market lists', () => {
 
   it('filters on annual EPS / revenue growth and reports the periods it needs', () => {
     expect(symbols(applyFilters(TW, state('epsy:3:10'), tw))).toContain('2330.TW');
-    expect(symbols(applyFilters(TW, state('epsy:3:10'), tw))).not.toContain('2454.TW'); // two fiscal years only
+    // Two fiscal years of three: enough (ceil(3 / 2) = 2), and both (+30%, +22%) grow 20% or more
+    expect(symbols(applyFilters(TW, state('epsy:3:10'), tw))).toContain('2454.TW');
+    expect(symbols(applyFilters(TW, state('epsy:3:20'), tw))).toContain('2454.TW');
+    expect(symbols(applyFilters(TW, state('epsy:3:25'), tw))).not.toContain('2454.TW'); // +22% is below 25%
     expect(symbols(applyFilters(TW, state('epsy:2:20'), tw))).toContain('2454.TW');
-    expect(symbols(applyFilters(TW, state('epsy:1:0;revy:3:0'), tw))).not.toContain('2412.TW');
+    // 2412: annual EPS +3% then -2% (a decline): a two-year gate at 0% fails, a one-year gate passes
+    expect(symbols(applyFilters(TW, state('epsy:2:0'), tw))).not.toContain('2412.TW');
+    expect(symbols(applyFilters(TW, state('epsy:1:0;revy:2:0'), tw))).toContain('2412.TW');
     const strict = applyFilters(TW, state('epsy:3:0'), tw);
     const lenient = applyFilters(TW, state('epsy:3:0;nd:keep'), tw);
     expect(lenient.length).toBeGreaterThan(strict.length);
@@ -327,10 +385,13 @@ describe('fundamental filters on the market lists', () => {
     expect(record('1301.TW').epsTurnQ[0]).toBe(true);
     expect(symbols(applyFilters(TW, state('eps:1:25'), tw))).toContain('1301.TW');
     expect(symbols(applyFilters(TW, state('eps:1:25;tn:0'), tw))).not.toContain('1301.TW');
-    expect(symbols(applyFilters(TW, state('eps:1:25;tn:0;nd:keep'), tw))).toContain('1301.TW'); // unknown → kept
+    // Switched off, the turnaround is a decline (not missing data): keeping missing data does not rescue it
+    expect(symbols(applyFilters(TW, state('eps:1:25;tn:0;nd:keep'), tw))).not.toContain('1301.TW');
     // The previous quarter (+80%) passes, the latest one is the turnaround
     expect(symbols(applyFilters(TW, state('eps:2:50'), tw))).toContain('1301.TW');
     expect(symbols(applyFilters(TW, state('eps:2:50;tn:0'), tw))).not.toContain('1301.TW');
+    // With 成長佔比 50%, one of the two judged quarters growing is enough (the turnaround counts as a decline here)
+    expect(symbols(applyFilters(TW, state('eps:2:50:50;tn:0'), tw))).toContain('1301.TW');
     // Revenue gates do not know turnarounds.
     expect(symbols(applyFilters(TW, state('rev:1:15;tn:0'), tw))).toContain('1301.TW');
   });
@@ -371,11 +432,14 @@ describe('fundamental filters on the market lists', () => {
     const covered = (kind: 'eps' | 'rev' | 'epsY' | 'revY', n: number, turn = true) => gateCoverage(TW, reportGrowth, kind, n, turn);
     expect(covered('eps', 1)).toBeGreaterThan(covered('eps', 2) - 1);
     expect(covered('eps', 2)).toBeGreaterThan(0);
-    expect(covered('eps', 3)).toBe(0); // Taiwan files only reach two quarters
-    expect(covered('eps', 4)).toBe(0);
+    // Taiwan files reach two quarters here: three or four quarters are judged on the two with data (ceil(N / 2))
+    expect(covered('eps', 3)).toBeGreaterThan(0);
+    expect(covered('eps', 4)).toBe(covered('eps', 3));
+    expect(covered('eps', 5)).toBe(0); // three would be needed
     expect(covered('epsY', 3)).toBeGreaterThan(0);
     expect(covered('epsY', 1)).toBeGreaterThanOrEqual(covered('epsY', 3));
-    expect(covered('eps', 2, false)).toBeLessThanOrEqual(covered('eps', 2, true)); // turnarounds count as data only when allowed
+    // A turnaround is data either way (growth with the switch on, a decline with it off)
+    expect(covered('eps', 2, false)).toBe(covered('eps', 2, true));
     expect(accelCoverage(TW, reportGrowth, true)).toBeGreaterThan(0);
     expect(accelCoverage(TW, reportGrowth, true)).toBeLessThan(TW.length);
     expect(gateCoverage(TW, null, 'eps', 1, true)).toBe(0);
@@ -559,7 +623,7 @@ describe('ten-year annual windows and the EPS growth streak (epss)', () => {
     // Taiwan has no annual history beyond three years here: a ten-year streak only comes from keeping missing data
     expect(symbols(applyFilters(TW, state('epss:10'), tw))).toEqual([]);
     expect(symbols(applyFilters(TW, state('epss:10;nd:keep'), tw)).length).toBeGreaterThan(0);
-    expect(gateCoverage(TW, reportGrowth, 'epsY', 5, true)).toBe(0);
+    expect(gateCoverage(TW, reportGrowth, 'epsY', 7, true)).toBe(0); // four of seven would be needed: the fixture has three years
   });
 
   it('is a chip, a removable condition and a row pill, and it needs the growth data', () => {
@@ -590,5 +654,90 @@ describe('ten-year annual windows and the EPS growth streak (epss)', () => {
     expect(metricPill(plain('TURN'), 'epss', file, false)).toBeNull();
     // A stock the streak fails still shows its (short) streak, so the list explains the exclusion
     expect(metricPill(plain('TEN'), 'epss', file)!.title).toContain('含虧轉盈');
+  });
+});
+
+describe('growth terms in the link: periods, threshold and 成長佔比 P', () => {
+  it('round-trips the share, and writes :P only when it is not the default 100', () => {
+    const text = 'eps:8:15:75;epsy:3:10:66.7;rev:12:-5;revy:2:0';
+    const parsed = state(text);
+    expect(parsed).toMatchObject({
+      eps: { quarters: 8, min: 15, share: 75 },
+      epsY: { years: 3, min: 10, share: 66.7 },
+      rev: { quarters: 12, min: -5, share: 100 },
+      revY: { years: 2, min: 0, share: 100 },
+    });
+    expect(serializeFilters(parsed)).toBe(text);
+    expect(serializeFilters(state('eps:4:30'))).toBe('eps:4:30'); // the old shape is canonical
+  });
+
+  it('drops a share outside 1–100 and any other wrong number of fields', () => {
+    for (const bad of ['eps:8:15:0', 'eps:8:15:101', 'eps:8:15:50:1', 'eps:8:15:', 'epsy:3:10:abc', 'epsy:11:10:50', 'eps:13:20:50']) {
+      expect(state(bad)).toMatchObject({ eps: null, epsY: null });
+    }
+    expect(state('eps:8:15:100').eps).toEqual({ quarters: 8, min: 15, share: 100 });
+  });
+
+  it('writes the chips and the sentence with the share, and keeps the old chip for P = 100', () => {
+    expect(activeChips(state('eps:8:15:75')).map((chip) => chip.label)).toEqual(['EPS YoY 近8季成長≥75%（≥15%）']);
+    expect(activeChips(state('epsy:3:10:66.7')).map((chip) => chip.label)).toEqual(['EPS 年增 近3年成長≥66.7%（≥10%）']);
+    expect(activeChips(state('eps:12:0')).map((chip) => chip.label)).toEqual(['EPS YoY 近12季皆≥0%']);
+    expect(activeChips(state('eps:1:15')).map((chip) => chip.label)).toEqual(['EPS YoY ≥15%']);
+    expect(gateSentence('EPS 年增', '季', 8, 15, 75)).toBe('近 8 季中至少 75% 的季度 EPS 年增 ≥ 15%');
+    expect(gateSentence('EPS 年增', '季', 8, 15, 100)).toBe('近 8 季的 EPS 年增皆 ≥ 15%');
+    expect(gateSentence('EPS 年增', '季', 1, 15, 100)).toBe('最近 1 季的 EPS 年增 ≥ 15%');
+    expect(gateSentence('EPS 年增', '年', 3, 10, 66.7)).toBe('近 3 年中至少 66.7% 的年度 EPS 年增 ≥ 10%');
+  });
+
+  it('says how many growth and decline periods a pass takes: ceil(N × P) growth, the rest decline', () => {
+    expect(gateCountText(8, 75)).toBe('成長 6 次／衰退 2 次');
+    expect(gateCountText(8, 100)).toBe('成長 8 次／衰退 0 次');
+    expect(gateCountText(3, 50)).toBe('成長 2 次／衰退 1 次'); // 1.5 → 2
+    expect(gateCountText(4, 75)).toBe('成長 3 次／衰退 1 次');
+    expect(enoughPeriods(1)).toBe(1);
+    expect(enoughPeriods(7)).toBe(4);
+    expect(enoughPeriods(12)).toBe(6);
+  });
+
+  it('offers 1 / 2 / 4 / 8 / 12 quarters and 1 / 2 / 3 / 5 / 10 years as quick choices', () => {
+    expect(QUARTER_PRESETS).toEqual([1, 2, 4, 8, 12]);
+    expect(YEAR_PRESETS).toEqual([1, 2, 3, 5, 10]);
+  });
+
+  it('tallies growth, decline and missing periods, and a turnaround by the switch', () => {
+    expect(gateTally([30, null, 10, null], 4, 20)).toEqual({ growth: 1, decline: 1, missing: 2, measured: 2 });
+    expect(gateTally([null, 30], 2, 20, [true], true)).toEqual({ growth: 2, decline: 0, missing: 0, measured: 2 });
+    expect(gateTally([null, 30], 2, 20, [true], false)).toEqual({ growth: 1, decline: 1, missing: 0, measured: 2 });
+    expect(gateTally(undefined, 3, 0)).toEqual({ growth: 0, decline: 0, missing: 3, measured: 0 });
+  });
+
+  it('shows the row count of growth and decline periods on the pill, with the sentence in the tooltip', () => {
+    const tsmc = row('2330.TW');
+    expect(metricPill(tsmc, 'eps', reportGrowth, true, { quarters: 2, min: 20, share: 100 })).toMatchObject({ text: 'EPS +30% 成2／衰0' });
+    const pill = metricPill(tsmc, 'eps', reportGrowth, true, { quarters: 2, min: 25, share: 100 })!;
+    expect(pill.text).toBe('EPS +30% 成1／衰1');
+    expect(pill.title).toContain('近2季：成長 1 季、衰退 1 季（YoY ≥ 25% 算成長）');
+    // A turnaround is growth with the switch on and a decline with it off
+    expect(metricPill(row('1301.TW'), 'eps', reportGrowth, true, { quarters: 2, min: 25, share: 100 })).toMatchObject({ text: 'EPS 轉盈 成2／衰0' });
+    expect(metricPill(row('1301.TW'), 'eps', reportGrowth, false, { quarters: 2, min: 25, share: 100 })).toMatchObject({ text: 'EPS 轉盈 成1／衰1' });
+    // Without an applied gate the pill is unchanged
+    expect(metricPill(tsmc, 'eps', reportGrowth)).toMatchObject({ text: 'EPS +30%' });
+  });
+
+  it('counts the rows with every year a streak of N needs (a gap or a short history leaves them out)', () => {
+    expect(streakCoverage(TW, reportGrowth, 3, true)).toBeGreaterThan(0);
+    expect(streakCoverage(TW, reportGrowth, 1, true)).toBeGreaterThanOrEqual(streakCoverage(TW, reportGrowth, 3, true));
+    expect(streakCoverage(TW, reportGrowth, 4, true)).toBe(0); // the fixture has three years
+    expect(streakCoverage(TW, null, 1, true)).toBe(0);
+  });
+
+  it('fits the longest realistic link (every condition, all numbers at their widest) in the parameter limit', () => {
+    const widest = state(
+      'chg:-12.35:100;ema20:-20:20;tr:a20,a50,a200,slope,stack,nobear;hi:20;rs:90;rs3:-99.99;rs1:-99.99;vr:99.99;eps:12:-1000.55:99.99;epsy:10:-1000.55:99.99;epss:10;rev:12:-1000.55:99.99;revy:10:-1000.55:99.99;acc:1;tn:0;nd:keep',
+    );
+    const text = serializeFilters(widest);
+    expect(text.length).toBeLessThanOrEqual(FILTER_PARAM_MAX);
+    expect(state(text)).toEqual(widest); // nothing dropped
+    expect(parseRoute(serializeRoute({ page: 'screener', group: 'universe-tw', f: text })).route).toEqual({ page: 'screener', group: 'universe-tw', f: text });
   });
 });

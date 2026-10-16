@@ -20,6 +20,8 @@ import build_growth as growth  # noqa: E402
 
 NOW = datetime(2026, 10, 14, 6, 0, tzinfo=timezone.utc)
 TODAY = NOW.date()
+# Long quarterly series end in 2026Q1: a date where that is still fresh (a quarter is stale after 270 days)
+SPRING = date(2026, 4, 15)
 SLOT = {"epsQ": 5, "revQ": 6, "epsY": 7, "revY": 8, "tQ": 9, "tY": 10, "qEnd": 3, "yEnd": 4, "lv": 1, "src": 2}
 
 
@@ -89,8 +91,9 @@ class QuarterlyAlignmentTest(unittest.TestCase):
             q(2026, 1, 1.5), q(2026, 2, 1.8),
         ]
         result = row_of(document(rows))
-        # slots: 2026Q2 (+50), 2026Q1 (+36.4), 2025Q4 (no period), 2025Q3 (+20 vs 2024Q3 = 2.0 -> 2.4)
-        self.assertEqual(result["epsQ"], [50.0, 36.4, None, 20.0])
+        # slots: 2026Q2 (+50), 2026Q1 (+36.4), 2025Q4 (no period), 2025Q3 (+20 vs 2024Q3 = 2.0 -> 2.4),
+        # 2025Q2 (+20 vs 2024Q2), 2025Q1 (+10 vs 2024Q1); 2024Q4 has no year-ago quarter in this file
+        self.assertEqual(result["epsQ"], [50.0, 36.4, None, 20.0, 20.0, 10.0])
 
     def test_pairs_by_fiscal_labels_for_a_non_calendar_year(self):
         rows = [
@@ -101,8 +104,9 @@ class QuarterlyAlignmentTest(unittest.TestCase):
             ("2025-03-29", 2025, 2, 1.0, 1.0, 100, None), ("2025-06-28", 2025, 3, 1.0, 1.0, 100, None),
         ]
         result = row_of(document(rows))
-        self.assertEqual(result["epsQ"], [50.0, 50.0, 0.0, 10.0])
-        self.assertEqual(result["revQ"], [50.0, 50.0, 0.0, 10.0])
+        # The fifth slot (2025Q4 against 2024Q4) is inside the 12-slot horizon too
+        self.assertEqual(result["epsQ"], [50.0, 50.0, 0.0, 10.0, 100.0])
+        self.assertEqual(result["revQ"], [50.0, 50.0, 0.0, 10.0, 100.0])
 
     def test_pair_with_dates_not_a_year_apart_is_null(self):
         # A fiscal year-end change: the "same" labelled quarter is 8 months earlier, so no YoY
@@ -123,6 +127,33 @@ class QuarterlyAlignmentTest(unittest.TestCase):
         # The newest period has only nulls (Yahoo placeholder): slot 0 is the newest period WITH data
         rows = [q(2025, 1, 1.0), q(2026, 1, 2.0), q(2026, 2)]
         self.assertEqual(row_of(document(rows))["epsQ"], [100.0])
+
+    @staticmethod
+    def steady_growth(count):
+        """`count` consecutive quarters from 2022Q1, every year +10% on the year before (EPS and revenue)."""
+        rows = []
+        for index in range(count):
+            fy, fq = 2022 + index // 4, index % 4 + 1
+            rows.append(q(fy, fq, 1.1 ** (index // 4), 100 * 1.1 ** (index // 4)))
+        return rows
+
+    def test_twelve_quarterly_slots_need_sixteen_quarters(self):
+        # 16 quarters (2022Q1..2025Q4): the newest quarter has a year-ago partner for all 12 slots
+        full = row_of(document(self.steady_growth(16)), today=SPRING)
+        self.assertEqual(full["epsQ"], [10.0] * 12)
+        self.assertEqual(full["revQ"], [10.0] * 12)
+        # 15 quarters (newest 2025Q3): only 11 slots have a quarter a year earlier
+        self.assertEqual(row_of(document(self.steady_growth(15)), today=SPRING)["epsQ"], [10.0] * 11)
+        # More history than the horizon: the thirteenth slot is never written
+        self.assertEqual(row_of(document(self.steady_growth(17)), today=SPRING)["epsQ"], [10.0] * 12)
+
+    def test_a_turnaround_in_the_oldest_of_twelve_quarters(self):
+        rows = self.steady_growth(16)
+        rows[0] = q(2022, 1, -1.0, 100)  # the year-ago base of 2023Q1 (slot 11) is a loss
+        result = row_of(document(rows), today=SPRING)
+        # The turnaround is the oldest slot (11): its YoY is null, so the trailing null is cut and the bit carries it
+        self.assertEqual(result["epsQ"], [10.0] * 11)
+        self.assertEqual(result["tQ"], 1 << 11)
 
 
 class EpsRulesTest(unittest.TestCase):
@@ -484,7 +515,8 @@ class RepoDataTest(unittest.TestCase):
         # Sizes of a full market (synthetic values with realistic lengths): reported, and kept in check
         self.assertLess(tw_bytes, 1_400_000)
         self.assertLess(us_bytes, 900_000)
-        self.assertLess(summary["bytes"], 1_300_000)
+        # 12 quarterly slots (was 4: about 1.3 MB): this synthetic full market comes to about 1.41 MB
+        self.assertLess(summary["bytes"], 1_500_000)
         print(f"\n[full-market sizes] tw.json {tw_bytes:,} B, us-sec.json {us_bytes:,} B, "
               f"growth.json {summary['bytes']:,} B for {summary['rows']:,} rows")
 
@@ -496,9 +528,9 @@ class RepoDataTest(unittest.TestCase):
             out = os.path.join(tmp, "growth.json")
             summary = growth.run(directory, out, NOW)
             self.assertEqual(summary["unreadable"], [])
-            # Annual YoY now runs to 10 years (YEAR_SLOTS): the 2026-10-15 financials give 743,191 B
-            # (571,112 B with the old 3-year arrays, +30%; about 200 KB gzipped). 800,000 B leaves a small margin.
-            self.assertLess(summary["bytes"], 800_000)
+            # Quarterly YoY runs to 12 quarters (QUARTER_SLOTS) and annual to 10 years (YEAR_SLOTS): the 2026-10-16
+            # financials give about 1.02 MB (743 KB with 4 quarters). 1,100,000 B leaves a small margin.
+            self.assertLess(summary["bytes"], 1_100_000)
             with open(out, encoding="utf-8") as file:
                 data = json.load(file)
         markets = {growth.market_of(row[0]) for row in data["rows"]}

@@ -23,7 +23,7 @@ describe('us-growth.json', () => {
 
   it('is tolerant per record and strict about the document', () => {
     expect(parseGrowthRecord({ epsYoY: [12, 'x', '3.5', null, 9, 9], revYoY: 'bad', epsTurn: 'yes', basis: 'basic', latest: 'soon' })).toEqual({
-      epsYoY: [12, null, 3.5, null],
+      epsYoY: [12, null, 3.5, null, 9, 9], // up to the 12-quarter horizon of growth.json (the Yahoo file has four)
       revYoY: [],
       epsTurn: false,
       epsTurnQ: [false],

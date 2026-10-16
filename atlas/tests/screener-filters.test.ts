@@ -50,8 +50,8 @@ describe('filter encoding', () => {
       rs3: null,
       rs1: null,
       vr: 1.5,
-      eps: { quarters: 2, min: 20 },
-      rev: { quarters: 1, min: 10 },
+      eps: { quarters: 2, min: 20, share: 100 },
+      rev: { quarters: 1, min: 10, share: 100 },
       epsY: null,
       revY: null,
       epss: null,
@@ -238,8 +238,10 @@ describe('applyFilters', () => {
     expect(passing.length).toBeGreaterThan(0);
     for (const row of passing) {
       const record = growth.items.get(row.symbol)!;
-      expect(record.epsYoY[0]! >= 20 || (record.epsYoY[0] === null && record.epsTurn)).toBe(true);
-      expect(record.epsYoY[1]!).toBeGreaterThanOrEqual(20);
+      // The latest two quarters with data: each grows 20% or more, a turnaround counts; a missing one is left out
+      const judged = [0, 1].filter((slot) => record.epsYoY[slot] !== null || (slot === 0 && record.epsTurn));
+      expect(judged.length).toBeGreaterThanOrEqual(1);
+      for (const slot of judged) expect(record.epsYoY[slot] === null ? record.epsTurn : record.epsYoY[slot]! >= 20).toBe(true);
     }
     // Taiwan rows have no record in the US file: nothing there to filter on, so the condition is skipped and flagged.
     expect(applyFilters(TW, gate, { market: 'TW', growth })).toHaveLength(TW.length);
@@ -254,18 +256,22 @@ describe('applyFilters', () => {
 
   it('excludes or keeps stocks with insufficient fundamentals per the switch', () => {
     const rivian = US.find((row) => row.symbol === 'RIVN')!; // no record at all
-    const tesla = US.find((row) => row.symbol === 'TSLA')!; // a missing third quarter
-    const intel = US.find((row) => row.symbol === 'INTC')!; // loss → profit, YoY undefined
+    const tesla = US.find((row) => row.symbol === 'TSLA')!; // a missing third quarter: two of three have data
+    const intel = US.find((row) => row.symbol === 'INTC')!; // loss → profit: the only number is the turnaround
+    // Fewer than ceil(3 / 2) = 2 periods with data is 「資料不足」: excluded, or kept with nd:keep
     const strict = applyFilters([rivian, tesla, intel], state('eps:3:-1000'), us);
-    expect(strict.map((row) => row.symbol)).toEqual([]);
+    expect(strict.map((row) => row.symbol)).toEqual(['TSLA']);
     const keep = applyFilters([rivian, tesla, intel], state('eps:3:-1000;nd:keep'), us);
     expect(keep.map((row) => row.symbol)).toEqual(['RIVN', 'TSLA', 'INTC']);
-    // A loss-to-profit turn passes a one-quarter gate even when strict.
+    // A loss-to-profit turn is growth in a one-quarter gate (含虧轉盈 on) …
     expect(applyFilters([intel], state('eps:1:25'), us)).toEqual([intel]);
-    expect(growthGatePasses([30, null], { quarters: 2, min: 20 }, false)).toBe(false);
-    expect(growthGatePasses([30, null], { quarters: 2, min: 20 }, true)).toBe(true);
-    expect(growthGatePasses([30, 10], { quarters: 2, min: 20 }, true)).toBe(false);
-    expect(growthGatePasses([null, 40], { quarters: 2, min: 20 }, false, true)).toBe(true);
+    // … and a decline with the switch off, which the keep switch does not rescue (it is not missing data)
+    expect(applyFilters([intel], state('eps:1:25;tn:0;nd:keep'), us)).toEqual([]);
+    expect(growthGatePasses([30, null], { quarters: 2, min: 20 }, false)).toBe(true); // one of two with data is enough
+    expect(growthGatePasses([30, null, null], { quarters: 3, min: 20 }, false)).toBe(false); // one of three is not
+    expect(growthGatePasses([30, null, null], { quarters: 3, min: 20 }, true)).toBe(true);
+    expect(growthGatePasses([30, 10], { quarters: 2, min: 20 }, true)).toBe(false); // one of two grows: 50% < 100%
+    expect(growthGatePasses([null, 40], { quarters: 2, min: 20 }, false, [true], true)).toBe(true);
     expect(growthGatePasses(undefined, { quarters: 1, min: 0 }, false)).toBe(false);
   });
 });
