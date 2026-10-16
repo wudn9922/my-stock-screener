@@ -100,7 +100,7 @@ PR #79 基準已包含前一階段的 87 個 SEC 官方 Q4 值、60 檔公司及
 
 完整按財年、股票、EPS 欄位的表在 [q4-eps-coverage-by-fiscal-year.csv](q4-eps-coverage-by-fiscal-year.csv)、[q4-eps-coverage-by-symbol.csv](q4-eps-coverage-by-symbol.csv)；計算摘要在 [q4-eps-coverage.json](q4-eps-coverage.json)。Q4 任一 EPS 欄位具 A/B 的期別數是 2,971（6.81%）。這不是全選股資料的覆蓋率：P/E river 仍能用年度 EPS fallback；本次不改動選股門檻或自動選股規則。
 
-對 `growth.json` 的基準比較：US quarterly EPS YoY 有 5,017 個值變 null、6 個值改變，沒有 null 變成 EPS YoY 值；annual EPS YoY 有 1 個值變 null（PRPL）；US revenue YoY 數值完全不變；輸出列數 6,593→6,592（PRPL 的被隔離年 EPS 不再輸出 EPS YoY）。Q4 等級門檻只套在美股，台股 EPS 與成長流程維持原行為。
+對 `growth.json` 的基準比較：US quarterly EPS YoY 有 5,017 個值變 null、6 個值改變，沒有 null 變成 EPS YoY 值；annual EPS YoY 有 1 個值變 null（PRPL）；US revenue YoY 數值完全不變；基準 growth 為 6,593 列；最新重建輸出 6,591 列。PRPL 的矛盾年度 EPS 已隔離，其相應 YoY 值不作正式輸出。Q4 等級門檻只套在美股，台股 EPS 與成長流程維持原行為。
 
 P/E river 的純資料影響，以 2026-10-16 為觀察日、按現有 `FinancialHistory` / `peRiver.epsAt` 規則重算：4,967 檔美股中 3,024 檔目前 EPS(TTM)/annual 輸入變動；TTM 可用檔數 3,068→55，年度 fallback 1,371→4,383，無 EPS 528→529。正 EPS 檔數 2,466→2,444；119 檔由正值轉成非正／無值，97 檔反向改變。台股 510 檔沒有變動。這是 Q4 正式等級 gate 導致的審慎資料效果，不表示 216 檔實際買賣決策已翻轉；repo 沒有由 P/E river 驅動的自動選股規則，也未使用即時價格重演所有估值門檻。逐檔前後資料與可重現程式見 [q4-eps-ttm-impact.json](q4-eps-ttm-impact.json)、[q4-eps-ttm-impact-by-symbol.csv](q4-eps-ttm-impact-by-symbol.csv)、`atlas/scripts/report_q4_eps_ttm_impact.py`。
 
