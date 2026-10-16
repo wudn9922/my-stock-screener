@@ -25,6 +25,9 @@ RELEASE = """
 """
 
 
+END = "2024-12-31"
+
+
 def table_of(html):
     return bq.tables_of(html)[0]
 
@@ -46,7 +49,7 @@ class NumberAndRowTests(unittest.TestCase):
 
 class TableEpsTests(unittest.TestCase):
     def test_matches_the_column_with_the_stored_net_income_in_thousands(self):
-        result, reason = bq.table_eps(table_of(RELEASE), 1_234_000)
+        result, reason = bq.table_eps(table_of(RELEASE), 1_234_000, END)
         self.assertIsNone(reason)
         self.assertEqual(result["epsDiluted"], 0.25)
         self.assertEqual(result["epsBasic"], 0.26)
@@ -54,32 +57,55 @@ class TableEpsTests(unittest.TestCase):
         self.assertEqual(result["scale"], 1000)
 
     def test_prior_year_column_is_used_when_it_is_the_stored_quarter(self):
-        result, _ = bq.table_eps(table_of(RELEASE), -567_000)
+        result, _ = bq.table_eps(table_of(RELEASE), -567_000, END)
         self.assertEqual(result["epsDiluted"], -0.12)
         self.assertEqual(result["dilutedShares"], 4_700_000)
 
     def test_a_table_without_this_quarter_is_not_a_candidate(self):
-        self.assertEqual(bq.table_eps(table_of(RELEASE), 999), (None, None))
+        self.assertEqual(bq.table_eps(table_of(RELEASE), 999, END), (None, None))
 
     def test_ambiguous_columns_are_rejected(self):
-        html = ("<table><tr><td>Net income</td><td>1,000</td><td>1,000</td></tr>"
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                "<tr><td>Net income</td><td>1,000</td><td>1,000</td></tr>"
                 "<tr><td>Diluted earnings per share</td><td>1.00</td><td>1.00</td></tr></table>")
-        result, reason = bq.table_eps(table_of(html), 1_000_000)
+        result, reason = bq.table_eps(table_of(html), 1_000_000, END)
         self.assertIsNone(result)
         self.assertEqual(reason, "net income matches more than one column or unit")
 
     def test_eps_sign_must_follow_net_income(self):
-        html = ("<table><tr><td>Net loss</td><td>(100</td></tr>"
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td></tr>"
+                "<tr><td>Net loss</td><td>(100</td></tr>"
                 "<tr><td>Diluted earnings per share</td><td>0.50</td></tr></table>")
-        result, reason = bq.table_eps(table_of(html), -100_000)
+        result, reason = bq.table_eps(table_of(html), -100_000, END)
         self.assertIsNone(result)
         self.assertEqual(reason, "EPS sign differs from net income")
 
     def test_net_income_divided_by_shares_must_agree_with_eps(self):
         html = RELEASE.replace("<td>0.25</td>", "<td>0.40</td>")
-        result, reason = bq.table_eps(table_of(html), 1_234_000)
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
         self.assertIsNone(result)
         self.assertEqual(reason, "net income divided by shares differs from EPS")
+
+    def test_a_table_for_another_period_is_not_used(self):
+        result, reason = bq.table_eps(table_of(RELEASE), 1_234_000, "2023-06-30")
+        self.assertEqual((result, reason), (None, None))
+
+    def test_the_period_name_must_match_month_and_year(self):
+        self.assertTrue(bq.shows_period("Three Months Ended February 1, 2020", "2020-02-01"))
+        self.assertTrue(bq.shows_period("three months ended Jan. 31, 2026", "2026-01-31"))
+        self.assertFalse(bq.shows_period("Twelve Months Ended December 31, 2023", "2024-12-31"))
+
+
+class SplitAndToleranceTests(unittest.TestCase):
+    def test_split_factor_counts_only_splits_after_the_filing(self):
+        doc = {"split": {"events": [["2000-06-19", 3], ["2021-07-20", 4], ["2024-06-10", 10]]}}
+        self.assertEqual(bq.split_factor(doc, "2020-02-05"), 40.0)
+        self.assertEqual(bq.split_factor(doc, "2024-08-01"), 1.0)
+        self.assertEqual(bq.split_factor({}, "2020-02-05"), 1.0)
+
+    def test_one_cent_rounding_is_within_tolerance(self):
+        self.assertTrue(bq.within_tolerance(0.24, 0.25))
+        self.assertFalse(bq.within_tolerance(0.20, 0.25))
 
 
 class FilingTests(unittest.TestCase):
