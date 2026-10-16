@@ -219,6 +219,7 @@ export const GROWTH_ORIGIN_LABELS: Record<GrowthOrigin, string> = {
   sec: 'SEC 財報（companyfacts）',
   yahoo: 'Yahoo 財報',
   mops: '公開資訊觀測站（官方財報）',
+  finmind: 'FinMind（源自公開資訊觀測站）',
   frames: 'SEC XBRL frames',
   'us-growth': 'Yahoo Finance 季資料',
 };
