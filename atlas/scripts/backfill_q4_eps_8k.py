@@ -379,6 +379,7 @@ def from_filing(sec, cik, filing, target, end, debug=None):
             debug.append({"index_items": [item.get("name") for item in items][:12]})
         return None, "no EX-99 exhibit in the filing"
     found, shown = [], []
+    orphans = {"net_tables_without_period": 0, "period_in_previous_table": 0, "sample": []}
     reason = "no table shows this quarter's net income"
     for position, name in enumerate(exhibits + extra):
         if position >= len(exhibits) and found:
@@ -387,18 +388,29 @@ def from_filing(sec, cik, filing, target, end, debug=None):
         text = sec.get_text(url)
         if text is None:
             continue
+        previous = ""
         for table in tables_of(text):
+            table_text = " ".join(" ".join(row) for row in table)
             result, why = table_eps(table, target, end)
             if result is not None:
                 found.append(dict(result, accession=accession, url=url))
             elif why:
                 reason = why
-            elif debug is not None and shows_period(" ".join(" ".join(row) for row in table), end):
+            elif debug is not None and shows_period(table_text, end):
                 shown += [[label.lower(), values] for label, values in (row_of(cells) for cells in table)
                           if label and is_net_income(label.lower())]
+            elif debug is not None and any(label and is_net_income(label.lower())
+                                           for label in (row_of(cells)[0] for cells in table)):
+                # a net income table without its period name: is the name in the table just before it?
+                orphans["net_tables_without_period"] += 1
+                if shows_period(previous, end):
+                    orphans["period_in_previous_table"] += 1
+                if len(orphans["sample"]) < 2:
+                    orphans["sample"].append([" | ".join(cell for cell in row if cell)[:120] for row in table[:3]])
+            previous = table_text
     if not found:
         if debug is not None:
-            debug.append({"target": target, "period_net_rows": shown[:4]})
+            debug.append({"target": target, "period_net_rows": shown[:4], "orphans": orphans})
             text = sec.get_text(base + (exhibits + extra)[0]) or ""
             debug.append({"net_like_text": re.findall(r">\s*([^<>]{0,80}net[^<>]{0,60})<", text, re.I)[:6]})
         return None, reason
