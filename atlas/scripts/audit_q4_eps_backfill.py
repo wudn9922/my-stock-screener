@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""Offline audit of missing Q4 diluted EPS and the proposed share-count estimate.
+"""Offline audit/backtest for missing Q4 diluted EPS and the share-count estimate.
 
-This script is read-only. It reports the current Q4 missing-EPS classification and
-back-tests method B against existing Q4 diluted EPS. It never edits financial files.
+Default mode is read-only. --apply-method-b fills only null diluted EPS values whose
+matching subgroups pass the median/P90 error gates.
 """
 import argparse
 import json
 import math
 import sys
 from collections import Counter
-from datetime import date, timedelta
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 SCRIPTS = str(Path(__file__).resolve().parent)
@@ -18,6 +17,7 @@ if SCRIPTS not in sys.path:
     sys.path.insert(0, SCRIPTS)
 
 import build_financials as fin  # noqa: E402
+from build_valuation_us import write_atomic  # noqa: E402
 
 
 REASONS = (
@@ -26,6 +26,13 @@ REASONS = (
     "年度與季度股數差超過25%",
     "其他",
 )
+METHOD_B_GROUP = "strict-positive"
+METHOD_B_GROUP_LABEL = "Q1–Q3 與年度 dilutedShares 差 ≤2%、Q4 淨利為正、推算股數在 Q3 ±15%"
+METHOD_B_SHARE_RANGE_MAX = Decimal("0.02")
+METHOD_B_Q3_DEVIATION_MAX = Decimal("0.15")
+METHOD_B_ERROR_FLOOR = Decimal("0.10")
+METHOD_B_MEDIAN_MAX = Decimal("0.02")
+METHOD_B_P90_MAX = Decimal("0.06")
 
 
 def value(block, field, index):
@@ -185,101 +192,220 @@ def percentile(values, p):
     return values[lower] + (values[upper] - values[lower]) * (position - lower)
 
 
-def has_split_in_fiscal_year(document, annual, annual_index):
-    annual_ends = annual.get("end") or []
-    if annual_index >= len(annual_ends):
-        return False
+def _decimal(value_):
+    if isinstance(value_, bool) or value_ is None:
+        return None
     try:
-        end = date.fromisoformat(annual_ends[annual_index])
-    except (TypeError, ValueError):
-        return False
-    prior_ends = []
-    for value_ in annual_ends:
-        try:
-            candidate = date.fromisoformat(value_)
-        except (TypeError, ValueError):
-            continue
-        if candidate < end:
-            prior_ends.append(candidate)
-    start = max(prior_ends) + timedelta(days=1) if prior_ends else end - timedelta(days=370)
-    events = (document.get("split") or {}).get("events") or []
-    for event in events:
-        if not isinstance(event, (list, tuple)) or not event:
-            continue
-        try:
-            split_day = date.fromisoformat(event[0])
-        except (TypeError, ValueError):
-            continue
-        if start <= split_day <= end:
-            return True
-    return False
+        result = Decimal(str(value_))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    return result if result.is_finite() else None
 
 
-def validate_method_b(document):
-    """Back-test the diluted-share estimate on eligible existing Q4 diluted EPS."""
+def method_b_observation(document, q4_index):
+    """Build the strict positive-income estimate; return (record, rejection reason)."""
     annual = document.get("annual") or {}
     quarterly = document.get("quarterly") or {}
     annual_by_fy = annual_rows_by_fy(annual)
     quarter_by_fy = quarter_rows_by_fy(quarterly)
+    fys = quarterly.get("fy") or []
+    fqs = quarterly.get("fq") or []
+    if q4_index >= len(fys) or q4_index >= len(fqs):
+        return None, "missing_annual_or_q123"
+    fy = fys[q4_index]
+    annual_matches = annual_by_fy.get(fy, [])
+    q123 = [quarter_by_fy.get(fy, {}).get(q, []) for q in (1, 2, 3)]
+    q4_matches = quarter_by_fy.get(fy, {}).get(4, [])
+    if (len(annual_matches) != 1 or any(len(matches) != 1 for matches in q123)
+            or len(q4_matches) != 1 or q4_matches[0] != q4_index):
+        return None, "missing_annual_or_q123"
+
+    annual_index = annual_matches[0]
+    q123_indices = [matches[0] for matches in q123]
+    annual_shares = _decimal(value(annual, "dilutedShares", annual_index))
+    q123_shares = [_decimal(value(quarterly, "dilutedShares", index)) for index in q123_indices]
+    if annual_shares is None or annual_shares <= 0 or any(shares is None or shares <= 0 for shares in q123_shares):
+        return None, "missing_share_inputs"
+
+    net_income = _decimal(value(quarterly, "netIncome", q4_index))
+    if net_income is None:
+        return None, "no_q4_income"
+    if net_income <= 0:
+        return None, "q4_income_not_positive"
+
+    all_shares = [annual_shares, *q123_shares]
+    if max(all_shares) / min(all_shares) - 1 > METHOD_B_SHARE_RANGE_MAX:
+        return None, "share_range_over_2pct"
+
+    q4_shares = Decimal(4) * annual_shares - sum(q123_shares, Decimal(0))
+    if q4_shares <= 0:
+        return None, "nonpositive_estimated_q4_shares"
+    if abs(q4_shares / q123_shares[2] - 1) > METHOD_B_Q3_DEVIATION_MAX:
+        return None, "estimated_shares_outside_q3_15pct"
+
+    estimate = net_income / q4_shares
+    if estimate <= 0:
+        return None, "nonpositive_estimate"
+    return {
+        "fy": fy,
+        "end": (quarterly.get("end") or [None] * (q4_index + 1))[q4_index],
+        "netIncome": net_income,
+        "annualShares": annual_shares,
+        "q123Shares": q123_shares,
+        "q4Shares": q4_shares,
+        "estimate": estimate,
+    }, None
+
+
+def validate_method_b(document):
+    """Back-test the share-count estimate on all eligible existing Q4 diluted EPS."""
+    quarterly = document.get("quarterly") or {}
     counts = Counter()
     errors = []
-
-    for index, (fy, fq) in enumerate(zip(quarterly.get("fy") or [], quarterly.get("fq") or [])):
+    for index, fq in enumerate(quarterly.get("fq") or []):
         if fq != 4 or value(quarterly, "epsDiluted", index) is None:
             continue
         counts["existing_q4_eps"] += 1
-        net_income = value(quarterly, "netIncome", index)
-        if net_income is None:
-            counts["no_q4_income"] += 1
+        observation, reason = method_b_observation(document, index)
+        if reason:
+            counts[reason] += 1
             continue
+        actual = _decimal(value(quarterly, "epsDiluted", index))
+        if actual is None:
+            counts["missing_actual_eps"] += 1
+            continue
+        errors.append(abs(observation["estimate"] - actual) / max(abs(actual), METHOD_B_ERROR_FLOOR))
         counts["with_q4_income"] += 1
-
-        annual_matches = annual_by_fy.get(fy, [])
-        q123 = [quarter_by_fy.get(fy, {}).get(q, []) for q in (1, 2, 3)]
-        if len(annual_matches) != 1 or any(len(matches) != 1 for matches in q123):
-            counts["missing_annual_or_q123"] += 1
-            continue
-        annual_index = annual_matches[0]
-        q123_indices = [matches[0] for matches in q123]
-        annual_shares = value(annual, "dilutedShares", annual_index)
-        q123_shares = [value(quarterly, "dilutedShares", q_index) for q_index in q123_indices]
-        if annual_shares is None or annual_shares <= 0 or any(
-            shares is None or shares <= 0 for shares in q123_shares
-        ):
-            counts["missing_share_inputs"] += 1
-            continue
-
-        q4_shares = Decimal(4) * Decimal(str(annual_shares)) - sum(
-            (Decimal(str(shares)) for shares in q123_shares), Decimal(0)
-        )
-        if q4_shares <= 0:
-            counts["nonpositive_estimated_q4_shares"] += 1
-            continue
-        q3_shares = Decimal(str(q123_shares[2]))
-        if abs(q4_shares / q3_shares - 1) > Decimal("0.15"):
-            counts["outside_q3_15pct"] += 1
-            continue
-        if has_split_in_fiscal_year(document, annual, annual_index) and any(
-            abs(Decimal(str(shares)) / Decimal(str(annual_shares)) - 1) > Decimal("0.25")
-            for shares in q123_shares
-        ):
-            counts["split_share_mismatch_over_25pct"] += 1
-            continue
-
-        estimate = (Decimal(str(net_income)) / q4_shares).quantize(
-            Decimal("0.001"), rounding=ROUND_HALF_UP
-        )
-        if estimate == 0 or (estimate > 0) != (Decimal(str(net_income)) > 0):
-            counts["wrong_or_zero_sign"] += 1
-            continue
-        actual = Decimal(str(value(quarterly, "epsDiluted", index)))
-        if actual == 0:
-            counts["zero_actual_eps"] += 1
-            continue
-        errors.append(abs(estimate - actual) / abs(actual))
-
     counts["eligible_compared"] = len(errors)
     return counts, errors
+
+
+def method_b_subgroup_backtest(directory):
+    """Back-test the strict subgroup using existing Q4 diluted EPS values."""
+    errors = {METHOD_B_GROUP: []}
+    skipped = Counter()
+    for path in sorted(Path(directory).glob("*.json")):
+        if path.name == "index.json":
+            continue
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if document.get("market") != "US":
+            continue
+        quarterly = document.get("quarterly") or {}
+        for index, fq in enumerate(quarterly.get("fq") or []):
+            if fq != 4 or value(quarterly, "epsDiluted", index) is None:
+                continue
+            observation, reason = method_b_observation(document, index)
+            if reason:
+                skipped[reason] += 1
+                continue
+            actual = _decimal(value(quarterly, "epsDiluted", index))
+            if actual is None:
+                skipped["invalid_actual_eps"] += 1
+                continue
+            error = abs(observation["estimate"] - actual) / max(abs(actual), METHOD_B_ERROR_FLOOR)
+            errors[METHOD_B_GROUP].append(error)
+    return errors, skipped
+
+
+def method_b_subgroup_report(errors):
+    report = {}
+    for key, label in ((METHOD_B_GROUP, METHOD_B_GROUP_LABEL),):
+        values = errors.get(key) or []
+        median = percentile(values, 0.5)
+        p90 = percentile(values, 0.9)
+        report[key] = {
+            "label": label,
+            "n": len(values),
+            "median": median,
+            "p90": p90,
+            "passed": (
+                median is not None and p90 is not None
+                and Decimal(str(median)) <= METHOD_B_MEDIAN_MAX
+                and Decimal(str(p90)) <= METHOD_B_P90_MAX
+            ),
+            "filled": 0,
+        }
+    return report
+
+
+def apply_method_b(directory, report, dry_run=False):
+    """Fill null diluted Q4 EPS only when the strict subgroup passes its back-test."""
+    summary = {"fills": [], "skipped": Counter(), "writtenFiles": set()}
+    if not report.get(METHOD_B_GROUP, {}).get("passed", False):
+        summary["skipped"]["strict-subgroup-validation-failed"] += 1
+        return summary
+    for path in sorted(Path(directory).glob("*.json")):
+        if path.name == "index.json":
+            continue
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            summary["skipped"]["corrupt"] += 1
+            continue
+        if document.get("market") != "US":
+            continue
+        quarterly = document.get("quarterly") or {}
+        if not isinstance(quarterly, dict):
+            continue
+        eps_values = (quarterly.get("values") or {}).get("epsDiluted")
+        if not isinstance(eps_values, list):
+            eps_values = [None] * len(quarterly.get("end") or [])
+        dirty = False
+        for index, fq in enumerate(quarterly.get("fq") or []):
+            if fq != 4:
+                continue
+            if index < len(eps_values) and eps_values[index] is not None:
+                continue
+            observation, reason = method_b_observation(document, index)
+            if reason:
+                summary["skipped"][reason] += 1
+                continue
+            stored = round(float(observation["estimate"]), 4)
+            if not math.isfinite(stored) or stored == 0:
+                summary["skipped"]["invalid-rounded-estimate"] += 1
+                continue
+            # Recheck the value immediately before setting it; existing EPS is never replaced.
+            if index < len(eps_values) and eps_values[index] is not None:
+                summary["skipped"]["value-became-non-null"] += 1
+                continue
+            summary["fills"].append({
+                "symbol": path.stem,
+                "fy": observation["fy"],
+                "end": observation["end"],
+                "value": stored,
+            })
+            if dry_run:
+                continue
+
+            while len(eps_values) <= index:
+                eps_values.append(None)
+            eps_values[index] = stored
+            quarterly.setdefault("values", {})["epsDiluted"] = eps_values
+            derived = quarterly.get("derived")
+            if not isinstance(derived, list):
+                derived = []
+            while len(derived) < len(quarterly.get("end") or []):
+                derived.append(None)
+            derived[index] = 1
+            quarterly["derived"] = derived
+            quality = document.setdefault("quality", {})
+            issue_codes = quality.get("issues")
+            codes = set(issue_codes if isinstance(issue_codes, list) else [])
+            codes.add("q4-eps-from-shares")
+            quality["issues"] = [code for code in fin.ISSUES if code in codes] + sorted(
+                code for code in codes if code not in fin.ISSUES
+            )
+            dirty = True
+        if dirty:
+            write_atomic(str(path), document)
+            summary["writtenFiles"].add(path.stem)
+    summary["filledPeriods"] = len({(fill["symbol"], fill["end"]) for fill in summary["fills"]})
+    summary["writtenFiles"] = len(summary["writtenFiles"])
+    report[METHOD_B_GROUP]["filled"] = summary["filledPeriods"]
+    return summary
 
 
 def audit(directory):
@@ -321,7 +447,11 @@ def main(argv=None):
         default=str(Path(__file__).resolve().parents[2] / "docs" / "report" / "financials"),
         help="financial JSON directory (default: docs/report/financials)",
     )
+    parser.add_argument("--apply-method-b", action="store_true", help="fill null diluted Q4 EPS if the strict subgroup passes")
+    parser.add_argument("--dry-run", action="store_true", help="preview Method B fills without writing files")
     args = parser.parse_args(argv)
+    if args.dry_run and not args.apply_method_b:
+        parser.error("--dry-run requires --apply-method-b")
     periods, counts, errors, q4_missing_income = audit(args.dir)
     unique_files = {symbol for symbol, _fy, _end, _reason, _detail in periods}
     reason_periods = Counter(reason for _symbol, _fy, _end, reason, _detail in periods)
@@ -338,22 +468,42 @@ def main(argv=None):
     for detail in sorted(other_periods):
         files = {symbol for symbol, _fy, _end, row_detail in other if row_detail == detail}
         print(f"{detail}\t{other_periods[detail]}\t{len(files)}")
-    print("method B validation (existing Q4 diluted EPS, all sources):")
+    print("method B strict-subgroup exclusions among existing Q4 EPS:")
     for name in (
-        "existing_q4_eps", "eligible_compared", "no_q4_income", "missing_annual_or_q123",
-        "missing_share_inputs", "nonpositive_estimated_q4_shares", "outside_q3_15pct",
-        "split_share_mismatch_over_25pct", "wrong_or_zero_sign", "zero_actual_eps",
+        "existing_q4_eps", "eligible_compared", "no_q4_income", "q4_income_not_positive",
+        "missing_annual_or_q123", "missing_share_inputs", "share_range_over_2pct",
+        "nonpositive_estimated_q4_shares", "estimated_shares_outside_q3_15pct",
+        "nonpositive_estimate", "missing_actual_eps",
     ):
         print(f"  {name}: {counts[f'method_b:{name}']}")
-    n = len(errors)
-    median = percentile(errors, 0.5)
-    p90 = percentile(errors, 0.9)
-    over_5 = sum(error > Decimal("0.05") for error in errors)
-    print(f"  median relative error: {median * 100:.2f}%" if median is not None else "  median relative error: N/A")
-    print(f"  P90 relative error: {p90 * 100:.2f}%" if p90 is not None else "  P90 relative error: N/A")
-    print(f"  relative error >5%: {over_5}/{n} ({over_5 / n * 100:.2f}%)" if n else "  relative error >5%: N/A")
-    passed = median is not None and p90 is not None and median <= 0.02 and p90 <= 0.06
-    print(f"  method B gate: {'PASS' if passed else 'FAIL'} (median <=2%, P90 <=6%)")
+    subgroup_errors, subgroup_skipped = method_b_subgroup_backtest(args.dir)
+    subgroup_report = method_b_subgroup_report(subgroup_errors)
+    item = subgroup_report[METHOD_B_GROUP]
+    median_text = "N/A" if item["median"] is None else f"{item['median'] * 100:.2f}%"
+    p90_text = "N/A" if item["p90"] is None else f"{item['p90'] * 100:.2f}%"
+    print("method B validation (existing Q4 EPS; error = |estimate − actual| / max(|actual|, 0.10)):")
+    print(f"  strict subgroup quarters={item['n']}, median={median_text}, P90={p90_text}, "
+          f"gate={'PASS' if item['passed'] else 'FAIL'} (median ≤2%, P90 ≤6%)")
+    summary = None
+    if args.apply_method_b:
+        if not item["passed"]:
+            print("Method B stopped: strict-subgroup validation threshold failed; no EPS values were written.")
+            return 2
+        summary = apply_method_b(args.dir, subgroup_report, dry_run=args.dry_run)
+    if subgroup_skipped:
+        print("method B backtest exclusions: " + ", ".join(
+            f"{reason} {count}" for reason, count in sorted(subgroup_skipped.items())
+        ))
+    if summary is not None:
+        mode = "would fill" if args.dry_run else "filled"
+        print(f"Method B {mode}: {summary['filledPeriods']} unique Q4 quarters "
+              f"({len(summary['fills'])} subgroup-quarter memberships; "
+              f"{summary['writtenFiles']} files written).")
+        if summary["skipped"]:
+            print("Method B candidates skipped: " + ", ".join(
+                f"{reason} {count}" for reason, count in sorted(summary["skipped"].items())
+            ))
+        print(f"  strict subgroup filled quarters: {item['filled']}")
     return 0
 
 
