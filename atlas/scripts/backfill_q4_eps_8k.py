@@ -248,6 +248,8 @@ def table_eps(table, target, end):
         return None, "EPS is empty in the matched column"
     if eps == 0:
         return None, "EPS is zero"
+    if abs(eps) >= 1000:
+        return None, "EPS is out of range (a share count?)"
     net = net_row[j] * scale
     if (eps > 0) != (net > 0):
         return None, "EPS sign differs from net income"
