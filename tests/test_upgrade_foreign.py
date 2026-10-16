@@ -206,6 +206,18 @@ class UpgradeMergeTests(unittest.TestCase):
         # the rest of Yahoo's periods still merge
         self.assertEqual(column(quarterly, "revenue")["2026-06-30"], 19_000_000_000)
 
+    def test_no_sec_eps_takes_yahoo_eps_on_one_basis(self):
+        """SEC carries no EPS at all: every EPS of the result is Yahoo's (per ADR, one basis), so they merge."""
+        sec_document = tsm_sec()
+        for name in ("annual", "quarterly"):
+            for field in ("epsBasic", "epsDiluted"):
+                sec_document[name]["values"].pop(field, None)
+        document, info = sec.upgrade_document(tsm_yahoo(), sec_document, "TSM", NOW, None)
+        self.assertIsNone(info["epsBasis"])
+        self.assertNotIn("adrRatio", document)
+        self.assertAlmostEqual(column(document["annual"], "epsBasic")["2023-12-31"], ADR * 10.0)
+        self.assertEqual(column(document["quarterly"], "dilutedShares")["2026-06-30"], 5_200_000_000)
+
     def test_asml_type_us_gaap_eur_has_unity_ratio(self):
         """US GAAP foreign filer, EUR, EPS equal on both sides (k = 1): unity, no rescale."""
         document, info = sec.upgrade_document(asml_yahoo(), asml_sec(), "ASML", NOW, None)

@@ -127,7 +127,6 @@ from build_financials import (
     fiscal_quarter,
     fiscal_year,
     fy_end_month,
-    has_eps,
     market_of,
     merge_events,
     merge_revisions,
@@ -144,7 +143,6 @@ from build_financials import (
     revision,
     share_jump,
     shares_of,
-    without_per_share,
     write_section,
 )
 
@@ -2693,11 +2691,8 @@ def upgrade_document(previous, sec, key, now, fetch_splits=None):
 
     stored = {"annual": sec_stored["annual"], "quarterly": sec_stored["quarterly"]}
     new = {"annual": dedupe(yahoo["annual"]), "quarterly": dedupe(yahoo["quarterly"])}
+    # None (no SEC EPS at all): every EPS of the result comes from Yahoo, one basis, so they are merged
     eps_state, ratio, reason, new = resolve_eps_basis(stored, new, today_iso)
-    if eps_state is None and any(has_eps(items) for items in new.values()):
-        # Yahoo's EPS are per ADR and nothing on the SEC side says by how much: they are not merged
-        new = {name: without_per_share(items) for name, items in new.items()}
-        reason = "the SEC side has no EPS to compare with"
     info.update(epsBasis=eps_state, adrRatio=ratio, detail=_eps_detail(eps_state, ratio, reason))
 
     renamed = {"annual": {}, "quarterly": {}}
