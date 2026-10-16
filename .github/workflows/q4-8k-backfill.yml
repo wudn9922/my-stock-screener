@@ -39,7 +39,6 @@ jobs:
       BUDGET: ${{ inputs.budget }}
       SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
       BRANCH: backfill/q4-8k
-      REPORT: ${{ runner.temp }}/q4-8k-report.json
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,7 +59,7 @@ jobs:
 
       - name: Run extraction
         run: |
-          args=(--mode "$MODE" --budget "$BUDGET" --report "$REPORT")
+          args=(--mode "$MODE" --budget "$BUDGET" --report "$RUNNER_TEMP/q4-8k-report.json")
           if [ -n "$TICKERS" ]; then args+=(--tickers "$TICKERS"); fi
           python -u atlas/scripts/backfill_q4_eps_8k.py "${args[@]}"
 
@@ -69,7 +68,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: q4-8k-report-${{ inputs.mode }}
-          path: ${{ env.REPORT }}
+          path: ${{ runner.temp }}/q4-8k-report.json
           if-no-files-found: ignore
 
       - name: Commit and push (fill only)
