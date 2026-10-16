@@ -1,5 +1,7 @@
 ﻿from datetime import datetime, timezone
 
+import requests
+
 from breakout_alert.config import (
     get_supabase_rest_url,
     get_supabase_service_key,
@@ -234,10 +236,6 @@ class SupabaseStore:
     index_configs_loaded = False
 
     def __init__(self):
-        # Import only when an HTTP-backed store is constructed. This keeps the
-        # module importable in lightweight consumers that do not make requests.
-        import requests
-
         self.rest_url = (
             get_supabase_rest_url()
         )
