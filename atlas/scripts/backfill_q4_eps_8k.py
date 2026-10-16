@@ -195,17 +195,20 @@ def table_eps(table, target, end):
     """
     if not shows_period(" ".join(" ".join(row) for row in table), end):
         return None, None
-    rows, heading = [], False
+    rows, heading_left = [], 0
     for cells in table:
         label, values = row_of(cells)
         if not label:
             continue
         low = label.lower()
         if "per share" in low and all(value is None for value in values):
-            heading = True                  # "Net income (loss) per share:" with its Basic / Diluted rows below
+            heading_left = 2                # "Net income (loss) per share:" heading; its Basic / Diluted rows follow
             continue
-        if heading and re.fullmatch(r"(basic|diluted)[\s:]*", low):
-            low = f"{low.split()[0]} earnings per share"
+        if heading_left:
+            heading_left -= 1
+            # only the two rows under the heading, and never share counts (per-share values are far below 1000)
+            if re.fullmatch(r"(basic|diluted)[\s:]*", low) and all(value is None or abs(value) < 1000 for value in values):
+                low = f"{low.split()[0]} earnings per share"
         rows.append((low, values))
     eps_label, eps_row = next(((label, values) for label, values in rows if is_eps(label, "diluted")),
                               (None, None))
