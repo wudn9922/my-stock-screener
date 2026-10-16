@@ -1,7 +1,7 @@
 import { itemStatusOf, type GroupItem } from '../report/schema';
 import type { GrowthFile, GrowthOrigin, GrowthRecord } from '../fundamentals/GrowthProvider';
 import { formatPercent, maDistance, maValue, toneClass } from '../ui/format';
-import { epsStreak, growthRecordFor, maDeviation, type FilterState } from './screenerFilters';
+import { epsStreak, gateTally, growthRecordFor, maDeviation, type FilterState, type GrowthGate, type YearGate } from './screenerFilters';
 
 export type SortMode = 'default' | 'gain' | 'loss' | 'symbol' | 'ma' | 'rs' | 'hi' | 'vr' | 'ma50' | 'r21' | 'eps';
 export const SORT_LABELS: Record<SortMode, string> = {
@@ -144,8 +144,26 @@ export interface PillContent {
   tone: 'up' | 'down' | 'flat';
 }
 
-/** Text of one metric pill for a row; null when the row has no value for it. */
-export function metricPill(item: GroupItem, key: MetricPill, growth?: GrowthFile | null, includeTurn = true): PillContent | null {
+/** The growth gate a metric pill counts its periods against (the applied condition of that metric), or null. */
+export function gateForPill(state: FilterState, key: MetricPill): GrowthGate | YearGate | null {
+  if (key === 'eps') return state.eps;
+  if (key === 'rev') return state.rev;
+  if (key === 'epsY') return state.epsY;
+  if (key === 'revY') return state.revY;
+  return null;
+}
+
+/**
+ * Text of one metric pill for a row; null when the row has no value for it. With an applied growth `gate` the pill
+ * also shows the row's 成長 / 衰退 count over the gate's periods (missing ones are not counted).
+ */
+export function metricPill(
+  item: GroupItem,
+  key: MetricPill,
+  growth?: GrowthFile | null,
+  includeTurn = true,
+  gate: GrowthGate | YearGate | null = null,
+): PillContent | null {
   const m = item.metrics;
   switch (key) {
     case 'rs': {
@@ -193,10 +211,21 @@ export function metricPill(item: GroupItem, key: MetricPill, growth?: GrowthFile
       const latest = values[0] ?? null;
       const name = { eps: 'EPS', rev: '營收', epsY: 'EPS年', revY: '營收年' }[key];
       const detail = growthDetail(record, isEps);
+      const tally = gate ? gateTallyOfPill(gate, values, turns, includeTurn, annual) : null;
+      const tallyText = tally ? ` 成${tally.growth}／衰${tally.decline}` : '';
+      const tallyTitle = tally ? `；${tally.text}` : '';
       if (latest === null && turns[0])
-        return { text: `${name} 轉盈`, title: `${annual ? '最新一年' : '最新一季'}由虧轉盈（去年同期為虧損，YoY 無法計算）。${detail}`, tone: 'up' };
+        return {
+          text: `${name} 轉盈${tallyText}`,
+          title: `${annual ? '最新一年' : '最新一季'}由虧轉盈（去年同期為虧損，YoY 無法計算）。${detail}${tallyTitle}`,
+          tone: 'up',
+        };
       if (latest === null) return null;
-      return { text: `${name} ${formatPercent(latest, 0)}`, title: `${isEps ? 'EPS' : '營收'} YoY ${detail}`, tone: toneClass(latest) };
+      return {
+        text: `${name} ${formatPercent(latest, 0)}${tallyText}`,
+        title: `${isEps ? 'EPS' : '營收'} YoY ${detail}${tallyTitle}`,
+        tone: toneClass(latest),
+      };
     }
     case 'epss': {
       const record = growthRecordFor(item, growth);
@@ -212,6 +241,22 @@ export function metricPill(item: GroupItem, key: MetricPill, growth?: GrowthFile
       };
     }
   }
+}
+
+/** The 成長 / 衰退 counts of one row against its gate, with the sentence for the pill's tooltip. */
+function gateTallyOfPill(
+  gate: GrowthGate | YearGate,
+  values: readonly (number | null)[],
+  turns: readonly boolean[],
+  includeTurn: boolean,
+  annual: boolean,
+) {
+  const periods = 'years' in gate ? gate.years : gate.quarters;
+  const tally = gateTally(values, periods, gate.min, turns, includeTurn);
+  const unit = annual ? '年' : '季';
+  const missing = tally.missing ? `、缺資料 ${tally.missing} ${unit}（不計入）` : '';
+  const text = `近${periods}${unit}：成長 ${tally.growth} ${unit}、衰退 ${tally.decline} ${unit}${missing}（YoY ≥ ${Number(gate.min.toFixed(2))}% 算成長）`;
+  return { ...tally, text };
 }
 
 /** Plain names of the growth sources (growth.json `src` / `srcY`, the us-growth file). */

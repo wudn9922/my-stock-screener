@@ -6,16 +6,21 @@ import { growthKey, type GrowthFile, type GrowthRecord } from '../fundamentals/G
  * Screener filter conditions: state, the compact `f` URL encoding and the pure filter itself.
  *
  * Encoding (`;`-separated, canonical order, open range ends left empty, `~` also accepted):
- * `chg:0:3;ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;rs3:0;rs1:0;vr:1.2;eps:2:20;epsy:2:15;epss:3;rev:1:10;revy:3:0;acc:1;tn:0;nd:keep`
+ * `chg:0:3;ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;rs3:0;rs1:0;vr:1.2;eps:8:15:75;epsy:2:15;epss:3;rev:4:10;revy:3:0;acc:1;tn:0;nd:keep`
  * - chg / ema20: inclusive ranges in % (today's change, close vs EMA20 distance)
  * - tr: trend flags (above MA20/50/200, MA20 rising, bullish stack 0 < d20 < d50 < d200, no downtrend)
  * - hi: within N% of the 52-week high; rs: RS percentile ≥ N (rank within the market's universe);
  *   rs3 / rs1: 3-month / 1-month relative return vs the market's benchmark index > N%
  * - vr: volume vs the previous session ≥ N (today ÷ yesterday)
- * - eps / rev: the latest Q (1–4) quarters all have YoY ≥ N%; epsy / revy: the latest Y (1–10) fiscal years all do
+ * - eps / rev: `N:X[:P]` quarterly YoY gate, epsy / revy: `N:X[:P]` annual one. Over the latest N periods (quarters
+ *   1–12, years 1–10) a period is growth when its YoY ≥ X% (a turnaround counts, see tn), otherwise a decline; the
+ *   stock passes when growth ÷ periods with data ≥ P% (the share, 1–100, default 100 = every period). Missing
+ *   periods are left out of that count. Fewer than ceil(N/2) periods with data is 「資料不足」: kept only with nd:keep.
+ *   The old `N:X` and `X` shapes mean P = 100. See `growthGatePasses`.
  * - epss:N: EPS grew for at least N fiscal years in a row, counting back from the latest one (see `epsStreak`)
  * - acc:1: EPS growth accelerates (the latest quarter's YoY is above the previous quarter's)
- * - tn:0: loss-to-profit turnarounds do NOT count as growth (the default counts them, in any period of the window)
+ * - tn:0: loss-to-profit turnarounds do NOT count as growth: in an EPS gate they count as a decline, in the streak and
+ *   acceleration they are missing (the default counts them as growth, in any period of the window)
  * - nd:keep keeps stocks whose fundamentals are missing (the default excludes them)
  * Unknown or malformed tokens are ignored, so old or hand-edited links never break the page. That includes the
  * retired `ma20` / `ma50` / `ma200` ranges: they are dropped, not migrated. An old `vr:N` keeps its number
@@ -27,21 +32,28 @@ export interface FilterRange {
   max: number | null;
 }
 export interface GrowthGate {
-  /** Latest N quarters (1–4) must all pass. */
+  /** Latest N quarters (1–12) are judged. */
   quarters: number;
-  /** Minimum YoY %. */
+  /** Threshold X: a quarter with YoY ≥ X % is growth, below it a decline. */
   min: number;
+  /** 成長佔比 P (1–100, default 100): growth periods ÷ periods with data must be ≥ P %. */
+  share: number;
 }
 export interface YearGate {
-  /** Latest N fiscal years (1–10) must all pass. */
+  /** Latest N fiscal years (1–10) are judged. */
   years: number;
-  /** Minimum YoY %. */
+  /** Threshold X: a year with YoY ≥ X % is growth, below it a decline. */
   min: number;
+  /** 成長佔比 P (1–100, default 100). */
+  share: number;
 }
-export const MAX_GATE_QUARTERS = 4;
+/** The newest quarters judged by a quarterly gate (growth.json QUARTER_SLOTS). */
+export const MAX_GATE_QUARTERS = 12;
 /** Annual YoY values in growth.json (build_growth.py YEAR_SLOTS): the longest annual window. */
 export const MAX_GATE_YEARS = 10;
-/** Periods offered by the filter sheet for the annual windows (a link may carry any 1–10). */
+/** Quarter counts offered as quick choices by the filter sheet (any 1–12 can be typed). */
+export const QUARTER_PRESETS: readonly number[] = [1, 2, 4, 8, 12];
+/** Year counts offered as quick choices by the filter sheet (any 1–10 can be typed). */
 export const YEAR_PRESETS: readonly number[] = [1, 2, 3, 5, 10];
 /** Longest EPS growth streak that can be counted (the stored annual horizon). */
 export const MAX_STREAK_YEARS = MAX_GATE_YEARS;
@@ -50,6 +62,11 @@ export const GROWTH_PRESETS: readonly number[] = [0, 10, 20, 30, 50];
 /** An applied threshold that is not one of the presets (an old or hand-made link): shown as 「目前條件」. */
 export const isCustomGrowthMin = (value: number | null | undefined): value is number =>
   value !== null && value !== undefined && !GROWTH_PRESETS.includes(value);
+/** 成長佔比 P: 100 = every judged period must grow (the old rule). The sheet offers the presets; any 1–100 can be typed. */
+export const SHARE_DEFAULT = 100;
+export const SHARE_PRESETS: readonly number[] = [50, 75, 100];
+/** Periods with data a gate needs before it judges a stock: ceil(N ÷ 2). Fewer is 「資料不足」 (see keepMissing). */
+export const enoughPeriods = (periods: number): number => Math.ceil(periods / 2);
 
 export const TREND_FLAGS = ['a20', 'a50', 'a200', 'slope', 'stack', 'nobear'] as const;
 export type TrendFlag = (typeof TREND_FLAGS)[number];
@@ -127,21 +144,28 @@ const rangeOf = (min: number | null, max: number | null): FilterRange | null => 
   if (min === null && max === null) return null;
   return min !== null && max !== null && min > max ? { min: max, max: min } : { min, max };
 };
-/** `N:min` (or just `min` = 1 period) → periods within 1..maxPeriods and the minimum YoY %. */
-const gateOf = (parts: string[], maxPeriods: number): { periods: number; min: number } | null => {
-  const [first, second] = parts;
-  const periods = second === undefined ? 1 : number(first);
-  const min = number(second === undefined ? first : second);
-  if (periods === null || min === null || !Number.isInteger(periods) || periods < 1 || periods > maxPeriods) return null;
-  return { periods, min };
+/**
+ * `N:X:P`, `N:X` (P = 100) or just `X` (1 period, P = 100) → periods within 1..maxPeriods, threshold X and share P
+ * (1–100). Anything else (a wrong count of numbers, a share outside 1–100) is dropped.
+ */
+const gateOf = (parts: string[], maxPeriods: number): { periods: number; min: number; share: number } | null => {
+  if (parts.length > 3) return null;
+  const single = parts.length === 1;
+  const periods = single ? 1 : number(parts[0]);
+  const min = number(single ? parts[0] : parts[1]);
+  const share = parts.length === 3 ? number(parts[2]) : SHARE_DEFAULT;
+  if (periods === null || min === null || share === null) return null;
+  if (!Number.isInteger(periods) || periods < 1 || periods > maxPeriods) return null;
+  if (!(share > 0 && share <= SHARE_DEFAULT)) return null;
+  return { periods, min, share };
 };
 const quarterGate = (parts: string[]): GrowthGate | null => {
   const gate = gateOf(parts, MAX_GATE_QUARTERS);
-  return gate && { quarters: gate.periods, min: gate.min };
+  return gate && { quarters: gate.periods, min: gate.min, share: gate.share };
 };
 const yearGate = (parts: string[]): YearGate | null => {
   const gate = gateOf(parts, MAX_GATE_YEARS);
-  return gate && { years: gate.periods, min: gate.min };
+  return gate && { years: gate.periods, min: gate.min, share: gate.share };
 };
 /** `epss:N` → the streak length 1–10 (exactly one number), or null. */
 const streakOf = (parts: string[]): number | null => {
@@ -188,6 +212,9 @@ export function parseFilters(value: string | null | undefined): FilterState {
 const formatNumber = (value: number) => String(Number(value.toFixed(2)));
 const formatRangeParam = (range: FilterRange) =>
   `${range.min === null ? '' : formatNumber(range.min)}:${range.max === null ? '' : formatNumber(range.max)}`;
+/** `eps:N:X`, with `:P` only when the share is not the default (so the old links are canonical). */
+const gateParam = (name: string, periods: number, min: number, share: number) =>
+  `${name}:${periods}:${formatNumber(min)}${share === SHARE_DEFAULT ? '' : `:${formatNumber(share)}`}`;
 
 /** Canonical `f` text; '' when nothing is set. Whole tokens only: one that would not fit is dropped. */
 export function serializeFilters(state: FilterState): string {
@@ -201,11 +228,11 @@ export function serializeFilters(state: FilterState): string {
   if (state.rs3 !== null) tokens.push(`rs3:${formatNumber(state.rs3)}`);
   if (state.rs1 !== null) tokens.push(`rs1:${formatNumber(state.rs1)}`);
   if (state.vr !== null) tokens.push(`vr:${formatNumber(state.vr)}`);
-  if (state.eps) tokens.push(`eps:${state.eps.quarters}:${formatNumber(state.eps.min)}`);
-  if (state.epsY) tokens.push(`epsy:${state.epsY.years}:${formatNumber(state.epsY.min)}`);
+  if (state.eps) tokens.push(gateParam('eps', state.eps.quarters, state.eps.min, state.eps.share));
+  if (state.epsY) tokens.push(gateParam('epsy', state.epsY.years, state.epsY.min, state.epsY.share));
   if (state.epss !== null) tokens.push(`epss:${state.epss}`);
-  if (state.rev) tokens.push(`rev:${state.rev.quarters}:${formatNumber(state.rev.min)}`);
-  if (state.revY) tokens.push(`revy:${state.revY.years}:${formatNumber(state.revY.min)}`);
+  if (state.rev) tokens.push(gateParam('rev', state.rev.quarters, state.rev.min, state.rev.share));
+  if (state.revY) tokens.push(gateParam('revy', state.revY.years, state.revY.min, state.revY.share));
   if (state.accel) tokens.push('acc:1');
   // `tn` only matters with an EPS condition, `nd` with any fundamental one.
   if (!state.turn && (state.eps || state.epsY || state.epss !== null || state.accel)) tokens.push('tn:0');
@@ -229,28 +256,58 @@ export function growthRecordFor(item: GroupItem, growth: GrowthFile | null | und
   return growth?.items.get(growthKey(item.symbol)) ?? null;
 }
 
+/** Per period of a gate: growth, decline, or missing (no number and no counted turnaround). */
+export interface GateTally {
+  growth: number;
+  decline: number;
+  missing: number;
+  /** Periods with data: growth + decline (the share's denominator). */
+  measured: number;
+}
+
 /**
- * The latest `n` YoY values all ≥ min. Missing periods fail unless `keepMissing`. A period that turned
- * from a loss to a profit (`turn`: its YoY is undefined) counts as growth: `true` = the latest period
- * only (the old signature), an array = per period (index 0 = latest).
+ * The latest `periods` values (index 0 = latest) sorted into growth (YoY ≥ min), decline (YoY < min) and missing.
+ * `turns` flags the periods that turned from a loss to a profit (their YoY is undefined): with `includeTurn`
+ * (含虧轉盈) such a period is growth, without it a decline. A period with no number and no turnaround is missing.
+ */
+export function gateTally(
+  values: readonly (number | null)[] | undefined,
+  periods: number,
+  min: number,
+  turns: readonly boolean[] = [],
+  includeTurn = true,
+): GateTally {
+  let growth = 0;
+  let decline = 0;
+  let missing = 0;
+  for (let slot = 0; slot < periods; slot++) {
+    const value = values?.[slot] ?? null;
+    if (value === null) {
+      if (!turns[slot]) missing += 1;
+      else if (includeTurn) growth += 1;
+      else decline += 1;
+    } else if (value >= min) growth += 1;
+    else decline += 1;
+  }
+  return { growth, decline, missing, measured: growth + decline };
+}
+
+/**
+ * A gate over the latest `gate.quarters` / `gate.years` periods: growth periods ÷ periods with data ≥ the share P
+ * (missing periods are left out of the count). Fewer than ceil(N/2) periods with data is 「資料不足」: the stock is
+ * kept only with `keepMissing`. P = 100 with no missing period is the old rule: every period grows.
  */
 export function growthGatePasses(
   values: readonly (number | null)[] | undefined,
-  gate: { min: number } & ({ quarters: number } | { years: number }),
+  gate: { min: number; share?: number } & ({ quarters: number } | { years: number }),
   keepMissing: boolean,
-  turn: boolean | readonly boolean[] = false,
+  turns: readonly boolean[] = [],
+  includeTurn = true,
 ): boolean {
-  if (!values) return keepMissing;
   const periods = 'years' in gate ? gate.years : gate.quarters;
-  const turns = turn === true ? [true] : turn || [];
-  for (let slot = 0; slot < periods; slot++) {
-    const value = values[slot] ?? null;
-    if (value === null) {
-      if (turns[slot]) continue;
-      if (!keepMissing) return false;
-    } else if (value < gate.min) return false;
-  }
-  return true;
+  const { growth, measured } = gateTally(values, periods, gate.min, turns, includeTurn);
+  if (measured < enoughPeriods(periods)) return keepMissing;
+  return growth * 100 >= (gate.share ?? SHARE_DEFAULT) * measured;
 }
 
 /** EPS acceleration: yes / no, or unknown when the two quarters cannot be compared. */
@@ -302,7 +359,7 @@ export function streakPasses(record: GrowthRecord | null | undefined, years: num
   return streak.years >= years || (keepMissing && streak.stop === 'missing');
 }
 
-/** How many of the rows have every one of the latest `periods` values (a turnaround counts when allowed). */
+/** How many of the rows have enough periods with data (ceil(N/2) of the latest N; a turnaround counts when allowed) for the gate to judge them. */
 export function gateCoverage(
   items: readonly GroupItem[],
   growth: GrowthFile | null | undefined,
@@ -315,8 +372,23 @@ export function gateCoverage(
     const record = growthRecordFor(item, growth);
     if (!record) continue;
     const values = kind === 'eps' ? record.epsYoY : kind === 'rev' ? record.revYoY : kind === 'epsY' ? record.epsYoYAnnual : record.revYoYAnnual;
-    const turns = !includeTurn ? [] : kind === 'eps' ? record.epsTurnQ : kind === 'epsY' ? record.epsTurnAnnual : [];
-    if (growthGatePasses(values, { quarters: periods, min: -Infinity }, false, turns)) covered += 1;
+    const turns = kind === 'eps' ? record.epsTurnQ : kind === 'epsY' ? record.epsTurnAnnual : [];
+    if (gateTally(values, periods, -Infinity, turns, includeTurn).measured >= enoughPeriods(periods)) covered += 1;
+  }
+  return covered;
+}
+
+/**
+ * How many rows have all of the latest `years` annual EPS values (a turnaround when it counts): the data a streak of
+ * `years` can be judged on at all. Rows with a gap in those years cannot show such a streak.
+ */
+export function streakCoverage(items: readonly GroupItem[], growth: GrowthFile | null | undefined, years: number, includeTurn: boolean): number {
+  let covered = 0;
+  for (const item of items) {
+    const record = growthRecordFor(item, growth);
+    if (!record) continue;
+    const { measured } = gateTally(record.epsYoYAnnual, years, -Infinity, includeTurn ? record.epsTurnAnnual : [], true);
+    if (measured === years) covered += 1;
   }
   return covered;
 }
@@ -441,12 +513,12 @@ export function applyFilters(items: readonly GroupItem[], state: FilterState, co
   if (eps && !available.eps)
     tests.push((item) => {
       const r = record(item);
-      return growthGatePasses(r?.epsYoY, eps, keepMissing, turn ? (r?.epsTurnQ ?? []) : []);
+      return growthGatePasses(r?.epsYoY, eps, keepMissing, r?.epsTurnQ ?? [], turn);
     });
   if (epsY && !available.epsY)
     tests.push((item) => {
       const r = record(item);
-      return growthGatePasses(r?.epsYoYAnnual, epsY, keepMissing, turn ? (r?.epsTurnAnnual ?? []) : []);
+      return growthGatePasses(r?.epsYoYAnnual, epsY, keepMissing, r?.epsTurnAnnual ?? [], turn);
     });
   if (epss !== null && !available.epss) tests.push((item) => streakPasses(record(item), epss, keepMissing, turn));
   if (rev && !available.rev) tests.push((item) => growthGatePasses(record(item)?.revYoY, rev, keepMissing));
@@ -476,11 +548,37 @@ export function formatRange(range: FilterRange, unit = '%'): string {
   if (range.min !== null) return `≥${signed(range.min)}${unit}`;
   return `≤${signed(range.max ?? 0)}${unit}`;
 }
+/** Chip text of a growth gate: `EPS YoY 近8季皆≥15%`, or with a share `EPS YoY 近8季成長≥75%（≥15%）`. */
+const gateChipText = (head: string, unit: '季' | '年', periods: number, min: number, share: number): string => {
+  const threshold = formatNumber(min);
+  if (periods === 1) return `${head} ≥${threshold}%`;
+  if (share >= SHARE_DEFAULT) return `${head} 近${periods}${unit}皆≥${threshold}%`;
+  return `${head} 近${periods}${unit}成長≥${formatNumber(share)}%（≥${threshold}%）`;
+};
 export function gateLabel(name: string, gate: GrowthGate): string {
-  return gate.quarters === 1 ? `${name} YoY ≥${formatNumber(gate.min)}%` : `${name} YoY 近${gate.quarters}季皆≥${formatNumber(gate.min)}%`;
+  return gateChipText(`${name} YoY`, '季', gate.quarters, gate.min, gate.share);
 }
 export function yearGateLabel(name: string, gate: YearGate): string {
-  return gate.years === 1 ? `${name} 年增 ≥${formatNumber(gate.min)}%` : `${name} 年增 近${gate.years}年皆≥${formatNumber(gate.min)}%`;
+  return gateChipText(`${name} 年增`, '年', gate.years, gate.min, gate.share);
+}
+
+/**
+ * The condition in words, for the filter sheet: 「近 8 季中至少 75% 的季度 EPS 年增 ≥ 15%」, 「近 8 季的 EPS 年增皆 ≥ 15%」
+ * (P = 100) or 「最近 1 季的 EPS 年增 ≥ 15%」. `subject` is e.g. 「EPS 年增」.
+ */
+export function gateSentence(subject: string, unit: '季' | '年', periods: number, min: number, share: number): string {
+  const threshold = `${formatNumber(min)}%`;
+  if (periods === 1) return `最近 1 ${unit}的 ${subject} ≥ ${threshold}`;
+  if (share >= SHARE_DEFAULT) return `近 ${periods} ${unit}的 ${subject}皆 ≥ ${threshold}`;
+  return `近 ${periods} ${unit}中至少 ${formatNumber(share)}% 的${unit === '季' ? '季度' : '年度'} ${subject} ≥ ${threshold}`;
+}
+/**
+ * The pass count in words: 「成長 6 次／衰退 2 次」 = with all N periods present, at least ceil(N × P) growth periods
+ * and at most the rest declining. With the periods missing the same ratio applies to those with data.
+ */
+export function gateCountText(periods: number, share: number): string {
+  const growth = Math.ceil((periods * share) / SHARE_DEFAULT - 1e-9);
+  return `成長 ${growth} 次／衰退 ${periods - growth} 次`;
 }
 export const streakLabel = (years: number): string => `EPS 連續成長 ≥${years} 年`;
 

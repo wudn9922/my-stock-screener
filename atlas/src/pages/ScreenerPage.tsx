@@ -12,6 +12,7 @@ import {
   STATUS_VIEWS,
   STATUS_VIEW_LABELS,
   filterAndSortItems,
+  gateForPill,
   itemsForView,
   metricPill,
   resultCountText,
@@ -27,6 +28,7 @@ import {
   applyFilters,
   filterAvailability,
   gateCoverage,
+  streakCoverage,
   needsGrowth,
   parseFilters,
   readStoredFilters,
@@ -142,7 +144,7 @@ function Row({
   pe,
   pills,
   growth,
-  includeTurn,
+  filters,
   top,
   onOpen,
 }: {
@@ -150,8 +152,8 @@ function Row({
   pe: PeFigures | undefined;
   pills: readonly MetricPill[];
   growth: GrowthFile | null | undefined;
-  /** 「含虧轉盈」 of the applied conditions: whether a turnaround counts in the EPS streak pill. */
-  includeTurn: boolean;
+  /** The applied conditions: 「含虧轉盈」 (whether a turnaround counts) and the growth gates the pills count against. */
+  filters: FilterState;
   top: number;
   onOpen: () => void;
 }) {
@@ -159,7 +161,7 @@ function Row({
   const status = itemStatusOf(item);
   const ticker = <b>{displayTicker(item.symbol)}</b>;
   const metricPills = pills.flatMap((key) => {
-    const pill = metricPill(item, key, growth, includeTurn);
+    const pill = metricPill(item, key, growth, filters.turn, gateForPill(filters, key));
     return pill ? [{ key, pill }] : [];
   });
   return (
@@ -371,8 +373,13 @@ function ScreenerView({
     [viewItems, context, query],
   );
   const coverage = useCallback(
-    (kind: FundamentalKind | 'accel', periods: number, includeTurn: boolean) => ({
-      covered: kind === 'accel' ? accelCoverage(viewItems, growth, includeTurn) : gateCoverage(viewItems, growth, kind, periods, includeTurn),
+    (kind: FundamentalKind | 'accel' | 'streak', periods: number, includeTurn: boolean) => ({
+      covered:
+        kind === 'accel'
+          ? accelCoverage(viewItems, growth, includeTurn)
+          : kind === 'streak'
+            ? streakCoverage(viewItems, growth, periods, includeTurn)
+            : gateCoverage(viewItems, growth, kind, periods, includeTurn),
       total: viewItems.length,
     }),
     [viewItems, growth],
@@ -561,7 +568,7 @@ function ScreenerView({
                     pe={pe[item.symbol]}
                     pills={pills}
                     growth={growth}
-                    includeTurn={filters.turn}
+                    filters={filters}
                     top={(start + offset) * ROW_HEIGHT}
                     onOpen={() => openChart({ symbol: item.symbol, name: item.name, tf: '1D', maList: item.maList })}
                   />
