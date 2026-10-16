@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 
 /** Synthetic financials files (made-up numbers in the builder's format), keyed by file name. */
@@ -37,6 +37,11 @@ const noHorizontalScroll = (page: Page) =>
     return Math.max(document.scrollingElement!.scrollWidth - innerWidth, main.scrollWidth - main.clientWidth);
   });
 
+/** Folded sections open on their summary line; a section that is already open is left alone. */
+async function openFold(section: Locator) {
+  if (!(await section.evaluate((node) => (node as HTMLDetailsElement).open))) await section.locator(':scope > summary').click();
+}
+
 test('annual cards: ten labelled bars, tap shows formula inputs, notes are honest', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
@@ -46,6 +51,9 @@ test('annual cards: ten labelled bars, tap shows formula inputs, notes are hones
   await expect(page.locator('.fin-title')).toContainText('USD');
   await expect(page.locator('.fin-card')).toHaveCount(6);
   const growth = page.locator('.fin-card[data-group="growth"]');
+  // EPS leads the growth card; the revenue bars (億美元) are the amounts these checks read.
+  await expect(growth.getByRole('button', { name: 'EPS', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await growth.getByRole('button', { name: '營收', exact: true }).click();
   await expect(growth.locator('.fin-bar')).toHaveCount(10);
   await expect(growth.locator('.fin-value')).toHaveCount(10);
   await expect(growth.locator('.fin-chart-title')).toContainText('億美元');
@@ -82,6 +90,7 @@ test('quarterly view: twelve bars with only latest / max / min labelled; URL kee
   expect(await growth.locator('.fin-value').count()).toBeLessThanOrEqual(3);
   await expect(page.locator('.fin-depth')).toContainText('目前 15 季');
   const returns = page.locator('.fin-card[data-group="returns"]');
+  await openFold(returns);
   await expect(returns.locator('.fin-detail')).toContainText('近 4 季');
   await growth.locator('.fin-bar').nth(2).click();
   expect(await growth.locator('.fin-value').count()).toBeLessThanOrEqual(4);
@@ -156,11 +165,13 @@ test('bank, loss-maker, Taiwan and short-history files', async ({ page }) => {
   await expect(growth.locator('.fin-chips')).toContainText('轉盈');
   await expect(growth.locator('.fin-chips')).toContainText('期間有虧損');
   const tax = page.locator('.fin-card[data-group="nonOperating"]');
+  await openFold(tax);
   await tax.getByRole('button', { name: '有效稅率', exact: true }).click();
   await expect(tax.locator('.fin-chips')).toContainText('異常');
 
   await page.goto('./?page=financials&symbol=2330.TW');
   await expect(page.locator('.fin-title')).toContainText('台積電');
+  await page.locator('.fin-card[data-group="growth"]').getByRole('button', { name: '營收', exact: true }).click();
   await expect(page.locator('.fin-card[data-group="growth"] .fin-chart-title')).toContainText('兆元');
   await expect(page.locator('.fin-depth')).toContainText('目前約 4 年');
 
@@ -208,10 +219,12 @@ test('K線｜財務 keeps the symbol, the chart timeframe and the annual or quar
   const financialsTab = tabs.getByRole('button', { name: '財務', exact: true });
   await expect(chartTab).toHaveAttribute('aria-current', 'page');
   await expect(financialsTab).not.toHaveAttribute('aria-current', 'page');
-  // Phone: the switch is a 40px-plus touch target and stays on screen.
+  // Touch screens: a 36px-plus target; desktop pointers get the compact one. Both stay on screen.
+  const phone = (page.viewportSize()?.width ?? 1440) < 1100;
   for (const tab of [chartTab, financialsTab]) {
     const box = await tab.boundingBox();
-    expect(box!.height).toBeGreaterThanOrEqual(40);
+    if (phone) expect(box!.height).toBeGreaterThanOrEqual(36);
+    else expect(box!.height).toBeLessThanOrEqual(34);
     await expect(tab).toBeInViewport();
   }
 
@@ -238,6 +251,7 @@ test('key metrics card: seven tiles on the newest period, with YoY and eight min
   await mockFinancials(page, {}, { AAPL: trackedAAPL });
   await page.goto('./?page=financials&symbol=AAPL');
   const key = page.locator('.fin-key');
+  await openFold(key);
   await expect(key.locator('.fin-key-tile')).toHaveCount(7);
   await expect(key.locator('.fin-key-period')).toContainText('FY2025');
   const labels = await key.locator('.fin-key-label').allTextContents();
@@ -316,12 +330,17 @@ test('three statements: lines switch between values and YoY, absent lines say �
   await expect(report.getByRole('button', { name: '資產負債' })).toHaveAttribute('aria-pressed', 'true');
   const liabilities = table.locator('tbody tr').filter({ hasText: '總負債' });
   await expect(liabilities).toContainText('此資料源未提供');
-  await expect(liabilities.locator('td').first()).toHaveText('—');
+  await expect(liabilities.locator('td').first().locator('.fin-cell-value')).toHaveText('—');
 
+  // Every cell carries its year-over-year change under the value; one switch shows or hides them all.
   const equity = table.locator('tbody tr').filter({ hasText: '權益' });
-  await equity.getByRole('button', { name: /^權益，目前顯示數值/ }).click();
-  await expect(equity.locator('td').first()).toContainText('%');
-  await expect(equity.locator('td').last()).toHaveText('—');
+  await expect(equity.locator('td').first().locator('.fin-cell-yoy')).toHaveCount(1);
+  const toggle = page.getByRole('button', { name: '顯示年增率' });
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await toggle.click();
+  await expect(table.locator('.fin-cell-yoy')).toHaveCount(0);
+  await toggle.click();
+  await expect(table.locator('.fin-cell-yoy').first()).toBeVisible();
 
   await report.getByRole('button', { name: '現金流' }).click();
   await expect(table.locator('tbody tr').filter({ hasText: '資本支出' })).toBeVisible();
@@ -355,7 +374,105 @@ test('foreign file with EPS on the ADR basis: the basis note replaces the per-or
   const notes = page.locator('.fin-notes');
   await expect(notes).toContainText('EPS 以每單位 ADR 計（1 ADR ＝ 5 股普通股，由 SEC 每股數字換算）');
   await expect(notes).not.toContainText('EPS 為每普通股');
-  await expect(page.locator('.fin-cards')).not.toContainText('EPS 為每普通股');
+  await expect(page.locator('.financials-page')).not.toContainText('EPS 為每普通股');
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
   expect(errors).toEqual([]);
+});
+
+test('layout: 當季財報 first, then growth (EPS first) and profitability (ratios first), then folded sections', async ({ page }, info) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(String(error)));
+  await mockFinancials(page, {}, { AAPL: trackedAAPL });
+  await page.goto('./?page=financials&symbol=AAPL');
+  const strip = page.locator('.fin-quarter');
+  await expect(strip.locator('.fin-quarter-cell')).toHaveCount(4);
+  await expect(strip.locator('.fin-quarter-period')).toHaveText(/^FY\d{4} Q[1-4]$/);
+  expect(await strip.locator('.fin-quarter-label').allTextContents()).toEqual(['EPS·美元', '營收·億美元', '毛利率', '淨利率']);
+  // The strip shows actual values only: no expectation or estimate column.
+  expect((await strip.textContent()) ?? '').not.toMatch(/預期|估計|共識|NaN/);
+
+  const top = (selector: string) => page.evaluate((query) => document.querySelector(query)!.getBoundingClientRect().top + window.scrollY, selector);
+  const order = {
+    strip: await top('.fin-quarter'),
+    growth: await top('.fin-card[data-group="growth"]'),
+    profit: await top('.fin-card[data-group="profitability"]'),
+    folds: await top('.fin-folds'),
+    notes: await top('.fin-notes'),
+  };
+  expect(order.strip).toBeLessThan(order.growth);
+  expect(order.growth).toBeLessThanOrEqual(order.profit);
+  expect(order.profit).toBeLessThan(order.folds);
+  expect(order.folds).toBeLessThan(order.notes);
+
+  await expect(page.locator('.fin-card[data-group="growth"]')).toHaveAttribute('open', '');
+  await expect(page.locator('.fin-card[data-group="profitability"]')).toHaveAttribute('open', '');
+  expect(await page.locator('.fin-card[data-group="growth"] .fin-tabs button').allTextContents()).toEqual(['EPS', '營收', '淨利']);
+  expect((await page.locator('.fin-card[data-group="profitability"] .fin-tabs button').allTextContents()).slice(0, 3)).toEqual([
+    '毛利率',
+    '營業利益率',
+    '淨利率',
+  ]);
+
+  // Folded by default, each with a one-line summary in its head.
+  for (const selector of [
+    '.fin-key',
+    '.fin-sumfold',
+    '.pe-river',
+    '.fin-card[data-group="nonOperating"]',
+    '.fin-card[data-group="cashFlow"]',
+    '.fin-card[data-group="returns"]',
+    '.fin-card[data-group="strength"]',
+  ]) {
+    const section = page.locator(selector);
+    await expect(section).not.toHaveAttribute('open', '');
+    await expect(section.locator('.fin-fold-summary')).not.toHaveText('');
+  }
+  await expect(page.locator('.fin-key .fin-fold-summary')).toContainText('FY2025');
+
+  // Opening a folded section shows its content; closing it folds the content away again.
+  const key = page.locator('.fin-key');
+  await openFold(key);
+  await expect(key.locator('.fin-key-tile')).toHaveCount(7);
+  await key.locator(':scope > summary').click();
+  await expect(key).not.toHaveAttribute('open', '');
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: info.outputPath(`financials-layout-${info.project.name}.png`), fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test('table: each cell shows its value with the year-over-year change under it; one switch hides them and is remembered', async ({ page }, info) => {
+  await mockFinancials(page, {}, { AAPL: trackedAAPL });
+  await page.goto('./?page=financials&symbol=AAPL');
+  await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();
+  const table = page.locator('.fin-table');
+  const revenueCell = table.locator('tbody tr').filter({ hasText: '營收' }).first().locator('td').first();
+  await expect(revenueCell.locator('.fin-cell-value')).not.toHaveText('—');
+  await expect(revenueCell.locator('.fin-cell-yoy')).toHaveCount(1);
+  const toggle = page.getByRole('button', { name: '顯示年增率' });
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await toggle.click();
+  await expect(table.locator('.fin-cell-yoy')).toHaveCount(0);
+  await expect(revenueCell.locator('.fin-cell-value')).not.toHaveText('—');
+  await page.reload();
+  await expect(page.locator('.fin-table')).toBeVisible();
+  await expect(page.getByRole('button', { name: '顯示年增率' })).toHaveAttribute('aria-pressed', 'false');
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+  await page.getByRole('button', { name: '顯示年增率' }).click();
+  await page.locator('.fin-table-card').screenshot({ path: info.outputPath(`financials-table-yoy-${info.project.name}.png`) });
+});
+
+test('當季財報 on a 390px phone: one compact row, no horizontal scroll, no cell overflows', async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockFinancials(page, {}, { AAPL: trackedAAPL });
+  await page.goto('./?page=financials&symbol=AAPL');
+  const strip = page.locator('.fin-quarter');
+  await expect(strip.locator('.fin-quarter-cell')).toHaveCount(4);
+  const box = (await strip.boundingBox())!;
+  expect(box.height).toBeLessThan(230);
+  const cells = await strip.locator('.fin-quarter-cell').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()));
+  for (let i = 1; i < cells.length; i++) expect(cells[i].left).toBeGreaterThanOrEqual(cells[i - 1].right - 0.5);
+  const overflowing = await strip.locator('.fin-quarter-cell').evaluateAll((nodes) => nodes.filter((node) => node.scrollWidth > node.clientWidth + 1).length);
+  expect(overflowing).toBe(0);
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+  await strip.screenshot({ path: info.outputPath('financials-strip-390.png') });
 });

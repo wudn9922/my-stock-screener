@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 
 /**
@@ -26,6 +26,10 @@ const noHorizontalScroll = (page: Page) =>
     return Math.max(document.scrollingElement!.scrollWidth - innerWidth, main.scrollWidth - main.clientWidth);
   });
 const card = (page: Page) => page.locator('.pe-river');
+/** The card is folded by default; its summary line is the toggle. An open card is left alone. */
+async function openCard(section: Locator) {
+  if (!(await section.evaluate((node) => (node as HTMLDetailsElement).open))) await section.locator(':scope > summary').click();
+}
 /** Element screenshots would include the sticky header and tab bar on top of the card. */
 const unstick = (page: Page) => page.addStyleTag({ content: '.fin-head{position:static!important}.bottom-nav,nav[aria-label]{display:none!important}' });
 
@@ -34,8 +38,11 @@ test('US stock: river with five labelled multiples, percentile, basis block, no 
   page.on('pageerror', (error) => errors.push(String(error)));
   await mockPeRiver(page);
   await page.goto('./?page=financials&symbol=AAPL');
+  await openCard(card(page));
   await expect(card(page)).toHaveAttribute('data-state', 'ok');
   await expect(card(page).locator('h2')).toHaveText('本益比河流圖');
+  // Folded head: the current multiple and its percentile in one line (before the chart mounts).
+  await expect(card(page).locator('.fin-fold-summary')).toContainText(/目前本益比 [\d.]+x · 歷史第 \d+ 百分位/);
   await expect(card(page).locator('.fin-big-unit')).toHaveText('目前本益比');
   await expect(card(page).locator('.fin-chip').first()).toContainText(/歷史第 \d+ 百分位/);
   await expect(card(page).locator('.fin-chip').nth(1)).toContainText(/相對歷史中位數（[\d.]+x）(溢價|折價)/);
@@ -71,6 +78,7 @@ test('US stock: river with five labelled multiples, percentile, basis block, no 
 test('NVDA (split-adjusted file): river is drawn and split-adjustment is stated', async ({ page }, info) => {
   await mockPeRiver(page);
   await page.goto('./?page=financials&symbol=NVDA');
+  await openCard(card(page));
   await expect(card(page)).toHaveAttribute('data-state', 'ok');
   await expect(page.locator('.fin-notes')).toContainText('已依股票分割還原');
   await expect(card(page).locator('.pe-river-basis')).toContainText('已還原分割');
@@ -83,6 +91,7 @@ test('NVDA (split-adjusted file): river is drawn and split-adjustment is stated'
 test('Taiwan 2330: only annual EPS is long enough, so the river is drawn with a short-history warning', async ({ page }, info) => {
   await mockPeRiver(page);
   await page.goto('./?page=financials&symbol=2330.TW');
+  await openCard(card(page));
   await expect(card(page)).toHaveAttribute('data-state', 'ok');
   await expect(card(page).locator('.pe-river-warn')).toContainText('歷史偏短');
   await expect(card(page).locator('.pe-river-basis')).toContainText('年度');
@@ -96,6 +105,7 @@ test('Taiwan 2330: only annual EPS is long enough, so the river is drawn with a 
 test('Taiwan stock with too little EPS history shows the empty state, not a chart', async ({ page }, info) => {
   await mockPeRiver(page);
   await page.goto('./?page=financials&symbol=1312.TW');
+  await openCard(card(page));
   await expect(card(page)).toHaveAttribute('data-state', 'unavailable');
   await expect(card(page)).toContainText('歷史資料不足，無法畫出本益比河流');
   await expect(card(page)).toContainText('歷史本益比不代表未來');
@@ -114,6 +124,7 @@ test('loading placeholder first, and a price failure is local to the card with a
     await route.fallback();
   });
   await page.goto('./?page=financials&symbol=AAPL');
+  await openCard(card(page));
   await expect(card(page)).toHaveAttribute('data-state', 'loading');
   await expect(card(page).getByRole('status', { name: /載入股價與本益比河流中/ })).toBeVisible();
   await expect(card(page)).toHaveAttribute('data-state', 'error');

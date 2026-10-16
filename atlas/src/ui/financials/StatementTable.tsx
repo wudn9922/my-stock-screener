@@ -13,16 +13,36 @@ import {
   type FinancialsView,
 } from './financialsView';
 
-type RowMode = 'value' | 'yoy';
+const YOY_KEY = 'atlas-financials-yoy-v1';
+/** Remembered per viewer; the year-over-year line is on by default. */
+const readShowYoy = (): boolean => {
+  try {
+    return localStorage.getItem(YOY_KEY) !== 'hidden';
+  } catch {
+    return true;
+  }
+};
+const writeShowYoy = (show: boolean) => {
+  try {
+    localStorage.setItem(YOY_KEY, show ? 'shown' : 'hidden');
+  } catch {
+    /* Remembering the choice is only a convenience. */
+  }
+};
 
 /**
  * Three statement tabs (損益表, 資產負債, 現金流), every period of the file, latest period on the left.
- * Each line switches between its values and year-over-year changes. Lines the source does not carry are
- * labelled 「此資料源未提供」 instead of being estimated.
+ * Each cell shows its value with the year-over-year change in small type underneath (the switch in the
+ * card head hides the changes). Lines the source does not carry are labelled 「此資料源未提供」 instead of
+ * being estimated.
  */
 export function StatementTable({ history, view }: { history: FinancialHistory; view: FinancialsView }) {
   const [statement, setStatement] = useState<StatementId>('income');
-  const [modes, setModes] = useState<Record<string, RowMode>>({});
+  const [showYoy, setShowYoy] = useState<boolean>(readShowYoy);
+  const onShowYoy = (next: boolean) => {
+    setShowYoy(next);
+    writeShowYoy(next);
+  };
   const series = history[view.kind];
   const order = series.end.map((_, index) => index).reverse();
   const quarterly = view.kind === 'quarterly';
@@ -32,18 +52,23 @@ export function StatementTable({ history, view }: { history: FinancialHistory; v
 
   return (
     <div className="card fin-table-card">
-      <div className="fin-tabs fin-statement-tabs" role="group" aria-label="報表">
-        {STATEMENT_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={tab.id === statement ? 'active' : ''}
-            aria-pressed={tab.id === statement}
-            onClick={() => setStatement(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="fin-statement-bar">
+        <div className="fin-tabs fin-statement-tabs" role="group" aria-label="報表">
+          {STATEMENT_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={tab.id === statement ? 'active' : ''}
+              aria-pressed={tab.id === statement}
+              onClick={() => setStatement(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <button type="button" className="fin-yoy-switch" aria-pressed={showYoy} onClick={() => onShowYoy(!showYoy)}>
+          顯示年增率
+        </button>
       </div>
       <div className="table-scroll fin-table-scroll" tabIndex={0} aria-label={`${title}數字表，可左右捲動`}>
         <table className="fin-table">
@@ -62,25 +87,13 @@ export function StatementTable({ history, view }: { history: FinancialHistory; v
           </thead>
           <tbody>
             {rows.map((row) => {
-              const key = `${statement}.${row.id}`;
-              const mode = modes[key] ?? 'value';
               const scale = moneyScale(row.values);
               const shown = displayValues(row.values, row.unit, scale);
               const digits = digitsFor(shown, row.unit);
               return (
                 <tr key={row.id} className={row.absent ? 'fin-absent-row' : undefined}>
                   <th scope="row" className="fin-sticky">
-                    <div className="fin-row-head">
-                      <span className="fin-row-name">{row.label}</span>
-                      <button
-                        type="button"
-                        className="fin-row-toggle"
-                        aria-label={`${row.label}，目前顯示${mode === 'value' ? '數值' : '年增率'}，點按切換為${mode === 'value' ? '年增率' : '數值'}`}
-                        onClick={() => setModes((current) => ({ ...current, [key]: mode === 'value' ? 'yoy' : 'value' }))}
-                      >
-                        {mode === 'value' ? '數值' : '年增率'}
-                      </button>
-                    </div>
+                    <span className="fin-row-name">{row.label}</span>
                     <small>
                       {unitText(row.unit, history.currency, scale)}
                       {row.derived ? ' · 部分推算' : ''}
@@ -89,24 +102,22 @@ export function StatementTable({ history, view }: { history: FinancialHistory; v
                   </th>
                   {order.map((index) => {
                     const result = row.results[index]!;
-                    if (mode === 'yoy') {
-                      const cell = changeCellText(row.changes[index] ?? null);
-                      return (
-                        <td key={series.end[index]} className={cell.tone} title={row.changes[index]?.reason ?? undefined}>
-                          {cell.text}
-                        </td>
-                      );
-                    }
                     const value = shown[index] ?? null;
                     const derived = result.basis === 'derived' && value !== null;
                     const classes = [value !== null && value < 0 ? 'negative' : '', derived ? 'derived' : ''].filter(Boolean).join(' ');
+                    const change = changeCellText(row.changes[index] ?? null);
                     return (
                       <td
                         key={series.end[index]}
                         className={classes || undefined}
                         title={value === null ? (result.reason ?? undefined) : derived ? `推算：${result.formula}` : undefined}
                       >
-                        {value === null ? '—' : formatNumber(value, digits)}
+                        <span className="fin-cell-value">{value === null ? '—' : formatNumber(value, digits)}</span>
+                        {showYoy && (
+                          <span className={`fin-cell-yoy ${change.tone}`} title={row.changes[index]?.reason ?? undefined}>
+                            {change.text}
+                          </span>
+                        )}
                       </td>
                     );
                   })}
@@ -127,7 +138,7 @@ export function StatementTable({ history, view }: { history: FinancialHistory; v
         </table>
       </div>
       <p className="source-note fin-table-note">
-        數字表顯示所有已取得期別（圖表只畫近期）。最新期在最左側，向右捲動看較早期別。資本支出、股利、庫藏股以正數表示流出。「—」為無資料或不適用，滑鼠移上或長按可看原因；每列右側的「數值／年增率」可切換，年增率為同期比較（季度對去年同季）。
+        數字表顯示所有已取得期別（圖表只畫近期）。最新期在最左側，向右捲動看較早期別。資本支出、股利、庫藏股以正數表示流出。「—」為無資料或不適用，滑鼠移上或長按可看原因。每格下方的小字為年增率（同期比較：季度對去年同季；年度對前一年），可用右上角「顯示年增率」關閉。
       </p>
     </div>
   );

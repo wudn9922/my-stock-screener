@@ -204,6 +204,105 @@ export function keyChangeText(change: ChangeResult | null): ChipText {
   return { text: `年增 ${signed(change.value, 1, '%')}`, tone };
 }
 
+// ------------------------------------------------------------------ latest quarter strip and fold summaries
+
+/** Strip-sized 年增 text: 「年增 +12.3%」, margins 「年增 +1.3pp」 (short enough for a phone cell). */
+export function stripChangeText(change: ChangeResult | null): ChipText {
+  if (!change || change.value === null) return keyChangeText(change);
+  if (change.mode === 'diff') return { text: `年增 ${signed(change.value, 1, 'pp')}`, tone: toneOf(change.value) };
+  return keyChangeText(change);
+}
+
+/** The 「當季財報」 strip, in display order: EPS, revenue and the two margins. */
+export const STRIP_METRIC_IDS: readonly MetricId[] = ['eps', 'revenue', 'grossMargin', 'netMargin'];
+
+export interface StripCell {
+  id: MetricId;
+  label: string;
+  /** 「6.11」「1,030億」「46.2」; 「—」 when the quarter has no value. */
+  value: string;
+  /** Unit (「美元」「億美元」「%」); empty when there is no value. Shown after the label, or after the value for %. */
+  unit: string;
+  /** 「年增 +12.3%」, 「年增 +1.3 百分點」, 「轉盈」… or 「年增 —」. Same-quarter comparison, actual values only. */
+  change: ChipText;
+  /** Why the value is missing (tooltip). */
+  reason: string | null;
+}
+
+export interface QuarterStrip {
+  /** Newest quarter with a value for any strip metric; null when the file has none. */
+  index: number | null;
+  period: string | null;
+  cells: StripCell[];
+}
+
+/** The newest quarter the strip shows, with EPS, revenue and both margins at that quarter (or a dash each). */
+export function quarterStrip(view: FinancialsView, currency: string): QuarterStrip {
+  let index: number | null = null;
+  for (const id of STRIP_METRIC_IDS) {
+    const latest = view.metrics[id].latestIndex;
+    if (latest !== null && (index === null || latest > index)) index = latest;
+  }
+  const cells = STRIP_METRIC_IDS.map((id): StripCell => {
+    const data = view.metrics[id];
+    const value = index === null ? null : (data.values[index] ?? null);
+    const scale = moneyScale(value === null ? [] : [value]);
+    return {
+      id,
+      label: data.label,
+      value: value === null ? '—' : formatValue(value, data.unit, scale),
+      unit: value === null ? '' : unitText(data.unit, currency, scale),
+      change: index === null ? { text: '年增 —', tone: 'flat' } : stripChangeText(data.changes[index] ?? null),
+      reason: value === null ? (index === null ? '這檔股票沒有季度資料' : (data.results[index]?.reason ?? '沒有資料')) : null,
+    };
+  });
+  return { index, period: index === null ? null : (view.labels[index]?.long ?? null), cells };
+}
+
+/** Folded-card line for the key metrics: 「FY2025 Q4：營收 1,205億美元、淨利 …、EPS 2.53美元」. */
+export function keyMetricsSummary(view: FinancialsView, currency: string): string {
+  const summary = keySummary(view);
+  if (summary.index === null) return '沒有可用的期別';
+  const text = (id: MetricId) => {
+    const tile = summary.tiles.find((item) => item.id === id);
+    if (!tile || tile.value === null) return '—';
+    const scale = moneyScale([tile.value]);
+    return `${formatValue(tile.value, tile.unit, scale)}${unitText(tile.unit, currency, scale)}`;
+  };
+  return `${view.labels[summary.index]?.long ?? ''}：EPS ${text('eps')}、營收 ${text('revenue')}`;
+}
+
+/** Folded-card line for the summary chips: 「營收 CAGR +6.1% · EPS CAGR +7.0% · 平均 ROIC 22.4%」 (annual window). */
+export function summaryChipsLine(annual: FinancialsView): string {
+  const growth = (id: MetricId) => {
+    const result = annual.metrics[id].cagr;
+    return result?.value === null || !result ? '—' : signed(result.value, 1, '%');
+  };
+  const roic = annual.metrics.roic.average?.value;
+  return `營收 CAGR ${growth('revenue')} · EPS CAGR ${growth('eps')} · 平均 ROIC ${roic === null || roic === undefined ? '—' : `${formatNumber(roic, 1)}%`}`;
+}
+
+/**
+ * Folded-card line for a metric card: the first two metrics that have a value, at the period of the first
+ * of them. 「營業現金流 1,020億美元、自由現金流 830億美元（FY2025）」; 「沒有可用的數字」 when none does.
+ */
+export function cardSummaryLine(view: FinancialsView, ids: readonly MetricId[], currency: string): string {
+  const parts: string[] = [];
+  let period: string | null = null;
+  for (const id of ids) {
+    const data = view.metrics[id];
+    if (data.latestIndex === null) continue;
+    const value = data.values[data.latestIndex];
+    if (value === null || value === undefined) continue;
+    const scale = moneyScale([value]);
+    parts.push(`${data.label} ${formatValue(value, data.unit, scale)}${unitText(data.unit, currency, scale)}`);
+    period ??= view.labels[data.latestIndex]?.long ?? null;
+    if (parts.length === 2) break;
+  }
+  if (!parts.length) return '沒有可用的數字';
+  return `${parts.join('、')}${period ? `（${period}）` : ''}`;
+}
+
 // ------------------------------------------------------------------ numbers
 
 export interface MoneyScale {

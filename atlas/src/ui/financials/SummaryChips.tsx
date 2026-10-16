@@ -1,5 +1,6 @@
 import type { FinancialHistory } from '../../fundamentals/FinancialHistory';
-import { formatNumber, formatValue, moneyScale, unitText, type FinancialsView } from './financialsView';
+import { FoldCard } from './FoldCard';
+import { formatNumber, formatValue, moneyScale, summaryChipsLine, unitText, type FinancialsView } from './financialsView';
 
 interface Tile {
   key: string;
@@ -13,7 +14,7 @@ const toneOf = (value: number | null) => (value === null || Math.abs(value) < 1e
 
 /**
  * Headline figures: revenue and EPS CAGR and average ROIC from the annual chart window, latest gross
- * margin and free cash flow from the period type on screen.
+ * margin and free cash flow from the period type on screen. Folded by default.
  */
 export function SummaryChips({ history, annual, current }: { history: FinancialHistory; annual: FinancialsView; current: FinancialsView }) {
   const tiles: Tile[] = [];
@@ -63,14 +64,16 @@ export function SummaryChips({ history, annual, current }: { history: FinancialH
     tone: fcfLatest !== null && fcfLatest < 0 ? 'down' : 'flat',
   });
   return (
-    <div className="fin-summary" role="list" aria-label="重點數字">
-      {tiles.map((tile) => (
-        <div key={tile.key} className="fin-tile" role="listitem">
-          <span className="fin-tile-label">{tile.label}</span>
-          <b className={`fin-tile-value ${tile.tone}`}>{tile.value}</b>
-          <span className="fin-tile-sub">{tile.sub}</span>
-        </div>
-      ))}
-    </div>
+    <FoldCard className="fin-sumfold" title="摘要" summary={summaryChipsLine(annual)}>
+      <div className="fin-summary" role="list" aria-label="重點數字">
+        {tiles.map((tile) => (
+          <div key={tile.key} className="fin-tile" role="listitem">
+            <span className="fin-tile-label">{tile.label}</span>
+            <b className={`fin-tile-value ${tile.tone}`}>{tile.value}</b>
+            <span className="fin-tile-sub">{tile.sub}</span>
+          </div>
+        ))}
+      </div>
+    </FoldCard>
   );
 }

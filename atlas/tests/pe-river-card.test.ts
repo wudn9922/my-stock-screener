@@ -28,11 +28,22 @@ const ok = (bars: PriceBar[], priceBasis: string | undefined = 'split-adjusted')
   asOfSec: dateToSec('2025-10-01'),
   stale: false,
 });
-const render = (history: ReturnType<typeof fixture>, load: PriceLoad) => renderToStaticMarkup(createElement(PeRiverPanel, { history, load, onRetry: () => undefined }));
+// The card is folded by default and its body mounts only once opened, so the states are rendered open here.
+const render = (history: ReturnType<typeof fixture>, load: PriceLoad) =>
+  renderToStaticMarkup(createElement(PeRiverPanel, { history, load, onRetry: () => undefined, defaultOpen: true }));
 
 describe('PeRiverPanel states', () => {
   const us = fixture('us-full.json');
   const bars = weekly('2016-10-10', '2025-09-29', (i) => 30 + i * 0.3 + Math.sin(i / 7) * 6);
+
+  it('folded by default: title and one-line summary show, the chart body does not mount', () => {
+    const html = renderToStaticMarkup(createElement(PeRiverPanel, { history: us, load: ok(bars), onRetry: () => undefined }));
+    expect(html).toContain('data-state="ok"');
+    expect(html).toContain('本益比河流圖');
+    expect(html).toMatch(/目前本益比 [\d.]+x · 歷史第 \d+ 百分位/);
+    expect(html).not.toContain('目前本益比</span>');
+    expect(html).not.toContain('pe-river-legend');
+  });
 
   it('loading: a status placeholder, no numbers', () => {
     const html = render(us, { status: 'loading' });

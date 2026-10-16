@@ -35,6 +35,7 @@ test('FinMind statements page: cards, provenance, statement source row; desktop 
   await expect(page.locator('.fin-notes')).toContainText('公開資訊觀測站（FinMind）');
 
   const growth = page.locator('.fin-card[data-group="growth"]');
+  await growth.getByRole('button', { name: '營收', exact: true }).click();
   await growth.getByRole('button', { name: /^FY2016 營收/ }).click();
   await expect(growth.locator('.fin-detail')).toContainText('FinMind');
 

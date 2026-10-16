@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 import type { FinancialHistory, PeriodSource } from '../../fundamentals/FinancialHistory';
 import { yoy, type MetricGroupId, type MetricId, type MetricInput, type MetricUnit } from '../../fundamentals/financialMetrics';
 import { formatDateTime } from '../format';
 import { BarChart } from './BarChart';
+import { FoldCard } from './FoldCard';
 import {
   CHART_PERIODS,
   averageText,
@@ -30,6 +30,10 @@ export interface MetricCardProps {
   onMetric: (id: MetricId) => void;
   /** Shown above the tabs, e.g. why bank statements have no gross margin. */
   note?: string | null;
+  /** Open at first render (growth and profitability); the other cards start folded. */
+  defaultOpen?: boolean;
+  /** One line in the card head while folded or open. */
+  summary?: string | null;
 }
 
 const BASIS_TEXT: Record<string, string> = {
@@ -50,7 +54,7 @@ function inputText(input: MetricInput, currency: string, scale: MoneyScale) {
 }
 
 /** One group (成長, 獲利能力…): metric tabs, headline value with YoY / CAGR chips, column chart and the tapped bar's details. */
-export function MetricCard({ group, history, view, metric, onMetric, note }: MetricCardProps) {
+export function MetricCard({ group, history, view, metric, onMetric, note, defaultOpen = false, summary }: MetricCardProps) {
   const data = view.metrics[metric];
   const series = history[view.kind];
   const windowValues = useMemo(() => data.window.map((index) => data.values[index] ?? null), [data]);
@@ -96,11 +100,7 @@ export function MetricCard({ group, history, view, metric, onMetric, note }: Met
   const latestLabel = data.latestIndex === null ? null : view.labels[data.latestIndex];
 
   return (
-    <details className="card fin-card" open data-group={group.id}>
-      <summary className="fin-card-head">
-        <h2>{group.title}</h2>
-        <ChevronDown size={18} className="fin-chevron" aria-hidden="true" />
-      </summary>
+    <FoldCard className="fin-card" title={group.title} summary={summary} defaultOpen={defaultOpen} dataAttributes={{ 'data-group': group.id }}>
       {note && <p className="fin-card-note">{note}</p>}
       <div className="fin-tabs" role="group" aria-label={`${group.title}指標`}>
         {group.metrics.map((id) => (
@@ -169,7 +169,7 @@ export function MetricCard({ group, history, view, metric, onMetric, note }: Met
           />
         )}
       </div>
-    </details>
+    </FoldCard>
   );
 }
 
