@@ -9,8 +9,8 @@ and US). Offline: it only reads files other steps already wrote, so it runs righ
        ATLAS_GROWTH_OUT (default <ATLAS_REPORT_DIR>/growth.json).
 
 Sources. Every row says where each block (quarterly / annual) comes from (src / srcY):
-- "sec" / "yahoo": the statement history in docs/report/financials/<KEY>.json (build_financials.py /
-  seed_financials_sec.py); the src of the block's newest period.
+- "sec" / "yahoo" / "finmind": the statement history in docs/report/financials/<KEY>.json (build_financials.py /
+  seed_financials_sec.py / build_financials_tw_finmind.py); the src of the block's newest period.
 - "mops": Taiwan official income statements, docs/report/fundamentals/tw.json (build_fundamentals_tw.py:
   公開資訊觀測站 綜合損益表彙總報表 / 證交所・櫃買中心 OpenAPI; year-to-date figures turned into quarters).
 - "frames": US SEC XBRL frames, docs/report/fundamentals/us-sec.json (build_fundamentals_sec.py; its
@@ -138,7 +138,7 @@ def read_periods(section, quarterly):
         periods.append({
             "end": end, "day": day, "fy": fy, "fq": fq,
             "epsD": eps_d[i], "epsB": eps_b[i], "rev": revenue[i], "shares": shares[i],
-            "src": "sec" if src == "sec" else "yahoo",
+            "src": src if src in ("sec", "finmind") else "yahoo",
         })
     return periods
 
@@ -469,12 +469,14 @@ def build_document(files, now, extra=None):
     """files: [(key, financials document)]; extra: {key: [(level, q block, y block)]} of the other sources."""
     today = now.date()
     candidates = {}
+    # The other sources first: on a tie of source tier (FinMind's growth history and the FinMind statement file
+    # both say "finmind") the first candidate wins, so the growth values stay those of the growth history
+    for key, entries in (extra or {}).items():
+        candidates.setdefault(key, []).extend(entries)
     for key, document in files:
         blocks = financials_blocks(document, today)
         if blocks is not None:
             candidates.setdefault(key, []).append(blocks)
-    for key, entries in (extra or {}).items():
-        candidates.setdefault(key, []).extend(entries)
     rows = []
     for key, entries in candidates.items():
         row = merge_candidates(key, entries)

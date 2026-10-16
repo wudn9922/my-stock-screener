@@ -34,9 +34,10 @@ does not load it). Runs in the daily schedule workflow; the files are committed 
     as a restatement (quality.revisions, issue "restated");
   * annual keeps only 12M points, quarterly only 3M points (TTM / 6M / 9M are dropped); points in
     another currency than the statement currency are dropped (share counts excepted);
-  * periods written by seed_financials_sec.py (src "sec") are never replaced or removed: Yahoo only
-    fills their null fields, a > 2% revenue / net income difference is recorded as "yahoo-differs",
-    and Yahoo periods are only added after the newest SEC period;
+  * official periods (src "sec": seed_financials_sec.py; src "finmind": build_financials_tw_finmind.py)
+    are never replaced or removed: Yahoo only fills their null fields, a > 2% revenue / net income
+    difference is recorded as "yahoo-differs", and Yahoo periods are only added after the newest official
+    period;
   * up to 20 annual and 60 quarterly periods (oldest Yahoo periods dropped first, SEC never).
 - Splits: when adjacent diluted share counts jump (×1.8 / ×0.55), one chart request (events=split)
   fetches the split events; periods whose share count × the split ratio lines up with the next newer
@@ -71,6 +72,12 @@ CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
 VERSION = 1
 SOURCE = "Yahoo Finance fundamentals-timeseries"
 SOURCE_MIXED = "SEC EDGAR companyfacts + Yahoo Finance"
+SOURCE_FINMIND = "FinMind（公開資訊觀測站）"
+SOURCE_FINMIND_MIXED = "FinMind（公開資訊觀測站）+ Yahoo Finance"
+# Official periods: src "sec" (seed_financials_sec.py) and src "finmind" (build_financials_tw_finmind.py).
+# Yahoo never replaces or removes them (it only fills their null values), and they are never trimmed.
+OFFICIAL_SOURCES = ("sec", "finmind")
+SOURCE_VALUES = ("sec", "yahoo", "finmind")
 # index.json item: date of the last SEC companyfacts check (seed_financials_sec.py --due). Kept apart from
 # checkedAt, which is the Yahoo check date; run_refresh and seed_financials_sec.update_index carry it over
 SEC_CHECKED_KEY = "secCheckedAt"
@@ -162,6 +169,10 @@ ISSUES = (
 )
 # Quality codes that only sec_ifrs.py writes (its IFRS and US GAAP foreign-filer periods); update_document keeps them
 SEC_FOREIGN_ISSUES = ("ifrs", "ifrs-fallback", "foreign-gaap", "foreign-gaap-fallback")
+# Quality codes that only build_financials_tw_finmind.py writes (appended like SEC_ISSUES, not in ISSUES): the
+# shared "q4-derived" / "debt-approx" codes and FinMind's "eps-annual-summed" / "debt-missing"; update_document
+# keeps them while the file holds FinMind periods
+FINMIND_ISSUES = ("q4-derived", "eps-annual-summed", "debt-approx", "debt-missing")
 DOCUMENT_KEYS = (
     "version", "symbol", "market", "currency", "foreignReporter", "generatedAt", "checkedAt", "source",
     "fyEndMonth", "annual", "quarterly", "split", "quality",
@@ -379,7 +390,7 @@ def read_section(section):
     sources = section.get("src")
     if sources is None:
         sources = ["yahoo"] * count
-    elif not isinstance(sources, list) or len(sources) != count or any(s not in ("sec", "yahoo") for s in sources):
+    elif not isinstance(sources, list) or len(sources) != count or any(s not in SOURCE_VALUES for s in sources):
         raise ValueError("bad src")
     per_period, extras = {}, {}
     for key, value in section.items():
@@ -453,6 +464,25 @@ def has_sec(document):
     return any(p["src"] == "sec" for p in sections["annual"] + sections["quarterly"])
 
 
+def has_official(document):
+    """A stored file that holds any official period (SEC or FinMind): never deleted as unlisted."""
+    try:
+        sections = read_sections(document)
+    except ValueError:
+        return True     # cannot tell: treat as precious
+    return any(p["src"] in OFFICIAL_SOURCES for p in sections["annual"] + sections["quarterly"])
+
+
+def source_label(periods, filled=()):
+    """The file's source line: SEC / FinMind (+ Yahoo when Yahoo periods or values are in the file)."""
+    if any(p["src"] == "sec" for p in periods):
+        return SOURCE_MIXED
+    if any(p["src"] == "finmind" for p in periods):
+        yahoo = bool(filled) or any(p["src"] == "yahoo" for p in periods)
+        return SOURCE_FINMIND_MIXED if yahoo else SOURCE_FINMIND
+    return SOURCE
+
+
 # ---------------------------------------------------------------------------------------------
 # Merge
 # ---------------------------------------------------------------------------------------------
@@ -493,16 +523,17 @@ def same_period_matches(periods, new):
     return match
 
 
-def merge_section(old, new, frequency, today_iso, renamed=None):
+def merge_section(old, new, frequency, today_iso, renamed=None, filled=None):
     """
     Merge new Yahoo periods into stored ones → (periods ascending, revisions).
     renamed (dict, optional) receives {old end: new end} for periods whose end date moved.
+    filled (list, optional) receives (end, field) for every null official value that Yahoo filled.
     """
     keep = KEEP_ANNUAL if frequency == "annual" else KEEP_QUARTERLY
     periods = [period(p["end"], p["values"], p["src"], p["extra"]) for p in old]
     new = dedupe(new)
-    sec_ends = [p["end"] for p in periods if p["src"] == "sec"]
-    latest_sec = max(sec_ends) if sec_ends else None
+    official_ends = [p["end"] for p in periods if p["src"] in OFFICIAL_SOURCES]
+    latest_official = max(official_ends) if official_ends else None
     match = same_period_matches(periods, new)
     revisions = []
     original = len(periods)
@@ -513,11 +544,11 @@ def merge_section(old, new, frequency, today_iso, renamed=None):
                 abs(days_between(periods[k]["end"], item["end"])) <= SAME_PERIOD_DAYS for k in range(original)
             )
             # Never squeeze a Yahoo period into the SEC history
-            if not near and (latest_sec is None or item["end"] > latest_sec):
+            if not near and (latest_official is None or item["end"] > latest_official):
                 periods.append(period(item["end"], item["values"]))
             continue
         target = periods[i]
-        if target["src"] == "sec":
+        if target["src"] in OFFICIAL_SOURCES:
             for field in ("revenue", "netIncome"):
                 old_value, new_value = target["values"].get(field), item["values"].get(field)
                 if old_value is not None and new_value is not None:
@@ -531,6 +562,8 @@ def merge_section(old, new, frequency, today_iso, renamed=None):
                     continue
                 if target["values"].get(field) is None:
                     target["values"][field] = value
+                    if filled is not None:
+                        filled.append((target["end"], field))
             continue
         for field in ("revenue", "netIncome"):
             old_value, new_value = target["values"].get(field), item["values"].get(field)
@@ -543,8 +576,8 @@ def merge_section(old, new, frequency, today_iso, renamed=None):
             renamed[target["end"]] = item["end"]
         target["end"] = item["end"]
     periods.sort(key=lambda p: p["end"])
-    # Drop the oldest periods beyond the cap, but never SEC ones (nor anything newer than them)
-    while len(periods) > keep and periods[0]["src"] != "sec":
+    # Drop the oldest periods beyond the cap, but never official ones (nor anything newer than them)
+    while len(periods) > keep and periods[0]["src"] not in OFFICIAL_SOURCES:
         del periods[0]
     return periods, revisions
 
@@ -1004,7 +1037,7 @@ def write_section(periods, extras, quarterly):
     section = {"end": [p["end"] for p in periods], "fy": [p["fy"] for p in periods]}
     if quarterly:
         section["fq"] = [p["fq"] for p in periods]
-    if any(p["src"] == "sec" for p in periods):
+    if any(p["src"] != "yahoo" for p in periods):
         section["src"] = [p["src"] for p in periods]
     present = {field for p in periods for field, value in p["values"].items() if value is not None}
     order = [field for field in FIELDS if field in present] + sorted(present - set(FIELDS))
@@ -1061,9 +1094,10 @@ def update_document(previous, payload, key, now, fetch_splits=None):
         new_annual, new_quarterly = merged["annual"], merged["quarterly"]
 
     renamed = {"annual": {}, "quarterly": {}}
-    annual, revised_a = merge_section(stored["annual"], new_annual, "annual", today_iso, renamed["annual"])
+    filled = []
+    annual, revised_a = merge_section(stored["annual"], new_annual, "annual", today_iso, renamed["annual"], filled)
     quarterly, revised_q = merge_section(
-        stored["quarterly"], new_quarterly, "quarterly", today_iso, renamed["quarterly"]
+        stored["quarterly"], new_quarterly, "quarterly", today_iso, renamed["quarterly"], filled
     )
     info["restated"] = sum(1 for r in revised_a + revised_q if r["kind"] == "restated")
 
@@ -1113,11 +1147,10 @@ def update_document(previous, payload, key, now, fetch_splits=None):
     if isinstance(previous, dict) and isinstance(previous.get("quality"), dict):
         carried = previous["quality"].get("issues")
         if isinstance(carried, list):
-            grade["issues"] += sorted(
-                code for code in SEC_FOREIGN_ISSUES if code in carried and code not in grade["issues"])
+            codes = SEC_FOREIGN_ISSUES + (FINMIND_ISSUES if any(p["src"] == "finmind" for p in annual + quarterly) else ())
+            grade["issues"] += sorted(code for code in codes if code in carried and code not in grade["issues"])
     if revisions:
         grade["revisions"] = revisions
-    mixed = any(p["src"] == "sec" for p in annual + quarterly)
     document = {
         "version": VERSION,
         "symbol": key,
@@ -1126,7 +1159,7 @@ def update_document(previous, payload, key, now, fetch_splits=None):
         "foreignReporter": foreign,
         "generatedAt": now.isoformat().replace("+00:00", "Z"),
         "checkedAt": today_iso,
-        "source": SOURCE_MIXED if mixed else SOURCE,
+        "source": source_label(annual + quarterly, filled),
         "fyEndMonth": end_month or 12,
         "annual": write_section(annual, stored["extras"]["annual"], False),
         "quarterly": write_section(quarterly, stored["extras"]["quarterly"], True),
@@ -1528,7 +1561,7 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
         else:
             last_listed = previous.get("lastListed") if parse_day(previous.get("lastListed")) else today_iso
             gone = (today - parse_day(last_listed)).days > KEEP_UNLISTED_DAYS
-            if gone and key in documents and not has_sec(documents[key]):
+            if gone and key in documents and not has_official(documents[key]):
                 try:
                     os.remove(os.path.join(out_dir, key + ".json"))
                     stats["deleted"].append(key)

@@ -65,40 +65,34 @@ Exit codes: 0 done (also: stopped by budget / rate limit with progress saved), 1
 --summary without a stored file.
 """
 import argparse
-import gzip
 import json
 import os
 import sys
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from collections import Counter
 from datetime import date, datetime, timezone
-from http.client import HTTPException
 
 import build_fundamentals_tw as tw
 import build_growth as growth
 from build_valuation_us import read_json, write_atomic
+from finmind_client import (  # noqa: F401 - re-exported: the client is shared with build_financials_tw_finmind
+    API_URL, AUTH_MARKERS, HOURLY_LIMIT, LIMIT_MARKERS, RATE_SAFETY, RETRIES, RETRY_WAIT, USER_AGENT,
+    AuthError, FinMindError, Http, LimitReached, RateLimited, fetch_rows, limit_used, parse_response,
+    request_interval, request_url as client_request_url,
+)
 
 VERSION = 1
 FILE_NAME = "tw-finmind.json"
 SRC = "finmind"
-API_URL = "https://api.finmindtrade.com/api/v4/data"
 DATASET = "TaiwanStockFinancialStatements"
 START_DATE = "2015-01-01"
 SOURCE = "FinMind TaiwanStockFinancialStatements（資料源自公開資訊觀測站）"
 UNITS = "as published by FinMind (rev / ni: NT$ or NT$ thousand, checked by --verify; eps: NT$)"
 FIELDS = ["rev", "eps", "ni"]
 FIELD_AT = {"rev": 0, "eps": 1, "ni": 2}
-USER_AGENT = "my-stock-screener fundamentals (github.com/wudn9922/my-stock-screener)"
-HOURLY_LIMIT = {False: 300, True: 600}
-RATE_SAFETY = 0.95
 DEFAULT_BUDGET_SECONDS = 600
 SAVE_EVERY = 25
 MAX_CONSECUTIVE_ERRORS = 5
-RETRIES = 2
-RETRY_WAIT = 20.0
 RECHECK_DAYS = 7
 SLOW_RECHECK_DAYS = 30
 OPEN_AFTER_DAYS = 30
@@ -112,9 +106,6 @@ CROSS_CHECK_TOLERANCE = 0.02
 COMPLETE_SHARE = 0.95
 SPOT_CODES = ("2330", "2317", "1101", "2881", "2882", "2891", "2801", "2834", "2823", "2867", "6005", "2855")
 
-# Answers that mean "stop for now" / "the token is wrong" (FinMind: {"msg": "...", "status": 402})
-LIMIT_MARKERS = ("UPPER LIMIT", "TOO MANY", "RATE LIMIT", "EXCEED", "LIMIT REACHED", "上限", "超過")
-AUTH_MARKERS = ("TOKEN", "UNAUTHORIZED", "NOT AUTHORIZED", "PERMISSION", "LOGIN", "權限")
 
 EPS_TYPES = ("EPS", "BasicEPS", "BasicEarningsPerShare", "BasicEarningsLossPerShare")
 PARENT_NI_TYPES = ("EquityAttributableToOwnersOfParent", "NetIncomeAttributableToOwnersOfParent",
@@ -133,26 +124,6 @@ INTEREST_KIND = tw.REVENUE_KINDS.index("利息淨收益+利息以外淨損益")
 
 class StoreError(ValueError):
     """tw-finmind.json does not have the expected layout."""
-
-
-class RateLimited(RuntimeError):
-    """FinMind says the request limit is reached: stop and keep the progress."""
-
-
-class AuthError(RuntimeError):
-    """FinMind refused the token / the request (HTTP 401 / 403)."""
-
-
-class LimitReached(RuntimeError):
-    """--limit requests are used up (checked before every attempt, retries included)."""
-
-
-class FinMindError(ValueError):
-    """An answer this parser does not understand (details for the log); transient = worth a retry."""
-
-    def __init__(self, message, transient=False):
-        super().__init__(message)
-        self.transient = transient
 
 
 # ---------------------------------------------------------------------------------------------
@@ -199,38 +170,6 @@ def open_season(today):
 # ---------------------------------------------------------------------------------------------
 # FinMind answers
 # ---------------------------------------------------------------------------------------------
-def parse_response(status, body):
-    """
-    HTTP status + body → the list of rows. RateLimited (402 / 429 / a msg about the limit), AuthError
-    (401 / 403 / a msg about the token), FinMindError otherwise (transient for 5xx); the message has the
-    status, FinMind's msg and the start of the body, enough to read in a log.
-    """
-    text = body.decode("utf-8", errors="replace") if isinstance(body, (bytes, bytearray)) else str(body or "")
-    try:
-        document = json.loads(text) if text.strip() else None
-    except ValueError:
-        document = None
-    if isinstance(document, dict):
-        msg, inner = str(document.get("msg") or ""), document.get("status")
-    else:
-        msg, inner = "", None
-    data = document.get("data") if isinstance(document, dict) else None
-    # An empty list is a real "no data" only with msg success: any other msg explains a refusal (not a stock
-    # without data), and must not be stored as "fetched, nothing published".
-    if status == 200 and isinstance(data, list) and inner in (None, 200, "200") and (data or msg.strip().lower() in ("", "success")):
-        return data
-    shown = msg or " ".join(text.split())[:200]
-    upper = shown.upper()
-    detail = f"HTTP {status}, status {inner!r}, msg {shown!r}"
-    if status in (402, 429) or inner in (402, 429, "402", "429") or any(marker in upper for marker in LIMIT_MARKERS):
-        raise RateLimited(f"FinMind request limit: {detail}")
-    if status in (401, 403) or inner in (401, 403, "401", "403") or any(marker in upper for marker in AUTH_MARKERS):
-        raise AuthError(f"FinMind refused the request: {detail}")
-    if status == 200 and isinstance(document, dict) and data is None:
-        raise FinMindError(f"no 'data' list in the answer ({detail}; keys {sorted(document)[:8]})")
-    raise FinMindError(detail, transient=status is None or status >= 500 or document is None and status == 200)
-
-
 def roles_of(type_name, origin_name):
     """One row → [(role, rank, kind)], role in eps / ni / rev / interest / noninterest; lower rank = better."""
     name, kind_type = tw.normalise(origin_name), str(type_name or "")
@@ -763,68 +702,13 @@ def combine(official_rows, finmind_rows):
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-class Http:
-    """urllib GET → (status, body bytes); HTTP errors return their status and body (FinMind explains in JSON)."""
-
-    def __init__(self, timeout=60):
-        self.timeout = timeout
-
-    @staticmethod
-    def _body(response):
-        body = response.read()
-        if (response.headers.get("Content-Encoding") or "").lower() == "gzip":
-            body = gzip.decompress(body)
-        return body
-
-    def get(self, url, headers):
-        request = urllib.request.Request(url, headers=headers)
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                return response.status, self._body(response)
-        except urllib.error.HTTPError as error:
-            try:
-                return error.code, self._body(error)
-            except (OSError, ValueError):
-                return error.code, b""
-
-
 def request_url(code, start_date):
-    return API_URL + "?" + urllib.parse.urlencode({"dataset": DATASET, "data_id": code, "start_date": start_date})
+    return client_request_url(DATASET, code, start_date)
 
 
 def fetch_stock(http, code, start_date, token, sleep, log, counter):
-    """One stock → FinMind rows (transient errors retried RETRIES times); RateLimited / AuthError / FinMindError /
-    LimitReached (counter["limit"] requests used up)."""
-    headers = {"Accept": "application/json", "Accept-Encoding": "gzip", "User-Agent": USER_AGENT}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    problem = None
-    for attempt in range(RETRIES + 1):
-        if limit_used(counter):
-            raise LimitReached(f"--limit {counter['limit']} requests")
-        counter["requests"] += 1
-        try:
-            status, body = http.get(request_url(code, start_date), headers)
-        except (OSError, HTTPException, ValueError) as error:
-            problem = f"{type(error).__name__}: {error}"
-        else:
-            try:
-                return parse_response(status, body)
-            except FinMindError as error:
-                if not error.transient:
-                    raise
-                problem = str(error)
-        if attempt < RETRIES:
-            used_up = limit_used(counter)
-            log(f"FinMind {code}: {problem}" + ("" if used_up else f"; retrying in {RETRY_WAIT:.0f}s"))
-            if not used_up:
-                sleep(RETRY_WAIT)
-    raise FinMindError(f"{problem} (after {RETRIES + 1} attempts)", transient=True)
-
-
-def limit_used(counter):
-    """True when the --limit requests are all used (counter["limit"] None: no limit)."""
-    return counter.get("limit") is not None and counter["requests"] >= counter["limit"]
+    """One stock → FinMind rows of the statements dataset (see finmind_client.fetch_rows)."""
+    return fetch_rows(http, DATASET, code, start_date, token, sleep, log, counter)
 
 
 def universe_codes(universe):
@@ -1024,7 +908,7 @@ def run(args, http=None, now=None, sleep=time.sleep, clock=time.monotonic, log=p
                 f"nothing fetched here (the backfill runs elsewhere, e.g. Codex)")
             return 0
     token = token if token is not None else (os.environ.get("FINMIND_TOKEN") or "").strip() or None
-    interval = 3600.0 / (HOURLY_LIMIT[bool(token)] * RATE_SAFETY)
+    interval = request_interval(token)
     plan = plan_fetches(store, sorted(codes), today, set(args.codes or ()))
     log(f"FinMind plan: {len(plan)} stocks ({Counter(reason.split(' ')[0] for _, _, reason in plan)}), "
         f"{'with' if token else 'without'} token, one request every {interval:.1f}s, budget {args.budget:.0f}s")

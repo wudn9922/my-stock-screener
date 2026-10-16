@@ -1,4 +1,12 @@
-import { hasSecHistory, provenance, type FinancialHistory, type PeriodKind, type Revision } from '../../fundamentals/FinancialHistory';
+import {
+  hasFinmindHistory,
+  hasSecHistory,
+  provenance,
+  type FinancialHistory,
+  type PeriodKind,
+  type PeriodSource,
+  type Revision,
+} from '../../fundamentals/FinancialHistory';
 import {
   FIELD_LABELS,
   METRICS,
@@ -314,10 +322,12 @@ export const ISSUE_TEXT: Record<string, string> = {
   'quarterly-ytd-suspected': '季度數字疑似為「年初至今累計」而非單季，未自動拆解，季度圖可能失真。',
   'negative-equity': '有期別股東權益為負（常見於大量買回庫藏股或累積虧損），該期 ROE 與負債權益比不計算。',
   'capex-sign': '資本支出的正負號已校正為「流出為正」。',
-  'yahoo-differs': '部分期別 Yahoo 與 SEC 的數字差異超過 2%，本頁保留 SEC 原始申報值。',
+  'yahoo-differs': '部分期別 Yahoo 與官方申報（SEC 或 FinMind）的數字差異超過 2%，本頁保留官方申報值。',
   'q4-derived': '第四季數字由「全年減前三季」推算，不是公司單獨公布的單季值。',
   'eps-inconsistent': 'EPS 與「淨利 ÷ 股數」對不起來，可能有特別股、分割或口徑差異。',
-  'debt-approx': '有息負債為 Yahoo 的 TotalDebt，可能包含租賃負債，負債比與 ROIC 為近似值。',
+  'debt-approx': '有息負債為近似值：Yahoo 的 TotalDebt，或 FinMind 的短期借款、長期借款與應付公司債（含一年內到期）加總，不含租賃負債，負債比與 ROIC 為近似值。',
+  'debt-missing': '有息負債科目在官方資料中找不到，負債比與 ROIC 不計算。',
+  'eps-annual-summed': '年度 EPS 為四季 EPS 加總（與公司年報的全年 EPS 可能有一分上下的差異），年度 EPS 的年增率請小心解讀。',
   'foreign-filer': '外國發行人（如 ADR）：EPS 為每普通股，不是每 ADR。',
   'currency-changed': '財報幣別曾經變更，較早期別與最新期別的幣別可能不同，跨期比較請小心。',
   ifrs: '外國發行人以 IFRS 申報（SEC 20-F／40-F），科目由 SEC 事實對照而來；淨利與權益以歸屬母公司為準，缺欄位留空、不推算。',
@@ -329,7 +339,10 @@ export const ISSUE_TEXT: Record<string, string> = {
 };
 export const issueText = (code: string) => ISSUE_TEXT[code] ?? `其他資料提示（${code}）。`;
 
-const SOURCE_NAMES = { sec: 'SEC EDGAR', yahoo: 'Yahoo Finance' } as const;
+const SOURCE_NAMES = { sec: 'SEC EDGAR', finmind: '公開資訊觀測站（FinMind）', yahoo: 'Yahoo Finance' } as const;
+
+/** Short source name of one period (the statement table's 來源 row and the detail card). */
+export const SOURCE_LABEL: Record<PeriodSource, string> = { sec: 'SEC', finmind: 'FinMind', yahoo: 'Yahoo' };
 
 /** 「資料來源：SEC EDGAR（FY2015–FY2020）＋ Yahoo Finance（FY2021–FY2024）」 */
 export function provenanceText(history: FinancialHistory, kind: PeriodKind): string {
@@ -376,6 +389,7 @@ export function depthText(history: FinancialHistory, kind: PeriodKind): string {
   if (kind === 'quarterly') return `目前 ${count} 季（${first} 起）；之後每季自動累積。`;
   const years = count;
   if (hasSecHistory(history)) return `含 SEC 申報歷史，共約 ${years} 年（${first} 起）；之後每季自動累積。`;
+  if (hasFinmindHistory(history)) return `含 FinMind（公開資訊觀測站）申報歷史，共約 ${years} 年（${first} 起）；之後每季自動累積。`;
   return `目前約 ${years} 年（${first} 起）；Yahoo 只回溯約 4 年，之後每季自動累積。`;
 }
 
@@ -397,6 +411,7 @@ export function revisionText(history: FinancialHistory, revision: Revision): str
     const scale = moneyScale([value]);
     return `${formatNumber(value / scale.divisor, 2)}${scale.unit}`;
   };
-  const kind = revision.kind === 'restated' ? '重編' : '保留 SEC 值，Yahoo 不同';
+  const official = hasFinmindHistory(history) && !hasSecHistory(history) ? 'FinMind' : 'SEC';
+  const kind = revision.kind === 'restated' ? '重編' : `保留 ${official} 值，Yahoo 不同`;
   return `${label} ${FIELD_LABELS[revision.field]}：${amount(revision.old)} → ${amount(revision.new)}（${kind}）`;
 }

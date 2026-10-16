@@ -463,7 +463,8 @@
   border: 1px solid var(--border-strong);
   color: var(--text-3);
 }
-.fin-source.sec {
+.fin-source.sec,
+.fin-source.finmind {
   color: var(--accent-text);
   border-color: var(--accent);
 }
@@ -612,7 +613,8 @@
   font-size: 11px;
   color: var(--text-3);
 }
-.fin-source-row td.sec {
+.fin-source-row td.sec,
+.fin-source-row td.finmind {
   color: var(--accent-text);
 }
 .fin-table-note {

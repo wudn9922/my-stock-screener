@@ -10,6 +10,8 @@ name: Official Fundamentals (TW / US)
 #   需要時在本機執行 `python atlas/scripts/build_fundamentals_sec.py` 後提交該檔。外國發行人（年度）每 7 天重抓一次。
 # - 台股歷史（FinMind，資料源自公開資訊觀測站）：docs/report/fundamentals/tw-finmind.json，約 10 年單季，逐檔續跑（每次約 20 分鐘）；
 #   FINMIND_TOKEN（secret，選填）提高每小時請求上限。被限額或被拒時保留進度、本步驟失敗不影響其他步驟。
+# - 台股財報（FinMind 損益、資產負債、現金流）：docs/report/financials/<代號>.TW(O).json 的官方期別（src "finmind"），
+#   state 在 docs/report/fundamentals/tw-financials-finmind.json；逐檔續跑（每次約 25 分鐘），寫完即提交。
 # - 最後 build_growth.py 合併 financials/*.json 與上面兩個檔案重建 growth.json（financials.yml 也會用同一套規則重建）。
 # 與 financials.yml 共用 concurrency group，兩者不會同時改 growth.json。
 on:
@@ -44,8 +46,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # 60 分鐘：台股官方 900 秒 + SEC + FinMind 1200 秒 + 重建與提交（原 40 分鐘不夠放下 FinMind 的預算）
-    timeout-minutes: 60
+    # 90 分鐘：台股官方 900 秒 + SEC + FinMind 歷史 1200 秒 + FinMind 財報 1500 秒 + 重建與提交
+    timeout-minutes: 90
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
@@ -86,6 +88,16 @@ jobs:
           FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
         run: python -u atlas/scripts/build_fundamentals_tw_finmind.py --budget 1200
 
+      # 台股財報檔（docs/report/financials/<代號>.TW(O).json）：FinMind 損益表、資產負債表、現金流量表逐檔續跑，
+      # 寫進與 Yahoo 同一個檔（Yahoo 每日更新只補空值與較新季，不覆蓋 FinMind 值）。失敗不擋其他步驟。
+      - name: Taiwan statements (FinMind, resumable)
+        if: contains(inputs.markets || 'TW,US', 'TW')
+        continue-on-error: true
+        env:
+          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
+        # 初次全量回補由人工（Codex）執行；回補完成前本步驟不抓，避免搶同一個 token 的配額、改到同一批檔案
+        run: python -u atlas/scripts/build_financials_tw_finmind.py --budget 1500 --only-after-backfill
+
       # 即使上一步失敗，也用 repo 內已有的檔案重建（純離線讀檔，很快）
       - name: Build screener growth data (EPS / revenue YoY)
         if: always()
@@ -98,6 +110,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           [ -d docs/report/fundamentals ] && git add -A docs/report/fundamentals
+          [ -d docs/report/financials ] && git add -A docs/report/financials
           [ -f docs/report/growth.json ] && git add docs/report/growth.json
           git commit -m "Auto-update official fundamentals" || { echo "No changes to commit"; exit 0; }
           # 每日報告與 Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試

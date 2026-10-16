@@ -254,7 +254,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
       {symbol && isChipsPageSymbol(symbol) && <ChipsSection symbol={symbol} />}
       <footer className="page-foot fin-foot">
         <span>
-          限制：Yahoo 只提供約 4 年年度、5–8 季季度財報，本站逐季累積、無法往回補（部分美股另以 SEC 申報補歷史）；比率由本頁依公式計算，可能與公司公告口徑不同；有息負債可能含租賃負債。
+          限制：Yahoo 只提供約 4 年年度、5–8 季季度財報，本站逐季累積、無法往回補（部分美股另以 SEC 申報補歷史，台股另以 FinMind〔源自公開資訊觀測站〕回溯至 2015 年）；比率由本頁依公式計算，可能與公司公告口徑不同；有息負債可能含租賃負債。
         </span>
         <span>僅供研究參考，非投資建議。</span>
       </footer>
