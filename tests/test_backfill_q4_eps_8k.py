@@ -117,6 +117,15 @@ class ZeroAndNetRowTests(unittest.TestCase):
         self.assertIsNone(result)
         self.assertEqual(reason, "EPS is zero")
 
+    def test_the_total_eps_is_used_not_the_continuing_operations_row(self):
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
+                "<tr><td>Earnings per share from continuing operations - diluted</td><td>0.30</td></tr>"
+                "<tr><td>Earnings per share - diluted</td><td>0.25</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+
     def test_a_later_net_income_row_can_match_the_stored_value(self):
         html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
                 "<tr><td>Net income</td><td>1,500</td></tr>"

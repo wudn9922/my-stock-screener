@@ -62,7 +62,7 @@ NI_RE = re.compile(r"net\s*(\(loss\)\s*|loss\s*)?(income|earnings)|net\s+loss")
 NON_GAAP = ("non-gaap", "non gaap", "nongaap", "adjusted", "excluding", "pro forma")
 NI_AVOID = ("per share", "noncontrolling", "non-controlling", "minority", "continuing", "discontinued",
             "before", "comprehensive") + NON_GAAP
-EPS_AVOID = ("weighted", "shares", "number of", "average") + NON_GAAP
+EPS_AVOID = ("weighted", "shares", "number of", "average", "continuing") + NON_GAAP   # total EPS, like the net income row
 
 
 class Forbidden(RuntimeError):
@@ -238,8 +238,9 @@ def table_eps(table, target, end):
         diluted_shares = shares_row[j] * scale
     basic_row = _pick(rows, lambda label: is_eps(label, "basic"))
     basic = basic_row[j] if basic_row is not None and len(basic_row) == len(net_row) else None
+    per_share_rows = [[label, values] for label, values in rows if "per share" in label or "earnings per" in label]
     return {"epsDiluted": eps, "epsBasic": basic, "dilutedShares": diluted_shares, "scale": scale,
-            "netLabel": net_label, "epsLabel": eps_label}, None
+            "netLabel": net_label, "epsLabel": eps_label, "perShareRows": per_share_rows[:8]}, None
 
 
 class Sec:
@@ -534,7 +535,8 @@ def run(args, sec):
     report = summarize(rows, args.mode)
     mismatches = [{"key": r["key"], "end": r["end"], "stored": r["stored"], "estimate": r["result"]["epsDiluted"],
                    "basic": r["result"]["epsBasic"], "netLabel": r["result"].get("netLabel"),
-                   "epsLabel": r["result"].get("epsLabel"), "url": r["result"]["url"]}
+                   "epsLabel": r["result"].get("epsLabel"), "perShareRows": r["result"].get("perShareRows"),
+                   "url": r["result"]["url"]}
                   for r in rows if args.mode == "backtest" and r["result"]
                   and not within_tolerance(r["result"]["epsDiluted"], r["stored"])]
     samples = {}
