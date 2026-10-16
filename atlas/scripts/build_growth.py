@@ -119,7 +119,22 @@ def column(values, name, count):
     return [finite_number(raw[i]) if i < len(raw) else None for i in range(count)]
 
 
-def read_periods(section, quarterly):
+# Q4_EPS_STRICT=1: a US Q4 EPS counts only when graded A (published, confirmed); the default also accepts Y
+# (derived, annual minus Q1-Q3) and ungraded values. C, D and B never count for US filers.
+STRICT_Q4_EPS = os.environ.get("Q4_EPS_STRICT") == "1"
+
+
+def eps_usable(grade, us, q4, strict=STRICT_Q4_EPS):
+    if not us:
+        return True
+    if grade in ("B", "C", "D"):
+        return False
+    if not q4:
+        return True
+    return grade == "A" if strict else grade in (None, "A", "Y")
+
+
+def read_periods(section, quarterly, market=None):
     """→ [{end, fy, fq, epsD, epsB, rev, shares, src}] for the periods with a valid end date and fy."""
     if not isinstance(section, dict) or not isinstance(section.get("end"), list):
         return []
@@ -130,6 +145,7 @@ def read_periods(section, quarterly):
     fqs = section.get("fq") if isinstance(section.get("fq"), list) else []
     srcs = section.get("src") if isinstance(section.get("src"), list) else []
     eps_d, eps_b = column(values, "epsDiluted", count), column(values, "epsBasic", count)
+    eps_quality = section.get("epsQuality") if isinstance(section.get("epsQuality"), list) else []
     revenue, shares = column(values, "revenue", count), column(values, "dilutedShares", count)
     periods = []
     for i, end in enumerate(ends):
@@ -140,10 +156,21 @@ def read_periods(section, quarterly):
             continue
         if quarterly and (isinstance(fq, bool) or not isinstance(fq, int) or not 1 <= fq <= 4):
             continue
+        grade = eps_quality[i] if i < len(eps_quality) and isinstance(eps_quality[i], dict) else {}
+        us, q4 = market != "TW", bool(quarterly and fq == 4)
+        gated = False
+        if us and not eps_usable(grade.get("epsDiluted"), us, q4):
+            gated = gated or eps_d[i] is not None
+            eps_d[i] = None
+        if us and not eps_usable(grade.get("epsBasic"), us, q4):
+            gated = gated or eps_b[i] is not None
+            eps_b[i] = None
         src = srcs[i] if i < len(srcs) and isinstance(srcs[i], str) else "yahoo"
         periods.append({
             "end": end, "day": day, "fy": fy, "fq": fq,
             "epsD": eps_d[i], "epsB": eps_b[i], "rev": revenue[i], "shares": shares[i],
+            # a gated Q4 still anchors this filing block's recency (dropping it could switch to a shorter block)
+            "gatedQ4Eps": bool(gated and q4),
             "src": src if src in ("sec", "finmind") else "yahoo",
         })
     return periods
@@ -265,7 +292,7 @@ def yoy_series(periods, quarterly, slots, events, today, stale_days, pair=None):
     (EPS yoy, turnaround, revenue yoy) (default: default_pair with the split events). A period dict
     with "derived": True sets the slot's bit in `derived`.
     """
-    candidates = [period for period in periods if usable(period)]
+    candidates = [period for period in periods if usable(period) or (quarterly and period.get("gatedQ4Eps"))]
     if not candidates:
         return None
     latest = max(candidates, key=lambda p: period_number(p, quarterly))
@@ -317,8 +344,8 @@ def financials_blocks(document, today):
     if not isinstance(document, dict):
         return None
     events = split_events(document)
-    quarterly = read_periods(document.get("quarterly"), True)
-    annual = read_periods(document.get("annual"), False)
+    quarterly = read_periods(document.get("quarterly"), True, document.get("market"))
+    annual = read_periods(document.get("annual"), False, document.get("market"))
     q = yoy_series(quarterly, True, QUARTER_SLOTS, events, today, STALE_QUARTER_DAYS)
     y = yoy_series(annual, False, YEAR_SLOTS, events, today, STALE_ANNUAL_DAYS)
     if q is None and y is None:
