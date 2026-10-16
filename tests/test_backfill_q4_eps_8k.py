@@ -149,6 +149,16 @@ class PerShareHeadingGuardTests(unittest.TestCase):
         self.assertEqual(result["epsDiluted"], 0.25)
 
 
+class EpsRangeTests(unittest.TestCase):
+    def test_a_share_count_read_as_eps_is_rejected(self):
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>26,671</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        self.assertIsNone(result)
+        self.assertEqual(reason, "EPS is out of range (a share count?)")
+
+
 class ZeroAndNetRowTests(unittest.TestCase):
     def test_zero_eps_is_never_accepted(self):
         html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
