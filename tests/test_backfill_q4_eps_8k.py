@@ -108,6 +108,47 @@ class NonGaapTests(unittest.TestCase):
         self.assertEqual(result["epsDiluted"], 0.25)
 
 
+class PerShareHeadingTests(unittest.TestCase):
+    def test_basic_and_diluted_rows_under_a_per_share_heading_are_eps_rows(self):
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
+                "<tr><td>Net income per share:</td></tr>"
+                "<tr><td>Basic</td><td>0.26</td></tr>"
+                "<tr><td>Diluted</td><td>0.25</td></tr>"
+                "<tr><td>Diluted weighted average shares outstanding</td><td>4,936</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertEqual(result["epsBasic"], 0.26)
+        self.assertEqual(result["dilutedShares"], 4_936_000)
+
+
+class PerShareHeadingGuardTests(unittest.TestCase):
+    def test_share_counts_under_the_heading_are_not_eps(self):
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
+                "<tr><td>Net income per share:</td></tr>"
+                "<tr><td>Basic</td><td>11,680,033</td></tr>"
+                "<tr><td>Diluted</td><td>12,041,825</td></tr>"
+                "<tr><td>Basic earnings per share</td><td>0.26</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.25</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+
+    def test_the_heading_reaches_only_the_two_rows_under_it(self):
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
+                "<tr><td>Net income per share:</td></tr>"
+                "<tr><td>Revenue</td><td>5,000</td></tr>"
+                "<tr><td>Gross profit</td><td>3,000</td></tr>"
+                "<tr><td>Diluted</td><td>0.99</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.25</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+
+
 class ZeroAndNetRowTests(unittest.TestCase):
     def test_zero_eps_is_never_accepted(self):
         html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
@@ -231,6 +272,27 @@ NEXT_YEAR_RELEASE = """
 """
 
 
+class OrphanDiagnosticTests(unittest.TestCase):
+    def test_a_net_income_table_without_its_period_is_counted_with_the_table_before_it(self):
+        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr></table>"
+                "<table><tr><td>Net income attributable to Acme</td><td>$</td><td>999</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>$</td><td>0.30</td></tr></table>")
+
+        class FakeSec:
+            def get_json(self, url):
+                return {"directory": {"item": [{"name": "ex99-1.htm"}]}}
+
+            def get_text(self, url):
+                return None if url.endswith(("-index.html", "-index.htm")) else html
+
+        filing = {"accessionNumber": "0001-26-000009", "filingDate": "2026-02-05"}
+        debug = []
+        result, reason = bq.from_filing(FakeSec(), 1234, filing, 1_234_000, "2024-12-31", debug)
+        self.assertIsNone(result)
+        self.assertEqual(debug[0]["orphans"]["net_tables_without_period"], 1)
+        self.assertEqual(debug[0]["orphans"]["period_in_previous_table"], 1)
+
+
 class IndependentCheckTests(unittest.TestCase):
     rows = [{"form": "8-K", "items": "2.02", "filingDate": "2026-02-05", "accessionNumber": "0001-26-000001"}]
 
@@ -254,10 +316,47 @@ class IndependentCheckTests(unittest.TestCase):
         check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, self.rows, END, 1_234_000, 0.20, {})
         self.assertEqual(check["status"], "conflict")
 
+    def test_a_restated_prior_year_net_income_is_kept_as_a_diagnostic(self):
+        check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, self.rows, END, 1_200_000, 0.25, {})
+        self.assertEqual(check["status"], "unavailable")
+        self.assertEqual(check["reason"], "no table shows this quarter's net income")
+        self.assertEqual(check["debug"][0]["period_net_rows"], [["net income attributable to acme", [999.0, 1234.0]]])
+
     def test_no_next_year_release_is_unavailable(self):
         check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, [], END, 1_234_000, 0.25, {})
         self.assertEqual(check["status"], "unavailable")
         self.assertIn("Item 2.02", check["reason"])
+
+
+class FillGradeTests(unittest.TestCase):
+    def test_a_confirmed_value_is_grade_a_and_an_unconfirmed_one_is_grade_c(self):
+        doc = {"quarterly": {"end": ["2024-12-31", "2023-12-31"], "fq": [4, 4],
+                             "values": {"netIncome": [1234000, 5], "epsDiluted": [None, None]}}}
+        found = {
+            "2024-12-31": {"epsDiluted": 0.25, "epsBasic": None, "dilutedShares": None, "accession": "a",
+                           "url": "u", "filingDate": "2025-02-05", "verified": {"status": "confirmed"}},
+            "2023-12-31": {"epsDiluted": 0.10, "epsBasic": None, "dilutedShares": None, "accession": "b",
+                           "url": "v", "filingDate": "2024-02-05", "verified": {"status": "unavailable"}},
+        }
+        bq.apply_fill(doc, found)
+        quality = doc["quarterly"]["epsQuality"]
+        self.assertEqual(quality[0]["epsDiluted"], "A")
+        self.assertEqual(quality[0]["epsDilutedFiled"], "2025-02-05")
+        self.assertEqual(quality[1]["epsDiluted"], "C")
+        self.assertEqual(doc["q4EpsSources"]["2024-12-31"]["grade"], "A")
+        self.assertEqual(doc["quarterly"]["values"]["epsDiluted"], [0.25, 0.10])
+
+    def test_an_existing_eps_keeps_its_own_grade(self):
+        doc = {"quarterly": {"end": ["2024-12-31"], "fq": [4], "values": {"netIncome": [1234000],
+                                                                     "epsDiluted": [None], "epsBasic": [0.26]},
+                             "epsQuality": [{"epsBasic": "A"}]}}
+        found = {"2024-12-31": {"epsDiluted": 0.25, "epsBasic": 0.27, "dilutedShares": None, "accession": "a",
+                                "url": "u", "filingDate": "2025-02-05", "verified": {"status": "confirmed"}}}
+        bq.apply_fill(doc, found)
+        entry = doc["quarterly"]["epsQuality"][0]
+        self.assertEqual(entry["epsBasic"], "A")
+        self.assertEqual(entry["epsDiluted"], "A")
+        self.assertEqual(doc["quarterly"]["values"]["epsBasic"], [0.26])
 
 
 class FillTests(unittest.TestCase):

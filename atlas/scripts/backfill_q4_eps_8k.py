@@ -195,11 +195,21 @@ def table_eps(table, target, end):
     """
     if not shows_period(" ".join(" ".join(row) for row in table), end):
         return None, None
-    rows = []
+    rows, heading_left = [], 0
     for cells in table:
         label, values = row_of(cells)
-        if label:
-            rows.append((label.lower(), values))
+        if not label:
+            continue
+        low = label.lower()
+        if "per share" in low and all(value is None for value in values):
+            heading_left = 2                # "Net income (loss) per share:" heading; its Basic / Diluted rows follow
+            continue
+        if heading_left:
+            heading_left -= 1
+            # only the two rows under the heading, and never share counts (per-share values are far below 1000)
+            if re.fullmatch(r"(basic|diluted)[\s:]*", low) and all(value is None or abs(value) < 1000 for value in values):
+                low = f"{low.split()[0]} earnings per share"
+        rows.append((low, values))
     eps_label, eps_row = next(((label, values) for label, values in rows if is_eps(label, "diluted")),
                               (None, None))
     if eps_row is None:
@@ -368,7 +378,8 @@ def from_filing(sec, cik, filing, target, end, debug=None):
         if debug is not None:
             debug.append({"index_items": [item.get("name") for item in items][:12]})
         return None, "no EX-99 exhibit in the filing"
-    found = []
+    found, shown = [], []
+    orphans = {"net_tables_without_period": 0, "period_in_previous_table": 0, "sample": []}
     reason = "no table shows this quarter's net income"
     for position, name in enumerate(exhibits + extra):
         if position >= len(exhibits) and found:
@@ -377,14 +388,29 @@ def from_filing(sec, cik, filing, target, end, debug=None):
         text = sec.get_text(url)
         if text is None:
             continue
+        previous = ""
         for table in tables_of(text):
+            table_text = " ".join(" ".join(row) for row in table)
             result, why = table_eps(table, target, end)
             if result is not None:
                 found.append(dict(result, accession=accession, url=url))
             elif why:
                 reason = why
+            elif debug is not None and shows_period(table_text, end):
+                shown += [[label.lower(), values] for label, values in (row_of(cells) for cells in table)
+                          if label and is_net_income(label.lower())]
+            elif debug is not None and any(label and is_net_income(label.lower())
+                                           for label in (row_of(cells)[0] for cells in table)):
+                # a net income table without its period name: is the name in the table just before it?
+                orphans["net_tables_without_period"] += 1
+                if shows_period(previous, end):
+                    orphans["period_in_previous_table"] += 1
+                if len(orphans["sample"]) < 2:
+                    orphans["sample"].append([" | ".join(cell for cell in row if cell)[:120] for row in table[:3]])
+            previous = table_text
     if not found:
         if debug is not None:
+            debug.append({"target": target, "period_net_rows": shown[:4], "orphans": orphans})
             text = sec.get_text(base + (exhibits + extra)[0]) or ""
             debug.append({"net_like_text": re.findall(r">\s*([^<>]{0,80}net[^<>]{0,60})<", text, re.I)[:6]})
         return None, reason
@@ -410,16 +436,16 @@ def verify_quarter(sec, cik, filings, end, net, eps, doc):
     → {"status": "confirmed" | "conflict" | "unavailable", "epsDiluted": checked EPS on today's basis, "url"}.
     """
     when = date.fromisoformat(end)
-    reason = "no 8-K with Item 2.02 in the next year's window"
+    reason, debug = "no 8-K with Item 2.02 in the next year's window", []
     for filing in candidate_filings(filings, when + timedelta(days=365))[:MAX_FILINGS]:
-        result, why = from_filing(sec, cik, filing, net, end)
+        result, why = from_filing(sec, cik, filing, net, end, debug)
         if result is None:
             reason = why or reason
             continue
         checked = round(result["epsDiluted"] / split_factor(doc, filing["filingDate"]), 6)
         status = "confirmed" if within_tolerance(checked, eps) else "conflict"
         return {"status": status, "epsDiluted": checked, "url": result["url"]}
-    return {"status": "unavailable", "reason": reason}
+    return {"status": "unavailable", "reason": reason, "debug": debug[:2]}
 
 
 def q4_periods(doc):
@@ -459,7 +485,7 @@ def process_ticker(sec, key, cik, doc, mode, rows):
                               epsBasic=None if result["epsBasic"] is None else round(result["epsBasic"] / factor, 6),
                               dilutedShares=None if result["dilutedShares"] is None
                               else round(result["dilutedShares"] * factor, 1))
-        if mode == "backtest" and result is not None:
+        if mode in ("backtest", "fill") and result is not None:
             result = dict(result, verified=verify_quarter(sec, cik, filings, p["end"], result["net"],
                                                           result["epsDiluted"], doc))
         rows.append({"key": key, "end": p["end"], "stored": p["eps"], "target": p["target"], "derived": p["derived"],
@@ -468,7 +494,11 @@ def process_ticker(sec, key, cik, doc, mode, rows):
 
 
 def apply_fill(doc, found):
-    """Writes accepted values into null fields only; records the source of every filled quarter."""
+    """
+    Writes accepted values into null fields only; records the source of every filled quarter and a quality grade
+    per written EPS field (the grade is what the consumers read): "A" when the next year's release confirms the
+    value, "C" otherwise. C is never selected as a US Q4 EPS.
+    """
     quarterly = doc["quarterly"]
     ends = quarterly["end"]
     values = quarterly.setdefault("values", {})
@@ -477,6 +507,8 @@ def apply_fill(doc, found):
         result = found.get(end)
         if not result:
             continue
+        grade = "A" if (result.get("verified") or {}).get("status") == "confirmed" else "C"
+        written = []
         for field in ("epsDiluted", "epsBasic", "dilutedShares"):
             value = result.get(field)
             if value is None:
@@ -486,8 +518,19 @@ def apply_fill(doc, found):
                 column.extend([None] * (len(ends) - len(column)))
             if column[i] is None:
                 column[i] = value
+                written.append(field)
+        eps_fields = [field for field in written if field in ("epsDiluted", "epsBasic")]
+        if eps_fields:
+            quality = quarterly.setdefault("epsQuality", [])
+            if len(quality) < len(ends):
+                quality.extend([None] * (len(ends) - len(quality)))
+            entry = dict(quality[i] or {})
+            for field in eps_fields:
+                entry[field] = grade
+                entry[field + "Filed"] = result["filingDate"]
+            quality[i] = entry
         sources[end] = {"method": "8-K EX-99.1", "accession": result["accession"], "url": result["url"],
-                        "filingDate": result["filingDate"]}
+                        "filingDate": result["filingDate"], "grade": grade}
 
 
 def backtest_error(estimate, stored):
@@ -520,6 +563,9 @@ def summarize(rows, mode):
             out["accepted_on_derived_stored"] = sum(bool(r.get("derived")) for r in accepted)
             checks = Counter((r["result"].get("verified") or {}).get("status", "not run") for r in accepted)
             out["independent_check"] = dict(checks)
+            out["independent_samples"] = [
+                {"key": r["key"], "end": r["end"], "target": r["target"], "debug": r["result"]["verified"]["debug"]}
+                for r in accepted if (r["result"].get("verified") or {}).get("reason", "").startswith("no table")][:3]
             out["independent_unavailable_reasons"] = dict(Counter(
                 (r["result"].get("verified") or {}).get("reason", "") for r in accepted
                 if (r["result"].get("verified") or {}).get("status") == "unavailable").most_common())
