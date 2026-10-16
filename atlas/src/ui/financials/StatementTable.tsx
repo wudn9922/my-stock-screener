@@ -2,7 +2,16 @@ import { useMemo, useState } from 'react';
 import type { FinancialHistory } from '../../fundamentals/FinancialHistory';
 import { STATEMENT_TABS, statementRows, type StatementId } from '../../fundamentals/financialStatements';
 import { formatDateTime } from '../format';
-import { changeCellText, digitsFor, displayValues, formatNumber, moneyScale, unitText, type FinancialsView } from './financialsView';
+import {
+  changeCellText,
+  digitsFor,
+  displayValues,
+  formatNumber,
+  moneyScale,
+  SOURCE_LABEL,
+  unitText,
+  type FinancialsView,
+} from './financialsView';
 
 type RowMode = 'value' | 'yoy';
 
@@ -110,7 +119,7 @@ export function StatementTable({ history, view }: { history: FinancialHistory; v
               </th>
               {order.map((index) => (
                 <td key={series.end[index]} className={series.src[index]}>
-                  {series.src[index] === 'sec' ? 'SEC' : 'Yahoo'}
+                  {SOURCE_LABEL[series.src[index] ?? 'yahoo']}
                 </td>
               ))}
             </tr>

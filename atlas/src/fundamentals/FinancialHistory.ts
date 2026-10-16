@@ -4,7 +4,8 @@ import { INDEX_SYMBOL_REGEX, TAIWAN_SYMBOL_REGEX } from '../market-data/MarketPr
 
 /**
  * Per-symbol statement history (`report/financials/<KEY>.json`, written by atlas/scripts/build_financials.py
- * from Yahoo fundamentals-timeseries, optionally seeded with SEC EDGAR companyfacts history).
+ * from Yahoo fundamentals-timeseries, optionally seeded with SEC EDGAR companyfacts history, and for Taiwan
+ * stocks with FinMind statements (build_financials_tw_finmind.py, data from 公開資訊觀測站)).
  *
  * Tolerant like report/breadth.ts: unknown fields are ignored, numbers may arrive as strings, a period
  * with a bad end date is dropped (with its values in every parallel array), periods are re-sorted by end
@@ -39,7 +40,7 @@ export const RAW_FIELDS = [
 export type RawField = (typeof RAW_FIELDS)[number];
 
 export type PeriodKind = 'annual' | 'quarterly';
-export type PeriodSource = 'sec' | 'yahoo';
+export type PeriodSource = 'sec' | 'finmind' | 'yahoo';
 export type QualityLevel = 'good' | 'partial' | 'limited';
 
 /** Retention limits of the builder (SEC-seeded files keep the longest history). */
@@ -52,7 +53,7 @@ export interface FinancialSeries {
   fy: (number | null)[];
   /** Fiscal quarter as written by the builder; all null for annual periods. */
   fq: (number | null)[];
-  /** Where each period came from; Yahoo unless the file says "sec". */
+  /** Where each period came from; Yahoo unless the file says "sec" or "finmind" (official sources). */
   src: PeriodSource[];
   values: Record<RawField, (number | null)[]>;
 }
@@ -188,7 +189,7 @@ export function parseSeries(raw: unknown, kind: PeriodKind): FinancialSeries {
     out.fy.push(year !== null && Number.isInteger(year) ? year : null);
     const quarter = finiteOrNull(fq[index]);
     out.fq.push(kind === 'quarterly' && quarter !== null && [1, 2, 3, 4].includes(quarter) ? quarter : null);
-    out.src.push(src[index] === 'sec' ? 'sec' : 'yahoo');
+    out.src.push(src[index] === 'sec' ? 'sec' : src[index] === 'finmind' ? 'finmind' : 'yahoo');
     RAW_FIELDS.forEach((field, column) => {
       let value = finiteOrNull(columns[column]![index]);
       // Capex is stored as a positive outflow; a stray sign must not inflate free cash flow.
@@ -400,3 +401,6 @@ export function provenance(series: FinancialSeries): ProvenanceSpan[] {
 
 export const hasSecHistory = (history: FinancialHistory) =>
   history.annual.src.includes('sec') || history.quarterly.src.includes('sec');
+
+export const hasFinmindHistory = (history: FinancialHistory) =>
+  history.annual.src.includes('finmind') || history.quarterly.src.includes('finmind');

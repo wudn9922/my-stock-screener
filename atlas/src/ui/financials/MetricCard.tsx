@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import type { FinancialHistory } from '../../fundamentals/FinancialHistory';
+import type { FinancialHistory, PeriodSource } from '../../fundamentals/FinancialHistory';
 import { yoy, type MetricGroupId, type MetricId, type MetricInput, type MetricUnit } from '../../fundamentals/financialMetrics';
 import { formatDateTime } from '../format';
 import { BarChart } from './BarChart';
@@ -15,6 +15,7 @@ import {
   formatValue,
   moneyScale,
   oiFieldText,
+  SOURCE_LABEL,
   unitText,
   yoyText,
   type FinancialsView,
@@ -185,7 +186,7 @@ function Detail({
   metric: MetricId;
   period: number;
   scale: MoneyScale;
-  source: 'sec' | 'yahoo';
+  source: PeriodSource;
 }) {
   const data = view.metrics[metric];
   const result = data.results[period]!;
@@ -198,7 +199,7 @@ function Detail({
       <div className="fin-detail-head">
         <b>{label.long}</b>
         <span>期末 {formatDateTime(label.end, false)}</span>
-        <span className={`fin-source ${source}`}>{source === 'sec' ? 'SEC' : 'Yahoo'}</span>
+        <span className={`fin-source ${source}`}>{SOURCE_LABEL[source]}</span>
       </div>
       <div className="fin-detail-value">
         <b>
