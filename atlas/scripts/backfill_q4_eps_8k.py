@@ -174,6 +174,20 @@ def shows_period(text, end):
     return re.search(pattern, text, re.I) is not None
 
 
+def shows_period_by_column(table, end):
+    """A period header split over rows (months and days on one row, the year on the next) is read column by column."""
+    width = max((len(row) for row in table), default=0)
+    for j in range(width):
+        column = " ".join(row[j] for row in table[:4] if j < len(row) and row[j])
+        if shows_period(column, end):
+            return True
+    return False
+
+
+def period_named(table, end):
+    return shows_period(" ".join(" ".join(row) for row in table), end) or shows_period_by_column(table, end)
+
+
 def split_factor(doc, filing_date):
     """Product of the split ratios dated after the filing: the stored EPS and shares are on today's basis."""
     factor = 1.0
@@ -193,7 +207,7 @@ def table_eps(table, target, end):
     One table → (result dict, None), (None, reason) when it is the quarter but fails a check, or (None, None)
     when it does not show this quarter's net income at all.
     """
-    if not shows_period(" ".join(" ".join(row) for row in table), end):
+    if not period_named(table, end):
         return None, None
     rows, heading_left = [], 0
     for cells in table:
@@ -388,26 +402,25 @@ def from_filing(sec, cik, filing, target, end, debug=None):
         text = sec.get_text(url)
         if text is None:
             continue
-        previous = ""
+        previous = None
         for table in tables_of(text):
-            table_text = " ".join(" ".join(row) for row in table)
             result, why = table_eps(table, target, end)
             if result is not None:
                 found.append(dict(result, accession=accession, url=url))
             elif why:
                 reason = why
-            elif debug is not None and shows_period(table_text, end):
+            elif debug is not None and period_named(table, end):
                 shown += [[label.lower(), values] for label, values in (row_of(cells) for cells in table)
                           if label and is_net_income(label.lower())]
             elif debug is not None and any(label and is_net_income(label.lower())
                                            for label in (row_of(cells)[0] for cells in table)):
                 # a net income table without its period name: is the name in the table just before it?
                 orphans["net_tables_without_period"] += 1
-                if shows_period(previous, end):
+                if previous is not None and period_named(previous, end):
                     orphans["period_in_previous_table"] += 1
                 if len(orphans["sample"]) < 2:
                     orphans["sample"].append([" | ".join(cell for cell in row if cell)[:120] for row in table[:3]])
-            previous = table_text
+            previous = table
     if not found:
         if debug is not None:
             debug.append({"target": target, "period_net_rows": shown[:4], "orphans": orphans})
