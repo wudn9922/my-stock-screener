@@ -52,6 +52,7 @@ EPS_FLOOR = 0.02
 FILING_DAYS = (15, 150)    # an 8-K with Item 2.02 this many days after the quarter end
 MAX_FILINGS = 3
 MAX_EXHIBITS = 4
+EXTRA_DOCS = 2             # other .htm documents of the filing, read only when no EX-99 table shows the quarter
 REQUEST_INTERVAL = 0.2     # seconds between SEC requests
 RETRIES = 3
 DASHES = ("", "-", "--", "—", "–")
@@ -199,22 +200,30 @@ def table_eps(table, target, end):
         label, values = row_of(cells)
         if label:
             rows.append((label.lower(), values))
-    net_row = _pick(rows, is_net_income)
-    eps_row = _pick(rows, lambda label: is_eps(label, "diluted"))
-    if net_row is None or eps_row is None:
+    eps_label, eps_row = next(((label, values) for label, values in rows if is_eps(label, "diluted")),
+                              (None, None))
+    if eps_row is None:
         return None, None
-    if len(net_row) != len(eps_row):
-        return None, "net income and EPS rows have different column counts"
-    hits = [(j, scale) for j, value in enumerate(net_row) if value is not None for scale in SCALES
-            if abs(value * scale - target) <= max(NI_TOLERANCE * abs(target), 0.5 * scale)]
+    hits = []                       # (column, unit scale, net values, net label) over every net income row
+    for label, values in rows:
+        if not is_net_income(label):
+            continue
+        for j, value in enumerate(values):
+            for scale in SCALES:
+                if value is not None and abs(value * scale - target) <= max(NI_TOLERANCE * abs(target), 0.5 * scale):
+                    hits.append((j, scale, values, label))
     if not hits:
         return None, None
-    if len(hits) != 1:
+    if len({(j, scale) for j, scale, _, _ in hits}) != 1:
         return None, "net income matches more than one column or unit"
-    j, scale = hits[0]
+    j, scale, net_row, net_label = hits[0]
+    if len(net_row) != len(eps_row):
+        return None, "net income and EPS rows have different column counts"
     eps = eps_row[j]
     if eps is None:
         return None, "EPS is empty in the matched column"
+    if eps == 0:
+        return None, "EPS is zero"
     net = net_row[j] * scale
     if (eps > 0) != (net > 0):
         return None, "EPS sign differs from net income"
@@ -229,7 +238,8 @@ def table_eps(table, target, end):
         diluted_shares = shares_row[j] * scale
     basic_row = _pick(rows, lambda label: is_eps(label, "basic"))
     basic = basic_row[j] if basic_row is not None and len(basic_row) == len(net_row) else None
-    return {"epsDiluted": eps, "epsBasic": basic, "dilutedShares": diluted_shares, "scale": scale}, None
+    return {"epsDiluted": eps, "epsBasic": basic, "dilutedShares": diluted_shares, "scale": scale,
+            "netLabel": net_label, "epsLabel": eps_label}, None
 
 
 class Sec:
@@ -327,6 +337,19 @@ def is_release_exhibit(item):
         kind.startswith("EX-99") or re.search(r"(ex|exhibit)[-_ ]?99", name, re.I) is not None)
 
 
+def index_exhibits(page):
+    """EX-99 document names from the Type column of a filing's index page (the file names do not say it)."""
+    names = []
+    for table in tables_of(page or ""):
+        for row in table:
+            cells = [cell.strip() for cell in row]
+            kind = any(re.fullmatch(r"EX-99(\.\d+)?", cell, re.I) for cell in cells)
+            name = next((cell for cell in cells if re.fullmatch(r"[\w.-]+\.html?", cell, re.I)), None)
+            if kind and name and name not in names:
+                names.append(name)
+    return names
+
+
 def from_filing(sec, cik, filing, target, end, debug=None):
     accession = filing["accessionNumber"]
     base = ARCHIVE_URL.format(cik=int(cik), folder=accession.replace("-", ""))
@@ -334,14 +357,22 @@ def from_filing(sec, cik, filing, target, end, debug=None):
     if index is None:
         return None, "filing index not available"
     items = (index.get("directory") or {}).get("item") or []
-    exhibits = [item for item in items if is_release_exhibit(item)][:MAX_EXHIBITS]
-    if not exhibits:
+    page = sec.get_text(base + accession + "-index.html") or sec.get_text(base + accession + "-index.htm")
+    by_name = [item["name"] for item in items if is_release_exhibit(item)]
+    exhibits = list(dict.fromkeys(index_exhibits(page) + by_name))[:MAX_EXHIBITS]
+    # when no EX-99 table shows the quarter, the release may sit in another document of the same filing
+    extra = [item["name"] for item in items if (item.get("name") or "").lower().endswith((".htm", ".html"))
+             and item["name"] not in exhibits][:EXTRA_DOCS]
+    if not exhibits and not extra:
         if debug is not None:
             debug.append({"index_items": [item.get("name") for item in items][:12]})
         return None, "no EX-99 exhibit in the filing"
-    found, reason = [], "no table shows this quarter's net income"
-    for item in exhibits:
-        url = base + item["name"]
+    found = []
+    reason = "no table shows this quarter's net income"
+    for position, name in enumerate(exhibits + extra):
+        if position >= len(exhibits) and found:
+            break
+        url = base + name
         text = sec.get_text(url)
         if text is None:
             continue
@@ -352,8 +383,8 @@ def from_filing(sec, cik, filing, target, end, debug=None):
             elif why:
                 reason = why
     if not found:
-        if debug is not None and reason.startswith("no table"):
-            text = sec.get_text(base + exhibits[0]["name"]) or ""
+        if debug is not None:
+            text = sec.get_text(base + (exhibits + extra)[0]) or ""
             debug.append({"net_like_text": re.findall(r">\s*([^<>]{0,80}net[^<>]{0,60})<", text, re.I)[:6]})
         return None, reason
     if len({item["epsDiluted"] for item in found}) > 1:
@@ -502,7 +533,8 @@ def run(args, sec):
         seed.write_atomic(STATE_PATH, state)
     report = summarize(rows, args.mode)
     mismatches = [{"key": r["key"], "end": r["end"], "stored": r["stored"], "estimate": r["result"]["epsDiluted"],
-                   "url": r["result"]["url"]}
+                   "basic": r["result"]["epsBasic"], "netLabel": r["result"].get("netLabel"),
+                   "epsLabel": r["result"].get("epsLabel"), "url": r["result"]["url"]}
                   for r in rows if args.mode == "backtest" and r["result"]
                   and not within_tolerance(r["result"]["epsDiluted"], r["stored"])]
     samples = {}
