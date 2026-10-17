@@ -31,9 +31,11 @@ verdicts (ytd / quarter / q4annual over company-years with four positive quarter
 its revenue verdict, the cash flow statement its operating cash flow verdict. Until both are known, stocks are
 held in memory (warm-up: WARMUP_STOCKS stocks, at most WARMUP_LIMIT), then written. The verdicts are kept in
 the state file. Singles: the cumulative differences of build_fundamentals_tw (EPS on the share basis of the
-later report); a missing earlier cumulative figure leaves the single quarter empty (never inferred).
-Annual: income statement and cash flow are the sum of four singles (flag "eps-annual-summed" for EPS), the
-balance sheet is Q4. Q4 singles are the full year less Q1..Q3 (flag "q4-derived").
+later report); a missing earlier cumulative figure leaves the single quarter empty (never inferred), and a
+quarter after a missing quarter is not treated as a single. Annual: income statement and cash flow are the sum
+of four singles; annual EPS uses official MOPS EPS when available, otherwise it is summed only on a stable Q1–Q3
+share basis (flag "eps-annual-summed"). The balance sheet is Q4. Q4 singles are the full year less Q1..Q3
+(flag "q4-derived").
 
 State: <report-dir>/fundamentals/tw-financials-finmind.json: the verdicts (with evidence), per stock
 [checked day, newest quarter, "ok" | "empty"], and the type / origin_name pairs seen per dataset.
@@ -284,11 +286,13 @@ def decide(held, modes, official, log):
 # ---------------------------------------------------------------------------------------------
 # Singles, annual values and periods of one stock
 # ---------------------------------------------------------------------------------------------
-def views(raw, mode, kinds=None):
+def views(raw, mode, kinds=None, quarters_of_year=None):
     """{quarter: published value} of one year → ({quarter: single}, {quarter: cumulative}); None when unknown.
-    kinds (revenue only): a difference is taken only between quarters of the same revenue kind."""
+    kinds (revenue only): a difference is taken only between quarters of the same revenue kind. For quarter and
+    q4annual modes, a raw value is a single only if Q1 or its same-year predecessor is present."""
     raw = {q: value for q, value in raw.items() if value is not None}
     single, cumulative = {}, {}
+    present = quarters_of_year if quarters_of_year is not None else raw
 
     def same(quarters):
         return kinds is None or len({kinds.get(q) for q in quarters}) == 1
@@ -301,13 +305,13 @@ def views(raw, mode, kinds=None):
             elif q - 1 in raw and same((q - 1, q)):
                 single[q] = raw[q] - raw[q - 1]
     elif mode == "quarter":
-        single = dict(raw)
+        single = {q: raw[q] for q in raw if fmo.can_be_single_quarter(q, present)}
         for q in (1, 2, 3, 4):
             if all(p in single for p in range(1, q + 1)) and same(range(1, q + 1)):
                 cumulative[q] = sum(single[p] for p in range(1, q + 1))
     elif mode == "q4annual":
         for q in (1, 2, 3):
-            if q in raw:
+            if q in raw and fmo.can_be_single_quarter(q, present):
                 single[q] = raw[q]
         for q in (1, 2, 3):
             if all(p in single for p in range(1, q + 1)) and same(range(1, q + 1)):
@@ -323,10 +327,10 @@ def views(raw, mode, kinds=None):
     return single, cumulative
 
 
-def eps_singles(eps_raw, ni_raw, mode):
+def eps_singles(eps_raw, ni_raw, mode, quarters_of_year=None):
     """Basic EPS singles as build_fundamentals_tw_finmind.company_periods (the share basis of the later report)."""
-    eps_q, eps_y = views(eps_raw, mode)
-    _, ni_y = views(ni_raw, mode)
+    eps_q, eps_y = views(eps_raw, mode, quarters_of_year=quarters_of_year)
+    _, ni_y = views(ni_raw, mode, quarters_of_year=quarters_of_year)
     result = {}
     for q in (1, 2, 3, 4):
         eps = eps_q.get(q)
@@ -351,8 +355,9 @@ def by_year(seasons):
     return years
 
 
-def derive(stock, modes):
+def derive(stock, modes, official_annual=None):
     """One stock's published values → (annual {year: {field: value}}, quarterly {(year, q): {field: value}}, flags)."""
+    official_annual = official_annual or {}
     pl_years, bs_years, cf_years = by_year(stock["pl"]), by_year(stock["bs"]), by_year(stock["cf"])
     annual, quarterly, flags = {}, {}, set()
     for year in sorted(set(pl_years) | set(bs_years) | set(cf_years)):
@@ -360,16 +365,19 @@ def derive(stock, modes):
         singles = {}
         if modes["pl"] and pl:
             kinds = {q: row.get("kind") for q, row in pl.items()}
-            singles["revenue"], _ = views({q: row.get("rev") for q, row in pl.items()}, modes["pl"], kinds)
-            singles["netIncome"], _ = views({q: row.get("ni") for q, row in pl.items()}, modes["pl"])
+            singles["revenue"], _ = views({q: row.get("rev") for q, row in pl.items()}, modes["pl"], kinds, pl)
+            singles["netIncome"], _ = views({q: row.get("ni") for q, row in pl.items()}, modes["pl"],
+                                             quarters_of_year=pl)
             eps = eps_singles({q: row.get("eps") for q, row in pl.items()}, {q: row.get("ni") for q, row in pl.items()},
-                              modes["pl"])
+                              modes["pl"], pl)
             singles["epsBasic"] = eps
             for line in PL_LINES:
-                singles[line], _ = views({q: row.get(line) for q, row in pl.items()}, modes["pl"])
+                singles[line], _ = views({q: row.get(line) for q, row in pl.items()}, modes["pl"],
+                                         quarters_of_year=pl)
         if modes["cf"] and cf:
             for line in CF_LINES:
-                singles[line], _ = views({q: row.get(line) for q, row in cf.items()}, modes["cf"])
+                singles[line], _ = views({q: row.get(line) for q, row in cf.items()}, modes["cf"],
+                                         quarters_of_year=cf)
         for field, per_quarter in singles.items():
             for q, value in per_quarter.items():
                 quarterly.setdefault((year, q), {})[field] = value
@@ -391,7 +399,11 @@ def derive(stock, modes):
                 continue
             if all(per_quarter.get(q) is not None for q in (1, 2, 3, 4)):
                 totals[field] = sum(per_quarter[q] for q in (1, 2, 3, 4))
-        if all(singles.get("epsBasic", {}).get(q) is not None for q in (1, 2, 3, 4)) and singles.get("epsBasic"):
+        official_eps = official_annual.get(year)
+        if pl and official_eps is not None:
+            totals["epsBasic"] = round(official_eps, 4)
+        elif (all(singles.get("epsBasic", {}).get(q) is not None for q in (1, 2, 3, 4))
+              and fmo.stable_share_count(singles.get("epsBasic", {}), singles.get("netIncome", {}))):
             totals["epsBasic"] = round(sum(singles["epsBasic"][q] for q in (1, 2, 3, 4)), 4)
             flags.add("eps-annual-summed")
         q4 = quarterly.get((year, 4), {})
@@ -610,8 +622,8 @@ def probe(codes, http, token, sleep, clock, log):
     return 0
 
 
-def dry_run(state, listing, codes, today, token, log):
-    chosen = plan(state, codes, today)
+def dry_run(state, listing, codes, today, token, log, forced=()):
+    chosen = plan(state, codes, today, forced)
     requests = 3 * len(chosen)
     rate = HOURLY_LIMIT[bool(token)]
     log(f"dry run (offline): {len(listing)} listed stocks, {len(chosen)} to fetch now "
@@ -655,7 +667,11 @@ def run(args, http=None, now=None, sleep=time.sleep, clock=time.monotonic, log=p
         return 1
     token = token if token is not None else (os.environ.get("FINMIND_TOKEN") or "").strip() or None
     if args.dry_run:
-        return dry_run(state, listing, sorted(listing), today, token, log)
+        forced = set(args.tickers or ())
+        unknown = sorted(forced - set(listing))
+        if unknown:
+            log(f"::warning::not in universe.json, skipped: {unknown}")
+        return dry_run(state, listing, sorted(listing), today, token, log, forced & set(listing))
     http = http or Http()
     if args.probe:
         codes = [code for code in args.probe if code]
@@ -682,6 +698,7 @@ def run(args, http=None, now=None, sleep=time.sleep, clock=time.monotonic, log=p
         f"3 requests each, {'with' if token else 'without'} token, one request every {interval:.1f}s, "
         f"budget {args.budget:.0f}s; verdicts: income statement {state['modes']['pl']}, cash flow {state['modes']['cf']}")
     official = read_json(os.path.join(report_dir, "fundamentals", growth.TW_FILE))
+    official_annual = fmo.official_annual_eps(official)
     counter = {"requests": 0, "limit": args.limit}
     deadline = clock() + args.budget
     next_at = clock()
@@ -711,7 +728,7 @@ def run(args, http=None, now=None, sleep=time.sleep, clock=time.monotonic, log=p
 
     def finish(code, symbol, parsed, reason):
         """Writes one stock (verdicts known) and records it in the state."""
-        annual, quarterly, flags = derive(parsed, state["modes"])
+        annual, quarterly, flags = derive(parsed, state["modes"], official_annual.get(code))
         annual_p, quarterly_p = periods_of(annual, quarterly)
         if not annual_p and not quarterly_p:
             state["fetch"][code] = [today.isoformat(), None, "empty"]
