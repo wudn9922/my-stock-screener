@@ -118,6 +118,68 @@ def tables_of(text):
     return parser.tables
 
 
+class _RawTableParser(HTMLParser):
+    """Capture the source markup for the same table sequence returned by tables_of."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.tables = []
+        self._table = None
+
+    def handle_starttag(self, tag, attrs):
+        raw = self.get_starttag_text()
+        if tag == "table":
+            # Match _TableParser's behavior for nested tables: the nested table replaces its parent.
+            self._table = [raw]
+        elif self._table is not None:
+            self._table.append(raw)
+
+    def handle_startendtag(self, tag, attrs):
+        raw = self.get_starttag_text()
+        if tag == "table":
+            self._table = [raw]
+            self.tables.append("".join(self._table))
+            self._table = None
+        elif self._table is not None:
+            self._table.append(raw)
+
+    def handle_endtag(self, tag):
+        if self._table is None:
+            return
+        self._table.append(f"</{tag}>")
+        if tag == "table":
+            self.tables.append("".join(self._table))
+            self._table = None
+
+    def handle_data(self, data):
+        if self._table is not None:
+            self._table.append(data)
+
+    def handle_entityref(self, name):
+        if self._table is not None:
+            self._table.append(f"&{name};")
+
+    def handle_charref(self, name):
+        if self._table is not None:
+            self._table.append(f"&#{name};")
+
+    def handle_comment(self, data):
+        if self._table is not None:
+            self._table.append(f"<!--{data}-->")
+
+    def handle_decl(self, decl):
+        if self._table is not None:
+            self._table.append(f"<!{decl}>")
+
+
+def html_tables_of(text):
+    """Return trimmed source <table> fragments in the same order as tables_of."""
+    parser = _RawTableParser()
+    parser.feed(text)
+    parser.close()
+    return [table.strip() for table in parser.tables]
+
+
 def number(text):
     """'1,234' → 1234, '(567' or '(567)' → -567, '$ 0.25' → 0.25, dashes and words → None."""
     compact = re.sub(r"[\s$,]", "", text or "")
@@ -470,7 +532,7 @@ def find_quarter(sec, cik, filings, end, target, debug=None):
     return None, reason
 
 
-def diagnose_filing(sec, cik, filing, end, target):
+def diagnose_filing(sec, cik, filing, end, target, fixture_specs=None):
     """Return read-only table and document evidence for one candidate 8-K."""
     accession = filing["accessionNumber"]
     base = ARCHIVE_URL.format(cik=int(cik), folder=accession.replace("-", ""))
@@ -511,6 +573,23 @@ def diagnose_filing(sec, cik, filing, end, target):
         document = {"name": name, "url": url, "isExhibit": position < len(exhibits),
                     "tableCount": len(tables), "tables": [],
                     "targetMatches": [], "netIncomeTargetMatches": [], "rawTextMatches": []}
+        selected_fixtures = [spec for spec in fixture_specs or []
+                             if spec.get("accession") == accession and spec.get("document") == name]
+        raw_tables = html_tables_of(text) if selected_fixtures else []
+        for spec in selected_fixtures:
+            table_index = spec.get("tableIndex")
+            if not isinstance(table_index, int) or table_index < 0 or table_index >= len(raw_tables):
+                document.setdefault("fixtureErrors", []).append({
+                    "file": spec.get("file"), "tableIndex": table_index,
+                    "error": f"source table index unavailable; found {len(raw_tables)} tables"})
+                continue
+            source_url = spec.get("url") or url
+            document.setdefault("fixtureHtml", []).append({
+                "file": spec.get("file"), "class": spec.get("class"),
+                "key": spec.get("key"), "end": spec.get("end"),
+                "accession": accession, "document": name, "tableIndex": table_index,
+                "sourceUrl": source_url,
+                "html": f"<!-- Source URL: {source_url} -->\n{raw_tables[table_index]}"})
         for table_index, table in enumerate(tables):
             ni_labels, ni_rows, matches = [], [], []
             for row_index, cells in enumerate(table):
@@ -621,7 +700,7 @@ def layout_class_hint(diagnosis):
     return "L9"
 
 
-def diagnose_quarter(sec, cik, filings, key, end, target):
+def diagnose_quarter(sec, cik, filings, key, end, target, fixture_specs=None):
     """Inspect the same nearest Item 2.02 filings and documents used by find_quarter."""
     candidates = candidate_filings(filings, date.fromisoformat(end))[:MAX_FILINGS]
     result = {"key": key, "end": end, "targetNetIncome": target,
@@ -631,7 +710,7 @@ def diagnose_quarter(sec, cik, filings, key, end, target):
         result["hintNote"] = "No 8-K with Item 2.02 was found inside FILING_DAYS and MAX_FILINGS."
         return result, []
     for filing in candidates:
-        detail, _ = diagnose_filing(sec, cik, filing, end, target)
+        detail, _ = diagnose_filing(sec, cik, filing, end, target, fixture_specs)
         result["candidateFilings"].append(detail)
     result["classHint"] = layout_class_hint(result)
     result["hintNote"] = "Heuristic only; assign the final S1 class after reviewing the tables and filing text."
@@ -654,6 +733,13 @@ def run_diagnose(args, sec):
     """Diagnose the no-table rows from a prior report; never writes financials or state."""
     with open(args.source_report, encoding="utf-8") as source:
         previous = json.load(source)
+    fixture_selection_path = getattr(args, "fixture_selection", "")
+    fixture_specs_by_row = {}
+    if fixture_selection_path:
+        with open(fixture_selection_path, encoding="utf-8") as source:
+            fixture_selection = json.load(source)
+        for spec in fixture_selection.get("cases", []):
+            fixture_specs_by_row.setdefault((str(spec.get("key", "")).upper(), spec.get("end")), []).append(spec)
     all_source_rows = [row for row in previous.get("rows", [])
                        if row.get("reason") == "no table shows this quarter's net income"]
     source_rows = all_source_rows
@@ -684,16 +770,28 @@ def run_diagnose(args, sec):
         try:
             if key not in filings_by_key:
                 filings_by_key[key] = filing_rows(sec, cik) if cik is not None else []
-            diagnosis, _ = diagnose_quarter(sec, cik, filings_by_key[key], key, end, target)
+            diagnosis, _ = diagnose_quarter(sec, cik, filings_by_key[key], key, end, target,
+                                            fixture_specs_by_row.get((key, end), []))
             record.update(diagnosis)
             rows.append(record)
         except (OutOfBudget, Forbidden, NetworkError) as exc:
             stop = f"{type(exc).__name__}: {exc}"
             break
     hints = Counter(row.get("classHint", "L9") for row in rows)
+    fixtures, fixture_errors = [], []
+    for row in rows:
+        for filing in row.get("candidateFilings", []):
+            for document in filing.get("documents", []):
+                fixtures.extend(document.pop("fixtureHtml", []))
+                fixture_errors.extend({"key": row.get("key"), "end": row.get("end"),
+                                       "accession": filing.get("accession"),
+                                       "document": document.get("name"), **error}
+                                      for error in document.pop("fixtureErrors", []))
     return {"mode": "diagnose", "sourceReport": os.path.relpath(args.source_report, REPO),
             "sourceRows": len(all_source_rows), "selectedSourceRows": len(source_rows),
             "diagnosed": len(rows), "classHintCounts": dict(sorted(hints.items())),
+            "fixtureSelection": os.path.relpath(fixture_selection_path, REPO) if fixture_selection_path else None,
+            "fixtureCount": len(fixtures), "fixtureErrors": fixture_errors, "fixtures": fixtures,
             "stopped": stop, "requests": sec.requests, "rows": rows}
 
 
@@ -908,6 +1006,8 @@ def parse_args(argv=None):
     parser.add_argument("--report", default="", help="also write the report JSON to this path")
     parser.add_argument("--source-report", default=DIAGNOSE_SOURCE,
                         help="backtest report whose no-table rows are inspected in diagnose mode")
+    parser.add_argument("--fixture-selection", default="",
+                        help="optional JSON manifest selecting SEC table HTML to include in diagnose output")
     return parser.parse_args(argv)
 
 

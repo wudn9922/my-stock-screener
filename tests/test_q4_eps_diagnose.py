@@ -80,6 +80,58 @@ class ClassificationFixtureTests(unittest.TestCase):
         self.assertTrue(target_table["nearestPrecedingNonempty"][0]["periodNamed"])
         self.assertEqual(target_table["niRows"][0]["closestToTarget"]["relativeDifference"], 0.0)
 
+    def test_selected_source_table_is_exported_as_trimmed_html(self):
+        fixture_name = "L2-period-wording.html"
+        with open(os.path.join(FIXTURES, fixture_name), encoding="utf-8") as source:
+            html = source.read()
+        filing = {"accessionNumber": "0000000001-24-000001", "filingDate": "2025-02-15"}
+        spec = {"accession": filing["accessionNumber"], "document": "exhibit99.htm",
+                "tableIndex": 0, "file": "SAMPLE-2024-12-31-L2.html", "class": "L2",
+                "key": "SAMPLE", "end": "2024-12-31", "url": "https://www.sec.gov/example"}
+        detail, _ = bq.diagnose_filing(FixtureSec(html), 1, filing,
+                                       self.manifest["end"], self.manifest["target_net_income"], [spec])
+        document = next(item for item in detail["documents"] if item.get("name") == "exhibit99.htm")
+        captured = document["fixtureHtml"][0]
+        self.assertEqual(captured["tableIndex"], 0)
+        self.assertIn("<!-- Source URL: https://www.sec.gov/example -->", captured["html"])
+        self.assertTrue(captured["html"].split("\n", 1)[1].startswith("<table"))
+        self.assertNotIn("<html", captured["html"].lower())
+
+
+class S1ClassificationReportTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        with open(os.path.join(ROOT, "docs", "report", "q4-8k", "s1-no-table-layouts.json"),
+                  encoding="utf-8") as source:
+            cls.report = json.load(source)
+        with open(os.path.join(FIXTURES, "s1_fixture_selection.json"), encoding="utf-8") as source:
+            cls.selection = json.load(source)
+
+    def test_all_run18_rows_are_classified_and_summarized(self):
+        rows = self.report["rows"]
+        self.assertEqual(self.report["rowCount"], 235)
+        self.assertEqual(len(rows), 235)
+        self.assertEqual(len({(row["key"], row["end"]) for row in rows}), 235)
+        self.assertTrue(all(set(row) == {"key", "end", "class", "accession", "url", "note"} for row in rows))
+        counts = {}
+        for row in rows:
+            counts[row["class"]] = counts.get(row["class"], 0) + 1
+            self.assertTrue(row["url"].startswith("https://www.sec.gov/"))
+        self.assertEqual(counts, self.report["classCounts"])
+        self.assertEqual(counts["L9"], 36)
+        self.assertFalse(self.report["otherLimit"]["passed"])
+
+    def test_fixture_selection_covers_s2_classes_and_records_dev_tickers(self):
+        cases = self.selection["cases"]
+        positives = [case for case in cases if case["role"] == "S2-positive"]
+        negatives = [case for case in cases if case["role"] == "negative"]
+        self.assertEqual(len(positives), 6)
+        self.assertEqual(len(negatives), 2)
+        for class_code in ("L1", "L2", "L3"):
+            self.assertEqual(sum(case["class"] == class_code for case in positives), 2)
+        self.assertEqual(self.selection["devTickers"], self.report["devTickers"])
+        self.assertTrue(all(case["url"].startswith("https://www.sec.gov/") for case in cases))
+
 
 class DiagnoseReadOnlyTests(unittest.TestCase):
     def test_only_no_table_rows_are_returned(self):

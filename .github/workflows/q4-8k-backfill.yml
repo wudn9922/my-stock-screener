@@ -67,6 +67,7 @@ jobs:
           if [ -n "$TICKERS" ] && [ "$MODE" != diagnose ]; then args+=(--tickers "$TICKERS"); fi
           if [ "$MODE" = diagnose ]; then
             args+=(--source-report docs/report/q4-8k/input/run-17/q4-8k-report.json)
+            args+=(--fixture-selection tests/fixtures/q4_8k/s1_fixture_selection.json)
             python -B -u atlas/scripts/backfill_q4_eps_8k.py "${args[@]}" > "$RUNNER_TEMP/q4-8k-report.json"
           else
             args+=(--report "$RUNNER_TEMP/q4-8k-report.json")

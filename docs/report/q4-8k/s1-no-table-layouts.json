@@ -1,0 +1,2061 @@
+{
+  "schemaVersion": 1,
+  "status": "needs-opus-review",
+  "diagnoseRun": {
+    "runId": 39028455462,
+    "artifactName": "q4-8k-report-diagnose",
+    "mainCommit": "2ba21827",
+    "zipPath": "docs/report/q4-8k/input/diagnose-run-18/q4-8k-report-diagnose.zip",
+    "zipSha256": "d7e9898befed247921d72fdf1b5b16b6ddf292e50901f1c5d1c32ccb59af7ced",
+    "innerFile": "q4-8k-report.json",
+    "sourceReport": "docs/report/q4-8k/input/run-17/q4-8k-report.json",
+    "sourceRows": 235,
+    "diagnosed": 235,
+    "stopped": null,
+    "requests": 2630,
+    "classHintCounts": {
+      "L1": 8,
+      "L2": 95,
+      "L3": 22,
+      "L4": 25,
+      "L9": 85
+    }
+  },
+  "rowCount": 235,
+  "classCounts": {
+    "L1": 8,
+    "L2": 134,
+    "L3": 22,
+    "L4": 13,
+    "L5": 12,
+    "L6": 8,
+    "L7": 2,
+    "L9": 36
+  },
+  "dispositions": {
+    "L1": "S2 handles",
+    "L2": "S2 handles",
+    "L3": "S2 handles",
+    "L4": "out of scope",
+    "L5": "out of scope",
+    "L6": "out of scope",
+    "L7": "out of scope",
+    "L9": "needs Opus"
+  },
+  "otherLimit": {
+    "maximumFraction": 0.1,
+    "maximumRows": 23,
+    "actualRows": 36,
+    "actualFraction": 0.153191,
+    "passed": false
+  },
+  "classExamples": {
+    "L1": [
+      {
+        "key": "TXT",
+        "end": "2021-01-02",
+        "accession": "0000217346-21-000013",
+        "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734621000013/q4208-kex991.htm"
+      },
+      {
+        "key": "ULTA",
+        "end": "2021-01-30",
+        "accession": "0001558370-21-002815",
+        "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837021002815/ulta-20210311xex99d1.htm"
+      }
+    ],
+    "L2": [
+      {
+        "key": "WOR",
+        "end": "2022-05-31",
+        "accession": "0001171843-22-004475",
+        "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184322004475/exh_991.htm"
+      },
+      {
+        "key": "TRMB",
+        "end": "2021-01-01",
+        "accession": "0000864749-21-000011",
+        "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474921000011/a2020q4-8kex991.htm"
+      }
+    ],
+    "L3": [
+      {
+        "key": "UFI",
+        "end": "2018-06-24",
+        "accession": "0001564590-18-018666",
+        "url": "https://www.sec.gov/Archives/edgar/data/100726/000156459018018666/ufi-ex991_41.htm"
+      },
+      {
+        "key": "UI",
+        "end": "2014-06-30",
+        "accession": "0001511737-14-000021",
+        "url": "https://www.sec.gov/Archives/edgar/data/1511737/000151173714000021/exhibit991q42014.htm"
+      }
+    ],
+    "L4": [
+      {
+        "key": "WLY",
+        "end": "2018-04-30",
+        "accession": "0000107140-18-000012",
+        "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714018000012/exhibit99.htm"
+      },
+      {
+        "key": "WRLD",
+        "end": "2016-03-31",
+        "accession": "0001157523-16-005496",
+        "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752316005496/a51335783_ex991.htm"
+      }
+    ],
+    "L5": [
+      {
+        "key": "TRAK",
+        "end": "2020-06-30",
+        "accession": "0001654954-20-010594",
+        "url": "https://www.sec.gov/Archives/edgar/data/50471/000165495420010594/ex991.htm"
+      },
+      {
+        "key": "VIRC",
+        "end": "2022-01-31",
+        "accession": "0001628280-22-009864",
+        "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828022009864/exhibit991q401312022pressr.htm"
+      }
+    ],
+    "L6": [
+      {
+        "key": "ZUMZ",
+        "end": "2012-01-28",
+        "accession": "0001102624-12-000183",
+        "url": "https://www.sec.gov/Archives/edgar/data/1318008/000110262412000183/zumiezinc.htm"
+      },
+      {
+        "key": "WLY",
+        "end": "2017-04-30",
+        "accession": "0000107140-17-000018",
+        "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714017000018/"
+      }
+    ],
+    "L7": [
+      {
+        "key": "TRAK",
+        "end": "2016-06-30",
+        "accession": "0001415889-16-007355",
+        "url": "https://www.sec.gov/Archives/edgar/data/50471/000141588916007355/ex99-11082016_021119.htm"
+      },
+      {
+        "key": "TRAK",
+        "end": "2018-06-30",
+        "accession": "0001654954-18-012355",
+        "url": "https://www.sec.gov/Archives/edgar/data/50471/000165495418012355/ex99-1.htm"
+      }
+    ],
+    "L9": [
+      {
+        "key": "UFI",
+        "end": "2012-06-24",
+        "accession": "0001437749-12-007180",
+        "url": "https://www.sec.gov/Archives/edgar/data/100726/000143774912007180/ex99-1.htm"
+      },
+      {
+        "key": "WMT",
+        "end": "2024-01-31",
+        "accession": "0000104169-24-000019",
+        "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416924000019/earningsreleasefy24q4.htm"
+      }
+    ]
+  },
+  "fixtureSelection": "tests/fixtures/q4_8k/s1_fixture_selection.json",
+  "fixtureStatus": "pending-actions-html-export",
+  "fixtureStatusNote": "Run 18 ZIP contains one JSON report only; table previews and SEC URLs are present, but raw SEC HTML is absent. Fixture selections are recorded for extraction by the next Actions diagnose run.",
+  "devTickers": [
+    "TRAK",
+    "TRMB",
+    "TXT",
+    "UFI",
+    "UI",
+    "ULTA",
+    "WLY",
+    "WOR"
+  ],
+  "rows": [
+    {
+      "key": "TRAK",
+      "end": "2014-06-30",
+      "class": "L6",
+      "accession": "0001415889-14-003028",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000141588914003028/ex99-10082014_021051.htm",
+      "note": "No selected HTML release contains a structured Q4 NI table; 1 HTML item(s) were omitted or the exhibit is text-only."
+    },
+    {
+      "key": "TRAK",
+      "end": "2016-06-30",
+      "class": "L7",
+      "accession": "0001415889-16-007355",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000141588916007355/ex99-11082016_021119.htm",
+      "note": "The nearest candidate (2016-11-08) contains a different-quarter release; no Q4 results were found inside the configured filing window."
+    },
+    {
+      "key": "TRAK",
+      "end": "2018-06-30",
+      "class": "L7",
+      "accession": "0001654954-18-012355",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000165495418012355/ex99-1.htm",
+      "note": "The nearest candidate (2018-11-13) contains a different-quarter release; no Q4 results were found inside the configured filing window."
+    },
+    {
+      "key": "TRAK",
+      "end": "2019-06-30",
+      "class": "L2",
+      "accession": "0001654954-19-010742",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000165495419010742/ex99-1.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months Ended Year Ended FY ENDS June 6/30/19 6/30/18 % Chg. 6/30/19 6/30/18 % Chg.; shows_period misses this header."
+    },
+    {
+      "key": "TRAK",
+      "end": "2020-06-30",
+      "class": "L5",
+      "accession": "0001654954-20-010594",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000165495420010594/ex991.htm",
+      "note": "Candidate earnings release provides annual/YTD net-income columns only; no Q4 column matches the target."
+    },
+    {
+      "key": "TRAK",
+      "end": "2021-06-30",
+      "class": "L5",
+      "accession": "0001654954-21-010535",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000165495421010535/ex99-1.htm",
+      "note": "Candidate earnings release provides annual/YTD net-income columns only; no Q4 column matches the target."
+    },
+    {
+      "key": "TRAK",
+      "end": "2022-06-30",
+      "class": "L5",
+      "accession": "0001851734-22-000579",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000185173422000579/ex_427215.htm",
+      "note": "Candidate earnings release provides annual/YTD net-income columns only; no Q4 column matches the target."
+    },
+    {
+      "key": "TRAK",
+      "end": "2023-06-30",
+      "class": "L2",
+      "accession": "0001437749-23-032290",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000143774923032290/ex_597959.htm",
+      "note": "Target NI is in quarter/week-header table 10; period wording: Three Months Ended September 30, 2023 2022; shows_period misses this header."
+    },
+    {
+      "key": "TRAK",
+      "end": "2024-06-30",
+      "class": "L5",
+      "accession": "0001437749-24-030452",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000143774924030452/ex_729117.htm",
+      "note": "Candidate earnings release provides annual/YTD net-income columns only; no Q4 column matches the target."
+    },
+    {
+      "key": "TRAK",
+      "end": "2025-06-30",
+      "class": "L5",
+      "accession": "0001437749-25-030128",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000143774925030128/ex_865467.htm",
+      "note": "Candidate earnings release provides annual/YTD net-income columns only; no Q4 column matches the target."
+    },
+    {
+      "key": "TRAK",
+      "end": "2026-06-30",
+      "class": "L5",
+      "accession": "0001437749-26-031604",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000143774926031604/ex_1020954.htm",
+      "note": "Candidate earnings release provides annual/YTD net-income columns only; no Q4 column matches the target."
+    },
+    {
+      "key": "TRMB",
+      "end": "2011-12-30",
+      "class": "L2",
+      "accession": "0001193125-12-073574",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312512073574/d304248dex991.htm",
+      "note": "Target NI is in quarter/week-header table 15; period wording: Three Months Ended Twelve Months Ended Dec-30,2011 Dec-31,2010 Dec-30,2011 Dec-31,2010; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2012-12-28",
+      "class": "L2",
+      "accession": "0001193125-13-038772",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312513038772/d480462dex991.htm",
+      "note": "Target NI is in quarter/week-header table 16; period wording: Fourth Quarter of Fiscal Years 2012 2011 2012 2011; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2014-01-03",
+      "class": "L2",
+      "accession": "0001193125-14-045764",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312514045764/d674817dex991.htm",
+      "note": "Target NI is in quarter/week-header table 2; period wording: Fourth Quarter of Fiscal Years 2013 2012 2013 2012; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2015-01-02",
+      "class": "L2",
+      "accession": "0001193125-15-041649",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312515041649/d869489dex991.htm",
+      "note": "Target NI is in quarter/week-header table 2; period wording: Fourth Quarter of Fiscal Years 2014 2013 2014 2013; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2016-01-01",
+      "class": "L2",
+      "accession": "0001193125-16-455374",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312516455374/d137078dex991.htm",
+      "note": "Target NI is in quarter/week-header table 2; period wording: Fourth Quarter of Fiscal Years 2015 2014 2015 2014; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2016-12-30",
+      "class": "L2",
+      "accession": "0001193125-17-034678",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312517034678/d332911dex991.htm",
+      "note": "Target NI is in quarter/week-header table 2; period wording: Fourth Quarter of Fiscal Years 2016 2015 2016 2015; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2017-12-29",
+      "class": "L2",
+      "accession": "0001193125-18-036297",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312518036297/d414765dex991.htm",
+      "note": "Target NI is in quarter/week-header table 2; period wording: Fourth Quarter of Fiscal Years 2017 2016 2017 2016; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2018-12-28",
+      "class": "L2",
+      "accession": "0001193125-19-029592",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312519029592/d698387dex991.htm",
+      "note": "Target NI is in quarter/week-header table 8; period wording: Fourth Quarter of Fiscal Years 2018 2017* As Adjusted 2018 2017* As Adjusted; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2020-01-03",
+      "class": "L2",
+      "accession": "0000864749-20-000011",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474920000011/a2019q4-8kex991.htm",
+      "note": "Target NI is in quarter/week-header table 9; period wording: Fourth Quarter of Fiscal Years; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2021-01-01",
+      "class": "L2",
+      "accession": "0000864749-21-000011",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474921000011/a2020q4-8kex991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Fourth Quarter of Fiscal Years 2020 2019 2020 2019; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2021-12-31",
+      "class": "L2",
+      "accession": "0000864749-22-000012",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474922000012/a2021q4-8kex991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Fourth Quarter of Years 2021 2020 2021 2020; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2022-12-30",
+      "class": "L2",
+      "accession": "0000864749-23-000007",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474923000007/a2022q4-8kex991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Fourth Quarter of Years 2022 2021 2022 2021; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2023-12-29",
+      "class": "L2",
+      "accession": "0000864749-24-000034",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474924000034/a2023q4-8kex991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Fourth Quarter of Year of 2023 2022 2023 2022; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2025-01-03",
+      "class": "L2",
+      "accession": "0000864749-25-000023",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474925000023/a2024q4-8kex991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Fourth Quarter of Year of 2024 2023 2024 2023; shows_period misses this header."
+    },
+    {
+      "key": "TRMB",
+      "end": "2026-01-02",
+      "class": "L2",
+      "accession": "0000864749-26-000006",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474926000006/a2025q4-8kex991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Fourth Quarter of Year of 2025 2024 2025 2024; shows_period misses this header."
+    },
+    {
+      "key": "TRNS",
+      "end": "2012-03-31",
+      "class": "L2",
+      "accession": "0001193125-12-246446",
+      "url": "https://www.sec.gov/Archives/edgar/data/99302/000119312512246446/d357606dex991.htm",
+      "note": "Target NI is in quarter/week-header table 9; period wording: (Unaudited) Fourth Quarter Ended For the Years Ended; shows_period misses this header."
+    },
+    {
+      "key": "TTWO",
+      "end": "2016-03-31",
+      "class": "L9",
+      "accession": "0001104659-16-121872",
+      "url": "https://www.sec.gov/Archives/edgar/data/946581/000110465916121872/a16-11393_1ex99d1.htm",
+      "note": "Accepted NI label 'Net income (loss)' matches target in period-named table 5; this layout does not meet L1–L7."
+    },
+    {
+      "key": "TWIN",
+      "end": "2012-06-30",
+      "class": "L4",
+      "accession": "0000100378-12-000069",
+      "url": "https://www.sec.gov/Archives/edgar/data/100378/000010037812000069/td8k10232012ex991.htm",
+      "note": "No NI-row value matches target 1263000; closest is Net earnings attributable to Twin Disc = 1.251e+06 (relative difference 0.950%)."
+    },
+    {
+      "key": "TWIN",
+      "end": "2013-06-30",
+      "class": "L9",
+      "accession": "0000100378-13-000028",
+      "url": "https://www.sec.gov/Archives/edgar/data/100378/000010037813000028/td8k07302013ex991.htm",
+      "note": "Accepted NI label 'Net earnings attributable to Twin Disc' matches target in period-named table 8; this layout does not meet L1–L7."
+    },
+    {
+      "key": "TWIN",
+      "end": "2021-06-30",
+      "class": "L4",
+      "accession": "0001437749-21-019799",
+      "url": "https://www.sec.gov/Archives/edgar/data/100378/000143774921019799/ex_275501.htm",
+      "note": "No NI-row value matches target -21521000; closest is Net loss attributable to Twin Disc = -2.0898e+07 (relative difference 2.895%)."
+    },
+    {
+      "key": "TWIN",
+      "end": "2022-06-30",
+      "class": "L4",
+      "accession": "0001437749-22-021624",
+      "url": "https://www.sec.gov/Archives/edgar/data/100378/000143774922021624/ex_418797.htm",
+      "note": "No NI-row value matches target 10151000; closest is Net income (loss) = 8.406e+06 (relative difference 17.190%)."
+    },
+    {
+      "key": "TWIN",
+      "end": "2023-06-30",
+      "class": "L4",
+      "accession": "0001437749-23-023905",
+      "url": "https://www.sec.gov/Archives/edgar/data/100378/000143774923023905/ex_561226.htm",
+      "note": "No NI-row value matches target 6775000; closest is Net income attributable to Twin Disc = 8.596e+06 (relative difference 26.878%)."
+    },
+    {
+      "key": "TWIN",
+      "end": "2025-06-30",
+      "class": "L4",
+      "accession": "0001437749-25-027486",
+      "url": "https://www.sec.gov/Archives/edgar/data/100378/000143774925027486/ex_855273.htm",
+      "note": "No NI-row value matches target 2621000; closest is Net income (loss) = 1.496e+06 (relative difference 42.923%)."
+    },
+    {
+      "key": "TXT",
+      "end": "2011-12-31",
+      "class": "L2",
+      "accession": "0001104659-12-026047",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465912026047/a12-9878_1ex99d1.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months Ended March 31, 2012 April 2, 2011 REVENUES; shows_period misses this header."
+    },
+    {
+      "key": "TXT",
+      "end": "2012-12-29",
+      "class": "L2",
+      "accession": "0001104659-13-029978",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465913029978/a13-10218_1ex99d1.htm",
+      "note": "Target NI is in quarter/week-header table 2; period wording: Three Months Ended March 30, 2013 March 31, 2012 REVENUES; shows_period misses this header."
+    },
+    {
+      "key": "TXT",
+      "end": "2013-12-28",
+      "class": "L2",
+      "accession": "0001104659-14-032982",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465914032982/a14-9291_3ex99d1.htm",
+      "note": "Target NI is in quarter/week-header table 2; period wording: Three Months Ended March 29, 2014 March 30, 2013 REVENUES; shows_period misses this header."
+    },
+    {
+      "key": "TXT",
+      "end": "2015-01-03",
+      "class": "L2",
+      "accession": "0001104659-15-030725",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465915030725/a15-10040_1ex99d1.htm",
+      "note": "Target NI is in quarter/week-header table 2; period wording: Three Months Ended April 4, 2015 March 29, 2014 REVENUES; shows_period misses this header."
+    },
+    {
+      "key": "TXT",
+      "end": "2016-01-02",
+      "class": "L2",
+      "accession": "0001104659-16-112662",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465916112662/a16-8702_1ex99d1.htm",
+      "note": "Target NI is in quarter/week-header table 2; period wording: Three Months Ended April 2, 2016 April 4, 2015 REVENUES; shows_period misses this header."
+    },
+    {
+      "key": "TXT",
+      "end": "2016-12-31",
+      "class": "L2",
+      "accession": "0001104659-17-024320",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465917024320/a17-11537_1ex99d1.htm",
+      "note": "Target NI is in quarter/week-header table 2; period wording: Three Months Ended April 1, 2017 April 2, 2016 REVENUES; shows_period misses this header."
+    },
+    {
+      "key": "TXT",
+      "end": "2017-12-30",
+      "class": "L2",
+      "accession": "0001104659-18-024682",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465918024682/a18-11106_1ex99d1.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Three Months Ended March 31, 2018 April 1, 2017 REVENUES; shows_period misses this header."
+    },
+    {
+      "key": "TXT",
+      "end": "2018-12-29",
+      "class": "L2",
+      "accession": "0001104659-19-021777",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465919021777/a19-8437_1ex99d1.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months Ended March 30, 2019 March 31, 2018 REVENUES; shows_period misses this header."
+    },
+    {
+      "key": "TXT",
+      "end": "2020-01-04",
+      "class": "L2",
+      "accession": "0001104659-20-053864",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465920053864/tm2017896d1_ex99-1.htm",
+      "note": "Target NI is in quarter/week-header table 5; period wording: Three Months Ended April 4, 2020 Diluted EPS Net income - GAAP $ 50 $ 0.22; shows_period misses this header."
+    },
+    {
+      "key": "TXT",
+      "end": "2021-01-02",
+      "class": "L1",
+      "accession": "0000217346-21-000013",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734621000013/q4208-kex991.htm",
+      "note": "Stored NI matches Net income in table 4; target table lacks period and preceding table 1 names a quarter."
+    },
+    {
+      "key": "TXT",
+      "end": "2022-01-01",
+      "class": "L2",
+      "accession": "0000217346-22-000002",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734622000002/q4218-kex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months Ended Twelve Months Ended January 1,2022 January 2,2021 January 1,2022 January 2,2021; shows_period misses this header."
+    },
+    {
+      "key": "TXT",
+      "end": "2022-12-31",
+      "class": "L2",
+      "accession": "0000217346-23-000002",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734623000002/q4228-kex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months Ended Twelve Months Ended December 31,2022 January 1,2022 December 31,2022 January 1,2022; shows_period misses this header."
+    },
+    {
+      "key": "TXT",
+      "end": "2023-12-30",
+      "class": "L2",
+      "accession": "0000217346-24-000014",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734624000014/q4238-kex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months Ended Twelve Months Ended December 30,2023 December 31,2022 December 30,2023 December 31,202; shows_period misses this header."
+    },
+    {
+      "key": "TXT",
+      "end": "2024-12-28",
+      "class": "L2",
+      "accession": "0000217346-25-000014",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734625000014/q4248-kex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months Ended Twelve Months Ended December 28,2024 December 30,2023 December 28,2024 December 30,202; shows_period misses this header."
+    },
+    {
+      "key": "TXT",
+      "end": "2026-01-03",
+      "class": "L2",
+      "accession": "0000217346-26-000002",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734626000002/q4258-kex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months Ended Twelve Months Ended January 3,2026 December 28,2024 January 3,2026 December 28,2024; shows_period misses this header."
+    },
+    {
+      "key": "UFI",
+      "end": "2012-06-24",
+      "class": "L9",
+      "accession": "0001437749-12-007180",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000143774912007180/ex99-1.htm",
+      "note": "Accepted NI label 'Net income attributable to Unifi, Inc.' matches target in period-named table 6; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UFI",
+      "end": "2013-06-30",
+      "class": "L9",
+      "accession": "0001437749-13-009245",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000143774913009245/ufi20130724_8kex99-1.htm",
+      "note": "Accepted NI label 'Net income attributable to Unifi, Inc.' matches target in period-named table 5; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UFI",
+      "end": "2014-06-29",
+      "class": "L9",
+      "accession": "0001437749-14-013228",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000143774914013228/ex99-1.htm",
+      "note": "Accepted NI label 'Net income attributable to Unifi, Inc.' matches target in period-named table 5; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UFI",
+      "end": "2015-06-28",
+      "class": "L9",
+      "accession": "0001437749-15-013901",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000143774915013901/ex99-1.htm",
+      "note": "Accepted NI label 'Net income attributable to Unifi, Inc.' matches target in period-named table 5; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UFI",
+      "end": "2016-06-26",
+      "class": "L9",
+      "accession": "0001437749-16-035702",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000143774916035702/ex99-1.htm",
+      "note": "Accepted NI label 'Net income attributable to Unifi, Inc.' matches target in period-named table 14; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UFI",
+      "end": "2017-06-25",
+      "class": "L2",
+      "accession": "0001564590-17-013985",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000156459017013985/ufi-ex991_6.htm",
+      "note": "Target NI is in quarter/week-header table 10; period wording: (dollars in millions, except per share amounts) Fourth Quarter Fiscal Year; shows_period misses this header."
+    },
+    {
+      "key": "UFI",
+      "end": "2018-06-24",
+      "class": "L3",
+      "accession": "0001564590-18-018666",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000156459018018666/ufi-ex991_41.htm",
+      "note": "Period table 15 matches the target under NI label 'Net income including non-controlling interest', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "UFI",
+      "end": "2019-06-30",
+      "class": "L9",
+      "accession": "0001564590-19-029649",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000156459019029649/ufi-ex991_6.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 27; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UFI",
+      "end": "2020-06-28",
+      "class": "L9",
+      "accession": "0001564590-20-036870",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000156459020036870/ufi-ex991_30.htm",
+      "note": "Accepted NI label 'Net (loss) income' matches target in period-named table 24; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UFI",
+      "end": "2021-06-27",
+      "class": "L9",
+      "accession": "0001564590-21-040893",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000156459021040893/ufi-ex991_7.htm",
+      "note": "Accepted NI label 'Net income (loss)' matches target in period-named table 18; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UFI",
+      "end": "2022-07-03",
+      "class": "L9",
+      "accession": "0001564590-22-028954",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000156459022028954/ufi-ex991_33.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 14; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UFI",
+      "end": "2023-07-02",
+      "class": "L9",
+      "accession": "0000950170-23-044149",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000095017023044149/ufi-ex99_1.htm",
+      "note": "Accepted NI label 'Net (loss) income' matches target in period-named table 0; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UFI",
+      "end": "2024-06-30",
+      "class": "L9",
+      "accession": "0000950170-24-099497",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000095017024099497/ufi-ex99_1.htm",
+      "note": "Accepted NI label 'Net loss' matches target in period-named table 0; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UFI",
+      "end": "2025-06-29",
+      "class": "L9",
+      "accession": "0000950170-25-110439",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000095017025110439/ufi-ex99_1.htm",
+      "note": "Accepted NI label 'Net income (loss)' matches target in period-named table 0; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UFI",
+      "end": "2026-06-28",
+      "class": "L9",
+      "accession": "0000100726-26-000010",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000010072626000010/ufi-ex99_1.htm",
+      "note": "Accepted NI label 'Net (loss) income' matches target in period-named table 0; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UI",
+      "end": "2014-06-30",
+      "class": "L3",
+      "accession": "0001511737-14-000021",
+      "url": "https://www.sec.gov/Archives/edgar/data/1511737/000151173714000021/exhibit991q42014.htm",
+      "note": "Period table 14 matches the target under NI label 'Net income and comprehensive income', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "UI",
+      "end": "2015-06-30",
+      "class": "L3",
+      "accession": "0001571049-15-006288",
+      "url": "https://www.sec.gov/Archives/edgar/data/1511737/000157104915006288/t1501817_ex99-1.htm",
+      "note": "Period table 28 matches the target under NI label 'Net income and comprehensive income', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "UI",
+      "end": "2016-06-30",
+      "class": "L3",
+      "accession": "0001415889-16-006679",
+      "url": "https://www.sec.gov/Archives/edgar/data/1511737/000141588916006679/ex99-08042016_010832.htm",
+      "note": "Period table 19 matches the target under NI label 'Net income and comprehensive income', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "UI",
+      "end": "2017-06-30",
+      "class": "L3",
+      "accession": "0001654954-17-006902",
+      "url": "https://www.sec.gov/Archives/edgar/data/1511737/000165495417006902/ex99-1.htm",
+      "note": "Period table 1 matches the target under NI label 'Net income and comprehensive income', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "UI",
+      "end": "2018-06-30",
+      "class": "L3",
+      "accession": "0001511737-18-000014",
+      "url": "https://www.sec.gov/Archives/edgar/data/1511737/000151173718000014/exhibit991q42018.htm",
+      "note": "Period table 17 matches the target under NI label 'Net income and comprehensive income', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "UI",
+      "end": "2024-06-30",
+      "class": "L2",
+      "accession": "0001511737-24-000055",
+      "url": "https://www.sec.gov/Archives/edgar/data/1511737/000151173724000055/exhibit991-063024.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Income statement highlights F4Q24 F3Q24 F4Q23 Revenues 507.5 493.0 491.1; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2012-01-28",
+      "class": "L2",
+      "accession": "0001193125-12-103852",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000119312512103852/d311794dex991.htm",
+      "note": "Target NI is in quarter/week-header table 25; period wording: 13 Weeks Ended 13 Weeks Ended January 28,2012 January 29,2011; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2013-02-02",
+      "class": "L2",
+      "accession": "0001193125-13-107354",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000119312513107354/d502755dex991.htm",
+      "note": "Target NI is in quarter/week-header table 25; period wording: 14 Weeks Ended 13 Weeks Ended February 2,2013 January 28,2012; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2014-02-01",
+      "class": "L2",
+      "accession": "0001193125-14-097688",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000119312514097688/d690979dex991.htm",
+      "note": "Target NI is in quarter/week-header table 26; period wording: 13 Weeks Ended 14 Weeks Ended February 1,2014 February 2,2013; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2015-01-31",
+      "class": "L2",
+      "accession": "0001193125-15-089243",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000119312515089243/d889169dex991.htm",
+      "note": "Target NI is in quarter/week-header table 30; period wording: 13 Weeks Ended 13 Weeks Ended January 31,2015 February 1,2014; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2016-01-30",
+      "class": "L2",
+      "accession": "0001193125-16-500119",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000119312516500119/d84337dex991.htm",
+      "note": "Target NI is in quarter/week-header table 32; period wording: 13 Weeks Ended 13 Weeks Ended January 30,2016 January 31,2015; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2017-01-28",
+      "class": "L2",
+      "accession": "0001193125-17-076882",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000119312517076882/d353652dex99.htm",
+      "note": "Target NI is in quarter/week-header table 30; period wording: 13 Weeks Ended 13 Weeks Ended January 28,2017 January 30,2016; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2018-02-03",
+      "class": "L2",
+      "accession": "0001558370-18-002126",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837018002126/ex-99d1.htm",
+      "note": "Target NI is in quarter/week-header table 38; period wording: 14 Weeks Ended 13 Weeks Ended February 3, January 28,; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2019-02-02",
+      "class": "L2",
+      "accession": "0001558370-19-002006",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837019002006/ex-99d1.htm",
+      "note": "Target NI is in quarter/week-header table 36; period wording: 13 Weeks Ended 14 Weeks Ended February 2, February 3,; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2020-02-01",
+      "class": "L2",
+      "accession": "0001558370-20-002538",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837020002538/ex-99d1.htm",
+      "note": "Target NI is in quarter/week-header table 26; period wording: 13 Weeks Ended February 1, February 2,; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2021-01-30",
+      "class": "L1",
+      "accession": "0001558370-21-002815",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837021002815/ulta-20210311xex99d1.htm",
+      "note": "Stored NI matches Net income in table 51; target table lacks period and preceding table 49 names a quarter."
+    },
+    {
+      "key": "ULTA",
+      "end": "2022-01-29",
+      "class": "L2",
+      "accession": "0001558370-22-003282",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837022003282/ulta-20220310xex99d1.htm",
+      "note": "Target NI is in quarter/week-header table 39; period wording: ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ 13 Weeks Ended ​ ​ January 29, ​ January 30,; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2023-01-28",
+      "class": "L2",
+      "accession": "0001558370-23-003308",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837023003308/ulta-20230309xex99d1.htm",
+      "note": "Target NI is in quarter/week-header table 36; period wording: ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ 13 Weeks Ended ​ ​ January 28, ​ January 29,; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2024-02-03",
+      "class": "L2",
+      "accession": "0001558370-24-003233",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837024003233/ulta-20240314xex99d1.htm",
+      "note": "Target NI is in quarter/week-header table 41; period wording: ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ 14 Weeks Ended ​ 13 Weeks Ended ​ ​ February 3, ​ January 28,; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2025-02-01",
+      "class": "L2",
+      "accession": "0001558370-25-002905",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837025002905/ulta-20250313xex99d1.htm",
+      "note": "Target NI is in quarter/week-header table 40; period wording: ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ 13 Weeks Ended ​ 14 Weeks Ended ​ ​ February 1, ​ February 3,; shows_period misses this header."
+    },
+    {
+      "key": "ULTA",
+      "end": "2026-01-31",
+      "class": "L2",
+      "accession": "0001104659-26-027061",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000110465926027061/ulta-20260312xex99d1.htm",
+      "note": "Target NI is in quarter/week-header table 41; period wording: ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ 13 Weeks Ended ​ ​ January 31, ​ February 1,; shows_period misses this header."
+    },
+    {
+      "key": "UNFI",
+      "end": "2013-08-03",
+      "class": "L2",
+      "accession": "0001020859-13-000076",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085913000076/q4fy13earningsrelease.htm",
+      "note": "Target NI is in quarter/week-header table 14; period wording: Fiscal year ended July 28, 2012; shows_period misses this header."
+    },
+    {
+      "key": "UNFI",
+      "end": "2014-08-02",
+      "class": "L9",
+      "accession": "0001020859-14-000116",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085914000116/q4fy14earningsrelease.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 7; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UNFI",
+      "end": "2015-08-01",
+      "class": "L2",
+      "accession": "0001020859-15-000190",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085915000190/q1fy16earningsrelease.htm",
+      "note": "Target NI is in quarter/week-header table 9; period wording: Three months ended October 31, 2015; shows_period misses this header."
+    },
+    {
+      "key": "UNFI",
+      "end": "2016-07-30",
+      "class": "L9",
+      "accession": "0001020859-16-000255",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085916000255/q4fy16earningsrelease.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 6; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UNFI",
+      "end": "2017-07-29",
+      "class": "L2",
+      "accession": "0001020859-17-000044",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085917000044/q4fy17earningsrelease.htm",
+      "note": "Target NI is in quarter/week-header table 7; period wording: 13-Week Period Ended Fiscal Year Ended; shows_period misses this header."
+    },
+    {
+      "key": "UNFI",
+      "end": "2019-08-03",
+      "class": "L3",
+      "accession": "0001020859-19-000114",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085919000114/q4-f19pressrelease.htm",
+      "note": "Period table 13 matches the target under NI label 'Net income (loss) including noncontrolling interests', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "URBN",
+      "end": "2012-01-31",
+      "class": "L9",
+      "accession": "0001193125-12-111659",
+      "url": "https://www.sec.gov/Archives/edgar/data/912615/000119312512111659/d314877dex991.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 2; this layout does not meet L1–L7."
+    },
+    {
+      "key": "URBN",
+      "end": "2013-01-31",
+      "class": "L9",
+      "accession": "0001193125-13-103185",
+      "url": "https://www.sec.gov/Archives/edgar/data/912615/000119312513103185/d501238dex991.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 2; this layout does not meet L1–L7."
+    },
+    {
+      "key": "URBN",
+      "end": "2014-01-31",
+      "class": "L2",
+      "accession": "0001193125-14-093584",
+      "url": "https://www.sec.gov/Archives/edgar/data/912615/000119312514093584/d691625dex991.htm",
+      "note": "Target NI is in quarter/week-header table 2; period wording: Three Months EndedJanuary 31, Year EndedJanuary 31, 2014 2013 2014 2013; shows_period misses this header."
+    },
+    {
+      "key": "URBN",
+      "end": "2015-01-31",
+      "class": "L9",
+      "accession": "0001193125-15-084548",
+      "url": "https://www.sec.gov/Archives/edgar/data/912615/000119312515084548/d889097dex991.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 3; this layout does not meet L1–L7."
+    },
+    {
+      "key": "URBN",
+      "end": "2016-01-31",
+      "class": "L1",
+      "accession": "0001193125-16-496526",
+      "url": "https://www.sec.gov/Archives/edgar/data/912615/000119312516496526/d138438dex991.htm",
+      "note": "Stored NI matches Net income in table 3; target table lacks period and preceding table 1 names a quarter."
+    },
+    {
+      "key": "UVV",
+      "end": "2014-03-31",
+      "class": "L9",
+      "accession": "0000102037-14-000016",
+      "url": "https://www.sec.gov/Archives/edgar/data/102037/000010203714000016/uvv-exhibit992x20140331xea.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 1; this layout does not meet L1–L7."
+    },
+    {
+      "key": "UVV",
+      "end": "2017-03-31",
+      "class": "L9",
+      "accession": "0000102037-17-000027",
+      "url": "https://www.sec.gov/Archives/edgar/data/102037/000010203717000027/uvv-exhibit992x20170331xea.htm",
+      "note": "Accepted NI label 'Net income attributable to Universal Corporation' matches target in period-named table 1; this layout does not meet L1–L7."
+    },
+    {
+      "key": "VEEV",
+      "end": "2016-01-31",
+      "class": "L2",
+      "accession": "0001157523-16-004794",
+      "url": "https://www.sec.gov/Archives/edgar/data/1393052/000115752316004794/a51290983ex99_1.htm",
+      "note": "Target NI is in quarter/week-header table 2; period wording: VEEVA SYSTEMS INC. CONDENSED CONSOLIDATED STATEMENTS OF COMPREHENSIVE INCOME (In thousands, except per sh; shows_period misses this header."
+    },
+    {
+      "key": "VEEV",
+      "end": "2017-01-31",
+      "class": "L2",
+      "accession": "0001157523-17-000662",
+      "url": "https://www.sec.gov/Archives/edgar/data/1393052/000115752317000662/a51517543ex99_1.htm",
+      "note": "Target NI is in quarter/week-header table 2; period wording: VEEVA SYSTEMS INC. CONDENSED CONSOLIDATED STATEMENTS OF COMPREHENSIVE INCOME (In thousands, except per sh; shows_period misses this header."
+    },
+    {
+      "key": "VEEV",
+      "end": "2018-01-31",
+      "class": "L3",
+      "accession": "0001157523-18-000424",
+      "url": "https://www.sec.gov/Archives/edgar/data/1393052/000115752318000424/a51765017ex99_1.htm",
+      "note": "Period table 5 matches the target under NI label 'Diluted net income per share on a GAAP basis', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "VIAV",
+      "end": "2015-06-27",
+      "class": "L3",
+      "accession": "0001104659-15-058709",
+      "url": "https://www.sec.gov/Archives/edgar/data/912093/000110465915058709/a15-17446_1ex99d1.htm",
+      "note": "Period table 6 matches the target under NI label 'Net loss per share from - basic and diluted', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "VIAV",
+      "end": "2016-07-02",
+      "class": "L3",
+      "accession": "0000912093-16-000023",
+      "url": "https://www.sec.gov/Archives/edgar/data/912093/000091209316000023/viavq4fy168-kex991.htm",
+      "note": "Period table 35 matches the target under NI label 'GAAP net loss from continuing operations', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "VIAV",
+      "end": "2017-07-01",
+      "class": "L2",
+      "accession": "0001628280-17-010506",
+      "url": "https://www.sec.gov/Archives/edgar/data/912093/000162828017010506/viavq1fy188-kex991.htm",
+      "note": "Target NI is in quarter/week-header table 5; period wording: GAAP Results; shows_period misses this header."
+    },
+    {
+      "key": "VIAV",
+      "end": "2021-07-03",
+      "class": "L2",
+      "accession": "0000912093-21-000116",
+      "url": "https://www.sec.gov/Archives/edgar/data/912093/000091209321000116/viavq4fy218-kex991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: GAAP Results Q4 Q3 Q4 Change; shows_period misses this header."
+    },
+    {
+      "key": "VIAV",
+      "end": "2023-07-01",
+      "class": "L2",
+      "accession": "0000912093-23-000034",
+      "url": "https://www.sec.gov/Archives/edgar/data/912093/000091209323000034/viavq4fy238-kex991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: GAAP Results Q4 Q3 Q4 Change; shows_period misses this header."
+    },
+    {
+      "key": "VIAV",
+      "end": "2024-06-29",
+      "class": "L2",
+      "accession": "0000912093-24-000051",
+      "url": "https://www.sec.gov/Archives/edgar/data/912093/000091209324000051/viavq4fy248-kex991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: GAAP Results Q4 Q3 Q4 Change; shows_period misses this header."
+    },
+    {
+      "key": "VIRC",
+      "end": "2012-01-31",
+      "class": "L2",
+      "accession": "0001193125-12-186578",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000119312512186578/d341772dex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months Ended Twelve Months Ended 1/31/2012 1/31/2011 1/31/2012 1/31/2011; shows_period misses this header."
+    },
+    {
+      "key": "VIRC",
+      "end": "2013-01-31",
+      "class": "L2",
+      "accession": "0001445305-13-000848",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000144530513000848/a8kforfy2012results_exhibi.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Three Months Ended Twelve Months Ended; shows_period misses this header."
+    },
+    {
+      "key": "VIRC",
+      "end": "2014-01-31",
+      "class": "L2",
+      "accession": "0001445305-14-001479",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000144530514001479/a8kforfy2013resultsexhibit.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Three Months Ended Twelve Months Ended; shows_period misses this header."
+    },
+    {
+      "key": "VIRC",
+      "end": "2015-01-31",
+      "class": "L2",
+      "accession": "0001628280-15-002926",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828015002926/a8kforfy2014q4resultsexhib.htm",
+      "note": "Target NI is in quarter/week-header table 4; period wording: Three Months Ended Twelve Months Ended; shows_period misses this header."
+    },
+    {
+      "key": "VIRC",
+      "end": "2016-01-31",
+      "class": "L2",
+      "accession": "0001628280-16-014733",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828016014733/a8kforfy2015q4resultsexhib.htm",
+      "note": "Target NI is in quarter/week-header table 3; period wording: Three Months Ended Twelve Months Ended; shows_period misses this header."
+    },
+    {
+      "key": "VIRC",
+      "end": "2017-01-31",
+      "class": "L2",
+      "accession": "0001628280-17-004281",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828017004281/a8kforfye01312017q4ex991.htm",
+      "note": "Target NI is in quarter/week-header table 3; period wording: Three Months Ended Twelve Months Ended; shows_period misses this header."
+    },
+    {
+      "key": "VIRC",
+      "end": "2018-01-31",
+      "class": "L2",
+      "accession": "0001628280-18-005277",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828018005277/a8kforfye01312018q4ex991.htm",
+      "note": "Target NI is in quarter/week-header table 3; period wording: Three Months Ended Twelve Months Ended; shows_period misses this header."
+    },
+    {
+      "key": "VIRC",
+      "end": "2019-01-31",
+      "class": "L2",
+      "accession": "0001628280-19-005570",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828019005570/a8kforfye01312019q4ex991.htm",
+      "note": "Target NI is in quarter/week-header table 4; period wording: Three Months Ended Twelve Months Ended; shows_period misses this header."
+    },
+    {
+      "key": "VIRC",
+      "end": "2020-01-31",
+      "class": "L2",
+      "accession": "0001628280-20-005967",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828020005967/exhibit991q401312020pressr.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Three Months Ended Twelve Months Ended; shows_period misses this header."
+    },
+    {
+      "key": "VIRC",
+      "end": "2021-01-31",
+      "class": "L2",
+      "accession": "0001628280-21-007939",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828021007939/exhibit991q401312021pressr.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Three Months Ended Twelve Months Ended 1/31/2021 1/31/2020 1/31/2021 1/31/2020; shows_period misses this header."
+    },
+    {
+      "key": "VIRC",
+      "end": "2022-01-31",
+      "class": "L5",
+      "accession": "0001628280-22-009864",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828022009864/exhibit991q401312022pressr.htm",
+      "note": "Candidate earnings release provides annual/YTD net-income columns only; no Q4 column matches the target."
+    },
+    {
+      "key": "VIRC",
+      "end": "2023-01-31",
+      "class": "L5",
+      "accession": "0001628280-23-014118",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828023014118/exhibit991q401312023pressr.htm",
+      "note": "Candidate earnings release provides annual/YTD net-income columns only; no Q4 column matches the target."
+    },
+    {
+      "key": "VIRC",
+      "end": "2024-01-31",
+      "class": "L5",
+      "accession": "0001628280-24-016000",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828024016000/exhibit991q401312024pressr.htm",
+      "note": "Candidate earnings release provides annual/YTD net-income columns only; no Q4 column matches the target."
+    },
+    {
+      "key": "VIRC",
+      "end": "2025-01-31",
+      "class": "L5",
+      "accession": "0001628280-25-017642",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828025017642/exhibit991q401312025pressr.htm",
+      "note": "Candidate earnings release provides annual/YTD net-income columns only; no Q4 column matches the target."
+    },
+    {
+      "key": "VIRC",
+      "end": "2026-01-31",
+      "class": "L5",
+      "accession": "0001628280-26-024202",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828026024202/exhibit991q401312026pressr.htm",
+      "note": "Candidate earnings release provides annual/YTD net-income columns only; no Q4 column matches the target."
+    },
+    {
+      "key": "VNCE",
+      "end": "2014-02-01",
+      "class": "L2",
+      "accession": "0001193125-14-117423",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000119312514117423/d696837dex991.htm",
+      "note": "Target NI is in quarter/week-header table 18; period wording: Three Months Ended February 1,2014 February 2,2013; shows_period misses this header."
+    },
+    {
+      "key": "VNCE",
+      "end": "2015-01-31",
+      "class": "L2",
+      "accession": "0001193125-15-097526",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000119312515097526/d894283dex991.htm",
+      "note": "Target NI is in quarter/week-header table 19; period wording: Three Months Ended Fiscal Year Ended January 31,2015 February 1,2014 January 31,2015 February 1,2014; shows_period misses this header."
+    },
+    {
+      "key": "VNCE",
+      "end": "2019-02-02",
+      "class": "L4",
+      "accession": "0001564590-19-011247",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000156459019011247/vnce-ex99_14.htm",
+      "note": "No NI-row value matches target 736000; closest is Net income (loss) = 672000 (relative difference 8.696%)."
+    },
+    {
+      "key": "VNCE",
+      "end": "2021-01-30",
+      "class": "L4",
+      "accession": "0001564590-21-022011",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000156459021022011/vnce-ex991_6.htm",
+      "note": "No NI-row value matches target -7372000; closest is Net (loss) earnings* = -5.672e+06 (relative difference 23.060%)."
+    },
+    {
+      "key": "VNCE",
+      "end": "2024-02-03",
+      "class": "L1",
+      "accession": "0000950170-24-050201",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000095017024050201/vnce-ex99_1.htm",
+      "note": "Stored NI matches Net (loss) income in table 1; target table lacks period and preceding table 0 names a quarter."
+    },
+    {
+      "key": "VNCE",
+      "end": "2026-01-31",
+      "class": "L1",
+      "accession": "0001193125-26-155934",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000119312526155934/vnce-ex99_1.htm",
+      "note": "Stored NI matches Net (loss) income in table 1; target table lacks period and preceding table 0 names a quarter."
+    },
+    {
+      "key": "VRA",
+      "end": "2012-01-28",
+      "class": "L2",
+      "accession": "0001193125-12-114896",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000119312512114896/d316280dex991.htm",
+      "note": "Target NI is in quarter/week-header table 5; period wording: Thirteen Weeks Ended Fiscal Year Ended January 28,2012 January 29,2011 January 28,2012 January 29,2011; shows_period misses this header."
+    },
+    {
+      "key": "VRA",
+      "end": "2013-02-02",
+      "class": "L2",
+      "accession": "0001193125-13-105178",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000119312513105178/d500741dex991.htm",
+      "note": "Target NI is in quarter/week-header table 5; period wording: FourteenWeeks EndedFebruary 2,2013 ThirteenWeeks EndedJanuary 28,2012 Fifty-ThreeWeeks EndedFebruary 2,20; shows_period misses this header."
+    },
+    {
+      "key": "VRA",
+      "end": "2015-01-31",
+      "class": "L1",
+      "accession": "0001495320-15-000005",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532015000005/q4ex-9912015.htm",
+      "note": "Stored NI matches Net income in table 25; target table lacks period and preceding table 24 names a quarter."
+    },
+    {
+      "key": "VRA",
+      "end": "2016-01-30",
+      "class": "L1",
+      "accession": "0001495320-16-000052",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532016000052/q4ex-9912016.htm",
+      "note": "Stored NI matches Diluted net income (loss) per share from continuing operations in table 30; target table lacks period and preceding table 28 names a quarter."
+    },
+    {
+      "key": "VRA",
+      "end": "2021-01-30",
+      "class": "L2",
+      "accession": "0001495320-21-000011",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532021000011/vra-20210130xex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Thirteen Weeks Ended Fifty-Two Weeks Ended January 30,2021 February 1,2020 January 30,2021 February 1,202; shows_period misses this header."
+    },
+    {
+      "key": "VRA",
+      "end": "2022-01-29",
+      "class": "L2",
+      "accession": "0001495320-22-000003",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532022000003/vra-20220129xex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Thirteen Weeks Ended Fifty-Two Weeks Ended January 29,2022 January 30,2021 January 29,2022 January 30,202; shows_period misses this header."
+    },
+    {
+      "key": "VRA",
+      "end": "2023-01-28",
+      "class": "L2",
+      "accession": "0001495320-23-000010",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532023000010/vra-20230128xex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Thirteen Weeks Ended Fifty-Two Weeks Ended January 28,2023 January 29,2022 January 28,2023 January 29,202; shows_period misses this header."
+    },
+    {
+      "key": "VRA",
+      "end": "2024-02-03",
+      "class": "L2",
+      "accession": "0001495320-24-000018",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532024000018/vra-20240203xex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Fourteen Weeks Ended Thirteen Weeks Ended Fifty-Three Weeks Ended Fifty-Two Weeks Ended February 3,2024 J; shows_period misses this header."
+    },
+    {
+      "key": "VRA",
+      "end": "2025-02-01",
+      "class": "L2",
+      "accession": "0001495320-25-000007",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532025000007/vra-20250201xex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Thirteen Weeks Ended Fourteen Weeks Ended Fifty-Two Weeks Ended Fifty-Three Weeks Ended February 1,2025 F; shows_period misses this header."
+    },
+    {
+      "key": "VRA",
+      "end": "2026-01-31",
+      "class": "L2",
+      "accession": "0001628280-26-017020",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000162828026017020/vra-20260131xex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Thirteen Weeks Ended Fifty-Two Weeks Ended January 31,2026 February 1,2025 January 31,2026 February 1,202; shows_period misses this header."
+    },
+    {
+      "key": "WLY",
+      "end": "2017-04-30",
+      "class": "L6",
+      "accession": "0000107140-17-000018",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714017000018/",
+      "note": "No selected HTML release contains a structured Q4 NI table; 1 HTML item(s) were omitted or the exhibit is text-only."
+    },
+    {
+      "key": "WLY",
+      "end": "2018-04-30",
+      "class": "L4",
+      "accession": "0000107140-18-000012",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714018000012/exhibit99.htm",
+      "note": "No NI-row value matches target 54200000; closest is Net Income = 5.406e+07 (relative difference 0.258%)."
+    },
+    {
+      "key": "WLY",
+      "end": "2020-04-30",
+      "class": "L9",
+      "accession": "0000107140-20-000023",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714020000023/exhibit99_1.htm",
+      "note": "Accepted NI label 'Net (Loss) Income' matches target in period-named table 33; this layout does not meet L1–L7."
+    },
+    {
+      "key": "WLY",
+      "end": "2023-04-30",
+      "class": "L2",
+      "accession": "0000107140-23-000083",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714023000083/wly-2023430xex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months EndedApril 30, Year EndedApril 30, 2023 2022 2023 2022; shows_period misses this header."
+    },
+    {
+      "key": "WLY",
+      "end": "2024-04-30",
+      "class": "L2",
+      "accession": "0000107140-24-000104",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714024000104/wly-2024430xex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months EndedApril 30, Year EndedApril 30, 2024 2023 2024 2023; shows_period misses this header."
+    },
+    {
+      "key": "WLY",
+      "end": "2025-04-30",
+      "class": "L2",
+      "accession": "0000107140-25-000071",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714025000071/wly-2025430xex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months EndedApril 30, Year EndedApril 30, 2025 2024 2025 2024; shows_period misses this header."
+    },
+    {
+      "key": "WLY",
+      "end": "2026-04-30",
+      "class": "L2",
+      "accession": "0001628280-26-043447",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000162828026043447/ex991fy26q4.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months EndedApril 30, Year EndedApril 30,; shows_period misses this header."
+    },
+    {
+      "key": "WLYB",
+      "end": "2017-04-30",
+      "class": "L6",
+      "accession": "0000107140-17-000018",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714017000018/",
+      "note": "No selected HTML release contains a structured Q4 NI table; 1 HTML item(s) were omitted or the exhibit is text-only."
+    },
+    {
+      "key": "WLYB",
+      "end": "2018-04-30",
+      "class": "L4",
+      "accession": "0000107140-18-000012",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714018000012/exhibit99.htm",
+      "note": "No NI-row value matches target 54200000; closest is Net Income = 5.406e+07 (relative difference 0.258%)."
+    },
+    {
+      "key": "WLYB",
+      "end": "2020-04-30",
+      "class": "L9",
+      "accession": "0000107140-20-000023",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714020000023/exhibit99_1.htm",
+      "note": "Accepted NI label 'Net (Loss) Income' matches target in period-named table 33; this layout does not meet L1–L7."
+    },
+    {
+      "key": "WLYB",
+      "end": "2023-04-30",
+      "class": "L2",
+      "accession": "0000107140-23-000083",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714023000083/wly-2023430xex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months EndedApril 30, Year EndedApril 30, 2023 2022 2023 2022; shows_period misses this header."
+    },
+    {
+      "key": "WLYB",
+      "end": "2024-04-30",
+      "class": "L2",
+      "accession": "0000107140-24-000104",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714024000104/wly-2024430xex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months EndedApril 30, Year EndedApril 30, 2024 2023 2024 2023; shows_period misses this header."
+    },
+    {
+      "key": "WLYB",
+      "end": "2025-04-30",
+      "class": "L2",
+      "accession": "0000107140-25-000071",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714025000071/wly-2025430xex991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months EndedApril 30, Year EndedApril 30, 2025 2024 2025 2024; shows_period misses this header."
+    },
+    {
+      "key": "WLYB",
+      "end": "2026-04-30",
+      "class": "L2",
+      "accession": "0001628280-26-043447",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000162828026043447/ex991fy26q4.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: Three Months EndedApril 30, Year EndedApril 30,; shows_period misses this header."
+    },
+    {
+      "key": "WMS",
+      "end": "2015-03-31",
+      "class": "L4",
+      "accession": "0001193125-15-293309",
+      "url": "https://www.sec.gov/Archives/edgar/data/1604028/000119312515293309/d64368dex991.htm",
+      "note": "No NI-row value matches target -24640000; closest is Adjustments that impact Net Income attributable to the Company = -1.7315e+07 (relative difference 29.728%)."
+    },
+    {
+      "key": "WMS",
+      "end": "2016-03-31",
+      "class": "L5",
+      "accession": "0001193125-16-614606",
+      "url": "https://www.sec.gov/Archives/edgar/data/1604028/000119312516614606/d307276dex991.htm",
+      "note": "Candidate earnings release provides annual/YTD net-income columns only; no Q4 column matches the target."
+    },
+    {
+      "key": "WMS",
+      "end": "2017-03-31",
+      "class": "L2",
+      "accession": "0001564590-17-015100",
+      "url": "https://www.sec.gov/Archives/edgar/data/1604028/000156459017015100/wms-ex991_7.htm",
+      "note": "Target NI is in quarter/week-header table 13; period wording: Three Months Ended June 30, (Amounts in thousands, except per share data) 2017 2016; shows_period misses this header."
+    },
+    {
+      "key": "WMT",
+      "end": "2012-01-31",
+      "class": "L9",
+      "accession": "0001193125-12-069086",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000119312512069086/d305069dex991.htm",
+      "note": "Accepted NI label 'Consolidated net income attributable to Walmart' matches target in period-named table 33; this layout does not meet L1–L7."
+    },
+    {
+      "key": "WMT",
+      "end": "2013-01-31",
+      "class": "L2",
+      "accession": "0000104169-13-000007",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416913000007/earningsrelease.htm",
+      "note": "Target NI is in quarter/week-header table 41; period wording: SUBJECT TO RECLASSIFICATION Three Months Ended Fiscal Years Ended; shows_period misses this header."
+    },
+    {
+      "key": "WMT",
+      "end": "2014-01-31",
+      "class": "L2",
+      "accession": "0000104169-14-000016",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416914000016/earningsrelease-13114.htm",
+      "note": "Target NI is in quarter/week-header table 34; period wording: Three Months Ended Fiscal Years Ended; shows_period misses this header."
+    },
+    {
+      "key": "WMT",
+      "end": "2015-01-31",
+      "class": "L2",
+      "accession": "0000104169-15-000006",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416915000006/earningsrelease-1312015.htm",
+      "note": "Target NI is in quarter/week-header table 63; period wording: Quarters Ended Fiscal Years Ended; shows_period misses this header."
+    },
+    {
+      "key": "WMT",
+      "end": "2016-01-31",
+      "class": "L2",
+      "accession": "0000104169-16-000074",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416916000074/earningsrelease-1312016.htm",
+      "note": "Target NI is in quarter/week-header table 50; period wording: Quarters Ended Fiscal Years Ended; shows_period misses this header."
+    },
+    {
+      "key": "WMT",
+      "end": "2017-01-31",
+      "class": "L2",
+      "accession": "0000104169-17-000013",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416917000013/earningsrelease-1312017.htm",
+      "note": "Target NI is in quarter/week-header table 50; period wording: Quarters Ended Fiscal Years Ended; shows_period misses this header."
+    },
+    {
+      "key": "WMT",
+      "end": "2018-01-31",
+      "class": "L1",
+      "accession": "0000104169-18-000020",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416918000020/earningsrelease-1312018.htm",
+      "note": "Stored NI matches Consolidated net income attributable to noncontrolling interest in table 52; target table lacks period and preceding table 51 names a quarter."
+    },
+    {
+      "key": "WMT",
+      "end": "2019-01-31",
+      "class": "L2",
+      "accession": "0000104169-19-000011",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416919000011/earningsrelease-1312019.htm",
+      "note": "Target NI is in quarter/week-header table 119; period wording: fiscal quarter label; shows_period misses this header."
+    },
+    {
+      "key": "WMT",
+      "end": "2020-01-31",
+      "class": "L2",
+      "accession": "0000104169-20-000007",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416920000007/earningsrelease-1312020.htm",
+      "note": "Target NI is in quarter/week-header table 75; period wording: fiscal quarter label; shows_period misses this header."
+    },
+    {
+      "key": "WMT",
+      "end": "2021-01-31",
+      "class": "L2",
+      "accession": "0000104169-21-000022",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416921000022/earningsreleasefy21q4.htm",
+      "note": "Target NI is in quarter/week-header table 13; period wording: Three Months Ended Fiscal Year Ended; shows_period misses this header."
+    },
+    {
+      "key": "WMT",
+      "end": "2022-01-31",
+      "class": "L2",
+      "accession": "0000104169-22-000009",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416922000009/earningsreleasefy22q4.htm",
+      "note": "Target NI is in quarter/week-header table 13; period wording: Three Months Ended Fiscal Year Ended; shows_period misses this header."
+    },
+    {
+      "key": "WMT",
+      "end": "2023-01-31",
+      "class": "L2",
+      "accession": "0000104169-23-000010",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416923000010/earningsreleasefy23q4.htm",
+      "note": "Target NI is in quarter/week-header table 14; period wording: Three Months Ended Fiscal Year Ended; shows_period misses this header."
+    },
+    {
+      "key": "WMT",
+      "end": "2024-01-31",
+      "class": "L9",
+      "accession": "0000104169-24-000019",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416924000019/earningsreleasefy24q4.htm",
+      "note": "Accepted NI label 'Consolidated net income attributable to Walmart' matches target in period-named table 14; this layout does not meet L1–L7."
+    },
+    {
+      "key": "WMT",
+      "end": "2025-01-31",
+      "class": "L9",
+      "accession": "0000104169-25-000010",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416925000010/earningsreleasefy25q4.htm",
+      "note": "Accepted NI label 'Consolidated net income attributable to Walmart' matches target in period-named table 14; this layout does not meet L1–L7."
+    },
+    {
+      "key": "WMT",
+      "end": "2026-01-31",
+      "class": "L9",
+      "accession": "0000104169-26-000032",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416926000032/earningsreleasefy26q4.htm",
+      "note": "Accepted NI label 'Consolidated net income attributable to Walmart' matches target in period-named table 14; this layout does not meet L1–L7."
+    },
+    {
+      "key": "WOR",
+      "end": "2012-05-31",
+      "class": "L2",
+      "accession": "0001102624-12-000550",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000110262412000550/exh99_1.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: 4Q 2012 3Q 2012 4Q 2011 12M 2012 12M 2011 Net sales $ 755.4 $ 611.3 $ 675.7 $ 2,534.7 $ 2,442.6 Operating; shows_period misses this header."
+    },
+    {
+      "key": "WOR",
+      "end": "2013-05-31",
+      "class": "L2",
+      "accession": "0001102624-13-000774",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000110262413000774/exh99_1.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: 4Q 2013 3Q 2013 4Q 2012 12M 2013 12M 2012 Net sales $ 704.1 $ 619.5 $ 755.4 $ 2,612.2 $ 2,534.7 Operating; shows_period misses this header."
+    },
+    {
+      "key": "WOR",
+      "end": "2014-05-31",
+      "class": "L2",
+      "accession": "0001102624-14-001019",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000110262414001019/exh99_1.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: (U.S. dollars in millions, except per share data) 4Q 2014 3Q 2014 4Q 2013 12M2014 12M2013; shows_period misses this header."
+    },
+    {
+      "key": "WOR",
+      "end": "2015-05-31",
+      "class": "L2",
+      "accession": "0001102624-15-001006",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000110262415001006/exh99_1.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: 4Q 2015 3Q 2015 4Q 2014 12M2015 12M2014 Net sales $ 846.0 $ 804.8 $ 891.0 $ 3,384.2 $ 3,126.4 Operating i; shows_period misses this header."
+    },
+    {
+      "key": "WOR",
+      "end": "2016-05-31",
+      "class": "L2",
+      "accession": "0001102624-16-003020",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000110262416003020/exh99_1.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: 4Q 2016 3Q 2016 4Q 2015 12M 2016 12M 2015 Net sales $ 714.7 $ 647.1 $ 846.0 $ 2,819.7 $ 3,384.2 Operating; shows_period misses this header."
+    },
+    {
+      "key": "WOR",
+      "end": "2017-05-31",
+      "class": "L2",
+      "accession": "0001171843-17-003873",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184317003873/exh_991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: 4Q 2017 3Q 2017 4Q 2016 12M 2017 12M 2016 Net sales $ 845.3 $ 703.4 $ 714.7 $ 3,014.1 $ 2,819.7 Operating; shows_period misses this header."
+    },
+    {
+      "key": "WOR",
+      "end": "2018-05-31",
+      "class": "L2",
+      "accession": "0001171843-18-004869",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184318004869/exh_991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: 4Q 2018 3Q 2018 4Q 2017 12M 2018 12M 2017 Net sales $ 1,020.5 $ 841.7 $ 845.3 $ 3,581.6 $ 3,014.1 Operati; shows_period misses this header."
+    },
+    {
+      "key": "WOR",
+      "end": "2019-05-31",
+      "class": "L2",
+      "accession": "0001171843-19-004189",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184319004189/exh_991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: 4Q 2019 3Q 2019 4Q 2018 12M 2019 12M 2018 Net sales $ 938.8 $ 874.4 $ 1,020.5 $ 3,759.6 $ 3,581.6 Operati; shows_period misses this header."
+    },
+    {
+      "key": "WOR",
+      "end": "2020-05-31",
+      "class": "L2",
+      "accession": "0001171843-20-004559",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184320004559/exh_991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: 4Q 2020 4Q 2019 12M 2020 12M 2019 Net sales $ 611.6 $ 938.8 $ 3,059.1 $ 3,759.6 Operating income 6.3 32.0; shows_period misses this header."
+    },
+    {
+      "key": "WOR",
+      "end": "2021-05-31",
+      "class": "L2",
+      "accession": "0001171843-21-004492",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184321004492/exh_991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: 4Q 2021 4Q 2020 After-Tax Per Share After-Tax Per Share Net earnings $ 113.6 $ 2.15 $ 16.2 $ 0.29; shows_period misses this header."
+    },
+    {
+      "key": "WOR",
+      "end": "2022-05-31",
+      "class": "L2",
+      "accession": "0001171843-22-004475",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184322004475/exh_991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: 4Q 2022 4Q 2021 After-Tax Per Share After-Tax Per Share Net earnings $ 80.3 $ 1.61 $ 113.6 $ 2.15; shows_period misses this header."
+    },
+    {
+      "key": "WOR",
+      "end": "2023-05-31",
+      "class": "L2",
+      "accession": "0001171843-23-004227",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184323004227/exh_991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: 4Q 2023 4Q 2022 After-Tax Per Share After-Tax Per Share Net earnings $ 129.9 $ 2.61 $ 80.3 $ 1.61; shows_period misses this header."
+    },
+    {
+      "key": "WOR",
+      "end": "2024-05-31",
+      "class": "L3",
+      "accession": "0000950170-24-077327",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000095017024077327/wor-ex99_1.htm",
+      "note": "Period table 2 matches the target under NI label 'Net earnings (loss) from continuing operations', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "WOR",
+      "end": "2025-05-31",
+      "class": "L3",
+      "accession": "0000950170-25-089494",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000095017025089494/wor-ex99_1.htm",
+      "note": "Period table 2 matches the target under NI label 'Net earnings (loss) from continuing operations', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "WOR",
+      "end": "2026-05-31",
+      "class": "L2",
+      "accession": "0001193125-26-279469",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000119312526279469/wor-ex99_1.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: (U.S. dollars in millions, except per share amounts) 4Q 2026 4Q 2025 GAAP Financial Measures; shows_period misses this header."
+    },
+    {
+      "key": "WRLD",
+      "end": "2016-03-31",
+      "class": "L4",
+      "accession": "0001157523-16-005496",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752316005496/a51335783_ex991.htm",
+      "note": "No NI-row value matches target 29826000; closest is Net income = 2.8616e+07 (relative difference 4.057%)."
+    },
+    {
+      "key": "WRLD",
+      "end": "2018-03-31",
+      "class": "L2",
+      "accession": "0001157523-18-001538",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752318001538/a51843253ex99_1.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: fiscal quarter label; shows_period misses this header."
+    },
+    {
+      "key": "WRLD",
+      "end": "2019-03-31",
+      "class": "L2",
+      "accession": "0001157523-19-001168",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752319001168/a51982191ex99_1.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: WORLD ACCEPTANCE CORPORATION AND SUBSIDIARIES CONSOLIDATED STATEMENTS OF OPERATIONS; shows_period misses this header."
+    },
+    {
+      "key": "WRLD",
+      "end": "2020-03-31",
+      "class": "L4",
+      "accession": "0001157523-20-000693",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752320000693/a52216317ex99_1.htm",
+      "note": "No NI-row value matches target 23303000; closest is Net income (loss) = 2.368e+07 (relative difference 1.618%)."
+    },
+    {
+      "key": "WRLD",
+      "end": "2021-03-31",
+      "class": "L9",
+      "accession": "0001157523-21-000613",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752321000613/a52424600ex99_1.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 7; this layout does not meet L1–L7."
+    },
+    {
+      "key": "WRLD",
+      "end": "2022-03-31",
+      "class": "L9",
+      "accession": "0001157523-22-000565",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752322000565/a52708776ex99_1.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 6; this layout does not meet L1–L7."
+    },
+    {
+      "key": "WRLD",
+      "end": "2023-03-31",
+      "class": "L4",
+      "accession": "0001157523-23-000727",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752323000727/a53393134_ex991.htm",
+      "note": "No NI-row value matches target 24632000; closest is Net income = 2.5643e+07 (relative difference 4.104%)."
+    },
+    {
+      "key": "WRLD",
+      "end": "2024-03-31",
+      "class": "L9",
+      "accession": "0001437749-24-014252",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000143774924014252/ex_665449.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 11; this layout does not meet L1–L7."
+    },
+    {
+      "key": "WRLD",
+      "end": "2025-03-31",
+      "class": "L2",
+      "accession": "0001437749-25-023343",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000143774925023343/ex_842512.htm",
+      "note": "Target NI is in quarter/week-header table 10; period wording: Three months ended June 30, 2025 2024 Revenues:; shows_period misses this header."
+    },
+    {
+      "key": "WRLD",
+      "end": "2026-03-31",
+      "class": "L2",
+      "accession": "0001437749-26-024363",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000143774926024363/ex_992357.htm",
+      "note": "Target NI is in quarter/week-header table 14; period wording: ​ ​ Three months ended June 30, ​ ​ ​ 2026 ​ ​ 2025 ​ Revenues: ​ ​ ​ ​ ​ ​ ​ ​; shows_period misses this header."
+    },
+    {
+      "key": "WSM",
+      "end": "2012-01-29",
+      "class": "L2",
+      "accession": "0001193125-12-102576",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312512102576/d312373dex991.htm",
+      "note": "Target NI is in quarter/week-header table 26; period wording: FOURTH QUARTER 2011 2010; shows_period misses this header."
+    },
+    {
+      "key": "WSM",
+      "end": "2013-02-03",
+      "class": "L2",
+      "accession": "0001193125-13-115118",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312513115118/d503606dex991.htm",
+      "note": "Target NI is in quarter/week-header table 25; period wording: FOURTH QUARTER 2012 2011; shows_period misses this header."
+    },
+    {
+      "key": "WSM",
+      "end": "2014-02-02",
+      "class": "L2",
+      "accession": "0001193125-14-095586",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312514095586/d691119dex991.htm",
+      "note": "Target NI is in quarter/week-header table 21; period wording: 4th Quarter 2013 (13 Weeks) 2012 (14 Weeks); shows_period misses this header."
+    },
+    {
+      "key": "WSM",
+      "end": "2015-02-01",
+      "class": "L2",
+      "accession": "0001193125-15-096958",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312515096958/d894119dex991.htm",
+      "note": "Target NI is in quarter/week-header table 17; period wording: 4th Quarter 2014 2013; shows_period misses this header."
+    },
+    {
+      "key": "WSM",
+      "end": "2016-01-31",
+      "class": "L2",
+      "accession": "0001193125-16-506695",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312516506695/d160621dex991.htm",
+      "note": "Target NI is in quarter/week-header table 17; period wording: 4th Quarter 2015 2014; shows_period misses this header."
+    },
+    {
+      "key": "WSM",
+      "end": "2017-01-29",
+      "class": "L2",
+      "accession": "0001193125-17-083658",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312517083658/d339255dex991.htm",
+      "note": "Target NI is in quarter/week-header table 17; period wording: 4th Quarter 2016 2015; shows_period misses this header."
+    },
+    {
+      "key": "WSM",
+      "end": "2020-02-02",
+      "class": "L2",
+      "accession": "0001193125-20-077192",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312520077192/d861901dex991.htm",
+      "note": "Target NI is in quarter/week-header table 15; period wording: Thirteen Weeks Ended Fourteen Weeks Ended February 2, 2020 February 3, 2019; shows_period misses this header."
+    },
+    {
+      "key": "WSM",
+      "end": "2021-01-31",
+      "class": "L2",
+      "accession": "0001193125-21-084120",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312521084120/d137529dex991.htm",
+      "note": "Target NI is in quarter/week-header table 16; period wording: Thirteen Weeks Ended Thirteen Weeks Ended January 31, 2021 February 2, 2020; shows_period misses this header."
+    },
+    {
+      "key": "WSM",
+      "end": "2022-01-30",
+      "class": "L9",
+      "accession": "0001628280-22-006378",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000162828022006378/exhibit991fy2021q4earnings.htm",
+      "note": "Accepted NI label 'Net earnings' matches target in period-named table 0; this layout does not meet L1–L7."
+    },
+    {
+      "key": "WSM",
+      "end": "2023-01-29",
+      "class": "L2",
+      "accession": "0001628280-23-008202",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000162828023008202/exhibit991fy2022q4earnings.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: For the Thirteen Weeks Ended January 29, 2023 January 30, 2022; shows_period misses this header."
+    },
+    {
+      "key": "WSM",
+      "end": "2024-01-28",
+      "class": "L2",
+      "accession": "0001628280-24-010801",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000162828024010801/exhibit991fy2023q4earnings.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: For the Thirteen Weeks Ended January 28, 2024 January 29, 2023; shows_period misses this header."
+    },
+    {
+      "key": "WSM",
+      "end": "2025-02-02",
+      "class": "L2",
+      "accession": "0001628280-25-013687",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000162828025013687/exhibit991fy2024q4earnings.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: For the Fourteen Weeks Ended For the Thirteen Weeks Ended February 2, 2025 January 28, 2024; shows_period misses this header."
+    },
+    {
+      "key": "WSM",
+      "end": "2026-02-01",
+      "class": "L2",
+      "accession": "0000719955-26-000030",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000071995526000030/exhibit991fy2025q4earnings.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: For the Thirteen Weeks Ended For the Fourteen Weeks Ended February 1, 2026 February 2, 2025; shows_period misses this header."
+    },
+    {
+      "key": "YEXT",
+      "end": "2017-01-31",
+      "class": "L2",
+      "accession": "0001628280-17-006152",
+      "url": "https://www.sec.gov/Archives/edgar/data/1614178/000162828017006152/ex991_q1fy18earningsreleas.htm",
+      "note": "Target NI is in quarter/week-header table 25; period wording: Three Months EndedApril 30,; shows_period misses this header."
+    },
+    {
+      "key": "ZM",
+      "end": "2019-01-31",
+      "class": "L2",
+      "accession": "0001564590-19-021917",
+      "url": "https://www.sec.gov/Archives/edgar/data/1585521/000156459019021917/zm-ex991_6.htm",
+      "note": "Target NI is in quarter/week-header table 15; period wording: Three Months Ended April 30, 2019 2018 GAAP income (loss) from operations $ 1,557 $ (1,684 ); shows_period misses this header."
+    },
+    {
+      "key": "ZS",
+      "end": "2019-07-31",
+      "class": "L2",
+      "accession": "0001713683-19-000049",
+      "url": "https://www.sec.gov/Archives/edgar/data/1713683/000171368319000049/zs-10312019991.htm",
+      "note": "Target NI is in quarter/week-header table 1; period wording: ZSCALER, INC. Condensed Consolidated Statements of Operations; shows_period misses this header."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2012-01-28",
+      "class": "L6",
+      "accession": "0001102624-12-000183",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000110262412000183/zumiezinc.htm",
+      "note": "No selected HTML release contains a structured Q4 NI table; 1 HTML item(s) were omitted or the exhibit is text-only."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2013-02-02",
+      "class": "L6",
+      "accession": "0001102624-13-000340",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000110262413000340/zumiezinc.htm",
+      "note": "No selected HTML release contains a structured Q4 NI table; 1 HTML item(s) were omitted or the exhibit is text-only."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2014-02-01",
+      "class": "L6",
+      "accession": "0001102624-14-000372",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000110262414000372/zumiezinc.htm",
+      "note": "No selected HTML release contains a structured Q4 NI table; 1 HTML item(s) were omitted or the exhibit is text-only."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2016-01-30",
+      "class": "L6",
+      "accession": "0001102624-16-002287",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000110262416002287/zumiezinc.htm",
+      "note": "No selected HTML release contains a structured Q4 NI table; 1 HTML item(s) were omitted or the exhibit is text-only."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2017-01-28",
+      "class": "L6",
+      "accession": "0001102624-17-000136",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000110262417000136/zumiezinc.htm",
+      "note": "No selected HTML release contains a structured Q4 NI table; 1 HTML item(s) were omitted or the exhibit is text-only."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2018-02-03",
+      "class": "L9",
+      "accession": "0001171843-18-002003",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184318002003/exh_991.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 0; this layout does not meet L1–L7."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2019-02-02",
+      "class": "L9",
+      "accession": "0001171843-19-001734",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184319001734/exh_991.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 0; this layout does not meet L1–L7."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2020-02-01",
+      "class": "L2",
+      "accession": "0001171843-20-004187",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184320004187/exh_991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Three Months Ended May 2, 2020 % of Sales May 4, 2019 % of Sales Net sales $ 137,772 100.0 % $ 212,928 10; shows_period misses this header."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2021-01-30",
+      "class": "L9",
+      "accession": "0001171843-21-001707",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184321001707/exh_991.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 0; this layout does not meet L1–L7."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2022-01-29",
+      "class": "L2",
+      "accession": "0001171843-22-004097",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184322004097/exh_991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: Three Months Ended April 30, 2022 % of Sales May 1, 2021 % of Sales Net sales $ 220,686 100.0 % $ 279,069; shows_period misses this header."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2023-01-28",
+      "class": "L2",
+      "accession": "0001171843-23-003691",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184323003691/exh_991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: ZUMIEZ INC.CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS(In thousands, except per share amounts)(Unaudi; shows_period misses this header."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2024-02-03",
+      "class": "L2",
+      "accession": "0001171843-24-001352",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184324001352/exh_991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: ZUMIEZ INC.CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS(In thousands, except per share amounts)(Unaudi; shows_period misses this header."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2025-02-01",
+      "class": "L2",
+      "accession": "0001171843-25-001458",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184325001458/exh_991.htm",
+      "note": "Target NI is in quarter/week-header table 0; period wording: ZUMIEZ INC. CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS (In thousands, except per share amounts) (Una; shows_period misses this header."
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2026-01-31",
+      "class": "L9",
+      "accession": "0001171843-26-001527",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184326001527/exh_991.htm",
+      "note": "Accepted NI label 'Net income' matches target in period-named table 0; this layout does not meet L1–L7."
+    },
+    {
+      "key": "ZWS",
+      "end": "2016-03-31",
+      "class": "L3",
+      "accession": "0001439288-16-000153",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928816000153/ex991q42016.htm",
+      "note": "Period table 11 matches the target under NI label 'Net income per share from continuing operations - diluted (in accordance with GAAP)', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "ZWS",
+      "end": "2017-03-31",
+      "class": "L3",
+      "accession": "0001439288-17-000034",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928817000034/ex991q42017.htm",
+      "note": "Period table 17 matches the target under NI label 'Net income from continuing operations', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "ZWS",
+      "end": "2018-03-31",
+      "class": "L3",
+      "accession": "0001439288-18-000017",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928818000017/ex991q42018.htm",
+      "note": "Period table 18 matches the target under NI label 'GAAP diluted net (loss) income per share attributable to Rexnord common stockholders', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "ZWS",
+      "end": "2019-03-31",
+      "class": "L3",
+      "accession": "0001439288-19-000018",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928819000018/ex991q42019.htm",
+      "note": "Period table 19 matches the target under NI label 'Net income from continuing operations', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "ZWS",
+      "end": "2020-03-31",
+      "class": "L3",
+      "accession": "0001439288-20-000088",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928820000088/ex991q42020.htm",
+      "note": "Period table 1 matches the target under NI label 'Net income from continuing operations', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "ZWS",
+      "end": "2022-03-31",
+      "class": "L3",
+      "accession": "0001439288-22-000055",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928822000055/ex99133122.htm",
+      "note": "Period table 2 matches the target under NI label 'Net income from continuing operations', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "ZWS",
+      "end": "2023-03-31",
+      "class": "L3",
+      "accession": "0001439288-23-000075",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928823000075/ex99133123.htm",
+      "note": "Period table 1 matches the target under NI label 'Net income from continuing operations', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "ZWS",
+      "end": "2024-03-31",
+      "class": "L3",
+      "accession": "0001439288-24-000077",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928824000077/ex991earningsrelease33124.htm",
+      "note": "Period table 1 matches the target under NI label 'Net income from continuing operations', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "ZWS",
+      "end": "2025-03-31",
+      "class": "L3",
+      "accession": "0001439288-25-000080",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928825000080/ex991earningsrelease33125.htm",
+      "note": "Period table 5 matches the target under NI label 'GAAP diluted net income per share from continuing operations', which is not accepted by the current NI label rule."
+    },
+    {
+      "key": "ZWS",
+      "end": "2026-03-31",
+      "class": "L3",
+      "accession": "0001628280-26-026279",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000162828026026279/ex991earningsrelease33126.htm",
+      "note": "Period table 1 matches the target under NI label 'Net income from continuing operations', which is not accepted by the current NI label rule."
+    }
+  ]
+}
