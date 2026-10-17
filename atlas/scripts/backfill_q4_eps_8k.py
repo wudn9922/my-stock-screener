@@ -22,6 +22,7 @@ stop at the first HTTP 403, and --budget requests per run. docs/report/fundament
 records finished tickers so the next run continues where this one stopped.
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -30,6 +31,7 @@ import sys
 import time
 from collections import Counter
 from datetime import date, timedelta
+from html import escape as html_escape
 from html.parser import HTMLParser
 from urllib import error, request
 
@@ -66,6 +68,9 @@ NON_GAAP = ("non-gaap", "non gaap", "nongaap", "adjusted", "excluding", "pro for
 NI_AVOID = ("per share", "noncontrolling", "non-controlling", "minority", "continuing", "discontinued",
             "before", "comprehensive") + NON_GAAP
 EPS_AVOID = ("weighted", "shares", "number of", "average", "continuing") + NON_GAAP   # total EPS, like the net income row
+PER_SHARE_TOKENS = ("per share", "per common share", "per diluted share", "eps", "earnings per")   # diagnose only
+HEADING_TOKENS = ("per share", "per common share", "per diluted share", "earnings per")           # diagnose only
+NON_GAAP_OR_CONTINUING = NON_GAAP + ("continuing",)                                              # diagnose only
 
 
 class Forbidden(RuntimeError):
@@ -116,6 +121,68 @@ def tables_of(text):
     parser.feed(text)
     parser.close()
     return parser.tables
+
+
+class _RawTableParser(HTMLParser):
+    """Capture the source markup for the same table sequence returned by tables_of."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.tables = []
+        self._table = None
+
+    def handle_starttag(self, tag, attrs):
+        raw = self.get_starttag_text()
+        if tag == "table":
+            # Match _TableParser's behavior for nested tables: the nested table replaces its parent.
+            self._table = [raw]
+        elif self._table is not None:
+            self._table.append(raw)
+
+    def handle_startendtag(self, tag, attrs):
+        raw = self.get_starttag_text()
+        if tag == "table":
+            self._table = [raw]
+            self.tables.append("".join(self._table))
+            self._table = None
+        elif self._table is not None:
+            self._table.append(raw)
+
+    def handle_endtag(self, tag):
+        if self._table is None:
+            return
+        self._table.append(f"</{tag}>")
+        if tag == "table":
+            self.tables.append("".join(self._table))
+            self._table = None
+
+    def handle_data(self, data):
+        if self._table is not None:
+            self._table.append(data)
+
+    def handle_entityref(self, name):
+        if self._table is not None:
+            self._table.append(f"&{name};")
+
+    def handle_charref(self, name):
+        if self._table is not None:
+            self._table.append(f"&#{name};")
+
+    def handle_comment(self, data):
+        if self._table is not None:
+            self._table.append(f"<!--{data}-->")
+
+    def handle_decl(self, decl):
+        if self._table is not None:
+            self._table.append(f"<!{decl}>")
+
+
+def html_tables_of(text):
+    """Return trimmed source <table> fragments in the same order as tables_of."""
+    parser = _RawTableParser()
+    parser.feed(text)
+    parser.close()
+    return [table.strip() for table in parser.tables]
 
 
 def number(text):
@@ -227,13 +294,8 @@ def split_factor(doc, filing_date):
     return factor
 
 
-def table_eps(table, target, end):
-    """
-    One table → (result dict, None), (None, reason) when it is the quarter but fails a check, or (None, None)
-    when it does not show this quarter's net income at all.
-    """
-    if not period_named(table, end):
-        return None, None
+def _labelled_rows(table):
+    """(lower-cased label, values) of every labelled row; the Basic / Diluted rows under a per-share heading are renamed."""
     rows, heading_left = [], 0
     for cells in table:
         label, values = row_of(cells)
@@ -249,6 +311,17 @@ def table_eps(table, target, end):
             if re.fullmatch(r"(basic|diluted)[\s:]*", low) and all(value is None or abs(value) < 1000 for value in values):
                 low = f"{low.split()[0]} earnings per share"
         rows.append((low, values))
+    return rows
+
+
+def table_eps(table, target, end):
+    """
+    One table → (result dict, None), (None, reason) when it is the quarter but fails a check, or (None, None)
+    when it does not show this quarter's net income at all.
+    """
+    if not period_named(table, end):
+        return None, None
+    rows = _labelled_rows(table)
     eps_label, eps_row = next(((label, values) for label, values in rows if is_eps(label, "diluted")),
                               (None, None))
     if eps_row is None:
@@ -292,6 +365,143 @@ def table_eps(table, target, end):
     per_share_rows = [[label, values] for label, values in rows if "per share" in label or "earnings per" in label]
     return {"epsDiluted": eps, "epsBasic": basic, "dilutedShares": diluted_shares, "scale": scale,
             "net": net, "netLabel": net_label, "epsLabel": eps_label, "perShareRows": per_share_rows[:8]}, None
+
+
+def cells_with_decimals(cells):
+    """(label, [(value, decimals)]) of one row: the same label and values as row_of, with the digits after the point."""
+    label, pairs = None, []
+    for cell in cells:
+        text = cell.strip()
+        if text in ("", "$", "(", ")", "%"):
+            continue
+        if label is None and number(text) is None and re.search(r"[A-Za-z]", text):
+            label = text
+        elif label is not None:
+            pairs.append((number(text), _decimal_places(text)))
+    return label, pairs
+
+
+def _decimal_places(text):
+    match = re.search(r"\.(\d+)", text or "")
+    return len(match.group(1)) if match else 0
+
+
+def strict_scales(value, decimals, target):
+    """Every unit scale at which the reported value matches the target within half a unit of its last shown digit."""
+    if value is None or target is None:
+        return []
+    return [scale for scale in SCALES
+            if abs(value * scale - target) <= max(NI_TOLERANCE * abs(target), 0.5 * scale * 10 ** -decimals)]
+
+
+def diluted_per_share_labels(table):
+    """Lower-cased labels of the diluted per-share rows: the EPS-table test of S1 decision §2 (diagnose only)."""
+    entries = []
+    for cells in table:
+        label, values = row_of(cells)
+        entries.append((label.lower() if label else None, values))
+    headings = [index for index, (low, values) in enumerate(entries)
+                if low and all(value is None for value in values) and any(token in low for token in HEADING_TOKENS)]
+    labels = []
+    for index, (low, _) in enumerate(entries):
+        if not low or any(word in low for word in EPS_AVOID):
+            continue
+        direct = "diluted" in low and any(token in low for token in PER_SHARE_TOKENS)
+        under_heading = re.match(r"diluted\b", low) is not None and any(h < index <= h + 4 for h in headings)
+        if direct or under_heading:
+            labels.append(low)
+    return labels
+
+
+def _diluted_avoid_labels(table):
+    """Diluted per-share rows that carry a non-GAAP or continuing-operations word (the L8 auto-negative test)."""
+    labels = []
+    for cells in table:
+        label, _ = row_of(cells)
+        low = label.lower() if label else ""
+        if "diluted" in low and any(token in low for token in PER_SHARE_TOKENS) \
+                and any(word in low for word in NON_GAAP_OR_CONTINUING):
+            labels.append(low)
+    return labels
+
+
+def header_text(table):
+    """Text of the rows before the first row with a numeric value: at most 6 rows, cut to 400 characters."""
+    rows = []
+    for cells in table:
+        _, values = row_of(cells)
+        if any(value is not None for value in values):
+            break
+        rows.append(cells)
+    text = " ".join(" ".join(cell for cell in cells if cell.strip()) for cells in rows[:6])
+    return " ".join(text.split())[:400]
+
+
+def _month_pattern(month):
+    name = MONTHS[month - 1]
+    return rf"(?:{name}|{name[:3]})"
+
+
+def variant_period(header, end):
+    """A period header that shows_period does not read but still names the quarter end (S1 decision §2, rules i to iv)."""
+    if shows_period(header, end):
+        return False
+    when = date.fromisoformat(end)
+    year = str(when.year)
+    if QUARTER_WORDING.search(header) and re.search(rf"\b{year}\b", header):
+        return True                                                           # (i)
+    month = _month_pattern(when.month)
+    if re.search(rf"\b{month}\.?\s+{when.day}\b(?!,?\s*\d{{4}})", header, re.I) and re.search(rf"\b{year}\b", header):
+        return True                                                           # (ii)
+    for match in re.finditer(r"(?<!\d)(\d{1,2})/(\d{1,2})/(\d{4}|\d{2})(?!\d)", header):
+        if int(match.group(1)) != when.month or int(match.group(2)) != when.day:
+            continue
+        written = match.group(3)
+        if (int(written) == when.year) if len(written) == 4 else (int(written) == when.year % 100):
+            return True                                                       # (iii)
+    if when.month == 1 and when.day <= 7 and re.search(r"\b(?:fourth quarter|q4|quarter)\b", header, re.I) \
+            and re.search(rf"\b{when.year - 1}\b", header):
+        return True                                                           # (iv)
+    return False
+
+
+def other_quarter_end(header, end):
+    """The header names another quarter end: a month other than the end month, or a first to third quarter."""
+    when = date.fromisoformat(end)
+    for month in range(1, 13):
+        if month == when.month or (month == 12 and when.month == 1 and when.day <= 7):
+            continue
+        if re.search(rf"\b{_month_pattern(month)}\b", header, re.I):
+            return True
+    return re.search(r"\b(?:first quarter|second quarter|third quarter|q1|q2|q3)\b", header, re.I) is not None
+
+
+def _table_evidence(table, target, end, named):
+    """The M1.3 fields of one recorded table (strict matches, EPS-table test, header wording, table_eps outcome)."""
+    strict = []
+    for row_index, cells in enumerate(table):
+        label, pairs = cells_with_decimals(cells)
+        low = label.lower() if label else ""
+        for column_index, (value, decimals) in enumerate(pairs):
+            scales = strict_scales(value, decimals, target)
+            if scales:
+                strict.append({"row": row_index, "column": column_index, "value": value, "decimals": decimals,
+                               "scales": scales, "label": label, "niLike": bool(label and NI_RE.search(low)),
+                               "acceptedNiLabel": bool(label and is_net_income(low))})
+    accepted = sorted({(match["column"], scale) for match in strict if match["acceptedNiLabel"]
+                       for scale in match["scales"]})
+    header = header_text(table)
+    eps_labels = diluted_per_share_labels(table)
+    evidence = {"strictMatches": strict, "acceptedStrictColumns": [list(pair) for pair in accepted],
+                "epsTable": bool(eps_labels), "dilutedPerShareLabels": eps_labels,
+                "dilutedAvoidLabels": _diluted_avoid_labels(table),
+                "headerText": header, "yearWording": YEAR_WORDING.search(header) is not None,
+                "tableEps": None}
+    if named and target is not None:
+        result, reason = table_eps(table, target, end)
+        evidence["tableEps"] = {"result": result is not None, "reason": reason,
+                                "epsRowFound": any(is_eps(label, "diluted") for label, _ in _labelled_rows(table))}
+    return evidence
 
 
 class Sec:
@@ -470,8 +680,11 @@ def find_quarter(sec, cik, filings, end, target, debug=None):
     return None, reason
 
 
-def diagnose_filing(sec, cik, filing, end, target):
-    """Return read-only table and document evidence for one candidate 8-K."""
+def diagnose_filing(sec, cik, filing, end, target, fixture_specs=None, texts=None):
+    """
+    Return read-only table and document evidence for one candidate 8-K. When texts is a dict, the text of every
+    document read is kept in it under (accession, document name) as (url, text); it is never written to JSON.
+    """
     accession = filing["accessionNumber"]
     base = ARCHIVE_URL.format(cik=int(cik), folder=accession.replace("-", ""))
     index_url = base + "index.json"
@@ -507,10 +720,29 @@ def diagnose_filing(sec, cik, filing, end, target):
                                         "tableCount": 0, "tables": [], "targetPresentAnywhere": False,
                                         "targetMatches": [], "rawTextMatches": []})
             continue
+        if texts is not None:
+            texts[(accession, name)] = (url, text)
         tables = tables_of(text)
         document = {"name": name, "url": url, "isExhibit": position < len(exhibits),
                     "tableCount": len(tables), "tables": [],
                     "targetMatches": [], "netIncomeTargetMatches": [], "rawTextMatches": []}
+        selected_fixtures = [spec for spec in fixture_specs or []
+                             if spec.get("accession") == accession and spec.get("document") == name]
+        raw_tables = html_tables_of(text) if selected_fixtures else []
+        for spec in selected_fixtures:
+            table_index = spec.get("tableIndex")
+            if not isinstance(table_index, int) or table_index < 0 or table_index >= len(raw_tables):
+                document.setdefault("fixtureErrors", []).append({
+                    "file": spec.get("file"), "tableIndex": table_index,
+                    "error": f"source table index unavailable; found {len(raw_tables)} tables"})
+                continue
+            source_url = spec.get("url") or url
+            document.setdefault("fixtureHtml", []).append({
+                "file": spec.get("file"), "class": spec.get("class"),
+                "key": spec.get("key"), "end": spec.get("end"),
+                "accession": accession, "document": name, "tableIndex": table_index,
+                "sourceUrl": source_url,
+                "html": f"<!-- Source URL: {source_url} -->\n{raw_tables[table_index]}"})
         for table_index, table in enumerate(tables):
             ni_labels, ni_rows, matches = [], [], []
             for row_index, cells in enumerate(table):
@@ -559,6 +791,7 @@ def diagnose_filing(sec, cik, filing, end, target):
                 prior_text = " ".join(" ".join(row) for row in prior)
                 preceding.append({"table": prior_index, "periodNamed": period_named(prior, end),
                                   "quarterWording": bool(QUARTER_WORDING.search(prior_text)),
+                                  "yearWording": YEAR_WORDING.search(header_text(prior)) is not None,
                                   "rows": short_table_rows(prior)})
                 if len(preceding) == 3:
                     break
@@ -571,6 +804,7 @@ def diagnose_filing(sec, cik, filing, end, target):
                     "targetMatches": matches,
                     "netIncomeTargetMatches": [match for match in matches if match["niLike"]],
                     "nearestPrecedingNonempty": preceding}
+            info.update(_table_evidence(table, target, end, named))
             document["tables"].append(info)
         for token in NUMBER_TOKEN.finditer(text):
             value = number(token.group(0))
@@ -581,10 +815,83 @@ def diagnose_filing(sec, cik, filing, end, target):
                                                    .replace("\n", " ")[:220]})
                 if len(document["rawTextMatches"]) >= 12:
                     break
+        document["rawStrictTextMatch"] = any(
+            strict_scales(number(token.group(0)), _decimal_places(token.group(0)), target)
+            for token in NUMBER_TOKEN.finditer(text))
         document["targetPresentAnywhere"] = bool(document["targetMatches"] or document["rawTextMatches"])
         document["netIncomeTargetPresent"] = bool(document["netIncomeTargetMatches"])
         result["documents"].append(document)
     return result, []
+
+
+TARGET_MARKER = "<!-- S1 target table -->"
+FIXTURE_FILE_CAP = 65_536          # bytes, UTF-8, whole fixture file
+FIXTURE_TOTAL_CAP = 1_200_000      # bytes of exported fixture HTML in one run
+KEPT_ATTRIBUTES = ("colspan", "rowspan")
+VOID_TAGS = frozenset(("area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source",
+                       "track", "wbr"))
+
+
+class _TrimParser(HTMLParser):
+    """Rebuilds markup: no attributes except colspan and rowspan; comments and declarations are dropped."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.out = []
+
+    def handle_starttag(self, tag, attrs):
+        kept = "".join(f' {name}="{html_escape(value, quote=True)}"' for name, value in attrs
+                       if name in KEPT_ATTRIBUTES and value is not None)
+        self.out.append(f"<{tag}{kept}>")
+
+    def handle_endtag(self, tag):
+        if tag not in VOID_TAGS:
+            self.out.append(f"</{tag}>")
+
+    def handle_data(self, data):
+        self.out.append(data)
+
+    def handle_entityref(self, name):
+        self.out.append(f"&{name};")
+
+    def handle_charref(self, name):
+        self.out.append(f"&#{name};")
+
+
+def trim_table_html(raw):
+    """One source table fragment with its tags stripped of attributes (colspan and rowspan kept); text unchanged."""
+    parser = _TrimParser()
+    parser.feed(raw)
+    parser.close()
+    return "".join(parser.out).strip()
+
+
+def export_fixture(text, url, table_indices, target_index):
+    """
+    Fixture for one row → (html, None), or (None, reason) for a fixtureError. The fixture starts with the source URL,
+    then the tables of table_indices in ascending order, each trimmed, with TARGET_MARKER on the line before the
+    target table. It is refused when it is over FIXTURE_FILE_CAP or its round trip fails: the tables it parses to
+    must equal the source tables at table_indices, cell for cell, and the source must have as many raw table
+    fragments as parsed tables.
+    """
+    source = tables_of(text)
+    raw = html_tables_of(text)
+    if len(raw) != len(source):
+        return None, "round trip: raw and parsed table counts differ"
+    indices = sorted(table_indices)
+    if not indices or indices[0] < 0 or indices[-1] >= len(source) or target_index not in indices:
+        return None, "table index unavailable"
+    lines = [f"<!-- Source URL: {url} -->"]
+    for index in indices:
+        if index == target_index:
+            lines.append(TARGET_MARKER)
+        lines.append(trim_table_html(raw[index]))
+    fixture = "\n".join(lines) + "\n"
+    if len(fixture.encode("utf-8")) > FIXTURE_FILE_CAP:
+        return None, "too large"
+    if tables_of(fixture) != [source[index] for index in indices]:
+        return None, "round trip failed"
+    return fixture, None
 
 
 def layout_class_hint(diagnosis):
@@ -621,7 +928,7 @@ def layout_class_hint(diagnosis):
     return "L9"
 
 
-def diagnose_quarter(sec, cik, filings, key, end, target):
+def diagnose_quarter(sec, cik, filings, key, end, target, fixture_specs=None, texts=None):
     """Inspect the same nearest Item 2.02 filings and documents used by find_quarter."""
     candidates = candidate_filings(filings, date.fromisoformat(end))[:MAX_FILINGS]
     result = {"key": key, "end": end, "targetNetIncome": target,
@@ -631,11 +938,175 @@ def diagnose_quarter(sec, cik, filings, key, end, target):
         result["hintNote"] = "No 8-K with Item 2.02 was found inside FILING_DAYS and MAX_FILINGS."
         return result, []
     for filing in candidates:
-        detail, _ = diagnose_filing(sec, cik, filing, end, target)
+        detail, _ = diagnose_filing(sec, cik, filing, end, target, fixture_specs, texts)
         result["candidateFilings"].append(detail)
     result["classHint"] = layout_class_hint(result)
     result["hintNote"] = "Heuristic only; assign the final S1 class after reviewing the tables and filing text."
     return result, []
+
+
+EDGAR_BROWSE = "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={cik}&type=8-K"
+S1_CLASS_NAMES = {"L1": "period-in-earlier-table", "L2": "period-wording", "L3": "ni-label", "L4": "ni-value",
+                  "L5": "no-quarter-column", "L6": "not-html-table", "L7": "no-release", "L8": "eps-row",
+                  "L9": "other", "L10": "check-reject"}
+
+
+def _clip(text, limit=300):
+    return " ".join(str(text).split())[:limit]
+
+
+def _classified(cls, note, accession=None, document=None, url=None, table=None, table_indices=None, eps_reason=None):
+    if table_indices is None:
+        table_indices = [] if table is None else [table]
+    return {"class": cls, "accession": accession, "document": document, "url": url, "tableIndex": table,
+            "tableIndices": list(table_indices), "tableEpsReason": eps_reason, "note": _clip(note)}
+
+
+def _classified_row(record):
+    record["classification"] = classify_row(record)
+    return record
+
+
+def classify_row(row):
+    """
+    S1 class of one diagnosed row, computed from its JSON evidence only (no SEC access, no stored text). The rules
+    are tried in order and the first that holds gives the class; the first table that satisfies it is the evidence.
+    """
+    cik = row.get("cik")
+    browse = EDGAR_BROWSE.format(cik=cik) if cik is not None else None
+    hint = row.get("hintNote") or "input missing"
+    if row.get("targetNetIncome") is None or cik is None:
+        return _classified("L9", hint, url=browse)
+    filings = row.get("candidateFilings") or []
+    if not filings:
+        return _classified("L7", "no candidate filing: " + hint, url=browse)
+    first = filings[0]
+    end = row.get("end")
+    pairs = [(filing, document) for filing in filings for document in filing.get("documents") or []]
+    located = [(filing, document, table) for filing, document in pairs for table in document.get("tables") or []]
+
+    def found(cls, filing, document, table, note, table_indices=None, eps_reason=None):
+        return _classified(cls, note, accession=filing.get("accession"), document=document.get("name"),
+                           url=document.get("url") or filing.get("filingUrl") or browse, table=table["table"],
+                           table_indices=table_indices, eps_reason=eps_reason)
+
+    def where(document, table):
+        return f"table {table['table']} of {document.get('name')}"
+
+    # rule 2 (L6): no candidate document holds an HTML table
+    if not any((document.get("tableCount") or 0) > 0 for _, document in pairs):
+        return _classified("L6", f"no HTML table in any of the {len(pairs)} documents of the candidate filings",
+                           accession=first.get("accession"), url=first.get("filingUrl") or browse)
+    # rule 3 (L10): period-named EPS table, accepted net income, table_eps rejects it with a reason
+    for filing, document, table in located:
+        eps = table.get("tableEps") or {}
+        if (table.get("periodNamed") and table.get("epsTable") and table.get("acceptedStrictColumns")
+                and eps.get("result") is False and eps.get("reason")):
+            return found("L10", filing, document, table,
+                         f"{where(document, table)}: period-named EPS table; net income matches under an accepted "
+                         f"label and table_eps rejects it ({eps['reason']})", eps_reason=eps["reason"])
+    # rule 4 (L8): period-named EPS table, one accepted net income column, no diluted per-share row read
+    for filing, document, table in located:
+        eps = table.get("tableEps") or {}
+        accepted = table.get("acceptedStrictColumns") or []
+        if (table.get("periodNamed") and table.get("epsTable") and len(accepted) == 1 and eps
+                and eps.get("reason") is None and eps.get("epsRowFound") is False):
+            column, scale = accepted[0]
+            return found("L8", filing, document, table,
+                         f"{where(document, table)}: period-named EPS table; net income matches in column {column} "
+                         f"at scale {scale:g}, and no diluted per-share row was read")
+    # rule 5 (L3): period-named EPS table, net income only under a label that is not accepted
+    for filing, document, table in located:
+        if table.get("periodNamed") and table.get("epsTable") and not table.get("acceptedStrictColumns"):
+            for match in table.get("strictMatches") or []:
+                label = match.get("label") or ""
+                if not match.get("acceptedNiLabel") and re.search(r"income|earnings|profit|loss", label, re.I):
+                    return found("L3", filing, document, table,
+                                 f"{where(document, table)}: period-named EPS table; net income matches only under "
+                                 f"label '{label}', which is not an accepted net income label")
+    # rule 6 (L1): net income in a table with no period header, and a period with quarter wording above it
+    for filing, document, table in located:
+        if table.get("periodNamed") or not table.get("acceptedStrictColumns"):
+            continue
+        nearest = (table.get("nearestPrecedingNonempty") or [])[:3]
+        period = next((prior for prior in nearest if prior.get("periodNamed") and prior.get("quarterWording")), None)
+        if period is not None:
+            indices = sorted([prior["table"] for prior in nearest] + [table["table"]])
+            return found("L1", filing, document, table,
+                         f"{where(document, table)}: net income matches with no period header; table "
+                         f"{period['table']} above it names the period with quarter wording",
+                         table_indices=indices)
+    # rule 7 (L2): net income in a table whose own header names the quarter in a variant form and no other quarter
+    for filing, document, table in located:
+        if table.get("periodNamed") or not table.get("acceptedStrictColumns"):
+            continue
+        header = table.get("headerText") or ""
+        if variant_period(header, end) and not other_quarter_end(header, end):
+            return found("L2", filing, document, table,
+                         f"{where(document, table)}: net income matches; header '{header[:120]}' names the quarter "
+                         f"ending {end} in a variant form and no other quarter end")
+    # rule 8 (L5): the layout_class_hint condition, unchanged: every recorded table is year wording without quarter
+    if located and all(YEAR_WORDING.search(" ".join(str(x) for x in table.get("rows", [])))
+                       and not table.get("quarterWording") for _, _, table in located):
+        filing, document, table = located[0]
+        return found("L5", filing, document, table,
+                     f"{where(document, table)}: every recorded table names a year period without quarter wording")
+    # rule 9 (L4): no strict match in any table and no strict match in the raw text
+    if (not any(table.get("strictMatches") for _, _, table in located)
+            and not any(document.get("rawStrictTextMatch") for _, document in pairs)):
+        closest = None
+        for filing, document, table in located:
+            for ni_row in table.get("niRows") or []:
+                candidate = ni_row.get("closestToTarget")
+                if candidate and (closest is None or candidate["relativeDifference"] < closest[0]["relativeDifference"]):
+                    closest = (candidate, ni_row.get("label"), filing, document, table)
+        if closest is not None:
+            candidate, label, filing, document, table = closest
+            return found("L4", filing, document, table,
+                         f"no strict net income match in any table; closest net income-like value "
+                         f"{candidate['scaledValue']:,.0f} (relative difference {candidate['relativeDifference']:.4f}) "
+                         f"under label '{label}' in {where(document, table)}")
+        filing, document = pairs[0]
+        return _classified("L4", f"no strict net income match, and no net income-like row in any table of "
+                                 f"{document.get('name')}", accession=filing.get("accession"),
+                           document=document.get("name"), url=document.get("url") or browse)
+    # rule 10 (L9): anything else; the first sub-case that applies gives the note
+    for filing, document, table in located:                                       # (a)
+        if (table.get("acceptedStrictColumns") and not table.get("periodNamed")
+                and not any(prior.get("periodNamed") for prior in (table.get("nearestPrecedingNonempty") or [])[:3])):
+            return found("L9", filing, document, table,
+                         f"(a) {where(document, table)}: accepted net income match with no period header in this table "
+                         f"or the 3 tables before it; header '{(table.get('headerText') or '')[:120]}'")
+    for filing, document, table in located:                                       # (b)
+        if table.get("periodNamed") and not table.get("epsTable") and table.get("acceptedStrictColumns"):
+            return found("L9", filing, document, table,
+                         f"(b) {where(document, table)}: net income is only in a period-named table without EPS rows")
+    for filing, document, table in located:                                       # (c)
+        eps = table.get("tableEps") or {}
+        if (table.get("periodNamed") and table.get("epsTable") and len(table.get("acceptedStrictColumns") or []) > 1
+                and eps and not eps.get("epsRowFound")):
+            return found("L9", filing, document, table,
+                         f"(c) {where(document, table)}: net income matches in more than one column of a period-named "
+                         f"EPS table with no diluted row")
+    for filing, document, table in located:                                       # (d)
+        for match in table.get("strictMatches") or []:
+            if not match.get("acceptedNiLabel"):
+                return found("L9", filing, document, table,
+                             f"(d) {where(document, table)}: strict match only under label '{match.get('label')}', "
+                             f"which is not an accepted net income label")
+    if not any(table.get("strictMatches") for _, _, table in located):
+        for filing, document in pairs:
+            if document.get("rawStrictTextMatch"):
+                return _classified("L9", f"(d) {document.get('name')}: strict match only in raw text, not in a "
+                                         f"table cell", accession=filing.get("accession"),
+                                   document=document.get("name"), url=document.get("url") or browse)
+    filing, document = next(((f, d) for f, d, t in located if t.get("strictMatches") or t.get("periodNamed")),
+                            pairs[0])
+    strict_tables = [t["table"] for t in document.get("tables") or [] if t.get("strictMatches")]
+    period_tables = [t["table"] for t in document.get("tables") or [] if t.get("periodNamed")]
+    return _classified("L9", f"(e) {document.get('name')}: strict-match tables {strict_tables}, period-named tables "
+                             f"{period_tables}; no sub-case (a) to (d) applies", accession=filing.get("accession"),
+                       document=document.get("name"), url=document.get("url") or browse)
 
 
 def source_target(doc, end):
@@ -650,15 +1121,196 @@ def source_target(doc, end):
     return None
 
 
+POSITIVE_CLASSES = ("L1", "L2", "L3", "L8")
+FALLBACK_KINDS = ("next-quarter-table", "period-named-non-eps-ni")
+NEGATIVE_TEXT = {
+    "L1-year-header": "a twelve-month or year header is not the quarter, and no quarter column is read",
+    "L8-non-gaap-diluted-row": "a non-GAAP or continuing diluted row is not the EPS row",
+    "next-quarter-table": "a next-quarter header is not the target quarter (slack and L2)",
+    "period-named-non-eps-ni": "net income in a period-named table with no EPS row is not an EPS row",
+}
+
+
+def load_selection(path):
+    """The fixture manifest (S1 plan §M5). Without a manifest nothing is selected."""
+    if not path:
+        return {"autoPositives": {}, "explicitNegatives": [], "autoNegatives": []}
+    with open(path, encoding="utf-8") as source:
+        data = json.load(source)
+    return {"autoPositives": data.get("autoPositives") or {},
+            "explicitNegatives": data.get("explicitNegatives") or [],
+            "autoNegatives": data.get("autoNegatives") or []}
+
+
+def _auto_matches(record):
+    """Tables of one diagnosed row that meet an auto-negative or fallback rule: (kind, accession, document, url, indices, target)."""
+    found = []
+    end = record.get("end")
+    for filing in record.get("candidateFilings") or []:
+        for document in filing.get("documents") or []:
+            for table in document.get("tables") or []:
+                accepted = table.get("acceptedStrictColumns") or []
+                eps = table.get("tableEps") or {}
+                nearest = (table.get("nearestPrecedingNonempty") or [])[:3]
+                target = table["table"]
+                place = (filing.get("accession"), document.get("name"), document.get("url"))
+                period = next((prior for prior in nearest if prior.get("periodNamed")), None)
+                if not table.get("periodNamed") and accepted and period is not None \
+                        and period.get("yearWording") and not period.get("quarterWording"):
+                    found.append(("L1-year-header", *place,
+                                  sorted([prior["table"] for prior in nearest] + [target]), target))
+                if (table.get("periodNamed") and len(accepted) == 1 and eps and eps.get("epsRowFound") is False
+                        and table.get("dilutedAvoidLabels")):
+                    found.append(("L8-non-gaap-diluted-row", *place, [target], target))
+                if accepted and other_quarter_end(table.get("headerText") or "", end):
+                    found.append(("next-quarter-table", *place, [target], target))
+                if table.get("periodNamed") and not table.get("epsTable") and accepted:
+                    found.append(("period-named-non-eps-ni", *place, [target], target))
+    return found
+
+
+def _entry(record, kind, role, cls, accession, document, url, indices, target, texts,
+           negative_for=None, must_reject=None, auto_kind=None):
+    """One fixture candidate of a row, exported from the document text kept for that row."""
+    held = texts.get((accession, document))
+    entry = {"kind": kind, "autoKind": auto_kind, "role": role, "key": record["key"], "end": record["end"],
+             "class": cls, "negativeFor": negative_for, "mustReject": must_reject, "accession": accession,
+             "document": document, "url": held[0] if held else url, "tableIndices": sorted(indices),
+             "targetTableIndex": target, "storedEps": record.get("storedEps"), "html": None, "fixtureError": None}
+    if held is None:
+        entry["fixtureError"] = "document text is not among this row's candidate filings"
+    else:
+        entry["html"], entry["fixtureError"] = export_fixture(held[1], held[0], indices, target)
+    return entry
+
+
+def _row_candidates(record, texts, selection):
+    """Every fixture candidate of one diagnosed row: its positive, its explicit negatives and its auto-negative tables."""
+    key, end = record["key"], record["end"]
+    cls = (record.get("classification") or {}).get("class")
+    found = []
+    classification = record.get("classification") or {}
+    if cls in POSITIVE_CLASSES and classification.get("accession") and classification.get("document"):
+        found.append(_entry(record, "positive", "positive", cls, classification["accession"],
+                            classification["document"], classification.get("url"), classification["tableIndices"],
+                            classification["tableIndex"], texts))
+    for spec in selection["explicitNegatives"]:
+        if str(spec.get("key", "")).upper() == key and spec.get("end") == end:
+            indices = sorted(spec["tableIndices"])
+            found.append(_entry(record, "explicit", "negative", cls, spec["accession"], spec["document"], None,
+                                indices, indices[-1], texts, negative_for=spec["negativeFor"],
+                                must_reject=spec.get("mustReject")))
+    for kind, accession, document, url, indices, target in _auto_matches(record):
+        found.append(_entry(record, "auto", "negative", cls, accession, document, url, indices, target, texts,
+                            negative_for=kind, must_reject=NEGATIVE_TEXT[kind], auto_kind=kind))
+    return found
+
+
+def _error_entry(key, end, kind, role, negative_for, accession, document, error):
+    return {"kind": kind, "autoKind": negative_for, "role": role, "key": key, "end": end, "class": None,
+            "negativeFor": negative_for, "mustReject": None, "accession": accession, "document": document,
+            "url": None, "tableIndices": [], "targetTableIndex": None, "storedEps": None, "html": None,
+            "fixtureError": error}
+
+
+def select_fixtures(pool, selection):
+    """
+    Chooses the fixtures to write (S1 plan §M5) → (fixtures, fixtureErrors). Explicit negatives are written as listed.
+    Positives: per class in L1, L2, L3, L8, the candidates sorted by (key, end), one per ticker; first those whose
+    ticker is already selected (seeded with the explicit negatives' tickers), then the rest; a candidate with a
+    fixture error is skipped. Auto-negatives: the first row in (key, end) order for each kind in autoNegatives, or
+    the next unused fallback kind. The total is at most FIXTURE_TOTAL_CAP.
+    """
+    fixtures, total = [], [0]
+    selected = {spec["key"] for spec in selection["explicitNegatives"]}
+
+    def accept(entry):
+        if entry["html"] is None or entry["fixtureError"]:
+            return False
+        size = len(entry["html"].encode("utf-8"))
+        if total[0] + size > FIXTURE_TOTAL_CAP:
+            entry["fixtureError"] = "exported fixture HTML would exceed 1.2 MB in total"
+            return False
+        total[0] += size
+        fixtures.append(entry)
+        return True
+
+    def in_order(entries):
+        return sorted(entries, key=lambda entry: (entry["key"], entry["end"]))
+
+    for spec in selection["explicitNegatives"]:
+        matches = [entry for entry in pool if entry["kind"] == "explicit" and entry["key"] == str(spec["key"]).upper()
+                   and entry["end"] == spec["end"] and entry["accession"] == spec["accession"]
+                   and entry["document"] == spec["document"]]
+        if not matches:
+            pool.append(_error_entry(spec["key"], spec["end"], "explicit", "negative", spec.get("negativeFor"),
+                                     spec["accession"], spec["document"], "explicit negative was not read in this run"))
+            continue
+        accept(matches[0])
+    for cls in POSITIVE_CLASSES:
+        wanted = int(selection["autoPositives"].get(cls) or 0)
+        candidates = in_order(entry for entry in pool if entry["kind"] == "positive" and entry["class"] == cls)
+        picked, picked_keys = 0, set()
+        for pass_number in (1, 2):
+            for entry in candidates:
+                if picked >= wanted:
+                    break
+                if entry["key"] in picked_keys or entry["fixtureError"] or entry["html"] is None:
+                    continue
+                if (entry["key"] in selected) != (pass_number == 1):
+                    continue
+                if accept(entry):
+                    picked += 1
+                    picked_keys.add(entry["key"])
+                    selected.add(entry["key"])
+    used = set()
+    for kind in selection["autoNegatives"]:
+        candidates = in_order(entry for entry in pool if entry["kind"] == "auto" and entry["autoKind"] == kind)
+        if any(accept(entry) for entry in candidates):
+            continue
+        for fallback in FALLBACK_KINDS:
+            if fallback in used:
+                continue
+            candidates = in_order(entry for entry in pool if entry["kind"] == "auto" and entry["autoKind"] == fallback
+                                  and not (fallback == "next-quarter-table" and entry["key"] == "TXT"))
+            chosen = next((entry for entry in candidates if accept(entry)), None)
+            if chosen is not None:
+                chosen["negativeFor"] = fallback
+                chosen["mustReject"] = f"{NEGATIVE_TEXT[fallback]}; used because {kind} was not found"
+                used.add(fallback)
+                break
+        else:
+            pool.append(_error_entry("", "", "auto", "negative", kind, None, None,
+                                     "auto-negative not found and no fallback kind left"))
+    records = []
+    for entry in fixtures:
+        name = (f"{entry['key']}-{entry['end']}-{entry['class']}.html" if entry["role"] == "positive"
+                else f"{entry['key']}-{entry['end']}-{entry['negativeFor']}-negative.html")
+        records.append({"file": name, "key": entry["key"], "end": entry["end"], "class": entry["class"],
+                        "role": entry["role"], "negativeFor": entry["negativeFor"],
+                        "mustReject": entry["mustReject"], "accession": entry["accession"],
+                        "document": entry["document"], "url": entry["url"],
+                        "tableIndices": entry["tableIndices"], "targetTableIndex": entry["targetTableIndex"],
+                        "bytes": None, "sha256": None, "roundTrip": True, "storedEps": entry["storedEps"],
+                        "epsDilutedRead": None, "html": entry["html"]})
+    errors = [{"key": entry["key"], "end": entry["end"], "class": entry["class"], "role": entry["role"],
+               "negativeFor": entry["negativeFor"], "accession": entry["accession"], "document": entry["document"],
+               "error": entry["fixtureError"]}
+              for entry in pool if entry.get("fixtureError")]
+    return records, errors
+
+
 def run_diagnose(args, sec):
     """Diagnose the no-table rows from a prior report; never writes financials or state."""
     with open(args.source_report, encoding="utf-8") as source:
         previous = json.load(source)
+    fixture_selection_path = getattr(args, "fixture_selection", "")
+    selection = load_selection(fixture_selection_path)
     all_source_rows = [row for row in previous.get("rows", [])
                        if row.get("reason") == "no table shows this quarter's net income"]
     source_rows = all_source_rows
     cik_of = seed.parse_ticker_map(sec.get_json(TICKERS_URL) or {})
-    filings_by_key, doc_by_key, rows = {}, {}, []
+    filings_by_key, doc_by_key, rows, pool = {}, {}, [], []
     stop = None
     for item in source_rows:
         key, end = str(item.get("key", "")).upper(), item.get("end")
@@ -667,33 +1319,39 @@ def run_diagnose(args, sec):
             doc_by_key[key] = seed.read_json(path) if os.path.isfile(path) else None
         doc = doc_by_key[key]
         target = source_target(doc, end) if isinstance(doc, dict) else None
+        cik = cik_of.get(key)
         record = {"key": key, "end": end, "storedEps": item.get("stored"),
                   "sourceReason": item.get("reason"), "inputDebugPresent": "debug" in item,
-                  "targetNetIncome": target}
-        cik = cik_of.get(key)
+                  "targetNetIncome": target, "cik": cik}
         if not isinstance(doc, dict) or target is None:
             record.update(classHint="L9", hintNote="Financials file or Q4 netIncome target is missing.",
                           candidateFilingCount=0, candidateFilings=[])
-            rows.append(record)
+            rows.append(_classified_row(record))
             continue
         if cik is None:
             record.update(classHint="L9", hintNote="Ticker is missing from the SEC company ticker map.",
                           candidateFilingCount=0, candidateFilings=[])
-            rows.append(record)
+            rows.append(_classified_row(record))
             continue
         try:
             if key not in filings_by_key:
                 filings_by_key[key] = filing_rows(sec, cik) if cik is not None else []
-            diagnosis, _ = diagnose_quarter(sec, cik, filings_by_key[key], key, end, target)
+            texts = {}                      # document texts of this row only; dropped once its candidates are built
+            diagnosis, _ = diagnose_quarter(sec, cik, filings_by_key[key], key, end, target, texts=texts)
             record.update(diagnosis)
-            rows.append(record)
+            rows.append(_classified_row(record))
+            pool.extend(_row_candidates(record, texts, selection))
         except (OutOfBudget, Forbidden, NetworkError) as exc:
             stop = f"{type(exc).__name__}: {exc}"
             break
     hints = Counter(row.get("classHint", "L9") for row in rows)
+    fixtures, fixture_errors = select_fixtures(pool, selection)
     return {"mode": "diagnose", "sourceReport": os.path.relpath(args.source_report, REPO),
             "sourceRows": len(all_source_rows), "selectedSourceRows": len(source_rows),
             "diagnosed": len(rows), "classHintCounts": dict(sorted(hints.items())),
+            "fixtureSelection": os.path.relpath(fixture_selection_path, REPO) if fixture_selection_path else None,
+            "fixtureCount": len(fixtures), "fixtureErrors": fixture_errors, "fixtures": fixtures,
+            "devTickers": sorted({fixture["key"] for fixture in fixtures}),
             "stopped": stop, "requests": sec.requests, "rows": rows}
 
 
@@ -899,6 +1557,78 @@ def run(args, sec):
     return report
 
 
+def _inside_repo(path):
+    real, root = os.path.realpath(path), os.path.realpath(REPO)
+    return real == root or real.startswith(root + os.sep)
+
+
+def build_s1_classes(report, env=None):
+    """The s1-classes.json document (plan §M4): one record per diagnosed row, class counts and dispositions."""
+    env = os.environ if env is None else env
+    records = sorted(({"key": row.get("key"), "end": row.get("end"),
+                       "class": (row.get("classification") or {}).get("class"),
+                       "accession": (row.get("classification") or {}).get("accession"),
+                       "url": (row.get("classification") or {}).get("url"),
+                       "tableIndex": (row.get("classification") or {}).get("tableIndex"),
+                       "tableEpsReason": (row.get("classification") or {}).get("tableEpsReason"),
+                       "note": (row.get("classification") or {}).get("note")}
+                      for row in report.get("rows") or []),
+                     key=lambda record: (record["key"] or "", record["end"] or ""))
+    counts = {cls: 0 for cls in S1_CLASS_NAMES}
+    for record in records:
+        counts[record["class"]] = counts.get(record["class"], 0) + 1
+    fixtures = report.get("fixtures") or []
+    positives = Counter(item.get("class") for item in fixtures if item.get("role") == "positive")
+    dispositions = {"L1": "S2 handles", "L2": "S2 handles", "L3": "S2 handles", "L8": "S2 handles",
+                    "L4": "out of scope", "L5": "out of scope", "L6": "out of scope", "L7": "out of scope",
+                    "L10": "out of scope", "L9": "needs Opus"}
+    classes = {}
+    for cls in S1_CLASS_NAMES:
+        disposition = dispositions[cls]
+        if disposition == "S2 handles" and positives[cls] < 2:
+            disposition = "out of scope"
+        examples = [record["url"] for record in records if record["class"] == cls and record["url"]][:2]
+        classes[cls] = {"name": S1_CLASS_NAMES[cls], "count": counts[cls], "examples": examples,
+                        "disposition": disposition}
+    row_count = len(records)
+    other = counts.get("L9", 0)
+    run_id = env.get("GITHUB_RUN_ID")
+    return {"schemaVersion": 2, "generator": "classify_row",
+            "status": "complete" if report.get("diagnosed") == report.get("sourceRows") and not report.get("stopped")
+            else "incomplete",
+            "diagnoseRun": {"runId": int(run_id) if run_id and run_id.isdigit() else None,
+                            "mainCommit": env.get("GITHUB_SHA") or None,
+                            "requests": report.get("requests"), "stopped": report.get("stopped")},
+            "sourceReport": report.get("sourceReport"), "sourceRows": report.get("sourceRows"),
+            "rowCount": row_count, "classCounts": counts,
+            "otherLimit": {"limit": row_count // 10, "count": other, "passed": other <= row_count // 10},
+            "classes": classes,
+            "devTickers": sorted({str(item.get("key")) for item in fixtures}),
+            "fixtureCount": len(fixtures), "fixtureErrors": report.get("fixtureErrors") or [],
+            "rows": records}
+
+
+def write_diagnose_outputs(report, out_dir):
+    """Writes s1-classes.json, fixtures/*.html and fixtures/s1_fixtures.json under out_dir and nothing else."""
+    fixtures_dir = os.path.join(out_dir, "fixtures")
+    os.makedirs(fixtures_dir, exist_ok=True)
+    manifest = []
+    for item in report.get("fixtures") or []:
+        data = item["html"].encode("utf-8")
+        with open(os.path.join(fixtures_dir, item["file"]), "wb") as file:
+            file.write(data)
+        record = {key: value for key, value in item.items() if key != "html"}
+        record.update(bytes=len(data), sha256=hashlib.sha256(data).hexdigest())
+        manifest.append(record)
+    with open(os.path.join(fixtures_dir, "s1_fixtures.json"), "w", encoding="utf-8") as file:
+        json.dump({"schemaVersion": 2, "devTickers": sorted({str(r.get("key")) for r in manifest}),
+                   "fixtures": manifest}, file, ensure_ascii=False, indent=2)
+        file.write("\n")
+    with open(os.path.join(out_dir, "s1-classes.json"), "w", encoding="utf-8") as file:
+        json.dump(build_s1_classes(dict(report, fixtures=manifest)), file, ensure_ascii=False, indent=2)
+        file.write("\n")
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Q4 EPS from 8-K earnings releases (see module docstring)")
     parser.add_argument("--mode", choices=("diagnose", "backtest", "fill"), default="backtest")
@@ -908,11 +1638,24 @@ def parse_args(argv=None):
     parser.add_argument("--report", default="", help="also write the report JSON to this path")
     parser.add_argument("--source-report", default=DIAGNOSE_SOURCE,
                         help="backtest report whose no-table rows are inspected in diagnose mode")
+    parser.add_argument("--fixture-selection", default="",
+                        help="optional JSON manifest selecting SEC table HTML to include in diagnose output")
+    parser.add_argument("--out-dir", default="",
+                        help="diagnose only: write s1-classes.json and fixtures/ here (must be outside the repository)")
+    parser.add_argument("--verbose-report", default="",
+                        help="diagnose only: write the full per-row evidence JSON to this path")
     return parser.parse_args(argv)
 
 
 def main(argv=None):
     args = parse_args(argv)
+    if args.out_dir:
+        if args.mode != "diagnose":
+            print("--out-dir is only valid with --mode diagnose", file=sys.stderr, flush=True)
+            return 2
+        if _inside_repo(args.out_dir):
+            print("--out-dir must be outside the repository; nothing was fetched", file=sys.stderr, flush=True)
+            return 2
     configured = (os.environ.get("SEC_USER_AGENT") or "").strip()
     user_agent = seed.resolve_user_agent({"SEC_USER_AGENT": configured} if configured else {})
     sec = Sec(user_agent, budget=args.budget)
@@ -936,8 +1679,19 @@ def main(argv=None):
             print(f"STOPPED: SEC could not be reached ({exc}); re-run later.", flush=True)
         return 2
     if args.mode == "diagnose":
-        # stdout may be redirected by Actions to an artifact path; the script itself stays read-only.
-        print(json.dumps(report, ensure_ascii=False, indent=2), flush=True)
+        # stdout may be redirected by Actions to an artifact path; the script itself writes only --out-dir and
+        # --verbose-report, and only when they are given.
+        if args.verbose_report:
+            with open(args.verbose_report, "w", encoding="utf-8") as file:
+                json.dump({key: value for key, value in report.items() if key != "fixtures"}, file,
+                          ensure_ascii=False, indent=2)
+                file.write("\n")
+        if args.out_dir:
+            write_diagnose_outputs(report, args.out_dir)
+            printed = {key: value for key, value in report.items() if key not in ("rows", "fixtures")}
+        else:
+            printed = report
+        print(json.dumps(printed, ensure_ascii=False, indent=2), flush=True)
     else:
         text = json.dumps(report, ensure_ascii=False, indent=2)
         if args.report:

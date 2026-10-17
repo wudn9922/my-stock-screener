@@ -1,8 +1,10 @@
 name: Q4 EPS from 8-K (manual)
+run-name: "q4-8k ${{ inputs.mode }}"
 
 # 手動執行：用 8-K 財報新聞稿（EX-99.1）補美股缺漏的第四季 EPS。
 # backtest：只用已有的第四季 EPS 檢查解析器，不寫檔，報告上傳為 artifact。
 # fill：只補空值，結果提交到分支 backfill/q4-8k，由人工審核後再合併；不會直接改 main。
+# diagnose / backtest 的報告另提交到孤立分支 runs/q4-8k 的 docs/report/q4-8k/runs/<run_id>/，不會改 main。
 # 不呼叫任何 AI 服務，不使用 Claude／Codex 額度。
 
 on:
@@ -39,6 +41,7 @@ jobs:
       BUDGET: ${{ inputs.budget }}
       SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
       BRANCH: backfill/q4-8k
+      RUNS_BRANCH: runs/q4-8k
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,15 +65,20 @@ jobs:
           python-version: "3.12"
 
       - name: Run extraction
+        id: extract
         run: |
+          OUT="$RUNNER_TEMP/out"
+          mkdir -p "$OUT"
           args=(--mode "$MODE" --budget "$BUDGET")
           if [ -n "$TICKERS" ] && [ "$MODE" != diagnose ]; then args+=(--tickers "$TICKERS"); fi
           if [ "$MODE" = diagnose ]; then
             args+=(--source-report docs/report/q4-8k/input/run-17/q4-8k-report.json)
-            python -B -u atlas/scripts/backfill_q4_eps_8k.py "${args[@]}" > "$RUNNER_TEMP/q4-8k-report.json"
+            args+=(--fixture-selection tests/fixtures/q4_8k/s1_fixture_selection.json)
+            args+=(--out-dir "$OUT" --verbose-report "$OUT/verbose.json")
+            python -B -u atlas/scripts/backfill_q4_eps_8k.py "${args[@]}" > "$OUT/summary.json"
           else
-            args+=(--report "$RUNNER_TEMP/q4-8k-report.json")
-            python -u atlas/scripts/backfill_q4_eps_8k.py "${args[@]}"
+            args+=(--report "$OUT/q4-8k-report.json")
+            python -u atlas/scripts/backfill_q4_eps_8k.py "${args[@]}" | tee "$OUT/summary.json"
           fi
 
       - name: Upload report
@@ -78,8 +86,90 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: q4-8k-report-${{ inputs.mode }}
-          path: ${{ runner.temp }}/q4-8k-report.json
+          path: |
+            ${{ runner.temp }}/out/summary.json
+            ${{ runner.temp }}/out/s1-classes.json
+            ${{ runner.temp }}/out/fixtures/
+            ${{ runner.temp }}/out/q4-8k-report.json
           if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Commit report to runs branch (diagnose and backtest only)
+        if: always() && inputs.mode != 'fill'
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          EXTRACT_OUTCOME: ${{ steps.extract.outcome }}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/out"
+          [ -d "$OUT" ] || { echo "No output directory; nothing to commit"; exit 0; }
+          dest="docs/report/q4-8k/runs/$RUN_ID"
+          wt="$RUNNER_TEMP/runs-wt"
+          main_sha="$(git rev-parse HEAD)"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin "$RUNS_BRANCH" >/dev/null 2>&1; then
+            git fetch -q origin "$RUNS_BRANCH"
+            git worktree add -q --detach "$wt" FETCH_HEAD
+          else
+            git worktree add -q --orphan -b "$RUNS_BRANCH" "$wt"
+          fi
+          mkdir -p "$wt/$dest"
+          python3 - "$OUT" "$wt/$dest" "$main_sha" <<'PY'
+          import gzip, hashlib, json, os, sys
+          out, dest, main_sha = sys.argv[1:4]
+          FILE_CAP, RUN_CAP, PLAIN_CAP = 10 * 2**20, 20 * 2**20, 5 * 2**20
+          names = ["summary.json", "s1-classes.json", "q4-8k-report.json", "verbose.json"]
+          fixtures = os.path.join(out, "fixtures")
+          if os.path.isdir(fixtures):
+              names += ["fixtures/" + n for n in sorted(os.listdir(fixtures))
+                        if n.endswith((".html", ".json"))]
+          files, omitted, total = [], [], 0
+          for name in names:
+              src = os.path.join(out, name)
+              if not os.path.isfile(src):
+                  continue
+              with open(src, "rb") as f:
+                  data = f.read()
+              target = name
+              if name == "verbose.json" or len(data) > PLAIN_CAP:
+                  data, target = gzip.compress(data, mtime=0), name + ".gz"
+              if len(data) > FILE_CAP or total + len(data) > RUN_CAP:
+                  omitted.append({"path": target, "bytes": len(data)})
+                  continue
+              path = os.path.join(dest, target)
+              os.makedirs(os.path.dirname(path), exist_ok=True)
+              with open(path, "wb") as f:
+                  f.write(data)
+              total += len(data)
+              files.append({"path": target, "bytes": len(data),
+                            "sha256": hashlib.sha256(data).hexdigest()})
+          meta = {"runId": int(os.environ["RUN_ID"]), "runNumber": int(os.environ["RUN_NUMBER"]),
+                  "mode": os.environ["MODE"], "tickers": os.environ.get("TICKERS", ""),
+                  "budget": os.environ.get("BUDGET", ""), "mainSha": main_sha,
+                  "extractOutcome": os.environ.get("EXTRACT_OUTCOME", ""),
+                  "files": files, "omitted": omitted, "totalBytes": total}
+          with open(os.path.join(dest, "run-meta.json"), "w", encoding="utf-8") as f:
+              json.dump(meta, f, indent=2, sort_keys=True)
+              f.write("\n")
+          PY
+          cd "$wt"
+          git add -A -- "$dest"
+          staged="$(git diff --cached --name-only)"
+          outside="$(printf '%s\n' "$staged" | grep -v -e "^$dest/" -e '^$' || true)"
+          if [ -n "$outside" ]; then echo "::error::Refusing to commit outside $dest: $outside"; exit 1; fi
+          if printf '%s\n' "$staged" | grep -E -e '^docs/report/financials/' -e '(^|/)growth\.json$' \
+               -e '(^|/)answer-set\.json$' -e '^docs/report/fundamentals/'; then
+            echo "::error::Refusing to commit a protected path"; exit 1
+          fi
+          git commit -q -m "q4-8k $MODE run $RUN_NUMBER ($RUN_ID): report output [main $main_sha]"
+          for i in 1 2 3 4; do
+            if git push -q origin "HEAD:refs/heads/$RUNS_BRANCH"; then exit 0; fi
+            sleep $((2 ** i))
+            git pull -q --rebase origin "$RUNS_BRANCH" || exit 1
+          done
+          exit 1
 
       - name: Commit and push (fill only)
         if: inputs.mode == 'fill' && always()
