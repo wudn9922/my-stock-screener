@@ -1,10 +1,13 @@
 """Synthetic 8-K earnings-release tables, validation, pacing, budget and fill rules for backfill_q4_eps_8k."""
+import argparse
+import contextlib
 import io
 import json
 import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from urllib import error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -188,6 +191,32 @@ class ZeroAndNetRowTests(unittest.TestCase):
         self.assertEqual(result["netLabel"], "net income attributable to acme")
 
 
+class StrictNetIncomeTableTests(unittest.TestCase):
+    """S2a-2 (e): table_eps matches net income with strict_scales (decimals-aware, capped at 1% of the target)."""
+
+    @staticmethod
+    def table(net_cells, eps="0.25"):
+        return bq.tables_of("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                            f"<tr><td>Net income</td>{net_cells}</tr>"
+                            f"<tr><td>Diluted earnings per share</td><td>{eps}</td></tr></table>")[0]
+
+    def test_a_zero_does_not_match_a_small_target_at_a_big_scale(self):
+        table = self.table("<td>0</td>")
+        self.assertEqual(bq.table_eps(table, -486_275, END), (None, None))
+
+    def test_a_one_decimal_value_must_match_to_its_own_half_unit(self):
+        table = self.table("<td>0.2</td>")
+        self.assertEqual(bq.table_eps(table, 210_000, END), (None, None))
+        result, reason = bq.table_eps(self.table("<td>0.21</td>"), 210_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["scale"], 1_000_000)
+
+    def test_a_negative_loss_with_one_decimal_matches_at_its_unit(self):
+        result, reason = bq.table_eps(self.table("<td>(0.4)</td>", eps="(0.25)"), -400_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual((result["scale"], result["epsDiluted"]), (1_000_000, -0.25))
+
+
 INDEX_PAGE = ("<table><tr><th>Seq</th><th>Description</th><th>Document</th><th>Type</th><th>Size</th></tr>"
               "<tr><td>1</td><td>8-K</td><td><a>form8k.htm</a></td><td>8-K</td><td>1000</td></tr>"
               "<tr><td>2</td><td>Press release</td><td><a>ex_309174.htm</a></td><td>EX-99.1</td><td>2000</td></tr>"
@@ -321,6 +350,67 @@ class OrphanDiagnosticTests(unittest.TestCase):
         self.assertEqual(debug[0]["orphans"]["period_in_previous_table"], 1)
 
 
+ZERO_EPS_RELEASE = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                    "<tr><td>Net income</td><td>1,234</td></tr>"
+                    "<tr><td>Diluted earnings per share</td><td>(0.00)</td></tr></table>")
+AMBIGUOUS_RELEASE = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                     "<tr><td>Net income</td><td>1,234</td><td>1,234</td></tr>"
+                     "<tr><td>Diluted earnings per share</td><td>1.00</td><td>1.00</td></tr></table>")
+NO_QUARTER_RELEASE = "<table><tr><td>Revenue</td><td>5</td></tr></table>"
+
+
+class FindQuarterReasonTests(unittest.TestCase):
+    """S2a-2 (f): the first specific reason across the candidate filings; the generic one only if none is specific."""
+
+    @staticmethod
+    def filings(*accessions):
+        return [{"form": "8-K", "items": "2.02", "filingDate": f"2025-0{2 + i}-05", "accessionNumber": accession}
+                for i, accession in enumerate(accessions)]
+
+    @staticmethod
+    def sec(pages):
+        class FakeSec:
+            def get_json(self, url):
+                if url.endswith("index.json"):
+                    return {"directory": {"item": [{"name": "ex99-1.htm", "type": "EX-99.1"}]}}
+                return None
+
+            def get_text(self, url):
+                for folder, html in pages.items():
+                    if folder in url and url.endswith("ex99-1.htm"):
+                        return html
+                return None
+        return FakeSec()
+
+    def reason(self, first, second):
+        rows = self.filings("0001-25-000011", "0001-25-000012")
+        pages = {"000125000011": first, "000125000012": second}
+        return bq.find_quarter(self.sec(pages), 1234, rows, END, 1_234_000)
+
+    def test_the_first_specific_reason_wins_over_a_later_generic_one(self):
+        self.assertEqual(self.reason(ZERO_EPS_RELEASE, NO_QUARTER_RELEASE), (None, "EPS is zero"))
+
+    def test_a_later_specific_reason_is_used_when_the_first_filing_is_generic(self):
+        self.assertEqual(self.reason(NO_QUARTER_RELEASE, AMBIGUOUS_RELEASE),
+                         (None, "net income matches more than one column or unit"))
+
+    def test_the_first_of_two_specific_reasons_wins(self):
+        self.assertEqual(self.reason(ZERO_EPS_RELEASE, AMBIGUOUS_RELEASE), (None, "EPS is zero"))
+
+    def test_the_generic_reason_is_used_only_when_no_filing_is_specific(self):
+        self.assertEqual(self.reason(NO_QUARTER_RELEASE, NO_QUARTER_RELEASE), (None, bq.GENERIC_REASON))
+
+    def test_no_candidate_filing_gives_the_window_reason(self):
+        self.assertEqual(bq.find_quarter(self.sec({}), 1234, [], END, 1_234_000),
+                         (None, "no 8-K with Item 2.02 in the window"))
+
+    def test_the_generic_reason_text_is_the_one_from_filing(self):
+        rows = self.filings("0001-25-000013")
+        result, reason = bq.from_filing(self.sec({"000125000013": NO_QUARTER_RELEASE}), 1234, rows[0], 1_234_000, END)
+        self.assertIsNone(result)
+        self.assertEqual(reason, bq.GENERIC_REASON)
+
+
 class IndependentCheckTests(unittest.TestCase):
     rows = [{"form": "8-K", "items": "2.02", "filingDate": "2026-02-05", "accessionNumber": "0001-26-000001"}]
 
@@ -354,6 +444,36 @@ class IndependentCheckTests(unittest.TestCase):
         check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, [], END, 1_234_000, 0.25, {})
         self.assertEqual(check["status"], "unavailable")
         self.assertIn("Item 2.02", check["reason"])
+
+
+def next_year_release(prior_eps):
+    return f"""
+<html><body><table>
+<tr><td></td><td>Three Months Ended December 31, 2025</td><td></td><td>Three Months Ended December 31, 2024</td></tr>
+<tr><td>Net income attributable to Acme</td><td>$</td><td>999</td><td>$</td><td>1,234</td></tr>
+<tr><td>Diluted earnings per share</td><td>$</td><td>0.30</td><td>$</td><td>{prior_eps}</td></tr>
+</table></body></html>
+"""
+
+
+class IndependentCheckToleranceTests(unittest.TestCase):
+    """S2a-2 (d): "confirmed" needs |checked - eps| <= max(0.011, 0.005 * |eps|)."""
+    rows = [{"form": "8-K", "items": "2.02", "filingDate": "2026-02-05", "accessionNumber": "0001-26-000001"}]
+
+    def status(self, prior_eps, stored_eps):
+        sec = IndependentCheckTests.sec_with(next_year_release(prior_eps))
+        return bq.verify_quarter(sec, 1234, self.rows, END, 1_234_000, stored_eps, {})["status"]
+
+    def test_a_gap_of_one_and_a_half_cents_on_a_dollar_eps_is_a_conflict(self):
+        self.assertEqual(self.status("1.015", 1.00), "conflict")
+
+    def test_the_eleven_cent_boundary_is_still_confirmed(self):
+        self.assertEqual(self.status("1.0105", 1.00), "confirmed")
+        self.assertEqual(self.status("1.0115", 1.00), "conflict")
+
+    def test_the_half_percent_applies_to_a_larger_eps(self):
+        self.assertEqual(self.status("10.04", 10.00), "confirmed")
+        self.assertEqual(self.status("10.06", 10.00), "conflict")
 
 
 class FillGradeTests(unittest.TestCase):
@@ -527,6 +647,270 @@ class RunTests(unittest.TestCase):
         with open(target, "rb") as file:
             self.assertEqual(file.read(), before)
         self.assertFalse(os.path.exists(self.state_path))
+
+
+ANSWER_SET_PATH = os.path.join(ROOT, "docs", "report", "q4-8k", "answer-set.json")
+
+
+class ShardTests(unittest.TestCase):
+    def test_every_key_is_in_exactly_one_shard_for_each_split(self):
+        keys = sorted(bq.load_answer_set(ANSWER_SET_PATH))
+        self.assertEqual(len(keys), 563)
+        for count in (1, 2, 8, 16):
+            with self.subTest(count=count):
+                parts = [bq.shard_keys(keys, (index, count)) for index in range(count)]
+                flat = [key for part in parts for key in part]
+                self.assertEqual(len(flat), len(set(flat)))
+                self.assertEqual(sorted(flat), keys)
+                for index, part in enumerate(parts):
+                    self.assertTrue(all(keys.index(key) % count == index for key in part))
+
+    def test_shards_take_sorted_unique_keys_by_index_mod_n(self):
+        self.assertEqual(bq.shard_keys(["b", "a", "b", "c", "d"], None), ["a", "b", "c", "d"])
+        self.assertEqual(bq.shard_keys(["b", "a", "b", "c", "d"], (0, 2)), ["a", "c"])
+        self.assertEqual(bq.shard_keys(["b", "a", "b", "c", "d"], (1, 2)), ["b", "d"])
+
+    def test_shard_argument_must_be_k_over_n_with_k_below_n(self):
+        self.assertEqual(bq.parse_shard("3/8"), (3, 8))
+        for bad in ("8/8", "0/0", "x/2", "-1/2", "2", ""):
+            with self.subTest(bad=bad):
+                with self.assertRaises(argparse.ArgumentTypeError):
+                    bq.parse_shard(bad)
+
+
+class AnswerSetFileTests(unittest.TestCase):
+    def write(self, rows):
+        handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+        json.dump({"rows": rows}, handle)
+        handle.close()
+        self.addCleanup(os.unlink, handle.name)
+        return handle.name
+
+    def test_the_committed_answer_set_has_its_pinned_counts(self):
+        answer = bq.load_answer_set(ANSWER_SET_PATH)
+        self.assertEqual(len(answer), 563)
+        self.assertEqual(sum(len(rows) for rows in answer.values()), 2649)
+
+    def test_a_duplicate_key_and_end_is_refused(self):
+        row = {"key": "ACME", "end": "2024-12-31", "fy": 2024, "value": 0.25, "netIncome": 1}
+        with self.assertRaises(ValueError):
+            bq.load_answer_set(self.write([row, dict(row, value=0.3)]))
+
+    def test_a_row_without_a_numeric_net_income_is_refused(self):
+        row = {"key": "ACME", "end": "2024-12-31", "fy": 2024, "value": 0.25, "netIncome": None}
+        with self.assertRaises(ValueError):
+            bq.load_answer_set(self.write([row]))
+
+    def test_rows_are_grouped_by_key_and_sorted_by_end(self):
+        rows = [{"key": "ACME", "end": "2024-12-31", "fy": 2024, "value": 0.25, "netIncome": 1},
+                {"key": "ACME", "end": "2023-12-31", "fy": 2023, "value": 0.5, "netIncome": 2}]
+        answer = bq.load_answer_set(self.write(rows))
+        self.assertEqual([row["end"] for row in answer["ACME"]], ["2023-12-31", "2024-12-31"])
+
+
+GATE_ANSWERS = [
+    {"key": "ACME", "end": "2023-12-31", "fy": 2023, "value": 0.50, "netIncome": 2000000, "accession": "A2"},
+    {"key": "ACME", "end": "2024-12-31", "fy": 2024, "value": 0.25, "netIncome": 1234000, "accession": "A1"},
+    {"key": "BETA", "end": "2024-12-31", "fy": 2024, "value": -0.10, "netIncome": -100000, "accession": "B1"},
+    {"key": "DEV", "end": "2024-12-31", "fy": 2024, "value": 1.00, "netIncome": 5000000, "accession": "D1"},
+]
+
+
+def gate_row(key, end, estimate, status="confirmed", checked=None):
+    result = None if estimate is None else {
+        "epsDiluted": estimate, "url": f"https://example.test/{key}/{end}",
+        "verified": {"status": status, "epsDiluted": checked if checked is not None else estimate,
+                     "url": f"https://example.test/check/{key}/{end}"}}
+    return {"key": key, "end": end, "stored": None, "result": result,
+            "reason": None if estimate is not None else "EPS sign differs from net income"}
+
+
+class GateTests(unittest.TestCase):
+    """--mode gate: offline, no SEC client, exit 3 and no summary unless each answer row is in exactly one report."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.answer = os.path.join(self.tmp.name, "answer-set.json")
+        with open(self.answer, "w", encoding="utf-8") as file:
+            json.dump({"rows": GATE_ANSWERS}, file)
+        self.dev = os.path.join(self.tmp.name, "s1_fixtures.json")
+        with open(self.dev, "w", encoding="utf-8") as file:
+            json.dump({"devTickers": ["DEV"]}, file)
+        self.summary = os.path.join(self.tmp.name, "summary.json")
+        saved = bq.DEV_FIXTURES
+        bq.DEV_FIXTURES = self.dev
+        self.addCleanup(setattr, bq, "DEV_FIXTURES", saved)
+        no_sec = mock.patch.object(bq, "Sec", side_effect=AssertionError("gate mode must not create a SEC client"))
+        self.sec = no_sec.start()
+        self.addCleanup(no_sec.stop)
+
+    def report(self, name, rows):
+        path = os.path.join(self.tmp.name, name)
+        with open(path, "w", encoding="utf-8") as file:
+            json.dump({"mode": "backtest", "rows": rows}, file)
+        return path
+
+    def gate(self, *reports):
+        argv = ["--mode", "gate", "--answer-set", self.answer, "--reports", *reports, "--report", self.summary]
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return bq.main(argv)
+
+    def all_correct(self):
+        return [gate_row("ACME", "2023-12-31", 0.50), gate_row("ACME", "2024-12-31", 0.25),
+                gate_row("BETA", "2024-12-31", -0.10), gate_row("DEV", "2024-12-31", 1.00)]
+
+    def read_summary(self):
+        with open(self.summary, encoding="utf-8") as file:
+            return json.load(file)
+
+    def test_every_answer_row_in_one_report_passes_and_writes_the_summary(self):
+        code = self.gate(self.report("a.json", self.all_correct()))
+        self.assertEqual(code, 0)
+        summary = self.read_summary()
+        self.assertEqual((summary["all"]["accepted"], summary["all"]["correct"]), (4, 4))
+        self.assertEqual(summary["all"]["coverage"], 1.0)
+        self.assertEqual(summary["all"]["precision"], 1.0)
+        self.assertEqual(summary["devTickers"], ["DEV"])
+        self.sec.assert_not_called()
+
+    def test_shards_that_partition_the_keys_pass(self):
+        first = self.report("a.json", self.all_correct()[:2])
+        second = self.report("b.json", self.all_correct()[2:])
+        self.assertEqual(self.gate(first, second), 0)
+        self.assertEqual(self.read_summary()["all"]["accepted"], 4)
+
+    def test_a_key_in_no_report_exits_3_and_writes_nothing(self):
+        code = self.gate(self.report("a.json", self.all_correct()[:3]))
+        self.assertEqual(code, 3)
+        self.assertFalse(os.path.exists(self.summary))
+
+    def test_a_key_in_two_reports_exits_3_and_writes_nothing(self):
+        code = self.gate(self.report("a.json", self.all_correct()),
+                         self.report("b.json", [gate_row("ACME", "2024-12-31", 0.25)]))
+        self.assertEqual(code, 3)
+        self.assertFalse(os.path.exists(self.summary))
+
+    def test_a_split_shard_that_repeats_a_key_of_the_full_shard_exits_3(self):
+        full_shard = self.report("full.json", self.all_correct())
+        half_shard = self.report("half.json", [gate_row("ACME", "2023-12-31", 0.50)])
+        self.assertEqual(self.gate(full_shard, half_shard), 3)
+        self.assertFalse(os.path.exists(self.summary))
+
+    def test_a_sign_error_is_counted_and_listed(self):
+        rows = self.all_correct()
+        rows[1] = gate_row("ACME", "2024-12-31", -0.25)
+        self.assertEqual(self.gate(self.report("a.json", rows)), 0)
+        summary = self.read_summary()
+        self.assertEqual(summary["all"]["signErrors"], 1)
+        self.assertEqual(summary["all"]["correct"], 3)
+        self.assertEqual([(row["key"], row["estimate"], row["answer"]) for row in summary["signErrors"]],
+                         [("ACME", -0.25, 0.25)])
+        self.assertEqual(len(summary["incorrect"]), 1)
+
+    def test_a_dev_ticker_is_left_out_of_the_accuracy_count(self):
+        rows = self.all_correct()
+        rows[3] = gate_row("DEV", "2024-12-31", 3.00)
+        self.assertEqual(self.gate(self.report("a.json", rows)), 0)
+        summary = self.read_summary()
+        self.assertEqual((summary["all"]["accepted"], summary["all"]["correct"]), (4, 3))
+        self.assertEqual((summary["excludingDevTickers"]["accepted"], summary["excludingDevTickers"]["correct"]),
+                         (3, 3))
+        self.assertEqual(summary["excludingDevTickers"]["precision"], 1.0)
+        self.assertEqual(summary["excludingDevTickers"]["answerRows"], 3)
+
+    def test_a_conflict_is_counted_over_extracted_rows_not_only_accepted_ones(self):
+        rows = self.all_correct()
+        rows[1] = gate_row("ACME", "2024-12-31", 0.25, status="conflict", checked=0.30)
+        self.assertEqual(self.gate(self.report("a.json", rows)), 0)
+        summary = self.read_summary()
+        self.assertEqual(summary["all"]["conflicts"], 1)
+        self.assertEqual(summary["all"]["accepted"], 3)
+        self.assertEqual(summary["conflicts"][0]["checked"], 0.30)
+
+    def test_the_tolerance_is_the_s3_correct_rule(self):
+        self.assertTrue(bq.within_s3_tolerance(0.2605, 0.25))
+        self.assertFalse(bq.within_s3_tolerance(0.2615, 0.25))
+        self.assertTrue(bq.within_s3_tolerance(10.04, 10.0))
+        self.assertFalse(bq.within_s3_tolerance(10.06, 10.0))
+
+    def test_a_row_outside_the_answer_set_is_counted_as_extra_and_changes_no_metric(self):
+        rows = self.all_correct() + [gate_row("ZZZZ", "2024-12-31", 9.0)]
+        self.assertEqual(self.gate(self.report("a.json", rows)), 0)
+        summary = self.read_summary()
+        self.assertEqual((summary["extraRows"], summary["all"]["accepted"]), (1, 4))
+
+    def test_the_dev_tickers_come_from_the_s1_manifest_by_default(self):
+        bq.DEV_FIXTURES = os.path.join(ROOT, "tests", "fixtures", "q4_8k", "s1_fixtures.json")
+        self.assertEqual(bq.load_dev_tickers(), ["TRAK", "TXT", "UI", "UNFI", "URBN", "VIAV", "VNCE", "WLY"])
+
+    def test_gate_needs_an_answer_set_and_reports_and_no_out_dir(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(bq.main(["--mode", "gate", "--reports", self.report("a.json", [])]), 2)
+            self.assertEqual(bq.main(["--mode", "gate", "--answer-set", self.answer]), 2)
+            self.assertEqual(bq.main(["--mode", "gate", "--answer-set", self.answer, "--reports",
+                                      self.report("a.json", []), "--out-dir", self.tmp.name]), 2)
+        self.sec.assert_not_called()
+
+
+class AnswerSetBacktestTests(unittest.TestCase):
+    """run() with --answer-set: only the answer rows of the shard are processed, against their value and netIncome."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.fin_dir = os.path.join(self.tmp.name, "financials")
+        os.makedirs(self.fin_dir)
+        self.saved = (bq.FIN_DIR, bq.STATE_PATH)
+        bq.FIN_DIR, bq.STATE_PATH = self.fin_dir, os.path.join(self.tmp.name, "state.json")
+        self.addCleanup(setattr, bq, "FIN_DIR", self.saved[0])
+        self.addCleanup(setattr, bq, "STATE_PATH", self.saved[1])
+        doc = {"symbol": "TEST", "market": "US", "quarterly": {
+            "end": ["2023-12-31", "2024-09-30", "2024-12-31"], "fq": [4, 3, 4], "fy": [2023, 2024, 2024],
+            "values": {"netIncome": [9, 1, 1234000], "epsDiluted": [0.9, 0.1, None]}}}
+        with open(os.path.join(self.fin_dir, "TEST.json"), "w", encoding="utf-8") as file:
+            json.dump(doc, file)
+        self.answer = os.path.join(self.tmp.name, "answer-set.json")
+        with open(self.answer, "w", encoding="utf-8") as file:
+            json.dump({"rows": [{"key": "TEST", "end": "2024-12-31", "fy": 2024, "value": 0.25,
+                                 "netIncome": 1234000, "accession": "T1"}]}, file)
+
+    def args(self, *extra):
+        return bq.parse_args(["--mode", "backtest", "--answer-set", self.answer, "--budget", "100", *extra])
+
+    def test_only_the_answer_row_is_processed_and_its_value_is_the_reference(self):
+        report = bq.run(self.args(), RunTests.FakeSec())
+        self.assertEqual([(row["key"], row["end"], row["stored"]) for row in report["rows"]],
+                         [("TEST", "2024-12-31", 0.25)])
+        self.assertEqual(report["accepted"], 1)
+        self.assertEqual(report["correct_share_of_all_periods"], 1.0)
+
+    def test_the_financials_file_is_not_written(self):
+        target = os.path.join(self.fin_dir, "TEST.json")
+        with open(target, "rb") as file:
+            before = file.read()
+        bq.run(self.args(), RunTests.FakeSec())
+        with open(target, "rb") as file:
+            self.assertEqual(file.read(), before)
+
+    def test_a_shard_processes_only_its_keys(self):
+        with open(self.answer, encoding="utf-8") as file:
+            document = json.load(file)
+        document["rows"].append({"key": "AAAA", "end": "2024-12-31", "fy": 2024, "value": 1.0, "netIncome": 1})
+        with open(self.answer, "w", encoding="utf-8") as file:
+            json.dump(document, file)
+        other = bq.run(self.args("--shard", "0/2"), RunTests.FakeSec())
+        mine = bq.run(self.args("--shard", "1/2"), RunTests.FakeSec())
+        self.assertEqual(other["rows"], [])
+        self.assertEqual([row["key"] for row in mine["rows"]], ["TEST"])
+
+    def test_answer_set_options_are_refused_before_any_sec_request(self):
+        with mock.patch.object(bq, "Sec", side_effect=AssertionError("no SEC client")), \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(bq.main(["--mode", "fill", "--answer-set", self.answer]), 2)
+            self.assertEqual(bq.main(["--mode", "backtest", "--shard", "0/2"]), 2)
+            self.assertEqual(bq.main(["--mode", "backtest", "--answer-set", self.answer, "--tickers", "TEST"]), 2)
+            self.assertEqual(bq.main(["--mode", "backtest", "--reports", self.answer]), 2)
 
 
 if __name__ == "__main__":
