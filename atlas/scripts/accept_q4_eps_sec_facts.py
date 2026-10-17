@@ -36,7 +36,7 @@ import build_financials as fin  # noqa: E402
 from build_valuation_us import write_atomic  # noqa: E402
 
 FIELDS = ("epsDiluted", "epsBasic")
-VERIFY_TOLERANCE = 0.01
+VERIFY_TOLERANCE = 0.01 + 1e-9  # a difference of exactly one cent is a match; float subtraction can land just above 0.01
 DEFERRED_ABS_EPS = 1000
 SPLIT_RATIO_TOLERANCE = 0.03
 DIRECT_CLASS = "direct-sec-existing-value-correction"
