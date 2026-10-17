@@ -10,6 +10,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
@@ -362,6 +363,10 @@ class FakeSec:
 
 
 class RunTest(unittest.TestCase):
+    def run_sec(self, *args, **kwargs):
+        with mock.patch.dict(os.environ, {"SEC_USER_AGENT": "TestAgent test@example.com"}):
+            return sec.run(*args, **kwargs)
+
     def args(self, tmp, **extra):
         values = {"report_dir": tmp, "out": os.path.join(tmp, "fundamentals", "us-sec.json"), "no_foreign": False,
                   "foreign_max_age_days": 0, "force": False}
@@ -373,7 +378,7 @@ class RunTest(unittest.TestCase):
             args = self.args(tmp)
             logs = []
             fake = FakeSec()
-            self.assertEqual(sec.run(args, client=fake, now=datetime(2026, 8, 20, tzinfo=timezone.utc), log=logs.append), 0)
+            self.assertEqual(self.run_sec(args, client=fake, now=datetime(2026, 8, 20, tzinfo=timezone.utc), log=logs.append), 0)
             with open(args.out, encoding="utf-8") as file:
                 document = json.load(file)
             rows = {row[0]: dict(zip(sec.FIELDS, row)) for row in document["rows"]}
@@ -392,7 +397,7 @@ class RunTest(unittest.TestCase):
             self.assertTrue(all("data.sec.gov" in url or "sec.gov/files" in url for url in fake.urls))
             # Unchanged second run: not rewritten
             before = os.path.getmtime(args.out)
-            self.assertEqual(sec.run(args, client=FakeSec(), now=datetime(2026, 8, 20, tzinfo=timezone.utc), log=logs.append), 0)
+            self.assertEqual(self.run_sec(args, client=FakeSec(), now=datetime(2026, 8, 20, tzinfo=timezone.utc), log=logs.append), 0)
             self.assertEqual(os.path.getmtime(args.out), before)
 
     def test_a_refusal_keeps_the_file_and_is_not_an_error(self):
@@ -402,7 +407,7 @@ class RunTest(unittest.TestCase):
             with open(args.out, "w", encoding="utf-8") as file:
                 file.write("keep")
             logs = []
-            self.assertEqual(sec.run(args, client=FakeSec(refuse=True), now=NOW, log=logs.append), 0)
+            self.assertEqual(self.run_sec(args, client=FakeSec(refuse=True), now=NOW, log=logs.append), 0)
             self.assertIn("403", logs[-1])
             with open(args.out, encoding="utf-8") as file:
                 self.assertEqual(file.read(), "keep")
@@ -424,7 +429,7 @@ class RunTest(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 args = self.args(tmp)
                 logs = []
-                self.assertEqual(sec.run(args, client=client, now=datetime(2026, 8, 20, tzinfo=timezone.utc), log=logs.append), 1)
+                self.assertEqual(self.run_sec(args, client=client, now=datetime(2026, 8, 20, tzinfo=timezone.utc), log=logs.append), 1)
                 self.assertIn(message, logs[-1])
                 self.assertFalse(os.path.exists(args.out))
 
@@ -437,7 +442,7 @@ class RunTest(unittest.TestCase):
             with open(args.out, "w", encoding="utf-8") as file:
                 json.dump(stored, file)
             logs = []
-            self.assertEqual(sec.run(args, client=FakeSec(), now=datetime(2026, 8, 20, tzinfo=timezone.utc), log=logs.append), 1)
+            self.assertEqual(self.run_sec(args, client=FakeSec(), now=datetime(2026, 8, 20, tzinfo=timezone.utc), log=logs.append), 1)
             self.assertIn("not written", logs[-1])
             with open(args.out, encoding="utf-8") as file:
                 self.assertEqual(len(json.load(file)["rows"]), 100)

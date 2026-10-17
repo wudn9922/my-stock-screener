@@ -1,15 +1,12 @@
 """
-Repair missing Q4 EPS in docs/report/financials/*.json. Default mode is offline method A; --sec fetches
-official SEC 3-month EPS facts, validates them, and only then fills null values.
+Repair missing Q4 EPS in docs/report/financials/*.json. Offline mode no longer derives Q4 EPS from
+annual-minus-quarter EPS. ``--sec`` caches direct SEC CompanyFacts candidates and compares existing
+values, but a null field can only be filled after a matching original filing excerpt/locator is staged.
 
-seed_financials_sec.py derives Q4 EPS = annual EPS − (Q1 + Q2 + Q3 EPS) on the basis the periods hold after
-the split adjustment (build_financials.fill_q4_eps). Files seeded before that step keep a null Q4 EPS; this
-script applies the same rule to the stored files (build_financials.repair_q4_document):
-
-- only null values change: an existing EPS is never overwritten, and a filled period gets the derived flag
-  (quarterly "derived") and "q4-derived" in quality.issues, as the seed writes them;
-- idempotent: a second run finds nothing to fill;
-- --dry-run lists the files and periods that would change and writes nothing.
+Other Q4 cash-flow and income values may still use the provider's documented YTD subtraction. EPS is
+different: annual diluted/basic EPS minus Q1–Q3 EPS is not a standalone Q4 value. Existing legacy values
+are preserved for audit and are excluded from formal U.S. Q4 consumers unless they have an allowed grade.
+The SEC mode keeps accession-linked candidates; formal fills require original filing evidence.
 
 The repaired data files are not committed by the change that adds this script.
 
@@ -118,7 +115,7 @@ def extract_q4_eps_facts(companyfacts, period_ends):
                 amount = _number(fact.get("val"))
                 if start is None or end is None or amount is None:
                     continue
-                duration = (end - start).days
+                duration = (end - start).days + 1
                 if not SEC_DURATION_DAYS[0] <= duration <= SEC_DURATION_DAYS[1]:
                     continue
                 for target_end, target_date in target_dates.items():
@@ -155,41 +152,115 @@ def best_q4_fact(facts, target_end):
     return min(facts, key=rank) if facts else None
 
 
-def normalize_and_check_q4_eps(document, end, q4_income, q3_shares, fact):
-    """Put a SEC fact on the stored split basis using seed's suffix-factor logic, then validate it."""
-    income, shares, raw = _number(q4_income), _number(q3_shares), _number((fact or {}).get("value"))
+def q4_eps_diagnostics(value, q4_income, q3_shares):
+    """Compare an official EPS candidate with NI/shares for review; never accept or reject on it."""
+    eps, income, shares = _number(value), _number(q4_income), _number(q3_shares)
+    result = {
+        "method": "q4-net-income-divided-by-q3-diluted-shares-diagnostic-only",
+        "impliedEps": None,
+        "absoluteDifference": None,
+        "relativeDifference": None,
+        "sameSign": None,
+        "flags": [],
+    }
     if income is None:
-        return None, 1.0, "missing-q4-net-income"
+        result["flags"].append("missing-q4-net-income")
     if shares is None or shares <= 0:
-        return None, 1.0, "missing-q3-shares"
-    if raw is None:
-        return None, 1.0, "invalid-sec-value"
-    if income == 0:
-        return None, 1.0, "zero-q4-net-income"
-    if raw == 0 or (raw > 0) != (income > 0):
-        return None, 1.0, "sign-mismatch"
-    expected = income / shares
-    if expected == 0:
-        return None, 1.0, "zero-eps-or-implied-eps"
+        result["flags"].append("missing-or-nonpositive-q3-shares")
+    if eps is None:
+        result["flags"].append("invalid-sec-value")
+    if result["flags"]:
+        return result
+    implied = income / shares
+    result["impliedEps"] = implied
+    result["absoluteDifference"] = abs(eps - implied)
+    result["sameSign"] = (eps == 0 and implied == 0) or (eps > 0) == (implied > 0)
+    if implied != 0:
+        result["relativeDifference"] = abs(eps - implied) / abs(implied)
+    if not result["sameSign"]:
+        result["flags"].append("sign-mismatch-review")
+    if result["relativeDifference"] is not None and result["relativeDifference"] > SEC_Q4_MAX_RELATIVE_ERROR:
+        result["flags"].append("outside-25-percent-review")
+    return result
 
+
+def _verified_split_factor(document, end, fact):
+    """Return the independently sourced suffix split factor after this fact's publication date.
+
+    Stored split events are acquired from the financials split-event feed, independently of EPS.
+    The factor is based only on event dates/ratios and the SEC filing date. EPS/NI/shares never
+    choose or tune the factor. A split event on the same day as filing is ambiguous and fails closed.
+    """
+    fact = fact if isinstance(fact, dict) else {}
+    filed = _parse_date(fact.get("filed") or fact.get("filingDate"))
+    target_end = _parse_date(end)
+    split = document.get("split") if isinstance(document, dict) else None
+    symbol = str(document.get("symbol") or "").strip().upper() if isinstance(document, dict) else ""
+    events_checked = _parse_date(split.get("eventsCheckedAt")) if isinstance(split, dict) else None
+    coverage_start = _parse_date(split.get("eventsCoverageStart")) if isinstance(split, dict) else None
+    coverage_end = _parse_date(split.get("eventsCoverageEnd")) if isinstance(split, dict) else None
+    snapshot_day = _parse_date(document.get("checkedAt")) if isinstance(document, dict) else None
+    all_period_ends = []
+    if isinstance(document, dict):
+        for section_name in ("annual", "quarterly"):
+            section = document.get(section_name)
+            if isinstance(section, dict):
+                all_period_ends.extend(day for day in (_parse_date(raw) for raw in section.get("end") or [])
+                                       if day is not None)
+    latest_end = max(all_period_ends, default=None)
+    complete = bool(
+        isinstance(split, dict) and split.get("eventsComplete") is True
+        and isinstance(split.get("eventsSource"), str) and split.get("eventsSource").strip()
+        and split.get("eventsSymbol") == symbol and bool(symbol)
+        and split.get("eventsParserVersion") == 3
+        and events_checked is not None and (filed is None or events_checked >= filed)
+        and (snapshot_day is None or events_checked >= snapshot_day)
+        and target_end is not None and coverage_start is not None and coverage_start <= target_end
+        and latest_end is not None and coverage_end is not None and coverage_end >= latest_end
+    )
+    if not complete:
+        return None, "split-event-history-unverified-or-incomplete"
     events = []
-    for event in ((document.get("split") or {}).get("events") or []):
+    for event in (split.get("events") or []):
         if not isinstance(event, (list, tuple)) or len(event) < 2:
             continue
         split_day, ratio = _parse_date(event[0]), _number(event[1])
         if split_day is None or ratio is None or ratio <= 0:
             continue
-        events.append((split_day.isoformat(), ratio))
-    usable = sorted((day, ratio) for day, ratio in events
-                    if ratio >= sec.MIN_SPLIT_RATIO or ratio <= 1 / sec.MIN_SPLIT_RATIO)
-    factor = sec._suffix_factor(usable, end, raw / expected)
-    adjusted = raw / factor
-    if (adjusted > 0) != (income > 0):
-        return None, factor, "sign-mismatch"
-    relative_error = abs(adjusted - expected) / abs(expected)
-    if relative_error > SEC_Q4_MAX_RELATIVE_ERROR:
-        return None, factor, "outside-q4-income-q3-shares-25pct"
-    return adjusted, factor, None
+        if ratio >= sec.MIN_SPLIT_RATIO or ratio <= 1 / sec.MIN_SPLIT_RATIO:
+            events.append((split_day, ratio))
+    if filed is None:
+        if target_end and any(day > target_end for day, _ in events):
+            return None, "split-basis-publication-date-missing"
+        return 1.0, None
+    ambiguous = [day for day, _ in events if day == filed]
+    if ambiguous:
+        return None, "split-basis-same-day-as-filing"
+    if target_end is not None and any(target_end < day <= filed for day, _ in events):
+        # A filing published after the split may already restate its comparative EPS.
+        # The event date alone cannot establish which basis this filing used.
+        return None, "split-basis-event-before-filing-needs-reporting-basis-review"
+    factor = 1.0
+    for day, ratio in events:
+        if day > filed:
+            factor *= ratio
+    return factor, None
+
+
+def normalize_and_check_q4_eps(document, end, q4_income, q3_shares, fact):
+    """Normalize an SEC value by dated split events; all income/share checks are diagnostics only.
+
+    The third return value is reserved for facts that cannot be safely normalized (invalid EPS or
+    ambiguous split basis). Sign and NI/share differences are available separately from
+    :func:`q4_eps_diagnostics` and never gate a directly reported value.
+    """
+    raw = _number((fact or {}).get("value"))
+    if raw is None:
+        return None, 1.0, "invalid-sec-value"
+    factor, failure = _verified_split_factor(document, end, fact)
+    if failure:
+        return None, 1.0, failure
+    return raw / factor, factor, None
 
 
 def _q4_rows(document):
@@ -278,7 +349,7 @@ def _fact_matches(state, symbol, signature, end, field):
 
 def sec_repair_directory(directory, *, state_path=DEFAULT_SEC_STATE, budget=None, client=None,
                          environ=None, clock=None):
-    """Fetch, validate, then fill null Q4 EPS; cached matches make --budget runs resumable."""
+    """Fetch/cache direct facts and validate existing values; raw filing evidence is required to fill nulls."""
     environ = os.environ if environ is None else environ
     clock = time.monotonic if clock is None else clock
     started = clock()
@@ -288,6 +359,7 @@ def sec_repair_directory(directory, *, state_path=DEFAULT_SEC_STATE, budget=None
         "status": "done", "targets": target_counts, "requests": 0, "companiesFetched": 0,
         "factsFetched": 0, "fills": [], "rejected": Counter(), "validationErrors": [],
         "validationCompared": 0, "validationMedian": None, "noFact": Counter(),
+        "pendingRawFilingReview": Counter(),
     }
     if not targets:
         print("No companies with missing Q4 EPS.")
@@ -409,6 +481,17 @@ def sec_repair_directory(directory, *, state_path=DEFAULT_SEC_STATE, budget=None
                         continue
                     validation_errors.append(abs(adjusted - actual) / abs(actual))
                     continue
+                raw_evidence = fact.get("rawFilingEvidence") if isinstance(fact, dict) else None
+                if not isinstance(raw_evidence, dict):
+                    summary["pendingRawFilingReview"][field] += 1
+                    continue
+                if (raw_evidence.get("accession") != fact.get("accn")
+                        or _number(raw_evidence.get("reportedValue")) != _number(fact.get("value"))
+                        or raw_evidence.get("field") != field
+                        or not raw_evidence.get("excerpt")
+                        or not isinstance(raw_evidence.get("locator"), dict)):
+                    summary["rejected"]["raw-filing-evidence-mismatch"] += 1
+                    continue
                 fills.append({
                     "symbol": symbol, "path": item["path"], "index": row["index"], "end": row["end"],
                     "field": field, "value": round(adjusted, 4), "factor": factor, "fact": fact,
@@ -447,7 +530,7 @@ def sec_repair_directory(directory, *, state_path=DEFAULT_SEC_STATE, budget=None
             "durationDays": fill["fact"]["durationDays"], "form": fill["fact"].get("form"),
             "filed": fill["fact"].get("filed"), "accession": fill["fact"].get("accn"),
             "reportedValue": fill["fact"]["value"], "splitFactor": fill["factor"],
-            "value": fill["value"],
+            "value": fill["value"], "rawFilingEvidence": fill["fact"]["rawFilingEvidence"],
         }
         write_atomic(fill["path"], document)
         filled_periods.add((fill["symbol"], fill["end"]))
@@ -463,6 +546,9 @@ def sec_repair_directory(directory, *, state_path=DEFAULT_SEC_STATE, budget=None
     if summary["noFact"]:
         print("No matching SEC 3-month fact for still-null fields: " +
               ", ".join(f"{field} {count}" for field, count in sorted(summary["noFact"].items())))
+    if summary["pendingRawFilingReview"]:
+        print("SEC CompanyFacts candidates awaiting original filing evidence: " +
+              ", ".join(f"{field} {count}" for field, count in sorted(summary["pendingRawFilingReview"].items())))
     if summary["rejected"]:
         print("SEC facts rejected by Q4 checks: " +
               ", ".join(f"{reason} {count}" for reason, count in sorted(summary["rejected"].items())))

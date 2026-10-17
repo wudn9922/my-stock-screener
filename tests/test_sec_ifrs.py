@@ -549,7 +549,8 @@ class SeedWiringTests(unittest.TestCase):
                 "--state", self.state_path, *extra]
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
-            code = sec.main(args, client=client, now=NOW, environ={}, clock=clock)
+            code = sec.main(args, client=client, now=NOW,
+                            environ={"SEC_USER_AGENT": "TestAgent test@example.com"}, clock=clock)
         return code, buffer.getvalue()
 
     def test_dry_run_is_offline_and_writes_nothing(self):
@@ -609,7 +610,7 @@ class SeedWiringTests(unittest.TestCase):
         self.assertEqual(client2.requests, 0)
 
     def test_first_403_stops_the_run_at_once(self):
-        forbidden = sec.SecClient(sec.DEFAULT_USER_AGENT, opener=lambda request: (403, b""),
+        forbidden = sec.SecClient("ResearchBot contact@example.com", opener=lambda request: (403, b""),
                                   sleeper=lambda seconds: None)
         code, text = self.run_main(forbidden)
         self.assertEqual(code, sec.EXIT_STOPPED)
@@ -632,7 +633,8 @@ class SeedWiringTests(unittest.TestCase):
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
             code = sec.main(["--tickers", "SYNA", "--no-splits", "--report-dir", self.report, "--out", self.out,
-                             "--state", self.state_path], client=client, now=NOW, environ={})
+                             "--state", self.state_path], client=client, now=NOW,
+                            environ={"SEC_USER_AGENT": "TestAgent test@example.com"})
         self.assertEqual(code, sec.EXIT_DONE)
         self.assertIn("skip reason foreign-filer: 1", buffer.getvalue())
         self.assertFalse(os.path.exists(os.path.join(self.out, "SYNA.json")))
@@ -832,7 +834,8 @@ class ForeignGaapWiringTests(unittest.TestCase):
         argv = ["--no-splits", "--report-dir", self.report, "--out", self.out, "--state", self.state_path, *args]
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
-            code = sec.main(argv, client=client, now=NOW, environ={})
+            code = sec.main(argv, client=client, now=NOW,
+                            environ={"SEC_USER_AGENT": "TestAgent test@example.com"})
         return code, buffer.getvalue()
 
     def test_foreign_run_writes_the_us_gaap_document_when_there_is_no_ifrs(self):

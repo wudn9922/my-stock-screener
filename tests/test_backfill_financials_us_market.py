@@ -305,7 +305,8 @@ class PersistenceAndRecoveryTests(unittest.TestCase):
                 "--snapshot", str(snapshot_path), "--progress", str(progress_path),
                 "--summary", str(summary_path), "--raw-cache-dir", str(raw_cache), "--batch-size", "1",
             ])
-            with mock.patch.dict(os.environ, {"CI": "", "GITHUB_ACTIONS": ""}), \
+            with mock.patch.dict(os.environ, {"CI": "", "GITHUB_ACTIONS": "",
+                                             "SEC_USER_AGENT": "TestAgent test@example.com"}), \
                     mock.patch.object(market.yahoo_restore, "resolve_revision", return_value="baseline"), \
                     mock.patch.object(market, "fetch_directory_snapshot", return_value=snapshot), \
                     mock.patch.object(market.CachedSecClient, "ticker_map", side_effect=market.sec.FetchError("offline")):
@@ -321,7 +322,8 @@ class PersistenceAndRecoveryTests(unittest.TestCase):
                 "--summary", str(summary_path), "--raw-cache-dir", str(raw_cache), "--batch-size", "1", "--resume",
             ])
             validation = {"currentSymbols": symbols, "validatedAt": "2026-10-15T00:00:01Z"}
-            with mock.patch.dict(os.environ, {"CI": "", "GITHUB_ACTIONS": ""}), \
+            with mock.patch.dict(os.environ, {"CI": "", "GITHUB_ACTIONS": "",
+                                             "SEC_USER_AGENT": "TestAgent test@example.com"}), \
                     mock.patch.object(market.yahoo_restore, "resolve_revision", return_value="baseline"), \
                     mock.patch.object(market, "validate_current_membership", return_value=validation), \
                     mock.patch.object(market.CachedSecClient, "ticker_map", return_value=mapping), \

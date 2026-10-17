@@ -18,6 +18,8 @@ metadata this module requires. Missing or uncertain metadata fails closed.
 """
 from datetime import date
 from decimal import Decimal, InvalidOperation
+import hashlib
+from pathlib import Path
 from urllib.parse import urlparse
 import re
 
@@ -279,15 +281,15 @@ def _failure_record(*, symbol, cik, field, period_start, period_end, reason,
 
 def stage_direct_q4_eps(companyfacts, *, symbol, cik, period_start, period_end,
                         companyfacts_url, cross_checks, split_multiplier=1,
-                        target_share_basis="current-share-basis"):
-    """Return one A-grade-eligible staging record per direct EPS type.
+                        target_share_basis="current-share-basis", raw_filing_evidence=None):
+    """Stage direct companyfacts candidates, requiring a matching original filing record for Grade A.
 
     ``cross_checks`` maps ``epsBasic``/``epsDiluted`` to ``{"income": {"value",
-    "unit":"USD"}, "shares":{"value", "unit":
-    "shares", "basis": target_share_basis}}``. A fact only receives grade A when
-    sign and absolute relative error against income/shares both pass. ``split_multiplier``
-    is the multiplier that puts reported USD/share on the target basis; it must be
-    supplied from verified split events by the caller (the function never guesses it).
+    "unit":"USD"}, "shares":{"value", "unit":"shares", "basis": target_share_basis}}``.
+    They are diagnostics and cannot reject a directly reported value. A Grade A candidate also
+    needs ``raw_filing_evidence[field]`` that ties the value to the same accession, exact period,
+    original filing URL/hash, excerpt and table/iXBRL locator. ``split_multiplier`` must be
+    supported by the evidence's splitAdjustment trace; it is never inferred from EPS ratios.
     """
     multiplier = _decimal(split_multiplier)
     if multiplier is None or multiplier <= 0:
@@ -321,34 +323,45 @@ def stage_direct_q4_eps(companyfacts, *, symbol, cik, period_start, period_end,
 
         adjusted = _decimal(candidate["rawValue"]) * multiplier
         error = None
+        flags = []
         check = (cross_checks or {}).get(field) or {}
         income = check.get("income") or {}
         shares = check.get("shares") or {}
         income_value = _decimal(income.get("value"))
         shares_value = _decimal(shares.get("value"))
-        failure = None
         if income.get("unit") != "USD":
-            failure = "cross-check-income-unit-mismatch"
+            flags.append("cross-check-income-unit-mismatch")
         elif shares.get("unit") != "shares":
-            failure = "cross-check-shares-unit-mismatch"
+            flags.append("cross-check-shares-unit-mismatch")
         elif shares.get("basis") != target_share_basis:
-            failure = "cross-check-share-basis-mismatch"
+            flags.append("cross-check-share-basis-mismatch")
         elif income_value is None:
-            failure = "cross-check-income-missing-or-invalid"
+            flags.append("cross-check-income-missing-or-invalid")
         elif shares_value is None or shares_value <= 0:
-            failure = "cross-check-shares-missing-or-nonpositive"
+            flags.append("cross-check-shares-missing-or-nonpositive")
         else:
             expected = income_value / shares_value
             if expected == 0:
-                if adjusted != 0:
-                    failure = "cross-check-zero-income-eps-mismatch"
                 error = Decimal(0) if adjusted == 0 else None
+                if adjusted != 0:
+                    flags.append("cross-check-zero-income-eps-mismatch")
             else:
                 if adjusted == 0 or (adjusted > 0) != (expected > 0):
-                    failure = "cross-check-sign-mismatch"
+                    flags.append("cross-check-sign-mismatch")
                 error = abs(adjusted - expected) / abs(expected)
-                if failure is None and error > DIRECT_CROSSCHECK_MAX_RELATIVE_ERROR:
-                    failure = "cross-check-outside-25-percent"
+                if error > DIRECT_CROSSCHECK_MAX_RELATIVE_ERROR:
+                    flags.append("cross-check-outside-25-percent")
+
+        filing_evidence = (raw_filing_evidence or {}).get(field)
+        evidence_reason = _validate_raw_filing_evidence(
+            filing_evidence, candidate=candidate, field=field,
+            period_start=period_start, period_end=period_end,
+            raw_value=candidate["rawValue"], split_multiplier=multiplier)
+        adjudication = filing_evidence.get("diagnosticAdjudication") if isinstance(filing_evidence, dict) else None
+        if (evidence_reason is None and flags
+                and not (isinstance(adjudication, dict) and adjudication.get("status") == "resolved"
+                         and str(adjudication.get("reason") or "").strip())):
+            evidence_reason = "cross-check-diagnostic-needs-source-review"
 
         source = {
             "provider": "SEC EDGAR companyfacts",
@@ -370,7 +383,9 @@ def stage_direct_q4_eps(companyfacts, *, symbol, cik, period_start, period_end,
                 "target": target_share_basis,
                 "splitMultiplier": _decimal_text(multiplier),
             },
+            "rawFilingEvidence": filing_evidence,
         }
+        verified = evidence_reason is None
         result[field] = {
             "schema": SCHEMA,
             "symbol": symbol,
@@ -380,18 +395,175 @@ def stage_direct_q4_eps(companyfacts, *, symbol, cik, period_start, period_end,
             "value": _decimal_text(adjusted),
             "currency": "USD",
             "unit": "USD/shares",
-            "grade": "A" if failure is None else None,
-            "status": "validated" if failure is None else "rejected",
+            "grade": "A" if verified else None,
+            "status": "validated" if verified else (
+                "pending-diagnostic-review" if evidence_reason == "cross-check-diagnostic-needs-source-review"
+                else "pending-raw-filing-validation"),
             "method": "direct-sec-companyfacts",
             "source": source,
             "validation": {
-                "passed": failure is None,
-                "failureReason": failure,
+                "passed": verified,
+                "failureReason": evidence_reason,
+                "diagnosticFlags": flags,
                 "crossCheckRelativeError": _decimal_text(error),
                 "crossCheckMaximumRelativeError": _decimal_text(DIRECT_CROSSCHECK_MAX_RELATIVE_ERROR),
             },
         }
     return result
+
+
+def _validate_raw_filing_evidence(evidence, *, candidate, field, period_start,
+                                  period_end, raw_value, split_multiplier):
+    """Re-read and structurally verify the exact original SEC fact before assigning Grade A."""
+    if field not in DIRECT_EPS_CONCEPTS:
+        return "unsupported-direct-eps-field"
+    if not isinstance(evidence, dict):
+        return "missing-original-sec-filing-evidence"
+    if evidence.get("accession") != candidate.get("accession"):
+        return "raw-filing-accession-mismatch"
+    if str(evidence.get("form") or "").upper() != str(candidate.get("form") or "").upper():
+        return "raw-filing-form-mismatch"
+    if evidence.get("periodStart") != period_start or evidence.get("periodEnd") != period_end:
+        return "raw-filing-period-mismatch"
+    if evidence.get("field") != field:
+        return "raw-filing-eps-type-mismatch"
+    if _decimal(evidence.get("reportedValue")) != _decimal(raw_value):
+        return "raw-filing-value-mismatch"
+    if evidence.get("unit") != "USD/shares":
+        return "raw-filing-unit-mismatch"
+    url = urlparse(str(evidence.get("url") or ""))
+    accession_digits = re.sub(r"[^0-9]", "", str(candidate.get("accession") or ""))
+    expected_cik = _cik(candidate.get("cik"))
+    archive = re.fullmatch(r"/Archives/edgar/data/(\d+)/(\d+)/([^/]+)", url.path)
+    if (url.scheme != "https" or url.netloc.lower() != "www.sec.gov" or not archive
+            or not expected_cik or _cik(archive.group(1)) != expected_cik
+            or not accession_digits or archive.group(2) != accession_digits
+            or url.params or url.query or url.fragment):
+        return "raw-filing-url-cik-accession-or-document-mismatch"
+    digest = str(evidence.get("filingSha256") or "")
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", digest):
+        return "raw-filing-hash-missing-or-invalid"
+    if not str(evidence.get("excerpt") or "").strip():
+        return "raw-filing-excerpt-missing"
+    if not isinstance(evidence.get("locator"), dict) or not evidence["locator"]:
+        return "raw-filing-locator-missing"
+    raw_path = evidence.get("rawBodyPath")
+    if not isinstance(raw_path, str) or not raw_path.strip() or evidence.get("rawBodyUrl") != evidence.get("url"):
+        return "raw-filing-body-location-missing-or-mismatched"
+    try:
+        body = Path(raw_path).read_bytes()
+    except OSError:
+        return "raw-filing-body-unreadable"
+    if hashlib.sha256(body).hexdigest() != digest.lower():
+        return "raw-filing-body-hash-mismatch"
+    locator_error = _verify_raw_filing_locator(
+        body, evidence=evidence, candidate=candidate, field=field,
+        period_start=period_start, period_end=period_end, raw_value=raw_value)
+    if locator_error:
+        return locator_error
+    split_adjustment = evidence.get("splitAdjustment")
+    if isinstance(split_adjustment, dict):
+        if _decimal(split_adjustment.get("factor")) != split_multiplier:
+            return "split-adjustment-not-independently-traced"
+        if split_multiplier != 1 and not split_adjustment.get("source"):
+            return "split-adjustment-source-missing"
+    elif split_multiplier != 1:
+        return "split-adjustment-not-independently-traced"
+    if not str(evidence.get("reportedBasis") or "").strip():
+        return "raw-filing-share-basis-missing"
+    return None
+
+
+def _verify_raw_filing_locator(body, *, evidence, candidate, field, period_start, period_end, raw_value):
+    locator = evidence.get("locator") or {}
+    try:
+        text = body.decode("utf-8", errors="replace")
+    except AttributeError:
+        return "raw-filing-body-is-not-bytes"
+    if locator.get("type") in {"ixbrl", "inline-xbrl", "xbrl"} or locator.get("factId"):
+        try:
+            from sec_inline_xbrl_q4 import parse_inline_xbrl
+            parsed = parse_inline_xbrl(text)
+        except Exception:
+            return "raw-filing-inline-xbrl-could-not-be-parsed"
+        concept = DIRECT_EPS_CONCEPTS.get(field)
+        expected_cik = _cik(candidate.get("cik"))
+        matches = []
+        for fact in parsed.get("facts", []):
+            if fact.get("name") != concept or fact.get("namespace", "").lower() != "us-gaap":
+                continue
+            if not re.fullmatch(r"https?://fasb\.org/us-gaap/\d{4}(?:[-/][A-Za-z0-9._-]+)?",
+                                str(fact.get("namespaceUri") or "")):
+                continue
+            context = fact.get("context") if isinstance(fact.get("context"), dict) else {}
+            entity_ids = context.get("entityIdentifiers") if isinstance(context.get("entityIdentifiers"), list) else []
+            context_start = _day(context.get("start"))
+            context_end = _day(context.get("end"))
+            duration_days = (context_end - context_start).days + 1 if context_start and context_end else None
+            if (context.get("start") != period_start or context.get("end") != period_end
+                    or duration_days is None or not 80 <= duration_days <= 100
+                    or fact.get("unit") != "USD/shares" or context.get("dimensions")
+                    or context.get("typedDimensions") or context.get("hasSegment") or context.get("hasScenario")
+                    or len(entity_ids) != 1 or not isinstance(entity_ids[0], dict)
+                    or _cik(entity_ids[0].get("identifier")) != expected_cik):
+                continue
+            scheme = urlparse(str(entity_ids[0].get("scheme") or ""))
+            if (scheme.scheme not in {"http", "https"}
+                    or (scheme.hostname or "").lower() not in {"sec.gov", "www.sec.gov", "data.sec.gov"}):
+                continue
+            if _decimal(fact.get("value")) != _decimal(raw_value):
+                continue
+            if locator.get("factId") and fact.get("id") != locator.get("factId"):
+                continue
+            if locator.get("contextRef") and fact.get("contextRef") != locator.get("contextRef"):
+                continue
+            matches.append(fact)
+        return None if len(matches) == 1 else "raw-filing-inline-xbrl-locator-does-not-resolve-uniquely"
+
+    try:
+        import backfill_q4_eps_8k as table_parser
+        tables = table_parser.structured_tables_of(text)
+    except Exception:
+        return "raw-filing-table-could-not-be-parsed"
+    table_index = locator.get("tableIndex", locator.get("table"))
+    row_index = locator.get("row", locator.get("rowIndex"))
+    column_index = locator.get("column", locator.get("columnIndex"))
+    if (isinstance(table_index, bool) or not isinstance(table_index, int) or table_index < 0
+            or isinstance(row_index, bool) or not isinstance(row_index, int)
+            or isinstance(column_index, bool) or not isinstance(column_index, int)
+            or table_index >= len(tables)):
+        return "raw-filing-table-locator-is-invalid"
+    table = tables[table_index]
+    result, reason = table_parser.table_eps(table, None, period_end, table_index=table_index,
+                                            expected_currency="USD")
+    if result is None and reason is None:
+        result, reason = table_parser.table_basic_eps(table, period_end, table_index=table_index,
+                                                      expected_currency="USD")
+    if result is None or reason:
+        return "raw-filing-table-locator-does-not-resolve-to-q4-eps"
+    raw_key = "epsDilutedAsReported" if field == "epsDiluted" else "epsBasicAsReported"
+    if _decimal(result.get(raw_key, result.get(field))) != _decimal(raw_value):
+        return "raw-filing-table-locator-value-mismatch"
+    evidence_table = result.get("evidence") if isinstance(result.get("evidence"), dict) else {}
+    if field == "epsDiluted":
+        cell = evidence_table.get("epsCell") if isinstance(evidence_table.get("epsCell"), dict) else {}
+        review_quality = ((result.get("qualityByField") or {}).get("epsDiluted") or {})
+    else:
+        cell = evidence_table.get("basicEpsCell") if isinstance(evidence_table.get("basicEpsCell"), dict) else {}
+        review_quality = ((result.get("qualityByField") or {}).get("epsBasic") or {})
+    if cell.get("row") != row_index or cell.get("column") != column_index:
+        return "raw-filing-table-locator-row-or-column-mismatch"
+    review_flags = set(review_quality.get("reviewFlags") or [])
+    formula_diagnostics = {
+        "diluted-eps-sign-differs-from-net-income",
+        "net-income-does-not-match-stored-quarter-value",
+        "net-income-target-match-is-ambiguous",
+        "net-income-divided-by-shares-differs-from-diluted-eps",
+    }
+    if review_quality.get("candidateValidated") is not True and not (field == "epsDiluted" and review_flags
+                                                                      and review_flags <= formula_diagnostics):
+        return "raw-filing-table-locator-candidate-needs-review"
+    return None
 
 
 def _normalize_reconstruction_fact(candidates, *, role, cik, start, end, unit, cutoff=None):

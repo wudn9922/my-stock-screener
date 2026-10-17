@@ -133,7 +133,8 @@ def run_main(argv, client=None, clock=None):
     """main(argv) with the network kept out → (exit code, printed text)."""
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
-        code = sec.main(argv, client=client, now=NOW, environ={}, clock=clock)
+        code = sec.main(argv, client=client, now=NOW,
+                        environ={"SEC_USER_AGENT": "TestAgent test@example.com"}, clock=clock)
     return code, out.getvalue()
 
 
@@ -182,7 +183,8 @@ class UpgradeMergeTests(unittest.TestCase):
             self.assertIn(code, issues)
         self.assertNotIn("short-history", issues)
         self.assertEqual(document["quality"]["level"], "good")
-        self.assertEqual(document["split"], {"adjusted": False, "events": []})
+        self.assertEqual(document["split"], {"adjusted": False, "events": [], "eventsComplete": False,
+                                             "eventsSource": None, "eventsCheckedAt": None})
 
     def test_stored_yahoo_adr_ratio_is_not_carried(self):
         """The Yahoo file's own adrRatio (Yahoo against Yahoo, epsFactor 1) says nothing about the ADR: dropped."""

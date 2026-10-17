@@ -339,7 +339,8 @@ class Runner:
         client = sec.SecClient("Test Agent test@example.com", opener=fake, sleeper=self.sleeps.append)
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
-            code = sec.main(argv, client=client, now=now, environ={} if environ is None else environ,
+            code = sec.main(argv, client=client, now=now,
+                            environ={"SEC_USER_AGENT": "TestAgent test@example.com"} if environ is None else environ,
                             yahoo_factory=yahoo or self._no_yahoo, sleep=self.yahoo_sleeps.append, clock=clock)
         self.client = client
         if yahoo is None:
@@ -362,18 +363,22 @@ def three_year_payload(income=True):
 # SEC access rules
 # ---------------------------------------------------------------------------------------------
 class AccessRulesTest(unittest.TestCase):
-    def test_default_user_agent_is_exact(self):
-        self.assertEqual(sec.DEFAULT_USER_AGENT, "SecSeed w556087587@gmail.com")
-        self.assertEqual(sec.resolve_user_agent({}), "SecSeed w556087587@gmail.com")
-        self.assertEqual(sec.resolve_user_agent({"PATH": "x"}), "SecSeed w556087587@gmail.com")
+    def test_user_agent_requires_operator_contact(self):
+        self.assertIsNone(sec.DEFAULT_USER_AGENT)
+        for environ in ({}, {"PATH": "x"}):
+            with self.assertRaises(sec.UserAgentError):
+                sec.resolve_user_agent(environ)
 
     def test_env_overrides_and_is_trimmed(self):
-        self.assertEqual(sec.resolve_user_agent({"SEC_USER_AGENT": "  Me me@example.com "}), "Me me@example.com")
+        self.assertEqual(sec.resolve_user_agent({"SEC_USER_AGENT": "  ResearchBot contact@example.com "}),
+                         "ResearchBot contact@example.com")
 
     def test_blank_env_is_refused(self):
         for value in ("", "   ", "\t\n"):
             with self.assertRaises(sec.UserAgentError):
                 sec.resolve_user_agent({"SEC_USER_AGENT": value})
+        with self.assertRaises(sec.UserAgentError):
+            sec.resolve_user_agent({"SEC_USER_AGENT": "ResearchBot without-contact"})
         with self.assertRaises(sec.UserAgentError):
             sec.resolve_user_agent({"SEC_USER_AGENT": "bad\nagent"})
 
@@ -404,13 +409,14 @@ class AccessRulesTest(unittest.TestCase):
         fake = FakeSec()
         fake.route(sec.TICKERS_URL, ok({"0": {"cik_str": 320193, "ticker": "AAPL"}}, gzipped=True))
         fake.route(sec.FACTS_URL.format(cik="0000320193"), ok(SYNTHETIC_BYTES, gzipped=True))
-        client = sec.SecClient(sec.resolve_user_agent({}), opener=fake, sleeper=lambda seconds: None)
+        client = sec.SecClient(sec.resolve_user_agent({"SEC_USER_AGENT": "ResearchBot contact@example.com"}),
+                               opener=fake, sleeper=lambda seconds: None)
         self.assertEqual(client.ticker_map(), {"AAPL": "0000320193"})
         payload = client.company_facts(320193)
         self.assertEqual(payload["entityName"], "Synthetic Inc.")
         self.assertEqual(len(fake.requests), 2)
         for request in fake.requests:
-            self.assertEqual(request.get_header("User-agent"), "SecSeed w556087587@gmail.com")
+            self.assertEqual(request.get_header("User-agent"), "ResearchBot contact@example.com")
             self.assertIn("gzip", request.get_header("Accept-encoding"))
 
     def test_default_client_uses_env_user_agent_and_urllib_opener(self):
@@ -648,7 +654,7 @@ class ExtractionTest(unittest.TestCase):
             dict(payload["facts"]["us-gaap"]["Revenues"]["units"]["USD"][3], val=120, accn="a-7"))
         self.assertEqual(sec.extract_periods(payload).annual[1]["values"]["revenue"], 120)   # a-7 > a-5, same day
 
-    def test_q4_is_annual_minus_nine_month_ytd_and_flagged(self):
+    def test_q4_income_and_revenue_use_ytd_periods_but_eps_stays_unreported(self):
         for fy in range(2020, 2025):
             ends = FYS[fy][1]
             q4 = self.Q[ends[3]]
@@ -660,9 +666,8 @@ class ExtractionTest(unittest.TestCase):
             self.assertIsNone(self.Q[ends[0]]["extra"]["derived"])
             self.assertNotIn("dilutedShares", q4["values"])        # no Q4 share count
             self.assertEqual(q4["values"]["equity"], 70 * B + fy)   # balance sheet from the 10-K
-        # Q4 EPS = annual EPS - (Q1 + Q2 + Q3)
-        q4 = self.Q["2024-09-28"]["values"]["epsDiluted"]
-        self.assertEqual(q4, fin.clean_value(annual_eps(2024) - sum(eps(2024, q) for q in range(3))))
+        # A standalone Q4 EPS fact is required; annual-minus-quarter EPS is not stored.
+        self.assertNotIn("epsDiluted", self.Q["2024-09-28"]["values"])
 
     def test_q4_without_nine_month_ytd_uses_the_three_quarters(self):
         payload = facts()
@@ -1799,7 +1804,8 @@ class MainTest(unittest.TestCase):
         fake = world(self.ENTRIES)
         client = sec.SecClient("T", opener=fake, sleeper=lambda s: None)
         with mock.patch.object(sec, "REPO_ROOT", tmp), contextlib.redirect_stdout(io.StringIO()):
-            code = sec.main([], client=client, now=NOW, environ={})
+            code = sec.main([], client=client, now=NOW,
+                            environ={"SEC_USER_AGENT": "TestAgent test@example.com"})
         self.assertEqual(code, 0)
         self.assertTrue(os.path.isfile(os.path.join(tmp, "docs", "report", "financials", "AAPL.json")))
 
@@ -1956,18 +1962,20 @@ def split_companyfacts(splits=SPLITS, shares=today_shares, name="Synthetic Split
     return {"cik": 4242, "entityName": name, "facts": {"us-gaap": gaap}}
 
 
-def chart(*events):
+def chart(*events, symbol="SYN"):
     """SYNTHETIC Yahoo chart payload (events=split) with the given (day, numerator, denominator)."""
     splits = {}
     for day, numerator, denominator in events:
         stamp = int(datetime.fromisoformat(day + "T13:30:00+00:00").timestamp())
         splits[str(stamp)] = {"date": stamp, "numerator": numerator, "denominator": denominator,
                               "splitRatio": f"{numerator}:{denominator}"}
-    result = {"meta": {"symbol": "SYN"}, "events": {"splits": splits}} if splits else {"meta": {"symbol": "SYN"}}
+    first_trade = int(datetime.fromisoformat("1990-01-01T00:00:00+00:00").timestamp())
+    result = {"meta": {"symbol": symbol, "firstTradeDate": first_trade, "range": "max"},
+              "timestamp": [first_trade, 1792108800], "events": {"splits": splits}}
     return {"chart": {"result": [result], "error": None}}
 
 
-SPLIT_CHART = chart(("2014-06-09", 7, 1), ("2020-08-31", 4, 1))
+SPLIT_CHART = chart(("2014-06-09", 7, 1), ("2020-08-31", 4, 1), symbol="SYN")
 SPLIT_FACTS = split_companyfacts()
 SPLIT_BYTES = json.dumps(SPLIT_FACTS).encode("utf-8")
 ISSUER_FACTS = split_companyfacts(splits=(), shares=issuer_shares, name="Synthetic Issuer Corp.")
@@ -2047,7 +2055,12 @@ class SplitMergeTest(unittest.TestCase):
         self.assertEqual(self.info["chart"], "fetched")
         self.assertFalse(self.info["shareJump"])
         self.assertTrue(self.info["splitAdjusted"])
-        self.assertEqual(self.doc["split"], {"adjusted": True, "events": [["2014-06-09", 7], ["2020-08-31", 4]]})
+        self.assertEqual(self.doc["split"], {"adjusted": True, "events": [["2014-06-09", 7], ["2020-08-31", 4]],
+                                             "eventsComplete": True,
+                                             "eventsSource": "Yahoo Finance chart range=max split events",
+                                             "eventsCheckedAt": TODAY, "eventsSymbol": "SYN",
+                                             "eventsCoverageStart": "1990-01-01", "eventsCoverageEnd": "2026-10-16",
+                                             "eventsParserVersion": 3})
         self.assertIn("split-adjusted", self.doc["quality"]["issues"])
         self.assertNotIn("eps-inconsistent", self.doc["quality"]["issues"])
         self.assert_one_basis(self.doc)
@@ -2064,14 +2077,11 @@ class SplitMergeTest(unittest.TestCase):
         self.assertEqual(self.doc["annual"]["values"]["netIncome"], self.raw["annual"]["values"]["netIncome"])
         self.assertEqual(self.doc["quarterly"]["values"]["revenue"], self.raw["quarterly"]["values"]["revenue"])
 
-    def test_q4_eps_follows_its_annual_period_and_mixed_bases_are_not_derived(self):
+    def test_q4_eps_is_not_derived_after_split_adjustment(self):
         q = columns(self.doc, "quarterly")
-        # FY2016: annual EPS and Q1-Q3 EPS all on the ÷4 basis → derived, then × 1/4 with the annual period
-        q4_income = split_income(2016) - 3 * (split_income(2016) // 4)
-        self.assertAlmostEqual(q["2016-12-31"]["epsDiluted"], q4_income / today_shares(2016), delta=0.002)
+        # There is no direct Q4 EPS fact in this fixture; split alignment cannot create one.
+        self.assertIsNone(q["2016-12-31"]["epsDiluted"])
         self.assertIsNone(q["2016-12-31"]["dilutedShares"])
-        self.assertAlmostEqual(q["2010-12-31"]["epsDiluted"],
-                               (split_income(2010) - 3 * (split_income(2010) // 4)) / today_shares(2010), delta=0.002)
         # FY2012 (annual ÷4, quarters ÷28) and FY2019 (quarters ÷4): as reported the four pieces have no one share
         # basis, so extraction derives no Q4 EPS. The split adjustment then puts annual and quarterly values on
         # today's basis, and fill_q4_eps derives the Q4 EPS there (± the cent rounding of the reported EPS)
@@ -2079,14 +2089,14 @@ class SplitMergeTest(unittest.TestCase):
         for end in ("2012-12-31", "2019-12-31"):
             self.assertNotIn("epsDiluted", raw_q[end], end)
             self.assertIsNotNone(q[end]["netIncome"], end)
-            self.assertAlmostEqual(q[end]["epsDiluted"], q[end]["netIncome"] / today_shares(int(end[:4])),
-                                   delta=0.0201, msg=end)
-        self.assertIn("epsDiluted", raw_q["2022-12-31"])
+            self.assertIsNone(q[end]["epsDiluted"], end)
+        self.assertNotIn("epsDiluted", raw_q["2022-12-31"])
 
     def test_without_fetch_values_stay_as_reported_and_jump_is_flagged(self):
         self.assertTrue(self.raw_info["shareJump"])
         self.assertIsNone(self.raw_info["chart"])
-        self.assertEqual(self.raw["split"], {"adjusted": False, "events": []})
+        self.assertEqual(self.raw["split"], {"adjusted": False, "events": [], "eventsComplete": False,
+                                             "eventsSource": None, "eventsCheckedAt": None})
         self.assertNotIn("split-adjusted", self.raw["quality"]["issues"])
         a = columns(self.raw, "annual")
         self.assertEqual(a["2011-12-31"]["dilutedShares"], today_shares(2011) // 28)
@@ -2102,11 +2112,16 @@ class SplitMergeTest(unittest.TestCase):
         self.assertEqual(info["chartError"], "RuntimeError: HTTP 429")
         self.assertTrue(info["shareJump"])
         self.assertFalse(info["splitAdjusted"])
-        self.assertTrue(fin.same_content(doc, self.raw))
+        self.assertEqual(doc["annual"]["values"], self.raw["annual"]["values"])
+        self.assertEqual(doc["quarterly"]["values"], self.raw["quarterly"]["values"])
+        self.assertEqual(doc["split"], {"adjusted": False, "events": [], "eventsComplete": False,
+                                        "eventsSource": "Yahoo Finance chart range=max split events",
+                                        "eventsCheckedAt": TODAY})
         # an unparsable chart payload counts as fetched without events (as in update_document)
         doc, info = sec.merge_into_document(None, self.result, "SYN", NOW, Fetch({"junk": 1}))
-        self.assertEqual(info["chart"], "fetched")
-        self.assertTrue(fin.same_content(doc, self.raw))
+        self.assertEqual(info["chart"], "failed")
+        self.assertEqual(doc["annual"]["values"], self.raw["annual"]["values"])
+        self.assertEqual(doc["quarterly"]["values"], self.raw["quarterly"]["values"])
 
     def test_second_merge_reuses_stored_events_and_is_idempotent(self):
         never = Fetch(AssertionError("must not fetch again"))
@@ -2124,13 +2139,19 @@ class SplitMergeTest(unittest.TestCase):
 
     def test_stored_events_are_used_without_a_fetch(self):
         stored = {"version": 1, "symbol": "SYN",
-                  "split": {"adjusted": True, "events": [["2014-06-09", 7], ["2020-08-31", 4]]}}
+                  "split": {"adjusted": True, "events": [["2014-06-09", 7], ["2020-08-31", 4]],
+                            "eventsComplete": True,
+                            "eventsSource": "Yahoo Finance chart range=max split events",
+                            "eventsCheckedAt": TODAY, "eventsSymbol": "SYN",
+                            "eventsCoverageStart": "1990-01-01", "eventsCoverageEnd": "2026-10-16",
+                            "eventsParserVersion": 3}}
         never = Fetch(AssertionError("must not fetch"))
         doc, info = sec.merge_into_document(stored, self.result, "SYN", NOW, never)
         self.assertEqual(never.calls, 0)
         self.assertTrue(fin.same_content(doc, self.doc))
         # only the newer event stored (e.g. by a Yahoo run): the jump left over triggers one fetch
-        partial = {"version": 1, "symbol": "SYN", "split": {"adjusted": True, "events": [["2020-08-31", 4]]}}
+        partial = {"version": 1, "symbol": "SYN", "split": {"adjusted": True, "events": [["2020-08-31", 4]],
+                                                                "eventsComplete": False}}
         once = Fetch(SPLIT_CHART)
         doc, info = sec.merge_into_document(partial, self.result, "SYN", NOW, once)
         self.assertEqual(once.calls, 1)
@@ -2146,7 +2167,7 @@ class SplitMergeTest(unittest.TestCase):
         result = sec.extract_periods(copy.deepcopy(ISSUER_FACTS))
         self.assertTrue(fin.share_jump([result.annual, result.quarterly]))
         reference, _ = sec.merge_into_document(None, result, "ISS", NOW)
-        for payload in (chart(), chart(("1999-05-03", 2, 1))):          # no event / only an older split
+        for payload in (chart(symbol="ISS"), chart(("1999-05-03", 2, 1), symbol="ISS")):  # no event / older split
             fetch = Fetch(payload)
             doc, info = sec.merge_into_document(None, result, "ISS", NOW, fetch)
             self.assertEqual(fetch.calls, 1)
@@ -2201,8 +2222,10 @@ class SplitMainTest(unittest.TestCase):
 
     def test_yahoo_created_lazily_once_and_splits_applied(self):
         runner = Runner(self)
-        make, log = self.factory({self.url("SPLT"): SPLIT_CHART, self.url("SPLU"): SPLIT_CHART,
-                                  self.url("ISSU"): chart()})
+        make, log = self.factory({self.url("SPLT"): chart(("2014-06-09", 7, 1),
+                                                              ("2020-08-31", 4, 1), symbol="SPLT"),
+                                  self.url("SPLU"): chart(("2014-06-09", 7, 1), ("2020-08-31", 4, 1), symbol="SPLU"),
+                                  self.url("ISSU"): chart(symbol="ISSU")})
         fake = world(self.ENTRIES)
         code, text = runner.run(fake, "--tickers", "AAPL,SPLT,ISSU,SPLU", yahoo=make)
         self.assertEqual(code, 0, text)
@@ -2226,7 +2249,7 @@ class SplitMainTest(unittest.TestCase):
         SplitMergeTest.assert_one_basis(self, document)
         # a --force re-run reuses the stored events: no Yahoo session at all, files unchanged
         before = read_bytes(runner.path("SPLT.json"))
-        make2, log2 = self.factory({self.url("ISSU"): chart()})
+        make2, log2 = self.factory({self.url("ISSU"): chart(symbol="ISSU")})
         code, text = runner.run(world(self.ENTRIES), "--tickers", "SPLT,SPLU", "--force", yahoo=make2)
         self.assertEqual(log2, [])
         self.assertIn("SPLT unchanged", text)
@@ -2256,14 +2279,17 @@ class SplitMainTest(unittest.TestCase):
         self.assertIn("split checks: Yahoo unavailable (Yahoo connection failed: RuntimeError: Yahoo crumb HTTP 429)", text)
         self.assertIn("split-check-pending: 2 ticker(s) (SPLT, SPLU)", text)
         document = read_json(runner.path("SPLT.json"))
-        self.assertEqual(document["split"], {"adjusted": False, "events": []})
+        self.assertEqual(document["split"], {"adjusted": False, "events": [], "eventsComplete": False,
+                                             "eventsSource": "Yahoo Finance chart range=max split events",
+                                             "eventsCheckedAt": TODAY})
         raw, _ = sec.merge_into_document(None, sec.extract_periods(copy.deepcopy(SPLIT_FACTS)), "SPLT", NOW)
         self.assertEqual(document["annual"]["values"], raw["annual"]["values"])       # as reported
         self.assertEqual(runner.files(), ["AAPL.json", "SPLT.json", "SPLU.json"])
 
     def test_connect_retry_then_success(self):
         runner = Runner(self)
-        make, log = self.factory({self.url("SPLT"): SPLIT_CHART}, fail=1)
+        make, log = self.factory({self.url("SPLT"): chart(("2014-06-09", 7, 1),
+                                                            ("2020-08-31", 4, 1), symbol="SPLT")}, fail=1)
         code, text = runner.run(world(self.ENTRIES), "--tickers", "SPLT", yahoo=make)
         self.assertEqual(code, 0)
         self.assertEqual([e[0] for e in log], ["connect", "connect", "chart"])
@@ -2290,7 +2316,10 @@ class SplitMainTest(unittest.TestCase):
         self.assertIn("[split-check-pending]", text)
         self.assertIn("split checks: disabled (--no-splits)", text)
         self.assertIn("split-check-pending: 1 ticker(s) (SPLT)", text)
-        self.assertEqual(read_json(runner.path("SPLT.json"))["split"], {"adjusted": False, "events": []})
+        self.assertEqual(read_json(runner.path("SPLT.json"))["split"], {"adjusted": False, "events": [],
+                                                                          "eventsComplete": False,
+                                                                          "eventsSource": None,
+                                                                          "eventsCheckedAt": None})
 
 
 # ---------------------------------------------------------------------------------------------
@@ -2433,7 +2462,8 @@ class UnitErrorTest(unittest.TestCase):
                 if p["values"].get("dilutedShares") is not None:
                     self.assertIn(p["values"]["dilutedShares"], reported[p["end"]])
             events = [(day, ratio, 1) for day, ratio in splits]
-            doc, info = sec.merge_into_document(None, result, "SYN", NOW, Fetch(chart(*events)))
+            doc, info = sec.merge_into_document(None, result, "SYN", NOW,
+                                                Fetch(chart(*events, symbol="SYN")))
             self.assertTrue(info["splitAdjusted"], splits)
             SplitMergeTest.assert_one_basis(self, doc)
 
@@ -2461,21 +2491,26 @@ class ImpliedShareBasisTest(unittest.TestCase):
         for end in ("2020-12-31", "2021-12-31"):
             self.assertNotIn("epsDiluted", q[end], end)
             self.assertIn("netIncome", q[end], end)
-        for end in ("2019-12-31", "2022-12-31", "2023-12-31"):          # one basis: derived
-            self.assertIn("epsDiluted", q[end], end)
+        for end in ("2019-12-31", "2022-12-31", "2023-12-31"):
+            self.assertNotIn("epsDiluted", q[end], end)                   # no standalone Q4 fact
         for end, values in q.items():
             if values.get("epsDiluted") and values.get("netIncome"):
                 self.assertEqual(values["epsDiluted"] > 0, values["netIncome"] > 0, end)
 
     def test_split_check_and_adjustment_work_on_implied_share_counts(self):
         result = sec.extract_periods(googl_companyfacts())
-        fetch = Fetch(chart(("2022-07-15", 20, 1)))
+        fetch = Fetch(chart(("2022-07-15", 20, 1), symbol="GOOGL"))
         doc, info = sec.merge_into_document(None, result, "GOOGL", NOW, fetch)
         self.assertEqual(fetch.calls, 1)                    # the implied counts jump × 20
         self.assertEqual(info["chart"], "fetched")
         self.assertTrue(info["splitAdjusted"])
         self.assertFalse(info["shareJump"])
-        self.assertEqual(doc["split"], {"adjusted": True, "events": [["2022-07-15", 20]]})
+        self.assertEqual(doc["split"], {"adjusted": True, "events": [["2022-07-15", 20]],
+                                        "eventsComplete": True,
+                                        "eventsSource": "Yahoo Finance chart range=max split events",
+                                        "eventsCheckedAt": TODAY, "eventsSymbol": "GOOGL",
+                                        "eventsCoverageStart": "1990-01-01", "eventsCoverageEnd": "2026-10-16",
+                                        "eventsParserVersion": 3})
         for frequency in ("annual", "quarterly"):
             self.assertNotIn("dilutedShares", doc[frequency]["values"])     # implied counts are never written
         SplitMergeTest.assert_one_basis(self, doc)
@@ -2491,8 +2526,7 @@ class ImpliedShareBasisTest(unittest.TestCase):
         self.assertTrue(info["shareJump"])
         self.assertNotIn("dilutedShares", raw["annual"]["values"])
 
-    def test_derived_q4_eps_of_the_wrong_sign_is_null(self):
-        # ADI / AMD / HPQ-like: four pieces on one basis whose difference contradicts the Q4 net income
+    def test_eps_subtraction_is_not_attempted_even_when_the_implied_sign_would_conflict(self):
         rows = {
             "NetIncomeLoss": quarters(2023, [25 * M] * 3) + [year(2023, 100 * M)],
             "EarningsPerShareDiluted": quarters(2023, [0.40] * 3, prefix="e") + [year(2023, 1.00)],
@@ -2501,8 +2535,8 @@ class ImpliedShareBasisTest(unittest.TestCase):
         result = sec.extract_periods(facts_of(rows))
         q4 = {p["end"]: p for p in result.quarterly}["2023-12-31"]
         self.assertEqual(q4["values"]["netIncome"], 25 * M)
-        self.assertNotIn("epsDiluted", q4["values"])                     # 1.00 − 1.20 < 0 < 25M
-        self.assertEqual(result.dropped["epsDiluted"], 1)
+        self.assertNotIn("epsDiluted", q4["values"])                     # no annual-minus-quarter EPS
+        self.assertNotIn("epsDiluted", result.dropped)
         self.assertEqual(q4["extra"]["derived"], 1)                      # net income is still derived
 
 
@@ -2554,22 +2588,19 @@ class Q4AfterSplitTest(unittest.TestCase):
         self.assertEqual(q["2023-12-31"]["netIncome"], 930_000_000)        # Q4 net income is still derived
         self.assertEqual(q["2024-12-31"]["netIncome"], 1_860_000_000)
 
-    def test_merge_derives_q4_eps_on_the_adjusted_basis(self):
-        fetch = Fetch(chart((NFLX_SPLIT[0], NFLX_SPLIT[1], 1)))
+    def test_merge_keeps_missing_q4_eps_null_even_on_one_adjusted_basis(self):
+        fetch = Fetch(chart((NFLX_SPLIT[0], NFLX_SPLIT[1], 1), symbol="NFX"))
         doc, info = sec.merge_into_document(None, self.result, "NFX", NOW, fetch)
         self.assertEqual(fetch.calls, 1)
         self.assertTrue(info["splitAdjusted"])
         self.assertFalse(info["shareJump"])
         q, a = columns(doc, "quarterly"), columns(doc, "annual")
-        # annual EPS − (Q1..Q3 EPS, each adjusted ÷10 to 4 decimals): 1.20 − (0.289 + 0.331 + 0.373) and
-        # 1.98 − (0.530 + 0.489 + 0.536); both lie within a cent of net income ÷ today's share count
-        self.assertEqual(q["2023-12-31"]["epsDiluted"], 0.207)
-        self.assertEqual(q["2024-12-31"]["epsDiluted"], 0.425)
+        self.assertIsNone(q["2023-12-31"]["epsDiluted"])
+        self.assertIsNone(q["2024-12-31"]["epsDiluted"])
         for end in ("2023-12-31", "2024-12-31"):
-            self.assertAlmostEqual(q[end]["epsDiluted"], q[end]["netIncome"] / a[end]["dilutedShares"],
-                                   delta=0.0201, msg=end)
+            self.assertIn("dilutedShares", a[end])
+        # q4-derived may still describe net-income/YTD subtraction; it is not an EPS grade.
         self.assertIn("q4-derived", doc["quality"]["issues"])
-        self.assertEqual(doc["quarterly"]["derived"][doc["quarterly"]["end"].index("2023-12-31")], 1)
 
     def test_without_the_split_check_the_q4_eps_stays_null(self):
         doc, info = sec.merge_into_document(None, self.result, "NFX", NOW)
@@ -2578,7 +2609,8 @@ class Q4AfterSplitTest(unittest.TestCase):
         self.assertIsNone(columns(doc, "quarterly")["2024-12-31"]["epsDiluted"])
 
     def test_merge_is_idempotent_over_the_derived_q4_eps(self):
-        doc, _ = sec.merge_into_document(None, self.result, "NFX", NOW, Fetch(chart((NFLX_SPLIT[0], NFLX_SPLIT[1], 1))))
+        doc, _ = sec.merge_into_document(None, self.result, "NFX", NOW,
+                                         Fetch(chart((NFLX_SPLIT[0], NFLX_SPLIT[1], 1), symbol="NFX")))
         again, _ = sec.merge_into_document(copy.deepcopy(doc), self.result, "NFX", NOW, Fetch(AssertionError("no fetch")))
         self.assertTrue(fin.same_content(doc, again))
 
@@ -2883,7 +2915,7 @@ class FollowUpTest(unittest.TestCase):
         self.assertEqual(a["2022-12-31"], 2.0)                            # continuing = net income / shares
         self.assertIsNone(a["2023-12-31"])                                # 1.8 ≠ 2.0: discontinued operations
         self.assertEqual(q["2024-06-30"], 0.5)
-        self.assertEqual(q["2021-12-31"], 0.5)                            # Q4 of the combined tag
+        self.assertIsNone(q["2021-12-31"])                                # no standalone combined-tag Q4 fact
         self.assertIsNone(q["2022-12-31"])                                # never a Q4 of continuing EPS
         self.assertEqual(result.concepts["epsDiluted"], sorted(["EarningsPerShareDiluted", both, cont]))
 

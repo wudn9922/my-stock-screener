@@ -5,12 +5,14 @@
    {
     "meta": {
      "symbol": "SPLT",
+      "firstTradeDate": 946684800,
      "currency": "USD",
      "dataGranularity": "1mo",
      "range": "max"
     },
     "timestamp": [
-     1700000000
+     946684800,
+     1792108800
     ],
     "events": {
      "splits": {

@@ -1,0 +1,22 @@
+{
+  "company": "Marvell Technology, Inc.",
+  "ticker": "MRVL",
+  "fiscalYear": 2026,
+  "periodEnd": "2026-01-31",
+  "cik": "0001835632",
+  "accession": "0001835632-26-000006",
+  "form": "8-K",
+  "exhibit": "EX-99.1",
+  "filingDate": "2026-03-05",
+  "url": "https://www.sec.gov/Archives/edgar/data/1835632/000183563226000006/q426_8kx1312026ex-991.htm",
+  "sourceDocumentSha256": "ef87538614d9ff172891a0bf14aada69784e3567aabb48cbfddab92bbda9545b",
+  "tableIndexesInSourceDocument": [
+    0,
+    4
+  ],
+  "officialPublishedValues": {
+    "epsDilutedGAAP": 0.46,
+    "epsDilutedNonGAAP": 0.8
+  },
+  "note": "HTML tables extracted from the original SEC filing exhibit; fixture hashes are distinct from the full source-document hash."
+}

@@ -8,7 +8,7 @@ docs/report/growth.json (src "frames").
 
   python atlas/scripts/build_fundamentals_sec.py [--no-foreign] [--foreign-max-age-days N]
          [--report-dir docs/report] [--out docs/report/fundamentals/us-sec.json]
-  Env: SEC_USER_AGENT (default: seed_financials_sec.DEFAULT_USER_AGENT, a contact address as SEC asks).
+  Env: SEC_USER_AGENT is required and must include an operator contact address, as SEC asks.
 
 Where it runs: SEC has answered 403 to GitHub-hosted runners whatever the User-Agent (see atlas.yml).
 The workflow still tries: the first request (company_tickers.json) decides within seconds, and a refusal

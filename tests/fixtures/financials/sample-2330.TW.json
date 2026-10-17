@@ -349,7 +349,10 @@
  },
  "split": {
   "adjusted": false,
-  "events": []
+  "events": [],
+  "eventsComplete": false,
+  "eventsSource": null,
+  "eventsCheckedAt": null
  },
  "quality": {
   "level": "good",

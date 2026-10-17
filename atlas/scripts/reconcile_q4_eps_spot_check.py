@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Reconcile a manually reviewed SEC filing spot-check against stored Q4 EPS.
+"""Reconcile manually reviewed SEC filing spot-checks against stored Q4 EPS.
 
 The source rows are curated from the visible GAAP Q4 tables in the named SEC filing.
-All records are validated before the script writes any financial file. Existing values
-are changed only where the cited official Q4 row establishes a different value.
+Raw source hash and period alignment are gates. Net-income/share comparisons are diagnostics only.
+The apply path fills nulls and never overwrites an existing EPS value.
 """
 import argparse
 import hashlib
@@ -212,7 +212,8 @@ def validate_records(directory=FINANCIALS, cache=CACHE):
         except (TypeError, ValueError):
             start, duration = None, None
         adjusted, split_factor, problem = repair.normalize_and_check_q4_eps(
-            doc, row["periodEnd"], income, q3_shares, {"value": row["value"]})
+            doc, row["periodEnd"], income, q3_shares,
+            {"value": row["value"], "filed": source.get("filed")})
         if problem is None and (start is None or duration is None):
             problem = "q4-period-duration-not-80-to-100-days"
         old = _column_value(q, row["field"], index)
@@ -223,14 +224,18 @@ def validate_records(directory=FINANCIALS, cache=CACHE):
             filed = str(trace.get("filed") or "")
             if filed > str(source["filed"] or ""):
                 problem = "newer-existing-grade-A-source"
+        diagnostic = repair.q4_eps_diagnostics(adjusted, income, q3_shares) if adjusted is not None else None
+        manual_review = bool(diagnostic and diagnostic.get("flags"))
+        if problem is None and manual_review:
+            problem = "q4-net-income-share-diagnostic-needs-source-review"
         item.update({"oldValue": old, "oldGrade": old_grade, "q4NetIncome": income,
                      "q3DilutedShares": q3_shares, "impliedEps": (income / q3_shares if income and q3_shares else None),
                      "periodStart": start, "durationDays": duration,
                      "splitFactor": split_factor, "adjustedValue": adjusted,
                      "validation": {"passed": problem is None, "failureReason": problem,
-                                    "sameSign": problem is None and (adjusted > 0) == (income > 0),
-                                    "maximumRelativeError": repair.SEC_Q4_MAX_RELATIVE_ERROR,
-                                    "within25pctOfQ4IncomePerQ3Shares": problem is None}})
+                                    "rawDocumentHashVerified": True,
+                                    "manualReviewRequired": manual_review,
+                                    "diagnostic": diagnostic}})
         if problem:
             failures.append(item)
         checked.append(item)
@@ -238,7 +243,7 @@ def validate_records(directory=FINANCIALS, cache=CACHE):
 
 
 def apply_records(records, directory=FINANCIALS, dry_run=False):
-    """Apply only after every source, period, sign and 25% check passes."""
+    """Fill only null EPS values after all raw source hashes and periods have been checked."""
     if any(not (row.get("validation") or {}).get("passed") for row in records):
         raise RuntimeError("official spot-check validation failed; financial files were not changed")
     ledger = []
@@ -254,16 +259,17 @@ def apply_records(records, directory=FINANCIALS, dry_run=False):
         while len(column) < len(q["end"]):
             column.append(None)
         old, new = column[index], row["adjustedValue"]
+        if old is not None:
+            # Existing values are immutable in this workflow, even if a filing candidate differs.
+            continue
+        if new is None:
+            raise RuntimeError(f"refusing to write null normalized EPS: {row['symbol']} {row['periodEnd']}")
         grade_rows = q.setdefault("epsQuality", [None] * len(q["end"]))
         while len(grade_rows) < len(q["end"]):
             grade_rows.append(None)
         grade = grade_rows[index] if isinstance(grade_rows[index], dict) else {}
-        if old is not None and float(old) != float(new):
-            ledger.append({"schema": "q4-eps-direct-filing-correction-v1", "symbol": row["symbol"],
-                           "period": {"fiscalYear": row["fiscalYear"], "end": row["periodEnd"]},
-                           "field": row["field"], "oldValue": old, "newValue": new,
-                           "reason": "direct GAAP Q4 value in SEC filing disagreed with stored value",
-                           "source": row["source"], "validation": row["validation"]})
+        if column[index] is not None:
+            raise RuntimeError(f"refusing to overwrite non-null EPS during apply: {row['symbol']} {row['periodEnd']} {row['field']}")
         column[index] = new
         values[row["field"]] = column
         grade[row["field"]] = "A"
@@ -298,10 +304,10 @@ def main(argv=None):
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args(argv)
     rows, failures = validate_records(args.dir, args.cache)
-    report = {"schema": "q4-eps-spot-check-reconciliation-v1",
+    report = {"schema": "q4-eps-spot-check-reconciliation-v2",
               "status": "validation-failed-no-write" if failures else "validated",
               "count": len(rows), "validationFailures": len(failures), "records": rows,
-              "selectionGate": "SEC source hash exact; unique matching Q4 period; sign matches; within 25% of Q4 net income / Q3 diluted shares",
+              "selectionGate": "SEC source hash exact; unique matching Q4 period; official GAAP field and table row reviewed; NI/share comparison is diagnostic only",
               "sourceMethod": "manually reviewed visible GAAP row and Q4 column in SEC 10-K/8-K exhibit"}
     args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if failures:

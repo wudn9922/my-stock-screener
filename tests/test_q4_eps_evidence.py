@@ -1,7 +1,10 @@
 """Synthetic, offline tests for auditable Q4 EPS evidence staging."""
 import os
+import hashlib
+import tempfile
 import sys
 import unittest
+from pathlib import Path
 
 from decimal import Decimal
 
@@ -15,6 +18,7 @@ import q4_eps_evidence as evidence  # noqa: E402
 
 CIK = "0000001234"
 COMPANYFACTS_URL = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{CIK}.json"
+RAW_FIXTURE_DIR = Path(tempfile.mkdtemp(prefix="q4-eps-raw-evidence-"))
 
 
 def eps_fact(value, *, concept, filed="2024-02-15", accn="0000001234-24-000001",
@@ -45,6 +49,52 @@ def direct_checks(*, basic_income=250, diluted_income=250, basis="current"):
             "shares": {"value": 1000, "unit": "shares", "basis": basis},
         },
     }
+
+
+def raw_filing_checks(*, basic_value="0.50", diluted_value="0.50", accession="0000001234-24-000001",
+                      diagnostic_adjudication=None):
+    body = (f'''<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL"
+      xmlns:xbrli="http://www.xbrl.org/2003/instance"
+      xmlns:iso4217="http://www.xbrl.org/2003/iso4217"
+      xmlns:us-gaap="http://fasb.org/us-gaap/2023">
+      <xbrli:unit id="USDperShare"><xbrli:divide><xbrli:unitNumerator>
+      <xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unitNumerator><xbrli:unitDenominator>
+      <xbrli:measure>xbrli:shares</xbrli:measure></xbrli:unitDenominator></xbrli:divide></xbrli:unit>
+      <xbrli:context id="Q4"><xbrli:entity><xbrli:identifier scheme="https://www.sec.gov/">1234</xbrli:identifier>
+      </xbrli:entity><xbrli:period><xbrli:startDate>2023-10-01</xbrli:startDate>
+      <xbrli:endDate>2023-12-31</xbrli:endDate></xbrli:period></xbrli:context>
+      <ix:nonFraction id="basicQ4" name="us-gaap:EarningsPerShareBasic" contextRef="Q4"
+      unitRef="USDperShare" decimals="2">{basic_value}</ix:nonFraction>
+      <ix:nonFraction id="dilutedQ4" name="us-gaap:EarningsPerShareDiluted" contextRef="Q4"
+      unitRef="USDperShare" decimals="2">{diluted_value}</ix:nonFraction></html>''').encode()
+    digest = hashlib.sha256(body).hexdigest()
+    body_path = RAW_FIXTURE_DIR / f"{accession.replace('-', '')}-{basic_value}-{diluted_value}.htm"
+    body_path.write_bytes(body)
+
+    def item(field, value):
+        fact_id = "basicQ4" if field == "epsBasic" else "dilutedQ4"
+        row = {
+            "accession": accession,
+            "form": "10-K",
+            "periodStart": "2023-10-01",
+            "periodEnd": "2023-12-31",
+            "field": field,
+            "reportedValue": value,
+            "unit": "USD/shares",
+            "url": "https://www.sec.gov/Archives/edgar/data/1234/000000123424000001/exhibit99.htm",
+            "filingSha256": digest,
+            "rawBodyPath": str(body_path),
+            "rawBodyUrl": "https://www.sec.gov/Archives/edgar/data/1234/000000123424000001/exhibit99.htm",
+            "excerpt": "Three months ended December 31, 2023; GAAP diluted EPS $0.50",
+            "locator": {"type": "ixbrl", "factId": fact_id, "contextRef": "Q4"},
+            "locatorVerified": False,
+            "reportedBasis": "as presented in the 2023 10-K",
+            "splitAdjustment": {"factor": "0.5", "source": "independently recorded split event"},
+        }
+        if diagnostic_adjudication:
+            row["diagnosticAdjudication"] = diagnostic_adjudication
+        return row
+    return {"epsBasic": item("epsBasic", basic_value), "epsDiluted": item("epsDiluted", diluted_value)}
 
 
 def reconstruction_fact(value, *, concept, unit, start, end, form, filed, accn,
@@ -163,7 +213,7 @@ class DirectOfficialFactTests(unittest.TestCase):
         self.assertIsNone(selected)
         self.assertEqual(reason, "conflicting-facts-in-selected-filing-version")
 
-    def test_direct_grade_a_requires_cross_check_and_adjusts_only_on_given_split_basis(self):
+    def test_direct_grade_a_requires_raw_filing_and_split_trace_crosscheck_is_diagnostic(self):
         payload = companyfacts(
             basic=[eps_fact("0.50", concept="EarningsPerShareBasic")],
             diluted=[eps_fact("0.50", concept="EarningsPerShareDiluted")],
@@ -171,7 +221,8 @@ class DirectOfficialFactTests(unittest.TestCase):
         staged = evidence.stage_direct_q4_eps(
             payload, symbol="SYN", cik=CIK, period_start="2023-10-01",
             period_end="2023-12-31", companyfacts_url=COMPANYFACTS_URL,
-            cross_checks=direct_checks(), split_multiplier="0.5", target_share_basis="current")
+            cross_checks=direct_checks(), split_multiplier="0.5", target_share_basis="current",
+            raw_filing_evidence=raw_filing_checks())
         self.assertEqual(staged["epsBasic"]["grade"], "A")
         self.assertEqual(staged["epsBasic"]["value"], "0.250")
         self.assertEqual(staged["epsDiluted"]["grade"], "A")
@@ -182,11 +233,24 @@ class DirectOfficialFactTests(unittest.TestCase):
         failed = evidence.stage_direct_q4_eps(
             payload, symbol="SYN", cik=CIK, period_start="2023-10-01",
             period_end="2023-12-31", companyfacts_url=COMPANYFACTS_URL,
-            cross_checks=direct_checks(basic_income=-250), split_multiplier=1,
-            target_share_basis="current")
+            cross_checks=direct_checks(basic_income=-250), split_multiplier="0.5",
+            target_share_basis="current", raw_filing_evidence=raw_filing_checks())
         self.assertIsNone(failed["epsBasic"]["grade"])
+        self.assertEqual(failed["epsBasic"]["status"], "pending-diagnostic-review")
         self.assertEqual(failed["epsBasic"]["validation"]["failureReason"],
-                         "cross-check-sign-mismatch")
+                         "cross-check-diagnostic-needs-source-review")
+        self.assertIn("cross-check-sign-mismatch", failed["epsBasic"]["validation"]["diagnosticFlags"])
+
+    def test_companyfacts_without_original_filing_locator_remains_pending(self):
+        payload = companyfacts(basic=[eps_fact("0.50", concept="EarningsPerShareBasic")])
+        staged = evidence.stage_direct_q4_eps(
+            payload, symbol="SYN", cik=CIK, period_start="2023-10-01",
+            period_end="2023-12-31", companyfacts_url=COMPANYFACTS_URL,
+            cross_checks=direct_checks(), target_share_basis="current")
+        self.assertIsNone(staged["epsBasic"]["grade"])
+        self.assertEqual(staged["epsBasic"]["status"], "pending-raw-filing-validation")
+        self.assertEqual(staged["epsBasic"]["validation"]["failureReason"],
+                         "missing-original-sec-filing-evidence")
 
     def test_wrong_issuer_or_nonofficial_companyfacts_url_is_rejected(self):
         payload = companyfacts()
