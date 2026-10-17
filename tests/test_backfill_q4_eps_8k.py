@@ -191,6 +191,32 @@ class ZeroAndNetRowTests(unittest.TestCase):
         self.assertEqual(result["netLabel"], "net income attributable to acme")
 
 
+class StrictNetIncomeTableTests(unittest.TestCase):
+    """S2a-2 (e): table_eps matches net income with strict_scales (decimals-aware, capped at 1% of the target)."""
+
+    @staticmethod
+    def table(net_cells, eps="0.25"):
+        return bq.tables_of("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                            f"<tr><td>Net income</td>{net_cells}</tr>"
+                            f"<tr><td>Diluted earnings per share</td><td>{eps}</td></tr></table>")[0]
+
+    def test_a_zero_does_not_match_a_small_target_at_a_big_scale(self):
+        table = self.table("<td>0</td>")
+        self.assertEqual(bq.table_eps(table, -486_275, END), (None, None))
+
+    def test_a_one_decimal_value_must_match_to_its_own_half_unit(self):
+        table = self.table("<td>0.2</td>")
+        self.assertEqual(bq.table_eps(table, 210_000, END), (None, None))
+        result, reason = bq.table_eps(self.table("<td>0.21</td>"), 210_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["scale"], 1_000_000)
+
+    def test_a_negative_loss_with_one_decimal_matches_at_its_unit(self):
+        result, reason = bq.table_eps(self.table("<td>(0.4)</td>", eps="(0.25)"), -400_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual((result["scale"], result["epsDiluted"]), (1_000_000, -0.25))
+
+
 INDEX_PAGE = ("<table><tr><th>Seq</th><th>Description</th><th>Document</th><th>Type</th><th>Size</th></tr>"
               "<tr><td>1</td><td>8-K</td><td><a>form8k.htm</a></td><td>8-K</td><td>1000</td></tr>"
               "<tr><td>2</td><td>Press release</td><td><a>ex_309174.htm</a></td><td>EX-99.1</td><td>2000</td></tr>"

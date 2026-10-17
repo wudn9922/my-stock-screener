@@ -64,7 +64,7 @@ SCALES = (1, 1e3, 1e6, 1e9)
 NI_TOLERANCE = 0.002       # relative: stored Q4 net income against the table (plus half a unit of its scale)
 SHARES_TOLERANCE = 0.05    # relative: net income / shares against EPS (absolute floor EPS_FLOOR)
 EPS_FLOOR = 0.02
-STRICT_UNIT_CAP = 0.01     # diagnose only: the strict half-unit slack is at most this share of the target (S1-CF C1)
+STRICT_UNIT_CAP = 0.01     # the strict half-unit slack is at most this share of the target (S1-CF C1; table_eps, S2a-2 (e))
 DEV_FIXTURES = os.path.join(REPO, "tests", "fixtures", "q4_8k", "s1_fixtures.json")   # gate: devTickers
 GATE_EXIT = 3             # --mode gate: an answer-set (key, end) is in no report or in more than one (S3.3)
 WILSON_Z = 1.96           # S3.3 Wilson 95% lower bound
@@ -343,13 +343,14 @@ def table_eps(table, target, end):
     if eps_row is None:
         return None, None
     hits = []                       # (column, unit scale, net values, net label) over every net income row
-    for label, values in rows:
-        if not is_net_income(label):
+    for cells in table:             # the raw cells, so that each value keeps the digits after its point (S2a-2 (e))
+        raw_label, pairs = cells_with_decimals(cells)
+        if not raw_label or not is_net_income(raw_label.lower()):
             continue
-        for j, value in enumerate(values):
-            for scale in SCALES:
-                if value is not None and abs(value * scale - target) <= max(NI_TOLERANCE * abs(target), 0.5 * scale):
-                    hits.append((j, scale, values, label))
+        values = [value for value, _ in pairs]
+        for j, (value, decimals) in enumerate(pairs):
+            for scale in strict_scales(value, decimals, target):
+                hits.append((j, scale, values, raw_label.lower()))
     if not hits:
         return None, None
     if len({(j, scale) for j, scale, _, _ in hits}) != 1:
