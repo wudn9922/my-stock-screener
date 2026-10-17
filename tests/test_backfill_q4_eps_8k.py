@@ -359,6 +359,36 @@ class IndependentCheckTests(unittest.TestCase):
         self.assertIn("Item 2.02", check["reason"])
 
 
+def next_year_release(prior_eps):
+    return f"""
+<html><body><table>
+<tr><td></td><td>Three Months Ended December 31, 2025</td><td></td><td>Three Months Ended December 31, 2024</td></tr>
+<tr><td>Net income attributable to Acme</td><td>$</td><td>999</td><td>$</td><td>1,234</td></tr>
+<tr><td>Diluted earnings per share</td><td>$</td><td>0.30</td><td>$</td><td>{prior_eps}</td></tr>
+</table></body></html>
+"""
+
+
+class IndependentCheckToleranceTests(unittest.TestCase):
+    """S2a-2 (d): "confirmed" needs |checked - eps| <= max(0.011, 0.005 * |eps|)."""
+    rows = [{"form": "8-K", "items": "2.02", "filingDate": "2026-02-05", "accessionNumber": "0001-26-000001"}]
+
+    def status(self, prior_eps, stored_eps):
+        sec = IndependentCheckTests.sec_with(next_year_release(prior_eps))
+        return bq.verify_quarter(sec, 1234, self.rows, END, 1_234_000, stored_eps, {})["status"]
+
+    def test_a_gap_of_one_and_a_half_cents_on_a_dollar_eps_is_a_conflict(self):
+        self.assertEqual(self.status("1.015", 1.00), "conflict")
+
+    def test_the_eleven_cent_boundary_is_still_confirmed(self):
+        self.assertEqual(self.status("1.0105", 1.00), "confirmed")
+        self.assertEqual(self.status("1.0115", 1.00), "conflict")
+
+    def test_the_half_percent_applies_to_a_larger_eps(self):
+        self.assertEqual(self.status("10.04", 10.00), "confirmed")
+        self.assertEqual(self.status("10.06", 10.00), "conflict")
+
+
 class FillGradeTests(unittest.TestCase):
     def test_a_confirmed_value_is_grade_a_and_an_unconfirmed_one_is_grade_c(self):
         doc = {"quarterly": {"end": ["2024-12-31", "2023-12-31"], "fq": [4, 4],
@@ -712,10 +742,10 @@ class GateTests(unittest.TestCase):
         self.assertEqual(summary["conflicts"][0]["checked"], 0.30)
 
     def test_the_tolerance_is_the_s3_correct_rule(self):
-        self.assertTrue(bq.within_gate_tolerance(0.2605, 0.25))
-        self.assertFalse(bq.within_gate_tolerance(0.2615, 0.25))
-        self.assertTrue(bq.within_gate_tolerance(10.04, 10.0))
-        self.assertFalse(bq.within_gate_tolerance(10.06, 10.0))
+        self.assertTrue(bq.within_s3_tolerance(0.2605, 0.25))
+        self.assertFalse(bq.within_s3_tolerance(0.2615, 0.25))
+        self.assertTrue(bq.within_s3_tolerance(10.04, 10.0))
+        self.assertFalse(bq.within_s3_tolerance(10.06, 10.0))
 
     def test_a_row_outside_the_answer_set_is_counted_as_extra_and_changes_no_metric(self):
         rows = self.all_correct() + [gate_row("ZZZZ", "2024-12-31", 9.0)]

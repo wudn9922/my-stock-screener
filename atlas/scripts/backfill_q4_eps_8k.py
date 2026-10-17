@@ -1552,7 +1552,7 @@ def verify_quarter(sec, cik, filings, end, net, eps, doc):
             reason = why or reason
             continue
         checked = round(result["epsDiluted"] / split_factor(doc, filing["filingDate"]), 6)
-        status = "confirmed" if within_tolerance(checked, eps) else "conflict"
+        status = "confirmed" if within_s3_tolerance(checked, eps) else "conflict"
         return {"status": status, "epsDiluted": checked, "url": result["url"]}
     return {"status": "unavailable", "reason": reason, "debug": debug[:2]}
 
@@ -1650,8 +1650,11 @@ def within_tolerance(estimate, stored):
     return abs(estimate - stored) <= max(0.02 * abs(stored), 0.011)
 
 
-def within_gate_tolerance(estimate, reference):
-    """S3.3 "correct": |estimate - reference| <= max(0.011, 0.005 * |reference|), both on today's split basis."""
+def within_s3_tolerance(estimate, reference):
+    """
+    The S3 correctness tolerance (S3.3 "correct", S2a-2 (d) "confirmed"): |estimate - reference| <= max(0.011, 0.005 *
+    |reference|), both on today's split basis.
+    """
     return abs(estimate - reference) <= max(0.011, 0.005 * abs(reference))
 
 
@@ -1775,14 +1778,14 @@ def gate_metrics(rows, answer_count):
     """S3.3 metrics over gate rows (one per answer-set row that some report holds), with per-FY precision."""
     extracted = [row for row in rows if row["estimate"] is not None]
     accepted = [row for row in extracted if row["status"] == "confirmed"]
-    correct = [row for row in accepted if within_gate_tolerance(row["estimate"], row["answer"])]
+    correct = [row for row in accepted if within_s3_tolerance(row["estimate"], row["answer"])]
     per_fy = {}
     for row in accepted:
         per_fy.setdefault(str(row["fy"]), []).append(row)
     fy_table = {}
     for fy in sorted(per_fy):
         group = per_fy[fy]
-        ok = sum(within_gate_tolerance(row["estimate"], row["answer"]) for row in group)
+        ok = sum(within_s3_tolerance(row["estimate"], row["answer"]) for row in group)
         fy_table[fy] = {"accepted": len(group), "correct": ok, "precision": round(ok / len(group), 4),
                         "checked": len(group) >= 20}
     n = len(accepted)
@@ -1841,7 +1844,7 @@ def run_gate(args):
     non_dev_pairs = [pair for pair in pairs if pair[0] not in dev]
     non_dev = [row for row in rows if row["key"] not in dev]
     incorrect = [row for row in rows if row["status"] == "confirmed" and row["estimate"] is not None
-                 and not within_gate_tolerance(row["estimate"], row["answer"])]
+                 and not within_s3_tolerance(row["estimate"], row["answer"])]
     signs = [row for row in rows if row["status"] == "confirmed" and row["answer"] != 0
              and _sign(row["estimate"]) != _sign(row["answer"])]
     conflicts = [row for row in rows if row["status"] == "conflict"]
