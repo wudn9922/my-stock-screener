@@ -281,6 +281,65 @@ class ConversionTest(unittest.TestCase):
         self.assertEqual(annual[0]["epsB"], 4.0)
 
 
+class CumulativeAndAnnualEpsTest(unittest.TestCase):
+    """F2: a quarter after a missing one is cumulative; F1: annual EPS is official, else a sum on a stable share count."""
+
+    STYLE = {"rev": "quarter", "eps": "quarter", "ni": "quarter"}
+
+    def test_a_quarter_after_a_missing_quarter_is_not_a_single_quarter(self):
+        # 2024 is a half-year and annual reporter (Q2 = H1, Q4 = full year, Q1 and Q3 absent) before listing
+        row = {"2024Q2": [200, 2.0, 20, 0], "2024Q4": [400, 4.0, 40, 0],
+               "2025Q1": [100, 1.0, 10, 0], "2025Q2": [110, 1.1, 11, 0], "2025Q3": [120, 1.2, 12, 0],
+               "2025Q4": [130, 1.3, 13, 0]}
+        periods, _ = fm.company_periods(row, self.STYLE)
+        by = {(p["fy"], p["fq"]): p for p in periods}
+        self.assertIsNone(by[(2024, 2)]["rev"])
+        self.assertIsNone(by[(2024, 2)]["epsB"])
+        self.assertIsNone(by[(2024, 4)]["rev"])
+        self.assertIsNone(by[(2024, 4)]["epsB"])
+        self.assertEqual(by[(2025, 2)]["rev"], 110)                 # a full year before it: a real quarter
+        self.assertEqual(by[(2025, 4)]["rev"], 130)
+
+    def test_a_quarter_after_a_published_one_is_kept_in_a_year_without_q1(self):
+        row = {"2024Q2": [200, 2.0, 20, 0], "2024Q3": [120, 1.2, 12, 0], "2024Q4": [130, 1.3, 13, 0]}
+        periods, _ = fm.company_periods(row, self.STYLE)
+        by = {(p["fy"], p["fq"]): p for p in periods}
+        self.assertIsNone(by[(2024, 2)]["rev"])                     # Q1 is missing: the H1 figure is not Q2
+        self.assertEqual(by[(2024, 3)]["rev"], 120)
+        self.assertEqual(by[(2024, 4)]["rev"], 130)
+
+    def test_annual_eps_prefers_the_official_full_year(self):
+        # the share count doubles in Q3, so the sum of the four quarters is not the full-year EPS
+        row = {"2025Q1": [100, 1.0, 10, 0], "2025Q2": [110, 1.0, 10, 0],
+               "2025Q3": [120, 1.0, 20, 0], "2025Q4": [130, 1.0, 20, 0]}
+        _, annual = fm.company_periods(row, self.STYLE)
+        self.assertIsNone(annual[0]["epsB"])                         # unstable share count and no official value
+        _, annual = fm.company_periods(row, self.STYLE, {2025: 3.5})
+        self.assertEqual(annual[0]["epsB"], 3.5)
+        self.assertAlmostEqual(annual[0]["shares"], 60 / 3.5, places=6)   # FinMind ΣNI over the official EPS
+        self.assertEqual(annual[0]["rev"], 460)                      # revenue is not affected
+
+    def test_annual_eps_sum_needs_a_stable_share_basis(self):
+        stable = {"2025Q1": [100, 1.0, 10, 0], "2025Q2": [100, 1.0, 10, 0],
+                  "2025Q3": [100, 1.0, 10.05, 0], "2025Q4": [100, 1.0, 10, 0]}      # Q3 shares 0.5% apart
+        _, annual = fm.company_periods(stable, self.STYLE)
+        self.assertEqual(annual[0]["epsB"], 4.0)
+        spread = {"2025Q1": [100, 1.0, 10, 0], "2025Q2": [100, 1.0, 10, 0],
+                  "2025Q3": [100, 1.0, 10.5, 0], "2025Q4": [100, 1.0, 10, 0]}       # Q3 shares 5% apart
+        _, annual = fm.company_periods(spread, self.STYLE)
+        self.assertIsNone(annual[0]["epsB"])
+        self.assertEqual(annual[0]["rev"], 400)
+
+    def test_official_annual_eps_reads_the_q4_season_only(self):
+        truths, _ = market("quarter", count=2)
+        document = official_of(truths, keys=("2025Q2", "2025Q4"))
+        result = fm.official_annual_eps(document)
+        self.assertEqual(set(result["1100"]), {2025})
+        self.assertAlmostEqual(result["1100"][2025], sum(truths["1100"][(2025, q)][1] for q in (1, 2, 3, 4)), places=2)
+        self.assertEqual(fm.official_annual_eps(None), {})
+        self.assertEqual(fm.official_annual_eps({"version": 2}), {})
+
+
 class GrowthTest(unittest.TestCase):
     def blocks(self, row, mode="quarter", today=TODAY):
         truths, store = market(mode)

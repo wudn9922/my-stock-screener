@@ -520,7 +520,8 @@ def field_views(quarters_of_year, at, mode):
                 single[q] = raw[q] - raw[q - 1]
     elif mode in ("quarter", "q4annual"):
         for q in raw:
-            if q < 4 or mode == "quarter":
+            # a quarter whose predecessor is not published (half-year, nine-month figures before listing) is cumulative
+            if (q < 4 or mode == "quarter") and (q == 1 or q - 1 in quarters_of_year):
                 single[q] = raw[q]
         for q in (1, 2, 3):
             if q in raw:
@@ -536,8 +537,42 @@ def field_views(quarters_of_year, at, mode):
     return single, {q: value for q, value in ytd.items() if value is not None}
 
 
-def company_periods(row, modes):
-    """{season: [rev, eps, ni, kind]} as published → (quarterly periods, annual periods) for yoy_series."""
+SHARE_STABLE_MAX = 0.02  # Q1..Q3 implied share counts within 2% of each other: their EPS sum is the full-year EPS
+
+
+def official_annual_eps(official):
+    """tw.json → {code: {year: full-year EPS}} (MOPS, the Q4 season's year-to-date EPS); {} when missing or malformed."""
+    if not isinstance(official, dict):
+        return {}
+    try:
+        data = tw.load_store(official)["data"]
+    except tw.StoreError:
+        return {}
+    result = {}
+    for code, seasons in data.items():
+        for key, values in seasons.items():
+            season = tw.parse_season(key)
+            if season and season[1] == 4 and values[1] is not None:
+                result.setdefault(code, {})[season[0]] = values[1]
+    return result
+
+
+def stable_share_count(eps_q, ni_q):
+    """Q1..Q3 each have an implied share count and the three agree within SHARE_STABLE_MAX."""
+    shares = [tw.implied_shares([None, eps_q.get(q), ni_q.get(q)]) for q in (1, 2, 3)]
+    if any(share is None for share in shares):
+        return False
+    return max(shares) / min(shares) - 1 < SHARE_STABLE_MAX
+
+
+def company_periods(row, modes, official_annual=None):
+    """{season: [rev, eps, ni, kind]} as published → (quarterly periods, annual periods) for yoy_series.
+
+    official_annual: {year: full-year EPS} from tw.json. Under the quarter style FinMind's annual EPS is a sum of
+    four quarters, which is wrong when the share count moved in the year: the official figure wins, and the sum is
+    kept only on a stable share count (stable_share_count); otherwise the annual EPS is None.
+    """
+    official_annual = official_annual or {}
     quarters, annual = [], []
     for year, entries in by_year(row).items():
         rev_q, rev_y = field_views(entries, 0, modes["rev"])
@@ -568,9 +603,17 @@ def company_periods(row, modes):
             end = tw.quarter_end(year, 4)
             kinds = {entries[q][3] for q in entries} if modes["rev"] == "quarter" else {entries[4][3]}
             eps_year = round(eps_y[4], 4) if eps_y.get(4) is not None else None
+            shares = tw.implied_shares([None, eps_y.get(4), ni_y.get(4)])
+            if modes["eps"] == "quarter":
+                official = official_annual.get(year)
+                if official is not None:
+                    # FinMind net income over the official EPS: the share basis of the full year, in NT$ shares
+                    eps_year, shares = round(official, 4), tw.implied_shares([None, official, ni_y.get(4)])
+                elif not stable_share_count(eps_q, ni_q):
+                    eps_year = None
             annual.append({
                 "end": end.isoformat(), "day": end, "fy": year, "fq": None, "epsD": None, "epsB": eps_year,
-                "rev": rev_y.get(4), "shares": tw.implied_shares([None, eps_y.get(4), ni_y.get(4)]), "src": SRC,
+                "rev": rev_y.get(4), "shares": shares, "src": SRC,
                 "derived": False, "kind": entries[4][3] if len(kinds) == 1 else -1,
             })
     return quarters, annual
@@ -659,11 +702,12 @@ def growth_candidates(document, symbols, today, official=None, log=print):
         log(f"::warning::FinMind: {len(bad)} stocks contradict the {modes['rev']} verdict and are left out: {sorted(bad)[:12]}")
     info["excluded"] = len(bad)
     result = {}
+    official_annual = official_annual_eps(official)
     for code, row in store["data"].items():
         symbol = symbols.get(code)
         if symbol is None or code in bad:
             continue
-        quarters, annual = company_periods(row, modes)
+        quarters, annual = company_periods(row, modes, official_annual.get(code))
         q = growth.yoy_series(quarters, True, growth.QUARTER_SLOTS, [], today, growth.STALE_QUARTER_DAYS, tw.tw_pair)
         y = growth.yoy_series(annual, False, annual_slots(annual), [], today, growth.STALE_ANNUAL_DAYS, tw.tw_pair)
         if q is not None or y is not None:
