@@ -49,9 +49,12 @@ Revenue that is not decisive means FinMind is not used at all. The verdict and i
 every run, --verify and build_growth.py. Stocks whose own revenue years contradict the verdict are left out.
 Quarters / years from the verdict: year-to-date → Qn = YTD(n) - YTD(n-1) (EPS on the share basis of the
 later report: (NI(n) - NI(n-1)) x EPS(n) / NI(n), as build_fundamentals_tw), year = Q4; single quarters →
-year = sum of the four quarters (EPS too: FinMind's Q4 is full year - Q1..Q3). Every Q4 is flagged derived
-(dQ). A quarter's revenue must be >= 0. The YoY rules are build_growth's (tw_pair: one revenue kind, share
-basis from NI / EPS, scale errors). The annual series is as long as the data (not YEAR_SLOTS).
+year = sum of the four quarters (EPS too: FinMind's Q4 is full year - Q1..Q3). When a quarter-mode row has
+an official MOPS annual EPS, that reported EPS is used; otherwise a quarterly EPS sum is used only when Q1-Q3
+imply a stable share basis. In quarter / q4annual modes, a raw quarter after a missing quarter is not treated
+as a single quarter. Every Q4 is flagged derived (dQ). A quarter's revenue must be >= 0. The YoY rules are
+build_growth's (tw_pair: one revenue kind, share basis from NI / EPS, scale errors). The annual series is as
+long as the data (not YEAR_SLOTS).
 Cross-check (growth_candidates, --verify): the year-to-date revenue of the official tw.json seasons
 (MOPS / OpenAPI, NT$ thousand) against the FinMind figures read with the verdict: the median ratio must be
 within 2% of 1 or 1000 (FinMind may publish NT$), else build_growth does not use FinMind.
@@ -520,7 +523,7 @@ def field_views(quarters_of_year, at, mode):
                 single[q] = raw[q] - raw[q - 1]
     elif mode in ("quarter", "q4annual"):
         for q in raw:
-            if q < 4 or mode == "quarter":
+            if (q < 4 or mode == "quarter") and (q == 1 or q - 1 in raw):
                 single[q] = raw[q]
         for q in (1, 2, 3):
             if q in raw:
@@ -536,8 +539,9 @@ def field_views(quarters_of_year, at, mode):
     return single, {q: value for q, value in ytd.items() if value is not None}
 
 
-def company_periods(row, modes):
-    """{season: [rev, eps, ni, kind]} as published → (quarterly periods, annual periods) for yoy_series."""
+def company_periods(row, modes, official_annual=None):
+    """{season: [rev, eps, ni, kind]} → (quarterly, annual) periods; quarter-mode annual EPS uses MOPS or a stable basis."""
+    official_annual = official_annual or {}
     quarters, annual = [], []
     for year, entries in by_year(row).items():
         rev_q, rev_y = field_views(entries, 0, modes["rev"])
@@ -564,13 +568,24 @@ def company_periods(row, modes):
                 "rev": rev_q.get(quarter), "shares": shares, "src": SRC, "derived": quarter == 4,
                 "kind": entries[quarter][3],
             })
-        if 4 in entries and (eps_y.get(4) is not None or rev_y.get(4) is not None):
+        eps_year = eps_y.get(4)
+        if modes["eps"] == "quarter":
+            reported_eps = official_annual.get(year)
+            if reported_eps is not None:
+                eps_year = reported_eps
+            else:
+                quarter_shares = [tw.implied_shares([None, eps_q.get(q), ni_q.get(q)]) for q in (1, 2, 3)]
+                stable_share_basis = (all(shares is not None for shares in quarter_shares)
+                                      and max(quarter_shares) / min(quarter_shares) - 1 < 0.02)
+                if eps_year is None or not stable_share_basis:
+                    eps_year = None
+        eps_year = round(eps_year, 4) if eps_year is not None else None
+        if 4 in entries and (eps_year is not None or rev_y.get(4) is not None):
             end = tw.quarter_end(year, 4)
             kinds = {entries[q][3] for q in entries} if modes["rev"] == "quarter" else {entries[4][3]}
-            eps_year = round(eps_y[4], 4) if eps_y.get(4) is not None else None
             annual.append({
                 "end": end.isoformat(), "day": end, "fy": year, "fq": None, "epsD": None, "epsB": eps_year,
-                "rev": rev_y.get(4), "shares": tw.implied_shares([None, eps_y.get(4), ni_y.get(4)]), "src": SRC,
+                "rev": rev_y.get(4), "shares": tw.implied_shares([None, eps_year, ni_y.get(4)]), "src": SRC,
                 "derived": False, "kind": entries[4][3] if len(kinds) == 1 else -1,
             })
     return quarters, annual
@@ -658,12 +673,22 @@ def growth_candidates(document, symbols, today, official=None, log=print):
     if bad:
         log(f"::warning::FinMind: {len(bad)} stocks contradict the {modes['rev']} verdict and are left out: {sorted(bad)[:12]}")
     info["excluded"] = len(bad)
+    try:
+        official_data = tw.load_store(official)["data"]
+    except tw.StoreError:
+        official_data = {}
+    official_annual = {}
+    for code, row in official_data.items():
+        for key, entry in row.items():
+            parsed = tw.parse_season(key)
+            if parsed and parsed[1] == 4 and entry[1] is not None:
+                official_annual.setdefault(code, {})[parsed[0]] = entry[1]
     result = {}
     for code, row in store["data"].items():
         symbol = symbols.get(code)
         if symbol is None or code in bad:
             continue
-        quarters, annual = company_periods(row, modes)
+        quarters, annual = company_periods(row, modes, official_annual.get(code))
         q = growth.yoy_series(quarters, True, growth.QUARTER_SLOTS, [], today, growth.STALE_QUARTER_DAYS, tw.tw_pair)
         y = growth.yoy_series(annual, False, annual_slots(annual), [], today, growth.STALE_ANNUAL_DAYS, tw.tw_pair)
         if q is not None or y is not None:

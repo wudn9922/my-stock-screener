@@ -256,7 +256,7 @@ class ConversionTest(unittest.TestCase):
         self.assertEqual(q2["epsB"], 0.91)                       # (2000 - 1000) x 1.82 / 2000, not 1.82 - 1.0
         self.assertEqual(q2["rev"], 100)
 
-    def test_q4_from_the_full_year_and_annual_eps_as_the_sum_of_quarters(self):
+    def test_q4_from_the_full_year_and_annual_eps_uses_official_or_stable_basis(self):
         row = {"2025Q1": [100, 1.0, 10, 0], "2025Q2": [110, 1.1, 11, 0], "2025Q3": [120, 1.2, 12, 0],
                "2025Q4": [500, 4.6, 46, 0]}
         periods, annual = fm.company_periods(row, {"rev": "q4annual", "eps": "q4annual", "ni": "q4annual"})
@@ -267,6 +267,106 @@ class ConversionTest(unittest.TestCase):
         single["2025Q4"] = [170, 1.3, 13, 0]
         _, annual = fm.company_periods(single, {"rev": "quarter", "eps": "quarter", "ni": "quarter"})
         self.assertEqual((annual[0]["rev"], annual[0]["epsB"]), (500, 4.6))
+        _, annual = fm.company_periods(single, {"rev": "quarter", "eps": "quarter", "ni": "quarter"},
+                                       official_annual={2025: 4.8})
+        self.assertEqual(annual[0]["epsB"], 4.8)
+
+    def test_annual_eps_sum_needs_a_stable_share_basis(self):
+        modes = {"rev": "quarter", "eps": "quarter", "ni": "quarter"}
+        unstable = {
+            "2025Q1": [100, 1.0, 1000, 0],
+            "2025Q2": [100, 0.95, 1000, 0],
+            "2025Q3": [100, 1.0, 1000, 0],
+            "2025Q4": [100, 1.0, 1000, 0],
+        }
+        _, annual = fm.company_periods(unstable, modes)
+        self.assertIsNone(annual[0]["epsB"])  # Q1-Q3 implied shares spread by more than 2%
+        self.assertIsNone(annual[0]["shares"])
+
+        stable = {**unstable, "2025Q2": [100, 0.995, 1000, 0]}
+        _, annual = fm.company_periods(stable, modes)
+        self.assertEqual(annual[0]["epsB"], 3.995)
+        self.assertAlmostEqual(annual[0]["shares"], 4000 / 3.995)
+
+    def test_a_quarter_after_a_missing_quarter_is_not_a_single_quarter(self):
+        published = truth(34, years=range(2022, 2026))
+        row = {f"{year}Q{quarter}": [rev, eps, ni, 0]
+               for (year, quarter), (rev, eps, ni) in published.items()
+               if not (year == 2024 and quarter in (1, 3))}
+        # 2024 has only Q2 (first half) and Q4 (second half); neither is a single-quarter amount.
+        row["2024Q2"] = [500, 5.0, 500, 0]
+        row["2024Q4"] = [900, 9.0, 900, 0]
+        modes = {"rev": "quarter", "eps": "quarter", "ni": "quarter"}
+        periods, _ = fm.company_periods(row, modes)
+        by_period = {(period["fy"], period["fq"]): period for period in periods}
+        for key in ((2024, 2), (2024, 4)):
+            self.assertIsNone(by_period[key]["rev"])
+            self.assertIsNone(by_period[key]["epsB"])
+        for mode in ("quarter", "q4annual"):
+            entries = fm.by_year(row)[2024]
+            for field in (0, 1, 2):
+                single, _ = fm.field_views(entries, field, mode)
+                self.assertNotIn(2, single)
+                self.assertIsNone(single.get(4))
+        # A field-level gap also counts when the quarter's other fields were present.
+        partial = {1: [None, 1.0, 100, 0], 2: [500, 5.0, 500, 0]}
+        for mode in ("quarter", "q4annual"):
+            single, _ = fm.field_views(partial, 0, mode)
+            self.assertNotIn(2, single)
+        self.assertIsNotNone(by_period[(2025, 2)]["rev"])
+        self.assertIsNotNone(by_period[(2025, 4)]["epsB"])
+
+        block = growth.yoy_series(periods, True, growth.QUARTER_SLOTS, [], TODAY,
+                                  growth.STALE_QUARTER_DAYS, tw.tw_pair)
+        self.assertIsNotNone(block)
+        self.assertIsNone(block["rev"][2])  # 2025Q4 vs 2024Q4
+        self.assertIsNone(block["eps"][2])
+        self.assertIsNone(block["rev"][4])  # 2025Q2 vs 2024Q2
+        self.assertIsNone(block["eps"][4])
+
+        # 0111 retains Q3/Q4 but drops Q2; 0001 drops Q4 because Q3 is absent.
+        only_0111 = {"2025Q2": [200, 2.0, 200, 0], "2025Q3": [300, 3.0, 300, 0],
+                     "2025Q4": [400, 4.0, 400, 0]}
+        periods, _ = fm.company_periods(only_0111, modes)
+        by_period = {period["fq"]: period for period in periods}
+        self.assertIsNone(by_period[2]["rev"])
+        self.assertEqual((by_period[3]["rev"], by_period[3]["epsB"]), (300, 3.0))
+        self.assertEqual((by_period[4]["rev"], by_period[4]["epsB"]), (400, 4.0))
+        only_0001 = {"2025Q4": [400, 4.0, 400, 0]}
+        periods, _ = fm.company_periods(only_0001, modes)
+        self.assertIsNone(periods[0]["rev"])
+        self.assertIsNone(periods[0]["epsB"])
+
+    def test_quarter_mode_annual_eps_uses_official_full_year_and_consistent_shares(self):
+        row = {f"2024Q{q}": [100, 1.0, 1000, 0] for q in (1, 2, 3, 4)}
+        row.update({
+            "2025Q1": [100, 1.0, 1000, 0],
+            "2025Q2": [100, 1.0, 1000, 0],
+            "2025Q3": [100, 0.5, 1000, 0],  # implied shares double in Q3
+            "2025Q4": [100, 5.0, 10000, 0],
+        })
+        modes = {"rev": "quarter", "eps": "quarter", "ni": "quarter"}
+        _, annual = fm.company_periods(row, modes, official_annual={2025: 10.0})
+        by_year = {period["fy"]: period for period in annual}
+        self.assertEqual(by_year[2024]["epsB"], 4.0)  # stable Q1-Q3 basis, no official annual row
+        self.assertEqual(by_year[2024]["shares"], 1000)
+        self.assertEqual(by_year[2025]["epsB"], 10.0)
+        self.assertEqual(by_year[2025]["shares"], 1300)  # 13,000 NT$ NI / 10 EPS; not thousands of shares
+        self.assertGreater(13000 / 7.5 / by_year[2024]["shares"], 1.5)  # the raw EPS sum creates a false jump
+        self.assertFalse(growth.share_count_jump(by_year[2025], by_year[2024]))
+        block = growth.yoy_series(annual, False, growth.YEAR_SLOTS, [], TODAY,
+                                  growth.STALE_ANNUAL_DAYS, tw.tw_pair)
+        self.assertEqual(block["eps"][0], 150.0)
+
+        _, store = market("quarter", count=30)
+        store["data"]["2330"] = row
+        official_store = tw.empty_store()
+        official_store["data"] = {"2330": {"2025Q4": [0.4, 10.0, 13.0, 0]}}
+        official = tw.dump_store(official_store, ["2025Q4"])
+        result, info = fm.growth_candidates(fm.dump_store(store), {"2330": "2330.TW"}, TODAY,
+                                            official=official, log=QUIET)
+        self.assertEqual(info["modes"]["eps"], "quarter")
+        self.assertEqual(result["2330.TW"][2]["eps"][0], 150.0)
 
     def test_negative_derived_revenue_and_mixed_kinds_give_nothing(self):
         row = {"2025Q1": [100, 1.0, 10, 0], "2025Q2": [90, 1.5, 15, 0], "2025Q3": [150, 2.0, 20, 1]}
