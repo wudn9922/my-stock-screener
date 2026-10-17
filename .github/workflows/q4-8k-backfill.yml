@@ -1,5 +1,5 @@
 name: Q4 EPS from 8-K (manual)
-run-name: "q4-8k ${{ inputs.mode }}"
+run-name: "q4-8k ${{ inputs.mode }} ${{ inputs.shard }}"
 
 # 手動執行：用 8-K 財報新聞稿（EX-99.1）補美股缺漏的第四季 EPS。
 # backtest：只用已有的第四季 EPS 檢查解析器，不寫檔，報告上傳為 artifact。
@@ -23,6 +23,14 @@ on:
         description: "每次執行的 SEC 請求上限"
         required: false
         default: "6000"
+      answer_set:
+        description: "S3：答案集檔案（backtest 用；必須是 95184ade 建出的 answer-set.json）"
+        required: false
+        default: ""
+      shard:
+        description: "S3：k/N，依排序後代號的索引 mod N 分片"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -39,6 +47,9 @@ jobs:
       MODE: ${{ inputs.mode }}
       TICKERS: ${{ inputs.tickers }}
       BUDGET: ${{ inputs.budget }}
+      ANSWER_SET: ${{ inputs.answer_set }}
+      SHARD: ${{ inputs.shard }}
+      ANSWER_REF: 95184ade77cd30c565d3873e9f9050f3ec7c0054
       SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
       BRANCH: backfill/q4-8k
       RUNS_BRANCH: runs/q4-8k
@@ -64,6 +75,25 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Verify answer set pin (S3 only)
+        if: inputs.answer_set != ''
+        run: |
+          set -euo pipefail
+          [ "$MODE" = backtest ] || { echo "::error::answer_set is only valid with mode backtest"; exit 1; }
+          [ "$ANSWER_SET" = docs/report/q4-8k/answer-set.json ] || { echo "::error::unexpected answer_set path"; exit 1; }
+          git fetch -q --depth=1 origin "$ANSWER_REF"
+          python atlas/scripts/build_q4_eps_answer_set.py --ref "$ANSWER_REF" --out "$RUNNER_TEMP/answer-set.rebuilt.json"
+          cmp "$ANSWER_SET" "$RUNNER_TEMP/answer-set.rebuilt.json"
+          python - "$ANSWER_SET" <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert d["ref"] == "95184ade", d["ref"]
+          assert len(d["rows"]) == 2649, len(d["rows"])
+          assert len({r["key"] for r in d["rows"]}) == 563
+          assert len(d["rowsBasic"]) == 2387, len(d["rowsBasic"])
+          print("answer set pinned to 95184ade: 2649 rows, 563 files, 2387 basic")
+          PY
+
       - name: Run extraction
         id: extract
         run: |
@@ -71,6 +101,8 @@ jobs:
           mkdir -p "$OUT"
           args=(--mode "$MODE" --budget "$BUDGET")
           if [ -n "$TICKERS" ] && [ "$MODE" != diagnose ]; then args+=(--tickers "$TICKERS"); fi
+          if [ -n "$ANSWER_SET" ]; then args+=(--answer-set "$ANSWER_SET"); fi
+          if [ -n "$SHARD" ]; then args+=(--shard "$SHARD"); fi
           if [ "$MODE" = diagnose ]; then
             args+=(--source-report docs/report/q4-8k/input/run-17/q4-8k-report.json)
             args+=(--fixture-selection tests/fixtures/q4_8k/s1_fixture_selection.json)
@@ -147,6 +179,7 @@ jobs:
                             "sha256": hashlib.sha256(data).hexdigest()})
           meta = {"runId": int(os.environ["RUN_ID"]), "runNumber": int(os.environ["RUN_NUMBER"]),
                   "mode": os.environ["MODE"], "tickers": os.environ.get("TICKERS", ""),
+                  "answerSet": os.environ.get("ANSWER_SET", ""), "shard": os.environ.get("SHARD", ""),
                   "budget": os.environ.get("BUDGET", ""), "mainSha": main_sha,
                   "extractOutcome": os.environ.get("EXTRACT_OUTCOME", ""),
                   "files": files, "omitted": omitted, "totalBytes": total}
