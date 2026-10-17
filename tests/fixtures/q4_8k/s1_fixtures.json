@@ -96,7 +96,9 @@
       "sha256": "c9e149c1f107fdcc55bf847f9283e743c231f0170e0432bbb771fd80ea67fd7a",
       "roundTrip": true,
       "storedEps": 1.24,
-      "epsDilutedRead": null
+      "epsDilutedRead": 1.22,
+      "epsLabelRead": "US GAAP Earnings Per Share - Diluted",
+      "epsReadNote": "differs from storedEps by 0.02"
     },
     {
       "file": "URBN-2016-01-31-L1.html",
@@ -120,7 +122,9 @@
       "sha256": "688684ba057d758c7e2bf11e2b9d0f4c97f067808a7867429f184118c9780b27",
       "roundTrip": true,
       "storedEps": 0.59,
-      "epsDilutedRead": null
+      "epsDilutedRead": 0.61,
+      "epsLabelRead": "Diluted",
+      "epsReadNote": "differs from storedEps by 0.02"
     },
     {
       "file": "VNCE-2024-02-03-L1.html",
@@ -142,7 +146,8 @@
       "sha256": "fa99175d749c5071024e30c6e584944c68beed6c01968e73c1bf71ab4ae5c5d5",
       "roundTrip": true,
       "storedEps": -0.37,
-      "epsDilutedRead": null
+      "epsDilutedRead": -0.37,
+      "epsLabelRead": "Diluted (loss) earnings per share"
     },
     {
       "file": "TRAK-2019-06-30-L2.html",
@@ -163,7 +168,8 @@
       "sha256": "99c42149250e80102b9b3d747b44297f0fdb4cd2a2b40174ac8429549b4b421e",
       "roundTrip": true,
       "storedEps": 0.009,
-      "epsDilutedRead": null
+      "epsDilutedRead": 0,
+      "epsLabelRead": "GAAP EPS, Diluted"
     },
     {
       "file": "TXT-2022-01-01-L2.html",
@@ -184,7 +190,9 @@
       "sha256": "57756dd5863abfb39d7c2a401014ef1dcbce315eea47d8aba20a1c575ac0f06e",
       "roundTrip": true,
       "storedEps": 0.93,
-      "epsDilutedRead": null
+      "epsDilutedRead": null,
+      "epsLabelRead": null,
+      "epsReadNote": "could not read by eye: no row reads 'diluted' under net income per share; the EPS block lists only 'Income from continuing operations' (0.93, three months ended January 1, 2022), not confirmed as the diluted net income row"
     },
     {
       "file": "URBN-2014-01-31-L2.html",
@@ -205,7 +213,8 @@
       "sha256": "c46db8d0a672099674faed32446d6d1d725ccbdaa0c9b16724c12712372478d6",
       "roundTrip": true,
       "storedEps": 0.59,
-      "epsDilutedRead": null
+      "epsDilutedRead": 0.59,
+      "epsLabelRead": "Diluted"
     },
     {
       "file": "UI-2014-06-30-L3.html",
@@ -226,7 +235,8 @@
       "sha256": "b5736eb258fa51b4d8b0e952bb30aca307e47d4d4ef75f617b4de53a41800083",
       "roundTrip": true,
       "storedEps": 0.55,
-      "epsDilutedRead": null
+      "epsDilutedRead": 0.55,
+      "epsLabelRead": "Diluted"
     },
     {
       "file": "UNFI-2019-08-03-L3.html",
@@ -247,7 +257,8 @@
       "sha256": "66c2ceb7d353f3b4b3cdca1dcc6513f6522f6e14701f8a5acb0510a5fefa70e8",
       "roundTrip": true,
       "storedEps": 0.36,
-      "epsDilutedRead": null
+      "epsDilutedRead": 0.36,
+      "epsLabelRead": "Diluted income (loss) per share"
     },
     {
       "file": "VIAV-2021-07-03-L3.html",
@@ -268,7 +279,9 @@
       "sha256": "cbc0a661024ede6c8a302fb84b107987c89e297fe91f9ea1c8ef987919f434e1",
       "roundTrip": true,
       "storedEps": 0.01,
-      "epsDilutedRead": null
+      "epsDilutedRead": -0.01,
+      "epsLabelRead": "Net (loss) income per share - diluted",
+      "epsReadNote": "differs from storedEps by 0.02"
     },
     {
       "file": "TXT-2012-12-29-L8.html",
@@ -289,7 +302,9 @@
       "sha256": "34e7f298cc5fd4dff2d187dd92d53159f9743470d55543fea9b1aa0e5aafeba3",
       "roundTrip": true,
       "storedEps": 0.51,
-      "epsDilutedRead": null
+      "epsDilutedRead": null,
+      "epsLabelRead": null,
+      "epsReadNote": "could not read by eye: no row reads 'diluted' under net income per share; the EPS block is labelled only 'Earnings per share' and its 'Net income (loss)' row shows 0.51 (three months ended December 29, 2012), not confirmed as diluted"
     },
     {
       "file": "UNFI-2013-08-03-L8.html",
@@ -310,7 +325,8 @@
       "sha256": "0860d96a44ab377a2b587d37890c56ff598aaa645dff2b6b99538b11dd769666",
       "roundTrip": true,
       "storedEps": 0.65,
-      "epsDilutedRead": null
+      "epsDilutedRead": 0.65,
+      "epsLabelRead": "Net income"
     },
     {
       "file": "URBN-2012-01-31-L8.html",
@@ -331,7 +347,8 @@
       "sha256": "f6784d3a4d1e136787de9f324baf582fdfcc0d5dd18d3270882e51d1734d8641",
       "roundTrip": true,
       "storedEps": 0.28,
-      "epsDilutedRead": null
+      "epsDilutedRead": 0.27,
+      "epsLabelRead": "Diluted"
     },
     {
       "file": "VNCE-2026-01-31-L1-year-header-negative.html",
