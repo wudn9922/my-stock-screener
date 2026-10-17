@@ -22,6 +22,7 @@ stop at the first HTTP 403, and --budget requests per run. docs/report/fundament
 records finished tickers so the next run continues where this one stopped.
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -1388,6 +1389,78 @@ def run(args, sec):
     return report
 
 
+def _inside_repo(path):
+    real, root = os.path.realpath(path), os.path.realpath(REPO)
+    return real == root or real.startswith(root + os.sep)
+
+
+def build_s1_classes(report, env=None):
+    """The s1-classes.json document (plan §M4): one record per diagnosed row, class counts and dispositions."""
+    env = os.environ if env is None else env
+    records = sorted(({"key": row.get("key"), "end": row.get("end"),
+                       "class": (row.get("classification") or {}).get("class"),
+                       "accession": (row.get("classification") or {}).get("accession"),
+                       "url": (row.get("classification") or {}).get("url"),
+                       "tableIndex": (row.get("classification") or {}).get("tableIndex"),
+                       "tableEpsReason": (row.get("classification") or {}).get("tableEpsReason"),
+                       "note": (row.get("classification") or {}).get("note")}
+                      for row in report.get("rows") or []),
+                     key=lambda record: (record["key"] or "", record["end"] or ""))
+    counts = {cls: 0 for cls in S1_CLASS_NAMES}
+    for record in records:
+        counts[record["class"]] = counts.get(record["class"], 0) + 1
+    fixtures = report.get("fixtures") or []
+    positives = Counter(item.get("class") for item in fixtures if item.get("role") == "positive")
+    dispositions = {"L1": "S2 handles", "L2": "S2 handles", "L3": "S2 handles", "L8": "S2 handles",
+                    "L4": "out of scope", "L5": "out of scope", "L6": "out of scope", "L7": "out of scope",
+                    "L10": "out of scope", "L9": "needs Opus"}
+    classes = {}
+    for cls in S1_CLASS_NAMES:
+        disposition = dispositions[cls]
+        if disposition == "S2 handles" and positives[cls] < 2:
+            disposition = "out of scope"
+        examples = [record["url"] for record in records if record["class"] == cls and record["url"]][:2]
+        classes[cls] = {"name": S1_CLASS_NAMES[cls], "count": counts[cls], "examples": examples,
+                        "disposition": disposition}
+    row_count = len(records)
+    other = counts.get("L9", 0)
+    run_id = env.get("GITHUB_RUN_ID")
+    return {"schemaVersion": 2, "generator": "classify_row",
+            "status": "complete" if report.get("diagnosed") == report.get("sourceRows") and not report.get("stopped")
+            else "incomplete",
+            "diagnoseRun": {"runId": int(run_id) if run_id and run_id.isdigit() else None,
+                            "mainCommit": env.get("GITHUB_SHA") or None,
+                            "requests": report.get("requests"), "stopped": report.get("stopped")},
+            "sourceReport": report.get("sourceReport"), "sourceRows": report.get("sourceRows"),
+            "rowCount": row_count, "classCounts": counts,
+            "otherLimit": {"limit": row_count // 10, "count": other, "passed": other <= row_count // 10},
+            "classes": classes,
+            "devTickers": sorted({str(item.get("key")) for item in fixtures}),
+            "fixtureCount": len(fixtures), "fixtureErrors": report.get("fixtureErrors") or [],
+            "rows": records}
+
+
+def write_diagnose_outputs(report, out_dir):
+    """Writes s1-classes.json, fixtures/*.html and fixtures/s1_fixtures.json under out_dir and nothing else."""
+    fixtures_dir = os.path.join(out_dir, "fixtures")
+    os.makedirs(fixtures_dir, exist_ok=True)
+    manifest = []
+    for item in report.get("fixtures") or []:
+        data = item["html"].encode("utf-8")
+        with open(os.path.join(fixtures_dir, item["file"]), "wb") as file:
+            file.write(data)
+        record = {key: value for key, value in item.items() if key != "html"}
+        record.update(bytes=len(data), sha256=hashlib.sha256(data).hexdigest())
+        manifest.append(record)
+    with open(os.path.join(fixtures_dir, "s1_fixtures.json"), "w", encoding="utf-8") as file:
+        json.dump({"schemaVersion": 2, "devTickers": sorted({str(r.get("key")) for r in manifest}),
+                   "fixtures": manifest}, file, ensure_ascii=False, indent=2)
+        file.write("\n")
+    with open(os.path.join(out_dir, "s1-classes.json"), "w", encoding="utf-8") as file:
+        json.dump(build_s1_classes(dict(report, fixtures=manifest)), file, ensure_ascii=False, indent=2)
+        file.write("\n")
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Q4 EPS from 8-K earnings releases (see module docstring)")
     parser.add_argument("--mode", choices=("diagnose", "backtest", "fill"), default="backtest")
@@ -1399,11 +1472,22 @@ def parse_args(argv=None):
                         help="backtest report whose no-table rows are inspected in diagnose mode")
     parser.add_argument("--fixture-selection", default="",
                         help="optional JSON manifest selecting SEC table HTML to include in diagnose output")
+    parser.add_argument("--out-dir", default="",
+                        help="diagnose only: write s1-classes.json and fixtures/ here (must be outside the repository)")
+    parser.add_argument("--verbose-report", default="",
+                        help="diagnose only: write the full per-row evidence JSON to this path")
     return parser.parse_args(argv)
 
 
 def main(argv=None):
     args = parse_args(argv)
+    if args.out_dir:
+        if args.mode != "diagnose":
+            print("--out-dir is only valid with --mode diagnose", file=sys.stderr, flush=True)
+            return 2
+        if _inside_repo(args.out_dir):
+            print("--out-dir must be outside the repository; nothing was fetched", file=sys.stderr, flush=True)
+            return 2
     configured = (os.environ.get("SEC_USER_AGENT") or "").strip()
     user_agent = seed.resolve_user_agent({"SEC_USER_AGENT": configured} if configured else {})
     sec = Sec(user_agent, budget=args.budget)
@@ -1427,8 +1511,19 @@ def main(argv=None):
             print(f"STOPPED: SEC could not be reached ({exc}); re-run later.", flush=True)
         return 2
     if args.mode == "diagnose":
-        # stdout may be redirected by Actions to an artifact path; the script itself stays read-only.
-        print(json.dumps(report, ensure_ascii=False, indent=2), flush=True)
+        # stdout may be redirected by Actions to an artifact path; the script itself writes only --out-dir and
+        # --verbose-report, and only when they are given.
+        if args.verbose_report:
+            with open(args.verbose_report, "w", encoding="utf-8") as file:
+                json.dump({key: value for key, value in report.items() if key != "fixtures"}, file,
+                          ensure_ascii=False, indent=2)
+                file.write("\n")
+        if args.out_dir:
+            write_diagnose_outputs(report, args.out_dir)
+            printed = {key: value for key, value in report.items() if key not in ("rows", "fixtures")}
+        else:
+            printed = report
+        print(json.dumps(printed, ensure_ascii=False, indent=2), flush=True)
     else:
         text = json.dumps(report, ensure_ascii=False, indent=2)
         if args.report:

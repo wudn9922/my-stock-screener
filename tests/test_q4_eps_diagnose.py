@@ -446,6 +446,110 @@ class MultiTableFixtureTests(unittest.TestCase):
         self.assertEqual(bq.tables_of(fixture), [bq.tables_of(FIVE_TABLES)[i] for i in (1, 3, 4)])
 
 
+def classified_row(key, end, html):
+    row = evidence_row(html, end=end)
+    row.update(key=key, end=end)
+    return bq._classified_row(row)
+
+
+class CompactOutputTests(unittest.TestCase):
+    def rows(self):
+        return [classified_row("BBB", "2024-12-31", doc(L8_TABLE)),
+                classified_row("AAA", "2024-12-31", doc(L10_TABLE)),
+                classified_row("AAA", "2023-12-31", doc(L9A_TABLE)),
+                classified_row("CCC", "2024-12-31", doc(L5_TABLE))]
+
+    def report(self, rows=None, **changes):
+        rows = self.rows() if rows is None else rows
+        report = {"mode": "diagnose", "sourceReport": "docs/report/q4-8k/input/run-17/q4-8k-report.json",
+                  "sourceRows": len(rows), "diagnosed": len(rows), "stopped": None, "requests": 7,
+                  "rows": rows, "fixtures": [], "fixtureErrors": []}
+        report.update(changes)
+        return report
+
+    def test_s1_classes_has_the_schema_and_its_counts_add_up(self):
+        document = bq.build_s1_classes(self.report(), env={"GITHUB_RUN_ID": "123", "GITHUB_SHA": "abc"})
+        self.assertEqual(document["schemaVersion"], 2)
+        self.assertEqual(document["generator"], "classify_row")
+        self.assertEqual(document["status"], "complete")
+        self.assertEqual(document["diagnoseRun"], {"runId": 123, "mainCommit": "abc", "requests": 7, "stopped": None})
+        self.assertEqual(document["rowCount"], 4)
+        self.assertEqual(sum(document["classCounts"].values()), document["rowCount"])
+        self.assertEqual(set(document["classes"]), set(bq.S1_CLASS_NAMES))
+        for cls, entry in document["classes"].items():
+            self.assertEqual(set(entry), {"name", "count", "examples", "disposition"})
+        self.assertEqual(document["classes"]["L9"]["disposition"], "needs Opus")
+        self.assertEqual(document["classes"]["L8"]["disposition"], "out of scope")
+        self.assertEqual(document["otherLimit"], {"limit": 0, "count": 1, "passed": False})
+
+    def test_every_row_record_has_eight_keys_and_is_under_one_kilobyte(self):
+        document = bq.build_s1_classes(self.report())
+        for record in document["rows"]:
+            self.assertEqual(set(record), {"key", "end", "class", "accession", "url", "tableIndex",
+                                           "tableEpsReason", "note"})
+            self.assertLess(len(json.dumps(record)), 1024)
+        self.assertEqual([(r["key"], r["end"]) for r in document["rows"]],
+                         sorted((r["key"], r["end"]) for r in document["rows"]))
+
+    def test_examples_are_the_first_urls_in_key_order_and_status_follows_the_run(self):
+        document = bq.build_s1_classes(self.report())
+        aaa = [r for r in document["rows"] if r["key"] == "AAA"]
+        self.assertEqual(document["classes"]["L10"]["examples"], [aaa[1]["url"]])
+        stopped = bq.build_s1_classes(self.report(stopped="Forbidden: x"))
+        self.assertEqual(stopped["status"], "incomplete")
+        short = bq.build_s1_classes(self.report(diagnosed=3))
+        self.assertEqual(short["status"], "incomplete")
+
+    def test_out_dir_inside_the_repo_is_refused_before_any_sec_request(self):
+        target = os.path.join(ROOT, "tests", "should-not-be-created")
+        with mock.patch.object(bq, "Sec") as sec, mock.patch.object(bq, "run") as run, \
+                contextlib.redirect_stderr(io.StringIO()):
+            status = bq.main(["--mode", "diagnose", "--out-dir", target])
+        self.assertEqual(status, 2)
+        sec.assert_not_called()
+        run.assert_not_called()
+        self.assertFalse(os.path.exists(target))
+
+    def test_out_dir_writes_three_outputs_outside_the_repo_and_prints_only_the_summary(self):
+        payload = self.report()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            out = os.path.join(temp_dir, "out")
+            output = io.StringIO()
+            with mock.patch.object(bq, "Sec", return_value=object()), \
+                    mock.patch.object(bq, "run", return_value=payload), \
+                    mock.patch.object(bq.seed, "resolve_user_agent", return_value="test-agent"), \
+                    contextlib.redirect_stdout(output):
+                status = bq.main(["--mode", "diagnose", "--out-dir", out])
+            self.assertEqual(status, 0)
+            summary = json.loads(output.getvalue())
+            self.assertNotIn("rows", summary)
+            self.assertNotIn("fixtures", summary)
+            self.assertEqual(summary["diagnosed"], 4)
+            with open(os.path.join(out, "s1-classes.json"), encoding="utf-8") as source:
+                self.assertEqual(json.load(source)["rowCount"], 4)
+            with open(os.path.join(out, "fixtures", "s1_fixtures.json"), encoding="utf-8") as source:
+                self.assertEqual(json.load(source), {"schemaVersion": 2, "devTickers": [], "fixtures": []})
+            written = sorted(os.path.relpath(os.path.join(dirpath, name), temp_dir)
+                             for dirpath, _, names in os.walk(temp_dir) for name in names)
+            self.assertEqual(written, [os.path.join("out", "fixtures", "s1_fixtures.json"),
+                                       os.path.join("out", "s1-classes.json")])
+
+    def test_verbose_report_holds_the_evidence_and_no_fixture_html(self):
+        payload = self.report(fixtures=[{"file": "x.html", "html": "<table></table>"}])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = os.path.join(temp_dir, "verbose.json")
+            with mock.patch.object(bq, "Sec", return_value=object()), \
+                    mock.patch.object(bq, "run", return_value=payload), \
+                    mock.patch.object(bq.seed, "resolve_user_agent", return_value="test-agent"), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(bq.main(["--mode", "diagnose", "--verbose-report", path]), 0)
+            with open(path, encoding="utf-8") as source:
+                verbose = json.load(source)
+        self.assertEqual(len(verbose["rows"]), 4)
+        self.assertNotIn("fixtures", verbose)
+        self.assertIn("classification", verbose["rows"][0])
+
+
 class TrimAndRoundTripTests(unittest.TestCase):
     def test_attributes_are_gone_except_colspan_and_rowspan(self):
         raw = ('<table class="a"><tr><td style="x" colspan="2" data-x=\'1\'>A &amp; B<!-- note --></td>'
