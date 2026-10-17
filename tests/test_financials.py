@@ -549,6 +549,24 @@ class SplitTest(unittest.TestCase):
                                              "eventsCoverageStart": "2000-01-01", "eventsCoverageEnd": "2026-10-16",
                                              "eventsParserVersion": 4})
 
+    def test_complete_empty_chart_replaces_stale_cached_split_events(self):
+        previous = copy.deepcopy(self.before)
+        previous["split"] = fin.split_record(
+            False, [["2026-06-10", 10]], True, "old chart", "2026-06-11", "SPLT",
+            "2000-01-01", "2026-06-10", 3,
+        )
+        old_share_count = values(previous["quarterly"], "dilutedShares")["2026-04-26"]
+        old_eps = values(previous["quarterly"], "epsDiluted")["2026-04-26"]
+        document, info = build(
+            fixture("yahoo_split_after_unadjusted.json"), "SPLT", previous=previous,
+            fetch_splits=self.chart(synth.split_chart([])),
+        )
+        self.assertEqual(info["chart"], "fetched")
+        self.assertEqual(document["split"]["events"], [])
+        self.assertTrue(document["split"]["eventsComplete"])
+        self.assertEqual(values(document["quarterly"], "dilutedShares")["2026-04-26"], old_share_count)
+        self.assertEqual(values(document["quarterly"], "epsDiluted")["2026-04-26"], old_eps)
+
     def test_two_splits_cascade(self):
         rows = [
             fin.period("2019-12-31", {"dilutedShares": 100, "epsDiluted": 40.0}),

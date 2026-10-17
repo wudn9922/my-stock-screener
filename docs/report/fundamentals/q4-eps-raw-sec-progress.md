@@ -26,19 +26,19 @@ PR #89 的基準資料報告仍是 [q4-eps-evidence.md](../financials/q4-eps-evi
 
 ### 執行環境重建後的續跑記錄
 
-上段所列的 13,719 request、12,457 URL cache key 及 A／AMD／VEEV 文件數，是先前執行環境的 checkpoint 紀錄。環境重建後，該快取未能恢復，因此不能由目前工作樹續跑或重算；它們只能作為歷史傳輸進度，不能視為目前可供 audit 的資料。以下是從空白快取開始的新續跑，時間截至 2026-10-17 04:38 UTC：
+上段所列的 13,719 request、12,457 URL cache key 及 A／AMD／VEEV 文件數，是先前執行環境的 checkpoint 紀錄。環境重建後，該快取未能恢復，因此不能由目前工作樹續跑或重算；它們只能作為歷史傳輸進度，不能視為目前可供 audit 的資料。以下是從空白快取開始的新續跑，時間截至 2026-10-17 04:54 UTC：
 
 | 指標 | 新 checkpoint 結果 |
 | --- | ---: |
-| 快取的 SEC 請求記錄／URL cache key | 1,540 |
+| 快取的 SEC 請求記錄／URL cache key | 2,050 |
 | 已建立 company checkpoint | 1 檔：A，狀態 paused |
 | A 的 Q4 期別／歷史 accession | 14／2,365 |
 | scanner 列出的候選 accession-period entries | 1,232 |
-| 已處理 accession 記錄 | 70：60 個索引狀態 ok、10 個 format-error |
-| 附件 URL／附件狀態 | 1,470：1,452 通過輕量容器／標記檢查、15 個 format-error、3 個 paused |
+| 已處理 accession 記錄 | 99：84 個狀態 ok、14 個 format-error、1 個 partial |
+| 附件 URL／附件狀態 | 1,952：1,929 通過輕量容器／標記檢查、19 個 format-error、4 個 paused |
 | HTTP 403 | 0；本次 checkpoint 為 paused，非全市場完成 |
 
-附件的 `ok` 只表示容器格式及最多 1 MB 的 HTML 標記檢查通過，不表示解析出 EPS，更不表示來源、期間、GAAP 類型或拆股基準已核實。這份新快取目前位於執行環境的 `.cache/q4-eps-sec-scan/`，未提交至 PR。對這 1,470 個附件執行離線 audit 時，解析工作超過 180 秒仍未產生 staging 結果，故已停止；這不等同於零候選或零差異。正式填值及正式欄位仍未變更。
+附件的 `ok` 只表示容器格式及最多 1 MB 的 HTML 標記檢查通過，不表示解析出 EPS，更不表示來源、期間、GAAP 類型或拆股基準已核實。這份新快取目前位於執行環境的 `.cache/q4-eps-sec-scan/`，未提交至 PR。對當時快取的 1,470 個附件執行離線 audit 時，解析工作超過 180 秒仍未產生 staging 結果，故已停止；其後新增的附件尚未重新 audit。這不等同於零候選或零差異。正式填值及正式欄位仍未變更。
 
 ## 已完成的離線審核
 
@@ -68,10 +68,10 @@ VEEV 來源：CIK `0001393052`、accession `0001393052-26-000007`、8-K Item 2.0
 
 ## 驗證及審查
 
-- Python 全套測試：`/tmp/pr99-test-venv/bin/python -m unittest discover -s tests -p 'test_*.py' -q`，1,160 tests、全數通過。系統 Python 缺少 `yfinance`；暫存 venv 僅安裝此測試依賴，沒有改 repo dependencies。
+- Python 全套測試：`/tmp/pr99-test-venv/bin/python -m unittest discover -s tests -p 'test_*.py' -q`，1,163 tests、全數通過。聚焦 SEC／split 套件 363 tests 亦通過。系統 Python 缺少 `yfinance`；暫存 venv 僅安裝此測試依賴，沒有改 repo dependencies。
 - TypeScript：`npx tsc -b` 通過；lint 通過；Vitest 72 files / 894 tests 通過。
 - `python -u scripts/build_growth.py`：rows=6,591、written=false；因財報 JSON 未變，`docs/report/growth.json` 未重寫。
-- 另有不同 Codex GPT-6 Sol XHigh read-only code review；Gemini 不可用。Reviewer 與主工作階段使用隔離 checkout，但看過部分工作脈絡，因此不是完全盲審。其指出的 5:4 拆股、歷史 accession 前綴 CIK、舊 `--sec` 原始證據驗證三項 blocker 已在本次程式修正並有新增回歸測試；最新 commit 尚待 reviewer 複核。
+- 另有不同 Codex GPT-6 Sol XHigh read-only code review；Gemini 不可用。Reviewer 與主工作階段使用隔離 checkout，但看過部分工作脈絡，因此不是完全盲審。reviewer 在中間遠端提交 `61f137e` 發現兩個 blocker：兩個大型 Python 檔因上傳截斷成為 binary（已在 follow-up 以本地／遠端 Git blob SHA 完全一致的內容修復），以及完整新 split chart 與舊事件合併、可能把已不存在的拆股標為新鮮（已改為完整 chart 取代舊事件並從未調整資料重算）。另補了 legacy `--sec` 的有效 raw body/hash/locator 正向回填測試及 AAON 跨 accession 前綴 end-to-end audit 測試。修正後的新遠端 head 正等待 reviewer 複核。
 - 本環境不能切換至指定的 Sol 6.1 XHigh 或 Luna Max 執行模型；由當前 Codex 工作階段完成實作與驗收，未使用 Astra。
 
 完整全市場 filing 擷取、33,136 筆未分級值逐筆核驗、7,364 筆基準逐類 A/B/D 結果、TTM 按公司差異，以及跨產業／規模／公司事件分層的全市場品質抽查，均未完成。不得將本進度報告或局部掃描描述為 COMPLETE。

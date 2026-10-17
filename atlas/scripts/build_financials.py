@@ -54,6 +54,7 @@ does not load it). Runs in the daily schedule workflow; the files are committed 
 - Files of stocks no longer listed anywhere are deleted 180 days after they were last listed, unless
   they hold SEC periods.
 """
+import copy
 import json
 import math
 import os
@@ -504,6 +505,26 @@ def split_record(adjusted, events, complete, source, checked_at, symbol=None,
                       eventsCoverageEnd=coverage_end,
                       eventsParserVersion=parser_version)
     return result
+
+
+def split_events_current(events, complete, checked_at, symbol, coverage_start, coverage_end,
+                         parser_version, expected_symbol, required_start, required_end, as_of):
+    """Whether stored split events are verified, fresh and cover the current financial history."""
+    checked = parse_day(checked_at)
+    coverage_begin = parse_day(coverage_start)
+    coverage_finish = parse_day(coverage_end)
+    start = parse_day(required_start)
+    end = parse_day(required_end)
+    as_of_day = parse_day(as_of)
+    return bool(
+        complete is True and parser_version == SPLIT_CHART_PARSER_VERSION
+        and _valid_split_event_map(events) and isinstance(symbol, str)
+        and symbol == expected_symbol and checked is not None and as_of_day is not None
+        and 0 <= (as_of_day - checked).days <= SPLIT_CHART_MAX_STALENESS_DAYS
+        and coverage_begin is not None and coverage_finish is not None
+        and start is not None and end is not None
+        and coverage_begin <= start and coverage_finish >= end
+    )
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1326,13 +1347,22 @@ def update_document(previous, payload, key, now, fetch_splits=None):
     split_events_coverage_start = stored["splitEventsCoverageStart"]
     split_events_coverage_end = stored["splitEventsCoverageEnd"]
     split_events_parser_version = stored["splitEventsParserVersion"]
-    adjusted = adjust_splits([annual, quarterly], events)
-    if fetch_splits is not None and share_jump([annual, quarterly]):
+    # Preview the saved events on copies first. If a new complete chart is fetched, discard this
+    # preview and recompute from the unadjusted merged sections using only the authoritative chart.
+    cached_annual = copy.deepcopy(annual)
+    cached_quarterly = copy.deepcopy(quarterly)
+    cached_adjusted = adjust_splits([cached_annual, cached_quarterly], events)
+    history_dates = [parse_day(item.get("end")) for group in (annual, quarterly) for item in group]
+    required_start = min((day for day in history_dates if day is not None), default=None)
+    required_end = max((day for day in history_dates if day is not None), default=None)
+    stored_chart_current = split_events_current(
+        events, split_events_complete, split_events_checked_at, split_events_symbol,
+        split_events_coverage_start, split_events_coverage_end, split_events_parser_version,
+        key, required_start, required_end, today_iso,
+    )
+    if fetch_splits is not None and share_jump([annual, quarterly]) and not stored_chart_current:
         try:
             split_payload = fetch_splits()
-            history_dates = [parse_day(item.get("end")) for group in (annual, quarterly) for item in group]
-            required_start = min((day for day in history_dates if day is not None), default=None)
-            required_end = max((day for day in history_dates if day is not None), default=None)
             split_metadata = split_chart_coverage(split_payload, key, required_start, required_end)
             if split_metadata is None:
                 raise ValueError("Yahoo chart response was incomplete or lacked a symbol identity")
@@ -1351,9 +1381,18 @@ def update_document(previous, payload, key, now, fetch_splits=None):
             split_events_source = "Yahoo Finance chart range=max split events"
             split_events_checked_at = today_iso
             print(f"{key}: split events unavailable: {error}", file=sys.stderr)
+            # Use the previously stored events only when the refresh could not be validated.
+            annual, quarterly = cached_annual, cached_quarterly
+            adjusted = cached_adjusted
         else:
-            events = merge_events(events, fetched)
-            adjusted = adjust_splits([annual, quarterly], events) or adjusted
+            # A complete max-range response is authoritative, including when it removes an old
+            # event. Merge would keep stale actions while marking them complete and fresh. Re-run
+            # from the unadjusted merged sections so the stale preview cannot affect stored values.
+            events = fetched
+            adjusted = adjust_splits([annual, quarterly], events)
+    else:
+        annual, quarterly = cached_annual, cached_quarterly
+        adjusted = cached_adjusted
     adjusted = repair_split_eps([annual, quarterly], events) > 0 or adjusted
     adjusted = adjusted or stored["adjusted"]
 

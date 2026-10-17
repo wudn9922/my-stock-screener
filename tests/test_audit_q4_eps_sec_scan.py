@@ -58,6 +58,29 @@ class AuditTests(unittest.TestCase):
         filing = {"accessionNumber": accession}
         self.assertIsNone(audit._archive_identity_error(item, target, filing))
 
+    def test_aaon_cross_prefix_archive_document_runs_through_offline_audit(self):
+        accession = "0001445305-13-002007"
+        doc = self.document(accession)
+        doc["name"] = "aaon-20130930.htm"
+        doc["url"] = ("https://www.sec.gov/Archives/edgar/data/824142/"
+                      "000144530513002007/aaon-20130930.htm")
+        filing = self.filing(accession, doc, filing_date="2013-12-16", form="10-K")
+        self.write_manifest([filing])
+        manifest_path = self.manifests / "AAA.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["ciks"] = [{"cik": "0000824142", "historicalBlocksComplete": True,
+                             "historicalBlockCount": 1, "uniqueAccessionCount": 1}]
+        manifest["periods"][0]["cik"] = "0000824142"
+        manifest["periods"][0]["provenanceCik"] = "0000824142"
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        report = self.run_audit()
+
+        self.assertEqual({row["field"] for row in report["stagedDecisions"]},
+                         {"epsBasic", "epsDiluted"})
+        self.assertTrue(all(row["provenance"][0]["accession"] == accession
+                            for row in report["stagedDecisions"]))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="q4-eps-audit-")
         self.addCleanup(self.temp.cleanup)

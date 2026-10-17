@@ -1,5 +1,6 @@
 """Synthetic SEC 3-month Q4 EPS extraction, split checks, validation and resumable fill tests."""
 import json
+import hashlib
 import os
 import sys
 import tempfile
@@ -208,6 +209,69 @@ class SecQ4FactTests(unittest.TestCase):
             self.assertEqual(summary["filledPeriods"], 0)
             self.assertEqual(summary["rejected"]["raw-filing-hash-missing-or-invalid"], 1)
             self.assertIsNone(result["quarterly"]["values"]["epsDiluted"][7])
+
+    def test_existing_sec_writer_fills_null_only_after_verifying_raw_filing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "TEST.json")
+            state_path = os.path.join(directory, "state.json")
+            original = stored_document()
+            original["split"] = verified_split_document([])["split"]
+            with open(path, "w", encoding="utf-8") as handle:
+                json.dump(original, handle)
+            body = (
+                '<html><body><table><caption>USD</caption>'
+                '<tr><th></th><th colspan="2">Three Months Ended December 31, 2024</th></tr>'
+                '<tr><td>Net income</td><td>$</td><td>200</td></tr>'
+                '<tr><td>Diluted earnings per share</td><td>$</td><td>0.20</td></tr>'
+                '<tr><td>Basic earnings per share</td><td>$</td><td>0.21</td></tr>'
+                '</table></body></html>'
+            ).encode()
+            raw_path = os.path.join(directory, "ex99.htm")
+            with open(raw_path, "wb") as handle:
+                handle.write(body)
+            accession = "0000000000-25-000001"
+            url = "https://www.sec.gov/Archives/edgar/data/1/000000000025000001/ex99.htm"
+            raw_evidence = {
+                "accession": accession, "form": "10-K", "periodStart": "2024-10-02",
+                "periodEnd": "2024-12-31", "field": "epsDiluted", "reportedValue": 0.2,
+                "unit": "USD/shares", "url": url, "rawBodyUrl": url,
+                "filingSha256": hashlib.sha256(body).hexdigest(), "rawBodyPath": raw_path,
+                "excerpt": "Diluted earnings per share $ 0.20",
+                "locator": {"type": "html-table", "table": 0, "row": 2, "column": 2},
+                "reportedBasis": "as-filed",
+            }
+            candidate = {
+                "concept": "EarningsPerShareDiluted", "unit": "USD/shares", "value": 0.2,
+                "start": "2024-10-02", "end": "2024-12-31", "durationDays": 91,
+                "form": "10-K", "filed": "2025-02-01", "accn": accession,
+                "rawFilingEvidence": raw_evidence,
+            }
+            prior = {"concept": "EarningsPerShareDiluted", "unit": "USD/shares", "value": 0.5,
+                     "start": "2023-10-02", "end": "2023-12-31", "durationDays": 91,
+                     "form": "10-K", "filed": "2024-02-01", "accn": "0000000000-24-000001"}
+            rows = repair._q4_rows(original)
+            state = {"version": 1, "tickerMap": {"TEST": "0000000001"}, "requests": 0,
+                     "facts": {"TEST": {"signature": repair._signature(rows), "status": "ok",
+                               "q4": {"2023-12-31": {"epsDiluted": [prior]},
+                                      "2024-12-31": {"epsDiluted": [candidate]}}}}}
+            with open(state_path, "w", encoding="utf-8") as handle:
+                json.dump(state, handle)
+
+            summary = repair.sec_repair_directory(
+                directory, state_path=state_path, client=FakeClient(None),
+                environ={"SEC_USER_AGENT": "TestAgent test@example.com"})
+
+            with open(path, encoding="utf-8") as handle:
+                result = json.load(handle)
+            self.assertEqual(summary["status"], "done")
+            self.assertEqual(summary["validationCompared"], 1)
+            self.assertEqual(summary["filledPeriods"], 1)
+            self.assertEqual(result["quarterly"]["values"]["epsDiluted"][7], 0.2)
+            self.assertEqual(result["quarterly"]["values"]["epsBasic"][7], None)
+            self.assertEqual(result["quarterly"]["epsQuality"][7], {"epsDiluted": "A"})
+            self.assertEqual(result["secQ4EpsFacts"]["2024-12-31"]["epsDiluted"]["grade"], "A")
+            self.assertEqual(result["secQ4EpsFacts"]["2024-12-31"]["epsDiluted"]["rawFilingEvidence"],
+                             raw_evidence)
 
     def test_split_between_period_end_and_filing_requires_reporting_basis_review(self):
         normalized, factor, reason = repair.normalize_and_check_q4_eps(
