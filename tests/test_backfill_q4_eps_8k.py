@@ -1,10 +1,13 @@
 """Synthetic 8-K earnings-release tables, validation, pacing, budget and fill rules for backfill_q4_eps_8k."""
+import argparse
+import contextlib
 import io
 import json
 import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from urllib import error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -527,6 +530,270 @@ class RunTests(unittest.TestCase):
         with open(target, "rb") as file:
             self.assertEqual(file.read(), before)
         self.assertFalse(os.path.exists(self.state_path))
+
+
+ANSWER_SET_PATH = os.path.join(ROOT, "docs", "report", "q4-8k", "answer-set.json")
+
+
+class ShardTests(unittest.TestCase):
+    def test_every_key_is_in_exactly_one_shard_for_each_split(self):
+        keys = sorted(bq.load_answer_set(ANSWER_SET_PATH))
+        self.assertEqual(len(keys), 563)
+        for count in (1, 2, 8, 16):
+            with self.subTest(count=count):
+                parts = [bq.shard_keys(keys, (index, count)) for index in range(count)]
+                flat = [key for part in parts for key in part]
+                self.assertEqual(len(flat), len(set(flat)))
+                self.assertEqual(sorted(flat), keys)
+                for index, part in enumerate(parts):
+                    self.assertTrue(all(keys.index(key) % count == index for key in part))
+
+    def test_shards_take_sorted_unique_keys_by_index_mod_n(self):
+        self.assertEqual(bq.shard_keys(["b", "a", "b", "c", "d"], None), ["a", "b", "c", "d"])
+        self.assertEqual(bq.shard_keys(["b", "a", "b", "c", "d"], (0, 2)), ["a", "c"])
+        self.assertEqual(bq.shard_keys(["b", "a", "b", "c", "d"], (1, 2)), ["b", "d"])
+
+    def test_shard_argument_must_be_k_over_n_with_k_below_n(self):
+        self.assertEqual(bq.parse_shard("3/8"), (3, 8))
+        for bad in ("8/8", "0/0", "x/2", "-1/2", "2", ""):
+            with self.subTest(bad=bad):
+                with self.assertRaises(argparse.ArgumentTypeError):
+                    bq.parse_shard(bad)
+
+
+class AnswerSetFileTests(unittest.TestCase):
+    def write(self, rows):
+        handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+        json.dump({"rows": rows}, handle)
+        handle.close()
+        self.addCleanup(os.unlink, handle.name)
+        return handle.name
+
+    def test_the_committed_answer_set_has_its_pinned_counts(self):
+        answer = bq.load_answer_set(ANSWER_SET_PATH)
+        self.assertEqual(len(answer), 563)
+        self.assertEqual(sum(len(rows) for rows in answer.values()), 2649)
+
+    def test_a_duplicate_key_and_end_is_refused(self):
+        row = {"key": "ACME", "end": "2024-12-31", "fy": 2024, "value": 0.25, "netIncome": 1}
+        with self.assertRaises(ValueError):
+            bq.load_answer_set(self.write([row, dict(row, value=0.3)]))
+
+    def test_a_row_without_a_numeric_net_income_is_refused(self):
+        row = {"key": "ACME", "end": "2024-12-31", "fy": 2024, "value": 0.25, "netIncome": None}
+        with self.assertRaises(ValueError):
+            bq.load_answer_set(self.write([row]))
+
+    def test_rows_are_grouped_by_key_and_sorted_by_end(self):
+        rows = [{"key": "ACME", "end": "2024-12-31", "fy": 2024, "value": 0.25, "netIncome": 1},
+                {"key": "ACME", "end": "2023-12-31", "fy": 2023, "value": 0.5, "netIncome": 2}]
+        answer = bq.load_answer_set(self.write(rows))
+        self.assertEqual([row["end"] for row in answer["ACME"]], ["2023-12-31", "2024-12-31"])
+
+
+GATE_ANSWERS = [
+    {"key": "ACME", "end": "2023-12-31", "fy": 2023, "value": 0.50, "netIncome": 2000000, "accession": "A2"},
+    {"key": "ACME", "end": "2024-12-31", "fy": 2024, "value": 0.25, "netIncome": 1234000, "accession": "A1"},
+    {"key": "BETA", "end": "2024-12-31", "fy": 2024, "value": -0.10, "netIncome": -100000, "accession": "B1"},
+    {"key": "DEV", "end": "2024-12-31", "fy": 2024, "value": 1.00, "netIncome": 5000000, "accession": "D1"},
+]
+
+
+def gate_row(key, end, estimate, status="confirmed", checked=None):
+    result = None if estimate is None else {
+        "epsDiluted": estimate, "url": f"https://example.test/{key}/{end}",
+        "verified": {"status": status, "epsDiluted": checked if checked is not None else estimate,
+                     "url": f"https://example.test/check/{key}/{end}"}}
+    return {"key": key, "end": end, "stored": None, "result": result,
+            "reason": None if estimate is not None else "EPS sign differs from net income"}
+
+
+class GateTests(unittest.TestCase):
+    """--mode gate: offline, no SEC client, exit 3 and no summary unless each answer row is in exactly one report."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.answer = os.path.join(self.tmp.name, "answer-set.json")
+        with open(self.answer, "w", encoding="utf-8") as file:
+            json.dump({"rows": GATE_ANSWERS}, file)
+        self.dev = os.path.join(self.tmp.name, "s1_fixtures.json")
+        with open(self.dev, "w", encoding="utf-8") as file:
+            json.dump({"devTickers": ["DEV"]}, file)
+        self.summary = os.path.join(self.tmp.name, "summary.json")
+        saved = bq.DEV_FIXTURES
+        bq.DEV_FIXTURES = self.dev
+        self.addCleanup(setattr, bq, "DEV_FIXTURES", saved)
+        no_sec = mock.patch.object(bq, "Sec", side_effect=AssertionError("gate mode must not create a SEC client"))
+        self.sec = no_sec.start()
+        self.addCleanup(no_sec.stop)
+
+    def report(self, name, rows):
+        path = os.path.join(self.tmp.name, name)
+        with open(path, "w", encoding="utf-8") as file:
+            json.dump({"mode": "backtest", "rows": rows}, file)
+        return path
+
+    def gate(self, *reports):
+        argv = ["--mode", "gate", "--answer-set", self.answer, "--reports", *reports, "--report", self.summary]
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return bq.main(argv)
+
+    def all_correct(self):
+        return [gate_row("ACME", "2023-12-31", 0.50), gate_row("ACME", "2024-12-31", 0.25),
+                gate_row("BETA", "2024-12-31", -0.10), gate_row("DEV", "2024-12-31", 1.00)]
+
+    def read_summary(self):
+        with open(self.summary, encoding="utf-8") as file:
+            return json.load(file)
+
+    def test_every_answer_row_in_one_report_passes_and_writes_the_summary(self):
+        code = self.gate(self.report("a.json", self.all_correct()))
+        self.assertEqual(code, 0)
+        summary = self.read_summary()
+        self.assertEqual((summary["all"]["accepted"], summary["all"]["correct"]), (4, 4))
+        self.assertEqual(summary["all"]["coverage"], 1.0)
+        self.assertEqual(summary["all"]["precision"], 1.0)
+        self.assertEqual(summary["devTickers"], ["DEV"])
+        self.sec.assert_not_called()
+
+    def test_shards_that_partition_the_keys_pass(self):
+        first = self.report("a.json", self.all_correct()[:2])
+        second = self.report("b.json", self.all_correct()[2:])
+        self.assertEqual(self.gate(first, second), 0)
+        self.assertEqual(self.read_summary()["all"]["accepted"], 4)
+
+    def test_a_key_in_no_report_exits_3_and_writes_nothing(self):
+        code = self.gate(self.report("a.json", self.all_correct()[:3]))
+        self.assertEqual(code, 3)
+        self.assertFalse(os.path.exists(self.summary))
+
+    def test_a_key_in_two_reports_exits_3_and_writes_nothing(self):
+        code = self.gate(self.report("a.json", self.all_correct()),
+                         self.report("b.json", [gate_row("ACME", "2024-12-31", 0.25)]))
+        self.assertEqual(code, 3)
+        self.assertFalse(os.path.exists(self.summary))
+
+    def test_a_split_shard_that_repeats_a_key_of_the_full_shard_exits_3(self):
+        full_shard = self.report("full.json", self.all_correct())
+        half_shard = self.report("half.json", [gate_row("ACME", "2023-12-31", 0.50)])
+        self.assertEqual(self.gate(full_shard, half_shard), 3)
+        self.assertFalse(os.path.exists(self.summary))
+
+    def test_a_sign_error_is_counted_and_listed(self):
+        rows = self.all_correct()
+        rows[1] = gate_row("ACME", "2024-12-31", -0.25)
+        self.assertEqual(self.gate(self.report("a.json", rows)), 0)
+        summary = self.read_summary()
+        self.assertEqual(summary["all"]["signErrors"], 1)
+        self.assertEqual(summary["all"]["correct"], 3)
+        self.assertEqual([(row["key"], row["estimate"], row["answer"]) for row in summary["signErrors"]],
+                         [("ACME", -0.25, 0.25)])
+        self.assertEqual(len(summary["incorrect"]), 1)
+
+    def test_a_dev_ticker_is_left_out_of_the_accuracy_count(self):
+        rows = self.all_correct()
+        rows[3] = gate_row("DEV", "2024-12-31", 3.00)
+        self.assertEqual(self.gate(self.report("a.json", rows)), 0)
+        summary = self.read_summary()
+        self.assertEqual((summary["all"]["accepted"], summary["all"]["correct"]), (4, 3))
+        self.assertEqual((summary["excludingDevTickers"]["accepted"], summary["excludingDevTickers"]["correct"]),
+                         (3, 3))
+        self.assertEqual(summary["excludingDevTickers"]["precision"], 1.0)
+        self.assertEqual(summary["excludingDevTickers"]["answerRows"], 3)
+
+    def test_a_conflict_is_counted_over_extracted_rows_not_only_accepted_ones(self):
+        rows = self.all_correct()
+        rows[1] = gate_row("ACME", "2024-12-31", 0.25, status="conflict", checked=0.30)
+        self.assertEqual(self.gate(self.report("a.json", rows)), 0)
+        summary = self.read_summary()
+        self.assertEqual(summary["all"]["conflicts"], 1)
+        self.assertEqual(summary["all"]["accepted"], 3)
+        self.assertEqual(summary["conflicts"][0]["checked"], 0.30)
+
+    def test_the_tolerance_is_the_s3_correct_rule(self):
+        self.assertTrue(bq.within_gate_tolerance(0.2605, 0.25))
+        self.assertFalse(bq.within_gate_tolerance(0.2615, 0.25))
+        self.assertTrue(bq.within_gate_tolerance(10.04, 10.0))
+        self.assertFalse(bq.within_gate_tolerance(10.06, 10.0))
+
+    def test_a_row_outside_the_answer_set_is_counted_as_extra_and_changes_no_metric(self):
+        rows = self.all_correct() + [gate_row("ZZZZ", "2024-12-31", 9.0)]
+        self.assertEqual(self.gate(self.report("a.json", rows)), 0)
+        summary = self.read_summary()
+        self.assertEqual((summary["extraRows"], summary["all"]["accepted"]), (1, 4))
+
+    def test_the_dev_tickers_come_from_the_s1_manifest_by_default(self):
+        bq.DEV_FIXTURES = os.path.join(ROOT, "tests", "fixtures", "q4_8k", "s1_fixtures.json")
+        self.assertEqual(bq.load_dev_tickers(), ["TRAK", "TXT", "UI", "UNFI", "URBN", "VIAV", "VNCE", "WLY"])
+
+    def test_gate_needs_an_answer_set_and_reports_and_no_out_dir(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(bq.main(["--mode", "gate", "--reports", self.report("a.json", [])]), 2)
+            self.assertEqual(bq.main(["--mode", "gate", "--answer-set", self.answer]), 2)
+            self.assertEqual(bq.main(["--mode", "gate", "--answer-set", self.answer, "--reports",
+                                      self.report("a.json", []), "--out-dir", self.tmp.name]), 2)
+        self.sec.assert_not_called()
+
+
+class AnswerSetBacktestTests(unittest.TestCase):
+    """run() with --answer-set: only the answer rows of the shard are processed, against their value and netIncome."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.fin_dir = os.path.join(self.tmp.name, "financials")
+        os.makedirs(self.fin_dir)
+        self.saved = (bq.FIN_DIR, bq.STATE_PATH)
+        bq.FIN_DIR, bq.STATE_PATH = self.fin_dir, os.path.join(self.tmp.name, "state.json")
+        self.addCleanup(setattr, bq, "FIN_DIR", self.saved[0])
+        self.addCleanup(setattr, bq, "STATE_PATH", self.saved[1])
+        doc = {"symbol": "TEST", "market": "US", "quarterly": {
+            "end": ["2023-12-31", "2024-09-30", "2024-12-31"], "fq": [4, 3, 4], "fy": [2023, 2024, 2024],
+            "values": {"netIncome": [9, 1, 1234000], "epsDiluted": [0.9, 0.1, None]}}}
+        with open(os.path.join(self.fin_dir, "TEST.json"), "w", encoding="utf-8") as file:
+            json.dump(doc, file)
+        self.answer = os.path.join(self.tmp.name, "answer-set.json")
+        with open(self.answer, "w", encoding="utf-8") as file:
+            json.dump({"rows": [{"key": "TEST", "end": "2024-12-31", "fy": 2024, "value": 0.25,
+                                 "netIncome": 1234000, "accession": "T1"}]}, file)
+
+    def args(self, *extra):
+        return bq.parse_args(["--mode", "backtest", "--answer-set", self.answer, "--budget", "100", *extra])
+
+    def test_only_the_answer_row_is_processed_and_its_value_is_the_reference(self):
+        report = bq.run(self.args(), RunTests.FakeSec())
+        self.assertEqual([(row["key"], row["end"], row["stored"]) for row in report["rows"]],
+                         [("TEST", "2024-12-31", 0.25)])
+        self.assertEqual(report["accepted"], 1)
+        self.assertEqual(report["correct_share_of_all_periods"], 1.0)
+
+    def test_the_financials_file_is_not_written(self):
+        target = os.path.join(self.fin_dir, "TEST.json")
+        with open(target, "rb") as file:
+            before = file.read()
+        bq.run(self.args(), RunTests.FakeSec())
+        with open(target, "rb") as file:
+            self.assertEqual(file.read(), before)
+
+    def test_a_shard_processes_only_its_keys(self):
+        with open(self.answer, encoding="utf-8") as file:
+            document = json.load(file)
+        document["rows"].append({"key": "AAAA", "end": "2024-12-31", "fy": 2024, "value": 1.0, "netIncome": 1})
+        with open(self.answer, "w", encoding="utf-8") as file:
+            json.dump(document, file)
+        other = bq.run(self.args("--shard", "0/2"), RunTests.FakeSec())
+        mine = bq.run(self.args("--shard", "1/2"), RunTests.FakeSec())
+        self.assertEqual(other["rows"], [])
+        self.assertEqual([row["key"] for row in mine["rows"]], ["TEST"])
+
+    def test_answer_set_options_are_refused_before_any_sec_request(self):
+        with mock.patch.object(bq, "Sec", side_effect=AssertionError("no SEC client")), \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(bq.main(["--mode", "fill", "--answer-set", self.answer]), 2)
+            self.assertEqual(bq.main(["--mode", "backtest", "--shard", "0/2"]), 2)
+            self.assertEqual(bq.main(["--mode", "backtest", "--answer-set", self.answer, "--tickers", "TEST"]), 2)
+            self.assertEqual(bq.main(["--mode", "backtest", "--reports", self.answer]), 2)
 
 
 if __name__ == "__main__":

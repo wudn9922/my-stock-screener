@@ -16,6 +16,13 @@ Modes:
             diagnostic JSON to stdout and does not write files.
   fill      write accepted values into null fields only (never overwrites) and record the source of
             each Q4 in q4EpsSources.
+  gate      offline (no SEC): merge backtest reports given with --reports and write the S3 summary to
+            --report. Exits 3 and writes nothing unless every (key, end) of --answer-set is in exactly
+            one report row.
+
+--answer-set PATH (backtest only) limits the run to the (key, end) rows of the answer set; the target is
+the row's netIncome and the reference its value. --shard k/N (with --answer-set) takes the sorted unique
+answer-set keys whose index mod N is k.
 
 SEC access: User-Agent from SEC_USER_AGENT (or the repo default), at most about 5 requests per second,
 stop at the first HTTP 403, and --budget requests per run. docs/report/fundamentals/q4-8k-state.json
@@ -25,6 +32,7 @@ import argparse
 import copy
 import hashlib
 import json
+import math
 import os
 import re
 import statistics
@@ -57,6 +65,9 @@ NI_TOLERANCE = 0.002       # relative: stored Q4 net income against the table (p
 SHARES_TOLERANCE = 0.05    # relative: net income / shares against EPS (absolute floor EPS_FLOOR)
 EPS_FLOOR = 0.02
 STRICT_UNIT_CAP = 0.01     # diagnose only: the strict half-unit slack is at most this share of the target (S1-CF C1)
+DEV_FIXTURES = os.path.join(REPO, "tests", "fixtures", "q4_8k", "s1_fixtures.json")   # gate: devTickers
+GATE_EXIT = 3             # --mode gate: an answer-set (key, end) is in no report or in more than one (S3.3)
+WILSON_Z = 1.96           # S3.3 Wilson 95% lower bound
 FILING_DAYS = (15, 150)    # an 8-K with Item 2.02 this many days after the quarter end
 MAX_FILINGS = 3
 MAX_EXHIBITS = 4
@@ -1639,6 +1650,11 @@ def within_tolerance(estimate, stored):
     return abs(estimate - stored) <= max(0.02 * abs(stored), 0.011)
 
 
+def within_gate_tolerance(estimate, reference):
+    """S3.3 "correct": |estimate - reference| <= max(0.011, 0.005 * |reference|), both on today's split basis."""
+    return abs(estimate - reference) <= max(0.011, 0.005 * abs(reference))
+
+
 def load_state(path):
     doc = seed.read_json(path) if os.path.exists(path) else None
     if isinstance(doc, dict) and isinstance(doc.get("done"), dict):
@@ -1673,14 +1689,194 @@ def summarize(rows, mode):
     return out
 
 
+def parse_shard(text):
+    """'k/N' → (k, N) with N >= 1 and 0 <= k < N (S3.2)."""
+    match = re.fullmatch(r"([0-9]+)/([0-9]+)", text.strip())
+    if match is None or int(match.group(2)) < 1 or int(match.group(1)) >= int(match.group(2)):
+        raise argparse.ArgumentTypeError(f"expected k/N with 0 <= k < N, got {text!r}")
+    return int(match.group(1)), int(match.group(2))
+
+
+def shard_keys(keys, shard=None):
+    """The keys of one shard: the sorted unique keys whose index mod N is k (S3.2). No shard means every key."""
+    ordered = sorted(set(keys))
+    if shard is None:
+        return ordered
+    index, count = shard
+    return [key for position, key in enumerate(ordered) if position % count == index]
+
+
+def _is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def load_answer_set(path):
+    """
+    The answer set (S3.1) as {key: [row, ...]} with the rows of each key sorted by end. Every (key, end) must be
+    unique, with a numeric value and netIncome. The file is read only.
+    """
+    with open(path, encoding="utf-8") as source:
+        document = json.load(source)
+    rows = document.get("rows") if isinstance(document, dict) else None
+    if not isinstance(rows, list):
+        raise ValueError(f"{path}: no rows list")
+    by_key, pairs = {}, set()
+    for row in rows:
+        pair = (row.get("key"), row.get("end"))
+        if pair in pairs:
+            raise ValueError(f"{path}: duplicate (key, end) {pair}")
+        if not (_is_number(row.get("value")) and _is_number(row.get("netIncome"))):
+            raise ValueError(f"{path}: {pair} has no numeric value and netIncome")
+        pairs.add(pair)
+        by_key.setdefault(row["key"], []).append(row)
+    for key in by_key:
+        by_key[key].sort(key=lambda row: row["end"])
+    return by_key
+
+
+def process_answer_rows(sec, key, cik, doc, answer_rows, rows):
+    """
+    The backtest of one ticker against the answer set (S3.2): only its (key, end) rows. The target is the row's
+    netIncome and the stored reference is its value. The answer is a direct SEC fact, so it is never derived.
+    """
+    filings = filing_rows(sec, cik)
+    for answer in answer_rows:
+        end = answer["end"]
+        debug = []
+        result, reason = find_quarter(sec, cik, filings, end, answer["netIncome"], debug)
+        if result is not None:
+            factor = split_factor(doc, result["filingDate"])
+            if factor != 1:
+                result = dict(result, asReported=result["epsDiluted"], splitFactor=factor,
+                              epsDiluted=round(result["epsDiluted"] / factor, 6),
+                              epsBasic=None if result["epsBasic"] is None else round(result["epsBasic"] / factor, 6),
+                              dilutedShares=None if result["dilutedShares"] is None
+                              else round(result["dilutedShares"] * factor, 1))
+            result = dict(result, verified=verify_quarter(sec, cik, filings, end, result["net"],
+                                                          result["epsDiluted"], doc))
+        rows.append({"key": key, "end": end, "stored": answer["value"], "target": answer["netIncome"],
+                     "derived": False, "result": result, "reason": reason, "debug": debug[:2]})
+    return True
+
+
+def _wilson_lower(correct, n):
+    if not n:
+        return None
+    z2 = WILSON_Z * WILSON_Z
+    p = correct / n
+    return (p + z2 / (2 * n) - WILSON_Z * math.sqrt(p * (1 - p) / n + z2 / (4 * n * n))) / (1 + z2 / n)
+
+
+def _sign(value):
+    return (value > 0) - (value < 0)
+
+
+def gate_metrics(rows, answer_count):
+    """S3.3 metrics over gate rows (one per answer-set row that some report holds), with per-FY precision."""
+    extracted = [row for row in rows if row["estimate"] is not None]
+    accepted = [row for row in extracted if row["status"] == "confirmed"]
+    correct = [row for row in accepted if within_gate_tolerance(row["estimate"], row["answer"])]
+    per_fy = {}
+    for row in accepted:
+        per_fy.setdefault(str(row["fy"]), []).append(row)
+    fy_table = {}
+    for fy in sorted(per_fy):
+        group = per_fy[fy]
+        ok = sum(within_gate_tolerance(row["estimate"], row["answer"]) for row in group)
+        fy_table[fy] = {"accepted": len(group), "correct": ok, "precision": round(ok / len(group), 4),
+                        "checked": len(group) >= 20}
+    n = len(accepted)
+    return {"answerRows": answer_count, "extracted": len(extracted), "accepted": n, "correct": len(correct),
+            "precision": round(len(correct) / n, 4) if n else None,
+            "wilsonLower95": round(_wilson_lower(len(correct), n), 4) if n else None,
+            "signErrors": sum(_sign(row["estimate"]) != _sign(row["answer"]) for row in accepted if row["answer"] != 0),
+            "conflicts": sum(row["status"] == "conflict" for row in extracted),
+            "coverage": round(n / answer_count, 4) if answer_count else None,
+            "perFY": fy_table}
+
+
+def load_dev_tickers(path=None):
+    with open(path or DEV_FIXTURES, encoding="utf-8") as source:
+        return sorted({str(ticker).upper() for ticker in json.load(source)["devTickers"]})
+
+
+def run_gate(args):
+    """
+    --mode gate (S3.3), offline. Every (key, end) of the answer set must be in exactly one row of the --reports;
+    otherwise nothing is written and the exit code is GATE_EXIT. Report rows outside the answer set are counted
+    as extraRows and left out of every metric.
+    """
+    answer = load_answer_set(args.answer_set)
+    pairs = {(key, row["end"]): row for key, rows in answer.items() for row in rows}
+    seen, reported = Counter(), []
+    for path in args.reports:
+        with open(path, encoding="utf-8") as source:
+            report = json.load(source)
+        for row in report.get("rows") or []:
+            pair = (row.get("key"), row.get("end"))
+            seen[pair] += 1
+            reported.append((pair, row))
+    missing = sorted(pair for pair in pairs if seen[pair] == 0)
+    doubled = sorted(pair for pair in pairs if seen[pair] > 1)
+    if missing or doubled:
+        print(f"gate: {len(missing)} answer rows are in no report and {len(doubled)} are in more than one; "
+              "no summary written", file=sys.stderr, flush=True)
+        for label, listed in (("missing", missing), ("in more than one report", doubled)):
+            for key, end in listed[:10]:
+                print(f"  {label}: {key} {end}", file=sys.stderr, flush=True)
+        return GATE_EXIT
+    rows, extra = [], 0
+    for pair, row in reported:
+        if pair not in pairs:
+            extra += 1
+            continue
+        answer_row, result = pairs[pair], row.get("result")
+        verified = (result or {}).get("verified") or {}
+        rows.append({"key": pair[0], "end": pair[1], "fy": answer_row.get("fy"), "answer": answer_row["value"],
+                     "accession": answer_row.get("accession"), "estimate": (result or {}).get("epsDiluted"),
+                     "url": (result or {}).get("url"), "reason": row.get("reason"),
+                     "status": verified.get("status"), "checked": verified.get("epsDiluted"),
+                     "checkUrl": verified.get("url")})
+    dev = set(load_dev_tickers())
+    non_dev_pairs = [pair for pair in pairs if pair[0] not in dev]
+    non_dev = [row for row in rows if row["key"] not in dev]
+    incorrect = [row for row in rows if row["status"] == "confirmed" and row["estimate"] is not None
+                 and not within_gate_tolerance(row["estimate"], row["answer"])]
+    signs = [row for row in rows if row["status"] == "confirmed" and row["answer"] != 0
+             and _sign(row["estimate"]) != _sign(row["answer"])]
+    conflicts = [row for row in rows if row["status"] == "conflict"]
+
+    def listed(row):
+        return {key: row[key] for key in ("key", "end", "estimate", "answer", "checked", "accession", "url",
+                                          "checkUrl")}
+
+    summary = {"mode": "gate", "answerSet": os.path.relpath(args.answer_set, REPO),
+               "reports": list(args.reports), "answerRows": len(pairs), "reportRows": len(reported),
+               "extraRows": extra, "devTickers": sorted(dev), "all": gate_metrics(rows, len(pairs)),
+               "excludingDevTickers": gate_metrics(non_dev, len(non_dev_pairs)),
+               "reasons": dict(Counter(row["reason"] for row in rows if row["estimate"] is None).most_common()),
+               "incorrect": [listed(row) for row in incorrect], "signErrors": [listed(row) for row in signs],
+               "conflicts": [listed(row) for row in conflicts]}
+    text = json.dumps(summary, ensure_ascii=False, indent=2)
+    if args.report:
+        with open(args.report, "w", encoding="utf-8") as file:
+            file.write(text + "\n")
+    print(text, flush=True)
+    return 0
+
+
 def run(args, sec):
     if args.mode == "diagnose":
         return run_diagnose(args, sec)
     cik_of = seed.parse_ticker_map(sec.get_json(TICKERS_URL) or {})
     state = load_state(STATE_PATH)
-    wanted = {t.strip().upper() for t in args.tickers.split(",") if t.strip()} if args.tickers else None
-    keys = sorted(name[:-5] for name in os.listdir(FIN_DIR) if name.endswith(".json") and name != "index.json")
-    keys = [k for k in keys if fin.market_of(k) == "US" and (wanted is None or k in wanted)]
+    answer = load_answer_set(args.answer_set) if args.answer_set else None
+    if answer is not None:
+        keys = shard_keys(answer, args.shard)
+    else:
+        wanted = {t.strip().upper() for t in args.tickers.split(",") if t.strip()} if args.tickers else None
+        keys = sorted(name[:-5] for name in os.listdir(FIN_DIR) if name.endswith(".json") and name != "index.json")
+        keys = [k for k in keys if fin.market_of(k) == "US" and (wanted is None or k in wanted)]
     if args.limit:
         keys = keys[:args.limit]
     rows, stop, filled = [], None, 0
@@ -1695,7 +1891,10 @@ def run(args, sec):
             continue
         ticker_rows, complete = [], False
         try:
-            complete = process_ticker(sec, key, cik, doc, args.mode, ticker_rows)
+            if answer is None:
+                complete = process_ticker(sec, key, cik, doc, args.mode, ticker_rows)
+            else:
+                complete = process_answer_rows(sec, key, cik, doc, answer[key], ticker_rows)
         except (OutOfBudget, Forbidden, NetworkError) as exc:
             stop = f"{type(exc).__name__}: {exc}"
         rows.extend(ticker_rows)
@@ -1804,7 +2003,7 @@ def write_diagnose_outputs(report, out_dir):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Q4 EPS from 8-K earnings releases (see module docstring)")
-    parser.add_argument("--mode", choices=("diagnose", "backtest", "fill"), default="backtest")
+    parser.add_argument("--mode", choices=("diagnose", "backtest", "fill", "gate"), default="backtest")
     parser.add_argument("--tickers", default="", help="comma separated; empty = every US file")
     parser.add_argument("--limit", type=int, default=0, help="only the first N files (0 = all)")
     parser.add_argument("--budget", type=int, default=6000, help="SEC requests this run")
@@ -1817,11 +2016,41 @@ def parse_args(argv=None):
                         help="diagnose only: write s1-classes.json and fixtures/ here (must be outside the repository)")
     parser.add_argument("--verbose-report", default="",
                         help="diagnose only: write the full per-row evidence JSON to this path")
+    parser.add_argument("--answer-set", default="",
+                        help="backtest only: the answer set (S3.1); only its (key, end) rows are processed")
+    parser.add_argument("--shard", type=parse_shard, default=None,
+                        help="with --answer-set: k/N, the sorted answer-set keys with index mod N equal to k")
+    parser.add_argument("--reports", nargs="+", default=[],
+                        help="gate only: backtest reports to merge")
     return parser.parse_args(argv)
 
 
 def main(argv=None):
     args = parse_args(argv)
+    if args.mode == "gate":
+        if not args.answer_set or not args.reports or args.out_dir:
+            print("--mode gate needs --answer-set and --reports, and no --out-dir", file=sys.stderr, flush=True)
+            return 2
+        try:
+            return run_gate(args)
+        except (OSError, ValueError) as exc:
+            print(f"gate: {exc}", file=sys.stderr, flush=True)
+            return 2
+    if args.reports:
+        print("--reports is only valid with --mode gate", file=sys.stderr, flush=True)
+        return 2
+    if args.answer_set:
+        if args.mode != "backtest" or args.tickers:
+            print("--answer-set needs --mode backtest and no --tickers", file=sys.stderr, flush=True)
+            return 2
+        try:
+            load_answer_set(args.answer_set)
+        except (OSError, ValueError) as exc:
+            print(f"--answer-set: {exc}", file=sys.stderr, flush=True)
+            return 2
+    if args.shard is not None and not args.answer_set:
+        print("--shard needs --answer-set", file=sys.stderr, flush=True)
+        return 2
     if args.out_dir:
         if args.mode != "diagnose":
             print("--out-dir is only valid with --mode diagnose", file=sys.stderr, flush=True)
