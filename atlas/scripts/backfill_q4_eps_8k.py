@@ -822,6 +822,23 @@ def diagnose_filing(sec, cik, filing, end, target, fixture_specs=None, texts=Non
     return result, []
 
 
+TARGET_MARKER = "<!-- S1 target table -->"
+
+
+def fixture_html(text, url, table_indices, target_index):
+    """
+    Fixture for one row: the source URL on the first line, then the tables of table_indices in ascending order,
+    with the target table preceded by TARGET_MARKER on its own line (diagnose only; trimmed in export_fixture).
+    """
+    raw = html_tables_of(text)
+    lines = [f"<!-- Source URL: {url} -->"]
+    for index in sorted(table_indices):
+        if index == target_index:
+            lines.append(TARGET_MARKER)
+        lines.append(raw[index])
+    return "\n".join(lines) + "\n"
+
+
 def layout_class_hint(diagnosis):
     """A review hint only; final S1 classes are assigned from the collected evidence."""
     candidates = diagnosis.get("candidateFilings") or []

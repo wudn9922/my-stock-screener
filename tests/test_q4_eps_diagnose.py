@@ -420,5 +420,29 @@ class M1EvidenceFieldTests(unittest.TestCase):
         self.assertEqual(bq.classify_row(restored), bq.classify_row(row))
 
 
+FIVE_TABLES = doc(tbl(), tbl(tr("Revenue", "5,000")), tbl(), tbl(tr(HEADER, "x")),
+                  tbl(tr("Net income attributable to Acme", "1,234")))
+
+
+class MultiTableFixtureTests(unittest.TestCase):
+    def test_five_tables_with_an_empty_third_export_tables_one_three_four_with_the_marker_before_four(self):
+        source = bq.tables_of(FIVE_TABLES)
+        fixture = bq.fixture_html(FIVE_TABLES, "https://www.sec.gov/example", [1, 3, 4], 4)
+        lines = fixture.split("\n")
+        self.assertEqual(lines[0], "<!-- Source URL: https://www.sec.gov/example -->")
+        marker = lines.index(bq.TARGET_MARKER)
+        self.assertTrue(lines[marker + 1].startswith("<table"))
+        self.assertIn("Net income attributable to Acme", lines[marker + 1])
+        self.assertEqual(bq.tables_of(fixture), [source[1], source[3], source[4]])
+        self.assertEqual(bq.tables_of(fixture)[2][0][0], "Net income attributable to Acme")
+
+    def test_the_l1_evidence_names_the_same_tables_the_export_uses(self):
+        row = evidence_row(FIVE_TABLES)
+        result = bq.classify_row(row)
+        self.assertEqual((result["class"], result["tableIndex"], result["tableIndices"]), ("L1", 4, [1, 3, 4]))
+        fixture = bq.fixture_html(FIVE_TABLES, "u", result["tableIndices"], result["tableIndex"])
+        self.assertEqual(bq.tables_of(fixture), [bq.tables_of(FIVE_TABLES)[i] for i in (1, 3, 4)])
+
+
 if __name__ == "__main__":
     unittest.main()
