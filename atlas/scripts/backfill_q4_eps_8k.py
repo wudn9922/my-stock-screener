@@ -22,6 +22,7 @@ stop at the first HTTP 403, and --budget requests per run. docs/report/fundament
 records finished tickers so the next run continues where this one stopped.
 """
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -32,6 +33,7 @@ import time
 from collections import Counter
 from datetime import date, timedelta
 from html import escape as html_escape
+from html import unescape as html_unescape
 from html.parser import HTMLParser
 from urllib import error, request
 
@@ -54,6 +56,7 @@ SCALES = (1, 1e3, 1e6, 1e9)
 NI_TOLERANCE = 0.002       # relative: stored Q4 net income against the table (plus half a unit of its scale)
 SHARES_TOLERANCE = 0.05    # relative: net income / shares against EPS (absolute floor EPS_FLOOR)
 EPS_FLOOR = 0.02
+STRICT_UNIT_CAP = 0.01     # diagnose only: the strict half-unit slack is at most this share of the target (S1-CF C1)
 FILING_DAYS = (15, 150)    # an 8-K with Item 2.02 this many days after the quarter end
 MAX_FILINGS = 3
 MAX_EXHIBITS = 4
@@ -239,6 +242,8 @@ QUARTER_WORDING = re.compile(
     re.I,
 )
 YEAR_WORDING = re.compile(r"\b(?:twelve\s+months|year\s+ended|fiscal\s+year|full\s+year|year\s+to\s+date|ytd)\b", re.I)
+YEAR_WORDING_L5 = re.compile(                                                    # classify_row rule 8 only (S1-CF C10)
+    r"\b(?:twelve\s+months|years?\s+ended|fiscal\s+years?|full\s+year|year\s+to\s+date|ytd|for\s+the\s+years?)\b", re.I)
 NUMBER_TOKEN = re.compile(r"(?<![A-Za-z0-9])\(?\s*\$?\s*-?\d[\d,]*(?:\.\d+)?\s*\)?(?![A-Za-z0-9])")
 
 
@@ -387,11 +392,50 @@ def _decimal_places(text):
 
 
 def strict_scales(value, decimals, target):
-    """Every unit scale at which the reported value matches the target within half a unit of its last shown digit."""
+    """
+    Every unit scale at which the reported value matches the target within half a unit of its last shown digit, and
+    never looser than STRICT_UNIT_CAP of the target (S1-CF C1: a 0 or a single digit no longer matches a large target).
+    """
     if value is None or target is None:
         return []
     return [scale for scale in SCALES
-            if abs(value * scale - target) <= max(NI_TOLERANCE * abs(target), 0.5 * scale * 10 ** -decimals)]
+            if abs(value * scale - target) <= max(NI_TOLERANCE * abs(target),
+                                                  min(0.5 * scale * 10 ** -decimals, STRICT_UNIT_CAP * abs(target)))]
+
+
+MONEY_UNITS = {"thousand": 1e3, "million": 1e6, "billion": 1e9}
+MONEY_WORD = re.compile(r"\$\s*\(?\s*(\d[\d,]*(?:\.\d+)?)\s*\)?\s*(thousand|million|billion)\b", re.I)
+MONEY_FULL = re.compile(r"\$\s*\(?\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?)(?![\d,.])(?!\s*\)?\s*(?:thousand|million|billion)\b)",
+                        re.I)
+SCRIPT_OR_STYLE = re.compile(r"<(script|style)\b[^>]*>.*?</\1\s*>", re.I | re.S)
+MARKUP_COMMENT = re.compile(r"<!--.*?-->", re.S)
+MARKUP_TAG = re.compile(r"<[^>]+>")
+
+
+def visible_text(text):
+    """The text a reader sees: no script, style, comments or tags; entities decoded; whitespace collapsed (S1-CF C4)."""
+    text = MARKUP_TAG.sub(" ", MARKUP_COMMENT.sub(" ", SCRIPT_OR_STYLE.sub(" ", text)))
+    return " ".join(html_unescape(text).split())
+
+
+def money_match(visible, target):
+    """
+    The first money token of the visible text (prose such as "$18.7 million" or "$1,376,813") whose absolute value
+    matches the target → (start, 160 characters of visible text around it), or None. Diagnose only (S1-CF C4).
+    """
+    if target is None:
+        return None
+    tokens = [(match.start(), match.group(1), MONEY_UNITS[match.group(2).lower()])
+              for match in MONEY_WORD.finditer(visible)]
+    tokens += [(match.start(), match.group(1), 1) for match in MONEY_FULL.finditer(visible)]
+    for start, digits, scale in sorted(tokens):
+        value = abs(float(digits.replace(",", "")))
+        decimals = _decimal_places(digits)
+        slack = max(NI_TOLERANCE * abs(target), min(0.5 * scale * 10 ** -decimals, STRICT_UNIT_CAP * abs(target)))
+        if abs(value * scale - abs(target)) <= slack:
+            window = max(0, start - 80)
+            return start, visible[window:window + 160]
+    return None
 
 
 def diluted_per_share_labels(table):
@@ -402,13 +446,19 @@ def diluted_per_share_labels(table):
         entries.append((label.lower() if label else None, values))
     headings = [index for index, (low, values) in enumerate(entries)
                 if low and all(value is None for value in values) and any(token in low for token in HEADING_TOKENS)]
+    has_diluted_shares = any(low and is_diluted_shares(low) for low, _ in entries)
+    has_basic = any(low and re.search(r"\bbasic\b", low) for low, _ in entries)
     labels = []
-    for index, (low, _) in enumerate(entries):
+    for index, (low, values) in enumerate(entries):
         if not low or any(word in low for word in EPS_AVOID):
             continue
         direct = "diluted" in low and any(token in low for token in PER_SHARE_TOKENS)
         under_heading = re.match(r"diluted\b", low) is not None and any(h < index <= h + 4 for h in headings)
-        if direct or under_heading:
+        # S1-CF C6: a net income row under a per-share heading, with a diluted share row and no basic row (TXT layout)
+        net_under_heading = (any(h < index <= h + 4 for h in headings) and is_net_income(low)
+                             and all(value is None or abs(value) < 1000 for value in values)
+                             and has_diluted_shares and not has_basic)
+        if direct or under_heading or net_under_heading:
             labels.append(low)
     return labels
 
@@ -425,15 +475,30 @@ def _diluted_avoid_labels(table):
     return labels
 
 
+YEAR_CELL = re.compile(r"(?:19|20)\d{2}")
+
+
+def _year_row(cells):
+    """True when every numeric cell of the row is a year and there is at least one (S1-CF C5: '2,013' is a value)."""
+    numeric = [cell.strip() for cell in cells if number(cell) is not None]
+    return bool(numeric) and all(YEAR_CELL.fullmatch(text) for text in numeric)
+
+
 def header_text(table):
-    """Text of the rows before the first row with a numeric value: at most 6 rows, cut to 400 characters."""
+    """
+    Text of the header rows: the rows before the first row with a numeric value that is not a year row (S1-CF C5).
+    At most 6 non-empty rows, cut to 400 characters.
+    """
     rows = []
     for cells in table:
         _, values = row_of(cells)
-        if any(value is not None for value in values):
+        if any(value is not None for value in values) and not _year_row(cells):
             break
-        rows.append(cells)
-    text = " ".join(" ".join(cell for cell in cells if cell.strip()) for cells in rows[:6])
+        if table_is_nonempty([cells]):
+            rows.append(cells)
+            if len(rows) == 6:
+                break
+    text = " ".join(" ".join(cell for cell in cells if cell.strip()) for cells in rows)
     return " ".join(text.split())[:400]
 
 
@@ -442,38 +507,88 @@ def _month_pattern(month):
     return rf"(?:{name}|{name[:3]})"
 
 
-def variant_period(header, end):
-    """A period header that shows_period does not read but still names the quarter end (S1 decision §2, rules i to iv)."""
+VARIANT_QUARTER = re.compile(
+    r"\b(?:three\s+months|3\s+months|quarters?|fourth\s+quarter|4th\s+quarter|q4|4q|thirteen\s+weeks|fourteen\s+weeks"
+    r"|13\s+weeks|14\s+weeks)\b",
+    re.I,
+)
+MONTH_MENTION = re.compile(
+    r"\b(january|february|march|april|may|june|july|august|september|october|november|december|sept"
+    r"|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\.?\s*(\d{1,2})\b(?:,?\s*(\d{4})\b)?",
+    re.I,
+)
+MONTH_NUMBER = {name[:3]: number for number, name in enumerate(MONTHS, start=1)}
+
+
+def normalize_header(header):
+    """A space at every lower-to-upper join ('EndedFebruary') and after the comma of '2,2013' (S1-CF C7)."""
+    text = re.sub(r"([a-z])([A-Z])", r"\1 \2", header)
+    return re.sub(r"\b(\d{1,2}),(\d{4})\b", r"\1, \2", text)
+
+
+def variant_rule(header, end):
+    """
+    How a period header names the quarter end in a variant form: "i" to "vi" (S1 decision §2; S1-CF C7), or None when
+    shows_period reads the header as it is or it does not name the quarter end at all.
+    """
     if shows_period(header, end):
-        return False
+        return None
+    text = normalize_header(header)
     when = date.fromisoformat(end)
     year = str(when.year)
-    if QUARTER_WORDING.search(header) and re.search(rf"\b{year}\b", header):
-        return True                                                           # (i)
+    if shows_period(text, end):
+        return "v"
+    if VARIANT_QUARTER.search(text) and re.search(rf"\b{year}\b", text):
+        return "i"
     month = _month_pattern(when.month)
-    if re.search(rf"\b{month}\.?\s+{when.day}\b(?!,?\s*\d{{4}})", header, re.I) and re.search(rf"\b{year}\b", header):
-        return True                                                           # (ii)
-    for match in re.finditer(r"(?<!\d)(\d{1,2})/(\d{1,2})/(\d{4}|\d{2})(?!\d)", header):
+    if re.search(rf"\b{month}\.?\s+{when.day}\b(?!,?\s*\d{{4}})", text, re.I) and re.search(rf"\b{year}\b", text):
+        return "ii"
+    for match in re.finditer(r"(?<!\d)(\d{1,2})/(\d{1,2})/(\d{4}|\d{2})(?!\d)", text):
         if int(match.group(1)) != when.month or int(match.group(2)) != when.day:
             continue
         written = match.group(3)
         if (int(written) == when.year) if len(written) == 4 else (int(written) == when.year % 100):
-            return True                                                       # (iii)
-    if when.month == 1 and when.day <= 7 and re.search(r"\b(?:fourth quarter|q4|quarter)\b", header, re.I) \
-            and re.search(rf"\b{when.year - 1}\b", header):
-        return True                                                           # (iv)
-    return False
+            return "iii"
+    if when.month == 1 and when.day <= 7 and re.search(r"\b(?:fourth quarter|q4|quarter)\b", text, re.I) \
+            and re.search(rf"\b{when.year - 1}\b", text):
+        return "iv"
+    if (when.month == 1 or (when.month == 2 and when.day <= 7)) \
+            and re.search(r"\b(?:fourth\s+quarter|4th\s+quarter|q4|4q)\b", text, re.I) \
+            and re.search(rf"\b{when.year - 1}\b", text) and not re.search(rf"\b{year}\b", text):
+        return "vi"
+    return None
 
 
 def other_quarter_end(header, end):
-    """The header names another quarter end: a month other than the end month, or a first to third quarter."""
+    """
+    The header names another quarter end: a month other than the end month, or a first to third quarter (S1-CF C8).
+    Dates within 7 days of the end, or of the end one year earlier, are not other quarter ends (the 52/53-week
+    calendar and the prior-year comparative), so they are blanked before the month test.
+    """
     when = date.fromisoformat(end)
+    previous = date(when.year - 1, 2, 28) if (when.month, when.day) == (2, 29) else date(when.year - 1, when.month, when.day)
+
+    def near(day):
+        return abs((day - when).days) <= 7 or abs((day - previous).days) <= 7
+
+    def blank(match):
+        month = MONTH_NUMBER[match.group(1)[:3].lower()]
+        years = [int(match.group(3))] if match.group(3) else [when.year, when.year - 1]
+        for year in years:
+            try:
+                if near(date(year, month, int(match.group(2)))):
+                    return " "
+            except ValueError:
+                continue
+        return match.group(0)
+
+    text = MONTH_MENTION.sub(blank, normalize_header(header))
     for month in range(1, 13):
         if month == when.month or (month == 12 and when.month == 1 and when.day <= 7):
             continue
-        if re.search(rf"\b{_month_pattern(month)}\b", header, re.I):
+        if re.search(rf"\b{_month_pattern(month)}\b", text, re.I):
             return True
-    return re.search(r"\b(?:first quarter|second quarter|third quarter|q1|q2|q3)\b", header, re.I) is not None
+    return re.search(r"\b(?:first quarter|second quarter|third quarter|q1|q2|q3|1q|2q|3q)\b", text, re.I) is not None
 
 
 def _table_evidence(table, target, end, named):
@@ -818,6 +933,9 @@ def diagnose_filing(sec, cik, filing, end, target, fixture_specs=None, texts=Non
         document["rawStrictTextMatch"] = any(
             strict_scales(number(token.group(0)), _decimal_places(token.group(0)), target)
             for token in NUMBER_TOKEN.finditer(text))
+        money = money_match(visible_text(text), target)
+        document["rawMoneyMatch"] = money is not None
+        document["rawMoneyContext"] = money[1] if money is not None else None
         document["targetPresentAnywhere"] = bool(document["targetMatches"] or document["rawTextMatches"])
         document["netIncomeTargetPresent"] = bool(document["netIncomeTargetMatches"])
         result["documents"].append(document)
@@ -955,11 +1073,13 @@ def _clip(text, limit=300):
     return " ".join(str(text).split())[:limit]
 
 
-def _classified(cls, note, accession=None, document=None, url=None, table=None, table_indices=None, eps_reason=None):
+def _classified(cls, note, accession=None, document=None, url=None, table=None, table_indices=None, eps_reason=None,
+                variant_form=None):
     if table_indices is None:
         table_indices = [] if table is None else [table]
     return {"class": cls, "accession": accession, "document": document, "url": url, "tableIndex": table,
-            "tableIndices": list(table_indices), "tableEpsReason": eps_reason, "note": _clip(note)}
+            "tableIndices": list(table_indices), "tableEpsReason": eps_reason, "note": _clip(note),
+            "variantRule": variant_form}                                       # set for L2 only (S1-CF C12)
 
 
 def _classified_row(record):
@@ -967,11 +1087,40 @@ def _classified_row(record):
     return record
 
 
+INDEX_PAGE = re.compile(r"^\d{10}-\d{2}-\d{6}-index(?:-headers)?\.html?$", re.I)     # EDGAR index pages (S1-CF C3)
+
+
+def _with_recomputed_strict(row):
+    """
+    A copy of a diagnosed row whose recorded strict matches are recomputed with strict_scales (S1-CF C2): each match keeps
+    only the scales it still meets, and acceptedStrictColumns is rebuilt from the matches under an accepted label.
+    The input row is not changed.
+    """
+    copied = copy.deepcopy(row)
+    target = copied.get("targetNetIncome")
+    for filing in copied.get("candidateFilings") or []:
+        for document in filing.get("documents") or []:
+            for table in document.get("tables") or []:
+                kept = []
+                for match in table.get("strictMatches") or []:
+                    scales = strict_scales(match.get("value"), match.get("decimals") or 0, target)
+                    if scales:
+                        kept.append(dict(match, scales=scales))
+                table["strictMatches"] = kept
+                accepted = {(match["column"], scale) for match in kept if match.get("acceptedNiLabel")
+                            for scale in match["scales"]}
+                table["acceptedStrictColumns"] = [[column, scale] for column, scale in sorted(accepted)]
+    return copied
+
+
 def classify_row(row):
     """
     S1 class of one diagnosed row, computed from its JSON evidence only (no SEC access, no stored text). The rules
     are tried in order and the first that holds gives the class; the first table that satisfies it is the evidence.
+    The row is copied first: strict matches are recomputed (S1-CF C2) and EDGAR index pages are not release documents
+    (S1-CF C3), so no rule sees either.
     """
+    row = _with_recomputed_strict(row)
     cik = row.get("cik")
     browse = EDGAR_BROWSE.format(cik=cik) if cik is not None else None
     hint = row.get("hintNote") or "input missing"
@@ -982,21 +1131,23 @@ def classify_row(row):
         return _classified("L7", "no candidate filing: " + hint, url=browse)
     first = filings[0]
     end = row.get("end")
-    pairs = [(filing, document) for filing in filings for document in filing.get("documents") or []]
+    pairs = [(filing, document) for filing in filings for document in filing.get("documents") or []
+             if not INDEX_PAGE.match(document.get("name") or "")]
     located = [(filing, document, table) for filing, document in pairs for table in document.get("tables") or []]
 
-    def found(cls, filing, document, table, note, table_indices=None, eps_reason=None):
+    def found(cls, filing, document, table, note, table_indices=None, eps_reason=None, variant_form=None):
         return _classified(cls, note, accession=filing.get("accession"), document=document.get("name"),
                            url=document.get("url") or filing.get("filingUrl") or browse, table=table["table"],
-                           table_indices=table_indices, eps_reason=eps_reason)
+                           table_indices=table_indices, eps_reason=eps_reason, variant_form=variant_form)
 
     def where(document, table):
         return f"table {table['table']} of {document.get('name')}"
 
-    # rule 2 (L6): no candidate document holds an HTML table
+    # rule 2 (L6): no candidate release document holds an HTML table (an index page alone gives the index note)
     if not any((document.get("tableCount") or 0) > 0 for _, document in pairs):
-        return _classified("L6", f"no HTML table in any of the {len(pairs)} documents of the candidate filings",
-                           accession=first.get("accession"), url=first.get("filingUrl") or browse)
+        note = (f"no HTML table in any of the {len(pairs)} documents of the candidate filings" if pairs
+                else "no release document in the candidate filings (only EDGAR index pages)")
+        return _classified("L6", note, accession=first.get("accession"), url=first.get("filingUrl") or browse)
     # rule 3 (L10): period-named EPS table, accepted net income, table_eps rejects it with a reason
     for filing, document, table in located:
         eps = table.get("tableEps") or {}
@@ -1041,19 +1192,29 @@ def classify_row(row):
         if table.get("periodNamed") or not table.get("acceptedStrictColumns"):
             continue
         header = table.get("headerText") or ""
-        if variant_period(header, end) and not other_quarter_end(header, end):
+        form = variant_rule(header, end)
+        if form is not None and not other_quarter_end(header, end):
             return found("L2", filing, document, table,
                          f"{where(document, table)}: net income matches; header '{header[:120]}' names the quarter "
-                         f"ending {end} in a variant form and no other quarter end")
-    # rule 8 (L5): the layout_class_hint condition, unchanged: every recorded table is year wording without quarter
-    if located and all(YEAR_WORDING.search(" ".join(str(x) for x in table.get("rows", [])))
-                       and not table.get("quarterWording") for _, _, table in located):
-        filing, document, table = located[0]
+                         f"ending {end} in a variant form ({form}) and no other quarter end", variant_form=form)
+    # rule 8 (L5): the net income tables of the release name a year period and no quarter (S1-CF C10). The relevant
+    # tables have a net income value and a header that does not name another quarter end.
+    relevant = [(filing, document, table) for filing, document, table in located
+                if any(value is not None for ni_row in table.get("niRows") or [] for value in ni_row.get("values") or [])
+                and not other_quarter_end(table.get("headerText") or "", end)]
+    if relevant and all(YEAR_WORDING_L5.search(table.get("headerText") or "") and not table.get("quarterWording")
+                        and not VARIANT_QUARTER.search(table.get("headerText") or "")
+                        for _, _, table in relevant):
+        filing, document, table = relevant[0]
         return found("L5", filing, document, table,
                      f"{where(document, table)}: every recorded table names a year period without quarter wording")
-    # rule 9 (L4): no strict match in any table and no strict match in the raw text
-    if (not any(table.get("strictMatches") for _, _, table in located)
-            and not any(document.get("rawStrictTextMatch") for _, document in pairs)):
+    # rule 9 (L4): no strict match under a net income label in a release table, and no prose money match (S1-CF C9)
+    def ni_strict(match):
+        low = (match.get("label") or "").lower()
+        return bool(NI_RE.search(low)) and not any(token in low for token in HEADING_TOKENS)
+
+    if (not any(ni_strict(match) for _, _, table in located for match in table.get("strictMatches") or [])
+            and not any(document.get("rawMoneyMatch") for _, document in pairs)):
         closest = None
         for filing, document, table in located:
             for ni_row in table.get("niRows") or []:
@@ -1071,6 +1232,13 @@ def classify_row(row):
                                  f"{document.get('name')}", accession=filing.get("accession"),
                            document=document.get("name"), url=document.get("url") or browse)
     # rule 10 (L9): anything else; the first sub-case that applies gives the note
+    for filing, document, table in located:                                       # (f), tried before (a) (S1-CF C11)
+        header = table.get("headerText") or ""
+        if (table.get("acceptedStrictColumns") and not table.get("periodNamed")
+                and variant_rule(header, end) is not None and other_quarter_end(header, end)):
+            return found("L9", filing, document, table,
+                         f"(f) {where(document, table)}: accepted net income match; header names the quarter in a "
+                         f"variant form and also another quarter end: '{header[:120]}'")
     for filing, document, table in located:                                       # (a)
         if (table.get("acceptedStrictColumns") and not table.get("periodNamed")
                 and not any(prior.get("periodNamed") for prior in (table.get("nearestPrecedingNonempty") or [])[:3])):
@@ -1096,10 +1264,11 @@ def classify_row(row):
                              f"which is not an accepted net income label")
     if not any(table.get("strictMatches") for _, _, table in located):
         for filing, document in pairs:
-            if document.get("rawStrictTextMatch"):
-                return _classified("L9", f"(d) {document.get('name')}: strict match only in raw text, not in a "
-                                         f"table cell", accession=filing.get("accession"),
-                                   document=document.get("name"), url=document.get("url") or browse)
+            if document.get("rawMoneyMatch"):
+                return _classified("L9", f"(d) {document.get('name')}: prose money match only, not in a table cell: "
+                                         f"'{document.get('rawMoneyContext') or ''}'",
+                                   accession=filing.get("accession"), document=document.get("name"),
+                                   url=document.get("url") or browse)
     filing, document = next(((f, d) for f, d, t in located if t.get("strictMatches") or t.get("periodNamed")),
                             pairs[0])
     strict_tables = [t["table"] for t in document.get("tables") or [] if t.get("strictMatches")]
@@ -1191,9 +1360,13 @@ def _row_candidates(record, texts, selection):
     found = []
     classification = record.get("classification") or {}
     if cls in POSITIVE_CLASSES and classification.get("accession") and classification.get("document"):
-        found.append(_entry(record, "positive", "positive", cls, classification["accession"],
-                            classification["document"], classification.get("url"), classification["tableIndices"],
-                            classification["tableIndex"], texts))
+        positive = _entry(record, "positive", "positive", cls, classification["accession"],
+                          classification["document"], classification.get("url"), classification["tableIndices"],
+                          classification["tableIndex"], texts)
+        if cls == "L2" and classification.get("variantRule") == "vi":
+            # S1-CF C13: rule vi is never an L2 auto-positive; it is skipped like a fixture error
+            positive["fixtureError"] = "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+        found.append(positive)
     for spec in selection["explicitNegatives"]:
         if str(spec.get("key", "")).upper() == key and spec.get("end") == end:
             indices = sorted(spec["tableIndices"])

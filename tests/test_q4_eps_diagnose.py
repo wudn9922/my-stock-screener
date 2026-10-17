@@ -248,7 +248,13 @@ L9A_TABLE = tbl(tr("Net income attributable to Acme", "1,234"), tr("Diluted earn
 L9B_TABLE = tbl(tr(HEADER, "x"), tr("Net income attributable to Acme", "1,234"))
 L9C_TABLE = tbl(tr(HEADER, "x", "y"), tr("Net income", "1,234", "1,234"), tr("Net income per common share:"),
                 tr("Basic", "0.26", "0.26"), tr("Diluted", "0.25", "0.25"))
-L9D_TABLE = tbl(tr(HEADER, "x"), tr("Revenue", "1,234"), tr("Net income", "999"))
+L9D_TABLE = tbl(tr(HEADER, "x"), tr("Net income attributable to noncontrolling interests", "1,234"),
+                tr("Net income", "999"))           # S1-CF C9: a strict match under a label that is not accepted
+REVENUE_MATCH_TABLE = tbl(tr(HEADER, "x"), tr("Revenue", "1,234"), tr("Net income", "999"))   # not an NI label: L4 now
+ANNUAL_TABLE = tbl(tr("For the Years Ended June 30, 2023 2022", "x"), tr("Net income", "1,234"))
+NEXT_QUARTER_TABLE = tbl(tr("Three Months Ended September 30, 2023 2022", "x"), tr("Net income", "5,000"))
+FOURTH_QUARTER_VI_TABLE = tbl(tr("FOURTH QUARTER 2011 2010 (13 Weeks)", "x"), tr("Net income", "1,234"))
+WOR_LIKE_TABLE = tbl(tr("4Q 2012 3Q 2012 4Q 2011 12M 2012 12M 2011", "x"), tr("Net income", "1,234"))
 L9E_TABLE = tbl(tr(HEADER, "x"), tr("Net income attributable to Acme", "1,234"),
                 tr("Diluted earnings per share", "0.25"))
 
@@ -259,6 +265,12 @@ class StrictMatchTests(unittest.TestCase):
 
     def test_a_whole_number_matches_at_its_own_unit_scale(self):
         self.assertEqual(bq.strict_scales(214, 0, 214_300_000), [1_000_000])
+
+    def test_a_zero_or_a_single_digit_does_not_match_a_large_target_at_a_big_scale(self):
+        self.assertEqual(bq.strict_scales(0, 0, -486_275), [])
+        self.assertEqual(bq.strict_scales(-0.4, 1, -400_000), [1_000_000])
+        self.assertEqual(bq.strict_scales(0.21, 2, 214_000_000), [])
+        self.assertEqual(bq.strict_scales(18.7, 1, 18_737_000), [1_000_000])
 
     def test_digits_after_the_point_are_counted_from_the_cell(self):
         label, pairs = bq.cells_with_decimals(["Net income", "1,234.5"])
@@ -300,6 +312,15 @@ class EpsTableLabelTests(unittest.TestCase):
                                         "4,936")), [])
         self.assertEqual(self.labels(tr("Adjusted diluted EPS", "0.30")), [])
 
+    def test_txt_layout_gives_the_net_income_row_under_the_per_share_heading(self):
+        self.assertEqual(self.labels(tr("Earnings per share:"), tr("Net income", "0.25"),
+                                     tr("Diluted average shares outstanding", "4,936")), ["net income"])
+
+    def test_a_basic_row_or_no_diluted_share_row_excludes_the_net_income_row(self):
+        self.assertEqual(self.labels(tr("Earnings per share:"), tr("Basic", "0.26"), tr("Net income", "0.25"),
+                                     tr("Diluted average shares outstanding", "4,936")), [])
+        self.assertEqual(self.labels(tr("Earnings per share:"), tr("Net income", "0.25")), [])
+
     def test_a_diluted_row_four_rows_after_the_heading_is_read_and_a_fifth_is_not(self):
         revenue = [tr("Revenue", "5")]
         self.assertEqual(self.labels(tr("Net income per common share:"), *revenue * 3, tr("Diluted", "0.25")),
@@ -309,20 +330,50 @@ class EpsTableLabelTests(unittest.TestCase):
 
 class PeriodWordingTests(unittest.TestCase):
     def test_quarter_wording_with_the_year_is_a_variant_header(self):
-        self.assertTrue(bq.variant_period("Fourth Quarter 2019", "2019-12-31"))
+        self.assertIsNotNone(bq.variant_rule("Fourth Quarter 2019", "2019-12-31"))
 
     def test_fiscal_year_header_in_early_january_is_a_variant(self):
-        self.assertTrue(bq.variant_period("Fourth Quarter of Fiscal Years 2013", "2014-01-03"))
+        self.assertIsNotNone(bq.variant_rule("Fourth Quarter of Fiscal Years 2013", "2014-01-03"))
 
     def test_the_end_month_and_day_with_no_year_is_a_variant_when_the_year_appears(self):
-        self.assertTrue(bq.variant_period("Year-end results: December 31 (reported in 2019)", "2019-12-31"))
-        self.assertFalse(bq.variant_period("Year-end results: December 31, 2019", "2019-12-31"))
+        self.assertIsNotNone(bq.variant_rule("Year-end results: December 31 (reported in 2019)", "2019-12-31"))
+        self.assertIsNone(bq.variant_rule("Year-end results: December 31, 2019", "2019-12-31"))
 
     def test_a_numeric_date_equal_to_the_end_is_a_variant(self):
-        self.assertTrue(bq.variant_period("Quarter ended 12/31/19", "2019-12-31"))
+        self.assertIsNotNone(bq.variant_rule("Quarter ended 12/31/19", "2019-12-31"))
 
     def test_the_exact_period_is_not_a_variant(self):
-        self.assertFalse(bq.variant_period("Three Months Ended December 31, 2019", "2019-12-31"))
+        self.assertIsNone(bq.variant_rule("Three Months Ended December 31, 2019", "2019-12-31"))
+
+    def test_variant_rules_i_to_vi_on_the_recorded_headers(self):
+        cases = [
+            ("14 Weeks Ended 13 Weeks Ended February 2,2013 January 28,2012", "2013-02-02", "v"),
+            ("FourteenWeeks EndedFebruary 2,2013 ThirteenWeeks EndedJanuary 28,2012", "2013-02-02", "v"),
+            ("Three Months Ended December 31,2022 January 1,2022", "2022-12-31", "v"),
+            ("4Q 2022 4Q 2021 After-Tax Per Share", "2022-05-31", "i"),
+            ("4Q 2012 3Q 2012 4Q 2011 12M 2012 12M 2011", "2012-05-31", "i"),
+            ("FOURTH QUARTER 2011 2010 (13 Weeks)", "2012-01-29", "vi"),
+            ("Fourth Quarter of Fiscal Years 2013", "2014-01-03", "iv"),
+            ("Quarter ended 12/31/19", "2019-12-31", "iii"),
+        ]
+        for header, end, rule in cases:
+            with self.subTest(header=header):
+                self.assertEqual(bq.variant_rule(header, end), rule)
+        self.assertIsNone(bq.variant_rule("FOURTH QUARTER 2011 2010 (13 Weeks)", "2012-03-31"))
+
+    def test_the_other_quarter_end_of_the_recorded_headers(self):
+        cases = [
+            ("14 Weeks Ended 13 Weeks Ended February 2,2013 January 28,2012", "2013-02-02", False),
+            ("FourteenWeeks EndedFebruary 2,2013 ThirteenWeeks EndedJanuary 28,2012", "2013-02-02", False),
+            ("Three Months Ended December 31,2022 January 1,2022", "2022-12-31", False),
+            ("4Q 2022 4Q 2021 After-Tax Per Share", "2022-05-31", False),
+            ("4Q 2012 3Q 2012 4Q 2011 12M 2012 12M 2011", "2012-05-31", True),
+            ("Three Months Ended October 3, 2015 September 27, 2014", "2015-06-27", True),
+            ("Three Months Ended April 1, 2017", "2016-12-31", True),
+        ]
+        for header, end, expected in cases:
+            with self.subTest(header=header):
+                self.assertIs(bq.other_quarter_end(header, end), expected)
 
     def test_another_quarter_end_is_detected(self):
         # the TXT 2016-12-31 next-quarter header
@@ -340,6 +391,21 @@ class PeriodWordingTests(unittest.TestCase):
         self.assertEqual(bq.header_text(table), "Consolidated x " + HEADER + " x")
         long_table = [[f"{'a' * 100}"]] * 8
         self.assertEqual(len(bq.header_text(long_table)), 400)
+
+    def test_a_year_row_with_a_label_stays_in_the_header_and_a_data_row_ends_it(self):
+        wmt = bq.tables_of(tbl(tr("", ""), tr("Three Months Ended", "Fiscal Years Ended"),
+                               tr("January 31,", "January 31,"),
+                               tr("(Amounts in millions)", "2013", "2012", "2013", "2012"),
+                               tr("Net sales", "127,919", "x", "1", "2")))[0]
+        text = bq.header_text(wmt)
+        self.assertIn("2013 2012", text)
+        self.assertNotIn("Net sales", text)
+        revenue = bq.tables_of(tbl(tr("Consolidated", "x"), tr(HEADER, "x"), tr("Revenue", "2,013", "1,990")))[0]
+        self.assertEqual(bq.header_text(revenue), "Consolidated x " + HEADER + " x")
+
+    def test_at_most_six_non_empty_header_rows_are_read(self):
+        table = [[""], [""]] + [[f"row{i}"] for i in range(7)]
+        self.assertEqual(bq.header_text(table), "row0 row1 row2 row3 row4 row5")
 
 
 class ClassifyRowRuleTests(unittest.TestCase):
@@ -413,7 +479,7 @@ class ClassifyRowRuleTests(unittest.TestCase):
     def test_rule_10c_net_income_in_two_columns_of_an_eps_table_without_a_diluted_row(self):
         self.assertTrue(bq.classify_row(evidence_row(doc(L9C_TABLE)))["note"].startswith("(c) "))
 
-    def test_rule_10d_strict_match_only_under_a_non_net_income_label(self):
+    def test_rule_10d_strict_match_only_under_a_net_income_label_that_is_not_accepted(self):
         self.assertTrue(bq.classify_row(evidence_row(doc(L9D_TABLE)))["note"].startswith("(d) "))
 
     def test_rule_10e_the_fallback_names_the_tables(self):
@@ -440,6 +506,68 @@ class ClassifyRowRuleTests(unittest.TestCase):
         self.assertClass(row, "L5", table=0)
 
 
+def l2_record(key, html, end, target=EVIDENCE_TARGET):
+    """A classified row with its document texts kept, as run_diagnose builds it (no SEC access)."""
+    filing = {"accessionNumber": "0000000001-25-000001", "filingDate": "2025-02-15"}
+    texts = {}
+    detail, _ = bq.diagnose_filing(FixtureSec(html), 1, filing, end, target, texts=texts)
+    record = {"key": key, "end": end, "storedEps": 0.25, "cik": 1, "targetNetIncome": target, "hintNote": "h",
+              "candidateFilings": [detail]}
+    return bq._classified_row(record), texts
+
+
+class S1CFRuleTests(unittest.TestCase):
+    def test_an_l9_strict_match_under_another_label_does_not_block_l4(self):
+        result = bq.classify_row(evidence_row(doc(REVENUE_MATCH_TABLE)))
+        self.assertEqual(result["class"], "L4", result)
+
+    def test_a_prose_money_match_blocks_l4_and_gives_the_d_note(self):
+        html = doc(L4_TABLE).replace("</body>", "<p>Revenue was $1.234 million in the quarter.</p></body>")
+        result = bq.classify_row(evidence_row(html))
+        self.assertEqual(result["class"], "L9", result)
+        self.assertTrue(result["note"].startswith("(d) "), result["note"])
+        self.assertIn("$1.234 million", result["note"])
+
+    def test_a_next_quarter_table_does_not_stop_an_annual_table_from_being_l5(self):
+        row = evidence_row(doc(ANNUAL_TABLE, NEXT_QUARTER_TABLE), end="2023-06-30", target=1_234_000)
+        result = bq.classify_row(row)
+        self.assertEqual((result["class"], result["tableIndex"]), ("L5", 0), result)
+        self.assertIn("every recorded table names a year period", result["note"])
+
+    def test_an_accepted_match_under_a_fourth_quarter_and_another_quarter_end_is_f_before_a(self):
+        row = evidence_row(doc(WOR_LIKE_TABLE, L9A_TABLE), end="2012-05-31", target=1_234_000)
+        result = bq.classify_row(row)
+        self.assertEqual(result["class"], "L9", result)
+        self.assertTrue(result["note"].startswith("(f) table 0 of "), result["note"])
+        self.assertIn("4Q 2012 3Q 2012", result["note"])
+
+    def test_wor_like_header_alone_is_f(self):
+        result = bq.classify_row(evidence_row(doc(WOR_LIKE_TABLE), end="2012-05-31", target=1_234_000))
+        self.assertTrue(result["note"].startswith("(f) "), result)
+
+    def test_the_l2_rule_is_recorded_and_other_classes_have_none(self):
+        self.assertEqual(bq.classify_row(evidence_row(doc(L2_TABLE)))["variantRule"], "i")
+        self.assertIsNone(bq.classify_row(evidence_row(doc(L8_TABLE)))["variantRule"])
+        result = bq.classify_row(evidence_row(doc(FOURTH_QUARTER_VI_TABLE), end="2012-01-29", target=1_234_000))
+        self.assertEqual((result["class"], result["variantRule"]), ("L2", "vi"))
+        self.assertIn("in a variant form (vi)", result["note"])
+
+    def test_an_l2_row_with_rule_vi_is_never_an_auto_positive_and_v_still_is(self):
+        vi, texts = l2_record("WSM", doc(FOURTH_QUARTER_VI_TABLE), "2012-01-29", 1_234_000)
+        self.assertEqual(vi["classification"]["class"], "L2")
+        pool = bq._row_candidates(vi, texts, selection())
+        fixtures, errors = bq.select_fixtures(pool, selection({"L2": 1}))
+        self.assertEqual(fixtures, [])
+        self.assertEqual([error["error"] for error in errors],
+                         ["L2 variant rule vi is never an auto-positive (S1-CF C13)"])
+        v, texts = l2_record("ULTA", doc(L2_TABLE), EVIDENCE_END, EVIDENCE_TARGET)
+        self.assertEqual(v["classification"]["variantRule"], "i")
+        pool = bq._row_candidates(v, texts, selection())
+        fixtures, errors = bq.select_fixtures(pool, selection({"L2": 1}))
+        self.assertEqual([fixture["key"] for fixture in fixtures], ["ULTA"])
+        self.assertEqual(errors, [])
+
+
 class M1EvidenceFieldTests(unittest.TestCase):
     def test_recorded_tables_carry_the_m1_3_fields(self):
         row = evidence_row(doc(L8_TABLE))
@@ -455,6 +583,78 @@ class M1EvidenceFieldTests(unittest.TestCase):
         row = evidence_row(doc(L10_TABLE, L8_TABLE))
         restored = json.loads(json.dumps(row))
         self.assertEqual(bq.classify_row(restored), bq.classify_row(row))
+
+
+def money_document(html, target):
+    """rawMoneyMatch and rawMoneyContext of the one synthetic document (real diagnose_filing output, no SEC access)."""
+    filing = {"accessionNumber": "0000000001-25-000001", "filingDate": "2025-02-15"}
+    detail, _ = bq.diagnose_filing(FixtureSec(html), 1, filing, EVIDENCE_END, target)
+    document = detail["documents"][0]
+    return document["rawMoneyMatch"], document["rawMoneyContext"]
+
+
+class ProseMoneyTests(unittest.TestCase):
+    def test_a_million_amount_with_one_decimal_matches_within_the_cap(self):
+        matched, context = money_document('<html><body><p style="margin:0">Net income of $18.7 million</p>'
+                                          '</body></html>', 18_737_000)
+        self.assertTrue(matched)
+        self.assertIn("$18.7 million", context)
+
+    def test_style_and_script_text_is_not_prose(self):
+        self.assertFalse(money_document("<style>p{margin:0}</style><p>30 days</p>", 29_826_000)[0])
+        self.assertFalse(money_document('<script>var a = "$18.7 million";</script><p>Net</p>', 18_737_000)[0])
+
+    def test_a_loss_is_compared_by_absolute_value(self):
+        self.assertTrue(money_document("<p>net loss of $5.3 million</p>", -5_300_000)[0])
+
+    def test_a_full_dollar_amount_matches_at_unit_scale(self):
+        self.assertTrue(money_document("<p>$1,376,813</p>", 1_376_813)[0])
+
+    def test_a_rounded_amount_that_is_too_far_does_not_match(self):
+        matched, context = money_document("<p>$1.4 Million</p>", 1_376_813)
+        self.assertFalse(matched)
+        self.assertIsNone(context)
+
+    def test_the_context_is_at_most_160_characters(self):
+        text = "x" * 200 + " net income of $18.7 million " + "y" * 200
+        self.assertLessEqual(len(money_document(f"<p>{text}</p>", 18_737_000)[1]), 160)
+
+
+def ni_only_row(label, strict):
+    """A diagnosed row built by hand, with recorded strict matches (as diagnose wrote them before S1-CF C1)."""
+    table = {"table": 0, "periodNamed": True, "quarterWording": True, "epsTable": False, "headerText": HEADER,
+             "rows": [], "niRows": [], "strictMatches": strict, "acceptedStrictColumns": [], "tableEps": None,
+             "nearestPrecedingNonempty": [], "dilutedAvoidLabels": []}
+    document = {"name": "ex.htm", "url": "u", "tableCount": 1, "tables": [table], "rawStrictTextMatch": False,
+                "rawMoneyMatch": False}
+    return {"key": "SYN", "end": EVIDENCE_END, "cik": 1, "targetNetIncome": EVIDENCE_TARGET, "hintNote": "h",
+            "candidateFilings": [{"accession": "A-1", "filingUrl": "https://www.sec.gov/x/", "documents": [document]}]}
+
+
+class RecomputedStrictAndIndexPageTests(unittest.TestCase):
+    def test_a_zero_recorded_at_the_billion_scale_under_another_label_is_dropped(self):
+        strict = [{"row": 1, "column": 0, "value": 0.0, "decimals": 0, "scales": [1e9], "label": "Impairment charge",
+                   "niLike": False, "acceptedNiLabel": False}]
+        row = ni_only_row("Impairment charge", strict)
+        before = json.loads(json.dumps(row))
+        result = bq.classify_row(row)
+        self.assertEqual(result["class"], "L4", result)
+        self.assertEqual(row, before)                    # the input row is not changed
+
+    def test_an_index_page_alone_is_an_l6_with_the_index_note(self):
+        row = evidence_row(doc(L8_TABLE))
+        row["candidateFilings"][0]["documents"][0]["name"] = "0000000001-25-000001-index.htm"
+        result = bq.classify_row(row)
+        self.assertEqual(result["class"], "L6")
+        self.assertEqual(result["note"], "no release document in the candidate filings (only EDGAR index pages)")
+
+    def test_an_index_page_is_not_a_release_document_in_any_rule(self):
+        row = evidence_row(doc(L10_TABLE))
+        row["candidateFilings"][0]["documents"][0]["name"] = "0000000001-25-000001-index-headers.html"
+        row["candidateFilings"][0]["documents"].append({"name": "ex.htm", "url": "u", "tableCount": 0, "tables": []})
+        result = bq.classify_row(row)
+        self.assertEqual((result["class"], result["note"]),
+                         ("L6", "no HTML table in any of the 1 documents of the candidate filings"))
 
 
 FIVE_TABLES = doc(tbl(), tbl(tr("Revenue", "5,000")), tbl(), tbl(tr(HEADER, "x")),
