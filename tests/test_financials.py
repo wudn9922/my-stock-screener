@@ -155,11 +155,55 @@ class ParseTest(unittest.TestCase):
             self.assertEqual(info["status"], "empty")
 
     def test_parse_splits(self):
-        self.assertEqual(fin.parse_splits(fixture("yahoo_chart_split.json")), [["2026-06-10", 10]])
+        self.assertEqual(fin.parse_splits(fixture("yahoo_chart_split.json")),
+                         [["2019-06-10", 1.1], ["2026-06-10", 10]])
         self.assertEqual(fin.parse_splits({"chart": {"result": None}}), [])
         self.assertEqual(fin.parse_splits(None), [])
+        self.assertTrue(fin.split_chart_is_complete(fixture("yahoo_chart_split.json"), "SPLT", "2020-01-01", "2026-01-01"))
+        self.assertFalse(fin.split_chart_is_complete(fixture("yahoo_chart_split.json"), "OTHER", "2020-01-01", "2026-01-01"))
+        self.assertFalse(fin.split_chart_is_complete(fixture("yahoo_chart_split.json"), "SPLT", "1999-01-01", "2026-01-01"))
+        self.assertFalse(fin.split_chart_is_complete({"junk": 1}, "SPLT", "2020-01-01", "2026-01-01"))
+        self.assertFalse(fin.split_chart_is_complete({"chart": {"result": None}}, "SPLT", "2020-01-01", "2026-01-01"))
+        chart = fixture("yahoo_chart_split.json")
+        result = chart["chart"]["result"][0]
+        result["timestamp"] = []
+        self.assertFalse(fin.split_chart_is_complete(chart, "SPLT", "2020-01-01", "2026-01-01"))
+        result["timestamp"] = [946684800, 1792108800]
+        result["events"] = {}
+        self.assertFalse(fin.split_chart_is_complete(chart, "SPLT", "2020-01-01", "2026-01-01"))
+        result["events"] = {"splits": {}}
+        self.assertTrue(fin.split_chart_is_complete(chart, "SPLT", "2020-01-01", "2026-01-01"))
         reverse = synth.split_chart([(1781098200, 1.0, 20.0)])
         self.assertEqual(fin.parse_splits(reverse), [["2026-06-10", 0.05]])
+        small_split = synth.split_chart([(1781098200, 5.0, 4.0)])
+        self.assertEqual(fin.parse_splits(small_split), [["2026-06-10", 1.25]])
+        small_reverse_split = synth.split_chart([(1781098200, 4.0, 5.0)])
+        self.assertEqual(fin.parse_splits(small_reverse_split), [["2026-06-10", 0.8]])
+        malformed = synth.split_chart([(1781098200, 5.0, 4.0)])
+        split_event = next(iter(malformed["chart"]["result"][0]["events"]["splits"].values()))
+        split_event["numerator"] = None
+        self.assertFalse(fin.split_chart_is_complete(
+            malformed, "SPLT", "2020-01-01", "2026-01-01", as_of="2026-10-17"))
+        with self.assertRaisesRegex(ValueError, "invalid date or ratio"):
+            fin.parse_splits(malformed)
+        self.assertFalse(fin.split_chart_is_complete(
+            fixture("yahoo_chart_split.json"), "SPLT", "2020-01-01", "2026-01-01",
+            as_of="2026-11-01"))
+
+    def test_parse_splits_is_bound_to_the_expected_chart_result_symbol(self):
+        chart = fixture("yahoo_chart_split.json")
+        other = copy.deepcopy(chart["chart"]["result"][0])
+        other["meta"]["symbol"] = "OTHER"
+        other["events"]["splits"] = {"other": {"date": 1781098200, "numerator": 3, "denominator": 1}}
+        chart["chart"]["result"].append(other)
+        self.assertEqual(fin.parse_splits(chart, expected_symbol="SPLT"),
+                         [["2019-06-10", 1.1], ["2026-06-10", 10]])
+        self.assertTrue(fin.split_chart_is_complete(chart, "SPLT", "2020-01-01", "2026-01-01"))
+        duplicate = copy.deepcopy(chart["chart"]["result"][0])
+        chart["chart"]["result"].append(duplicate)
+        self.assertFalse(fin.split_chart_is_complete(chart, "SPLT", "2020-01-01", "2026-01-01"))
+        with self.assertRaisesRegex(ValueError, "exactly one result"):
+            fin.parse_splits(chart, expected_symbol="SPLT")
 
 
 # ---------------------------------------------------------------------------------------------
@@ -197,7 +241,8 @@ class DocumentTest(unittest.TestCase):
         # Fields without any value are left out
         self.assertNotIn("interestExpense", annual["values"])
         self.assertEqual(values(annual, "revenue")["2025-09-27"], synth.money(416 * BN))
-        self.assertEqual(document["split"], {"adjusted": False, "events": []})
+        self.assertEqual(document["split"], {"adjusted": False, "events": [], "eventsComplete": False,
+                                             "eventsSource": None, "eventsCheckedAt": None})
         self.assertEqual(document["quality"]["level"], "good")
         self.assertEqual(document["quality"]["annualYears"], 4)
         self.assertEqual(document["quality"]["quarters"], 7)
@@ -438,7 +483,13 @@ class SplitTest(unittest.TestCase):
         document, info = build(fixture("yahoo_split_after_unadjusted.json"), "SPLT",
                                previous=copy.deepcopy(self.before), fetch_splits=self.chart())
         self.assertEqual(self.chart_calls, 1)
-        self.assertEqual(document["split"], {"adjusted": True, "events": [["2026-06-10", 10]]})
+        self.assertEqual(document["split"], {"adjusted": True,
+                                             "events": [["2019-06-10", 1.1], ["2026-06-10", 10]],
+                                             "eventsComplete": True,
+                                             "eventsSource": "Yahoo Finance chart range=max split events",
+                                             "eventsCheckedAt": TODAY.isoformat(), "eventsSymbol": "SPLT",
+                                             "eventsCoverageStart": "2000-01-01", "eventsCoverageEnd": "2026-10-16",
+                                             "eventsParserVersion": 4})
         self.assertIn("split-adjusted", document["quality"]["issues"])
         self.assert_on_post_split_basis(document)
         old = statement(synth.SPLIT_QUARTERLY, "2025-04-27", synth.SPLIT_RATIOS)
@@ -483,14 +534,38 @@ class SplitTest(unittest.TestCase):
                                previous=copy.deepcopy(self.before), fetch_splits=broken)
         self.assertEqual(self.chart_calls, 1)
         self.assertEqual(info["chart"], "failed")
-        self.assertEqual(document["split"], {"adjusted": False, "events": []})
+        self.assertEqual(document["split"], {"adjusted": False, "events": [], "eventsComplete": False,
+                                             "eventsSource": "Yahoo Finance chart range=max split events",
+                                             "eventsCheckedAt": TODAY.isoformat()})
         self.assertEqual(values(document["quarterly"], "dilutedShares")["2026-04-26"], 2440000000)
 
     def test_small_stock_dividend_is_ignored(self):
         chart = synth.split_chart([(1781098200, 11.0, 10.0)])
         document, _ = build(fixture("yahoo_split_after_unadjusted.json"), "SPLT",
                             previous=copy.deepcopy(self.before), fetch_splits=self.chart(chart))
-        self.assertEqual(document["split"], {"adjusted": False, "events": []})
+        self.assertEqual(document["split"], {"adjusted": False, "events": [["2026-06-10", 1.1]], "eventsComplete": True,
+                                             "eventsSource": "Yahoo Finance chart range=max split events",
+                                             "eventsCheckedAt": TODAY.isoformat(), "eventsSymbol": "SPLT",
+                                             "eventsCoverageStart": "2000-01-01", "eventsCoverageEnd": "2026-10-16",
+                                             "eventsParserVersion": 4})
+
+    def test_complete_empty_chart_replaces_stale_cached_split_events(self):
+        previous = copy.deepcopy(self.before)
+        previous["split"] = fin.split_record(
+            False, [["2026-06-10", 10]], True, "old chart", "2026-06-11", "SPLT",
+            "2000-01-01", "2026-06-10", 3,
+        )
+        old_share_count = values(previous["quarterly"], "dilutedShares")["2026-04-26"]
+        old_eps = values(previous["quarterly"], "epsDiluted")["2026-04-26"]
+        document, info = build(
+            fixture("yahoo_split_after_unadjusted.json"), "SPLT", previous=previous,
+            fetch_splits=self.chart(synth.split_chart([])),
+        )
+        self.assertEqual(info["chart"], "fetched")
+        self.assertEqual(document["split"]["events"], [])
+        self.assertTrue(document["split"]["eventsComplete"])
+        self.assertEqual(values(document["quarterly"], "dilutedShares")["2026-04-26"], old_share_count)
+        self.assertEqual(values(document["quarterly"], "epsDiluted")["2026-04-26"], old_eps)
 
     def test_two_splits_cascade(self):
         rows = [
@@ -1028,25 +1103,25 @@ class RepairSplitEpsTest(unittest.TestCase):
             },
         }
 
-    def test_over_adjusted_quarter_is_rewritten(self):
+    def test_formula_like_split_mismatch_never_overwrites_reported_eps(self):
         document = self.doc([
             ("2012-09-29", 8_000_000_000, 26_000_000_000, 0.3077, 0.31),
             ("2012-12-29", 13_000_000_000, 26_000_000_000, 0.0714, 0.0714),   # 1/7 too small
             ("2013-03-30", 9_500_000_000, 26_000_000_000, 0.3654, 0.3654),
         ])
-        self.assertEqual(fin.repair_document(document), 1)
+        self.assertEqual(fin.repair_document(document), 0)
         values = document["quarterly"]["values"]
-        self.assertEqual(values["epsDiluted"], [0.3077, 0.5, 0.3654])
-        self.assertEqual(values["epsBasic"][1], 0.5)
+        self.assertEqual(values["epsDiluted"], [0.3077, 0.0714, 0.3654])
+        self.assertEqual(values["epsBasic"][1], 0.0714)
 
-    def test_q4_without_shares_uses_neighbours(self):
+    def test_q4_without_shares_is_not_rewritten_from_neighbouring_eps(self):
         document = self.doc([
             ("2012-06-30", 8_000_000_000, 26_000_000_000, 0.3077, 0.3077),
             ("2012-09-29", 8_000_000_000, None, 2.1538, 2.1538),               # 7x too large, no share count
             ("2012-12-29", 8_000_000_000, 26_000_000_000, 0.3077, 0.3077),
         ])
-        self.assertEqual(fin.repair_document(document), 1)
-        self.assertEqual(document["quarterly"]["values"]["epsDiluted"][1], 0.3077)
+        self.assertEqual(fin.repair_document(document), 0)
+        self.assertEqual(document["quarterly"]["values"]["epsDiluted"][1], 2.1538)
 
     def test_non_split_mismatch_is_left_alone(self):
         # preferred dividends / minority interest: off by 1.6x, not a split multiple
@@ -1067,17 +1142,17 @@ class RepairSplitEpsTest(unittest.TestCase):
         document = self.doc([("2021-03-27", 20_000_000_000, 16_900_000_000, 0.2958, 0.2958)])
         self.assertEqual(fin.repair_document(document), 0)
 
-    def test_repair_is_idempotent(self):
+    def test_deprecated_repair_is_idempotent_and_preserves_reported_values(self):
         document = self.doc([
             ("2012-09-29", 8_000_000_000, 26_000_000_000, 0.3077, 0.31),
             ("2012-12-29", 13_000_000_000, 26_000_000_000, 0.0714, 0.0714),
         ])
-        self.assertEqual(fin.repair_document(document), 1)
+        self.assertEqual(fin.repair_document(document), 0)
         before = json.dumps(document, sort_keys=True)
         self.assertEqual(fin.repair_document(document), 0)
         self.assertEqual(json.dumps(document, sort_keys=True), before)
 
-    def test_repair_all_rewrites_files(self):
+    def test_repair_all_does_not_rewrite_files_from_eps_ratios(self):
         with tempfile.TemporaryDirectory() as directory:
             document = self.doc([("2012-12-29", 13_000_000_000, 26_000_000_000, 0.0714, 0.0714)])
             with open(os.path.join(directory, "AAPL.json"), "w", encoding="utf-8") as file:
@@ -1085,10 +1160,10 @@ class RepairSplitEpsTest(unittest.TestCase):
             with open(os.path.join(directory, "index.json"), "w", encoding="utf-8") as file:
                 json.dump({"items": {}}, file)
             with mock.patch("builtins.print"):
-                self.assertEqual(fin.repair_all(directory), (1, 1))
+                self.assertEqual(fin.repair_all(directory), (0, 0))
                 self.assertEqual(fin.repair_all(directory), (0, 0))
             with open(os.path.join(directory, "AAPL.json"), encoding="utf-8") as file:
-                self.assertEqual(json.load(file)["quarterly"]["values"]["epsDiluted"], [0.5])
+                self.assertEqual(json.load(file)["quarterly"]["values"]["epsDiluted"], [0.0714])
 
 
 class NestedSymbolsTest(unittest.TestCase):

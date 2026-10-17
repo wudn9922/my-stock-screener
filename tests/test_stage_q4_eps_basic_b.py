@@ -120,10 +120,11 @@ class RawFactAndWriteTests(unittest.TestCase):
     def test_exact_inline_fact_is_matched_and_missing_source_fact_is_rejected(self):
         html = b"""<html xmlns:ix=\"http://www.xbrl.org/2013/inlineXBRL\"
           xmlns:xbrli=\"http://www.xbrl.org/2003/instance\"
+          xmlns:iso4217=\"http://www.xbrl.org/2003/iso4217\"
           xmlns:us-gaap=\"http://fasb.org/us-gaap/2023\">
           <xbrli:context id=\"fy\"><xbrli:entity><xbrli:identifier scheme=\"x\">1</xbrli:identifier></xbrli:entity>
           <xbrli:period><xbrli:startDate>2023-01-01</xbrli:startDate><xbrli:endDate>2023-12-31</xbrli:endDate></xbrli:period></xbrli:context>
-          <xbrli:unit id=\"usd\"><xbrli:measure>xbrli:USD</xbrli:measure></xbrli:unit>
+          <xbrli:unit id=\"usd\"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>
           <ix:nonFraction name=\"us-gaap:NetIncomeLossAvailableToCommonStockholdersBasic\" contextRef=\"fy\" unitRef=\"usd\" scale=\"0\">365</ix:nonFraction>
           </html>"""
         parsed = stage.inline.parse_inline_xbrl(html)

@@ -82,7 +82,7 @@ class Q4RuleTest(unittest.TestCase):
         self.assertIsNone(fin.share_basis(None, None, 0.25))
         self.assertIsNone(fin.share_basis(None, 1 * B, 0))            # no EPS: no basis
 
-    def test_q4_eps_is_annual_minus_the_three_quarters(self):
+    def test_q4_eps_arithmetic_is_retained_only_as_a_diagnostic_helper(self):
         value = fin.q4_eps(1.20, [0.288, 0.329, 0.373], [4.5 * B] * 4)
         self.assertAlmostEqual(value, 0.21, places=9)
 
@@ -114,20 +114,20 @@ class FillQ4EpsTest(unittest.TestCase):
         filled = fin.fill_q4_eps(annual, quarterly)
         return filled, quarterly[-1]["values"], quarterly[-1]["extra"]
 
-    def test_fills_both_eps_fields_with_the_flag(self):
+    def test_formal_q4_fill_does_not_subtract_annual_and_quarter_eps(self):
         filled, values, extra = self.fill()
-        self.assertEqual(filled, [("2023-12-31", "epsDiluted"), ("2023-12-31", "epsBasic")])
-        self.assertEqual(values["epsDiluted"], 0.21)
-        self.assertEqual(values["epsBasic"], 0.212)
-        self.assertEqual(extra["derived"], 1)
+        self.assertEqual(filled, [])
+        self.assertNotIn("epsDiluted", values)
+        self.assertNotIn("epsBasic", values)
+        self.assertEqual(extra, {})
         self.assertNotIn("dilutedShares", values)           # a Q4 share count is never derived
 
     def test_each_field_is_filled_only_when_null(self):
         self.quarterly[-1]["values"]["epsDiluted"] = 0.25   # reported: kept as it is
         filled, values, _ = self.fill()
-        self.assertEqual(filled, [("2023-12-31", "epsBasic")])
+        self.assertEqual(filled, [])
         self.assertEqual(values["epsDiluted"], 0.25)
-        self.assertEqual(values["epsBasic"], 0.212)
+        self.assertNotIn("epsBasic", values)
 
     def test_pieces_must_all_be_sec_periods(self):
         self.quarterly[1]["src"] = "yahoo"
@@ -166,8 +166,8 @@ class FillQ4EpsTest(unittest.TestCase):
             quarter_item("2023-12-31", 12, netIncome=20_000_000),
         ]
         filled, values, _ = self.fill(annual, quarterly)
-        self.assertEqual(values["epsDiluted"], 0.01)          # 0.10 − 0.09; 0.02 of net income per share
-        self.assertEqual(len(filled), 2)
+        self.assertNotIn("epsDiluted", values)
+        self.assertEqual(filled, [])
 
     def test_non_calendar_fiscal_years_pair_the_right_periods(self):
         # NVDA-like (fiscal year ends late January, SYNTHETIC numbers): 2.5B shares, 7.35B net income, EPS 2.94
@@ -180,8 +180,8 @@ class FillQ4EpsTest(unittest.TestCase):
         self.assertEqual([(item["fy"], item["fq"]) for item in quarters],
                          [(2025, 1), (2025, 2), (2025, 3), (2025, 4)])
         filled = fin.fill_q4_eps(nvda, quarters)
-        self.assertEqual(filled, [("2025-01-26", "epsDiluted"), ("2025-01-26", "epsBasic")])
-        self.assertAlmostEqual(quarters[-1]["values"]["epsDiluted"], 0.90, places=9)   # 2.94 − 3 × 0.68
+        self.assertEqual(filled, [])
+        self.assertNotIn("epsDiluted", quarters[-1]["values"])
 
         aapl_annual = [annual_item("2025-09-27", netIncome=112 * B, epsDiluted=7.5, epsBasic=7.55,
                                    dilutedShares=15 * B)]
@@ -194,26 +194,28 @@ class FillQ4EpsTest(unittest.TestCase):
                          quarter_item("2025-09-27", 9, netIncome=31 * B)]
         self.assertEqual(aapl_quarters[-1]["fq"], 4)
         filled = fin.fill_q4_eps(aapl_annual, aapl_quarters)
-        self.assertEqual(filled[0], ("2025-09-27", "epsDiluted"))
-        self.assertAlmostEqual(aapl_quarters[-1]["values"]["epsDiluted"], round(7.5 - 2.4 - 1.65 - 1.57, 4))
+        self.assertEqual(filled, [])
+        self.assertNotIn("epsDiluted", aapl_quarters[-1]["values"])
 
 
 class RepairDocumentTest(unittest.TestCase):
-    def test_the_filled_quarter_gets_the_flag_and_the_quality_code(self):
+    def test_repair_preserves_legacy_value_and_does_not_derive_a_new_eps(self):
         document = stored_document()
+        before = copy.deepcopy(document)
         filled = fin.repair_q4_document(document)
-        self.assertEqual(filled, [("2023-12-31", "epsDiluted"), ("2023-12-31", "epsBasic")])
+        self.assertEqual(filled, [])
+        self.assertEqual(document, before)
         quarterly = document["quarterly"]
-        self.assertEqual(quarterly["values"]["epsDiluted"][3], 0.21)
-        self.assertEqual(quarterly["values"]["epsBasic"][3], 0.212)
+        self.assertIsNone(quarterly["values"]["epsDiluted"][3])
+        self.assertIsNone(quarterly["values"]["epsBasic"][3])
         self.assertEqual(quarterly["derived"], [None, None, None, 1])
-        self.assertEqual(document["quality"]["issues"], ["split-adjusted", "q4-derived"])
+        self.assertEqual(document["quality"]["issues"], ["split-adjusted"])
 
     def test_the_derived_column_is_created_when_missing(self):
         document = stored_document()
         del document["quarterly"]["derived"]
         fin.repair_q4_document(document)
-        self.assertEqual(document["quarterly"]["derived"], [None, None, None, 1])
+        self.assertNotIn("derived", document["quarterly"])
 
     def test_nothing_to_fill_leaves_the_document_untouched(self):
         document = stored_document()
@@ -267,29 +269,30 @@ class RepairScriptTest(unittest.TestCase):
     def test_dry_run_reports_and_writes_nothing(self):
         before = {name: self.read(name) for name in os.listdir(self.directory)}
         text = self.run_main("--dry-run")
-        self.assertIn("files to repair: 1", text)
-        self.assertIn("periods filled: 2 (epsDiluted: 1, epsBasic: 1)", text)
+        self.assertIn("files to repair: 0", text)
+        self.assertIn("periods filled: 0 (epsDiluted: 0, epsBasic: 0)", text)
         self.assertIn("skipped: corrupt 1, not-us 1", text)
         self.assertIn("dry run: nothing written", text)
         self.assertEqual({name: self.read(name) for name in os.listdir(self.directory)}, before)
 
-    def test_repair_writes_the_filled_file_and_a_second_run_changes_nothing(self):
+    def test_repair_preserves_nulls_and_a_second_run_changes_nothing(self):
         bad = self.read("BAD.json")
         twx = self.read("TWX.json")
         self.run_main()
         document = json.loads(self.read("NFX.json"))
-        self.assertEqual(document["quarterly"]["values"]["epsDiluted"][3], 0.21)
-        self.assertIn("q4-derived", document["quality"]["issues"])
+        self.assertIsNone(document["quarterly"]["values"]["epsDiluted"][3])
+        self.assertIsNone(document["quarterly"]["values"]["epsBasic"][3])
+        self.assertEqual(document, stored_document())
         self.assertEqual(self.read("BAD.json"), bad)
         self.assertEqual(self.read("TWX.json"), twx)
         text = self.run_main()
         self.assertIn("files to repair: 0", text)
         self.assertIn("nothing to write", text)
 
-    def test_symbol_filter_prints_each_filled_value(self):
+    def test_symbol_filter_does_not_print_or_write_inferred_eps(self):
         text = self.run_main("--dry-run", "--symbol", "NFX")
-        self.assertIn("NFX 2023-12-31 epsDiluted = 0.21", text)
-        self.assertIn("NFX 2023-12-31 epsBasic = 0.212", text)
+        self.assertNotIn("NFX 2023-12-31 epsDiluted =", text)
+        self.assertNotIn("NFX 2023-12-31 epsBasic =", text)
         self.assertIn("scanned 1 files", text)
 
 

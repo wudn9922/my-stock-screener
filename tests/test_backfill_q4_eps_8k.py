@@ -5,6 +5,8 @@ import os
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from datetime import date
 from urllib import error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -16,11 +18,14 @@ import backfill_q4_eps_8k as bq  # noqa: E402
 
 RELEASE = """
 <html><body><table>
-<tr><td></td><td>Three Months Ended December 31, 2024</td><td></td><td>Three Months Ended December 31, 2023</td></tr>
-<tr><td>Net income attributable to Acme</td><td>$</td><td>1,234</td><td>$</td><td>(567</td><td>)</td></tr>
-<tr><td>Diluted earnings per share</td><td>$</td><td>0.25</td><td>$</td><td>(0.12</td><td>)</td></tr>
-<tr><td>Basic earnings per share</td><td>$</td><td>0.26</td><td>$</td><td>(0.12</td><td>)</td></tr>
+<tr><td colspan="5">(USD in thousands, except per share amounts)</td></tr>
+<tr><th></th><th colspan="2">Three Months Ended December 31, 2024</th>
+    <th colspan="2">Three Months Ended December 31, 2023</th></tr>
+<tr><td>Net income attributable to Acme</td><td>$</td><td>1,234</td><td>$</td><td>(567)</td></tr>
+<tr><td>Diluted earnings per share</td><td>$</td><td>0.25<sup>1</sup></td><td>$</td><td>(0.12)</td></tr>
+<tr><td>Basic earnings per share</td><td>$</td><td>0.26</td><td>$</td><td>(0.12)</td></tr>
 <tr><td>Diluted weighted average shares outstanding</td><td></td><td>4,936</td><td></td><td>4,700</td></tr>
+<tr><td colspan="5">(1) Per share amounts reflect the reported period.</td></tr>
 </table></body></html>
 """
 
@@ -29,7 +34,21 @@ END = "2024-12-31"
 
 
 def table_of(html):
-    return bq.tables_of(html)[0]
+    return bq.structured_tables_of(html)[0]
+
+
+def audited_source(end, field, value, accession, filing_date="2025-02-05", cik="1"):
+    name = "ex99.htm"
+    compact = accession.replace("-", "")
+    url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{compact}/{name}"
+    return {"coverageComplete": True, "allVersionsAgree": True, "periodEnd": end,
+            "fields": {field: {"field": field, "reportedValue": value, "periodEnd": end,
+                               "periodStart": "2024-10-01", "periodKind": "Q4", "gaap": True,
+                               "shareClass": "entity-total", "unit": "USD/shares", "cik": cik,
+                               "accession": accession, "form": "8-K", "filingDate": filing_date,
+                               "document": name, "url": url, "sha256": "a" * 64,
+                               "excerpt": "GAAP Diluted earnings per share 0.25",
+                               "locator": {"tableIndex": 0, "row": 1, "column": 1}}}}
 
 
 class NumberAndRowTests(unittest.TestCase):
@@ -49,42 +68,232 @@ class NumberAndRowTests(unittest.TestCase):
 
 class TableEpsTests(unittest.TestCase):
     def test_matches_the_column_with_the_stored_net_income_in_thousands(self):
-        result, reason = bq.table_eps(table_of(RELEASE), 1_234_000, END)
+        result, reason = bq.table_eps(table_of(RELEASE), 1_234_000, END, expected_currency="USD")
         self.assertIsNone(reason)
         self.assertEqual(result["epsDiluted"], 0.25)
         self.assertEqual(result["epsBasic"], 0.26)
         self.assertEqual(result["dilutedShares"], 4_936_000)
         self.assertEqual(result["scale"], 1000)
 
-    def test_prior_year_column_is_used_when_it_is_the_stored_quarter(self):
-        result, _ = bq.table_eps(table_of(RELEASE), -567_000, END)
-        self.assertEqual(result["epsDiluted"], -0.12)
-        self.assertEqual(result["dilutedShares"], 4_700_000)
+    def test_basic_only_gaap_quarter_is_extractable_without_inventing_diluted_eps(self):
+        html = ("<table><caption>USD</caption><tr><th></th><th colspan='2'>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Basic earnings per share</td><td>$</td><td>(0.13)</td></tr></table>")
+        result, reason = bq.table_basic_eps(table_of(html), END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsBasic"], -0.13)
+        self.assertIsNone(result["epsDiluted"])
+        self.assertTrue(result["evidence"]["classification"]["gaap"])
 
-    def test_a_table_without_this_quarter_is_not_a_candidate(self):
-        self.assertEqual(bq.table_eps(table_of(RELEASE), 999, END), (None, None))
+    def test_class_specific_basic_only_eps_stays_pending(self):
+        html = ("<table><caption>USD</caption><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Basic earnings per share, Class A</td><td>0.13</td></tr></table>")
+        result, reason = bq.table_basic_eps(table_of(html), END)
+        self.assertIsNone(result)
+        self.assertIn("class-specific", reason)
+
+    def test_class_specific_basic_row_is_not_mislabeled_as_entity_basic(self):
+        html = ("<table><caption>USD</caption><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,000</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.25</td></tr>"
+                "<tr><td>Basic earnings per share, Class A</td><td>0.26</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1000, END)
+        self.assertIsNone(reason)
+        self.assertIsNone(result["epsBasic"])
+        self.assertEqual(result["epsDiluted"], 0.25)
+
+    def test_basic_eps_under_continuing_operations_heading_is_not_entity_total(self):
+        html = ("<table><caption>USD</caption><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income attributable to Acme</td><td>1,000</td></tr>"
+                "<tr><td>Earnings per share, diluted</td><td>0.25</td></tr>"
+                "<tr><td colspan='2'>Continuing operations</td></tr>"
+                "<tr><td>Earnings per share, basic</td><td>0.26</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertIsNone(result["epsBasic"])
+        self.assertIn("basic-eps-operations-scope-is-not-entity-total",
+                      result["qualityByField"]["epsBasic"]["reviewFlags"])
+        self.assertTrue(result["qualityByField"]["epsDiluted"]["candidateValidated"])
+
+    def test_basic_eps_under_class_heading_is_not_entity_total(self):
+        html = ("<table><caption>USD</caption><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income attributable to Acme</td><td>1,000</td></tr>"
+                "<tr><td>Earnings per share, diluted</td><td>0.25</td></tr>"
+                "<tr><td colspan='2'>Class A</td></tr>"
+                "<tr><td>Earnings per share, basic</td><td>0.26</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertIsNone(result["epsBasic"])
+        self.assertIn("basic-eps-share-class-or-ownership-needs-review",
+                      result["qualityByField"]["epsBasic"]["reviewFlags"])
+        self.assertTrue(result["qualityByField"]["epsDiluted"]["candidateValidated"])
+
+    def test_foreign_currency_eps_is_not_validated_as_usd(self):
+        html = ("<table><caption>EUR</caption><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,000</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.25</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertIn("eps-currency-is-not-verified-usd", result["reviewFlags"])
+        self.assertFalse(result["candidateValidated"])
+
+    def test_selected_column_currency_overrides_conflicting_table_caption(self):
+        html = ("<table><caption>Amounts in USD</caption><tr><th></th>"
+                "<th>Three Months Ended December 31, 2024 (CAD)</th></tr>"
+                "<tr><td>Net income</td><td>1,000</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>$0.25</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertNotEqual(result["evidence"]["currency"]["status"], "verified-usd")
+        self.assertFalse(result["candidateValidated"])
+
+    def test_mixed_currency_caption_without_selected_usd_column_stays_ambiguous(self):
+        html = ("<table><caption>Amounts in USD and CAD</caption><tr><th></th>"
+                "<th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,000</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>$0.25</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["evidence"]["currency"]["status"], "ambiguous")
+        self.assertFalse(result["candidateValidated"])
+
+    def test_class_caption_is_not_entity_total_diluted_or_basic_eps(self):
+        html = ("<table><caption>Class A common stock</caption><tr><th></th>"
+                "<th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,000</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>$0.25</td></tr>"
+                "<tr><td>Basic earnings per share</td><td>$0.26</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertIn("eps-share-class-or-ownership-needs-review", result["reviewFlags"])
+        self.assertFalse(result["candidateValidated"])
+        basic, reason = bq.table_basic_eps(table_of(html), END, expected_currency="USD")
+        self.assertIsNone(basic)
+        self.assertIn("class-specific", reason)
+
+    def test_basic_currency_is_validated_independently_from_diluted_row(self):
+        html = ("<table><caption>USD</caption><tr><th></th>"
+                "<th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,000</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>$0.25</td></tr>"
+                "<tr><td>Basic earnings per share CAD</td><td>$0.26</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertIsNone(result["epsBasic"])
+        self.assertNotEqual(result["evidence"]["basicCurrency"]["status"], "verified-usd")
+
+    def test_currency_text_in_another_period_column_does_not_contaminate_target_eps(self):
+        html = ("<table><caption>USD</caption>"
+                "<tr><th></th><th>Three Months Ended December 31, 2024</th>"
+                "<th>Three Months Ended December 31, 2023</th></tr>"
+                "<tr><td>Net income</td><td>$1,000</td><td>CAD 900</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>$0.25</td><td>CAD 0.20</td></tr>"
+                "</table>")
+        result, reason = bq.table_eps(table_of(html), 1000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertEqual(result["evidence"]["currency"]["status"], "verified-usd")
+
+    def test_explicit_usd_release_is_verified_even_when_it_uses_dollar_symbol(self):
+        result, reason = bq.table_eps(table_of(RELEASE), 1_234_000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertEqual(result["evidence"]["currency"]["status"], "verified-usd")
+        self.assertTrue(result["candidateValidated"])
+
+    def test_dollar_sign_plus_expected_usd_does_not_verify_source_currency(self):
+        html = ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,000</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>$0.25</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["evidence"]["currency"]["status"], "dollar-symbol-currency-ambiguous")
+        self.assertFalse(result["candidateValidated"])
+
+    def test_adjusted_section_heading_cannot_be_overridden_by_gaap_column_header(self):
+        html = ("<table><tr><th></th><th>GAAP Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,000</td></tr><tr><td>Adjusted Results</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.30</td></tr>"
+                "<tr><td>Basic earnings per share</td><td>0.29</td></tr></table>")
+        table = table_of(html)
+        diluted, reason = bq.table_eps(table, 1000, END, expected_currency="USD")
+        basic, basic_reason = bq.table_basic_eps(table, END, expected_currency="USD")
+        self.assertIsNone(diluted)
+        self.assertIsNone(reason)
+        self.assertIsNone(basic)
+        self.assertIsNone(basic_reason)
+
+    def test_per_ads_eps_is_not_common_share_eps(self):
+        html = ("<table><caption>USD</caption><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,000</td></tr>"
+                "<tr><td>Diluted earnings per ADS</td><td>0.25</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1000, END, expected_currency="USD")
+        self.assertIsNone(result)
+        self.assertIsNone(reason)
+
+    def test_prior_q4_column_does_not_override_the_target_quarter_header(self):
+        result, reason = bq.table_eps(table_of(RELEASE), -567_000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertIn("net-income-does-not-match-stored-quarter-value", result["reviewFlags"])
+        self.assertEqual(result["evidence"]["columnHeader"],
+                         "(USD in thousands, except per share amounts) Three Months Ended December 31, 2024")
+
+    def test_eps_remains_a_candidate_when_stored_net_income_does_not_match(self):
+        result, reason = bq.table_eps(table_of(RELEASE), 999, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertIn("net-income-does-not-match-stored-quarter-value", result["reviewFlags"])
+        self.assertFalse(result["diagnostics"]["netIncomeMatchesStored"])
 
     def test_ambiguous_columns_are_rejected(self):
-        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+        html = ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th>"
+                "<th>Three Months Ended December 31, 2024</th></tr>"
                 "<tr><td>Net income</td><td>1,000</td><td>1,000</td></tr>"
                 "<tr><td>Diluted earnings per share</td><td>1.00</td><td>1.00</td></tr></table>")
         result, reason = bq.table_eps(table_of(html), 1_000_000, END)
         self.assertIsNone(result)
-        self.assertEqual(reason, "net income matches more than one column or unit")
+        self.assertIn("multiple distinct column groups", reason)
+        self.assertIn("table", reason)
+        self.assertIn("columns", reason)
 
-    def test_eps_sign_must_follow_net_income(self):
-        html = ("<table><tr><td>Three Months Ended December 31, 2024</td></tr>"
-                "<tr><td>Net loss</td><td>(100</td></tr>"
+    def test_eps_sign_disagreement_is_a_review_flag_not_a_rejection(self):
+        html = ("<table><caption>USD</caption><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net loss</td><td>(100)</td></tr>"
                 "<tr><td>Diluted earnings per share</td><td>0.50</td></tr></table>")
-        result, reason = bq.table_eps(table_of(html), -100_000, END)
-        self.assertIsNone(result)
-        self.assertEqual(reason, "EPS sign differs from net income")
+        result, reason = bq.table_eps(table_of(html), -100_000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.50)
+        self.assertIn("diluted-eps-sign-differs-from-net-income", result["reviewFlags"])
+        self.assertTrue(result["uniqueCandidate"])
+        self.assertFalse(result["candidateValidated"])
+        self.assertTrue(result["manualReviewRequired"])
 
-    def test_net_income_divided_by_shares_must_agree_with_eps(self):
-        html = RELEASE.replace("<td>0.25</td>", "<td>0.40</td>")
-        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
-        self.assertIsNone(result)
-        self.assertEqual(reason, "net income divided by shares differs from EPS")
+    def test_share_formula_disagreement_is_a_review_flag_not_a_rejection(self):
+        html = RELEASE.replace("0.25<sup>1</sup>", "0.40")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.40)
+        self.assertIn("net-income-divided-by-shares-differs-from-diluted-eps", result["reviewFlags"])
+        self.assertFalse(result["diagnostics"]["shareFormulaWithinTolerance"])
+        self.assertTrue(result["uniqueCandidate"])
+        self.assertFalse(result["candidateValidated"])
+        self.assertTrue(result["manualReviewRequired"])
+
+    def test_accounting_parentheses_split_across_cells_preserve_negative_values(self):
+        html = ("<table><tr><th></th><th colspan='3'>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net loss</td><td>(</td><td>1,234</td><td>)</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>(</td><td>0.25</td><td>)</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), -1_234_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], -0.25)
+        self.assertEqual(result["net"], -1_234_000)
+        self.assertTrue(result["diagnostics"]["epsSignMatchesNetIncome"])
 
     def test_a_table_for_another_period_is_not_used(self):
         result, reason = bq.table_eps(table_of(RELEASE), 1_234_000, "2023-06-30")
@@ -98,19 +307,46 @@ class TableEpsTests(unittest.TestCase):
 
 class NonGaapTests(unittest.TestCase):
     def test_non_gaap_rows_are_never_used(self):
-        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+        html = ("<table><caption>Amounts in USD</caption>"
+                "<tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
                 "<tr><td>Non-GAAP net income</td><td>1,500</td></tr>"
                 "<tr><td>Non-GAAP diluted earnings per share</td><td>0.30</td></tr>"
                 "<tr><td>Net income</td><td>1,234</td></tr>"
                 "<tr><td>Diluted earnings per share</td><td>0.25</td></tr></table>")
-        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END, expected_currency="USD")
         self.assertIsNone(reason)
         self.assertEqual(result["epsDiluted"], 0.25)
+
+    def test_adjusted_eps_and_adjusted_column_headers_are_excluded(self):
+        html = ("<table><tr><th></th><th>GAAP Three Months Ended December 31, 2024</th>"
+                "<th>Adjusted Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,234</td><td>1,500</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.25</td><td>0.30</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+
+    def test_non_gaap_table_caption_excludes_unqualified_rows(self):
+        html = ("<table><caption>Non-GAAP financial results</caption>"
+                "<tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,500</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.30</td></tr></table>")
+        self.assertEqual(bq.table_eps(table_of(html), 1_234_000, END), (None, None))
+
+    def test_mixed_gaap_reconciliation_table_selects_explicit_gaap_row(self):
+        html = ("<table><caption>Reconciliation from GAAP to Non-GAAP</caption>"
+                "<tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>GAAP diluted earnings per share</td><td>0.46</td></tr>"
+                "<tr><td>Non-GAAP diluted earnings per share</td><td>0.80</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 396_100_000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.46)
 
 
 class PerShareHeadingTests(unittest.TestCase):
     def test_basic_and_diluted_rows_under_a_per_share_heading_are_eps_rows(self):
-        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+        html = ("<table><caption>Amounts in USD</caption>"
+                "<tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
                 "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
                 "<tr><td>Net income per share:</td></tr>"
                 "<tr><td>Basic</td><td>0.26</td></tr>"
@@ -124,8 +360,19 @@ class PerShareHeadingTests(unittest.TestCase):
 
 
 class PerShareHeadingGuardTests(unittest.TestCase):
+    def test_weighted_average_shares_heading_does_not_make_diluted_share_count_an_eps_row(self):
+        html = ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,000</td></tr>"
+                "<tr><td>Net income per share:</td></tr>"
+                "<tr><td>Diluted</td><td>0.25</td></tr>"
+                "<tr><td>Weighted-average shares used in per share calculations:</td></tr>"
+                "<tr><td>Basic</td><td>100</td></tr><tr><td>Diluted</td><td>100</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+
     def test_share_counts_under_the_heading_are_not_eps(self):
-        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+        html = ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
                 "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
                 "<tr><td>Net income per share:</td></tr>"
                 "<tr><td>Basic</td><td>11,680,033</td></tr>"
@@ -137,7 +384,7 @@ class PerShareHeadingGuardTests(unittest.TestCase):
         self.assertEqual(result["epsDiluted"], 0.25)
 
     def test_the_heading_reaches_only_the_two_rows_under_it(self):
-        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+        html = ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
                 "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
                 "<tr><td>Net income per share:</td></tr>"
                 "<tr><td>Revenue</td><td>5,000</td></tr>"
@@ -150,25 +397,26 @@ class PerShareHeadingGuardTests(unittest.TestCase):
 
 
 class ZeroAndNetRowTests(unittest.TestCase):
-    def test_zero_eps_is_never_accepted(self):
-        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+    def test_zero_eps_remains_a_reported_candidate(self):
+        html = ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
                 "<tr><td>Net income</td><td>1,234</td></tr>"
                 "<tr><td>Diluted earnings per share</td><td>(0.00)</td></tr></table>")
         result, reason = bq.table_eps(table_of(html), 1_234_000, END)
-        self.assertIsNone(result)
-        self.assertEqual(reason, "EPS is zero")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.0)
 
-    def test_the_total_eps_is_used_not_the_continuing_operations_row(self):
-        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+    def test_total_eps_is_used_not_continuing_or_discontinued_operations(self):
+        html = ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
                 "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
                 "<tr><td>Earnings per share from continuing operations - diluted</td><td>0.30</td></tr>"
+                "<tr><td>Earnings per share from discontinued operations - diluted</td><td>0.04</td></tr>"
                 "<tr><td>Earnings per share - diluted</td><td>0.25</td></tr></table>")
         result, reason = bq.table_eps(table_of(html), 1_234_000, END)
         self.assertIsNone(reason)
         self.assertEqual(result["epsDiluted"], 0.25)
 
     def test_a_later_net_income_row_can_match_the_stored_value(self):
-        html = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+        html = ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
                 "<tr><td>Net income</td><td>1,500</td></tr>"
                 "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
                 "<tr><td>Diluted earnings per share</td><td>0.25</td></tr></table>")
@@ -176,6 +424,79 @@ class ZeroAndNetRowTests(unittest.TestCase):
         self.assertIsNone(reason)
         self.assertEqual(result["epsDiluted"], 0.25)
         self.assertEqual(result["netLabel"], "net income attributable to acme")
+
+
+class StructuralPeriodHeaderTests(unittest.TestCase):
+    def test_period_header_accepts_actual_fiscal_end_within_five_days(self):
+        html = "Three Months Ended January 4, 2025"
+        self.assertTrue(bq._has_target_date(html, "2024-12-31"))
+
+    def test_sec_period_header_accepts_adjacent_year_after_comma(self):
+        self.assertTrue(bq._has_target_date("Three Months Ended January 31,2026", "2026-01-31"))
+
+    def test_period_header_accepts_six_day_week_53_period_drift(self):
+        html = "Three Months Ended January 6, 2025"
+        self.assertTrue(bq._has_target_date(html, "2024-12-31"))
+
+    def test_period_header_rejects_date_more_than_seven_days_from_fiscal_end(self):
+        html = "Three Months Ended January 8, 2025"
+        self.assertFalse(bq._has_target_date(html, "2024-12-31"))
+
+    def test_multirow_colspan_and_rowspan_separate_q4_from_full_year(self):
+        html = ("<table><caption>Fourth quarter and fiscal year results in USD for December 31, 2024</caption>"
+                "<tr><td colspan='5'>(in millions, except per share data; shares in thousands)</td></tr>"
+                "<tr><th rowspan='2'></th><th colspan='2'>Three Months Ended</th>"
+                "<th colspan='2'>Year Ended</th></tr>"
+                "<tr><th colspan='2'>December 31, 2024</th><th colspan='2'>December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>$</td><td>1.234</td><td>$</td><td>10.000</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>$</td><td>0.25<sup>1</sup></td>"
+                "<td>$</td><td>1.25</td></tr>"
+                "<tr><td>Basic earnings per share</td><td>$</td><td>0.26</td><td>$</td><td>1.27</td></tr>"
+                "<tr><td>Diluted weighted average shares outstanding</td><td></td><td>4,936</td>"
+                "<td></td><td>40,000</td></tr>"
+                "<tr><td colspan='5'>(1) Includes amounts attributable to the reported period.</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END, expected_currency="USD")
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertEqual(result["epsBasic"], 0.26)
+        self.assertEqual(result["dilutedShares"], 4_936_000)
+        self.assertEqual(result["scale"], 1_000_000)
+        self.assertTrue(result["diagnostics"]["shareFormulaWithinTolerance"])
+        self.assertEqual(result["evidence"]["targetColumns"], [1, 2])
+        self.assertIn("fiscal year", result["evidence"]["tableCaption"])
+        self.assertEqual(result["evidence"]["epsCell"]["footnoteMarkers"], ["1"])
+        self.assertEqual(result["evidence"]["tableUnits"],
+                         ["(in millions, except per share data; shares in thousands)"])
+        self.assertEqual(result["evidence"]["footnotes"]["rows"][0]["row"], 7)
+
+    def test_period_column_without_a_unique_gaap_diluted_row_is_not_written(self):
+        html = ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,234</td></tr>"
+                "<tr><td>Adjusted diluted EPS</td><td>0.40</td></tr>"
+                "<tr><td>Non-GAAP diluted earnings per share</td><td>0.41</td></tr></table>")
+        self.assertEqual(bq.table_eps(table_of(html), 1_234_000, END), (None, None))
+
+    def test_multiple_total_diluted_rows_are_ambiguous(self):
+        html = ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,234</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.25</td></tr>"
+                "<tr><td>Diluted EPS</td><td>0.26</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        self.assertIsNone(result)
+        self.assertIn("multiple GAAP diluted EPS rows", reason)
+        self.assertIn("row 2", reason)
+        self.assertIn("row 3", reason)
+
+    def test_contradictory_money_unit_scales_keep_the_candidate_pending(self):
+        html = ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td colspan='2'>(in thousands; amounts in millions)</td></tr>"
+                "<tr><td>Net income</td><td>1,234</td></tr>"
+                "<tr><td>Diluted earnings per share</td><td>0.25</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1_234_000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+        self.assertIn("table-money-unit-is-ambiguous", result["reviewFlags"])
+        self.assertTrue(result["manualReviewRequired"])
 
 
 INDEX_PAGE = ("<table><tr><th>Seq</th><th>Description</th><th>Document</th><th>Type</th><th>Size</th></tr>"
@@ -203,6 +524,20 @@ class IndexPageTests(unittest.TestCase):
         result, reason = bq.from_filing(FakeSec(), 1234, filing, 1_234_000, END)
         self.assertIsNone(reason)
         self.assertTrue(result["url"].endswith("/ex_309174.htm"))
+        self.assertEqual(result["filingDate"], "2025-02-05")
+        self.assertEqual(result["source"], "SEC EDGAR 8-K exhibit")
+        self.assertEqual(result["accession"], filing["accessionNumber"])
+        self.assertRegex(result["sourceTextSha256"], r"^[0-9a-f]{64}$")
+        evidence = result["evidence"]
+        self.assertEqual(evidence["tableIndex"], 0)
+        self.assertEqual(evidence["reportPeriod"], {"end": END, "kind": "Q4"})
+        self.assertEqual(evidence["classification"]["gaap"], True)
+        self.assertEqual(evidence["classification"]["diluted"], True)
+        self.assertEqual(evidence["classification"]["operations"], "total")
+        self.assertIn("row", evidence["epsCell"])
+        self.assertIn("column", evidence["epsCell"])
+        self.assertIn("row", evidence["netIncomeRow"])
+        self.assertIn("column", evidence["netIncomeRow"])
 
     def test_release_in_another_document_is_read_when_the_exhibit_has_no_table(self):
         class FakeSec:
@@ -221,11 +556,27 @@ class IndexPageTests(unittest.TestCase):
 
 
 class SplitAndToleranceTests(unittest.TestCase):
+    @staticmethod
+    def complete_split_document(events):
+        today = date.today().isoformat()
+        return {
+            "symbol": "AAA", "checkedAt": today,
+            "annual": {"end": [END]}, "quarterly": {"end": [END]},
+            "split": {
+                "events": events, "eventsComplete": True,
+                "eventsSource": "Yahoo Finance chart range=max split events",
+                "eventsCheckedAt": today, "eventsSymbol": "AAA",
+                "eventsCoverageStart": "1990-01-01", "eventsCoverageEnd": today,
+                "eventsParserVersion": 4,
+            },
+        }
+
     def test_split_factor_counts_only_splits_after_the_filing(self):
-        doc = {"split": {"events": [["2000-06-19", 3], ["2021-07-20", 4], ["2024-06-10", 10]]}}
-        self.assertEqual(bq.split_factor(doc, "2020-02-05"), 40.0)
-        self.assertEqual(bq.split_factor(doc, "2024-08-01"), 1.0)
-        self.assertEqual(bq.split_factor({}, "2020-02-05"), 1.0)
+        doc = self.complete_split_document(
+            [["2000-06-19", 3], ["2021-07-20", 4], ["2024-06-10", 10]])
+        self.assertEqual(bq.split_factor(doc, "2020-02-05", END), 40.0)
+        self.assertEqual(bq.split_factor(doc, "2024-08-01", END), 1.0)
+        self.assertIsNone(bq.split_factor({}, "2020-02-05", END))
 
     def test_one_cent_rounding_is_within_tolerance(self):
         self.assertTrue(bq.within_tolerance(0.24, 0.25))
@@ -265,7 +616,8 @@ class FilingTests(unittest.TestCase):
 
 NEXT_YEAR_RELEASE = """
 <html><body><table>
-<tr><td></td><td>Three Months Ended December 31, 2025</td><td></td><td>Three Months Ended December 31, 2024</td></tr>
+<tr><th></th><th colspan="2">Three Months Ended December 31, 2025</th>
+    <th colspan="2">Three Months Ended December 31, 2024</th></tr>
 <tr><td>Net income attributable to Acme</td><td>$</td><td>999</td><td>$</td><td>1,234</td></tr>
 <tr><td>Diluted earnings per share</td><td>$</td><td>0.30</td><td>$</td><td>0.25</td></tr>
 </table></body></html>
@@ -308,19 +660,22 @@ class IndependentCheckTests(unittest.TestCase):
         return FakeSec()
 
     def test_the_prior_year_column_of_the_next_release_confirms_the_value(self):
-        check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, self.rows, END, 1_234_000, 0.25, {})
+        doc = SplitAndToleranceTests.complete_split_document([])
+        check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, self.rows, END, 1_234_000, 0.25, doc)
         self.assertEqual(check["status"], "confirmed")
         self.assertEqual(check["epsDiluted"], 0.25)
 
     def test_a_different_prior_year_eps_is_a_conflict(self):
-        check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, self.rows, END, 1_234_000, 0.20, {})
+        doc = SplitAndToleranceTests.complete_split_document([])
+        check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, self.rows, END, 1_234_000, 0.20, doc)
         self.assertEqual(check["status"], "conflict")
 
     def test_a_restated_prior_year_net_income_is_kept_as_a_diagnostic(self):
-        check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, self.rows, END, 1_200_000, 0.25, {})
-        self.assertEqual(check["status"], "unavailable")
-        self.assertEqual(check["reason"], "no table shows this quarter's net income")
-        self.assertEqual(check["debug"][0]["period_net_rows"], [["net income attributable to acme", [999.0, 1234.0]]])
+        doc = SplitAndToleranceTests.complete_split_document([])
+        check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, self.rows, END, 1_200_000, 0.25, doc)
+        self.assertEqual(check["status"], "confirmed")
+        self.assertFalse(check["diagnostics"]["netIncomeMatchesStored"])
+        self.assertIn("net-income-does-not-match-stored-quarter-value", check["reviewFlags"])
 
     def test_no_next_year_release_is_unavailable(self):
         check = bq.verify_quarter(self.sec_with(NEXT_YEAR_RELEASE), 1234, [], END, 1_234_000, 0.25, {})
@@ -329,34 +684,66 @@ class IndependentCheckTests(unittest.TestCase):
 
 
 class FillGradeTests(unittest.TestCase):
-    def test_a_confirmed_value_is_grade_a_and_an_unconfirmed_one_is_grade_c(self):
+    def test_metadata_only_source_audit_cannot_promote_grade_a(self):
         doc = {"quarterly": {"end": ["2024-12-31", "2023-12-31"], "fq": [4, 4],
                              "values": {"netIncome": [1234000, 5], "epsDiluted": [None, None]}}}
+        accession_a, accession_b = "0000000001-25-000101", "0000000001-24-000102"
+        url_a = audited_source("2024-12-31", "epsDiluted", 0.25, accession_a)["fields"]["epsDiluted"]["url"]
+        url_b = audited_source("2023-12-31", "epsDiluted", 0.10, accession_b)["fields"]["epsDiluted"]["url"]
         found = {
-            "2024-12-31": {"epsDiluted": 0.25, "epsBasic": None, "dilutedShares": None, "accession": "a",
-                           "url": "u", "filingDate": "2025-02-05", "verified": {"status": "confirmed"}},
-            "2023-12-31": {"epsDiluted": 0.10, "epsBasic": None, "dilutedShares": None, "accession": "b",
-                           "url": "v", "filingDate": "2024-02-05", "verified": {"status": "unavailable"}},
+            "2024-12-31": {"epsDiluted": 0.25, "epsBasic": None, "dilutedShares": None,
+                           "accession": accession_a, "url": url_a, "filingDate": "2025-02-05", "uniqueCandidate": True,
+                           "candidateValidated": True, "sourceAudit": audited_source("2024-12-31", "epsDiluted", 0.25, accession_a),
+                           "verified": {"status": "conflict"}},
+            "2023-12-31": {"epsDiluted": 0.10, "epsBasic": None, "dilutedShares": None,
+                           "accession": accession_b, "url": url_b, "filingDate": "2024-02-05", "uniqueCandidate": True,
+                           "candidateValidated": True, "sourceAudit": audited_source("2023-12-31", "epsDiluted", 0.10, accession_b),
+                           "verified": {"status": "unavailable"}},
         }
+        self.assertEqual(bq.apply_fill(doc, found), 0)
+        self.assertEqual(doc["quarterly"]["values"]["epsDiluted"], [None, None])
+        self.assertNotIn("q4EpsSources", doc)
+
+    def test_manual_review_candidate_stays_pending_and_does_not_write(self):
+        doc = {"quarterly": {"end": ["2024-12-31"], "values": {"epsDiluted": [None]}}}
+        found = {"2024-12-31": {"epsDiluted": 0.25, "accession": "a", "url": "u",
+                                "filingDate": "2025-02-05", "uniqueCandidate": True,
+                                "candidateValidated": False, "manualReviewRequired": True,
+                                "reviewFlags": ["net-income-divided-by-shares-differs-from-diluted-eps"]}}
         bq.apply_fill(doc, found)
-        quality = doc["quarterly"]["epsQuality"]
-        self.assertEqual(quality[0]["epsDiluted"], "A")
-        self.assertEqual(quality[0]["epsDilutedFiled"], "2025-02-05")
-        self.assertEqual(quality[1]["epsDiluted"], "C")
-        self.assertEqual(doc["q4EpsSources"]["2024-12-31"]["grade"], "A")
-        self.assertEqual(doc["quarterly"]["values"]["epsDiluted"], [0.25, 0.10])
+        self.assertEqual(doc["quarterly"]["values"]["epsDiluted"], [None])
+        self.assertNotIn("q4EpsSources", doc)
+
+    def test_audited_manual_candidate_can_be_promoted(self):
+        doc = {"quarterly": {"end": ["2024-12-31"], "values": {"epsDiluted": [None]}}}
+        accession = "0000000001-25-000103"
+        source = audited_source("2024-12-31", "epsDiluted", 0.25, accession)
+        found = {"2024-12-31": {"epsDiluted": 0.25, "accession": accession,
+                                "url": source["fields"]["epsDiluted"]["url"],
+                                "filingDate": "2025-02-05", "uniqueCandidate": True,
+                                "candidateValidated": False, "manualReviewRequired": True,
+                                "auditApproved": True, "sourceAudit": source}}
+        self.assertEqual(bq.apply_fill(doc, found), 0)
+        self.assertEqual(doc["quarterly"]["values"]["epsDiluted"], [None])
+        self.assertNotIn("q4EpsSources", doc)
 
     def test_an_existing_eps_keeps_its_own_grade(self):
         doc = {"quarterly": {"end": ["2024-12-31"], "fq": [4], "values": {"netIncome": [1234000],
                                                                      "epsDiluted": [None], "epsBasic": [0.26]},
                              "epsQuality": [{"epsBasic": "A"}]}}
-        found = {"2024-12-31": {"epsDiluted": 0.25, "epsBasic": 0.27, "dilutedShares": None, "accession": "a",
-                                "url": "u", "filingDate": "2025-02-05", "verified": {"status": "confirmed"}}}
-        bq.apply_fill(doc, found)
+        accession = "0000000001-25-000104"
+        source = audited_source("2024-12-31", "epsDiluted", 0.25, accession)
+        found = {"2024-12-31": {"epsDiluted": 0.25, "epsBasic": 0.27, "dilutedShares": None,
+                                "accession": accession, "url": source["fields"]["epsDiluted"]["url"],
+                                "filingDate": "2025-02-05", "uniqueCandidate": True,
+                                "candidateValidated": True, "sourceAudit": source,
+                                "verified": {"status": "confirmed"}}}
+        self.assertEqual(bq.apply_fill(doc, found), 0)
         entry = doc["quarterly"]["epsQuality"][0]
         self.assertEqual(entry["epsBasic"], "A")
-        self.assertEqual(entry["epsDiluted"], "A")
+        self.assertNotIn("epsDiluted", entry)
         self.assertEqual(doc["quarterly"]["values"]["epsBasic"], [0.26])
+        self.assertEqual(doc["quarterly"]["values"]["epsDiluted"], [None])
 
 
 class FillTests(unittest.TestCase):
@@ -364,20 +751,42 @@ class FillTests(unittest.TestCase):
         doc = {"quarterly": {"end": ["2024-03-31", "2024-12-31"], "fq": [1, 4],
                              "values": {"netIncome": [5, 1234000], "epsDiluted": [0.5, None],
                                         "epsBasic": [0.6, 0.3]}}}
+        accession = "0000000001-25-000105"
+        source = audited_source("2024-12-31", "epsDiluted", 0.25, accession)
         found = {"2024-12-31": {"epsDiluted": 0.25, "epsBasic": 0.26, "dilutedShares": 4936000,
-                                "accession": "a", "url": "u", "filingDate": "2025-02-05"}}
-        bq.apply_fill(doc, found)
+                                "accession": accession, "url": source["fields"]["epsDiluted"]["url"],
+                                "filingDate": "2025-02-05", "uniqueCandidate": True,
+                                "candidateValidated": True, "sourceAudit": source}}
+        self.assertEqual(bq.apply_fill(doc, found), 0)
         values = doc["quarterly"]["values"]
-        self.assertEqual(values["epsDiluted"], [0.5, 0.25])
+        self.assertEqual(values["epsDiluted"], [0.5, None])
         self.assertEqual(values["epsBasic"], [0.6, 0.3])              # existing value kept
-        self.assertEqual(values["dilutedShares"], [None, 4936000])
-        self.assertEqual(doc["q4EpsSources"]["2024-12-31"]["accession"], "a")
-        self.assertNotIn("2024-03-31", doc["q4EpsSources"])
+        self.assertEqual(values.get("dilutedShares"), None)
+        self.assertNotIn("q4EpsSources", doc)
+        self.assertNotIn("q4EpsSources", doc)
+
+    def test_filling_diluted_keeps_existing_basic_source_record(self):
+        doc = {"quarterly": {"end": [END], "fq": [4],
+                              "values": {"netIncome": [1234000], "epsDiluted": [None], "epsBasic": [0.26]}},
+               "q4EpsSources": {END: {"epsBasic": {"accession": "old-basic", "url": "old-url",
+                                                    "grade": "A", "reportedValue": 0.26}}}}
+        accession = "0000000001-25-000106"
+        source = audited_source(END, "epsDiluted", 0.25, accession)
+        found = {END: {"epsDiluted": 0.25, "epsBasic": 0.27,
+                       "accession": accession, "url": source["fields"]["epsDiluted"]["url"],
+                       "filingDate": "2025-02-05", "uniqueCandidate": True,
+                       "candidateValidated": True, "sourceAudit": source}}
+
+        self.assertEqual(bq.apply_fill(doc, found), 0)
+        recorded = doc["q4EpsSources"][END]
+        self.assertEqual(recorded["epsBasic"]["accession"], "old-basic")
+        self.assertNotIn("epsDiluted", recorded)
 
 
 class SecClientTests(unittest.TestCase):
     def sec(self, opener, budget=None):
         return bq.Sec("test agent", budget=budget, opener=opener, sleep=lambda seconds: None)
+
 
     def test_403_stops_at_once(self):
         def opener(req):
@@ -406,6 +815,15 @@ class SecClientTests(unittest.TestCase):
         self.sec(opener).get("https://www.sec.gov/x")
         self.assertEqual(seen.get("User-agent"), "test agent")
         self.assertEqual(seen.get("Accept-encoding"), "identity")
+
+
+class LegacyFillModeTests(unittest.TestCase):
+    def test_legacy_fill_mode_stops_before_network_or_writes(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = bq.main(["--mode", "fill"])
+        self.assertEqual(code, 2)
+        self.assertIn("lacks a cache-bound raw-document audit", output.getvalue())
 
 
 class SummaryTests(unittest.TestCase):
@@ -468,18 +886,16 @@ class RunTests(unittest.TestCase):
     def args(self, mode):
         return bq.parse_args(["--mode", mode, "--tickers", "TEST", "--budget", "100"])
 
-    def test_fill_writes_the_null_q4_only_and_saves_state(self):
+    def test_legacy_fill_mode_does_not_write_without_complete_source_audit(self):
         self.write_test_file(None)
+        target = os.path.join(self.fin_dir, "TEST.json")
+        with open(target, "rb") as file:
+            before = file.read()
         report = bq.run(self.args("fill"), self.FakeSec())
-        self.assertEqual(report["filled"], 1)
-        with open(os.path.join(self.fin_dir, "TEST.json"), encoding="utf-8") as file:
-            doc = json.load(file)
-        self.assertEqual(doc["quarterly"]["values"]["epsDiluted"], [0.1, 0.25])
-        self.assertEqual(doc["quarterly"]["values"]["epsBasic"], [0.1, 0.26])
-        self.assertEqual(doc["quarterly"]["values"]["dilutedShares"], [None, 4936000])
-        self.assertEqual(doc["q4EpsSources"]["2024-12-31"]["accession"], "0001-25-000001")
-        with open(self.state_path, encoding="utf-8") as file:
-            self.assertIn("TEST", json.load(file)["done"])
+        self.assertEqual(report["filled"], 0)
+        with open(target, "rb") as file:
+            self.assertEqual(file.read(), before)
+        self.assertFalse(os.path.exists(self.state_path))
 
     def test_fill_never_overwrites_a_stored_q4_eps(self):
         self.write_test_file(0.99)
@@ -487,6 +903,46 @@ class RunTests(unittest.TestCase):
         self.assertEqual(report["filled"], 0)
         with open(os.path.join(self.fin_dir, "TEST.json"), encoding="utf-8") as file:
             self.assertEqual(json.load(file)["quarterly"]["values"]["epsDiluted"], [0.1, 0.99])
+
+    def test_fill_leaves_a_formula_mismatch_pending_without_writing_financial_data(self):
+        self.write_test_file(None)
+        target = os.path.join(self.fin_dir, "TEST.json")
+        with open(target, "rb") as file:
+            before = file.read()
+
+        class MismatchSec(self.FakeSec):
+            def get_text(self, url):
+                self.requests += 1
+                return RELEASE.replace("0.25<sup>1</sup>", "0.40")
+
+        report = bq.run(self.args("fill"), MismatchSec())
+        self.assertEqual(report["filled"], 0)
+        result = report["rows"][0]["result"]
+        self.assertTrue(result["uniqueCandidate"])
+        self.assertTrue(result["manualReviewRequired"])
+        self.assertFalse(result["candidateValidated"])
+        with open(target, "rb") as file:
+            self.assertEqual(file.read(), before)
+        self.assertFalse(os.path.exists(self.state_path))
+
+    def test_fill_does_not_mark_an_ambiguous_source_as_done(self):
+        self.write_test_file(None)
+
+        class AmbiguousSec(self.FakeSec):
+            def get_text(self, url):
+                self.requests += 1
+                if url.endswith("ex99-1.htm"):
+                    return ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th>"
+                            "<th>Three Months Ended December 31, 2024</th></tr>"
+                            "<tr><td>Net income</td><td>1,234</td><td>1,234</td></tr>"
+                            "<tr><td>Diluted earnings per share</td><td>0.25</td><td>0.25</td></tr></table>")
+                return RELEASE
+
+        report = bq.run(self.args("fill"), AmbiguousSec())
+        self.assertEqual(report["filled"], 0)
+        self.assertIsNone(report["rows"][0]["result"])
+        self.assertIn("multiple distinct column groups", report["rows"][0]["reason"])
+        self.assertFalse(os.path.exists(self.state_path))
 
     def test_backtest_reads_only_and_reports_against_the_stored_value(self):
         self.write_test_file(0.25)

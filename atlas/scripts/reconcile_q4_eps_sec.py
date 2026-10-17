@@ -7,9 +7,11 @@ Staging validates all candidates, reports the SEC comparison gate, and writes an
 atomic JSONL review file. Applying rechecks every old cell before changing any file.
 """
 import argparse
+import hashlib
 import json
 import math
 import os
+import re
 import sys
 from collections import Counter, defaultdict
 from datetime import date, timedelta
@@ -109,7 +111,7 @@ def _split_events(document):
         split_day, ratio = repair._parse_date(event[0]), _number(event[1])
         if split_day is None or ratio is None or ratio <= 0:
             continue
-        if ratio >= sec.MIN_SPLIT_RATIO or ratio <= 1 / sec.MIN_SPLIT_RATIO:
+        if not math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12):
             events.append((split_day.isoformat(), ratio))
     return sorted(events)
 
@@ -226,7 +228,22 @@ def _existing_trace_candidate(trace, *, field, cik, companyfacts_url):
     }
 
 
-def _source(candidate, *, raw_company=None, split_factor=1, current_basis="stored financials share basis"):
+def _source(candidate, *, raw_company=None, split_factor=1, current_basis="stored financials share basis",
+            document=None):
+    filed = str(candidate.get("filed") or "")
+    split_events = [
+        {"date": day, "ratio": ratio}
+        for day, ratio in _split_events(document or {})
+        if filed and day > filed
+    ]
+    symbol = str((document or {}).get("symbol") or "")
+    split_trace = {
+        "provider": "Yahoo Finance Chart API events=split (independent of EPS values)",
+        "url": f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?events=split&range=max&interval=1mo"
+        if symbol else None,
+        "eventsAfterFiling": split_events,
+        "rawPayloadSha256": None,
+    }
     return {
         "provider": "SEC EDGAR companyfacts",
         "url": candidate.get("url"),
@@ -247,6 +264,7 @@ def _source(candidate, *, raw_company=None, split_factor=1, current_basis="store
             "basisBeforeAdjustment": "as-reported-at-filing",
             "basisAfterAdjustment": current_basis,
             "splitFactorDivisor": split_factor,
+            "eventTrace": split_trace,
         },
     }
 
@@ -349,10 +367,9 @@ def stage_directory(directory=DEFAULT_DIR, *, old_state_path=DEFAULT_OLD_STATE,
                         "schema": evidence.SCHEMA, "symbol": symbol, "cik": cik,
                         "period": {"fiscalYear": row["fy"], "start": start, "end": row["end"]},
                         "field": field, "oldValue": row["values"].get(field), "value": None,
-                        "grade": "D", "status": "rejected", "method": "direct-sec-companyfacts",
-                        "source": _source(candidate, raw_company=raw_company),
-                        "validation": {"passed": False,
-                                       "failureReason": "companyfacts-does-not-disambiguate-berkshire-a-and-b-share-classes"},
+                        "grade": None, "status": "pending-share-class-review", "method": "direct-sec-companyfacts",
+                        "source": _source(candidate, raw_company=raw_company, document=document),
+                        "validation": {"passed": False, "failureReason": "companyfacts-does-not-disambiguate-berkshire-a-and-b-share-classes"},
                     })
                     continue
                 if field == "epsBasic":
@@ -374,28 +391,27 @@ def stage_directory(directory=DEFAULT_DIR, *, old_state_path=DEFAULT_OLD_STATE,
                     document, row["end"], income, q3_shares, fact)
                 old_value = row["values"].get(field)
                 if rejected:
-                    summary[f"rejected-{rejected}"] += 1
+                    summary[f"pending-{rejected}"] += 1
                     records.append({"schema": evidence.SCHEMA, "symbol": symbol, "cik": cik,
                                     "period": {"start": start, "end": row["end"]}, "field": field,
-                                    "oldValue": old_value, "value": None, "grade": "D",
-                                    "status": "rejected", "method": "direct-sec-companyfacts",
+                                    "oldValue": old_value, "value": None, "grade": None,
+                                    "status": "pending-split-basis-review", "method": "direct-sec-companyfacts",
                                     "source": _source(candidate, raw_company=raw_company,
-                                                      split_factor=split_factor),
+                                                      split_factor=split_factor, document=document),
                                     "validation": {"passed": False, "failureReason": rejected}})
                     continue
-                expected = _number(income) / _number(q3_shares)
-                relative = 0.0 if expected == 0 and adjusted == 0 else abs(adjusted - expected) / abs(expected)
+                cross_check = repair.q4_eps_diagnostics(adjusted, income, q3_shares)
+                expected = cross_check["impliedEps"]
+                relative = cross_check["relativeDifference"]
                 comparison = None
                 if old_value is not None:
                     comparison = abs(adjusted - _number(old_value)) / max(abs(_number(old_value) or 0), 0.10)
                     comparisons.append(comparison)
                     abs_errors.append(abs(adjusted - float(old_value)))
-                if old_value is None:
-                    action = "fill-null"
-                elif abs(adjusted - float(old_value)) > 0.01:
-                    action = "correct-existing-with-direct-sec"
-                else:
-                    action = "verify-existing-with-direct-sec"
+                # CompanyFacts identifies the filing accession and XBRL concept, but it omits the
+                # original context/table coordinates needed to disambiguate dimensions, labels,
+                # and share basis. Keep this as a candidate until the raw filing scanner confirms it.
+                action = "needs-original-filing-review"
                 records.append({
                     "schema": evidence.SCHEMA,
                     "symbol": symbol,
@@ -404,11 +420,11 @@ def stage_directory(directory=DEFAULT_DIR, *, old_state_path=DEFAULT_OLD_STATE,
                     "field": field,
                     "oldValue": old_value,
                     "value": round(adjusted, 4),
-                    "grade": "A",
+                    "grade": None,
                     "status": action,
                     "method": "direct-sec-companyfacts",
                     "source": _source(candidate, raw_company=raw_company,
-                                      split_factor=split_factor),
+                                      split_factor=split_factor, document=document),
                     "crossCheck": {
                         "netIncome": income,
                         "q3Shares": q3_shares,
@@ -416,10 +432,12 @@ def stage_directory(directory=DEFAULT_DIR, *, old_state_path=DEFAULT_OLD_STATE,
                         "impliedEps": expected,
                         "relativeError": relative,
                         "maximumRelativeError": MAX_RELATIVE_ERROR,
-                        "sameSign": (adjusted == 0 and expected == 0) or (adjusted > 0) == (expected > 0),
+                        "sameSign": cross_check["sameSign"],
+                        "diagnosticFlags": cross_check["flags"],
                     },
                     "validation": {
-                        "passed": True,
+                        "passed": False,
+                        "failureReason": "original-sec-filing-context-not-yet-verified",
                         "existingValueComparisonError": comparison,
                         "absoluteEpsError": None if old_value is None else abs(adjusted - float(old_value)),
                     },
@@ -443,12 +461,89 @@ def stage_directory(directory=DEFAULT_DIR, *, old_state_path=DEFAULT_OLD_STATE,
 
 
 def apply_records(records, directory=DEFAULT_DIR):
-    """Validate all staged old values first, then apply fills/corrections per file atomically."""
-    actionable = [r for r in records if r.get("grade") == "A" and r.get("status") in {
-        "fill-null", "correct-existing-with-direct-sec", "verify-existing-with-direct-sec"}]
+    """Fill nulls only when the original filing bytes and locator are revalidated at apply time."""
+    candidates = [r for r in records if r.get("grade") == "A" and r.get("status") == "fill-null"]
+    actionable = []
+    for record in candidates:
+        source = record.get("source") or {}
+        target_period = record.get("period") if isinstance(record.get("period"), dict) else {}
+        field = record.get("field")
+        target_start = target_period.get("start")
+        target_end = target_period.get("end")
+        source_start, source_end = source.get("start"), source.get("end")
+        raw = source.get("rawFilingEvidence")
+        # The SEC context itself must be the target fiscal Q4, not merely any valid
+        # 80–100 day quarter from the same issuer and accession.
+        if (field not in evidence.DIRECT_EPS_CONCEPTS
+                or not isinstance(target_start, str)
+                or not isinstance(target_end, str)
+                or source_start != target_start
+                or source_end != target_end
+                or not isinstance(raw, dict)
+                or raw.get("periodStart") != source_start
+                or raw.get("periodEnd") != source_end):
+            continue
+        financial_path = Path(directory) / f"{record.get('symbol')}.json"
+        try:
+            financial_document = read_json(financial_path)
+        except (OSError, ValueError, TypeError):
+            continue
+        if not isinstance(financial_document, dict):
+            continue
+        split_factor = evidence._decimal((source.get("splitBasis") or {}).get("splitFactorDivisor"))
+        expected_split_factor, split_failure = repair._verified_split_factor(
+            financial_document, target_end, {"filed": source.get("filed")})
+        if (split_failure is not None or split_factor is None
+                or expected_split_factor is None
+                or split_factor != evidence._decimal(expected_split_factor)):
+            continue
+        validation_error = evidence._validate_raw_filing_evidence(
+            raw, candidate={"accession": source.get("accession"), "form": source.get("form"),
+                            "cik": source.get("cik")},
+            field=field, period_start=source_start,
+            period_end=source_end, raw_value=source.get("rawValue"),
+            split_multiplier=split_factor)
+        if (validation_error is not None or raw.get("reportedBasis") is None
+                or not (record.get("validation") or {}).get("passed")):
+            continue
+        raw_path = raw.get("rawBodyPath")
+        if (not isinstance(raw_path, str) or not raw_path.strip()
+                or raw.get("rawBodyUrl") != raw.get("url")):
+            continue
+        try:
+            body = Path(raw_path).read_bytes()
+        except OSError:
+            continue
+        digest = str(raw.get("sha256") or raw.get("filingSha256") or "").lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", digest) or hashlib.sha256(body).hexdigest() != digest:
+            continue
+        raw_value = evidence._decimal(source.get("rawValue"))
+        try:
+            stored_value = evidence._decimal(record.get("value"))
+            expected_value = round(float(raw_value / split_factor), 6) if raw_value is not None and split_factor else None
+        except (TypeError, ValueError, ZeroDivisionError, OverflowError):
+            expected_value = None
+        if stored_value is None or expected_value is None or float(stored_value) != expected_value:
+            continue
+        actionable.append(record)
+
+    # Different source versions for one field are never resolved by input order.
+    groups = defaultdict(list)
+    for record in actionable:
+        period = record.get("period") if isinstance(record.get("period"), dict) else {}
+        groups[(record.get("symbol"), period.get("end"), record.get("field"))].append(record)
+    conflicting = set()
+    for key, rows in groups.items():
+        values = {str(row.get("value")) for row in rows}
+        if len(values) > 1:
+            conflicting.add(key)
+    if conflicting:
+        actionable = [record for record in actionable
+                      if (record.get("symbol"), (record.get("period") or {}).get("end"), record.get("field"))
+                      not in conflicting]
+
     documents = {}
     locations = {}
-    demotions = {}
     for record in actionable:
         path = Path(directory) / f"{record['symbol']}.json"
         document = documents.setdefault(record["symbol"], read_json(path))
@@ -459,33 +554,9 @@ def apply_records(records, directory=DEFAULT_DIR):
             raise RuntimeError(f"staged period no longer unique: {record['symbol']} {record['period']}")
         index = matches[0]
         current = repair._column_value(q.get("values") or {}, record["field"], index)
-        old = record.get("oldValue")
-        new = record.get("value")
-        if current not in (old, new):
-            raise RuntimeError(f"staged old value changed: {record['symbol']} {record['period']['end']} {record['field']} current={current!r} expected={old!r}")
+        if record.get("oldValue") is not None or current is not None:
+            raise RuntimeError(f"refusing to overwrite non-null EPS: {record['symbol']} {record['period']['end']} {record['field']}")
         locations[(record["symbol"], record["period"]["end"], record["field"])] = (index, record)
-
-    for record in records:
-        if (record.get("grade") != "D" or record.get("status") != "rejected"
-                or not isinstance(record.get("period"), dict) or not record["period"].get("end")):
-            continue
-        path = Path(directory) / f"{record['symbol']}.json"
-        document = documents.setdefault(record["symbol"], read_json(path))
-        q = document.get("quarterly") or {}
-        matches = [i for i, (fy, end, fq) in enumerate(zip(q.get("fy") or [], q.get("end") or [], q.get("fq") or []))
-                   if fq == 4 and end == record["period"]["end"]
-                   and (record["period"].get("fiscalYear") is None or fy == record["period"].get("fiscalYear"))]
-        if len(matches) != 1:
-            raise RuntimeError(f"staged rejected period no longer unique: {record['symbol']} {record['period']}")
-        index = matches[0]
-        grades = q.get("epsQuality") or []
-        grade = grades[index].get(record["field"]) if index < len(grades) and isinstance(grades[index], dict) else None
-        if grade != "A":
-            continue
-        current = repair._column_value(q.get("values") or {}, record["field"], index)
-        if current != record.get("oldValue"):
-            raise RuntimeError(f"rejected SEC value changed before demotion: {record['symbol']} {record['period']['end']} {record['field']}")
-        demotions[(record["symbol"], record["period"]["end"], record["field"])] = (index, record)
 
     for symbol, document in documents.items():
         q = document.get("quarterly") or {}
@@ -502,8 +573,9 @@ def apply_records(records, directory=DEFAULT_DIR):
             column = values.setdefault(field, [None] * len(q.get("end") or []))
             while len(column) < len(q.get("end") or []):
                 column.append(None)
-            if column[index] != record.get("value"):
-                column[index] = record.get("value")
+            if column[index] is not None:
+                raise RuntimeError(f"refusing to overwrite non-null EPS during apply: {symbol} {end} {field}")
+            column[index] = record.get("value")
             values[field] = column
             grade = grades[index] if isinstance(grades[index], dict) else {}
             grade[field] = "A"
@@ -515,50 +587,18 @@ def apply_records(records, directory=DEFAULT_DIR):
                 "durationDays": (date.fromisoformat(src["end"]) - date.fromisoformat(src["start"])).days,
                 "form": src["form"], "filed": src["filed"], "accession": src["accession"],
                 "reportedValue": _number(src["rawValue"]),
-                "splitFactor": src["splitBasis"]["splitFactorDivisor"],
+                "splitFactor": src.get("splitBasis", {}).get("splitFactorDivisor"),
                 "value": record["value"], "currency": "USD", "grade": "A", "method": record["method"],
                 "cik": src["cik"], "url": src["url"], "filingUrl": src["filingUrl"],
-                "version": src["version"],
+                "version": src["version"], "rawFilingEvidence": src["rawFilingEvidence"],
             }
-        for (record_symbol, end, field), (index, record) in demotions.items():
-            if record_symbol != symbol:
-                continue
-            grade = grades[index] if isinstance(grades[index], dict) else {}
-            grade[field] = "D"
-            grades[index] = grade
-            trace = traces.setdefault(end, {}).get(field)
-            if isinstance(trace, dict):
-                trace["grade"] = "D"
-                trace["validation"] = {"passed": False,
-                                       "failureReason": (record.get("validation") or {}).get("failureReason")}
         q["epsQuality"] = grades
         q["values"] = values
         document["quarterly"] = q
-        path = Path(directory) / f"{symbol}.json"
-        write_atomic(str(path), document)
-    quarantine_path = Path(directory) / "q4-eps-quarantine-C.jsonl"
-    if quarantine_path.exists():
-        quarantined = _read_jsonl(quarantine_path)
-        direct = {(record["symbol"], record["period"]["fiscalYear"], record["period"]["end"], record["field"]): record
-                  for record in actionable}
-        changed = False
-        for item in quarantined:
-            key = (item.get("symbol"), (item.get("period") or {}).get("fiscalYear"),
-                   (item.get("period") or {}).get("end"), item.get("field"))
-            official = direct.get(key)
-            if official is None:
-                continue
-            item["status"] = "superseded-by-grade-A"
-            item["supersededBy"] = {
-                "value": official.get("value"),
-                "accession": ((official.get("source") or {}).get("accession")),
-                "url": ((official.get("source") or {}).get("filingUrl")),
-            }
-            changed = True
-        if changed:
-            _write_jsonl_atomic(quarantine_path, quarantined)
+        write_atomic(str(Path(directory) / f"{symbol}.json"), document)
     return {"filesWritten": len(documents), "fieldsProcessed": len(actionable),
-            "rejectedPriorAValuesDemotedToD": len(demotions)}
+            "rejectedPriorAValuesDemotedToD": 0,
+            "skippedMissingRawFilingEvidence": len(candidates) - len(actionable)}
 
 
 def main(argv=None):

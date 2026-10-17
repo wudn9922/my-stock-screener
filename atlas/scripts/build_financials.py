@@ -54,6 +54,7 @@ does not load it). Runs in the daily schedule workflow; the files are committed 
 - Files of stocks no longer listed anywhere are deleted 180 days after they were last listed, unless
   they hold SEC periods.
 """
+import copy
 import json
 import math
 import os
@@ -61,7 +62,7 @@ import statistics
 import sys
 import time
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from build_valuation_us import Yahoo, finite_number, read_json, write_atomic
 
@@ -98,14 +99,13 @@ RECHECK_DAYS = 3
 MAX_CHECK_AGE_DAYS = 45
 MISS_RETRY_DAYS = 7
 KEEP_UNLISTED_DAYS = 180
-# Splits: adjacent share counts this far apart trigger the chart request; ratios closer to 1 than
-# MIN_SPLIT_RATIO are ignored; an adjusted share count must land within SPLIT_MATCH of the next one
+# Splits: adjacent share counts this far apart trigger the chart request. Known corporate actions
+# retain every valid non-1:1 ratio; an adjusted share count must land within SPLIT_MATCH of the next one.
 SHARE_JUMP_UP = 1.8
 SHARE_JUMP_DOWN = 0.55
 MIN_SPLIT_RATIO = 1.5
 SPLIT_MATCH = 0.25
-# repair_split_eps: EPS must be this close to a split-factor multiple of net income / shares to be rewritten
-REPAIR_MATCH = 0.2
+SPLIT_CHART_MAX_STALENESS_DAYS = 7
 # Foreign issuers (ADR, 20-F / 40-F) of the full US universe that are not in the core list form their own
 # lane: while core stocks are still due they take at most this share of the requests, so the core list
 # is refreshed on schedule even during the first pass over the (several hundred) foreign issuers
@@ -181,6 +181,10 @@ SECTION_KEYS = ("end", "fy", "fq", "src", "values")
 
 
 def parse_day(value):
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
     if not isinstance(value, str):
         return None
     try:
@@ -341,29 +345,186 @@ def parse_timeseries(payload, today, currency=None, market="US"):
     return parsed
 
 
-def parse_splits(payload):
-    """chart payload (events=split) → [["YYYY-MM-DD", ratio], ...] ascending, small ratios dropped."""
+def _split_results_for_symbol(payload, expected_symbol):
     chart = payload.get("chart") if isinstance(payload, dict) else None
     results = chart.get("result") if isinstance(chart, dict) else None
+    if not isinstance(results, list):
+        return []
+    required_symbol = str(expected_symbol or "").strip().upper()
+    if not required_symbol:
+        return []
+    return [result for result in results if isinstance(result, dict)
+            and isinstance(result.get("meta"), dict)
+            and str(result["meta"].get("symbol") or "").strip().upper() == required_symbol]
+
+
+def parse_splits(payload, expected_symbol=None):
+    """Chart split events → ``[["YYYY-MM-DD", ratio], ...]`` in ascending order.
+
+    Keep every positive non-1:1 ratio. Filtering ratios by size can silently omit valid
+    5:4/2:3 actions while still making a chart look like a complete split history.
+    """
+    chart = payload.get("chart") if isinstance(payload, dict) else None
+    results = chart.get("result") if isinstance(chart, dict) else None
+    if expected_symbol is not None:
+        results = _split_results_for_symbol(payload, expected_symbol)
+        if len(results) != 1:
+            raise ValueError("Yahoo split response did not contain exactly one result for the expected symbol")
     events = {}
     for result in results if isinstance(results, list) else []:
-        splits = ((result or {}).get("events") or {}).get("splits") if isinstance(result, dict) else None
-        if not isinstance(splits, dict):
+        event_map = result.get("events") if isinstance(result, dict) else None
+        splits = event_map.get("splits") if isinstance(event_map, dict) else None
+        if splits is None:
             continue
+        if not isinstance(splits, dict):
+            raise ValueError("Yahoo split events are not a mapping")
         for event in splits.values():
             if not isinstance(event, dict):
-                continue
+                raise ValueError("Yahoo split event is malformed")
             stamp = finite_number(event.get("date"))
             numerator = finite_number(event.get("numerator"))
             denominator = finite_number(event.get("denominator"))
             if stamp is None or not numerator or not denominator or numerator <= 0 or denominator <= 0:
-                continue
+                raise ValueError("Yahoo split event has an invalid date or ratio")
             ratio = numerator / denominator
-            if 1 / MIN_SPLIT_RATIO < ratio < MIN_SPLIT_RATIO:
+            if math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12):
                 continue
-            day = datetime.fromtimestamp(stamp, timezone.utc).date().isoformat()
+            try:
+                day = datetime.fromtimestamp(stamp, timezone.utc).date().isoformat()
+            except (OverflowError, OSError, ValueError) as error:
+                raise ValueError("Yahoo split event date is out of range") from error
+            if day in events and not math.isclose(events[day], ratio, rel_tol=0.0, abs_tol=1e-12):
+                raise ValueError("Yahoo returned conflicting split ratios on one date")
             events[day] = clean_ratio(ratio)
     return [[day, events[day]] for day in sorted(events)]
+
+
+def _valid_split_event_map(events):
+    if not isinstance(events, list):
+        return False
+    seen = set()
+    for event in events:
+        if not isinstance(event, (list, tuple)) or len(event) != 2:
+            return False
+        day = parse_day(event[0])
+        ratio = finite_number(event[1])
+        if (day is None or ratio is None or ratio <= 0
+                or math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12)
+                or day.isoformat() in seen):
+            return False
+        seen.add(day.isoformat())
+    return True
+
+
+SPLIT_CHART_PARSER_VERSION = 4
+
+
+def split_chart_coverage(payload, expected_symbol, required_start, required_end=None, as_of=None):
+    """Return verified identity/range metadata for a complete Yahoo max-range chart."""
+    chart = payload.get("chart") if isinstance(payload, dict) else None
+    if not isinstance(chart, dict) or chart.get("error") not in (None, {}):
+        return None
+    results = chart.get("result")
+    if not isinstance(results, list) or not results:
+        return None
+    required_symbol = str(expected_symbol or "").strip().upper()
+    required_day = parse_day(required_start)
+    required_last_day = parse_day(required_end)
+    if not required_symbol or required_day is None or required_last_day is None or required_last_day < required_day:
+        return None
+    matching_results = _split_results_for_symbol(payload, expected_symbol)
+    if len(matching_results) != 1:
+        return None
+    for result in matching_results:
+        if not isinstance(result, dict):
+            continue
+        meta = result.get("meta")
+        symbol = meta.get("symbol") if isinstance(meta, dict) else None
+        first_trade = finite_number(meta.get("firstTradeDate")) if isinstance(meta, dict) else None
+        timestamps = result.get("timestamp")
+        events = result.get("events")
+        splits = events.get("splits") if isinstance(events, dict) else None
+        if (not isinstance(symbol, str) or symbol.strip().upper() != required_symbol or first_trade is None
+                or not isinstance(meta, dict) or meta.get("range") != "max"
+                or not isinstance(timestamps, list) or not timestamps
+                or not isinstance(splits, dict)
+                or not _valid_yahoo_split_map(splits)):
+            continue
+        first_trade_day = datetime.fromtimestamp(first_trade, timezone.utc).date()
+        valid_timestamps = [finite_number(value) for value in timestamps]
+        valid_timestamps = [value for value in valid_timestamps if value is not None]
+        if not valid_timestamps:
+            continue
+        chart_start = datetime.fromtimestamp(min(valid_timestamps), timezone.utc).date()
+        chart_end = datetime.fromtimestamp(max(valid_timestamps), timezone.utc).date()
+        as_of_day = parse_day(as_of) or date.today()
+        latest_allowed = as_of_day - timedelta(days=SPLIT_CHART_MAX_STALENESS_DAYS)
+        if (first_trade_day <= required_day and chart_start <= required_day and chart_end >= required_last_day
+                and chart_end >= latest_allowed):
+            return {"symbol": required_symbol, "coverageStart": first_trade_day.isoformat(),
+                    "coverageEnd": chart_end.isoformat(),
+                    "parserVersion": SPLIT_CHART_PARSER_VERSION}
+    return None
+
+
+def _valid_yahoo_split_map(splits):
+    if not isinstance(splits, dict):
+        return False
+    seen = set()
+    for event in splits.values():
+        if not isinstance(event, dict):
+            return False
+        stamp = finite_number(event.get("date"))
+        numerator = finite_number(event.get("numerator"))
+        denominator = finite_number(event.get("denominator"))
+        if stamp is None or numerator is None or denominator is None or numerator <= 0 or denominator <= 0:
+            return False
+        try:
+            day = datetime.fromtimestamp(stamp, timezone.utc).date().isoformat()
+        except (OverflowError, OSError, ValueError):
+            return False
+        ratio = numerator / denominator
+        if math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12) or day in seen:
+            return False
+        seen.add(day)
+    return True
+
+
+def split_chart_is_complete(payload, expected_symbol, required_start, required_end=None, as_of=None):
+    """True only when the response proves the exact symbol and full requested history range."""
+    return split_chart_coverage(payload, expected_symbol, required_start, required_end, as_of) is not None
+
+
+def split_record(adjusted, events, complete, source, checked_at, symbol=None,
+                 coverage_start=None, coverage_end=None, parser_version=None):
+    """Serialize split history, keeping verified identity/range metadata with successful charts."""
+    result = {"adjusted": bool(adjusted), "events": events, "eventsComplete": bool(complete),
+              "eventsSource": source, "eventsCheckedAt": checked_at}
+    if symbol and coverage_start and coverage_end and parser_version == SPLIT_CHART_PARSER_VERSION:
+        result.update(eventsSymbol=symbol, eventsCoverageStart=coverage_start,
+                      eventsCoverageEnd=coverage_end,
+                      eventsParserVersion=parser_version)
+    return result
+
+
+def split_events_current(events, complete, checked_at, symbol, coverage_start, coverage_end,
+                         parser_version, expected_symbol, required_start, required_end, as_of):
+    """Whether stored split events are verified, fresh and cover the current financial history."""
+    checked = parse_day(checked_at)
+    coverage_begin = parse_day(coverage_start)
+    coverage_finish = parse_day(coverage_end)
+    start = parse_day(required_start)
+    end = parse_day(required_end)
+    as_of_day = parse_day(as_of)
+    return bool(
+        complete is True and parser_version == SPLIT_CHART_PARSER_VERSION
+        and _valid_split_event_map(events) and isinstance(symbol, str)
+        and symbol == expected_symbol and checked is not None and as_of_day is not None
+        and 0 <= (as_of_day - checked).days <= SPLIT_CHART_MAX_STALENESS_DAYS
+        and coverage_begin is not None and coverage_finish is not None
+        and start is not None and end is not None
+        and coverage_begin <= start and coverage_finish >= end
+    )
 
 
 # ---------------------------------------------------------------------------------------------
@@ -436,6 +597,13 @@ def read_sections(document):
         "fyEndMonth": month if isinstance(month, int) and 1 <= month <= 12 else None,
         "events": [[day, events[day]] for day in sorted(events)],
         "adjusted": split.get("adjusted") is True,
+        "splitEventsComplete": split.get("eventsComplete") is True,
+        "splitEventsSource": split.get("eventsSource") if isinstance(split.get("eventsSource"), str) else None,
+        "splitEventsCheckedAt": split.get("eventsCheckedAt") if isinstance(split.get("eventsCheckedAt"), str) else None,
+        "splitEventsSymbol": split.get("eventsSymbol") if isinstance(split.get("eventsSymbol"), str) else None,
+        "splitEventsCoverageStart": split.get("eventsCoverageStart") if isinstance(split.get("eventsCoverageStart"), str) else None,
+        "splitEventsCoverageEnd": split.get("eventsCoverageEnd") if isinstance(split.get("eventsCoverageEnd"), str) else None,
+        "splitEventsParserVersion": split.get("eventsParserVersion") if isinstance(split.get("eventsParserVersion"), int) else None,
         "revisions": revisions,
         "other": {key: value for key, value in document.items() if key not in DOCUMENT_KEYS},
     }
@@ -801,7 +969,7 @@ def adjust_splits(sections, events):
     """
     usable = sorted(
         (day, ratio) for day, ratio in events
-        if ratio >= MIN_SPLIT_RATIO or ratio <= 1 / MIN_SPLIT_RATIO
+        if math.isfinite(ratio) and ratio > 0 and not math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12)
     )
     if not usable:
         return False
@@ -835,7 +1003,8 @@ def split_factors(events, end):
     """Every product of a subset of the split ratios after `end` (without 1), largest first."""
     ratios = [
         ratio for day, ratio in events
-        if day > end and (ratio >= MIN_SPLIT_RATIO or ratio <= 1 / MIN_SPLIT_RATIO)
+        if day > end and math.isfinite(ratio) and ratio > 0
+        and not math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12)
     ]
     products = {1.0}
     for ratio in ratios:
@@ -858,43 +1027,13 @@ def reference_shares(periods, index):
 
 
 def repair_split_eps(sections, events):
-    """
-    Rewrite SEC EPS that sits on the wrong side of a split, in place. Returns the number of periods.
+    """Deprecated: NI/share similarity cannot establish a reported EPS or its split basis.
 
-    companyfacts EPS is "as reported in the latest filing of that period", so neighbouring periods can
-    carry different split bases (AAPL 2012-12: 0.0704 next to 0.4931 implied by net income / shares;
-    Q4 = annual − Q1..Q3 mixes bases the same way). When EPS differs from net income / shares by a
-    factor that matches a product of the split ratios after the period (within REPAIR_MATCH), EPS is
-    replaced by net income / shares (basic EPS scaled by the same factor). Anything else (preferred
-    dividends, minority interest, share classes) is left alone.
+    Split correction is performed only by ``adjust_splits`` when independently recorded split
+    events and share counts establish the basis. This compatibility function intentionally leaves
+    EPS untouched so old callers cannot silently replace an official value with a ratio estimate.
     """
-    fixed = 0
-    for periods in sections:
-        ordered = sorted(periods, key=lambda p: p["end"])
-        for index, item in enumerate(ordered):
-            if item.get("src") != "sec":
-                continue
-            values = item["values"]
-            eps, income = values.get("epsDiluted"), values.get("netIncome")
-            if eps is None or income is None or eps <= 0 or income <= 0:
-                continue
-            shares = reference_shares(ordered, index)
-            if not shares:
-                continue
-            implied = income / shares
-            ratio = eps / implied
-            if 1 - SPLIT_MATCH / 2 <= ratio <= 1 + SPLIT_MATCH / 2:
-                continue
-            for factor in split_factors(events, item["end"]):
-                if abs(ratio * factor - 1) <= REPAIR_MATCH or abs(ratio / factor - 1) <= REPAIR_MATCH:
-                    new_eps = round(implied, 4) + 0.0
-                    basic = values.get("epsBasic")
-                    if basic is not None:
-                        values["epsBasic"] = round(basic * new_eps / eps, 4) + 0.0
-                    values["epsDiluted"] = new_eps
-                    fixed += 1
-                    break
-    return fixed
+    return 0
 
 
 def repair_document(document):
@@ -948,13 +1087,7 @@ def share_basis(shares, income, eps):
 
 
 def q4_eps(total, pieces, bases):
-    """
-    Annual EPS − (Q1 + Q2 + Q3 EPS) when all four are reported on one share basis, else None.
-
-    total: the annual EPS; pieces: the Q1..Q3 EPS; bases: the four share bases (share_basis, annual first).
-    Every basis must lie within SPLIT_MATCH of the others: a split between the filings mixes bases (an annual
-    EPS restated after a split next to Q1..Q3 that are still pre-split).
-    """
+    """Diagnostic arithmetic only; this subtraction is not a reported Q4 EPS value."""
     if total is None or any(value is None for value in pieces):
         return None
     if any(not basis for basis in bases) or max(bases) / min(bases) > 1 + SPLIT_MATCH:
@@ -975,66 +1108,19 @@ def eps_inconsistent(values):
 
 
 def fill_q4_eps(annual, quarterly):
-    """
-    Fill the null Q4 EPS (epsBasic, epsDiluted) of SEC periods, in place, on the basis the periods hold now
-    (after any split adjustment). Items are dicts with end, fy, fq, src, values and extra.
+    """Do not populate the formal EPS field with annual-minus-quarter EPS arithmetic.
 
-    Q4 (fq 4) = the annual period of its fiscal year − its Q1..Q3 (q4_eps), each field on its own. A field is
-    filled only when it is null, all four pieces are SEC periods (exactly one per fiscal quarter), and:
-    - the annual EPS agrees with its own net income and share count (eps_inconsistent is False): a wrong
-      annual EPS (AMST 2022: −56.04 next to −4.67 implied) would carry its error into Q4;
-    - the Q4 net income is known and the derived value has its sign;
-    - the derived value agrees with the Q4 net income over the annual share basis (within EPS_TOLERANCE, plus
-      Q4_EPS_ROUNDING because the pieces are cent-rounded EPS): otherwise the basis or the version is wrong.
-    A filled period gets extra["derived"] = 1. Nothing else is derived here: net income, share counts and
-    balance-sheet values of a Q4 are never changed.
-    → [(end, field)] of the values filled.
+    Directly reported SEC Q4 EPS is extracted through the raw filing backfill. Basic Grade B is
+    staged by ``stage_q4_eps_basic_b.py`` under ADR-005. Historical ungraded numbers are preserved
+    as-is, but no future seed/repair run may create another inferred per-share value.
     """
-    years, quarters = {}, {}
-    for item in annual:
-        if item.get("src") == Q4_EPS_SOURCE:
-            years.setdefault(item.get("fy"), []).append(item)
-    for item in quarterly:
-        if item.get("src") == Q4_EPS_SOURCE and item.get("fq") in (1, 2, 3, 4):
-            quarters.setdefault((item.get("fy"), item["fq"]), []).append(item)
-    filled = []
-    for (fy, fq), found in quarters.items():
-        item = _single(found) if fq == 4 else None
-        year = _single(years.get(fy, []))
-        pieces = [_single(quarters.get((fy, number), [])) for number in (1, 2, 3)]
-        if item is None or year is None or any(piece is None for piece in pieces):
-            continue
-        if eps_inconsistent(year["values"]):
-            continue
-        income = item["values"].get("netIncome")
-        if income is None:
-            continue
-        for field in Q4_EPS_FIELDS:
-            if item["values"].get(field) is not None:
-                continue
-            bases = [
-                share_basis(period["values"].get("dilutedShares"), period["values"].get("netIncome"),
-                            period["values"].get(field))
-                for period in (year, *pieces)
-            ]
-            value = q4_eps(year["values"].get(field), [piece["values"].get(field) for piece in pieces], bases)
-            if value is None or (value and (value > 0) != (income > 0)):
-                continue
-            basis = bases[0]
-            if abs(value - income / basis) > EPS_TOLERANCE * abs(value) + Q4_EPS_ROUNDING:
-                continue
-            item["values"][field] = clean_value(value)
-            item.setdefault("extra", {})[DERIVED_COLUMN] = 1
-            filled.append((item["end"], field))
-    return filled
+    return []
 
 
 def repair_q4_document(document):
     """
-    fill_q4_eps on a stored document (dict) in place: the filled quarterly columns and their derived flag are
-    written, and "q4-derived" joins quality.issues (ISSUES order, then the SEC codes sorted, as
-    seed_financials_sec.merge_into_document writes them). Only null values change.
-    → [(end, field)] filled; the document is untouched when there is nothing to fill.
+    Compatibility wrapper retained for callers. Q4 EPS inference is disabled; source-derived net income,
+    revenue and other cash flows are handled by the SEC normalizer, while EPS needs direct evidence.
     """
     sections = {}
     for name in ("annual", "quarterly"):
@@ -1254,17 +1340,59 @@ def update_document(previous, payload, key, now, fetch_splits=None):
     info["restated"] = sum(1 for r in revised_a + revised_q if r["kind"] == "restated")
 
     events = stored["events"]
-    adjusted = adjust_splits([annual, quarterly], events)
-    if fetch_splits is not None and share_jump([annual, quarterly]):
+    split_events_complete = stored["splitEventsComplete"]
+    split_events_source = stored["splitEventsSource"]
+    split_events_checked_at = stored["splitEventsCheckedAt"]
+    split_events_symbol = stored["splitEventsSymbol"]
+    split_events_coverage_start = stored["splitEventsCoverageStart"]
+    split_events_coverage_end = stored["splitEventsCoverageEnd"]
+    split_events_parser_version = stored["splitEventsParserVersion"]
+    # Preview the saved events on copies first. If a new complete chart is fetched, discard this
+    # preview and recompute from the unadjusted merged sections using only the authoritative chart.
+    cached_annual = copy.deepcopy(annual)
+    cached_quarterly = copy.deepcopy(quarterly)
+    cached_adjusted = adjust_splits([cached_annual, cached_quarterly], events)
+    history_dates = [parse_day(item.get("end")) for group in (annual, quarterly) for item in group]
+    required_start = min((day for day in history_dates if day is not None), default=None)
+    required_end = max((day for day in history_dates if day is not None), default=None)
+    stored_chart_current = split_events_current(
+        events, split_events_complete, split_events_checked_at, split_events_symbol,
+        split_events_coverage_start, split_events_coverage_end, split_events_parser_version,
+        key, required_start, required_end, today_iso,
+    )
+    if fetch_splits is not None and share_jump([annual, quarterly]) and not stored_chart_current:
         try:
-            fetched = parse_splits(fetch_splits())
+            split_payload = fetch_splits()
+            split_metadata = split_chart_coverage(split_payload, key, required_start, required_end)
+            if split_metadata is None:
+                raise ValueError("Yahoo chart response was incomplete or lacked a symbol identity")
+            fetched = parse_splits(split_payload, expected_symbol=key)
             info["chart"] = "fetched"
+            split_events_complete = True
+            split_events_source = "Yahoo Finance chart range=max split events"
+            split_events_checked_at = today_iso
+            split_events_symbol = split_metadata["symbol"]
+            split_events_coverage_start = split_metadata["coverageStart"]
+            split_events_coverage_end = split_metadata["coverageEnd"]
+            split_events_parser_version = split_metadata["parserVersion"]
         except Exception as error:  # noqa: BLE001 - leave the data as Yahoo sent it
             info["chart"] = "failed"
+            split_events_complete = False
+            split_events_source = "Yahoo Finance chart range=max split events"
+            split_events_checked_at = today_iso
             print(f"{key}: split events unavailable: {error}", file=sys.stderr)
+            # Use the previously stored events only when the refresh could not be validated.
+            annual, quarterly = cached_annual, cached_quarterly
+            adjusted = cached_adjusted
         else:
-            events = merge_events(events, fetched)
-            adjusted = adjust_splits([annual, quarterly], events) or adjusted
+            # A complete max-range response is authoritative, including when it removes an old
+            # event. Merge would keep stale actions while marking them complete and fresh. Re-run
+            # from the unadjusted merged sections so the stale preview cannot affect stored values.
+            events = fetched
+            adjusted = adjust_splits([annual, quarterly], events)
+    else:
+        annual, quarterly = cached_annual, cached_quarterly
+        adjusted = cached_adjusted
     adjusted = repair_split_eps([annual, quarterly], events) > 0 or adjusted
     adjusted = adjusted or stored["adjusted"]
 
@@ -1315,7 +1443,9 @@ def update_document(previous, payload, key, now, fetch_splits=None):
         "fyEndMonth": end_month or 12,
         "annual": write_section(annual, stored["extras"]["annual"], False),
         "quarterly": write_section(quarterly, stored["extras"]["quarterly"], True),
-        "split": {"adjusted": adjusted, "events": events},
+        "split": split_record(adjusted, events, split_events_complete, split_events_source,
+                              split_events_checked_at, split_events_symbol, split_events_coverage_start,
+                              split_events_coverage_end, split_events_parser_version),
         "quality": grade,
     }
     for name, value in stored["other"].items():

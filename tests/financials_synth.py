@@ -287,8 +287,9 @@ def split_chart(splits):
         "_synthetic": SYNTHETIC,
         "chart": {
             "result": [{
-                "meta": {"symbol": "SPLT", "currency": "USD", "dataGranularity": "1mo", "range": "max"},
-                "timestamp": [1700000000],
+                "meta": {"symbol": "SPLT", "currency": "USD", "dataGranularity": "1mo", "range": "max",
+                         "firstTradeDate": 946684800},
+                "timestamp": [946684800, 1792108800],
                 "events": {"splits": events},
                 "indicators": {"quote": [{"close": [100.0]}]},
             }],
