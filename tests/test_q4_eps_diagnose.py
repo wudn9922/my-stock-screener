@@ -248,7 +248,13 @@ L9A_TABLE = tbl(tr("Net income attributable to Acme", "1,234"), tr("Diluted earn
 L9B_TABLE = tbl(tr(HEADER, "x"), tr("Net income attributable to Acme", "1,234"))
 L9C_TABLE = tbl(tr(HEADER, "x", "y"), tr("Net income", "1,234", "1,234"), tr("Net income per common share:"),
                 tr("Basic", "0.26", "0.26"), tr("Diluted", "0.25", "0.25"))
-L9D_TABLE = tbl(tr(HEADER, "x"), tr("Revenue", "1,234"), tr("Net income", "999"))
+L9D_TABLE = tbl(tr(HEADER, "x"), tr("Net income attributable to noncontrolling interests", "1,234"),
+                tr("Net income", "999"))           # S1-CF C9: a strict match under a label that is not accepted
+REVENUE_MATCH_TABLE = tbl(tr(HEADER, "x"), tr("Revenue", "1,234"), tr("Net income", "999"))   # not an NI label: L4 now
+ANNUAL_TABLE = tbl(tr("For the Years Ended June 30, 2023 2022", "x"), tr("Net income", "1,234"))
+NEXT_QUARTER_TABLE = tbl(tr("Three Months Ended September 30, 2023 2022", "x"), tr("Net income", "5,000"))
+FOURTH_QUARTER_VI_TABLE = tbl(tr("FOURTH QUARTER 2011 2010 (13 Weeks)", "x"), tr("Net income", "1,234"))
+WOR_LIKE_TABLE = tbl(tr("4Q 2012 3Q 2012 4Q 2011 12M 2012 12M 2011", "x"), tr("Net income", "1,234"))
 L9E_TABLE = tbl(tr(HEADER, "x"), tr("Net income attributable to Acme", "1,234"),
                 tr("Diluted earnings per share", "0.25"))
 
@@ -345,6 +351,7 @@ class PeriodWordingTests(unittest.TestCase):
             ("FourteenWeeks EndedFebruary 2,2013 ThirteenWeeks EndedJanuary 28,2012", "2013-02-02", "v"),
             ("Three Months Ended December 31,2022 January 1,2022", "2022-12-31", "v"),
             ("4Q 2022 4Q 2021 After-Tax Per Share", "2022-05-31", "i"),
+            ("4Q 2012 3Q 2012 4Q 2011 12M 2012 12M 2011", "2012-05-31", "i"),
             ("FOURTH QUARTER 2011 2010 (13 Weeks)", "2012-01-29", "vi"),
             ("Fourth Quarter of Fiscal Years 2013", "2014-01-03", "iv"),
             ("Quarter ended 12/31/19", "2019-12-31", "iii"),
@@ -472,7 +479,7 @@ class ClassifyRowRuleTests(unittest.TestCase):
     def test_rule_10c_net_income_in_two_columns_of_an_eps_table_without_a_diluted_row(self):
         self.assertTrue(bq.classify_row(evidence_row(doc(L9C_TABLE)))["note"].startswith("(c) "))
 
-    def test_rule_10d_strict_match_only_under_a_non_net_income_label(self):
+    def test_rule_10d_strict_match_only_under_a_net_income_label_that_is_not_accepted(self):
         self.assertTrue(bq.classify_row(evidence_row(doc(L9D_TABLE)))["note"].startswith("(d) "))
 
     def test_rule_10e_the_fallback_names_the_tables(self):
@@ -497,6 +504,68 @@ class ClassifyRowRuleTests(unittest.TestCase):
         documents = row["candidateFilings"][0]["documents"]
         self.assertFalse(any(table["strictMatches"] for document in documents for table in document["tables"]))
         self.assertClass(row, "L5", table=0)
+
+
+def l2_record(key, html, end, target=EVIDENCE_TARGET):
+    """A classified row with its document texts kept, as run_diagnose builds it (no SEC access)."""
+    filing = {"accessionNumber": "0000000001-25-000001", "filingDate": "2025-02-15"}
+    texts = {}
+    detail, _ = bq.diagnose_filing(FixtureSec(html), 1, filing, end, target, texts=texts)
+    record = {"key": key, "end": end, "storedEps": 0.25, "cik": 1, "targetNetIncome": target, "hintNote": "h",
+              "candidateFilings": [detail]}
+    return bq._classified_row(record), texts
+
+
+class S1CFRuleTests(unittest.TestCase):
+    def test_an_l9_strict_match_under_another_label_does_not_block_l4(self):
+        result = bq.classify_row(evidence_row(doc(REVENUE_MATCH_TABLE)))
+        self.assertEqual(result["class"], "L4", result)
+
+    def test_a_prose_money_match_blocks_l4_and_gives_the_d_note(self):
+        html = doc(L4_TABLE).replace("</body>", "<p>Revenue was $1.234 million in the quarter.</p></body>")
+        result = bq.classify_row(evidence_row(html))
+        self.assertEqual(result["class"], "L9", result)
+        self.assertTrue(result["note"].startswith("(d) "), result["note"])
+        self.assertIn("$1.234 million", result["note"])
+
+    def test_a_next_quarter_table_does_not_stop_an_annual_table_from_being_l5(self):
+        row = evidence_row(doc(ANNUAL_TABLE, NEXT_QUARTER_TABLE), end="2023-06-30", target=1_234_000)
+        result = bq.classify_row(row)
+        self.assertEqual((result["class"], result["tableIndex"]), ("L5", 0), result)
+        self.assertIn("every recorded table names a year period", result["note"])
+
+    def test_an_accepted_match_under_a_fourth_quarter_and_another_quarter_end_is_f_before_a(self):
+        row = evidence_row(doc(WOR_LIKE_TABLE, L9A_TABLE), end="2012-05-31", target=1_234_000)
+        result = bq.classify_row(row)
+        self.assertEqual(result["class"], "L9", result)
+        self.assertTrue(result["note"].startswith("(f) table 0 of "), result["note"])
+        self.assertIn("4Q 2012 3Q 2012", result["note"])
+
+    def test_wor_like_header_alone_is_f(self):
+        result = bq.classify_row(evidence_row(doc(WOR_LIKE_TABLE), end="2012-05-31", target=1_234_000))
+        self.assertTrue(result["note"].startswith("(f) "), result)
+
+    def test_the_l2_rule_is_recorded_and_other_classes_have_none(self):
+        self.assertEqual(bq.classify_row(evidence_row(doc(L2_TABLE)))["variantRule"], "i")
+        self.assertIsNone(bq.classify_row(evidence_row(doc(L8_TABLE)))["variantRule"])
+        result = bq.classify_row(evidence_row(doc(FOURTH_QUARTER_VI_TABLE), end="2012-01-29", target=1_234_000))
+        self.assertEqual((result["class"], result["variantRule"]), ("L2", "vi"))
+        self.assertIn("in a variant form (vi)", result["note"])
+
+    def test_an_l2_row_with_rule_vi_is_never_an_auto_positive_and_v_still_is(self):
+        vi, texts = l2_record("WSM", doc(FOURTH_QUARTER_VI_TABLE), "2012-01-29", 1_234_000)
+        self.assertEqual(vi["classification"]["class"], "L2")
+        pool = bq._row_candidates(vi, texts, selection())
+        fixtures, errors = bq.select_fixtures(pool, selection({"L2": 1}))
+        self.assertEqual(fixtures, [])
+        self.assertEqual([error["error"] for error in errors],
+                         ["L2 variant rule vi is never an auto-positive (S1-CF C13)"])
+        v, texts = l2_record("ULTA", doc(L2_TABLE), EVIDENCE_END, EVIDENCE_TARGET)
+        self.assertEqual(v["classification"]["variantRule"], "i")
+        pool = bq._row_candidates(v, texts, selection())
+        fixtures, errors = bq.select_fixtures(pool, selection({"L2": 1}))
+        self.assertEqual([fixture["key"] for fixture in fixtures], ["ULTA"])
+        self.assertEqual(errors, [])
 
 
 class M1EvidenceFieldTests(unittest.TestCase):

@@ -242,6 +242,8 @@ QUARTER_WORDING = re.compile(
     re.I,
 )
 YEAR_WORDING = re.compile(r"\b(?:twelve\s+months|year\s+ended|fiscal\s+year|full\s+year|year\s+to\s+date|ytd)\b", re.I)
+YEAR_WORDING_L5 = re.compile(                                                    # classify_row rule 8 only (S1-CF C10)
+    r"\b(?:twelve\s+months|years?\s+ended|fiscal\s+years?|full\s+year|year\s+to\s+date|ytd|for\s+the\s+years?)\b", re.I)
 NUMBER_TOKEN = re.compile(r"(?<![A-Za-z0-9])\(?\s*\$?\s*-?\d[\d,]*(?:\.\d+)?\s*\)?(?![A-Za-z0-9])")
 
 
@@ -1071,11 +1073,13 @@ def _clip(text, limit=300):
     return " ".join(str(text).split())[:limit]
 
 
-def _classified(cls, note, accession=None, document=None, url=None, table=None, table_indices=None, eps_reason=None):
+def _classified(cls, note, accession=None, document=None, url=None, table=None, table_indices=None, eps_reason=None,
+                variant_form=None):
     if table_indices is None:
         table_indices = [] if table is None else [table]
     return {"class": cls, "accession": accession, "document": document, "url": url, "tableIndex": table,
-            "tableIndices": list(table_indices), "tableEpsReason": eps_reason, "note": _clip(note)}
+            "tableIndices": list(table_indices), "tableEpsReason": eps_reason, "note": _clip(note),
+            "variantRule": variant_form}                                       # set for L2 only (S1-CF C12)
 
 
 def _classified_row(record):
@@ -1131,10 +1135,10 @@ def classify_row(row):
              if not INDEX_PAGE.match(document.get("name") or "")]
     located = [(filing, document, table) for filing, document in pairs for table in document.get("tables") or []]
 
-    def found(cls, filing, document, table, note, table_indices=None, eps_reason=None):
+    def found(cls, filing, document, table, note, table_indices=None, eps_reason=None, variant_form=None):
         return _classified(cls, note, accession=filing.get("accession"), document=document.get("name"),
                            url=document.get("url") or filing.get("filingUrl") or browse, table=table["table"],
-                           table_indices=table_indices, eps_reason=eps_reason)
+                           table_indices=table_indices, eps_reason=eps_reason, variant_form=variant_form)
 
     def where(document, table):
         return f"table {table['table']} of {document.get('name')}"
@@ -1188,19 +1192,29 @@ def classify_row(row):
         if table.get("periodNamed") or not table.get("acceptedStrictColumns"):
             continue
         header = table.get("headerText") or ""
-        if variant_rule(header, end) is not None and not other_quarter_end(header, end):
+        form = variant_rule(header, end)
+        if form is not None and not other_quarter_end(header, end):
             return found("L2", filing, document, table,
                          f"{where(document, table)}: net income matches; header '{header[:120]}' names the quarter "
-                         f"ending {end} in a variant form and no other quarter end")
-    # rule 8 (L5): the layout_class_hint condition, unchanged: every recorded table is year wording without quarter
-    if located and all(YEAR_WORDING.search(" ".join(str(x) for x in table.get("rows", [])))
-                       and not table.get("quarterWording") for _, _, table in located):
-        filing, document, table = located[0]
+                         f"ending {end} in a variant form ({form}) and no other quarter end", variant_form=form)
+    # rule 8 (L5): the net income tables of the release name a year period and no quarter (S1-CF C10). The relevant
+    # tables have a net income value and a header that does not name another quarter end.
+    relevant = [(filing, document, table) for filing, document, table in located
+                if any(value is not None for ni_row in table.get("niRows") or [] for value in ni_row.get("values") or [])
+                and not other_quarter_end(table.get("headerText") or "", end)]
+    if relevant and all(YEAR_WORDING_L5.search(table.get("headerText") or "") and not table.get("quarterWording")
+                        and not VARIANT_QUARTER.search(table.get("headerText") or "")
+                        for _, _, table in relevant):
+        filing, document, table = relevant[0]
         return found("L5", filing, document, table,
                      f"{where(document, table)}: every recorded table names a year period without quarter wording")
-    # rule 9 (L4): no strict match in any table and no strict match in the raw text
-    if (not any(table.get("strictMatches") for _, _, table in located)
-            and not any(document.get("rawStrictTextMatch") for _, document in pairs)):
+    # rule 9 (L4): no strict match under a net income label in a release table, and no prose money match (S1-CF C9)
+    def ni_strict(match):
+        low = (match.get("label") or "").lower()
+        return bool(NI_RE.search(low)) and not any(token in low for token in HEADING_TOKENS)
+
+    if (not any(ni_strict(match) for _, _, table in located for match in table.get("strictMatches") or [])
+            and not any(document.get("rawMoneyMatch") for _, document in pairs)):
         closest = None
         for filing, document, table in located:
             for ni_row in table.get("niRows") or []:
@@ -1218,6 +1232,13 @@ def classify_row(row):
                                  f"{document.get('name')}", accession=filing.get("accession"),
                            document=document.get("name"), url=document.get("url") or browse)
     # rule 10 (L9): anything else; the first sub-case that applies gives the note
+    for filing, document, table in located:                                       # (f), tried before (a) (S1-CF C11)
+        header = table.get("headerText") or ""
+        if (table.get("acceptedStrictColumns") and not table.get("periodNamed")
+                and variant_rule(header, end) is not None and other_quarter_end(header, end)):
+            return found("L9", filing, document, table,
+                         f"(f) {where(document, table)}: accepted net income match; header names the quarter in a "
+                         f"variant form and also another quarter end: '{header[:120]}'")
     for filing, document, table in located:                                       # (a)
         if (table.get("acceptedStrictColumns") and not table.get("periodNamed")
                 and not any(prior.get("periodNamed") for prior in (table.get("nearestPrecedingNonempty") or [])[:3])):
@@ -1243,10 +1264,11 @@ def classify_row(row):
                              f"which is not an accepted net income label")
     if not any(table.get("strictMatches") for _, _, table in located):
         for filing, document in pairs:
-            if document.get("rawStrictTextMatch"):
-                return _classified("L9", f"(d) {document.get('name')}: strict match only in raw text, not in a "
-                                         f"table cell", accession=filing.get("accession"),
-                                   document=document.get("name"), url=document.get("url") or browse)
+            if document.get("rawMoneyMatch"):
+                return _classified("L9", f"(d) {document.get('name')}: prose money match only, not in a table cell: "
+                                         f"'{document.get('rawMoneyContext') or ''}'",
+                                   accession=filing.get("accession"), document=document.get("name"),
+                                   url=document.get("url") or browse)
     filing, document = next(((f, d) for f, d, t in located if t.get("strictMatches") or t.get("periodNamed")),
                             pairs[0])
     strict_tables = [t["table"] for t in document.get("tables") or [] if t.get("strictMatches")]
@@ -1338,9 +1360,13 @@ def _row_candidates(record, texts, selection):
     found = []
     classification = record.get("classification") or {}
     if cls in POSITIVE_CLASSES and classification.get("accession") and classification.get("document"):
-        found.append(_entry(record, "positive", "positive", cls, classification["accession"],
-                            classification["document"], classification.get("url"), classification["tableIndices"],
-                            classification["tableIndex"], texts))
+        positive = _entry(record, "positive", "positive", cls, classification["accession"],
+                          classification["document"], classification.get("url"), classification["tableIndices"],
+                          classification["tableIndex"], texts)
+        if cls == "L2" and classification.get("variantRule") == "vi":
+            # S1-CF C13: rule vi is never an L2 auto-positive; it is skipped like a fixture error
+            positive["fixtureError"] = "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+        found.append(positive)
     for spec in selection["explicitNegatives"]:
         if str(spec.get("key", "")).upper() == key and spec.get("end") == end:
             indices = sorted(spec["tableIndices"])
