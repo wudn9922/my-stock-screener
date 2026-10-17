@@ -1,0 +1,1223 @@
+{
+  "mode": "backtest",
+  "periods": 347,
+  "accepted": 125,
+  "reasons": {
+    "no table shows this quarter's net income": 170,
+    "net income divided by shares differs from EPS": 17,
+    "no 8-K with Item 2.02 in the window": 14,
+    "net income and EPS rows have different column counts": 11,
+    "period header not aligned": 6,
+    "period header is a full year, not a quarter": 2,
+    "tables disagree on diluted EPS": 1,
+    "net income matches more than one column or unit": 1
+  },
+  "coverage": 0.3602,
+  "median_error": 0.0,
+  "correct_share_of_all_periods": 0.3228,
+  "accepted_on_derived_stored": 0,
+  "independent_check": {
+    "unavailable": 60,
+    "confirmed": 64,
+    "conflict": 1
+  },
+  "independent_samples": [
+    {
+      "key": "ADEA",
+      "end": "2021-12-31",
+      "target": -14559000,
+      "debug": [
+        {
+          "target": -14559000.0,
+          "period_net_rows": [
+            [
+              "net income (loss)",
+              [
+                -298586.0,
+                -58913.0
+              ]
+            ],
+            [
+              "adjustments to reconcile net income (loss) to net cash from operating activities:",
+              []
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 5,
+            "period_in_previous_table": 1,
+            "sample": [
+              [
+                "",
+                "Category (in millions, except for tax rate) | 2023 GAAP Outlook | 2023 Non-GAAP Outlook",
+                "Revenue | $385.0 - 415.0 | $385.0 - 415.0"
+              ],
+              [
+                "",
+                "Three Months Ended | Twelve Months Ended",
+                "December 31,2022 | December 31,2021 | December 31,2022 | December 31,2021"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Net income",
+            "Other income and expense, net",
+            "Net income from continuing operations",
+            "Net loss from discontinued operations, net of tax",
+            "Net income (loss)",
+            "Net income (loss) attributable to the Company"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "ATEN",
+      "end": "2018-12-31",
+      "target": -1608000,
+      "debug": [
+        {
+          "target": -1608000.0,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 4,
+            "period_in_previous_table": 1,
+            "sample": [
+              [
+                "",
+                "",
+                "Three Months EndedDecember 31, | Twelve Months EndedDecember 31,"
+              ],
+              [
+                "",
+                "",
+                "Three Months EndedDecember 31, | Twelve Months EndedDecember 31,"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "GAAP Net Income and GAAP EPS Break-even",
+            "investors.a10networks.com",
+            "About A10 Networks",
+            "investors@a10networks.com",
+            "Source: A10 Networks, Inc.",
+            "A10 NETWORKS, INC."
+          ]
+        }
+      ]
+    },
+    {
+      "key": "BHF",
+      "end": "2018-12-31",
+      "target": 1442000000,
+      "debug": [
+        {
+          "target": 1442000000.0,
+          "period_net_rows": [
+            [
+              "net income (loss) available to shareholders (1)",
+              [
+                -1077.0,
+                -10.02,
+                1442.0,
+                12.14,
+                -761.0,
+                -6.76,
+                865.0,
+                7.21
+              ]
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 9,
+            "period_in_previous_table": 0,
+            "sample": [
+              [
+                "",
+                "",
+                "Non-GAAP financial measures: | Most directly comparable GAAP financial measures:"
+              ],
+              [
+                "",
+                "For the Three Months Ended",
+                "Revenues | December 31,2019 | September 30,2019 | December 31,2018"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Net income (loss) available to shareholders (1)",
+            "Net Investment Income and Adjusted Net Investment Income (Unaudited, in millions)",
+            "Net investment income",
+            "Adjusted net investment income",
+            "Net Investment Income",
+            "net income (loss) available to shareholders (1)"
+          ]
+        }
+      ]
+    }
+  ],
+  "independent_unavailable_reasons": {
+    "no table shows this quarter's net income": 57,
+    "no 8-K with Item 2.02 in the next year's window": 3
+  },
+  "independent_precision": 0.9846,
+  "filled": 0,
+  "tickers_done": 0,
+  "stopped": null,
+  "requests": 4304,
+  "mismatches": [
+    {
+      "key": "DX",
+      "end": "2011-12-31",
+      "stored": 0.36,
+      "estimate": 1.080001,
+      "basic": 1.080001,
+      "derived": false,
+      "verified": {
+        "status": "unavailable",
+        "reason": "no table shows this quarter's net income",
+        "debug": [
+          {
+            "target": 14406000.0,
+            "period_net_rows": [],
+            "orphans": {
+              "net_tables_without_period": 2,
+              "period_in_previous_table": 1,
+              "sample": [
+                [
+                  "",
+                  "",
+                  "($ in thousands, except per share amounts) | 4Q2012 | 3Q2012 | 4Q2011"
+                ],
+                [
+                  "",
+                  "",
+                  "Three Months Ended | For the Year Ended"
+                ]
+              ]
+            }
+          },
+          {
+            "net_like_text": [
+              "GLEN ALLEN, Va. -- Dynex Capital, Inc. (NYSE: DX) reported net income available to common shareholders of ",
+              ".   The Company reported net income available to common shareholders of ",
+              "Net interest income",
+              "Gain on sale of investments, net",
+              "Net income to common shareholders",
+              "Net interest spread"
+            ]
+          }
+        ]
+      },
+      "netLabel": "net income",
+      "epsLabel": "diluted earnings per share",
+      "perShareRows": [
+        [
+          "basic earnings per share",
+          [
+            0.36,
+            0.41,
+            1.03,
+            1.5
+          ]
+        ],
+        [
+          "diluted earnings per share",
+          [
+            0.36,
+            0.4,
+            1.03,
+            1.41
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/826675/000082667512000008/q411pressrelease.htm"
+    },
+    {
+      "key": "DX",
+      "end": "2012-12-31",
+      "stored": 0.34,
+      "estimate": 1.020001,
+      "basic": 1.020001,
+      "derived": false,
+      "verified": {
+        "status": "unavailable",
+        "reason": "no table shows this quarter's net income",
+        "debug": [
+          {
+            "target": 19552000.0,
+            "period_net_rows": [
+              [
+                "gaap net income (loss) to common shareholders",
+                [
+                  19266.0,
+                  -6921.0,
+                  18330.0
+                ]
+              ],
+              [
+                "roae, calculated using annualized gaap net income (loss)",
+                [
+                  16.1,
+                  -5.7,
+                  null,
+                  13.0
+                ]
+              ],
+              [
+                "gaap net income to common shareholders",
+                [
+                  60167.0,
+                  72006.0
+                ]
+              ],
+              [
+                "roae, calculated using gaap net income",
+                [
+                  11.5,
+                  13.8
+                ]
+              ]
+            ],
+            "orphans": {
+              "net_tables_without_period": 3,
+              "period_in_previous_table": 1,
+              "sample": [
+                [
+                  "",
+                  "",
+                  "($ in thousands, except per share amounts) | 4Q2013 | 3Q2013 | 4Q2012"
+                ],
+                [
+                  "",
+                  "",
+                  "Q42013"
+                ]
+              ]
+            }
+          },
+          {
+            "net_like_text": [
+              "Net income per common share of ",
+              ", core net operating income per common share of ",
+              "&#32;quarter of 2013 versus a net loss of ",
+              "&#32;per common share, for the third quarter of 2013 and net income of ",
+              "Net interest income after provision",
+              "Gain (loss) on derivative instruments, net"
+            ]
+          }
+        ]
+      },
+      "netLabel": "net income",
+      "epsLabel": "diluted earnings per share",
+      "perShareRows": [
+        [
+          "basic earnings per share",
+          [
+            0.34,
+            0.36,
+            1.35,
+            1.03
+          ]
+        ],
+        [
+          "diluted earnings per share",
+          [
+            0.34,
+            0.36,
+            1.35,
+            1.03
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/826675/000082667513000002/q4-12earningsrelease.htm"
+    },
+    {
+      "key": "DX",
+      "end": "2013-12-31",
+      "stored": 0.35,
+      "estimate": 1.050001,
+      "basic": 1.050001,
+      "derived": false,
+      "verified": {
+        "status": "unavailable",
+        "reason": "no table shows this quarter's net income",
+        "debug": [
+          {
+            "target": 21560000.0,
+            "period_net_rows": [
+              [
+                "gaap net income to common shareholders",
+                [
+                  1379.0,
+                  28572.0,
+                  19266.0
+                ]
+              ],
+              [
+                "roae, calculated using annualized gaap net income",
+                [
+                  1.1,
+                  22.7,
+                  16.1
+                ]
+              ],
+              [
+                "gaap net income to common shareholders",
+                [
+                  18630.0,
+                  60167.0
+                ]
+              ],
+              [
+                "roae, calculated using gaap net income",
+                [
+                  3.7,
+                  11.5
+                ]
+              ]
+            ],
+            "orphans": {
+              "net_tables_without_period": 2,
+              "period_in_previous_table": 1,
+              "sample": [
+                [
+                  "",
+                  "",
+                  "($ in thousands, except per share amounts) | 4Q2014 | 3Q2014 | 4Q2013"
+                ],
+                [
+                  "",
+                  "",
+                  "Three Months Ended | Year Ended"
+                ]
+              ]
+            }
+          },
+          {
+            "net_like_text": [
+              "Core net operating income to common shareholders of ",
+              "Net income to common shareholders of ",
+              "Core net operating income of ",
+              "Net income to common shareholders of ",
+              "Net income per common share",
+              "Core net operating income per common share "
+            ]
+          }
+        ]
+      },
+      "netLabel": "net income",
+      "epsLabel": "diluted earnings per share",
+      "perShareRows": [
+        [
+          "basic earnings per share",
+          [
+            0.35,
+            0.34,
+            1.1,
+            1.35
+          ]
+        ],
+        [
+          "diluted earnings per share",
+          [
+            0.35,
+            0.34,
+            1.1,
+            1.35
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/826675/000082667514000010/q4-13earningsrelease.htm"
+    },
+    {
+      "key": "ENVA",
+      "end": "2019-12-31",
+      "stored": -1.48,
+      "estimate": -1.51,
+      "basic": -1.51,
+      "derived": false,
+      "verified": {
+        "status": "unavailable",
+        "reason": "no table shows this quarter's net income",
+        "debug": [
+          {
+            "target": -50553000.0,
+            "period_net_rows": [],
+            "orphans": {
+              "net_tables_without_period": 1,
+              "period_in_previous_table": 0,
+              "sample": [
+                [
+                  "ENOVA INTERNATIONAL, INC. AND SUBSIDIARIES",
+                  "CONSOLIDATED STATEMENTS OF INCOME",
+                  "(in thousands, except per share data)"
+                ]
+              ]
+            }
+          },
+          {
+            "net_like_text": [
+              "Loans and finance receivables, net",
+              "Property and equipment, net",
+              "Intangible assets, net",
+              "Deferred tax liabilities, net",
+              "Net Revenue/Gross Profit",
+              "Interest expense, net"
+            ]
+          }
+        ]
+      },
+      "netLabel": "net (loss) income",
+      "epsLabel": "(loss) earnings per common share – diluted",
+      "perShareRows": [
+        [
+          "(loss) earnings per common share – basic",
+          [
+            -1.51,
+            0.25,
+            1.09,
+            2.06
+          ]
+        ],
+        [
+          "(loss) earnings per common share – diluted",
+          [
+            -1.51,
+            0.25,
+            1.06,
+            1.99
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/1529864/000119312520018605/d120996dex991.htm"
+    },
+    {
+      "key": "EXE",
+      "end": "2019-12-31",
+      "stored": -35.53,
+      "estimate": -0.18,
+      "basic": null,
+      "derived": false,
+      "verified": {
+        "status": "unavailable",
+        "reason": "no table shows this quarter's net income",
+        "debug": [
+          {
+            "target": -324000000.0,
+            "period_net_rows": [],
+            "orphans": {
+              "net_tables_without_period": 0,
+              "period_in_previous_table": 0,
+              "sample": []
+            }
+          },
+          {
+            "net_like_text": []
+          }
+        ]
+      },
+      "netLabel": "net income (loss) ($ in millions)",
+      "epsLabel": "net income (loss) per share available to common stockholders – diluted ($)",
+      "perShareRows": [
+        [
+          "net income (loss) per share available to common stockholders – diluted ($)",
+          [
+            -0.18,
+            0.57,
+            -0.25,
+            0.15
+          ]
+        ],
+        [
+          "adjusted net income (loss) attributable to chesapeake per share - diluted ($)(f)",
+          [
+            -0.04,
+            0.03,
+            -0.27,
+            -0.15
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/895126/000089512620000058/chk-ex991201912318kpr.htm"
+    },
+    {
+      "key": "QMCO",
+      "end": "2015-03-31",
+      "stored": 0.04,
+      "estimate": 6.4,
+      "basic": 8.0,
+      "derived": false,
+      "verified": {
+        "status": "confirmed",
+        "epsDiluted": 6.4,
+        "url": "https://www.sec.gov/Archives/edgar/data/709283/000162828016016066/q416exhibit991-pressrelease.htm"
+      },
+      "netLabel": "net income (loss)",
+      "epsLabel": "diluted earnings per share",
+      "perShareRows": [
+        [
+          "basic earnings per share",
+          [
+            0.05,
+            -0.06,
+            0.07,
+            -0.09
+          ]
+        ],
+        [
+          "diluted earnings per share",
+          [
+            0.04,
+            -0.06,
+            0.06,
+            -0.09
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/709283/000120677415001609/exhibit99-1.htm"
+    },
+    {
+      "key": "SCOR",
+      "end": "2011-12-31",
+      "stored": -0.1,
+      "estimate": -2.0,
+      "basic": null,
+      "derived": false,
+      "verified": {
+        "status": "confirmed",
+        "epsDiluted": -2.0,
+        "url": "https://www.sec.gov/Archives/edgar/data/1158172/000119312513060531/d485435dex991.htm"
+      },
+      "netLabel": "net loss",
+      "epsLabel": "eps (diluted)",
+      "perShareRows": [],
+      "url": "https://www.sec.gov/Archives/edgar/data/1158172/000119312512058328/d301278dex991.htm"
+    },
+    {
+      "key": "SCOR",
+      "end": "2012-12-31",
+      "stored": -0.05,
+      "estimate": -1.0,
+      "basic": -1.0,
+      "derived": false,
+      "verified": {
+        "status": "confirmed",
+        "epsDiluted": -1.0,
+        "url": "https://www.sec.gov/Archives/edgar/data/1158172/000115817214000002/exhibit991q42013.htm"
+      },
+      "netLabel": "net loss",
+      "epsLabel": "diluted earnings per share",
+      "perShareRows": [
+        [
+          "basic earnings per share",
+          [
+            -0.05,
+            -0.1,
+            -0.35,
+            -0.49
+          ]
+        ],
+        [
+          "diluted earnings per share",
+          [
+            -0.05,
+            -0.1,
+            -0.35,
+            -0.49
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/1158172/000119312513060531/d485435dex991.htm"
+    },
+    {
+      "key": "SCOR",
+      "end": "2014-12-31",
+      "stored": -0.08,
+      "estimate": -1.6,
+      "basic": -1.6,
+      "derived": false,
+      "verified": {
+        "status": "confirmed",
+        "epsDiluted": -1.6,
+        "url": "https://www.sec.gov/Archives/edgar/data/1158172/000115817216000134/exhibit991q42015.htm"
+      },
+      "netLabel": "net (loss) income",
+      "epsLabel": "diluted earnings per share",
+      "perShareRows": [
+        [
+          "basic earnings per share",
+          [
+            -0.08,
+            0.0,
+            -0.29,
+            -0.07
+          ]
+        ],
+        [
+          "diluted earnings per share",
+          [
+            -0.08,
+            0.0,
+            -0.29,
+            -0.07
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/1158172/000115817215000008/exhibit991q42014.htm"
+    },
+    {
+      "key": "SUNE",
+      "end": "2014-12-31",
+      "stored": -0.12,
+      "estimate": -71999.640002,
+      "basic": -71999.640002,
+      "derived": false,
+      "verified": {
+        "status": "unavailable",
+        "reason": "no 8-K with Item 2.02 in the next year's window",
+        "debug": []
+      },
+      "netLabel": "net income (loss)",
+      "epsLabel": "diluted net income (loss) per share",
+      "perShareRows": [
+        [
+          "basic net income (loss) per share",
+          [
+            -0.12,
+            -0.09,
+            0.23,
+            -0.11
+          ]
+        ],
+        [
+          "diluted net income (loss) per share",
+          [
+            -0.12,
+            -0.09,
+            0.23,
+            -0.11
+          ]
+        ],
+        [
+          "cash dividends per share",
+          [
+            0.16,
+            0.16,
+            0.64,
+            0.64
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/22701/000089710115000305/csi150896_ex99-1.htm"
+    },
+    {
+      "key": "SUNE",
+      "end": "2016-12-31",
+      "stored": -0.21,
+      "estimate": -125999.370003,
+      "basic": -125999.370003,
+      "derived": false,
+      "verified": {
+        "status": "confirmed",
+        "epsDiluted": -125999.370003,
+        "url": "https://www.sec.gov/Archives/edgar/data/22701/000089710118000342/csi180821_ex99-1.htm"
+      },
+      "netLabel": "net loss",
+      "epsLabel": "diluted net loss per share",
+      "perShareRows": [
+        [
+          "basic net loss per share",
+          [
+            -0.21,
+            -0.66,
+            -0.92,
+            -1.11
+          ]
+        ],
+        [
+          "diluted net loss per share",
+          [
+            -0.21,
+            -0.66,
+            -0.92,
+            -1.11
+          ]
+        ],
+        [
+          "cash dividends per share",
+          [
+            0.04,
+            0.16,
+            0.4,
+            0.64
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/22701/000089710117000304/csi170727_ex99-1.htm"
+    },
+    {
+      "key": "SUNE",
+      "end": "2017-12-31",
+      "stored": -0.19,
+      "estimate": -113999.430003,
+      "basic": -113999.430003,
+      "derived": false,
+      "verified": {
+        "status": "unavailable",
+        "reason": "no 8-K with Item 2.02 in the next year's window",
+        "debug": []
+      },
+      "netLabel": "net loss",
+      "epsLabel": "diluted net loss per share",
+      "perShareRows": [
+        [
+          "basic net loss per share",
+          [
+            -0.19,
+            -0.21,
+            -1.32,
+            -0.92
+          ]
+        ],
+        [
+          "diluted net loss per share",
+          [
+            -0.19,
+            -0.21,
+            -1.32,
+            -0.92
+          ]
+        ],
+        [
+          "cash dividends per share",
+          [
+            0.04,
+            0.04,
+            0.16,
+            0.4
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/22701/000089710118000342/csi180821_ex99-1.htm"
+    },
+    {
+      "key": "WEX",
+      "end": "2017-12-31",
+      "stored": 2.02,
+      "estimate": 1.85,
+      "basic": 1.86,
+      "derived": false,
+      "verified": {
+        "status": "unavailable",
+        "reason": "no table shows this quarter's net income",
+        "debug": [
+          {
+            "target": 79804000.0,
+            "period_net_rows": [],
+            "orphans": {
+              "net_tables_without_period": 1,
+              "period_in_previous_table": 0,
+              "sample": [
+                [
+                  "",
+                  "",
+                  ""
+                ]
+              ]
+            }
+          },
+          {
+            "net_like_text": [
+              "Net income attributable to shareholders\n        ",
+              "Net foreign currency remeasurement loss (gain)\n        ",
+              "Adjusted net income attributable to shareholders\n        "
+            ]
+          }
+        ]
+      },
+      "netLabel": "net earnings attributable to shareholders",
+      "epsLabel": "diluted earnings per share",
+      "perShareRows": [
+        [
+          "basic earnings per share",
+          [
+            1.86,
+            0.12,
+            3.73,
+            1.49
+          ]
+        ],
+        [
+          "diluted earnings per share",
+          [
+            1.85,
+            0.12,
+            3.72,
+            1.48
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/1309108/000115752318000369/a51761727ex99_1.htm"
+    }
+  ],
+  "samples": {
+    "no table shows this quarter's net income": {
+      "key": "AA",
+      "end": "2016-12-31",
+      "stored": -0.68,
+      "debug": [
+        {
+          "target": -125000000,
+          "period_net_rows": [
+            [
+              "in preparing the statement of consolidated operations for the year ended december 31, 2016, management discovered that the amount of cost of goods sold previously reported for the quarter ended september 30, 2016 included an immaterial error due to an under-allocation of lifo expense of $4. as a result, management has revised cost of goods sold from the $1,964 previously reported to $1,968 and net loss attributable to alcoa corporation from the $(6) previously reported to $(10).",
+              []
+            ],
+            [
+              "in preparing the statement of consolidated operations for the year ended december 31, 2016, management discovered that the amount of cost of goods sold previously reported for the nine months ended september 30, 2016 included an immaterial error due to an under-allocation of lifo expense of $14. as a result, management has revised cost of goods sold from the $5,761 previously reported to $5,775 and net loss attributable to alcoa corporation from the $(261) previously reported to $(275) for the nine months ended september 30, 2016, the effects of which are included in the statement of consolidated operations for the year ended december 31, 2016.",
+              []
+            ],
+            [
+              "net loss attributable to alcoa corporation",
+              [
+                -826.0,
+                -10.0,
+                -125.0,
+                -863.0,
+                -400.0
+              ]
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 6,
+            "period_in_previous_table": 4,
+            "sample": [
+              [
+                "",
+                "$M, except per share amounts | 3Q16 | 4Q16 | FY15 | FY16",
+                "Revenue | $ | 2,329 | $ | 2,537 | $ | 11,199 | $ | 9,318"
+              ],
+              [
+                "",
+                "Alcoa Corporation and subsidiaries",
+                "Statement of Consolidated Operations (unaudited)"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Excluding special items, adjusted net\n        income of $26 million, or $0.14 per share",
+            "$853 million cash balance and $1.4\n        billion of debt for net debt of $0.6 billion as of December 31, 2016",
+            "Net loss attributable to Alcoa Corporation\n        ",
+            "Other expenses (income), net\n        ",
+            "Net (loss) income\n        ",
+            "NET LOSS ATTRIBUTABLE TO ALCOA CORPORATION\n        "
+          ]
+        }
+      ]
+    },
+    "period header is a full year, not a quar": {
+      "key": "AA",
+      "end": "2017-12-31",
+      "stored": -1.06,
+      "debug": [
+        {
+          "target": -196000000,
+          "period_net_rows": [
+            [
+              "net (loss) income attributable to alcoa corporation",
+              [
+                -125.0,
+                113.0,
+                -196.0,
+                -400.0,
+                217.0
+              ]
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 5,
+            "period_in_previous_table": 1,
+            "sample": [
+              [
+                "",
+                "M, except per share amounts | 4Q161 | 3Q17 | 4Q17 | FY161 | FY17",
+                "Revenue | $2,537 | $2,964 | $3,174 | $9,318 | $11,652"
+              ],
+              [
+                "",
+                "Alcoa Corporation and subsidiaries",
+                "Statement of Consolidated Operations (unaudited)"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "$1.36\n        billion cash balance and $1.41 billion of debt, for net debt of $0.05\n        billion, as of December 31, 2017",
+            "Net (loss) income attributable to Alcoa Corporation\n        ",
+            "Adjusted net income (loss)\n        ",
+            "Other expenses, net\n        ",
+            "Net (loss) income\n        ",
+            "NET (LOSS) INCOME ATTRIBUTABLE TO ALCOA CORPORATION\n          "
+          ]
+        }
+      ]
+    },
+    "net income and EPS rows have different c": {
+      "key": "AA",
+      "end": "2019-12-31",
+      "stored": -1.63,
+      "debug": [
+        {
+          "target": -303000000,
+          "period_net_rows": [
+            [
+              "net income (loss)(1)",
+              [
+                227.0,
+                -147.0,
+                -355.0
+              ]
+            ],
+            [
+              "net income (loss) attributable to alcoa corporation(1)",
+              [
+                51.0,
+                -221.0,
+                -303.0
+              ]
+            ],
+            [
+              "net income (loss)",
+              [
+                0.27,
+                -1.19,
+                -1.63
+              ]
+            ],
+            [
+              "net income (loss)",
+              [
+                0.27,
+                -1.19,
+                -1.63
+              ]
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 3,
+            "period_in_previous_table": 0,
+            "sample": [
+              [
+                "M, except per share amounts | 4Q181 | 3Q19 | 4Q19 | FY181 | FY19",
+                "Revenue | $3,344 | $2,567 | $2,436 | $13,403 | $10,433",
+                "Net income (loss) attributable to Alcoa Corporation | $51 | $(221) | $(303) | $250 | $(1,125)"
+              ],
+              [
+                "Alcoa Corporation and subsidiaries",
+                "Statement of Consolidated Cash Flows (unaudited)",
+                "(in millions)"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Net loss of $303 million, or $1.63 per share ",
+            "Excluding special items, adjusted net loss of $57 million, or $0.31 per share ",
+            "$879 million cash balance and $1.8 billion of debt, for net debt of $921 million, as of December 31, 2019 ",
+            "Net loss of $1,125 million, or $6.07 per share, and adjusted net loss of $184 million, or $0.99 per share ",
+            "Net income (loss) attributable to Alcoa Corporation ",
+            "Adjusted net income (loss) "
+          ]
+        }
+      ]
+    },
+    "net income divided by shares differs fro": {
+      "key": "ARMP",
+      "end": "2016-12-31",
+      "stored": -10.6399,
+      "debug": [
+        {
+          "target": -9500000,
+          "period_net_rows": [
+            [
+              "net loss",
+              [
+                -18838000.0,
+                -516000.0
+              ]
+            ],
+            [
+              "adjustments required to reconcile net loss to net cash used in operating activities:",
+              []
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 0,
+            "period_in_previous_table": 0,
+            "sample": []
+          }
+        },
+        {
+          "net_like_text": [
+            "Property and equipment, net",
+            "Intangible assets, net",
+            "Net loss",
+            "Net loss attributable to common stockholders",
+            "Net loss per share of common stock - basic",
+            "Net loss per share of common stock - diluted"
+          ]
+        }
+      ]
+    },
+    "period header not aligned": {
+      "key": "BBWI",
+      "end": "2017-01-28",
+      "stored": 2.18,
+      "debug": [
+        {
+          "target": 632000000,
+          "period_net_rows": [
+            [
+              "net income",
+              [
+                631745.0,
+                636017.0
+              ]
+            ],
+            [
+              "net income per diluted share",
+              [
+                2.18,
+                2.15
+              ]
+            ],
+            [
+              "net income",
+              [
+                1158114.0,
+                1252992.0
+              ]
+            ],
+            [
+              "net income per diluted share",
+              [
+                3.98,
+                4.22
+              ]
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 0,
+            "period_in_previous_table": 0,
+            "sample": []
+          }
+        },
+        {
+          "net_like_text": [
+            "Net Sales",
+            "Net Income",
+            "Net Income Per Diluted Share",
+            "Net Sales",
+            "Net Income",
+            "Net Income Per Diluted Share"
+          ]
+        }
+      ]
+    },
+    "tables disagree on diluted EPS": {
+      "key": "CENT",
+      "end": "2019-09-28",
+      "stored": 0.04,
+      "debug": [
+        {
+          "target": 2440000,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 2,
+            "period_in_previous_table": 1,
+            "sample": [
+              [
+                "CENTRAL GARDEN & PET COMPANY",
+                "CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS",
+                "(in thousands, except per share amounts)"
+              ],
+              [
+                "EBITDA Reconciliation | GAAP to Non-GAAP Reconciliation (in thousands, except per share amounts) For the Three Months En",
+                "Garden | Pet | Corp | Total",
+                "Net income attributable to Central Garden & Pet | — | — | — | $ | (4,417 | )"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Inventories, net ",
+            "Plant, property and equipment, net ",
+            "Other intangible assets, net ",
+            "Net sales ",
+            "Net loss attributable to noncontrolling interest ",
+            "Weighted average shares used in the computation of net income (loss) per share: "
+          ]
+        }
+      ]
+    },
+    "net income matches more than one column ": {
+      "key": "CRMT",
+      "end": "2020-04-30",
+      "stored": 1.35,
+      "debug": [
+        {
+          "target": 9259000,
+          "period_net_rows": [
+            [
+              "net income",
+              [
+                51343.0,
+                47625.0,
+                7.9,
+                8.1
+              ]
+            ],
+            [
+              "net income attributable to common shareholders",
+              [
+                51303.0,
+                47585.0
+              ]
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 0,
+            "period_in_previous_table": 0,
+            "sample": []
+          }
+        },
+        {
+          "net_like_text": [
+            "Net income",
+            "Net income attributable to common shareholders",
+            "Net income",
+            "Net income attributable to common shareholders",
+            "Finance receivables, net",
+            "Finance receivables, net of allowance and deferred revenue"
+          ]
+        }
+      ]
+    },
+    "no 8-K with Item 2.02 in the window": {
+      "key": "ENVA",
+      "end": "2013-12-31",
+      "stored": 0.6,
+      "debug": []
+    }
+  }
+}
