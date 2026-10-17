@@ -1,0 +1,40 @@
+{
+  "mode": "diagnose",
+  "sourceReport": "docs/report/q4-8k/input/run-17/q4-8k-report.json",
+  "sourceRows": 235,
+  "selectedSourceRows": 235,
+  "diagnosed": 235,
+  "classHintCounts": {
+    "L1": 8,
+    "L2": 95,
+    "L3": 22,
+    "L4": 25,
+    "L9": 85
+  },
+  "fixtureSelection": "tests/fixtures/q4_8k/s1_fixture_selection.json",
+  "fixtureCount": 17,
+  "fixtureErrors": [
+    {
+      "key": "TRMB",
+      "end": "2011-12-30",
+      "class": "L1",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-12-073574",
+      "document": "d304248dex991.htm",
+      "error": "too large"
+    }
+  ],
+  "devTickers": [
+    "TRAK",
+    "TXT",
+    "UI",
+    "UNFI",
+    "URBN",
+    "VIAV",
+    "VNCE",
+    "WLY"
+  ],
+  "stopped": null,
+  "requests": 2630
+}

@@ -1,0 +1,118 @@
+{
+  "budget": "6000",
+  "extractOutcome": "success",
+  "files": [
+    {
+      "bytes": 777,
+      "path": "summary.json",
+      "sha256": "db39437eee5b445ec1006d7638b3958385fd785847e53ca03ab9089df9de73cc"
+    },
+    {
+      "bytes": 112058,
+      "path": "s1-classes.json",
+      "sha256": "bea5ee9546d9dd1484b97ce23baeb3f3657a2bb01ee919b801a29384efdd1314"
+    },
+    {
+      "bytes": 1734042,
+      "path": "verbose.json.gz",
+      "sha256": "ec41ef14ce29355bd70ffb687b7f6ea7de7289b91cc3ad1007dfe706e2a3c078"
+    },
+    {
+      "bytes": 21587,
+      "path": "fixtures/TRAK-2019-06-30-L2.html",
+      "sha256": "99c42149250e80102b9b3d747b44297f0fdb4cd2a2b40174ac8429549b4b421e"
+    },
+    {
+      "bytes": 8935,
+      "path": "fixtures/TRAK-2020-06-30-L5-negative.html",
+      "sha256": "b16d9d7db7c43d4b3ae1fea6733e97e4af6b7f1d60fe09b7b1ff8d5c1c295f11"
+    },
+    {
+      "bytes": 12533,
+      "path": "fixtures/TXT-2016-12-31-L2-negative.html",
+      "sha256": "21b4c3c3e1a7b9828c13482403090a738e3b88c0b8dee83c856385092045dab0"
+    },
+    {
+      "bytes": 9860,
+      "path": "fixtures/TXT-2020-01-04-L8-non-gaap-diluted-row-negative.html",
+      "sha256": "1bd05656219e5faeb26fd6dd01834f81acb46a0311f32ebea07cf6a97699f529"
+    },
+    {
+      "bytes": 65148,
+      "path": "fixtures/TXT-2021-01-02-L1.html",
+      "sha256": "bf98f201e22b7fa8b73f260474d58265488829875395ec2ec50e73d462228bb3"
+    },
+    {
+      "bytes": 24686,
+      "path": "fixtures/TXT-2022-01-01-L2.html",
+      "sha256": "57756dd5863abfb39d7c2a401014ef1dcbce315eea47d8aba20a1c575ac0f06e"
+    },
+    {
+      "bytes": 11478,
+      "path": "fixtures/UI-2014-06-30-L3.html",
+      "sha256": "b5736eb258fa51b4d8b0e952bb30aca307e47d4d4ef75f617b4de53a41800083"
+    },
+    {
+      "bytes": 12803,
+      "path": "fixtures/UNFI-2013-08-03-L8.html",
+      "sha256": "0860d96a44ab377a2b587d37890c56ff598aaa645dff2b6b99538b11dd769666"
+    },
+    {
+      "bytes": 17977,
+      "path": "fixtures/UNFI-2019-08-03-L3.html",
+      "sha256": "66c2ceb7d353f3b4b3cdca1dcc6513f6522f6e14701f8a5acb0510a5fefa70e8"
+    },
+    {
+      "bytes": 18177,
+      "path": "fixtures/URBN-2012-01-31-L8.html",
+      "sha256": "f6784d3a4d1e136787de9f324baf582fdfcc0d5dd18d3270882e51d1734d8641"
+    },
+    {
+      "bytes": 13714,
+      "path": "fixtures/URBN-2014-01-31-L2.html",
+      "sha256": "c46db8d0a672099674faed32446d6d1d725ccbdaa0c9b16724c12712372478d6"
+    },
+    {
+      "bytes": 17922,
+      "path": "fixtures/URBN-2016-01-31-L1.html",
+      "sha256": "688684ba057d758c7e2bf11e2b9d0f4c97f067808a7867429f184118c9780b27"
+    },
+    {
+      "bytes": 18194,
+      "path": "fixtures/VIAV-2017-07-01-L8.html",
+      "sha256": "9249d2caf3a1256a357a6f9e54259cb899192ec6b76690bd676d3ad4243d2ee4"
+    },
+    {
+      "bytes": 11584,
+      "path": "fixtures/VIAV-2021-07-03-L3.html",
+      "sha256": "cbc0a661024ede6c8a302fb84b107987c89e297fe91f9ea1c8ef987919f434e1"
+    },
+    {
+      "bytes": 45889,
+      "path": "fixtures/VNCE-2026-01-31-L1-year-header-negative.html",
+      "sha256": "1f94df814c652a9fba2e28e0ab11159e92b98eeec766775918e9f2576f8f165c"
+    },
+    {
+      "bytes": 11378,
+      "path": "fixtures/WLY-2018-04-30-L4-negative.html",
+      "sha256": "7985ce4b71c8b8bec6bdac4eb884a79e0c1e63b6c5a1ddf42ae66e6dfe54ae5b"
+    },
+    {
+      "bytes": 27341,
+      "path": "fixtures/WLY-2023-04-30-L1.html",
+      "sha256": "c9e149c1f107fdcc55bf847f9283e743c231f0170e0432bbb771fd80ea67fd7a"
+    },
+    {
+      "bytes": 11519,
+      "path": "fixtures/s1_fixtures.json",
+      "sha256": "3730e1a51d347755875b8809bdfa8eb951d1fdbc56e6005b1c6038c2e39408ef"
+    }
+  ],
+  "mainSha": "d773c713ae712196091d3c9b8c1494e1f252b1c9",
+  "mode": "diagnose",
+  "omitted": [],
+  "runId": 39035520759,
+  "runNumber": 19,
+  "tickers": "",
+  "totalBytes": 2207602
+}
