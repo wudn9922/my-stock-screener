@@ -306,6 +306,15 @@ class EpsTableLabelTests(unittest.TestCase):
                                         "4,936")), [])
         self.assertEqual(self.labels(tr("Adjusted diluted EPS", "0.30")), [])
 
+    def test_txt_layout_gives_the_net_income_row_under_the_per_share_heading(self):
+        self.assertEqual(self.labels(tr("Earnings per share:"), tr("Net income", "0.25"),
+                                     tr("Diluted average shares outstanding", "4,936")), ["net income"])
+
+    def test_a_basic_row_or_no_diluted_share_row_excludes_the_net_income_row(self):
+        self.assertEqual(self.labels(tr("Earnings per share:"), tr("Basic", "0.26"), tr("Net income", "0.25"),
+                                     tr("Diluted average shares outstanding", "4,936")), [])
+        self.assertEqual(self.labels(tr("Earnings per share:"), tr("Net income", "0.25")), [])
+
     def test_a_diluted_row_four_rows_after_the_heading_is_read_and_a_fifth_is_not(self):
         revenue = [tr("Revenue", "5")]
         self.assertEqual(self.labels(tr("Net income per common share:"), *revenue * 3, tr("Diluted", "0.25")),
@@ -346,6 +355,21 @@ class PeriodWordingTests(unittest.TestCase):
         self.assertEqual(bq.header_text(table), "Consolidated x " + HEADER + " x")
         long_table = [[f"{'a' * 100}"]] * 8
         self.assertEqual(len(bq.header_text(long_table)), 400)
+
+    def test_a_year_row_with_a_label_stays_in_the_header_and_a_data_row_ends_it(self):
+        wmt = bq.tables_of(tbl(tr("", ""), tr("Three Months Ended", "Fiscal Years Ended"),
+                               tr("January 31,", "January 31,"),
+                               tr("(Amounts in millions)", "2013", "2012", "2013", "2012"),
+                               tr("Net sales", "127,919", "x", "1", "2")))[0]
+        text = bq.header_text(wmt)
+        self.assertIn("2013 2012", text)
+        self.assertNotIn("Net sales", text)
+        revenue = bq.tables_of(tbl(tr("Consolidated", "x"), tr(HEADER, "x"), tr("Revenue", "2,013", "1,990")))[0]
+        self.assertEqual(bq.header_text(revenue), "Consolidated x " + HEADER + " x")
+
+    def test_at_most_six_non_empty_header_rows_are_read(self):
+        table = [[""], [""]] + [[f"row{i}"] for i in range(7)]
+        self.assertEqual(bq.header_text(table), "row0 row1 row2 row3 row4 row5")
 
 
 class ClassifyRowRuleTests(unittest.TestCase):

@@ -444,13 +444,19 @@ def diluted_per_share_labels(table):
         entries.append((label.lower() if label else None, values))
     headings = [index for index, (low, values) in enumerate(entries)
                 if low and all(value is None for value in values) and any(token in low for token in HEADING_TOKENS)]
+    has_diluted_shares = any(low and is_diluted_shares(low) for low, _ in entries)
+    has_basic = any(low and re.search(r"\bbasic\b", low) for low, _ in entries)
     labels = []
-    for index, (low, _) in enumerate(entries):
+    for index, (low, values) in enumerate(entries):
         if not low or any(word in low for word in EPS_AVOID):
             continue
         direct = "diluted" in low and any(token in low for token in PER_SHARE_TOKENS)
         under_heading = re.match(r"diluted\b", low) is not None and any(h < index <= h + 4 for h in headings)
-        if direct or under_heading:
+        # S1-CF C6: a net income row under a per-share heading, with a diluted share row and no basic row (TXT layout)
+        net_under_heading = (any(h < index <= h + 4 for h in headings) and is_net_income(low)
+                             and all(value is None or abs(value) < 1000 for value in values)
+                             and has_diluted_shares and not has_basic)
+        if direct or under_heading or net_under_heading:
             labels.append(low)
     return labels
 
@@ -467,15 +473,30 @@ def _diluted_avoid_labels(table):
     return labels
 
 
+YEAR_CELL = re.compile(r"(?:19|20)\d{2}")
+
+
+def _year_row(cells):
+    """True when every numeric cell of the row is a year and there is at least one (S1-CF C5: '2,013' is a value)."""
+    numeric = [cell.strip() for cell in cells if number(cell) is not None]
+    return bool(numeric) and all(YEAR_CELL.fullmatch(text) for text in numeric)
+
+
 def header_text(table):
-    """Text of the rows before the first row with a numeric value: at most 6 rows, cut to 400 characters."""
+    """
+    Text of the header rows: the rows before the first row with a numeric value that is not a year row (S1-CF C5).
+    At most 6 non-empty rows, cut to 400 characters.
+    """
     rows = []
     for cells in table:
         _, values = row_of(cells)
-        if any(value is not None for value in values):
+        if any(value is not None for value in values) and not _year_row(cells):
             break
-        rows.append(cells)
-    text = " ".join(" ".join(cell for cell in cells if cell.strip()) for cells in rows[:6])
+        if table_is_nonempty([cells]):
+            rows.append(cells)
+            if len(rows) == 6:
+                break
+    text = " ".join(" ".join(cell for cell in cells if cell.strip()) for cells in rows)
     return " ".join(text.split())[:400]
 
 
