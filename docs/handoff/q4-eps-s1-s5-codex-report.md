@@ -113,3 +113,53 @@
 - Output files: this section only.
 - Deviations: none.
 - Stop: none.
+
+## S3 (stopped at the gate)
+
+- Step: S3 backtest and gate (plan §5). Stopped by Opus decision (agent a69ff5fdff8e3bf27, 2026-10-17): the gate fails on conflicts. No S3.6 revision, no further dispatch, no gate run.
+- Date (UTC): 2026-10-17. Main commit: d3360a27 (PR #124). Answer set unchanged: 2,649 rows, 563 keys, 2,387 basic.
+- Runs (shard, `runs/q4-8k` commit, outcome):
+  - run 21, 39055646603, 0/8, c3aa572f: accepted, 347 periods, 4,304 requests, 1 conflict (SNDA 2019-12-31).
+  - run 22, 39057185890, 1/8, 8572920a: accepted, 341 periods, 4,025 requests, 0 conflicts.
+  - run 23, 39058821815, 2/8, 4dc39349: accepted, 318 periods, 3,659 requests, 0 conflicts.
+  - run 24, 39060384310, 3/8 first attempt, 0a21d561: NetworkError (sec.gov, index-headers) after 26 of 344 periods, 401 requests, 1 conflict (ACNT 2022-12-31).
+  - run 25, 39062001066, 3/8 retry, 35b2c538: NetworkError (sec.gov, index.json) after 42 of 344 periods, 565 requests, 1 conflict (ACNT 2022-12-31).
+  - Shards 4/8 to 7/8: not dispatched.
+- Requests: runs 21 to 25 total 12,954 (cap 60,000). Today's UTC total is about 18,214 including diagnose runs 19 and 20 (cap 40,000).
+- Partial numbers, shards 0 to 2 (1,006 answer rows): extracted 349; accepted (confirmed) 208; correct 197; precision 0.947; Wilson 95% lower bound 0.908 (gate needs 0.970); sign errors 0; conflicts 1 (2 with shard 3); incorrect 11.
+- Incorrect rows (11), by layout class:
+  - Split-basis mismatch (9). Estimate × splitFactor equals the answer in 8 rows. CNC 2012 matches only if the later split alone is applied.
+
+    | Key | End | Extracted | Answer | Filing |
+    |---|---|---|---|---|
+    | QMCO | 2015-03-31 | 6.4 | 0.04 | https://www.sec.gov/Archives/edgar/data/709283/000120677415001609/exhibit99-1.htm |
+    | SCOR | 2011-12-31 | -2.0 | -0.1 | https://www.sec.gov/Archives/edgar/data/1158172/000119312512058328/d301278dex991.htm |
+    | SCOR | 2012-12-31 | -1.0 | -0.05 | https://www.sec.gov/Archives/edgar/data/1158172/000119312513060531/d485435dex991.htm |
+    | SCOR | 2014-12-31 | -1.6 | -0.08 | https://www.sec.gov/Archives/edgar/data/1158172/000115817215000008/exhibit991q42014.htm |
+    | SUNE | 2016-12-31 | -125999.37 | -0.21 | https://www.sec.gov/Archives/edgar/data/22701/000089710117000304/csi170727_ex99-1.htm |
+    | CNC | 2012-12-31 | 0.0425 | 0.085 | https://www.sec.gov/Archives/edgar/data/1071739/000107173913000015/exhibit991.htm |
+    | CNC | 2015-12-31 | 0.45 | 0.9 | https://www.sec.gov/Archives/edgar/data/1071739/000107173916000175/exhibit991.htm |
+    | IPI | 2010-12-31 | 2.4 | 0.24 | https://www.sec.gov/Archives/edgar/data/1421461/000110465911009385/a11-1982_4ex99d1.htm |
+    | PENG | 2017-08-25 | -0.24 | -0.48 | https://www.sec.gov/Archives/edgar/data/1616533/000156459017019049/sgh-ex991_6.htm |
+
+  - Parser error (2). Genuine misreads.
+
+    | Key | End | Extracted | Answer | Filing |
+    |---|---|---|---|---|
+    | TRU | 2021-12-31 | 0.81 | 5.27 | https://www.sec.gov/Archives/edgar/data/1552033/000155203322000007/exhibit99112312021.htm |
+    | TRU | 2022-12-31 | 0.78 | 0.24 | https://www.sec.gov/Archives/edgar/data/1552033/000155203323000014/exhibit99112312022.htm |
+
+- Conflicts (2). A conflict cannot be undone by more rows (S3.6).
+
+  | Key | End | Extracted | Answer | Next-year release | Filing |
+  |---|---|---|---|---|---|
+  | SNDA | 2019-12-31 | 5.10 | 5.10 | 5.05 | https://www.sec.gov/Archives/edgar/data/1043000/000156459020014381/csu-ex991_6.htm |
+  | ACNT | 2022-12-31 | 0.01 | 0.01 | 0.43 | https://www.sec.gov/Archives/edgar/data/95953/000009595323000006/acnt-20221231xex991.htm |
+
+- Findings:
+  - The S3.3 "correct" test puts both values on today's split basis, but the answer value is on the basis of its own 10-K filing date. The comparison is mis-specified for the 9 split-basis rows. The answer set is pinned and was not edited.
+  - The independent check is not independent for these 11 rows. The checked value equals the estimate, because the next year's release repeats the same layout and the same split conversion.
+  - SUNE 2016 was accepted with EPS −125,999.37 (split factor 1.67e-6). The |EPS| ≥ 1000 rejection runs before the split division, so it never sees this value. Code fix needed before any fill.
+  - Even with the split basis fixed, TRU and the 2 conflicts still fail S3.4.
+- Not done: gate (exit 3 expected; `s3-backtest-summary.json` not committed), S3.6 revision, S4, S5, fill, answer-set edit, code change.
+- Stop: yes. S3 failed (conflicts; partial Wilson 0.908). S3.6 revision needs an Opus decision.
