@@ -324,20 +324,49 @@ class EpsTableLabelTests(unittest.TestCase):
 
 class PeriodWordingTests(unittest.TestCase):
     def test_quarter_wording_with_the_year_is_a_variant_header(self):
-        self.assertTrue(bq.variant_period("Fourth Quarter 2019", "2019-12-31"))
+        self.assertIsNotNone(bq.variant_rule("Fourth Quarter 2019", "2019-12-31"))
 
     def test_fiscal_year_header_in_early_january_is_a_variant(self):
-        self.assertTrue(bq.variant_period("Fourth Quarter of Fiscal Years 2013", "2014-01-03"))
+        self.assertIsNotNone(bq.variant_rule("Fourth Quarter of Fiscal Years 2013", "2014-01-03"))
 
     def test_the_end_month_and_day_with_no_year_is_a_variant_when_the_year_appears(self):
-        self.assertTrue(bq.variant_period("Year-end results: December 31 (reported in 2019)", "2019-12-31"))
-        self.assertFalse(bq.variant_period("Year-end results: December 31, 2019", "2019-12-31"))
+        self.assertIsNotNone(bq.variant_rule("Year-end results: December 31 (reported in 2019)", "2019-12-31"))
+        self.assertIsNone(bq.variant_rule("Year-end results: December 31, 2019", "2019-12-31"))
 
     def test_a_numeric_date_equal_to_the_end_is_a_variant(self):
-        self.assertTrue(bq.variant_period("Quarter ended 12/31/19", "2019-12-31"))
+        self.assertIsNotNone(bq.variant_rule("Quarter ended 12/31/19", "2019-12-31"))
 
     def test_the_exact_period_is_not_a_variant(self):
-        self.assertFalse(bq.variant_period("Three Months Ended December 31, 2019", "2019-12-31"))
+        self.assertIsNone(bq.variant_rule("Three Months Ended December 31, 2019", "2019-12-31"))
+
+    def test_variant_rules_i_to_vi_on_the_recorded_headers(self):
+        cases = [
+            ("14 Weeks Ended 13 Weeks Ended February 2,2013 January 28,2012", "2013-02-02", "v"),
+            ("FourteenWeeks EndedFebruary 2,2013 ThirteenWeeks EndedJanuary 28,2012", "2013-02-02", "v"),
+            ("Three Months Ended December 31,2022 January 1,2022", "2022-12-31", "v"),
+            ("4Q 2022 4Q 2021 After-Tax Per Share", "2022-05-31", "i"),
+            ("FOURTH QUARTER 2011 2010 (13 Weeks)", "2012-01-29", "vi"),
+            ("Fourth Quarter of Fiscal Years 2013", "2014-01-03", "iv"),
+            ("Quarter ended 12/31/19", "2019-12-31", "iii"),
+        ]
+        for header, end, rule in cases:
+            with self.subTest(header=header):
+                self.assertEqual(bq.variant_rule(header, end), rule)
+        self.assertIsNone(bq.variant_rule("FOURTH QUARTER 2011 2010 (13 Weeks)", "2012-03-31"))
+
+    def test_the_other_quarter_end_of_the_recorded_headers(self):
+        cases = [
+            ("14 Weeks Ended 13 Weeks Ended February 2,2013 January 28,2012", "2013-02-02", False),
+            ("FourteenWeeks EndedFebruary 2,2013 ThirteenWeeks EndedJanuary 28,2012", "2013-02-02", False),
+            ("Three Months Ended December 31,2022 January 1,2022", "2022-12-31", False),
+            ("4Q 2022 4Q 2021 After-Tax Per Share", "2022-05-31", False),
+            ("4Q 2012 3Q 2012 4Q 2011 12M 2012 12M 2011", "2012-05-31", True),
+            ("Three Months Ended October 3, 2015 September 27, 2014", "2015-06-27", True),
+            ("Three Months Ended April 1, 2017", "2016-12-31", True),
+        ]
+        for header, end, expected in cases:
+            with self.subTest(header=header):
+                self.assertIs(bq.other_quarter_end(header, end), expected)
 
     def test_another_quarter_end_is_detected(self):
         # the TXT 2016-12-31 next-quarter header

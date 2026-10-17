@@ -505,38 +505,88 @@ def _month_pattern(month):
     return rf"(?:{name}|{name[:3]})"
 
 
-def variant_period(header, end):
-    """A period header that shows_period does not read but still names the quarter end (S1 decision §2, rules i to iv)."""
+VARIANT_QUARTER = re.compile(
+    r"\b(?:three\s+months|3\s+months|quarters?|fourth\s+quarter|4th\s+quarter|q4|4q|thirteen\s+weeks|fourteen\s+weeks"
+    r"|13\s+weeks|14\s+weeks)\b",
+    re.I,
+)
+MONTH_MENTION = re.compile(
+    r"\b(january|february|march|april|may|june|july|august|september|october|november|december|sept"
+    r"|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\.?\s*(\d{1,2})\b(?:,?\s*(\d{4})\b)?",
+    re.I,
+)
+MONTH_NUMBER = {name[:3]: number for number, name in enumerate(MONTHS, start=1)}
+
+
+def normalize_header(header):
+    """A space at every lower-to-upper join ('EndedFebruary') and after the comma of '2,2013' (S1-CF C7)."""
+    text = re.sub(r"([a-z])([A-Z])", r"\1 \2", header)
+    return re.sub(r"\b(\d{1,2}),(\d{4})\b", r"\1, \2", text)
+
+
+def variant_rule(header, end):
+    """
+    How a period header names the quarter end in a variant form: "i" to "vi" (S1 decision §2; S1-CF C7), or None when
+    shows_period reads the header as it is or it does not name the quarter end at all.
+    """
     if shows_period(header, end):
-        return False
+        return None
+    text = normalize_header(header)
     when = date.fromisoformat(end)
     year = str(when.year)
-    if QUARTER_WORDING.search(header) and re.search(rf"\b{year}\b", header):
-        return True                                                           # (i)
+    if shows_period(text, end):
+        return "v"
+    if VARIANT_QUARTER.search(text) and re.search(rf"\b{year}\b", text):
+        return "i"
     month = _month_pattern(when.month)
-    if re.search(rf"\b{month}\.?\s+{when.day}\b(?!,?\s*\d{{4}})", header, re.I) and re.search(rf"\b{year}\b", header):
-        return True                                                           # (ii)
-    for match in re.finditer(r"(?<!\d)(\d{1,2})/(\d{1,2})/(\d{4}|\d{2})(?!\d)", header):
+    if re.search(rf"\b{month}\.?\s+{when.day}\b(?!,?\s*\d{{4}})", text, re.I) and re.search(rf"\b{year}\b", text):
+        return "ii"
+    for match in re.finditer(r"(?<!\d)(\d{1,2})/(\d{1,2})/(\d{4}|\d{2})(?!\d)", text):
         if int(match.group(1)) != when.month or int(match.group(2)) != when.day:
             continue
         written = match.group(3)
         if (int(written) == when.year) if len(written) == 4 else (int(written) == when.year % 100):
-            return True                                                       # (iii)
-    if when.month == 1 and when.day <= 7 and re.search(r"\b(?:fourth quarter|q4|quarter)\b", header, re.I) \
-            and re.search(rf"\b{when.year - 1}\b", header):
-        return True                                                           # (iv)
-    return False
+            return "iii"
+    if when.month == 1 and when.day <= 7 and re.search(r"\b(?:fourth quarter|q4|quarter)\b", text, re.I) \
+            and re.search(rf"\b{when.year - 1}\b", text):
+        return "iv"
+    if (when.month == 1 or (when.month == 2 and when.day <= 7)) \
+            and re.search(r"\b(?:fourth\s+quarter|4th\s+quarter|q4|4q)\b", text, re.I) \
+            and re.search(rf"\b{when.year - 1}\b", text) and not re.search(rf"\b{year}\b", text):
+        return "vi"
+    return None
 
 
 def other_quarter_end(header, end):
-    """The header names another quarter end: a month other than the end month, or a first to third quarter."""
+    """
+    The header names another quarter end: a month other than the end month, or a first to third quarter (S1-CF C8).
+    Dates within 7 days of the end, or of the end one year earlier, are not other quarter ends (the 52/53-week
+    calendar and the prior-year comparative), so they are blanked before the month test.
+    """
     when = date.fromisoformat(end)
+    previous = date(when.year - 1, 2, 28) if (when.month, when.day) == (2, 29) else date(when.year - 1, when.month, when.day)
+
+    def near(day):
+        return abs((day - when).days) <= 7 or abs((day - previous).days) <= 7
+
+    def blank(match):
+        month = MONTH_NUMBER[match.group(1)[:3].lower()]
+        years = [int(match.group(3))] if match.group(3) else [when.year, when.year - 1]
+        for year in years:
+            try:
+                if near(date(year, month, int(match.group(2)))):
+                    return " "
+            except ValueError:
+                continue
+        return match.group(0)
+
+    text = MONTH_MENTION.sub(blank, normalize_header(header))
     for month in range(1, 13):
         if month == when.month or (month == 12 and when.month == 1 and when.day <= 7):
             continue
-        if re.search(rf"\b{_month_pattern(month)}\b", header, re.I):
+        if re.search(rf"\b{_month_pattern(month)}\b", text, re.I):
             return True
-    return re.search(r"\b(?:first quarter|second quarter|third quarter|q1|q2|q3)\b", header, re.I) is not None
+    return re.search(r"\b(?:first quarter|second quarter|third quarter|q1|q2|q3|1q|2q|3q)\b", text, re.I) is not None
 
 
 def _table_evidence(table, target, end, named):
@@ -1138,7 +1188,7 @@ def classify_row(row):
         if table.get("periodNamed") or not table.get("acceptedStrictColumns"):
             continue
         header = table.get("headerText") or ""
-        if variant_period(header, end) and not other_quarter_end(header, end):
+        if variant_rule(header, end) is not None and not other_quarter_end(header, end):
             return found("L2", filing, document, table,
                          f"{where(document, table)}: net income matches; header '{header[:120]}' names the quarter "
                          f"ending {end} in a variant form and no other quarter end")
