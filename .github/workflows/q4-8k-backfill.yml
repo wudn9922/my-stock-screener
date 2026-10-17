@@ -9,12 +9,12 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "backtest：檢查解析器；fill：補缺漏的第四季 EPS"
+        description: "diagnose：檢查舊報告的 no-table 列；backtest：檢查解析器；fill：補缺漏的第四季 EPS"
         type: choice
-        options: [backtest, fill]
+        options: [diagnose, backtest, fill]
         default: backtest
       tickers:
-        description: "逗號分隔的代號（空白＝全部美股檔）"
+        description: "逗號分隔的代號（diagnose 固定檢查輸入報告的全部 no-table 列）"
         required: false
         default: ""
       budget:
@@ -46,10 +46,14 @@ jobs:
       - name: Select branch
         run: |
           git fetch -q origin
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-            git checkout -q -B "$BRANCH" "origin/$BRANCH"
+          if [ "$MODE" = fill ]; then
+            if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+              git checkout -q -B "$BRANCH" "origin/$BRANCH"
+            else
+              git checkout -q -B "$BRANCH" origin/main
+            fi
           else
-            git checkout -q -B "$BRANCH" origin/main
+            git checkout -q -B q4-8k-readonly origin/main
           fi
 
       - name: Set up Python
@@ -59,9 +63,15 @@ jobs:
 
       - name: Run extraction
         run: |
-          args=(--mode "$MODE" --budget "$BUDGET" --report "$RUNNER_TEMP/q4-8k-report.json")
-          if [ -n "$TICKERS" ]; then args+=(--tickers "$TICKERS"); fi
-          python -u atlas/scripts/backfill_q4_eps_8k.py "${args[@]}"
+          args=(--mode "$MODE" --budget "$BUDGET")
+          if [ -n "$TICKERS" ] && [ "$MODE" != diagnose ]; then args+=(--tickers "$TICKERS"); fi
+          if [ "$MODE" = diagnose ]; then
+            args+=(--source-report docs/report/q4-8k/input/run-17/q4-8k-report.json)
+            python -B -u atlas/scripts/backfill_q4_eps_8k.py "${args[@]}" > "$RUNNER_TEMP/q4-8k-report.json"
+          else
+            args+=(--report "$RUNNER_TEMP/q4-8k-report.json")
+            python -u atlas/scripts/backfill_q4_eps_8k.py "${args[@]}"
+          fi
 
       - name: Upload report
         if: always()
