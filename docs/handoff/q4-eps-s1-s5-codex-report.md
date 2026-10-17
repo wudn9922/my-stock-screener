@@ -83,3 +83,28 @@
   - `table_eps` (e) can now accept a table that was rejected as ambiguous, when the decimals narrow the matching scales to one. Seen only on synthetic input.
   - Backtest with `--answer-set`: a key whose financials file is missing is skipped without a row. The gate then exits 3 for the missing pairs.
 - Stop: none.
+
+## S2b
+
+- Step: S2b (automated S1 plan §4 and `q4-eps-s1-s5-codex.md` §5 S2 items 5–6): L8 (heading words) and L1 (diluted heading, look-back to the period header). Decision: `docs/handoff/s2b-opus-decision.md`. Review: `docs/handoff/s2b-review.md` (Opus, PASS, no required changes).
+- Date (UTC): 2026-10-17.
+- Merged: PR #121 (`claude/s2b-2`, merge commit e0cb3816) and PR #122 (review document, merge commit e2a520e9). Branch commits: 263d527e (L8), b39e176d (L1), 18b68e78 (merge of the WIP save eb81c963, tree unchanged).
+- Workflow run ids and artifact names: none. No workflow dispatch, no SEC request.
+- Files changed on main: `atlas/scripts/backfill_q4_eps_8k.py`, `tests/test_backfill_q4_eps_8k_s2.py` (new, 31 tests). Nothing else.
+- Changed tests (expectation changed): none. `git diff origin/main -- tests/test_backfill_q4_eps_8k.py` is empty for the S2b change, and `tests/test_q4_eps_diagnose.py` is not touched.
+- S1 matcher unchanged: `_table_evidence` calls `table_eps(..., s2=False)`. Run 20 replay of `classify_row`: 235 rows, 0 mismatches against `s1-classes.json`, on main and on the branch.
+- Fixture results on the S2 path (review §5): URBN-2012-01-31-L8 accepted (EPS 0.27); UNFI-2013-08-03-L8 accepted (0.65); URBN-2016-01-31-L1 accepted (0.61); VNCE-2024-02-03-L1 accepted (−0.37). The four negatives and the documented miss (WLY-2023-04-30) give no result. Out-of-scope fixtures give no result. On main all 15 give no result.
+- Deviations, all accepted by Opus: (a) annual plumbing in the L8 commit (decision §3 change 4); (b) `process_answer_rows` passes `annual`, required on the S3 path; (c) the WIP commit eb81c963 is in history through merge 18b68e78, tree unchanged; (d) S1 evidence uses `s2=False` (decision §3).
+- Scope not done this round: L2 (74 answer rows) and L3 (7 rows). Stop rules in the decision are unchanged. Open points for a later round: L2 is blocked by TRAK zero EPS, TXT-2022 continuing-operations EPS and the URBN-2014 dependency; L3 needs a label policy and the VIAV-2021 stored-data defect (below).
+- Stored data defect, not edited: VIAV-2021-07-03 has stored Q4 net income 3.3M and EPS 0.01; the release shows −1.9M and −0.01. Financials are not changed by S2. Needs a decision from the user before any fill.
+- Stop: none.
+
+## S2 acceptance
+
+- Step: S2 acceptance (automated S1 plan §4; S2a-1, S2a-2, S2b all merged). Bookkeeping only. No code change, no SEC request, no workflow dispatch, no S3 run.
+- Date (UTC): 2026-10-17.
+- Main commit: e2a520e9 (after PR #122).
+- PRs: #111 (S2a-1, answer set), #118 (S2a-2), #119 (S2 review documents), #120 (S2b decision), #121 (S2b implementation), #122 (S2b review document).
+- Full suite on main: `python3 -m unittest discover -s tests -p "test_*.py"`: 1,219 tests, OK. Count history: 1,153 before S2a-2, 1,188 after S2a-2 (+35), 1,219 after S2b (+31).
+- Changed tests across S2 (expectation changed): none. Every existing test in `tests/test_backfill_q4_eps_8k.py` and `tests/test_q4_eps_diagnose.py` passes unchanged.
+- Remaining before S3: an Opus go on this section. S3 has not started; no backtest has been dispatched.
