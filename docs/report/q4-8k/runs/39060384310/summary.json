@@ -1,0 +1,310 @@
+{
+  "mode": "backtest",
+  "periods": 26,
+  "accepted": 9,
+  "reasons": {
+    "no table shows this quarter's net income": 12,
+    "net income divided by shares differs from EPS": 4,
+    "EPS sign differs from net income": 1
+  },
+  "coverage": 0.3462,
+  "median_error": 0.0,
+  "correct_share_of_all_periods": 0.3462,
+  "accepted_on_derived_stored": 0,
+  "independent_check": {
+    "unavailable": 6,
+    "conflict": 1,
+    "confirmed": 2
+  },
+  "independent_samples": [
+    {
+      "key": "ADTN",
+      "end": "2011-12-31",
+      "target": 31163000,
+      "debug": [
+        {
+          "target": 31163000.0,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 3,
+            "period_in_previous_table": 0,
+            "sample": [
+              [
+                "Consolidated Statements of Income (Unaudited) (In thousands, except per share data)",
+                "",
+                "Three Months Ended | Twelve Months Ended"
+              ],
+              [
+                "Consolidated Statements of Comprehensive Income (Unaudited) (In thousands)",
+                "",
+                "Three Months Ended | Twelve Months Ended"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Accounts receivable, net\n        ",
+            "Deferred tax assets, net\n        ",
+            "Property, plant and equipment, net\n        ",
+            "Deferred tax assets, net\n        ",
+            "Income tax payable, net\n        ",
+            "Net realized investment gain\n        "
+          ]
+        }
+      ]
+    },
+    {
+      "key": "ADTN",
+      "end": "2012-12-31",
+      "target": 3961000,
+      "debug": [
+        {
+          "target": 3961000.0,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 3,
+            "period_in_previous_table": 0,
+            "sample": [
+              [
+                "",
+                "",
+                ""
+              ],
+              [
+                "",
+                "",
+                ""
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Accounts receivable, net\n        ",
+            "Deferred tax assets, net\n        ",
+            "Property, plant and equipment, net\n        ",
+            "Deferred tax assets, net\n        ",
+            "Income tax payable, net\n        ",
+            "Net realized investment gain\n        "
+          ]
+        }
+      ]
+    },
+    {
+      "key": "ADTN",
+      "end": "2014-12-31",
+      "target": 9292000,
+      "debug": [
+        {
+          "target": 9292000.0,
+          "period_net_rows": [
+            [
+              "net income",
+              [
+                5718.0,
+                9292.0,
+                18646.0,
+                44620.0
+              ]
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 2,
+            "period_in_previous_table": 1,
+            "sample": [
+              [
+                "",
+                "Three Months EndedDecember 31, | Twelve Months EndedDecember 31,",
+                "2015 | 2014 | 2015 | 2014"
+              ],
+              [
+                "",
+                "Twelve Months EndedDecember 31,",
+                "2015 | 2014"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Accounts receivable, net",
+            "Deferred tax assets, net",
+            "Property, plant and equipment, net",
+            "Deferred tax assets, net",
+            "Income tax payable, net",
+            "Net realized investment gain"
+          ]
+        }
+      ]
+    }
+  ],
+  "independent_unavailable_reasons": {
+    "no table shows this quarter's net income": 5,
+    "no 8-K with Item 2.02 in the next year's window": 1
+  },
+  "independent_precision": 0.6667,
+  "filled": 0,
+  "tickers_done": 0,
+  "stopped": "NetworkError: https://www.sec.gov/Archives/edgar/data/1514991/000151499114000015/0001514991-14-000015-index-headers.html",
+  "requests": 401,
+  "mismatches": [],
+  "samples": {
+    "net income divided by shares differs fro": {
+      "key": "AAT",
+      "end": "2021-12-31",
+      "stored": 0.14,
+      "debug": [
+        {
+          "target": 10478000,
+          "period_net_rows": [
+            [
+              "accumulated dividends in excess of net income",
+              [
+                -217785.0,
+                -176560.0
+              ]
+            ],
+            [
+              "net income",
+              [
+                10478.0,
+                36593.0
+              ]
+            ],
+            [
+              "net income",
+              [
+                10478.0,
+                3788.0,
+                36593.0,
+                35588.0
+              ]
+            ],
+            [
+              "(2) percentage of net operating income (noi) calculated for the three months ended december 31, 2021. reconciliation of noi to net income is included in the glossary of terms.",
+              []
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 1,
+            "period_in_previous_table": 0,
+            "sample": [
+              [
+                "",
+                "(Amounts in thousands, except share and per share data)",
+                ""
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Same-Store Cash Net Operating Income",
+            "Real estate, net",
+            "Accounts receivable, net",
+            "Deferred rent receivables, net",
+            "Other assets, net",
+            "Secured notes payable, net"
+          ]
+        }
+      ]
+    },
+    "EPS sign differs from net income": {
+      "key": "ACNT",
+      "end": "2023-12-31",
+      "stored": 1.07,
+      "debug": [
+        {
+          "target": 11139000,
+          "period_net_rows": [
+            [
+              "net (loss) income",
+              [
+                -26629.0,
+                22066.0
+              ]
+            ],
+            [
+              "adjustments to reconcile net (loss) income to net cash provided by operating activities:",
+              []
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 3,
+            "period_in_previous_table": 1,
+            "sample": [
+              [
+                "",
+                "(in millions, except per share and margin) | Q4 2023 | Q4 2022 | Change",
+                "Net Sales | $41.2 | $54.2 | (23.9)%"
+              ],
+              [
+                "",
+                "(in millions, except per share and margin) | 2023 | 2022 | Change",
+                "Net Sales | $193.2 | $262.0 | (26.3)%"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Net Sales",
+            "Net (Loss) Income",
+            "Net Sales",
+            "Net (Loss) Income",
+            "Property, plant and equipment, net",
+            "Right-of-use assets, operating leases, net"
+          ]
+        }
+      ]
+    },
+    "no table shows this quarter's net income": {
+      "key": "ADTN",
+      "end": "2015-12-31",
+      "stored": 0.12,
+      "debug": [
+        {
+          "target": 5718000,
+          "period_net_rows": [
+            [
+              "net income",
+              [
+                5718.0,
+                9292.0,
+                18646.0,
+                44620.0
+              ]
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 2,
+            "period_in_previous_table": 1,
+            "sample": [
+              [
+                "",
+                "Three Months EndedDecember 31, | Twelve Months EndedDecember 31,",
+                "2015 | 2014 | 2015 | 2014"
+              ],
+              [
+                "",
+                "Twelve Months EndedDecember 31,",
+                "2015 | 2014"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Accounts receivable, net",
+            "Deferred tax assets, net",
+            "Property, plant and equipment, net",
+            "Deferred tax assets, net",
+            "Income tax payable, net",
+            "Net realized investment gain"
+          ]
+        }
+      ]
+    }
+  }
+}

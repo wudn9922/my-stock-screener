@@ -1,0 +1,25 @@
+{
+  "answerSet": "docs/report/q4-8k/answer-set.json",
+  "budget": "6000",
+  "extractOutcome": "success",
+  "files": [
+    {
+      "bytes": 8318,
+      "path": "summary.json",
+      "sha256": "2ee9dcbe77a97d2bce05b7575a0548071a77b2e957c2584649cdab94a3bf2939"
+    },
+    {
+      "bytes": 28314,
+      "path": "q4-8k-report.json",
+      "sha256": "3f048b65c627cfdc60cd55ee5d602edf1c918f929f66ab44d46c160974f25ed7"
+    }
+  ],
+  "mainSha": "d3360a27154106ebb7a801ca9641b436b8d93cc5",
+  "mode": "backtest",
+  "omitted": [],
+  "runId": 39060384310,
+  "runNumber": 24,
+  "shard": "3/8",
+  "tickers": "",
+  "totalBytes": 36632
+}
