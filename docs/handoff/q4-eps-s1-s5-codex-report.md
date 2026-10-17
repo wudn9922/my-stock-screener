@@ -91,11 +91,11 @@
 - Merged: PR #121 (`claude/s2b-2`, merge commit e0cb3816) and PR #122 (review document, merge commit e2a520e9). Branch commits: 263d527e (L8), b39e176d (L1), 18b68e78 (merge of the WIP save eb81c963, tree unchanged).
 - Workflow run ids and artifact names: none. No workflow dispatch, no SEC request.
 - Files changed on main: `atlas/scripts/backfill_q4_eps_8k.py`, `tests/test_backfill_q4_eps_8k_s2.py` (new, 31 tests). Nothing else.
-- Changed tests (expectation changed): none. `git diff origin/main -- tests/test_backfill_q4_eps_8k.py` is empty for the S2b change, and `tests/test_q4_eps_diagnose.py` is not touched.
+- Changed tests (expectation changed): none. `git diff 1294b446 e2a520e9 -- tests/test_backfill_q4_eps_8k.py tests/test_q4_eps_diagnose.py` is empty.
 - S1 matcher unchanged: `_table_evidence` calls `table_eps(..., s2=False)`. Run 20 replay of `classify_row`: 235 rows, 0 mismatches against `s1-classes.json`, on main and on the branch.
-- Fixture results on the S2 path (review §5): URBN-2012-01-31-L8 accepted (EPS 0.27); UNFI-2013-08-03-L8 accepted (0.65); URBN-2016-01-31-L1 accepted (0.61); VNCE-2024-02-03-L1 accepted (−0.37). The four negatives and the documented miss (WLY-2023-04-30) give no result. Out-of-scope fixtures give no result. On main all 15 give no result.
+- Fixture results on the S2 path (review §5): URBN-2012-01-31-L8 accepted (EPS 0.27); UNFI-2013-08-03-L8 accepted (0.65); URBN-2016-01-31-L1 accepted (0.61); VNCE-2024-02-03-L1 accepted (−0.37). The four negatives (TXT-2020-01-04, TXT-2016-12-31, VNCE-2026-01-31, VIAV-2021-07-03), TXT-2012-12-29 (not a positive) and the documented miss WLY-2023-04-30 give no result, as do the five out-of-scope fixtures (URBN-2014, TRAK-2019, TXT-2022, UI-2014, UNFI-2019). On main all 15 give no result.
 - Deviations, all accepted by Opus: (a) annual plumbing in the L8 commit (decision §3 change 4); (b) `process_answer_rows` passes `annual`, required on the S3 path; (c) the WIP commit eb81c963 is in history through merge 18b68e78, tree unchanged; (d) S1 evidence uses `s2=False` (decision §3).
-- Scope not done this round: L2 (74 answer rows) and L3 (7 rows). Stop rules in the decision are unchanged. Open points for a later round: L2 is blocked by TRAK zero EPS, TXT-2022 continuing-operations EPS and the URBN-2014 dependency; L3 needs a label policy and the VIAV-2021 stored-data defect (below).
+- Scope not done this round: L2 (74 answer rows) and L3 (7 rows). Stop rules in the decision are unchanged. Open points for a later round: L2 is blocked by TRAK zero EPS, TXT-2022 continuing-operations EPS and the URBN-2014 dependency; L3 has one usable positive (UI-2014) against the two required; UNFI-2019 matches only the NCI-inclusive label, and VIAV-2021 is not an L3 row but a stored-data defect, now a negative (decision item 6).
 - Stored data defect, not edited: VIAV-2021-07-03 has stored Q4 net income 3.3M and EPS 0.01; the release shows −1.9M and −0.01. Financials are not changed by S2. Needs a decision from the user before any fill.
 - Stop: none.
 
@@ -108,3 +108,8 @@
 - Full suite on main: `python3 -m unittest discover -s tests -p "test_*.py"`: 1,219 tests, OK. Count history: 1,153 before S2a-2, 1,188 after S2a-2 (+35), 1,219 after S2b (+31).
 - Changed tests across S2 (expectation changed): none. Every existing test in `tests/test_backfill_q4_eps_8k.py` and `tests/test_q4_eps_diagnose.py` passes unchanged.
 - Remaining before S3: an Opus go on this section. S3 has not started; no backtest has been dispatched.
+- Workflow run ids and artifact names: none.
+- Input counts: answer set unchanged, 2,649 rows, 563 keys, 2,387 basic.
+- Output files: this section only.
+- Deviations: none.
+- Stop: none.
