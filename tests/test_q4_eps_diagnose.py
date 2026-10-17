@@ -427,7 +427,8 @@ FIVE_TABLES = doc(tbl(), tbl(tr("Revenue", "5,000")), tbl(), tbl(tr(HEADER, "x")
 class MultiTableFixtureTests(unittest.TestCase):
     def test_five_tables_with_an_empty_third_export_tables_one_three_four_with_the_marker_before_four(self):
         source = bq.tables_of(FIVE_TABLES)
-        fixture = bq.fixture_html(FIVE_TABLES, "https://www.sec.gov/example", [1, 3, 4], 4)
+        fixture, error = bq.export_fixture(FIVE_TABLES, "https://www.sec.gov/example", [1, 3, 4], 4)
+        self.assertIsNone(error)
         lines = fixture.split("\n")
         self.assertEqual(lines[0], "<!-- Source URL: https://www.sec.gov/example -->")
         marker = lines.index(bq.TARGET_MARKER)
@@ -440,8 +441,44 @@ class MultiTableFixtureTests(unittest.TestCase):
         row = evidence_row(FIVE_TABLES)
         result = bq.classify_row(row)
         self.assertEqual((result["class"], result["tableIndex"], result["tableIndices"]), ("L1", 4, [1, 3, 4]))
-        fixture = bq.fixture_html(FIVE_TABLES, "u", result["tableIndices"], result["tableIndex"])
+        fixture, error = bq.export_fixture(FIVE_TABLES, "u", result["tableIndices"], result["tableIndex"])
+        self.assertIsNone(error)
         self.assertEqual(bq.tables_of(fixture), [bq.tables_of(FIVE_TABLES)[i] for i in (1, 3, 4)])
+
+
+class TrimAndRoundTripTests(unittest.TestCase):
+    def test_attributes_are_gone_except_colspan_and_rowspan(self):
+        raw = ('<table class="a"><tr><td style="x" colspan="2" data-x=\'1\'>A &amp; B<!-- note --></td>'
+               '<td rowspan=3>C</td></tr></table>')
+        self.assertEqual(bq.trim_table_html(raw),
+                         '<table><tr><td colspan="2">A &amp; B</td><td rowspan="3">C</td></tr></table>')
+
+    def test_every_synthetic_fixture_table_round_trips(self):
+        checked = 0
+        for name in sorted(os.listdir(FIXTURES)):
+            if not name.endswith(".html"):
+                continue
+            with open(os.path.join(FIXTURES, name), encoding="utf-8") as source:
+                text = source.read()
+            for index in range(len(bq.tables_of(text))):
+                fixture, error = bq.export_fixture(text, "https://www.sec.gov/x", [index], index)
+                self.assertIsNone(error, (name, index))
+                checked += 1
+        self.assertGreater(checked, 0)
+
+    def test_a_nested_table_round_trips(self):
+        html = ("<table><tr><td>Outer</td></tr>"
+                "<table><tr><td>Inner 1,234</td></tr></table></table>")
+        self.assertEqual(len(bq.html_tables_of(html)), len(bq.tables_of(html)))
+        fixture, error = bq.export_fixture(html, "u", [0], 0)
+        self.assertIsNone(error)
+        self.assertEqual(bq.tables_of(fixture), bq.tables_of(html))
+
+    def test_a_table_of_70_kb_is_a_fixture_error(self):
+        html = doc(tbl(tr("Net income", "x" * 70_000)))
+        fixture, error = bq.export_fixture(html, "u", [0], 0)
+        self.assertIsNone(fixture)
+        self.assertEqual(error, "too large")
 
 
 if __name__ == "__main__":

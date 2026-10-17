@@ -30,6 +30,7 @@ import sys
 import time
 from collections import Counter
 from datetime import date, timedelta
+from html import escape as html_escape
 from html.parser import HTMLParser
 from urllib import error, request
 
@@ -823,20 +824,73 @@ def diagnose_filing(sec, cik, filing, end, target, fixture_specs=None, texts=Non
 
 
 TARGET_MARKER = "<!-- S1 target table -->"
+FIXTURE_FILE_CAP = 65_536          # bytes, UTF-8, whole fixture file
+FIXTURE_TOTAL_CAP = 1_200_000      # bytes of exported fixture HTML in one run
+KEPT_ATTRIBUTES = ("colspan", "rowspan")
+VOID_TAGS = frozenset(("area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source",
+                       "track", "wbr"))
 
 
-def fixture_html(text, url, table_indices, target_index):
+class _TrimParser(HTMLParser):
+    """Rebuilds markup: no attributes except colspan and rowspan; comments and declarations are dropped."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.out = []
+
+    def handle_starttag(self, tag, attrs):
+        kept = "".join(f' {name}="{html_escape(value, quote=True)}"' for name, value in attrs
+                       if name in KEPT_ATTRIBUTES and value is not None)
+        self.out.append(f"<{tag}{kept}>")
+
+    def handle_endtag(self, tag):
+        if tag not in VOID_TAGS:
+            self.out.append(f"</{tag}>")
+
+    def handle_data(self, data):
+        self.out.append(data)
+
+    def handle_entityref(self, name):
+        self.out.append(f"&{name};")
+
+    def handle_charref(self, name):
+        self.out.append(f"&#{name};")
+
+
+def trim_table_html(raw):
+    """One source table fragment with its tags stripped of attributes (colspan and rowspan kept); text unchanged."""
+    parser = _TrimParser()
+    parser.feed(raw)
+    parser.close()
+    return "".join(parser.out).strip()
+
+
+def export_fixture(text, url, table_indices, target_index):
     """
-    Fixture for one row: the source URL on the first line, then the tables of table_indices in ascending order,
-    with the target table preceded by TARGET_MARKER on its own line (diagnose only; trimmed in export_fixture).
+    Fixture for one row → (html, None), or (None, reason) for a fixtureError. The fixture starts with the source URL,
+    then the tables of table_indices in ascending order, each trimmed, with TARGET_MARKER on the line before the
+    target table. It is refused when it is over FIXTURE_FILE_CAP or its round trip fails: the tables it parses to
+    must equal the source tables at table_indices, cell for cell, and the source must have as many raw table
+    fragments as parsed tables.
     """
+    source = tables_of(text)
     raw = html_tables_of(text)
+    if len(raw) != len(source):
+        return None, "round trip: raw and parsed table counts differ"
+    indices = sorted(table_indices)
+    if not indices or indices[0] < 0 or indices[-1] >= len(source) or target_index not in indices:
+        return None, "table index unavailable"
     lines = [f"<!-- Source URL: {url} -->"]
-    for index in sorted(table_indices):
+    for index in indices:
         if index == target_index:
             lines.append(TARGET_MARKER)
-        lines.append(raw[index])
-    return "\n".join(lines) + "\n"
+        lines.append(trim_table_html(raw[index]))
+    fixture = "\n".join(lines) + "\n"
+    if len(fixture.encode("utf-8")) > FIXTURE_FILE_CAP:
+        return None, "too large"
+    if tables_of(fixture) != [source[index] for index in indices]:
+        return None, "round trip failed"
+    return fixture, None
 
 
 def layout_class_hint(diagnosis):
