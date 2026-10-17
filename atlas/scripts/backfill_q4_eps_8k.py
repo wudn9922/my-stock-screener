@@ -1121,22 +1121,196 @@ def source_target(doc, end):
     return None
 
 
+POSITIVE_CLASSES = ("L1", "L2", "L3", "L8")
+FALLBACK_KINDS = ("next-quarter-table", "period-named-non-eps-ni")
+NEGATIVE_TEXT = {
+    "L1-year-header": "a twelve-month or year header is not the quarter, and no quarter column is read",
+    "L8-non-gaap-diluted-row": "a non-GAAP or continuing diluted row is not the EPS row",
+    "next-quarter-table": "a next-quarter header is not the target quarter (slack and L2)",
+    "period-named-non-eps-ni": "net income in a period-named table with no EPS row is not an EPS row",
+}
+
+
+def load_selection(path):
+    """The fixture manifest (S1 plan §M5). Without a manifest nothing is selected."""
+    if not path:
+        return {"autoPositives": {}, "explicitNegatives": [], "autoNegatives": []}
+    with open(path, encoding="utf-8") as source:
+        data = json.load(source)
+    return {"autoPositives": data.get("autoPositives") or {},
+            "explicitNegatives": data.get("explicitNegatives") or [],
+            "autoNegatives": data.get("autoNegatives") or []}
+
+
+def _auto_matches(record):
+    """Tables of one diagnosed row that meet an auto-negative or fallback rule: (kind, accession, document, url, indices, target)."""
+    found = []
+    end = record.get("end")
+    for filing in record.get("candidateFilings") or []:
+        for document in filing.get("documents") or []:
+            for table in document.get("tables") or []:
+                accepted = table.get("acceptedStrictColumns") or []
+                eps = table.get("tableEps") or {}
+                nearest = (table.get("nearestPrecedingNonempty") or [])[:3]
+                target = table["table"]
+                place = (filing.get("accession"), document.get("name"), document.get("url"))
+                period = next((prior for prior in nearest if prior.get("periodNamed")), None)
+                if not table.get("periodNamed") and accepted and period is not None \
+                        and period.get("yearWording") and not period.get("quarterWording"):
+                    found.append(("L1-year-header", *place,
+                                  sorted([prior["table"] for prior in nearest] + [target]), target))
+                if (table.get("periodNamed") and len(accepted) == 1 and eps and eps.get("epsRowFound") is False
+                        and table.get("dilutedAvoidLabels")):
+                    found.append(("L8-non-gaap-diluted-row", *place, [target], target))
+                if accepted and other_quarter_end(table.get("headerText") or "", end):
+                    found.append(("next-quarter-table", *place, [target], target))
+                if table.get("periodNamed") and not table.get("epsTable") and accepted:
+                    found.append(("period-named-non-eps-ni", *place, [target], target))
+    return found
+
+
+def _entry(record, kind, role, cls, accession, document, url, indices, target, texts,
+           negative_for=None, must_reject=None, auto_kind=None):
+    """One fixture candidate of a row, exported from the document text kept for that row."""
+    held = texts.get((accession, document))
+    entry = {"kind": kind, "autoKind": auto_kind, "role": role, "key": record["key"], "end": record["end"],
+             "class": cls, "negativeFor": negative_for, "mustReject": must_reject, "accession": accession,
+             "document": document, "url": held[0] if held else url, "tableIndices": sorted(indices),
+             "targetTableIndex": target, "storedEps": record.get("storedEps"), "html": None, "fixtureError": None}
+    if held is None:
+        entry["fixtureError"] = "document text is not among this row's candidate filings"
+    else:
+        entry["html"], entry["fixtureError"] = export_fixture(held[1], held[0], indices, target)
+    return entry
+
+
+def _row_candidates(record, texts, selection):
+    """Every fixture candidate of one diagnosed row: its positive, its explicit negatives and its auto-negative tables."""
+    key, end = record["key"], record["end"]
+    cls = (record.get("classification") or {}).get("class")
+    found = []
+    classification = record.get("classification") or {}
+    if cls in POSITIVE_CLASSES and classification.get("accession") and classification.get("document"):
+        found.append(_entry(record, "positive", "positive", cls, classification["accession"],
+                            classification["document"], classification.get("url"), classification["tableIndices"],
+                            classification["tableIndex"], texts))
+    for spec in selection["explicitNegatives"]:
+        if str(spec.get("key", "")).upper() == key and spec.get("end") == end:
+            indices = sorted(spec["tableIndices"])
+            found.append(_entry(record, "explicit", "negative", cls, spec["accession"], spec["document"], None,
+                                indices, indices[-1], texts, negative_for=spec["negativeFor"],
+                                must_reject=spec.get("mustReject")))
+    for kind, accession, document, url, indices, target in _auto_matches(record):
+        found.append(_entry(record, "auto", "negative", cls, accession, document, url, indices, target, texts,
+                            negative_for=kind, must_reject=NEGATIVE_TEXT[kind], auto_kind=kind))
+    return found
+
+
+def _error_entry(key, end, kind, role, negative_for, accession, document, error):
+    return {"kind": kind, "autoKind": negative_for, "role": role, "key": key, "end": end, "class": None,
+            "negativeFor": negative_for, "mustReject": None, "accession": accession, "document": document,
+            "url": None, "tableIndices": [], "targetTableIndex": None, "storedEps": None, "html": None,
+            "fixtureError": error}
+
+
+def select_fixtures(pool, selection):
+    """
+    Chooses the fixtures to write (S1 plan §M5) → (fixtures, fixtureErrors). Explicit negatives are written as listed.
+    Positives: per class in L1, L2, L3, L8, the candidates sorted by (key, end), one per ticker; first those whose
+    ticker is already selected (seeded with the explicit negatives' tickers), then the rest; a candidate with a
+    fixture error is skipped. Auto-negatives: the first row in (key, end) order for each kind in autoNegatives, or
+    the next unused fallback kind. The total is at most FIXTURE_TOTAL_CAP.
+    """
+    fixtures, total = [], [0]
+    selected = {spec["key"] for spec in selection["explicitNegatives"]}
+
+    def accept(entry):
+        if entry["html"] is None or entry["fixtureError"]:
+            return False
+        size = len(entry["html"].encode("utf-8"))
+        if total[0] + size > FIXTURE_TOTAL_CAP:
+            entry["fixtureError"] = "exported fixture HTML would exceed 1.2 MB in total"
+            return False
+        total[0] += size
+        fixtures.append(entry)
+        return True
+
+    def in_order(entries):
+        return sorted(entries, key=lambda entry: (entry["key"], entry["end"]))
+
+    for spec in selection["explicitNegatives"]:
+        matches = [entry for entry in pool if entry["kind"] == "explicit" and entry["key"] == str(spec["key"]).upper()
+                   and entry["end"] == spec["end"] and entry["accession"] == spec["accession"]
+                   and entry["document"] == spec["document"]]
+        if not matches:
+            pool.append(_error_entry(spec["key"], spec["end"], "explicit", "negative", spec.get("negativeFor"),
+                                     spec["accession"], spec["document"], "explicit negative was not read in this run"))
+            continue
+        accept(matches[0])
+    for cls in POSITIVE_CLASSES:
+        wanted = int(selection["autoPositives"].get(cls) or 0)
+        candidates = in_order(entry for entry in pool if entry["kind"] == "positive" and entry["class"] == cls)
+        picked, picked_keys = 0, set()
+        for pass_number in (1, 2):
+            for entry in candidates:
+                if picked >= wanted:
+                    break
+                if entry["key"] in picked_keys or entry["fixtureError"] or entry["html"] is None:
+                    continue
+                if (entry["key"] in selected) != (pass_number == 1):
+                    continue
+                if accept(entry):
+                    picked += 1
+                    picked_keys.add(entry["key"])
+                    selected.add(entry["key"])
+    used = set()
+    for kind in selection["autoNegatives"]:
+        candidates = in_order(entry for entry in pool if entry["kind"] == "auto" and entry["autoKind"] == kind)
+        if any(accept(entry) for entry in candidates):
+            continue
+        for fallback in FALLBACK_KINDS:
+            if fallback in used:
+                continue
+            candidates = in_order(entry for entry in pool if entry["kind"] == "auto" and entry["autoKind"] == fallback
+                                  and not (fallback == "next-quarter-table" and entry["key"] == "TXT"))
+            chosen = next((entry for entry in candidates if accept(entry)), None)
+            if chosen is not None:
+                chosen["negativeFor"] = fallback
+                chosen["mustReject"] = f"{NEGATIVE_TEXT[fallback]}; used because {kind} was not found"
+                used.add(fallback)
+                break
+        else:
+            pool.append(_error_entry("", "", "auto", "negative", kind, None, None,
+                                     "auto-negative not found and no fallback kind left"))
+    records = []
+    for entry in fixtures:
+        name = (f"{entry['key']}-{entry['end']}-{entry['class']}.html" if entry["role"] == "positive"
+                else f"{entry['key']}-{entry['end']}-{entry['negativeFor']}-negative.html")
+        records.append({"file": name, "key": entry["key"], "end": entry["end"], "class": entry["class"],
+                        "role": entry["role"], "negativeFor": entry["negativeFor"],
+                        "mustReject": entry["mustReject"], "accession": entry["accession"],
+                        "document": entry["document"], "url": entry["url"],
+                        "tableIndices": entry["tableIndices"], "targetTableIndex": entry["targetTableIndex"],
+                        "bytes": None, "sha256": None, "roundTrip": True, "storedEps": entry["storedEps"],
+                        "epsDilutedRead": None, "html": entry["html"]})
+    errors = [{"key": entry["key"], "end": entry["end"], "class": entry["class"], "role": entry["role"],
+               "negativeFor": entry["negativeFor"], "accession": entry["accession"], "document": entry["document"],
+               "error": entry["fixtureError"]}
+              for entry in pool if entry.get("fixtureError")]
+    return records, errors
+
+
 def run_diagnose(args, sec):
     """Diagnose the no-table rows from a prior report; never writes financials or state."""
     with open(args.source_report, encoding="utf-8") as source:
         previous = json.load(source)
     fixture_selection_path = getattr(args, "fixture_selection", "")
-    fixture_specs_by_row = {}
-    if fixture_selection_path:
-        with open(fixture_selection_path, encoding="utf-8") as source:
-            fixture_selection = json.load(source)
-        for spec in fixture_selection.get("cases", []):
-            fixture_specs_by_row.setdefault((str(spec.get("key", "")).upper(), spec.get("end")), []).append(spec)
+    selection = load_selection(fixture_selection_path)
     all_source_rows = [row for row in previous.get("rows", [])
                        if row.get("reason") == "no table shows this quarter's net income"]
     source_rows = all_source_rows
     cik_of = seed.parse_ticker_map(sec.get_json(TICKERS_URL) or {})
-    filings_by_key, doc_by_key, rows = {}, {}, []
+    filings_by_key, doc_by_key, rows, pool = {}, {}, [], []
     stop = None
     for item in source_rows:
         key, end = str(item.get("key", "")).upper(), item.get("end")
@@ -1162,28 +1336,22 @@ def run_diagnose(args, sec):
         try:
             if key not in filings_by_key:
                 filings_by_key[key] = filing_rows(sec, cik) if cik is not None else []
-            diagnosis, _ = diagnose_quarter(sec, cik, filings_by_key[key], key, end, target,
-                                            fixture_specs_by_row.get((key, end), []))
+            texts = {}                      # document texts of this row only; dropped once its candidates are built
+            diagnosis, _ = diagnose_quarter(sec, cik, filings_by_key[key], key, end, target, texts=texts)
             record.update(diagnosis)
             rows.append(_classified_row(record))
+            pool.extend(_row_candidates(record, texts, selection))
         except (OutOfBudget, Forbidden, NetworkError) as exc:
             stop = f"{type(exc).__name__}: {exc}"
             break
     hints = Counter(row.get("classHint", "L9") for row in rows)
-    fixtures, fixture_errors = [], []
-    for row in rows:
-        for filing in row.get("candidateFilings", []):
-            for document in filing.get("documents", []):
-                fixtures.extend(document.pop("fixtureHtml", []))
-                fixture_errors.extend({"key": row.get("key"), "end": row.get("end"),
-                                       "accession": filing.get("accession"),
-                                       "document": document.get("name"), **error}
-                                      for error in document.pop("fixtureErrors", []))
+    fixtures, fixture_errors = select_fixtures(pool, selection)
     return {"mode": "diagnose", "sourceReport": os.path.relpath(args.source_report, REPO),
             "sourceRows": len(all_source_rows), "selectedSourceRows": len(source_rows),
             "diagnosed": len(rows), "classHintCounts": dict(sorted(hints.items())),
             "fixtureSelection": os.path.relpath(fixture_selection_path, REPO) if fixture_selection_path else None,
             "fixtureCount": len(fixtures), "fixtureErrors": fixture_errors, "fixtures": fixtures,
+            "devTickers": sorted({fixture["key"] for fixture in fixtures}),
             "stopped": stop, "requests": sec.requests, "rows": rows}
 
 

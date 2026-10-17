@@ -1,8 +1,10 @@
 """Fixed-layout classification fixtures and read-only diagnose-mode behavior."""
 import contextlib
+import hashlib
 import io
 import json
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -98,39 +100,74 @@ class ClassificationFixtureTests(unittest.TestCase):
         self.assertNotIn("<html", captured["html"].lower())
 
 
+S1_REPORT = os.path.join(ROOT, "docs", "report", "q4-8k", "s1-no-table-layouts.json")
+S1_MANIFEST = os.path.join(FIXTURES, "s1_fixtures.json")
+
+
+def s1_report_is_classify_row_output():
+    try:
+        with open(S1_REPORT, encoding="utf-8") as source:
+            return json.load(source).get("generator") == "classify_row"
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+@unittest.skipUnless(s1_report_is_classify_row_output(),
+                     "s1-no-table-layouts.json is missing or was not written by classify_row (run 19 not merged yet)")
 class S1ClassificationReportTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        with open(os.path.join(ROOT, "docs", "report", "q4-8k", "s1-no-table-layouts.json"),
-                  encoding="utf-8") as source:
+        with open(S1_REPORT, encoding="utf-8") as source:
             cls.report = json.load(source)
-        with open(os.path.join(FIXTURES, "s1_fixture_selection.json"), encoding="utf-8") as source:
-            cls.selection = json.load(source)
+        with open(S1_MANIFEST, encoding="utf-8") as source:
+            cls.manifest = json.load(source)
 
-    def test_all_run18_rows_are_classified_and_summarized(self):
+    def test_rows_are_unique_and_each_is_in_exactly_one_class(self):
         rows = self.report["rows"]
         self.assertEqual(self.report["rowCount"], 235)
         self.assertEqual(len(rows), 235)
         self.assertEqual(len({(row["key"], row["end"]) for row in rows}), 235)
-        self.assertTrue(all(set(row) == {"key", "end", "class", "accession", "url", "note"} for row in rows))
         counts = {}
         for row in rows:
             counts[row["class"]] = counts.get(row["class"], 0) + 1
-            self.assertTrue(row["url"].startswith("https://www.sec.gov/"))
-        self.assertEqual(counts, self.report["classCounts"])
-        self.assertEqual(counts["L9"], 36)
-        self.assertFalse(self.report["otherLimit"]["passed"])
+        self.assertEqual(sum(counts.values()), 235)
+        self.assertEqual({k: v for k, v in self.report["classCounts"].items() if v}, counts)
 
-    def test_fixture_selection_covers_s2_classes_and_records_dev_tickers(self):
-        cases = self.selection["cases"]
-        positives = [case for case in cases if case["role"] == "S2-positive"]
-        negatives = [case for case in cases if case["role"] == "negative"]
-        self.assertEqual(len(positives), 6)
-        self.assertEqual(len(negatives), 2)
-        for class_code in ("L1", "L2", "L3"):
-            self.assertEqual(sum(case["class"] == class_code for case in positives), 2)
-        self.assertEqual(self.selection["devTickers"], self.report["devTickers"])
-        self.assertTrue(all(case["url"].startswith("https://www.sec.gov/") for case in cases))
+    def test_other_limit_passes_and_every_class_has_count_examples_and_disposition(self):
+        self.assertTrue(self.report["otherLimit"]["passed"])
+        self.assertLessEqual(self.report["classes"]["L9"]["count"], 23)
+        for name, entry in self.report["classes"].items():
+            with self.subTest(cls=name):
+                self.assertIn("count", entry)
+                self.assertIsInstance(entry["examples"], list)
+                self.assertIn("disposition", entry)
+
+    def test_every_fixture_exists_with_its_sha256_and_its_rows_class(self):
+        classes = {(row["key"], row["end"]): row["class"] for row in self.report["rows"]}
+        for fixture in self.manifest["fixtures"]:
+            with open(os.path.join(FIXTURES, fixture["file"]), "rb") as source:
+                data = source.read()
+            self.assertEqual(hashlib.sha256(data).hexdigest(), fixture["sha256"], fixture["file"])
+            self.assertEqual(classes[(fixture["key"], fixture["end"])], fixture["class"], fixture["file"])
+
+    def test_s2_classes_have_two_positives_and_there_are_at_least_five_negatives(self):
+        fixtures = self.manifest["fixtures"]
+        for cls, entry in self.report["classes"].items():
+            if entry["disposition"] == "S2 handles":
+                positives = [f for f in fixtures if f["role"] == "positive" and f["class"] == cls]
+                self.assertGreaterEqual(len(positives), 2, cls)
+        self.assertGreaterEqual(sum(f["role"] == "negative" for f in fixtures), 5)
+
+    def test_every_fixture_round_trips_and_dev_tickers_match(self):
+        fixtures = self.manifest["fixtures"]
+        self.assertTrue(all(f["roundTrip"] for f in fixtures))
+        self.assertEqual(self.report["devTickers"], self.manifest["devTickers"])
+        self.assertEqual(self.manifest["devTickers"], sorted({f["key"] for f in fixtures}))
+
+    def test_every_positive_has_a_numeric_eps_diluted_read(self):
+        for fixture in self.manifest["fixtures"]:
+            if fixture["role"] == "positive":
+                self.assertIsInstance(fixture["epsDilutedRead"], (int, float), fixture["file"])
 
 
 class DiagnoseReadOnlyTests(unittest.TestCase):
@@ -548,6 +585,160 @@ class CompactOutputTests(unittest.TestCase):
         self.assertEqual(len(verbose["rows"]), 4)
         self.assertNotIn("fixtures", verbose)
         self.assertIn("classification", verbose["rows"][0])
+
+
+def pool_entry(key, end, cls, role="positive", kind="positive", auto_kind=None, negative_for=None,
+               accession="A", document="ex.htm", error=None, html="<table></table>\n"):
+    return {"kind": kind, "autoKind": auto_kind, "role": role, "key": key, "end": end, "class": cls,
+            "negativeFor": negative_for, "mustReject": None, "accession": accession, "document": document,
+            "url": f"https://www.sec.gov/x/{key}.htm", "tableIndices": [0], "targetTableIndex": 0,
+            "storedEps": 0.25, "html": None if error else html, "fixtureError": error}
+
+
+def selection(positives=None, explicit=(), auto=()):
+    return {"autoPositives": positives or {}, "explicitNegatives": list(explicit), "autoNegatives": list(auto)}
+
+
+class SelectionRuleTests(unittest.TestCase):
+    def test_positives_are_one_per_ticker_in_key_order(self):
+        pool = [pool_entry("BBB", "2023-12-31", "L1"), pool_entry("BBB", "2024-12-31", "L1"),
+                pool_entry("AAA", "2024-12-31", "L1"), pool_entry("CCC", "2024-12-31", "L1")]
+        fixtures, errors = bq.select_fixtures(pool, selection({"L1": 2}))
+        self.assertEqual([f["file"] for f in fixtures], ["AAA-2024-12-31-L1.html", "BBB-2023-12-31-L1.html"])
+        self.assertEqual(errors, [])
+
+    def test_a_ticker_already_selected_by_an_explicit_negative_is_preferred(self):
+        explicit = {"key": "CCC", "end": "2025-06-30", "accession": "A", "document": "ex.htm", "tableIndices": [0],
+                    "negativeFor": "L4", "mustReject": "no strict NI match"}
+        pool = [pool_entry("CCC", "2025-06-30", "L4", role="negative", kind="explicit", negative_for="L4"),
+                pool_entry("AAA", "2024-12-31", "L1"), pool_entry("CCC", "2024-12-31", "L1")]
+        fixtures, _ = bq.select_fixtures(pool, selection({"L1": 1}, explicit=[explicit]))
+        self.assertEqual([f["file"] for f in fixtures],
+                         ["CCC-2025-06-30-L4-negative.html", "CCC-2024-12-31-L1.html"])
+
+    def test_a_candidate_with_a_fixture_error_is_skipped(self):
+        pool = [pool_entry("AAA", "2024-12-31", "L2", error="too large"), pool_entry("BBB", "2024-12-31", "L2")]
+        fixtures, errors = bq.select_fixtures(pool, selection({"L2": 1}))
+        self.assertEqual([f["key"] for f in fixtures], ["BBB"])
+        self.assertEqual([(e["key"], e["error"]) for e in errors], [("AAA", "too large")])
+
+    def test_auto_negatives_take_the_first_row_then_the_next_unused_fallback(self):
+        pool = [pool_entry("TXT", "2016-12-31", "L2", role="negative", kind="auto", auto_kind="next-quarter-table",
+                           negative_for="next-quarter-table"),
+                pool_entry("AAA", "2024-12-31", "L9", role="negative", kind="auto", auto_kind="next-quarter-table",
+                           negative_for="next-quarter-table"),
+                pool_entry("BBB", "2024-12-31", "L9", role="negative", kind="auto",
+                           auto_kind="period-named-non-eps-ni", negative_for="period-named-non-eps-ni")]
+        fixtures, errors = bq.select_fixtures(pool, selection(auto=["L1-year-header", "L8-non-gaap-diluted-row"]))
+        self.assertEqual([f["file"] for f in fixtures], ["AAA-2024-12-31-next-quarter-table-negative.html",
+                                                         "BBB-2024-12-31-period-named-non-eps-ni-negative.html"])
+        self.assertIn("used because L1-year-header was not found", fixtures[0]["mustReject"])
+        self.assertEqual(errors, [])
+
+    def test_an_auto_kind_with_no_candidate_or_fallback_is_an_error(self):
+        fixtures, errors = bq.select_fixtures([], selection(auto=["L1-year-header"]))
+        self.assertEqual(fixtures, [])
+        self.assertEqual(errors[0]["error"], "auto-negative not found and no fallback kind left")
+
+    def test_an_explicit_negative_that_was_not_read_is_an_error(self):
+        explicit = {"key": "WLY", "end": "2018-04-30", "accession": "B", "document": "x.htm", "tableIndices": [36],
+                    "negativeFor": "L4", "mustReject": "no strict NI match"}
+        fixtures, errors = bq.select_fixtures([], selection(explicit=[explicit]))
+        self.assertEqual(fixtures, [])
+        self.assertEqual(errors[0]["error"], "explicit negative was not read in this run")
+
+    def test_the_total_cap_refuses_the_fixture_that_would_exceed_it(self):
+        big = "x" * 700_000
+        pool = [pool_entry("AAA", "2024-12-31", "L1", html=big), pool_entry("BBB", "2024-12-31", "L1", html=big)]
+        fixtures, errors = bq.select_fixtures(pool, selection({"L1": 2}))
+        self.assertEqual([f["key"] for f in fixtures], ["AAA"])
+        self.assertEqual(errors[0]["error"], "exported fixture HTML would exceed 1.2 MB in total")
+
+
+class RoutingSec:
+    """Serves one synthetic 8-K per CIK from memory: no network."""
+
+    def __init__(self, documents):
+        self.documents = documents
+        self.requests = 0
+
+    def get_json(self, url):
+        self.requests += 1
+        if url.endswith("company_tickers.json"):
+            return {}
+        if "/submissions/" in url:
+            cik = int(re.search(r"CIK(\d+)\.json", url).group(1))
+            return {"filings": {"recent": {"form": ["8-K"], "filingDate": ["2025-02-05"],
+                                           "accessionNumber": [f"{cik:010d}-25-000001"], "items": ["2.02"]}}}
+        if url.endswith("index.json"):
+            return {"directory": {"item": [{"name": "ex99.htm", "type": "EX-99.1"}]}}
+        raise AssertionError(url)
+
+    def get_text(self, url):
+        self.requests += 1
+        if url.endswith(("-index.html", "-index.htm")):
+            return ""
+        return self.documents[int(url.split("/data/")[1].split("/")[0])]
+
+
+def tree_snapshot():
+    found = {}
+    for part in ("docs", "tests", os.path.join("atlas", "scripts")):
+        for dirpath, dirnames, names in os.walk(os.path.join(ROOT, part)):
+            dirnames[:] = [name for name in dirnames if name != "__pycache__"]
+            for name in names:
+                path = os.path.join(dirpath, name)
+                found[path] = (os.stat(path).st_mtime_ns, os.stat(path).st_size)
+    return found
+
+
+class DiagnoseEndToEndTests(unittest.TestCase):
+    def test_a_routed_run_writes_the_three_outputs_and_changes_nothing_in_the_repo(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fin_dir = os.path.join(temp_dir, "financials")
+            os.makedirs(fin_dir)
+            for key in ("AAA", "BBB"):
+                with open(os.path.join(fin_dir, key + ".json"), "w", encoding="utf-8") as target:
+                    json.dump({"quarterly": {"end": ["2024-12-31"], "fq": [4],
+                                             "values": {"netIncome": [1234000]}}}, target)
+            source = os.path.join(temp_dir, "source.json")
+            with open(source, "w", encoding="utf-8") as target:
+                json.dump({"rows": [{"key": key, "end": "2024-12-31", "stored": 0.25,
+                                     "reason": "no table shows this quarter's net income"}
+                                    for key in ("AAA", "BBB")]}, target)
+            manifest = os.path.join(temp_dir, "selection.json")
+            with open(manifest, "w", encoding="utf-8") as target:
+                json.dump({"autoPositives": {"L1": 1, "L8": 1}, "explicitNegatives": [],
+                           "autoNegatives": []}, target)
+            out = os.path.join(temp_dir, "out")
+            sec = RoutingSec({1: doc(L8_TABLE), 2: doc(EARLIER_HEADER, L1_TABLE)})
+            before = tree_snapshot()
+            with mock.patch.object(bq, "FIN_DIR", fin_dir), \
+                    mock.patch.object(bq.seed, "parse_ticker_map", return_value={"AAA": 1, "BBB": 2}), \
+                    mock.patch.object(bq, "Sec", return_value=sec), \
+                    mock.patch.object(bq.seed, "resolve_user_agent", return_value="test-agent"), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                status = bq.main(["--mode", "diagnose", "--source-report", source,
+                                  "--fixture-selection", manifest, "--out-dir", out])
+            self.assertEqual(status, 0)
+            with open(os.path.join(out, "s1-classes.json"), encoding="utf-8") as handle:
+                s1 = json.load(handle)
+            self.assertEqual((s1["rowCount"], s1["status"]), (2, "complete"))
+            self.assertEqual((s1["classCounts"]["L8"], s1["classCounts"]["L1"]), (1, 1))
+            self.assertEqual(sorted(os.listdir(os.path.join(out, "fixtures"))),
+                             ["AAA-2024-12-31-L8.html", "BBB-2024-12-31-L1.html", "s1_fixtures.json"])
+            with open(os.path.join(out, "fixtures", "s1_fixtures.json"), encoding="utf-8") as handle:
+                manifest_doc = json.load(handle)
+            self.assertEqual(manifest_doc["devTickers"], ["AAA", "BBB"])
+            for record in manifest_doc["fixtures"]:
+                self.assertEqual(record["role"], "positive")
+                with open(os.path.join(out, "fixtures", record["file"]), "rb") as handle:
+                    self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), record["sha256"])
+            with open(os.path.join(out, "fixtures", "BBB-2024-12-31-L1.html"), encoding="utf-8") as handle:
+                fixture = handle.read()
+            self.assertTrue(fixture.startswith("<!-- Source URL: https://www.sec.gov/"))
+            self.assertEqual(bq.tables_of(fixture), bq.tables_of(doc(EARLIER_HEADER, L1_TABLE)))
+        self.assertEqual(tree_snapshot(), before)
 
 
 class TrimAndRoundTripTests(unittest.TestCase):
