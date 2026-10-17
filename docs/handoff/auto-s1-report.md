@@ -129,3 +129,10 @@ The loop keeps this file on branch `claude/auto-s1-report`. Each milestone appen
 
 Opus decides (decision file `docs/handoff/auto-s1-decision-2.md`). If Opus says continue, the loop
 resumes at the step it names. Nothing is merged from this report.
+
+## Stop: S3 gate (runs 21 to 25), S4 not started
+
+- Outcome: S3 failed. Gate not run. Conflicts 2 (SNDA 2019-12-31, ACNT 2022-12-31). Partial Wilson 95% lower bound 0.908 over shards 0 to 2; gate needs 0.970.
+- Shard 3 failed twice with sec.gov NetworkError (26 and 42 of 344 periods). Shards 4 to 7 not dispatched.
+- Full numbers, incorrect and conflict rows, and filing links: `docs/handoff/q4-eps-s1-s5-codex-report.md`, section "S3 (stopped at the gate)".
+- Next: S3.6 revision needs an Opus decision. Split-basis comparison and the SUNE 2016 |EPS| check need Opus review before any revision. S4 not started.
