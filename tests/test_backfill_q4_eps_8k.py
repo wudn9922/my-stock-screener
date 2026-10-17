@@ -350,6 +350,67 @@ class OrphanDiagnosticTests(unittest.TestCase):
         self.assertEqual(debug[0]["orphans"]["period_in_previous_table"], 1)
 
 
+ZERO_EPS_RELEASE = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                    "<tr><td>Net income</td><td>1,234</td></tr>"
+                    "<tr><td>Diluted earnings per share</td><td>(0.00)</td></tr></table>")
+AMBIGUOUS_RELEASE = ("<table><tr><td>Three Months Ended December 31, 2024</td><td>x</td></tr>"
+                     "<tr><td>Net income</td><td>1,234</td><td>1,234</td></tr>"
+                     "<tr><td>Diluted earnings per share</td><td>1.00</td><td>1.00</td></tr></table>")
+NO_QUARTER_RELEASE = "<table><tr><td>Revenue</td><td>5</td></tr></table>"
+
+
+class FindQuarterReasonTests(unittest.TestCase):
+    """S2a-2 (f): the first specific reason across the candidate filings; the generic one only if none is specific."""
+
+    @staticmethod
+    def filings(*accessions):
+        return [{"form": "8-K", "items": "2.02", "filingDate": f"2025-0{2 + i}-05", "accessionNumber": accession}
+                for i, accession in enumerate(accessions)]
+
+    @staticmethod
+    def sec(pages):
+        class FakeSec:
+            def get_json(self, url):
+                if url.endswith("index.json"):
+                    return {"directory": {"item": [{"name": "ex99-1.htm", "type": "EX-99.1"}]}}
+                return None
+
+            def get_text(self, url):
+                for folder, html in pages.items():
+                    if folder in url and url.endswith("ex99-1.htm"):
+                        return html
+                return None
+        return FakeSec()
+
+    def reason(self, first, second):
+        rows = self.filings("0001-25-000011", "0001-25-000012")
+        pages = {"000125000011": first, "000125000012": second}
+        return bq.find_quarter(self.sec(pages), 1234, rows, END, 1_234_000)
+
+    def test_the_first_specific_reason_wins_over_a_later_generic_one(self):
+        self.assertEqual(self.reason(ZERO_EPS_RELEASE, NO_QUARTER_RELEASE), (None, "EPS is zero"))
+
+    def test_a_later_specific_reason_is_used_when_the_first_filing_is_generic(self):
+        self.assertEqual(self.reason(NO_QUARTER_RELEASE, AMBIGUOUS_RELEASE),
+                         (None, "net income matches more than one column or unit"))
+
+    def test_the_first_of_two_specific_reasons_wins(self):
+        self.assertEqual(self.reason(ZERO_EPS_RELEASE, AMBIGUOUS_RELEASE), (None, "EPS is zero"))
+
+    def test_the_generic_reason_is_used_only_when_no_filing_is_specific(self):
+        self.assertEqual(self.reason(NO_QUARTER_RELEASE, NO_QUARTER_RELEASE), (None, bq.GENERIC_REASON))
+
+    def test_no_candidate_filing_gives_the_window_reason(self):
+        self.assertEqual(bq.find_quarter(self.sec({}), 1234, [], END, 1_234_000),
+                         (None, "no 8-K with Item 2.02 in the window"))
+
+    def test_the_generic_reason_text_is_the_one_from_filing(self):
+        rows = self.filings("0001-25-000013")
+        result, reason = bq.from_filing(self.sec({"000125000013": NO_QUARTER_RELEASE}), 1234, rows[0], 1_234_000, END)
+        self.assertIsNone(result)
+        self.assertEqual(reason, bq.GENERIC_REASON)
+
+
 class IndependentCheckTests(unittest.TestCase):
     rows = [{"form": "8-K", "items": "2.02", "filingDate": "2026-02-05", "accessionNumber": "0001-26-000001"}]
 

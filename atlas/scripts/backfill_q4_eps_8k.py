@@ -75,6 +75,8 @@ EXTRA_DOCS = 2             # other .htm documents of the filing, read only when 
 REQUEST_INTERVAL = 0.2     # seconds between SEC requests
 RETRIES = 3
 DASHES = ("", "-", "--", "—", "–")
+GENERIC_REASON = "no table shows this quarter's net income"     # the from_filing text; a test pins it
+NO_FILING_REASON = "no 8-K with Item 2.02 in the window"         # find_quarter when no candidate filing exists
 
 NI_RE = re.compile(r"net\s*(\(loss\)\s*|loss\s*)?(income|earnings)|net\s+loss")
 # non-GAAP and adjusted rows sit next to the GAAP rows in most releases and must never be picked
@@ -797,14 +799,20 @@ def from_filing(sec, cik, filing, target, end, debug=None):
 
 
 def find_quarter(sec, cik, filings, end, target, debug=None):
-    """The first candidate filing that gives this quarter → (result, None), else (None, reason)."""
-    reason = "no 8-K with Item 2.02 in the window"
+    """
+    The first candidate filing that gives this quarter → (result, None), else (None, reason). The reason is the first
+    specific reason across the filings; the generic one only when no filing has a specific reason (S2a-2 (f)).
+    """
+    specific = generic = None
     for filing in candidate_filings(filings, date.fromisoformat(end))[:MAX_FILINGS]:
         result, why = from_filing(sec, cik, filing, target, end, debug)
         if result is not None:
             return dict(result, end=end, filingDate=filing["filingDate"]), None
-        reason = why or reason
-    return None, reason
+        if why and why != GENERIC_REASON:
+            specific = specific or why
+        else:
+            generic = generic or why
+    return None, specific or generic or NO_FILING_REASON
 
 
 def diagnose_filing(sec, cik, filing, end, target, fixture_specs=None, texts=None):
