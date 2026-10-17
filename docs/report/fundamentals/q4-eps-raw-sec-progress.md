@@ -51,3 +51,7 @@ VEEV 來源：CIK `0001393052`、accession `0001393052-26-000007`、8-K Item 2.0
 - 本環境不能切換至指定的 Sol 6.1 XHigh 或 Luna Max 執行模型；由當前 Codex 工作階段完成實作與驗收，未使用 Astra。
 
 完整全市場 filing 擷取、33,136 筆未分級值逐筆核驗、7,364 筆基準逐類 A/B/D 結果、TTM 按公司差異，以及跨產業／規模／公司事件分層的全市場品質抽查，均未完成。不得將本進度報告或局部掃描描述為 COMPLETE。
+
+## 交付狀態
+
+此進度報告與程式、測試及來源 fixture 已提交至 draft stacked PR [#99](https://github.com/wudn9922/my-stock-screener/pull/99)，base 為 PR #89 的分支 `codex/q4-eps-backfill`。PR #99 仍未完成全市場掃描、逐筆既有值核驗或正式資料回補，故維持 draft。
