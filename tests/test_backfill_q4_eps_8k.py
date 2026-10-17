@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from datetime import date
 from urllib import error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -359,6 +360,17 @@ class PerShareHeadingTests(unittest.TestCase):
 
 
 class PerShareHeadingGuardTests(unittest.TestCase):
+    def test_weighted_average_shares_heading_does_not_make_diluted_share_count_an_eps_row(self):
+        html = ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
+                "<tr><td>Net income</td><td>1,000</td></tr>"
+                "<tr><td>Net income per share:</td></tr>"
+                "<tr><td>Diluted</td><td>0.25</td></tr>"
+                "<tr><td>Weighted-average shares used in per share calculations:</td></tr>"
+                "<tr><td>Basic</td><td>100</td></tr><tr><td>Diluted</td><td>100</td></tr></table>")
+        result, reason = bq.table_eps(table_of(html), 1000, END)
+        self.assertIsNone(reason)
+        self.assertEqual(result["epsDiluted"], 0.25)
+
     def test_share_counts_under_the_heading_are_not_eps(self):
         html = ("<table><tr><th></th><th>Three Months Ended December 31, 2024</th></tr>"
                 "<tr><td>Net income attributable to Acme</td><td>1,234</td></tr>"
@@ -546,15 +558,16 @@ class IndexPageTests(unittest.TestCase):
 class SplitAndToleranceTests(unittest.TestCase):
     @staticmethod
     def complete_split_document(events):
+        today = date.today().isoformat()
         return {
-            "symbol": "AAA", "checkedAt": "2026-06-01",
+            "symbol": "AAA", "checkedAt": today,
             "annual": {"end": [END]}, "quarterly": {"end": [END]},
             "split": {
                 "events": events, "eventsComplete": True,
                 "eventsSource": "Yahoo Finance chart range=max split events",
-                "eventsCheckedAt": "2026-06-01", "eventsSymbol": "AAA",
-                "eventsCoverageStart": "1990-01-01", "eventsCoverageEnd": "2026-06-01",
-                "eventsParserVersion": 3,
+                "eventsCheckedAt": today, "eventsSymbol": "AAA",
+                "eventsCoverageStart": "1990-01-01", "eventsCoverageEnd": today,
+                "eventsParserVersion": 4,
             },
         }
 

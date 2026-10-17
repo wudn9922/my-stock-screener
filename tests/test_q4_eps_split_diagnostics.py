@@ -34,6 +34,17 @@ class Q4EpsSplitSafetyTests(unittest.TestCase):
         self.assertEqual(old["values"]["epsDiluted"], 1.0)
         self.assertEqual(old["values"]["epsBasic"], 0.95)
 
+    def test_known_five_for_four_event_normalizes_eps_even_below_large_jump_threshold(self):
+        old = {"end": "2024-12-31", "src": "sec", "values": {
+            "dilutedShares": 100, "epsDiluted": 1.25,
+        }}
+        new = {"end": "2025-12-31", "src": "sec", "values": {
+            "dilutedShares": 125, "epsDiluted": 1.0,
+        }}
+        self.assertTrue(financials.adjust_splits([[old, new]], [["2025-06-01", 1.25]]))
+        self.assertEqual(old["values"]["dilutedShares"], 125)
+        self.assertEqual(old["values"]["epsDiluted"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

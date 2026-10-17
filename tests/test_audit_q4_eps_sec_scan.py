@@ -45,11 +45,19 @@ def financial_document(*, diluted=None, basic=None, split_events=None):
                   "eventsComplete": True, "eventsSource": "test fixture: complete split events",
                   "eventsCheckedAt": "2026-01-01", "eventsSymbol": "AAA",
                   "eventsCoverageStart": "2000-01-01", "eventsCoverageEnd": "2026-01-01",
-                  "eventsParserVersion": 3},
+                  "eventsParserVersion": 4},
     }
 
 
 class AuditTests(unittest.TestCase):
+    def test_archive_accession_prefix_may_be_filing_agent_when_target_path_matches(self):
+        accession = "0001445305-13-002007"
+        item = {"name": "aaon-20130930.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/824142/000144530513002007/aaon-20130930.htm"}
+        target = {"cik": "0000824142"}
+        filing = {"accessionNumber": accession}
+        self.assertIsNone(audit._archive_identity_error(item, target, filing))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="q4-eps-audit-")
         self.addCleanup(self.temp.cleanup)

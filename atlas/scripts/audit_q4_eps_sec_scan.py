@@ -28,6 +28,7 @@ if str(SCRIPTS) not in sys.path:
 
 import backfill_q4_eps_8k as table_parser  # noqa: E402
 import sec_inline_xbrl_q4 as inline_xbrl  # noqa: E402
+import build_financials as fin  # noqa: E402
 
 DEFAULT_MANIFEST_DIR = REPO_ROOT / ".cache/q4-eps-sec-scan/results"
 DEFAULT_CACHE_DIR = REPO_ROOT / ".cache/q4-eps-sec-scan"
@@ -169,9 +170,6 @@ def _archive_identity_error(item, target, filing):
     if not cik.isdigit() or not accession or not name or Path(name).name != name:
         return "manifest-lacks-cik-accession-or-safe-document-name"
     compact = re.sub(r"[^0-9]", "", accession)
-    accession_cik = accession.split("-", 1)[0]
-    if _normalized_cik(accession_cik) != _normalized_cik(cik):
-        return "accession-issuer-cik-does-not-match-target-cik"
     parsed = urlparse(str(item.get("url") or ""))
     expected_path = f"/Archives/edgar/data/{int(cik)}/{compact}/{name}"
     if (parsed.scheme != "https" or parsed.netloc.lower() != "www.sec.gov"
@@ -247,16 +245,18 @@ def _split_normalization(document, period_end, filing_date, value, scan_as_of=No
                     if end_day is not None and (latest_period_end is None or end_day > latest_period_end):
                         latest_period_end = end_day
     expected_symbol = str(document.get("symbol") or "").strip().upper() if isinstance(document, dict) else ""
+    split_as_of = scan_date or date.today()
     coverage_required_end = max((day for day in (_iso_date(period_end), latest_period_end) if day is not None),
                                 default=None)
     complete = bool(isinstance(split, dict) and split.get("eventsComplete") is True
                     and isinstance(events_source, str) and events_source.strip() and events_checked is not None
                     and split.get("eventsSymbol") == expected_symbol and bool(expected_symbol)
-                    and coverage_start is not None and coverage_end is not None and split.get("eventsParserVersion") == 3
+                    and coverage_start is not None and coverage_end is not None and split.get("eventsParserVersion") == 4
+                    and fin._valid_split_event_map(events)
                     and _iso_date(period_end) is not None and coverage_start <= _iso_date(period_end)
                     and coverage_required_end is not None and coverage_end >= coverage_required_end
                     and (snapshot_date is None or events_checked >= snapshot_date)
-                    and (scan_date is None or events_checked >= scan_date))
+                    and 0 <= (split_as_of - events_checked).days <= fin.SPLIT_CHART_MAX_STALENESS_DAYS)
     result = {"source": "financial-document.split.events", "events": [],
               "eventsComplete": complete, "eventsSource": events_source,
               "eventsCheckedAt": events_checked.isoformat() if events_checked else None,

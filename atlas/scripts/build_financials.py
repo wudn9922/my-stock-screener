@@ -98,12 +98,13 @@ RECHECK_DAYS = 3
 MAX_CHECK_AGE_DAYS = 45
 MISS_RETRY_DAYS = 7
 KEEP_UNLISTED_DAYS = 180
-# Splits: adjacent share counts this far apart trigger the chart request; ratios closer to 1 than
-# MIN_SPLIT_RATIO are ignored; an adjusted share count must land within SPLIT_MATCH of the next one
+# Splits: adjacent share counts this far apart trigger the chart request. Known corporate actions
+# retain every valid non-1:1 ratio; an adjusted share count must land within SPLIT_MATCH of the next one.
 SHARE_JUMP_UP = 1.8
 SHARE_JUMP_DOWN = 0.55
 MIN_SPLIT_RATIO = 1.5
 SPLIT_MATCH = 0.25
+SPLIT_CHART_MAX_STALENESS_DAYS = 7
 # Foreign issuers (ADR, 20-F / 40-F) of the full US universe that are not in the core list form their own
 # lane: while core stocks are still due they take at most this share of the requests, so the core list
 # is refreshed on schedule even during the first pass over the (several hundred) foreign issuers
@@ -370,29 +371,54 @@ def parse_splits(payload, expected_symbol=None):
             raise ValueError("Yahoo split response did not contain exactly one result for the expected symbol")
     events = {}
     for result in results if isinstance(results, list) else []:
-        splits = ((result or {}).get("events") or {}).get("splits") if isinstance(result, dict) else None
-        if not isinstance(splits, dict):
+        event_map = result.get("events") if isinstance(result, dict) else None
+        splits = event_map.get("splits") if isinstance(event_map, dict) else None
+        if splits is None:
             continue
+        if not isinstance(splits, dict):
+            raise ValueError("Yahoo split events are not a mapping")
         for event in splits.values():
             if not isinstance(event, dict):
-                continue
+                raise ValueError("Yahoo split event is malformed")
             stamp = finite_number(event.get("date"))
             numerator = finite_number(event.get("numerator"))
             denominator = finite_number(event.get("denominator"))
             if stamp is None or not numerator or not denominator or numerator <= 0 or denominator <= 0:
-                continue
+                raise ValueError("Yahoo split event has an invalid date or ratio")
             ratio = numerator / denominator
             if math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12):
                 continue
-            day = datetime.fromtimestamp(stamp, timezone.utc).date().isoformat()
+            try:
+                day = datetime.fromtimestamp(stamp, timezone.utc).date().isoformat()
+            except (OverflowError, OSError, ValueError) as error:
+                raise ValueError("Yahoo split event date is out of range") from error
+            if day in events and not math.isclose(events[day], ratio, rel_tol=0.0, abs_tol=1e-12):
+                raise ValueError("Yahoo returned conflicting split ratios on one date")
             events[day] = clean_ratio(ratio)
     return [[day, events[day]] for day in sorted(events)]
 
 
-SPLIT_CHART_PARSER_VERSION = 3
+def _valid_split_event_map(events):
+    if not isinstance(events, list):
+        return False
+    seen = set()
+    for event in events:
+        if not isinstance(event, (list, tuple)) or len(event) != 2:
+            return False
+        day = parse_day(event[0])
+        ratio = finite_number(event[1])
+        if (day is None or ratio is None or ratio <= 0
+                or math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12)
+                or day.isoformat() in seen):
+            return False
+        seen.add(day.isoformat())
+    return True
 
 
-def split_chart_coverage(payload, expected_symbol, required_start, required_end=None):
+SPLIT_CHART_PARSER_VERSION = 4
+
+
+def split_chart_coverage(payload, expected_symbol, required_start, required_end=None, as_of=None):
     """Return verified identity/range metadata for a complete Yahoo max-range chart."""
     chart = payload.get("chart") if isinstance(payload, dict) else None
     if not isinstance(chart, dict) or chart.get("error") not in (None, {}):
@@ -420,7 +446,8 @@ def split_chart_coverage(payload, expected_symbol, required_start, required_end=
         if (not isinstance(symbol, str) or symbol.strip().upper() != required_symbol or first_trade is None
                 or not isinstance(meta, dict) or meta.get("range") != "max"
                 or not isinstance(timestamps, list) or not timestamps
-                or not isinstance(splits, dict)):
+                or not isinstance(splits, dict)
+                or not _valid_yahoo_split_map(splits)):
             continue
         first_trade_day = datetime.fromtimestamp(first_trade, timezone.utc).date()
         valid_timestamps = [finite_number(value) for value in timestamps]
@@ -429,16 +456,42 @@ def split_chart_coverage(payload, expected_symbol, required_start, required_end=
             continue
         chart_start = datetime.fromtimestamp(min(valid_timestamps), timezone.utc).date()
         chart_end = datetime.fromtimestamp(max(valid_timestamps), timezone.utc).date()
-        if first_trade_day <= required_day and chart_start <= required_day and chart_end >= required_last_day:
+        as_of_day = parse_day(as_of) or date.today()
+        latest_allowed = as_of_day - timedelta(days=SPLIT_CHART_MAX_STALENESS_DAYS)
+        if (first_trade_day <= required_day and chart_start <= required_day and chart_end >= required_last_day
+                and chart_end >= latest_allowed):
             return {"symbol": required_symbol, "coverageStart": first_trade_day.isoformat(),
                     "coverageEnd": chart_end.isoformat(),
                     "parserVersion": SPLIT_CHART_PARSER_VERSION}
     return None
 
 
-def split_chart_is_complete(payload, expected_symbol, required_start, required_end=None):
+def _valid_yahoo_split_map(splits):
+    if not isinstance(splits, dict):
+        return False
+    seen = set()
+    for event in splits.values():
+        if not isinstance(event, dict):
+            return False
+        stamp = finite_number(event.get("date"))
+        numerator = finite_number(event.get("numerator"))
+        denominator = finite_number(event.get("denominator"))
+        if stamp is None or numerator is None or denominator is None or numerator <= 0 or denominator <= 0:
+            return False
+        try:
+            day = datetime.fromtimestamp(stamp, timezone.utc).date().isoformat()
+        except (OverflowError, OSError, ValueError):
+            return False
+        ratio = numerator / denominator
+        if math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12) or day in seen:
+            return False
+        seen.add(day)
+    return True
+
+
+def split_chart_is_complete(payload, expected_symbol, required_start, required_end=None, as_of=None):
     """True only when the response proves the exact symbol and full requested history range."""
-    return split_chart_coverage(payload, expected_symbol, required_start, required_end) is not None
+    return split_chart_coverage(payload, expected_symbol, required_start, required_end, as_of) is not None
 
 
 def split_record(adjusted, events, complete, source, checked_at, symbol=None,
@@ -895,7 +948,7 @@ def adjust_splits(sections, events):
     """
     usable = sorted(
         (day, ratio) for day, ratio in events
-        if ratio >= MIN_SPLIT_RATIO or ratio <= 1 / MIN_SPLIT_RATIO
+        if math.isfinite(ratio) and ratio > 0 and not math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12)
     )
     if not usable:
         return False
@@ -929,7 +982,8 @@ def split_factors(events, end):
     """Every product of a subset of the split ratios after `end` (without 1), largest first."""
     ratios = [
         ratio for day, ratio in events
-        if day > end and (ratio >= MIN_SPLIT_RATIO or ratio <= 1 / MIN_SPLIT_RATIO)
+        if day > end and math.isfinite(ratio) and ratio > 0
+        and not math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12)
     ]
     products = {1.0}
     for ratio in ratios:

@@ -5,6 +5,7 @@ import hashlib
 import sys
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -152,17 +153,18 @@ class Q4EpsReconciliationTests(unittest.TestCase):
         }
 
     def _write_apply_financial(self, path, value=None):
+        today = date.today().isoformat()
         path.write_text(json.dumps({
-            "symbol": "AAA", "checkedAt": "2026-01-01",
+            "symbol": "AAA", "checkedAt": today,
             "quarterly": {"fy": [2023], "fq": [4], "end": ["2023-12-31"],
                           "values": {"epsDiluted": [value]}},
             "annual": {"end": ["2023-12-31"]},
             "split": {
                 "events": [], "eventsComplete": True,
                 "eventsSource": "Yahoo Finance chart range=max split events",
-                "eventsCheckedAt": "2026-01-01", "eventsSymbol": "AAA",
-                "eventsCoverageStart": "1990-01-01", "eventsCoverageEnd": "2026-01-01",
-                "eventsParserVersion": 3,
+                "eventsCheckedAt": today, "eventsSymbol": "AAA",
+                "eventsCoverageStart": "1990-01-01", "eventsCoverageEnd": today,
+                "eventsParserVersion": 4,
             },
         }), encoding="utf-8")
 

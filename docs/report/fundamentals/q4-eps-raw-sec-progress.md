@@ -14,13 +14,31 @@ PR #89 的基準資料報告仍是 [q4-eps-evidence.md](../financials/q4-eps-evi
 
 兩次全市場預設續跑都在首家公司附件工作量達到 budget 後 checkpoint；另對 VEEV 做了 120 秒優先續跑。Submissions 歷史可用 accession 數、候選 accession 數、已快取 accession 數是不同統計，不能互相當成已審核文件數。
 
+下表是環境重建前的歷史 checkpoint 紀錄，當前工作樹已沒有對應的 raw cache；它不代表目前可續跑或重新 audit 的資料。新的空白快取續跑數字見下方「執行環境重建後的續跑記錄」。
+
 | 股票 | Q4 期別 | SEC 歷史 accession 數 | 期別候選 accession 數 | 已快取 accession 記錄 | 原始掃描狀態 |
 | --- | ---: | ---: | ---: | ---: | --- |
 | A | 14 | 2,365 | 1,232 | 70 | paused；14/14 歷史 block 完整，0/14 本次 force-refresh |
 | AMD | 15 | 3,326 | 1,178 | 49 | paused；15/15 歷史 block 完整，0/15 本次 force-refresh |
 | VEEV | 14 | 2,004 | 965 | 14 | paused；14/14 歷史 block 完整且已 refresh；最新 Q4 的 7 個候選 accession 已列入 |
 
-目前共快取 218 份 VEEV 文件、1,571 份 A 文件及 918 份 AMD 文件；部分 filing 另含圖片、ZIP、CSS 或其他非 HTML 附件，這些不算可解析 EPS 證據。checkpoint 的累積計數為 13,719 次 SecClient request、12,457 個 URL cache key；這是跨續跑的快取統計，不代表 12,457 份成功審核的來源。當前 cache 沒有記錄 HTTP 403；受限網路時產生的 URLError 不視為 HTTP 403，程式仍保留首個真實 403 即停止的行為。
+先前 checkpoint 紀錄 218 份 VEEV 文件、1,571 份 A 文件及 918 份 AMD 文件；部分 filing 另含圖片、ZIP、CSS 或其他非 HTML 附件，這些不算可解析 EPS 證據。舊 checkpoint 記錄 13,719 次 SecClient request、12,457 個 URL cache key；這是歷史傳輸統計，不代表 12,457 份成功審核的來源。舊 checkpoint 沒有記錄 HTTP 403；目前可恢復的新 checkpoint 與舊紀錄的關係詳見下方，不把 URLError 當成 HTTP 403，程式仍保留首個真實 403 即停止的行為。
+
+### 執行環境重建後的續跑記錄
+
+上段所列的 13,719 request、12,457 URL cache key 及 A／AMD／VEEV 文件數，是先前執行環境的 checkpoint 紀錄。環境重建後，該快取未能恢復，因此不能由目前工作樹續跑或重算；它們只能作為歷史傳輸進度，不能視為目前可供 audit 的資料。以下是從空白快取開始的新續跑，時間截至 2026-10-17 04:38 UTC：
+
+| 指標 | 新 checkpoint 結果 |
+| --- | ---: |
+| 快取的 SEC 請求記錄／URL cache key | 1,540 |
+| 已建立 company checkpoint | 1 檔：A，狀態 paused |
+| A 的 Q4 期別／歷史 accession | 14／2,365 |
+| scanner 列出的候選 accession-period entries | 1,232 |
+| 已處理 accession 記錄 | 70：60 個索引狀態 ok、10 個 format-error |
+| 附件 URL／附件狀態 | 1,470：1,452 通過輕量容器／標記檢查、15 個 format-error、3 個 paused |
+| HTTP 403 | 0；本次 checkpoint 為 paused，非全市場完成 |
+
+附件的 `ok` 只表示容器格式及最多 1 MB 的 HTML 標記檢查通過，不表示解析出 EPS，更不表示來源、期間、GAAP 類型或拆股基準已核實。這份新快取目前位於執行環境的 `.cache/q4-eps-sec-scan/`，未提交至 PR。對這 1,470 個附件執行離線 audit 時，解析工作超過 180 秒仍未產生 staging 結果，故已停止；這不等同於零候選或零差異。正式填值及正式欄位仍未變更。
 
 ## 已完成的離線審核
 
@@ -44,16 +62,16 @@ VEEV 來源：CIK `0001393052`、accession `0001393052-26-000007`、8-K Item 2.0
 
 ## 近十年季度 Diluted EPS 快照檢查
 
-以目前 4,967 檔財報 JSON 的季度欄位，按每檔最後 40 個連續 FY/FQ 期別檢查：2,344 檔有至少 40 個連續季度列；其中 1,522 檔的 40 個 Diluted EPS 均非空且季度來源標記為 SEC。再要求這 40 季中的十個 Q4 都有 Grade A/B 的 `secQ4EpsFacts.epsDiluted`，而且 fact value 與季度值相同，符合者為 3 檔：ARL、TCI、WLDN。
+以 4,967 檔財報 JSON 的季度欄位，保留原始陣列順序並檢查最後 40 列是否有連續 FY/FQ：2,380 檔符合連續列條件；其中 36 檔缺少或未對齊 `epsDiluted` list，因此只有 2,344 檔有可比對的 Diluted 欄位。這 2,344 檔中，1,522 檔最後 40 季 EPS 非空且 `quarterly.src` 全標記為 SEC。再要求十個 Q4 都有 Grade A/B `secQ4EpsFacts.epsDiluted` 且 fact value 相同，符合者 3 檔：ARL、TCI、WLDN。
 
 這是現存快照的結構／來源標記檢查，並非逐季重新核對原始 filing。Q1–Q3 尚未逐筆保存或複核原始 accession 與摘錄；因此按本任務要求的「完整 raw-source audit」標準，本次新完成近十年全季度原始來源稽核的公司數為 0。上述 3 檔不可解讀為本次重新核實後可直接供正式回測。
 
 ## 驗證及審查
 
-- Python 全套測試：`/tmp/q4-test-venv/bin/python -m unittest discover -s tests -p 'test_*.py'`，1,154 tests、全數通過。該暫存 venv 只補上測試依賴，沒有改 repo dependencies。
+- Python 全套測試：`/tmp/pr99-test-venv/bin/python -m unittest discover -s tests -p 'test_*.py' -q`，1,160 tests、全數通過。系統 Python 缺少 `yfinance`；暫存 venv 僅安裝此測試依賴，沒有改 repo dependencies。
 - TypeScript：`npx tsc -b` 通過；lint 通過；Vitest 72 files / 894 tests 通過。
 - `python -u scripts/build_growth.py`：rows=6,591、written=false；因財報 JSON 未變，`docs/report/growth.json` 未重寫。
-- 另有不同 Codex GPT-6 Sol Max read-only code review；Gemini 不可用。Reviewer 和主工作階段共用 workspace/cache，且看到部分工作脈絡，因此不是完全盲審。
+- 另有不同 Codex GPT-6 Sol XHigh read-only code review；Gemini 不可用。Reviewer 與主工作階段使用隔離 checkout，但看過部分工作脈絡，因此不是完全盲審。其指出的 5:4 拆股、歷史 accession 前綴 CIK、舊 `--sec` 原始證據驗證三項 blocker 已在本次程式修正並有新增回歸測試；最新 commit 尚待 reviewer 複核。
 - 本環境不能切換至指定的 Sol 6.1 XHigh 或 Luna Max 執行模型；由當前 Codex 工作階段完成實作與驗收，未使用 Astra。
 
 完整全市場 filing 擷取、33,136 筆未分級值逐筆核驗、7,364 筆基準逐類 A/B/D 結果、TTM 按公司差異，以及跨產業／規模／公司事件分層的全市場品質抽查，均未完成。不得將本進度報告或局部掃描描述為 COMPLETE。

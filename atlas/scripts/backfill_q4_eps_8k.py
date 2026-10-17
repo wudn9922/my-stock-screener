@@ -551,6 +551,7 @@ def _header_contexts(parsed, grid):
 
 def _eps_kind(label, infos, row_index):
     low = (label or "").lower()
+    section = str((infos[row_index] if 0 <= row_index < len(infos) else {}).get("sectionContext") or "").lower()
     if _non_gaap(low) or any(word in low for word in ("continuing", "discontinued")):
         return None, False
     has_basic = re.search(r"\bbasic\b", low) is not None
@@ -561,6 +562,14 @@ def _eps_kind(label, infos, row_index):
     if is_eps(low, kind):
         return kind, True
     if re.fullmatch(r"(?:basic|diluted)[\s:]*", low):
+        share_headers = list(re.finditer(
+            r"\bweighted[-\s]?average shares?\b[^:;,.]{0,100}|"
+            r"\bshares of common stock outstanding\b[^:;,.]{0,100}", section))
+        eps_headers = [match for match in re.finditer(
+            r"\b(?:earnings\s+per\s+share|per\s+share|eps)\b", section)
+            if not any(header.start() <= match.start() < header.end() for header in share_headers)]
+        if share_headers and (not eps_headers or share_headers[-1].start() > eps_headers[-1].start()):
+            return None, False
         for prior in range(row_index - 1, -1, -1):
             info = infos[prior]
             previous = (info["label"] or "").lower()

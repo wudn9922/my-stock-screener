@@ -54,7 +54,8 @@ def _split_factor(document, filed):
             day, ratio = date.fromisoformat(event[0]), float(event[1])
         except (TypeError, ValueError):
             continue
-        if day > cutoff and (ratio >= sec.MIN_SPLIT_RATIO or ratio <= 1 / sec.MIN_SPLIT_RATIO):
+        if day > cutoff and math.isfinite(ratio) and ratio > 0 \
+                and not math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12):
             factor *= ratio
     return factor
 

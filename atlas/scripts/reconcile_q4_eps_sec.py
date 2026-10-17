@@ -111,7 +111,7 @@ def _split_events(document):
         split_day, ratio = repair._parse_date(event[0]), _number(event[1])
         if split_day is None or ratio is None or ratio <= 0:
             continue
-        if ratio >= sec.MIN_SPLIT_RATIO or ratio <= 1 / sec.MIN_SPLIT_RATIO:
+        if not math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12):
             events.append((split_day.isoformat(), ratio))
     return sorted(events)
 

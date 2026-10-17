@@ -33,6 +33,7 @@ if SCRIPTS not in sys.path:
 import build_financials as fin  # noqa: E402
 from build_valuation_us import read_json, write_atomic  # noqa: E402
 import seed_financials_sec as sec  # noqa: E402
+import q4_eps_evidence as q4_evidence  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DEFAULT_DIR = os.path.join(REPO_ROOT, "docs", "report", "financials")
@@ -212,9 +213,11 @@ def _verified_split_factor(document, end, fact):
         isinstance(split, dict) and split.get("eventsComplete") is True
         and isinstance(split.get("eventsSource"), str) and split.get("eventsSource").strip()
         and split.get("eventsSymbol") == symbol and bool(symbol)
-        and split.get("eventsParserVersion") == 3
+        and split.get("eventsParserVersion") == 4
+        and fin._valid_split_event_map(split.get("events"))
         and events_checked is not None and (filed is None or events_checked >= filed)
         and (snapshot_day is None or events_checked >= snapshot_day)
+        and 0 <= (date.today() - events_checked).days <= fin.SPLIT_CHART_MAX_STALENESS_DAYS
         and target_end is not None and coverage_start is not None and coverage_start <= target_end
         and latest_end is not None and coverage_end is not None and coverage_end >= latest_end
     )
@@ -227,7 +230,7 @@ def _verified_split_factor(document, end, fact):
         split_day, ratio = _parse_date(event[0]), _number(event[1])
         if split_day is None or ratio is None or ratio <= 0:
             continue
-        if ratio >= sec.MIN_SPLIT_RATIO or ratio <= 1 / sec.MIN_SPLIT_RATIO:
+        if not math.isclose(ratio, 1.0, rel_tol=0.0, abs_tol=1e-12):
             events.append((split_day, ratio))
     if filed is None:
         if target_end and any(day > target_end for day, _ in events):
@@ -485,12 +488,14 @@ def sec_repair_directory(directory, *, state_path=DEFAULT_SEC_STATE, budget=None
                 if not isinstance(raw_evidence, dict):
                     summary["pendingRawFilingReview"][field] += 1
                     continue
-                if (raw_evidence.get("accession") != fact.get("accn")
-                        or _number(raw_evidence.get("reportedValue")) != _number(fact.get("value"))
-                        or raw_evidence.get("field") != field
-                        or not raw_evidence.get("excerpt")
-                        or not isinstance(raw_evidence.get("locator"), dict)):
-                    summary["rejected"]["raw-filing-evidence-mismatch"] += 1
+                cik = (state.get("tickerMap") or {}).get(symbol)
+                candidate = {"accession": fact.get("accn"), "cik": cik, "form": fact.get("form")}
+                evidence_error = q4_evidence._validate_raw_filing_evidence(
+                    raw_evidence, candidate=candidate, field=field,
+                    period_start=fact.get("start"), period_end=fact.get("end"),
+                    raw_value=fact.get("value"), split_multiplier=factor)
+                if evidence_error:
+                    summary["rejected"][evidence_error] += 1
                     continue
                 fills.append({
                     "symbol": symbol, "path": item["path"], "index": row["index"], "end": row["end"],
@@ -530,8 +535,18 @@ def sec_repair_directory(directory, *, state_path=DEFAULT_SEC_STATE, budget=None
             "durationDays": fill["fact"]["durationDays"], "form": fill["fact"].get("form"),
             "filed": fill["fact"].get("filed"), "accession": fill["fact"].get("accn"),
             "reportedValue": fill["fact"]["value"], "splitFactor": fill["factor"],
-            "value": fill["value"], "rawFilingEvidence": fill["fact"]["rawFilingEvidence"],
+            "value": fill["value"], "currency": "USD", "grade": "A", "method": "direct-sec-companyfacts",
+            "cik": (state.get("tickerMap") or {}).get(fill["symbol"]),
+            "url": fill["fact"]["rawFilingEvidence"]["url"],
+            "filingUrl": fill["fact"]["rawFilingEvidence"]["url"],
+            "rawFilingEvidence": fill["fact"]["rawFilingEvidence"],
         }
+        grades = quarterly.setdefault("epsQuality", [None] * len(quarterly["end"]))
+        while len(grades) < len(quarterly["end"]):
+            grades.append(None)
+        grade = grades[fill["index"]] if isinstance(grades[fill["index"]], dict) else {}
+        grade[fill["field"]] = "A"
+        grades[fill["index"]] = grade
         write_atomic(fill["path"], document)
         filled_periods.add((fill["symbol"], fill["end"]))
         written_files.add(fill["symbol"])

@@ -177,6 +177,18 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(fin.parse_splits(reverse), [["2026-06-10", 0.05]])
         small_split = synth.split_chart([(1781098200, 5.0, 4.0)])
         self.assertEqual(fin.parse_splits(small_split), [["2026-06-10", 1.25]])
+        small_reverse_split = synth.split_chart([(1781098200, 4.0, 5.0)])
+        self.assertEqual(fin.parse_splits(small_reverse_split), [["2026-06-10", 0.8]])
+        malformed = synth.split_chart([(1781098200, 5.0, 4.0)])
+        split_event = next(iter(malformed["chart"]["result"][0]["events"]["splits"].values()))
+        split_event["numerator"] = None
+        self.assertFalse(fin.split_chart_is_complete(
+            malformed, "SPLT", "2020-01-01", "2026-01-01", as_of="2026-10-17"))
+        with self.assertRaisesRegex(ValueError, "invalid date or ratio"):
+            fin.parse_splits(malformed)
+        self.assertFalse(fin.split_chart_is_complete(
+            fixture("yahoo_chart_split.json"), "SPLT", "2020-01-01", "2026-01-01",
+            as_of="2026-11-01"))
 
     def test_parse_splits_is_bound_to_the_expected_chart_result_symbol(self):
         chart = fixture("yahoo_chart_split.json")
@@ -477,7 +489,7 @@ class SplitTest(unittest.TestCase):
                                              "eventsSource": "Yahoo Finance chart range=max split events",
                                              "eventsCheckedAt": TODAY.isoformat(), "eventsSymbol": "SPLT",
                                              "eventsCoverageStart": "2000-01-01", "eventsCoverageEnd": "2026-10-16",
-                                             "eventsParserVersion": 3})
+                                             "eventsParserVersion": 4})
         self.assertIn("split-adjusted", document["quality"]["issues"])
         self.assert_on_post_split_basis(document)
         old = statement(synth.SPLIT_QUARTERLY, "2025-04-27", synth.SPLIT_RATIOS)
@@ -535,7 +547,7 @@ class SplitTest(unittest.TestCase):
                                              "eventsSource": "Yahoo Finance chart range=max split events",
                                              "eventsCheckedAt": TODAY.isoformat(), "eventsSymbol": "SPLT",
                                              "eventsCoverageStart": "2000-01-01", "eventsCoverageEnd": "2026-10-16",
-                                             "eventsParserVersion": 3})
+                                             "eventsParserVersion": 4})
 
     def test_two_splits_cascade(self):
         rows = [

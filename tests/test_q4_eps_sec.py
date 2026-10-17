@@ -4,6 +4,7 @@ import os
 import sys
 import tempfile
 import unittest
+from datetime import date
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS = os.path.join(ROOT, "atlas", "scripts")
@@ -71,17 +72,18 @@ def stored_document():
 
 
 def verified_split_document(events):
+    today = date.today().isoformat()
     return {
         "symbol": "TEST",
-        "checkedAt": "2026-01-01",
+        "checkedAt": today,
         "annual": {"end": ["2024-12-31"]},
         "quarterly": {"end": ["2024-12-31"]},
         "split": {
             "events": events, "eventsComplete": True,
             "eventsSource": "Yahoo Finance chart range=max split events",
-            "eventsCheckedAt": "2026-01-01", "eventsSymbol": "TEST",
-            "eventsCoverageStart": "1990-01-01", "eventsCoverageEnd": "2026-01-01",
-            "eventsParserVersion": 3,
+            "eventsCheckedAt": today, "eventsSymbol": "TEST",
+            "eventsCoverageStart": "1990-01-01", "eventsCoverageEnd": today,
+            "eventsParserVersion": 4,
         },
     }
 
@@ -148,6 +150,64 @@ class SecQ4FactTests(unittest.TestCase):
             2_000_000, 2_000_000, {"value": 0.5, "filed": "2025-02-01"})
         self.assertIsNone(normalized)
         self.assertEqual(reason, "split-basis-same-day-as-filing")
+
+    def test_five_for_four_split_is_not_discarded_as_too_small(self):
+        normalized, factor, reason = repair.normalize_and_check_q4_eps(
+            verified_split_document([["2025-06-01", 1.25]]), "2024-12-31",
+            2_000_000, 2_000_000, {"value": 1.25, "filed": "2025-02-01"})
+        self.assertEqual((normalized, factor, reason), (1.0, 1.25, None))
+
+    def test_legacy_split_parser_metadata_is_not_trusted(self):
+        document = verified_split_document([])
+        document["split"]["eventsParserVersion"] = 3
+        normalized, factor, reason = repair.normalize_and_check_q4_eps(
+            document, "2024-12-31", 2_000_000, 2_000_000,
+            {"value": 1.0, "filed": "2025-02-01"})
+        self.assertIsNone(normalized)
+        self.assertEqual(factor, 1.0)
+        self.assertEqual(reason, "split-event-history-unverified-or-incomplete")
+
+    def test_existing_sec_writer_rejects_weak_raw_evidence_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "TEST.json")
+            state_path = os.path.join(directory, "state.json")
+            original = stored_document()
+            original["split"] = verified_split_document([])["split"]
+            with open(path, "w", encoding="utf-8") as handle:
+                json.dump(original, handle)
+            rows = repair._q4_rows(original)
+            signature = repair._signature(rows)
+            candidate = {
+                "concept": "EarningsPerShareDiluted", "unit": "USD/shares", "value": 0.2,
+                "start": "2024-10-02", "end": "2024-12-31", "durationDays": 91,
+                "form": "10-K", "filed": "2025-02-01", "accn": "0000000000-25-000001",
+                "rawFilingEvidence": {"accession": "0000000000-25-000001", "form": "10-K",
+                                      "periodStart": "2024-10-02", "periodEnd": "2024-12-31",
+                                      "field": "epsDiluted", "reportedValue": 0.2,
+                                      "unit": "USD/shares",
+                                      "url": "https://www.sec.gov/Archives/edgar/data/1/000000000025000001/ex99.htm",
+                                      "rawBodyUrl": "https://www.sec.gov/Archives/edgar/data/1/000000000025000001/ex99.htm",
+                                      "excerpt": "Diluted EPS 0.20", "locator": {"type": "html-row"}},
+            }
+            prior = {"concept": "EarningsPerShareDiluted", "unit": "USD/shares", "value": 0.5,
+                     "start": "2023-10-02", "end": "2023-12-31", "durationDays": 91,
+                     "form": "10-K", "filed": "2024-02-01", "accn": "0000000000-24-000001"}
+            state = {"version": 1, "tickerMap": {"TEST": "0000000001"}, "requests": 0,
+                     "facts": {"TEST": {"signature": signature, "status": "ok",
+                               "q4": {"2023-12-31": {"epsDiluted": [prior]},
+                                      "2024-12-31": {"epsDiluted": [candidate]}}}}}
+            with open(state_path, "w", encoding="utf-8") as handle:
+                json.dump(state, handle)
+            summary = repair.sec_repair_directory(
+                directory, state_path=state_path, client=FakeClient(None),
+                environ={"SEC_USER_AGENT": "TestAgent test@example.com"})
+            with open(path, encoding="utf-8") as handle:
+                result = json.load(handle)
+            self.assertEqual(summary["status"], "done")
+            self.assertEqual(summary["validationCompared"], 1)
+            self.assertEqual(summary["filledPeriods"], 0)
+            self.assertEqual(summary["rejected"]["raw-filing-hash-missing-or-invalid"], 1)
+            self.assertIsNone(result["quarterly"]["values"]["epsDiluted"][7])
 
     def test_split_between_period_end_and_filing_requires_reporting_basis_review(self):
         normalized, factor, reason = repair.normalize_and_check_q4_eps(
