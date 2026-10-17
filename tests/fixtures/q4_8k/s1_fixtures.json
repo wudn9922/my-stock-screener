@@ -98,7 +98,7 @@
       "storedEps": 1.24,
       "epsDilutedRead": 1.22,
       "epsLabelRead": "US GAAP Earnings Per Share - Diluted",
-      "epsReadNote": "differs from storedEps by 0.02"
+      "epsReadNote": "differs from storedEps by 0.02; read from table 4 (US GAAP EPS reconciliation, three months ended April 30, 2023), not targetTableIndex 6 (net income to EBITDA table, no EPS row)"
     },
     {
       "file": "URBN-2016-01-31-L1.html",
@@ -190,9 +190,9 @@
       "sha256": "57756dd5863abfb39d7c2a401014ef1dcbce315eea47d8aba20a1c575ac0f06e",
       "roundTrip": true,
       "storedEps": 0.93,
-      "epsDilutedRead": null,
-      "epsLabelRead": null,
-      "epsReadNote": "could not read by eye: no row reads 'diluted' under net income per share; the EPS block lists only 'Income from continuing operations' (0.93, three months ended January 1, 2022), not confirmed as the diluted net income row"
+      "epsDilutedRead": 0.93,
+      "epsLabelRead": "Income from continuing operations",
+      "epsReadNote": "diluted by rule: EPS block has no basic/diluted split; only share row is 'Diluted average shares outstanding', no basic row; reconciliation titled 'Diluted earnings per share (EPS)'; discontinued operations '—' so net income 207 = income from continuing operations 207"
     },
     {
       "file": "URBN-2014-01-31-L2.html",
@@ -302,9 +302,9 @@
       "sha256": "34e7f298cc5fd4dff2d187dd92d53159f9743470d55543fea9b1aa0e5aafeba3",
       "roundTrip": true,
       "storedEps": 0.51,
-      "epsDilutedRead": null,
-      "epsLabelRead": null,
-      "epsReadNote": "could not read by eye: no row reads 'diluted' under net income per share; the EPS block is labelled only 'Earnings per share' and its 'Net income (loss)' row shows 0.51 (three months ended December 29, 2012), not confirmed as diluted"
+      "epsDilutedRead": 0.51,
+      "epsLabelRead": "Net income (loss)",
+      "epsReadNote": "diluted by rule (decision-2 C6 layout): EPS block has no basic/diluted split; only share row is 'Diluted average shares outstanding (d)', no basic row; read the 'Net income (loss)' per-share row"
     },
     {
       "file": "UNFI-2013-08-03-L8.html",
