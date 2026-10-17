@@ -56,3 +56,30 @@
 - Deviations: the decided manifest edits for the two TXT rules and WLY's table note, with reason "Opus review,
   decision in docs/handoff/s1-run20-review.md".
 - Stop: none.
+
+## S2a-2
+
+- Step: S2a-2 (automated S1 plan §4): items (c), (d), (e), (f) and the workflow delta (Appendix B). Code, tests and workflow only. No SEC request, no workflow dispatch, no S3 run, no merge.
+- Date (UTC): 2026-10-17.
+- Main commit: 60545951 (base of `claude/s2a-2`). Branch commits: 4965aca6 (c), e490ecb7 (d), 2cecb468 (e), dc145c67 (f), d09edbd4 (workflow); this section is the last commit.
+- Workflow run ids and artifact names: none. The workflow was not dispatched.
+- Input counts: `docs/report/q4-8k/answer-set.json`: 2,649 rows, 563 keys, 2,387 basic rows. A local rebuild from 95184ade with the committed builder into the scratchpad is byte-identical to the committed file, so the workflow's `cmp` and pin assertions pass. `tests/fixtures/q4_8k/s1_fixtures.json` devTickers: 8.
+- Output files: `atlas/scripts/backfill_q4_eps_8k.py`, `tests/test_backfill_q4_eps_8k.py`, `.github/workflows/q4-8k-backfill.yml`, this section.
+- Key numbers: full suite 1,188 tests, OK (1,153 before, plus 35 new).
+- Changed tests (expectation changed): none. Every existing test in `tests/test_backfill_q4_eps_8k.py` and `tests/test_q4_eps_diagnose.py` passes unchanged. `tests/test_q4_eps_diagnose.py` is not touched.
+- Changes by item:
+  - (c) `--answer-set`, `--shard k/N`, `--mode gate --reports`. Tests: ShardTests, AnswerSetFileTests, GateTests, AnswerSetBacktestTests.
+  - (d) `verify_quarter` confirms only with |checked − eps| ≤ max(0.011, 0.005·|eps|). Test: IndependentCheckToleranceTests.
+  - (e) `table_eps` matches net income with the capped `strict_scales`. Checked offline: no table in `tests/fixtures/q4_8k/` changes its result for any target tried. Test: StrictNetIncomeTableTests (three of them fail on the old code).
+  - (f) `find_quarter` returns the first specific reason across filings; the generic reason only when none is specific. Test: FindQuarterReasonTests (two fail on the old code).
+- Gate cases (GateTests): all keys in one report, exit 0, summary written (pass); partition across two shard reports (pass); key in no report (exit 3, no summary); key in two reports (exit 3, no summary); split shard repeating a key of the full shard (exit 3, no summary); sign error counted and listed; dev ticker excluded from the accuracy count; conflict counted over extracted rows; row outside the answer set counted as extra and left out; gate creates no SEC client; usage errors exit 2.
+- Shards: every key in exactly one shard for N = 1, 2, 8, 16 on the real answer set (563 keys).
+- Deviations and open points for Opus:
+  - Gate, report row outside the answer set: the spec does not say. It is counted as `extraRows` and left out of every metric. It does not cause exit 3.
+  - Gate output goes to `--report`. There is no default path. Claude passes `--report docs/report/q4-8k/s3-backtest-summary.json`.
+  - The gate summary has no pass/fail verdict. S3.4 is applied by the reviewer.
+  - Usage checks I added: `--answer-set` needs `--mode backtest` and no `--tickers`; `--shard` needs `--answer-set`; `--mode gate` needs `--answer-set` and `--reports` and no `--out-dir`.
+  - Functions touched: `run` (c), `verify_quarter` (d), `table_eps` (e), `find_quarter` (f). Not touched: `_labelled_rows`, `from_filing`, `process_ticker`, `apply_fill`, `summarize`, and the listed constants. `table_eps`, `find_quarter` and `run` are on the S1-CF unchanged list in `auto-s1-decision-2.md` §5, but `auto-s1-decision-2.md` §4 and plan §4 name them as S2a-2 changes, so I read them as authorised.
+  - `table_eps` (e) can now accept a table that was rejected as ambiguous, when the decimals narrow the matching scales to one. Seen only on synthetic input.
+  - Backtest with `--answer-set`: a key whose financials file is missing is skipped without a row. The gate then exits 3 for the missing pairs.
+- Stop: none.
