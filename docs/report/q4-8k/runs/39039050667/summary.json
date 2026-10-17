@@ -1,0 +1,100 @@
+{
+  "mode": "diagnose",
+  "sourceReport": "docs/report/q4-8k/input/run-17/q4-8k-report.json",
+  "sourceRows": 235,
+  "selectedSourceRows": 235,
+  "diagnosed": 235,
+  "classHintCounts": {
+    "L1": 8,
+    "L2": 95,
+    "L3": 22,
+    "L4": 25,
+    "L9": 85
+  },
+  "fixtureSelection": "tests/fixtures/q4_8k/s1_fixture_selection.json",
+  "fixtureCount": 17,
+  "fixtureErrors": [
+    {
+      "key": "TRMB",
+      "end": "2011-12-30",
+      "class": "L1",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-12-073574",
+      "document": "d304248dex991.htm",
+      "error": "too large"
+    },
+    {
+      "key": "WSM",
+      "end": "2012-01-29",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-12-102576",
+      "document": "d312373dex991.htm",
+      "error": "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+    },
+    {
+      "key": "WSM",
+      "end": "2013-02-03",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-13-115118",
+      "document": "d503606dex991.htm",
+      "error": "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+    },
+    {
+      "key": "WSM",
+      "end": "2014-02-02",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-14-095586",
+      "document": "d691119dex991.htm",
+      "error": "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+    },
+    {
+      "key": "WSM",
+      "end": "2015-02-01",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-15-096958",
+      "document": "d894119dex991.htm",
+      "error": "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+    },
+    {
+      "key": "WSM",
+      "end": "2016-01-31",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-16-506695",
+      "document": "d160621dex991.htm",
+      "error": "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+    },
+    {
+      "key": "WSM",
+      "end": "2017-01-29",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-17-083658",
+      "document": "d339255dex991.htm",
+      "error": "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+    }
+  ],
+  "devTickers": [
+    "TRAK",
+    "TXT",
+    "UI",
+    "UNFI",
+    "URBN",
+    "VIAV",
+    "VNCE",
+    "WLY"
+  ],
+  "stopped": null,
+  "requests": 2630
+}

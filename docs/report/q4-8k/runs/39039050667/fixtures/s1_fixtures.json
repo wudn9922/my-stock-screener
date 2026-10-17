@@ -1,0 +1,382 @@
+{
+  "schemaVersion": 2,
+  "devTickers": [
+    "TRAK",
+    "TXT",
+    "UI",
+    "UNFI",
+    "URBN",
+    "VIAV",
+    "VNCE",
+    "WLY"
+  ],
+  "fixtures": [
+    {
+      "file": "TXT-2016-12-31-L2-negative.html",
+      "key": "TXT",
+      "end": "2016-12-31",
+      "class": "L8",
+      "role": "negative",
+      "negativeFor": "L2",
+      "mustReject": "next-quarter table (slack and L2)",
+      "accession": "0001104659-17-024320",
+      "document": "a17-11537_1ex99d1.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465917024320/a17-11537_1ex99d1.htm",
+      "tableIndices": [
+        2
+      ],
+      "targetTableIndex": 2,
+      "bytes": 12533,
+      "sha256": "21b4c3c3e1a7b9828c13482403090a738e3b88c0b8dee83c856385092045dab0",
+      "roundTrip": true,
+      "storedEps": 0.78,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "WLY-2018-04-30-L4-negative.html",
+      "key": "WLY",
+      "end": "2018-04-30",
+      "class": "L4",
+      "role": "negative",
+      "negativeFor": "L4",
+      "mustReject": "no strict NI match",
+      "accession": "0000107140-18-000012",
+      "document": "exhibit99.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714018000012/exhibit99.htm",
+      "tableIndices": [
+        36
+      ],
+      "targetTableIndex": 36,
+      "bytes": 11378,
+      "sha256": "7985ce4b71c8b8bec6bdac4eb884a79e0c1e63b6c5a1ddf42ae66e6dfe54ae5b",
+      "roundTrip": true,
+      "storedEps": 0.93,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "TRAK-2020-06-30-L5-negative.html",
+      "key": "TRAK",
+      "end": "2020-06-30",
+      "class": "L5",
+      "role": "negative",
+      "negativeFor": "L5",
+      "mustReject": "no quarter column",
+      "accession": "0001654954-20-010594",
+      "document": "ex991.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000165495420010594/ex991.htm",
+      "tableIndices": [
+        1
+      ],
+      "targetTableIndex": 1,
+      "bytes": 8935,
+      "sha256": "b16d9d7db7c43d4b3ae1fea6733e97e4af6b7f1d60fe09b7b1ff8d5c1c295f11",
+      "roundTrip": true,
+      "storedEps": 0.01,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "WLY-2023-04-30-L1.html",
+      "key": "WLY",
+      "end": "2023-04-30",
+      "class": "L1",
+      "role": "positive",
+      "negativeFor": null,
+      "mustReject": null,
+      "accession": "0000107140-23-000083",
+      "document": "wly-2023430xex991.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714023000083/wly-2023430xex991.htm",
+      "tableIndices": [
+        3,
+        4,
+        5,
+        6
+      ],
+      "targetTableIndex": 6,
+      "bytes": 27341,
+      "sha256": "c9e149c1f107fdcc55bf847f9283e743c231f0170e0432bbb771fd80ea67fd7a",
+      "roundTrip": true,
+      "storedEps": 1.24,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "URBN-2016-01-31-L1.html",
+      "key": "URBN",
+      "end": "2016-01-31",
+      "class": "L1",
+      "role": "positive",
+      "negativeFor": null,
+      "mustReject": null,
+      "accession": "0001193125-16-496526",
+      "document": "d138438dex991.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/912615/000119312516496526/d138438dex991.htm",
+      "tableIndices": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "targetTableIndex": 3,
+      "bytes": 17922,
+      "sha256": "688684ba057d758c7e2bf11e2b9d0f4c97f067808a7867429f184118c9780b27",
+      "roundTrip": true,
+      "storedEps": 0.59,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "VNCE-2024-02-03-L1.html",
+      "key": "VNCE",
+      "end": "2024-02-03",
+      "class": "L1",
+      "role": "positive",
+      "negativeFor": null,
+      "mustReject": null,
+      "accession": "0000950170-24-050201",
+      "document": "vnce-ex99_1.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000095017024050201/vnce-ex99_1.htm",
+      "tableIndices": [
+        0,
+        1
+      ],
+      "targetTableIndex": 1,
+      "bytes": 30708,
+      "sha256": "fa99175d749c5071024e30c6e584944c68beed6c01968e73c1bf71ab4ae5c5d5",
+      "roundTrip": true,
+      "storedEps": -0.37,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "TRAK-2019-06-30-L2.html",
+      "key": "TRAK",
+      "end": "2019-06-30",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "mustReject": null,
+      "accession": "0001654954-19-010742",
+      "document": "ex99-1.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000165495419010742/ex99-1.htm",
+      "tableIndices": [
+        1
+      ],
+      "targetTableIndex": 1,
+      "bytes": 21587,
+      "sha256": "99c42149250e80102b9b3d747b44297f0fdb4cd2a2b40174ac8429549b4b421e",
+      "roundTrip": true,
+      "storedEps": 0.009,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "TXT-2022-01-01-L2.html",
+      "key": "TXT",
+      "end": "2022-01-01",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "mustReject": null,
+      "accession": "0000217346-22-000002",
+      "document": "q4218-kex991.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734622000002/q4218-kex991.htm",
+      "tableIndices": [
+        1
+      ],
+      "targetTableIndex": 1,
+      "bytes": 24686,
+      "sha256": "57756dd5863abfb39d7c2a401014ef1dcbce315eea47d8aba20a1c575ac0f06e",
+      "roundTrip": true,
+      "storedEps": 0.93,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "URBN-2014-01-31-L2.html",
+      "key": "URBN",
+      "end": "2014-01-31",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "mustReject": null,
+      "accession": "0001193125-14-093584",
+      "document": "d691625dex991.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/912615/000119312514093584/d691625dex991.htm",
+      "tableIndices": [
+        2
+      ],
+      "targetTableIndex": 2,
+      "bytes": 13714,
+      "sha256": "c46db8d0a672099674faed32446d6d1d725ccbdaa0c9b16724c12712372478d6",
+      "roundTrip": true,
+      "storedEps": 0.59,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "UI-2014-06-30-L3.html",
+      "key": "UI",
+      "end": "2014-06-30",
+      "class": "L3",
+      "role": "positive",
+      "negativeFor": null,
+      "mustReject": null,
+      "accession": "0001511737-14-000021",
+      "document": "exhibit991q42014.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/1511737/000151173714000021/exhibit991q42014.htm",
+      "tableIndices": [
+        14
+      ],
+      "targetTableIndex": 14,
+      "bytes": 11478,
+      "sha256": "b5736eb258fa51b4d8b0e952bb30aca307e47d4d4ef75f617b4de53a41800083",
+      "roundTrip": true,
+      "storedEps": 0.55,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "UNFI-2019-08-03-L3.html",
+      "key": "UNFI",
+      "end": "2019-08-03",
+      "class": "L3",
+      "role": "positive",
+      "negativeFor": null,
+      "mustReject": null,
+      "accession": "0001020859-19-000114",
+      "document": "q4-f19pressrelease.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085919000114/q4-f19pressrelease.htm",
+      "tableIndices": [
+        13
+      ],
+      "targetTableIndex": 13,
+      "bytes": 17977,
+      "sha256": "66c2ceb7d353f3b4b3cdca1dcc6513f6522f6e14701f8a5acb0510a5fefa70e8",
+      "roundTrip": true,
+      "storedEps": 0.36,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "VIAV-2021-07-03-L3.html",
+      "key": "VIAV",
+      "end": "2021-07-03",
+      "class": "L3",
+      "role": "positive",
+      "negativeFor": null,
+      "mustReject": null,
+      "accession": "0000912093-21-000116",
+      "document": "viavq4fy218-kex991.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/912093/000091209321000116/viavq4fy218-kex991.htm",
+      "tableIndices": [
+        6
+      ],
+      "targetTableIndex": 6,
+      "bytes": 11584,
+      "sha256": "cbc0a661024ede6c8a302fb84b107987c89e297fe91f9ea1c8ef987919f434e1",
+      "roundTrip": true,
+      "storedEps": 0.01,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "TXT-2012-12-29-L8.html",
+      "key": "TXT",
+      "end": "2012-12-29",
+      "class": "L8",
+      "role": "positive",
+      "negativeFor": null,
+      "mustReject": null,
+      "accession": "0001104659-13-003986",
+      "document": "a13-3441_1ex99d1.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465913003986/a13-3441_1ex99d1.htm",
+      "tableIndices": [
+        2
+      ],
+      "targetTableIndex": 2,
+      "bytes": 20305,
+      "sha256": "34e7f298cc5fd4dff2d187dd92d53159f9743470d55543fea9b1aa0e5aafeba3",
+      "roundTrip": true,
+      "storedEps": 0.51,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "UNFI-2013-08-03-L8.html",
+      "key": "UNFI",
+      "end": "2013-08-03",
+      "class": "L8",
+      "role": "positive",
+      "negativeFor": null,
+      "mustReject": null,
+      "accession": "0001020859-13-000076",
+      "document": "q4fy13earningsrelease.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085913000076/q4fy13earningsrelease.htm",
+      "tableIndices": [
+        10
+      ],
+      "targetTableIndex": 10,
+      "bytes": 12803,
+      "sha256": "0860d96a44ab377a2b587d37890c56ff598aaa645dff2b6b99538b11dd769666",
+      "roundTrip": true,
+      "storedEps": 0.65,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "URBN-2012-01-31-L8.html",
+      "key": "URBN",
+      "end": "2012-01-31",
+      "class": "L8",
+      "role": "positive",
+      "negativeFor": null,
+      "mustReject": null,
+      "accession": "0001193125-12-111659",
+      "document": "d314877dex991.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/912615/000119312512111659/d314877dex991.htm",
+      "tableIndices": [
+        2
+      ],
+      "targetTableIndex": 2,
+      "bytes": 18177,
+      "sha256": "f6784d3a4d1e136787de9f324baf582fdfcc0d5dd18d3270882e51d1734d8641",
+      "roundTrip": true,
+      "storedEps": 0.28,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "VNCE-2026-01-31-L1-year-header-negative.html",
+      "key": "VNCE",
+      "end": "2026-01-31",
+      "class": "L1",
+      "role": "negative",
+      "negativeFor": "L1-year-header",
+      "mustReject": "a twelve-month or year header is not the quarter, and no quarter column is read",
+      "accession": "0001193125-26-155934",
+      "document": "vnce-ex99_1.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000119312526155934/vnce-ex99_1.htm",
+      "tableIndices": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "targetTableIndex": 7,
+      "bytes": 45889,
+      "sha256": "1f94df814c652a9fba2e28e0ab11159e92b98eeec766775918e9f2576f8f165c",
+      "roundTrip": true,
+      "storedEps": -0.28,
+      "epsDilutedRead": null
+    },
+    {
+      "file": "TXT-2020-01-04-L8-non-gaap-diluted-row-negative.html",
+      "key": "TXT",
+      "end": "2020-01-04",
+      "class": "L9",
+      "role": "negative",
+      "negativeFor": "L8-non-gaap-diluted-row",
+      "mustReject": "a non-GAAP or continuing diluted row is not the EPS row",
+      "accession": "0001104659-20-007817",
+      "document": "tm206034d1_ex99-1.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465920007817/tm206034d1_ex99-1.htm",
+      "tableIndices": [
+        13
+      ],
+      "targetTableIndex": 13,
+      "bytes": 9860,
+      "sha256": "1bd05656219e5faeb26fd6dd01834f81acb46a0311f32ebea07cf6a97699f529",
+      "roundTrip": true,
+      "storedEps": 0.87,
+      "epsDilutedRead": null
+    }
+  ]
+}
