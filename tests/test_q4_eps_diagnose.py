@@ -260,6 +260,12 @@ class StrictMatchTests(unittest.TestCase):
     def test_a_whole_number_matches_at_its_own_unit_scale(self):
         self.assertEqual(bq.strict_scales(214, 0, 214_300_000), [1_000_000])
 
+    def test_a_zero_or_a_single_digit_does_not_match_a_large_target_at_a_big_scale(self):
+        self.assertEqual(bq.strict_scales(0, 0, -486_275), [])
+        self.assertEqual(bq.strict_scales(-0.4, 1, -400_000), [1_000_000])
+        self.assertEqual(bq.strict_scales(0.21, 2, 214_000_000), [])
+        self.assertEqual(bq.strict_scales(18.7, 1, 18_737_000), [1_000_000])
+
     def test_digits_after_the_point_are_counted_from_the_cell(self):
         label, pairs = bq.cells_with_decimals(["Net income", "1,234.5"])
         self.assertEqual((label, pairs), ("Net income", [(1234.5, 1)]))
@@ -455,6 +461,78 @@ class M1EvidenceFieldTests(unittest.TestCase):
         row = evidence_row(doc(L10_TABLE, L8_TABLE))
         restored = json.loads(json.dumps(row))
         self.assertEqual(bq.classify_row(restored), bq.classify_row(row))
+
+
+def money_document(html, target):
+    """rawMoneyMatch and rawMoneyContext of the one synthetic document (real diagnose_filing output, no SEC access)."""
+    filing = {"accessionNumber": "0000000001-25-000001", "filingDate": "2025-02-15"}
+    detail, _ = bq.diagnose_filing(FixtureSec(html), 1, filing, EVIDENCE_END, target)
+    document = detail["documents"][0]
+    return document["rawMoneyMatch"], document["rawMoneyContext"]
+
+
+class ProseMoneyTests(unittest.TestCase):
+    def test_a_million_amount_with_one_decimal_matches_within_the_cap(self):
+        matched, context = money_document('<html><body><p style="margin:0">Net income of $18.7 million</p>'
+                                          '</body></html>', 18_737_000)
+        self.assertTrue(matched)
+        self.assertIn("$18.7 million", context)
+
+    def test_style_and_script_text_is_not_prose(self):
+        self.assertFalse(money_document("<style>p{margin:0}</style><p>30 days</p>", 29_826_000)[0])
+        self.assertFalse(money_document('<script>var a = "$18.7 million";</script><p>Net</p>', 18_737_000)[0])
+
+    def test_a_loss_is_compared_by_absolute_value(self):
+        self.assertTrue(money_document("<p>net loss of $5.3 million</p>", -5_300_000)[0])
+
+    def test_a_full_dollar_amount_matches_at_unit_scale(self):
+        self.assertTrue(money_document("<p>$1,376,813</p>", 1_376_813)[0])
+
+    def test_a_rounded_amount_that_is_too_far_does_not_match(self):
+        matched, context = money_document("<p>$1.4 Million</p>", 1_376_813)
+        self.assertFalse(matched)
+        self.assertIsNone(context)
+
+    def test_the_context_is_at_most_160_characters(self):
+        text = "x" * 200 + " net income of $18.7 million " + "y" * 200
+        self.assertLessEqual(len(money_document(f"<p>{text}</p>", 18_737_000)[1]), 160)
+
+
+def ni_only_row(label, strict):
+    """A diagnosed row built by hand, with recorded strict matches (as diagnose wrote them before S1-CF C1)."""
+    table = {"table": 0, "periodNamed": True, "quarterWording": True, "epsTable": False, "headerText": HEADER,
+             "rows": [], "niRows": [], "strictMatches": strict, "acceptedStrictColumns": [], "tableEps": None,
+             "nearestPrecedingNonempty": [], "dilutedAvoidLabels": []}
+    document = {"name": "ex.htm", "url": "u", "tableCount": 1, "tables": [table], "rawStrictTextMatch": False,
+                "rawMoneyMatch": False}
+    return {"key": "SYN", "end": EVIDENCE_END, "cik": 1, "targetNetIncome": EVIDENCE_TARGET, "hintNote": "h",
+            "candidateFilings": [{"accession": "A-1", "filingUrl": "https://www.sec.gov/x/", "documents": [document]}]}
+
+
+class RecomputedStrictAndIndexPageTests(unittest.TestCase):
+    def test_a_zero_recorded_at_the_billion_scale_under_another_label_is_dropped(self):
+        strict = [{"row": 1, "column": 0, "value": 0.0, "decimals": 0, "scales": [1e9], "label": "Impairment charge",
+                   "niLike": False, "acceptedNiLabel": False}]
+        row = ni_only_row("Impairment charge", strict)
+        before = json.loads(json.dumps(row))
+        result = bq.classify_row(row)
+        self.assertEqual(result["class"], "L4", result)
+        self.assertEqual(row, before)                    # the input row is not changed
+
+    def test_an_index_page_alone_is_an_l6_with_the_index_note(self):
+        row = evidence_row(doc(L8_TABLE))
+        row["candidateFilings"][0]["documents"][0]["name"] = "0000000001-25-000001-index.htm"
+        result = bq.classify_row(row)
+        self.assertEqual(result["class"], "L6")
+        self.assertEqual(result["note"], "no release document in the candidate filings (only EDGAR index pages)")
+
+    def test_an_index_page_is_not_a_release_document_in_any_rule(self):
+        row = evidence_row(doc(L10_TABLE))
+        row["candidateFilings"][0]["documents"][0]["name"] = "0000000001-25-000001-index-headers.html"
+        row["candidateFilings"][0]["documents"].append({"name": "ex.htm", "url": "u", "tableCount": 0, "tables": []})
+        result = bq.classify_row(row)
+        self.assertEqual((result["class"], result["note"]),
+                         ("L6", "no HTML table in any of the 1 documents of the candidate filings"))
 
 
 FIVE_TABLES = doc(tbl(), tbl(tr("Revenue", "5,000")), tbl(), tbl(tr(HEADER, "x")),

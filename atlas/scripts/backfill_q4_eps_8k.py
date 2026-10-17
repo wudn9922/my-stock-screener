@@ -22,6 +22,7 @@ stop at the first HTTP 403, and --budget requests per run. docs/report/fundament
 records finished tickers so the next run continues where this one stopped.
 """
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -32,6 +33,7 @@ import time
 from collections import Counter
 from datetime import date, timedelta
 from html import escape as html_escape
+from html import unescape as html_unescape
 from html.parser import HTMLParser
 from urllib import error, request
 
@@ -54,6 +56,7 @@ SCALES = (1, 1e3, 1e6, 1e9)
 NI_TOLERANCE = 0.002       # relative: stored Q4 net income against the table (plus half a unit of its scale)
 SHARES_TOLERANCE = 0.05    # relative: net income / shares against EPS (absolute floor EPS_FLOOR)
 EPS_FLOOR = 0.02
+STRICT_UNIT_CAP = 0.01     # diagnose only: the strict half-unit slack is at most this share of the target (S1-CF C1)
 FILING_DAYS = (15, 150)    # an 8-K with Item 2.02 this many days after the quarter end
 MAX_FILINGS = 3
 MAX_EXHIBITS = 4
@@ -387,11 +390,50 @@ def _decimal_places(text):
 
 
 def strict_scales(value, decimals, target):
-    """Every unit scale at which the reported value matches the target within half a unit of its last shown digit."""
+    """
+    Every unit scale at which the reported value matches the target within half a unit of its last shown digit, and
+    never looser than STRICT_UNIT_CAP of the target (S1-CF C1: a 0 or a single digit no longer matches a large target).
+    """
     if value is None or target is None:
         return []
     return [scale for scale in SCALES
-            if abs(value * scale - target) <= max(NI_TOLERANCE * abs(target), 0.5 * scale * 10 ** -decimals)]
+            if abs(value * scale - target) <= max(NI_TOLERANCE * abs(target),
+                                                  min(0.5 * scale * 10 ** -decimals, STRICT_UNIT_CAP * abs(target)))]
+
+
+MONEY_UNITS = {"thousand": 1e3, "million": 1e6, "billion": 1e9}
+MONEY_WORD = re.compile(r"\$\s*\(?\s*(\d[\d,]*(?:\.\d+)?)\s*\)?\s*(thousand|million|billion)\b", re.I)
+MONEY_FULL = re.compile(r"\$\s*\(?\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?)(?![\d,.])(?!\s*\)?\s*(?:thousand|million|billion)\b)",
+                        re.I)
+SCRIPT_OR_STYLE = re.compile(r"<(script|style)\b[^>]*>.*?</\1\s*>", re.I | re.S)
+MARKUP_COMMENT = re.compile(r"<!--.*?-->", re.S)
+MARKUP_TAG = re.compile(r"<[^>]+>")
+
+
+def visible_text(text):
+    """The text a reader sees: no script, style, comments or tags; entities decoded; whitespace collapsed (S1-CF C4)."""
+    text = MARKUP_TAG.sub(" ", MARKUP_COMMENT.sub(" ", SCRIPT_OR_STYLE.sub(" ", text)))
+    return " ".join(html_unescape(text).split())
+
+
+def money_match(visible, target):
+    """
+    The first money token of the visible text (prose such as "$18.7 million" or "$1,376,813") whose absolute value
+    matches the target → (start, 160 characters of visible text around it), or None. Diagnose only (S1-CF C4).
+    """
+    if target is None:
+        return None
+    tokens = [(match.start(), match.group(1), MONEY_UNITS[match.group(2).lower()])
+              for match in MONEY_WORD.finditer(visible)]
+    tokens += [(match.start(), match.group(1), 1) for match in MONEY_FULL.finditer(visible)]
+    for start, digits, scale in sorted(tokens):
+        value = abs(float(digits.replace(",", "")))
+        decimals = _decimal_places(digits)
+        slack = max(NI_TOLERANCE * abs(target), min(0.5 * scale * 10 ** -decimals, STRICT_UNIT_CAP * abs(target)))
+        if abs(value * scale - abs(target)) <= slack:
+            window = max(0, start - 80)
+            return start, visible[window:window + 160]
+    return None
 
 
 def diluted_per_share_labels(table):
@@ -818,6 +860,9 @@ def diagnose_filing(sec, cik, filing, end, target, fixture_specs=None, texts=Non
         document["rawStrictTextMatch"] = any(
             strict_scales(number(token.group(0)), _decimal_places(token.group(0)), target)
             for token in NUMBER_TOKEN.finditer(text))
+        money = money_match(visible_text(text), target)
+        document["rawMoneyMatch"] = money is not None
+        document["rawMoneyContext"] = money[1] if money is not None else None
         document["targetPresentAnywhere"] = bool(document["targetMatches"] or document["rawTextMatches"])
         document["netIncomeTargetPresent"] = bool(document["netIncomeTargetMatches"])
         result["documents"].append(document)
@@ -967,11 +1012,40 @@ def _classified_row(record):
     return record
 
 
+INDEX_PAGE = re.compile(r"^\d{10}-\d{2}-\d{6}-index(?:-headers)?\.html?$", re.I)     # EDGAR index pages (S1-CF C3)
+
+
+def _with_recomputed_strict(row):
+    """
+    A copy of a diagnosed row whose recorded strict matches are recomputed with strict_scales (S1-CF C2): each match keeps
+    only the scales it still meets, and acceptedStrictColumns is rebuilt from the matches under an accepted label.
+    The input row is not changed.
+    """
+    copied = copy.deepcopy(row)
+    target = copied.get("targetNetIncome")
+    for filing in copied.get("candidateFilings") or []:
+        for document in filing.get("documents") or []:
+            for table in document.get("tables") or []:
+                kept = []
+                for match in table.get("strictMatches") or []:
+                    scales = strict_scales(match.get("value"), match.get("decimals") or 0, target)
+                    if scales:
+                        kept.append(dict(match, scales=scales))
+                table["strictMatches"] = kept
+                accepted = {(match["column"], scale) for match in kept if match.get("acceptedNiLabel")
+                            for scale in match["scales"]}
+                table["acceptedStrictColumns"] = [[column, scale] for column, scale in sorted(accepted)]
+    return copied
+
+
 def classify_row(row):
     """
     S1 class of one diagnosed row, computed from its JSON evidence only (no SEC access, no stored text). The rules
     are tried in order and the first that holds gives the class; the first table that satisfies it is the evidence.
+    The row is copied first: strict matches are recomputed (S1-CF C2) and EDGAR index pages are not release documents
+    (S1-CF C3), so no rule sees either.
     """
+    row = _with_recomputed_strict(row)
     cik = row.get("cik")
     browse = EDGAR_BROWSE.format(cik=cik) if cik is not None else None
     hint = row.get("hintNote") or "input missing"
@@ -982,7 +1056,8 @@ def classify_row(row):
         return _classified("L7", "no candidate filing: " + hint, url=browse)
     first = filings[0]
     end = row.get("end")
-    pairs = [(filing, document) for filing in filings for document in filing.get("documents") or []]
+    pairs = [(filing, document) for filing in filings for document in filing.get("documents") or []
+             if not INDEX_PAGE.match(document.get("name") or "")]
     located = [(filing, document, table) for filing, document in pairs for table in document.get("tables") or []]
 
     def found(cls, filing, document, table, note, table_indices=None, eps_reason=None):
@@ -993,10 +1068,11 @@ def classify_row(row):
     def where(document, table):
         return f"table {table['table']} of {document.get('name')}"
 
-    # rule 2 (L6): no candidate document holds an HTML table
+    # rule 2 (L6): no candidate release document holds an HTML table (an index page alone gives the index note)
     if not any((document.get("tableCount") or 0) > 0 for _, document in pairs):
-        return _classified("L6", f"no HTML table in any of the {len(pairs)} documents of the candidate filings",
-                           accession=first.get("accession"), url=first.get("filingUrl") or browse)
+        note = (f"no HTML table in any of the {len(pairs)} documents of the candidate filings" if pairs
+                else "no release document in the candidate filings (only EDGAR index pages)")
+        return _classified("L6", note, accession=first.get("accession"), url=first.get("filingUrl") or browse)
     # rule 3 (L10): period-named EPS table, accepted net income, table_eps rejects it with a reason
     for filing, document, table in located:
         eps = table.get("tableEps") or {}
