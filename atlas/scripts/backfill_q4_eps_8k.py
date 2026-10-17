@@ -86,6 +86,7 @@ NI_AVOID = ("per share", "noncontrolling", "non-controlling", "minority", "conti
 EPS_AVOID = ("weighted", "shares", "number of", "average", "continuing") + NON_GAAP   # total EPS, like the net income row
 PER_SHARE_TOKENS = ("per share", "per common share", "per diluted share", "eps", "earnings per")   # diagnose only
 HEADING_TOKENS = ("per share", "per common share", "per diluted share", "earnings per")           # diagnose only
+S2_HEADING_WORDS = ("per share", "per common share")     # S2b L8 (decision §1 item 1): the heading words the S2 path reads
 NON_GAAP_OR_CONTINUING = NON_GAAP + ("continuing",)                                              # diagnose only
 
 
@@ -312,38 +313,63 @@ def split_factor(doc, filing_date):
     return factor
 
 
-def _labelled_rows(table):
-    """(lower-cased label, values) of every labelled row; the Basic / Diluted rows under a per-share heading are renamed."""
-    rows, heading_left = [], 0
+def _diluted_heading_net(low, values):
+    """S2b L8 item 3: a net income row under a diluted heading, with per-share values (under 1000, one not None)."""
+    return (is_net_income(low) and not any(word in low for word in EPS_AVOID)
+            and any(value is not None for value in values) and all(value is None or abs(value) < 1000 for value in values))
+
+
+def _labelled_rows(table, s2=True, renamed=None):
+    """
+    (lower-cased label, values) of every labelled row; the Basic / Diluted rows under a per-share heading are renamed.
+    s2=False keeps the S1 heading words ("per share" only), which the S1 classifier evidence was recorded with.
+    s2=True also reads "per common share" headings (S2b L8 item 1), and renames the first net income row under a
+    diluted heading to "diluted earnings per share" (S2b L8 item 3). renamed, when a list, receives the index of every
+    row whose label was renamed.
+    """
+    heading_words = S2_HEADING_WORDS if s2 else ("per share",)
+    rows, heading_left, heading_diluted, heading_renamed = [], 0, False, False
     for cells in table:
         label, values = row_of(cells)
         if not label:
             continue
         low = label.lower()
-        if "per share" in low and all(value is None for value in values):
+        if any(token in low for token in heading_words) and all(value is None for value in values):
             heading_left = 2                # "Net income (loss) per share:" heading; its Basic / Diluted rows follow
+            heading_diluted = s2 and re.search(r"\bdiluted\b", low) is not None and re.search(r"\bbasic\b", low) is None
+            heading_renamed = False
             continue
         if heading_left:
             heading_left -= 1
             # only the two rows under the heading, and never share counts (per-share values are far below 1000)
             if re.fullmatch(r"(basic|diluted)[\s:]*", low) and all(value is None or abs(value) < 1000 for value in values):
                 low = f"{low.split()[0]} earnings per share"
+                if renamed is not None:
+                    renamed.append(len(rows))
+            elif heading_diluted and not heading_renamed and _diluted_heading_net(low, values):
+                low = "diluted earnings per share"          # at most one row per heading
+                heading_renamed = True
+                if renamed is not None:
+                    renamed.append(len(rows))
         rows.append((low, values))
     return rows
 
 
-def table_eps(table, target, end):
+def table_eps(table, target, end, annual=None, s2=True):
     """
     One table → (result dict, None), (None, reason) when it is the quarter but fails a check, or (None, None)
-    when it does not show this quarter's net income at all.
+    when it does not show this quarter's net income at all. annual is the full-year net income of the quarter's
+    fiscal year, or None: a diluted EPS row that is a renamed heading row is rejected when the net income equals it
+    (S2b L8, handoff S2.3). s2=False gives the S1 matcher only (no heading variants): the S1 classifier evidence uses it.
     """
     if not period_named(table, end):
         return None, None
-    rows = _labelled_rows(table)
-    eps_label, eps_row = next(((label, values) for label, values in rows if is_eps(label, "diluted")),
-                              (None, None))
-    if eps_row is None:
+    renamed = []
+    rows = _labelled_rows(table, s2, renamed)
+    eps_index = next((index for index, (label, _) in enumerate(rows) if is_eps(label, "diluted")), None)
+    if eps_index is None:
         return None, None
+    eps_label, eps_row = rows[eps_index]
     hits = []                       # (column, unit scale, net values, net label) over every net income row
     for cells in table:             # the raw cells, so that each value keeps the digits after its point (S2a-2 (e))
         raw_label, pairs = cells_with_decimals(cells)
@@ -358,6 +384,8 @@ def table_eps(table, target, end):
     if len({(j, scale) for j, scale, _, _ in hits}) != 1:
         return None, "net income matches more than one column or unit"
     j, scale, net_row, net_label = hits[0]
+    if eps_index in renamed and annual is not None and abs(annual - target) <= NI_TOLERANCE * abs(target):
+        return None, "net income equals the full-year net income"           # S2b L8 check on a renamed row
     if len(net_row) != len(eps_row):
         return None, "net income and EPS rows have different column counts"
     eps = eps_row[j]
@@ -627,9 +655,10 @@ def _table_evidence(table, target, end, named):
                 "headerText": header, "yearWording": YEAR_WORDING.search(header) is not None,
                 "tableEps": None}
     if named and target is not None:
-        result, reason = table_eps(table, target, end)
+        result, reason = table_eps(table, target, end, s2=False)
         evidence["tableEps"] = {"result": result is not None, "reason": reason,
-                                "epsRowFound": any(is_eps(label, "diluted") for label, _ in _labelled_rows(table))}
+                                "epsRowFound": any(is_eps(label, "diluted")
+                                                   for label, _ in _labelled_rows(table, s2=False))}
     return evidence
 
 
@@ -741,7 +770,7 @@ def index_exhibits(page):
     return names
 
 
-def from_filing(sec, cik, filing, target, end, debug=None):
+def from_filing(sec, cik, filing, target, end, debug=None, annual=None):
     accession = filing["accessionNumber"]
     base = ARCHIVE_URL.format(cik=int(cik), folder=accession.replace("-", ""))
     index = sec.get_json(base + "index.json")
@@ -770,7 +799,7 @@ def from_filing(sec, cik, filing, target, end, debug=None):
             continue
         previous = None
         for table in tables_of(text):
-            result, why = table_eps(table, target, end)
+            result, why = table_eps(table, target, end, annual=annual)
             if result is not None:
                 found.append(dict(result, accession=accession, url=url))
             elif why:
@@ -798,14 +827,15 @@ def from_filing(sec, cik, filing, target, end, debug=None):
     return found[0], None
 
 
-def find_quarter(sec, cik, filings, end, target, debug=None):
+def find_quarter(sec, cik, filings, end, target, debug=None, annual=None):
     """
     The first candidate filing that gives this quarter → (result, None), else (None, reason). The reason is the first
     specific reason across the filings; the generic one only when no filing has a specific reason (S2a-2 (f)).
+    annual is the full-year net income of the quarter's fiscal year (S2b L8 check), or None.
     """
     specific = generic = None
     for filing in candidate_filings(filings, date.fromisoformat(end))[:MAX_FILINGS]:
-        result, why = from_filing(sec, cik, filing, target, end, debug)
+        result, why = from_filing(sec, cik, filing, target, end, debug, annual)
         if result is not None:
             return dict(result, end=end, filingDate=filing["filingDate"]), None
         if why and why != GENERIC_REASON:
@@ -1548,6 +1578,24 @@ def run_diagnose(args, sec):
             "stopped": stop, "requests": sec.requests, "rows": rows}
 
 
+def quarter_index(doc, end):
+    ends = (doc.get("quarterly") or {}).get("end") or []
+    return ends.index(end) if end in ends else None
+
+
+def annual_net_income(doc, index):
+    """The full-year net income of the fiscal year of quarter index (S2b L8 annual check), or None."""
+    if index is None:
+        return None
+    fiscal = (doc.get("quarterly") or {}).get("fy") or []
+    annual = doc.get("annual") or {}
+    years, values = annual.get("fy") or [], (annual.get("values") or {}).get("netIncome") or []
+    if index >= len(fiscal) or fiscal[index] not in years:
+        return None
+    position = years.index(fiscal[index])
+    return values[position] if position < len(values) else None
+
+
 def verify_quarter(sec, cik, filings, end, net, eps, doc):
     """
     Independent check: the next year's release shows this quarter again as its prior-year column.
@@ -1555,8 +1603,9 @@ def verify_quarter(sec, cik, filings, end, net, eps, doc):
     """
     when = date.fromisoformat(end)
     reason, debug = "no 8-K with Item 2.02 in the next year's window", []
+    annual = annual_net_income(doc, quarter_index(doc, end))
     for filing in candidate_filings(filings, when + timedelta(days=365))[:MAX_FILINGS]:
-        result, why = from_filing(sec, cik, filing, net, end, debug)
+        result, why = from_filing(sec, cik, filing, net, end, debug, annual)
         if result is None:
             reason = why or reason
             continue
@@ -1594,7 +1643,8 @@ def process_ticker(sec, key, cik, doc, mode, rows):
     filings = filing_rows(sec, cik)
     for p in periods:
         debug = []
-        result, reason = find_quarter(sec, cik, filings, p["end"], p["target"], debug)
+        result, reason = find_quarter(sec, cik, filings, p["end"], p["target"], debug,
+                                      annual=annual_net_income(doc, p["index"]))
         if result is not None:
             factor = split_factor(doc, result["filingDate"])
             if factor != 1:
@@ -1755,7 +1805,8 @@ def process_answer_rows(sec, key, cik, doc, answer_rows, rows):
     for answer in answer_rows:
         end = answer["end"]
         debug = []
-        result, reason = find_quarter(sec, cik, filings, end, answer["netIncome"], debug)
+        result, reason = find_quarter(sec, cik, filings, end, answer["netIncome"], debug,
+                                      annual=annual_net_income(doc, quarter_index(doc, end)))
         if result is not None:
             factor = split_factor(doc, result["filingDate"])
             if factor != 1:
