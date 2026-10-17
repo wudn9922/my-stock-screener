@@ -42,6 +42,12 @@ VEEV 來源：CIK `0001393052`、accession `0001393052-26-000007`、8-K Item 2.0
 - 本次正式值更正：0；33,136 筆既有未分級 Diluted EPS 沒有變化。VEEV 差異保留待核，不能算已修正錯值。
 - 正式 Q4 A/B 覆蓋率沿用 PR #89 報告：Basic 2,463/43,614（5.65%），Diluted 2,723/43,614（6.24%）；未達全市場正式選股及回測條件。
 
+## 近十年季度 Diluted EPS 快照檢查
+
+以目前 4,967 檔財報 JSON 的季度欄位，按每檔最後 40 個連續 FY/FQ 期別檢查：2,344 檔有至少 40 個連續季度列；其中 1,522 檔的 40 個 Diluted EPS 均非空且季度來源標記為 SEC。再要求這 40 季中的十個 Q4 都有 Grade A/B 的 `secQ4EpsFacts.epsDiluted`，而且 fact value 與季度值相同，符合者為 3 檔：ARL、TCI、WLDN。
+
+這是現存快照的結構／來源標記檢查，並非逐季重新核對原始 filing。Q1–Q3 尚未逐筆保存或複核原始 accession 與摘錄；因此按本任務要求的「完整 raw-source audit」標準，本次新完成近十年全季度原始來源稽核的公司數為 0。上述 3 檔不可解讀為本次重新核實後可直接供正式回測。
+
 ## 驗證及審查
 
 - Python 全套測試：`/tmp/q4-test-venv/bin/python -m unittest discover -s tests -p 'test_*.py'`，1,154 tests、全數通過。該暫存 venv 只補上測試依賴，沒有改 repo dependencies。
