@@ -12,6 +12,8 @@ Tables from one filing must agree on diluted EPS.
 Modes:
   backtest  run the same extraction on Q4 periods that already hold a diluted EPS and report the
             errors; writes nothing.
+  diagnose  inspect filings and tables for the no-table rows in a prior report; writes per-row
+            diagnostic JSON to stdout and does not write files.
   fill      write accepted values into null fields only (never overwrites) and record the source of
             each Q4 in q4EpsSources.
 
@@ -41,6 +43,7 @@ import seed_financials_sec as seed  # noqa: E402
 REPO = os.path.dirname(os.path.dirname(SCRIPTS))
 FIN_DIR = os.path.join(REPO, "docs", "report", "financials")
 STATE_PATH = os.path.join(REPO, "docs", "report", "fundamentals", "q4-8k-state.json")
+DIAGNOSE_SOURCE = os.path.join(REPO, "docs", "report", "q4-8k", "input", "run-17", "q4-8k-report.json")
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 ARCHIVE_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{folder}/"
@@ -164,6 +167,28 @@ def _pick(rows, predicate):
 
 MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september",
           "october", "november", "december"]
+QUARTER_WORDING = re.compile(
+    r"\b(?:three\s+months|3\s+months|quarter|fourth\s+quarter|q4|thirteen\s+weeks|fourteen\s+weeks|13\s+weeks|14\s+weeks)\b",
+    re.I,
+)
+YEAR_WORDING = re.compile(r"\b(?:twelve\s+months|year\s+ended|fiscal\s+year|full\s+year|year\s+to\s+date|ytd)\b", re.I)
+NUMBER_TOKEN = re.compile(r"(?<![A-Za-z0-9])\(?\s*\$?\s*-?\d[\d,]*(?:\.\d+)?\s*\)?(?![A-Za-z0-9])")
+
+
+def target_matches(value, target):
+    """Return the (column value, scale) matches used by table_eps for one reported number."""
+    if value is None or target is None:
+        return []
+    return [scale for scale in SCALES
+            if abs(value * scale - target) <= max(NI_TOLERANCE * abs(target), 0.5 * scale)]
+
+
+def table_is_nonempty(table):
+    return any(cell.strip() for row in table for cell in row)
+
+
+def short_table_rows(table, count=3):
+    return [[cell[:240] for cell in row] for row in table[:count]]
 
 
 def shows_period(text, end):
@@ -445,6 +470,233 @@ def find_quarter(sec, cik, filings, end, target, debug=None):
     return None, reason
 
 
+def diagnose_filing(sec, cik, filing, end, target):
+    """Return read-only table and document evidence for one candidate 8-K."""
+    accession = filing["accessionNumber"]
+    base = ARCHIVE_URL.format(cik=int(cik), folder=accession.replace("-", ""))
+    index_url = base + "index.json"
+    result = {"accession": accession, "filingDate": filing.get("filingDate"),
+              "filingUrl": base, "indexUrl": index_url, "documents": []}
+    index = sec.get_json(index_url)
+    if index is None:
+        result["error"] = "filing index not available"
+        return result, []
+    items = (index.get("directory") or {}).get("item") or []
+    page_urls = [base + accession + "-index.html", base + accession + "-index.htm"]
+    page = sec.get_text(page_urls[0]) or sec.get_text(page_urls[1])
+    by_name = [item["name"] for item in items if is_release_exhibit(item)]
+    exhibits = list(dict.fromkeys(index_exhibits(page) + by_name))[:MAX_EXHIBITS]
+    extra = [item["name"] for item in items if (item.get("name") or "").lower().endswith((".htm", ".html"))
+             and item["name"] not in exhibits][:EXTRA_DOCS]
+    non_html = [{"name": item.get("name"), "type": item.get("type")}
+                for item in items if not (item.get("name") or "").lower().endswith((".htm", ".html"))]
+    result.update(indexItems=[{"name": item.get("name"), "type": item.get("type")}
+                              for item in items[:40]],
+                  nonHtmlItems=non_html[:20],
+                  omittedHtmlItems=max(0, sum((item.get("name") or "").lower().endswith((".htm", ".html"))
+                                              for item in items) - len(exhibits) - len(extra)))
+    if not exhibits and not extra:
+        result["error"] = "no HTML exhibit or extra document in the filing"
+        return result, []
+
+    for position, name in enumerate(exhibits + extra):
+        url = base + name
+        text = sec.get_text(url)
+        if text is None:
+            result["documents"].append({"name": name, "url": url, "error": "document not available",
+                                        "tableCount": 0, "tables": [], "targetPresentAnywhere": False,
+                                        "targetMatches": [], "rawTextMatches": []})
+            continue
+        tables = tables_of(text)
+        document = {"name": name, "url": url, "isExhibit": position < len(exhibits),
+                    "tableCount": len(tables), "tables": [],
+                    "targetMatches": [], "netIncomeTargetMatches": [], "rawTextMatches": []}
+        for table_index, table in enumerate(tables):
+            ni_labels, ni_rows, matches = [], [], []
+            for row_index, cells in enumerate(table):
+                label, values = row_of(cells)
+                low = label.lower() if label else ""
+                if label and NI_RE.search(low):
+                    ni_labels.append(label)
+                    closest = None
+                    for column_index, value in enumerate(values):
+                        if value is None or target is None:
+                            continue
+                        for scale in SCALES:
+                            scaled = value * scale
+                            relative_difference = abs(scaled - target) / max(abs(target), 1.0)
+                            candidate = {"column": column_index, "value": value, "scale": scale,
+                                         "scaledValue": scaled,
+                                         "relativeDifference": relative_difference}
+                            if closest is None or relative_difference < closest["relativeDifference"]:
+                                closest = candidate
+                    ni_rows.append({"row": row_index, "label": label,
+                                    "acceptedNiLabel": is_net_income(low), "values": values,
+                                    "closestToTarget": closest})
+                for column_index, value in enumerate(values):
+                    scales = target_matches(value, target)
+                    if not scales:
+                        continue
+                    match = {"row": row_index, "column": column_index, "label": label,
+                             "value": value, "scales": scales,
+                             "niLike": bool(label and NI_RE.search(low)),
+                             "acceptedNiLabel": bool(label and is_net_income(low))}
+                    matches.append(match)
+                    document["targetMatches"].append(dict(match, table=table_index))
+                    if match["niLike"]:
+                        document["netIncomeTargetMatches"].append(dict(match, table=table_index))
+            named = period_named(table, end)
+            quarter_wording = bool(QUARTER_WORDING.search(" ".join(" ".join(row) for row in table)))
+            variant_period = (not named and quarter_wording
+                              and str(date.fromisoformat(end).year) in " ".join(" ".join(row) for row in table))
+            if not ni_labels and not named and not matches:
+                continue
+            preceding = []
+            for prior_index in range(table_index - 1, -1, -1):
+                prior = tables[prior_index]
+                if not table_is_nonempty(prior):
+                    continue
+                prior_text = " ".join(" ".join(row) for row in prior)
+                preceding.append({"table": prior_index, "periodNamed": period_named(prior, end),
+                                  "quarterWording": bool(QUARTER_WORDING.search(prior_text)),
+                                  "rows": short_table_rows(prior)})
+                if len(preceding) == 3:
+                    break
+            info = {"table": table_index, "rows": short_table_rows(table),
+                    "columnCounts": [len(row) for row in table],
+                    "columnCount": max((len(row) for row in table), default=0),
+                    "niLabels": list(dict.fromkeys(ni_labels)), "niRows": ni_rows,
+                    "periodNamed": named,
+                    "quarterWording": quarter_wording, "periodWordingHint": variant_period,
+                    "targetMatches": matches,
+                    "netIncomeTargetMatches": [match for match in matches if match["niLike"]],
+                    "nearestPrecedingNonempty": preceding}
+            document["tables"].append(info)
+        for token in NUMBER_TOKEN.finditer(text):
+            value = number(token.group(0))
+            scales = target_matches(value, target)
+            if scales:
+                document["rawTextMatches"].append({"value": value, "scales": scales,
+                                                   "context": text[max(0, token.start()-100):token.end()+100]
+                                                   .replace("\n", " ")[:220]})
+                if len(document["rawTextMatches"]) >= 12:
+                    break
+        document["targetPresentAnywhere"] = bool(document["targetMatches"] or document["rawTextMatches"])
+        document["netIncomeTargetPresent"] = bool(document["netIncomeTargetMatches"])
+        result["documents"].append(document)
+    return result, []
+
+
+def layout_class_hint(diagnosis):
+    """A review hint only; final S1 classes are assigned from the collected evidence."""
+    candidates = diagnosis.get("candidateFilings") or []
+    if not candidates:
+        return "L7"
+    docs = [doc for filing in candidates for doc in filing.get("documents", [])]
+    if not any(doc.get("tableCount", 0) for doc in docs):
+        return "L6"
+    for filing in candidates:
+        for document in filing.get("documents", []):
+            for table in document.get("tables", []):
+                if table.get("netIncomeTargetMatches") and not table.get("periodNamed"):
+                    if any(prior.get("periodNamed") and prior.get("quarterWording")
+                           for prior in table.get("nearestPrecedingNonempty", [])):
+                        return "L1"
+                    if table.get("periodWordingHint"):
+                        return "L2"
+                if table.get("periodNamed") and table.get("netIncomeTargetMatches"):
+                    if any(not match.get("acceptedNiLabel")
+                           for match in table["netIncomeTargetMatches"]):
+                        return "L3"
+    has_net_income_matches = any(doc.get("netIncomeTargetPresent") for doc in docs)
+    period_ni_tables = [table for filing in candidates for doc in filing.get("documents", [])
+                        for table in doc.get("tables", []) if table.get("periodNamed") and table.get("niLabels")]
+    tables = [table for filing in candidates for doc in filing.get("documents", [])
+              for table in doc.get("tables", [])]
+    if tables and all(YEAR_WORDING.search(" ".join(str(x) for x in table.get("rows", [])))
+                      and not table.get("quarterWording") for table in tables):
+        return "L5"
+    if not has_net_income_matches and period_ni_tables:
+        return "L4"
+    return "L9"
+
+
+def diagnose_quarter(sec, cik, filings, key, end, target):
+    """Inspect the same nearest Item 2.02 filings and documents used by find_quarter."""
+    candidates = candidate_filings(filings, date.fromisoformat(end))[:MAX_FILINGS]
+    result = {"key": key, "end": end, "targetNetIncome": target,
+              "candidateFilingCount": len(candidates), "candidateFilings": []}
+    if not candidates:
+        result["classHint"] = "L7"
+        result["hintNote"] = "No 8-K with Item 2.02 was found inside FILING_DAYS and MAX_FILINGS."
+        return result, []
+    for filing in candidates:
+        detail, _ = diagnose_filing(sec, cik, filing, end, target)
+        result["candidateFilings"].append(detail)
+    result["classHint"] = layout_class_hint(result)
+    result["hintNote"] = "Heuristic only; assign the final S1 class after reviewing the tables and filing text."
+    return result, []
+
+
+def source_target(doc, end):
+    """Find the stored Q4 net income for one report row without changing the source document."""
+    quarter = doc.get("quarterly") or {}
+    ends, fqs = quarter.get("end") or [], quarter.get("fq") or []
+    values = quarter.get("values") or {}
+    net_income = values.get("netIncome") or []
+    for i, period_end in enumerate(ends):
+        if period_end == end and i < len(fqs) and fqs[i] == 4:
+            return net_income[i] if i < len(net_income) else None
+    return None
+
+
+def run_diagnose(args, sec):
+    """Diagnose the no-table rows from a prior report; never writes financials or state."""
+    with open(args.source_report, encoding="utf-8") as source:
+        previous = json.load(source)
+    all_source_rows = [row for row in previous.get("rows", [])
+                       if row.get("reason") == "no table shows this quarter's net income"]
+    source_rows = all_source_rows
+    cik_of = seed.parse_ticker_map(sec.get_json(TICKERS_URL) or {})
+    filings_by_key, doc_by_key, rows = {}, {}, []
+    stop = None
+    for item in source_rows:
+        key, end = str(item.get("key", "")).upper(), item.get("end")
+        if key not in doc_by_key:
+            path = os.path.join(FIN_DIR, key + ".json")
+            doc_by_key[key] = seed.read_json(path) if os.path.isfile(path) else None
+        doc = doc_by_key[key]
+        target = source_target(doc, end) if isinstance(doc, dict) else None
+        record = {"key": key, "end": end, "storedEps": item.get("stored"),
+                  "sourceReason": item.get("reason"), "inputDebugPresent": "debug" in item,
+                  "targetNetIncome": target}
+        cik = cik_of.get(key)
+        if not isinstance(doc, dict) or target is None:
+            record.update(classHint="L9", hintNote="Financials file or Q4 netIncome target is missing.",
+                          candidateFilingCount=0, candidateFilings=[])
+            rows.append(record)
+            continue
+        if cik is None:
+            record.update(classHint="L9", hintNote="Ticker is missing from the SEC company ticker map.",
+                          candidateFilingCount=0, candidateFilings=[])
+            rows.append(record)
+            continue
+        try:
+            if key not in filings_by_key:
+                filings_by_key[key] = filing_rows(sec, cik) if cik is not None else []
+            diagnosis, _ = diagnose_quarter(sec, cik, filings_by_key[key], key, end, target)
+            record.update(diagnosis)
+            rows.append(record)
+        except (OutOfBudget, Forbidden, NetworkError) as exc:
+            stop = f"{type(exc).__name__}: {exc}"
+            break
+    hints = Counter(row.get("classHint", "L9") for row in rows)
+    return {"mode": "diagnose", "sourceReport": os.path.relpath(args.source_report, REPO),
+            "sourceRows": len(all_source_rows), "selectedSourceRows": len(source_rows),
+            "diagnosed": len(rows), "classHintCounts": dict(sorted(hints.items())),
+            "stopped": stop, "requests": sec.requests, "rows": rows}
+
+
 def verify_quarter(sec, cik, filings, end, net, eps, doc):
     """
     Independent check: the next year's release shows this quarter again as its prior-year column.
@@ -591,6 +843,8 @@ def summarize(rows, mode):
 
 
 def run(args, sec):
+    if args.mode == "diagnose":
+        return run_diagnose(args, sec)
     cik_of = seed.parse_ticker_map(sec.get_json(TICKERS_URL) or {})
     state = load_state(STATE_PATH)
     wanted = {t.strip().upper() for t in args.tickers.split(",") if t.strip()} if args.tickers else None
@@ -647,11 +901,13 @@ def run(args, sec):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Q4 EPS from 8-K earnings releases (see module docstring)")
-    parser.add_argument("--mode", choices=("backtest", "fill"), default="backtest")
+    parser.add_argument("--mode", choices=("diagnose", "backtest", "fill"), default="backtest")
     parser.add_argument("--tickers", default="", help="comma separated; empty = every US file")
     parser.add_argument("--limit", type=int, default=0, help="only the first N files (0 = all)")
     parser.add_argument("--budget", type=int, default=6000, help="SEC requests this run")
     parser.add_argument("--report", default="", help="also write the report JSON to this path")
+    parser.add_argument("--source-report", default=DIAGNOSE_SOURCE,
+                        help="backtest report whose no-table rows are inspected in diagnose mode")
     return parser.parse_args(argv)
 
 
@@ -663,17 +919,36 @@ def main(argv=None):
     try:
         report = run(args, sec)
     except Forbidden as exc:
-        print(f"STOPPED: SEC returned HTTP 403 for {exc}; files written so far are kept, re-run later.", flush=True)
+        if args.mode == "diagnose":
+            print(json.dumps({"mode": "diagnose", "sourceReport": args.source_report,
+                              "diagnosed": 0, "stopped": f"Forbidden: {exc}",
+                              "requests": sec.requests, "rows": []}, ensure_ascii=False, indent=2), flush=True)
+        else:
+            print(f"STOPPED: SEC returned HTTP 403 for {exc}; files written so far are kept, re-run later.",
+                  flush=True)
         return 2
     except NetworkError as exc:
-        print(f"STOPPED: SEC could not be reached ({exc}); re-run later.", flush=True)
+        if args.mode == "diagnose":
+            print(json.dumps({"mode": "diagnose", "sourceReport": args.source_report,
+                              "diagnosed": 0, "stopped": f"NetworkError: {exc}",
+                              "requests": sec.requests, "rows": []}, ensure_ascii=False, indent=2), flush=True)
+        else:
+            print(f"STOPPED: SEC could not be reached ({exc}); re-run later.", flush=True)
         return 2
-    text = json.dumps(report, ensure_ascii=False, indent=2)
-    if args.report:
-        with open(args.report, "w", encoding="utf-8") as file:
-            file.write(text)
-    summary = {k: v for k, v in report.items() if k != "rows"}
-    print(json.dumps(summary, ensure_ascii=False, indent=2), flush=True)
+    if args.mode == "diagnose":
+        # stdout may be redirected by Actions to an artifact path; the script itself stays read-only.
+        print(json.dumps(report, ensure_ascii=False, indent=2), flush=True)
+    else:
+        text = json.dumps(report, ensure_ascii=False, indent=2)
+        if args.report:
+            with open(args.report, "w", encoding="utf-8") as file:
+                file.write(text)
+        summary = {k: v for k, v in report.items() if k != "rows"}
+        print(json.dumps(summary, ensure_ascii=False, indent=2), flush=True)
+    if args.mode == "diagnose" and report.get("stopped"):
+        print(f"STOPPED: diagnostic run ended with {report['stopped']}; do not retry after an SEC 403.",
+              file=sys.stderr, flush=True)
+        return 2
     return 0
 
 
