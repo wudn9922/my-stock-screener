@@ -85,7 +85,7 @@ NI_AVOID = ("per share", "noncontrolling", "non-controlling", "minority", "conti
             "before", "comprehensive") + NON_GAAP
 EPS_AVOID = ("weighted", "shares", "number of", "average", "continuing") + NON_GAAP   # total EPS, like the net income row
 PER_SHARE_TOKENS = ("per share", "per common share", "per diluted share", "eps", "earnings per")   # diagnose only
-HEADING_TOKENS = ("per share", "per common share", "per diluted share", "earnings per")           # diagnose only
+HEADING_TOKENS = ("per share", "per common share", "per diluted share", "earnings per")           # per-share headings
 NON_GAAP_OR_CONTINUING = NON_GAAP + ("continuing",)                                              # diagnose only
 
 
@@ -101,31 +101,54 @@ class NetworkError(RuntimeError):
     """SEC could not be reached after the retries."""
 
 
+class _Table(list):
+    """
+    The rows of cell texts of one table, as tables_of has always returned them, plus its grid: spans[r][c] is the
+    colspan of cell c in row r, and rowspan is True when some cell spans several rows (S2b L1 column alignment).
+    """
+    spans = None
+    rowspan = False
+
+
+def _attr_count(attrs, name):
+    for key, value in attrs:
+        if key == name and value and value.strip().isdigit():
+            return max(1, min(int(value), 1000))
+    return 1
+
+
 class _TableParser(HTMLParser):
     """Rows of cell texts for every table of an HTML document (no nested tables)."""
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.tables, self._table, self._row, self._cell = [], None, None, None
+        self._spans, self._row_spans, self._span, self._rowspan = None, None, 1, False
 
     def handle_starttag(self, tag, attrs):
         if tag == "table":
-            self._table = []
+            self._table, self._spans, self._rowspan = [], [], False
         elif tag == "tr" and self._table is not None:
-            self._row = []
+            self._row, self._row_spans = [], []
         elif tag in ("td", "th") and self._row is not None:
             self._cell = []
+            self._span = _attr_count(attrs, "colspan")
+            self._rowspan = self._rowspan or _attr_count(attrs, "rowspan") > 1
 
     def handle_endtag(self, tag):
         if tag in ("td", "th") and self._cell is not None:
             self._row.append(" ".join("".join(self._cell).split()))
+            self._row_spans.append(self._span)
             self._cell = None
         elif tag == "tr" and self._row is not None:
             self._table.append(self._row)
+            self._spans.append(self._row_spans)
             self._row = None
         elif tag == "table" and self._table is not None:
-            self.tables.append(self._table)
-            self._table = None
+            table = _Table(self._table)
+            table.spans, table.rowspan = self._spans, self._rowspan
+            self.tables.append(table)
+            self._table = self._spans = None
 
     def handle_data(self, data):
         if self._cell is not None:
@@ -312,15 +335,20 @@ def split_factor(doc, filing_date):
     return factor
 
 
-def _labelled_rows(table):
-    """(lower-cased label, values) of every labelled row; the Basic / Diluted rows under a per-share heading are renamed."""
+def _labelled_rows(table, s2=True):
+    """
+    (lower-cased label, values) of every labelled row; the Basic / Diluted rows under a per-share heading are renamed.
+    s2=False keeps the S1 heading words ("per share" only), which the S1 classifier evidence was recorded with.
+    """
+    heading_words = HEADING_TOKENS if s2 else ("per share",)
     rows, heading_left = [], 0
     for cells in table:
         label, values = row_of(cells)
         if not label:
             continue
         low = label.lower()
-        if "per share" in low and all(value is None for value in values):
+        # S2b L8: "Net income per common share:" is a heading too (URBN), not only the words "per share"
+        if any(token in low for token in heading_words) and all(value is None for value in values):
             heading_left = 2                # "Net income (loss) per share:" heading; its Basic / Diluted rows follow
             continue
         if heading_left:
@@ -332,16 +360,120 @@ def _labelled_rows(table):
     return rows
 
 
-def table_eps(table, target, end):
+def _heading_net_row(table):
+    """
+    S2b L8 (S1-CF C6): the EPS row of a table with no diluted per-share label. It is a net income row, within 4 table
+    rows after a per-share heading, with values under 1000, in a table that has a diluted share-count row and no basic
+    row (the TXT layout: "Earnings per share:" then "Net income (loss)"). → (label, values) or (None, None).
+    """
+    entries = [(label.lower() if label else None, values) for label, values in (row_of(cells) for cells in table)]
+    headings = [index for index, (low, values) in enumerate(entries)
+                if low and all(value is None for value in values) and any(token in low for token in HEADING_TOKENS)]
+    if not headings or not any(low and is_diluted_shares(low) for low, _ in entries) \
+            or any(low and re.search(r"\bbasic\b", low) for low, _ in entries):
+        return None, None
+    for index, (low, values) in enumerate(entries):
+        if low and not any(word in low for word in EPS_AVOID) and is_net_income(low) \
+                and any(h < index <= h + 4 for h in headings) and any(value is not None for value in values) \
+                and all(value is None or abs(value) < 1000 for value in values):
+            return low, values
+    return None, None
+
+
+def _grid(table):
+    """Each row as [(text, first grid column, colspan)]; a cell without a colspan takes one column."""
+    spans = getattr(table, "spans", None)
+    grid = []
+    for index, row in enumerate(table):
+        widths = spans[index] if spans and index < len(spans) and len(spans[index]) == len(row) else [1] * len(row)
+        position, cells = 0, []
+        for text, width in zip(row, widths):
+            cells.append((text, position, width))
+            position += width
+        grid.append(cells)
+    return grid
+
+
+def _header_row_indices(table):
+    """Indices of the header rows: those before the first numeric row that is not a year row, at most 6 non-empty."""
+    indices = []
+    for index, cells in enumerate(table):
+        _, values = row_of(cells)
+        if any(value is not None for value in values) and not _year_row(cells):
+            break
+        if table_is_nonempty([cells]):
+            indices.append(index)
+            if len(indices) == 6:
+                break
+    return indices
+
+
+YEAR_TOKEN = re.compile(r"(?<!\d)(?:19|20)\d{2}(?!\d)")
+
+
+def _period_columns(table):
+    """
+    The period columns of a header table (S2b L1): each cell of its last header row that names a year, with the text
+    of every header cell above it that covers the same grid column. None when the grid is unknown (a rowspan).
+    """
+    if getattr(table, "rowspan", False):
+        return None
+    grid = _grid(table)
+    header = _header_row_indices(table)
+    leaf_row = next((index for index in reversed(header)
+                     if any(YEAR_TOKEN.search(text) for text, _, _ in grid[index])), None)
+    if leaf_row is None:
+        return []
+    columns = []
+    for text, start, _ in grid[leaf_row]:
+        if not YEAR_TOKEN.search(text):
+            continue
+        covering = [cell for index in header if index <= leaf_row
+                    for cell, first, width in grid[index] if cell and first <= start < first + width]
+        columns.append(" ".join(covering))
+    return columns
+
+
+def _look_back(table, hit, end, preceding, annual, target):
+    """
+    S2b L1 (handoff S2.1, S2.3; S1 decision §2 rule 6): the net income column of a table that does not name the period
+    is the quarter only when the nearest preceding table that names the period with quarter wording has a period
+    column for that column. → (True, None) to read the table, (False, reason) to reject it, (False, None) when no
+    preceding table names the quarter.
+    """
+    j, _, values, _ = hit
+    named = [previous for previous in preceding if period_named(previous, end)]
+    header = next((previous for previous in named if QUARTER_WORDING.search(header_text(previous))), None)
+    if header is None:
+        if named and YEAR_WORDING.search(header_text(named[0])):
+            return False, "period header is a full year, not a quarter"
+        return False, None
+    columns = _period_columns(header)
+    if columns is None or len(columns) != len(values):
+        return False, "period header not aligned"
+    column = normalize_header(columns[j])
+    if YEAR_WORDING.search(column):
+        return False, "matched column header is a full year"
+    if not (shows_period(column, end) and QUARTER_WORDING.search(column)):
+        return False, "matched column header does not name the quarter"
+    if annual is not None and abs(annual - target) <= NI_TOLERANCE * abs(target):
+        return False, "net income equals the full-year net income"
+    return True, None
+
+
+def table_eps(table, target, end, preceding=(), annual=None, s2=True):
     """
     One table → (result dict, None), (None, reason) when it is the quarter but fails a check, or (None, None)
-    when it does not show this quarter's net income at all.
+    when it does not show this quarter's net income at all. A table that does not name the period is read only
+    through the header of a preceding table (S2b L1). preceding is up to 3 tables of the same document, nearest first;
+    annual is the full-year net income of the quarter's fiscal year, or None. s2=False gives the S1 matcher only
+    (no heading variants, no EPS row under a heading, no look-back): the S1 classifier evidence uses it.
     """
-    if not period_named(table, end):
-        return None, None
-    rows = _labelled_rows(table)
+    rows = _labelled_rows(table, s2)
     eps_label, eps_row = next(((label, values) for label, values in rows if is_eps(label, "diluted")),
                               (None, None))
+    if eps_row is None and s2:
+        eps_label, eps_row = _heading_net_row(table)                 # S2b L8
     if eps_row is None:
         return None, None
     hits = []                       # (column, unit scale, net values, net label) over every net income row
@@ -355,6 +487,12 @@ def table_eps(table, target, end):
                 hits.append((j, scale, values, raw_label.lower()))
     if not hits:
         return None, None
+    if not period_named(table, end):                                  # S2b L1: read through the look-back only
+        if not s2 or len({(j, scale) for j, scale, _, _ in hits}) != 1:
+            return None, None
+        ok, reason = _look_back(table, hits[0], end, preceding, annual, target)
+        if not ok:
+            return None, reason
     if len({(j, scale) for j, scale, _, _ in hits}) != 1:
         return None, "net income matches more than one column or unit"
     j, scale, net_row, net_label = hits[0]
@@ -503,15 +641,7 @@ def header_text(table):
     Text of the header rows: the rows before the first row with a numeric value that is not a year row (S1-CF C5).
     At most 6 non-empty rows, cut to 400 characters.
     """
-    rows = []
-    for cells in table:
-        _, values = row_of(cells)
-        if any(value is not None for value in values) and not _year_row(cells):
-            break
-        if table_is_nonempty([cells]):
-            rows.append(cells)
-            if len(rows) == 6:
-                break
+    rows = [table[index] for index in _header_row_indices(table)]
     text = " ".join(" ".join(cell for cell in cells if cell.strip()) for cells in rows)
     return " ".join(text.split())[:400]
 
@@ -627,9 +757,10 @@ def _table_evidence(table, target, end, named):
                 "headerText": header, "yearWording": YEAR_WORDING.search(header) is not None,
                 "tableEps": None}
     if named and target is not None:
-        result, reason = table_eps(table, target, end)
+        result, reason = table_eps(table, target, end, s2=False)
         evidence["tableEps"] = {"result": result is not None, "reason": reason,
-                                "epsRowFound": any(is_eps(label, "diluted") for label, _ in _labelled_rows(table))}
+                                "epsRowFound": any(is_eps(label, "diluted")
+                                                   for label, _ in _labelled_rows(table, s2=False))}
     return evidence
 
 
@@ -741,7 +872,7 @@ def index_exhibits(page):
     return names
 
 
-def from_filing(sec, cik, filing, target, end, debug=None):
+def from_filing(sec, cik, filing, target, end, debug=None, annual=None):
     accession = filing["accessionNumber"]
     base = ARCHIVE_URL.format(cik=int(cik), folder=accession.replace("-", ""))
     index = sec.get_json(base + "index.json")
@@ -768,9 +899,9 @@ def from_filing(sec, cik, filing, target, end, debug=None):
         text = sec.get_text(url)
         if text is None:
             continue
-        previous = None
+        previous, recent = None, []         # recent: up to 3 non-empty tables before this one, in document order
         for table in tables_of(text):
-            result, why = table_eps(table, target, end)
+            result, why = table_eps(table, target, end, preceding=tuple(reversed(recent)), annual=annual)
             if result is not None:
                 found.append(dict(result, accession=accession, url=url))
             elif why:
@@ -787,6 +918,8 @@ def from_filing(sec, cik, filing, target, end, debug=None):
                 if len(orphans["sample"]) < 2:
                     orphans["sample"].append([" | ".join(cell for cell in row if cell)[:120] for row in table[:3]])
             previous = table
+            if table_is_nonempty(table):
+                recent = (recent + [table])[-3:]
     if not found:
         if debug is not None:
             debug.append({"target": target, "period_net_rows": shown[:4], "orphans": orphans})
@@ -798,14 +931,15 @@ def from_filing(sec, cik, filing, target, end, debug=None):
     return found[0], None
 
 
-def find_quarter(sec, cik, filings, end, target, debug=None):
+def find_quarter(sec, cik, filings, end, target, debug=None, annual=None):
     """
     The first candidate filing that gives this quarter → (result, None), else (None, reason). The reason is the first
     specific reason across the filings; the generic one only when no filing has a specific reason (S2a-2 (f)).
+    annual is the full-year net income of the quarter's fiscal year (S2b L1 check), or None.
     """
     specific = generic = None
     for filing in candidate_filings(filings, date.fromisoformat(end))[:MAX_FILINGS]:
-        result, why = from_filing(sec, cik, filing, target, end, debug)
+        result, why = from_filing(sec, cik, filing, target, end, debug, annual)
         if result is not None:
             return dict(result, end=end, filingDate=filing["filingDate"]), None
         if why and why != GENERIC_REASON:
@@ -1548,6 +1682,24 @@ def run_diagnose(args, sec):
             "stopped": stop, "requests": sec.requests, "rows": rows}
 
 
+def quarter_index(doc, end):
+    ends = (doc.get("quarterly") or {}).get("end") or []
+    return ends.index(end) if end in ends else None
+
+
+def annual_net_income(doc, index):
+    """The full-year net income of the fiscal year of quarter index (S2b L1 annual check), or None."""
+    if index is None:
+        return None
+    fiscal = (doc.get("quarterly") or {}).get("fy") or []
+    annual = doc.get("annual") or {}
+    years, values = annual.get("fy") or [], (annual.get("values") or {}).get("netIncome") or []
+    if index >= len(fiscal) or fiscal[index] not in years:
+        return None
+    position = years.index(fiscal[index])
+    return values[position] if position < len(values) else None
+
+
 def verify_quarter(sec, cik, filings, end, net, eps, doc):
     """
     Independent check: the next year's release shows this quarter again as its prior-year column.
@@ -1555,8 +1707,9 @@ def verify_quarter(sec, cik, filings, end, net, eps, doc):
     """
     when = date.fromisoformat(end)
     reason, debug = "no 8-K with Item 2.02 in the next year's window", []
+    annual = annual_net_income(doc, quarter_index(doc, end))
     for filing in candidate_filings(filings, when + timedelta(days=365))[:MAX_FILINGS]:
-        result, why = from_filing(sec, cik, filing, net, end, debug)
+        result, why = from_filing(sec, cik, filing, net, end, debug, annual)
         if result is None:
             reason = why or reason
             continue
@@ -1594,7 +1747,8 @@ def process_ticker(sec, key, cik, doc, mode, rows):
     filings = filing_rows(sec, cik)
     for p in periods:
         debug = []
-        result, reason = find_quarter(sec, cik, filings, p["end"], p["target"], debug)
+        result, reason = find_quarter(sec, cik, filings, p["end"], p["target"], debug,
+                                      annual=annual_net_income(doc, p["index"]))
         if result is not None:
             factor = split_factor(doc, result["filingDate"])
             if factor != 1:
