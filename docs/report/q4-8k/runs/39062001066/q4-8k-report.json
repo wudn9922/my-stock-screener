@@ -1,0 +1,1694 @@
+{
+  "mode": "backtest",
+  "periods": 42,
+  "accepted": 19,
+  "reasons": {
+    "no table shows this quarter's net income": 15,
+    "net income divided by shares differs from EPS": 5,
+    "no 8-K with Item 2.02 in the window": 2,
+    "EPS sign differs from net income": 1
+  },
+  "coverage": 0.4524,
+  "median_error": 0.0,
+  "correct_share_of_all_periods": 0.4524,
+  "accepted_on_derived_stored": 0,
+  "independent_check": {
+    "unavailable": 12,
+    "conflict": 1,
+    "confirmed": 6
+  },
+  "independent_samples": [
+    {
+      "key": "ADTN",
+      "end": "2011-12-31",
+      "target": 31163000,
+      "debug": [
+        {
+          "target": 31163000.0,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 3,
+            "period_in_previous_table": 0,
+            "sample": [
+              [
+                "Consolidated Statements of Income (Unaudited) (In thousands, except per share data)",
+                "",
+                "Three Months Ended | Twelve Months Ended"
+              ],
+              [
+                "Consolidated Statements of Comprehensive Income (Unaudited) (In thousands)",
+                "",
+                "Three Months Ended | Twelve Months Ended"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Accounts receivable, net\n        ",
+            "Deferred tax assets, net\n        ",
+            "Property, plant and equipment, net\n        ",
+            "Deferred tax assets, net\n        ",
+            "Income tax payable, net\n        ",
+            "Net realized investment gain\n        "
+          ]
+        }
+      ]
+    },
+    {
+      "key": "ADTN",
+      "end": "2012-12-31",
+      "target": 3961000,
+      "debug": [
+        {
+          "target": 3961000.0,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 3,
+            "period_in_previous_table": 0,
+            "sample": [
+              [
+                "",
+                "",
+                ""
+              ],
+              [
+                "",
+                "",
+                ""
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Accounts receivable, net\n        ",
+            "Deferred tax assets, net\n        ",
+            "Property, plant and equipment, net\n        ",
+            "Deferred tax assets, net\n        ",
+            "Income tax payable, net\n        ",
+            "Net realized investment gain\n        "
+          ]
+        }
+      ]
+    },
+    {
+      "key": "ADTN",
+      "end": "2014-12-31",
+      "target": 9292000,
+      "debug": [
+        {
+          "target": 9292000.0,
+          "period_net_rows": [
+            [
+              "net income",
+              [
+                5718.0,
+                9292.0,
+                18646.0,
+                44620.0
+              ]
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 2,
+            "period_in_previous_table": 1,
+            "sample": [
+              [
+                "",
+                "Three Months EndedDecember 31, | Twelve Months EndedDecember 31,",
+                "2015 | 2014 | 2015 | 2014"
+              ],
+              [
+                "",
+                "Twelve Months EndedDecember 31,",
+                "2015 | 2014"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Accounts receivable, net",
+            "Deferred tax assets, net",
+            "Property, plant and equipment, net",
+            "Deferred tax assets, net",
+            "Income tax payable, net",
+            "Net realized investment gain"
+          ]
+        }
+      ]
+    }
+  ],
+  "independent_unavailable_reasons": {
+    "no table shows this quarter's net income": 11,
+    "no 8-K with Item 2.02 in the next year's window": 1
+  },
+  "independent_precision": 0.8571,
+  "filled": 0,
+  "tickers_done": 0,
+  "stopped": "NetworkError: https://www.sec.gov/Archives/edgar/data/2186/000135448813000999/index.json",
+  "requests": 565,
+  "mismatches": [],
+  "samples": {
+    "net income divided by shares differs fro": {
+      "key": "AAT",
+      "end": "2021-12-31",
+      "stored": 0.14,
+      "debug": [
+        {
+          "target": 10478000,
+          "period_net_rows": [
+            [
+              "accumulated dividends in excess of net income",
+              [
+                -217785.0,
+                -176560.0
+              ]
+            ],
+            [
+              "net income",
+              [
+                10478.0,
+                36593.0
+              ]
+            ],
+            [
+              "net income",
+              [
+                10478.0,
+                3788.0,
+                36593.0,
+                35588.0
+              ]
+            ],
+            [
+              "(2) percentage of net operating income (noi) calculated for the three months ended december 31, 2021. reconciliation of noi to net income is included in the glossary of terms.",
+              []
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 1,
+            "period_in_previous_table": 0,
+            "sample": [
+              [
+                "",
+                "(Amounts in thousands, except share and per share data)",
+                ""
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Same-Store Cash Net Operating Income",
+            "Real estate, net",
+            "Accounts receivable, net",
+            "Deferred rent receivables, net",
+            "Other assets, net",
+            "Secured notes payable, net"
+          ]
+        }
+      ]
+    },
+    "EPS sign differs from net income": {
+      "key": "ACNT",
+      "end": "2023-12-31",
+      "stored": 1.07,
+      "debug": [
+        {
+          "target": 11139000,
+          "period_net_rows": [
+            [
+              "net (loss) income",
+              [
+                -26629.0,
+                22066.0
+              ]
+            ],
+            [
+              "adjustments to reconcile net (loss) income to net cash provided by operating activities:",
+              []
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 3,
+            "period_in_previous_table": 1,
+            "sample": [
+              [
+                "",
+                "(in millions, except per share and margin) | Q4 2023 | Q4 2022 | Change",
+                "Net Sales | $41.2 | $54.2 | (23.9)%"
+              ],
+              [
+                "",
+                "(in millions, except per share and margin) | 2023 | 2022 | Change",
+                "Net Sales | $193.2 | $262.0 | (26.3)%"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Net Sales",
+            "Net (Loss) Income",
+            "Net Sales",
+            "Net (Loss) Income",
+            "Property, plant and equipment, net",
+            "Right-of-use assets, operating leases, net"
+          ]
+        }
+      ]
+    },
+    "no table shows this quarter's net income": {
+      "key": "ADTN",
+      "end": "2015-12-31",
+      "stored": 0.12,
+      "debug": [
+        {
+          "target": 5718000,
+          "period_net_rows": [
+            [
+              "net income",
+              [
+                5718.0,
+                9292.0,
+                18646.0,
+                44620.0
+              ]
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 2,
+            "period_in_previous_table": 1,
+            "sample": [
+              [
+                "",
+                "Three Months EndedDecember 31, | Twelve Months EndedDecember 31,",
+                "2015 | 2014 | 2015 | 2014"
+              ],
+              [
+                "",
+                "Twelve Months EndedDecember 31,",
+                "2015 | 2014"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Accounts receivable, net",
+            "Deferred tax assets, net",
+            "Property, plant and equipment, net",
+            "Deferred tax assets, net",
+            "Income tax payable, net",
+            "Net realized investment gain"
+          ]
+        }
+      ]
+    },
+    "no 8-K with Item 2.02 in the window": {
+      "key": "APYX",
+      "end": "2011-12-31",
+      "stored": -0.05,
+      "debug": []
+    }
+  },
+  "rows": [
+    {
+      "key": "AAT",
+      "end": "2021-12-31",
+      "stored": 0.14,
+      "result": null,
+      "reason": "net income divided by shares differs from EPS"
+    },
+    {
+      "key": "AAT",
+      "end": "2022-12-31",
+      "stored": 0.16,
+      "result": null,
+      "reason": "net income divided by shares differs from EPS"
+    },
+    {
+      "key": "AAT",
+      "end": "2023-12-31",
+      "stored": 0.17,
+      "result": null,
+      "reason": "net income divided by shares differs from EPS"
+    },
+    {
+      "key": "AAT",
+      "end": "2024-12-31",
+      "stored": 0.15,
+      "result": null,
+      "reason": "net income divided by shares differs from EPS"
+    },
+    {
+      "key": "AAT",
+      "end": "2025-12-31",
+      "stored": 0.05,
+      "result": {
+        "epsDiluted": 0.05,
+        "epsBasic": 0.05,
+        "dilutedShares": null,
+        "scale": 1000.0,
+        "net": 4221000.0,
+        "netLabel": "net income",
+        "epsLabel": "basic and diluted income attributable to common stockholders per share",
+        "perShareRows": [
+          [
+            "basic and diluted income attributable to common stockholders per share",
+            [
+              0.05,
+              0.15,
+              0.92,
+              0.94
+            ]
+          ]
+        ],
+        "accession": "0001500217-26-000004",
+        "url": "https://www.sec.gov/Archives/edgar/data/1500217/000150021726000004/a4q25earningsrelease.htm",
+        "end": "2025-12-31",
+        "filingDate": "2026-02-03",
+        "verified": {
+          "status": "unavailable",
+          "reason": "no 8-K with Item 2.02 in the next year's window",
+          "debug": []
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "ACNT",
+      "end": "2022-12-31",
+      "stored": 0.01,
+      "result": {
+        "epsDiluted": 0.01,
+        "epsBasic": 0.01,
+        "dilutedShares": null,
+        "scale": 1000.0,
+        "net": 127000.0,
+        "netLabel": "net income",
+        "epsLabel": "diluted earnings per share",
+        "perShareRows": [
+          [
+            "basic earnings per share",
+            [
+              0.01,
+              0.85,
+              2.16,
+              2.17
+            ]
+          ],
+          [
+            "diluted earnings per share",
+            [
+              0.01,
+              0.84,
+              2.12,
+              2.14
+            ]
+          ]
+        ],
+        "accession": "0000095953-23-000006",
+        "url": "https://www.sec.gov/Archives/edgar/data/95953/000009595323000006/acnt-20221231xex991.htm",
+        "end": "2022-12-31",
+        "filingDate": "2023-03-31",
+        "verified": {
+          "status": "conflict",
+          "epsDiluted": 0.43,
+          "url": "https://www.sec.gov/Archives/edgar/data/95953/000009595324000016/acnt-20231231ex991.htm"
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "ACNT",
+      "end": "2023-12-31",
+      "stored": 1.07,
+      "result": null,
+      "reason": "EPS sign differs from net income"
+    },
+    {
+      "key": "ADTN",
+      "end": "2011-12-31",
+      "stored": 0.48,
+      "result": {
+        "epsDiluted": 0.48,
+        "epsBasic": 0.49,
+        "dilutedShares": 64586000.0,
+        "scale": 1000.0,
+        "net": 31163000.0,
+        "netLabel": "net income",
+        "epsLabel": "earnings per common share - diluted (1)",
+        "perShareRows": [
+          [
+            "earnings per common share - basic",
+            [
+              0.49,
+              0.57,
+              2.16,
+              1.82
+            ]
+          ],
+          [
+            "earnings per common share - diluted (1)",
+            [
+              0.48,
+              0.56,
+              2.12,
+              1.78
+            ]
+          ]
+        ],
+        "accession": "0001157523-12-000174",
+        "url": "https://www.sec.gov/Archives/edgar/data/926282/000115752312000174/a50136330ex99-1.htm",
+        "end": "2011-12-31",
+        "filingDate": "2012-01-18",
+        "verified": {
+          "status": "unavailable",
+          "reason": "no table shows this quarter's net income",
+          "debug": [
+            {
+              "target": 31163000.0,
+              "period_net_rows": [],
+              "orphans": {
+                "net_tables_without_period": 3,
+                "period_in_previous_table": 0,
+                "sample": [
+                  [
+                    "Consolidated Statements of Income (Unaudited) (In thousands, except per share data)",
+                    "",
+                    "Three Months Ended | Twelve Months Ended"
+                  ],
+                  [
+                    "Consolidated Statements of Comprehensive Income (Unaudited) (In thousands)",
+                    "",
+                    "Three Months Ended | Twelve Months Ended"
+                  ]
+                ]
+              }
+            },
+            {
+              "net_like_text": [
+                "Accounts receivable, net\n        ",
+                "Deferred tax assets, net\n        ",
+                "Property, plant and equipment, net\n        ",
+                "Deferred tax assets, net\n        ",
+                "Income tax payable, net\n        ",
+                "Net realized investment gain\n        "
+              ]
+            }
+          ]
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "ADTN",
+      "end": "2012-12-31",
+      "stored": 0.06,
+      "result": {
+        "epsDiluted": 0.06,
+        "epsBasic": 0.06,
+        "dilutedShares": 62690000.0,
+        "scale": 1000.0,
+        "net": 3961000.0,
+        "netLabel": "net income",
+        "epsLabel": "earnings per common share - diluted (1)",
+        "perShareRows": [
+          [
+            "earnings per common share - basic",
+            [
+              0.06,
+              0.49,
+              0.75,
+              2.16
+            ]
+          ],
+          [
+            "earnings per common share - diluted (1)",
+            [
+              0.06,
+              0.48,
+              0.74,
+              2.12
+            ]
+          ]
+        ],
+        "accession": "0001157523-13-000139",
+        "url": "https://www.sec.gov/Archives/edgar/data/926282/000115752313000139/a50532989ex99_1.htm",
+        "end": "2012-12-31",
+        "filingDate": "2013-01-16",
+        "verified": {
+          "status": "unavailable",
+          "reason": "no table shows this quarter's net income",
+          "debug": [
+            {
+              "target": 3961000.0,
+              "period_net_rows": [],
+              "orphans": {
+                "net_tables_without_period": 3,
+                "period_in_previous_table": 0,
+                "sample": [
+                  [
+                    "",
+                    "",
+                    ""
+                  ],
+                  [
+                    "",
+                    "",
+                    ""
+                  ]
+                ]
+              }
+            },
+            {
+              "net_like_text": [
+                "Accounts receivable, net\n        ",
+                "Deferred tax assets, net\n        ",
+                "Property, plant and equipment, net\n        ",
+                "Deferred tax assets, net\n        ",
+                "Income tax payable, net\n        ",
+                "Net realized investment gain\n        "
+              ]
+            }
+          ]
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "ADTN",
+      "end": "2013-12-31",
+      "stored": 0.2,
+      "result": {
+        "epsDiluted": 0.2,
+        "epsBasic": 0.21,
+        "dilutedShares": 57777000.0,
+        "scale": 1000.0,
+        "net": 11840000.0,
+        "netLabel": "net income",
+        "epsLabel": "earnings per common share - diluted (1)",
+        "perShareRows": [
+          [
+            "earnings per common share - basic",
+            [
+              0.21,
+              0.06,
+              0.78,
+              0.75
+            ]
+          ],
+          [
+            "earnings per common share - diluted (1)",
+            [
+              0.2,
+              0.06,
+              0.77,
+              0.74
+            ]
+          ]
+        ],
+        "accession": "0001157523-14-000154",
+        "url": "https://www.sec.gov/Archives/edgar/data/926282/000115752314000154/a50788047_ex99-1.htm",
+        "end": "2013-12-31",
+        "filingDate": "2014-01-22",
+        "verified": {
+          "status": "confirmed",
+          "epsDiluted": 0.2,
+          "url": "https://www.sec.gov/Archives/edgar/data/926282/000119312515015465/d854255dex991.htm"
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "ADTN",
+      "end": "2014-12-31",
+      "stored": 0.17,
+      "result": {
+        "epsDiluted": 0.17,
+        "epsBasic": 0.17,
+        "dilutedShares": 54085000.0,
+        "scale": 1000.0,
+        "net": 9292000.0,
+        "netLabel": "net income",
+        "epsLabel": "earnings per common share - diluted (2)",
+        "perShareRows": [
+          [
+            "earnings per common share - basic",
+            [
+              0.17,
+              0.21,
+              0.81,
+              0.78
+            ]
+          ],
+          [
+            "earnings per common share - diluted (2)",
+            [
+              0.17,
+              0.2,
+              0.8,
+              0.77
+            ]
+          ]
+        ],
+        "accession": "0001193125-15-015465",
+        "url": "https://www.sec.gov/Archives/edgar/data/926282/000119312515015465/d854255dex991.htm",
+        "end": "2014-12-31",
+        "filingDate": "2015-01-21",
+        "verified": {
+          "status": "unavailable",
+          "reason": "no table shows this quarter's net income",
+          "debug": [
+            {
+              "target": 9292000.0,
+              "period_net_rows": [
+                [
+                  "net income",
+                  [
+                    5718.0,
+                    9292.0,
+                    18646.0,
+                    44620.0
+                  ]
+                ]
+              ],
+              "orphans": {
+                "net_tables_without_period": 2,
+                "period_in_previous_table": 1,
+                "sample": [
+                  [
+                    "",
+                    "Three Months EndedDecember 31, | Twelve Months EndedDecember 31,",
+                    "2015 | 2014 | 2015 | 2014"
+                  ],
+                  [
+                    "",
+                    "Twelve Months EndedDecember 31,",
+                    "2015 | 2014"
+                  ]
+                ]
+              }
+            },
+            {
+              "net_like_text": [
+                "Accounts receivable, net",
+                "Deferred tax assets, net",
+                "Property, plant and equipment, net",
+                "Deferred tax assets, net",
+                "Income tax payable, net",
+                "Net realized investment gain"
+              ]
+            }
+          ]
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "ADTN",
+      "end": "2015-12-31",
+      "stored": 0.12,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "ADTN",
+      "end": "2016-12-31",
+      "stored": 0.16,
+      "result": {
+        "epsDiluted": 0.16,
+        "epsBasic": 0.16,
+        "dilutedShares": 48757000.0,
+        "scale": 1000.0,
+        "net": 7572000.0,
+        "netLabel": "net income",
+        "epsLabel": "earnings per common share – diluted (1)",
+        "perShareRows": [
+          [
+            "earnings per common share – basic",
+            [
+              0.16,
+              0.12,
+              0.72,
+              0.36
+            ]
+          ],
+          [
+            "earnings per common share – diluted (1)",
+            [
+              0.16,
+              0.12,
+              0.72,
+              0.36
+            ]
+          ]
+        ],
+        "accession": "0001193125-17-011669",
+        "url": "https://www.sec.gov/Archives/edgar/data/926282/000119312517011669/d306758dex991.htm",
+        "end": "2016-12-31",
+        "filingDate": "2017-01-18",
+        "verified": {
+          "status": "confirmed",
+          "epsDiluted": 0.16,
+          "url": "https://www.sec.gov/Archives/edgar/data/926282/000156459018000519/adtn-ex991_14.htm"
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "ADTN",
+      "end": "2017-12-31",
+      "stored": -0.23,
+      "result": {
+        "epsDiluted": -0.23,
+        "epsBasic": -0.23,
+        "dilutedShares": 48912000.0,
+        "scale": 1000.0,
+        "net": -11117000.0,
+        "netLabel": "net income (loss)",
+        "epsLabel": "earnings per common share – diluted",
+        "perShareRows": [
+          [
+            "earnings per common share – basic",
+            [
+              -0.23,
+              0.16,
+              0.49,
+              0.72
+            ]
+          ],
+          [
+            "earnings per common share – diluted",
+            [
+              -0.23,
+              0.16,
+              0.49,
+              0.72
+            ]
+          ]
+        ],
+        "accession": "0001564590-18-000519",
+        "url": "https://www.sec.gov/Archives/edgar/data/926282/000156459018000519/adtn-ex991_14.htm",
+        "end": "2017-12-31",
+        "filingDate": "2018-01-17",
+        "verified": {
+          "status": "unavailable",
+          "reason": "no table shows this quarter's net income",
+          "debug": [
+            {
+              "target": -11117000.0,
+              "period_net_rows": [
+                [
+                  "net income (loss)",
+                  [
+                    -8447.0,
+                    -11110.0,
+                    -19342.0,
+                    23840.0
+                  ]
+                ],
+                [
+                  "net income (loss)",
+                  [
+                    -8447.0,
+                    -11110.0,
+                    -19342.0,
+                    23840.0
+                  ]
+                ]
+              ],
+              "orphans": {
+                "net_tables_without_period": 1,
+                "period_in_previous_table": 1,
+                "sample": [
+                  [
+                    "Twelve Months Ended",
+                    "December 31,",
+                    "2018 | 2017"
+                  ]
+                ]
+              }
+            },
+            {
+              "net_like_text": [
+                "Accounts receivable, net",
+                "Inventory, net",
+                "Property, plant and equipment, net",
+                "Income tax payable, net",
+                "Net investment gain (loss)",
+                "Other income (expense), net"
+              ]
+            }
+          ]
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "ADTN",
+      "end": "2018-12-31",
+      "stored": -0.18,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "ADTN",
+      "end": "2019-12-31",
+      "stored": -0.25,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "ADTN",
+      "end": "2020-12-31",
+      "stored": 0.13,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "ADTN",
+      "end": "2021-12-31",
+      "stored": -0.09,
+      "result": {
+        "epsDiluted": -0.09,
+        "epsBasic": -0.09,
+        "dilutedShares": 48914000.0,
+        "scale": 1000.0,
+        "net": -4190000.0,
+        "netLabel": "net (loss) income",
+        "epsLabel": "(loss) earnings per common share - diluted",
+        "perShareRows": [
+          [
+            "(loss) earnings per common share - basic",
+            [
+              -0.09,
+              0.13,
+              -0.18,
+              0.05
+            ]
+          ],
+          [
+            "(loss) earnings per common share - diluted",
+            [
+              -0.09,
+              0.13,
+              -0.18,
+              0.05
+            ]
+          ],
+          [
+            "non-gaap earnings per common share - basic",
+            [
+              0.1,
+              0.11,
+              0.38,
+              0.26
+            ]
+          ],
+          [
+            "non-gaap earnings per common share - diluted",
+            [
+              0.1,
+              0.11,
+              0.38,
+              0.26
+            ]
+          ]
+        ],
+        "accession": "0000950170-22-000705",
+        "url": "https://www.sec.gov/Archives/edgar/data/926282/000095017022000705/adtn-ex99_1.htm",
+        "end": "2021-12-31",
+        "filingDate": "2022-02-03",
+        "verified": {
+          "status": "unavailable",
+          "reason": "no table shows this quarter's net income",
+          "debug": [
+            {
+              "target": -4190000.0,
+              "period_net_rows": [
+                [
+                  "net income (loss)",
+                  [
+                    34955.0,
+                    -4190.0,
+                    -8888.0,
+                    -8635.0
+                  ]
+                ],
+                [
+                  "net income (loss) attributable to adtran holdings, inc.",
+                  [
+                    38881.0,
+                    -4190.0,
+                    -2037.0,
+                    -8635.0
+                  ]
+                ],
+                [
+                  "net income (loss) attributable to adtran holdings, inc.",
+                  [
+                    358271.0,
+                    340709.0,
+                    154158.0,
+                    1025536.0,
+                    563004.0
+                  ]
+                ],
+                [
+                  "net income (loss) attributable to adtran holdings, inc.",
+                  [
+                    38881.0,
+                    -41934.0,
+                    -4190.0,
+                    -2037.0,
+                    -8635.0
+                  ]
+                ]
+              ],
+              "orphans": {
+                "net_tables_without_period": 1,
+                "period_in_previous_table": 1,
+                "sample": [
+                  [
+                    "",
+                    "Twelve Months Ended December 31,",
+                    "2022 | 2021"
+                  ]
+                ]
+              }
+            },
+            {
+              "net_like_text": [
+                "Accounts receivable, net",
+                "Inventory, net",
+                "Property, plant and equipment, net",
+                "Deferred tax assets, net",
+                "Intangibles, net",
+                "Income tax payable, net"
+              ]
+            }
+          ]
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "ADTN",
+      "end": "2024-12-31",
+      "stored": -0.58,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "ALLY",
+      "end": "2016-12-31",
+      "stored": 0.52,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "ALLY",
+      "end": "2017-12-31",
+      "stored": 0.41,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "ALLY",
+      "end": "2018-12-31",
+      "stored": 0.7,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "ALLY",
+      "end": "2019-12-31",
+      "stored": 0.99,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "ALLY",
+      "end": "2020-12-31",
+      "stored": 1.82,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "AMCX",
+      "end": "2011-12-31",
+      "stored": 0.41,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "AMCX",
+      "end": "2012-12-31",
+      "stored": 0.21,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "AMCX",
+      "end": "2013-12-31",
+      "stored": 0.49,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "AMCX",
+      "end": "2014-12-31",
+      "stored": 1.06,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "AMCX",
+      "end": "2015-12-31",
+      "stored": 1.23,
+      "result": null,
+      "reason": "no table shows this quarter's net income"
+    },
+    {
+      "key": "AMCX",
+      "end": "2016-12-31",
+      "stored": 0.2,
+      "result": {
+        "epsDiluted": 0.2,
+        "epsBasic": 0.21,
+        "dilutedShares": 70946000.0,
+        "scale": 1000.0,
+        "net": 14498000.0,
+        "netLabel": "net income attributable to amc networks’ stockholders",
+        "epsLabel": "diluted earnings per share",
+        "perShareRows": [
+          [
+            "basic earnings per share",
+            [
+              0.21,
+              1.24,
+              3.77,
+              5.06
+            ]
+          ],
+          [
+            "diluted earnings per share",
+            [
+              0.2,
+              1.23,
+              3.74,
+              5.01
+            ]
+          ]
+        ],
+        "accession": "0001514991-17-000003",
+        "url": "https://www.sec.gov/Archives/edgar/data/1514991/000151499117000003/amcx-22317ex991.htm",
+        "end": "2016-12-31",
+        "filingDate": "2017-02-23",
+        "verified": {
+          "status": "confirmed",
+          "epsDiluted": 0.2,
+          "url": "https://www.sec.gov/Archives/edgar/data/1514991/000151499118000002/amcx-3118ex991.htm"
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "AMCX",
+      "end": "2017-12-31",
+      "stored": 2.33,
+      "result": {
+        "epsDiluted": 2.33,
+        "epsBasic": 2.36,
+        "dilutedShares": null,
+        "scale": 1000.0,
+        "net": 145499000.0,
+        "netLabel": "net income attributable to amc networks’ stockholders",
+        "epsLabel": "diluted earnings per share",
+        "perShareRows": [
+          [
+            "basic earnings per share",
+            [
+              2.36,
+              0.21,
+              7.26,
+              3.77
+            ]
+          ],
+          [
+            "diluted earnings per share",
+            [
+              2.33,
+              0.2,
+              7.18,
+              3.74
+            ]
+          ]
+        ],
+        "accession": "0001514991-18-000002",
+        "url": "https://www.sec.gov/Archives/edgar/data/1514991/000151499118000002/amcx-3118ex991.htm",
+        "end": "2017-12-31",
+        "filingDate": "2018-03-01",
+        "verified": {
+          "status": "confirmed",
+          "epsDiluted": 2.33,
+          "url": "https://www.sec.gov/Archives/edgar/data/1514991/000151499119000004/amcx-22819ex991.htm"
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "AMCX",
+      "end": "2018-12-31",
+      "stored": 1.24,
+      "result": {
+        "epsDiluted": 1.24,
+        "epsBasic": 1.27,
+        "dilutedShares": null,
+        "scale": 1000.0,
+        "net": 71879000.0,
+        "netLabel": "net income attributable to amc networks’ stockholders",
+        "epsLabel": "diluted earnings per share",
+        "perShareRows": [
+          [
+            "basic earnings per share",
+            [
+              1.27,
+              2.36,
+              7.68,
+              7.26
+            ]
+          ],
+          [
+            "diluted earnings per share",
+            [
+              1.24,
+              2.33,
+              7.57,
+              7.18
+            ]
+          ]
+        ],
+        "accession": "0001514991-19-000004",
+        "url": "https://www.sec.gov/Archives/edgar/data/1514991/000151499119000004/amcx-22819ex991.htm",
+        "end": "2018-12-31",
+        "filingDate": "2019-02-28",
+        "verified": {
+          "status": "unavailable",
+          "reason": "no table shows this quarter's net income",
+          "debug": [
+            {
+              "target": 71879000.0,
+              "period_net_rows": [],
+              "orphans": {
+                "net_tables_without_period": 1,
+                "period_in_previous_table": 0,
+                "sample": [
+                  [
+                    "",
+                    "Three Months Ended December 31, | Twelve Months Ended December 31,",
+                    "2019 | 2018 | 2019 | 2018"
+                  ]
+                ]
+              }
+            },
+            {
+              "net_like_text": [
+                "AMC NETWORKS INC. REPORTS FULL YEAR ",
+                "Net Revenues&#58;",
+                "National Networks",
+                "Total Net Revenues",
+                "National Networks",
+                "National Networks"
+              ]
+            }
+          ]
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "AMCX",
+      "end": "2019-12-31",
+      "stored": -0.15,
+      "result": {
+        "epsDiluted": -0.15,
+        "epsBasic": -0.15,
+        "dilutedShares": null,
+        "scale": 1000.0,
+        "net": -8577000.0,
+        "netLabel": "net income attributable to amc networks’ stockholders",
+        "epsLabel": "diluted earnings per share",
+        "perShareRows": [
+          [
+            "basic earnings per share",
+            [
+              -0.15,
+              1.27,
+              6.77,
+              7.68
+            ]
+          ],
+          [
+            "diluted earnings per share",
+            [
+              -0.15,
+              1.24,
+              6.67,
+              7.57
+            ]
+          ]
+        ],
+        "accession": "0001514991-20-000007",
+        "url": "https://www.sec.gov/Archives/edgar/data/1514991/000151499120000007/amcx-2019yeex991.htm",
+        "end": "2019-12-31",
+        "filingDate": "2020-02-26",
+        "verified": {
+          "status": "confirmed",
+          "epsDiluted": -0.15,
+          "url": "https://www.sec.gov/Archives/edgar/data/1514991/000151499121000011/amcx-22621ex991.htm"
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "AMCX",
+      "end": "2020-12-31",
+      "stored": 2.09,
+      "result": {
+        "epsDiluted": 2.09,
+        "epsBasic": 2.15,
+        "dilutedShares": null,
+        "scale": 1000.0,
+        "net": 94711000.0,
+        "netLabel": "net income (loss) attributable to amc networks’ stockholders",
+        "epsLabel": "diluted earnings per share",
+        "perShareRows": [
+          [
+            "basic earnings per share",
+            [
+              2.15,
+              -0.15,
+              4.7,
+              6.77
+            ]
+          ],
+          [
+            "diluted earnings per share",
+            [
+              2.09,
+              -0.15,
+              4.64,
+              6.67
+            ]
+          ]
+        ],
+        "accession": "0001514991-21-000011",
+        "url": "https://www.sec.gov/Archives/edgar/data/1514991/000151499121000011/amcx-22621ex991.htm",
+        "end": "2020-12-31",
+        "filingDate": "2021-02-26",
+        "verified": {
+          "status": "confirmed",
+          "epsDiluted": 2.09,
+          "url": "https://www.sec.gov/Archives/edgar/data/1514991/000151499122000005/amcx-21622ex991.htm"
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "APYX",
+      "end": "2011-12-31",
+      "stored": -0.05,
+      "result": null,
+      "reason": "no 8-K with Item 2.02 in the window"
+    },
+    {
+      "key": "APYX",
+      "end": "2015-12-31",
+      "stored": -0.05,
+      "result": {
+        "epsDiluted": -0.05,
+        "epsBasic": -0.05,
+        "dilutedShares": null,
+        "scale": 1000.0,
+        "net": -1410000.0,
+        "netLabel": "net loss",
+        "epsLabel": "diluted earnings per share",
+        "perShareRows": [
+          [
+            "basic earnings per share",
+            [
+              -0.05,
+              -0.31,
+              0.34,
+              -1.03
+            ]
+          ],
+          [
+            "diluted earnings per share",
+            [
+              -0.05,
+              -0.39,
+              0.24,
+              -1.03
+            ]
+          ]
+        ],
+        "accession": "0001477932-16-009086",
+        "url": "https://www.sec.gov/Archives/edgar/data/719135/000147793216009086/bvx_ex991.htm",
+        "end": "2015-12-31",
+        "filingDate": "2016-03-18",
+        "verified": {
+          "status": "unavailable",
+          "reason": "no table shows this quarter's net income",
+          "debug": [
+            {
+              "target": -1410000.0,
+              "period_net_rows": [],
+              "orphans": {
+                "net_tables_without_period": 2,
+                "period_in_previous_table": 0,
+                "sample": [
+                  [
+                    "",
+                    "",
+                    "Three Months Ended December 31, | Year EndedDecember 31,"
+                  ],
+                  [
+                    "",
+                    "",
+                    "Three Months Ended December 31, | Year EndedDecember 31,"
+                  ]
+                ]
+              }
+            },
+            {
+              "net_like_text": [
+                "Net loss from operations was ",
+                "&#32;in the same period of the prior year. Net loss attributable to common shareholders was ",
+                "&#32;on the revaluation of derivative warrants, compared with a net loss of ",
+                "Net loss from operations was ",
+                ". Net loss attributable to common shareholders was ",
+                "&#32;on the revaluation of derivative warrants, compared with net income of "
+              ]
+            }
+          ]
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "ARTL",
+      "end": "2024-09-30",
+      "stored": -2.1,
+      "result": null,
+      "reason": "no 8-K with Item 2.02 in the window"
+    },
+    {
+      "key": "AWR",
+      "end": "2017-12-31",
+      "stored": 0.35,
+      "result": {
+        "epsDiluted": 0.35,
+        "epsBasic": 0.35,
+        "dilutedShares": 36898000.0,
+        "scale": 1000.0,
+        "net": 12868000.0,
+        "netLabel": "net income",
+        "epsLabel": "fully diluted earnings per share",
+        "perShareRows": [
+          [
+            "basic earnings per share",
+            [
+              0.35,
+              0.3,
+              1.88,
+              1.63
+            ]
+          ],
+          [
+            "fully diluted earnings per share",
+            [
+              0.35,
+              0.3,
+              1.88,
+              1.62
+            ]
+          ]
+        ],
+        "accession": "0001157523-18-000415",
+        "url": "https://www.sec.gov/Archives/edgar/data/1056903/000115752318000415/a51763705ex99_1.htm",
+        "end": "2017-12-31",
+        "filingDate": "2018-02-26",
+        "verified": {
+          "status": "unavailable",
+          "reason": "no table shows this quarter's net income",
+          "debug": [
+            {
+              "target": 12868000.0,
+              "period_net_rows": [],
+              "orphans": {
+                "net_tables_without_period": 1,
+                "period_in_previous_table": 0,
+                "sample": [
+                  [
+                    "",
+                    "American States Water Company",
+                    "Consolidated"
+                  ]
+                ]
+              }
+            },
+            {
+              "net_like_text": [
+                "Utility Plant-Net\n        ",
+                "Other, net\n        ",
+                "Net Income"
+              ]
+            }
+          ]
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "AWR",
+      "end": "2018-12-31",
+      "stored": 0.37,
+      "result": {
+        "epsDiluted": 0.37,
+        "epsBasic": 0.37,
+        "dilutedShares": 36959000.0,
+        "scale": 1000.0,
+        "net": 13789000.0,
+        "netLabel": "net income",
+        "epsLabel": "fully diluted earnings per share",
+        "perShareRows": [
+          [
+            "basic earnings per share",
+            [
+              0.37,
+              0.35,
+              1.73,
+              1.88
+            ]
+          ],
+          [
+            "fully diluted earnings per share",
+            [
+              0.37,
+              0.35,
+              1.72,
+              1.88
+            ]
+          ]
+        ],
+        "accession": "0001157523-19-000437",
+        "url": "https://www.sec.gov/Archives/edgar/data/1056903/000115752319000437/a51945136ex99_1.htm",
+        "end": "2018-12-31",
+        "filingDate": "2019-02-25",
+        "verified": {
+          "status": "unavailable",
+          "reason": "no table shows this quarter's net income",
+          "debug": [
+            {
+              "target": 13789000.0,
+              "period_net_rows": [],
+              "orphans": {
+                "net_tables_without_period": 1,
+                "period_in_previous_table": 1,
+                "sample": [
+                  [
+                    "",
+                    "",
+                    "Condensed Statements of Income"
+                  ]
+                ]
+              }
+            },
+            {
+              "net_like_text": [
+                "Utility Plant-Net",
+                "Other, net",
+                "Net Income"
+              ]
+            }
+          ]
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "AWR",
+      "end": "2019-12-31",
+      "stored": 0.45,
+      "result": {
+        "epsDiluted": 0.45,
+        "epsBasic": 0.45,
+        "dilutedShares": 36996000.0,
+        "scale": 1000.0,
+        "net": 16700000.0,
+        "netLabel": "net income",
+        "epsLabel": "fully diluted earnings per common share",
+        "perShareRows": [
+          [
+            "basic earnings per common share",
+            [
+              0.45,
+              0.37,
+              2.28,
+              1.73
+            ]
+          ],
+          [
+            "fully diluted earnings per common share",
+            [
+              0.45,
+              0.37,
+              2.28,
+              1.72
+            ]
+          ]
+        ],
+        "accession": "0001056903-20-000020",
+        "url": "https://www.sec.gov/Archives/edgar/data/1056903/000105690320000020/exhibit991pressrelease.htm",
+        "end": "2019-12-31",
+        "filingDate": "2020-02-24",
+        "verified": {
+          "status": "unavailable",
+          "reason": "no table shows this quarter's net income",
+          "debug": [
+            {
+              "target": 16700000.0,
+              "period_net_rows": [],
+              "orphans": {
+                "net_tables_without_period": 1,
+                "period_in_previous_table": 1,
+                "sample": [
+                  [
+                    "",
+                    "Condensed Statements of Income",
+                    "(in thousands, except per share amounts) | Three months ended December 31, | Twelve months ended December 31,"
+                  ]
+                ]
+              }
+            },
+            {
+              "net_like_text": [
+                "Net Utility Plant",
+                "Other, net",
+                "Net Income"
+              ]
+            }
+          ]
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "AWR",
+      "end": "2020-12-31",
+      "stored": 0.54,
+      "result": {
+        "epsDiluted": 0.54,
+        "epsBasic": 0.55,
+        "dilutedShares": 37007000.0,
+        "scale": 1000.0,
+        "net": 20211000.0,
+        "netLabel": "net income",
+        "epsLabel": "fully diluted earnings per common share",
+        "perShareRows": [
+          [
+            "basic earnings per common share",
+            [
+              0.55,
+              0.45,
+              2.34,
+              2.28
+            ]
+          ],
+          [
+            "fully diluted earnings per common share",
+            [
+              0.54,
+              0.45,
+              2.33,
+              2.28
+            ]
+          ]
+        ],
+        "accession": "0001056903-21-000023",
+        "url": "https://www.sec.gov/Archives/edgar/data/1056903/000105690321000023/exhibit991pressrelease2020.htm",
+        "end": "2020-12-31",
+        "filingDate": "2021-02-22",
+        "verified": {
+          "status": "unavailable",
+          "reason": "no table shows this quarter's net income",
+          "debug": [
+            {
+              "target": 20211000.0,
+              "period_net_rows": [],
+              "orphans": {
+                "net_tables_without_period": 3,
+                "period_in_previous_table": 1,
+                "sample": [
+                  [
+                    "",
+                    "Condensed Statements of Income",
+                    "(in thousands, except per share amounts) | Three months ended December 31, | Twelve months ended December 31,"
+                  ],
+                  [
+                    "",
+                    "Water | Electric | Contracted Services | AWR (Parent) | Consolidated (GAAP)",
+                    "In 000's except per share amounts | Q4 2021 | Q4 2020 | Q4 2021 | Q4 2020 | Q4 2021 | Q4 2020 | Q4 2021 | Q4 2020 | Q4 2"
+                  ]
+                ]
+              }
+            },
+            {
+              "net_like_text": [
+                "Net Utility Plant",
+                "Other, net",
+                "Net Income",
+                "Net income ",
+                "Net income "
+              ]
+            }
+          ]
+        }
+      },
+      "reason": null
+    },
+    {
+      "key": "BFS",
+      "end": "2018-12-31",
+      "stored": 0.41,
+      "result": null,
+      "reason": "net income divided by shares differs from EPS"
+    }
+  ]
+}
