@@ -164,6 +164,84 @@ class DerivationTest(unittest.TestCase):
         self.assertEqual(ftw.eps_singles({1: 1.0, 2: None}, {1: 10.0, 2: 20.0}, "ytd"), {1: 1.0})
 
 
+class CumulativeAndAnnualEpsTest(unittest.TestCase):
+    """Reuse the growth builder's F1/F2 helpers when producing full financial statements."""
+
+    MODES = {"pl": "quarter", "cf": "ytd"}
+
+    @staticmethod
+    def stock(quarters):
+        return {
+            "pl": {f"{year}Q{quarter}": {"rev": rev, "eps": eps, "ni": ni, "kind": 0,
+                                           "operatingIncome": oi}
+                   for year, quarter, rev, eps, ni, oi in quarters},
+            "bs": {}, "cf": {},
+        }
+
+    def test_single_quarters_after_a_gap_are_not_emitted(self):
+        stock = self.stock([
+            (2024, 2, 200, 2.0, 20, 20), (2024, 4, 400, 4.0, 40, 40),  # 0101 before listing
+            (2025, 1, 100, 1.0, 10, 10), (2025, 2, 110, 1.1, 11, 11),
+            (2025, 3, 120, 1.2, 12, 12), (2025, 4, 130, 1.3, 13, 13),
+        ])
+        annual, quarterly, _ = ftw.derive(stock, self.MODES)
+        for period in ((2024, 2), (2024, 4)):
+            self.assertFalse(quarterly.get(period, {}))
+        self.assertEqual(quarterly[(2025, 2)]["revenue"], 110)
+        self.assertEqual(quarterly[(2025, 4)]["revenue"], 130)
+
+        # 0111 drops the first half in Q2 but retains Q3/Q4; 0001 drops the full-year Q4.
+        partial = self.stock([(2024, 2, 200, 2.0, 20, 20), (2024, 3, 120, 1.2, 12, 12),
+                              (2024, 4, 130, 1.3, 13, 13)])
+        _, quarterly, _ = ftw.derive(partial, self.MODES)
+        self.assertFalse(quarterly.get((2024, 2), {}))
+        self.assertEqual(quarterly[(2024, 3)]["revenue"], 120)
+        self.assertEqual(quarterly[(2024, 4)]["revenue"], 130)
+        annual_only = self.stock([(2024, 4, 400, 4.0, 40, 40)])
+        _, quarterly, _ = ftw.derive(annual_only, self.MODES)
+        self.assertFalse(quarterly.get((2024, 4), {}))
+
+    def test_field_views_share_the_growth_builders_gap_rule(self):
+        for mode in ("quarter", "q4annual"):
+            with self.subTest(mode=mode):
+                single, _ = ftw.views({2: 200, 4: 400}, mode, quarters_of_year={2: {}, 4: {}})
+                self.assertNotIn(2, single)
+                self.assertNotIn(4, single)
+                single, _ = ftw.views({2: 200, 3: 120, 4: 130}, mode,
+                                      quarters_of_year={2: {}, 3: {}, 4: {}})
+                self.assertNotIn(2, single)
+                self.assertEqual(single.get(3), 120)
+                if mode == "quarter":
+                    self.assertEqual(single.get(4), 130)
+
+    def test_annual_eps_uses_the_official_full_year_value(self):
+        stock = self.stock([(2025, 1, 100, 1.0, 10, 10), (2025, 2, 100, 1.0, 10, 10),
+                            (2025, 3, 100, 1.0, 20, 20), (2025, 4, 100, 1.0, 20, 20)])
+        official_store = ftw.tw.empty_store()
+        official_store["data"] = {"2330": {"2025Q4": [400, 3.5, 60, 0]}}
+        official = ftw.tw.dump_store(official_store, ["2025Q4"])
+        by_code = ftw.fmo.official_annual_eps(official)
+
+        annual, _, flags = ftw.derive(stock, self.MODES, by_code["2330"])
+        self.assertEqual(annual[2025]["epsBasic"], 3.5)
+        self.assertEqual(annual[2025]["revenue"], 400)
+        self.assertNotIn("eps-annual-summed", flags)
+
+    def test_annual_eps_sum_requires_stable_q1_to_q3_share_counts(self):
+        stable = self.stock([(2025, 1, 100, 1.0, 10.0, 10), (2025, 2, 100, 1.0, 10.0, 10),
+                             (2025, 3, 100, 1.0, 10.05, 10), (2025, 4, 100, 1.0, 10.0, 10)])
+        annual, _, flags = ftw.derive(stable, self.MODES)
+        self.assertEqual(annual[2025]["epsBasic"], 4.0)
+        self.assertIn("eps-annual-summed", flags)
+
+        unstable = self.stock([(2025, 1, 100, 1.0, 10.0, 10), (2025, 2, 100, 1.0, 10.0, 10),
+                               (2025, 3, 100, 1.0, 10.5, 10), (2025, 4, 100, 1.0, 10.0, 10)])
+        annual, _, flags = ftw.derive(unstable, self.MODES)
+        self.assertIsNone(annual[2025].get("epsBasic"))
+        self.assertEqual(annual[2025]["revenue"], 400)
+        self.assertNotIn("eps-annual-summed", flags)
+
+
 class FinanceAndDebtTest(unittest.TestCase):
     def test_financial_company_has_no_gross_profit_and_is_marked_so(self):
         rows, _ = statements_of("2881", "quarter", 11, finance=True)
@@ -434,6 +512,15 @@ class RunTest(unittest.TestCase):
         self.assertIn("dry run (offline): 9 listed stocks, 9 to fetch now", text)
         self.assertIn("full backfill: 9 stocks x 3 = 27 requests", text)
         self.assertIn("300 per hour without", text)
+        self.assertFalse(os.path.exists(os.path.join(self.report, "fundamentals", ftw.STATE_FILE)))
+
+    def test_dry_run_limits_the_plan_to_the_requested_tickers(self):
+        code, http, logs = self.go(dry_run=True, tickers=["1102", "2881"])
+        self.assertEqual((code, http.requests), (0, []))
+        text = "\n".join(logs)
+        self.assertIn("2 to fetch now", text)
+        self.assertIn("6 requests", text)
+        self.assertIn("first stocks: 1102, 2881", text)
         self.assertFalse(os.path.exists(os.path.join(self.report, "fundamentals", ftw.STATE_FILE)))
 
     def test_only_after_backfill_waits_for_the_manual_backfill(self):
