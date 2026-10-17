@@ -130,6 +130,13 @@ class ProcessFileTests(unittest.TestCase):
         self.assertEqual(out["secQ4EpsFacts"]["2018-12-31"]["epsBasic"]["value"], 0.08)
         self.assertEqual(report["verifiedA"], 1)
 
+    def test_exactly_one_cent_is_a_match_despite_float_subtraction(self):
+        # 0.25 - 0.24 is 0.010000000000000009 in floating point; a one-cent difference is still a match
+        document = synthetic_document(old_basic=0.24)
+        _, report = self.run_one(document, {"2018-12-31": {"epsBasic": sec_fact(0.25)}}, [])
+        self.assertEqual(report["verifiedA"], 1)
+        self.assertEqual(report["blocked"], [])
+
     def test_grade_B_source_fact_is_ignored(self):
         document = synthetic_document(old_basic=0.08)
         out, report = self.run_one(document, {"2018-12-31": {"epsBasic": sec_fact(0.08, grade="B")}}, [])
