@@ -40,3 +40,19 @@
   TULP; 2026Q1 for NTRP; non-consecutive for BNC and LFCR) matches the data.
 - Stop check: the diluted A count is 2,649, which is 0 away from 2,649 (limit 5). No stop.
 - Stop: none.
+
+## S1 run 20
+
+- Step: S1, run 20 output (automated S1 plan §3.4), with the decided manifest edits from `docs/handoff/s1-run20-review.md`.
+- Date (UTC): 2026-10-17.
+- Main commit: 298e23866778ad27cdbe8f5b071f07f3d5227809 (`git merge-base origin/main HEAD`, the branch's base).
+- Workflow run ids and artifact names: run 20: 39039050667, artifact `q4-8k-report-diagnose` on the run. Output on
+  `runs/q4-8k` commit e30ff107 (path `docs/report/q4-8k/runs/39039050667/`).
+- Input counts: sourceRows 235.
+- Output files: `docs/report/q4-8k/input/diagnose-run-20/README.md`; `docs/report/q4-8k/s1-no-table-layouts.json`;
+  the 17 fixtures in `tests/fixtures/q4_8k/`; the manifest `tests/fixtures/q4_8k/s1_fixtures.json`.
+- Key numbers: classCounts L1 13, L2 74, L3 7, L4 27, L5 8, L6 8, L7 0, L8 62, L9 13, L10 23. L9 13 ≤ 23, and
+  otherLimit passed true. Fixtures 17, positives 12, negatives 5.
+- Deviations: the decided manifest edits for the two TXT rules and WLY's table note, with reason "Opus review,
+  decision in docs/handoff/s1-run20-review.md".
+- Stop: none.
