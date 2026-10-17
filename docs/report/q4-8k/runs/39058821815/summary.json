@@ -1,0 +1,700 @@
+{
+  "mode": "backtest",
+  "periods": 318,
+  "accepted": 96,
+  "reasons": {
+    "no table shows this quarter's net income": 188,
+    "no 8-K with Item 2.02 in the window": 17,
+    "net income and EPS rows have different column counts": 7,
+    "net income divided by shares differs from EPS": 3,
+    "tables disagree on diluted EPS": 2,
+    "period header not aligned": 2,
+    "EPS sign differs from net income": 1,
+    "EPS is empty in the matched column": 1,
+    "period header is a full year, not a quarter": 1
+  },
+  "coverage": 0.3019,
+  "median_error": 0.0,
+  "correct_share_of_all_periods": 0.2862,
+  "accepted_on_derived_stored": 0,
+  "independent_check": {
+    "unavailable": 29,
+    "confirmed": 67
+  },
+  "independent_samples": [
+    {
+      "key": "AAON",
+      "end": "2012-12-31",
+      "target": 7578000,
+      "debug": [
+        {
+          "target": 7578000.0,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 2,
+            "period_in_previous_table": 0,
+            "sample": [
+              [
+                "",
+                "",
+                "AAON, Inc. and Subsidiaries"
+              ],
+              [
+                "",
+                "",
+                "AAON, Inc. and Subsidiaries"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "&#32;in 2012. Net income was a record ",
+            "Net sales",
+            "Interest income, net",
+            "Other (expense) income, net",
+            "Net income",
+            "Accounts receivable, net"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "AAON",
+      "end": "2019-12-31",
+      "target": 17273000,
+      "debug": [
+        {
+          "target": 17273000.0,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 3,
+            "period_in_previous_table": 1,
+            "sample": [
+              [
+                "",
+                "",
+                "Financial Highlights: | Three Months Ended December 31, | % | Years Ending December 31, | %"
+              ],
+              [
+                "",
+                "AAON, Inc. and Subsidiaries",
+                "Consolidated Statements of Income"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Net sales",
+            "Net income*",
+            "Net income %",
+            "Net sales",
+            "Interest income, net",
+            "Other income (expense), net"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "AAON",
+      "end": "2020-12-31",
+      "target": 18892000,
+      "debug": [
+        {
+          "target": 18892000.0,
+          "period_net_rows": [
+            [
+              "net income, a gaap disclosure",
+              [
+                6186.0,
+                18892.0,
+                58758.0,
+                79009.0
+              ]
+            ],
+            [
+              "net income, a gaap measure",
+              [
+                6186.0,
+                18892.0,
+                58758.0,
+                79009.0
+              ]
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 3,
+            "period_in_previous_table": 2,
+            "sample": [
+              [
+                "",
+                "",
+                "Financial Highlights: | Three Months Ended December 31, | % | Years Ending December 31, | %"
+              ],
+              [
+                "",
+                "AAON, Inc. and Subsidiaries",
+                "Consolidated Statements of Income"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Net sales",
+            "Net income",
+            "Non-GAAP adjusted net income",
+            "Net sales",
+            "Interest (expense)  income, net",
+            "Other income, net"
+          ]
+        }
+      ]
+    }
+  ],
+  "independent_unavailable_reasons": {
+    "no table shows this quarter's net income": 27,
+    "no 8-K with Item 2.02 in the next year's window": 2
+  },
+  "independent_precision": 1.0,
+  "filled": 0,
+  "tickers_done": 0,
+  "stopped": null,
+  "requests": 3659,
+  "mismatches": [
+    {
+      "key": "AAON",
+      "end": "2012-12-31",
+      "stored": 0.21,
+      "estimate": 0.31,
+      "basic": 0.31,
+      "derived": false,
+      "verified": {
+        "status": "unavailable",
+        "reason": "no table shows this quarter's net income",
+        "debug": [
+          {
+            "target": 7578000.0,
+            "period_net_rows": [],
+            "orphans": {
+              "net_tables_without_period": 2,
+              "period_in_previous_table": 0,
+              "sample": [
+                [
+                  "",
+                  "",
+                  "AAON, Inc. and Subsidiaries"
+                ],
+                [
+                  "",
+                  "",
+                  "AAON, Inc. and Subsidiaries"
+                ]
+              ]
+            }
+          },
+          {
+            "net_like_text": [
+              "&#32;in 2012. Net income was a record ",
+              "Net sales",
+              "Interest income, net",
+              "Other (expense) income, net",
+              "Net income",
+              "Accounts receivable, net"
+            ]
+          }
+        ]
+      },
+      "netLabel": "net income",
+      "epsLabel": "diluted earnings per share",
+      "perShareRows": [
+        [
+          "basic earnings per share",
+          [
+            0.31,
+            0.04,
+            1.12,
+            0.57
+          ]
+        ],
+        [
+          "diluted earnings per share",
+          [
+            0.31,
+            0.04,
+            1.11,
+            0.56
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/824142/000102660813000022/aaon_8k31413ex991.htm"
+    },
+    {
+      "key": "PENG",
+      "end": "2017-08-25",
+      "stored": -0.48,
+      "estimate": -0.24,
+      "basic": -0.24,
+      "derived": false,
+      "verified": {
+        "status": "confirmed",
+        "epsDiluted": -0.24,
+        "url": "https://www.sec.gov/Archives/edgar/data/1616533/000156459018023975/sgh-ex991_6.htm"
+      },
+      "netLabel": "net income (loss)",
+      "epsLabel": "diluted earnings per share",
+      "perShareRows": [
+        [
+          "basic earnings per share",
+          [
+            -0.48,
+            0.57,
+            -0.11,
+            -0.49,
+            -1.44
+          ]
+        ],
+        [
+          "diluted earnings per share",
+          [
+            -0.48,
+            0.5,
+            -0.11,
+            -0.49,
+            -1.44
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/1616533/000156459017019049/sgh-ex991_6.htm"
+    },
+    {
+      "key": "TRU",
+      "end": "2021-12-31",
+      "stored": 5.27,
+      "estimate": 0.81,
+      "basic": 0.82,
+      "derived": false,
+      "verified": {
+        "status": "confirmed",
+        "epsDiluted": 0.81,
+        "url": "https://www.sec.gov/Archives/edgar/data/1552033/000155203323000014/exhibit99112312022.htm"
+      },
+      "netLabel": "net income attributable to transunion",
+      "epsLabel": "diluted earnings per share",
+      "perShareRows": [
+        [
+          "basic earnings per share",
+          [
+            0.82,
+            0.73,
+            3.47,
+            2.71
+          ]
+        ],
+        [
+          "diluted earnings per share",
+          [
+            0.81,
+            0.72,
+            3.44,
+            2.67
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/1552033/000155203322000007/exhibit99112312021.htm"
+    },
+    {
+      "key": "TRU",
+      "end": "2022-12-31",
+      "stored": 0.24,
+      "estimate": 0.78,
+      "basic": 0.79,
+      "derived": false,
+      "verified": {
+        "status": "confirmed",
+        "epsDiluted": 0.78,
+        "url": "https://www.sec.gov/Archives/edgar/data/1552033/000155203324000017/exhibit99112312023.htm"
+      },
+      "netLabel": "net income attributable to transunion",
+      "epsLabel": "diluted earnings per share",
+      "perShareRows": [
+        [
+          "basic earnings per share",
+          [
+            0.79,
+            0.82,
+            3.64,
+            3.47
+          ]
+        ],
+        [
+          "diluted earnings per share",
+          [
+            0.78,
+            0.81,
+            3.62,
+            3.44
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/1552033/000155203323000014/exhibit99112312022.htm"
+    },
+    {
+      "key": "VISN",
+      "end": "2019-12-31",
+      "stored": -2.32,
+      "estimate": -450.5,
+      "basic": -2.32,
+      "derived": false,
+      "verified": {
+        "status": "unavailable",
+        "reason": "no table shows this quarter's net income",
+        "debug": [
+          {
+            "target": -436700000.0,
+            "period_net_rows": [],
+            "orphans": {
+              "net_tables_without_period": 7,
+              "period_in_previous_table": 0,
+              "sample": [
+                [
+                  "• | GAAP net income of $23.9 million"
+                ],
+                [
+                  "• | GAAP net loss of $573.4 million"
+                ]
+              ]
+            }
+          },
+          {
+            "net_like_text": [
+              "Net sales of $2.132 billion",
+              "GAAP net income of $23.9 million ",
+              "Net sales of $8.436 billion",
+              "GAAP net loss of $573.4 million",
+              "Net sales",
+              "GAAP net income (loss)"
+            ]
+          }
+        ]
+      },
+      "netLabel": "net income (loss)",
+      "epsLabel": "diluted earnings per share",
+      "perShareRows": [
+        [
+          "basic earnings per share",
+          [
+            -2.32,
+            -0.12,
+            -5.02,
+            0.73
+          ]
+        ],
+        [
+          "diluted earnings per share",
+          [
+            -450.5,
+            -23.2,
+            -973.2,
+            140.2
+          ]
+        ]
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/1517228/000156459020005398/comm-ex99_6.htm"
+    }
+  ],
+  "samples": {
+    "no table shows this quarter's net income": {
+      "key": "AAON",
+      "end": "2011-12-31",
+      "stored": 0.04,
+      "debug": [
+        {
+          "target": 871000,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 2,
+            "period_in_previous_table": 1,
+            "sample": [
+              [
+                "Three Months Ended",
+                "March 31, 2012 | March 31, 2011",
+                "(in thousands except per share amounts)"
+              ],
+              [
+                "Three Months Ended",
+                "March 31, 2012 | March 31, 2011",
+                "(in thousands)"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Net sales",
+            "Other income (expense), net",
+            "Net income",
+            "Accounts receivable, net",
+            "Inventories, net",
+            "&#160;&#160;&#160;Property, plant and equipment, net"
+          ]
+        }
+      ]
+    },
+    "no 8-K with Item 2.02 in the window": {
+      "key": "AAON",
+      "end": "2017-12-31",
+      "stored": 0.3,
+      "debug": []
+    },
+    "tables disagree on diluted EPS": {
+      "key": "ANIP",
+      "end": "2014-12-31",
+      "stored": 1.82,
+      "debug": [
+        {
+          "target": 21005000,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 0,
+            "period_in_previous_table": 0,
+            "sample": []
+          }
+        },
+        {
+          "net_like_text": []
+        }
+      ]
+    },
+    "EPS sign differs from net income": {
+      "key": "ANIP",
+      "end": "2016-12-31",
+      "stored": -0.09,
+      "debug": [
+        {
+          "target": -1080000,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 0,
+            "period_in_previous_table": 0,
+            "sample": []
+          }
+        },
+        {
+          "net_like_text": []
+        }
+      ]
+    },
+    "net income divided by shares differs fro": {
+      "key": "GYRE",
+      "end": "2011-12-31",
+      "stored": -0.29,
+      "debug": [
+        {
+          "target": -9805000,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 0,
+            "period_in_previous_table": 0,
+            "sample": []
+          }
+        },
+        {
+          "net_like_text": [
+            "linnmich@comcast.net",
+            "Net operating revenues",
+            "Interest income, net",
+            "Net (loss) income",
+            "Basic net (loss) income per share",
+            "Diluted net (loss) income per share"
+          ]
+        }
+      ]
+    },
+    "net income and EPS rows have different c": {
+      "key": "HTZ",
+      "end": "2017-12-31",
+      "stored": 7.42,
+      "debug": [
+        {
+          "target": 616000000,
+          "period_net_rows": [
+            [
+              "net income (loss)",
+              [
+                616.0,
+                -440.0
+              ]
+            ],
+            [
+              "net income (loss)",
+              [
+                327.0,
+                -491.0
+              ]
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 1,
+            "period_in_previous_table": 0,
+            "sample": [
+              [
+                "",
+                "• | Net income in the fourth quarter was $616 million, including a one-time benefit of $679 million related to U.S. tax "
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "&#32;in the same period last year. Fourth quarter 2017 net income was ",
+            "&#32;related to U.S. tax reform, compared with a net loss from continuing operations of ",
+            "&#32;per diluted share. The Company reported adjusted net loss for the ",
+            "&#32;compared with adjusted net loss of ",
+            "For the full-year 2017, Hertz Global reported net income of ",
+            ". The Company reported adjusted net loss for 2017 of "
+          ]
+        }
+      ]
+    },
+    "EPS is empty in the matched column": {
+      "key": "NAVI",
+      "end": "2014-12-31",
+      "stored": 0.64,
+      "debug": [
+        {
+          "target": 263000000,
+          "period_net_rows": [
+            [
+              "net income (loss)",
+              [
+                82.0,
+                92.0,
+                98.0,
+                -55.0,
+                null,
+                217.0,
+                null,
+                46.0,
+                46.0,
+                263.0
+              ]
+            ],
+            [
+              "net income",
+              [
+                46.0
+              ]
+            ],
+            [
+              "net income (loss)",
+              [
+                296.0,
+                351.0,
+                428.0,
+                -257.0,
+                null,
+                818.0,
+                null,
+                331.0,
+                331.0,
+                1149.0
+              ]
+            ],
+            [
+              "net income",
+              [
+                331.0
+              ]
+            ]
+          ],
+          "orphans": {
+            "net_tables_without_period": 12,
+            "period_in_previous_table": 0,
+            "sample": [
+              [
+                "",
+                "Quarters Ended | Years Ended",
+                "(In millions, except per share data) | December 31,2014 | September 30,2014 | December 31,2013 | December 31,2014 | Dece"
+              ],
+              [
+                "",
+                "December 31, 2014vs.September 30, 2014 | December 31, 2014vs.December 31, 2013",
+                "Quarters Ended | Increase(Decrease) | Increase(Decrease)"
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Gains from sales of subsidiaries, net of tax",
+            "Net income attributable to Navient Corporation",
+            "Net interest margin, FFELP Loans",
+            "Net interest margin, Private Education Loans",
+            "Ending FFELP Loans, net",
+            "Ending Private Education Loans, net"
+          ]
+        }
+      ]
+    },
+    "period header not aligned": {
+      "key": "PBFS",
+      "end": "2026-06-30",
+      "stored": 0.14,
+      "debug": [
+        {
+          "target": 3484000,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 0,
+            "period_in_previous_table": 0,
+            "sample": []
+          }
+        },
+        {
+          "net_like_text": [
+            "Net Income of $3.5 Million",
+            "Net Interest Income and Margin",
+            "Net loans receivable",
+            "Premises and equipment, net",
+            "Net interest income",
+            "Net interest income after provision for credit losses"
+          ]
+        }
+      ]
+    },
+    "period header is a full year, not a quar": {
+      "key": "STC",
+      "end": "2013-12-31",
+      "stored": 0.72,
+      "debug": [
+        {
+          "target": 17511000,
+          "period_net_rows": [],
+          "orphans": {
+            "net_tables_without_period": 1,
+            "period_in_previous_table": 0,
+            "sample": [
+              [
+                "Fourth Quarter | Year",
+                "2013 | 2012 | 2013 | 2012",
+                ""
+              ]
+            ]
+          }
+        },
+        {
+          "net_like_text": [
+            "Net earnings attributable to Stewart",
+            "Net earnings per diluted share attributable to Stewart",
+            "Investment and other gains (losses) &#8211; net",
+            "Net earnings",
+            "Less net earnings attributable to noncontrolling interests",
+            "Net earnings attributable to Stewart"
+          ]
+        }
+      ]
+    }
+  }
+}
