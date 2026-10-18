@@ -5,6 +5,7 @@ import ast
 import io
 import json
 import os
+import subprocess
 import re
 import sys
 import tempfile
@@ -706,35 +707,110 @@ class SplitAndGateTests(unittest.TestCase):
         self.assertEqual(probe.polygon_ticker("AAPL"), "AAPL")
 
 
-class CommitGuardTests(unittest.TestCase):
-    DEST = "docs/report/source-probes/polygon/123"
+class CommitGuardInlineTests(unittest.TestCase):
+    """The commit job's guard is inline in the workflow. These tests run that exact text under python3 -I on synthetic
+    reports and staged lists."""
+    RUN = "123456"
+    DEST = "docs/report/source-probes/polygon/" + RUN
 
-    def test_report_inside_destination_is_allowed(self):
-        self.assertEqual(probe.refused_commit_paths([self.DEST + "/report.json"], self.DEST), [])
+    @classmethod
+    def setUpClass(cls):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        commit_job = text.split("\n  commit:", 1)[1]
+        lines = commit_job.splitlines()
+        start = next(i for i, ln in enumerate(lines) if "python3 -I - " in ln)
+        indent = lines[start][: len(lines[start]) - len(lines[start].lstrip())]
+        end = next(i for i in range(start + 1, len(lines)) if lines[i].strip() == "PY")
+        body = [ln[len(indent):] if ln.startswith(indent) else ln.lstrip() for ln in lines[start + 1:end]]
+        cls.code = "\n".join(body) + "\n"
 
-    def test_other_run_directory_is_refused(self):
-        refused = probe.refused_commit_paths(["docs/report/source-probes/polygon/999/report.json"], self.DEST)
-        self.assertEqual(len(refused), 1)
+    def report(self, **extra):
+        base = {"schema": "polygon-q4-probe-report-v1",
+                "agreement": {"b_grade_a_q4_no_split_after_end": {"wilson_lower_95": 0.91, "compared": 1}},
+                "rows": [{"symbol": "AAA", "end": "2019-12-31", "covered": True, "label": "reported",
+                          "equal_subtraction": None}]}
+        base.update(extra)
+        return base
 
-    def test_parent_reference_is_refused(self):
-        self.assertTrue(probe.refused_commit_paths([self.DEST + "/../../../growth.json"], self.DEST))
+    def run_guard(self, report=None, staged=None, run_id=None, dest=None, report_text=None, write_report=True):
+        with tempfile.TemporaryDirectory() as tmp:
+            report_path = Path(tmp) / "report.json"
+            staged_path = Path(tmp) / "staged.txt"
+            if write_report:
+                text = report_text if report_text is not None else json.dumps(report)
+                report_path.write_text(text, encoding="utf-8")
+            staged_path.write_text(staged if staged is not None else f"A\t{self.DEST}/report.json\n",
+                                   encoding="utf-8")
+            return subprocess.run([sys.executable, "-I", "-", self.RUN if run_id is None else run_id,
+                                   self.DEST if dest is None else dest,
+                                   str(report_path), str(staged_path)],
+                                  input=self.code, capture_output=True, text=True, cwd=tmp)
 
-    def test_protected_paths_are_refused(self):
-        for path in ("docs/report/financials/AAPL.json", "docs/report/fundamentals/x.json",
-                     "docs/report/q4-8k/answer-set.json", "docs/report/growth.json",
-                     "docs/report/q4-eps-missing-classification.json", "atlas/scripts/probe_polygon_q4.py",
-                     ".github/workflows/polygon-probe.yml", "main.py"):
-            self.assertTrue(probe.refused_commit_paths([path], self.DEST), path)
+    def test_valid_report_and_single_addition_pass(self):
+        result = self.run_guard(self.report())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("guard passed", result.stdout)
 
-    def test_cli_exit_codes_and_no_key_needed(self):
-        with mock.patch("sys.stdin", io.StringIO(self.DEST + "/report.json\n")), \
-                mock.patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(probe.main(["--check-commit-paths", self.DEST]), 0)
-        with mock.patch("sys.stdin", io.StringIO("docs/report/financials/AAPL.json\n")), \
-                mock.patch("sys.stderr", io.StringIO()):
-            self.assertEqual(probe.main(["--check-commit-paths", self.DEST]), 1)
+    def test_non_numeric_run_id_is_refused(self):
+        for run_id in ("12a", "", "../9", "1 2"):
+            result = self.run_guard(self.report(), run_id=run_id, dest="docs/report/source-probes/polygon/" + run_id)
+            self.assertEqual(result.returncode, 1, run_id)
+            self.assertIn("run id is not numeric", result.stderr)
 
+    def test_destination_must_be_the_run_directory(self):
+        result = self.run_guard(self.report(), dest="docs/report/source-probes/polygon/999999")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("destination", result.stderr)
 
+    def test_wrong_schema_is_refused(self):
+        result = self.run_guard(self.report(schema="polygon-q4-probe-report-v0"))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("schema", result.stderr)
+
+    def test_float_in_a_nested_list_is_refused_without_printing_its_value(self):
+        result = self.run_guard(self.report(rows=[{"eps": 1.2345678}]))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("eps", result.stderr)
+        self.assertNotIn("1.2345678", result.stdout + result.stderr)
+
+    def test_float_under_another_top_level_key_is_refused(self):
+        result = self.run_guard(self.report(flag=0.5))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("flag", result.stderr)
+
+    def test_non_finite_wilson_value_is_refused(self):
+        bad = self.report()
+        bad["agreement"]["b_grade_a_q4_no_split_after_end"]["wilson_lower_95"] = float("nan")
+        result = self.run_guard(bad)
+        self.assertEqual(result.returncode, 1)
+
+    def test_extra_staged_file_is_refused(self):
+        result = self.run_guard(self.report(), staged=f"A\t{self.DEST}/report.json\nA\tdocs/x.json\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("exactly one staged change", result.stderr)
+
+    def test_modification_of_an_existing_file_is_refused(self):
+        result = self.run_guard(self.report(), staged=f"M\t{self.DEST}/report.json\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("addition", result.stderr)
+
+    def test_other_path_is_refused(self):
+        result = self.run_guard(self.report(), staged="A\tdocs/report/financials/AAPL.json\n")
+        self.assertEqual(result.returncode, 1)
+
+    def test_empty_staged_list_is_refused(self):
+        result = self.run_guard(self.report(), staged="")
+        self.assertEqual(result.returncode, 1)
+
+    def test_missing_report_is_refused(self):
+        result = self.run_guard(write_report=False)
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_guard_runs_no_repo_code(self):
+        commit_job = WORKFLOW.read_text(encoding="utf-8").split("\n  commit:", 1)[1]
+        self.assertIn("python3 -I - ", commit_job)
+        self.assertNotIn("atlas/scripts", commit_job)
+        self.assertNotIn("probe_polygon", commit_job)
 
 
 class ScriptShapeTests(unittest.TestCase):
@@ -820,15 +896,15 @@ class WorkflowShapeTests(unittest.TestCase):
     def test_commit_job_commits_report_json_only_to_runs_branch(self):
         self.assertIn("runs/source-probes", self.commit_job)
         self.assertIn("docs/report/source-probes/polygon/$RUN_ID", self.commit_job)
-        self.assertIn("--check-commit-paths", self.commit_job)
+        self.assertIn("python3 -I - ", self.commit_job)
+        self.assertNotIn("atlas/scripts", self.commit_job)
         self.assertIn("cp \"$src\" \"$wt/$dest/report.json\"", self.commit_job)
         self.assertNotIn("POLYGON", self.commit_job)
         self.assertNotIn("secrets.", self.commit_job)
         self.assertIn("git push -q origin \"HEAD:refs/heads/$RUNS_BRANCH\"", self.commit_job)
 
     def test_commit_step_refuses_on_guard_failure(self):
-        guard = [ln for ln in self.commit_job.splitlines() if "--check-commit-paths" in ln][0]
-        self.assertIn("printf", guard)
+        guard = [ln for ln in self.commit_job.splitlines() if "python3 -I - " in ln][0]
         self.assertNotIn("|| true", guard)
         self.assertIn("set -euo pipefail", self.commit_job)
 

@@ -23,7 +23,7 @@ Tickers: Polygon writes share classes with a dot (BRK-B is requested as BRK.B). 
 
 Output: a report of counts, (symbol, end) keys and flags. Polygon values stay in memory during a run. The checkpoint
 keeps flags only, so no EPS value is written to the report, the log or the checkpoint. The workflow commits the report
-to the runs branch; --check-commit-paths refuses any path outside that run's directory or a protected path.
+to the runs branch. The commit job checks that commit with an inline guard in the workflow, not with this file.
 
 Unverified: the Polygon path and field names (vX/reference/financials, timeframe, limit, next_url, end_date,
 fiscal_period, filing_date, source_filing_url, financials.income_statement.diluted_earnings_per_share.value). The
@@ -740,25 +740,6 @@ def aggregate(plan, done, input_sha, status, stop_reason):
     }
 
 
-PROTECTED_PREFIXES = ("docs/report/financials/", "docs/report/fundamentals/", "docs/report/q4-8k/",
-                      ".github/", "atlas/", "tests/", "supabase/")
-PROTECTED_NAMES = re.compile(r"(^|/)(growth\.json|answer-set\.json|q4-eps-[^/]*\.json)$")
-
-
-def refused_commit_paths(paths, dest):
-    """Paths that must not be committed: anything outside dest/, anything with a parent reference, and any protected
-    path. Returns the refused paths in input order; an empty list means the commit may proceed."""
-    refused = []
-    for path in paths:
-        if not path:
-            continue
-        inside = path.startswith(dest.rstrip("/") + "/") and ".." not in path.split("/")
-        protected = any(path.startswith(prefix) for prefix in PROTECTED_PREFIXES) or PROTECTED_NAMES.search(path)
-        if not inside or protected:
-            refused.append(path)
-    return refused
-
-
 def write_report(path, report):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -836,8 +817,6 @@ def _scrub(text, secret):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Polygon.io Q4 EPS probe (read-only).")
-    parser.add_argument("--check-commit-paths", metavar="DEST", default=None,
-                        help="read staged paths on stdin; exit 1 if any is outside DEST/ or protected")
     default_tmp = Path(os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()) / "polygon-probe"
     parser.add_argument("--classification", default=str(DEFAULT_CLASSIFICATION))
     parser.add_argument("--financials-dir", default=str(DEFAULT_FINANCIALS_DIR))
@@ -848,13 +827,6 @@ def main(argv=None):
     parser.add_argument("--fresh", action="store_true", help="ignore and replace an existing checkpoint")
     parser.add_argument("--replay-dir", default=None, help="offline: read saved responses instead of calling Polygon")
     args = parser.parse_args(argv)
-    if args.check_commit_paths is not None:
-        paths = [line.strip() for line in sys.stdin if line.strip()]
-        refused = refused_commit_paths(paths, args.check_commit_paths)
-        for path in refused:
-            print(f"refused: {path}", file=sys.stderr)
-        return 1 if refused else 0
-
     log = RunLog(args.log, echo=True)
     secret = ""
     code = 0
