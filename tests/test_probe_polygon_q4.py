@@ -81,17 +81,17 @@ def ok(payload):
 
 
 def http_error(code, headers=None):
-    return urllib.error.HTTPError(f"https://api.polygon.io/vX/reference/financials?apiKey={FAKE_KEY}", code,
-                                  "err", headers or {}, None)
+    return urllib.error.HTTPError(f"https://api.massive.com/stocks/financials/v1/income-statements?apiKey={FAKE_KEY}",
+                                  code, "err", headers or {}, None)
 
 
-def item(end, fq, eps, url="https://example.invalid/10-q.htm", filing="2020-02-01", timeframe="quarterly",
-         with_field=True, value_key="value"):
-    income = {}
+def item(end, fq, eps, filing="2020-02-01", timeframe="quarterly", with_field=True):
+    """One result in the vendor's flat income-statement shape (massive/rest/models/financials.py)."""
+    row = {"timeframe": timeframe, "period_end": end, "fiscal_quarter": fq, "fiscal_year": int(end[:4]),
+           "filing_date": filing}
     if with_field:
-        income["diluted_earnings_per_share"] = {value_key: eps, "unit": "USD", "label": "Diluted EPS", "order": 1}
-    return {"timeframe": timeframe, "end_date": end, "fiscal_period": f"Q{fq}", "fiscal_year": int(end[:4]),
-            "filing_date": filing, "source_filing_url": url, "financials": {"income_statement": income}}
+        row["diluted_earnings_per_share"] = eps
+    return row
 
 
 def key(group, end, fq=4, reference=None, subtraction=None, split_after_end=False, cls="derivation-rejected"):
@@ -301,9 +301,28 @@ class PlanTests(unittest.TestCase):
 class ParseTests(unittest.TestCase):
     def test_schema_mismatch_on_structure(self):
         state = probe.ParseState()
-        bad = [{"results": [{"end_date": "2019-12-31", "fiscal_period": "Q4", "timeframe": "quarterly"}]}]
+        bad = [{"results": [{"period_end": "2019-12-31", "timeframe": "quarterly"}]}]
         with self.assertRaises(probe.SchemaMismatch):
             probe.parse_pages("TEST", bad, state)
+
+    def test_flat_fields_parse_to_a_record(self):
+        records, stats = probe.parse_pages("TEST", [{"results": [item("2019-12-31", 4, 1.25)]}], probe.ParseState())
+        self.assertEqual(records[0].end, date(2019, 12, 31))
+        self.assertEqual(records[0].fiscal_period, "Q4")
+        self.assertEqual(records[0].eps, 1.25)
+        self.assertEqual(records[0].filing_date, "2020-02-01")
+        self.assertEqual(stats["no_eps"], 0)
+
+    def test_period_end_and_fiscal_quarter_are_checked(self):
+        for bad in ({"period_end": "2019-13-40"}, {"period_end": 20191231}):
+            row = dict(item("2019-12-31", 4, 1.0), **bad)
+            with self.assertRaises(probe.SchemaMismatch):
+                probe.parse_pages("TEST", [{"results": [row]}], probe.ParseState())
+        for fq in (5, 0, 2.5, True, "4"):
+            with self.assertRaises(probe.SchemaMismatch, msg=repr(fq)):
+                probe.parse_pages("TEST", [{"results": [item("2019-12-31", fq, 1.0)]}], probe.ParseState())
+        records, _ = probe.parse_pages("TEST", [{"results": [item("2019-12-31", 4.0, 1.0)]}], probe.ParseState())
+        self.assertEqual(records[0].fiscal_period, "Q4")
 
     def test_field_absent_everywhere_stops_on_first_response(self):
         state = probe.ParseState()
@@ -318,12 +337,10 @@ class ParseTests(unittest.TestCase):
         self.assertIsNone(records[0].eps)
         self.assertEqual(stats["no_eps"], 1)
 
-    def test_value_entry_must_exist_and_be_numeric(self):
-        with self.assertRaises(probe.SchemaMismatch):
-            probe.parse_pages("TEST", [{"results": [item("2019-12-31", 4, 1.0, value_key="amount")]}],
-                              probe.ParseState())
-        with self.assertRaises(probe.SchemaMismatch):
-            probe.parse_pages("TEST", [{"results": [item("2019-12-31", 4, "1.0")]}], probe.ParseState())
+    def test_eps_must_be_a_number_or_null(self):
+        for bad in ("1.0", {"value": 1.0}, True):
+            with self.assertRaises(probe.SchemaMismatch, msg=repr(bad)):
+                probe.parse_pages("TEST", [{"results": [item("2019-12-31", 4, bad)]}], probe.ParseState())
 
     def test_non_quarterly_results_are_skipped(self):
         records, stats = probe.parse_pages("TEST", [{"results": [item("2019-12-31", 4, 1.0, timeframe="annual"),
@@ -408,29 +425,49 @@ class RetryTests(unittest.TestCase):
             source.fetch("AAA")
         self.assertEqual(len(opener.urls), 1)
 
+    def test_gone_endpoint_stops_at_once_and_is_exit_six(self):
+        source, opener, _ = self.make([http_error(410)])
+        with self.assertRaises(probe.EndpointGone) as caught:
+            source.fetch("AAA")
+        self.assertEqual(len(opener.urls), 1)
+        self.assertEqual(caught.exception.exit_code, 6)
+        self.assertNotIn(FAKE_KEY, str(caught.exception))
+
+    def test_rejected_request_is_a_schema_mismatch(self):
+        for code in (400, 422):
+            source, opener, _ = self.make([http_error(code)])
+            with self.assertRaises(probe.SchemaMismatch, msg=str(code)) as caught:
+                source.fetch("AAA")
+            self.assertEqual(len(opener.urls), 1)
+            self.assertNotIn(FAKE_KEY, str(caught.exception))
+
     def test_key_is_sent_to_api_host_only(self):
         source, opener, _ = self.make([ok({"results": [], "next_url": "https://evil.example/next?cursor=1"})])
         with self.assertRaises(probe.SchemaMismatch):
             source.fetch("AAA")
         self.assertEqual(len(opener.urls), 1)
-        self.assertTrue(all(urllib.parse.urlsplit(u).netloc == "api.polygon.io" for u in opener.urls))
+        self.assertTrue(all(urllib.parse.urlsplit(u).netloc == probe.API_HOST for u in opener.urls))
 
-    def test_next_url_is_followed_with_key_on_polygon_host(self):
+    def test_next_url_is_followed_with_key_on_the_api_host(self):
         first = {"results": [item("2019-12-31", 4, 1.0)],
-                 "next_url": "https://api.polygon.io/vX/reference/financials?cursor=abc"}
+                 "next_url": "https://api.massive.com/stocks/financials/v1/income-statements?cursor=abc"}
         second = {"results": [item("2018-12-31", 4, 0.9)]}
         source, opener, _ = self.make([ok(first), ok(second)])
         pages = source.fetch("AAA")
         self.assertEqual(len(pages), 2)
         self.assertIn("cursor=abc", opener.urls[1])
-        self.assertTrue(opener.urls[1].startswith("https://api.polygon.io/"))
+        self.assertTrue(opener.urls[1].startswith("https://api.massive.com/stocks/financials/v1/income-statements"))
         self.assertIn("apiKey=" + urllib.parse.quote(FAKE_KEY, safe=""), opener.urls[1])
 
-    def test_request_uses_ticker_timeframe_and_limit(self):
+    def test_request_uses_tickers_timeframe_and_limit(self):
         source, opener, _ = self.make([ok({"results": []})])
         source.fetch("BRK-B")
-        query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(opener.urls[0]).query))
-        self.assertEqual(query["ticker"], "BRK.B")
+        parts = urllib.parse.urlsplit(opener.urls[0])
+        self.assertEqual(parts.netloc, "api.massive.com")
+        self.assertEqual(parts.path, "/stocks/financials/v1/income-statements")
+        query = dict(urllib.parse.parse_qsl(parts.query))
+        self.assertEqual(query["tickers"], "BRK.B")
+        self.assertNotIn("ticker", query)
         self.assertEqual(query["timeframe"], "quarterly")
         self.assertEqual(query["limit"], str(probe.LIMIT))
         self.assertGreaterEqual(int(query["limit"]), 70)
@@ -481,11 +518,11 @@ class PipelineTests(unittest.TestCase):
         self.replay = self.root / "replay"
         self.replay.mkdir()
         (self.replay / "AAA.json").write_text(json.dumps(
-            {"results": [item("2019-12-31", 4, 1.0, url="https://x/10-q.htm"),
+            {"results": [item("2019-12-31", 4, 1.0),
                          item("2019-01-02", 4, 0.9, timeframe="annual")]}), encoding="utf-8")
         (self.replay / "BBB.json").write_text(json.dumps(
-            [{"results": [item("2019-12-31", 4, 1.5, url="https://x/10-q.htm")],
-              "next_url": "https://api.polygon.io/vX/reference/financials?cursor=z"},
+            [{"results": [item("2019-12-31", 4, 1.5)],
+              "next_url": "https://api.massive.com/stocks/financials/v1/income-statements?cursor=z"},
              {"results": [item("2018-12-31", 4, 1.2)]}]), encoding="utf-8")
 
     def tearDown(self):
@@ -829,9 +866,9 @@ class ScriptShapeTests(unittest.TestCase):
         for path in (SCRIPT, WORKFLOW, Path(__file__)):
             self.assertNotIn("sec" + ".gov", path.read_text(encoding="utf-8").lower(), path.name)
 
-    def test_only_polygon_host_is_named(self):
+    def test_only_the_api_host_is_named(self):
         hosts = set(re.findall(r"https?://([A-Za-z0-9.\-]+)", SCRIPT.read_text(encoding="utf-8")))
-        self.assertEqual(hosts, {"api.polygon.io"})
+        self.assertEqual(hosts, {"api.massive.com"})
 
 
 class WorkflowShapeTests(unittest.TestCase):
