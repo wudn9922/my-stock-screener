@@ -1,0 +1,4720 @@
+{
+  "schema_version": 1,
+  "sample_id": "sec-q4-eps-stage2-60x60-20261018",
+  "base_commit": "b3aac2d7877c5389648c884ad8694c9c92f3263c",
+  "selection_seed": "20261018",
+  "selection_frozen_before_sec_requests": true,
+  "selection_rules": {
+    "missing_companies": "60 unique current US companies; exactly 15 per main classification class; FY 2012–2025; one primary missing period per company balanced over available period-end years, then SHA-256(seed|scope|...); add at most one additional missing period for that selected company",
+    "period_end_year_scope": "calendar year of local Q4 end; available years are recorded in strata and may include 2026 where FY 2025 ends in 2026",
+    "control_periods": "60 unique tickers with one Q4 period each; answer-set rows whose key index in sorted unique keys has mod 8 in {4,5,6,7}; deterministic SHA-256(seed|control-company|ticker) ordering",
+    "control_value_firewall": "selection stores no answer-set EPS, stored value, net income, filing accession, or filing date; answer-set values are read only by the post-extraction comparison command",
+    "local_eligibility": "period must match one SEC-sourced quarterly row with fq=4 and one SEC-sourced annual period for the same FY; no financials file is modified",
+    "selection_seed": "20261018"
+  },
+  "input_hashes": {
+    "classification": {
+      "path": "docs/report/q4-eps-missing-classification.json",
+      "sha256": "249ec9db253b3180a25f7a9b34130cb4b5e7b0e1e02fffcf5ab9805873bbd61e"
+    },
+    "answer_set_identity_source": {
+      "path": "docs/report/q4-8k/answer-set.json",
+      "sha256": "6bbf7c10049edf107fd1f9a895876f940948dc31637688c69a5eb906af0e0740",
+      "value_fields_used_for_selection": false
+    },
+    "progress_summary": {
+      "path": "docs/report/fundamentals/us-market-progress-summary.json",
+      "sha256": "5da778a720e86706863a8531a608109ddc7eb90b347f2d5f587fa89bc837f87f"
+    },
+    "market_snapshot": {
+      "path": "docs/report/fundamentals/us-market-snapshot.json",
+      "sha256": "bccb525c81bbde158563bec5220f2c7b4cb7f51fbdc80b909fc86d7aac1a59e5"
+    },
+    "financials_files": [
+      {
+        "path": "docs/report/financials/ACDC.json",
+        "sha256": "96ee3a00c0c22d4774c5181e4b2daf3c5fad2765fb03ea18be475c7b9bf7adb3"
+      },
+      {
+        "path": "docs/report/financials/ACHC.json",
+        "sha256": "4ae26343a9a22f3967653c773b8d79ac7f11de5487dcd80c6b36b744110bbcb7"
+      },
+      {
+        "path": "docs/report/financials/ACR.json",
+        "sha256": "36cd74a2e17496ce684f9ddeb911ca94b3f412e145d583685a32e233b86abe45"
+      },
+      {
+        "path": "docs/report/financials/AGL.json",
+        "sha256": "985152efaf3ff506d2c508a01db7215890f35532518f8e32507f2ffc761ea0b3"
+      },
+      {
+        "path": "docs/report/financials/AIRE.json",
+        "sha256": "830e0a0ef1664c8bec0718cef76933cbd88ece41126e8e5d50e7bdcf88b17bfd"
+      },
+      {
+        "path": "docs/report/financials/AMKR.json",
+        "sha256": "895f5163db8aeb9637b55919473d19047c28d230985c880ed36ea71a273108c9"
+      },
+      {
+        "path": "docs/report/financials/ANIX.json",
+        "sha256": "0c99caff9b414595ffc81f433c6f20f3b4488d50890d3d6d3dce3feba4e8a593"
+      },
+      {
+        "path": "docs/report/financials/ANNA.json",
+        "sha256": "617424e0e88cfc795207e4975a73ff27f8fa7c8eead1deea05a34c74c4003d92"
+      },
+      {
+        "path": "docs/report/financials/APPN.json",
+        "sha256": "2d1f62acd6300a1f30a81078d82d7aebc98fb7af28dba148206fa412a9e539d2"
+      },
+      {
+        "path": "docs/report/financials/ARLP.json",
+        "sha256": "44517fe42c688d717494457d2670a0f9452d46fd1b86229705f6a083a15cca65"
+      },
+      {
+        "path": "docs/report/financials/ARMP.json",
+        "sha256": "1fe0718a14e5efea1582caf1595ced477a6c877b0844ab6d0b03874437da9785"
+      },
+      {
+        "path": "docs/report/financials/ASPS.json",
+        "sha256": "4e8edd9f44f6b3292781af3155e966460675d6534700ce45d65eb8779ababbcb"
+      },
+      {
+        "path": "docs/report/financials/ATRA.json",
+        "sha256": "faed5f3a52d84333316ba8de1f5cc5970464d5fa57b2058577b08346c4f1a2cb"
+      },
+      {
+        "path": "docs/report/financials/AUBN.json",
+        "sha256": "12182f13d999ecea132818cd93b19aff808c04430f0d35013b6e825bf2bb58c7"
+      },
+      {
+        "path": "docs/report/financials/AZZ.json",
+        "sha256": "b388588bbb6362645f67c2564367bdb6f87c421621a8dc6e7bff783ec6e08a90"
+      },
+      {
+        "path": "docs/report/financials/BGC.json",
+        "sha256": "7214d81635420fe823289d08d944e8180226d9466564c8af463f10e9cc5933d6"
+      },
+      {
+        "path": "docs/report/financials/BHC.json",
+        "sha256": "45e7f0cb80de7974e51a4772c1e893ffb4c3bae8d335b5a198f2794fbccfb67f"
+      },
+      {
+        "path": "docs/report/financials/BLDR.json",
+        "sha256": "bced66b91aeb67288ef8a31e89205a87f1637faa72e6d9349e353262f6f4ad0a"
+      },
+      {
+        "path": "docs/report/financials/BLNK.json",
+        "sha256": "5fa5b3d747bc21a87620c5513cc53986d0a9102e72b4fd53f728ad1e629c4b1b"
+      },
+      {
+        "path": "docs/report/financials/BOOT.json",
+        "sha256": "6da8846ac3460575235b754b668cad02ad4204e0501fd95fa2ca47a8a8b9c094"
+      },
+      {
+        "path": "docs/report/financials/BRX.json",
+        "sha256": "be9cd69a36f002c69fd5a13afeec129e71641b01474405178e63f9e9f8b5bea2"
+      },
+      {
+        "path": "docs/report/financials/BSET.json",
+        "sha256": "e44458c7f16b7b208fe92aa34b7250446c8ed3f9f726098bb93b84383450c701"
+      },
+      {
+        "path": "docs/report/financials/BSIN.json",
+        "sha256": "e6a83604c35f3cf968a1f76f4e8a4949efe2a9ad1fe5f27c34cd42cba955a326"
+      },
+      {
+        "path": "docs/report/financials/BSM.json",
+        "sha256": "274d0b9a3e9ec33c9a8285672c4710d116221c8105566295a82022e8cb95b1b5"
+      },
+      {
+        "path": "docs/report/financials/CARG.json",
+        "sha256": "ccbb07d82c4df0ab58786adf3c8f750005889c54df4fd591c3091008856f94eb"
+      },
+      {
+        "path": "docs/report/financials/CCOI.json",
+        "sha256": "5d867c3686a7d4da006435cc720fec1fcb7ef5c062a2953af2bd3a0a6a2f3580"
+      },
+      {
+        "path": "docs/report/financials/CDNA.json",
+        "sha256": "6bb4c60ab1ae4144086f94ecf45d2ef3dbc9ed2a527b18f41421f2ced66b4493"
+      },
+      {
+        "path": "docs/report/financials/CELC.json",
+        "sha256": "82968088cd5df5d9590cf548d2ba8715586e3f68e39a9c5bdaebbd988d7ea93a"
+      },
+      {
+        "path": "docs/report/financials/CELU.json",
+        "sha256": "4ad585cf0ec8ebca13a4819afe12e88ea2b3c9db84ae75bdeac983eac92cf21b"
+      },
+      {
+        "path": "docs/report/financials/CGNX.json",
+        "sha256": "c5257833d1ec9ea939d23e21ec495c84e9dbe0b535361b99d43c77304c276191"
+      },
+      {
+        "path": "docs/report/financials/CHCI.json",
+        "sha256": "6b2aa46f978736e39057564bea0aa51a68bab081fcc8f264b6521116641a009b"
+      },
+      {
+        "path": "docs/report/financials/CHRD.json",
+        "sha256": "a7cea9d51abf680a550288eea5e2558914974ab46f6b3b5c822fc58d6cc83d8e"
+      },
+      {
+        "path": "docs/report/financials/CLDX.json",
+        "sha256": "e1298ebc4e3204d6252c89287487fabaa1aabbf32f398cf5985e7e010bafa733"
+      },
+      {
+        "path": "docs/report/financials/CLPR.json",
+        "sha256": "390425b00a9275a2d74ddf622bd3eb5e304eee97555498f964ade28f93d62bcc"
+      },
+      {
+        "path": "docs/report/financials/CRMD.json",
+        "sha256": "2df5615ced9e383f6ab0e46b9c43aa349bf644c55cecbd7310b5e01e0d18691e"
+      },
+      {
+        "path": "docs/report/financials/CWH.json",
+        "sha256": "fc9cc12ca3ecea94adf3fed659e6c9d5a28d7a38d9178a2aaf492598844c99e4"
+      },
+      {
+        "path": "docs/report/financials/DGICA.json",
+        "sha256": "d06425ce1d0ce29b1dcc5bf707d2237a34d634dfb36bf0ede089974407d659a2"
+      },
+      {
+        "path": "docs/report/financials/DLPN.json",
+        "sha256": "313b04fbc37ebbc116d1e173f1689557145eff4bb4a4820e588ad01f3a4cab09"
+      },
+      {
+        "path": "docs/report/financials/DTCX.json",
+        "sha256": "a3bcef77a35774334a3cb74c6b364d6635810856ed351c23355ce0f6038e905c"
+      },
+      {
+        "path": "docs/report/financials/EE.json",
+        "sha256": "aa0788de8019021911e357ff53285a5db74bb6ee58e0ebe5429b1ee397e082f5"
+      },
+      {
+        "path": "docs/report/financials/ENR.json",
+        "sha256": "97d262114934e69ba1c5bca305485bfabb7bba653135e2a44aad800d0397037d"
+      },
+      {
+        "path": "docs/report/financials/ESOA.json",
+        "sha256": "e39a846e1f7ca9fe8c0f9fefb613c742ea547b3221512bf50e3bfc2a99d05fa9"
+      },
+      {
+        "path": "docs/report/financials/FBK.json",
+        "sha256": "4a55ffec694a4f8975b1f6798bf5c2416dd2bcbe7b9e9c0bfdf1511029546319"
+      },
+      {
+        "path": "docs/report/financials/FIZZ.json",
+        "sha256": "6eb088772b43ab0e37cf5a0f45de8e9675248fd49ca5c2897f3fff09194fa491"
+      },
+      {
+        "path": "docs/report/financials/FRST.json",
+        "sha256": "23474a98f046e1b88dee93ea9de3a3b1fdc6002280656915c6adc16d5869c206"
+      },
+      {
+        "path": "docs/report/financials/FWONK.json",
+        "sha256": "ba215625bff1be7025a880ad823a2a8a00c33220a803035d03117cfd57a2855c"
+      },
+      {
+        "path": "docs/report/financials/GBR.json",
+        "sha256": "e3d88489874b70407cfcfff418fd477c1ffb639caf7bfdb68f559f8b3e7d0934"
+      },
+      {
+        "path": "docs/report/financials/GEF.json",
+        "sha256": "6423d884f04989ddb8c447e707fa1582c1a4559ee1a8d0a564f9ede9346ce94d"
+      },
+      {
+        "path": "docs/report/financials/GEG.json",
+        "sha256": "a9964fba98c5b082c9a899098b5b1872d257a67d419f3e75d8869dd6e5c9f070"
+      },
+      {
+        "path": "docs/report/financials/GEVO.json",
+        "sha256": "255b4bb677f3fac683d0a1a1e42b70ecb9307085fcaee29ac69005cec059cb17"
+      },
+      {
+        "path": "docs/report/financials/GLP.json",
+        "sha256": "05fd7c8b0c9952c54cd0ec3b9f545e4904abf506db1d74647b177c35b2228956"
+      },
+      {
+        "path": "docs/report/financials/GNK.json",
+        "sha256": "682647bf047307bca954535d6f5859e2c761ecab90c31b742b91f18c58b48bff"
+      },
+      {
+        "path": "docs/report/financials/GOLD.json",
+        "sha256": "1ac2b252b28591c6e4983053a8ab638e31187647f86a5844d0c5a93d4fc4aa8c"
+      },
+      {
+        "path": "docs/report/financials/GPUS.json",
+        "sha256": "439eb1d281d02468d085a45fa2784564557b21958cc88ed09012beaa073e3922"
+      },
+      {
+        "path": "docs/report/financials/HGV.json",
+        "sha256": "5de0d110851fbfb6f607804c69dfe243e6efbefc84d89f1e2ea6c9db44919786"
+      },
+      {
+        "path": "docs/report/financials/HSY.json",
+        "sha256": "01c784f71514b4d5f09fd8b205371758f59f9c6f27069a344a170cc3c610f0b3"
+      },
+      {
+        "path": "docs/report/financials/IDR.json",
+        "sha256": "b1ff997da5f459f65a41f200c4b5264ad7e8e6d65426bb08781fa89758176b1a"
+      },
+      {
+        "path": "docs/report/financials/INOD.json",
+        "sha256": "f7397a340360fcf8e187bf12e0b483dd3d15674baee57e567ba741153307ed7b"
+      },
+      {
+        "path": "docs/report/financials/INVA.json",
+        "sha256": "52282096f155d499153b2d4b3c2decbe5d6c6a5131a55572a3a2aeac01b9208e"
+      },
+      {
+        "path": "docs/report/financials/IVF.json",
+        "sha256": "f10f2cb30ca58dc9c1034696bd90b5b1cfdbc62497e68424e8cff5c7e6973ac2"
+      },
+      {
+        "path": "docs/report/financials/JOUT.json",
+        "sha256": "1b4c2fcb6ad016882f5e67efaecbbb3e26fb88cce943f5333cf542a08a267c68"
+      },
+      {
+        "path": "docs/report/financials/KIM.json",
+        "sha256": "386cf185dc6d59e3932216a4de7a1c4a4548b4b6c90d719b8261b96a97bcc10d"
+      },
+      {
+        "path": "docs/report/financials/KNSA.json",
+        "sha256": "1503d4929b5aed6fcca55c40983d9d1291b564b761c252b9a25f19d4887b2363"
+      },
+      {
+        "path": "docs/report/financials/KWY.json",
+        "sha256": "07e44e946c55ef034c09e3f2fee70332daa5b86f9a0d931cafcf2b5479a99425"
+      },
+      {
+        "path": "docs/report/financials/LITE.json",
+        "sha256": "024c82e60d6a15ea75dd901b4679173e7b3ac9d9b962ad1d4b69c505753a40d8"
+      },
+      {
+        "path": "docs/report/financials/LOOP.json",
+        "sha256": "740ac73490afea2b4e11efe6c5af5a0b96ee1ff9f67778afc2a4c623ce15c5a6"
+      },
+      {
+        "path": "docs/report/financials/MAA.json",
+        "sha256": "b7b9347414bba2797e0634c55ad112ce86835dd2b6722db0256dbe9843c2a056"
+      },
+      {
+        "path": "docs/report/financials/MAC.json",
+        "sha256": "540e6677183f577c40a9792dbaa2fac562bb2b86a66f7ed8c7d048ff3f22fecc"
+      },
+      {
+        "path": "docs/report/financials/MATV.json",
+        "sha256": "0f4aa648cb4c5322b80930c66c776ddad4a84ec59d9eadeaef9b6c19a2b8d230"
+      },
+      {
+        "path": "docs/report/financials/MDBH.json",
+        "sha256": "54f69f168158badd4821f5edd02d51cd96d4aec4e2ce3234c64257849bf172f9"
+      },
+      {
+        "path": "docs/report/financials/MGNI.json",
+        "sha256": "21ee4e38992be39e0f74071b86c9c3f3f8803b9250f7047b60b5cd65e939364f"
+      },
+      {
+        "path": "docs/report/financials/NB.json",
+        "sha256": "73170754cabbd99c111c9a92bf951d4af4867d14ee80fb2ce997504a9c916931"
+      },
+      {
+        "path": "docs/report/financials/NCPL.json",
+        "sha256": "1de46ffc41476eac862e4cf785349b1164d13c073596e8ecc8248334e88e114c"
+      },
+      {
+        "path": "docs/report/financials/NEO.json",
+        "sha256": "5a5f15104fbe43e97c3de2a774652c3b4fe0858c2b13736806b01b061176d26a"
+      },
+      {
+        "path": "docs/report/financials/NEOG.json",
+        "sha256": "5897cf780f9a16044a34de77961f357858963ff7114e5f794eacfb71b304a01f"
+      },
+      {
+        "path": "docs/report/financials/NEPH.json",
+        "sha256": "f58f933aaa6f5f2dd71605f3832ae45e0fb3dce7884485e7fc7ad6b64c5b11ac"
+      },
+      {
+        "path": "docs/report/financials/NWL.json",
+        "sha256": "ff4530149315adf50f87a47e3382edf18ee10c3819aa99555b53d72eb6cfd5b2"
+      },
+      {
+        "path": "docs/report/financials/O.json",
+        "sha256": "e11894341866fc9597d4ea4a509e2d631270ad8b7688c77e8501d164f2ba6104"
+      },
+      {
+        "path": "docs/report/financials/OSW.json",
+        "sha256": "1f40950d39511667e74b41973485c35eaec85d0884d51061c82600f4ee0071f8"
+      },
+      {
+        "path": "docs/report/financials/PAA.json",
+        "sha256": "759d4fc97c6b97a6d44979485f9faac2fa2feacbb5e1d9f39e528bd167b1c775"
+      },
+      {
+        "path": "docs/report/financials/PAYS.json",
+        "sha256": "30d8531f78ac01d9f59c8cf87d669d89ea1cde84507cbdf913c7458a8f1bf1f3"
+      },
+      {
+        "path": "docs/report/financials/PBHC.json",
+        "sha256": "18d0e6bd50cf7bf1685f0a9f1c4b1e60d6aeb4bcdc2bfb6a5254538d4ce0bc55"
+      },
+      {
+        "path": "docs/report/financials/PI.json",
+        "sha256": "681a8150951b7eada9fa816354f9108f090125a7ef0954118190393406e6cf44"
+      },
+      {
+        "path": "docs/report/financials/PJT.json",
+        "sha256": "9e8cf70123c73d4afd59c0ccdbc89fefd9d9cc1d0486ccbf10ce11a7beddaf6f"
+      },
+      {
+        "path": "docs/report/financials/PKOH.json",
+        "sha256": "558c439c95d5c4ff39509248e080d519bc42435caca8503eb4813411e58f33be"
+      },
+      {
+        "path": "docs/report/financials/PPCB.json",
+        "sha256": "c98939a11c46bc2efcfac1ff7e158204eb9ed7f0fd4376a5a10ac25a21b99248"
+      },
+      {
+        "path": "docs/report/financials/PRPL.json",
+        "sha256": "f3894f0e5af19447883db5b077a980fa6e1cc4dd6f07931dc95bd782f2c1f36f"
+      },
+      {
+        "path": "docs/report/financials/PRSO.json",
+        "sha256": "602caa75d51448efa9faf478d6bcfa481d98fa1d61af4b09d361d6918f8cd96e"
+      },
+      {
+        "path": "docs/report/financials/PRTS.json",
+        "sha256": "3b901b201116cb48c55bf6bc08a18319d075d0745e5aae6c37594ca48ce7a0a0"
+      },
+      {
+        "path": "docs/report/financials/PTN.json",
+        "sha256": "6f2beabfb7befa34894c438767c4658dea10033657acdce56e9ac5d957f52651"
+      },
+      {
+        "path": "docs/report/financials/QXL.json",
+        "sha256": "99d51cd8cf7a0804aefba7a8914cd00ff332c850a3811071786a837b88af239e"
+      },
+      {
+        "path": "docs/report/financials/RCEL.json",
+        "sha256": "5f49d924b59e4715904bca4f1a8347a9cfc38730c22390dc55a639ef3b0c848b"
+      },
+      {
+        "path": "docs/report/financials/RGS.json",
+        "sha256": "95b9dc415ffdd4f3dec5cc589394f1a43669ce3d0de1441c78fe5341a7c58fb6"
+      },
+      {
+        "path": "docs/report/financials/RNGR.json",
+        "sha256": "88ef8818ada94bc9e94dc034e96d5cb20856008306b4014a305fa7e843e9b3fc"
+      },
+      {
+        "path": "docs/report/financials/ROCK.json",
+        "sha256": "276bd54cd8e0657d3bb5c137bb9318ed034fb7862e0812adb551b926f9630322"
+      },
+      {
+        "path": "docs/report/financials/RVP.json",
+        "sha256": "0cdea0bcee5286da95f97bd9d8ebd1daf76d8eff761f4ae5ebc2a3b9ce5b0226"
+      },
+      {
+        "path": "docs/report/financials/SARO.json",
+        "sha256": "484e1fab828b104995cf13a2ba95c5aaea1ee716138a5bc048c90df83fa2e38e"
+      },
+      {
+        "path": "docs/report/financials/SGRY.json",
+        "sha256": "c3d9cd9ea771e7347c5b6f3f0d91d6b79836fbaee96f6b12272ce4fbdbc6675d"
+      },
+      {
+        "path": "docs/report/financials/SION.json",
+        "sha256": "72f0bbd674afd59875e92eeccf1c152be8d27aa4ee04f7a312135102f7f57330"
+      },
+      {
+        "path": "docs/report/financials/SKYE.json",
+        "sha256": "2037a0efbf2d39fdee9305318bc2d1e0f4fafcb5b70e0007ac6a817419b42998"
+      },
+      {
+        "path": "docs/report/financials/SLNH.json",
+        "sha256": "7a0b4296c3d0aab8af623e58bbe79a0fc48fd61b0675e021444478c12f69c622"
+      },
+      {
+        "path": "docs/report/financials/SMPL.json",
+        "sha256": "1553f1e36dd51b34d5a9e4f4de916f67df2edf0c8fc74202f929667aa1e036c1"
+      },
+      {
+        "path": "docs/report/financials/SMSI.json",
+        "sha256": "c4769d8b8e44bbedea072a7d365e066b7a8a7b14b0996671cd90dbe14f1aa3fa"
+      },
+      {
+        "path": "docs/report/financials/SRPT.json",
+        "sha256": "7a4c094b85e31fd05cdeea6df8a777b6ff2b6b1434466f50a634d67ccd7783c1"
+      },
+      {
+        "path": "docs/report/financials/TGTX.json",
+        "sha256": "8d4087c7b3899c0a7e1af588cdcb85523589bce595e997e2877d72d746b9dcf7"
+      },
+      {
+        "path": "docs/report/financials/TR.json",
+        "sha256": "09c2451d8e62fec4fa2bcc24b2f06f9a1c9611277fefbd93c23839f5835e9b80"
+      },
+      {
+        "path": "docs/report/financials/TRAK.json",
+        "sha256": "ad1612ca1a9b08eb25acfc30893963bdcfa6df968f0679889177c578bacd8ae7"
+      },
+      {
+        "path": "docs/report/financials/TULP.json",
+        "sha256": "5ae11106050bcba000f7e2317c9920907ad4267675105ea386df89acb141c4db"
+      },
+      {
+        "path": "docs/report/financials/UA.json",
+        "sha256": "7158987fae4d3dd19e10981c2c42f76aadac511da623b98eb6b91614147b9729"
+      },
+      {
+        "path": "docs/report/financials/UBER.json",
+        "sha256": "c58b0ff8aaf1ce46017e657185749f7b24107ca1c7da4e3a4fb417fe9c8928cd"
+      },
+      {
+        "path": "docs/report/financials/UTI.json",
+        "sha256": "aa0065dfa6e2cbaac780c82cd9c2788f033afb6b04f1ddca4d2a401a65d9c83f"
+      },
+      {
+        "path": "docs/report/financials/UUUU.json",
+        "sha256": "1a4cd1ba91f682bbf7767efc149435133277e8376912cad11451ca68beee1c73"
+      },
+      {
+        "path": "docs/report/financials/VATE.json",
+        "sha256": "59489ffa2fa4d3e48f8a284d261fe3cb989d16da8ff1e6ef7dd5dc54bdbada0a"
+      },
+      {
+        "path": "docs/report/financials/VCEL.json",
+        "sha256": "6756629e39ae6c6cf55b999e9e55fa505e3f0c058950f09ef2c6eb003be7f104"
+      },
+      {
+        "path": "docs/report/financials/VELO.json",
+        "sha256": "c1f8b33339698819c615a5b2f91a3a49f7b29ac819767728a66519675a1cb760"
+      },
+      {
+        "path": "docs/report/financials/VRT.json",
+        "sha256": "a75d853985c33dab02fad557e24b615f153626393d2218d1e2c104474299f404"
+      },
+      {
+        "path": "docs/report/financials/WAFDP.json",
+        "sha256": "6795c67870473fdf0290677f583e96f6f832891137798b1aa52191d0c00b1c2b"
+      },
+      {
+        "path": "docs/report/financials/XBP.json",
+        "sha256": "381733123ceacb42459c7cae4fa5d461c903990c974bf8fb1bc26b15722d626c"
+      },
+      {
+        "path": "docs/report/financials/XOS.json",
+        "sha256": "f1c9063ccaeb7d3477dfffdf52d93bc0b286ed1016b3029f62d181a218c78651"
+      },
+      {
+        "path": "docs/report/financials/XWEL.json",
+        "sha256": "6bcc4f66ab7970c174910c7a0e95d8743a75fe0cddb01a26f7ac91d767c9ca10"
+      }
+    ]
+  },
+  "selection_audit": {
+    "main_classification_rows": 7755,
+    "missing_candidate_periods_by_class": {
+      "no-q4-net-income": 187,
+      "no-annual-diluted-eps": 1996,
+      "q1-q3-incomplete": 1256,
+      "derivation-rejected": 3832
+    },
+    "missing_candidate_rows_rejected": {
+      "no_current_single_cik_mapping": 11,
+      "no_unique_sec_q4_and_annual_period": 80,
+      "out_of_scope": 393
+    },
+    "class_period_end_year_primary_strata": {
+      "no-q4-net-income": {
+        "target": {
+          "2018": 2,
+          "2023": 1,
+          "2024": 1,
+          "2025": 1,
+          "2016": 1,
+          "2017": 1,
+          "2013": 1,
+          "2020": 1,
+          "2014": 1,
+          "2022": 1,
+          "2021": 1,
+          "2012": 1,
+          "2015": 1,
+          "2019": 1
+        },
+        "selected": {
+          "2012": 1,
+          "2013": 1,
+          "2014": 1,
+          "2015": 1,
+          "2016": 1,
+          "2017": 1,
+          "2018": 2,
+          "2019": 1,
+          "2020": 1,
+          "2021": 1,
+          "2022": 1,
+          "2023": 1,
+          "2024": 1,
+          "2025": 1
+        }
+      },
+      "no-annual-diluted-eps": {
+        "target": {
+          "2018": 2,
+          "2021": 1,
+          "2016": 1,
+          "2012": 1,
+          "2023": 1,
+          "2019": 1,
+          "2013": 1,
+          "2020": 1,
+          "2017": 1,
+          "2024": 1,
+          "2022": 1,
+          "2015": 1,
+          "2014": 1,
+          "2025": 1
+        },
+        "selected": {
+          "2012": 1,
+          "2013": 1,
+          "2014": 1,
+          "2015": 1,
+          "2016": 1,
+          "2017": 1,
+          "2018": 2,
+          "2019": 1,
+          "2020": 1,
+          "2021": 1,
+          "2022": 1,
+          "2023": 1,
+          "2024": 1,
+          "2025": 1
+        }
+      },
+      "q1-q3-incomplete": {
+        "target": {
+          "2016": 2,
+          "2021": 1,
+          "2017": 1,
+          "2022": 1,
+          "2024": 1,
+          "2020": 1,
+          "2025": 1,
+          "2013": 1,
+          "2014": 1,
+          "2023": 1,
+          "2012": 1,
+          "2015": 1,
+          "2019": 1,
+          "2018": 1
+        },
+        "selected": {
+          "2012": 1,
+          "2013": 1,
+          "2014": 1,
+          "2015": 1,
+          "2016": 2,
+          "2017": 1,
+          "2018": 1,
+          "2019": 1,
+          "2020": 1,
+          "2021": 1,
+          "2022": 1,
+          "2023": 1,
+          "2024": 1,
+          "2025": 1
+        }
+      },
+      "derivation-rejected": {
+        "target": {
+          "2025": 1,
+          "2021": 1,
+          "2019": 1,
+          "2013": 1,
+          "2012": 1,
+          "2020": 1,
+          "2024": 1,
+          "2016": 1,
+          "2015": 1,
+          "2022": 1,
+          "2014": 1,
+          "2026": 1,
+          "2023": 1,
+          "2017": 1,
+          "2018": 1
+        },
+        "selected": {
+          "2012": 1,
+          "2013": 1,
+          "2014": 1,
+          "2015": 1,
+          "2016": 1,
+          "2017": 1,
+          "2018": 1,
+          "2019": 1,
+          "2020": 1,
+          "2021": 1,
+          "2022": 1,
+          "2023": 1,
+          "2024": 1,
+          "2025": 1,
+          "2026": 1
+        }
+      }
+    },
+    "missing_company_count": 60,
+    "missing_period_count": 99,
+    "answer_set_sorted_unique_keys": 563,
+    "control_key_indices_selected": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "control_candidate_periods_after_local_validation": 1289,
+    "control_candidate_rows_rejected": {
+      "no_current_single_cik_mapping": 2,
+      "no_unique_sec_q4_and_annual_period": 8
+    },
+    "control_unique_companies_available": 279,
+    "control_period_count": 60
+  },
+  "missing_companies": [
+    {
+      "symbol": "CHCI",
+      "cik": "0001299969",
+      "company_name": "Comstock Holding Companies, Inc.",
+      "sic": 6500,
+      "sic_description": "Real Estate",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2018,
+          "q4_end": "2018-12-31",
+          "period_end_year": 2018,
+          "q4_start_estimate": "2018-10-01",
+          "local_annual_report_end": "2018-12-31",
+          "financials_path": "docs/report/financials/CHCI.json",
+          "financials_sha256": "6b2aa46f978736e39057564bea0aa51a68bab081fcc8f264b6521116641a009b",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2015-09-28",
+              0.142857
+            ]
+          ],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "e5f1aacf665b0ec11ab8fc19ab5a011996a9f465621b7ac0dfbbdcb117983f3e",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "DLPN",
+      "cik": "0001282224",
+      "company_name": "Dolphin Entertainment, Inc.",
+      "sic": 7200,
+      "sic_description": "Services-Personal Services",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2018,
+          "q4_end": "2018-12-31",
+          "period_end_year": 2018,
+          "q4_start_estimate": "2018-10-01",
+          "local_annual_report_end": "2018-12-31",
+          "financials_path": "docs/report/financials/DLPN.json",
+          "financials_sha256": "313b04fbc37ebbc116d1e173f1689557145eff4bb4a4820e588ad01f3a4cab09",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2007-05-18",
+              0.066667
+            ],
+            [
+              "2016-05-16",
+              0.05
+            ],
+            [
+              "2017-09-18",
+              0.5
+            ],
+            [
+              "2020-11-27",
+              0.2
+            ],
+            [
+              "2024-10-16",
+              0.5
+            ]
+          ],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "5f7b046e55ec32ff1a2c68a4caacbc2f86fb4b765d73cf52afef872935400ed7",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "EE",
+      "cik": "0001888447",
+      "company_name": "Excelerate Energy, Inc.",
+      "sic": 4924,
+      "sic_description": "Natural Gas Distribution",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2021,
+          "q4_end": "2021-12-31",
+          "period_end_year": 2021,
+          "q4_start_estimate": "2021-10-01",
+          "local_annual_report_end": "2021-12-31",
+          "financials_path": "docs/report/financials/EE.json",
+          "financials_sha256": "aa0788de8019021911e357ff53285a5db74bb6ee58e0ebe5429b1ee397e082f5",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "d043c5533b8e234277081ec877c65caeb6d73219bd6611cb5df0c685c12154c7",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2023,
+          "q4_end": "2023-12-31",
+          "period_end_year": 2023,
+          "q4_start_estimate": "2023-10-01",
+          "local_annual_report_end": "2023-12-31",
+          "financials_path": "docs/report/financials/EE.json",
+          "financials_sha256": "aa0788de8019021911e357ff53285a5db74bb6ee58e0ebe5429b1ee397e082f5",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "cb8f40179334dfe14681fcb0fbd75c986f76089ac09aee991f619011dd65d521",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "VELO",
+      "cik": "0001825079",
+      "company_name": "Velo3D, Inc.",
+      "sic": 3559,
+      "sic_description": "Special Industry Machinery, NEC",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2024,
+          "q4_end": "2024-12-31",
+          "period_end_year": 2024,
+          "q4_start_estimate": "2024-10-01",
+          "local_annual_report_end": "2024-12-31",
+          "financials_path": "docs/report/financials/VELO.json",
+          "financials_sha256": "c1f8b33339698819c615a5b2f91a3a49f7b29ac819767728a66519675a1cb760",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2024-06-13",
+              0.028571
+            ],
+            [
+              "2025-07-28",
+              0.066667
+            ]
+          ],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "c07c03f9738bc806b2f3bf5621438231f9e160b214f41a6ca6e1ec15360d9608",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2025,
+          "q4_end": "2025-12-31",
+          "period_end_year": 2025,
+          "q4_start_estimate": "2025-10-01",
+          "local_annual_report_end": "2025-12-31",
+          "financials_path": "docs/report/financials/VELO.json",
+          "financials_sha256": "c1f8b33339698819c615a5b2f91a3a49f7b29ac819767728a66519675a1cb760",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2024-06-13",
+              0.028571
+            ],
+            [
+              "2025-07-28",
+              0.066667
+            ]
+          ],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "b4c554ef2f5ce300c1d7a7d0feb4146c686b5abc510009923169e78392337d50",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "AIRE",
+      "cik": "0001859199",
+      "company_name": "reAlpha Tech Corp.",
+      "sic": 6500,
+      "sic_description": "Real Estate",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2025,
+          "q4_end": "2025-12-31",
+          "period_end_year": 2025,
+          "q4_start_estimate": "2025-10-01",
+          "local_annual_report_end": "2025-12-31",
+          "financials_path": "docs/report/financials/AIRE.json",
+          "financials_sha256": "830e0a0ef1664c8bec0718cef76933cbd88ece41126e8e5d50e7bdcf88b17bfd",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2026-04-30",
+              0.04
+            ]
+          ],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "0cf6a67c6334e83152b72f906bfb73b3a13e110ce21f43c27439f67a63bec322",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "PRSO",
+      "cik": "0000890394",
+      "company_name": "Peraso Inc.",
+      "sic": 3674,
+      "sic_description": "Semiconductors & Related Devices",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2014,
+          "q4_end": "2014-12-31",
+          "period_end_year": 2014,
+          "q4_start_estimate": "2014-10-01",
+          "local_annual_report_end": "2014-12-31",
+          "financials_path": "docs/report/financials/PRSO.json",
+          "financials_sha256": "602caa75d51448efa9faf478d6bcfa481d98fa1d61af4b09d361d6918f8cd96e",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2017-02-16",
+              0.1
+            ],
+            [
+              "2019-08-28",
+              0.05
+            ],
+            [
+              "2024-01-03",
+              0.025
+            ]
+          ],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "afc69a87185c136a07db51c3f76feb5f6b774c95971690e4c3c6e48538ed72b9",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2016,
+          "q4_end": "2016-12-31",
+          "period_end_year": 2016,
+          "q4_start_estimate": "2016-10-01",
+          "local_annual_report_end": "2016-12-31",
+          "financials_path": "docs/report/financials/PRSO.json",
+          "financials_sha256": "602caa75d51448efa9faf478d6bcfa481d98fa1d61af4b09d361d6918f8cd96e",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2017-02-16",
+              0.1
+            ],
+            [
+              "2019-08-28",
+              0.05
+            ],
+            [
+              "2024-01-03",
+              0.025
+            ]
+          ],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "fe9384b53d455e44ecb6f7daccfd4e2b13e14a09dad8055eb0714d62976fbf09",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "UUUU",
+      "cik": "0001385849",
+      "company_name": "ENERGY FUELS INC",
+      "sic": 1400,
+      "sic_description": "Mining & Quarrying of  Nonmetallic Minerals (No Fuels)",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2017,
+          "q4_end": "2017-12-31",
+          "period_end_year": 2017,
+          "q4_start_estimate": "2017-10-01",
+          "local_annual_report_end": "2017-12-31",
+          "financials_path": "docs/report/financials/UUUU.json",
+          "financials_sha256": "1a4cd1ba91f682bbf7767efc149435133277e8376912cad11451ca68beee1c73",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2013-11-05",
+              0.02
+            ]
+          ],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "df128f5fe34f2ca0f2dee38062c6673ac989b00f0e2abafe6ff9012258b60019",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2018,
+          "q4_end": "2018-12-31",
+          "period_end_year": 2018,
+          "q4_start_estimate": "2018-10-01",
+          "local_annual_report_end": "2018-12-31",
+          "financials_path": "docs/report/financials/UUUU.json",
+          "financials_sha256": "1a4cd1ba91f682bbf7767efc149435133277e8376912cad11451ca68beee1c73",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2013-11-05",
+              0.02
+            ]
+          ],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "b1fcf9d090c888d111fc6498e26e863b7a0e15750de9250cb4087397d5938b6c",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "GLP",
+      "cik": "0001323468",
+      "company_name": "GLOBAL PARTNERS LP",
+      "sic": 5171,
+      "sic_description": "Wholesale-Petroleum Bulk Stations & Terminals",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2013,
+          "q4_end": "2013-12-31",
+          "period_end_year": 2013,
+          "q4_start_estimate": "2013-10-01",
+          "local_annual_report_end": "2013-12-31",
+          "financials_path": "docs/report/financials/GLP.json",
+          "financials_sha256": "05fd7c8b0c9952c54cd0ec3b9f545e4904abf506db1d74647b177c35b2228956",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "e727ed04bae7ce6f158e99aa7520733c8e5a198bc58cebfdc28d67250cfb2e26",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2014,
+          "q4_end": "2014-12-31",
+          "period_end_year": 2014,
+          "q4_start_estimate": "2014-10-01",
+          "local_annual_report_end": "2014-12-31",
+          "financials_path": "docs/report/financials/GLP.json",
+          "financials_sha256": "05fd7c8b0c9952c54cd0ec3b9f545e4904abf506db1d74647b177c35b2228956",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "ee0110ebc3d5c70a34f21b0c41d8edf466131107de8cf841b60340d71dc1d553",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "ESOA",
+      "cik": "0001357971",
+      "company_name": "Energy Services of America CORP",
+      "sic": 1623,
+      "sic_description": "Water, Sewer, Pipeline, Comm & Power Line Construction",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2020,
+          "q4_end": "2020-09-30",
+          "period_end_year": 2020,
+          "q4_start_estimate": "2020-07-01",
+          "local_annual_report_end": "2020-09-30",
+          "financials_path": "docs/report/financials/ESOA.json",
+          "financials_sha256": "e39a846e1f7ca9fe8c0f9fefb613c742ea547b3221512bf50e3bfc2a99d05fa9",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "ee05d53d21f8a666343d6a01ea0c1d316514208d11e4bf1f765cff22b471d8a0",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2021,
+          "q4_end": "2021-09-30",
+          "period_end_year": 2021,
+          "q4_start_estimate": "2021-07-01",
+          "local_annual_report_end": "2021-09-30",
+          "financials_path": "docs/report/financials/ESOA.json",
+          "financials_sha256": "e39a846e1f7ca9fe8c0f9fefb613c742ea547b3221512bf50e3bfc2a99d05fa9",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "54772336ad57768c8008a0048592c3d59d4de23817e7ffca99d38e1a66f86df4",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "QXL",
+      "cik": "0000797542",
+      "company_name": "QUANTUM X LABS INC.",
+      "sic": 7372,
+      "sic_description": "Services-Prepackaged Software",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2014,
+          "q4_end": "2014-12-31",
+          "period_end_year": 2014,
+          "q4_start_estimate": "2014-10-01",
+          "local_annual_report_end": "2014-12-31",
+          "financials_path": "docs/report/financials/QXL.json",
+          "financials_sha256": "99d51cd8cf7a0804aefba7a8914cd00ff332c850a3811071786a837b88af239e",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2015-03-20",
+              0.25
+            ],
+            [
+              "2019-05-20",
+              0.066667
+            ],
+            [
+              "2022-09-06",
+              0.035714
+            ],
+            [
+              "2025-03-14",
+              0.25
+            ]
+          ],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "538a17da4e50e582c0cb3be3675fd09b10dedf7e6d03c7c8ff43703945dcb8ba",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2019,
+          "q4_end": "2019-12-31",
+          "period_end_year": 2019,
+          "q4_start_estimate": "2019-10-01",
+          "local_annual_report_end": "2019-12-31",
+          "financials_path": "docs/report/financials/QXL.json",
+          "financials_sha256": "99d51cd8cf7a0804aefba7a8914cd00ff332c850a3811071786a837b88af239e",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2015-03-20",
+              0.25
+            ],
+            [
+              "2019-05-20",
+              0.066667
+            ],
+            [
+              "2022-09-06",
+              0.035714
+            ],
+            [
+              "2025-03-14",
+              0.25
+            ]
+          ],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "6b1737d7cddd27ea68d2d3a59c2162f86ad5e62ee421e7378ffdfb66a1080373",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "CWH",
+      "cik": "0001669779",
+      "company_name": "Camping World Holdings, Inc.",
+      "sic": 5500,
+      "sic_description": "Retail-Auto Dealers & Gasoline Stations",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2022,
+          "q4_end": "2022-12-31",
+          "period_end_year": 2022,
+          "q4_start_estimate": "2022-10-01",
+          "local_annual_report_end": "2022-12-31",
+          "financials_path": "docs/report/financials/CWH.json",
+          "financials_sha256": "fc9cc12ca3ecea94adf3fed659e6c9d5a28d7a38d9178a2aaf492598844c99e4",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "0488b5a244fc791e52e0761ddbe7d3a4626dfb75c9231f7e75010977a85d88db",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "CLDX",
+      "cik": "0000744218",
+      "company_name": "Celldex Therapeutics, Inc.",
+      "sic": 2835,
+      "sic_description": "In Vitro & In Vivo Diagnostic Substances",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2021,
+          "q4_end": "2021-12-31",
+          "period_end_year": 2021,
+          "q4_start_estimate": "2021-10-01",
+          "local_annual_report_end": "2021-12-31",
+          "financials_path": "docs/report/financials/CLDX.json",
+          "financials_sha256": "e1298ebc4e3204d6252c89287487fabaa1aabbf32f398cf5985e7e010bafa733",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "975097c379797127c99f92d7ab26fe4250c1d297f1992fe9ef2b8dabd81e266f",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2023,
+          "q4_end": "2023-12-31",
+          "period_end_year": 2023,
+          "q4_start_estimate": "2023-10-01",
+          "local_annual_report_end": "2023-12-31",
+          "financials_path": "docs/report/financials/CLDX.json",
+          "financials_sha256": "e1298ebc4e3204d6252c89287487fabaa1aabbf32f398cf5985e7e010bafa733",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "a59061d4a22687b938454125348ff4e519dd858ea35e5f02e0c8d492bcaeeeb9",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "TRAK",
+      "cik": "0000050471",
+      "company_name": "ReposiTrak, Inc.",
+      "sic": 7374,
+      "sic_description": "Services-Computer Processing & Data Preparation",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2012,
+          "q4_end": "2012-06-30",
+          "period_end_year": 2012,
+          "q4_start_estimate": "2012-04-01",
+          "local_annual_report_end": "2012-06-30",
+          "financials_path": "docs/report/financials/TRAK.json",
+          "financials_sha256": "ad1612ca1a9b08eb25acfc30893963bdcfa6df968f0679889177c578bacd8ae7",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2006-08-11",
+              0.02
+            ]
+          ],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "dd0938776f54396b4cb930949d015bcf34511bdaf9c9d7c01ef7d05b502d25e7",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "PAYS",
+      "cik": "0001496443",
+      "company_name": "Paysign, Inc.",
+      "sic": 7389,
+      "sic_description": "Services-Business Services, NEC",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2015,
+          "q4_end": "2015-12-31",
+          "period_end_year": 2015,
+          "q4_start_estimate": "2015-10-01",
+          "local_annual_report_end": "2015-12-31",
+          "financials_path": "docs/report/financials/PAYS.json",
+          "financials_sha256": "30d8531f78ac01d9f59c8cf87d669d89ea1cde84507cbdf913c7458a8f1bf1f3",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "3f63ba745811a55a7b4ea47d1970cae14dbf1d7fd422e4ea5e356528ba4cd448",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "PRPL",
+      "cik": "0001643953",
+      "company_name": "Purple Innovation, Inc.",
+      "sic": 2510,
+      "sic_description": "Household Furniture",
+      "class": "no-q4-net-income",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2019,
+          "q4_end": "2019-12-31",
+          "period_end_year": 2019,
+          "q4_start_estimate": "2019-10-01",
+          "local_annual_report_end": "2019-12-31",
+          "financials_path": "docs/report/financials/PRPL.json",
+          "financials_sha256": "f3894f0e5af19447883db5b077a980fa6e1cc4dd6f07931dc95bd782f2c1f36f",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2026-07-20",
+              0.04
+            ]
+          ],
+          "missing_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "period_selection_rank": "3d0b7b7b94b89941dd557bdae381fdf2a8e4f085efc5661393536dcf95853faa",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "JOUT",
+      "cik": "0000788329",
+      "company_name": "JOHNSON OUTDOORS INC",
+      "sic": 3949,
+      "sic_description": "Sporting & Athletic Goods, NEC",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2018,
+          "q4_end": "2018-09-28",
+          "period_end_year": 2018,
+          "q4_start_estimate": "2018-06-30",
+          "local_annual_report_end": "2018-09-28",
+          "financials_path": "docs/report/financials/JOUT.json",
+          "financials_sha256": "1b4c2fcb6ad016882f5e67efaecbbb3e26fb88cce943f5333cf542a08a267c68",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2018",
+          "period_selection_rank": "99bf40d7b8b8e6cc1a01cff7f5b1ed046c0cb1f06bdd9529fa1dc5e891a25065",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2025,
+          "q4_end": "2025-10-03",
+          "period_end_year": 2025,
+          "q4_start_estimate": "2025-06-28",
+          "local_annual_report_end": "2025-10-03",
+          "financials_path": "docs/report/financials/JOUT.json",
+          "financials_sha256": "1b4c2fcb6ad016882f5e67efaecbbb3e26fb88cce943f5333cf542a08a267c68",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2025",
+          "period_selection_rank": "39700d9585113b3b4e217d759459092760b4c69d3eb94a29d553556545dfd1bb",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "TR",
+      "cik": "0000098677",
+      "company_name": "TOOTSIE ROLL INDUSTRIES INC",
+      "sic": 2060,
+      "sic_description": "Sugar & Confectionery Products",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2015,
+          "q4_end": "2015-12-31",
+          "period_end_year": 2015,
+          "q4_start_estimate": "2015-10-01",
+          "local_annual_report_end": "2015-12-31",
+          "financials_path": "docs/report/financials/TR.json",
+          "financials_sha256": "09c2451d8e62fec4fa2bcc24b2f06f9a1c9611277fefbd93c23839f5835e9b80",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2015",
+          "period_selection_rank": "0be06ecd50f4d096da4c56eedd3c334b5e2fbff9fca01b2649eb4a9f3565960d",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2018,
+          "q4_end": "2018-12-31",
+          "period_end_year": 2018,
+          "q4_start_estimate": "2018-10-01",
+          "local_annual_report_end": "2018-12-31",
+          "financials_path": "docs/report/financials/TR.json",
+          "financials_sha256": "09c2451d8e62fec4fa2bcc24b2f06f9a1c9611277fefbd93c23839f5835e9b80",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2018",
+          "period_selection_rank": "04fd96244ade8a0604511ce22e381a97fb445faf45f3b063b2f64eb693e4bdd3",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "XBP",
+      "cik": "0001839530",
+      "company_name": "XBP Global Holdings, Inc.",
+      "sic": 7389,
+      "sic_description": "Services-Business Services, NEC",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2021,
+          "q4_end": "2021-12-31",
+          "period_end_year": 2021,
+          "q4_start_estimate": "2021-10-01",
+          "local_annual_report_end": "2021-12-31",
+          "financials_path": "docs/report/financials/XBP.json",
+          "financials_sha256": "381733123ceacb42459c7cae4fa5d461c903990c974bf8fb1bc26b15722d626c",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2025-12-15",
+              0.1
+            ]
+          ],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2021",
+          "period_selection_rank": "fa1fa52f074d23938f6806da88926444b5c66c93b72b7bc6010068097a9cc70f",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "BSM",
+      "cik": "0001621434",
+      "company_name": "Black Stone Minerals, L.P.",
+      "sic": 1311,
+      "sic_description": "Crude Petroleum & Natural Gas",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2016,
+          "q4_end": "2016-12-31",
+          "period_end_year": 2016,
+          "q4_start_estimate": "2016-10-01",
+          "local_annual_report_end": "2016-12-31",
+          "financials_path": "docs/report/financials/BSM.json",
+          "financials_sha256": "274d0b9a3e9ec33c9a8285672c4710d116221c8105566295a82022e8cb95b1b5",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2016",
+          "period_selection_rank": "a15b97041ee7a7ed48d08e71be1e9eaaf7e6f5a2cb54497c2931a2267ba158c5",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2019,
+          "q4_end": "2019-12-31",
+          "period_end_year": 2019,
+          "q4_start_estimate": "2019-10-01",
+          "local_annual_report_end": "2019-12-31",
+          "financials_path": "docs/report/financials/BSM.json",
+          "financials_sha256": "274d0b9a3e9ec33c9a8285672c4710d116221c8105566295a82022e8cb95b1b5",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2019",
+          "period_selection_rank": "203b17ac8566fd7b49e682b37d18db31de3e55a779c8abad4f58a46371afe212",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "PAA",
+      "cik": "0001070423",
+      "company_name": "PLAINS ALL AMERICAN PIPELINE LP",
+      "sic": 4610,
+      "sic_description": "Pipe Lines (No Natural Gas)",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2012,
+          "q4_end": "2012-12-31",
+          "period_end_year": 2012,
+          "q4_start_estimate": "2012-10-01",
+          "local_annual_report_end": "2012-12-31",
+          "financials_path": "docs/report/financials/PAA.json",
+          "financials_sha256": "759d4fc97c6b97a6d44979485f9faac2fa2feacbb5e1d9f39e528bd167b1c775",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2012",
+          "period_selection_rank": "8c028630e4e9c2bd0eaad0d07e4f629dacfc8d0ab64fc789b41d4185869b7783",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2021,
+          "q4_end": "2021-12-31",
+          "period_end_year": 2021,
+          "q4_start_estimate": "2021-10-01",
+          "local_annual_report_end": "2021-12-31",
+          "financials_path": "docs/report/financials/PAA.json",
+          "financials_sha256": "759d4fc97c6b97a6d44979485f9faac2fa2feacbb5e1d9f39e528bd167b1c775",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2021",
+          "period_selection_rank": "31a596a4585c35d7de9f1acf1f35fae0d2fd41b7d544c0db409c485545b646d6",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "LOOP",
+      "cik": "0001504678",
+      "company_name": "Loop Industries, Inc.",
+      "sic": 2800,
+      "sic_description": "Chemicals & Allied Products",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2022,
+          "q4_end": "2022-02-28",
+          "period_end_year": 2022,
+          "q4_start_estimate": "2021-12-01",
+          "local_annual_report_end": "2022-02-28",
+          "financials_path": "docs/report/financials/LOOP.json",
+          "financials_sha256": "740ac73490afea2b4e11efe6c5af5a0b96ee1ff9f67778afc2a4c623ce15c5a6",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2022",
+          "period_selection_rank": "21da86940937114c0878d4ebe2f1a540fcc596a9daa08af9f548a38fad470c37",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2023,
+          "q4_end": "2023-02-28",
+          "period_end_year": 2023,
+          "q4_start_estimate": "2022-12-01",
+          "local_annual_report_end": "2023-02-28",
+          "financials_path": "docs/report/financials/LOOP.json",
+          "financials_sha256": "740ac73490afea2b4e11efe6c5af5a0b96ee1ff9f67778afc2a4c623ce15c5a6",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2023",
+          "period_selection_rank": "94ae32f95403c35351c16a1ee1f760d79d782e60fa613be8d0cb45aa1527a77f",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "DGICA",
+      "cik": "0000800457",
+      "company_name": "DONEGAL GROUP INC",
+      "sic": 6331,
+      "sic_description": "Fire, Marine & Casualty Insurance",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2019,
+          "q4_end": "2019-12-31",
+          "period_end_year": 2019,
+          "q4_start_estimate": "2019-10-01",
+          "local_annual_report_end": "2019-12-31",
+          "financials_path": "docs/report/financials/DGICA.json",
+          "financials_sha256": "d06425ce1d0ce29b1dcc5bf707d2237a34d634dfb36bf0ede089974407d659a2",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2019",
+          "period_selection_rank": "63dc07ef5f7f56cbfe1f2a130bf0968df2f7707a3fe2ae8aea8e3b3a331eed15",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2021,
+          "q4_end": "2021-12-31",
+          "period_end_year": 2021,
+          "q4_start_estimate": "2021-10-01",
+          "local_annual_report_end": "2021-12-31",
+          "financials_path": "docs/report/financials/DGICA.json",
+          "financials_sha256": "d06425ce1d0ce29b1dcc5bf707d2237a34d634dfb36bf0ede089974407d659a2",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2021",
+          "period_selection_rank": "4d4c100765a13590680ed33c0b9699220245ead269243587ffe0460da2ff2de2",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "HSY",
+      "cik": "0000047111",
+      "company_name": "HERSHEY CO",
+      "sic": 2060,
+      "sic_description": "Sugar & Confectionery Products",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2013,
+          "q4_end": "2013-12-31",
+          "period_end_year": 2013,
+          "q4_start_estimate": "2013-09-30",
+          "local_annual_report_end": "2013-12-31",
+          "financials_path": "docs/report/financials/HSY.json",
+          "financials_sha256": "01c784f71514b4d5f09fd8b205371758f59f9c6f27069a344a170cc3c610f0b3",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2013",
+          "period_selection_rank": "7262a4e168cb8a6ac4648b814950d65b33edefda072eb1b337346e1de46a7891",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2018,
+          "q4_end": "2018-12-31",
+          "period_end_year": 2018,
+          "q4_start_estimate": "2018-10-01",
+          "local_annual_report_end": "2018-12-31",
+          "financials_path": "docs/report/financials/HSY.json",
+          "financials_sha256": "01c784f71514b4d5f09fd8b205371758f59f9c6f27069a344a170cc3c610f0b3",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2018",
+          "period_selection_rank": "5a7ee3dc461a98263c8e6e85bde39bba1c87733f3ca0c74bb554ad9346144e7e",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "AGL",
+      "cik": "0001831097",
+      "company_name": "agilon health, inc.",
+      "sic": 8090,
+      "sic_description": "Services-Misc Health & Allied Services, NEC",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2020,
+          "q4_end": "2020-12-31",
+          "period_end_year": 2020,
+          "q4_start_estimate": "2020-10-01",
+          "local_annual_report_end": "2020-12-31",
+          "financials_path": "docs/report/financials/AGL.json",
+          "financials_sha256": "985152efaf3ff506d2c508a01db7215890f35532518f8e32507f2ffc761ea0b3",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2026-03-31",
+              0.04
+            ]
+          ],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2020",
+          "period_selection_rank": "786451efe94cb55b1c3cdccbe69ab6e2f83e375c9606b594df5add5e21a9e5bf",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2025,
+          "q4_end": "2025-12-31",
+          "period_end_year": 2025,
+          "q4_start_estimate": "2025-10-01",
+          "local_annual_report_end": "2025-12-31",
+          "financials_path": "docs/report/financials/AGL.json",
+          "financials_sha256": "985152efaf3ff506d2c508a01db7215890f35532518f8e32507f2ffc761ea0b3",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2026-03-31",
+              0.04
+            ]
+          ],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2025",
+          "period_selection_rank": "6fab7563d5376cc42641ec4006902d70cbcd7f31d32311d4f9037dcc214aff55",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "GEF",
+      "cik": "0000043920",
+      "company_name": "GREIF, INC",
+      "sic": 3412,
+      "sic_description": "Metal Shipping Barrels, Drums, Kegs & Pails",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2017,
+          "q4_end": "2017-10-31",
+          "period_end_year": 2017,
+          "q4_start_estimate": "2017-08-01",
+          "local_annual_report_end": "2017-10-31",
+          "financials_path": "docs/report/financials/GEF.json",
+          "financials_sha256": "6423d884f04989ddb8c447e707fa1582c1a4559ee1a8d0a564f9ede9346ce94d",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2017",
+          "period_selection_rank": "f3c1ba8dcc7a2a21ed7187b706d75cd3bb6224981410cab6759166986e00a7fc",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2022,
+          "q4_end": "2022-10-31",
+          "period_end_year": 2022,
+          "q4_start_estimate": "2022-08-01",
+          "local_annual_report_end": "2022-10-31",
+          "financials_path": "docs/report/financials/GEF.json",
+          "financials_sha256": "6423d884f04989ddb8c447e707fa1582c1a4559ee1a8d0a564f9ede9346ce94d",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2022",
+          "period_selection_rank": "31845cb6283c9397fda9a2274a852fc8d935bb0146e41e98b04cde51041301d0",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "CLPR",
+      "cik": "0001649096",
+      "company_name": "Clipper Realty Inc.",
+      "sic": 6798,
+      "sic_description": "Real Estate Investment Trusts",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2023,
+          "q4_end": "2023-12-31",
+          "period_end_year": 2023,
+          "q4_start_estimate": "2023-10-01",
+          "local_annual_report_end": "2023-12-31",
+          "financials_path": "docs/report/financials/CLPR.json",
+          "financials_sha256": "390425b00a9275a2d74ddf622bd3eb5e304eee97555498f964ade28f93d62bcc",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2023",
+          "period_selection_rank": "c74e46d43fde453a21cd60320487d3c2c7668ff0fa2723f8858a946e1f30a861",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2024,
+          "q4_end": "2024-12-31",
+          "period_end_year": 2024,
+          "q4_start_estimate": "2024-10-01",
+          "local_annual_report_end": "2024-12-31",
+          "financials_path": "docs/report/financials/CLPR.json",
+          "financials_sha256": "390425b00a9275a2d74ddf622bd3eb5e304eee97555498f964ade28f93d62bcc",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2024",
+          "period_selection_rank": "f51fc94be34be8cb6e76829b8d1b2e0bd5b229810bb9f536ce5287c73e1aa630",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "ANNA",
+      "cik": "0001845123",
+      "company_name": "AleAnna, Inc.",
+      "sic": 1311,
+      "sic_description": "Crude Petroleum & Natural Gas",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2022,
+          "q4_end": "2022-12-31",
+          "period_end_year": 2022,
+          "q4_start_estimate": "2022-10-01",
+          "local_annual_report_end": "2022-12-31",
+          "financials_path": "docs/report/financials/ANNA.json",
+          "financials_sha256": "617424e0e88cfc795207e4975a73ff27f8fa7c8eead1deea05a34c74c4003d92",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2022",
+          "period_selection_rank": "b7da2c2bf9b1774dd8ca82e5d2e077ed62e571ff8eb4e459cbc000aa66f5f921",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "PJT",
+      "cik": "0001626115",
+      "company_name": "PJT Partners Inc.",
+      "sic": 6282,
+      "sic_description": "Investment Advice",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2015,
+          "q4_end": "2015-12-31",
+          "period_end_year": 2015,
+          "q4_start_estimate": "2015-10-01",
+          "local_annual_report_end": "2015-12-31",
+          "financials_path": "docs/report/financials/PJT.json",
+          "financials_sha256": "9e8cf70123c73d4afd59c0ccdbc89fefd9d9cc1d0486ccbf10ce11a7beddaf6f",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2015",
+          "period_selection_rank": "f570cf91473aa2a4b1d941c78a2617333e35f23d88db29b6a63ad4e2c2542c1e",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2019,
+          "q4_end": "2019-12-31",
+          "period_end_year": 2019,
+          "q4_start_estimate": "2019-10-01",
+          "local_annual_report_end": "2019-12-31",
+          "financials_path": "docs/report/financials/PJT.json",
+          "financials_sha256": "9e8cf70123c73d4afd59c0ccdbc89fefd9d9cc1d0486ccbf10ce11a7beddaf6f",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2019",
+          "period_selection_rank": "00cae3952bf69f1053a6c3f09bf1c5b05dab968557f61783cf1d020779be6b6d",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "ARLP",
+      "cik": "0001086600",
+      "company_name": "ALLIANCE RESOURCE PARTNERS LP",
+      "sic": 1221,
+      "sic_description": "Bituminous Coal & Lignite Surface Mining",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2014,
+          "q4_end": "2014-12-31",
+          "period_end_year": 2014,
+          "q4_start_estimate": "2014-10-01",
+          "local_annual_report_end": "2014-12-31",
+          "financials_path": "docs/report/financials/ARLP.json",
+          "financials_sha256": "44517fe42c688d717494457d2670a0f9452d46fd1b86229705f6a083a15cca65",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2014",
+          "period_selection_rank": "fd1691a7661bde525c9a326e76d9a0543280158064500634f57a5e317822ad95",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2018,
+          "q4_end": "2018-12-31",
+          "period_end_year": 2018,
+          "q4_start_estimate": "2018-10-01",
+          "local_annual_report_end": "2018-12-31",
+          "financials_path": "docs/report/financials/ARLP.json",
+          "financials_sha256": "44517fe42c688d717494457d2670a0f9452d46fd1b86229705f6a083a15cca65",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2018",
+          "period_selection_rank": "18dcddf2582b624d6238711f7aa5356706315d747d0951c46aecd0684b9bef02",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "MDBH",
+      "cik": "0001934642",
+      "company_name": "MDB Capital Holdings, LLC",
+      "sic": 6199,
+      "sic_description": "Finance Services",
+      "class": "no-annual-diluted-eps",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2022,
+          "q4_end": "2022-12-31",
+          "period_end_year": 2022,
+          "q4_start_estimate": "2022-10-01",
+          "local_annual_report_end": "2022-12-31",
+          "financials_path": "docs/report/financials/MDBH.json",
+          "financials_sha256": "54f69f168158badd4821f5edd02d51cd96d4aec4e2ce3234c64257849bf172f9",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2022",
+          "period_selection_rank": "7d7a12d15596e106216681c37a8f4afdf59b249a5355e7b2700d8fc96f3d0e1c",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2025,
+          "q4_end": "2025-12-31",
+          "period_end_year": 2025,
+          "q4_start_estimate": "2025-10-01",
+          "local_annual_report_end": "2025-12-31",
+          "financials_path": "docs/report/financials/MDBH.json",
+          "financials_sha256": "54f69f168158badd4821f5edd02d51cd96d4aec4e2ce3234c64257849bf172f9",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2025",
+          "period_selection_rank": "8d9e70c59f6b2a658f2451ce3344f6e09feb9347ae49737573dc578a3a9eefd1",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "CELC",
+      "cik": "0001603454",
+      "company_name": "Celcuity Inc.",
+      "sic": 8071,
+      "sic_description": "Services-Medical Laboratories",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2016,
+          "q4_end": "2016-12-31",
+          "period_end_year": 2016,
+          "q4_start_estimate": "2016-10-01",
+          "local_annual_report_end": "2016-12-31",
+          "financials_path": "docs/report/financials/CELC.json",
+          "financials_sha256": "82968088cd5df5d9590cf548d2ba8715586e3f68e39a9c5bdaebbd988d7ea93a",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 rows=0, Q2 rows=0",
+          "period_selection_rank": "e4e4e0fc042e123e6b347aba838eabe09e142a7a4395f0d3e9caa5091d63210f",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2022,
+          "q4_end": "2022-12-31",
+          "period_end_year": 2022,
+          "q4_start_estimate": "2022-10-01",
+          "local_annual_report_end": "2022-12-31",
+          "financials_path": "docs/report/financials/CELC.json",
+          "financials_sha256": "82968088cd5df5d9590cf548d2ba8715586e3f68e39a9c5bdaebbd988d7ea93a",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null",
+          "period_selection_rank": "856b09743fd11189bf89f078b9204dd1b3865cb12eff989c31af1258096cc2c3",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "ATRA",
+      "cik": "0001604464",
+      "company_name": "Atara Biotherapeutics, Inc.",
+      "sic": 2836,
+      "sic_description": "Biological Products, (No Diagnostic Substances)",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2016,
+          "q4_end": "2016-12-31",
+          "period_end_year": 2016,
+          "q4_start_estimate": "2016-10-01",
+          "local_annual_report_end": "2016-12-31",
+          "financials_path": "docs/report/financials/ATRA.json",
+          "financials_sha256": "faed5f3a52d84333316ba8de1f5cc5970464d5fa57b2058577b08346c4f1a2cb",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2024-06-20",
+              0.04
+            ]
+          ],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null, Q2 null, Q3 null",
+          "period_selection_rank": "cad798deceb66c4fb0f7abdfb75232221e5c97f0df23ba26979f12138e28a48f",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2017,
+          "q4_end": "2017-12-31",
+          "period_end_year": 2017,
+          "q4_start_estimate": "2017-10-01",
+          "local_annual_report_end": "2017-12-31",
+          "financials_path": "docs/report/financials/ATRA.json",
+          "financials_sha256": "faed5f3a52d84333316ba8de1f5cc5970464d5fa57b2058577b08346c4f1a2cb",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2024-06-20",
+              0.04
+            ]
+          ],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null, Q2 null, Q3 null",
+          "period_selection_rank": "30bc6b9827f6e19bbfee5956e804300f372aac1991c203603303d45830d4d7e6",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "DTCX",
+      "cik": "0001853825",
+      "company_name": "Datacentrex, Inc.",
+      "sic": 7374,
+      "sic_description": "Services-Computer Processing & Data Preparation",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2021,
+          "q4_end": "2021-12-31",
+          "period_end_year": 2021,
+          "q4_start_estimate": "2021-10-01",
+          "local_annual_report_end": "2021-12-31",
+          "financials_path": "docs/report/financials/DTCX.json",
+          "financials_sha256": "a3bcef77a35774334a3cb74c6b364d6635810856ed351c23355ce0f6038e905c",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null",
+          "period_selection_rank": "81358ecd6a314cca2719b42fb6d075a5a0121e0e4d78a91aadab521a3eea56b5",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "KNSA",
+      "cik": "0001730430",
+      "company_name": "Kiniksa Pharmaceuticals International, plc",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2017,
+          "q4_end": "2017-12-31",
+          "period_end_year": 2017,
+          "q4_start_estimate": "2017-10-01",
+          "local_annual_report_end": "2017-12-31",
+          "financials_path": "docs/report/financials/KNSA.json",
+          "financials_sha256": "1503d4929b5aed6fcca55c40983d9d1291b564b761c252b9a25f19d4887b2363",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 rows=0",
+          "period_selection_rank": "091528adc976d4fbcd9d38ec55fc959472223d72aa2d34215bdab9691c7064d7",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "ANIX",
+      "cik": "0000715446",
+      "company_name": "Anixa Biosciences Inc",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2022,
+          "q4_end": "2022-10-31",
+          "period_end_year": 2022,
+          "q4_start_estimate": "2022-08-01",
+          "local_annual_report_end": "2022-10-31",
+          "financials_path": "docs/report/financials/ANIX.json",
+          "financials_sha256": "0c99caff9b414595ffc81f433c6f20f3b4488d50890d3d6d3dce3feba4e8a593",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "1985-11-12",
+              3
+            ],
+            [
+              "1991-03-19",
+              2
+            ],
+            [
+              "1996-06-18",
+              2
+            ],
+            [
+              "2015-06-26",
+              0.04
+            ]
+          ],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q2 null",
+          "period_selection_rank": "30520497d5e0bc45f1d1ab9c429901ccb36f5c9bdedd601204382d4fb77235b1",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "AUBN",
+      "cik": "0000750574",
+      "company_name": "AUBURN NATIONAL BANCORPORATION, INC",
+      "sic": 6022,
+      "sic_description": "State Commercial Banks",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2024,
+          "q4_end": "2024-12-31",
+          "period_end_year": 2024,
+          "q4_start_estimate": "2024-10-01",
+          "local_annual_report_end": "2024-12-31",
+          "financials_path": "docs/report/financials/AUBN.json",
+          "financials_sha256": "12182f13d999ecea132818cd93b19aff808c04430f0d35013b6e825bf2bb58c7",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null, Q2 null",
+          "period_selection_rank": "9a46dd64c6c0e7a1ab5baa0264526e7c550f0bad76b20151f50aa76641a411eb",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "XOS",
+      "cik": "0001819493",
+      "company_name": "Xos, Inc.",
+      "sic": 3714,
+      "sic_description": "Motor Vehicle Parts & Accessories",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2020,
+          "q4_end": "2020-12-31",
+          "period_end_year": 2020,
+          "q4_start_estimate": "2020-10-01",
+          "local_annual_report_end": "2020-12-31",
+          "financials_path": "docs/report/financials/XOS.json",
+          "financials_sha256": "f1c9063ccaeb7d3477dfffdf52d93bc0b286ed1016b3029f62d181a218c78651",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2023-12-07",
+              0.033333
+            ]
+          ],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null, Q2 null",
+          "period_selection_rank": "29acfa741ffddb7331f54b21db6989523f30ab7d3682d7ae582d6775690c49b1",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "NB",
+      "cik": "0001512228",
+      "company_name": "NIOCORP DEVELOPMENTS LTD",
+      "sic": 1000,
+      "sic_description": "Metal Mining",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2024,
+          "q4_end": "2024-06-30",
+          "period_end_year": 2024,
+          "q4_start_estimate": "2024-04-01",
+          "local_annual_report_end": "2024-06-30",
+          "financials_path": "docs/report/financials/NB.json",
+          "financials_sha256": "73170754cabbd99c111c9a92bf951d4af4867d14ee80fb2ce997504a9c916931",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null, Q2 null, Q3 null",
+          "period_selection_rank": "b35a2425031d73fec8981bd89c7be2dd0fc3d488fa1dd3b5f55758beede91ef4",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2025,
+          "q4_end": "2025-06-30",
+          "period_end_year": 2025,
+          "q4_start_estimate": "2025-04-01",
+          "local_annual_report_end": "2025-06-30",
+          "financials_path": "docs/report/financials/NB.json",
+          "financials_sha256": "73170754cabbd99c111c9a92bf951d4af4867d14ee80fb2ce997504a9c916931",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null",
+          "period_selection_rank": "4c60ac98481eea8ec341a3c2320ee45dd368acbbb31cfc850d17047248d5d655",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "PBHC",
+      "cik": "0001609065",
+      "company_name": "Pathfinder Bancorp, Inc.",
+      "sic": 6022,
+      "sic_description": "State Commercial Banks",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2013,
+          "q4_end": "2013-12-31",
+          "period_end_year": 2013,
+          "q4_start_estimate": null,
+          "local_annual_report_end": "2013-12-31",
+          "financials_path": "docs/report/financials/PBHC.json",
+          "financials_sha256": "18d0e6bd50cf7bf1685f0a9f1c4b1e60d6aeb4bcdc2bfb6a5254538d4ce0bc55",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "1998-02-06",
+              1.5
+            ],
+            [
+              "2014-10-17",
+              1.647
+            ]
+          ],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 rows=0, Q2 rows=0, Q3 rows=0",
+          "period_selection_rank": "185b316bec8286c26d7d3a8458b11d8fcca38e34ee5829ce8df23e53142bd44c",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "BOOT",
+      "cik": "0001610250",
+      "company_name": "Boot Barn Holdings, Inc.",
+      "sic": 5661,
+      "sic_description": "Retail-Shoe Stores",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2014,
+          "q4_end": "2014-03-29",
+          "period_end_year": 2014,
+          "q4_start_estimate": "2013-12-29",
+          "local_annual_report_end": "2014-03-29",
+          "financials_path": "docs/report/financials/BOOT.json",
+          "financials_sha256": "6da8846ac3460575235b754b668cad02ad4204e0501fd95fa2ca47a8a8b9c094",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null",
+          "period_selection_rank": "2dd0816e9f61a38c52dee15243c6ff4b733a9f21e30b32e46ef75aab4e2f6f5b",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "SARO",
+      "cik": "0002025410",
+      "company_name": "StandardAero, Inc.",
+      "sic": 3724,
+      "sic_description": "Aircraft Engines & Engine Parts",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2023,
+          "q4_end": "2023-12-31",
+          "period_end_year": 2023,
+          "q4_start_estimate": "2023-10-01",
+          "local_annual_report_end": "2023-12-31",
+          "financials_path": "docs/report/financials/SARO.json",
+          "financials_sha256": "484e1fab828b104995cf13a2ba95c5aaea1ee716138a5bc048c90df83fa2e38e",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null, Q2 null",
+          "period_selection_rank": "6e7c2c26e5974f925a6d3029024596c34ef066a59e4778f5b367e592d44313d2",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "IDR",
+      "cik": "0001030192",
+      "company_name": "Idaho Strategic Resources, Inc.",
+      "sic": 1040,
+      "sic_description": "Gold and Silver Ores",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2012,
+          "q4_end": "2012-12-31",
+          "period_end_year": 2012,
+          "q4_start_estimate": "2012-10-01",
+          "local_annual_report_end": "2012-12-31",
+          "financials_path": "docs/report/financials/IDR.json",
+          "financials_sha256": "b1ff997da5f459f65a41f200c4b5264ad7e8e6d65426bb08781fa89758176b1a",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2021-12-06",
+              0.071429
+            ]
+          ],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q2 null, Q3 null",
+          "period_selection_rank": "0a21656eeb2733474a8c65d5ed3d27cd099f11e5216ab7b187179d71ad77e197",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2023,
+          "q4_end": "2023-12-31",
+          "period_end_year": 2023,
+          "q4_start_estimate": "2023-10-01",
+          "local_annual_report_end": "2023-12-31",
+          "financials_path": "docs/report/financials/IDR.json",
+          "financials_sha256": "b1ff997da5f459f65a41f200c4b5264ad7e8e6d65426bb08781fa89758176b1a",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2021-12-06",
+              0.071429
+            ]
+          ],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null, Q2 null, Q3 null",
+          "period_selection_rank": "a30727c1b1c7eb99da78201f6283dac1a72a4d35ab767931f3612f0ab742ed9b",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "PI",
+      "cik": "0001114995",
+      "company_name": "IMPINJ INC",
+      "sic": 3679,
+      "sic_description": "Electronic Components, NEC",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2015,
+          "q4_end": "2015-12-31",
+          "period_end_year": 2015,
+          "q4_start_estimate": "2015-10-01",
+          "local_annual_report_end": "2015-12-31",
+          "financials_path": "docs/report/financials/PI.json",
+          "financials_sha256": "681a8150951b7eada9fa816354f9108f090125a7ef0954118190393406e6cf44",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 rows=0",
+          "period_selection_rank": "0b1ae38761c4e159df9d955c81fea2e5aed0fb2ea20deddcc097ed3e8a8e865b",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "ROCK",
+      "cik": "0000912562",
+      "company_name": "GIBRALTAR INDUSTRIES, INC.",
+      "sic": 3310,
+      "sic_description": "Steel Works, Blast Furnaces & Rolling & Finishing Mills",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2019,
+          "q4_end": "2019-12-31",
+          "period_end_year": 2019,
+          "q4_start_estimate": "2019-10-01",
+          "local_annual_report_end": "2019-12-31",
+          "financials_path": "docs/report/financials/ROCK.json",
+          "financials_sha256": "276bd54cd8e0657d3bb5c137bb9318ed034fb7862e0812adb551b926f9630322",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null, Q2 null, Q3 null",
+          "period_selection_rank": "deacaa8d84b704bbbb9de08006149b07a61804466e99bf15da19cf5379d2f858",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "GBR",
+      "cik": "0000105744",
+      "company_name": "New Concept Energy, Inc.",
+      "sic": 1311,
+      "sic_description": "Crude Petroleum & Natural Gas",
+      "class": "q1-q3-incomplete",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2018,
+          "q4_end": "2018-12-31",
+          "period_end_year": 2018,
+          "q4_start_estimate": "2018-10-01",
+          "local_annual_report_end": "2018-12-31",
+          "financials_path": "docs/report/financials/GBR.json",
+          "financials_sha256": "e3d88489874b70407cfcfff418fd477c1ffb639caf7bfdb68f559f8b3e7d0934",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "1995-12-01",
+              0.2
+            ],
+            [
+              "2001-12-03",
+              0.04
+            ],
+            [
+              "2003-10-29",
+              2
+            ]
+          ],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q3 null",
+          "period_selection_rank": "dc9d0ccdcb479fc0fccb3be1e03d7360e8617700bce3e21d136bb6838a50078a",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2021,
+          "q4_end": "2021-12-31",
+          "period_end_year": 2021,
+          "q4_start_estimate": "2021-10-01",
+          "local_annual_report_end": "2021-12-31",
+          "financials_path": "docs/report/financials/GBR.json",
+          "financials_sha256": "e3d88489874b70407cfcfff418fd477c1ffb639caf7bfdb68f559f8b3e7d0934",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "1995-12-01",
+              0.2
+            ],
+            [
+              "2001-12-03",
+              0.04
+            ],
+            [
+              "2003-10-29",
+              2
+            ]
+          ],
+          "missing_class": "q1-q3-incomplete",
+          "classification_detail": "Q2 null",
+          "period_selection_rank": "ae9f1c3f823f69f32161c411b89a8233baa09925f78911c8708e43e40c6e4b24",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "SION",
+      "cik": "0002036042",
+      "company_name": "Sionna Therapeutics, Inc.",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2025,
+          "q4_end": "2025-12-31",
+          "period_end_year": 2025,
+          "q4_start_estimate": "2025-10-01",
+          "local_annual_report_end": "2025-12-31",
+          "financials_path": "docs/report/financials/SION.json",
+          "financials_sha256": "72f0bbd674afd59875e92eeccf1c152be8d27aa4ee04f7a312135102f7f57330",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "112cd26faf6770a24a9693bf805b22881acca87cd8977ca1ee85825a485dc85d",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "SLNH",
+      "cik": "0000064463",
+      "company_name": "Soluna Holdings, Inc",
+      "sic": 6199,
+      "sic_description": "Finance Services",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2013,
+          "q4_end": "2013-12-31",
+          "period_end_year": 2013,
+          "q4_start_estimate": "2013-10-01",
+          "local_annual_report_end": "2013-12-31",
+          "financials_path": "docs/report/financials/SLNH.json",
+          "financials_sha256": "7a0b4296c3d0aab8af623e58bbe79a0fc48fd61b0675e021444478c12f69c622",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2000-04-13",
+              3
+            ],
+            [
+              "2008-05-16",
+              0.125
+            ],
+            [
+              "2023-10-16",
+              0.04
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "73c645fb7eea3f9f32260266355d9ab6375532fd697ac7f443102c4b8c7f45fa",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2021,
+          "q4_end": "2021-12-31",
+          "period_end_year": 2021,
+          "q4_start_estimate": "2021-10-01",
+          "local_annual_report_end": "2021-12-31",
+          "financials_path": "docs/report/financials/SLNH.json",
+          "financials_sha256": "7a0b4296c3d0aab8af623e58bbe79a0fc48fd61b0675e021444478c12f69c622",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2000-04-13",
+              3
+            ],
+            [
+              "2008-05-16",
+              0.125
+            ],
+            [
+              "2023-10-16",
+              0.04
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "2c906aed35548b28256f86a82315b9b9022d058dee47021913d67ecf1a75452b",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "ARMP",
+      "cik": "0000921114",
+      "company_name": "Armata Pharmaceuticals, Inc.",
+      "sic": 2836,
+      "sic_description": "Biological Products, (No Diagnostic Substances)",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2017,
+          "q4_end": "2017-12-31",
+          "period_end_year": 2017,
+          "q4_start_estimate": "2017-10-01",
+          "local_annual_report_end": "2017-12-31",
+          "financials_path": "docs/report/financials/ARMP.json",
+          "financials_sha256": "1fe0718a14e5efea1582caf1595ced477a6c877b0844ab6d0b03874437da9785",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2006-05-11",
+              0.1
+            ],
+            [
+              "2015-08-07",
+              0.02
+            ],
+            [
+              "2017-04-25",
+              0.1
+            ],
+            [
+              "2019-05-10",
+              0.071429
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "880752437d02a476890332ea68d00dc2a2c9a23031e59eb182b7e92d575e68bb",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2019,
+          "q4_end": "2019-12-31",
+          "period_end_year": 2019,
+          "q4_start_estimate": "2019-10-01",
+          "local_annual_report_end": "2019-12-31",
+          "financials_path": "docs/report/financials/ARMP.json",
+          "financials_sha256": "1fe0718a14e5efea1582caf1595ced477a6c877b0844ab6d0b03874437da9785",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2006-05-11",
+              0.1
+            ],
+            [
+              "2015-08-07",
+              0.02
+            ],
+            [
+              "2017-04-25",
+              0.1
+            ],
+            [
+              "2019-05-10",
+              0.071429
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "65940317992ee47dc7751b4ddfec1f78da0473f324d85f33f1fc5dde78fcead3",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "TGTX",
+      "cik": "0001001316",
+      "company_name": "TG THERAPEUTICS, INC.",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2012,
+          "q4_end": "2012-12-31",
+          "period_end_year": 2012,
+          "q4_start_estimate": "2012-10-01",
+          "local_annual_report_end": "2012-12-31",
+          "financials_path": "docs/report/financials/TGTX.json",
+          "financials_sha256": "8d4087c7b3899c0a7e1af588cdcb85523589bce595e997e2877d72d746b9dcf7",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2011-07-14",
+              0.02
+            ],
+            [
+              "2012-04-30",
+              0.017778
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "9ecb7958544f7237859b5e25acf321ad09e1fccf23616a03978180731bb63997",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2013,
+          "q4_end": "2013-12-31",
+          "period_end_year": 2013,
+          "q4_start_estimate": "2013-10-01",
+          "local_annual_report_end": "2013-12-31",
+          "financials_path": "docs/report/financials/TGTX.json",
+          "financials_sha256": "8d4087c7b3899c0a7e1af588cdcb85523589bce595e997e2877d72d746b9dcf7",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2011-07-14",
+              0.02
+            ],
+            [
+              "2012-04-30",
+              0.017778
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "79641bac036d66430df263bfcb7a7f2e35fb3bace631b297e8f6a3e1b3bda174",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "PPCB",
+      "cik": "0001517681",
+      "company_name": "Propanc Biopharma, Inc.",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2012,
+          "q4_end": "2012-06-30",
+          "period_end_year": 2012,
+          "q4_start_estimate": "2012-04-01",
+          "local_annual_report_end": "2012-06-30",
+          "financials_path": "docs/report/financials/PPCB.json",
+          "financials_sha256": "c98939a11c46bc2efcfac1ff7e158204eb9ed7f0fd4376a5a10ac25a21b99248",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2017-04-20",
+              0.004
+            ],
+            [
+              "2019-06-24",
+              0.002
+            ],
+            [
+              "2020-11-19",
+              0.001
+            ],
+            [
+              "2025-01-29",
+              0.5
+            ],
+            [
+              "2026-05-18",
+              0.04
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "e99c78499177e4fbc4b8aa1dfa806317598e41f9c59686dd05622f3533e482b3",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2018,
+          "q4_end": "2018-06-30",
+          "period_end_year": 2018,
+          "q4_start_estimate": "2018-04-01",
+          "local_annual_report_end": "2018-06-30",
+          "financials_path": "docs/report/financials/PPCB.json",
+          "financials_sha256": "c98939a11c46bc2efcfac1ff7e158204eb9ed7f0fd4376a5a10ac25a21b99248",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2017-04-20",
+              0.004
+            ],
+            [
+              "2019-06-24",
+              0.002
+            ],
+            [
+              "2020-11-19",
+              0.001
+            ],
+            [
+              "2025-01-29",
+              0.5
+            ],
+            [
+              "2026-05-18",
+              0.04
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "7652456dd587242ae28df71226fe0a6113cf4b94da7976fdec4ef231fa040899",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "CELU",
+      "cik": "0001752828",
+      "company_name": "Celularity Inc",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2020,
+          "q4_end": "2020-12-31",
+          "period_end_year": 2020,
+          "q4_start_estimate": "2020-10-01",
+          "local_annual_report_end": "2020-12-31",
+          "financials_path": "docs/report/financials/CELU.json",
+          "financials_sha256": "4ad585cf0ec8ebca13a4819afe12e88ea2b3c9db84ae75bdeac983eac92cf21b",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2024-02-29",
+              0.1
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "缺股數且 EPS 無效，無法推算股數",
+          "period_selection_rank": "c5a37849f429362e9cde503a0f2cfc61b23ff078c1e1c2b6e8a3cfd8226f30a3",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2022,
+          "q4_end": "2022-12-31",
+          "period_end_year": 2022,
+          "q4_start_estimate": "2022-10-01",
+          "local_annual_report_end": "2022-12-31",
+          "financials_path": "docs/report/financials/CELU.json",
+          "financials_sha256": "4ad585cf0ec8ebca13a4819afe12e88ea2b3c9db84ae75bdeac983eac92cf21b",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2024-02-29",
+              0.1
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 推算值未通過 Q4 淨利／股數檢查",
+          "period_selection_rank": "81dce118ef9eacc72edff89d8f29dc7542e0992c677e9a0969dc8db3bc736b62",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "SKYE",
+      "cik": "0001516551",
+      "company_name": "Skye Bioscience, Inc.",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2022,
+          "q4_end": "2022-12-31",
+          "period_end_year": 2022,
+          "q4_start_estimate": "2022-10-01",
+          "local_annual_report_end": "2022-12-31",
+          "financials_path": "docs/report/financials/SKYE.json",
+          "financials_sha256": "2037a0efbf2d39fdee9305318bc2d1e0f4fafcb5b70e0007ac6a817419b42998",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2023-09-08",
+              0.004
+            ],
+            [
+              "2026-08-24",
+              0.125
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "dbd84914be7868ce35569c5c9bf47a3a78a8ff872c9cec7320812f2267aba988",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2024,
+          "q4_end": "2024-12-31",
+          "period_end_year": 2024,
+          "q4_start_estimate": "2024-10-01",
+          "local_annual_report_end": "2024-12-31",
+          "financials_path": "docs/report/financials/SKYE.json",
+          "financials_sha256": "2037a0efbf2d39fdee9305318bc2d1e0f4fafcb5b70e0007ac6a817419b42998",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2023-09-08",
+              0.004
+            ],
+            [
+              "2026-08-24",
+              0.125
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "99112003c8e9bc309e1e580f637a210a67098699582c6fef9cd842bad34d94fa",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "GEVO",
+      "cik": "0001392380",
+      "company_name": "Gevo, Inc.",
+      "sic": 2860,
+      "sic_description": "Industrial Organic Chemicals",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2016,
+          "q4_end": "2016-12-31",
+          "period_end_year": 2016,
+          "q4_start_estimate": "2016-10-01",
+          "local_annual_report_end": "2016-12-31",
+          "financials_path": "docs/report/financials/GEVO.json",
+          "financials_sha256": "255b4bb677f3fac683d0a1a1e42b70ecb9307085fcaee29ac69005cec059cb17",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2015-04-21",
+              0.066667
+            ],
+            [
+              "2017-01-06",
+              0.05
+            ],
+            [
+              "2018-06-04",
+              0.05
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "9dc34da03e0bef2207768ba9244e78bbd6e825354ee31130c8cf7e82ad8199f5",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2018,
+          "q4_end": "2018-12-31",
+          "period_end_year": 2018,
+          "q4_start_estimate": "2018-10-01",
+          "local_annual_report_end": "2018-12-31",
+          "financials_path": "docs/report/financials/GEVO.json",
+          "financials_sha256": "255b4bb677f3fac683d0a1a1e42b70ecb9307085fcaee29ac69005cec059cb17",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2015-04-21",
+              0.066667
+            ],
+            [
+              "2017-01-06",
+              0.05
+            ],
+            [
+              "2018-06-04",
+              0.05
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "88181de1b6afa155f7b7706efd586f4e36db03e77a447215cc3db44bcfb4c061",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "NEPH",
+      "cik": "0001196298",
+      "company_name": "NEPHROS INC",
+      "sic": 3841,
+      "sic_description": "Surgical & Medical Instruments & Apparatus",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2015,
+          "q4_end": "2015-12-31",
+          "period_end_year": 2015,
+          "q4_start_estimate": "2015-10-01",
+          "local_annual_report_end": "2015-12-31",
+          "financials_path": "docs/report/financials/NEPH.json",
+          "financials_sha256": "f58f933aaa6f5f2dd71605f3832ae45e0fb3dce7884485e7fc7ad6b64c5b11ac",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2011-03-17",
+              0.05
+            ],
+            [
+              "2019-07-10",
+              0.111111
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 推算 EPS 與 Q4 淨利符號不一致",
+          "period_selection_rank": "d350c8887f02e72867ffccc38575c8d66b5f4cfdd89b20ca222270d44c1d334f",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2018,
+          "q4_end": "2018-12-31",
+          "period_end_year": 2018,
+          "q4_start_estimate": "2018-10-01",
+          "local_annual_report_end": "2018-12-31",
+          "financials_path": "docs/report/financials/NEPH.json",
+          "financials_sha256": "f58f933aaa6f5f2dd71605f3832ae45e0fb3dce7884485e7fc7ad6b64c5b11ac",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2011-03-17",
+              0.05
+            ],
+            [
+              "2019-07-10",
+              0.111111
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "ef5757d78b8e9611c495207a9b2293923108a436bac575b512527d7e1b073e52",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "IVF",
+      "cik": "0001417926",
+      "company_name": "INVO Fertility, Inc.",
+      "sic": 3841,
+      "sic_description": "Surgical & Medical Instruments & Apparatus",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2022,
+          "q4_end": "2022-12-31",
+          "period_end_year": 2022,
+          "q4_start_estimate": "2022-10-01",
+          "local_annual_report_end": "2022-12-31",
+          "financials_path": "docs/report/financials/IVF.json",
+          "financials_sha256": "f10f2cb30ca58dc9c1034696bd90b5b1cfdbc62497e68424e8cff5c7e6973ac2",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2023-07-28",
+              0.05
+            ],
+            [
+              "2025-03-18",
+              0.083333
+            ],
+            [
+              "2025-07-21",
+              0.333333
+            ],
+            [
+              "2025-11-28",
+              0.125
+            ],
+            [
+              "2026-03-27",
+              0.2
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "ff500f7eb63a9341e201eab84a5f4c3f63e5337bf26789070800ac2d6cea043d",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2024,
+          "q4_end": "2024-12-31",
+          "period_end_year": 2024,
+          "q4_start_estimate": "2024-10-01",
+          "local_annual_report_end": "2024-12-31",
+          "financials_path": "docs/report/financials/IVF.json",
+          "financials_sha256": "f10f2cb30ca58dc9c1034696bd90b5b1cfdbc62497e68424e8cff5c7e6973ac2",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2023-07-28",
+              0.05
+            ],
+            [
+              "2025-03-18",
+              0.083333
+            ],
+            [
+              "2025-07-21",
+              0.333333
+            ],
+            [
+              "2025-11-28",
+              0.125
+            ],
+            [
+              "2026-03-27",
+              0.2
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "c8c86a467fdd38ae1041eb5b95fb4dd9ad636db487c601ca66772fac4876b445",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "NCPL",
+      "cik": "0001414767",
+      "company_name": "Netcapital Inc.",
+      "sic": 6199,
+      "sic_description": "Finance Services",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2014,
+          "q4_end": "2014-04-30",
+          "period_end_year": 2014,
+          "q4_start_estimate": "2014-02-01",
+          "local_annual_report_end": "2014-04-30",
+          "financials_path": "docs/report/financials/NCPL.json",
+          "financials_sha256": "1de46ffc41476eac862e4cf785349b1164d13c073596e8ecc8248334e88e114c",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2020-11-05",
+              0.0005
+            ],
+            [
+              "2024-08-02",
+              0.014286
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "缺股數且 EPS 無效，無法推算股數",
+          "period_selection_rank": "8dc4bbfd21fbe270bff97df147ff1d8bef5c9dc0127681d255e91acef59c37d2",
+          "sample_period_role": "primary"
+        },
+        {
+          "fy": 2024,
+          "q4_end": "2024-04-30",
+          "period_end_year": 2024,
+          "q4_start_estimate": "2024-02-01",
+          "local_annual_report_end": "2024-04-30",
+          "financials_path": "docs/report/financials/NCPL.json",
+          "financials_sha256": "1de46ffc41476eac862e4cf785349b1164d13c073596e8ecc8248334e88e114c",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2020-11-05",
+              0.0005
+            ],
+            [
+              "2024-08-02",
+              0.014286
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "b6824655437ee469308bc7bf63a04393903d82fdb993c2f3a5208b54319ee75f",
+          "sample_period_role": "secondary"
+        }
+      ]
+    },
+    {
+      "symbol": "PRTS",
+      "cik": "0001378950",
+      "company_name": "CarParts.com, Inc.",
+      "sic": 5531,
+      "sic_description": "Retail-Auto & Home Supply Stores",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2020,
+          "q4_end": "2021-01-02",
+          "period_end_year": 2021,
+          "q4_start_estimate": "2020-09-27",
+          "local_annual_report_end": "2021-01-02",
+          "financials_path": "docs/report/financials/PRTS.json",
+          "financials_sha256": "3b901b201116cb48c55bf6bc08a18319d075d0745e5aae6c37594ca48ce7a0a0",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2026-05-26",
+              0.1
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "ae03f32bf3b02c7108d52d9e7660977863a73f11daadb38901ca7a50a0294610",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2025,
+          "q4_end": "2026-01-03",
+          "period_end_year": 2026,
+          "q4_start_estimate": "2025-09-28",
+          "local_annual_report_end": "2026-01-03",
+          "financials_path": "docs/report/financials/PRTS.json",
+          "financials_sha256": "3b901b201116cb48c55bf6bc08a18319d075d0745e5aae6c37594ca48ce7a0a0",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2026-05-26",
+              0.1
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 推算值未通過 Q4 淨利／股數檢查",
+          "period_selection_rank": "280032503da9df96fbeaa7e46d2f60660408d2f0dad07d353806fa160c0b284a",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "GPUS",
+      "cik": "0000896493",
+      "company_name": "Hyperscale Data, Inc.",
+      "sic": 3533,
+      "sic_description": "Oil & Gas Field Machinery & Equipment",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2019,
+          "q4_end": "2019-12-31",
+          "period_end_year": 2019,
+          "q4_start_estimate": "2019-10-01",
+          "local_annual_report_end": "2019-12-31",
+          "financials_path": "docs/report/financials/GPUS.json",
+          "financials_sha256": "439eb1d281d02468d085a45fa2784564557b21958cc88ed09012beaa073e3922",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2019-03-15",
+              0.05
+            ],
+            [
+              "2019-08-06",
+              0.025
+            ],
+            [
+              "2023-05-18",
+              0.003333
+            ],
+            [
+              "2024-01-17",
+              0.04
+            ],
+            [
+              "2024-11-25",
+              0.028571
+            ],
+            [
+              "2026-08-25",
+              0.2
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "1ada61c761d43e752ca9f19544311103d92e9f6d29e1b7d6fa9e8bc4770a7bc4",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2023,
+          "q4_end": "2023-12-31",
+          "period_end_year": 2023,
+          "q4_start_estimate": "2023-10-01",
+          "local_annual_report_end": "2023-12-31",
+          "financials_path": "docs/report/financials/GPUS.json",
+          "financials_sha256": "439eb1d281d02468d085a45fa2784564557b21958cc88ed09012beaa073e3922",
+          "financials_split_adjusted": true,
+          "split_events": [
+            [
+              "2019-03-15",
+              0.05
+            ],
+            [
+              "2019-08-06",
+              0.025
+            ],
+            [
+              "2023-05-18",
+              0.003333
+            ],
+            [
+              "2024-01-17",
+              0.04
+            ],
+            [
+              "2024-11-25",
+              0.028571
+            ],
+            [
+              "2026-08-25",
+              0.2
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "50eaf8b47b4aba7d16ee4992a1000fb9cf3484f78d2da6d017a9077678e2e798",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "APPN",
+      "cik": "0001441683",
+      "company_name": "APPIAN CORP",
+      "sic": 7372,
+      "sic_description": "Services-Prepackaged Software",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2017,
+          "q4_end": "2017-12-31",
+          "period_end_year": 2017,
+          "q4_start_estimate": "2017-10-01",
+          "local_annual_report_end": "2017-12-31",
+          "financials_path": "docs/report/financials/APPN.json",
+          "financials_sha256": "2d1f62acd6300a1f30a81078d82d7aebc98fb7af28dba148206fa412a9e539d2",
+          "financials_split_adjusted": false,
+          "split_events": [],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "365551a10907b9285ed77d2820ae58241b5307ed639ce49bd65b844a9c322491",
+          "sample_period_role": "primary"
+        }
+      ]
+    },
+    {
+      "symbol": "CRMD",
+      "cik": "0001410098",
+      "company_name": "CorMedix Inc.",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations",
+      "class": "derivation-rejected",
+      "company_selection_rule": "fixed-seed balanced period-end year, then SHA-256 rank; unique CIK across the missing-company sample",
+      "periods": [
+        {
+          "fy": 2013,
+          "q4_end": "2013-12-31",
+          "period_end_year": 2013,
+          "q4_start_estimate": "2013-10-01",
+          "local_annual_report_end": "2013-12-31",
+          "financials_path": "docs/report/financials/CRMD.json",
+          "financials_sha256": "2df5615ced9e383f6ab0e46b9c43aa349bf644c55cecbd7310b5e01e0d18691e",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2019-03-26",
+              0.2
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "cf271e55891414e496ab335d3ec0a1b3c4b86ad22c2b041c4157d75372889845",
+          "sample_period_role": "secondary"
+        },
+        {
+          "fy": 2018,
+          "q4_end": "2018-12-31",
+          "period_end_year": 2018,
+          "q4_start_estimate": "2018-10-01",
+          "local_annual_report_end": "2018-12-31",
+          "financials_path": "docs/report/financials/CRMD.json",
+          "financials_sha256": "2df5615ced9e383f6ab0e46b9c43aa349bf644c55cecbd7310b5e01e0d18691e",
+          "financials_split_adjusted": false,
+          "split_events": [
+            [
+              "2019-03-26",
+              0.2
+            ]
+          ],
+          "missing_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "period_selection_rank": "b1d81686c484c5b75862b2d4d1806598e56ed8602a3eafd1c0afed1306247f1f",
+          "sample_period_role": "primary"
+        }
+      ]
+    }
+  ],
+  "controls": [
+    {
+      "fy": 2020,
+      "q4_end": "2020-12-31",
+      "period_end_year": 2020,
+      "q4_start_estimate": "2020-10-01",
+      "local_annual_report_end": "2020-12-31",
+      "financials_path": "docs/report/financials/OSW.json",
+      "financials_sha256": "1f40950d39511667e74b41973485c35eaec85d0884d51061c82600f4ee0071f8",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 381,
+      "answer_key_mod_8": 5,
+      "selection_rank": "bd402d340d22d5e8db6d6a769dd61eab90ce09b9a2906b5eb6f56560489cf817",
+      "symbol": "OSW",
+      "cik": "0001758488",
+      "company_name": "ONESPAWORLD HOLDINGS Ltd",
+      "sic": 7997,
+      "sic_description": "Services-Membership Sports & Recreation Clubs"
+    },
+    {
+      "fy": 2015,
+      "q4_end": "2015-12-31",
+      "period_end_year": 2015,
+      "q4_start_estimate": "2015-10-01",
+      "local_annual_report_end": "2015-12-31",
+      "financials_path": "docs/report/financials/NEO.json",
+      "financials_sha256": "5a5f15104fbe43e97c3de2a774652c3b4fe0858c2b13736806b01b061176d26a",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 349,
+      "answer_key_mod_8": 5,
+      "selection_rank": "5f978c6bb5630605074e8aaef9ff6da6234ddf48901a62ddcc687e196542ee02",
+      "symbol": "NEO",
+      "cik": "0001077183",
+      "company_name": "NEOGENOMICS INC",
+      "sic": 8734,
+      "sic_description": "Services-Testing Laboratories"
+    },
+    {
+      "fy": 2013,
+      "q4_end": "2013-12-31",
+      "period_end_year": 2013,
+      "q4_start_estimate": "2013-10-01",
+      "local_annual_report_end": "2013-12-31",
+      "financials_path": "docs/report/financials/PKOH.json",
+      "financials_sha256": "558c439c95d5c4ff39509248e080d519bc42435caca8503eb4813411e58f33be",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 399,
+      "answer_key_mod_8": 7,
+      "selection_rank": "220327383e7e1ba472894778077182004fd6bb7efec9dba66cf89bd2ddc5719c",
+      "symbol": "PKOH",
+      "cik": "0000076282",
+      "company_name": "PARK OHIO HOLDINGS CORP",
+      "sic": 3460,
+      "sic_description": "Metal Forgings & Stampings"
+    },
+    {
+      "fy": 2019,
+      "q4_end": "2019-12-31",
+      "period_end_year": 2019,
+      "q4_start_estimate": "2019-10-01",
+      "local_annual_report_end": "2019-06-30",
+      "financials_path": "docs/report/financials/RCEL.json",
+      "financials_sha256": "5f49d924b59e4715904bca4f1a8347a9cfc38730c22390dc55a639ef3b0c848b",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 421,
+      "answer_key_mod_8": 5,
+      "selection_rank": "50efc4361f3f0c3b2bf4d6c56cd1cf51cb5a403106f118a98304324bfd1d5e02",
+      "symbol": "RCEL",
+      "cik": "0001762303",
+      "company_name": "AVITA Medical, Inc.",
+      "sic": 3841,
+      "sic_description": "Surgical & Medical Instruments & Apparatus"
+    },
+    {
+      "fy": 2020,
+      "q4_end": "2020-12-31",
+      "period_end_year": 2020,
+      "q4_start_estimate": "2020-10-01",
+      "local_annual_report_end": "2020-12-31",
+      "financials_path": "docs/report/financials/VRT.json",
+      "financials_sha256": "a75d853985c33dab02fad557e24b615f153626393d2218d1e2c104474299f404",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 534,
+      "answer_key_mod_8": 6,
+      "selection_rank": "933d83b4fd92cacd521d6a3129f8b700550a3c1a61d012d16c1dc4f46c6a0fc0",
+      "symbol": "VRT",
+      "cik": "0001674101",
+      "company_name": "Vertiv Holdings Co",
+      "sic": 3679,
+      "sic_description": "Electronic Components, NEC"
+    },
+    {
+      "fy": 2019,
+      "q4_end": "2019-12-31",
+      "period_end_year": 2019,
+      "q4_start_estimate": "2019-10-01",
+      "local_annual_report_end": "2019-12-31",
+      "financials_path": "docs/report/financials/HGV.json",
+      "financials_sha256": "5de0d110851fbfb6f607804c69dfe243e6efbefc84d89f1e2ea6c9db44919786",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 239,
+      "answer_key_mod_8": 7,
+      "selection_rank": "4eea5a56daa6c7f7fbbb432ee765c970349bfb4e57759fce986e72ffd5d44e61",
+      "symbol": "HGV",
+      "cik": "0001674168",
+      "company_name": "Hilton Grand Vacations Inc.",
+      "sic": 7000,
+      "sic_description": "Hotels, Rooming Houses, Camps & Other Lodging Places"
+    },
+    {
+      "fy": 2019,
+      "q4_end": "2019-06-30",
+      "period_end_year": 2019,
+      "q4_start_estimate": "2019-04-01",
+      "local_annual_report_end": "2019-06-30",
+      "financials_path": "docs/report/financials/RGS.json",
+      "financials_sha256": "95b9dc415ffdd4f3dec5cc589394f1a43669ce3d0de1441c78fe5341a7c58fb6",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "1996-06-05",
+          1.5
+        ],
+        [
+          "1999-03-02",
+          1.5
+        ],
+        [
+          "2023-11-29",
+          0.05
+        ]
+      ],
+      "answer_key_index": 429,
+      "answer_key_mod_8": 5,
+      "selection_rank": "2a6f7aad63d47b9fa1d7f7f035ffb79883aeaa7c37ea6df958960a34cf6566a2",
+      "symbol": "RGS",
+      "cik": "0000716643",
+      "company_name": "REGIS CORP",
+      "sic": 7200,
+      "sic_description": "Services-Personal Services"
+    },
+    {
+      "fy": 2012,
+      "q4_end": "2012-12-31",
+      "period_end_year": 2012,
+      "q4_start_estimate": "2012-10-01",
+      "local_annual_report_end": "2012-12-31",
+      "financials_path": "docs/report/financials/INOD.json",
+      "financials_sha256": "f7397a340360fcf8e187bf12e0b483dd3d15674baee57e567ba741153307ed7b",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 268,
+      "answer_key_mod_8": 4,
+      "selection_rank": "58d4f9bf52aef1fd4c9e9756396e0a8cc005b3510a55550a414359ce56ad09fc",
+      "symbol": "INOD",
+      "cik": "0000903651",
+      "company_name": "INNODATA INC",
+      "sic": 7374,
+      "sic_description": "Services-Computer Processing & Data Preparation"
+    },
+    {
+      "fy": 2020,
+      "q4_end": "2020-12-31",
+      "period_end_year": 2020,
+      "q4_start_estimate": "2020-10-01",
+      "local_annual_report_end": "2020-12-31",
+      "financials_path": "docs/report/financials/KIM.json",
+      "financials_sha256": "386cf185dc6d59e3932216a4de7a1c4a4548b4b6c90d719b8261b96a97bcc10d",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 285,
+      "answer_key_mod_8": 5,
+      "selection_rank": "0a9796cec134c1da306284556908f60754f69122423cc9adbde6821803914903",
+      "symbol": "KIM",
+      "cik": "0000879101",
+      "company_name": "KIMCO REALTY CORP",
+      "sic": 6798,
+      "sic_description": "Real Estate Investment Trusts"
+    },
+    {
+      "fy": 2014,
+      "q4_end": "2014-12-31",
+      "period_end_year": 2014,
+      "q4_start_estimate": "2014-10-01",
+      "local_annual_report_end": "2014-12-31",
+      "financials_path": "docs/report/financials/BRX.json",
+      "financials_sha256": "be9cd69a36f002c69fd5a13afeec129e71641b01474405178e63f9e9f8b5bea2",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 85,
+      "answer_key_mod_8": 5,
+      "selection_rank": "12c5510741f98e72c9de7801ac109f45f38538310c971b843ff1b49c420eed0d",
+      "symbol": "BRX",
+      "cik": "0001581068",
+      "company_name": "Brixmor Property Group Inc.",
+      "sic": 6798,
+      "sic_description": "Real Estate Investment Trusts"
+    },
+    {
+      "fy": 2011,
+      "q4_end": "2011-12-31",
+      "period_end_year": 2011,
+      "q4_start_estimate": "2011-10-01",
+      "local_annual_report_end": "2011-12-31",
+      "financials_path": "docs/report/financials/BSIN.json",
+      "financials_sha256": "e6a83604c35f3cf968a1f76f4e8a4949efe2a9ad1fe5f27c34cd42cba955a326",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2016-06-22",
+          0.166667
+        ],
+        [
+          "2020-01-06",
+          0.1
+        ]
+      ],
+      "answer_key_index": 87,
+      "answer_key_mod_8": 7,
+      "selection_rank": "15ce7aa91db84f3e0626a2d23167ee3a6d05a42323ba313b0592181f4835dc8d",
+      "symbol": "BSIN",
+      "cik": "0000101594",
+      "company_name": "BIG SKY INDUSTRIAL INC.",
+      "sic": 1311,
+      "sic_description": "Crude Petroleum & Natural Gas"
+    },
+    {
+      "fy": 2018,
+      "q4_end": "2018-12-31",
+      "period_end_year": 2018,
+      "q4_start_estimate": "2018-10-01",
+      "local_annual_report_end": "2018-12-31",
+      "financials_path": "docs/report/financials/RNGR.json",
+      "financials_sha256": "88ef8818ada94bc9e94dc034e96d5cb20856008306b4014a305fa7e843e9b3fc",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 437,
+      "answer_key_mod_8": 5,
+      "selection_rank": "2fd34b60ef62428a2197f577d35a19ec9b75e0f7c879a5f9c392a4f50025ed55",
+      "symbol": "RNGR",
+      "cik": "0001699039",
+      "company_name": "Ranger Energy Services, Inc.",
+      "sic": 1389,
+      "sic_description": "Oil & Gas Field Services, NEC"
+    },
+    {
+      "fy": 2018,
+      "q4_end": "2018-06-30",
+      "period_end_year": 2018,
+      "q4_start_estimate": "2018-04-01",
+      "local_annual_report_end": "2018-06-30",
+      "financials_path": "docs/report/financials/LITE.json",
+      "financials_sha256": "024c82e60d6a15ea75dd901b4679173e7b3ac9d9b962ad1d4b69c505753a40d8",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 309,
+      "answer_key_mod_8": 5,
+      "selection_rank": "04e539aaef2d5cfc34e7fde4387d44a231b48f0aba3c1a9177786aeb3b367603",
+      "symbol": "LITE",
+      "cik": "0001633978",
+      "company_name": "Lumentum Holdings Inc.",
+      "sic": 3669,
+      "sic_description": "Communications Equipment, NEC"
+    },
+    {
+      "fy": 2016,
+      "q4_end": "2016-12-31",
+      "period_end_year": 2016,
+      "q4_start_estimate": "2016-10-01",
+      "local_annual_report_end": "2016-12-31",
+      "financials_path": "docs/report/financials/KWY.json",
+      "financials_sha256": "07e44e946c55ef034c09e3f2fee70332daa5b86f9a0d931cafcf2b5479a99425",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 292,
+      "answer_key_mod_8": 4,
+      "selection_rank": "1ee1e2ab795138d91c87b4fad6de3d0cf18b3da1a651c4faebbbeb929e0cc4a4",
+      "symbol": "KWY",
+      "cik": "0001072627",
+      "company_name": "KINGSWAY Corp",
+      "sic": 6331,
+      "sic_description": "Fire, Marine & Casualty Insurance"
+    },
+    {
+      "fy": 2019,
+      "q4_end": "2019-08-31",
+      "period_end_year": 2019,
+      "q4_start_estimate": "2019-05-26",
+      "local_annual_report_end": "2019-08-31",
+      "financials_path": "docs/report/financials/SMPL.json",
+      "financials_sha256": "1553f1e36dd51b34d5a9e4f4de916f67df2edf0c8fc74202f929667aa1e036c1",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 470,
+      "answer_key_mod_8": 6,
+      "selection_rank": "28c201eca395961da300d65da04aea5d58df569433bc0db9035dd8d101340cef",
+      "symbol": "SMPL",
+      "cik": "0001702744",
+      "company_name": "Simply Good Foods Co",
+      "sic": 2000,
+      "sic_description": "Food and Kindred Products"
+    },
+    {
+      "fy": 2022,
+      "q4_end": "2022-12-31",
+      "period_end_year": 2022,
+      "q4_start_estimate": "2022-10-01",
+      "local_annual_report_end": "2022-12-31",
+      "financials_path": "docs/report/financials/ACDC.json",
+      "financials_sha256": "96ee3a00c0c22d4774c5181e4b2daf3c5fad2765fb03ea18be475c7b9bf7adb3",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 5,
+      "answer_key_mod_8": 5,
+      "selection_rank": "1f0c6b48f98a03b280255e9139c9932be0efd96d88db4f564483fdde7c344c59",
+      "symbol": "ACDC",
+      "cik": "0001881487",
+      "company_name": "ProFrac Holding Corp.",
+      "sic": 1389,
+      "sic_description": "Oil & Gas Field Services, NEC"
+    },
+    {
+      "fy": 2016,
+      "q4_end": "2016-05-31",
+      "period_end_year": 2016,
+      "q4_start_estimate": "2016-03-01",
+      "local_annual_report_end": "2016-05-31",
+      "financials_path": "docs/report/financials/NEOG.json",
+      "financials_sha256": "5897cf780f9a16044a34de77961f357858963ff7114e5f794eacfb71b304a01f",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2007-09-05",
+          1.5
+        ],
+        [
+          "2009-12-16",
+          1.5
+        ],
+        [
+          "2013-10-31",
+          1.5
+        ],
+        [
+          "2021-06-07",
+          2
+        ]
+      ],
+      "answer_key_index": 350,
+      "answer_key_mod_8": 6,
+      "selection_rank": "151d7f1994f2f0fbfe87d5e08609eb575a6a087443dd39d5fad127720ba06349",
+      "symbol": "NEOG",
+      "cik": "0000711377",
+      "company_name": "NEOGEN CORP",
+      "sic": 2835,
+      "sic_description": "In Vitro & In Vivo Diagnostic Substances"
+    },
+    {
+      "fy": 2013,
+      "q4_end": "2013-12-31",
+      "period_end_year": 2013,
+      "q4_start_estimate": "2013-10-01",
+      "local_annual_report_end": "2013-12-31",
+      "financials_path": "docs/report/financials/FWONK.json",
+      "financials_sha256": "ba215625bff1be7025a880ad823a2a8a00c33220a803035d03117cfd57a2855c",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 212,
+      "answer_key_mod_8": 4,
+      "selection_rank": "1d7abf86190e102b111f1c29f849f82968f4a337e1fd6eb953290e5f06bcde62",
+      "symbol": "FWONK",
+      "cik": "0001560385",
+      "company_name": "Liberty Media Corp",
+      "sic": 4833,
+      "sic_description": "Television Broadcasting Stations"
+    },
+    {
+      "fy": 2024,
+      "q4_end": "2024-12-31",
+      "period_end_year": 2024,
+      "q4_start_estimate": "2024-10-01",
+      "local_annual_report_end": "2024-12-31",
+      "financials_path": "docs/report/financials/UBER.json",
+      "financials_sha256": "c58b0ff8aaf1ce46017e657185749f7b24107ca1c7da4e3a4fb417fe9c8928cd",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 518,
+      "answer_key_mod_8": 6,
+      "selection_rank": "d2d8c2325b8d368296ab51a4b70ff1695459f1df977af33ef45bbb40638adab4",
+      "symbol": "UBER",
+      "cik": "0001543151",
+      "company_name": "Uber Technologies, Inc",
+      "sic": 7389,
+      "sic_description": "Services-Business Services, NEC"
+    },
+    {
+      "fy": 2020,
+      "q4_end": "2020-11-28",
+      "period_end_year": 2020,
+      "q4_start_estimate": "2020-08-30",
+      "local_annual_report_end": "2020-11-28",
+      "financials_path": "docs/report/financials/BSET.json",
+      "financials_sha256": "e44458c7f16b7b208fe92aa34b7250446c8ed3f9f726098bb93b84383450c701",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 86,
+      "answer_key_mod_8": 6,
+      "selection_rank": "3f3695eb46dee5699a19ad1f1ab558d8fb55a8351ba58f10b5e1b40803f4be53",
+      "symbol": "BSET",
+      "cik": "0000010329",
+      "company_name": "BASSETT FURNITURE INDUSTRIES INC",
+      "sic": 2511,
+      "sic_description": "Wood Household Furniture, (No Upholstered)"
+    },
+    {
+      "fy": 2023,
+      "q4_end": "2023-12-31",
+      "period_end_year": 2023,
+      "q4_start_estimate": "2023-10-01",
+      "local_annual_report_end": "2023-03-31",
+      "financials_path": "docs/report/financials/UA.json",
+      "financials_sha256": "7158987fae4d3dd19e10981c2c42f76aadac511da623b98eb6b91614147b9729",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 516,
+      "answer_key_mod_8": 4,
+      "selection_rank": "03075d346ecba637f0d8ff0e05843f30ed03205ae164f37159224f7cc836c57b",
+      "symbol": "UA",
+      "cik": "0001336917",
+      "company_name": "Under Armour, Inc.",
+      "sic": 2300,
+      "sic_description": "Apparel & Other Finishd Prods of  Fabrics & Similar Matl"
+    },
+    {
+      "fy": 2020,
+      "q4_end": "2020-12-31",
+      "period_end_year": 2020,
+      "q4_start_estimate": "2020-09-28",
+      "local_annual_report_end": "2020-12-31",
+      "financials_path": "docs/report/financials/CGNX.json",
+      "financials_sha256": "c5257833d1ec9ea939d23e21ec495c84e9dbe0b535361b99d43c77304c276191",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "1992-02-18",
+          2
+        ],
+        [
+          "1993-10-01",
+          2
+        ],
+        [
+          "1995-12-19",
+          2
+        ],
+        [
+          "2013-09-17",
+          2
+        ],
+        [
+          "2017-12-04",
+          2
+        ]
+      ],
+      "answer_key_index": 108,
+      "answer_key_mod_8": 4,
+      "selection_rank": "1bef727ff1003d2a697d885e93b52eadd48a750aac1a0ec756906beab79a428c",
+      "symbol": "CGNX",
+      "cik": "0000851205",
+      "company_name": "COGNEX CORP",
+      "sic": 3823,
+      "sic_description": "Industrial Instruments For Measurement, Display, and Control"
+    },
+    {
+      "fy": 2010,
+      "q4_end": "2010-12-31",
+      "period_end_year": 2010,
+      "q4_start_estimate": "2010-10-01",
+      "local_annual_report_end": "2010-12-31",
+      "financials_path": "docs/report/financials/MAA.json",
+      "financials_sha256": "b7b9347414bba2797e0634c55ad112ce86835dd2b6722db0256dbe9843c2a056",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 325,
+      "answer_key_mod_8": 5,
+      "selection_rank": "0d6d4e73d849261831411ac44de112f5a48d0fbb2d1b10437bf9f25d5fa5cd18",
+      "symbol": "MAA",
+      "cik": "0000912595",
+      "company_name": "MID AMERICA APARTMENT COMMUNITIES INC.",
+      "sic": 6798,
+      "sic_description": "Real Estate Investment Trusts"
+    },
+    {
+      "fy": 2019,
+      "q4_end": "2019-12-31",
+      "period_end_year": 2019,
+      "q4_start_estimate": "2019-10-01",
+      "local_annual_report_end": "2019-12-31",
+      "financials_path": "docs/report/financials/FBK.json",
+      "financials_sha256": "4a55ffec694a4f8975b1f6798bf5c2416dd2bcbe7b9e9c0bfdf1511029546319",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 188,
+      "answer_key_mod_8": 4,
+      "selection_rank": "63aa781fee50cc90580e173cb490cadbc3427d6eaf73999a47de8a903593471e",
+      "symbol": "FBK",
+      "cik": "0001649749",
+      "company_name": "FB Financial Corp",
+      "sic": 6022,
+      "sic_description": "State Commercial Banks"
+    },
+    {
+      "fy": 2016,
+      "q4_end": "2016-12-31",
+      "period_end_year": 2016,
+      "q4_start_estimate": "2016-10-01",
+      "local_annual_report_end": "2016-12-31",
+      "financials_path": "docs/report/financials/MATV.json",
+      "financials_sha256": "0f4aa648cb4c5322b80930c66c776ddad4a84ec59d9eadeaef9b6c19a2b8d230",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2012-08-22",
+          2
+        ]
+      ],
+      "answer_key_index": 327,
+      "answer_key_mod_8": 7,
+      "selection_rank": "1419c5ab148d866374f0fd6a38e532f635d823c45ead142069da43b59b823e60",
+      "symbol": "MATV",
+      "cik": "0001000623",
+      "company_name": "Mativ Holdings, Inc.",
+      "sic": 2621,
+      "sic_description": "Paper Mills"
+    },
+    {
+      "fy": 2020,
+      "q4_end": "2020-06-30",
+      "period_end_year": 2020,
+      "q4_start_estimate": "2020-04-01",
+      "local_annual_report_end": "2020-06-30",
+      "financials_path": "docs/report/financials/GEG.json",
+      "financials_sha256": "a9964fba98c5b082c9a899098b5b1872d257a67d419f3e75d8869dd6e5c9f070",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 215,
+      "answer_key_mod_8": 7,
+      "selection_rank": "12f6351616d1effd31164a5e460101c22d3f8f3ba2a813b7e6349b9eca0f719e",
+      "symbol": "GEG",
+      "cik": "0001831096",
+      "company_name": "Great Elm Group, Inc.",
+      "sic": 7372,
+      "sic_description": "Services-Prepackaged Software"
+    },
+    {
+      "fy": 2017,
+      "q4_end": "2017-12-31",
+      "period_end_year": 2017,
+      "q4_start_estimate": "2017-10-01",
+      "local_annual_report_end": "2017-12-31",
+      "financials_path": "docs/report/financials/AMKR.json",
+      "financials_sha256": "895f5163db8aeb9637b55919473d19047c28d230985c880ed36ea71a273108c9",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 37,
+      "answer_key_mod_8": 5,
+      "selection_rank": "200d2098d7ffc9f6a894fb8197f692548cbc39b588ea4895e2efe2a85c2e861b",
+      "symbol": "AMKR",
+      "cik": "0001047127",
+      "company_name": "AMKOR TECHNOLOGY, INC.",
+      "sic": 3674,
+      "sic_description": "Semiconductors & Related Devices"
+    },
+    {
+      "fy": 2018,
+      "q4_end": "2018-06-30",
+      "period_end_year": 2018,
+      "q4_start_estimate": "2018-04-01",
+      "local_annual_report_end": "2018-06-30",
+      "financials_path": "docs/report/financials/PTN.json",
+      "financials_sha256": "6f2beabfb7befa34894c438767c4658dea10033657acdce56e9ac5d957f52651",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2010-09-27",
+          0.1
+        ],
+        [
+          "2022-08-31",
+          0.04
+        ],
+        [
+          "2025-08-12",
+          0.02
+        ]
+      ],
+      "answer_key_index": 412,
+      "answer_key_mod_8": 4,
+      "selection_rank": "0331d4c5561f1ac3654f373124fc29ac91000f4db901e69986dd75c81ba0b5e3",
+      "symbol": "PTN",
+      "cik": "0000911216",
+      "company_name": "PALATIN TECHNOLOGIES INC",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations"
+    },
+    {
+      "fy": 2011,
+      "q4_end": "2011-12-31",
+      "period_end_year": 2011,
+      "q4_start_estimate": "2011-10-01",
+      "local_annual_report_end": "2011-12-31",
+      "financials_path": "docs/report/financials/FRST.json",
+      "financials_sha256": "23474a98f046e1b88dee93ea9de3a3b1fdc6002280656915c6adc16d5869c206",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 206,
+      "answer_key_mod_8": 6,
+      "selection_rank": "1e8600bdabea3d9d349431d4aed9cca778e0128e1c0181b18fb55b57c2f6cce4",
+      "symbol": "FRST",
+      "cik": "0001325670",
+      "company_name": "Primis Financial Corp.",
+      "sic": 6022,
+      "sic_description": "State Commercial Banks"
+    },
+    {
+      "fy": 2018,
+      "q4_end": "2018-12-31",
+      "period_end_year": 2018,
+      "q4_start_estimate": "2018-10-01",
+      "local_annual_report_end": "2018-12-31",
+      "financials_path": "docs/report/financials/INVA.json",
+      "financials_sha256": "52282096f155d499153b2d4b3c2decbe5d6c6a5131a55572a3a2aeac01b9208e",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 270,
+      "answer_key_mod_8": 6,
+      "selection_rank": "5b1fe60fed9355d89a5c60950197bdd7b20da44d1ce463c40e486330367a5903",
+      "symbol": "INVA",
+      "cik": "0001080014",
+      "company_name": "Innoviva, Inc.",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations"
+    },
+    {
+      "fy": 2019,
+      "q4_end": "2019-12-31",
+      "period_end_year": 2019,
+      "q4_start_estimate": "2019-10-01",
+      "local_annual_report_end": "2019-12-31",
+      "financials_path": "docs/report/financials/RVP.json",
+      "financials_sha256": "0cdea0bcee5286da95f97bd9d8ebd1daf76d8eff761f4ae5ebc2a3b9ce5b0226",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 446,
+      "answer_key_mod_8": 6,
+      "selection_rank": "34f2423c6fac5e764ad446ced0e8bfeeaee18989681456cb07e4b71f84c618f9",
+      "symbol": "RVP",
+      "cik": "0000946563",
+      "company_name": "RETRACTABLE TECHNOLOGIES INC",
+      "sic": 3841,
+      "sic_description": "Surgical & Medical Instruments & Apparatus"
+    },
+    {
+      "fy": 2020,
+      "q4_end": "2020-12-31",
+      "period_end_year": 2020,
+      "q4_start_estimate": "2020-10-01",
+      "local_annual_report_end": "2020-12-31",
+      "financials_path": "docs/report/financials/VCEL.json",
+      "financials_sha256": "6756629e39ae6c6cf55b999e9e55fa505e3f0c058950f09ef2c6eb003be7f104",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2010-02-18",
+          0.125
+        ],
+        [
+          "2013-10-16",
+          0.05
+        ]
+      ],
+      "answer_key_index": 527,
+      "answer_key_mod_8": 7,
+      "selection_rank": "12286e7a6de7c62a9f922654ae029b28b90008c7056501ebc9570b0617749461",
+      "symbol": "VCEL",
+      "cik": "0000887359",
+      "company_name": "Vericel Corp",
+      "sic": 2836,
+      "sic_description": "Biological Products, (No Diagnostic Substances)"
+    },
+    {
+      "fy": 2015,
+      "q4_end": "2015-09-30",
+      "period_end_year": 2015,
+      "q4_start_estimate": "2015-07-01",
+      "local_annual_report_end": "2015-09-30",
+      "financials_path": "docs/report/financials/ENR.json",
+      "financials_sha256": "97d262114934e69ba1c5bca305485bfabb7bba653135e2a44aad800d0397037d",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 175,
+      "answer_key_mod_8": 7,
+      "selection_rank": "04e9bbc816d7f05b7515faaccb9b6cfab2a0d49e4236ead14e60fbb145567516",
+      "symbol": "ENR",
+      "cik": "0001632790",
+      "company_name": "ENERGIZER HOLDINGS, INC.",
+      "sic": 3690,
+      "sic_description": "Miscellaneous Electrical Machinery, Equipment & Supplies"
+    },
+    {
+      "fy": 2014,
+      "q4_end": "2014-12-31",
+      "period_end_year": 2014,
+      "q4_start_estimate": "2014-10-01",
+      "local_annual_report_end": "2014-12-31",
+      "financials_path": "docs/report/financials/BLDR.json",
+      "financials_sha256": "bced66b91aeb67288ef8a31e89205a87f1637faa72e6d9349e353262f6f4ad0a",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 76,
+      "answer_key_mod_8": 4,
+      "selection_rank": "0dbb5d8d63d0e22171006fab476a1cb014bcbe57448d7333b2a8624f5c2a3e63",
+      "symbol": "BLDR",
+      "cik": "0001316835",
+      "company_name": "Builders FirstSource, Inc.",
+      "sic": 5211,
+      "sic_description": "Retail-Lumber & Other Building Materials Dealers"
+    },
+    {
+      "fy": 2015,
+      "q4_end": "2015-05-02",
+      "period_end_year": 2015,
+      "q4_start_estimate": "2015-02-01",
+      "local_annual_report_end": "2015-05-02",
+      "financials_path": "docs/report/financials/FIZZ.json",
+      "financials_sha256": "6eb088772b43ab0e37cf5a0f45de8e9675248fd49ca5c2897f3fff09194fa491",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "1994-11-10",
+          4
+        ],
+        [
+          "1996-10-28",
+          2
+        ],
+        [
+          "2004-03-23",
+          2
+        ],
+        [
+          "2021-02-22",
+          2
+        ]
+      ],
+      "answer_key_index": 196,
+      "answer_key_mod_8": 4,
+      "selection_rank": "031d80d2b8b4c2a8a54f143dde6198bb04bd4a5fdaa44622fc9e7f051bc46059",
+      "symbol": "FIZZ",
+      "cik": "0000069891",
+      "company_name": "NATIONAL BEVERAGE CORP",
+      "sic": 2086,
+      "sic_description": "Bottled & Canned Soft Drinks & Carbonated Waters"
+    },
+    {
+      "fy": 2011,
+      "q4_end": "2011-12-31",
+      "period_end_year": 2011,
+      "q4_start_estimate": "2011-10-01",
+      "local_annual_report_end": "2011-12-31",
+      "financials_path": "docs/report/financials/ASPS.json",
+      "financials_sha256": "4e8edd9f44f6b3292781af3155e966460675d6534700ce45d65eb8779ababbcb",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2025-05-28",
+          0.125
+        ]
+      ],
+      "answer_key_index": 54,
+      "answer_key_mod_8": 6,
+      "selection_rank": "424b1aa80c552e55564c4f24266beda101c46106922a19b5b13d6b0101cae11c",
+      "symbol": "ASPS",
+      "cik": "0001462418",
+      "company_name": "ALTISOURCE PORTFOLIO SOLUTIONS S.A.",
+      "sic": 7380,
+      "sic_description": "Services-Miscellaneous Business Services"
+    },
+    {
+      "fy": 2020,
+      "q4_end": "2020-12-31",
+      "period_end_year": 2020,
+      "q4_start_estimate": "2020-10-01",
+      "local_annual_report_end": "2020-12-31",
+      "financials_path": "docs/report/financials/O.json",
+      "financials_sha256": "e11894341866fc9597d4ea4a509e2d631270ad8b7688c77e8501d164f2ba6104",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 367,
+      "answer_key_mod_8": 7,
+      "selection_rank": "2ad26c579a326660f1394fa4d5dbff2408406e25b8d4dc23038252c741a0463b",
+      "symbol": "O",
+      "cik": "0000726728",
+      "company_name": "REALTY INCOME CORP",
+      "sic": 6798,
+      "sic_description": "Real Estate Investment Trusts"
+    },
+    {
+      "fy": 2016,
+      "q4_end": "2016-12-31",
+      "period_end_year": 2016,
+      "q4_start_estimate": "2016-10-01",
+      "local_annual_report_end": "2016-12-31",
+      "financials_path": "docs/report/financials/MGNI.json",
+      "financials_sha256": "21ee4e38992be39e0f74071b86c9c3f3f8803b9250f7047b60b5cd65e939364f",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 333,
+      "answer_key_mod_8": 5,
+      "selection_rank": "4d65df2486d7fe6323e075f7022d9021f402838fe202de760451a214b6d03db3",
+      "symbol": "MGNI",
+      "cik": "0001595974",
+      "company_name": "MAGNITE, INC.",
+      "sic": 7370,
+      "sic_description": "Services-Computer Programming, Data Processing, Etc."
+    },
+    {
+      "fy": 2019,
+      "q4_end": "2019-12-31",
+      "period_end_year": 2019,
+      "q4_start_estimate": "2019-10-01",
+      "local_annual_report_end": "2019-12-31",
+      "financials_path": "docs/report/financials/TULP.json",
+      "financials_sha256": "5ae11106050bcba000f7e2317c9920907ad4267675105ea386df89acb141c4db",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2021-01-04",
+          0.142857
+        ]
+      ],
+      "answer_key_index": 511,
+      "answer_key_mod_8": 7,
+      "selection_rank": "0ce2bcf359d51ca07ddf4c941c9161fa5be6334eab7fb10f17da418ba19014d4",
+      "symbol": "TULP",
+      "cik": "0000875355",
+      "company_name": "BLOOMIA HOLDINGS, INC.",
+      "sic": 100,
+      "sic_description": "Agricultural Production-Crops"
+    },
+    {
+      "fy": 2016,
+      "q4_end": "2016-12-31",
+      "period_end_year": 2016,
+      "q4_start_estimate": "2016-10-01",
+      "local_annual_report_end": "2016-12-31",
+      "financials_path": "docs/report/financials/ACHC.json",
+      "financials_sha256": "4ae26343a9a22f3967653c773b8d79ac7f11de5487dcd80c6b36b744110bbcb7",
+      "financials_split_adjusted": false,
+      "split_events": [
+        [
+          "2011-11-01",
+          0.25
+        ]
+      ],
+      "answer_key_index": 7,
+      "answer_key_mod_8": 7,
+      "selection_rank": "37d3773c86843a48544861964605f73f726cbef0ba3093bc0567fe0fea803356",
+      "symbol": "ACHC",
+      "cik": "0001520697",
+      "company_name": "Acadia Healthcare Company, Inc.",
+      "sic": 8093,
+      "sic_description": "Services-Specialty Outpatient Facilities, NEC"
+    },
+    {
+      "fy": 2018,
+      "q4_end": "2018-12-31",
+      "period_end_year": 2018,
+      "q4_start_estimate": "2018-10-01",
+      "local_annual_report_end": "2018-12-31",
+      "financials_path": "docs/report/financials/CCOI.json",
+      "financials_sha256": "5d867c3686a7d4da006435cc720fec1fcb7ef5c062a2953af2bd3a0a6a2f3580",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 100,
+      "answer_key_mod_8": 4,
+      "selection_rank": "ff69f85bb2b74b41f4fba87824a1187d8c791343fc282a6b8bb0d5b09c8365cc",
+      "symbol": "CCOI",
+      "cik": "0001158324",
+      "company_name": "COGENT COMMUNICATIONS HOLDINGS, INC.",
+      "sic": 4899,
+      "sic_description": "Communications Services, NEC"
+    },
+    {
+      "fy": 2024,
+      "q4_end": "2024-12-31",
+      "period_end_year": 2024,
+      "q4_start_estimate": "2024-10-01",
+      "local_annual_report_end": "2024-12-31",
+      "financials_path": "docs/report/financials/CARG.json",
+      "financials_sha256": "ccbb07d82c4df0ab58786adf3c8f750005889c54df4fd591c3091008856f94eb",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 95,
+      "answer_key_mod_8": 7,
+      "selection_rank": "07e35268a84349a59c8dfa7f65cf1251c5b07e4ac11025a8dd5b97683df449ae",
+      "symbol": "CARG",
+      "cik": "0001494259",
+      "company_name": "CarGurus, Inc.",
+      "sic": 7374,
+      "sic_description": "Services-Computer Processing & Data Preparation"
+    },
+    {
+      "fy": 2016,
+      "q4_end": "2016-12-31",
+      "period_end_year": 2016,
+      "q4_start_estimate": "2016-10-01",
+      "local_annual_report_end": "2016-12-31",
+      "financials_path": "docs/report/financials/SGRY.json",
+      "financials_sha256": "c3d9cd9ea771e7347c5b6f3f0d91d6b79836fbaee96f6b12272ce4fbdbc6675d",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 462,
+      "answer_key_mod_8": 6,
+      "selection_rank": "2fa906298518123f09f5e1c2971a3adb3304af7c6ce495cd8a6c83675f547cfe",
+      "symbol": "SGRY",
+      "cik": "0001638833",
+      "company_name": "Surgery Partners, Inc.",
+      "sic": 8062,
+      "sic_description": "Services-General Medical & Surgical Hospitals, NEC"
+    },
+    {
+      "fy": 2016,
+      "q4_end": "2016-12-31",
+      "period_end_year": 2016,
+      "q4_start_estimate": "2016-10-01",
+      "local_annual_report_end": "2016-12-31",
+      "financials_path": "docs/report/financials/SMSI.json",
+      "financials_sha256": "c4769d8b8e44bbedea072a7d365e066b7a8a7b14b0996671cd90dbe14f1aa3fa",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2016-08-17",
+          0.25
+        ],
+        [
+          "2024-04-11",
+          0.125
+        ],
+        [
+          "2026-06-05",
+          0.2
+        ]
+      ],
+      "answer_key_index": 471,
+      "answer_key_mod_8": 7,
+      "selection_rank": "12c8d56380bfeb3c6a2aca30165e342e19cfc3ace95ba5b0a9cb3370345f039b",
+      "symbol": "SMSI",
+      "cik": "0000948708",
+      "company_name": "SMITH MICRO SOFTWARE, INC.",
+      "sic": 7372,
+      "sic_description": "Services-Prepackaged Software"
+    },
+    {
+      "fy": 2015,
+      "q4_end": "2015-12-31",
+      "period_end_year": 2015,
+      "q4_start_estimate": "2015-10-01",
+      "local_annual_report_end": "2015-12-31",
+      "financials_path": "docs/report/financials/VATE.json",
+      "financials_sha256": "59489ffa2fa4d3e48f8a284d261fe3cb989d16da8ff1e6ef7dd5dc54bdbada0a",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2024-08-09",
+          0.1
+        ]
+      ],
+      "answer_key_index": 526,
+      "answer_key_mod_8": 6,
+      "selection_rank": "0d8ec8e9e743d6b739e747cfd9e3bddc0675a862c587cda0d9d892aa4e91a4ec",
+      "symbol": "VATE",
+      "cik": "0001006837",
+      "company_name": "INNOVATE Corp.",
+      "sic": 3440,
+      "sic_description": "Fabricated Structural Metal Products"
+    },
+    {
+      "fy": 2019,
+      "q4_end": "2019-12-31",
+      "period_end_year": 2019,
+      "q4_start_estimate": "2019-10-01",
+      "local_annual_report_end": "2019-12-31",
+      "financials_path": "docs/report/financials/BGC.json",
+      "financials_sha256": "7214d81635420fe823289d08d944e8180226d9466564c8af463f10e9cc5933d6",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2018-12-03",
+          1.555
+        ]
+      ],
+      "answer_key_index": 68,
+      "answer_key_mod_8": 4,
+      "selection_rank": "8fc4d4fd513c216d2c88a798cb754cb24831db47dfd8a5d354152c280221b0d1",
+      "symbol": "BGC",
+      "cik": "0001094831",
+      "company_name": "BGC Group, Inc.",
+      "sic": 6200,
+      "sic_description": "Security & Commodity Brokers, Dealers, Exchanges & Services"
+    },
+    {
+      "fy": 2020,
+      "q4_end": "2020-12-31",
+      "period_end_year": 2020,
+      "q4_start_estimate": "2020-10-01",
+      "local_annual_report_end": "2020-12-31",
+      "financials_path": "docs/report/financials/ACR.json",
+      "financials_sha256": "36cd74a2e17496ce684f9ddeb911ca94b3f412e145d583685a32e233b86abe45",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2015-09-01",
+          0.25
+        ],
+        [
+          "2021-02-17",
+          0.333333
+        ]
+      ],
+      "answer_key_index": 12,
+      "answer_key_mod_8": 4,
+      "selection_rank": "d4b16b236c4c97b3beb014c69b69b8188f1062811916dafcda5bf7f73b0a2760",
+      "symbol": "ACR",
+      "cik": "0001332551",
+      "company_name": "ACRES Commercial Realty Corp.",
+      "sic": 6798,
+      "sic_description": "Real Estate Investment Trusts"
+    },
+    {
+      "fy": 2021,
+      "q4_end": "2021-12-31",
+      "period_end_year": 2021,
+      "q4_start_estimate": "2021-10-01",
+      "local_annual_report_end": "2021-12-31",
+      "financials_path": "docs/report/financials/NWL.json",
+      "financials_sha256": "ff4530149315adf50f87a47e3382edf18ee10c3819aa99555b53d72eb6cfd5b2",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 365,
+      "answer_key_mod_8": 5,
+      "selection_rank": "99c4e7465573c5ee26818ce329518e70fb1e20e68e42f2ffb3ab5a4e0f7d1ee5",
+      "symbol": "NWL",
+      "cik": "0000814453",
+      "company_name": "NEWELL BRANDS INC.",
+      "sic": 3089,
+      "sic_description": "Plastics Products, NEC"
+    },
+    {
+      "fy": 2014,
+      "q4_end": "2014-12-31",
+      "period_end_year": 2014,
+      "q4_start_estimate": "2014-10-01",
+      "local_annual_report_end": "2014-12-31",
+      "financials_path": "docs/report/financials/BHC.json",
+      "financials_sha256": "45e7f0cb80de7974e51a4772c1e893ffb4c3bae8d335b5a198f2794fbccfb67f",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 71,
+      "answer_key_mod_8": 7,
+      "selection_rank": "1ca4a585426746c1126c21e21a58ea7b27415b0d0925b5ac709869df77e06f0a",
+      "symbol": "BHC",
+      "cik": "0000885590",
+      "company_name": "Bausch Health Companies Inc.",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations"
+    },
+    {
+      "fy": 2013,
+      "q4_end": "2013-12-31",
+      "period_end_year": 2013,
+      "q4_start_estimate": "2013-10-01",
+      "local_annual_report_end": "2013-12-31",
+      "financials_path": "docs/report/financials/XWEL.json",
+      "financials_sha256": "6bcc4f66ab7970c174910c7a0e95d8743a75fe0cddb01a26f7ac91d767c9ca10",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2015-11-30",
+          0.1
+        ],
+        [
+          "2019-02-25",
+          0.05
+        ],
+        [
+          "2020-06-11",
+          0.333333
+        ],
+        [
+          "2023-09-28",
+          0.05
+        ]
+      ],
+      "answer_key_index": 556,
+      "answer_key_mod_8": 4,
+      "selection_rank": "5aad3af3e47c4bbcbdb4e712f567dad6c4fbe10cf4495c56d7e531bb7fb0a038",
+      "symbol": "XWEL",
+      "cik": "0001410428",
+      "company_name": "XWELL, Inc.",
+      "sic": 7200,
+      "sic_description": "Services-Personal Services"
+    },
+    {
+      "fy": 2020,
+      "q4_end": "2020-02-29",
+      "period_end_year": 2020,
+      "q4_start_estimate": "2019-12-01",
+      "local_annual_report_end": "2020-02-29",
+      "financials_path": "docs/report/financials/AZZ.json",
+      "financials_sha256": "b388588bbb6362645f67c2564367bdb6f87c421621a8dc6e7bff783ec6e08a90",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2007-05-07",
+          2
+        ],
+        [
+          "2012-07-31",
+          2
+        ]
+      ],
+      "answer_key_index": 61,
+      "answer_key_mod_8": 5,
+      "selection_rank": "2a7413e913ae599047db96467ca81aa4df07d71aae11f5f1eaca978b876421d8",
+      "symbol": "AZZ",
+      "cik": "0000008947",
+      "company_name": "AZZ INC",
+      "sic": 3470,
+      "sic_description": "Coating, Engraving & Allied Services"
+    },
+    {
+      "fy": 2012,
+      "q4_end": "2012-09-30",
+      "period_end_year": 2012,
+      "q4_start_estimate": "2012-07-01",
+      "local_annual_report_end": "2012-09-30",
+      "financials_path": "docs/report/financials/UTI.json",
+      "financials_sha256": "aa0065dfa6e2cbaac780c82cd9c2788f033afb6b04f1ddca4d2a401a65d9c83f",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 524,
+      "answer_key_mod_8": 4,
+      "selection_rank": "3d0276da8f79eae7b49e1add7824eeef33bb35a98c645ee69fc4bff731c5ebb4",
+      "symbol": "UTI",
+      "cik": "0001261654",
+      "company_name": "UNIVERSAL TECHNICAL INSTITUTE INC",
+      "sic": 8200,
+      "sic_description": "Services-Educational Services"
+    },
+    {
+      "fy": 2025,
+      "q4_end": "2025-12-31",
+      "period_end_year": 2025,
+      "q4_start_estimate": "2025-10-01",
+      "local_annual_report_end": "2025-12-31",
+      "financials_path": "docs/report/financials/SRPT.json",
+      "financials_sha256": "7a4c094b85e31fd05cdeea6df8a777b6ff2b6b1434466f50a634d67ccd7783c1",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2012-07-12",
+          0.166667
+        ]
+      ],
+      "answer_key_index": 479,
+      "answer_key_mod_8": 7,
+      "selection_rank": "16c9aa1c9b1b65ba2b9221e290c3838a3e51f31e01dbb65a5b6e160363586fda",
+      "symbol": "SRPT",
+      "cik": "0000873303",
+      "company_name": "Sarepta Therapeutics, Inc.",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations"
+    },
+    {
+      "fy": 2013,
+      "q4_end": "2013-06-30",
+      "period_end_year": 2013,
+      "q4_start_estimate": "2013-04-01",
+      "local_annual_report_end": "2013-06-30",
+      "financials_path": "docs/report/financials/GOLD.json",
+      "financials_sha256": "1ac2b252b28591c6e4983053a8ab638e31187647f86a5844d0c5a93d4fc4aa8c",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2022-06-07",
+          2
+        ]
+      ],
+      "answer_key_index": 223,
+      "answer_key_mod_8": 7,
+      "selection_rank": "651f1419f0747b59f7bf8e794b71c1f6b5a0520e8fc472013172cfe6563081eb",
+      "symbol": "GOLD",
+      "cik": "0001591588",
+      "company_name": "Gold.com, Inc.",
+      "sic": 5094,
+      "sic_description": "Wholesale-Jewelry, Watches, Precious Stones & Metals"
+    },
+    {
+      "fy": 2019,
+      "q4_end": "2019-12-31",
+      "period_end_year": 2019,
+      "q4_start_estimate": "2019-10-01",
+      "local_annual_report_end": "2019-12-31",
+      "financials_path": "docs/report/financials/CHRD.json",
+      "financials_sha256": "a7cea9d51abf680a550288eea5e2558914974ab46f6b3b5c822fc58d6cc83d8e",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 111,
+      "answer_key_mod_8": 7,
+      "selection_rank": "0fd272968ee1b58d8031f1eb20aef701e537ec09711d8e7c393ffbfa36d3bf60",
+      "symbol": "CHRD",
+      "cik": "0001486159",
+      "company_name": "Chord Energy Corp",
+      "sic": 1311,
+      "sic_description": "Crude Petroleum & Natural Gas"
+    },
+    {
+      "fy": 2017,
+      "q4_end": "2017-12-31",
+      "period_end_year": 2017,
+      "q4_start_estimate": "2017-10-01",
+      "local_annual_report_end": "2017-12-31",
+      "financials_path": "docs/report/financials/CDNA.json",
+      "financials_sha256": "6bb4c60ab1ae4144086f94ecf45d2ef3dbc9ed2a527b18f41421f2ced66b4493",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 102,
+      "answer_key_mod_8": 6,
+      "selection_rank": "249a48c1a2af3270110439a4582710a03f1dbb0a06c6dd443c46474f6a482862",
+      "symbol": "CDNA",
+      "cik": "0001217234",
+      "company_name": "CareDx, Inc.",
+      "sic": 8071,
+      "sic_description": "Services-Medical Laboratories"
+    },
+    {
+      "fy": 2015,
+      "q4_end": "2015-12-31",
+      "period_end_year": 2015,
+      "q4_start_estimate": "2015-10-01",
+      "local_annual_report_end": "2015-12-31",
+      "financials_path": "docs/report/financials/MAC.json",
+      "financials_sha256": "540e6677183f577c40a9792dbaa2fac562bb2b86a66f7ed8c7d048ff3f22fecc",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 326,
+      "answer_key_mod_8": 6,
+      "selection_rank": "1133e28db123dcdd0d9dd414bd1872c888f16b6138af67f2a830021a4c644943",
+      "symbol": "MAC",
+      "cik": "0000912242",
+      "company_name": "MACERICH CO",
+      "sic": 6798,
+      "sic_description": "Real Estate Investment Trusts"
+    },
+    {
+      "fy": 2017,
+      "q4_end": "2017-12-31",
+      "period_end_year": 2017,
+      "q4_start_estimate": "2017-10-01",
+      "local_annual_report_end": "2017-12-31",
+      "financials_path": "docs/report/financials/GNK.json",
+      "financials_sha256": "682647bf047307bca954535d6f5859e2c761ecab90c31b742b91f18c58b48bff",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2016-07-08",
+          0.1
+        ]
+      ],
+      "answer_key_index": 221,
+      "answer_key_mod_8": 5,
+      "selection_rank": "44baeba0a9ed23fe58a3c71bd273c40c3f8671784901836c7f8a64820262d2d4",
+      "symbol": "GNK",
+      "cik": "0001326200",
+      "company_name": "GENCO SHIPPING & TRADING LTD",
+      "sic": 4412,
+      "sic_description": "Deep Sea Foreign Transportation of  Freight"
+    },
+    {
+      "fy": 2025,
+      "q4_end": "2025-12-31",
+      "period_end_year": 2025,
+      "q4_start_estimate": "2025-10-01",
+      "local_annual_report_end": "2025-12-31",
+      "financials_path": "docs/report/financials/BLNK.json",
+      "financials_sha256": "5fa5b3d747bc21a87620c5513cc53986d0a9102e72b4fd53f728ad1e629c4b1b",
+      "financials_split_adjusted": true,
+      "split_events": [
+        [
+          "2011-02-25",
+          0.02
+        ],
+        [
+          "2017-08-29",
+          0.02
+        ]
+      ],
+      "answer_key_index": 78,
+      "answer_key_mod_8": 6,
+      "selection_rank": "1c46fa962bff2e6af040c89f2977d3b00339b72a665653316cd96876c103e87c",
+      "symbol": "BLNK",
+      "cik": "0001429764",
+      "company_name": "Blink Charging Co.",
+      "sic": 3690,
+      "sic_description": "Miscellaneous Electrical Machinery, Equipment & Supplies"
+    },
+    {
+      "fy": 2016,
+      "q4_end": "2016-09-30",
+      "period_end_year": 2016,
+      "q4_start_estimate": "2016-07-01",
+      "local_annual_report_end": "2016-09-30",
+      "financials_path": "docs/report/financials/WAFDP.json",
+      "financials_sha256": "6795c67870473fdf0290677f583e96f6f832891137798b1aa52191d0c00b1c2b",
+      "financials_split_adjusted": false,
+      "split_events": [],
+      "answer_key_index": 540,
+      "answer_key_mod_8": 4,
+      "selection_rank": "09e8f2c17803d2d50b341a06029d3b39551eb942552db8a64be0f6181a3aad66",
+      "symbol": "WAFDP",
+      "cik": "0000936528",
+      "company_name": "WAFD INC",
+      "sic": 6021,
+      "sic_description": "National Commercial Banks"
+    }
+  ],
+  "freeze_sha256": "cb20f5d471b4a41297ac6e51e97928c49de4bf17886612f50508e2f4fe35d622"
+}
