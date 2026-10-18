@@ -1,0 +1,24 @@
+{
+  "sample": {
+    "controls": [
+      {"symbol": "GOOD", "fy": 2020, "q4_end": "2020-12-31", "split_events": [], "answer_key_index": 4, "answer_key_mod_8": 4},
+      {"symbol": "SIGN", "fy": 2021, "q4_end": "2021-12-31", "split_events": [], "answer_key_index": 5, "answer_key_mod_8": 5},
+      {"symbol": "MISS", "fy": 2022, "q4_end": "2022-12-31", "split_events": [], "answer_key_index": 6, "answer_key_mod_8": 6}
+    ]
+  },
+  "extraction": {
+    "period_results": [
+      {"symbol": "GOOD", "fy": 2020, "q4_end": "2020-12-31", "sample_role": "control", "status": "A_verified_direct_q4_eps", "accepted": {"value_as_filed": -0.5, "filing_date": "2021-02-15", "source": "8-K/8-K-A", "accession": "0000000000-21-000001"}},
+      {"symbol": "SIGN", "fy": 2021, "q4_end": "2021-12-31", "sample_role": "control", "status": "A_verified_direct_q4_eps", "accepted": {"value_as_filed": 0.5, "filing_date": "2022-02-15", "source": "10-K/10-K-A", "accession": "0000000000-22-000002"}},
+      {"symbol": "MISS", "fy": 2022, "q4_end": "2022-12-31", "sample_role": "control", "status": "D_no_direct_disclosure_found", "accepted": null}
+    ]
+  },
+  "answer_set": {
+    "rows": [
+      {"key": "GOOD", "fy": 2020, "end": "2020-12-31", "value": -0.5, "filed": "2021-02-15", "accession": "0000000000-21-000001"},
+      {"key": "SIGN", "fy": 2021, "end": "2021-12-31", "value": -0.5, "filed": "2022-02-15", "accession": "0000000000-22-000002"},
+      {"key": "MISS", "fy": 2022, "end": "2022-12-31", "value": -0.1, "filed": "2023-02-15", "accession": "0000000000-23-000003"}
+    ]
+  },
+  "expected_metrics": {"controls_selected": 3, "accepted": 2, "correct": 1, "incorrect": 1, "sign_errors": 1, "unverifiable": 1}
+}
