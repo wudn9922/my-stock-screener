@@ -1,0 +1,14 @@
+{
+  "end": "2024-12-31",
+  "target_net_income": 1000,
+  "cases": [
+    {"class": "L1", "file": "L1-earlier-table.html"},
+    {"class": "L2", "file": "L2-period-wording.html"},
+    {"class": "L3", "file": "L3-ni-label.html"},
+    {"class": "L4", "file": "L4-ni-value-negative.html", "negative": true},
+    {"class": "L5", "file": "L5-no-quarter-column-negative.html", "negative": true},
+    {"class": "L6", "file": "L6-no-html-table.html"},
+    {"class": "L9", "file": "L9-other.html"},
+    {"class": "L7", "file": null}
+  ]
+}

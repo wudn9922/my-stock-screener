@@ -165,7 +165,7 @@ ISSUES = (
     "short-history", "financial-sector-format", "missing-cashflow", "missing-balance",
     "split-adjusted", "foreign-currency", "restated", "yahoo-differs", "quarter-annual-mismatch",
     "quarterly-ytd-suspected", "negative-equity", "capex-sign", "currency-changed", "adr-eps-rescaled",
-    "eps-yahoo-only",
+    "eps-yahoo-only", "q4-eps-from-shares",
 )
 # Quality codes that only sec_ifrs.py writes (its IFRS and US GAAP foreign-filer periods); update_document keeps them
 SEC_FOREIGN_ISSUES = ("ifrs", "ifrs-fallback", "foreign-gaap", "foreign-gaap-fallback")

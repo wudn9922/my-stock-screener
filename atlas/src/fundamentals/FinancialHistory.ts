@@ -46,6 +46,14 @@ export type QualityLevel = 'good' | 'partial' | 'limited';
 /** Retention limits of the builder (SEC-seeded files keep the longest history). */
 export const MAX_PERIODS: Record<PeriodKind, number> = { annual: 20, quarterly: 60 };
 
+/** Grade and filing date of a period's EPS (A/B/C/D/Y, see build_growth.py); null when the file has none. */
+export interface EpsQuality {
+  epsDiluted?: string;
+  epsBasic?: string;
+  epsDilutedFiled?: string;
+  epsBasicFiled?: string;
+}
+
 export interface FinancialSeries {
   /** Period end dates, ascending (YYYY-MM-DD). */
   end: string[];
@@ -55,6 +63,8 @@ export interface FinancialSeries {
   fq: (number | null)[];
   /** Where each period came from; Yahoo unless the file says "sec" or "finmind" (official sources). */
   src: PeriodSource[];
+  /** Per-period EPS grade and filing dates; absent in files written before grading. */
+  epsQuality?: (EpsQuality | null)[];
   values: Record<RawField, (number | null)[]>;
 }
 
@@ -167,12 +177,26 @@ export function emptySeries(): FinancialSeries {
 }
 
 /** Rebuilds one period block: valid ends only, ascending, one period per end date, newest `limit` kept. */
+function parseQuality(value: unknown): EpsQuality | null {
+  const record = recordOf(value);
+  const out: EpsQuality = {};
+  for (const key of ['epsDiluted', 'epsBasic'] as const) {
+    if (record[key] === 'A' || record[key] === 'B' || record[key] === 'C' || record[key] === 'D' || record[key] === 'Y') out[key] = record[key];
+  }
+  for (const key of ['epsDilutedFiled', 'epsBasicFiled'] as const) {
+    const date = validDate(record[key]);
+    if (date) out[key] = date;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 export function parseSeries(raw: unknown, kind: PeriodKind): FinancialSeries {
   const block = recordOf(raw);
   const ends = arrayOf(block.end);
   const fy = arrayOf(block.fy);
   const fq = arrayOf(block.fq);
   const src = arrayOf(block.src);
+  const qualities = arrayOf(block.epsQuality);
   const rawValues = recordOf(block.values);
   const columns = RAW_FIELDS.map((field) => arrayOf(rawValues[field]));
   const byEnd = new Map<string, number>();
@@ -190,6 +214,7 @@ export function parseSeries(raw: unknown, kind: PeriodKind): FinancialSeries {
     const quarter = finiteOrNull(fq[index]);
     out.fq.push(kind === 'quarterly' && quarter !== null && [1, 2, 3, 4].includes(quarter) ? quarter : null);
     out.src.push(src[index] === 'sec' ? 'sec' : src[index] === 'finmind' ? 'finmind' : 'yahoo');
+    (out.epsQuality ??= []).push(parseQuality(qualities[index]));
     RAW_FIELDS.forEach((field, column) => {
       let value = finiteOrNull(columns[column]![index]);
       // Capex is stored as a positive outflow; a stray sign must not inflate free cash flow.

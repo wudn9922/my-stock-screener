@@ -423,6 +423,7 @@ export const ISSUE_TEXT: Record<string, string> = {
   'capex-sign': '資本支出的正負號已校正為「流出為正」。',
   'yahoo-differs': '部分期別 Yahoo 與官方申報（SEC 或 FinMind）的數字差異超過 2%，本頁保留官方申報值。',
   'q4-derived': '第四季數字由「全年減前三季」推算，不是公司單獨公布的單季值。',
+  'q4-eps-from-shares': '部分第四季 EPS 以第四季淨利 ÷ 推算的第四季加權股數估算（年度股數 × 4 − 前三季股數），誤差多在 5% 內',
   'eps-inconsistent': 'EPS 與「淨利 ÷ 股數」對不起來，可能有特別股、分割或口徑差異。',
   'debt-approx': '有息負債為近似值：Yahoo 的 TotalDebt，或 FinMind 的短期借款、長期借款與應付公司債（含一年內到期）加總，不含租賃負債，負債比與 ROIC 為近似值。',
   'debt-missing': '有息負債科目在官方資料中找不到，負債比與 ROIC 不計算。',
