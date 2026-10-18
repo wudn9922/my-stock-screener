@@ -1,0 +1,112 @@
+name: defeatbeta probe (manual, read-only)
+run-name: "defeatbeta probe (read-only; not a fill source)"
+
+# Manual only. Downloads the defeatbeta/yahoo-finance-data dataset card and data/US/stock_statement.parquet from
+# Hugging Face, compares the quarterly diluted EPS rows with the repo's existing US Q4 EPS numbers, and uploads the
+# report as the artifact defeatbeta-probe. It fills no value, writes nothing to the repo, commits nothing, and makes
+# no request to the SEC.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download the dataset card and the statement file
+        run: |
+          set -euo pipefail
+          base="https://huggingface.co/datasets/defeatbeta/yahoo-finance-data/resolve/main"
+          work="$RUNNER_TEMP/defeatbeta"
+          mkdir -p "$work/data/US"
+          curl -fsSL --retry 3 --retry-all-errors -o "$work/README.md" "$base/README.md"
+          curl -fsSL --retry 3 --retry-all-errors -o "$work/data/US/stock_statement.parquet" "$base/data/US/stock_statement.parquet"
+          python3 -I - "$base" "$work" <<'PY'
+          import hashlib, json, os, sys
+
+          base, work = sys.argv[1], sys.argv[2]
+          entries = []
+          for name in ("README.md", "data/US/stock_statement.parquet"):
+              path = os.path.join(work, name)
+              digest = hashlib.sha256()
+              with open(path, "rb") as handle:
+                  for block in iter(lambda: handle.read(1 << 20), b""):
+                      digest.update(block)
+              entries.append({"file": name, "source": f"{base}/{name}", "bytes": os.path.getsize(path),
+                              "sha256": digest.hexdigest()})
+          with open(os.path.join(work, "download-sizes.json"), "w", encoding="utf-8") as handle:
+              json.dump(entries, handle, indent=2)
+              handle.write("\n")
+          print(json.dumps(entries, indent=2))
+          PY
+
+      - name: Install the parquet reader (used only for the export below)
+        run: python3 -m pip install --quiet "pyarrow==25.0.1"
+
+      - name: Export the quarterly diluted EPS rows to CSV
+        run: |
+          set -euo pipefail
+          python3 -I - "$RUNNER_TEMP/defeatbeta/data/US/stock_statement.parquet" \
+            "$RUNNER_TEMP/defeatbeta/stock_statement_diluted_eps_quarterly.csv" <<'PY'
+          import sys
+
+          import pyarrow as pa
+          import pyarrow.compute as pc
+          import pyarrow.csv as pacsv
+          import pyarrow.dataset as ds
+
+          src, dst = sys.argv[1], sys.argv[2]
+          dataset = ds.dataset(src, format="parquet")
+          needed = ["symbol", "report_date", "item_name", "item_value", "finance_type", "period_type"]
+          absent = [name for name in needed if name not in dataset.schema.names]
+          if absent:
+              sys.exit(f"stock_statement.parquet has no columns {absent}")
+          text = lambda name: ds.field(name).cast(pa.string())
+          keep = ((text("finance_type") == "income_statement")
+                  & (text("period_type") == "quarterly")
+                  & (pc.utf8_lower(text("item_name")) == "diluted_eps"))
+          table = dataset.to_table(columns=needed, filter=keep)
+          if table.num_rows == 0:
+              sys.exit("no diluted_eps rows in the quarterly income statement; the item name is not what the probe expects")
+          pacsv.write_csv(table, dst)
+          print(f"exported {table.num_rows} rows")
+          PY
+
+      - name: Stage the artifact files
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/artifact"
+          cp "$RUNNER_TEMP/defeatbeta/README.md" "$RUNNER_TEMP/artifact/README.md"
+          cp "$RUNNER_TEMP/defeatbeta/download-sizes.json" "$RUNNER_TEMP/artifact/download-sizes.json"
+
+      - name: Run the probe on the downloaded copy
+        run: |
+          set -euo pipefail
+          python3 -I atlas/scripts/probe_defeatbeta_q4.py \
+            --card "$RUNNER_TEMP/defeatbeta/README.md" \
+            --statement-csv "$RUNNER_TEMP/defeatbeta/stock_statement_diluted_eps_quarterly.csv" \
+            --download-sizes "$RUNNER_TEMP/defeatbeta/download-sizes.json" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --out "$RUNNER_TEMP/artifact/probe-report.json"
+
+      - name: Upload the artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: defeatbeta-probe
+          path: ${{ runner.temp }}/artifact/
+          if-no-files-found: error
