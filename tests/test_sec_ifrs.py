@@ -448,6 +448,34 @@ class DocumentTests(unittest.TestCase):
         self.assertNotIn("cash", annual["values"])
         self.assertNotIn("capex", quarterly["values"])        # 6-K cash flows are year-to-date: not split
 
+    def test_transition_year_quarters_use_their_own_annual_end(self):
+        concepts = defaultdict(lambda: defaultdict(list))
+        annual_rows = (
+            ("2022-03-31", "2021-04-01", "2023-04-01"),
+            ("2023-03-31", "2022-04-01", "2024-04-01"),
+            ("2023-12-31", "2023-01-01", "2024-04-02"),
+        )
+        for index, (end, start, filed) in enumerate(annual_rows):
+            concepts["Revenue"][TWD].append(
+                point(end, 100 + index, filed, f"0010-A{index}", "20-F", start=start)
+            )
+        for index, (end, start, filed) in enumerate((
+            ("2023-06-30", "2023-04-01", "2023-08-01"),
+            ("2023-09-30", "2023-07-01", "2023-11-01"),
+        )):
+            concepts["Revenue"][TWD].append(
+                point(end, 20 + index, filed, f"0010-Q{index}", "6-K", start=start)
+            )
+
+        document, reason = ifrs.build_document(
+            payload("1010", "Synthetic Transition Ltd.", concepts), "SYNTRANS", NOW,
+        )
+        self.assertIsNone(reason)
+        quarterly = document["quarterly"]
+        self.assertEqual(quarterly["end"], ["2023-06-30", "2023-09-30"])
+        self.assertEqual(quarterly["fy"], [2023, 2023])
+        self.assertEqual(quarterly["fq"], [2, 3])
+
     def test_quality_issues_carry_ifrs_codes(self):
         quality = self.document["quality"]
         self.assertEqual(quality["annualYears"], 5)

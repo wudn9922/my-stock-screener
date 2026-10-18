@@ -1116,6 +1116,70 @@ def fiscal_quarter(end, end_month):
     return index // 12, quarter
 
 
+def assign_fiscal_labels(annual, quarterly, fallback_end_month=None):
+    """Assign annual FYs and quarterly FY/FQs, using each actual annual end as the anchor.
+
+    A quarter belongs to the first annual end on or after it, provided that end is within 371 days.
+    Its quarter number comes from the effective month distance to that annual end. Periods after
+    the latest annual end continue from that end's month. When there are no annual periods, retain
+    the caller's existing month-based (or year-only) behavior.
+    """
+    anchors = []
+    for item in annual:
+        item["fy"] = fiscal_year(item["end"])
+        day = parse_day(item["end"])
+        if day is not None:
+            anchors.append((day, item["end"], item["fy"]))
+    anchors.sort(key=lambda anchor: anchor[0])
+
+    if not anchors:
+        for item in quarterly:
+            if fallback_end_month is None:
+                item["fy"], item["fq"] = effective(item["end"]).year, None
+            else:
+                item["fy"], item["fq"] = fiscal_quarter(item["end"], fallback_end_month)
+        return
+
+    def month_index(day):
+        return day.year * 12 + day.month - 1
+
+    for item in quarterly:
+        quarter_day = parse_day(item["end"])
+        effective_quarter = effective(item["end"])
+        owner = next(
+            (anchor for anchor in anchors
+             if 0 <= (anchor[0] - quarter_day).days <= 371),
+            None,
+        )
+        if owner is not None:
+            annual_day, annual_end, fy = owner
+            effective_annual = effective(annual_end)
+            months_before = month_index(effective_annual) - month_index(effective_quarter)
+            quarter_steps = 0 if months_before <= 0 else max(1, round(months_before / 3))
+            fq = max(1, 4 - quarter_steps)
+        elif quarter_day > anchors[0][0]:
+            # No annual end owns this quarter within 371 days, but an earlier annual does.
+            # Continue the nearest prior fiscal calendar forward rather than rounding a short
+            # transition period back into that prior year's Q4.
+            prior = [anchor for anchor in anchors if anchor[0] < quarter_day]
+            _annual_day, annual_end, prior_fy = prior[-1]
+            effective_annual = effective(annual_end)
+            months_after = month_index(effective_quarter) - month_index(effective_annual)
+            months_after = max(1, months_after)
+            months_into_year = (months_after - 1) % 12 + 1
+            quarter_steps = max(1, round(months_into_year / 3))
+            fq = (quarter_steps - 1) % 4 + 1
+            fy = prior_fy + (months_after + 11) // 12
+        else:
+            # Sparse historical annuals can leave old quarters outside the 371-day window.
+            # Use the nearest real annual end as the month anchor for those periods.
+            prior = [anchor for anchor in anchors if anchor[0] < quarter_day]
+            reference = prior[-1] if prior else anchors[0]
+            fy, fq = fiscal_quarter(item["end"], effective(reference[1]).month)
+
+        item["fy"], item["fq"] = fy, fq
+
+
 def reconcile(annual, quarterly):
     """→ issues from comparing the four quarters of a fiscal year with the annual figure (revenue)."""
     issues = set()
@@ -1271,13 +1335,7 @@ def update_document(previous, payload, key, now, fetch_splits=None):
     end_month = fy_end_month([p["end"] for p in annual])
     if end_month is None and market == "TW":
         end_month = 12     # Taiwan companies report on the calendar year
-    for item in annual:
-        item["fy"] = fiscal_year(item["end"])
-    for item in quarterly:
-        if end_month is None:
-            item["fy"], item["fq"] = effective(item["end"]).year, None
-        else:
-            item["fy"], item["fq"] = fiscal_quarter(item["end"], end_month)
+    assign_fiscal_labels(annual, quarterly, fallback_end_month=end_month)
 
     revisions = merge_revisions(stored["revisions"], revised_a + revised_q, annual, quarterly, renamed)
     flags = {r["kind"] for r in revisions}
