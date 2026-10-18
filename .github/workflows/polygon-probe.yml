@@ -1,0 +1,87 @@
+name: Polygon Q4 EPS probe (manual, read-only)
+
+# Read-only probe: does Polygon.io carry a diluted EPS value for the US Q4 rows the repo is missing?
+# Manual only. Nothing is committed and nothing is written under docs/report/financials.
+# The run calls Polygon at 5 requests per minute (one every 12 seconds), so 4,100 symbols need about 820 minutes:
+# each dispatch covers about 1,600 symbols, and the checkpoint carries the rest to the next dispatch.
+# The checkpoint holds flags only (no EPS value) and is kept in the Actions cache between dispatches.
+# Outputs: the artifact "polygon-probe" (report.json and run.log). The report holds counts, (symbol, end) keys and flags.
+
+on:
+  workflow_dispatch:
+    inputs:
+      fresh:
+        description: 'Ignore the saved checkpoint and start over'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: polygon-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Most recent checkpoint saved by an earlier dispatch (restore-keys picks the newest match)
+      - name: Restore checkpoint
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/polygon-probe/checkpoint.jsonl
+          key: polygon-probe-none-${{ github.run_id }}
+          restore-keys: polygon-probe-
+
+      - name: Run probe
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+          FRESH: ${{ inputs.fresh }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/polygon-probe"
+          args=(--checkpoint "$RUNNER_TEMP/polygon-probe/checkpoint.jsonl"
+                --report "$RUNNER_TEMP/polygon-probe/report.json"
+                --log "$RUNNER_TEMP/polygon-probe/run.log"
+                --budget-minutes 320)
+          if [ "$FRESH" = "true" ]; then
+            args+=(--fresh)
+          fi
+          python3 -u atlas/scripts/probe_polygon_q4.py "${args[@]}"
+
+      - name: Check checkpoint exists
+        id: ckpt
+        if: always()
+        run: |
+          if [ -s "$RUNNER_TEMP/polygon-probe/checkpoint.jsonl" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Saved even when the run stopped at the time budget or failed, so the next dispatch resumes
+      - name: Save checkpoint
+        if: always() && steps.ckpt.outputs.present == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/polygon-probe/checkpoint.jsonl
+          key: polygon-probe-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: polygon-probe
+          path: |
+            ${{ runner.temp }}/polygon-probe/report.json
+            ${{ runner.temp }}/polygon-probe/run.log
+          if-no-files-found: error
