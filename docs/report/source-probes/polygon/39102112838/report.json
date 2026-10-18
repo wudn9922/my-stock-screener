@@ -1,0 +1,252 @@
+{
+  "agreement": {
+    "a_sec_q1_q3_derived_subset": {
+      "agreements": 0,
+      "compared": 0,
+      "disagreements": 0,
+      "rows_in_set": 38631,
+      "run": 0,
+      "sign_errors": 0,
+      "split_after_end_compared": 0,
+      "split_after_end_disagreements": 0,
+      "uncovered": 0,
+      "wilson_lower_95": null
+    },
+    "a_sec_q1_q3_not_derived": {
+      "agreements": 0,
+      "compared": 0,
+      "disagreements": 0,
+      "rows_in_set": 21384,
+      "run": 0,
+      "sign_errors": 0,
+      "split_after_end_compared": 0,
+      "split_after_end_disagreements": 0,
+      "uncovered": 0,
+      "wilson_lower_95": null
+    },
+    "b_grade_a_q4_no_split_after_end": {
+      "agreements": 0,
+      "compared": 0,
+      "disagreements": 0,
+      "rows_in_set": 2177,
+      "run": 0,
+      "sign_errors": 0,
+      "split_after_end_compared": 0,
+      "split_after_end_disagreements": 0,
+      "uncovered": 0,
+      "wilson_lower_95": null
+    },
+    "b_grade_a_q4_split_after_end": {
+      "agreements": 0,
+      "compared": 0,
+      "disagreements": 0,
+      "rows_in_set": 472,
+      "run": 0,
+      "sign_errors": 0,
+      "split_after_end_compared": 0,
+      "split_after_end_disagreements": 0,
+      "uncovered": 0,
+      "wilson_lower_95": null
+    }
+  },
+  "docs_verified": false,
+  "fields_unverified": [
+    "GET /vX/reference/financials",
+    "query: ticker, timeframe=quarterly, limit, apiKey",
+    "response: results[].end_date, fiscal_period, timeframe, filing_date, source_filing_url, next_url",
+    "results[].financials.income_statement.diluted_earnings_per_share.value"
+  ],
+  "gate": {
+    "complete": false,
+    "covered_not_equal_subtraction_no_split_after_end": 0,
+    "met": false,
+    "threshold": 500
+  },
+  "input_sha256": "e38ee05ad61da2d33105140d043d30c328d878a543a4354c24b3016a6b2acd47",
+  "missing_rows": {
+    "by_class": {
+      "derivation-rejected": {
+        "covered": 0,
+        "derived": 0,
+        "reported": 0,
+        "run": 0,
+        "total": 3891
+      },
+      "ledger-blocked": {
+        "covered": 0,
+        "derived": 0,
+        "reported": 0,
+        "run": 0,
+        "total": 0
+      },
+      "no-annual-diluted-eps": {
+        "covered": 0,
+        "derived": 0,
+        "reported": 0,
+        "run": 0,
+        "total": 2171
+      },
+      "no-q4-net-income": {
+        "covered": 0,
+        "derived": 0,
+        "reported": 0,
+        "run": 0,
+        "total": 208
+      },
+      "q1-q3-incomplete": {
+        "covered": 0,
+        "derived": 0,
+        "reported": 0,
+        "run": 0,
+        "total": 1485
+      }
+    },
+    "by_fiscal_year": {
+      "2009": {
+        "covered": 0,
+        "total": 8
+      },
+      "2010": {
+        "covered": 0,
+        "total": 10
+      },
+      "2011": {
+        "covered": 0,
+        "total": 300
+      },
+      "2012": {
+        "covered": 0,
+        "total": 281
+      },
+      "2013": {
+        "covered": 0,
+        "total": 297
+      },
+      "2014": {
+        "covered": 0,
+        "total": 298
+      },
+      "2015": {
+        "covered": 0,
+        "total": 325
+      },
+      "2016": {
+        "covered": 0,
+        "total": 322
+      },
+      "2017": {
+        "covered": 0,
+        "total": 384
+      },
+      "2018": {
+        "covered": 0,
+        "total": 438
+      },
+      "2019": {
+        "covered": 0,
+        "total": 466
+      },
+      "2020": {
+        "covered": 0,
+        "total": 732
+      },
+      "2021": {
+        "covered": 0,
+        "total": 783
+      },
+      "2022": {
+        "covered": 0,
+        "total": 729
+      },
+      "2023": {
+        "covered": 0,
+        "total": 687
+      },
+      "2024": {
+        "covered": 0,
+        "total": 811
+      },
+      "2025": {
+        "covered": 0,
+        "total": 809
+      },
+      "2026": {
+        "covered": 0,
+        "total": 75
+      }
+    },
+    "covered": 0,
+    "covered_derived": 0,
+    "covered_reported": 0,
+    "derived_by_arithmetic": 0,
+    "derived_by_form_url": 0,
+    "derived_form_url_test": "unverified: source_filing_url format not confirmed",
+    "not_covered_by_status": {
+      "ambiguous": 0,
+      "no_record": 0,
+      "no_value": 0
+    },
+    "rows_before_response_window": 0,
+    "run": 0,
+    "total": 7755
+  },
+  "records": {
+    "non_quarterly_skipped": 0,
+    "returned_quarterly": 0,
+    "without_eps": 0
+  },
+  "rows": [],
+  "schema": "polygon-q4-probe-report-v1",
+  "status": "partial",
+  "stop_reason": "ApiError: AA: HTTP 410",
+  "subtraction": {
+    "by_class": {
+      "derivation-rejected": {
+        "equal": 0,
+        "not_testable": 0,
+        "testable_covered": 0,
+        "testable_total": 3891
+      },
+      "ledger-blocked": {
+        "equal": 0,
+        "not_testable": 0,
+        "testable_covered": 0,
+        "testable_total": 0
+      },
+      "no-annual-diluted-eps": {
+        "equal": 0,
+        "not_testable": 2171,
+        "testable_covered": 0,
+        "testable_total": 0
+      },
+      "no-q4-net-income": {
+        "equal": 0,
+        "not_testable": 84,
+        "testable_covered": 0,
+        "testable_total": 124
+      },
+      "q1-q3-incomplete": {
+        "equal": 0,
+        "not_testable": 1485,
+        "testable_covered": 0,
+        "testable_total": 0
+      }
+    },
+    "covered_not_equal_subtraction": 0,
+    "covered_not_equal_subtraction_no_split_after_end": 0,
+    "covered_not_equal_subtraction_split_after_end": 0,
+    "covered_not_testable": 0,
+    "equal_to_subtraction": 0,
+    "not_testable_total": 3740,
+    "testable_covered": 0,
+    "testable_total": 4015
+  },
+  "symbols": {
+    "agreement_only": 45,
+    "done": 0,
+    "hyphen_mapped_to_dot": 11,
+    "no_data": 0,
+    "planned": 2280,
+    "planned_with_missing_rows": 2235
+  }
+}
