@@ -173,3 +173,10 @@
 - Set (a): 80 sign errors.
 - Subtraction test: 490 testable; 415 not equal.
 - Decision: dropped (set b fails the gate).
+
+## Polygon probe (dropped)
+
+- Run 39102112838: HTTP 410 on the first symbol (old endpoint `api.polygon.io/vX/reference/financials`). No data.
+- Run 39102913019: HTTP 403, KeyRejected (new endpoint `api.massive.com/stocks/financials/v1/income-statements`, Bearer auth). No data.
+- Decision: dropped. The probe script, its tests and its workflow are removed in this PR; `runs/source-probes` is untouched.
+- A paid plan requires the user's explicit approval. None is approved.
