@@ -1,494 +1,693 @@
 #!/usr/bin/env python3
-"""Render the frozen SEC Q4 EPS POC's adjudication and source ledger."""
+"""Render the frozen SEC Q4 EPS POC from persisted SEC responses."""
 
 from __future__ import annotations
 
 import json
-from collections import Counter, defaultdict
+import re
+from collections import Counter
+from datetime import datetime
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORT = ROOT / "docs/report/sec-q4-eps-poc"
+FINANCIALS = ROOT / "docs/report/financials"
 
-# Adjudication is fixed to the sample frozen before SEC retrieval.  In
-# particular, the four period-end mapping errors remain in the sample as E.
-CASES = {
-    ("BNC", 2014): ("C", None, "Annual and Q1–Q3 evidence only; no direct diluted Q4 EPS found."),
-    ("BNC", 2024): ("E", None, "Frozen Q4 end 2025-01-31 conflicts with SEC 10-K report date 2024-12-31."),
-    ("QXL", 2014): ("C", None, "The 10-K Fourth Quarter table is stock-price High/Low data, not EPS; only annual EPS evidence."),
-    ("QXL", 2019): ("C", None, "The 10-K Fourth Quarter table is stock-price High/Low data, not EPS; only annual EPS evidence."),
-    ("FGC", 2016): ("A", 0.27, "Direct GAAP diluted Q4 EPS in SEC 8-K EX-99.1."),
-    ("FGC", 2022): ("A", -0.03, "Direct GAAP diluted Q4 EPS in SEC 8-K EX-99.1; release narrative and quarterly statement agree."),
-    ("WRAP", 2017): ("C", None, "Annual EPS and statement evidence only; no direct Q4 EPS row found."),
-    ("WRAP", 2022): ("A", -0.09, "Direct GAAP basic-and-diluted Q4 EPS in SEC 8-K EX-99.1 earnings release."),
-    ("OFG", 2017): ("A", 0.30, "Direct GAAP diluted Q4 EPS in 10-K Table 17, Selected Quarterly Financial Data."),
-    ("OFG", 2020): ("A", 0.42, "Direct diluted Q4 EPS in 10-K narrative, corroborated by the following 1Q21 8-K EX-99.1."),
-    ("DUKR", 2015): ("C", None, "Annual and partial quarterly EPS evidence only; no direct Q4 EPS row found."),
-    ("DUKR", 2021): ("C", None, "Annual and partial quarterly EPS evidence only; no direct Q4 EPS row found."),
-    ("ASTC", 2014): ("A", -0.04, "Direct GAAP diluted Q4 EPS in 8-K EX-99.1 Fourth Quarter Results."),
-    ("ASTC", 2019): ("C", None, "Annual EPS and statement evidence only; no direct Q4 EPS row found."),
-    ("IGC", 2012): ("C", None, "Annual diluted EPS and a prior-calendar-quarter pro-forma table only; no fiscal Q4 disclosure."),
-    ("IGC", 2019): ("C", None, "Annual and partial quarterly EPS evidence only; no direct Q4 EPS row found."),
-    ("NMTC", 2017): ("C", None, "The 10-K Fourth Quarter High/Low table is stock price, not EPS; local positive-control value is not independently traced."),
-    ("NMTC", 2019): ("E", None, "Frozen Q4 end 2019-12-31 conflicts with SEC 10-K fiscal year-end 2019-09-30."),
-    ("TDW", 2018): ("E", None, "Frozen Q4 end 2018-03-31 is fiscal Q1; SEC 10-K fiscal year-end is 2018-12-31."),
-    ("TDW", 2019): ("E", None, "Frozen Q4 end 2019-03-31 is fiscal Q1; SEC 10-K fiscal year-end is 2019-12-31."),
-}
-
-VERIFIED = {
+# Each A result is tied to a reviewed SEC exhibit.  Values are as-filed values;
+# this renderer never derives Q4 EPS from annual and Q1-Q3 figures.
+DISCLOSURES = {
     ("ASTC", 2014): {
-        "source": "Source D — original SEC 8-K EX-99.1",
+        "source": "SEC 8-K EX-99.1",
         "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004870/t1401849_ex99-1.htm",
-        "accession": "0001571049-14-004870",
-        "filing_date": "2014-09-30",
-        "q4_end": "2014-06-30",
-        "eps": -0.04,
-        "raw_tag": None,
-        "location": "Exhibit 99.1, “Fourth Quarter Results”; release headline says GAAP results; sentence reports $(0.04) per diluted share for the quarter ended June 30, 2014.",
-        "gaap_diluted_basis": "The release explicitly labels results GAAP and says per diluted share in the same Q4 sentence. It is unadjusted; no non-GAAP qualifier applies to that sentence.",
-        "split_basis": "As-filed basis; no split adjustment applied. Later reverse splits were in 2017 and 2022. The same-period local Q4 value is null, so no numeric database comparison is available.",
-        "database_match": "No same-period Q4 value exists locally; not comparable.",
-        "source_text": "Fourth Quarter Results The Company posted fourth quarter fiscal year 2014 net loss of $0.8 million, or $(0.04) per diluted share ...",
+        "accession": "0001571049-14-004870", "filing_date": "2014-09-30",
+        "q4_end": "2014-06-30", "eps": -0.04, "raw_tag": None,
+        "location": "Exhibit 99.1, ‘Fourth Quarter Results’; sentence for the quarter ended June 30, 2014.",
+        "gaap_diluted_basis": "Release labels results GAAP and explicitly reports the Q4 loss per diluted share; no adjusted qualifier applies.",
+        "split_basis": "As-filed basis; no adjustment applied. Later reverse splits were in 2017 and 2022.",
+        "database_match": "No same-period local Q4 value; not comparable.",
     },
     ("FGC", 2016): {
-        "source": "Source D — original SEC 8-K EX-99.1",
+        "source": "SEC 8-K EX-99.1",
         "url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001425/ex99-1.htm",
-        "accession": "0001387131-17-001425",
-        "filing_date": "2017-03-16",
-        "q4_end": "2016-12-31",
-        "eps": 0.27,
-        "raw_tag": None,
-        "location": "Exhibit 99.1, Consolidated Statements of Comprehensive (Loss) Income; unaudited Three months ended December 31, 2016 column; Diluted row attributable to common shareholders.",
-        "gaap_diluted_basis": "The primary consolidated income statement row says “Diluted” and reports per-share income attributable to common shareholders. The separate annual $1.07 “before catastrophe events” figure is an adjusted/non-GAAP measure and was excluded.",
-        "split_basis": "As-filed 2016 basis; no later split adjustment applied to the quoted EPS. Later reverse splits were 0.04 (2024) and 0.20 (2026); the same-period local Q4 value is null, so no numeric database comparison is available.",
-        "database_match": "No same-period Q4 value exists locally; not comparable.",
-        "source_text": "Three months ended December 31, 2016 / 2015 ... (Loss) Earnings per share attributable to common shareholders: Basic ... Diluted $ 0.27 ...",
-    },
-    ("OFG", 2017): {
-        "source": "Source C — original SEC 10-K; corroborated by Source D — original 8-K EX-99.1",
-        "url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046918000021/ofg10k12312017.htm",
-        "accession": "0001030469-18-000021",
-        "filing_date": "2018-03-13",
-        "corroborating_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046918000006/ofg8K20171231EX99.htm",
-        "corroborating_accession": "0001030469-18-000006",
-        "corroborating_filing_date": "2018-01-30",
-        "q4_end": "2017-12-31",
-        "eps": 0.30,
-        "raw_tag": None,
-        "location": "Table 17 — Selected Quarterly Financial Data; Earnings Data / Per Share Data; December 31, 2017 column; Diluted row.",
-        "gaap_diluted_basis": "The table summarizes quarterly net income, income available to common shareholders, and Basic/Diluted per-share data. It has no adjusted/non-GAAP label; Q4 is the December 31 column, not the annual Total column. The January 8-K and March 10-K disagree on annual diluted EPS ($0.86 vs $0.88), but both report Q4 diluted EPS $0.30; the annual values are not used to derive Q4.",
-        "split_basis": "As-filed basis; no post-period split. A 1993 split predates this period. The same-period local Q4 value is null, so no numeric database comparison is available.",
-        "database_match": "No same-period Q4 value exists locally; not comparable.",
-        "source_text": "PER SHARE DATA: Basic $0.27 $0.30 — $0.31 $0.88; Diluted $0.26 $0.30 — $0.30 $0.88; columns March 31, June 30, September 30, December 31, Total 2017.",
+        "accession": "0001387131-17-001425", "filing_date": "2017-03-16",
+        "q4_end": "2016-12-31", "eps": 0.27, "raw_tag": None,
+        "location": "Exhibit 99.1, unaudited consolidated income statement; Three Months Ended December 31, 2016, Diluted row.",
+        "gaap_diluted_basis": "Primary consolidated statement labels the row Diluted. The annual ‘before catastrophe events’ EPS is adjusted/non-GAAP and excluded.",
+        "split_basis": "As-filed FY2016 basis; no adjustment applied. Later reverse splits were 0.04 (2024) and 0.20 (2026).",
+        "database_match": "No same-period local Q4 value; not comparable.",
     },
     ("FGC", 2022): {
-        "source": "Source D — original SEC 8-K EX-99.1",
+        "source": "SEC 8-K EX-99.1",
         "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223008865/ex99-1.htm",
-        "accession": "0001493152-23-008865",
-        "filing_date": "2023-03-24",
-        "q4_end": "2022-12-31",
-        "eps": -0.03,
-        "raw_tag": None,
-        "location": "Exhibit 99.1, earnings release narrative and unaudited Consolidated Statements of Operations; Three months ended December 31, 2022 is the first column, separate from FY2022 and prior-year columns.",
-        "gaap_diluted_basis": "The narrative explicitly says $0.03 per fully diluted share for Q4. The consolidated GAAP statement labels the row “Basic and diluted net earnings (loss) per common share”; total loss per common share is $(0.03). The separate FY2022 value is $(0.09), not the Q4 column. No adjusted/non-GAAP qualifier applies to these primary statement values.",
-        "split_basis": "As-filed FY2022 basis; no split adjustment applied. The same CIK had later reverse splits on 2024-11-01 (0.04) and 2026-02-13 (0.20); the same-period local Q4 value is null, so no numeric database comparison is available. The local legacy symbol FGC maps to CIK 0001591890; this filing reports FG Financial Group, Inc. / FGF.",
-        "database_match": "No same-period Q4 value exists locally; not comparable.",
-        "source_text": "Net loss attributable to common shareholders for the fourth quarter of 2022 ... $0.30 million, or $(0.03) per fully diluted share. Basic and diluted net earnings (loss) per common share: Continuing operations $(0.03) ... Loss per share attributable to common shareholders $(0.03) $(0.66) $(0.09) $(1.96).",
-    },
-    ("OFG", 2020): {
-        "source": "Source C — original SEC 10-K; corroborated by Source D — 1Q21 8-K EX-99.1",
-        "url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046921000009/ofg10k2020.htm",
-        "accession": "0001030469-21-000009",
-        "filing_date": "2021-02-26",
-        "corroborating_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046921000012/ofg8kexhibit991q21.htm",
-        "corroborating_accession": "0001030469-21-000012",
-        "corroborating_filing_date": "2021-04-21",
-        "q4_end": "2020-12-31",
-        "eps": 0.42,
-        "raw_tag": None,
-        "location": "10-K “Fourth quarter of 2020: Increased Earnings & Revenues” paragraph; confirmed by the SEC 1Q21 EX-99.1 “1Q21 Highlights” comparative statement.",
-        "gaap_diluted_basis": "Both SEC filings use unqualified “EPS diluted” language for $0.42, with no adjusted/core qualifier. The release separately identifies non-GAAP measures; the company’s 2020 GAAP annual diluted EPS is $1.32. The Q4 amount is stated directly, not derived.",
-        "split_basis": "As-filed basis; no split adjustment applied. No split falls after this Q4 period. The same-period local Q4 value is null, so no numeric database comparison is available.",
-        "database_match": "No same-period Q4 value exists locally; not comparable.",
-        "source_text": "10-K: Fourth quarter of 2020 ... Earnings per share (EPS) diluted of $0.42 ...; 8-K: EPS diluted was $0.56 compared to $0.42 in 4Q20 ...",
+        "accession": "0001493152-23-008865", "filing_date": "2023-03-24",
+        "q4_end": "2022-12-31", "eps": -0.03, "raw_tag": None,
+        "location": "Exhibit 99.1, Q4 earnings narrative and consolidated statement; Three Months Ended December 31, 2022 column.",
+        "gaap_diluted_basis": "Narrative says fully diluted Q4 EPS; primary statement says Basic and diluted net earnings (loss) per common share. The separate annual column is not used.",
+        "split_basis": "As-filed FY2022 basis; no adjustment applied. Later reverse splits were 0.04 (2024) and 0.20 (2026).",
+        "database_match": "No same-period local Q4 value; not comparable.",
     },
     ("WRAP", 2022): {
-        "source": "Source D — original SEC 8-K EX-99.1 earnings release",
+        "source": "SEC 8-K EX-99.1",
         "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923005259/ex_483215.htm",
-        "accession": "0001437749-23-005259",
-        "filing_date": "2023-03-03",
-        "q4_end": "2022-12-31",
-        "eps": -0.09,
-        "raw_tag": None,
-        "location": "Exhibit 99.1 Consolidated Statements of Operations; header separates Three Months Ended December 31 from Twelve Months Ended December 31; first quarter column is 2022.",
-        "gaap_diluted_basis": "The unaudited consolidated statement row is “Net loss per basic and diluted common share”. It reports Q4 loss $(0.09); the same column has net loss $(3.536) million and weighted average common shares 41,160,136. It is an unadjusted primary statement measure.",
-        "split_basis": "As-filed FY2022 basis; no stock splits fall after this period and no adjustment was applied. The same-period local Q4 value is null, so no numeric database comparison is available.",
-        "database_match": "No same-period Q4 value exists locally; not comparable.",
-        "source_text": "Three Months Ended December 31, Twelve Months Ended December 31, 2022 2021 2022 2021 ... Net loss per basic and diluted common share $ (0.09) $ (0.13) $ (0.43) $ (0.62).",
+        "accession": "0001437749-23-005259", "filing_date": "2023-03-03",
+        "q4_end": "2022-12-31", "eps": -0.09, "raw_tag": None,
+        "location": "Exhibit 99.1, consolidated statements of operations; first column is Three Months Ended December 31, 2022.",
+        "gaap_diluted_basis": "Primary statement row is Net loss per basic and diluted common share; Q4 column is distinct from the twelve-month columns.",
+        "split_basis": "As-filed FY2022 basis; no post-period split adjustment applied.",
+        "database_match": "No same-period local Q4 value; not comparable.",
+    },
+    ("ULBI", 2021): {
+        "source": "SEC 8-K EX-99.1",
+        "url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922002307/ex_331663.htm",
+        "accession": "0001437749-22-002307", "filing_date": "2022-02-03",
+        "q4_end": "2021-12-31", "eps": -0.07, "raw_tag": None,
+        "location": "Exhibit 99.1, unaudited Q4 table; Three-Month Period Ended December 31, 2021, Net (Loss) Income Attributable row, Per Diluted Share column.",
+        "gaap_diluted_basis": "The table reports the unadjusted net loss attributable to Ultralife and its per diluted share amount. The separate adjusted net income row is not used.",
+        "split_basis": "As-filed basis; no adjustment applied and no later split identified for this period.",
+        "database_match": "No same-period local Q4 EPS value; the local Q4 EPS is null.",
     },
 }
 
-OUT_OF_SAMPLE = [
-    {
-        "ticker": "TDW", "fiscal_year": 2018, "q4_end": "2018-12-31", "eps": -2.83,
-        "accession": "0001564590-19-005545", "filing_date": "2019-02-28",
-        "url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019005545/tdw-10k_20181231.htm",
-        "note": "Direct Q4 diluted EPS in quarterly financial data; excluded because the frozen target date was 2018-03-31 (Q1).",
+ADJUDICATION = {
+    ("BNC", 2014): ("C", None, "年度 EPS 與部分季度資料可用；10-K/8-K 搜尋範圍未找到可直接採用的 Q4 diluted EPS。"),
+    ("BNC", 2024): ("E", None, "凍結期末 2025-01-31 與 SEC FY2024 年報期末 2024-12-31 不同，無法把年報當作該凍結期別。"),
+    ("QXL", 2014): ("C", None, "年報的 Fourth Quarter 表是股價 High/Low，不是 EPS；僅有年度/部分季度 EPS 線索。"),
+    ("QXL", 2019): ("C", None, "年報的 Fourth Quarter 表是股價 High/Low，不是 EPS；僅有年度/部分季度 EPS 線索。"),
+    ("FGC", 2016): ("A", 0.27, "SEC 8-K EX-99.1 明確列示 GAAP diluted Q4 EPS。"),
+    ("FGC", 2022): ("A", -0.03, "SEC 8-K EX-99.1 明確分開單季和年度欄，GAAP 表及敘述一致。"),
+    ("WRAP", 2017): ("C", None, "年度/部分季度資料可用；10-K/8-K 搜尋範圍未找到可直接採用的 Q4 diluted EPS。"),
+    ("WRAP", 2022): ("A", -0.09, "SEC 8-K EX-99.1 明確列示 GAAP basic-and-diluted Q4 EPS。"),
+    ("PCSA", 2012): ("E", None, "目前 CIK 的 SEC submissions 沒有可連結至 FY2012 的申報；歷史 CIK/公司承接映射不完整，不能判定沒有披露。"),
+    ("PCSA", 2022): ("C", None, "10-K 只找到年度 basic-and-diluted EPS；SEC 8-K 文字與已完成的圖片 OCR 均未找到單季 Q4 EPS。"),
+    ("ULBI", 2014): ("B", None, "8-K 報告 Q4 每股 0.05 美元，但未說明是 basic 或 diluted，故不接受為 diluted EPS。"),
+    ("ULBI", 2021): ("A", -0.07, "SEC 8-K EX-99.1 表格明確列示 GAAP Q4 per diluted share。"),
+    ("ASTC", 2014): ("A", -0.04, "SEC 8-K EX-99.1 ‘Fourth Quarter Results’ 明確列示 GAAP diluted EPS。"),
+    ("ASTC", 2019): ("C", None, "有年度 EPS 和財報資料；已查來源範圍未找到直接 Q4 EPS。"),
+    ("IGC", 2012): ("C", None, "年報有年度 diluted EPS 與前一曆年季度 pro forma 表，並非該財年 Q4。"),
+    ("IGC", 2019): ("C", None, "有年度與部分季度 EPS 線索；已查來源範圍未找到直接 Q4 EPS。"),
+    ("PZG", 2016): ("B", None, "Notes 與年報季度表列示 +0.32，但 main Grade A fact 為 -0.32；原始表格符號基準有衝突，暫不採用。"),
+    ("PZG", 2019): ("A", -0.09, "SEC 年報季度 EPS fact 為 -0.09，並與 main Grade A as-filed value 一致；原始表格以 net loss 語境列示 0.09。"),
+    ("PTN", 2018): ("A", 0.06, "SEC 年報季度 diluted EPS fact +0.06，與 main Grade A as-filed value 一致。"),
+    ("PTN", 2019): ("A", 0.23, "SEC 年報季度 diluted EPS fact +0.23，與 main Grade A as-filed value 一致。"),
+}
+
+FISCAL_MISMATCH_EVIDENCE = {
+    "TDW": {
+        2018: ("2018-12-31", "0001564590-19-005545", "2019-02-28"),
+        2019: ("2019-12-31", "0001564590-20-008191", "2020-03-02"),
+        2020: ("2020-12-31", "0001437749-21-005037", "2021-03-04"),
+        2021: ("2021-12-31", "0001437749-22-005725", "2022-03-09"),
+        2022: ("2022-12-31", "0001437749-23-004829", "2023-02-28"),
+        2023: ("2023-12-31", "0001437749-24-006108", "2024-02-29"),
+        2024: ("2024-12-31", "0001437749-25-005487", "2025-02-27"),
+        2025: ("2025-12-31", "0001437749-26-006391", "2026-03-02"),
     },
-    {
-        "ticker": "TDW", "fiscal_year": 2019, "q4_end": "2019-12-31", "eps": -1.52,
-        "accession": "0001564590-20-008191", "filing_date": "2020-03-02",
-        "url": "https://www.sec.gov/Archives/edgar/data/98222/000156459020008191/tdw-10k_20191231.htm",
-        "raw_tag": "us-gaap:EarningsPerShareDiluted",
-        "note": "Direct Inline XBRL Q4 diluted EPS; excluded because the frozen target date was 2019-03-31 (Q1). Same-date local value matches numerically but is labeled FY2020/FQ3 and derived=1.",
+    "NMTC": {
+        2019: ("2019-09-30", "0001213900-19-026720", "2019-12-20"),
+        2020: ("2020-09-30", "0001213900-20-041661", "2020-12-09"),
+        2021: ("2021-09-30", "0001213900-21-065463", "2021-12-15"),
+        2022: ("2022-09-30", "0001213900-22-081897", "2022-12-22"),
+        2023: ("2023-09-30", "0001213900-23-096120", "2023-12-15"),
+        2024: ("2024-09-30", "0001213900-24-109524", "2024-12-17"),
+        2025: ("2025-09-30", "0001213900-25-122390", "2025-12-17"),
     },
-]
+    "BNC": {2024: ("2024-12-31", "0001641172-25-000913", "2025-03-27")},
+}
 
 
-def read(name):
+def read_json(name: str):
     return json.loads((REPORT / name).read_text(encoding="utf-8"))
 
 
-def write_json(name, value):
-    (REPORT / name).write_text(
-        json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+def write_json(name: str, value):
+    (REPORT / name).write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def by_period(sample):
-    return {
-        (company["ticker"], int(period["fy"])): (company, period)
-        for company in sample["sample"] for period in company["periods"]
-    }
+def file_sha256(path: Path) -> str:
+    import hashlib
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def source_records(source):
+def all_records(source):
     return source.get("accessions", source.get("filings", {}))
 
 
-def build_results():
-    sample = read("sample.json")
-    fmap = read("filing-map.json")
-    a, b, c, d = (read(name) for name in (
-        "source-a.json", "source-b.json", "source-c.json", "source-d.json"
-    ))
-    d_ocr = read("source-d-ocr.json")
-    d_ocr_by_url = {item.get("url"): item for item in d_ocr}
-    c_initial = read("source-c-initial-parser-diagnostic.json")
-    d_initial = read("source-d-initial-selector-diagnostic.json")
-    official = read("official-docs.json")
-    period_inputs = by_period(sample)
-    cmap = source_records(c)
-    amap, bmap = source_records(a), source_records(b)
-    c_by_period = defaultdict(list)
-    for item in cmap.values():
+def source_status(source, ticker, fy, end):
+    """Locate target-period data facts; preserve candidates for audit."""
+    end_compact = end.replace("-", "")
+    records = all_records(source)
+    hits = []
+    related = []
+    for accession, item in records.items():
         meta = item.get("metadata", {})
-        c_by_period[(meta.get("ticker"), int(meta.get("fy", -1)))].append(item)
-    fmap_periods = {}
-    for issuer in fmap["issuers"]:
-        for period in issuer.get("periods", []):
-            fmap_periods[(period["ticker"], int(period["fy"]))] = period
+        tickers = [meta.get("ticker")] if meta.get("ticker") else meta.get("tickers", [])
+        if ticker not in tickers:
+            continue
+        if meta.get("fy") not in (fy, fy + 1, None):
+            continue
+        related.append((accession, item))
+        for fact in item.get("eps_candidates", []):
+            if (fact.get("date") == end_compact and fact.get("quarters") == "1"
+                    and "Diluted" in fact.get("tag", "")
+                    and fact.get("unit") == "USD" and not fact.get("dimension_members")):
+                hits.append({"accession": accession, "tag": fact.get("tag"), "value": fact.get("value"),
+                             "unit": fact.get("unit"), "date": fact.get("date"),
+                             "quarters": fact.get("quarters"), "dimensions": fact.get("dimension_members", [])})
+    hits.sort(key=lambda row: (row["accession"], row["tag"], row["value"] or ""))
+    return {
+        "status": "HTTP 200 / parsed" if related else "no target accession linked to this CIK/period",
+        "related_accessions": [acc for acc, _ in related],
+        "eps_candidate_count": len(hits), "direct_q4_facts": hits,
+        "dataset_statuses": sorted({item.get("dataset_status") for _, item in related if item.get("dataset_status")}),
+    }
 
+
+def source_c_records(c, ticker, fy):
+    found = []
+    for accession, item in all_records(c).items():
+        meta = item.get("metadata", {})
+        if meta.get("ticker") == ticker and meta.get("fy") == fy:
+            found.append({"accession": accession, "form": meta.get("form"),
+                          "filing_date": meta.get("filing_date"), "report_date": meta.get("report_date"),
+                          "url": item.get("url"), "http_status": item.get("http_status"),
+                          "parse_status": item.get("parse_status"),
+                          "eps_table_count": len(item.get("eps_tables", [])),
+                          "quarterly_excerpt_count": len(item.get("quarterly_section_excerpts", []))})
+    return sorted(found, key=lambda x: (x["form"] == "10-K/A", x["filing_date"] or ""))
+
+
+def source_d_windows(d, ocr, ticker, fy):
+    ocr_by_url = {item.get("url"): item for item in ocr}
+    windows = []
+    for accession, filing in d.get("filings", {}).items():
+        matching = [w for w in filing.get("metadata", {}).get("period_windows", [])
+                    if w.get("ticker") == ticker and int(w.get("fy", -1)) == fy]
+        if not matching:
+            continue
+        documents = []
+        for doc in filing.get("documents", []):
+            ocr_item = ocr_by_url.get(doc.get("url"), {})
+            unsupported = doc.get("parse_status") == "unsupported_nontext"
+            documents.append({"name": doc.get("name"), "url": doc.get("url"),
+                              "http_status": doc.get("http_status"), "parse_status": doc.get("parse_status"),
+                              "ocr_status": ocr_item.get("ocr_status") if unsupported else None,
+                              "ocr_hash_matches": (ocr_item.get("sha256") == doc.get("sha256")) if unsupported else None})
+        complete = filing.get("index_http_status") == 200 and all(
+            doc["http_status"] == 200 and doc["parse_status"] in {"parsed", "unsupported_nontext"}
+            and (doc["parse_status"] != "unsupported_nontext" or
+                 (doc["ocr_status"] == "ok" and doc["ocr_hash_matches"]))
+            for doc in documents)
+        windows.append({"accession": accession, "filing_date": filing.get("metadata", {}).get("filing_date"),
+                        "index_url": filing.get("index_url"), "index_http_status": filing.get("index_http_status"),
+                        "complete": complete, "period_windows": matching, "documents": documents})
+    return sorted(windows, key=lambda x: (x["filing_date"] or "", x["accession"]))
+
+
+def quarter_for_date(value):
+    date = datetime.strptime(value, "%Y-%m-%d")
+    return f"{date.year}q{(date.month - 1) // 3 + 1}"
+
+
+def archive_observation(source, fact_status):
+    zips = source.get("zips", {})
+    quarters = sorted({quarter_for_date(item.get("metadata", {}).get("filing_date"))
+                       for acc in fact_status.get("related_accessions", [])
+                       for item in [all_records(source).get(acc, {})]
+                       if item.get("metadata", {}).get("filing_date")})
+    matches = [zips.get(q) for q in quarters if q in zips]
+    if not fact_status.get("related_accessions"):
+        return {"calendar_quarters": quarters, "http_status": None, "parse_status": "target accession unavailable"}
+    return {"calendar_quarters": quarters,
+            "http_status": 200 if matches and all(z.get("http_status") == 200 for z in matches) else None,
+            "parse_status": "parsed" if matches and all(z.get("parse_status") == "parsed" for z in matches) else "missing archive record"}
+
+
+def main_grade_fact(company, period):
+    return period.get("main_grade_a_audit", {}).get("sec_fact") or {}
+
+
+def period_results(sample, a, b, c, d, ocr):
     rows = []
-    for key, (company, frozen) in period_inputs.items():
-        classification, eps, explanation = CASES[key]
-        filings = sorted(c_by_period[key], key=lambda x: (x["metadata"].get("form") != "10-K", x["metadata"].get("filing_date", "")))
-        form10k = next((x for x in filings if x["metadata"].get("form") == "10-K"), None)
-        meta = form10k.get("metadata", {}) if form10k else {}
-        sec_report_ends = sorted({x.get("metadata", {}).get("report_date") for x in filings if x.get("metadata", {}).get("report_date")})
-        matches = fmap_periods.get(key, {})
-        target_10ks = matches.get("target_10k_matches", [])
-        accession = form10k.get("metadata", {}).get("accession") if form10k else None
-        a_observation = amap.get(accession, {}) if accession else {}
-        b_observation = bmap.get(accession, {}) if accession else {}
-        d_windows = []
-        for acc, filing in d.get("filings", {}).items():
-            period_windows = [w for w in filing.get("metadata", {}).get("period_windows", [])
-                              if w.get("ticker") == key[0] and int(w.get("fy", -1)) == key[1]]
-            if not period_windows:
+    for company in sample["sample"]:
+        for period in company["periods"]:
+            ticker, fy = company["ticker"], int(period["fy"])
+            classification, eps, explanation = ADJUDICATION[(ticker, fy)]
+            status_a = source_status(a, ticker, fy, period["q4_end"])
+            status_b = source_status(b, ticker, fy, period["q4_end"])
+            c_filings = source_c_records(c, ticker, fy)
+            d_filings = source_d_windows(d, ocr, ticker, fy)
+            grade_fact = main_grade_fact(company, period)
+            unverified_candidate = None
+            if (ticker, fy) == ("ULBI", 2014):
+                unverified_candidate = {"value": 0.05, "unit": "USD/share", "source": "SEC 8-K EX-99.1",
+                                        "accession": "0000875657-15-000003", "filing_date": "2015-02-12",
+                                        "reason": "per-share amount is not identified as basic or diluted"}
+            elif (ticker, fy) == ("PZG", 2016):
+                unverified_candidate = {"value": 0.32, "unit": "USD/share", "source": "SEC Notes / FY2016 10-K quarterly table",
+                                        "accession": "0001564590-16-025274", "filing_date": "2016-09-16",
+                                        "reason": "source positive magnitude conflicts with main Grade A reportedValue -0.32"}
+            row = {
+                "ticker": ticker, "company_name": company["company_name"], "cik": company["cik"],
+                "sample_role": company["sample_role"], "fiscal_year": fy,
+                "frozen_q4_end": period["q4_end"],
+                "missing_reason": company.get("missing_reason"),
+                "classification": classification, "verified_q4_eps": eps,
+                "unverified_candidate": unverified_candidate,
+                "result": explanation,
+                "source_a_fsds": {**status_a, **archive_observation(a, status_a)},
+                "source_b_notes": {**status_b, **archive_observation(b, status_b)},
+                "source_c_10k": {"status": "HTTP 200 / parsed" if c_filings and all(x["http_status"] == 200 and x["parse_status"] == "parsed" for x in c_filings)
+                                           else ("no accession linked to current CIK/period" if not c_filings else "incomplete"),
+                                  "filings": c_filings},
+                "source_d_8k": {"status": "HTTP 200 / parsed; OCR hash verified" if d_filings and all(x["complete"] for x in d_filings)
+                                         else (("historical CIK/filing window unavailable" if (ticker, fy) == ("PCSA", 2012)
+                                                else "no 8-K matched the requested search window") if not d_filings else "incomplete"),
+                                "filings": d_filings},
+                "main_grade_a_audit": ({"eps_quality": period.get("main_grade_a_audit", {}).get("main_eps_quality"),
+                                        "is_main_grade_a": period.get("main_grade_a_audit", {}).get("is_main_grade_a"),
+                                        "as_filed_value": grade_fact.get("reportedValue"),
+                                        "current_basis_value": grade_fact.get("value"),
+                                        "split_factor": grade_fact.get("splitFactor"),
+                                        "accession": grade_fact.get("accession"),
+                                        "filing_date": grade_fact.get("filed"),
+                                        "url": grade_fact.get("filingUrl")}
+                                       if company["sample_role"] == "positive_control_grade_a" else None),
+            }
+            rows.append(row)
+    return rows
+
+
+def fiscal_mismatches():
+    rows = []
+    for ticker, years in FISCAL_MISMATCH_EVIDENCE.items():
+        d = json.loads((FINANCIALS / f"{ticker}.json").read_text(encoding="utf-8"))
+        annual = {int(fy): end for fy, end in zip(d["annual"]["fy"], d["annual"]["end"])}
+        q = d["quarterly"]
+        for idx, (fy, fq, local_end) in enumerate(zip(q["fy"], q["fq"], q["end"])):
+            fy = int(fy)
+            if int(fq) != 4:
                 continue
-            unsupported = [doc for doc in filing.get("documents", [])
-                           if doc.get("parse_status") == "unsupported_nontext"]
-            all_docs_http_200 = all(doc.get("http_status") == 200 for doc in filing.get("documents", []))
-            parse_complete = all(doc.get("parse_status") in {"parsed", "unsupported_nontext"}
-                                 for doc in filing.get("documents", []))
-            ocr_complete = all(d_ocr_by_url.get(doc.get("url"), {}).get("ocr_status") == "ok"
-                               for doc in unsupported)
-            d_windows.append({
-                "accession": acc,
-                "index_http_status": filing.get("index_http_status"),
-                "filing_status": filing.get("status"),
-                "document_count": len(filing.get("documents", [])),
-                "documents_http_200": all_docs_http_200,
-                "document_parse_complete": parse_complete,
-                "unsupported_image_count": len(unsupported),
-                "unsupported_images_ocr_ok": ocr_complete,
-                "period_windows": period_windows,
-            })
-        d_complete = all(x["index_http_status"] == 200 and x["documents_http_200"]
-                         and x["document_parse_complete"]
-                         and x["unsupported_images_ocr_ok"] for x in d_windows)
-        verified = VERIFIED.get(key)
-        rows.append({
-            "ticker": key[0], "company_name": company["company_name"], "cik": company["cik"],
-            "sample_role": company["sample_role"], "fiscal_year": key[1],
-            "frozen_q4_end": frozen["q4_end"], "missing_reason": frozen.get("category"),
-            "period_end_match": bool(matches.get("q4_end_matches_local_annual_end", False)),
-            "sec_10k_report_ends": sec_report_ends,
-            "selected_10k_accessions": [x.get("accession") for x in target_10ks],
-            "source_c_original_10k": ({
-                "accession": meta.get("accession"), "form": meta.get("form"),
-                "filing_date": meta.get("filing_date"), "report_date": meta.get("report_date"),
-                "url": form10k.get("url"), "http_status": form10k.get("http_status"),
-                "parse_status": form10k.get("parse_status"),
-            } if form10k else None),
-            "source_a_fsds": {
-                "dataset_lookup_status": a_observation.get("dataset_status"),
-                "http_status": 200 if a_observation else None,
-                "parse_status": "parsed" if a_observation else "not_present_in_target_zip",
-                "accession_in_SUB": a_observation.get("accession_matches_metadata"),
-                "candidate_count": len(a_observation.get("eps_candidates", [])),
-            },
-            "source_b_notes": {
-                "dataset_lookup_status": b_observation.get("dataset_status"),
-                "http_status": 200 if b_observation else None,
-                "parse_status": "parsed" if b_observation else "not_present_in_target_zip",
-                "accession_in_SUB": b_observation.get("accession_matches_metadata"),
-                "candidate_count": len(b_observation.get("eps_candidates", [])),
-                "note_text_candidate_count": len(b_observation.get("note_text_candidates", [])),
-            },
-            "source_d_8k_search": {"status": "searched_complete" if d_complete else "incomplete",
-                                   "matching_search_windows": d_windows},
-            "classification": classification, "verified_q4_eps": eps,
-            "database_value_same_period": frozen.get("current_q4_eps_diluted", frozen.get("existing_q4_eps_diluted")),
-            "database_derived_flag": frozen.get("quarterly_derived_flag"),
-            "result": explanation,
-            "verified_source": verified,
-        })
+            if fy in years:
+                sec_end, accession, filing_date = years[fy]
+                if sec_end != local_end:
+                    rows.append({"ticker": ticker, "fy": fy, "local_fq": 4, "local_q4_end": local_end,
+                                 "sec_report_end": sec_end, "accession": accession, "filing_date": filing_date,
+                                 "status": "confirmed_mismatch"})
+            elif fy == 2026 and ticker == "TDW":
+                rows.append({"ticker": ticker, "fy": fy, "local_fq": 4, "local_q4_end": local_end,
+                             "sec_report_end": annual.get(fy), "accession": None, "filing_date": None,
+                             "status": "unmatched_no_same_fy_annual_row"})
+            elif fy == 2025 and ticker == "BNC":
+                rows.append({"ticker": ticker, "fy": fy, "local_fq": 4, "local_q4_end": local_end,
+                             "sec_report_end": "2026-04-30 (latest retrieved 10-K; fiscal-year label unresolved)",
+                             "accession": "0001482541-26-000019", "filing_date": "2026-06-23",
+                             "status": "unmatched_local_row_requires_period_mapping"})
+            elif fy == 2018 and ticker == "NMTC":
+                rows.append({"ticker": ticker, "fy": fy, "local_fq": 4, "local_q4_end": local_end,
+                             "sec_report_end": None, "accession": None, "filing_date": None,
+                             "status": "unmatched_no_same_fy_annual_row"})
+    return rows
 
-    counts = Counter(row["classification"] for row in rows)
-    missing_rows = [row for row in rows if row["sample_role"] == "missing_q4_eps"]
-    missing_counts = Counter(row["classification"] for row in missing_rows)
 
-    # Per-source candidates are raw period-matched EPS-looking items. The two
-    # TDW March 31 candidates are retained but adjudicated as Q1 after matching
-    # to the issuer's December fiscal year end.
-    source_summary = [
-        {"source": "SEC Financial Statement Data Sets", "tested_periods": 20,
-         "zip_count": a["zip_count"], "zip_filing_quarter_range": [min(a["zips"]), max(a["zips"])],
-         "downloaded_zip_bytes": sum(z.get("wire_bytes", 0) for z in a["zips"].values()),
-         "found_candidate": 2, "verified_direct": 0, "unverifiable": 2, "failure": 0,
-         "single_source_unique_verified": 0, "cumulative_unique_verified": 0,
-         "candidate_period_keys": ["TDW:2018-03-31", "TDW:2019-03-31"]},
-        {"source": "SEC Financial Statement and Notes Data Sets", "tested_periods": 20,
-         "zip_count": b["zip_count"], "zip_filing_quarter_range": [min(b["zips"]), max(b["zips"])],
-         "downloaded_zip_bytes": sum(z.get("wire_bytes", 0) for z in b["zips"].values()),
-         "found_candidate": 2, "verified_direct": 0, "unverifiable": 2, "failure": 0,
-         "single_source_unique_verified": 0, "cumulative_unique_verified": 0,
-         "candidate_period_keys": ["TDW:2018-03-31", "TDW:2019-03-31"]},
-        {"source": "Original 10-K / 10-K/A", "tested_periods": 20,
-         "filings_fetched": c["accession_count"], "filings_parsed": sum(x.get("parse_status") == "parsed" for x in cmap.values()),
-         "found_candidate": 4, "verified_direct": 2, "unverifiable": 2, "failure": 0,
-         "single_source_unique_verified": 2, "cumulative_unique_verified": 2,
-         "candidate_period_keys": ["TDW:2018-03-31", "TDW:2019-03-31", "OFG:2017-12-31", "OFG:2020-12-31"]},
-        {"source": "Original 8-K / EX-99.1", "tested_periods": 20,
-         "candidate_8k_filings": d["filing_count"],
-         "documents_scanned": sum(len(x.get("documents", [])) for x in d["filings"].values()),
-         "html_documents_parsed": sum(doc.get("parse_status") == "parsed" for x in d["filings"].values() for doc in x.get("documents", [])),
-         "image_documents_ocr_ok": sum(item.get("ocr_status") == "ok" for item in d_ocr),
-         "found_candidate": 8, "verified_direct": 6, "unverifiable": 2, "failure": 0,
-         "single_source_unique_verified": 4, "cumulative_unique_verified": 6,
-         "candidate_period_keys": ["TDW:2018-03-31", "TDW:2019-03-31", "ASTC:2014-06-30", "FGC:2016-12-31", "OFG:2017-12-31", "OFG:2020-12-31", "FGC:2022-12-31", "WRAP:2022-12-31"]},
+def source_summary(rows, a, b, c, d):
+    # Twenty targets were planned for each source (16 missing rows plus 4
+    # positive-control periods). PCSA FY2012 has no accession linked to the
+    # current CIK, so every source has one incomplete target and 19 completed
+    # source checks. Unique contribution columns count only the 16 missing rows.
+    return [
+        {"source": "SEC Financial Statement Data Sets", "planned_targets": 20,
+         "completed_periods": 19, "incomplete_periods": 1,
+         "found_candidate": 3, "verified_direct": 3, "unverifiable": 0, "failure": 0,
+         "single_source_unique_missing": 0, "cumulative_unique_missing": 0,
+         "candidate_periods": ["PZG:2019-06-30", "PTN:2018-06-30", "PTN:2019-06-30"],
+         "verified_missing_periods": [], "verified_controls": ["PZG:2019-06-30", "PTN:2018-06-30", "PTN:2019-06-30"]},
+        {"source": "SEC Financial Statement and Notes Data Sets", "planned_targets": 20,
+         "completed_periods": 19, "incomplete_periods": 1,
+         "found_candidate": 4, "verified_direct": 3, "unverifiable": 1, "failure": 0,
+         "single_source_unique_missing": 0, "cumulative_unique_missing": 0,
+         "candidate_periods": ["PZG:2016-06-30", "PZG:2019-06-30", "PTN:2018-06-30", "PTN:2019-06-30"],
+         "verified_missing_periods": [], "verified_controls": ["PZG:2019-06-30", "PTN:2018-06-30", "PTN:2019-06-30"],
+         "unverifiable_periods": ["PZG:2016-06-30"]},
+        {"source": "原始 10-K / 10-K/A", "planned_targets": 20,
+         "completed_periods": 19, "incomplete_periods": 1,
+         "found_candidate": 4, "verified_direct": 3, "unverifiable": 1, "failure": 0,
+         "single_source_unique_missing": 0, "cumulative_unique_missing": 0,
+         "candidate_periods": ["PZG:2016-06-30", "PZG:2019-06-30", "PTN:2018-06-30", "PTN:2019-06-30"],
+         "verified_missing_periods": [], "verified_controls": ["PZG:2019-06-30", "PTN:2018-06-30", "PTN:2019-06-30"],
+         "unverifiable_periods": ["PZG:2016-06-30"]},
+        {"source": "原始 8-K / EX-99.1", "planned_targets": 20,
+         "completed_periods": 19, "incomplete_periods": 1,
+         "found_candidate": 6, "verified_direct": 5, "unverifiable": 1, "failure": 0,
+         "single_source_unique_missing": 5, "cumulative_unique_missing": 5,
+         "candidate_periods": ["ASTC:2014-06-30", "FGC:2016-12-31", "FGC:2022-12-31", "WRAP:2022-12-31", "ULBI:2014-12-31", "ULBI:2021-12-31"],
+         "verified_missing_periods": ["ASTC:2014-06-30", "FGC:2016-12-31", "FGC:2022-12-31", "WRAP:2022-12-31", "ULBI:2021-12-31"],
+         "unverifiable_periods": ["ULBI:2014-12-31"]},
     ]
 
-    docs = official.get("docs", {})
-    official_metrics = official.get("end_to_end_metrics", {})
-    official_wire_bytes = int(official_metrics.get(
-        "wire_bytes_received", sum(int(v.get("wire_bytes", v.get("bytes", 0)) or 0) for v in docs.values())
-    ))
-    d_unique_urls = {}
-    for item in d.get("filings", {}).values():
-        d_unique_urls[item["index_url"]] = item.get("index_wire_bytes", 0)
-        for doc in item.get("documents", []):
-            d_unique_urls[doc["url"]] = doc.get("wire_bytes", 0)
-    d_wire_bytes = sum(d_unique_urls.values())
-    filing_map_metrics = fmap.get("end_to_end_metrics", {})
-    filing_map_wire_bytes = int(filing_map_metrics.get(
-        "wire_bytes_received", sum(int(x.get("wire_bytes", 0)) for x in fmap["issuers"])
-    ))
-    source_a_metrics = a.get("end_to_end_metrics", a["metrics"])
-    source_b_metrics = b.get("end_to_end_metrics", b["metrics"])
-    source_c_metrics = c_initial["metrics"]
-    source_d_metrics = d.get("end_to_end_metrics", d["metrics"])
-    endpoint_request_count = (
-        int(official_metrics.get("actual_http_requests", 6))
-        + int(filing_map_metrics.get("actual_http_requests", 10))
-        + int(source_a_metrics.get("actual_http_requests", source_a_metrics.get("sec_http_requests", 0)))
-        + int(source_b_metrics.get("actual_http_requests", source_b_metrics.get("sec_http_requests", 0)))
-        + int(source_c_metrics.get("sec_http_requests", 0))
-        + int(source_d_metrics.get("actual_http_requests", source_d_metrics.get("sec_http_requests", 0)))
+
+def controls_audit(sample):
+    old = sample["input_audit"].get("previous_positive_control_rows_checked_against_main", [])
+    return {
+        "selected_control_companies": [x["ticker"] for x in sample["sample"] if x["sample_role"] == "positive_control_grade_a"],
+        "selected_controls": [
+            {"ticker": co["ticker"], "fy": p["fy"], "q4_end": p["q4_end"],
+             "main_grade_a": p["main_grade_a_audit"],
+             "poc_status": ADJUDICATION[(co["ticker"], int(p["fy"]))][0],
+             "poc_eps_as_filed": ADJUDICATION[(co["ticker"], int(p["fy"]))][1],
+             "poc_note": ADJUDICATION[(co["ticker"], int(p["fy"]))][2]}
+            for co in sample["sample"] if co["sample_role"] == "positive_control_grade_a" for p in co["periods"]
+        ],
+        "prior_suggested_controls_nm_tc_tdw": old,
+        "ledger_scope_note": "Main classifier/report now exists. Main acceptance ledger has aggregate verifiedA=5009 but no per-row accepted-A list; the selected Grade A controls were audited using main financial-row epsQuality plus secQ4EpsFacts and their SEC accession. NMTC/TDW rows have local values but no row-level A fact, no missing-classification entry, and no blocked/overridden/deferred ledger entries.",
+    }
+
+
+def build_results(sample, a, b, c, d, ocr, filing_map, official, supplement):
+    periods = period_results(sample, a, b, c, d, ocr)
+    missing = [r for r in periods if r["sample_role"] == "missing_q4_eps"]
+    counts = Counter(r["classification"] for r in missing)
+    sources = source_summary(periods, a, b, c, d)
+    mismatches = fiscal_mismatches()
+    current_direct = [f"{r['ticker']}:{r['frozen_q4_end']}" for r in missing if r["classification"] == "A"]
+    old_audit = sample["input_audit"].get("previous_freeze_membership", {})
+    prior_source_a = {"sec_http_requests": 19, "wire_bytes_received": 1841375190}
+    prior_source_b = {"sec_http_requests": 18, "wire_bytes_received": 8864151660}
+    current_source_a = a.get("metrics", {})
+    current_source_b = b.get("metrics", {})
+    current_a_increment = current_source_a.get("incremental", {})
+    current_b_increment = current_source_b.get("incremental", {})
+    # The artifacts retain acquisition counters across the earlier and
+    # refrozen samples. Keep those deltas separate from the last invocation's
+    # incremental counters and from the bytes of ZIPs referenced by this sample.
+    refresh_metrics = {
+        "source_a_fsds": {
+            "recorded_request_delta_from_prior_poc": current_source_a.get("sec_http_requests", 0) - prior_source_a["sec_http_requests"],
+            "recorded_wire_byte_delta_from_prior_poc": current_source_a.get("wire_bytes_received", 0) - prior_source_a["wire_bytes_received"],
+            "last_invocation_requests": current_a_increment.get("sec_http_requests", 0),
+            "last_invocation_wire_bytes": current_a_increment.get("wire_bytes_received", 0),
+            "current_sample_unique_zip_payload_bytes": sum(x.get("wire_bytes", 0) or 0 for x in a.get("zips", {}).values()),
+            "current_sample_unique_zip_count": len(a.get("zips", {})),
+        },
+        "source_b_notes": {
+            "recorded_request_delta_from_prior_poc": current_source_b.get("sec_http_requests", 0) - prior_source_b["sec_http_requests"],
+            "recorded_wire_byte_delta_from_prior_poc": current_source_b.get("wire_bytes_received", 0) - prior_source_b["wire_bytes_received"],
+            "last_invocation_requests": current_b_increment.get("sec_http_requests", 0),
+            "last_invocation_wire_bytes": current_b_increment.get("wire_bytes_received", 0),
+            "current_sample_unique_zip_payload_bytes": sum(x.get("wire_bytes", 0) or 0 for x in b.get("zips", {}).values()),
+            "current_sample_unique_zip_count": len(b.get("zips", {})),
+        },
+        "source_c_10k": {"requests": c.get("metrics", {}).get("sec_http_requests", 0),
+                          "wire_bytes": c.get("metrics", {}).get("wire_bytes_received", 0)},
+        "source_d_8k": {"requests": d.get("metrics", {}).get("sec_http_requests", 0),
+                         "wire_bytes": d.get("metrics", {}).get("wire_bytes_received", 0)},
+        "submissions": {"requests": filing_map.get("end_to_end_metrics", {}).get("actual_http_requests", 0),
+                        "wire_bytes": filing_map.get("end_to_end_metrics", {}).get("wire_bytes_received", 0)},
+        "positive_control_supplement": {"requests": supplement.get("metrics", {}).get("sec_http_requests", 0),
+                                         "wire_bytes": supplement.get("metrics", {}).get("wire_bytes_received", 0)},
+    }
+    # Sum only the explicitly delimited refresh deltas. It excludes the older
+    # mixed-scope total in the prior report and the unique ZIP payload sizes.
+    refresh_requests = (
+        refresh_metrics["source_a_fsds"]["recorded_request_delta_from_prior_poc"]
+        + refresh_metrics["source_b_notes"]["recorded_request_delta_from_prior_poc"]
+        + refresh_metrics["source_c_10k"]["requests"]
+        + refresh_metrics["source_d_8k"]["requests"]
+        + refresh_metrics["submissions"]["requests"]
+        + refresh_metrics["positive_control_supplement"]["requests"]
     )
-    network = {
-        "actual_http_requests": endpoint_request_count,
-        "final_unique_urls": (int(official_metrics.get("actual_http_requests", 6))
-                               + int(filing_map_metrics.get("actual_http_requests", 10))
-                               + int(source_a_metrics.get("actual_http_requests", source_a_metrics.get("sec_http_requests", 19)))
-                               + int(source_b_metrics.get("actual_http_requests", source_b_metrics.get("sec_http_requests", 19)))
-                               + int(source_c_metrics.get("sec_http_requests", 23))
-                               + int(source_d_metrics.get("unique_sec_urls", len(d_unique_urls)))),
-        "final_unique_url_http_status_counts": {"200": (int(official_metrics.get("actual_http_requests", 6))
-                               + int(filing_map_metrics.get("actual_http_requests", 10))
-                               + int(source_a_metrics.get("actual_http_requests", source_a_metrics.get("sec_http_requests", 19)))
-                               + int(source_b_metrics.get("actual_http_requests", source_b_metrics.get("sec_http_requests", 19)))
-                               + int(source_c_metrics.get("sec_http_requests", 23))
-                               + int(source_d_metrics.get("unique_sec_urls", len(d_unique_urls))))},
-        "final_permission_or_rate_limit_errors": 0,
-        "intermediate_retry_statuses_persisted": False,
-        "intermediate_retry_attempts": int(source_d_metrics.get("intermediate_retry_attempts", source_d_metrics.get("retries", 0))),
-        "retries": int(source_d_metrics.get("intermediate_retry_attempts", source_d_metrics.get("retries", 0))),
-        "rate_limit_requests_per_second": 4.0,
-        "user_agent": "SecClient uses SEC_USER_AGENT when set, otherwise SEC_DEFAULT_USER_AGENT; value omitted from report",
-        "source_requests": {"official_docs": int(official_metrics.get("actual_http_requests", 6)),
-                             "submissions": int(filing_map_metrics.get("actual_http_requests", 10)),
-                             "source_a_unique_zip_downloads": int(source_a_metrics.get("actual_http_requests", 19)),
-                             "source_b_unique_zip_downloads": int(source_b_metrics.get("actual_http_requests", 19)),
-                             "source_c_original_filings": int(source_c_metrics.get("sec_http_requests", 23)),
-                             "source_d_unique_index_and_document_urls": int(source_d_metrics.get("unique_sec_urls", len(d_unique_urls))),
-                             "source_d_retry_attempts": int(source_d_metrics.get("intermediate_retry_attempts", source_d_metrics.get("retries", 0)))},
-        "wire_bytes": {
-            "official_docs": official_wire_bytes,
-            "submissions": filing_map_wire_bytes,
-            "source_a_zip_archives": sum(z.get("wire_bytes", 0) for z in a["zips"].values()),
-            "source_b_zip_archives": sum(z.get("wire_bytes", 0) for z in b["zips"].values()),
-            "source_c_original_filings": c_initial["metrics"]["wire_bytes_received"],
-            "source_d_indexes_and_documents": int(source_d_metrics.get("wire_bytes_received", d_wire_bytes)),
+    refresh_wire_bytes = (
+        refresh_metrics["source_a_fsds"]["recorded_wire_byte_delta_from_prior_poc"]
+        + refresh_metrics["source_b_notes"]["recorded_wire_byte_delta_from_prior_poc"]
+        + refresh_metrics["source_c_10k"]["wire_bytes"]
+        + refresh_metrics["source_d_8k"]["wire_bytes"]
+        + refresh_metrics["submissions"]["wire_bytes"]
+        + refresh_metrics["positive_control_supplement"]["wire_bytes"]
+    )
+    net = {
+        "rate_limit_requests_per_second": 4,
+        "previous_poc_artifact_snapshot": "229ca59f0 (pre-refreeze SEC POC artifacts)",
+        "refresh_delta_since_previous_poc_artifacts": {
+            "requests": refresh_requests,
+            "wire_bytes": refresh_wire_bytes,
+            "by_source": refresh_metrics,
+            "note": "Source A/B are cumulative artifact-counter deltas versus the previous POC snapshot; C/D, submissions, and the PZG supplement are the recorded acquisition-stage counters. Do not add their cumulative metrics fields again. The current report/render invocation is offline.",
         },
-        "decoded_bytes": {
-            "official_docs": official_metrics.get("decoded_bytes_received"),
-            "submissions": filing_map_metrics.get("decoded_bytes_received"),
-            "source_a_zip_archives": source_a_metrics.get("decoded_bytes_received"),
-            "source_b_zip_archives": source_b_metrics.get("decoded_bytes_received"),
-            "source_c_original_filings": source_c_metrics.get("decoded_bytes_received"),
-            "source_d_indexes_and_documents": source_d_metrics.get(
-                "final_unique_url_decoded_bytes", source_d_metrics.get("decoded_bytes_received")
-            ),
+        "current_sample_unique_archive_payload_bytes": {
+            "source_a_fsds": refresh_metrics["source_a_fsds"]["current_sample_unique_zip_payload_bytes"],
+            "source_b_notes": refresh_metrics["source_b_notes"]["current_sample_unique_zip_payload_bytes"],
+            "note": "Sum of the 16 unique quarterly ZIP payload sizes referenced by the frozen sample, including reused responses; not bytes downloaded during this refresh.",
         },
-        "total_wire_bytes": official_wire_bytes + filing_map_wire_bytes
-            + sum(z.get("wire_bytes", 0) for z in a["zips"].values())
-            + sum(z.get("wire_bytes", 0) for z in b["zips"].values())
-            + c_initial["metrics"]["wire_bytes_received"]
-            + int(source_d_metrics.get("wire_bytes_received", d_wire_bytes)),
-        "distinct_url_wire_bytes": official_wire_bytes + filing_map_wire_bytes
-            + sum(z.get("wire_bytes", 0) for z in a["zips"].values())
-            + sum(z.get("wire_bytes", 0) for z in b["zips"].values())
-            + c_initial["metrics"]["wire_bytes_received"] + d_wire_bytes,
-        "observed_wall_clock_window": ["2026-10-18T10:04:51Z", "2026-10-18T11:18:43Z"],
-        "elapsed_seconds": 4432,
-        "zip_archives_not_committed": True,
+        "legacy_initial_run_reported_counters": {
+            "requests": 406,
+            "reported_total_bytes": 11190612664,
+            "note": "Previous report total is preserved for traceability only. Its byte total includes a cached Notes ZIP's payload size and is not an exact actual-wire-byte baseline; it is not added to the refresh delta.",
+        },
+        "source_metrics": {
+            "official_docs": official.get("end_to_end_metrics", {}),
+            "submissions_end_to_end": filing_map.get("end_to_end_metrics", filing_map.get("metrics", {})),
+            "submissions_current_replay": filing_map.get("metrics", {}),
+            "source_a_fsds": a.get("metrics", {}), "source_b_notes": b.get("metrics", {}),
+            "source_c_10k": c.get("metrics", {}), "source_d_8k": d.get("metrics", {}),
+            "positive_control_supplement": supplement.get("metrics", {}),
+        },
+        "observed_collection_window": {"sample_frozen_at": sample.get("frozen_at"),
+                                       "last_sec_source_response": supplement.get("retrieved_at"),
+                                       "elapsed_after_freeze_seconds": 1260,
+                                       "elapsed_note": "約 21 分鐘至最後一筆 SEC source artifact；包括快取重用和解析，不含後續 report/test。"},
+        "responses_note": "主來源 artifact 的實際 SEC HTTP request/byte 數分開呈現；快取讀取不重複計為網路請求。沒有提交 SEC 原始 ZIP。",
     }
-    outcomes = {
-        "total_periods": len(rows), "missing_q4_eps_periods": len(missing_rows),
-        "verified_direct_missing_periods": sum(x["classification"] == "A" for x in missing_rows),
-        "missing_period_classifications": dict(sorted(missing_counts.items())),
-        "all_sample_classifications": dict(sorted(counts.items())),
-        "success_rate_within_frozen_missing_periods": 6 / 16,
-        "direct_disclosure_case_keys": ["ASTC:2014-06-30", "FGC:2016-12-31", "OFG:2017-12-31", "OFG:2020-12-31", "FGC:2022-12-31", "WRAP:2022-12-31"],
-    }
-    payload = {
-        "version": 1,
-        "sample_id": sample["sample_id"],
-        "sample_freeze_sha256": sample["freeze_sha256"],
-        "retrieved_at": "2026-10-18",
+    return {
+        "version": 2, "sample_id": sample["sample_id"], "sample_freeze_sha256": sample["freeze_sha256"],
+        "source_commit": sample["source_commit"], "classification_source": sample["input_audit"]["classification_path"],
+        "classification_sha256": sample["input_audit"]["classification_sha256"],
+        "retrieved_at": max(x.get("retrieved_at", "") for x in (a, b, c, d, filing_map, supplement)),
         "classification_legend": {
-            "A": "Verified direct Q4 EPS", "B": "Candidate needing verification",
-            "C": "Derived-only or annual/quarter-input evidence; no accepted direct Q4 EPS",
-            "D": "No direct disclosure and no usable derived evidence found in the completed search",
-            "E": "Technical failure or an incomplete/unmatched frozen period",
+            "A": "Verified direct Q4 EPS: SEC 原始文件有明確單季 GAAP diluted 數值。",
+            "B": "Candidate: 有候選數值，但股類、符號、GAAP、期間、版本或拆股仍有疑義。",
+            "C": "Derived/annual evidence only: 有年度或部分季度 EPS 線索，不以推算值填欄位。",
+            "D": "Completed SEC search found no direct Q4 EPS and no usable annual/quarterly evidence.",
+            "E": "Technical failure or incomplete period mapping; never treated as no disclosure.",
         },
-        "period_results": rows,
-        "verified_disclosures": list(VERIFIED.values()),
-        "out_of_sample_diagnostics_excluded_from_success_count": OUT_OF_SAMPLE,
-        "source_success_summary": source_summary,
-        "network_and_volume": network,
-        "outcomes": outcomes,
-        "positive_control_audit": {
-            "historical_grade_a_rows_auditable": False,
-            "reason": "The requested q4-eps-acceptance-ledger.json, q4-eps-missing-classification.json, and atlas/scripts/classify_q4_eps_missing.py are absent from main.",
-            "selected_tickers_are_candidates_only": ["NMTC", "TDW"],
-            "out_of_sample_tdws": OUT_OF_SAMPLE,
+        "period_results": periods,
+        "verified_disclosures": [dict(ticker=t, fy=y, **v) for (t, y), v in DISCLOSURES.items()],
+        "source_success_summary": sources,
+        "network_and_volume": net,
+        "outcomes": {
+            "total_periods": len(periods), "missing_q4_eps_periods": len(missing),
+            "verified_direct_missing_periods": len(current_direct),
+            "missing_period_classifications": dict(sorted(counts.items())),
+            "current_sample_direct_case_keys": current_direct,
+            "current_success_rate_within_frozen_missing_periods": f"{len(current_direct)}/{len(missing)}",
+            "prior_version_direct_case_count": 6,
+            "prior_version_note": "舊樣本的 6/16 不適用於 main 分類檔重新凍結後的樣本；OFG 兩期退出，新增 ULBI、PCSA 期別。",
+            "extrapolation_warning": "本次樣本依缺漏類別分層且只含 16 個缺漏期別；不能外推至全市場 7,755 筆。",
         },
-        "known_input_limits": sample["input_audit"],
-        "technical_diagnostics": {
-            "source_c_first_parser_pass": "21 parser errors from lxml comment nodes; fixed non-string tag handling and re-parsed the same 23 cached filings successfully.",
-            "source_d_first_selector_pass": "The SEC directory marked some HTML exhibits as generic text.gif and used generic exhibit names. After a broad audit, filename plus primary-body-link selection recovered six omitted documents, including the WRAP FY2022 earnings release. The full 102-filing set contains 225 documents: 161 HTML parsed and 64 binary images OCR reviewed.",
-            "source_d_ocr_status_counts": dict(Counter(item.get("ocr_status") for item in d_ocr)),
-            "source_d_ocr_character_count": sum(len(item.get("ocr_text", "")) for item in d_ocr),
-            "source_d_missed_candidates_corrected": ["FGC:2022-12-31 (per fully diluted share phrase was not initially selected)", "WRAP:2022-12-31 (generic linked EX-99.1 filename)"] ,
-            "source_c_final_status_counts": dict(Counter(x.get("parse_status") for x in cmap.values())),
-            "source_d_final_index_status_counts": dict(Counter(str(x.get("index_http_status")) for x in d["filings"].values())),
-            "source_d_final_document_status_counts": dict(Counter(str(doc.get("http_status")) for x in d["filings"].values() for doc in x.get("documents", []))),
-            "source_c_initial_metrics": c_initial["metrics"],
-            "source_d_end_to_end_metrics": source_d_metrics,
-            "source_d_initial_selector_diagnostic": {
-                "candidate_filings": d_initial["candidate_filing_count"],
-                "indexes_retrieved_before_fix": d_initial["index_files_retrieved"],
-                "index_status_counts": d_initial["index_http_status_counts"],
+        "positive_control_audit": controls_audit(sample),
+        "fiscal_period_mismatches": {
+            "confirmed_count": sum(x["status"] == "confirmed_mismatch" for x in mismatches),
+            "unmatched_count": sum(x["status"] != "confirmed_mismatch" for x in mismatches),
+            "rows": mismatches,
+            "note": "這些 rows 僅列入診斷；本 PR 不修改 docs/report/financials。TDW local FY2017 Q4 end 2017-03-31 對應舊 3 月財年；公司另有 Nine Month Transition Period Ended 2017-12-31，完整曆年比較自 FY2018 起。本清單 confirmed_mismatch 自 FY2018 起，並另列 FY2017 transition-period gap。",
+            "tdw_transition_period": {
+                "local_fy2017_q4_end": "2017-03-31",
+                "sec_transition_period_end": "2017-12-31",
+                "sec_period_label": "Nine Month Transition Period Ended December 31, 2017",
+                "evidence_accession": "0001564590-20-008191",
+                "evidence_filing_date": "2020-03-02",
+                "evidence_note": "The TDW 2019 10-K comparative quarterly table includes the 2017 nine-month transition period; there is no local Q4 row at 2017-12-31.",
             },
         },
+        "sample_refreeze": {
+            "removed_tickers": ["DUKR", "OFG", "NMTC", "TDW"],
+            "added_tickers": ["PCSA", "ULBI", "PZG", "PTN"],
+            "retained_unchanged_period_count": 12,
+            "changed_main_reasons": [
+                "OFG FY2017/FY2020 are derivation_rejected on main, not q1_q3_incomplete.",
+                "DUKR FY2021 is derivation_rejected on main.",
+            ],
+            "prior_membership_audit": old_audit,
+        },
         "verdict": "PARTIAL",
-        "verdict_basis": "Six direct EPS values were found among 16 frozen missing periods. The small, stratified sample is not representative; four frozen period mappings are invalid, and historical Grade A controls cannot be independently audited.",
-        "sol_xhigh_review": "completed; reviewer found no blocking findings and recommended PARTIAL; the overlapping-count clarification is included",
+        "verdict_basis": f"Main classifier refreeze yields {len(current_direct)}/16 verified direct missing-period values. SEC 8-K/EX-99.1 adds five unique values. Two frozen periods are incomplete/mismatched; one ULBI candidate and one Grade A control have unresolved issues. This is a small stratified sample and cannot be extrapolated to the 7,755 missing rows.",
+        "sol_xhigh_review": "PARTIAL，無阻擋事項。Sol 6.1 XHigh 唯讀審查核對了樣本凍結與分類、ledger 對照、來源分母與網路統計、TDW transition 期間證據，以及 POC-only diff 範圍。",
     }
-    return payload, source_summary, official, a, b, c, d, fmap, c_initial, d_initial, d_ocr
 
 
-def ledger_lines(official, a, b, c, d, fmap, d_ocr):
+def table_cell(value):
+    return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def source_cell(row, key):
+    s = row[key]
+    if key in {"source_a_fsds", "source_b_notes"}:
+        return f"{s['status']}<br>{s['parse_status']} {','.join(s['calendar_quarters']) if s.get('calendar_quarters') else ''}"
+    if key == "source_c_10k":
+        return f"{s['status']}<br>{', '.join(x['accession'] for x in s['filings']) or '無配對申報'}"
+    filings = s.get("filings", [])
+    return f"{s['status']}<br>{len(filings)} windows / {sum(len(x['documents']) for x in filings)} docs"
+
+
+def make_report(results, sample):
+    lines = [
+        "# SEC Q4 Diluted EPS 免費資料來源 POC", "",
+        "本報告使用 main 的分類檔重新凍結樣本，並重用未改期別的 SEC 回應。先列 10 檔股票與 20 個測試期別。", "",
+        "| Ticker | FY/Q4 | 原本缺漏原因 | SEC ZIP | SEC Notes | 10-K | 8-K | 最終結果 | EPS |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    rows_by_ticker = {}
+    for r in results["period_results"]:
+        rows_by_ticker.setdefault(r["ticker"], []).append(r)
+    for company in sample["sample"]:
+        items = rows_by_ticker[company["ticker"]]
+        reasons = company.get("missing_reason") or "main Grade A positive control"
+        period_text = "<br>".join(f"FY{x['fiscal_year']} {x['frozen_q4_end']}" for x in items)
+        a = "<br>".join(source_cell(x, "source_a_fsds") for x in items)
+        b = "<br>".join(source_cell(x, "source_b_notes") for x in items)
+        c = "<br>".join(source_cell(x, "source_c_10k") for x in items)
+        d = "<br>".join(source_cell(x, "source_d_8k") for x in items)
+        result = "<br>".join(f"FY{x['fiscal_year']}: {x['classification']} — {x['result']}" for x in items)
+        def eps_text(x):
+            if x["verified_q4_eps"] is not None:
+                return str(x["verified_q4_eps"])
+            candidate = x.get("unverified_candidate")
+            return f"— (候選 {candidate['value']:+.2f}，未通過驗證)" if candidate else "—"
+        eps = "<br>".join(f"{x['frozen_q4_end']}: {eps_text(x)}" for x in items)
+        lines.append("| " + " | ".join(map(table_cell, [
+            f"{company['ticker']} — {company['company_name']}<br>CIK {company['cik']}", period_text,
+            reasons, a, b, c, d, result, eps,
+        ])) + " |")
+
+    out = results["outcomes"]
+    lines += [
+        "", "## 樣本凍結與主要結果", "",
+        f"- Source commit：`{sample['source_commit']}`；seed：`{sample['selection_seed']}`；分類來源：`{sample['input_audit']['classification_path']}`。樣本 SHA-256：`{sample['freeze_sha256']}`。",
+        f"- Main 分類總缺漏為 {sample['input_audit']['us_financials_missing_q4_eps']} 筆；本次固定抽樣 8 檔缺漏股、16 個期別，另 2 檔 Grade A 對照、4 個期別。分層小樣本不可外推至全市場 7,755 筆。",
+        "- 重新凍結後，缺漏期別找到 **5/16** 筆直接 Q4 EPS。舊版 **6/16** 是不同樣本的結果：OFG FY2017/FY2020 在 main 分類為 `derivation_rejected` 且不再入樣，PCSA/ULBI 取代舊樣本；本報告不沿用舊分子。無論舊或新比例，都不能外推到 7,755 筆。",
+        "- 分類：" + ", ".join(f"{k}={v}" for k, v in sorted(out["missing_period_classifications"].items())) + "。C 是僅年度/部分季度證據；B 是候選未通過驗證；E 是日期/身份映射不完整。沒有以年度 EPS 減前三季 EPS 補值。",
+        "- 樣本變動：移除 DUKR、OFG、NMTC、TDW；新增 PCSA、ULBI、PZG、PTN。保留的六家公司中 12 個原期別未變；來源回應得以按 accession 重用。OFG FY2017/FY2020 與 DUKR FY2021 均依 main 更新分類。", "",
+        "## Verified Direct Q4 EPS", "",
+        "以下每筆均是 SEC 原始申報內直接披露的單季值；未用年度減前三季推算。", "",
+        "| 股票 / FY | SEC 原始來源 / Accession / 申報日 | Fiscal Quarter / End Date | EPS | 原始標籤與位置 | GAAP / Diluted 判定 | 拆股基準 / 資料庫一致性 |",
+        "|---|---|---|---:|---|---|---|",
+    ]
+    for item in results["verified_disclosures"]:
+        lines.append("| " + " | ".join(map(table_cell, [
+            f"{item['ticker']} FY{item['fy']}",
+            f"[{item['source']}]({item['url']})<br>`{item['accession']}`; filed {item['filing_date']}",
+            f"FY{item['fy']} Q4 ended {item['q4_end']}", item["eps"],
+            f"{item['raw_tag'] or '無 XBRL tag；原始 HTML/表格'} — {item['location']}",
+            item["gaap_diluted_basis"], f"{item['split_basis']} {item['database_match']}",
+        ])) + " |")
+
+    lines += [
+        "", "## 來源成功率", "",
+        "每個來源預定查 20 個樣本期別（16 個缺漏期別及 4 個 Grade A 對照）；PCSA FY2012 因目前 CIK 沒有可連結的申報 accession，故每個來源均有 1 個未完成目標、19 個完成檢查期別。此 E 不算成找不到資料或來源失敗。候選數含對照期別；唯一貢獻欄只計 16 個缺漏期別，不把對照當成新補值或重複計算。", "",
+        "| 來源 | 預定目標 | 完成檢查 | 未完成 | 找到候選 | Verified Direct | 不可驗證 | 來源失敗 | 單一來源新增唯一值 | 累積唯一期別 |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for x in results["source_success_summary"]:
+        lines.append(f"| {x['source']} | {x['planned_targets']} | {x['completed_periods']} | {x['incomplete_periods']} | {x['found_candidate']} | {x['verified_direct']} | {x['unverifiable']} | {x['failure']} | {x['single_source_unique_missing']} | {x['cumulative_unique_missing']} |")
+    lines += [
+        "", "- Source A/B/C 的候選主要落在陽性對照；Notes 與原始 10-K 各提供 3 筆可與 main 對照值相符的 direct control facts。PZG FY2016 的 +0.32 與 main -0.32 衝突，列為不可驗證。這些 control 值不計為缺漏資料回補。",
+        "- Source D 在缺漏樣本找到 5 筆 Verified Direct，另 ULBI FY2014 只有未標示 basic/diluted 的 +0.05 候選；PCSA FY2012 身份/歷史申報窗口不完整，列 E。Source D 是本次對缺漏列最有效來源。", "",
+        "## Positive control / main ledger 稽核", "",
+        "Main 現有 classifier 與 acceptance ledger 已可用。PZG、PTN 四個選中期別均由 main `epsQuality=A` 和該列 SEC Q4 fact 核對；其中 3/4 個 SEC as-filed 值一致，PZG FY2016 保留 unresolved sign conflict。PTN splitFactor=0.0008，as-filed +0.06/+0.23 調整後為目前資料 +75/+287.5；不混用拆股前後基準。", "",
+        "NMTC 與 TDW 不在 main missing-classification 清單。main financial rows 中有 EPS 值，但沒有 row-level `epsQuality=A` / `secQ4EpsFacts` 可作為 Grade A 證據；ledger 對這四列沒有 blocked、overridden 或 deferred 記錄。ledger 的 `verifiedA=5009` 是總數，沒有 per-row accepted-A 清單，因此不能只由 aggregate 認定 NMTC/TDW 是 Grade A；它們不是本次陽性對照。", "",
+        "| 舊控制候選 | FY / 本地 Q4 end | 本地 EPS | 在 main missing list | row-level Grade A fact | ledger blocked / overridden / deferred |",
+        "|---|---|---:|---|---|---|",
+        "| NMTC | FY2017 / 2017-12-31 | -0.21 | 否 | 無 | 無 / 無 / 無；ledger 只有 aggregate verifiedA=5009 |",
+        "| NMTC | FY2019 / 2019-12-31 | -0.34 | 否 | 無 | 無 / 無 / 無；ledger 只有 aggregate verifiedA=5009 |",
+        "| TDW | FY2018 / 2018-03-31 | -1.67 | 否 | 無 | 無 / 無 / 無；ledger 只有 aggregate verifiedA=5009 |",
+        "| TDW | FY2019 / 2019-03-31 | -0.58 | 否 | 無 | 無 / 無 / 無；ledger 只有 aggregate verifiedA=5009 |", "",
+        "## Fiscal period mismatch（另案處理）", "",
+        "以下比對 main 本地 Q4 row end 與 SEC 同 FY 10-K report end。這是期間映射診斷，本 PR 不修改 financials。TDW 本地仍把 2017–2026 年 3 月季度標為 Q4；FY2017-03-31 對應舊 3 月財年，但公司隨後改為 12 月結帳，並有截至 2017-12-31 的九個月 transition period。可比完整曆年年報自 FY2018 起，故下表確認 end-date mismatch 自 FY2018，另將 FY2017 transition gap 列在下方。", "",
+        "| 股票 | FY / Local FQ | 本地 Q4 end | SEC 10-K report end | Accession / Filing Date | 狀態 |",
+        "|---|---|---|---|---|---|",
+    ]
+    for r in results["fiscal_period_mismatches"]["rows"]:
+        evidence = f"`{r['accession']}` / {r['filing_date']}" if r.get("accession") else "—"
+        lines.append(f"| {r['ticker']} | FY{r['fy']} / Q{r['local_fq']} | {r['local_q4_end']} | {r.get('sec_report_end') or '無同 FY 年報列'} | {evidence} | {r['status']} |")
+    lines += [
+        "", f"TDW transition-period gap：本地 FY2017 Q4 為 2017-03-31；SEC 2019 10-K 的比較季度表明列 ‘Nine Month Transition Period Ended December 31, 2017’（[accession 0001564590-20-008191](https://www.sec.gov/Archives/edgar/data/98222/000156459020008191/tdw-10k_20191231.htm)）。本地沒有 2017-12-31 的 Q4 row，這項過渡期間缺口與上表的 16 個同 FY confirmed mismatch 分開記錄。",
+        "", f"確認期末不一致 {results['fiscal_period_mismatches']['confirmed_count']} 列；另 {results['fiscal_period_mismatches']['unmatched_count']} 列需要對應或等待同 FY 年報。所有 listed rows 留待獨立 financial-period 修正 PR。", "",
+        "## 未解決原因", "",
+        "| 原因 | 期別 | 說明 |", "|---|---|---|",
+        "| SEC 搜尋範圍未找到可直接採用的 Q4 EPS | 8 | 缺漏樣本中 8 個 C 期別；只代表本次明確 10-K/8-K 範圍未找到，並非宣稱 SEC 從未披露。 |",
+        "| 只有年度或部分季度 EPS | 8 | 同上 C 類；可支援資料線索但不構成 Q4 直接值。 |",
+        "| 原始申報沒有可用 Q4 EPS 表 | 8 | 八個 C 期別只有年度/部分季度資料，或 Q4 表是股價資訊；沒有可用的直接 Q4 diluted EPS 列。這是搜尋範圍內的結果，不等於 SEC 歷史上從未披露。 |",
+        "| 有候選但 basic/diluted 或符號無法排除 | 2 | ULBI FY2014 未標示 basic/diluted；PZG FY2016 Notes/表格 +0.32 與 main Grade A -0.32 衝突。 |",
+        "| 公司/歷史 CIK 對應不完整 | 1 | PCSA FY2012 沒有可連至目前 CIK 的 SEC filing accession；E，非 D。 |",
+        "| 期間日期不匹配 | 1 frozen target + 16 fiscal rows | BNC FY2024 的凍結期末與年報期末不同；另見上方獨立 mismatch 列表。 |",
+        "| 解析器 / OCR 技術失敗 | 0 final unresolved | 本次 10-K HTML 已解析，8-K 的影像附件均有 HTTP 200，OCR sidecar hash 對應且完成；兩個 initial diagnostics 已清除。 |",
+        "| 最終網路 / 權限失敗 | 0 | 最終 artifact 記錄的 SEC 回應為 HTTP 200；PCSA FY2012 是歷史 mapping 範圍不完整，不是 403/429 或網路失敗。 |", "",
+        "## 執行量與重現", "",
+        f"- SEC 節流上限 4 requests/second。Source A/B 各有 {results['network_and_volume']['current_sample_unique_archive_payload_bytes']['source_a_fsds']:,}/{results['network_and_volume']['current_sample_unique_archive_payload_bytes']['source_b_notes']:,} bytes 的 16 個樣本 ZIP 引用資料；這是含重用回應的獨立 ZIP payload 大小，不代表本次下載量。大型原始 ZIP 僅暫存，未納入 Git。",
+        f"- 從前一版 POC artifact 到重凍結資料，按可對照的來源計數器記錄 {results['network_and_volume']['refresh_delta_since_previous_poc_artifacts']['requests']} 次新增 SEC request、{results['network_and_volume']['refresh_delta_since_previous_poc_artifacts']['wire_bytes']:,} wire bytes；來源細項見 `results.json`。Source A/B 的 request/bytes 是舊版與新版 artifact 累積計數差；其 last-invocation 欄位另列，不能與累積差再相加。前一版曾報 406 requests 及 11,190,612,664 bytes；其 bytes 含一個 Notes ZIP 的快取 payload，因此不作為精確線上傳輸基準，也未與本次增量合計。",
+        "- 官方端點文件在首次測試取得；本次報告重建不發 SEC request。Source A/B 的 ZIP 及 accession 可重用；Source C/D 只查樣本相關申報。SEC 回應遵守 4 requests/second 上限，使用 User-Agent、快取與退避；未呼叫 Massive API、未使用付費資料或爬蟲，也未輸出任何 API key。",
+        "- SEC 收集約在樣本凍結後 21 分鐘完成（不含後續 report/test）。各來源 request、bytes、cache hit、HTTP status 和 parse status 在 `results.json` / `source-ledger.jsonl` 保存。",
+        "- 重建報告：`python scripts/render_sec_q4_eps_poc_report.py`。POC 測試：`python -m unittest discover -s tests -p 'test_sec_q4_eps_poc.py' -v`。完整 Python 測試：`python -m unittest discover -s tests -v`；Atlas 測試：`cd atlas && npm test`。", "",
+        "## 可行性結論", "",
+        "1. **重新凍結的 16 個缺漏期別中，找到 5 筆** Verified Direct Q4 Diluted EPS。先前 6/16 的樣本已因 main 分類更新而改變；此分層小樣本不能外推到 7,755 筆。",
+        "2. **原始 SEC 8-K / EX-99.1 最有效**：新增 5 個唯一缺漏期別；資料集和 10-K 對現有控制較有利，但未增加缺漏列的 Verified Direct 值。",
+        "3. 瓶頸同時來自直接揭露不足和解析/分類能力：8-K 的五筆直接值證明部分數值存在於原始公告；但另外 8 個缺漏期別只見年度/部分季度線索，1 個有 basic/diluted 不明候選，另有 2 個 period/歷史 CIK mapping 不完整。不能把後者全部歸因於 SEC 未公布或 parser 不足。",
+        "4. **值得做 50–100 檔下一階段測試**，但先用 SEC 10-K report date 矯正 FY/Q4 對應、解決 PZG control 符號差異，並保留對來源窗口與公司歷史 CIK 的檢查。10 檔樣本是按缺漏理由分層後選出，沒有代表性抽樣設計，不可把 5/16 或舊 6/16 外推到 7,755 筆。", "",
+        "**Verdict: PARTIAL** — 五筆直接值完成來源驗證；一筆候選與一筆 control 仍有疑義；PCSA FY2012 與 BNC FY2024 期別搜尋不完整/不匹配，另有獨立 local fiscal-period 對應問題。", "",
+        f"Sol XHigh 審核：{results['sol_xhigh_review']}", "",
+        "## 證據檔案", "",
+        "- `sample.json`：main classification / ledger 輸入、固定 seed、抽樣條件、frozen hash。",
+        "- `results.json`：逐期 adjudication、來源狀態、control audit、期間 mismatch 與 network metrics。",
+        "- `source-ledger.jsonl`：來源 URL、accession、HTTP、bytes、hash、ZIP parsing、OCR hash 與 adjudication。",
+        "- `official-docs.json`、`filing-map.json`、`source-a.json`、`source-b.json`、`source-c.json`、`source-d.json`、`source-d-ocr.json`：SEC 原始來源索引/解析 metadata；大型 ZIP 未提交。",
+        "- `positive-control-pzg-2017-source.json`：PZG 後續 10-K 比較來源，未能消除 FY2016 的 EPS 符號衝突。",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def build_ledger(results, sample, sources):
     lines = []
-    ocr_by_url = {item.get("url"): item for item in d_ocr}
-
-    def add(item):
-        lines.append(json.dumps(item, ensure_ascii=False, separators=(",", ":")))
-
-    for doc_id, doc in official.get("docs", {}).items():
-        add({"record_type": "official_documentation", "source_id": doc_id,
-             "url": doc.get("url"), "http_status": doc.get("actual_http_status", doc.get("status")),
-             "retrieved_at": doc.get("retrieved_at"), "bytes": doc.get("wire_bytes", doc.get("bytes")),
-             "sha256": doc.get("sha256"), "lock_interstitial": doc.get("lock_interstitial", False)})
-    for issuer in fmap.get("issuers", []):
-        add({"record_type": "sec_submissions", "tickers": issuer.get("tickers"), "cik": issuer.get("cik"),
-             "url": issuer.get("url"), "http_status": issuer.get("actual_http_status", issuer.get("http_status")),
-             "retrieved_at": issuer.get("retrieved_at"), "response_bytes": issuer.get("response_bytes"),
-             "wire_bytes": issuer.get("wire_bytes"),
-             "error": issuer.get("error"), "filing_count_in_recent_submissions": len(issuer.get("filings", []))})
-    for source_id, source in (("A_FSDS", a), ("B_NOTES", b)):
+    def add(value):
+        lines.append(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+    for path, data in [("official-docs.json", read_json("official-docs.json")),
+                       ("filing-map.json", read_json("filing-map.json"))]:
+        if path == "official-docs.json":
+            for name, item in data.get("docs", {}).items():
+                add({"record_type": "official_documentation", "source_id": name, "url": item.get("url"),
+                     "http_status": item.get("actual_http_status", item.get("status")),
+                     "retrieved_at": item.get("retrieved_at"), "bytes": item.get("wire_bytes", item.get("bytes")),
+                     "sha256": item.get("sha256")})
+        else:
+            for issuer in data.get("issuers", []):
+                add({"record_type": "sec_submissions", "tickers": issuer.get("tickers"), "cik": issuer.get("cik"),
+                     "url": issuer.get("url"), "http_status": issuer.get("http_status"),
+                     "retrieved_at": issuer.get("retrieved_at"), "response_bytes": issuer.get("response_bytes"),
+                     "cache_hit": issuer.get("cache_hit"), "error": issuer.get("error")})
+    for source_id, source in (("A_FSDS", read_json("source-a.json")), ("B_NOTES", read_json("source-b.json"))):
         for quarter, item in source.get("zips", {}).items():
             add({"record_type": "dataset_zip", "source_id": source_id, "filing_calendar_quarter": quarter,
-                 "url": item.get("url"), "http_status": item.get("http_status"),
-                 "retrieved_at": item.get("retrieved_at"), "zip_bytes": item.get("wire_bytes"),
-                 "sha256": item.get("sha256"), "parse_status": item.get("parse_status"),
-                 "members": item.get("members"), "row_counts": item.get("row_counts"),
-                 "target_accessions": item.get("target_accessions", [])})
-        for accession, item in source_records(source).items():
+                 "url": item.get("url"), "http_status": item.get("http_status"), "retrieved_at": item.get("retrieved_at"),
+                 "zip_bytes": item.get("wire_bytes"), "sha256": item.get("sha256"),
+                 "parse_status": item.get("parse_status"), "members": item.get("members"),
+                 "row_counts": item.get("row_counts"), "target_accessions": item.get("target_accessions", [])})
+        for accession, item in all_records(source).items():
             meta = item.get("metadata", {})
             add({"record_type": "dataset_accession", "source_id": source_id, "accession": accession,
                  "ticker": meta.get("ticker"), "cik": meta.get("cik"), "form": meta.get("form"),
                  "filing_date": meta.get("filing_date"), "report_date": meta.get("report_date"),
                  "dataset_lookup_status": item.get("dataset_status"),
-                 "accession_in_SUB": item.get("accession_matches_metadata"),
-                 "candidate_count": len(item.get("eps_candidates", [])),
+                 "eps_candidate_count": len(item.get("eps_candidates", [])),
                  "note_text_candidate_count": len(item.get("note_text_candidates", []))})
-    for accession, item in source_records(c).items():
+    c = read_json("source-c.json")
+    for accession, item in all_records(c).items():
         meta = item.get("metadata", {})
-        add({"record_type": "sec_10k", "accession": accession, "ticker": meta.get("ticker"),
-             "cik": meta.get("cik"), "fy": meta.get("fy"), "form": meta.get("form"),
-             "filing_date": meta.get("filing_date"), "report_date": meta.get("report_date"),
-             "url": item.get("url"), "http_status": item.get("http_status"),
-             "parse_status": item.get("parse_status"), "bytes": item.get("wire_bytes"),
-             "sha256": item.get("sha256"), "error": item.get("error"),
-             "eps_fact_count": len(item.get("eps_facts", [])),
-             "eps_table_count": len(item.get("eps_tables", [])),
+        add({"record_type": "sec_10k", "accession": accession, "ticker": meta.get("ticker"), "cik": meta.get("cik"),
+             "fy": meta.get("fy"), "form": meta.get("form"), "filing_date": meta.get("filing_date"),
+             "report_date": meta.get("report_date"), "url": item.get("url"), "http_status": item.get("http_status"),
+             "parse_status": item.get("parse_status"), "bytes": item.get("wire_bytes"), "sha256": item.get("sha256"),
+             "eps_fact_count": len(item.get("eps_facts", [])), "eps_table_count": len(item.get("eps_tables", [])),
              "quarterly_section_excerpt_count": len(item.get("quarterly_section_excerpts", []))})
+    d, ocr = read_json("source-d.json"), read_json("source-d-ocr.json")
+    ocr_by_url = {x.get("url"): x for x in ocr}
     for accession, item in d.get("filings", {}).items():
         meta = item.get("metadata", {})
         add({"record_type": "sec_8k_index", "accession": accession, "tickers": meta.get("tickers"),
@@ -497,156 +696,42 @@ def ledger_lines(official, a, b, c, d, fmap, d_ocr):
              "bytes": item.get("index_wire_bytes"), "sha256": item.get("index_sha256"),
              "status": item.get("status"), "period_windows": meta.get("period_windows", [])})
         for doc in item.get("documents", []):
-            ocr = ocr_by_url.get(doc.get("url"), {})
+            o = ocr_by_url.get(doc.get("url"), {})
             add({"record_type": "sec_8k_document", "accession": accession, "name": doc.get("name"),
-                 "url": doc.get("url"), "description": doc.get("description"),
-                 "http_status": doc.get("http_status"), "parse_status": doc.get("parse_status"),
-                 "bytes": doc.get("wire_bytes"), "sha256": doc.get("sha256"), "error": doc.get("error"),
+                 "url": doc.get("url"), "description": doc.get("description"), "http_status": doc.get("http_status"),
+                 "parse_status": doc.get("parse_status"), "bytes": doc.get("wire_bytes"), "sha256": doc.get("sha256"),
                  "eps_fact_count": len(doc.get("eps_facts", [])), "eps_table_count": len(doc.get("eps_tables", [])),
-                 "ocr_status": ocr.get("ocr_status"),
-                 "ocr_sha256_verified": (ocr.get("sha256") == doc.get("sha256")) if ocr else None,
-                 "ocr_text_characters": len(ocr.get("ocr_text", "")) if ocr else None})
-    for (ticker, fy), case in VERIFIED.items():
-        add({"record_type": "adjudicated_verified_q4_eps", "ticker": ticker, "fy": fy,
-             "q4_end": case["q4_end"], "eps": case["eps"], "url": case["url"],
-             "accession": case["accession"], "filing_date": case["filing_date"],
-             "raw_tag": case["raw_tag"], "location": case["location"],
-             "corroborating_url": case.get("corroborating_url"),
-             "corroborating_accession": case.get("corroborating_accession")})
-    return "\n".join(lines) + "\n"
-
-
-def md_escape(value):
-    return str(value).replace("|", "\\|").replace("\n", " ")
-
-
-def make_report(results, sample, source_summary):
-    input_audit = sample["input_audit"]
-    lines = [
-        "# SEC Q4 Diluted EPS 免費資料來源 POC",
-        "",
-        "| Ticker | FY/Q4 | 原本缺漏原因 | SEC ZIP | SEC Notes | 10-K | 8-K | 最終結果 | EPS |",
-        "|---|---|---|---|---|---|---|---|---|",
-    ]
-    companies = {item["ticker"]: item for item in sample["sample"]}
-    for company in sample["sample"]:
-        ticker = company["ticker"]
-        items = [row for row in results["period_results"] if row["ticker"] == ticker]
-        ticker_text = f"{ticker} — {company['company_name']}<br>CIK {company['cik']}"
-        period_text = "<br>".join(f"FY{r['fiscal_year']} {r['frozen_q4_end']} ({r['classification']})" for r in items)
-        reason = company.get("missing_reason") or "陽性對照候選；歷史 Grade A 無法稽核"
-        zip_text = "<br>".join("A/B HTTP 200、ZIP 解析成功" for _ in items)
-        c_text = "<br>".join(
-            "HTTP 200、原始 filing parsed" if r["period_end_match"] else "HTTP 200、實際財年期末不同"
-            for r in items
-        )
-        d_text = "<br>".join(
-            f"8-K {len(r['source_d_8k_search']['matching_search_windows'])} filing windows; "
-            f"{sum(x['document_count'] for x in r['source_d_8k_search']['matching_search_windows'])} docs; "
-            f"{r['source_d_8k_search']['status']}"
-            for r in items
-        )
-        final = "<br>".join(f"{r['classification']} — {r['result']}" for r in items)
-        eps = "<br>".join(
-            f"{r['frozen_q4_end']}: {r['verified_q4_eps']:+.2f}" if r["verified_q4_eps"] is not None
-            else f"{r['frozen_q4_end']}: —" for r in items
-        )
-        lines.append("| " + " | ".join(map(md_escape, [ticker_text, period_text, reason, zip_text, zip_text, c_text, d_text, final, eps])) + " |")
-
-    lines += [
-        "",
-        "> 樣本固定為 10 檔、20 個 FY/Q4 期別；8 檔缺漏類別各兩檔，另有兩檔陽性對照候選。`A/B/C/D/E` 是此 POC 的 SEC 取樣結果分類，不會寫回專案正式 Grade A/B/C/D。陽性對照歷史 Grade A 身分無法由目前 main 驗證。",
-        "",
-        "## 已驗證直接披露",
-        "",
-        "| 股票 / FY | SEC 來源、Accession、申報日 | Fiscal Quarter / End Date | EPS | 原始標籤與位置 | GAAP / Diluted 判定 | 拆股基準與資料庫一致性 |",
-        "|---|---|---|---:|---|---|---|",
-    ]
-    for row in results["verified_disclosures"]:
-        key = (row["accession"], row["q4_end"])
-        period = next(x for x in results["period_results"]
-                      if x["classification"] == "A" and x["verified_source"]["accession"] == row["accession"])
-        label = f"{period['ticker']} FY{period['fiscal_year']}"
-        source_links = f"[{md_escape(row['source'])}]({row['url']})<br>`{row['accession']}`; filed {row['filing_date']}"
-        if row.get("corroborating_url"):
-            source_links += f"<br>[8-K EX-99.1]({row['corroborating_url']})<br>`{row['corroborating_accession']}`; filed {row['corroborating_filing_date']}"
-        lines.append("| " + " | ".join(map(md_escape, [
-            label, source_links, f"FY{period['fiscal_year']} Q4 ended {row['q4_end']}",
-            f"{row['eps']:+.2f}",
-            f"{row['raw_tag'] or '無 XBRL tag；原始 HTML/敘述'} — {row['location']}",
-            row["gaap_diluted_basis"], row["split_basis"] + " " + row["database_match"],
-        ])) + " |")
-
-    lines += [
-        "",
-        "## 來源成功率",
-        "",
-        "| 來源 | 測試期別 | 找到候選 | Verified Direct | 不可驗證 | 失敗 | 單一來源新增唯一值 | 累積唯一期別 |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
-    ]
-    for row in source_summary:
-        lines.append("| " + " | ".join(map(str, [row["source"], row["tested_periods"], row["found_candidate"], row["verified_direct"], row["unverifiable"], row["failure"], row["single_source_unique_verified"], row["cumulative_unique_verified"]])) + " |")
-    lines += [
-        "",
-        "候選期別在來源間重疊，不得相加為唯一值。FSDS 和 Notes 各找到 TDW 兩個 March 31 diluted EPS fact；對照 10-K 的 December 31 財年期末後，兩者證實是 Q1 而非 Q4。Source C 有 OFG FY2017 與 FY2020 兩筆直接披露；Source D 找到六筆直接披露，其中 OFG 兩筆與 10-K 重疊，並新增 ASTC FY2014、FGC FY2016、FGC FY2022、WRAP FY2022 四個唯一期別。Source D 另有兩個 TDW 候選仍因實際財政季度映射為 Q1 而不可驗證。",
-        "",
-        "## 尚未解決原因",
-        "",
-        "下列原因是不同的診斷面向，可能描述同一個期別，不可將列上的期別數相加作為總數。",
-        "",
-        "| 原因 | 期別數 | 說明 |",
-        "|---|---:|---|",
-        "| 搜尋的原始 SEC 範圍未找到可直接採用的 Q4 EPS（C） | 10 | 9 筆缺漏期別加 NMTC FY2017 對照候選。每期均有年度、部分季度或其他線索，但不足以接受 Q4 值；此結果不等同公司從未在其他歷史附件或場合公布。 |",
-        "| Frozen period 對不上 SEC fiscal year end（E） | 4 | 缺漏樣本 BNC FY2024 一筆；對照候選 NMTC FY2019、TDW FY2018/FY2019 三筆。均保留原樣，未替換。 |",
-        "| 原始 10-K / 8-K 沒有找到可用的 Q4 EPS 列 | 10 | 9 個缺漏 C 期別加 NMTC FY2017 對照候選；有些檔案包含第四季股價表，不能視為 EPS 表。沒有把「未在搜尋範圍找到」擴大成「SEC 絕未披露」。 |",
-        "| 有資料但最終 parser / OCR 無法讀取 | 0 | 161 個 HTML 文件已解析；64 個 image 附件的 OCR 均成功且 hash 對應。首輪 selector 漏掉 OFG/WRAP generic exhibits，窄 EPS 關鍵字漏掉 FGC 的 “per fully diluted share”；均已補搜並納入。 |",
-        "| 公司名稱 / ticker 或 CIK 對應未解決 | 0 | FGC 2016 舊名與 2022 的 FG Financial Group / FGF 報告使用相同 CIK 0001591890；ticker／名稱變更已記錄，未替換凍結樣本。 |",
-        "| GAAP / Non-GAAP、股類、拆股或申報版本仍有衝突 | 0 | 六筆直接值均有 GAAP 表格或明確 GAAP 語境、Diluted 標示及單季期間。FGC FY2022 的 2024/2026 reverse split 依原始申報基準保留，未套用調整。 |",
-        "| 網路 / 權限失敗 | 0 個最終 URL | 404 個最終唯一 SEC URL 均 HTTP 200；全程有 2 次 retry，但 retry 中間回應的 status 未留存，因此不能聲稱完全沒有 transient 403/429。沒有最終失敗、403 或 429。 |",
-        "| 陽性對照 Grade A 無法回溯稽核 | 4 | 指定 acceptance ledger / 原 classifier 都不在 main；兩個候選共四期只能驗證 SEC 搜尋結果，不能宣稱原 Grade A。 |",
-        "",
-        "## 執行與可重現性",
-        "",
-        f"- SEC 來源文件窗口：FSDS {len(read('source-a.json')['zips'])} 個 filing-calendar-quarter ZIP，Notes {len(read('source-b.json')['zips'])} 個 ZIP；從 `{min(read('source-a.json')['zips'])}` 到 `{max(read('source-a.json')['zips'])}`。SEC ZIP 是季度全市場封裝；逐檔順序下載/解析，程式只保留樣本 CIK/accession 的匹配列，沒有掃描其他歷史季度。ZIP 合計 {results['network_and_volume']['wire_bytes']['source_a_zip_archives'] + results['network_and_volume']['wire_bytes']['source_b_zip_archives']:,} bytes（約 11.17 GB）。",
-        f"- 10-K/10-K/A 原始文件 23 份；8-K/EX 附近窗口 102 個 accession、225 份文件（161 HTML parsed、64 image OCR）。共 {results['network_and_volume']['actual_http_requests']} 次 HTTP 請求，{results['network_and_volume']['final_unique_urls']} 個最終唯一 URL 均 HTTP 200；含重試 wire bytes {results['network_and_volume']['total_wire_bytes']:,}（約 {results['network_and_volume']['total_wire_bytes']/1_000_000_000:.2f} GB），另有 2 次 retry 的中間 status 未持久化。觀測時間窗 10:04:51–11:18:43 UTC（約 1 小時 13 分 52 秒，含分析與修正時間）；明確 User-Agent 值不寫入報告，速率上限 4 req/s，使用 Retry-After 與退避。",
-        "- 官方 SEC 說明頁回 HTTP 200 但回傳 lock interstitial；因此使用 SEC 官方 FSDS/Notes PDF 格式文件及可取得的官方頁面確認欄位。ZIP 及原始 SEC filing 不納入 repo；本 repo 留下 URL、accession、response status、bytes、SHA-256 與摘錄。",
-        "- 全程沒有呼叫 Massive API、沒有用爬蟲、沒有 API key，沒有修改正式 financials、production DB、TTM/P-E/growth 或 S3/S4 規則。",
-        "- 測試：`python -m unittest discover -s tests -p 'test_sec_q4_eps_poc.py' -v`。重建報告：`python scripts/render_sec_q4_eps_poc_report.py`。真實 SEC 取樣重跑命令與資料窗口見 [README.md](README.md)。",
-        "",
-        "## 可行性判斷與下一步",
-        "",
-        "1. 16 個凍結缺漏 FY/Q4 期別中，找到 6 筆直接披露 GAAP diluted EPS（37.5%）；9 筆仍無可接受的直接 Q4 EPS，BNC FY2024 一筆因 frozen end date 與 SEC 年報期末不符列 E。TDW FY2018/FY2019 真正 December Q4 的 -2.83/-1.52 是樣本外診斷，不算 frozen March 期別的成功。",
-        "2. Source D 8-K/EX-99.1 找到 6 筆 verified direct，是最有效來源；其中 2 筆與 10-K 重疊、4 筆是新增期別。Source C 10-K 有 2 筆直接值；FSDS/Notes 沒有增加 verified direct。Notes 對識別季度期間仍有用，因季度 ZIP 是申報日曆季度，不是 issuer fiscal quarter。",
-        "3. 瓶頸同時在 SEC 揭露形態和解析程式：結構化 datasets 沒提供可用的 Q4-only EPS fact；但原始 10-K/8-K 中另有 6 個直接披露期別，兩筆在初始解析/選擇器中漏掉，經人工稽核與修正後找回。剩下 9 個缺漏 C 不能僅憑此小範圍查詢判定 SEC 從未公布。另有 4 個 frozen period mapping 不符 SEC fiscal year end。",
-        "4. 建議進一步做 50–100 檔分層測試，但先恢復原分類器與 Grade A ledger、以 SEC 10-K report_date 重建財政 Q4 end，並校準 positive controls。這 10 檔按原因分層且不是隨機全市場樣本；缺失的原分類 artifacts、產業差異、候選搜尋窗口和 4 個日期錯配都會影響結果。37.5% 不能外推到 7,755 筆或全市場。",
-        "",
-        "**Verdict: PARTIAL** — 真實 SEC 來源在本 frozen sample 找到六筆直接 Q4 diluted EPS。四個 frozen fiscal periods 與 SEC 期末不匹配，歷史 Grade A controls 無法以缺失的原 ledger 稽核，且九個缺漏期別仍無已驗證直接 Q4 值；不能據此推估全市場回補量。",
-        "",
-        "Sol XHigh 審核：完成；無阻擋事項，建議 PARTIAL。已加入未解原因計數可能重疊的說明。",
-        "",
-        "## 證據檔案",
-        "",
-        "- `sample.json`：預先凍結的樣本、種子、選樣 SHA、輸入分類限制。",
-        "- `results.json`：逐期結果、來源狀態、request/volume、陽性候選與樣本外 TDW diagnostic。",
-        "- `source-ledger.jsonl`：逐 URL/accession 的 SEC status、檔案大小、SHA-256 與 parser 結果。",
-        "- `official-docs.json`、`filing-map.json`、`source-a.json`、`source-b.json`、`source-c.json`、`source-d.json`、`source-d-ocr.json`：來源 metadata、matched rows/excerpts、OCR review 與 request diagnostics。",
-    ]
+                 "ocr_status": o.get("ocr_status"),
+                 "ocr_sha256_verified": (o.get("sha256") == doc.get("sha256")) if o else None,
+                 "ocr_text_characters": len(o.get("ocr_text", "")) if o else None})
+    supplement = read_json("positive-control-pzg-2017-source.json")
+    add({"record_type": "positive_control_supplement", "ticker": "PZG", "url": supplement.get("url"),
+         "accession": "0001564590-17-018742", "filing_date": "2017-09-18", "http_status": supplement.get("http_status"),
+         "bytes": supplement.get("wire_bytes"), "sha256": supplement.get("sha256"),
+         "parse_status": supplement.get("parse_status"),
+         "note": "Comparative 10-K prints positive magnitude +0.32 under ‘Net loss per Common Share’; sign conflict with main FY2016 Grade A -0.32 remains."})
+    for disclosure in results["verified_disclosures"]:
+        add({"record_type": "adjudicated_verified_q4_eps", **disclosure})
+    for row in results["period_results"]:
+        add({"record_type": "period_adjudication", "ticker": row["ticker"], "fy": row["fiscal_year"],
+             "q4_end": row["frozen_q4_end"], "sample_role": row["sample_role"],
+             "classification": row["classification"], "eps": row["verified_q4_eps"], "result": row["result"]})
+    for mismatch in results["fiscal_period_mismatches"]["rows"]:
+        add({"record_type": "fiscal_period_mismatch", **mismatch})
     return "\n".join(lines) + "\n"
 
 
 def main():
-    results, source_summary, official, a, b, c, d, fmap, _, _, d_ocr = build_results()
-    sample = read("sample.json")
+    sample = read_json("sample.json")
+    a, b, c, d, ocr = (read_json(name) for name in
+                       ("source-a.json", "source-b.json", "source-c.json", "source-d.json", "source-d-ocr.json"))
+    filing_map, official = read_json("filing-map.json"), read_json("official-docs.json")
+    supplement = read_json("positive-control-pzg-2017-source.json")
+    results = build_results(sample, a, b, c, d, ocr, filing_map, official, supplement)
     write_json("results.json", results)
-    (REPORT / "source-ledger.jsonl").write_text(ledger_lines(official, a, b, c, d, fmap, d_ocr), encoding="utf-8")
-    (REPORT / "feasibility-report.md").write_text(make_report(results, sample, source_summary), encoding="utf-8")
-    print(json.dumps({
-        "results": str(REPORT / "results.json"),
-        "source_ledger": str(REPORT / "source-ledger.jsonl"),
-        "report": str(REPORT / "feasibility-report.md"),
-        "outcomes": results["outcomes"],
-        "network": results["network_and_volume"],
-    }, ensure_ascii=False, indent=2))
+    (REPORT / "source-ledger.jsonl").write_text(build_ledger(results, sample, (a, b, c, d)), encoding="utf-8")
+    (REPORT / "feasibility-report.md").write_text(make_report(results, sample), encoding="utf-8")
+    print(f"Rendered {len(results['period_results'])} periods; {results['outcomes']['verified_direct_missing_periods']}/16 verified missing-period EPS.")
 
 
 if __name__ == "__main__":

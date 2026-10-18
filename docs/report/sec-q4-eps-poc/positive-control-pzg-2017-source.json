@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "ticker": "PZG",
+    "cik": "0001629210",
+    "fy": 2017,
+    "report_date": "2017-06-30",
+    "form": "10-K",
+    "filing_date": "2017-09-18",
+    "accession": "0001564590-17-018742",
+    "primary_document": "pzg-10k_20170630.htm",
+    "supplemental_purpose": "compare PZG FY2016 main Grade A fact filed in this subsequent 10-K"
+  },
+  "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459017018742/pzg-10k_20170630.htm",
+  "http_status": 200,
+  "retrieved_at": "2026-10-18T12:46:16Z",
+  "cache_hit": false,
+  "download_bytes": 1545423,
+  "wire_bytes": 88563,
+  "sha256": "38f55e4e95fece806f309a1aead62d72987d18e217d640c13ee9bd9b7b1bff49",
+  "parse_status": "parsed",
+  "contexts": {},
+  "units": {},
+  "eps_facts": [],
+  "eps_tables": [
+    {
+      "text": "Year Ended June 30, 2015 High Low Fourth Quarter (from April 20, 2015) $ 1.85 $ 1.48 Year Ended June 30, 2016 First Quarter $ 1.58 1.10 Second Quarter 1.38 0.93 Third Quarter 1.48 0.99 Fourth Quarter 1.69 1.37 Year Ended June 30, 2017 First Quarter $ 2.79 1.65 Second Quarter 2.08 1.54 Third Quarter 2.09 1.60 Fourth Quarter 1.80 1.51",
+      "xpath": "/html/body/document/type/sequence/filename/description/text/div[13]/table",
+      "contains_q4_language": true,
+      "contains_adjusted_language": false
+    },
+    {
+      "text": "2017 Q1 Q2 Q3 Q4 Revenue $ 5,306 $ 40,599 $ 237,694 $ (2,928 ) Net loss before other items 1,265,014 1,867,372 1,527,443 3,052,147 Net loss (income) (1,953,496 ) 1,824,892 1,424,462 3,043,744 Net loss (income) per Common Share Basic $ (0.13 ) $ 0.12 $ 0.09 $ 0.19 Diluted $ (0.13 ) $ 0.12 $ 0.09 $ 0.19 2016 Q1 Q2 Q3 Q4 Revenue $ 5,202 $ 125,722 $ — $ 35,796 Net loss before other items 803,279 736,277 1,033,971 2,716,057 Net loss 801,993 734,967 1,100,601 2,704,611 Net loss per Common Share Basic $ 0.09 $ 0.09 $ 0.13 $ 0.32 Diluted $ 0.09 $ 0.09 $ 0.13 $ 0.32",
+      "xpath": "/html/body/document/type/sequence/filename/description/text/div[56]/table",
+      "contains_q4_language": false,
+      "contains_adjusted_language": false
+    }
+  ],
+  "keyword_hits": [
+    {
+      "term": "Net Loss per Share",
+      "offset": 130830,
+      "excerpt": "ets arising from the acquisition, construction or development and for normal operations of such assets. The Company’s asset retirement obligations are further described in Note 8. Net Loss per Share Basic loss per share is computed by dividing net loss available to common shareholders by the weighted average number of shares outstanding during each period. Diluted loss per share reflect the potential dilution that could occur if securities or other contracts to issue common stock were exercised or converted into common stock. For the years ended June 30, 2017 and 2016, the shares of common stock equivalents rel"
+    },
+    {
+      "term": "Diluted loss per share",
+      "offset": 131009,
+      "excerpt": " Net Loss per Share Basic loss per share is computed by dividing net loss available to common shareholders by the weighted average number of shares outstanding during each period. Diluted loss per share reflect the potential dilution that could occur if securities or other contracts to issue common stock were exercised or converted into common stock. For the years ended June 30, 2017 and 2016, the shares of common stock equivalents related to outstanding stock options have not been included in the diluted per share calculation as they are anti-dilutive as the Company has recorded a net loss from continuing operatio"
+    },
+    {
+      "term": "Quarterly Financial Data",
+      "offset": 154186,
+      "excerpt": "ds generated or utilized in years earlier than 2010 are also subject to examination and adjustment. The Company has no income tax examinations in process. F-15 Note 12. Summary of Quarterly Financial Data (Unaudited) The following table sets forth a summary of the unaudited quarterly results of operations for the years ended June 30, 2017 and 2016: 2017 Q1 Q2 Q3 Q4 Revenue $ 5,306 $ 40,599 $ 237,694 $ (2,928 ) Net loss before other items 1,265,014 1,867,372 1,527,443 3,052,147 Net loss (income) (1,953,496 ) 1,824,892 1,424,462 3,043,744 Net loss (income) per Common Share Basic $ (0.13 ) $ 0.12 $ 0.09 $ 0.19 Diluted $"
+    },
+    {
+      "term": "Net loss (income) per Common Share",
+      "offset": 154549,
+      "excerpt": "3 Q4 Revenue $ 5,306 $ 40,599 $ 237,694 $ (2,928 ) Net loss before other items 1,265,014 1,867,372 1,527,443 3,052,147 Net loss (income) (1,953,496 ) 1,824,892 1,424,462 3,043,744 Net loss (income) per Common Share Basic $ (0.13 ) $ 0.12 $ 0.09 $ 0.19 Diluted $ (0.13 ) $ 0.12 $ 0.09 $ 0.19 2016 Q1 Q2 Q3 Q4 Revenue $ 5,202 $ 125,722 $ — $ 35,796 Net loss before other items 803,279 736,277 1,033,971 2,716,057 Net loss 801,993 734,967 1,100,601 2,704,611 Net loss per Common Share Basic $ 0.09 $ 0.09 $ 0.13 $ 0.32 Diluted $ 0.09 $ 0.09 $ 0.13 $ 0.32 Note 13. Commitments and Contingencies: Lease Commitments The Company has office p"
+    },
+    {
+      "term": "Net loss per Common Share",
+      "offset": 154825,
+      "excerpt": " $ 0.09 $ 0.19 2016 Q1 Q2 Q3 Q4 Revenue $ 5,202 $ 125,722 $ — $ 35,796 Net loss before other items 803,279 736,277 1,033,971 2,716,057 Net loss 801,993 734,967 1,100,601 2,704,611 Net loss per Common Share Basic $ 0.09 $ 0.09 $ 0.13 $ 0.32 Diluted $ 0.09 $ 0.09 $ 0.13 $ 0.32 Note 13. Commitments and Contingencies: Lease Commitments The Company has office premises leases that expire at various dates until June 30, 2018. The aggregate minimum rentals payable for these operating leases are as follows: Year Total Amount 2018 $ 18,400 During the year ended June 30, 2017, $43,694 was recognized as rent expense in the statem"
+    }
+  ],
+  "quarterly_section_excerpts": [
+    {
+      "term": "Quarterly Financial Data",
+      "offset": 154186,
+      "text": "ds generated or utilized in years earlier than 2010 are also subject to examination and adjustment. The Company has no income tax examinations in process. F-15 Note 12. Summary of Quarterly Financial Data (Unaudited) The following table sets forth a summary of the unaudited quarterly results of operations for the years ended June 30, 2017 and 2016: 2017 Q1 Q2 Q3 Q4 Revenue $ 5,306 $ 40,599 $ 237,694 $ (2,928 ) Net loss before other items 1,265,014 1,867,372 1,527,443 3,052,147 Net loss (income) (1,953,496 ) 1,824,892 1,424,462 3,043,744 Net loss (income) per Common Share Basic $ (0.13 ) $ 0.12 $ 0.09 $ 0.19 Diluted $ (0.13 ) $ 0.12 $ 0.09 $ 0.19 2016 Q1 Q2 Q3 Q4 Revenue $ 5,202 $ 125,722 $ — $ 35,796 Net loss before other items 803,279 736,277 1,033,971 2,716,057 Net loss 801,993 734,967 1,100,601 2,704,611 Net loss per Common Share Basic $ 0.09 $ 0.09 $ 0.13 $ 0.32 Diluted $ 0.09 $ 0.09 $ 0.13 $ 0.32 Note 13. Commitments and Contingencies: Lease Commitments The Company has office premises leases that expire at various dates until June 30, 2018. The aggregate minimum rentals payable for these operating leases are as follows: Year Total Amount 2018 $ 18,400 During the year ended June 30, 2017, $43,694 was recognized as rent expense in the statement of operations and comprehensive loss. F-16 ",
+      "truncated": false
+    }
+  ],
+  "document_text_length": 155317,
+  "metrics": {
+    "sec_http_requests": 1,
+    "wire_bytes_received": 88563,
+    "retries": 0
+  }
+}

@@ -47,6 +47,12 @@ CLASSIFICATIONS = (
     "q1_q3_incomplete",
     "derivation_rejected",
 )
+MAIN_CLASSIFICATION_MAP = {
+    "no-q4-net-income": "q4_net_income_missing",
+    "no-annual-diluted-eps": "annual_diluted_eps_missing",
+    "q1-q3-incomplete": "q1_q3_incomplete",
+    "derivation-rejected": "derivation_rejected",
+}
 EARLY = (2012, 2018)
 RECENT = (2019, 2025)
 SIZE_LIMIT = 1_000_000_000
@@ -602,6 +608,36 @@ def dataset_accessions(filing_map):
     return out
 
 
+def same_filing_metadata(old, new):
+    old_meta = old.get("metadata") or {}
+    return all(old_meta.get(key) == new.get(key) for key in (
+        "accession", "ticker", "cik", "form", "filing_date", "report_date", "primary_document"
+    ))
+
+
+def combined_fetch_metrics(previous, client, reused_accessions, new_accessions):
+    previous = previous or {}
+    prior = {key: int((previous.get("metrics") or {}).get(key, 0) or 0)
+             for key in ("sec_http_requests", "wire_bytes_received", "decoded_bytes_received", "cache_hits", "retries")}
+    incremental = {
+        "sec_http_requests": client.requests,
+        "wire_bytes_received": client.wire_bytes_received,
+        "decoded_bytes_received": client.bytes_received,
+        "cache_hits": client.cache_hits,
+        "retries": client.retries,
+        "reused_existing_accessions": reused_accessions,
+        "new_accessions_fetched": new_accessions,
+        "rate_limit_requests_per_second": 1 / SEC_MIN_INTERVAL,
+    }
+    return {
+        **{key: prior[key] + incremental[key] for key in prior},
+        "reused_existing_accessions": reused_accessions,
+        "new_accessions_fetched": new_accessions,
+        "incremental": incremental,
+        "rate_limit_requests_per_second": 1 / SEC_MIN_INTERVAL,
+    }
+
+
 def run_source_a(filing_map_path=None, output_path=None):
     filing_map_path = Path(filing_map_path or ROOT / "docs/report/sec-q4-eps-poc/filing-map.json")
     output_path = Path(output_path or ROOT / "docs/report/sec-q4-eps-poc/source-a.json")
@@ -614,14 +650,32 @@ def run_source_a(filing_map_path=None, output_path=None):
     grouped = defaultdict(list)
     for accession, record in accessions.items():
         grouped[filing_quarter(record["filing_date"])].append(accession)
+    previous = load_json(output_path) if output_path.exists() else {}
+    previous_accessions = previous.get("accessions", {})
+    previous_zips = previous.get("zips", {})
     client = SecClient()
     zip_results = {}
-    accession_results = {
-        accession: {"accession": accession, "metadata": record, "sec_zip_rows": 0,
-                    "eps_candidates": [], "dataset_status": "pending"}
-        for accession, record in accessions.items()
-    }
-    for quarter, target_accessions in sorted(grouped.items()):
+    accession_results = {}
+    pending_by_quarter = defaultdict(list)
+    reused = 0
+    for accession, record in accessions.items():
+        old = previous_accessions.get(accession)
+        if old and same_filing_metadata(old, record):
+            accession_results[accession] = {**old, "metadata": record}
+            reused += 1
+        else:
+            accession_results[accession] = {
+                "accession": accession, "metadata": record, "sec_zip_rows": 0,
+                "eps_candidates": [], "dataset_status": "pending",
+            }
+            pending_by_quarter[filing_quarter(record["filing_date"])].append(accession)
+    for quarter, all_accessions in sorted(grouped.items()):
+        pending_accessions = pending_by_quarter.get(quarter, [])
+        if not pending_accessions and quarter in previous_zips:
+            zip_results[quarter] = {**previous_zips[quarter], "target_accessions": all_accessions,
+                                    "reused_previous_response": True}
+            continue
+        target_accessions = pending_accessions or all_accessions
         url = f"https://www.sec.gov/files/dera/data/financial-statement-data-sets/{quarter}.zip"
         response = client.fetch(url)
         zip_result = {
@@ -632,7 +686,9 @@ def run_source_a(filing_map_path=None, output_path=None):
             "download_bytes": len(response["body"]),
             "wire_bytes": response.get("wire_bytes"),
             "sha256": sha256_bytes(response["body"]),
-            "target_accessions": target_accessions,
+            "target_accessions": all_accessions,
+            "new_accessions_processed": pending_accessions,
+            "reused_previous_response": False,
         }
         if response["status"] == 200 and not response.get("error"):
             try:
@@ -675,9 +731,7 @@ def run_source_a(filing_map_path=None, output_path=None):
         "zip_count": len(zip_results),
         "zips": zip_results,
         "accessions": accession_results,
-        "metrics": {"sec_http_requests": client.requests, "wire_bytes_received": client.wire_bytes_received,
-                    "decoded_bytes_received": client.bytes_received, "cache_hits": client.cache_hits,
-                    "retries": client.retries, "rate_limit_requests_per_second": 1 / SEC_MIN_INTERVAL},
+        "metrics": combined_fetch_metrics(previous, client, reused, len(accessions) - reused),
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -696,18 +750,36 @@ def run_source_b(filing_map_path=None, output_path=None):
     grouped = defaultdict(list)
     for accession, record in accessions.items():
         grouped[filing_quarter(record["filing_date"])].append(accession)
+    previous = load_json(output_path) if output_path.exists() else {}
+    previous_accessions = previous.get("accessions", {})
+    previous_zips = previous.get("zips", {})
     client = SecClient()
     zip_results = {}
-    accession_results = {
-        accession: {"accession": accession, "metadata": record, "sec_zip_rows": 0,
-                    "eps_candidates": [], "note_text_candidates": [], "dataset_status": "pending"}
-        for accession, record in accessions.items()
-    }
-    for quarter, target_accessions in sorted(grouped.items()):
+    accession_results = {}
+    pending_by_quarter = defaultdict(list)
+    reused = 0
+    for accession, record in accessions.items():
+        old = previous_accessions.get(accession)
+        if old and same_filing_metadata(old, record):
+            accession_results[accession] = {**old, "metadata": record}
+            reused += 1
+        else:
+            accession_results[accession] = {
+                "accession": accession, "metadata": record, "sec_zip_rows": 0,
+                "eps_candidates": [], "note_text_candidates": [], "dataset_status": "pending",
+            }
+            pending_by_quarter[filing_quarter(record["filing_date"])].append(accession)
+    for quarter, all_accessions in sorted(grouped.items()):
+        pending_accessions = pending_by_quarter.get(quarter, [])
+        if not pending_accessions and quarter in previous_zips:
+            zip_results[quarter] = {**previous_zips[quarter], "target_accessions": all_accessions,
+                                    "reused_previous_response": True}
+            continue
+        target_accessions = pending_accessions or all_accessions
         url = f"https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/{quarter}_notes.zip"
-        # Notes ZIPs are 400–700 MB each. Keep the earlier 2012q3 schema probe
-        # cached; process later quarters sequentially without retaining their
-        # whole-market archives in /tmp.
+        # Notes ZIPs are 400–700 MB each. Reuse parsed accession rows already
+        # present in the prior result and fetch only quarters needed by new
+        # accessions; process one whole-market archive at a time.
         response = client.fetch(url, cache=(quarter == "2012q3"))
         zip_result = {
             "url": url,
@@ -717,7 +789,9 @@ def run_source_b(filing_map_path=None, output_path=None):
             "download_bytes": len(response["body"]),
             "wire_bytes": response.get("wire_bytes"),
             "sha256": sha256_bytes(response["body"]),
-            "target_accessions": target_accessions,
+            "target_accessions": all_accessions,
+            "new_accessions_processed": pending_accessions,
+            "reused_previous_response": False,
         }
         if response["status"] == 200 and not response.get("error"):
             try:
@@ -765,9 +839,7 @@ def run_source_b(filing_map_path=None, output_path=None):
         "zip_count": len(zip_results),
         "zips": zip_results,
         "accessions": accession_results,
-        "metrics": {"sec_http_requests": client.requests, "wire_bytes_received": client.wire_bytes_received,
-                    "decoded_bytes_received": client.bytes_received, "cache_hits": client.cache_hits,
-                    "retries": client.retries, "rate_limit_requests_per_second": 1 / SEC_MIN_INTERVAL},
+        "metrics": combined_fetch_metrics(previous, client, reused, len(accessions) - reused),
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -1445,7 +1517,8 @@ def source_map(progress):
     return mapped
 
 
-def document_year_rows(doc, ticker, cik, company, sic, sic_description, path):
+def document_period_rows(doc, ticker, cik, company, sic, sic_description, path):
+    """Return metadata for SEC Q4 rows; the authoritative missing class comes from main's report."""
     annual = doc.get("annual") or {}
     quarterly = doc.get("quarterly") or {}
     qends = quarterly.get("end") if isinstance(quarterly.get("end"), list) else []
@@ -1509,57 +1582,12 @@ def document_year_rows(doc, ticker, cik, company, sic, sic_description, path):
                 "shareBasis": financials.share_basis(qshares[qindex], qni[qindex], qeps[qindex]),
             })
 
-        if qni[index] is None:
-            reason = "q4_net_income_missing"
-            details = ["Q4 SEC row has no netIncome"]
-        elif annual_row is None or annual_row["epsDiluted"] is None:
-            reason = "annual_diluted_eps_missing"
-            details = ["no unique SEC annual row for this FY" if annual_row is None
-                       else "SEC annual epsDiluted is null"]
-        elif any(item is None or item["epsDiluted"] is None or item["shareBasis"] is None for item in q_items):
-            reason = "q1_q3_incomplete"
-            details = []
-            for number, item in enumerate(q_items, 1):
-                if item is None:
-                    details.append(f"Q{number} has no unique SEC period")
-                elif item["epsDiluted"] is None:
-                    details.append(f"Q{number} epsDiluted is null")
-                elif item["shareBasis"] is None:
-                    details.append(f"Q{number} has no usable diluted share basis")
-        else:
-            reason, details = "derivation_rejected", []
-            annual_values = annual_row["values"]
-            if financials.eps_inconsistent(annual_values):
-                details.append("annual EPS does not agree with annual net income / diluted shares")
-            annual_basis = financials.share_basis(
-                annual_values.get("dilutedShares"), annual_values.get("netIncome"), annual_row["epsDiluted"]
-            )
-            bases = [annual_basis] + [item["shareBasis"] for item in q_items]
-            if any(not basis for basis in bases):
-                details.append("annual or quarterly diluted share basis unavailable")
-            elif max(bases) / min(bases) > 1 + financials.SPLIT_MATCH:
-                details.append("annual and Q1–Q3 share bases differ beyond split tolerance")
-            else:
-                value = financials.q4_eps(annual_row["epsDiluted"], [item["epsDiluted"] for item in q_items], bases)
-                income = qni[index]
-                if value is None:
-                    details.append("annual less Q1–Q3 EPS could not be evaluated")
-                elif value and (value > 0) != (income > 0):
-                    details.append("candidate EPS sign disagrees with Q4 net income")
-                elif abs(value - income / bases[0]) > (
-                    financials.EPS_TOLERANCE * abs(value) + financials.Q4_EPS_ROUNDING
-                ):
-                    details.append("candidate EPS disagrees with Q4 net income / annual share basis")
-                else:
-                    details.append("existing production rule still leaves this Q4 EPS empty")
-
         out.append({
             "ticker": ticker,
             "company_name": company,
             "cik": cik,
             "sic": sic,
             "sic_description": sic_description,
-            "category": reason,
             "fy": year_number,
             "q4_end": end,
             "filing_period_source": source,
@@ -1567,7 +1595,6 @@ def document_year_rows(doc, ticker, cik, company, sic, sic_description, path):
             "current_q4_net_income": qni[index],
             "current_annual_eps_diluted": annual_row["epsDiluted"] if annual_row else None,
             "q1_q3": q_items,
-            "category_evidence": details,
             "quarterly_derived_flag": derived[index],
             "financials_path": str(path.relative_to(ROOT)),
             "financials_sha256": sha256_file(path),
@@ -1613,14 +1640,77 @@ def diversity_select(candidates, count, seed, category):
     return chosen
 
 
-def freeze_sample(seed="20261018", output=None):
+def ledger_period_entries(ledger, ticker, end, field="epsDiluted"):
+    """Return row-level ledger mutations; accepted rows are represented only by ledger aggregates."""
+    result = {}
+    for name in ("blocked", "overridden", "deferred"):
+        result[name] = [row for row in ledger.get(name, [])
+                        if row.get("symbol") == ticker and row.get("end") == end and row.get("field") == field]
+    return result
+
+
+def main_grade_a_period(doc, ticker, end, fy, ledger, missing_keys):
+    quarterly = doc.get("quarterly") or {}
+    ends = quarterly.get("end") or []
+    fys = quarterly.get("fy") or []
+    fqs = quarterly.get("fq") or []
+    indices = [i for i, (row_end, year, quarter) in enumerate(zip(ends, fys, fqs))
+               if row_end == end and year == fy and quarter == 4]
+    if len(indices) != 1:
+        return None
+    index = indices[0]
+    values = quarterly.get("values") or {}
+    stored = col(values, "epsDiluted", len(ends))[index]
+    sources = col(quarterly, "src", len(ends), "yahoo")
+    derived = col(quarterly, "derived", len(ends))
+    qualities = quarterly.get("epsQuality") or []
+    quality = qualities[index] if index < len(qualities) else None
+    fact = ((doc.get("secQ4EpsFacts") or {}).get(end) or {}).get("epsDiluted")
+    fact_value = fact.get("value") if isinstance(fact, dict) else None
+    mutations = ledger_period_entries(ledger, ticker, end)
+    main_grade_a = bool(
+        isinstance(quality, dict) and quality.get("epsDiluted") == "A"
+        and isinstance(fact, dict) and fact.get("grade") == "A"
+        and isinstance(fact_value, (int, float)) and not isinstance(fact_value, bool)
+        and sources[index] == "sec" and stored is not None
+        and abs(float(stored) - float(fact_value)) <= 0.005
+        and not any(mutations.values())
+    )
+    return {
+        "ticker": ticker,
+        "fy": fy,
+        "q4_end": end,
+        "local_eps_diluted": stored,
+        "local_source": sources[index],
+        "quarterly_derived_flag": derived[index],
+        "main_eps_quality": quality.get("epsDiluted") if isinstance(quality, dict) else None,
+        "sec_fact": fact,
+        "is_main_grade_a": main_grade_a,
+        "present_in_main_missing_classification": (ticker, end) in missing_keys,
+        "ledger_row_entries": mutations,
+        "ledger_verifiedA_aggregate": ledger.get("verifiedA"),
+        "ledger_has_per_row_verifiedA_list": False,
+    }
+
+
+def freeze_sample(seed="20261018", output=None, *, classification_path=None, ledger_path=None,
+                  source_commit=None, replace=False):
     report_dir = ROOT / "docs" / "report" / "sec-q4-eps-poc"
     output = Path(output) if output else report_dir / "sample.json"
     if not output.is_absolute():
         output = ROOT / output
-    if output.exists():
-        raise FileExistsError(f"refusing to replace frozen sample: {output}")
+    previous_sample = load_json(output) if output.exists() else None
+    if previous_sample and not replace:
+        raise FileExistsError(f"refusing to replace frozen sample without --replace: {output}")
 
+    classification_path = Path(classification_path or ROOT / "docs/report/q4-eps-missing-classification.json")
+    ledger_path = Path(ledger_path or ROOT / "docs/report/q4-eps-acceptance-ledger.json")
+    if not classification_path.is_absolute():
+        classification_path = ROOT / classification_path
+    if not ledger_path.is_absolute():
+        ledger_path = ROOT / ledger_path
+    classification = load_json(classification_path)
+    ledger = load_json(ledger_path)
     snapshot_path = ROOT / "docs/report/fundamentals/us-market-snapshot.json"
     progress_path = ROOT / "docs/report/fundamentals/us-market-progress-summary.json"
     financial_dir = ROOT / "docs/report/financials"
@@ -1630,66 +1720,51 @@ def freeze_sample(seed="20261018", output=None):
     current_symbols = {item["symbol"]: item for item in snapshot.get("eligibleSymbols", [])}
 
     docs = {}
-    missing_periods = []
-    all_us_missing = 0
     for path in sorted(financial_dir.glob("*.json")):
         try:
             doc = load_json(path)
         except (OSError, ValueError):
             continue
-        if doc.get("market") != "US":
-            continue
-        quarterly = doc.get("quarterly") or {}
-        ends = quarterly.get("end") if isinstance(quarterly.get("end"), list) else []
-        fy = col(quarterly, "fy", len(ends))
-        fq = col(quarterly, "fq", len(ends))
-        eps = col(quarterly.get("values") or {}, "epsDiluted", len(ends))
-        for year, quarter, value in zip(fy, fq, eps):
-            if quarter == 4 and value is None:
-                all_us_missing += 1
-        docs[doc.get("symbol", path.stem)] = (path, doc)
+        if doc.get("market") == "US":
+            docs[doc.get("symbol", path.stem)] = (path, doc)
 
+    missing_keys = {(row.get("symbol"), row.get("end")) for row in classification.get("rows", [])}
     classified_by_category = defaultdict(list)
+    source_records_by_ticker = {}
     source_eligible_rows = 0
-    for ticker, (path, doc) in docs.items():
-        maps = ticker_map.get(ticker, [])
-        if doc.get("market") != "US" or ticker not in current_symbols or len({x["cik"] for x in maps}) != 1:
+    for row in classification.get("rows", []):
+        category = MAIN_CLASSIFICATION_MAP.get(row.get("class"))
+        if category is None:
             continue
+        ticker = row.get("symbol")
+        try:
+            year_number = int(row.get("fy"))
+        except (TypeError, ValueError):
+            continue
+        if not (2012 <= year_number <= 2025) or ticker not in current_symbols or ticker not in docs:
+            continue
+        maps = ticker_map.get(ticker, [])
+        if len({item["cik"] for item in maps}) != 1:
+            continue
+        path, doc = docs[ticker]
         mapping = maps[0]
         company = mapping["name"] or current_symbols[ticker].get("name")
-        records, annual_by_fy, qends, qeps, qsrc, derived, split_events = document_year_rows(
-            doc, ticker, mapping["cik"], company, mapping["sic"], mapping["sicDescription"], path
-        )
-        source_eligible_rows += len(records)
-        for record in records:
-            classified_by_category[record["category"]].append(record)
-        # Positive control rows use the local SEC series only, and are selected
-        # without looking at any SEC response from this POC.
-        q = doc.get("quarterly") or {}
-        fy = col(q, "fy", len(qends))
-        fq = col(q, "fq", len(qends))
-        for index, (end, year, quarter, source, eps) in enumerate(zip(qends, fy, fq, qsrc, qeps)):
-            if (quarter != 4 or source != "sec" or eps is None or derived[index] is not None
-                    or not (2012 <= int(year) <= 2025)):
-                continue
-            record = {
-                "ticker": ticker,
-                "company_name": company,
-                "cik": mapping["cik"],
-                "sic": mapping["sic"],
-                "sic_description": mapping["sicDescription"],
-                "fy": int(year),
-                "q4_end": end,
-                "existing_q4_eps_diluted": eps,
-                "existing_q4_source": source,
-                "quarterly_derived_flag": derived[index],
-                "financials_path": str(path.relative_to(ROOT)),
-                "financials_sha256": sha256_file(path),
-                "split_adjusted": bool((doc.get("split") or {}).get("adjusted")),
-                "split_events": split_events,
-                "existing_quality_level": (doc.get("quality") or {}).get("level"),
-            }
-            classified_by_category["direct_sec_controls"].append(record)
+        if ticker not in source_records_by_ticker:
+            source_records_by_ticker[ticker] = document_period_rows(
+                doc, ticker, mapping["cik"], company, mapping["sic"], mapping["sicDescription"], path
+            )[0]
+        matching = [item for item in source_records_by_ticker[ticker]
+                    if item["fy"] == year_number and item["q4_end"] == row.get("end")]
+        if len(matching) != 1:
+            continue
+        record = dict(matching[0])
+        record["category"] = category
+        record["classification_class"] = row.get("class")
+        record["classification_detail"] = row.get("detail")
+        record["category_evidence"] = [row.get("detail")]
+        record["classification_path"] = str(classification_path.relative_to(ROOT))
+        classified_by_category[category].append(record)
+        source_eligible_rows += 1
 
     by_ticker = defaultdict(list)
     for category, records in classified_by_category.items():
@@ -1697,14 +1772,15 @@ def freeze_sample(seed="20261018", output=None):
             by_ticker[(category, record["ticker"])].append(record)
 
     def period_pair(records):
-        early = sorted((r for r in records if EARLY[0] <= r["fy"] <= EARLY[1]), key=lambda r: (r["fy"], r["q4_end"]))
-        recent = sorted((r for r in records if RECENT[0] <= r["fy"] <= RECENT[1]), key=lambda r: (r["fy"], r["q4_end"]))
+        early = sorted((r for r in records if EARLY[0] <= r["fy"] <= EARLY[1]),
+                       key=lambda r: (r["fy"], r["q4_end"]))
+        recent = sorted((r for r in records if RECENT[0] <= r["fy"] <= RECENT[1]),
+                        key=lambda r: (r["fy"], r["q4_end"]))
         return (early[0], recent[0]) if early and recent else None
 
     candidates = {category: [] for category in CLASSIFICATIONS}
     for category in CLASSIFICATIONS:
-        tickers = sorted({r["ticker"] for r in classified_by_category[category]})
-        for ticker in tickers:
+        for ticker in sorted({r["ticker"] for r in classified_by_category[category]}):
             rows = by_ticker[(category, ticker)]
             pair = period_pair(rows)
             path, doc = docs[ticker]
@@ -1743,17 +1819,50 @@ def freeze_sample(seed="20261018", output=None):
                 "periods": candidate["periods"],
             })
 
+    controls_by_ticker = defaultdict(list)
+    for ticker, (path, doc) in docs.items():
+        if ticker not in current_symbols:
+            continue
+        maps = ticker_map.get(ticker, [])
+        if len({item["cik"] for item in maps}) != 1:
+            continue
+        q = doc.get("quarterly") or {}
+        ends = q.get("end") or []
+        fys = q.get("fy") or []
+        fqs = q.get("fq") or []
+        for end, year, quarter in zip(ends, fys, fqs):
+            if quarter != 4 or not isinstance(year, int) or not (2012 <= year <= 2025):
+                continue
+            audit = main_grade_a_period(doc, ticker, end, year, ledger, missing_keys)
+            if not audit or not audit["is_main_grade_a"]:
+                continue
+            mapping = maps[0]
+            record = {
+                "ticker": ticker,
+                "company_name": mapping["name"] or current_symbols[ticker].get("name"),
+                "cik": mapping["cik"],
+                "sic": mapping["sic"],
+                "sic_description": mapping["sicDescription"],
+                "fy": year,
+                "q4_end": end,
+                "existing_q4_eps_diluted": audit["local_eps_diluted"],
+                "existing_q4_source": audit["local_source"],
+                "quarterly_derived_flag": audit["quarterly_derived_flag"],
+                "main_grade_a_audit": audit,
+                "financials_path": str(path.relative_to(ROOT)),
+                "financials_sha256": sha256_file(path),
+                "split_adjusted": bool((doc.get("split") or {}).get("adjusted")),
+                "split_events": (doc.get("split") or {}).get("events", []),
+                "existing_quality_level": (doc.get("quality") or {}).get("level"),
+            }
+            controls_by_ticker[ticker].append(record)
+
     control_candidates = []
-    control_records = classified_by_category["direct_sec_controls"]
-    control_by_ticker = defaultdict(list)
-    for row in control_records:
-        control_by_ticker[row["ticker"]].append(row)
-    for ticker, rows in control_by_ticker.items():
+    for ticker, rows in controls_by_ticker.items():
         pair = period_pair(rows)
         if not pair:
             continue
-        path, doc = docs[ticker]
-        size = median_sec_revenue(doc)
+        size = median_sec_revenue(docs[ticker][1])
         if size is None or size > SIZE_LIMIT or ticker in POPULAR_TICKERS:
             continue
         control_candidates.append({
@@ -1765,8 +1874,6 @@ def freeze_sample(seed="20261018", output=None):
             "median_2019_2025_sec_revenue_proxy": size,
             "periods": list(pair),
         })
-    # Prefer smaller issuers, with the fixed seed as the tie breaker. One issuer
-    # per CIK and two-digit SIC diversity are enforced by diversity_select.
     ordered_controls = sorted(
         control_candidates,
         key=lambda item: (item["median_2019_2025_sec_revenue_proxy"],
@@ -1785,10 +1892,11 @@ def freeze_sample(seed="20261018", output=None):
                 break
         if len(control_selected) == 2:
             break
-    candidate_counts["direct_sec_controls"] = {
-        "eligible_tickers_with_early_and_recent_periods_and_sec_revenue_le_1bn": len(control_candidates),
+    candidate_counts["direct_sec_grade_a_controls"] = {
+        "eligible_tickers_with_early_and_recent_main_grade_a_periods_and_sec_revenue_le_1bn": len(control_candidates),
         "selected_tickers": [item["ticker"] for item in control_selected],
-        "historical_grade_a_ledger_available": False,
+        "ledger_verifiedA_aggregate": ledger.get("verifiedA"),
+        "ledger_has_row_level_verifiedA_list": False,
     }
     for candidate in control_selected:
         selected.append({
@@ -1796,55 +1904,95 @@ def freeze_sample(seed="20261018", output=None):
                 "ticker", "cik", "company_name", "sic", "sic_description",
                 "median_2019_2025_sec_revenue_proxy",
             )},
-            "sample_role": "positive_control_candidate",
+            "sample_role": "positive_control_grade_a",
             "missing_reason": None,
-            "historical_grade_a_status": "not_auditable: acceptance ledger and original classifier absent from main",
-            "selection_rule": "direct SEC Q4 epsDiluted exists locally with no per-row derived flag; smallest revenue proxy, then fixed seed, with SIC diversity",
+            "historical_grade_a_status": "confirmed by main epsQuality A plus a row-level SEC Q4 fact; ledger has no accepted-row list and no mutation entry",
+            "selection_rule": "main Grade A Q4 fact; smallest revenue proxy, then fixed seed, with SIC diversity",
             "periods": candidate["periods"],
         })
 
-    # The categories are required to have two selected tickers; fail closed rather
-    # than silently making a post-query substitution.
     gaps = {category: candidate_counts[category]["selected_tickers"] for category in CLASSIFICATIONS
             if len(candidate_counts[category]["selected_tickers"]) != 2}
     if gaps or len(control_selected) != 2:
         raise RuntimeError(f"frozen sample incomplete; no SEC query permitted: {gaps or 'positive control gap'}")
 
-    classification_counts = {category: len(classified_by_category[category]) for category in CLASSIFICATIONS}
+    previous_membership = None
+    if previous_sample:
+        old_by_ticker = {item["ticker"]: item for item in previous_sample.get("sample", [])}
+        new_by_ticker = {item["ticker"]: item for item in selected}
+        previous_membership = {
+            "freeze_sha256": previous_sample.get("freeze_sha256"),
+            "retained_tickers": sorted(set(old_by_ticker) & set(new_by_ticker)),
+            "removed_tickers": sorted(set(old_by_ticker) - set(new_by_ticker)),
+            "added_tickers": sorted(set(new_by_ticker) - set(old_by_ticker)),
+            "unchanged_selected_periods": sorted(
+                f"{ticker}:{period['fy']}:{period['q4_end']}"
+                for ticker in set(old_by_ticker) & set(new_by_ticker)
+                for period in new_by_ticker[ticker].get("periods", [])
+                if any(old.get("fy") == period.get("fy") and old.get("q4_end") == period.get("q4_end")
+                       for old in old_by_ticker[ticker].get("periods", []))
+            ),
+        }
+
+    prior_control_audit = []
+    if previous_sample:
+        for item in previous_sample.get("sample", []):
+            if item.get("sample_role") not in {"positive_control_candidate", "positive_control_grade_a"}:
+                continue
+            ticker = item["ticker"]
+            if ticker not in docs:
+                continue
+            for period in item.get("periods", []):
+                audit = main_grade_a_period(
+                    docs[ticker][1], ticker, period.get("q4_end"), period.get("fy"), ledger, missing_keys
+                )
+                if audit:
+                    prior_control_audit.append(audit)
+
+    class_counts = {MAIN_CLASSIFICATION_MAP[key]: value for key, value in classification.get("counts", {}).items()
+                    if key in MAIN_CLASSIFICATION_MAP}
     payload = {
         "version": 1,
         "sample_id": "sec-q4-diluted-eps-poc-20261018",
+        "freeze_revision": 2 if previous_sample else 1,
         "frozen_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-        "source_commit": "dd7ac76821976ea42f6291bc09eb5e63b28c2ecc",
+        "source_commit": source_commit,
         "selection_seed": seed,
         "selection_constraints": {
             "current_directory_and_cik": "ticker must exist in main's US eligibleSymbols and map to one SEC CIK in us-market-progress-summary.json",
-            "financial_rows": "US financials; SEC-sourced Q4 row; fiscal year 2012–2025; Q4 epsDiluted null for missing cases",
+            "classification_source": str(classification_path.relative_to(ROOT)),
+            "financial_rows": "US financial rows matched to main's missing-classification report; SEC-sourced Q4; FY 2012–2025",
             "annual_revenue_proxy": "median of SEC-sourced annual revenue for FY 2019–2025 <= USD 1B",
-            "periods_per_ticker": "earliest fiscal year in 2012–2018 and earliest fiscal year in 2019–2025; no SEC response is used in selection",
-            "industry_diversity": "one CIK per category; greedily prefer unused two-digit SIC industry",
+            "periods_per_ticker": "earliest eligible fiscal year in 2012–2018 and earliest eligible fiscal year in 2019–2025; no POC SEC response is used in selection",
+            "industry_diversity": "one CIK per category; greedily prefer unused two-digit SIC group",
             "sorting": "missing-category tickers ranked by SHA-256(seed|category|ticker); controls ranked by revenue proxy, then SHA-256; dates sorted by FY and end date",
             "popular_ticker_exclusions": sorted(POPULAR_TICKERS),
-            "positive_control_predicate": "existing local Q4 row has source sec, non-null epsDiluted, null quarterly derived flag; original Grade A acceptance ledger is absent, so the historical Grade A label cannot be asserted",
+            "positive_control_predicate": "main's q4 answer-set predicate: quarterly.epsQuality[i].epsDiluted is A and secQ4EpsFacts[end].epsDiluted has a numeric fact; SEC-sourced stored value matches the fact and no ledger mutation blocks the row",
         },
         "input_audit": {
-            "missing_inputs": [
-                "docs/report/q4-eps-missing-classification.json",
-                "docs/report/q4-eps-acceptance-ledger.json",
-                "atlas/scripts/classify_q4_eps_missing.py",
-            ],
-            "temporary_classifier": "in-memory deterministic classification implemented in this POC from main's financials; no input report regenerated or overwritten",
+            "classification_path": str(classification_path.relative_to(ROOT)),
+            "classification_sha256": sha256_file(classification_path),
+            "classification_counts": class_counts,
+            "acceptance_ledger_path": str(ledger_path.relative_to(ROOT)),
+            "acceptance_ledger_sha256": sha256_file(ledger_path),
+            "acceptance_ledger": {
+                "schema": ledger.get("schema"),
+                "verifiedA_aggregate": ledger.get("verifiedA"),
+                "nullToA_aggregate": ledger.get("nullToA"),
+                "has_row_level_verifiedA_list": False,
+            },
             "financials_dir": "docs/report/financials/",
             "financials_files": len(docs),
-            "us_financials_missing_q4_eps_all_sources_all_years": all_us_missing,
-            "sec_sourced_current_directory_missing_q4_eps_periods_fy2012_2025": source_eligible_rows,
-            "temporary_classification_counts": classification_counts,
+            "us_financials_missing_q4_eps": classification.get("reconciliation", {}).get("missing"),
+            "sec_sourced_eligible_missing_periods_fy2012_2025": source_eligible_rows,
             "candidate_pool": candidate_counts,
+            "previous_freeze_membership": previous_membership,
+            "previous_positive_control_rows_checked_against_main": prior_control_audit,
             "snapshot_sha256": sha256_file(snapshot_path),
             "progress_summary_sha256": sha256_file(progress_path),
         },
         "sample": selected,
-        "freeze_note": "Selection is locked before SEC submissions, data-set ZIPs, filing documents, or earnings releases are queried. Any post-freeze retrieval failure remains E/incomplete and will not trigger replacement.",
+        "freeze_note": "This revision is selected from main's persisted missing-classification report before any SEC request for newly selected periods. Existing SEC findings for retained ticker-periods remain unchanged; no selector replacement is based on SEC outcomes.",
     }
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     payload["freeze_sha256"] = sha256_bytes(canonical)
@@ -1859,6 +2007,10 @@ def main(argv=None):
     freeze = sub.add_parser("freeze-sample", help="select and freeze a deterministic 10-ticker sample from local main data")
     freeze.add_argument("--seed", default="20261018")
     freeze.add_argument("--out", default="docs/report/sec-q4-eps-poc/sample.json")
+    freeze.add_argument("--classification", default="docs/report/q4-eps-missing-classification.json")
+    freeze.add_argument("--ledger", default="docs/report/q4-eps-acceptance-ledger.json")
+    freeze.add_argument("--source-commit", default=None)
+    freeze.add_argument("--replace", action="store_true", help="replace an existing freeze after reviewing the selection basis")
     fetch_docs = sub.add_parser("fetch-docs", help="read the two official SEC data-set documentation pages")
     fetch_docs.add_argument("--out", default="docs/report/sec-q4-eps-poc/official-docs.json")
     filing_map = sub.add_parser("resolve-submissions", help="map frozen periods to SEC 10-K and 8-K submissions")
@@ -1878,12 +2030,19 @@ def main(argv=None):
     source_d.add_argument("--out", default="docs/report/sec-q4-eps-poc/source-d.json")
     args = parser.parse_args(argv)
     if args.command == "freeze-sample":
-        result = freeze_sample(args.seed, args.out)
+        result = freeze_sample(
+            args.seed,
+            args.out,
+            classification_path=args.classification,
+            ledger_path=args.ledger,
+            source_commit=args.source_commit,
+            replace=args.replace,
+        )
         print(json.dumps({
             "sample": str(Path(args.out)),
             "freeze_sha256": result["freeze_sha256"],
             "symbols": [f"{row['ticker']}:{row['sample_role']}" for row in result["sample"]],
-            "missing_category_counts": result["input_audit"]["temporary_classification_counts"],
+            "classification_counts": result["input_audit"]["classification_counts"],
             "candidate_pool": result["input_audit"]["candidate_pool"],
         }, ensure_ascii=False, indent=2))
         return 0

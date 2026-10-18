@@ -48,5 +48,5 @@
     "src": "sec",
     "derived": 1
   },
-  "positive_control_audit": "raw SEC value and same-end local value agree; local row is FY2020/FQ3 and historical Grade A status cannot be audited from missing acceptance ledger"
+  "positive_control_audit": "the local 2019-03-31 row is FY2020/FQ3, while SEC filing 0001564590-20-008191 reports FY2019 Q4 ended 2019-12-31; the row is not a Q4 positive control. Main's acceptance ledger has no per-row accepted-A list and no blocked, overridden, or deferred entry for this local row."
 }

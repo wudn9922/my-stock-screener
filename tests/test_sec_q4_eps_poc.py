@@ -112,13 +112,28 @@ class SecQ4EpsPocTests(unittest.TestCase):
         self.assertEqual(poc.compare_positive_control(None, -0.58)["status"],
                          "unverifiable_missing_value")
 
-    def test_frozen_positive_controls_are_not_claimed_as_grade_a_without_the_source_ledger(self):
+    def test_frozen_positive_controls_match_main_grade_a_facts_and_audit_old_controls(self):
         sample = json.loads((ROOT / "docs/report/sec-q4-eps-poc/sample.json").read_text(encoding="utf-8"))
-        controls = [row for row in sample["sample"] if row["sample_role"] == "positive_control_candidate"]
-        self.assertEqual({row["ticker"] for row in controls}, {"NMTC", "TDW"})
-        self.assertTrue(all(row["historical_grade_a_status"].startswith("not_auditable:")
-                            for row in controls))
-        self.assertIn("docs/report/q4-eps-acceptance-ledger.json", sample["input_audit"]["missing_inputs"])
+        controls = [row for row in sample["sample"] if row["sample_role"] == "positive_control_grade_a"]
+        self.assertEqual({row["ticker"] for row in controls}, {"PZG", "PTN"})
+        for company in controls:
+            for period in company["periods"]:
+                audit = period["main_grade_a_audit"]
+                self.assertTrue(audit["is_main_grade_a"], (company["ticker"], period["q4_end"]))
+                self.assertEqual(audit["main_eps_quality"], "A")
+                self.assertEqual(audit["sec_fact"]["grade"], "A")
+                self.assertAlmostEqual(audit["local_eps_diluted"], audit["sec_fact"]["value"], places=3)
+        ptn = next(row for row in controls if row["ticker"] == "PTN")
+        self.assertTrue(all(period["main_grade_a_audit"]["sec_fact"]["splitFactor"] == 0.0008
+                            for period in ptn["periods"]))
+
+        old_controls = sample["input_audit"]["previous_positive_control_rows_checked_against_main"]
+        self.assertEqual({row["ticker"] for row in old_controls}, {"NMTC", "TDW"})
+        self.assertTrue(all(not row["is_main_grade_a"] for row in old_controls))
+        self.assertTrue(all(not row["present_in_main_missing_classification"] for row in old_controls))
+        self.assertTrue(all(not any(row["ledger_row_entries"].values()) for row in old_controls))
+        self.assertTrue(all(row["ledger_verifiedA_aggregate"] == 5009 for row in old_controls))
+        self.assertTrue(all(not row["ledger_has_per_row_verifiedA_list"] for row in old_controls))
 
     def release_disclosure(self, fixture):
         return {
