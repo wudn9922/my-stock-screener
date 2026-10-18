@@ -45,7 +45,8 @@ def quarter(end, fy, fq, eps, src="sec", derived=None, grade=None):
     return {"end": end, "fy": fy, "fq": fq, "eps": eps, "src": src, "derived": derived, "grade": grade}
 
 
-def us_document(quarters):
+def us_document(quarters, annual=()):
+    """annual: (fy, diluted EPS) pairs for the annual block."""
     return {"market": "US", "quarterly": {
         "end": [q["end"] for q in quarters],
         "fy": [q["fy"] for q in quarters],
@@ -54,6 +55,10 @@ def us_document(quarters):
         "derived": [q["derived"] for q in quarters],
         "values": {"epsDiluted": [q["eps"] for q in quarters]},
         "epsQuality": [({"epsDiluted": q["grade"]} if q["grade"] else None) for q in quarters],
+    }, "annual": {
+        "end": [f"{fy}-12-31" for fy, _ in annual],
+        "fy": [fy for fy, _ in annual],
+        "values": {"epsDiluted": [eps for _, eps in annual]},
     }}
 
 
@@ -240,6 +245,7 @@ class Comparison(ProbeCase):
             ("CCC", "2024-03-31", ordinal("2024-03-31"), 2.5),       # magnitude disagreement
             ("DDD", "2024-03-31", ordinal("2024-03-31"), 3.0),       # no row
         ]
+        entries = [(symbol, end, ordinal, sec_value, 2024) for symbol, end, ordinal, sec_value in entries]
         result = probe.compare(entries, index)
         self.assertEqual(result["population"], 6)
         self.assertEqual(result["compared"], 5)
@@ -323,15 +329,121 @@ class Coverage(ProbeCase):
         report, _, _ = self.run_probe(documents, classification, statements)
         set_a = report["agreement"]["setA"]
         set_b = report["agreement"]["setB"]
-        self.assertEqual(report["repo"]["setAPopulation"], 4)
-        self.assertEqual(report["repo"]["setAWithDerivedFlag"], 1)
-        self.assertEqual(set_a["compared"], 3)
-        self.assertEqual(set_a["agreements"], 2)
+        self.assertEqual(report["repo"]["setAPopulation"], 3)
+        self.assertEqual(report["repo"]["setADerivedPopulation"], 1)
+        self.assertEqual(set_a["compared"], 2)
+        self.assertEqual(set_a["agreements"], 1)
         self.assertEqual(set_a["disagreementKeys"], [{"symbol": "AAA", "end": "2024-09-28"}])
         self.assertEqual(set_a["notCompared"]["noRow"], 1)
+        self.assertEqual(report["agreement"]["setADerived"]["compared"], 1)
+        self.assertEqual(report["agreement"]["setADerived"]["agreements"], 1)
         self.assertEqual(set_b["population"], 1)
         self.assertEqual(set_b["agreements"], 1)
+        self.assertEqual(set_b["subtraction"]["notTestable"], 1)
         self.assertAlmostEqual(set_b["wilsonLower95"], 1 / (1 + probe.Z95 * probe.Z95), places=6)
+
+
+class Subtraction(ProbeCase):
+    """The subtraction test: annual diluted EPS minus (Q1 + Q2 + Q3), on covered missing rows and on covered set b rows."""
+
+    @staticmethod
+    def scan_with(annual, quarters):
+        return {"annual": {(symbol, fy): values for (symbol, fy), values in annual.items()},
+                "quarterly": quarters}
+
+    def base_scan(self):
+        return self.scan_with({("AAA", 2024): [4.4]},
+                              {("AAA", 2024, 1): [1.0], ("AAA", 2024, 2): [1.1], ("AAA", 2024, 3): [1.2]})
+
+    def test_subtraction_value_is_annual_minus_the_three_quarters(self):
+        self.assertAlmostEqual(probe.subtraction_value(self.base_scan(), "AAA", 2024), 1.1, places=9)
+
+    def test_missing_or_duplicated_input_is_not_testable(self):
+        scan = self.base_scan()
+        scan["quarterly"][("AAA", 2024, 2)] = []
+        self.assertIsNone(probe.subtraction_value(scan, "AAA", 2024))
+        scan = self.base_scan()
+        scan["quarterly"][("AAA", 2024, 1)] = [1.0, 1.0]
+        self.assertIsNone(probe.subtraction_value(scan, "AAA", 2024))
+        scan = self.base_scan()
+        scan["annual"][("AAA", 2024)] = [4.4, 4.4]
+        self.assertIsNone(probe.subtraction_value(scan, "AAA", 2024))
+        scan = self.base_scan()
+        scan["annual"][("AAA", 2024)] = [None]
+        self.assertIsNone(probe.subtraction_value(scan, "AAA", 2024))
+        self.assertIsNone(probe.subtraction_value(self.base_scan(), "AAA", 2023))
+
+    def test_outcome_is_within_outside_or_not_testable(self):
+        scan = self.base_scan()
+        self.assertEqual(probe.subtraction_outcome(scan, "AAA", 2024, 1.1 + 0.005), probe.WITHIN)
+        self.assertEqual(probe.subtraction_outcome(scan, "AAA", 2024, 1.1 + 0.02), probe.OUTSIDE)
+        self.assertEqual(probe.subtraction_outcome(scan, "AAA", 2023, 1.1), probe.NOT_TESTABLE)
+
+    def test_tolerance_scales_with_the_subtraction(self):
+        scan = self.scan_with({("BIG", 2024): [404.0]},
+                              {("BIG", 2024, 1): [1.0], ("BIG", 2024, 2): [1.0], ("BIG", 2024, 3): [1.0]})
+        self.assertEqual(probe.subtraction_outcome(scan, "BIG", 2024, 402.5), probe.WITHIN)
+        self.assertEqual(probe.subtraction_outcome(scan, "BIG", 2024, 403.5), probe.OUTSIDE)
+
+    def test_covered_missing_rows_and_set_b_by_class(self):
+        documents = {
+            "AAA": us_document([
+                quarter("2024-03-30", 2024, 1, 1.0),
+                quarter("2024-06-29", 2024, 2, 1.1),
+                quarter("2024-09-28", 2024, 3, 1.2),
+                quarter("2024-12-28", 2024, 4, None),
+                quarter("2025-03-29", 2025, 1, 0.5),
+                quarter("2025-06-28", 2025, 2, 0.5),
+                quarter("2025-09-27", 2025, 3, 0.5),
+                quarter("2025-12-27", 2025, 4, 2.5, grade="A"),
+            ], annual=[(2024, 4.4), (2025, 4.0)]),
+            "BBB": us_document([
+                quarter("2024-03-31", 2024, 1, 1.0),
+                quarter("2024-06-30", 2024, 2, None),
+                quarter("2024-09-30", 2024, 3, 1.0),
+                quarter("2024-12-31", 2024, 4, None),
+            ], annual=[(2024, 4.0)]),
+            "CCC": us_document([
+                quarter("2024-03-31", 2024, 1, 1.0),
+                quarter("2024-06-30", 2024, 2, 1.0),
+                quarter("2024-09-30", 2024, 3, 1.0),
+                quarter("2024-12-31", 2024, 4, None),
+            ], annual=[(2024, 4.0)]),
+            "DDD": us_document([
+                quarter("2024-03-31", 2024, 1, 1.0),
+                quarter("2024-06-30", 2024, 2, 1.0),
+                quarter("2024-09-30", 2024, 3, 1.0),
+                quarter("2024-12-31", 2024, 4, None),
+            ], annual=[(2024, 4.0)]),
+        }
+        classification = [
+            classified("AAA", "2024-12-28", "derivation-rejected", 2024),
+            classified("BBB", "2024-12-31", "no-q4-net-income", 2024),
+            classified("CCC", "2024-12-31", "derivation-rejected", 2024),
+            classified("DDD", "2024-12-31", "derivation-rejected", 2024),
+        ]
+        statements = [
+            statement_row("AAA", "2024-12-27", 1.1),   # covered, 1 day off, equals 4.4 - 3.3
+            statement_row("AAA", "2025-12-27", 2.5),   # set b, equals 4.0 - 1.5
+            statement_row("BBB", "2024-12-31", 0.9),   # covered, Q2 is null: not testable
+            statement_row("CCC", "2024-12-31", 2.5),   # covered, 4.0 - 3.0 = 1.0, so outside
+        ]
+        report, _, _ = self.run_probe(documents, classification, statements)
+        covered = report["subtraction"]["coveredMissing"]
+        self.assertEqual(covered["covered"], 3)
+        self.assertEqual(covered["testable"], 2)
+        self.assertEqual(covered["withinSubtraction"], 1)
+        self.assertEqual(covered["outsideSubtraction"], 1)
+        self.assertEqual(covered["notTestable"], 1)
+        self.assertEqual(covered["coveredNotWithinSubtraction"], 2)
+        self.assertEqual(covered["byClass"]["derivation-rejected"]["covered"], 2)
+        self.assertEqual(covered["byClass"]["derivation-rejected"]["withinSubtraction"], 1)
+        self.assertEqual(covered["byClass"]["derivation-rejected"]["outsideSubtraction"], 1)
+        self.assertEqual(covered["byClass"]["no-q4-net-income"]["notTestable"], 1)
+        self.assertEqual(covered["byClass"]["no-q4-net-income"]["testable"], 0)
+        self.assertEqual(report["coverage"]["total"]["covered"], covered["covered"])
+        set_b = report["agreement"]["setB"]["subtraction"]
+        self.assertEqual((set_b["testable"], set_b["withinSubtraction"], set_b["notTestable"]), (1, 1, 0))
 
 
 class LicenseText(unittest.TestCase):

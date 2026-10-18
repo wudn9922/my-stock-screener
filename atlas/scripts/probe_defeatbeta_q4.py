@@ -14,11 +14,16 @@ value does not match.
 Agreement: |dataset - SEC| <= max(0.011, 0.005 * |SEC|) and no sign error. A sign error (both values nonzero, opposite
 signs) is counted and is never agreement. The SEC value (the repo's value) always wins; the dataset is only compared.
 
-Set a: US quarterly rows with fq 1 to 3, quarterly.src == "sec" and a stored quarterly.values.epsDiluted. The stored
-record does not name the SEC form. The count of rows with quarterly.derived == 1 is reported next to the set.
-Set b: US Q4 rows with quarterly.epsQuality[i].epsDiluted == "A" and a stored value (the 2,649 grade-A rows).
+Set a: US quarterly rows with fq 1 to 3, quarterly.src == "sec", a stored quarterly.values.epsDiluted and
+quarterly.derived != 1. The stored record does not name the SEC form. The rows with quarterly.derived == 1 are reported
+as a separate subset with the same measures.
+Set b: US Q4 rows with quarterly.epsQuality[i].epsDiluted == "A" and a stored value (the 2,649 grade-A rows). Set b is
+the deciding set.
 Coverage: the missing US Q4 rows of q4-eps-missing-classification.json, reconciled with the financials files first.
 Covered = a matching dataset row with a usable diluted EPS value.
+Subtraction: annual diluted EPS minus (Q1 + Q2 + Q3) diluted EPS of the same fiscal year, from the repo's own files.
+Tested on the covered missing rows and on the covered set b rows. Not testable when a required input is missing or
+duplicated.
 
 Usage:
   python3 -I atlas/scripts/probe_defeatbeta_q4.py --card README.md --statement-csv rows.csv \
@@ -67,11 +72,15 @@ RULES = {
     "agreement": "|dataset - SEC| <= tolerance and no sign error",
     "signError": "both values nonzero and of opposite sign; a sign error is never agreement",
     "wilson": "lower bound of the 95% Wilson score interval (z = 1.959964) on agreements out of compared",
-    "setA": "US quarterly rows with fq 1 to 3, quarterly.src == \"sec\" and a stored quarterly.values.epsDiluted; "
-            "the stored record does not name the SEC form",
+    "setA": "US quarterly rows with fq 1 to 3, quarterly.src == \"sec\", a stored quarterly.values.epsDiluted and "
+            "quarterly.derived != 1; the stored record does not name the SEC form",
+    "setADerived": "the same rows with quarterly.derived == 1, as a separate subset with the same measures",
     "setB": "US Q4 rows with quarterly.epsQuality[i].epsDiluted == \"A\" and a stored quarterly.values.epsDiluted",
     "coverage": "the missing US Q4 rows of q4-eps-missing-classification.json, reconciled with the financials files; "
                 "covered = a matching dataset row with a usable diluted EPS value",
+    "subtraction": "annual diluted EPS minus (Q1 + Q2 + Q3) diluted EPS of the same fiscal year, from the repo's own "
+                   "files; testable only with exactly one annual row holding a value and exactly one row holding a value "
+                   "for each of Q1, Q2 and Q3; within = |dataset - subtraction| <= max(0.011, 0.005 * |subtraction|)",
     "winner": "the SEC value (the repo's value) always wins; the dataset is compared, never copied; no repo file is written",
 }
 
@@ -250,12 +259,53 @@ def tally_into(tally, status, offset):
         tally[UNMATCHED_KEY[status]] += 1
 
 
-def compare(entries, index):
-    """Agreement of one set against the dataset. entries: (symbol, end, end ordinal, SEC value)."""
+WITHIN, OUTSIDE, NOT_TESTABLE = "within", "outside", "notTestable"
+SUBTRACTION_KEYS = ("covered", "testable", "withinSubtraction", "outsideSubtraction", "notTestable")
+SUBTRACTION_FIELD = {WITHIN: "withinSubtraction", OUTSIDE: "outsideSubtraction", NOT_TESTABLE: "notTestable"}
+
+
+def subtraction_value(scan, symbol, fy):
+    """Annual diluted EPS minus (Q1 + Q2 + Q3) diluted EPS of one fiscal year, or None when a required input is not
+    testable: exactly one annual row holding a value, and exactly one row holding a value for each of Q1, Q2, Q3."""
+    annual = scan["annual"].get((symbol, fy), [])
+    if len(annual) != 1 or annual[0] is None:
+        return None
+    quarters = []
+    for fq in (1, 2, 3):
+        rows = scan["quarterly"].get((symbol, fy, fq), [])
+        if len(rows) != 1 or rows[0] is None:
+            return None
+        quarters.append(rows[0])
+    return annual[0] - (quarters[0] + quarters[1] + quarters[2])
+
+
+def subtraction_outcome(scan, symbol, fy, value):
+    """WITHIN or OUTSIDE when the dataset value is compared with the subtraction; NOT_TESTABLE otherwise."""
+    expected = subtraction_value(scan, symbol, fy)
+    if expected is None:
+        return NOT_TESTABLE
+    return WITHIN if abs(value - expected) <= tolerance(expected) else OUTSIDE
+
+
+def empty_subtraction():
+    return {key: 0 for key in SUBTRACTION_KEYS}
+
+
+def tally_subtraction(tally, outcome):
+    tally["covered"] += 1
+    if outcome != NOT_TESTABLE:
+        tally["testable"] += 1
+    tally[SUBTRACTION_FIELD[outcome]] += 1
+
+
+def compare(entries, index, scan=None):
+    """Agreement of one set against the dataset. entries: (symbol, end, end ordinal, SEC value, fy). With scan, the
+    compared rows also get the subtraction test."""
     counts = Counter()
     disagreements = []
     signs = []
-    for symbol, end, ordinal, sec_value in entries:
+    subtraction = empty_subtraction()
+    for symbol, end, ordinal, sec_value, fy in entries:
         status, value, offset = match(index, symbol, ordinal)
         if status != MATCHED:
             counts[UNMATCHED_KEY[status]] += 1
@@ -269,9 +319,11 @@ def compare(entries, index):
             counts["agreements"] += 1
         else:
             disagreements.append((symbol, end))
+        if scan is not None:
+            tally_subtraction(subtraction, subtraction_outcome(scan, symbol, fy, value))
     compared = counts["compared"]
     agreements = counts["agreements"]
-    return {
+    result = {
         "population": len(entries),
         "compared": compared,
         "agreements": agreements,
@@ -286,6 +338,14 @@ def compare(entries, index):
         "disagreementKeys": [{"symbol": symbol, "end": end} for symbol, end in sorted(disagreements)],
         "signErrorKeys": [{"symbol": symbol, "end": end} for symbol, end in sorted(signs)],
     }
+    if scan is not None:
+        result["subtraction"] = {
+            "testable": subtraction["testable"],
+            "withinSubtraction": subtraction["withinSubtraction"],
+            "outsideSubtraction": subtraction["outsideSubtraction"],
+            "notTestable": subtraction["notTestable"],
+        }
+    return result
 
 
 def card_license(text):
@@ -308,9 +368,10 @@ def card_license(text):
 
 
 def scan_financials(directory):
-    """One pass over the US financials files: the missing Q4 keys, set a and set b (with their end ordinals)."""
-    scan = {"usFiles": 0, "usQ4Rows": 0, "filesWithoutEpsDilutedList": 0, "derivedFlagInSetA": 0,
-            "missing": set(), "setA": [], "setB": []}
+    """One pass over the US financials files: the missing Q4 keys; set a (split by quarterly.derived), set b; and the
+    annual and Q1..Q3 diluted EPS the subtraction test reads. Set entries are (symbol, end, end ordinal, value, fy)."""
+    scan = {"usFiles": 0, "usQ4Rows": 0, "filesWithoutEpsDilutedList": 0, "missing": set(), "setA": [],
+            "setADerived": [], "setB": [], "annual": {}, "quarterly": {}}
     for path in sorted(Path(directory).glob("*.json")):
         if path.name == "index.json":
             continue
@@ -319,8 +380,17 @@ def scan_financials(directory):
             continue
         symbol = path.stem
         scan["usFiles"] += 1
+        annual = document.get("annual") or {}
+        annual_years = annual.get("fy") or []
+        annual_eps = (annual.get("values") or {}).get("epsDiluted")
+        if not isinstance(annual_eps, list):
+            annual_eps = []
+        for position, fy in enumerate(annual_years):
+            value = annual_eps[position] if position < len(annual_eps) and is_number(annual_eps[position]) else None
+            scan["annual"].setdefault((symbol, fy), []).append(value)
         quarterly = document.get("quarterly") or {}
         ends = quarterly.get("end") or []
+        years = quarterly.get("fy") or []
         fqs = quarterly.get("fq") or []
         sources = quarterly.get("src") or []
         derived = quarterly.get("derived") or []
@@ -334,6 +404,9 @@ def scan_financials(directory):
                 continue
             value = eps[position] if position < len(eps) and is_number(eps[position]) else None
             end = ends[position] if position < len(ends) else None
+            fy = years[position] if position < len(years) else None
+            if fq in (1, 2, 3):
+                scan["quarterly"].setdefault((symbol, fy, fq), []).append(value)
             if fq == 4:
                 scan["usQ4Rows"] += 1
                 if value is None:
@@ -341,11 +414,11 @@ def scan_financials(directory):
                     continue
                 grade = quality[position] if position < len(quality) else None
                 if isinstance(grade, dict) and grade.get("epsDiluted") == "A":
-                    scan["setB"].append((symbol, end, require_ordinal(end, f"{path.name} end[{position}]"), value))
+                    scan["setB"].append((symbol, end, require_ordinal(end, f"{path.name} end[{position}]"), value, fy))
             elif value is not None and position < len(sources) and sources[position] == "sec":
-                scan["setA"].append((symbol, end, require_ordinal(end, f"{path.name} end[{position}]"), value))
-                if position < len(derived) and derived[position] == 1:
-                    scan["derivedFlagInSetA"] += 1
+                is_derived = position < len(derived) and derived[position] == 1
+                entry = (symbol, end, require_ordinal(end, f"{path.name} end[{position}]"), value, fy)
+                scan["setADerived" if is_derived else "setA"].append(entry)
     return scan
 
 
@@ -384,16 +457,23 @@ def build_report(card, statement_csv, download_sizes, repo_root):
         raise ProbeError(f"the classification does not match the missing Q4 rows of the financials: "
                          f"{len(only_classification)} only in the classification, "
                          f"{len(only_financials)} only in the financials")
-    by_class = {name: empty_tally() for name in classification["rowDefinition"]["classOrder"]}
+    class_order = classification["rowDefinition"]["classOrder"]
+    by_class = {name: empty_tally() for name in class_order}
+    sub_by_class = {name: empty_subtraction() for name in class_order}
     by_year = {}
     for row in rows:
-        status, _, offset = match(index, row["symbol"], require_ordinal(row["end"], f"{row['symbol']} end"))
+        status, value, offset = match(index, row["symbol"], require_ordinal(row["end"], f"{row['symbol']} end"))
         tally_into(by_class[row["class"]], status, offset)
         tally_into(by_year.setdefault(str(row["fy"]), empty_tally()), status, offset)
+        if status == MATCHED:
+            tally_subtraction(sub_by_class[row["class"]], subtraction_outcome(scan, row["symbol"], row["fy"], value))
     total = empty_tally()
-    for tally in by_class.values():
+    sub_total = empty_subtraction()
+    for name in class_order:
         for key in COVERAGE_KEYS:
-            total[key] += tally[key]
+            total[key] += by_class[name][key]
+        for key in SUBTRACTION_KEYS:
+            sub_total[key] += sub_by_class[name][key]
     return {
         "schema": SCHEMA,
         "dataset": DATASET,
@@ -423,7 +503,7 @@ def build_report(card, statement_csv, download_sizes, repo_root):
             "reconciledWithClassification": True,
             "classificationCounts": classification["counts"],
             "setAPopulation": len(scan["setA"]),
-            "setAWithDerivedFlag": scan["derivedFlagInSetA"],
+            "setADerivedPopulation": len(scan["setADerived"]),
             "setBPopulation": len(scan["setB"]),
         },
         "coverage": {
@@ -432,9 +512,17 @@ def build_report(card, statement_csv, download_sizes, repo_root):
             "byClass": {name: by_class[name] for name in sorted(by_class)},
             "byFiscalYear": {year: by_year[year] for year in sorted(by_year, key=int)},
         },
+        "subtraction": {
+            "coveredMissing": {
+                **sub_total,
+                "coveredNotWithinSubtraction": sub_total["covered"] - sub_total["withinSubtraction"],
+                "byClass": {name: sub_by_class[name] for name in sorted(sub_by_class)},
+            },
+        },
         "agreement": {
             "setA": compare(scan["setA"], index),
-            "setB": compare(scan["setB"], index),
+            "setADerived": compare(scan["setADerived"], index),
+            "setB": compare(scan["setB"], index, scan),
         },
     }
 
