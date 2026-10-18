@@ -162,4 +162,4 @@
   - SUNE 2016 was accepted with EPS −125,999.37 (split factor 1.67e-6). The |EPS| ≥ 1000 rejection runs before the split division, so it never sees this value. Code fix needed before any fill.
   - Even with the split basis fixed, TRU and the 2 conflicts still fail S3.4.
 - Not done: gate (exit 3 expected; `s3-backtest-summary.json` not committed), S3.6 revision, S4, S5, fill, answer-set edit, code change.
-- Stop: yes. S3 failed (conflicts; partial Wilson 0.908). S3.6 revision needs an Opus decision.
+- Stop: yes. S3 failed (conflicts; partial Wilson 0.908). S3.6 revision needs an Opus decision. Opus decision 2026-10-18: no S3.6 revision; S4 blocked.

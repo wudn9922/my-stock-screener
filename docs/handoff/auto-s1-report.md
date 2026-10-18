@@ -135,4 +135,4 @@ resumes at the step it names. Nothing is merged from this report.
 - Outcome: S3 failed. Gate not run. Conflicts 2 (SNDA 2019-12-31, ACNT 2022-12-31). Partial Wilson 95% lower bound 0.908 over shards 0 to 2; gate needs 0.970.
 - Shard 3 failed twice with sec.gov NetworkError (26 and 42 of 344 periods). Shards 4 to 7 not dispatched.
 - Full numbers, incorrect and conflict rows, and filing links: `docs/handoff/q4-eps-s1-s5-codex-report.md`, section "S3 (stopped at the gate)".
-- Next: S3.6 revision needs an Opus decision. Split-basis comparison and the SUNE 2016 |EPS| check need Opus review before any revision. S4 not started.
+- Next: Opus decision 2026-10-18: no S3.6 revision (both conflicts are deterministic and outside the dev tickers, so a fresh S3 run cannot pass); S4 blocked; open decision for the user: whether the S3 gate definition changes (0 conflicts, split basis of the answer value).
