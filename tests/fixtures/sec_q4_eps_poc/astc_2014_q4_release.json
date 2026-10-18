@@ -1,0 +1,32 @@
+{
+  "source_url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004870/t1401849_ex99-1.htm",
+  "accession": "0001571049-14-004870",
+  "filing_date": "2014-09-30",
+  "form": "8-K EX-99.1",
+  "ticker": "ASTC",
+  "cik": "0001001907",
+  "fiscal_year": 2014,
+  "q4_target": {
+    "q4_end": "2014-06-30",
+    "q4_start_estimate": "2014-04-01",
+    "q4_end_matches_local_annual_end": true
+  },
+  "location": "Exhibit 99.1, “Fourth Quarter Results” paragraph; release headline identifies GAAP results.",
+  "source_text_excerpt": "to be part of Astrotech,” Pickens added. “We continue to engage with key industry partners to develop compelling solutions that address an expanding variety of lucrative markets.” Fourth Quarter Results The Company posted fourth quarter fiscal year 2014 net loss of $0.8 million, or $(0.04) per diluted share on revenue of $5.6 million compared with a fourth quarter fiscal year 2013 net income of $2.2 million or $0.11 per diluted share on revenue of $9.2 million. Fiscal Year Results The Company posted fiscal year 2014 net loss of $5.0 million, or $(0.25) per diluted share on revenue of $16.4 million compared with fis",
+  "diluted_eps_fact": {
+    "concept": "custom:ReleaseGaapDilutedEpsDisclosure",
+    "context": {
+      "start": "2014-04-01",
+      "end": "2014-06-30",
+      "dimensions": []
+    },
+    "unit_measures": [
+      "iso4217:USD",
+      "xbrli:shares"
+    ],
+    "value": -0.04,
+    "row_text": "GAAP results: net loss of $0.8 million, or $(0.04) per diluted share for the quarter ended June 30, 2014",
+    "table_text": "to be part of Astrotech,” Pickens added. “We continue to engage with key industry partners to develop compelling solutions that address an expanding variety of lucrative markets.” Fourth Quarter Results The Company posted fourth quarter fiscal year 2014 net loss of $0.8 million, or $(0.04) per diluted share on revenue of $5.6 million compared with a fourth quarter fiscal year 2013 net income of $2.2 million or $0.11 per diluted share on revenue of $9.2 million. Fiscal Year Results The Company posted fiscal year 2014 net loss of $5.0 million, or $(0.25) per diluted share on revenue of $16.4 million compared with fis",
+    "gaap_evidence": "The exhibit explicitly labels the financial results GAAP and ties diluted EPS to the quarter-end net loss."
+  }
+}

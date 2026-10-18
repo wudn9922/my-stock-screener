@@ -1,0 +1,1114 @@
+{
+  "attempt": "initial Source D primary-file/index pass terminated after the selector checked only type/description; SEC index JSON reports generic text.gif and exhibit identifiers live in item.name",
+  "candidate_filing_count": 102,
+  "index_files_retrieved": 95,
+  "index_http_status_counts": {
+    "200": 95
+  },
+  "filing_index_records": [
+    {
+      "accession": "0001193125-19-111231",
+      "filing_date": "2019-04-19",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000119312519111231/index.json",
+      "index_http_status": 200,
+      "index_bytes": 660,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001564590-19-009797",
+      "filing_date": "2019-03-28",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019009797/index.json",
+      "index_http_status": 200,
+      "index_bytes": 3388,
+      "primary_document_cached": true,
+      "index_item_count": 30,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_8.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-19-009241",
+      "filing_date": "2019-03-26",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019009241/index.json",
+      "index_http_status": 200,
+      "index_bytes": 770,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_32.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-19-006435",
+      "filing_date": "2019-03-06",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019006435/index.json",
+      "index_http_status": 200,
+      "index_bytes": 771,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_6.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-19-006163",
+      "filing_date": "2019-03-05",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019006163/index.json",
+      "index_http_status": 200,
+      "index_bytes": 772,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_6.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-19-003244",
+      "filing_date": "2019-02-19",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019003244/index.json",
+      "index_http_status": 200,
+      "index_bytes": 2616,
+      "primary_document_cached": true,
+      "index_item_count": 23,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_7.htm",
+        "tdw-ex992_8.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-19-003216",
+      "filing_date": "2019-02-19",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019003216/index.json",
+      "index_http_status": 200,
+      "index_bytes": 770,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_6.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-19-002620",
+      "filing_date": "2019-02-12",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019002620/index.json",
+      "index_http_status": 200,
+      "index_bytes": 769,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_6.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-19-000653",
+      "filing_date": "2019-01-15",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019000653/index.json",
+      "index_http_status": 200,
+      "index_bytes": 769,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_6.htm"
+      ]
+    },
+    {
+      "accession": "0001193125-19-002520",
+      "filing_date": "2019-01-04",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000119312519002520/index.json",
+      "index_http_status": 200,
+      "index_bytes": 862,
+      "primary_document_cached": true,
+      "index_item_count": 7,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001193125-18-219178",
+      "filing_date": "2018-07-17",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000119312518219178/index.json",
+      "index_http_status": 200,
+      "index_bytes": 868,
+      "primary_document_cached": true,
+      "index_item_count": 7,
+      "filename_matches_ignored_by_initial_selector": [
+        "d535381dex991.htm"
+      ]
+    },
+    {
+      "accession": "0001193125-18-218867",
+      "filing_date": "2018-07-16",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000119312518218867/index.json",
+      "index_http_status": 200,
+      "index_bytes": 2586,
+      "primary_document_cached": true,
+      "index_item_count": 23,
+      "filename_matches_ignored_by_initial_selector": [
+        "d509995dex991.htm",
+        "d509995dex992.htm",
+        "g509995ex99_2s10g1.jpg",
+        "g509995ex99_2s11g1.jpg",
+        "g509995ex99_2s12g1.jpg",
+        "g509995ex99_2s13g1.jpg",
+        "g509995ex99_2s14g1.jpg",
+        "g509995ex99_2s15g1.jpg",
+        "g509995ex99_2s1g1.jpg",
+        "g509995ex99_2s2g1.jpg",
+        "g509995ex99_2s3g1.jpg",
+        "g509995ex99_2s4g1.jpg",
+        "g509995ex99_2s5g1.jpg",
+        "g509995ex99_2s6g1.jpg",
+        "g509995ex99_2s7g1.jpg",
+        "g509995ex99_2s8g1.jpg",
+        "g509995ex99_2s9g1.jpg"
+      ]
+    },
+    {
+      "accession": "0001564590-18-015958",
+      "filing_date": "2018-06-21",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459018015958/index.json",
+      "index_http_status": 200,
+      "index_bytes": 564,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001564590-18-014512",
+      "filing_date": "2018-05-29",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459018014512/index.json",
+      "index_http_status": 200,
+      "index_bytes": 3488,
+      "primary_document_cached": true,
+      "index_item_count": 31,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_7.htm",
+        "tdw-ex992_8.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-18-014104",
+      "filing_date": "2018-05-22",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459018014104/index.json",
+      "index_http_status": 200,
+      "index_bytes": 774,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_6.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-18-013704",
+      "filing_date": "2018-05-16",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459018013704/index.json",
+      "index_http_status": 200,
+      "index_bytes": 776,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_6.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-18-012474",
+      "filing_date": "2018-05-09",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459018012474/index.json",
+      "index_http_status": 200,
+      "index_bytes": 773,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_6.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-18-012464",
+      "filing_date": "2018-05-09",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459018012464/index.json",
+      "index_http_status": 200,
+      "index_bytes": 774,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_6.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-18-010548",
+      "filing_date": "2018-05-03",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459018010548/index.json",
+      "index_http_status": 200,
+      "index_bytes": 564,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001193125-20-115764",
+      "filing_date": "2020-04-23",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000119312520115764/index.json",
+      "index_http_status": 200,
+      "index_bytes": 1765,
+      "primary_document_cached": true,
+      "index_item_count": 16,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001193125-20-107240",
+      "filing_date": "2020-04-14",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000119312520107240/index.json",
+      "index_http_status": 200,
+      "index_bytes": 2066,
+      "primary_document_cached": true,
+      "index_item_count": 19,
+      "filename_matches_ignored_by_initial_selector": [
+        "d824648dex991.htm"
+      ]
+    },
+    {
+      "accession": "0001193125-20-080767",
+      "filing_date": "2020-03-20",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000119312520080767/index.json",
+      "index_http_status": 200,
+      "index_bytes": 1765,
+      "primary_document_cached": true,
+      "index_item_count": 16,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001564590-20-008506",
+      "filing_date": "2020-03-04",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459020008506/index.json",
+      "index_http_status": 200,
+      "index_bytes": 1986,
+      "primary_document_cached": true,
+      "index_item_count": 18,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_219.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-19-022690",
+      "filing_date": "2019-06-18",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019022690/index.json",
+      "index_http_status": 200,
+      "index_bytes": 3933,
+      "primary_document_cached": true,
+      "index_item_count": 35,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_7.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-19-020389",
+      "filing_date": "2019-05-24",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019020389/index.json",
+      "index_http_status": 200,
+      "index_bytes": 3607,
+      "primary_document_cached": true,
+      "index_item_count": 32,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_18.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-19-016274",
+      "filing_date": "2019-05-07",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019016274/index.json",
+      "index_http_status": 200,
+      "index_bytes": 772,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "tdw-ex991_6.htm"
+      ]
+    },
+    {
+      "accession": "0001193125-19-130757",
+      "filing_date": "2019-05-01",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/98222/000119312519130757/index.json",
+      "index_http_status": 200,
+      "index_bytes": 559,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001295345-15-000102",
+      "filing_date": "2015-04-30",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000102/index.json",
+      "index_http_status": 200,
+      "index_bytes": 564,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001295345-15-000059",
+      "filing_date": "2015-03-24",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000059/index.json",
+      "index_http_status": 200,
+      "index_bytes": 659,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001295345-15-000051",
+      "filing_date": "2015-03-16",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000051/index.json",
+      "index_http_status": 200,
+      "index_bytes": 660,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001295345-15-000030",
+      "filing_date": "2015-02-13",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000030/index.json",
+      "index_http_status": 200,
+      "index_bytes": 658,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001295345-15-000020",
+      "filing_date": "2015-02-03",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000020/index.json",
+      "index_http_status": 200,
+      "index_bytes": 564,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001295345-15-000002",
+      "filing_date": "2015-01-02",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000002/index.json",
+      "index_http_status": 200,
+      "index_bytes": 661,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001493152-20-002870",
+      "filing_date": "2020-02-24",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000149315220002870/index.json",
+      "index_http_status": 200,
+      "index_bytes": 558,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001493152-20-001694",
+      "filing_date": "2020-02-06",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000149315220001694/index.json",
+      "index_http_status": 200,
+      "index_bytes": 651,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001493152-20-000007",
+      "filing_date": "2020-01-02",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000149315220000007/index.json",
+      "index_http_status": 200,
+      "index_bytes": 651,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001571049-14-004870",
+      "filing_date": "2014-09-30",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004870/index.json",
+      "index_http_status": 200,
+      "index_bytes": 767,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1logo.jpg",
+        "t1401849_ex99-1.htm"
+      ]
+    },
+    {
+      "accession": "0001571049-14-004194",
+      "filing_date": "2014-08-22",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004194/index.json",
+      "index_http_status": 200,
+      "index_bytes": 1081,
+      "primary_document_cached": true,
+      "index_item_count": 9,
+      "filename_matches_ignored_by_initial_selector": [
+        "nny1401636_ex99-1.htm",
+        "nny1401636_ex99-2.htm"
+      ]
+    },
+    {
+      "accession": "0001571049-14-002797",
+      "filing_date": "2014-07-01",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914002797/index.json",
+      "index_http_status": 200,
+      "index_bytes": 761,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "t1401248_ex99-1.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-19-035776",
+      "filing_date": "2019-09-27",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1001907/000156459019035776/index.json",
+      "index_http_status": 200,
+      "index_bytes": 884,
+      "primary_document_cached": true,
+      "index_item_count": 7,
+      "filename_matches_ignored_by_initial_selector": [
+        "astc-ex991_6.htm"
+      ]
+    },
+    {
+      "accession": "0001564590-19-034503",
+      "filing_date": "2019-09-11",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1001907/000156459019034503/index.json",
+      "index_http_status": 200,
+      "index_bytes": 976,
+      "primary_document_cached": true,
+      "index_item_count": 8,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001030469-18-000023",
+      "filing_date": "2018-04-20",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046918000023/index.json",
+      "index_http_status": 200,
+      "index_bytes": 779,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001030469-18-000010",
+      "filing_date": "2018-03-07",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046918000010/index.json",
+      "index_http_status": 200,
+      "index_bytes": 566,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001030469-18-000007",
+      "filing_date": "2018-01-30",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046918000007/index.json",
+      "index_http_status": 200,
+      "index_bytes": 671,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001030469-18-000006",
+      "filing_date": "2018-01-30",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046918000006/index.json",
+      "index_http_status": 200,
+      "index_bytes": 781,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001030469-21-000013",
+      "filing_date": "2021-04-23",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046921000013/index.json",
+      "index_http_status": 200,
+      "index_bytes": 1996,
+      "primary_document_cached": true,
+      "index_item_count": 18,
+      "filename_matches_ignored_by_initial_selector": [
+        "ofg8kexhibit991q21.htm",
+        "ofg8kexhibit991q21p1i0.jpg"
+      ]
+    },
+    {
+      "accession": "0001030469-21-000012",
+      "filing_date": "2021-04-21",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046921000012/index.json",
+      "index_http_status": 200,
+      "index_bytes": 793,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "ofg8kearningsrelease1.htm",
+        "ofg8kexhibit991q21.htm",
+        "ofg8kexhibit991q21p1i0.jpg"
+      ]
+    },
+    {
+      "accession": "0001193125-21-020799",
+      "filing_date": "2021-01-28",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1030469/000119312521020799/index.json",
+      "index_http_status": 200,
+      "index_bytes": 1870,
+      "primary_document_cached": true,
+      "index_item_count": 17,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001030469-21-000006",
+      "filing_date": "2021-01-25",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046921000006/index.json",
+      "index_http_status": 200,
+      "index_bytes": 1998,
+      "primary_document_cached": true,
+      "index_item_count": 18,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001185185-12-001394",
+      "filing_date": "2012-06-27",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001394/index.json",
+      "index_http_status": 200,
+      "index_bytes": 760,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm"
+      ]
+    },
+    {
+      "accession": "0001185185-12-001377",
+      "filing_date": "2012-06-25",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001377/index.json",
+      "index_http_status": 200,
+      "index_bytes": 857,
+      "primary_document_cached": true,
+      "index_item_count": 7,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm"
+      ]
+    },
+    {
+      "accession": "0001185185-12-001266",
+      "filing_date": "2012-06-01",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001266/index.json",
+      "index_http_status": 200,
+      "index_bytes": 665,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm"
+      ]
+    },
+    {
+      "accession": "0001185185-12-000718",
+      "filing_date": "2012-04-06",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512000718/index.json",
+      "index_http_status": 200,
+      "index_bytes": 672,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm"
+      ]
+    },
+    {
+      "accession": "0001493152-15-001584",
+      "filing_date": "2015-04-23",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215001584/index.json",
+      "index_http_status": 200,
+      "index_bytes": 654,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm"
+      ]
+    },
+    {
+      "accession": "0001493152-15-001501",
+      "filing_date": "2015-04-17",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215001501/index.json",
+      "index_http_status": 200,
+      "index_bytes": 560,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001493152-15-000723",
+      "filing_date": "2015-03-03",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000723/index.json",
+      "index_http_status": 200,
+      "index_bytes": 561,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001493152-15-000685",
+      "filing_date": "2015-02-27",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000685/index.json",
+      "index_http_status": 200,
+      "index_bytes": 654,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001493152-15-000682",
+      "filing_date": "2015-02-27",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000682/index.json",
+      "index_http_status": 200,
+      "index_bytes": 3837,
+      "primary_document_cached": true,
+      "index_item_count": 37,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm"
+      ]
+    },
+    {
+      "accession": "0001493152-15-000665",
+      "filing_date": "2015-02-26",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000665/index.json",
+      "index_http_status": 200,
+      "index_bytes": 654,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm"
+      ]
+    },
+    {
+      "accession": "0001493152-15-000132",
+      "filing_date": "2015-01-13",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000132/index.json",
+      "index_http_status": 200,
+      "index_bytes": 1221,
+      "primary_document_cached": true,
+      "index_item_count": 11,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm"
+      ]
+    },
+    {
+      "accession": "0001493152-15-000109",
+      "filing_date": "2015-01-09",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000109/index.json",
+      "index_http_status": 200,
+      "index_bytes": 842,
+      "primary_document_cached": true,
+      "index_item_count": 7,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm",
+        "ex99-2.htm"
+      ]
+    },
+    {
+      "accession": "0001493152-15-000092",
+      "filing_date": "2015-01-08",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000092/index.json",
+      "index_http_status": 200,
+      "index_bytes": 841,
+      "primary_document_cached": true,
+      "index_item_count": 7,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm"
+      ]
+    },
+    {
+      "accession": "0001213900-18-004693",
+      "filing_date": "2018-04-19",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390018004693/index.json",
+      "index_http_status": 200,
+      "index_bytes": 571,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-18-004507",
+      "filing_date": "2018-04-16",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390018004507/index.json",
+      "index_http_status": 200,
+      "index_bytes": 577,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-18-004159",
+      "filing_date": "2018-04-09",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390018004159/index.json",
+      "index_http_status": 200,
+      "index_bytes": 578,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-18-003876",
+      "filing_date": "2018-04-02",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390018003876/index.json",
+      "index_http_status": 200,
+      "index_bytes": 576,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-18-003436",
+      "filing_date": "2018-03-26",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390018003436/index.json",
+      "index_http_status": 200,
+      "index_bytes": 571,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-18-003074",
+      "filing_date": "2018-03-16",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390018003074/index.json",
+      "index_http_status": 200,
+      "index_bytes": 911,
+      "primary_document_cached": true,
+      "index_item_count": 7,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-18-002506",
+      "filing_date": "2018-03-02",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390018002506/index.json",
+      "index_http_status": 200,
+      "index_bytes": 578,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-18-002095",
+      "filing_date": "2018-02-20",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390018002095/index.json",
+      "index_http_status": 200,
+      "index_bytes": 574,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-18-000950",
+      "filing_date": "2018-01-29",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390018000950/index.json",
+      "index_http_status": 200,
+      "index_bytes": 574,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-18-000697",
+      "filing_date": "2018-01-19",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390018000697/index.json",
+      "index_http_status": 200,
+      "index_bytes": 578,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-18-000177",
+      "filing_date": "2018-01-05",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390018000177/index.json",
+      "index_http_status": 200,
+      "index_bytes": 578,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-20-008662",
+      "filing_date": "2020-04-06",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390020008662/index.json",
+      "index_http_status": 200,
+      "index_bytes": 3007,
+      "primary_document_cached": true,
+      "index_item_count": 28,
+      "filename_matches_ignored_by_initial_selector": [
+        "ea120432ex99-1_neuroone.htm",
+        "ex99-1_001.jpg",
+        "ex99-1_002.jpg",
+        "ex99-1_003.jpg",
+        "ex99-1_004.jpg",
+        "ex99-1_005.jpg",
+        "ex99-1_006.jpg",
+        "ex99-1_007.jpg",
+        "ex99-1_008.jpg",
+        "ex99-1_009.jpg",
+        "ex99-1_010.jpg",
+        "ex99-1_011.jpg",
+        "ex99-1_012.jpg",
+        "ex99-1_013.jpg",
+        "ex99-1_014.jpg",
+        "ex99-1_015.jpg",
+        "ex99-1_016.jpg",
+        "ex99-1_017.jpg",
+        "ex99-1_018.jpg",
+        "ex99-1_019.jpg",
+        "ex99-1_020.jpg",
+        "ex99-1_021.jpg",
+        "ex99-1_022.jpg",
+        "ex99-1_023.jpg"
+      ]
+    },
+    {
+      "accession": "0001213900-20-004573",
+      "filing_date": "2020-02-24",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390020004573/index.json",
+      "index_http_status": 200,
+      "index_bytes": 690,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": [
+        "f8k021820ex99-1_neuroone.htm"
+      ]
+    },
+    {
+      "accession": "0001213900-20-001745",
+      "filing_date": "2020-01-24",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390020001745/index.json",
+      "index_http_status": 200,
+      "index_bytes": 894,
+      "primary_document_cached": true,
+      "index_item_count": 7,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-19-027296",
+      "filing_date": "2019-12-31",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390019027296/index.json",
+      "index_http_status": 200,
+      "index_bytes": 578,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-19-025880",
+      "filing_date": "2019-12-11",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390019025880/index.json",
+      "index_http_status": 200,
+      "index_bytes": 689,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-19-025318",
+      "filing_date": "2019-12-04",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390019025318/index.json",
+      "index_http_status": 200,
+      "index_bytes": 578,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-19-025070",
+      "filing_date": "2019-12-02",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390019025070/index.json",
+      "index_http_status": 200,
+      "index_bytes": 692,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": [
+        "f8k112919ex99-1_neuroonemed.htm"
+      ]
+    },
+    {
+      "accession": "0001213900-19-022367",
+      "filing_date": "2019-11-07",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390019022367/index.json",
+      "index_http_status": 200,
+      "index_bytes": 914,
+      "primary_document_cached": true,
+      "index_item_count": 7,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-19-021393",
+      "filing_date": "2019-10-29",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390019021393/index.json",
+      "index_http_status": 200,
+      "index_bytes": 682,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-19-021161",
+      "filing_date": "2019-10-25",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390019021161/index.json",
+      "index_http_status": 200,
+      "index_bytes": 579,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-19-020209",
+      "filing_date": "2019-10-11",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390019020209/index.json",
+      "index_http_status": 200,
+      "index_bytes": 691,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001387131-17-001993",
+      "filing_date": "2017-04-07",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001993/index.json",
+      "index_http_status": 200,
+      "index_bytes": 566,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001387131-17-001425",
+      "filing_date": "2017-03-16",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001425/index.json",
+      "index_http_status": 200,
+      "index_bytes": 760,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm"
+      ]
+    },
+    {
+      "accession": "0001387131-17-001260",
+      "filing_date": "2017-03-08",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001260/index.json",
+      "index_http_status": 200,
+      "index_bytes": 567,
+      "primary_document_cached": true,
+      "index_item_count": 4,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001387131-17-001258",
+      "filing_date": "2017-03-08",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001258/index.json",
+      "index_http_status": 200,
+      "index_bytes": 762,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm",
+        "ex99-1_img001.jpg"
+      ]
+    },
+    {
+      "accession": "0001493152-23-002542",
+      "filing_date": "2023-01-26",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/index.json",
+      "index_http_status": 200,
+      "index_bytes": 3458,
+      "primary_document_cached": true,
+      "index_item_count": 33,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm",
+        "ex99-1_001.jpg",
+        "ex99-1_002.jpg",
+        "ex99-1_003.jpg",
+        "ex99-1_004.jpg",
+        "ex99-1_005.jpg",
+        "ex99-1_006.jpg",
+        "ex99-1_007.jpg",
+        "ex99-1_008.jpg",
+        "ex99-1_009.jpg",
+        "ex99-1_010.jpg",
+        "ex99-1_011.jpg",
+        "ex99-1_012.jpg",
+        "ex99-1_013.jpg",
+        "ex99-1_014.jpg",
+        "ex99-1_015.jpg",
+        "ex99-1_016.jpg"
+      ]
+    },
+    {
+      "accession": "0001493152-23-002541",
+      "filing_date": "2023-01-26",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002541/index.json",
+      "index_http_status": 200,
+      "index_bytes": 1957,
+      "primary_document_cached": true,
+      "index_item_count": 18,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm",
+        "ex99-1_001.jpg"
+      ]
+    },
+    {
+      "accession": "0001010412-16-000212",
+      "filing_date": "2016-01-28",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1638911/000101041216000212/index.json",
+      "index_http_status": 200,
+      "index_bytes": 681,
+      "primary_document_cached": true,
+      "index_item_count": 5,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001213900-22-018925",
+      "filing_date": "2022-04-08",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1638911/000121390022018925/index.json",
+      "index_http_status": 200,
+      "index_bytes": 1799,
+      "primary_document_cached": true,
+      "index_item_count": 16,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001654954-18-000244",
+      "filing_date": "2018-01-09",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1702924/000165495418000244/index.json",
+      "index_http_status": 200,
+      "index_bytes": 759,
+      "primary_document_cached": true,
+      "index_item_count": 6,
+      "filename_matches_ignored_by_initial_selector": [
+        "ex99-1.htm"
+      ]
+    },
+    {
+      "accession": "0001437749-23-005259",
+      "filing_date": "2023-03-03",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923005259/index.json",
+      "index_http_status": 200,
+      "index_bytes": 1973,
+      "primary_document_cached": true,
+      "index_item_count": 18,
+      "filename_matches_ignored_by_initial_selector": []
+    },
+    {
+      "accession": "0001851734-23-000054",
+      "filing_date": "2023-02-10",
+      "index_url": "https://www.sec.gov/Archives/edgar/data/1702924/000185173423000054/index.json",
+      "index_http_status": 200,
+      "index_bytes": 1881,
+      "primary_document_cached": true,
+      "index_item_count": 17,
+      "filename_matches_ignored_by_initial_selector": []
+    }
+  ],
+  "note": "No conclusion about disclosure was drawn from this partial attempt. Re-run uses filename-based EX-99 matching and performs the complete Source D search."
+}

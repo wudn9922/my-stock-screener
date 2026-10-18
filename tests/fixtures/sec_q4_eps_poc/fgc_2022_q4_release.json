@@ -1,0 +1,33 @@
+{
+  "ticker_in_frozen_sample": "FGC",
+  "reported_ticker_at_filing": "FGF",
+  "company_name_at_filing": "FG Financial Group, Inc.",
+  "cik": "0001591890",
+  "accession": "0001493152-23-008865",
+  "filing_date": "2023-03-24",
+  "form": "8-K EX-99.1",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223008865/ex99-1.htm",
+  "q4_start": "2022-10-01",
+  "q4_end": "2022-12-31",
+  "eps": -0.03,
+  "measure_label": "Basic and diluted net earnings (loss) per common share; loss per share attributable to common shareholders",
+  "statement_scope": "Unaudited consolidated Statements of Operations",
+  "source_html_excerpt": "<html><body><p>FG Financial Group, Inc. Reports Fourth Quarter and Full Year 2022 Financial Results. The Company today announced results for the fourth quarter and full year ended December 31, 2022.</p><p>Net loss attributable to common shareholders for the fourth quarter of 2022 improved to $0.30 million, or $(0.03) per fully diluted share, compared to a loss of $3.8 million, or $(0.66) per fully diluted share for the fourth quarter of 2021.</p><p>Consolidated Statements of Operations (Unaudited): Three months ended December 31, Full year ended December 31, 2022 2021 2022 2021. Basic and diluted net earnings (loss) per common share: Continuing operations $(0.03) $(0.66) $(0.09) $(1.99); Discontinued operations — — — 0.03; Loss per share attributable to common shareholders $(0.03) $(0.66) $(0.09) $(1.96).</p></body></html>",
+  "period_columns": [
+    {"start": "2022-10-01", "end": "2022-12-31", "duration": "three months", "fiscal_label": "Q4 2022"},
+    {"start": "2021-10-01", "end": "2021-12-31", "duration": "three months", "fiscal_label": "Q4 2021"},
+    {"start": "2022-01-01", "end": "2022-12-31", "duration": "full year", "fiscal_label": "FY2022"},
+    {"start": "2021-01-01", "end": "2021-12-31", "duration": "full year", "fiscal_label": "FY2021"}
+  ],
+  "row_values": ["(0.03)", "(0.66)", "(0.09)", "(1.96)"],
+  "evidence_excerpt": "The Company today announced results for the fourth quarter and full year ended December 31, 2022. Net loss attributable to common shareholders for the fourth quarter of 2022 improved to $0.30 million, or $(0.03) per fully diluted share, compared to a loss of $3.8 million, or $(0.66) per fully diluted share for the fourth quarter of 2021. Consolidated Statements of Operations (Unaudited): Three months ended December 31, Full year ended December 31, 2022 2021 2022 2021. Basic and diluted net earnings (loss) per common share: Continuing operations $(0.03) $(0.66) $(0.09) $(1.99); Discontinued operations — — — 0.03; Loss per share attributable to common shareholders $(0.03) $(0.66) $(0.09) $(1.96).",
+  "gaap_statement_basis_verified": true,
+  "consolidated_scope_verified": true,
+  "share_class": "common",
+  "split_events_after_q4": [["2024-11-01", 0.04], ["2026-02-13", 0.2]],
+  "split_review_complete": true,
+  "split_adjustment_applied": false,
+  "same_period_database_value": null,
+  "database_comparison": "No same-period local Q4 EPS value exists; not comparable.",
+  "identity_note": "Local symbol FGC maps to CIK 0001591890; the issuer's reported name and ticker at this filing were FG Financial Group, Inc. / FGF. The CIK is continuous."
+}

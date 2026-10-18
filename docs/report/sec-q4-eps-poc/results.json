@@ -1,0 +1,3511 @@
+{
+  "version": 1,
+  "sample_id": "sec-q4-diluted-eps-poc-20261018",
+  "sample_freeze_sha256": "85d642f65764c8330005a1df30d90752a73f893cebe3ccb4e5b76ed0e2ecf490",
+  "retrieved_at": "2026-10-18",
+  "classification_legend": {
+    "A": "Verified direct Q4 EPS",
+    "B": "Candidate needing verification",
+    "C": "Derived-only or annual/quarter-input evidence; no accepted direct Q4 EPS",
+    "D": "No direct disclosure and no usable derived evidence found in the completed search",
+    "E": "Technical failure or an incomplete/unmatched frozen period"
+  },
+  "period_results": [
+    {
+      "ticker": "BNC",
+      "company_name": "BNB Standard Corp",
+      "cik": "0001482541",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2014,
+      "frozen_q4_end": "2014-12-31",
+      "missing_reason": "q4_net_income_missing",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2014-12-31"
+      ],
+      "selected_10k_accessions": [
+        "0001493152-15-001473"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001493152-15-001473",
+        "form": "10-K",
+        "filing_date": "2015-04-16",
+        "report_date": "2014-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215001473/form10-k.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 14
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 30,
+        "note_text_candidate_count": 5
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001493152-15-000092",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-000109",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-000132",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-000665",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-000682",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-000685",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-000723",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-001501",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-001584",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "C",
+      "verified_q4_eps": null,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "Annual and Q1–Q3 evidence only; no direct diluted Q4 EPS found.",
+      "verified_source": null
+    },
+    {
+      "ticker": "BNC",
+      "company_name": "BNB Standard Corp",
+      "cik": "0001482541",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2024,
+      "frozen_q4_end": "2025-01-31",
+      "missing_reason": "q4_net_income_missing",
+      "period_end_match": false,
+      "sec_10k_report_ends": [
+        "2024-12-31"
+      ],
+      "selected_10k_accessions": [],
+      "source_c_original_10k": {
+        "accession": "0001641172-25-000913",
+        "form": "10-K",
+        "filing_date": "2025-03-27",
+        "report_date": "2024-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/1482541/000164117225000913/form10-k.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 11
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 42,
+        "note_text_candidate_count": 2
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001493152-25-006050",
+            "index_http_status": 200,
+            "filing_status": "searched_with_unsupported_attachments",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 1,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2024,
+                "frozen_q4_end": "2025-01-31",
+                "window_end": "2025-01-31",
+                "diagnostic_only": false
+              },
+              {
+                "ticker": "BNC",
+                "fy": 2024,
+                "frozen_q4_end": "2025-01-31",
+                "window_end": "2024-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001641172-25-002000",
+            "index_http_status": 200,
+            "filing_status": "searched_with_unsupported_attachments",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 1,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2024,
+                "frozen_q4_end": "2025-01-31",
+                "window_end": "2025-01-31",
+                "diagnostic_only": false
+              },
+              {
+                "ticker": "BNC",
+                "fy": 2024,
+                "frozen_q4_end": "2025-01-31",
+                "window_end": "2024-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001641172-25-009265",
+            "index_http_status": 200,
+            "filing_status": "searched_with_unsupported_attachments",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 1,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2024,
+                "frozen_q4_end": "2025-01-31",
+                "window_end": "2025-01-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "E",
+      "verified_q4_eps": null,
+      "database_value_same_period": null,
+      "database_derived_flag": null,
+      "result": "Frozen Q4 end 2025-01-31 conflicts with SEC 10-K report date 2024-12-31.",
+      "verified_source": null
+    },
+    {
+      "ticker": "QXL",
+      "company_name": "QUANTUM X LABS INC.",
+      "cik": "0000797542",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2014,
+      "frozen_q4_end": "2014-12-31",
+      "missing_reason": "q4_net_income_missing",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2014-12-31"
+      ],
+      "selected_10k_accessions": [
+        "0001295345-15-000048"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001295345-15-000048",
+        "form": "10-K",
+        "filing_date": "2015-03-12",
+        "report_date": "2014-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000048/zxsi12312014.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 2
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 2,
+        "note_text_candidate_count": 2
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001295345-15-000002",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001295345-15-000020",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001295345-15-000030",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001295345-15-000051",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001295345-15-000059",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001295345-15-000102",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "C",
+      "verified_q4_eps": null,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "The 10-K Fourth Quarter table is stock-price High/Low data, not EPS; only annual EPS evidence.",
+      "verified_source": null
+    },
+    {
+      "ticker": "QXL",
+      "company_name": "QUANTUM X LABS INC.",
+      "cik": "0000797542",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2019,
+      "frozen_q4_end": "2019-12-31",
+      "missing_reason": "q4_net_income_missing",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2019-12-31"
+      ],
+      "selected_10k_accessions": [
+        "0001493152-20-004372"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001493152-20-004372",
+        "form": "10-K",
+        "filing_date": "2020-03-20",
+        "report_date": "2019-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/797542/000149315220004372/form10-k.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 20
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 27,
+        "note_text_candidate_count": 3
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001493152-20-000007",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-20-001694",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-20-002870",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "C",
+      "verified_q4_eps": null,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "The 10-K Fourth Quarter table is stock-price High/Low data, not EPS; only annual EPS evidence.",
+      "verified_source": null
+    },
+    {
+      "ticker": "FGC",
+      "company_name": "FG Communities Holdings Inc.",
+      "cik": "0001591890",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2016,
+      "frozen_q4_end": "2016-12-31",
+      "missing_reason": "annual_diluted_eps_missing",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2016-12-31"
+      ],
+      "selected_10k_accessions": [
+        "0001387131-17-001422"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001387131-17-001422",
+        "form": "10-K",
+        "filing_date": "2017-03-16",
+        "report_date": "2016-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001422/pih-10k_123116.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 10
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 34,
+        "note_text_candidate_count": 5
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001387131-17-001258",
+            "index_http_status": 200,
+            "filing_status": "searched_with_unsupported_attachments",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 1,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2016,
+                "frozen_q4_end": "2016-12-31",
+                "window_end": "2016-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001387131-17-001260",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2016,
+                "frozen_q4_end": "2016-12-31",
+                "window_end": "2016-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001387131-17-001425",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2016,
+                "frozen_q4_end": "2016-12-31",
+                "window_end": "2016-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001387131-17-001993",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2016,
+                "frozen_q4_end": "2016-12-31",
+                "window_end": "2016-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "A",
+      "verified_q4_eps": 0.27,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "Direct GAAP diluted Q4 EPS in SEC 8-K EX-99.1.",
+      "verified_source": {
+        "source": "Source D — original SEC 8-K EX-99.1",
+        "url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001425/ex99-1.htm",
+        "accession": "0001387131-17-001425",
+        "filing_date": "2017-03-16",
+        "q4_end": "2016-12-31",
+        "eps": 0.27,
+        "raw_tag": null,
+        "location": "Exhibit 99.1, Consolidated Statements of Comprehensive (Loss) Income; unaudited Three months ended December 31, 2016 column; Diluted row attributable to common shareholders.",
+        "gaap_diluted_basis": "The primary consolidated income statement row says “Diluted” and reports per-share income attributable to common shareholders. The separate annual $1.07 “before catastrophe events” figure is an adjusted/non-GAAP measure and was excluded.",
+        "split_basis": "As-filed 2016 basis; no later split adjustment applied to the quoted EPS. Later reverse splits were 0.04 (2024) and 0.20 (2026); the same-period local Q4 value is null, so no numeric database comparison is available.",
+        "database_match": "No same-period Q4 value exists locally; not comparable.",
+        "source_text": "Three months ended December 31, 2016 / 2015 ... (Loss) Earnings per share attributable to common shareholders: Basic ... Diluted $ 0.27 ..."
+      }
+    },
+    {
+      "ticker": "FGC",
+      "company_name": "FG Communities Holdings Inc.",
+      "cik": "0001591890",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2022,
+      "frozen_q4_end": "2022-12-31",
+      "missing_reason": "annual_diluted_eps_missing",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2022-12-31"
+      ],
+      "selected_10k_accessions": [
+        "0001493152-23-008861"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001493152-23-008861",
+        "form": "10-K",
+        "filing_date": "2023-03-24",
+        "report_date": "2022-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223008861/form10-k.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 23
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 51,
+        "note_text_candidate_count": 5
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001493152-23-002541",
+            "index_http_status": 200,
+            "filing_status": "searched_with_unsupported_attachments",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 1,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-23-002542",
+            "index_http_status": 200,
+            "filing_status": "searched_with_unsupported_attachments",
+            "document_count": 18,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 16,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-23-008865",
+            "index_http_status": 200,
+            "filing_status": "searched_with_unsupported_attachments",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 1,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "A",
+      "verified_q4_eps": -0.03,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "Direct GAAP diluted Q4 EPS in SEC 8-K EX-99.1; release narrative and quarterly statement agree.",
+      "verified_source": {
+        "source": "Source D — original SEC 8-K EX-99.1",
+        "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223008865/ex99-1.htm",
+        "accession": "0001493152-23-008865",
+        "filing_date": "2023-03-24",
+        "q4_end": "2022-12-31",
+        "eps": -0.03,
+        "raw_tag": null,
+        "location": "Exhibit 99.1, earnings release narrative and unaudited Consolidated Statements of Operations; Three months ended December 31, 2022 is the first column, separate from FY2022 and prior-year columns.",
+        "gaap_diluted_basis": "The narrative explicitly says $0.03 per fully diluted share for Q4. The consolidated GAAP statement labels the row “Basic and diluted net earnings (loss) per common share”; total loss per common share is $(0.03). The separate FY2022 value is $(0.09), not the Q4 column. No adjusted/non-GAAP qualifier applies to these primary statement values.",
+        "split_basis": "As-filed FY2022 basis; no split adjustment applied. The same CIK had later reverse splits on 2024-11-01 (0.04) and 2026-02-13 (0.20); the same-period local Q4 value is null, so no numeric database comparison is available. The local legacy symbol FGC maps to CIK 0001591890; this filing reports FG Financial Group, Inc. / FGF.",
+        "database_match": "No same-period Q4 value exists locally; not comparable.",
+        "source_text": "Net loss attributable to common shareholders for the fourth quarter of 2022 ... $0.30 million, or $(0.03) per fully diluted share. Basic and diluted net earnings (loss) per common share: Continuing operations $(0.03) ... Loss per share attributable to common shareholders $(0.03) $(0.66) $(0.09) $(1.96)."
+      }
+    },
+    {
+      "ticker": "WRAP",
+      "company_name": "WRAP TECHNOLOGIES, INC.",
+      "cik": "0001702924",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2017,
+      "frozen_q4_end": "2017-12-31",
+      "missing_reason": "annual_diluted_eps_missing",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2017-12-31"
+      ],
+      "selected_10k_accessions": [
+        "0001654954-18-002199"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001654954-18-002199",
+        "form": "10-K",
+        "filing_date": "2018-03-06",
+        "report_date": "2017-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/1702924/000165495418002199/wrap10k_dec312017.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 27
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 27,
+        "note_text_candidate_count": 3
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001654954-18-000244",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "WRAP",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "C",
+      "verified_q4_eps": null,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "Annual EPS and statement evidence only; no direct Q4 EPS row found.",
+      "verified_source": null
+    },
+    {
+      "ticker": "WRAP",
+      "company_name": "WRAP TECHNOLOGIES, INC.",
+      "cik": "0001702924",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2022,
+      "frozen_q4_end": "2022-12-31",
+      "missing_reason": "annual_diluted_eps_missing",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2022-12-31"
+      ],
+      "selected_10k_accessions": [
+        "0001437749-23-011737",
+        "0001437749-23-005218"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001437749-23-005218",
+        "form": "10-K",
+        "filing_date": "2023-03-02",
+        "report_date": "2022-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923005218/wrap20221231_10k.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 8
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 17,
+        "note_text_candidate_count": 2
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001851734-23-000054",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "WRAP",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001437749-23-005259",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "WRAP",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001437749-23-008064",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "WRAP",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001437749-23-010660",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "WRAP",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001437749-23-011139",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "WRAP",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "A",
+      "verified_q4_eps": -0.09,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "Direct GAAP basic-and-diluted Q4 EPS in SEC 8-K EX-99.1 earnings release.",
+      "verified_source": {
+        "source": "Source D — original SEC 8-K EX-99.1 earnings release",
+        "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923005259/ex_483215.htm",
+        "accession": "0001437749-23-005259",
+        "filing_date": "2023-03-03",
+        "q4_end": "2022-12-31",
+        "eps": -0.09,
+        "raw_tag": null,
+        "location": "Exhibit 99.1 Consolidated Statements of Operations; header separates Three Months Ended December 31 from Twelve Months Ended December 31; first quarter column is 2022.",
+        "gaap_diluted_basis": "The unaudited consolidated statement row is “Net loss per basic and diluted common share”. It reports Q4 loss $(0.09); the same column has net loss $(3.536) million and weighted average common shares 41,160,136. It is an unadjusted primary statement measure.",
+        "split_basis": "As-filed FY2022 basis; no stock splits fall after this period and no adjustment was applied. The same-period local Q4 value is null, so no numeric database comparison is available.",
+        "database_match": "No same-period Q4 value exists locally; not comparable.",
+        "source_text": "Three Months Ended December 31, Twelve Months Ended December 31, 2022 2021 2022 2021 ... Net loss per basic and diluted common share $ (0.09) $ (0.13) $ (0.43) $ (0.62)."
+      }
+    },
+    {
+      "ticker": "OFG",
+      "company_name": "OFG BANCORP",
+      "cik": "0001030469",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2017,
+      "frozen_q4_end": "2017-12-31",
+      "missing_reason": "q1_q3_incomplete",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2017-12-31"
+      ],
+      "selected_10k_accessions": [
+        "0001030469-18-000021"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001030469-18-000021",
+        "form": "10-K",
+        "filing_date": "2018-03-13",
+        "report_date": "2017-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046918000021/ofg10k12312017.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 14
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 30,
+        "note_text_candidate_count": 4
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001030469-18-000006",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "OFG",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001030469-18-000007",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "OFG",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001030469-18-000010",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "OFG",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001030469-18-000023",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "OFG",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "A",
+      "verified_q4_eps": 0.3,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "Direct GAAP diluted Q4 EPS in 10-K Table 17, Selected Quarterly Financial Data.",
+      "verified_source": {
+        "source": "Source C — original SEC 10-K; corroborated by Source D — original 8-K EX-99.1",
+        "url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046918000021/ofg10k12312017.htm",
+        "accession": "0001030469-18-000021",
+        "filing_date": "2018-03-13",
+        "corroborating_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046918000006/ofg8K20171231EX99.htm",
+        "corroborating_accession": "0001030469-18-000006",
+        "corroborating_filing_date": "2018-01-30",
+        "q4_end": "2017-12-31",
+        "eps": 0.3,
+        "raw_tag": null,
+        "location": "Table 17 — Selected Quarterly Financial Data; Earnings Data / Per Share Data; December 31, 2017 column; Diluted row.",
+        "gaap_diluted_basis": "The table summarizes quarterly net income, income available to common shareholders, and Basic/Diluted per-share data. It has no adjusted/non-GAAP label; Q4 is the December 31 column, not the annual Total column. The January 8-K and March 10-K disagree on annual diluted EPS ($0.86 vs $0.88), but both report Q4 diluted EPS $0.30; the annual values are not used to derive Q4.",
+        "split_basis": "As-filed basis; no post-period split. A 1993 split predates this period. The same-period local Q4 value is null, so no numeric database comparison is available.",
+        "database_match": "No same-period Q4 value exists locally; not comparable.",
+        "source_text": "PER SHARE DATA: Basic $0.27 $0.30 — $0.31 $0.88; Diluted $0.26 $0.30 — $0.30 $0.88; columns March 31, June 30, September 30, December 31, Total 2017."
+      }
+    },
+    {
+      "ticker": "OFG",
+      "company_name": "OFG BANCORP",
+      "cik": "0001030469",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2020,
+      "frozen_q4_end": "2020-12-31",
+      "missing_reason": "q1_q3_incomplete",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2020-12-31"
+      ],
+      "selected_10k_accessions": [
+        "0001030469-21-000009"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001030469-21-000009",
+        "form": "10-K",
+        "filing_date": "2021-02-26",
+        "report_date": "2020-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046921000009/ofg10k2020.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 23
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 54,
+        "note_text_candidate_count": 4
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001030469-21-000006",
+            "index_http_status": 200,
+            "filing_status": "searched_with_unsupported_attachments",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 1,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "OFG",
+                "fy": 2020,
+                "frozen_q4_end": "2020-12-31",
+                "window_end": "2020-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001193125-21-020799",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "OFG",
+                "fy": 2020,
+                "frozen_q4_end": "2020-12-31",
+                "window_end": "2020-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001030469-21-000012",
+            "index_http_status": 200,
+            "filing_status": "searched_with_unsupported_attachments",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 1,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "OFG",
+                "fy": 2020,
+                "frozen_q4_end": "2020-12-31",
+                "window_end": "2020-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001030469-21-000013",
+            "index_http_status": 200,
+            "filing_status": "searched_with_unsupported_attachments",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 1,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "OFG",
+                "fy": 2020,
+                "frozen_q4_end": "2020-12-31",
+                "window_end": "2020-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "A",
+      "verified_q4_eps": 0.42,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "Direct diluted Q4 EPS in 10-K narrative, corroborated by the following 1Q21 8-K EX-99.1.",
+      "verified_source": {
+        "source": "Source C — original SEC 10-K; corroborated by Source D — 1Q21 8-K EX-99.1",
+        "url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046921000009/ofg10k2020.htm",
+        "accession": "0001030469-21-000009",
+        "filing_date": "2021-02-26",
+        "corroborating_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046921000012/ofg8kexhibit991q21.htm",
+        "corroborating_accession": "0001030469-21-000012",
+        "corroborating_filing_date": "2021-04-21",
+        "q4_end": "2020-12-31",
+        "eps": 0.42,
+        "raw_tag": null,
+        "location": "10-K “Fourth quarter of 2020: Increased Earnings & Revenues” paragraph; confirmed by the SEC 1Q21 EX-99.1 “1Q21 Highlights” comparative statement.",
+        "gaap_diluted_basis": "Both SEC filings use unqualified “EPS diluted” language for $0.42, with no adjusted/core qualifier. The release separately identifies non-GAAP measures; the company’s 2020 GAAP annual diluted EPS is $1.32. The Q4 amount is stated directly, not derived.",
+        "split_basis": "As-filed basis; no split adjustment applied. No split falls after this Q4 period. The same-period local Q4 value is null, so no numeric database comparison is available.",
+        "database_match": "No same-period Q4 value exists locally; not comparable.",
+        "source_text": "10-K: Fourth quarter of 2020 ... Earnings per share (EPS) diluted of $0.42 ...; 8-K: EPS diluted was $0.56 compared to $0.42 in 4Q20 ..."
+      }
+    },
+    {
+      "ticker": "DUKR",
+      "company_name": "DUKE Robotics Corp.",
+      "cik": "0001638911",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2015,
+      "frozen_q4_end": "2015-12-31",
+      "missing_reason": "q1_q3_incomplete",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2015-12-31"
+      ],
+      "selected_10k_accessions": [
+        "0001548123-16-000516"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001548123-16-000516",
+        "form": "10-K",
+        "filing_date": "2016-03-30",
+        "report_date": "2015-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/1638911/000154812316000516/f10kv4clean.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 6
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 10,
+        "note_text_candidate_count": 2
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001010412-16-000212",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "DUKR",
+                "fy": 2015,
+                "frozen_q4_end": "2015-12-31",
+                "window_end": "2015-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "C",
+      "verified_q4_eps": null,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "Annual and partial quarterly EPS evidence only; no direct Q4 EPS row found.",
+      "verified_source": null
+    },
+    {
+      "ticker": "DUKR",
+      "company_name": "DUKE Robotics Corp.",
+      "cik": "0001638911",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2021,
+      "frozen_q4_end": "2021-12-31",
+      "missing_reason": "q1_q3_incomplete",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2021-12-31"
+      ],
+      "selected_10k_accessions": [
+        "0001213900-22-010947"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001213900-22-010947",
+        "form": "10-K",
+        "filing_date": "2022-03-07",
+        "report_date": "2021-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/1638911/000121390022010947/f10k2021_uasdrone.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 7
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 15,
+        "note_text_candidate_count": 8
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001213900-22-018925",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "DUKR",
+                "fy": 2021,
+                "frozen_q4_end": "2021-12-31",
+                "window_end": "2021-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "C",
+      "verified_q4_eps": null,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "Annual and partial quarterly EPS evidence only; no direct Q4 EPS row found.",
+      "verified_source": null
+    },
+    {
+      "ticker": "ASTC",
+      "company_name": "ASTROTECH Corp",
+      "cik": "0001001907",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2014,
+      "frozen_q4_end": "2014-06-30",
+      "missing_reason": "derivation_rejected",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2014-06-30"
+      ],
+      "selected_10k_accessions": [
+        "0001571049-14-004871"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001571049-14-004871",
+        "form": "10-K",
+        "filing_date": "2014-09-30",
+        "report_date": "2014-06-30",
+        "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004871/t1401825_10k.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 8
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 24,
+        "note_text_candidate_count": 6
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001571049-14-002797",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "ASTC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-06-30",
+                "window_end": "2014-06-30",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001571049-14-004194",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "ASTC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-06-30",
+                "window_end": "2014-06-30",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001571049-14-004870",
+            "index_http_status": 200,
+            "filing_status": "searched_with_unsupported_attachments",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 1,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "ASTC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-06-30",
+                "window_end": "2014-06-30",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "A",
+      "verified_q4_eps": -0.04,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "Direct GAAP diluted Q4 EPS in 8-K EX-99.1 Fourth Quarter Results.",
+      "verified_source": {
+        "source": "Source D — original SEC 8-K EX-99.1",
+        "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004870/t1401849_ex99-1.htm",
+        "accession": "0001571049-14-004870",
+        "filing_date": "2014-09-30",
+        "q4_end": "2014-06-30",
+        "eps": -0.04,
+        "raw_tag": null,
+        "location": "Exhibit 99.1, “Fourth Quarter Results”; release headline says GAAP results; sentence reports $(0.04) per diluted share for the quarter ended June 30, 2014.",
+        "gaap_diluted_basis": "The release explicitly labels results GAAP and says per diluted share in the same Q4 sentence. It is unadjusted; no non-GAAP qualifier applies to that sentence.",
+        "split_basis": "As-filed basis; no split adjustment applied. Later reverse splits were in 2017 and 2022. The same-period local Q4 value is null, so no numeric database comparison is available.",
+        "database_match": "No same-period Q4 value exists locally; not comparable.",
+        "source_text": "Fourth Quarter Results The Company posted fourth quarter fiscal year 2014 net loss of $0.8 million, or $(0.04) per diluted share ..."
+      }
+    },
+    {
+      "ticker": "ASTC",
+      "company_name": "ASTROTECH Corp",
+      "cik": "0001001907",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2019,
+      "frozen_q4_end": "2019-06-30",
+      "missing_reason": "derivation_rejected",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2019-06-30"
+      ],
+      "selected_10k_accessions": [
+        "0001564590-19-035928"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001564590-19-035928",
+        "form": "10-K",
+        "filing_date": "2019-09-30",
+        "report_date": "2019-06-30",
+        "url": "https://www.sec.gov/Archives/edgar/data/1001907/000156459019035928/astc-10k_20190630.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 8
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 14,
+        "note_text_candidate_count": 4
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001564590-19-034503",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "ASTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-06-30",
+                "window_end": "2019-06-30",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-035776",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "ASTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-06-30",
+                "window_end": "2019-06-30",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "C",
+      "verified_q4_eps": null,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "Annual EPS and statement evidence only; no direct Q4 EPS row found.",
+      "verified_source": null
+    },
+    {
+      "ticker": "IGC",
+      "company_name": "IGC Pharma, Inc.",
+      "cik": "0001326205",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2012,
+      "frozen_q4_end": "2012-03-31",
+      "missing_reason": "derivation_rejected",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2012-03-31"
+      ],
+      "selected_10k_accessions": [
+        "0001185185-12-001484"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001185185-12-001484",
+        "form": "10-K",
+        "filing_date": "2012-07-16",
+        "report_date": "2012-03-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001484/indiaglobal10k033112.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 8
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 8,
+        "note_text_candidate_count": 4
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001185185-12-000718",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "IGC",
+                "fy": 2012,
+                "frozen_q4_end": "2012-03-31",
+                "window_end": "2012-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001185185-12-001266",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "IGC",
+                "fy": 2012,
+                "frozen_q4_end": "2012-03-31",
+                "window_end": "2012-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001185185-12-001377",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "IGC",
+                "fy": 2012,
+                "frozen_q4_end": "2012-03-31",
+                "window_end": "2012-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001185185-12-001394",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "IGC",
+                "fy": 2012,
+                "frozen_q4_end": "2012-03-31",
+                "window_end": "2012-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "C",
+      "verified_q4_eps": null,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "Annual diluted EPS and a prior-calendar-quarter pro-forma table only; no fiscal Q4 disclosure.",
+      "verified_source": null
+    },
+    {
+      "ticker": "IGC",
+      "company_name": "IGC Pharma, Inc.",
+      "cik": "0001326205",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2019,
+      "frozen_q4_end": "2019-03-31",
+      "missing_reason": "derivation_rejected",
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2019-03-31"
+      ],
+      "selected_10k_accessions": [
+        "0001185185-19-000890"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001185185-19-000890",
+        "form": "10-K",
+        "filing_date": "2019-06-14",
+        "report_date": "2019-03-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518519000890/indiaglob20190331_10k.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 6
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 7,
+        "note_text_candidate_count": 2
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": []
+      },
+      "classification": "C",
+      "verified_q4_eps": null,
+      "database_value_same_period": null,
+      "database_derived_flag": 1,
+      "result": "Annual and partial quarterly EPS evidence only; no direct Q4 EPS row found.",
+      "verified_source": null
+    },
+    {
+      "ticker": "NMTC",
+      "company_name": "NEUROONE MEDICAL TECHNOLOGIES Corp",
+      "cik": "0001500198",
+      "sample_role": "positive_control_candidate",
+      "fiscal_year": 2017,
+      "frozen_q4_end": "2017-12-31",
+      "missing_reason": null,
+      "period_end_match": true,
+      "sec_10k_report_ends": [
+        "2017-12-31"
+      ],
+      "selected_10k_accessions": [
+        "0001213900-18-004509"
+      ],
+      "source_c_original_10k": {
+        "accession": "0001213900-18-004509",
+        "form": "10-K",
+        "filing_date": "2018-04-16",
+        "report_date": "2017-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390018004509/f10k2017_neuroonemedical.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 8
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 22,
+        "note_text_candidate_count": 3
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001213900-18-000177",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-18-000697",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-18-000950",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-18-002095",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-18-002506",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-18-003074",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-18-003436",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-18-003876",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-18-004159",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-18-004507",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-18-004693",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "C",
+      "verified_q4_eps": null,
+      "database_value_same_period": -0.21,
+      "database_derived_flag": null,
+      "result": "The 10-K Fourth Quarter High/Low table is stock price, not EPS; local positive-control value is not independently traced.",
+      "verified_source": null
+    },
+    {
+      "ticker": "NMTC",
+      "company_name": "NEUROONE MEDICAL TECHNOLOGIES Corp",
+      "cik": "0001500198",
+      "sample_role": "positive_control_candidate",
+      "fiscal_year": 2019,
+      "frozen_q4_end": "2019-12-31",
+      "missing_reason": null,
+      "period_end_match": false,
+      "sec_10k_report_ends": [
+        "2019-09-30"
+      ],
+      "selected_10k_accessions": [],
+      "source_c_original_10k": {
+        "accession": "0001213900-19-026720",
+        "form": "10-K",
+        "filing_date": "2019-12-20",
+        "report_date": "2019-09-30",
+        "url": "https://www.sec.gov/Archives/edgar/data/1500198/000121390019026720/f10k2019_neuroonemedical.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 8
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 30,
+        "note_text_candidate_count": 5
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001213900-19-020209",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-09-30",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-19-021161",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-09-30",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-19-021393",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-09-30",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-19-022367",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-09-30",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-19-025070",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-09-30",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-19-025318",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-09-30",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-19-025880",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-09-30",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-19-027296",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-09-30",
+                "diagnostic_only": true
+              },
+              {
+                "ticker": "NMTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-20-001745",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-09-30",
+                "diagnostic_only": true
+              },
+              {
+                "ticker": "NMTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-20-004573",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001213900-20-008662",
+            "index_http_status": 200,
+            "filing_status": "searched_with_unsupported_attachments",
+            "document_count": 25,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 23,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "NMTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": false
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "E",
+      "verified_q4_eps": null,
+      "database_value_same_period": -0.34,
+      "database_derived_flag": null,
+      "result": "Frozen Q4 end 2019-12-31 conflicts with SEC 10-K fiscal year-end 2019-09-30.",
+      "verified_source": null
+    },
+    {
+      "ticker": "TDW",
+      "company_name": "TIDEWATER INC",
+      "cik": "0000098222",
+      "sample_role": "positive_control_candidate",
+      "fiscal_year": 2018,
+      "frozen_q4_end": "2018-03-31",
+      "missing_reason": null,
+      "period_end_match": false,
+      "sec_10k_report_ends": [
+        "2018-12-31"
+      ],
+      "selected_10k_accessions": [],
+      "source_c_original_10k": {
+        "accession": "0001564590-19-005545",
+        "form": "10-K",
+        "filing_date": "2019-02-28",
+        "report_date": "2018-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019005545/tdw-10k_20181231.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 33
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 81,
+        "note_text_candidate_count": 12
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001564590-18-010548",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-18-012464",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-18-012474",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-18-013704",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-18-014104",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-18-014512",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-18-015958",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001193125-18-218867",
+            "index_http_status": 200,
+            "filing_status": "searched_with_unsupported_attachments",
+            "document_count": 18,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 15,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001193125-18-219178",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001193125-19-002520",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-000653",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-002620",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-003216",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-003244",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 3,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-006163",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-006435",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-009241",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-009797",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001193125-19-111231",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2018,
+                "frozen_q4_end": "2018-03-31",
+                "window_end": "2018-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "E",
+      "verified_q4_eps": null,
+      "database_value_same_period": -1.67,
+      "database_derived_flag": null,
+      "result": "Frozen Q4 end 2018-03-31 is fiscal Q1; SEC 10-K fiscal year-end is 2018-12-31.",
+      "verified_source": null
+    },
+    {
+      "ticker": "TDW",
+      "company_name": "TIDEWATER INC",
+      "cik": "0000098222",
+      "sample_role": "positive_control_candidate",
+      "fiscal_year": 2019,
+      "frozen_q4_end": "2019-03-31",
+      "missing_reason": null,
+      "period_end_match": false,
+      "sec_10k_report_ends": [
+        "2019-12-31"
+      ],
+      "selected_10k_accessions": [],
+      "source_c_original_10k": {
+        "accession": "0001564590-20-008191",
+        "form": "10-K",
+        "filing_date": "2020-03-02",
+        "report_date": "2019-12-31",
+        "url": "https://www.sec.gov/Archives/edgar/data/98222/000156459020008191/tdw-10k_20191231.htm",
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_a_fsds": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 38
+      },
+      "source_b_notes": {
+        "dataset_lookup_status": "accession_found",
+        "http_status": 200,
+        "parse_status": "parsed",
+        "accession_in_SUB": true,
+        "candidate_count": 98,
+        "note_text_candidate_count": 9
+      },
+      "source_d_8k_search": {
+        "status": "searched_complete",
+        "matching_search_windows": [
+          {
+            "accession": "0001193125-19-111231",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2019,
+                "frozen_q4_end": "2019-03-31",
+                "window_end": "2019-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001193125-19-130757",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2019,
+                "frozen_q4_end": "2019-03-31",
+                "window_end": "2019-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-016274",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2019,
+                "frozen_q4_end": "2019-03-31",
+                "window_end": "2019-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-020389",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2019,
+                "frozen_q4_end": "2019-03-31",
+                "window_end": "2019-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-022690",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2019,
+                "frozen_q4_end": "2019-03-31",
+                "window_end": "2019-03-31",
+                "diagnostic_only": false
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-20-008506",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2019,
+                "frozen_q4_end": "2019-03-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001193125-20-080767",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2019,
+                "frozen_q4_end": "2019-03-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001193125-20-107240",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 2,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2019,
+                "frozen_q4_end": "2019-03-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          },
+          {
+            "accession": "0001193125-20-115764",
+            "index_http_status": 200,
+            "filing_status": "searched",
+            "document_count": 1,
+            "documents_http_200": true,
+            "document_parse_complete": true,
+            "unsupported_image_count": 0,
+            "unsupported_images_ocr_ok": true,
+            "period_windows": [
+              {
+                "ticker": "TDW",
+                "fy": 2019,
+                "frozen_q4_end": "2019-03-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": true
+              }
+            ]
+          }
+        ]
+      },
+      "classification": "E",
+      "verified_q4_eps": null,
+      "database_value_same_period": -0.58,
+      "database_derived_flag": null,
+      "result": "Frozen Q4 end 2019-03-31 is fiscal Q1; SEC 10-K fiscal year-end is 2019-12-31.",
+      "verified_source": null
+    }
+  ],
+  "verified_disclosures": [
+    {
+      "source": "Source D — original SEC 8-K EX-99.1",
+      "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004870/t1401849_ex99-1.htm",
+      "accession": "0001571049-14-004870",
+      "filing_date": "2014-09-30",
+      "q4_end": "2014-06-30",
+      "eps": -0.04,
+      "raw_tag": null,
+      "location": "Exhibit 99.1, “Fourth Quarter Results”; release headline says GAAP results; sentence reports $(0.04) per diluted share for the quarter ended June 30, 2014.",
+      "gaap_diluted_basis": "The release explicitly labels results GAAP and says per diluted share in the same Q4 sentence. It is unadjusted; no non-GAAP qualifier applies to that sentence.",
+      "split_basis": "As-filed basis; no split adjustment applied. Later reverse splits were in 2017 and 2022. The same-period local Q4 value is null, so no numeric database comparison is available.",
+      "database_match": "No same-period Q4 value exists locally; not comparable.",
+      "source_text": "Fourth Quarter Results The Company posted fourth quarter fiscal year 2014 net loss of $0.8 million, or $(0.04) per diluted share ..."
+    },
+    {
+      "source": "Source D — original SEC 8-K EX-99.1",
+      "url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001425/ex99-1.htm",
+      "accession": "0001387131-17-001425",
+      "filing_date": "2017-03-16",
+      "q4_end": "2016-12-31",
+      "eps": 0.27,
+      "raw_tag": null,
+      "location": "Exhibit 99.1, Consolidated Statements of Comprehensive (Loss) Income; unaudited Three months ended December 31, 2016 column; Diluted row attributable to common shareholders.",
+      "gaap_diluted_basis": "The primary consolidated income statement row says “Diluted” and reports per-share income attributable to common shareholders. The separate annual $1.07 “before catastrophe events” figure is an adjusted/non-GAAP measure and was excluded.",
+      "split_basis": "As-filed 2016 basis; no later split adjustment applied to the quoted EPS. Later reverse splits were 0.04 (2024) and 0.20 (2026); the same-period local Q4 value is null, so no numeric database comparison is available.",
+      "database_match": "No same-period Q4 value exists locally; not comparable.",
+      "source_text": "Three months ended December 31, 2016 / 2015 ... (Loss) Earnings per share attributable to common shareholders: Basic ... Diluted $ 0.27 ..."
+    },
+    {
+      "source": "Source C — original SEC 10-K; corroborated by Source D — original 8-K EX-99.1",
+      "url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046918000021/ofg10k12312017.htm",
+      "accession": "0001030469-18-000021",
+      "filing_date": "2018-03-13",
+      "corroborating_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046918000006/ofg8K20171231EX99.htm",
+      "corroborating_accession": "0001030469-18-000006",
+      "corroborating_filing_date": "2018-01-30",
+      "q4_end": "2017-12-31",
+      "eps": 0.3,
+      "raw_tag": null,
+      "location": "Table 17 — Selected Quarterly Financial Data; Earnings Data / Per Share Data; December 31, 2017 column; Diluted row.",
+      "gaap_diluted_basis": "The table summarizes quarterly net income, income available to common shareholders, and Basic/Diluted per-share data. It has no adjusted/non-GAAP label; Q4 is the December 31 column, not the annual Total column. The January 8-K and March 10-K disagree on annual diluted EPS ($0.86 vs $0.88), but both report Q4 diluted EPS $0.30; the annual values are not used to derive Q4.",
+      "split_basis": "As-filed basis; no post-period split. A 1993 split predates this period. The same-period local Q4 value is null, so no numeric database comparison is available.",
+      "database_match": "No same-period Q4 value exists locally; not comparable.",
+      "source_text": "PER SHARE DATA: Basic $0.27 $0.30 — $0.31 $0.88; Diluted $0.26 $0.30 — $0.30 $0.88; columns March 31, June 30, September 30, December 31, Total 2017."
+    },
+    {
+      "source": "Source D — original SEC 8-K EX-99.1",
+      "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223008865/ex99-1.htm",
+      "accession": "0001493152-23-008865",
+      "filing_date": "2023-03-24",
+      "q4_end": "2022-12-31",
+      "eps": -0.03,
+      "raw_tag": null,
+      "location": "Exhibit 99.1, earnings release narrative and unaudited Consolidated Statements of Operations; Three months ended December 31, 2022 is the first column, separate from FY2022 and prior-year columns.",
+      "gaap_diluted_basis": "The narrative explicitly says $0.03 per fully diluted share for Q4. The consolidated GAAP statement labels the row “Basic and diluted net earnings (loss) per common share”; total loss per common share is $(0.03). The separate FY2022 value is $(0.09), not the Q4 column. No adjusted/non-GAAP qualifier applies to these primary statement values.",
+      "split_basis": "As-filed FY2022 basis; no split adjustment applied. The same CIK had later reverse splits on 2024-11-01 (0.04) and 2026-02-13 (0.20); the same-period local Q4 value is null, so no numeric database comparison is available. The local legacy symbol FGC maps to CIK 0001591890; this filing reports FG Financial Group, Inc. / FGF.",
+      "database_match": "No same-period Q4 value exists locally; not comparable.",
+      "source_text": "Net loss attributable to common shareholders for the fourth quarter of 2022 ... $0.30 million, or $(0.03) per fully diluted share. Basic and diluted net earnings (loss) per common share: Continuing operations $(0.03) ... Loss per share attributable to common shareholders $(0.03) $(0.66) $(0.09) $(1.96)."
+    },
+    {
+      "source": "Source C — original SEC 10-K; corroborated by Source D — 1Q21 8-K EX-99.1",
+      "url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046921000009/ofg10k2020.htm",
+      "accession": "0001030469-21-000009",
+      "filing_date": "2021-02-26",
+      "corroborating_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046921000012/ofg8kexhibit991q21.htm",
+      "corroborating_accession": "0001030469-21-000012",
+      "corroborating_filing_date": "2021-04-21",
+      "q4_end": "2020-12-31",
+      "eps": 0.42,
+      "raw_tag": null,
+      "location": "10-K “Fourth quarter of 2020: Increased Earnings & Revenues” paragraph; confirmed by the SEC 1Q21 EX-99.1 “1Q21 Highlights” comparative statement.",
+      "gaap_diluted_basis": "Both SEC filings use unqualified “EPS diluted” language for $0.42, with no adjusted/core qualifier. The release separately identifies non-GAAP measures; the company’s 2020 GAAP annual diluted EPS is $1.32. The Q4 amount is stated directly, not derived.",
+      "split_basis": "As-filed basis; no split adjustment applied. No split falls after this Q4 period. The same-period local Q4 value is null, so no numeric database comparison is available.",
+      "database_match": "No same-period Q4 value exists locally; not comparable.",
+      "source_text": "10-K: Fourth quarter of 2020 ... Earnings per share (EPS) diluted of $0.42 ...; 8-K: EPS diluted was $0.56 compared to $0.42 in 4Q20 ..."
+    },
+    {
+      "source": "Source D — original SEC 8-K EX-99.1 earnings release",
+      "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923005259/ex_483215.htm",
+      "accession": "0001437749-23-005259",
+      "filing_date": "2023-03-03",
+      "q4_end": "2022-12-31",
+      "eps": -0.09,
+      "raw_tag": null,
+      "location": "Exhibit 99.1 Consolidated Statements of Operations; header separates Three Months Ended December 31 from Twelve Months Ended December 31; first quarter column is 2022.",
+      "gaap_diluted_basis": "The unaudited consolidated statement row is “Net loss per basic and diluted common share”. It reports Q4 loss $(0.09); the same column has net loss $(3.536) million and weighted average common shares 41,160,136. It is an unadjusted primary statement measure.",
+      "split_basis": "As-filed FY2022 basis; no stock splits fall after this period and no adjustment was applied. The same-period local Q4 value is null, so no numeric database comparison is available.",
+      "database_match": "No same-period Q4 value exists locally; not comparable.",
+      "source_text": "Three Months Ended December 31, Twelve Months Ended December 31, 2022 2021 2022 2021 ... Net loss per basic and diluted common share $ (0.09) $ (0.13) $ (0.43) $ (0.62)."
+    }
+  ],
+  "out_of_sample_diagnostics_excluded_from_success_count": [
+    {
+      "ticker": "TDW",
+      "fiscal_year": 2018,
+      "q4_end": "2018-12-31",
+      "eps": -2.83,
+      "accession": "0001564590-19-005545",
+      "filing_date": "2019-02-28",
+      "url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019005545/tdw-10k_20181231.htm",
+      "note": "Direct Q4 diluted EPS in quarterly financial data; excluded because the frozen target date was 2018-03-31 (Q1)."
+    },
+    {
+      "ticker": "TDW",
+      "fiscal_year": 2019,
+      "q4_end": "2019-12-31",
+      "eps": -1.52,
+      "accession": "0001564590-20-008191",
+      "filing_date": "2020-03-02",
+      "url": "https://www.sec.gov/Archives/edgar/data/98222/000156459020008191/tdw-10k_20191231.htm",
+      "raw_tag": "us-gaap:EarningsPerShareDiluted",
+      "note": "Direct Inline XBRL Q4 diluted EPS; excluded because the frozen target date was 2019-03-31 (Q1). Same-date local value matches numerically but is labeled FY2020/FQ3 and derived=1."
+    }
+  ],
+  "source_success_summary": [
+    {
+      "source": "SEC Financial Statement Data Sets",
+      "tested_periods": 20,
+      "zip_count": 19,
+      "zip_filing_quarter_range": [
+        "2012q3",
+        "2025q1"
+      ],
+      "downloaded_zip_bytes": 1841375190,
+      "found_candidate": 2,
+      "verified_direct": 0,
+      "unverifiable": 2,
+      "failure": 0,
+      "single_source_unique_verified": 0,
+      "cumulative_unique_verified": 0,
+      "candidate_period_keys": [
+        "TDW:2018-03-31",
+        "TDW:2019-03-31"
+      ]
+    },
+    {
+      "source": "SEC Financial Statement and Notes Data Sets",
+      "tested_periods": 20,
+      "zip_count": 19,
+      "zip_filing_quarter_range": [
+        "2012q3",
+        "2025q1"
+      ],
+      "downloaded_zip_bytes": 9325618278,
+      "found_candidate": 2,
+      "verified_direct": 0,
+      "unverifiable": 2,
+      "failure": 0,
+      "single_source_unique_verified": 0,
+      "cumulative_unique_verified": 0,
+      "candidate_period_keys": [
+        "TDW:2018-03-31",
+        "TDW:2019-03-31"
+      ]
+    },
+    {
+      "source": "Original 10-K / 10-K/A",
+      "tested_periods": 20,
+      "filings_fetched": 23,
+      "filings_parsed": 23,
+      "found_candidate": 4,
+      "verified_direct": 2,
+      "unverifiable": 2,
+      "failure": 0,
+      "single_source_unique_verified": 2,
+      "cumulative_unique_verified": 2,
+      "candidate_period_keys": [
+        "TDW:2018-03-31",
+        "TDW:2019-03-31",
+        "OFG:2017-12-31",
+        "OFG:2020-12-31"
+      ]
+    },
+    {
+      "source": "Original 8-K / EX-99.1",
+      "tested_periods": 20,
+      "candidate_8k_filings": 102,
+      "documents_scanned": 225,
+      "html_documents_parsed": 161,
+      "image_documents_ocr_ok": 64,
+      "found_candidate": 8,
+      "verified_direct": 6,
+      "unverifiable": 2,
+      "failure": 0,
+      "single_source_unique_verified": 4,
+      "cumulative_unique_verified": 6,
+      "candidate_period_keys": [
+        "TDW:2018-03-31",
+        "TDW:2019-03-31",
+        "ASTC:2014-06-30",
+        "FGC:2016-12-31",
+        "OFG:2017-12-31",
+        "OFG:2020-12-31",
+        "FGC:2022-12-31",
+        "WRAP:2022-12-31"
+      ]
+    }
+  ],
+  "network_and_volume": {
+    "actual_http_requests": 406,
+    "final_unique_urls": 404,
+    "final_unique_url_http_status_counts": {
+      "200": 404
+    },
+    "final_permission_or_rate_limit_errors": 0,
+    "intermediate_retry_statuses_persisted": false,
+    "intermediate_retry_attempts": 2,
+    "retries": 2,
+    "rate_limit_requests_per_second": 4.0,
+    "user_agent": "SecClient uses SEC_USER_AGENT when set, otherwise SEC_DEFAULT_USER_AGENT; value omitted from report",
+    "source_requests": {
+      "official_docs": 6,
+      "submissions": 10,
+      "source_a_unique_zip_downloads": 19,
+      "source_b_unique_zip_downloads": 19,
+      "source_c_original_filings": 23,
+      "source_d_unique_index_and_document_urls": 327,
+      "source_d_retry_attempts": 2
+    },
+    "wire_bytes": {
+      "official_docs": 641349,
+      "submissions": 216457,
+      "source_a_zip_archives": 1841375190,
+      "source_b_zip_archives": 9325618278,
+      "source_c_original_filings": 3837453,
+      "source_d_indexes_and_documents": 18923937
+    },
+    "decoded_bytes": {
+      "official_docs": 641349,
+      "submissions": 1173724,
+      "source_a_zip_archives": 1841375190,
+      "source_b_zip_archives": 9325618278,
+      "source_c_original_filings": 67684932,
+      "source_d_indexes_and_documents": 56922055
+    },
+    "total_wire_bytes": 11190612664,
+    "distinct_url_wire_bytes": 11190612482,
+    "observed_wall_clock_window": [
+      "2026-10-18T10:04:51Z",
+      "2026-10-18T11:18:43Z"
+    ],
+    "elapsed_seconds": 4432,
+    "zip_archives_not_committed": true
+  },
+  "outcomes": {
+    "total_periods": 20,
+    "missing_q4_eps_periods": 16,
+    "verified_direct_missing_periods": 6,
+    "missing_period_classifications": {
+      "A": 6,
+      "C": 9,
+      "E": 1
+    },
+    "all_sample_classifications": {
+      "A": 6,
+      "C": 10,
+      "E": 4
+    },
+    "success_rate_within_frozen_missing_periods": 0.375,
+    "direct_disclosure_case_keys": [
+      "ASTC:2014-06-30",
+      "FGC:2016-12-31",
+      "OFG:2017-12-31",
+      "OFG:2020-12-31",
+      "FGC:2022-12-31",
+      "WRAP:2022-12-31"
+    ]
+  },
+  "positive_control_audit": {
+    "historical_grade_a_rows_auditable": false,
+    "reason": "The requested q4-eps-acceptance-ledger.json, q4-eps-missing-classification.json, and atlas/scripts/classify_q4_eps_missing.py are absent from main.",
+    "selected_tickers_are_candidates_only": [
+      "NMTC",
+      "TDW"
+    ],
+    "out_of_sample_tdws": [
+      {
+        "ticker": "TDW",
+        "fiscal_year": 2018,
+        "q4_end": "2018-12-31",
+        "eps": -2.83,
+        "accession": "0001564590-19-005545",
+        "filing_date": "2019-02-28",
+        "url": "https://www.sec.gov/Archives/edgar/data/98222/000156459019005545/tdw-10k_20181231.htm",
+        "note": "Direct Q4 diluted EPS in quarterly financial data; excluded because the frozen target date was 2018-03-31 (Q1)."
+      },
+      {
+        "ticker": "TDW",
+        "fiscal_year": 2019,
+        "q4_end": "2019-12-31",
+        "eps": -1.52,
+        "accession": "0001564590-20-008191",
+        "filing_date": "2020-03-02",
+        "url": "https://www.sec.gov/Archives/edgar/data/98222/000156459020008191/tdw-10k_20191231.htm",
+        "raw_tag": "us-gaap:EarningsPerShareDiluted",
+        "note": "Direct Inline XBRL Q4 diluted EPS; excluded because the frozen target date was 2019-03-31 (Q1). Same-date local value matches numerically but is labeled FY2020/FQ3 and derived=1."
+      }
+    ]
+  },
+  "known_input_limits": {
+    "missing_inputs": [
+      "docs/report/q4-eps-missing-classification.json",
+      "docs/report/q4-eps-acceptance-ledger.json",
+      "atlas/scripts/classify_q4_eps_missing.py"
+    ],
+    "temporary_classifier": "in-memory deterministic classification implemented in this POC from main's financials; no input report regenerated or overwritten",
+    "financials_dir": "docs/report/financials/",
+    "financials_files": 4967,
+    "us_financials_missing_q4_eps_all_sources_all_years": 7831,
+    "sec_sourced_current_directory_missing_q4_eps_periods_fy2012_2025": 7404,
+    "temporary_classification_counts": {
+      "q4_net_income_missing": 188,
+      "annual_diluted_eps_missing": 2080,
+      "q1_q3_incomplete": 1593,
+      "derivation_rejected": 3543
+    },
+    "candidate_pool": {
+      "q4_net_income_missing": {
+        "eligible_tickers_with_early_and_recent_periods": 2,
+        "eligible_periods": 4,
+        "selected_tickers": [
+          "BNC",
+          "QXL"
+        ]
+      },
+      "annual_diluted_eps_missing": {
+        "eligible_tickers_with_early_and_recent_periods": 66,
+        "eligible_periods": 132,
+        "selected_tickers": [
+          "FGC",
+          "WRAP"
+        ]
+      },
+      "q1_q3_incomplete": {
+        "eligible_tickers_with_early_and_recent_periods": 77,
+        "eligible_periods": 154,
+        "selected_tickers": [
+          "OFG",
+          "DUKR"
+        ]
+      },
+      "derivation_rejected": {
+        "eligible_tickers_with_early_and_recent_periods": 274,
+        "eligible_periods": 548,
+        "selected_tickers": [
+          "ASTC",
+          "IGC"
+        ]
+      },
+      "direct_sec_controls": {
+        "eligible_tickers_with_early_and_recent_periods_and_sec_revenue_le_1bn": 2,
+        "selected_tickers": [
+          "NMTC",
+          "TDW"
+        ],
+        "historical_grade_a_ledger_available": false
+      }
+    },
+    "snapshot_sha256": "bccb525c81bbde158563bec5220f2c7b4cb7f51fbdc80b909fc86d7aac1a59e5",
+    "progress_summary_sha256": "5da778a720e86706863a8531a608109ddc7eb90b347f2d5f587fa89bc837f87f"
+  },
+  "technical_diagnostics": {
+    "source_c_first_parser_pass": "21 parser errors from lxml comment nodes; fixed non-string tag handling and re-parsed the same 23 cached filings successfully.",
+    "source_d_first_selector_pass": "The SEC directory marked some HTML exhibits as generic text.gif and used generic exhibit names. After a broad audit, filename plus primary-body-link selection recovered six omitted documents, including the WRAP FY2022 earnings release. The full 102-filing set contains 225 documents: 161 HTML parsed and 64 binary images OCR reviewed.",
+    "source_d_ocr_status_counts": {
+      "ok": 64
+    },
+    "source_d_ocr_character_count": 54080,
+    "source_d_missed_candidates_corrected": [
+      "FGC:2022-12-31 (per fully diluted share phrase was not initially selected)",
+      "WRAP:2022-12-31 (generic linked EX-99.1 filename)"
+    ],
+    "source_c_final_status_counts": {
+      "parsed": 23
+    },
+    "source_d_final_index_status_counts": {
+      "200": 102
+    },
+    "source_d_final_document_status_counts": {
+      "200": 225
+    },
+    "source_c_initial_metrics": {
+      "sec_http_requests": 23,
+      "wire_bytes_received": 3837453,
+      "decoded_bytes_received": 67684932,
+      "cache_hits": 0,
+      "retries": 0,
+      "rate_limit_requests_per_second": 4.0
+    },
+    "source_d_end_to_end_metrics": {
+      "actual_http_requests": 329,
+      "unique_sec_urls": 327,
+      "final_unique_url_http_status_counts": {
+        "200": 327
+      },
+      "final_unique_url_wire_bytes": 18923755,
+      "final_unique_url_decoded_bytes": 56922055,
+      "wire_bytes_received": 18923937,
+      "intermediate_retry_attempts": 2,
+      "intermediate_retry_statuses_persisted": false,
+      "rate_limit_requests_per_second": 4.0,
+      "note": "320 initial index/document URL requests plus 4 requests in the selector correction and 5 requests in the linked-exhibit pass (including 2 retries). All 327 final distinct URLs returned HTTP 200; statuses for the 2 intermediate retry responses were not persisted."
+    },
+    "source_d_initial_selector_diagnostic": {
+      "candidate_filings": 102,
+      "indexes_retrieved_before_fix": 95,
+      "index_status_counts": {
+        "200": 95
+      }
+    }
+  },
+  "verdict": "PARTIAL",
+  "verdict_basis": "Six direct EPS values were found among 16 frozen missing periods. The small, stratified sample is not representative; four frozen period mappings are invalid, and historical Grade A controls cannot be independently audited.",
+  "sol_xhigh_review": "completed; reviewer found no blocking findings and recommended PARTIAL; the overlapping-count clarification is included"
+}

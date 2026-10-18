@@ -1,0 +1,52 @@
+{
+  "source_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459020008191/tdw-10k_20191231.htm",
+  "accession": "0001564590-20-008191",
+  "filing_date": "2020-03-02",
+  "ticker": "TDW",
+  "fiscal_year": 2019,
+  "note": "Partial normalized fact extracted from the original SEC 10-K. The raw inline XBRL row/context is reproduced; no original filing is vendored.",
+  "actual_q4_target": {
+    "q4_end": "2019-12-31",
+    "q4_start_estimate": "2019-10-01",
+    "q4_end_matches_local_annual_end": true
+  },
+  "frozen_local_q4_target": {
+    "q4_end": "2019-03-31",
+    "q4_start_estimate": "2019-01-01",
+    "q4_end_matches_local_annual_end": false
+  },
+  "fact": {
+    "concept": "us-gaap:EarningsPerShareDiluted",
+    "context_ref": "C_0000098222_20191001_20191231",
+    "context": {
+      "start": "2019-10-01",
+      "end": "2019-12-31",
+      "instant": null,
+      "dimensions": []
+    },
+    "unit_ref": "U_iso4217USD_xbrlishares",
+    "unit_measures": [
+      "iso4217:USD",
+      "xbrli:shares"
+    ],
+    "decimals": "2",
+    "scale": null,
+    "sign": "-",
+    "raw_value": "1.52",
+    "value": -1.52,
+    "fact_text": "1.52",
+    "row_text": "Diluted loss per share attributable to Tidewater Inc. $ ( .58 ) ( .42 ) ( 1.15 ) ( 1.52 )",
+    "table_text": "Quarter Ended Quarter Ended Quarter Ended Quarter Ended March 31, June 30, September 30, December 31, (In thousands except per share data) 2019 2019 2019 2019 Year Ended December 31, 2019 Revenues $ 122,149 125,859 119,765 118,776 Asset impairments and other included in operating loss — — ( 5,224 ) ( 32,549 ) Operating (loss) ( 9,620 ) ( 4,394 ) ( 22,551 ) ( 50,039 ) Net loss attributable to Tidewater Inc. ( 21,731 ) ( 15,959 ) ( 44,200 ) ( 59,853 ) Basic loss per share attributable to Tidewater Inc. $ ( .58 ) ( .42 ) ( 1.15 ) ( 1.52 ) Diluted loss per share attributable to Tidewater Inc. $ ( .58 ) ( .42 ) ( 1.15 ) ( 1.52 ) Quarter Ended Quarter Ended Quarter Ended Quarter Ended March 31, June 30, September 30, December 31, (In thousands except per share data) 2018 2018 2018 2018 Year Ended December 31, 2018 Revenues $ 91,493 105,601 99,192 110,234 Impairment of due from affiliate included in operating loss — — — ( 20,083 ) Asset impairments and other included in operating loss ( 6,186 ) ( 1,215 ) ( 16,853 ) ( 36,878 ) Operating (loss) ( 12,194 ) ( 140 ) ( 25,086 ) ( 70,077 ) Net loss attributable to Tidewater Inc. ( 39,172 ) ( 10,940 ) ( 30,896 ) ( 90,509 ) Basic loss per share attributable to Tidewater Inc. $ ( 1.67 ) ( .44 ) ( 1.16 ) ( 2.83 ) Diluted loss per share attributable to Tidewater Inc. $ ( 1.67 ) ( .44 ) ( 1.16 ) ( 2.83 ) Successor Predecessor Period from Period from Quarter Ended August 1, 2017 July 1, 2017 Quarter Ended December 31, through through June 30, (In thousands except per share data) 2017 September 30, 2017 July 31, 2017 2017 Nine Month Transition Period Ended December 31, 2017 Revenues $ 104,453 74,300 36,263 115,106 Asset impairments and other included in operating loss ( 16,777 ) — ( 21,325 ) ( 163,423 ) Operating (loss) ( 18,091 ) ( 5,782 ) ( 38,674 ) ( 205,374 ) Net loss attributable to Tidewater Inc. ( 23,573 ) ( 15,693 ) ( 1,122,475 ) ( 524,434 ) Basic loss per share attributable to Tidewater Inc. $ ( 1.02 ) ( .81 ) ( 23.82 ) ( 11.13 ) Diluted loss per share attributable to Tidewater Inc. $ ( 1.02 ) ( .81 ) ( 23.82 ) ( 11.13 )",
+    "row_xpath": "/html/body/ix:nonnumeric[21]/ix:nonnumeric/div/table/tr[11]",
+    "fact_xpath": "/html/body/ix:nonnumeric[21]/ix:nonnumeric/div/table/tr[11]/td[17]/p/ix:nonfraction"
+  },
+  "database_row_with_same_end_date": {
+    "end": "2019-12-31",
+    "fy": 2020,
+    "fq": 3,
+    "epsDiluted": -1.52,
+    "src": "sec",
+    "derived": 1
+  },
+  "positive_control_audit": "raw SEC value and same-end local value agree; local row is FY2020/FQ3 and historical Grade A status cannot be audited from missing acceptance ledger"
+}
