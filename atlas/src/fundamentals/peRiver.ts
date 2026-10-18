@@ -93,16 +93,36 @@ export function publishDelayDays(market: 'US' | 'TW', kind: 'quarter' | 'annual'
   return PUBLISH_DELAY_DAYS[market].quarter;
 }
 
+/**
+ * Same policy as build_growth.py: US C, D and B grades never count; a US Q4 counts when graded A, Y or ungraded
+ * (strict mode, STRICT_Q4_EPS, accepts only A). Other markets are not gated.
+ */
+const STRICT_Q4_EPS = false;
+
+function gradeUsable(grade: string | undefined, isQ4: boolean): boolean {
+  if (grade === 'B' || grade === 'C' || grade === 'D') return false;
+  if (!isQ4) return true;
+  return STRICT_Q4_EPS ? grade === 'A' : grade === undefined || grade === 'A' || grade === 'Y';
+}
+
 function periodsOf(series: FinancialSeries, kind: 'quarter' | 'annual', market: 'US' | 'TW', annualEnds: ReadonlySet<string>, cutoff: string | null): EpsPeriod[] {
   const out: EpsPeriod[] = [];
   series.end.forEach((end, index) => {
     if (cutoff !== null && end < cutoff) return;
-    const diluted = series.values.epsDiluted[index] ?? null;
-    const basicValue = series.values.epsBasic[index] ?? null;
+    const evidence = series.epsQuality?.[index];
+    const isQ4 = market === 'US' && kind === 'quarter' && series.fq[index] === 4;
+    const gated = market === 'US';
+    const diluted = gated && !gradeUsable(evidence?.epsDiluted, isQ4) ? null : (series.values.epsDiluted[index] ?? null);
+    const basicValue = gated && !gradeUsable(evidence?.epsBasic, isQ4) ? null : (series.values.epsBasic[index] ?? null);
     const eps = diluted ?? basicValue;
+    // a value cannot be known before it was filed (look-ahead guard)
+    const filed = diluted !== null ? evidence?.epsDilutedFiled : evidence?.epsBasicFiled;
     const delay = publishDelayDays(market, kind, kind === 'quarter' ? (series.fq[index] ?? null) : null, annualEnds.has(end));
     const endSec = dateToSec(end);
-    out.push({ end, endSec, availSec: endSec + delay * DAY_SECONDS, eps, basic: diluted === null && basicValue !== null });
+    const filingSec = filed ? dateToSec(filed) : NaN;
+    const defaultAvailableSec = endSec + delay * DAY_SECONDS;
+    const availSec = Number.isFinite(filingSec) ? Math.max(defaultAvailableSec, filingSec) : defaultAvailableSec;
+    out.push({ end, endSec, availSec, eps, basic: diluted === null && basicValue !== null });
   });
   return out.sort((a, b) => a.endSec - b.endSec);
 }

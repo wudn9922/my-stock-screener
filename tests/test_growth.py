@@ -529,8 +529,9 @@ class RepoDataTest(unittest.TestCase):
             summary = growth.run(directory, out, NOW)
             self.assertEqual(summary["unreadable"], [])
             # Quarterly YoY runs to 12 quarters (QUARTER_SLOTS) and annual to 10 years (YEAR_SLOTS): the 2026-10-16
-            # financials give about 1.02 MB (743 KB with 4 quarters). 1,100,000 B leaves a small margin.
-            self.assertLess(summary["bytes"], 1_100_000)
+            # financials give about 1.02 MB (743 KB with 4 quarters). With the FinMind Taiwan statements the output is
+            # about 1.49 MB. 1,600,000 B leaves a small margin.
+            self.assertLess(summary["bytes"], 1_600_000)
             with open(out, encoding="utf-8") as file:
                 data = json.load(file)
         markets = {growth.market_of(row[0]) for row in data["rows"]}
@@ -546,3 +547,31 @@ class RepoDataTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EpsGradeTests(unittest.TestCase):
+    def test_c_b_and_d_never_count_for_us_filers(self):
+        for grade in ("B", "C", "D"):
+            self.assertFalse(growth.eps_usable(grade, us=True, q4=False))
+            self.assertFalse(growth.eps_usable(grade, us=True, q4=True))
+
+    def test_default_q4_accepts_a_y_and_ungraded(self):
+        self.assertTrue(growth.eps_usable(None, us=True, q4=True, strict=False))
+        self.assertTrue(growth.eps_usable("A", us=True, q4=True, strict=False))
+        self.assertTrue(growth.eps_usable("Y", us=True, q4=True, strict=False))
+
+    def test_strict_q4_accepts_only_a(self):
+        self.assertTrue(growth.eps_usable("A", us=True, q4=True, strict=True))
+        self.assertFalse(growth.eps_usable("Y", us=True, q4=True, strict=True))
+        self.assertFalse(growth.eps_usable(None, us=True, q4=True, strict=True))
+
+    def test_other_markets_are_not_gated(self):
+        self.assertTrue(growth.eps_usable("C", us=False, q4=True, strict=True))
+
+    def test_a_gated_q4_is_flagged_so_it_still_anchors_recency(self):
+        section = {"end": ["2024-12-31"], "fy": [2024], "fq": [4],
+                   "values": {"epsDiluted": [0.25], "epsBasic": [None]},
+                   "epsQuality": [{"epsDiluted": "C"}]}
+        periods = growth.read_periods(section, True, "US")
+        self.assertIsNone(periods[0]["epsD"])
+        self.assertTrue(periods[0]["gatedQ4Eps"])

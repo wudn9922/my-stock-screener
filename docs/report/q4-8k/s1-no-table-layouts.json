@@ -1,0 +1,2555 @@
+{
+  "schemaVersion": 2,
+  "generator": "classify_row",
+  "status": "complete",
+  "diagnoseRun": {
+    "runId": 39039050667,
+    "mainCommit": "734498067f40d11fa6194092d599feb0fa159cfe",
+    "requests": 2630,
+    "stopped": null
+  },
+  "sourceReport": "docs/report/q4-8k/input/run-17/q4-8k-report.json",
+  "sourceRows": 235,
+  "rowCount": 235,
+  "classCounts": {
+    "L1": 13,
+    "L2": 74,
+    "L3": 7,
+    "L4": 27,
+    "L5": 8,
+    "L6": 8,
+    "L7": 0,
+    "L8": 62,
+    "L9": 13,
+    "L10": 23
+  },
+  "otherLimit": {
+    "limit": 23,
+    "count": 13,
+    "passed": true
+  },
+  "classes": {
+    "L1": {
+      "name": "period-in-earlier-table",
+      "count": 13,
+      "examples": [
+        "https://www.sec.gov/Archives/edgar/data/864749/000119312512073574/d304248dex991.htm",
+        "https://www.sec.gov/Archives/edgar/data/912615/000119312516496526/d138438dex991.htm"
+      ],
+      "disposition": "S2 handles"
+    },
+    "L2": {
+      "name": "period-wording",
+      "count": 74,
+      "examples": [
+        "https://www.sec.gov/Archives/edgar/data/50471/000165495419010742/ex99-1.htm",
+        "https://www.sec.gov/Archives/edgar/data/864749/000119312513038772/d480462dex991.htm"
+      ],
+      "disposition": "S2 handles"
+    },
+    "L3": {
+      "name": "ni-label",
+      "count": 7,
+      "examples": [
+        "https://www.sec.gov/Archives/edgar/data/1511737/000151173714000021/exhibit991q42014.htm",
+        "https://www.sec.gov/Archives/edgar/data/1511737/000157104915006288/t1501817_ex99-1.htm"
+      ],
+      "disposition": "S2 handles"
+    },
+    "L4": {
+      "name": "ni-value",
+      "count": 27,
+      "examples": [
+        "https://www.sec.gov/Archives/edgar/data/50471/000141588916007355/ex99-11082016_021119.htm",
+        "https://www.sec.gov/Archives/edgar/data/50471/000165495418012355/ex99-2.htm"
+      ],
+      "disposition": "out of scope"
+    },
+    "L5": {
+      "name": "no-quarter-column",
+      "count": 8,
+      "examples": [
+        "https://www.sec.gov/Archives/edgar/data/50471/000165495420010594/ex991.htm",
+        "https://www.sec.gov/Archives/edgar/data/50471/000165495421010535/ex99-1.htm"
+      ],
+      "disposition": "out of scope"
+    },
+    "L6": {
+      "name": "not-html-table",
+      "count": 8,
+      "examples": [
+        "https://www.sec.gov/Archives/edgar/data/50471/000141588914003028/",
+        "https://www.sec.gov/Archives/edgar/data/107140/000010714017000018/"
+      ],
+      "disposition": "out of scope"
+    },
+    "L7": {
+      "name": "no-release",
+      "count": 0,
+      "examples": [],
+      "disposition": "out of scope"
+    },
+    "L8": {
+      "name": "eps-row",
+      "count": 62,
+      "examples": [
+        "https://www.sec.gov/Archives/edgar/data/217346/000110465913003986/a13-3441_1ex99d1.htm",
+        "https://www.sec.gov/Archives/edgar/data/217346/000110465914003436/a14-4002_1ex99d1.htm"
+      ],
+      "disposition": "S2 handles"
+    },
+    "L9": {
+      "name": "other",
+      "count": 13,
+      "examples": [
+        "https://www.sec.gov/Archives/edgar/data/217346/000110465912003741/a12-3382_1ex99d1.htm",
+        "https://www.sec.gov/Archives/edgar/data/217346/000110465918005235/a18-5049_1ex99d1.htm"
+      ],
+      "disposition": "needs Opus"
+    },
+    "L10": {
+      "name": "check-reject",
+      "count": 23,
+      "examples": [
+        "https://www.sec.gov/Archives/edgar/data/946581/000110465916121872/a16-11393_1ex99d1.htm",
+        "https://www.sec.gov/Archives/edgar/data/100378/000010037813000028/td8k07302013ex991.htm"
+      ],
+      "disposition": "out of scope"
+    }
+  },
+  "devTickers": [
+    "TRAK",
+    "TXT",
+    "UI",
+    "UNFI",
+    "URBN",
+    "VIAV",
+    "VNCE",
+    "WLY"
+  ],
+  "fixtureCount": 17,
+  "fixtureErrors": [
+    {
+      "key": "TRMB",
+      "end": "2011-12-30",
+      "class": "L1",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-12-073574",
+      "document": "d304248dex991.htm",
+      "error": "too large"
+    },
+    {
+      "key": "WSM",
+      "end": "2012-01-29",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-12-102576",
+      "document": "d312373dex991.htm",
+      "error": "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+    },
+    {
+      "key": "WSM",
+      "end": "2013-02-03",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-13-115118",
+      "document": "d503606dex991.htm",
+      "error": "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+    },
+    {
+      "key": "WSM",
+      "end": "2014-02-02",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-14-095586",
+      "document": "d691119dex991.htm",
+      "error": "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+    },
+    {
+      "key": "WSM",
+      "end": "2015-02-01",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-15-096958",
+      "document": "d894119dex991.htm",
+      "error": "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+    },
+    {
+      "key": "WSM",
+      "end": "2016-01-31",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-16-506695",
+      "document": "d160621dex991.htm",
+      "error": "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+    },
+    {
+      "key": "WSM",
+      "end": "2017-01-29",
+      "class": "L2",
+      "role": "positive",
+      "negativeFor": null,
+      "accession": "0001193125-17-083658",
+      "document": "d339255dex991.htm",
+      "error": "L2 variant rule vi is never an auto-positive (S1-CF C13)"
+    }
+  ],
+  "rows": [
+    {
+      "key": "TRAK",
+      "end": "2014-06-30",
+      "class": "L6",
+      "accession": "0001415889-14-003028",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000141588914003028/",
+      "tableIndex": null,
+      "tableEpsReason": null,
+      "note": "no HTML table in any of the 2 documents of the candidate filings"
+    },
+    {
+      "key": "TRAK",
+      "end": "2016-06-30",
+      "class": "L4",
+      "accession": "0001415889-16-007355",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000141588916007355/ex99-11082016_021119.htm",
+      "tableIndex": 6,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 427,649 (relative difference 0.1405) under label 'Net Income (Loss) to Common Shareholders' in table 6 of ex99-11082016_021119.htm"
+    },
+    {
+      "key": "TRAK",
+      "end": "2018-06-30",
+      "class": "L4",
+      "accession": "0001654954-18-012355",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000165495418012355/ex99-2.htm",
+      "tableIndex": 3,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 1,094,947 (relative difference 0.1379) under label 'Adjusted non-GAAP Net Income' in table 3 of ex99-2.htm"
+    },
+    {
+      "key": "TRAK",
+      "end": "2019-06-30",
+      "class": "L2",
+      "accession": "0001654954-19-010742",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000165495419010742/ex99-1.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of ex99-1.htm: net income matches; header 'Three Months Ended Year Ended FY ENDS June 6/30/19 6/30/18 % Chg. 6/30/19 6/30/18 % Chg.' names the quarter ending 2019-06-30 in a variant form (iii) and no other quarter end"
+    },
+    {
+      "key": "TRAK",
+      "end": "2020-06-30",
+      "class": "L5",
+      "accession": "0001654954-20-010594",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000165495420010594/ex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of ex991.htm: every recorded table names a year period without quarter wording"
+    },
+    {
+      "key": "TRAK",
+      "end": "2021-06-30",
+      "class": "L5",
+      "accession": "0001654954-21-010535",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000165495421010535/ex99-1.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of ex99-1.htm: every recorded table names a year period without quarter wording"
+    },
+    {
+      "key": "TRAK",
+      "end": "2022-06-30",
+      "class": "L5",
+      "accession": "0001851734-22-000579",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000185173422000579/ex_427215.htm",
+      "tableIndex": 20,
+      "tableEpsReason": null,
+      "note": "table 20 of ex_427215.htm: every recorded table names a year period without quarter wording"
+    },
+    {
+      "key": "TRAK",
+      "end": "2023-06-30",
+      "class": "L5",
+      "accession": "0001437749-23-027428",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000143774923027428/ex_575930.htm",
+      "tableIndex": 19,
+      "tableEpsReason": null,
+      "note": "table 19 of ex_575930.htm: every recorded table names a year period without quarter wording"
+    },
+    {
+      "key": "TRAK",
+      "end": "2024-06-30",
+      "class": "L5",
+      "accession": "0001437749-24-030452",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000143774924030452/ex_729117.htm",
+      "tableIndex": 18,
+      "tableEpsReason": null,
+      "note": "table 18 of ex_729117.htm: every recorded table names a year period without quarter wording"
+    },
+    {
+      "key": "TRAK",
+      "end": "2025-06-30",
+      "class": "L5",
+      "accession": "0001437749-25-030128",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000143774925030128/ex_865467.htm",
+      "tableIndex": 20,
+      "tableEpsReason": null,
+      "note": "table 20 of ex_865467.htm: every recorded table names a year period without quarter wording"
+    },
+    {
+      "key": "TRAK",
+      "end": "2026-06-30",
+      "class": "L5",
+      "accession": "0001437749-26-031604",
+      "url": "https://www.sec.gov/Archives/edgar/data/50471/000143774926031604/ex_1020954.htm",
+      "tableIndex": 18,
+      "tableEpsReason": null,
+      "note": "table 18 of ex_1020954.htm: every recorded table names a year period without quarter wording"
+    },
+    {
+      "key": "TRMB",
+      "end": "2011-12-30",
+      "class": "L1",
+      "accession": "0001193125-12-073574",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312512073574/d304248dex991.htm",
+      "tableIndex": 19,
+      "tableEpsReason": null,
+      "note": "table 19 of d304248dex991.htm: net income matches with no period header; table 18 above it names the period with quarter wording"
+    },
+    {
+      "key": "TRMB",
+      "end": "2012-12-28",
+      "class": "L2",
+      "accession": "0001193125-13-038772",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312513038772/d480462dex991.htm",
+      "tableIndex": 16,
+      "tableEpsReason": null,
+      "note": "table 16 of d480462dex991.htm: net income matches; header 'Fourth Quarter of Fiscal Years 2012 2011 2012 2011 Revenues:' names the quarter ending 2012-12-28 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "TRMB",
+      "end": "2014-01-03",
+      "class": "L2",
+      "accession": "0001193125-14-045764",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312514045764/d674817dex991.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of d674817dex991.htm: net income matches; header 'Fourth Quarter of Fiscal Years 2013 2012 2013 2012 Revenues:' names the quarter ending 2014-01-03 in a variant form (iv) and no other quarter end"
+    },
+    {
+      "key": "TRMB",
+      "end": "2015-01-02",
+      "class": "L2",
+      "accession": "0001193125-15-041649",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312515041649/d869489dex991.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of d869489dex991.htm: net income matches; header 'Fourth Quarter of Fiscal Years 2014 2013 2014 2013 Revenues:' names the quarter ending 2015-01-02 in a variant form (iv) and no other quarter end"
+    },
+    {
+      "key": "TRMB",
+      "end": "2016-01-01",
+      "class": "L2",
+      "accession": "0001193125-16-455374",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312516455374/d137078dex991.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of d137078dex991.htm: net income matches; header 'Fourth Quarter of Fiscal Years 2015 2014 2015 2014 Revenues' names the quarter ending 2016-01-01 in a variant form (iv) and no other quarter end"
+    },
+    {
+      "key": "TRMB",
+      "end": "2016-12-30",
+      "class": "L2",
+      "accession": "0001193125-17-034678",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312517034678/d332911dex991.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of d332911dex991.htm: net income matches; header 'Fourth Quarter of Fiscal Years 2016 2015 2016 2015 Revenue:' names the quarter ending 2016-12-30 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "TRMB",
+      "end": "2017-12-29",
+      "class": "L2",
+      "accession": "0001193125-18-036297",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312518036297/d414765dex991.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of d414765dex991.htm: net income matches; header 'Fourth Quarter of Fiscal Years 2017 2016 2017 2016 Revenue:' names the quarter ending 2017-12-29 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "TRMB",
+      "end": "2018-12-28",
+      "class": "L2",
+      "accession": "0001193125-19-029592",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000119312519029592/d698387dex991.htm",
+      "tableIndex": 8,
+      "tableEpsReason": null,
+      "note": "table 8 of d698387dex991.htm: net income matches; header 'Fourth Quarter of Fiscal Years 2018 2017* As Adjusted 2018 2017* As Adjusted Revenue:' names the quarter ending 2018-12-28 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "TRMB",
+      "end": "2020-01-03",
+      "class": "L2",
+      "accession": "0000864749-20-000011",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474920000011/a2019q4-8kex991.htm",
+      "tableIndex": 9,
+      "tableEpsReason": null,
+      "note": "table 9 of a2019q4-8kex991.htm: net income matches; header 'Fourth Quarter of Fiscal Years 2019 2018 2019 2018 Revenue:' names the quarter ending 2020-01-03 in a variant form (iv) and no other quarter end"
+    },
+    {
+      "key": "TRMB",
+      "end": "2021-01-01",
+      "class": "L2",
+      "accession": "0000864749-21-000011",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474921000011/a2020q4-8kex991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of a2020q4-8kex991.htm: net income matches; header 'Fourth Quarter of Fiscal Years 2020 2019 2020 2019 Revenue:' names the quarter ending 2021-01-01 in a variant form (iv) and no other quarter end"
+    },
+    {
+      "key": "TRMB",
+      "end": "2021-12-31",
+      "class": "L2",
+      "accession": "0000864749-22-000012",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474922000012/a2021q4-8kex991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of a2021q4-8kex991.htm: net income matches; header 'Fourth Quarter of Years 2021 2020 2021 2020 Revenue:' names the quarter ending 2021-12-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "TRMB",
+      "end": "2022-12-30",
+      "class": "L2",
+      "accession": "0000864749-23-000007",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474923000007/a2022q4-8kex991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of a2022q4-8kex991.htm: net income matches; header 'Fourth Quarter of Years 2022 2021 2022 2021 Revenue:' names the quarter ending 2022-12-30 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "TRMB",
+      "end": "2023-12-29",
+      "class": "L2",
+      "accession": "0000864749-24-000034",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474924000034/a2023q4-8kex991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of a2023q4-8kex991.htm: net income matches; header 'Fourth Quarter of Year of 2023 2022 2023 2022 Revenue:' names the quarter ending 2023-12-29 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "TRMB",
+      "end": "2025-01-03",
+      "class": "L2",
+      "accession": "0000864749-25-000023",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474925000023/a2024q4-8kex991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of a2024q4-8kex991.htm: net income matches; header 'Fourth Quarter of Year of 2024 2023 2024 2023 Revenue:' names the quarter ending 2025-01-03 in a variant form (iv) and no other quarter end"
+    },
+    {
+      "key": "TRMB",
+      "end": "2026-01-02",
+      "class": "L2",
+      "accession": "0000864749-26-000006",
+      "url": "https://www.sec.gov/Archives/edgar/data/864749/000086474926000006/a2025q4-8kex991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of a2025q4-8kex991.htm: net income matches; header 'Fourth Quarter of Year of 2025 2024 2025 2024 Revenue:' names the quarter ending 2026-01-02 in a variant form (iv) and no other quarter end"
+    },
+    {
+      "key": "TRNS",
+      "end": "2012-03-31",
+      "class": "L2",
+      "accession": "0001193125-12-246446",
+      "url": "https://www.sec.gov/Archives/edgar/data/99302/000119312512246446/d357606dex991.htm",
+      "tableIndex": 9,
+      "tableEpsReason": null,
+      "note": "table 9 of d357606dex991.htm: net income matches; header '(Unaudited) Fourth Quarter Ended For the Years Ended March 31,2012 March 26,2011 March 31,2012 March 26,2011' names the quarter ending 2012-03-31 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "TTWO",
+      "end": "2016-03-31",
+      "class": "L10",
+      "accession": "0001104659-16-121872",
+      "url": "https://www.sec.gov/Archives/edgar/data/946581/000110465916121872/a16-11393_1ex99d1.htm",
+      "tableIndex": 5,
+      "tableEpsReason": "net income divided by shares differs from EPS",
+      "note": "table 5 of a16-11393_1ex99d1.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income divided by shares differs from EPS)"
+    },
+    {
+      "key": "TWIN",
+      "end": "2012-06-30",
+      "class": "L4",
+      "accession": "0000100378-12-000069",
+      "url": "https://www.sec.gov/Archives/edgar/data/100378/000010037812000069/td8k10232012ex991.htm",
+      "tableIndex": 3,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 1,251,000 (relative difference 0.0095) under label 'Net earnings attributable to Twin Disc' in table 3 of td8k10232012ex991.htm"
+    },
+    {
+      "key": "TWIN",
+      "end": "2013-06-30",
+      "class": "L10",
+      "accession": "0000100378-13-000028",
+      "url": "https://www.sec.gov/Archives/edgar/data/100378/000010037813000028/td8k07302013ex991.htm",
+      "tableIndex": 8,
+      "tableEpsReason": "EPS is zero",
+      "note": "table 8 of td8k07302013ex991.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (EPS is zero)"
+    },
+    {
+      "key": "TWIN",
+      "end": "2021-06-30",
+      "class": "L4",
+      "accession": "0001437749-21-019799",
+      "url": "https://www.sec.gov/Archives/edgar/data/100378/000143774921019799/ex_275501.htm",
+      "tableIndex": 8,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value -20,898,000 (relative difference 0.0289) under label 'Net loss attributable to Twin Disc' in table 8 of ex_275501.htm"
+    },
+    {
+      "key": "TWIN",
+      "end": "2022-06-30",
+      "class": "L4",
+      "accession": "0001437749-22-021624",
+      "url": "https://www.sec.gov/Archives/edgar/data/100378/000143774922021624/ex_418797.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 8,406,000 (relative difference 0.1719) under label 'Net income (loss)' in table 2 of ex_418797.htm"
+    },
+    {
+      "key": "TWIN",
+      "end": "2023-06-30",
+      "class": "L4",
+      "accession": "0001437749-23-023905",
+      "url": "https://www.sec.gov/Archives/edgar/data/100378/000143774923023905/ex_561226.htm",
+      "tableIndex": 8,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 8,596,000 (relative difference 0.2688) under label 'Net income attributable to Twin Disc' in table 8 of ex_561226.htm"
+    },
+    {
+      "key": "TWIN",
+      "end": "2025-06-30",
+      "class": "L4",
+      "accession": "0001437749-25-027486",
+      "url": "https://www.sec.gov/Archives/edgar/data/100378/000143774925027486/ex_855273.htm",
+      "tableIndex": 12,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 1,496,000 (relative difference 0.4292) under label 'Net income (loss)' in table 12 of ex_855273.htm"
+    },
+    {
+      "key": "TXT",
+      "end": "2011-12-31",
+      "class": "L9",
+      "accession": "0001104659-12-003741",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465912003741/a12-3382_1ex99d1.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "(b) table 2 of a12-3382_1ex99d1.htm: net income is only in a period-named table without EPS rows"
+    },
+    {
+      "key": "TXT",
+      "end": "2012-12-29",
+      "class": "L8",
+      "accession": "0001104659-13-003986",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465913003986/a13-3441_1ex99d1.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of a13-3441_1ex99d1.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "TXT",
+      "end": "2013-12-28",
+      "class": "L8",
+      "accession": "0001104659-14-003436",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465914003436/a14-4002_1ex99d1.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of a14-4002_1ex99d1.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "TXT",
+      "end": "2015-01-03",
+      "class": "L8",
+      "accession": "0001104659-15-004875",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465915004875/a15-3145_1ex99d1.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of a15-3145_1ex99d1.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "TXT",
+      "end": "2016-01-02",
+      "class": "L8",
+      "accession": "0001104659-16-091539",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465916091539/a16-2933_1ex99d1.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of a16-2933_1ex99d1.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "TXT",
+      "end": "2016-12-31",
+      "class": "L8",
+      "accession": "0001104659-17-003911",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465917003911/a17-3147_1ex99d1.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of a17-3147_1ex99d1.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "TXT",
+      "end": "2017-12-30",
+      "class": "L9",
+      "accession": "0001104659-18-005235",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465918005235/a18-5049_1ex99d1.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "(b) table 2 of a18-5049_1ex99d1.htm: net income is only in a period-named table without EPS rows"
+    },
+    {
+      "key": "TXT",
+      "end": "2018-12-29",
+      "class": "L9",
+      "accession": "0001104659-19-003063",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465919003063/a19-3355_1ex99d1.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "(b) table 1 of a19-3355_1ex99d1.htm: net income is only in a period-named table without EPS rows"
+    },
+    {
+      "key": "TXT",
+      "end": "2020-01-04",
+      "class": "L9",
+      "accession": "0001104659-20-007817",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000110465920007817/tm206034d1_ex99-1.htm",
+      "tableIndex": 4,
+      "tableEpsReason": null,
+      "note": "(b) table 4 of tm206034d1_ex99-1.htm: net income is only in a period-named table without EPS rows"
+    },
+    {
+      "key": "TXT",
+      "end": "2021-01-02",
+      "class": "L8",
+      "accession": "0000217346-21-000013",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734621000013/q4208-kex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of q4208-kex991.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "TXT",
+      "end": "2022-01-01",
+      "class": "L2",
+      "accession": "0000217346-22-000002",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734622000002/q4218-kex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of q4218-kex991.htm: net income matches; header 'Three Months Ended Twelve Months Ended January 1,2022 January 2,2021 January 1,2022 January 2,2021 REVENUES MANUFACTURIN' names the quarter ending 2022-01-01 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "TXT",
+      "end": "2022-12-31",
+      "class": "L2",
+      "accession": "0000217346-23-000002",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734623000002/q4228-kex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of q4228-kex991.htm: net income matches; header 'Three Months Ended Twelve Months Ended December 31,2022 January 1,2022 December 31,2022 January 1,2022 REVENUES MANUFACT' names the quarter ending 2022-12-31 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "TXT",
+      "end": "2023-12-30",
+      "class": "L2",
+      "accession": "0000217346-24-000014",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734624000014/q4238-kex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of q4238-kex991.htm: net income matches; header 'Three Months Ended Twelve Months Ended December 30,2023 December 31,2022 December 30,2023 December 31,2022 REVENUES MANU' names the quarter ending 2023-12-30 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "TXT",
+      "end": "2024-12-28",
+      "class": "L2",
+      "accession": "0000217346-25-000014",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734625000014/q4248-kex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of q4248-kex991.htm: net income matches; header 'Three Months Ended Twelve Months Ended December 28,2024 December 30,2023 December 28,2024 December 30,2023 REVENUES MANU' names the quarter ending 2024-12-28 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "TXT",
+      "end": "2026-01-03",
+      "class": "L2",
+      "accession": "0000217346-26-000002",
+      "url": "https://www.sec.gov/Archives/edgar/data/217346/000021734626000002/q4258-kex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of q4258-kex991.htm: net income matches; header 'Three Months Ended Twelve Months Ended January 3,2026 December 28,2024 January 3,2026 December 28,2024 REVENUES MANUFACT' names the quarter ending 2026-01-03 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "UFI",
+      "end": "2012-06-24",
+      "class": "L8",
+      "accession": "0001437749-12-007180",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000143774912007180/ex99-1.htm",
+      "tableIndex": 6,
+      "tableEpsReason": null,
+      "note": "table 6 of ex99-1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2013-06-30",
+      "class": "L8",
+      "accession": "0001437749-13-009245",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000143774913009245/ufi20130724_8kex99-1.htm",
+      "tableIndex": 5,
+      "tableEpsReason": null,
+      "note": "table 5 of ufi20130724_8kex99-1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2014-06-29",
+      "class": "L8",
+      "accession": "0001437749-14-013228",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000143774914013228/ex99-1.htm",
+      "tableIndex": 5,
+      "tableEpsReason": null,
+      "note": "table 5 of ex99-1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2015-06-28",
+      "class": "L8",
+      "accession": "0001437749-15-013901",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000143774915013901/ex99-1.htm",
+      "tableIndex": 5,
+      "tableEpsReason": null,
+      "note": "table 5 of ex99-1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2016-06-26",
+      "class": "L8",
+      "accession": "0001437749-16-035702",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000143774916035702/ex99-1.htm",
+      "tableIndex": 14,
+      "tableEpsReason": null,
+      "note": "table 14 of ex99-1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2017-06-25",
+      "class": "L8",
+      "accession": "0001564590-17-013985",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000156459017013985/ufi-ex991_6.htm",
+      "tableIndex": 22,
+      "tableEpsReason": null,
+      "note": "table 22 of ufi-ex991_6.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2018-06-24",
+      "class": "L8",
+      "accession": "0001564590-18-018666",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000156459018018666/ufi-ex991_41.htm",
+      "tableIndex": 15,
+      "tableEpsReason": null,
+      "note": "table 15 of ufi-ex991_41.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2019-06-30",
+      "class": "L8",
+      "accession": "0001564590-19-029649",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000156459019029649/ufi-ex991_6.htm",
+      "tableIndex": 27,
+      "tableEpsReason": null,
+      "note": "table 27 of ufi-ex991_6.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2020-06-28",
+      "class": "L8",
+      "accession": "0001564590-20-036870",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000156459020036870/ufi-ex991_30.htm",
+      "tableIndex": 24,
+      "tableEpsReason": null,
+      "note": "table 24 of ufi-ex991_30.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2021-06-27",
+      "class": "L8",
+      "accession": "0001564590-21-040893",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000156459021040893/ufi-ex991_7.htm",
+      "tableIndex": 18,
+      "tableEpsReason": null,
+      "note": "table 18 of ufi-ex991_7.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2022-07-03",
+      "class": "L8",
+      "accession": "0001564590-22-028954",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000156459022028954/ufi-ex991_33.htm",
+      "tableIndex": 14,
+      "tableEpsReason": null,
+      "note": "table 14 of ufi-ex991_33.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2023-07-02",
+      "class": "L8",
+      "accession": "0000950170-23-044149",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000095017023044149/ufi-ex99_1.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of ufi-ex99_1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2024-06-30",
+      "class": "L8",
+      "accession": "0000950170-24-099497",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000095017024099497/ufi-ex99_1.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of ufi-ex99_1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2025-06-29",
+      "class": "L8",
+      "accession": "0000950170-25-110439",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000095017025110439/ufi-ex99_1.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of ufi-ex99_1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UFI",
+      "end": "2026-06-28",
+      "class": "L8",
+      "accession": "0000100726-26-000010",
+      "url": "https://www.sec.gov/Archives/edgar/data/100726/000010072626000010/ufi-ex99_1.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of ufi-ex99_1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UI",
+      "end": "2014-06-30",
+      "class": "L3",
+      "accession": "0001511737-14-000021",
+      "url": "https://www.sec.gov/Archives/edgar/data/1511737/000151173714000021/exhibit991q42014.htm",
+      "tableIndex": 14,
+      "tableEpsReason": null,
+      "note": "table 14 of exhibit991q42014.htm: period-named EPS table; net income matches only under label 'Net income and comprehensive income', which is not an accepted net income label"
+    },
+    {
+      "key": "UI",
+      "end": "2015-06-30",
+      "class": "L3",
+      "accession": "0001571049-15-006288",
+      "url": "https://www.sec.gov/Archives/edgar/data/1511737/000157104915006288/t1501817_ex99-1.htm",
+      "tableIndex": 28,
+      "tableEpsReason": null,
+      "note": "table 28 of t1501817_ex99-1.htm: period-named EPS table; net income matches only under label 'Net income and comprehensive income', which is not an accepted net income label"
+    },
+    {
+      "key": "UI",
+      "end": "2016-06-30",
+      "class": "L3",
+      "accession": "0001415889-16-006679",
+      "url": "https://www.sec.gov/Archives/edgar/data/1511737/000141588916006679/ex99-08042016_010832.htm",
+      "tableIndex": 19,
+      "tableEpsReason": null,
+      "note": "table 19 of ex99-08042016_010832.htm: period-named EPS table; net income matches only under label 'Net income and comprehensive income', which is not an accepted net income label"
+    },
+    {
+      "key": "UI",
+      "end": "2017-06-30",
+      "class": "L3",
+      "accession": "0001654954-17-006902",
+      "url": "https://www.sec.gov/Archives/edgar/data/1511737/000165495417006902/ex99-1.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of ex99-1.htm: period-named EPS table; net income matches only under label 'Net income and comprehensive income', which is not an accepted net income label"
+    },
+    {
+      "key": "UI",
+      "end": "2018-06-30",
+      "class": "L3",
+      "accession": "0001511737-18-000014",
+      "url": "https://www.sec.gov/Archives/edgar/data/1511737/000151173718000014/exhibit991q42018.htm",
+      "tableIndex": 17,
+      "tableEpsReason": null,
+      "note": "table 17 of exhibit991q42018.htm: period-named EPS table; net income matches only under label 'Income before income taxes', which is not an accepted net income label"
+    },
+    {
+      "key": "UI",
+      "end": "2024-06-30",
+      "class": "L10",
+      "accession": "0001511737-24-000055",
+      "url": "https://www.sec.gov/Archives/edgar/data/1511737/000151173724000055/exhibit991-063024.htm",
+      "tableIndex": 3,
+      "tableEpsReason": "net income matches more than one column or unit",
+      "note": "table 3 of exhibit991-063024.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income matches more than one column or unit)"
+    },
+    {
+      "key": "ULTA",
+      "end": "2012-01-28",
+      "class": "L2",
+      "accession": "0001193125-12-103852",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000119312512103852/d311794dex991.htm",
+      "tableIndex": 25,
+      "tableEpsReason": null,
+      "note": "table 25 of d311794dex991.htm: net income matches; header '13 Weeks Ended 13 Weeks Ended January 28,2012 January 29,2011 (Unaudited) (Unaudited)' names the quarter ending 2012-01-28 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "ULTA",
+      "end": "2013-02-02",
+      "class": "L2",
+      "accession": "0001193125-13-107354",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000119312513107354/d502755dex991.htm",
+      "tableIndex": 25,
+      "tableEpsReason": null,
+      "note": "table 25 of d502755dex991.htm: net income matches; header '14 Weeks Ended 13 Weeks Ended February 2,2013 January 28,2012 (Unaudited) (Unaudited)' names the quarter ending 2013-02-02 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "ULTA",
+      "end": "2014-02-01",
+      "class": "L2",
+      "accession": "0001193125-14-097688",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000119312514097688/d690979dex991.htm",
+      "tableIndex": 26,
+      "tableEpsReason": null,
+      "note": "table 26 of d690979dex991.htm: net income matches; header '13 Weeks Ended 14 Weeks Ended February 1,2014 February 2,2013 (Unaudited) (Unaudited)' names the quarter ending 2014-02-01 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "ULTA",
+      "end": "2015-01-31",
+      "class": "L2",
+      "accession": "0001193125-15-089243",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000119312515089243/d889169dex991.htm",
+      "tableIndex": 30,
+      "tableEpsReason": null,
+      "note": "table 30 of d889169dex991.htm: net income matches; header '13 Weeks Ended 13 Weeks Ended January 31,2015 February 1,2014 (Unaudited) (Unaudited)' names the quarter ending 2015-01-31 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "ULTA",
+      "end": "2016-01-30",
+      "class": "L2",
+      "accession": "0001193125-16-500119",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000119312516500119/d84337dex991.htm",
+      "tableIndex": 32,
+      "tableEpsReason": null,
+      "note": "table 32 of d84337dex991.htm: net income matches; header '13 Weeks Ended 13 Weeks Ended January 30,2016 January 31,2015 (Unaudited) (Unaudited)' names the quarter ending 2016-01-30 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "ULTA",
+      "end": "2017-01-28",
+      "class": "L2",
+      "accession": "0001193125-17-076882",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000119312517076882/d353652dex99.htm",
+      "tableIndex": 30,
+      "tableEpsReason": null,
+      "note": "table 30 of d353652dex99.htm: net income matches; header '13 Weeks Ended 13 Weeks Ended January 28,2017 January 30,2016 (Unaudited) (Unaudited)' names the quarter ending 2017-01-28 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "ULTA",
+      "end": "2018-02-03",
+      "class": "L8",
+      "accession": "0001558370-18-002126",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837018002126/ex-99d1.htm",
+      "tableIndex": 38,
+      "tableEpsReason": null,
+      "note": "table 38 of ex-99d1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "ULTA",
+      "end": "2019-02-02",
+      "class": "L8",
+      "accession": "0001558370-19-002006",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837019002006/ex-99d1.htm",
+      "tableIndex": 36,
+      "tableEpsReason": null,
+      "note": "table 36 of ex-99d1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "ULTA",
+      "end": "2020-02-01",
+      "class": "L8",
+      "accession": "0001558370-20-002538",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837020002538/ex-99d1.htm",
+      "tableIndex": 26,
+      "tableEpsReason": null,
+      "note": "table 26 of ex-99d1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "ULTA",
+      "end": "2021-01-30",
+      "class": "L8",
+      "accession": "0001558370-21-002815",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837021002815/ulta-20210311xex99d1.htm",
+      "tableIndex": 43,
+      "tableEpsReason": null,
+      "note": "table 43 of ulta-20210311xex99d1.htm: period-named EPS table; net income matches in column 1 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "ULTA",
+      "end": "2022-01-29",
+      "class": "L8",
+      "accession": "0001558370-22-003282",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837022003282/ulta-20220310xex99d1.htm",
+      "tableIndex": 39,
+      "tableEpsReason": null,
+      "note": "table 39 of ulta-20220310xex99d1.htm: period-named EPS table; net income matches in column 1 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "ULTA",
+      "end": "2023-01-28",
+      "class": "L8",
+      "accession": "0001558370-23-003308",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837023003308/ulta-20230309xex99d1.htm",
+      "tableIndex": 36,
+      "tableEpsReason": null,
+      "note": "table 36 of ulta-20230309xex99d1.htm: period-named EPS table; net income matches in column 1 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "ULTA",
+      "end": "2024-02-03",
+      "class": "L8",
+      "accession": "0001558370-24-003233",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837024003233/ulta-20240314xex99d1.htm",
+      "tableIndex": 41,
+      "tableEpsReason": null,
+      "note": "table 41 of ulta-20240314xex99d1.htm: period-named EPS table; net income matches in column 1 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "ULTA",
+      "end": "2025-02-01",
+      "class": "L8",
+      "accession": "0001558370-25-002905",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000155837025002905/ulta-20250313xex99d1.htm",
+      "tableIndex": 40,
+      "tableEpsReason": null,
+      "note": "table 40 of ulta-20250313xex99d1.htm: period-named EPS table; net income matches in column 1 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "ULTA",
+      "end": "2026-01-31",
+      "class": "L8",
+      "accession": "0001104659-26-027061",
+      "url": "https://www.sec.gov/Archives/edgar/data/1403568/000110465926027061/ulta-20260312xex99d1.htm",
+      "tableIndex": 41,
+      "tableEpsReason": null,
+      "note": "table 41 of ulta-20260312xex99d1.htm: period-named EPS table; net income matches in column 1 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UNFI",
+      "end": "2013-08-03",
+      "class": "L8",
+      "accession": "0001020859-13-000076",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085913000076/q4fy13earningsrelease.htm",
+      "tableIndex": 10,
+      "tableEpsReason": null,
+      "note": "table 10 of q4fy13earningsrelease.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UNFI",
+      "end": "2014-08-02",
+      "class": "L8",
+      "accession": "0001020859-14-000116",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085914000116/q4fy14earningsrelease.htm",
+      "tableIndex": 7,
+      "tableEpsReason": null,
+      "note": "table 7 of q4fy14earningsrelease.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UNFI",
+      "end": "2015-08-01",
+      "class": "L8",
+      "accession": "0001020859-15-000099",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085915000099/q4fy15earningsrelease.htm",
+      "tableIndex": 7,
+      "tableEpsReason": null,
+      "note": "table 7 of q4fy15earningsrelease.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UNFI",
+      "end": "2016-07-30",
+      "class": "L8",
+      "accession": "0001020859-16-000255",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085916000255/q4fy16earningsrelease.htm",
+      "tableIndex": 6,
+      "tableEpsReason": null,
+      "note": "table 6 of q4fy16earningsrelease.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UNFI",
+      "end": "2017-07-29",
+      "class": "L8",
+      "accession": "0001020859-17-000044",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085917000044/q4fy17earningsrelease.htm",
+      "tableIndex": 7,
+      "tableEpsReason": null,
+      "note": "table 7 of q4fy17earningsrelease.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "UNFI",
+      "end": "2019-08-03",
+      "class": "L3",
+      "accession": "0001020859-19-000114",
+      "url": "https://www.sec.gov/Archives/edgar/data/1020859/000102085919000114/q4-f19pressrelease.htm",
+      "tableIndex": 13,
+      "tableEpsReason": null,
+      "note": "table 13 of q4-f19pressrelease.htm: period-named EPS table; net income matches only under label 'Net income (loss) including noncontrolling interests', which is not an accepted net income label"
+    },
+    {
+      "key": "URBN",
+      "end": "2012-01-31",
+      "class": "L8",
+      "accession": "0001193125-12-111659",
+      "url": "https://www.sec.gov/Archives/edgar/data/912615/000119312512111659/d314877dex991.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of d314877dex991.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "URBN",
+      "end": "2013-01-31",
+      "class": "L8",
+      "accession": "0001193125-13-103185",
+      "url": "https://www.sec.gov/Archives/edgar/data/912615/000119312513103185/d501238dex991.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of d501238dex991.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "URBN",
+      "end": "2014-01-31",
+      "class": "L2",
+      "accession": "0001193125-14-093584",
+      "url": "https://www.sec.gov/Archives/edgar/data/912615/000119312514093584/d691625dex991.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of d691625dex991.htm: net income matches; header 'Three Months EndedJanuary 31, Year EndedJanuary 31, 2014 2013 2014 2013' names the quarter ending 2014-01-31 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "URBN",
+      "end": "2015-01-31",
+      "class": "L8",
+      "accession": "0001193125-15-084548",
+      "url": "https://www.sec.gov/Archives/edgar/data/912615/000119312515084548/d889097dex991.htm",
+      "tableIndex": 3,
+      "tableEpsReason": null,
+      "note": "table 3 of d889097dex991.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "URBN",
+      "end": "2016-01-31",
+      "class": "L1",
+      "accession": "0001193125-16-496526",
+      "url": "https://www.sec.gov/Archives/edgar/data/912615/000119312516496526/d138438dex991.htm",
+      "tableIndex": 3,
+      "tableEpsReason": null,
+      "note": "table 3 of d138438dex991.htm: net income matches with no period header; table 1 above it names the period with quarter wording"
+    },
+    {
+      "key": "UVV",
+      "end": "2014-03-31",
+      "class": "L10",
+      "accession": "0000102037-14-000016",
+      "url": "https://www.sec.gov/Archives/edgar/data/102037/000010203714000016/uvv-exhibit992x20140331xea.htm",
+      "tableIndex": 1,
+      "tableEpsReason": "net income matches more than one column or unit",
+      "note": "table 1 of uvv-exhibit992x20140331xea.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income matches more than one column or unit)"
+    },
+    {
+      "key": "UVV",
+      "end": "2017-03-31",
+      "class": "L10",
+      "accession": "0000102037-17-000027",
+      "url": "https://www.sec.gov/Archives/edgar/data/102037/000010203717000027/uvv-exhibit992x20170331xea.htm",
+      "tableIndex": 1,
+      "tableEpsReason": "EPS sign differs from net income",
+      "note": "table 1 of uvv-exhibit992x20170331xea.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (EPS sign differs from net income)"
+    },
+    {
+      "key": "VEEV",
+      "end": "2016-01-31",
+      "class": "L2",
+      "accession": "0001157523-16-004794",
+      "url": "https://www.sec.gov/Archives/edgar/data/1393052/000115752316004794/a51290983ex99_1.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of a51290983ex99_1.htm: net income matches; header 'VEEVA SYSTEMS INC. CONDENSED CONSOLIDATED STATEMENTS OF COMPREHENSIVE INCOME (In thousands, except per share data) (Unau' names the quarter ending 2016-01-31 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "VEEV",
+      "end": "2017-01-31",
+      "class": "L2",
+      "accession": "0001157523-17-000662",
+      "url": "https://www.sec.gov/Archives/edgar/data/1393052/000115752317000662/a51517543ex99_1.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of a51517543ex99_1.htm: net income matches; header 'VEEVA SYSTEMS INC. CONDENSED CONSOLIDATED STATEMENTS OF COMPREHENSIVE INCOME (In thousands, except per share data) (Unau' names the quarter ending 2017-01-31 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "VEEV",
+      "end": "2018-01-31",
+      "class": "L4",
+      "accession": "0001157523-18-001194",
+      "url": "https://www.sec.gov/Archives/edgar/data/1393052/000115752318001194/a51811644ex99_1.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 44,310,000 (relative difference 0.0899) under label 'Net income' in table 2 of a51811644ex99_1.htm"
+    },
+    {
+      "key": "VIAV",
+      "end": "2015-06-27",
+      "class": "L9",
+      "accession": "0000912093-15-000003",
+      "url": "https://www.sec.gov/Archives/edgar/data/912093/000091209315000003/viavq1fy16earningsrelease1.htm",
+      "tableIndex": 12,
+      "tableEpsReason": null,
+      "note": "(f) table 12 of viavq1fy16earningsrelease1.htm: accepted net income match; header names the quarter in a variant form and also another quarter end: 'Three Months Ended October 3, 2015 September 27, 2014'"
+    },
+    {
+      "key": "VIAV",
+      "end": "2016-07-02",
+      "class": "L4",
+      "accession": "0000912093-16-000023",
+      "url": "https://www.sec.gov/Archives/edgar/data/912093/000091209316000023/viavq4fy168-kex991.htm",
+      "tableIndex": 35,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value -67,500,000 (relative difference 0.0059) under label 'GAAP net loss from continuing operations' in table 35 of viavq4fy168-kex991.htm"
+    },
+    {
+      "key": "VIAV",
+      "end": "2017-07-01",
+      "class": "L8",
+      "accession": "0000912093-17-000019",
+      "url": "https://www.sec.gov/Archives/edgar/data/912093/000091209317000019/viavq4fy178-kex991.htm",
+      "tableIndex": 23,
+      "tableEpsReason": null,
+      "note": "table 23 of viavq4fy178-kex991.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "VIAV",
+      "end": "2021-07-03",
+      "class": "L3",
+      "accession": "0000912093-21-000116",
+      "url": "https://www.sec.gov/Archives/edgar/data/912093/000091209321000116/viavq4fy218-kex991.htm",
+      "tableIndex": 6,
+      "tableEpsReason": null,
+      "note": "table 6 of viavq4fy218-kex991.htm: period-named EPS table; net income matches only under label 'Interest income and other income, net', which is not an accepted net income label"
+    },
+    {
+      "key": "VIAV",
+      "end": "2023-07-01",
+      "class": "L10",
+      "accession": "0000912093-23-000034",
+      "url": "https://www.sec.gov/Archives/edgar/data/912093/000091209323000034/viavq4fy238-kex991.htm",
+      "tableIndex": 6,
+      "tableEpsReason": "net income matches more than one column or unit",
+      "note": "table 6 of viavq4fy238-kex991.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income matches more than one column or unit)"
+    },
+    {
+      "key": "VIAV",
+      "end": "2024-06-29",
+      "class": "L10",
+      "accession": "0000912093-24-000051",
+      "url": "https://www.sec.gov/Archives/edgar/data/912093/000091209324000051/viavq4fy248-kex991.htm",
+      "tableIndex": 6,
+      "tableEpsReason": "net income matches more than one column or unit",
+      "note": "table 6 of viavq4fy248-kex991.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income matches more than one column or unit)"
+    },
+    {
+      "key": "VIRC",
+      "end": "2012-01-31",
+      "class": "L2",
+      "accession": "0001193125-12-186578",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000119312512186578/d341772dex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of d341772dex991.htm: net income matches; header 'Three Months Ended Twelve Months Ended 1/31/2012 1/31/2011 1/31/2012 1/31/2011 (In thousands, except per share data)' names the quarter ending 2012-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "VIRC",
+      "end": "2013-01-31",
+      "class": "L2",
+      "accession": "0001445305-13-000848",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000144530513000848/a8kforfy2012results_exhibi.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of a8kforfy2012results_exhibi.htm: net income matches; header 'Three Months Ended Twelve Months Ended 1/31/2013 1/31/2012 1/31/2013 1/31/2012 (In thousands, except share data)' names the quarter ending 2013-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "VIRC",
+      "end": "2014-01-31",
+      "class": "L2",
+      "accession": "0001445305-14-001479",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000144530514001479/a8kforfy2013resultsexhibit.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of a8kforfy2013resultsexhibit.htm: net income matches; header 'Three Months Ended Twelve Months Ended 1/31/2014 1/31/2013 1/31/2014 1/31/2013 (In thousands, except per share data)' names the quarter ending 2014-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "VIRC",
+      "end": "2015-01-31",
+      "class": "L2",
+      "accession": "0001628280-15-002926",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828015002926/a8kforfy2014q4resultsexhib.htm",
+      "tableIndex": 4,
+      "tableEpsReason": null,
+      "note": "table 4 of a8kforfy2014q4resultsexhib.htm: net income matches; header 'Three Months Ended Twelve Months Ended 1/31/2015 1/31/2014 1/31/2015 1/31/2014 (In thousands, except per share data)' names the quarter ending 2015-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "VIRC",
+      "end": "2016-01-31",
+      "class": "L2",
+      "accession": "0001628280-16-014733",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828016014733/a8kforfy2015q4resultsexhib.htm",
+      "tableIndex": 3,
+      "tableEpsReason": null,
+      "note": "table 3 of a8kforfy2015q4resultsexhib.htm: net income matches; header 'Three Months Ended Twelve Months Ended 1/31/2016 1/31/2015 1/31/2016 1/31/2015 (In thousands, except per share data)' names the quarter ending 2016-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "VIRC",
+      "end": "2017-01-31",
+      "class": "L2",
+      "accession": "0001628280-17-004281",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828017004281/a8kforfye01312017q4ex991.htm",
+      "tableIndex": 3,
+      "tableEpsReason": null,
+      "note": "table 3 of a8kforfye01312017q4ex991.htm: net income matches; header 'Three Months Ended Twelve Months Ended 1/31/2017 1/31/2016 1/31/2017 1/31/2016 (In thousands, except per share data)' names the quarter ending 2017-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "VIRC",
+      "end": "2018-01-31",
+      "class": "L2",
+      "accession": "0001628280-18-005277",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828018005277/a8kforfye01312018q4ex991.htm",
+      "tableIndex": 3,
+      "tableEpsReason": null,
+      "note": "table 3 of a8kforfye01312018q4ex991.htm: net income matches; header 'Three Months Ended Twelve Months Ended 1/31/2018 1/31/2017 1/31/2018 1/31/2017 (In thousands, except per share data)' names the quarter ending 2018-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "VIRC",
+      "end": "2019-01-31",
+      "class": "L2",
+      "accession": "0001628280-19-005570",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828019005570/a8kforfye01312019q4ex991.htm",
+      "tableIndex": 4,
+      "tableEpsReason": null,
+      "note": "table 4 of a8kforfye01312019q4ex991.htm: net income matches; header 'Three Months Ended Twelve Months Ended 1/31/2019 1/31/2018 1/31/2019 1/31/2018 (In thousands, except per share data)' names the quarter ending 2019-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "VIRC",
+      "end": "2020-01-31",
+      "class": "L2",
+      "accession": "0001628280-20-005967",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828020005967/exhibit991q401312020pressr.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of exhibit991q401312020pressr.htm: net income matches; header 'Three Months Ended Twelve Months Ended 1/31/2020 1/31/2019 1/31/2020 1/31/2019 (In thousands, except per share data)' names the quarter ending 2020-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "VIRC",
+      "end": "2021-01-31",
+      "class": "L2",
+      "accession": "0001628280-21-007939",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828021007939/exhibit991q401312021pressr.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of exhibit991q401312021pressr.htm: net income matches; header 'Three Months Ended Twelve Months Ended 1/31/2021 1/31/2020 1/31/2021 1/31/2020 (In thousands, except per share data)' names the quarter ending 2021-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "VIRC",
+      "end": "2022-01-31",
+      "class": "L4",
+      "accession": "0001628280-22-009864",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828022009864/exhibit991q401312022pressr.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value -15,136,000 (relative difference 0.0721) under label 'Net loss' in table 2 of exhibit991q401312022pressr.htm"
+    },
+    {
+      "key": "VIRC",
+      "end": "2023-01-31",
+      "class": "L4",
+      "accession": "0001628280-23-014118",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828023014118/exhibit991q401312023pressr.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 16,547 (relative difference 0.9959) under label 'Net income (loss)' in table 2 of exhibit991q401312023pressr.htm"
+    },
+    {
+      "key": "VIRC",
+      "end": "2024-01-31",
+      "class": "L4",
+      "accession": "0001628280-24-027220",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828024027220/exhibit991q104302024pressr.htm",
+      "tableIndex": 3,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value -1,442,000 (relative difference 0.3843) under label 'Net income (loss)' in table 3 of exhibit991q104302024pressr.htm"
+    },
+    {
+      "key": "VIRC",
+      "end": "2025-01-31",
+      "class": "L9",
+      "accession": "0001628280-25-017642",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828025017642/exhibit991q401312025pressr.htm",
+      "tableIndex": null,
+      "tableEpsReason": null,
+      "note": "(d) exhibit991q401312025pressr.htm: prose money match only, not in a table cell: '1,910,000 last year. For the fourth quarter, the Company incurred a net loss of $5,730,000 versus a net loss of $2,342,000 in the same quarter of the prior year'"
+    },
+    {
+      "key": "VIRC",
+      "end": "2026-01-31",
+      "class": "L4",
+      "accession": "0001628280-26-040123",
+      "url": "https://www.sec.gov/Archives/edgar/data/751365/000162828026040123/exhibit991q104302026pressr.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value -2,777,000 (relative difference 0.6046) under label 'Net (loss) income' in table 1 of exhibit991q104302026pressr.htm"
+    },
+    {
+      "key": "VNCE",
+      "end": "2014-02-01",
+      "class": "L8",
+      "accession": "0001193125-14-117423",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000119312514117423/d696837dex991.htm",
+      "tableIndex": 21,
+      "tableEpsReason": null,
+      "note": "table 21 of d696837dex991.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "VNCE",
+      "end": "2015-01-31",
+      "class": "L2",
+      "accession": "0001193125-15-097526",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000119312515097526/d894283dex991.htm",
+      "tableIndex": 19,
+      "tableEpsReason": null,
+      "note": "table 19 of d894283dex991.htm: net income matches; header 'Three Months Ended Fiscal Year Ended January 31,2015 February 1,2014 January 31,2015 February 1,2014' names the quarter ending 2015-01-31 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "VNCE",
+      "end": "2019-02-02",
+      "class": "L4",
+      "accession": "0001564590-19-011247",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000156459019011247/vnce-ex99_14.htm",
+      "tableIndex": 22,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 672,000 (relative difference 0.0870) under label 'Net income (loss)' in table 22 of vnce-ex99_14.htm"
+    },
+    {
+      "key": "VNCE",
+      "end": "2021-01-30",
+      "class": "L4",
+      "accession": "0001564590-21-022011",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000156459021022011/vnce-ex991_6.htm",
+      "tableIndex": 32,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value -5,672,000 (relative difference 0.2306) under label 'Net (loss) earnings*' in table 32 of vnce-ex991_6.htm"
+    },
+    {
+      "key": "VNCE",
+      "end": "2024-02-03",
+      "class": "L1",
+      "accession": "0000950170-24-050201",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000095017024050201/vnce-ex99_1.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of vnce-ex99_1.htm: net income matches with no period header; table 0 above it names the period with quarter wording"
+    },
+    {
+      "key": "VNCE",
+      "end": "2026-01-31",
+      "class": "L1",
+      "accession": "0001193125-26-155934",
+      "url": "https://www.sec.gov/Archives/edgar/data/1579157/000119312526155934/vnce-ex99_1.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of vnce-ex99_1.htm: net income matches with no period header; table 0 above it names the period with quarter wording"
+    },
+    {
+      "key": "VRA",
+      "end": "2012-01-28",
+      "class": "L2",
+      "accession": "0001193125-12-114896",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000119312512114896/d316280dex991.htm",
+      "tableIndex": 5,
+      "tableEpsReason": null,
+      "note": "table 5 of d316280dex991.htm: net income matches; header 'Thirteen Weeks Ended Fiscal Year Ended January 28,2012 January 29,2011 January 28,2012 January 29,2011 (unaudited) (unau' names the quarter ending 2012-01-28 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "VRA",
+      "end": "2013-02-02",
+      "class": "L2",
+      "accession": "0001193125-13-105178",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000119312513105178/d500741dex991.htm",
+      "tableIndex": 5,
+      "tableEpsReason": null,
+      "note": "table 5 of d500741dex991.htm: net income matches; header 'FourteenWeeks EndedFebruary 2,2013 ThirteenWeeks EndedJanuary 28,2012 Fifty-ThreeWeeks EndedFebruary 2,2013 Fifty-TwoWee' names the quarter ending 2013-02-02 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "VRA",
+      "end": "2015-01-31",
+      "class": "L8",
+      "accession": "0001495320-15-000005",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532015000005/q4ex-9912015.htm",
+      "tableIndex": 22,
+      "tableEpsReason": null,
+      "note": "table 22 of q4ex-9912015.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "VRA",
+      "end": "2016-01-30",
+      "class": "L8",
+      "accession": "0001495320-16-000052",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532016000052/q4ex-9912016.htm",
+      "tableIndex": 28,
+      "tableEpsReason": null,
+      "note": "table 28 of q4ex-9912016.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "VRA",
+      "end": "2021-01-30",
+      "class": "L2",
+      "accession": "0001495320-21-000011",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532021000011/vra-20210130xex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of vra-20210130xex991.htm: net income matches; header 'Thirteen Weeks Ended Fifty-Two Weeks Ended January 30,2021 February 1,2020 January 30,2021 February 1,2020' names the quarter ending 2021-01-30 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "VRA",
+      "end": "2022-01-29",
+      "class": "L2",
+      "accession": "0001495320-22-000003",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532022000003/vra-20220129xex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of vra-20220129xex991.htm: net income matches; header 'Thirteen Weeks Ended Fifty-Two Weeks Ended January 29,2022 January 30,2021 January 29,2022 January 30,2021' names the quarter ending 2022-01-29 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "VRA",
+      "end": "2023-01-28",
+      "class": "L2",
+      "accession": "0001495320-23-000010",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532023000010/vra-20230128xex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of vra-20230128xex991.htm: net income matches; header 'Thirteen Weeks Ended Fifty-Two Weeks Ended January 28,2023 January 29,2022 January 28,2023 January 29,2022' names the quarter ending 2023-01-28 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "VRA",
+      "end": "2024-02-03",
+      "class": "L2",
+      "accession": "0001495320-24-000018",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532024000018/vra-20240203xex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of vra-20240203xex991.htm: net income matches; header 'Fourteen Weeks Ended Thirteen Weeks Ended Fifty-Three Weeks Ended Fifty-Two Weeks Ended February 3,2024 January 28,2023 ' names the quarter ending 2024-02-03 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "VRA",
+      "end": "2025-02-01",
+      "class": "L2",
+      "accession": "0001495320-25-000007",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000149532025000007/vra-20250201xex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of vra-20250201xex991.htm: net income matches; header 'Thirteen Weeks Ended Fourteen Weeks Ended Fifty-Two Weeks Ended Fifty-Three Weeks Ended February 1,2025 February 3,2024 ' names the quarter ending 2025-02-01 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "VRA",
+      "end": "2026-01-31",
+      "class": "L2",
+      "accession": "0001628280-26-017020",
+      "url": "https://www.sec.gov/Archives/edgar/data/1495320/000162828026017020/vra-20260131xex991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of vra-20260131xex991.htm: net income matches; header 'Thirteen Weeks Ended Fifty-Two Weeks Ended January 31,2026 February 1,2025 January 31,2026 February 1,2025' names the quarter ending 2026-01-31 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "WLY",
+      "end": "2017-04-30",
+      "class": "L6",
+      "accession": "0000107140-17-000018",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714017000018/",
+      "tableIndex": null,
+      "tableEpsReason": null,
+      "note": "no release document in the candidate filings (only EDGAR index pages)"
+    },
+    {
+      "key": "WLY",
+      "end": "2018-04-30",
+      "class": "L4",
+      "accession": "0000107140-18-000012",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714018000012/exhibit99.htm",
+      "tableIndex": 36,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 54,060,000 (relative difference 0.0026) under label 'Net Income' in table 36 of exhibit99.htm"
+    },
+    {
+      "key": "WLY",
+      "end": "2020-04-30",
+      "class": "L8",
+      "accession": "0000107140-20-000023",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714020000023/exhibit99_1.htm",
+      "tableIndex": 33,
+      "tableEpsReason": null,
+      "note": "table 33 of exhibit99_1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "WLY",
+      "end": "2023-04-30",
+      "class": "L1",
+      "accession": "0000107140-23-000083",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714023000083/wly-2023430xex991.htm",
+      "tableIndex": 6,
+      "tableEpsReason": null,
+      "note": "table 6 of wly-2023430xex991.htm: net income matches with no period header; table 5 above it names the period with quarter wording"
+    },
+    {
+      "key": "WLY",
+      "end": "2024-04-30",
+      "class": "L1",
+      "accession": "0000107140-24-000104",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714024000104/wly-2024430xex991.htm",
+      "tableIndex": 5,
+      "tableEpsReason": null,
+      "note": "table 5 of wly-2024430xex991.htm: net income matches with no period header; table 4 above it names the period with quarter wording"
+    },
+    {
+      "key": "WLY",
+      "end": "2025-04-30",
+      "class": "L1",
+      "accession": "0000107140-25-000071",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714025000071/wly-2025430xex991.htm",
+      "tableIndex": 7,
+      "tableEpsReason": null,
+      "note": "table 7 of wly-2025430xex991.htm: net income matches with no period header; table 6 above it names the period with quarter wording"
+    },
+    {
+      "key": "WLY",
+      "end": "2026-04-30",
+      "class": "L1",
+      "accession": "0001628280-26-043447",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000162828026043447/ex991fy26q4.htm",
+      "tableIndex": 5,
+      "tableEpsReason": null,
+      "note": "table 5 of ex991fy26q4.htm: net income matches with no period header; table 4 above it names the period with quarter wording"
+    },
+    {
+      "key": "WLYB",
+      "end": "2017-04-30",
+      "class": "L6",
+      "accession": "0000107140-17-000018",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714017000018/",
+      "tableIndex": null,
+      "tableEpsReason": null,
+      "note": "no release document in the candidate filings (only EDGAR index pages)"
+    },
+    {
+      "key": "WLYB",
+      "end": "2018-04-30",
+      "class": "L4",
+      "accession": "0000107140-18-000012",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714018000012/exhibit99.htm",
+      "tableIndex": 36,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 54,060,000 (relative difference 0.0026) under label 'Net Income' in table 36 of exhibit99.htm"
+    },
+    {
+      "key": "WLYB",
+      "end": "2020-04-30",
+      "class": "L8",
+      "accession": "0000107140-20-000023",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714020000023/exhibit99_1.htm",
+      "tableIndex": 33,
+      "tableEpsReason": null,
+      "note": "table 33 of exhibit99_1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "WLYB",
+      "end": "2023-04-30",
+      "class": "L1",
+      "accession": "0000107140-23-000083",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714023000083/wly-2023430xex991.htm",
+      "tableIndex": 6,
+      "tableEpsReason": null,
+      "note": "table 6 of wly-2023430xex991.htm: net income matches with no period header; table 5 above it names the period with quarter wording"
+    },
+    {
+      "key": "WLYB",
+      "end": "2024-04-30",
+      "class": "L1",
+      "accession": "0000107140-24-000104",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714024000104/wly-2024430xex991.htm",
+      "tableIndex": 5,
+      "tableEpsReason": null,
+      "note": "table 5 of wly-2024430xex991.htm: net income matches with no period header; table 4 above it names the period with quarter wording"
+    },
+    {
+      "key": "WLYB",
+      "end": "2025-04-30",
+      "class": "L1",
+      "accession": "0000107140-25-000071",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000010714025000071/wly-2025430xex991.htm",
+      "tableIndex": 7,
+      "tableEpsReason": null,
+      "note": "table 7 of wly-2025430xex991.htm: net income matches with no period header; table 6 above it names the period with quarter wording"
+    },
+    {
+      "key": "WLYB",
+      "end": "2026-04-30",
+      "class": "L1",
+      "accession": "0001628280-26-043447",
+      "url": "https://www.sec.gov/Archives/edgar/data/107140/000162828026043447/ex991fy26q4.htm",
+      "tableIndex": 5,
+      "tableEpsReason": null,
+      "note": "table 5 of ex991fy26q4.htm: net income matches with no period header; table 4 above it names the period with quarter wording"
+    },
+    {
+      "key": "WMS",
+      "end": "2015-03-31",
+      "class": "L4",
+      "accession": "0001193125-15-293309",
+      "url": "https://www.sec.gov/Archives/edgar/data/1604028/000119312515293309/d64368dex991.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value -17,315,000 (relative difference 0.2973) under label 'Adjustments that impact Net Income attributable to the Company' in table 2 of d64368dex991.htm"
+    },
+    {
+      "key": "WMS",
+      "end": "2016-03-31",
+      "class": "L5",
+      "accession": "0001193125-16-614606",
+      "url": "https://www.sec.gov/Archives/edgar/data/1604028/000119312516614606/d307276dex991.htm",
+      "tableIndex": 5,
+      "tableEpsReason": null,
+      "note": "table 5 of d307276dex991.htm: every recorded table names a year period without quarter wording"
+    },
+    {
+      "key": "WMS",
+      "end": "2017-03-31",
+      "class": "L4",
+      "accession": "0001564590-17-015100",
+      "url": "https://www.sec.gov/Archives/edgar/data/1604028/000156459017015100/wms-ex991_7.htm",
+      "tableIndex": 13,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 0 (relative difference 1.0000) under label 'Net income per share – Basic' in table 13 of wms-ex991_7.htm"
+    },
+    {
+      "key": "WMT",
+      "end": "2012-01-31",
+      "class": "L8",
+      "accession": "0001193125-12-069086",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000119312512069086/d305069dex991.htm",
+      "tableIndex": 33,
+      "tableEpsReason": null,
+      "note": "table 33 of d305069dex991.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "WMT",
+      "end": "2013-01-31",
+      "class": "L2",
+      "accession": "0000104169-13-000007",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416913000007/earningsrelease.htm",
+      "tableIndex": 41,
+      "tableEpsReason": null,
+      "note": "table 41 of earningsrelease.htm: net income matches; header 'SUBJECT TO RECLASSIFICATION Three Months Ended Fiscal Years Ended January 31, January 31, (Dollars in millions, except p' names the quarter ending 2013-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WMT",
+      "end": "2014-01-31",
+      "class": "L2",
+      "accession": "0000104169-14-000016",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416914000016/earningsrelease-13114.htm",
+      "tableIndex": 34,
+      "tableEpsReason": null,
+      "note": "table 34 of earningsrelease-13114.htm: net income matches; header 'Three Months Ended Fiscal Years Ended SUBJECT TO RECLASSIFICATION January 31, January 31, (Dollars in millions, except s' names the quarter ending 2014-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WMT",
+      "end": "2015-01-31",
+      "class": "L2",
+      "accession": "0000104169-15-000006",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416915000006/earningsrelease-1312015.htm",
+      "tableIndex": 63,
+      "tableEpsReason": null,
+      "note": "table 63 of earningsrelease-1312015.htm: net income matches; header 'Quarters Ended Fiscal Years Ended SUBJECT TO RECLASSIFICATION January 31, January 31, (Dollars in millions, except per s' names the quarter ending 2015-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WMT",
+      "end": "2016-01-31",
+      "class": "L2",
+      "accession": "0000104169-16-000074",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416916000074/earningsrelease-1312016.htm",
+      "tableIndex": 50,
+      "tableEpsReason": null,
+      "note": "table 50 of earningsrelease-1312016.htm: net income matches; header 'Quarters Ended Fiscal Years Ended SUBJECT TO RECLASSIFICATION January 31, January 31, (Dollars in millions, except per s' names the quarter ending 2016-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WMT",
+      "end": "2017-01-31",
+      "class": "L2",
+      "accession": "0000104169-17-000013",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416917000013/earningsrelease-1312017.htm",
+      "tableIndex": 50,
+      "tableEpsReason": null,
+      "note": "table 50 of earningsrelease-1312017.htm: net income matches; header 'Quarters Ended Fiscal Years Ended January 31, January 31, (Dollars in millions, except per share data) 2017 2016 Percent' names the quarter ending 2017-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WMT",
+      "end": "2018-01-31",
+      "class": "L1",
+      "accession": "0000104169-18-000020",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416918000020/earningsrelease-1312018.htm",
+      "tableIndex": 52,
+      "tableEpsReason": null,
+      "note": "table 52 of earningsrelease-1312018.htm: net income matches with no period header; table 51 above it names the period with quarter wording"
+    },
+    {
+      "key": "WMT",
+      "end": "2019-01-31",
+      "class": "L2",
+      "accession": "0000104169-19-000011",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416919000011/earningsrelease-1312019.htm",
+      "tableIndex": 119,
+      "tableEpsReason": null,
+      "note": "table 119 of earningsrelease-1312019.htm: net income matches; header 'Quarters Ended Fiscal Years Ended January 31, January 31, (Amounts in millions, except per share data) 2019 2018 Percent' names the quarter ending 2019-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WMT",
+      "end": "2020-01-31",
+      "class": "L2",
+      "accession": "0000104169-20-000007",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416920000007/earningsrelease-1312020.htm",
+      "tableIndex": 75,
+      "tableEpsReason": null,
+      "note": "table 75 of earningsrelease-1312020.htm: net income matches; header 'Three Months Ended Fiscal Years Ended January 31, January 31, (Amounts in millions, except per share data) 2020 2019 Per' names the quarter ending 2020-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WMT",
+      "end": "2021-01-31",
+      "class": "L2",
+      "accession": "0000104169-21-000022",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416921000022/earningsreleasefy21q4.htm",
+      "tableIndex": 13,
+      "tableEpsReason": null,
+      "note": "table 13 of earningsreleasefy21q4.htm: net income matches; header 'Three Months Ended Fiscal Year Ended January 31, January 31, (Amounts in millions, except per share data) 2021 2020 Perc' names the quarter ending 2021-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WMT",
+      "end": "2022-01-31",
+      "class": "L2",
+      "accession": "0000104169-22-000009",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416922000009/earningsreleasefy22q4.htm",
+      "tableIndex": 13,
+      "tableEpsReason": null,
+      "note": "table 13 of earningsreleasefy22q4.htm: net income matches; header 'Three Months Ended Fiscal Year Ended January 31, January 31, (Amounts in millions, except per share data) 2022 2021 Perc' names the quarter ending 2022-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WMT",
+      "end": "2023-01-31",
+      "class": "L2",
+      "accession": "0000104169-23-000010",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416923000010/earningsreleasefy23q4.htm",
+      "tableIndex": 14,
+      "tableEpsReason": null,
+      "note": "table 14 of earningsreleasefy23q4.htm: net income matches; header 'Three Months Ended Fiscal Year Ended January 31, January 31, (Amounts in millions, except per share data) 2023 2022 Perc' names the quarter ending 2023-01-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WMT",
+      "end": "2024-01-31",
+      "class": "L8",
+      "accession": "0000104169-24-000019",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416924000019/earningsreleasefy24q4.htm",
+      "tableIndex": 14,
+      "tableEpsReason": null,
+      "note": "table 14 of earningsreleasefy24q4.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "WMT",
+      "end": "2025-01-31",
+      "class": "L8",
+      "accession": "0000104169-25-000010",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416925000010/earningsreleasefy25q4.htm",
+      "tableIndex": 14,
+      "tableEpsReason": null,
+      "note": "table 14 of earningsreleasefy25q4.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "WMT",
+      "end": "2026-01-31",
+      "class": "L8",
+      "accession": "0000104169-26-000032",
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416926000032/earningsreleasefy26q4.htm",
+      "tableIndex": 14,
+      "tableEpsReason": null,
+      "note": "table 14 of earningsreleasefy26q4.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "WOR",
+      "end": "2012-05-31",
+      "class": "L9",
+      "accession": "0001102624-12-000550",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000110262412000550/exh99_1.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "(f) table 0 of exh99_1.htm: accepted net income match; header names the quarter in a variant form and also another quarter end: '4Q 2012 3Q 2012 4Q 2011 12M 2012 12M 2011'"
+    },
+    {
+      "key": "WOR",
+      "end": "2013-05-31",
+      "class": "L9",
+      "accession": "0001102624-13-000774",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000110262413000774/exh99_1.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "(f) table 0 of exh99_1.htm: accepted net income match; header names the quarter in a variant form and also another quarter end: '4Q 2013 3Q 2013 4Q 2012 12M 2013 12M 2012'"
+    },
+    {
+      "key": "WOR",
+      "end": "2014-05-31",
+      "class": "L9",
+      "accession": "0001102624-14-001019",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000110262414001019/exh99_1.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "(f) table 0 of exh99_1.htm: accepted net income match; header names the quarter in a variant form and also another quarter end: '(U.S. dollars in millions, except per share data) 4Q 2014 3Q 2014 4Q 2013 12M2014 12M2013'"
+    },
+    {
+      "key": "WOR",
+      "end": "2015-05-31",
+      "class": "L9",
+      "accession": "0001102624-15-001006",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000110262415001006/exh99_1.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "(f) table 0 of exh99_1.htm: accepted net income match; header names the quarter in a variant form and also another quarter end: '4Q 2015 3Q 2015 4Q 2014 12M2015 12M2014'"
+    },
+    {
+      "key": "WOR",
+      "end": "2016-05-31",
+      "class": "L9",
+      "accession": "0001102624-16-003020",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000110262416003020/exh99_1.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "(f) table 0 of exh99_1.htm: accepted net income match; header names the quarter in a variant form and also another quarter end: '4Q 2016 3Q 2016 4Q 2015 12M 2016 12M 2015'"
+    },
+    {
+      "key": "WOR",
+      "end": "2017-05-31",
+      "class": "L9",
+      "accession": "0001171843-17-003873",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184317003873/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "(f) table 0 of exh_991.htm: accepted net income match; header names the quarter in a variant form and also another quarter end: '4Q 2017 3Q 2017 4Q 2016 12M 2017 12M 2016'"
+    },
+    {
+      "key": "WOR",
+      "end": "2018-05-31",
+      "class": "L2",
+      "accession": "0001171843-18-004869",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184318004869/exh_991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of exh_991.htm: net income matches; header 'Three Months EndedMay 31, Twelve Months EndedMay 31, 2018 2017 2018 2017' names the quarter ending 2018-05-31 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "WOR",
+      "end": "2019-05-31",
+      "class": "L9",
+      "accession": "0001171843-19-004189",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184319004189/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "(f) table 0 of exh_991.htm: accepted net income match; header names the quarter in a variant form and also another quarter end: '4Q 2019 3Q 2019 4Q 2018 12M 2019 12M 2018'"
+    },
+    {
+      "key": "WOR",
+      "end": "2020-05-31",
+      "class": "L2",
+      "accession": "0001171843-20-004559",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184320004559/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of exh_991.htm: net income matches; header '4Q 2020 4Q 2019 12M 2020 12M 2019' names the quarter ending 2020-05-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WOR",
+      "end": "2021-05-31",
+      "class": "L2",
+      "accession": "0001171843-21-004492",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184321004492/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of exh_991.htm: net income matches; header '4Q 2021 4Q 2020 After-Tax Per Share After-Tax Per Share' names the quarter ending 2021-05-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WOR",
+      "end": "2022-05-31",
+      "class": "L2",
+      "accession": "0001171843-22-004475",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184322004475/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of exh_991.htm: net income matches; header '4Q 2022 4Q 2021 After-Tax Per Share After-Tax Per Share' names the quarter ending 2022-05-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WOR",
+      "end": "2023-05-31",
+      "class": "L2",
+      "accession": "0001171843-23-004227",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000117184323004227/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of exh_991.htm: net income matches; header '4Q 2023 4Q 2022 After-Tax Per Share After-Tax Per Share' names the quarter ending 2023-05-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WOR",
+      "end": "2024-05-31",
+      "class": "L10",
+      "accession": "0000950170-24-077327",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000095017024077327/wor-ex99_1.htm",
+      "tableIndex": 2,
+      "tableEpsReason": "net income divided by shares differs from EPS",
+      "note": "table 2 of wor-ex99_1.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income divided by shares differs from EPS)"
+    },
+    {
+      "key": "WOR",
+      "end": "2025-05-31",
+      "class": "L8",
+      "accession": "0000950170-25-089494",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000095017025089494/wor-ex99_1.htm",
+      "tableIndex": 2,
+      "tableEpsReason": null,
+      "note": "table 2 of wor-ex99_1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "WOR",
+      "end": "2026-05-31",
+      "class": "L2",
+      "accession": "0001193125-26-279469",
+      "url": "https://www.sec.gov/Archives/edgar/data/108516/000119312526279469/wor-ex99_1.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of wor-ex99_1.htm: net income matches; header '(U.S. dollars in millions, except per share amounts) 4Q 2026 4Q 2025 GAAP Financial Measures' names the quarter ending 2026-05-31 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "WRLD",
+      "end": "2016-03-31",
+      "class": "L4",
+      "accession": "0001157523-16-005496",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752316005496/a51335783_ex991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 28,616,000 (relative difference 0.0406) under label 'Net income' in table 0 of a51335783_ex991.htm"
+    },
+    {
+      "key": "WRLD",
+      "end": "2018-03-31",
+      "class": "L8",
+      "accession": "0001157523-18-001074",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752318001074/a51804191ex99_1.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of a51804191ex99_1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "WRLD",
+      "end": "2019-03-31",
+      "class": "L2",
+      "accession": "0001157523-19-001168",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752319001168/a51982191ex99_1.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of a51982191ex99_1.htm: net income matches; header 'WORLD ACCEPTANCE CORPORATION AND SUBSIDIARIES CONSOLIDATED STATEMENTS OF OPERATIONS (unaudited and in thousands, except ' names the quarter ending 2019-03-31 in a variant form (v) and no other quarter end"
+    },
+    {
+      "key": "WRLD",
+      "end": "2020-03-31",
+      "class": "L4",
+      "accession": "0001157523-20-000693",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752320000693/a52216317ex99_1.htm",
+      "tableIndex": 7,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 23,680,000 (relative difference 0.0162) under label 'Net income (loss)' in table 7 of a52216317ex99_1.htm"
+    },
+    {
+      "key": "WRLD",
+      "end": "2021-03-31",
+      "class": "L8",
+      "accession": "0001157523-21-000613",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752321000613/a52424600ex99_1.htm",
+      "tableIndex": 7,
+      "tableEpsReason": null,
+      "note": "table 7 of a52424600ex99_1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "WRLD",
+      "end": "2022-03-31",
+      "class": "L8",
+      "accession": "0001157523-22-000565",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752322000565/a52708776ex99_1.htm",
+      "tableIndex": 6,
+      "tableEpsReason": null,
+      "note": "table 6 of a52708776ex99_1.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "WRLD",
+      "end": "2023-03-31",
+      "class": "L4",
+      "accession": "0001157523-23-000727",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000115752323000727/a53393134_ex991.htm",
+      "tableIndex": 7,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 25,643,000 (relative difference 0.0410) under label 'Net income' in table 7 of a53393134_ex991.htm"
+    },
+    {
+      "key": "WRLD",
+      "end": "2024-03-31",
+      "class": "L8",
+      "accession": "0001437749-24-014252",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000143774924014252/ex_665449.htm",
+      "tableIndex": 11,
+      "tableEpsReason": null,
+      "note": "table 11 of ex_665449.htm: period-named EPS table; net income matches in column 0 at scale 1000, and no diluted per-share row was read"
+    },
+    {
+      "key": "WRLD",
+      "end": "2025-03-31",
+      "class": "L4",
+      "accession": "0001437749-25-013411",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000143774925013411/ex_808151.htm",
+      "tableIndex": 8,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 44,278,000 (relative difference 0.0273) under label 'Net income' in table 8 of ex_808151.htm"
+    },
+    {
+      "key": "WRLD",
+      "end": "2026-03-31",
+      "class": "L4",
+      "accession": "0001437749-26-013984",
+      "url": "https://www.sec.gov/Archives/edgar/data/108385/000143774926013984/ex_953445.htm",
+      "tableIndex": 7,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 35,014,000 (relative difference 0.0078) under label 'Net income' in table 7 of ex_953445.htm"
+    },
+    {
+      "key": "WSM",
+      "end": "2012-01-29",
+      "class": "L2",
+      "accession": "0001193125-12-102576",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312512102576/d312373dex991.htm",
+      "tableIndex": 26,
+      "tableEpsReason": null,
+      "note": "table 26 of d312373dex991.htm: net income matches; header 'FOURTH QUARTER 2011 2010 (13 Weeks) (13 Weeks) % of % of $ Revenues $ Revenues' names the quarter ending 2012-01-29 in a variant form (vi) and no other quarter end"
+    },
+    {
+      "key": "WSM",
+      "end": "2013-02-03",
+      "class": "L2",
+      "accession": "0001193125-13-115118",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312513115118/d503606dex991.htm",
+      "tableIndex": 25,
+      "tableEpsReason": null,
+      "note": "table 25 of d503606dex991.htm: net income matches; header 'FOURTH QUARTER 2012 2011 (14 Weeks) (13 Weeks) % of % of $ Revenues $ Revenues' names the quarter ending 2013-02-03 in a variant form (vi) and no other quarter end"
+    },
+    {
+      "key": "WSM",
+      "end": "2014-02-02",
+      "class": "L2",
+      "accession": "0001193125-14-095586",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312514095586/d691119dex991.htm",
+      "tableIndex": 21,
+      "tableEpsReason": null,
+      "note": "table 21 of d691119dex991.htm: net income matches; header '4th Quarter 2013 (13 Weeks) 2012 (14 Weeks) $ % ofRevenues $ % ofRevenues' names the quarter ending 2014-02-02 in a variant form (vi) and no other quarter end"
+    },
+    {
+      "key": "WSM",
+      "end": "2015-02-01",
+      "class": "L2",
+      "accession": "0001193125-15-096958",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312515096958/d894119dex991.htm",
+      "tableIndex": 17,
+      "tableEpsReason": null,
+      "note": "table 17 of d894119dex991.htm: net income matches; header '4th Quarter 2014 2013 $ % ofRevenues $ % ofRevenues' names the quarter ending 2015-02-01 in a variant form (vi) and no other quarter end"
+    },
+    {
+      "key": "WSM",
+      "end": "2016-01-31",
+      "class": "L2",
+      "accession": "0001193125-16-506695",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312516506695/d160621dex991.htm",
+      "tableIndex": 17,
+      "tableEpsReason": null,
+      "note": "table 17 of d160621dex991.htm: net income matches; header '4th Quarter 2015 2014 $ % ofRevenues $ % ofRevenues' names the quarter ending 2016-01-31 in a variant form (vi) and no other quarter end"
+    },
+    {
+      "key": "WSM",
+      "end": "2017-01-29",
+      "class": "L2",
+      "accession": "0001193125-17-083658",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312517083658/d339255dex991.htm",
+      "tableIndex": 17,
+      "tableEpsReason": null,
+      "note": "table 17 of d339255dex991.htm: net income matches; header '4th Quarter 2016 2015 $ % ofRevenues $ % ofRevenues' names the quarter ending 2017-01-29 in a variant form (vi) and no other quarter end"
+    },
+    {
+      "key": "WSM",
+      "end": "2020-02-02",
+      "class": "L10",
+      "accession": "0001193125-20-077192",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312520077192/d861901dex991.htm",
+      "tableIndex": 15,
+      "tableEpsReason": "net income and EPS rows have different column counts",
+      "note": "table 15 of d861901dex991.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income and EPS rows have different column counts)"
+    },
+    {
+      "key": "WSM",
+      "end": "2021-01-31",
+      "class": "L10",
+      "accession": "0001193125-21-084120",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000119312521084120/d137529dex991.htm",
+      "tableIndex": 16,
+      "tableEpsReason": "net income and EPS rows have different column counts",
+      "note": "table 16 of d137529dex991.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income and EPS rows have different column counts)"
+    },
+    {
+      "key": "WSM",
+      "end": "2022-01-30",
+      "class": "L10",
+      "accession": "0001628280-22-006378",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000162828022006378/exhibit991fy2021q4earnings.htm",
+      "tableIndex": 0,
+      "tableEpsReason": "net income and EPS rows have different column counts",
+      "note": "table 0 of exhibit991fy2021q4earnings.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income and EPS rows have different column counts)"
+    },
+    {
+      "key": "WSM",
+      "end": "2023-01-29",
+      "class": "L10",
+      "accession": "0001628280-23-008202",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000162828023008202/exhibit991fy2022q4earnings.htm",
+      "tableIndex": 0,
+      "tableEpsReason": "net income and EPS rows have different column counts",
+      "note": "table 0 of exhibit991fy2022q4earnings.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income and EPS rows have different column counts)"
+    },
+    {
+      "key": "WSM",
+      "end": "2024-01-28",
+      "class": "L10",
+      "accession": "0001628280-24-010801",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000162828024010801/exhibit991fy2023q4earnings.htm",
+      "tableIndex": 0,
+      "tableEpsReason": "net income matches more than one column or unit",
+      "note": "table 0 of exhibit991fy2023q4earnings.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income matches more than one column or unit)"
+    },
+    {
+      "key": "WSM",
+      "end": "2025-02-02",
+      "class": "L10",
+      "accession": "0001628280-25-013687",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000162828025013687/exhibit991fy2024q4earnings.htm",
+      "tableIndex": 0,
+      "tableEpsReason": "net income and EPS rows have different column counts",
+      "note": "table 0 of exhibit991fy2024q4earnings.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income and EPS rows have different column counts)"
+    },
+    {
+      "key": "WSM",
+      "end": "2026-02-01",
+      "class": "L10",
+      "accession": "0000719955-26-000030",
+      "url": "https://www.sec.gov/Archives/edgar/data/719955/000071995526000030/exhibit991fy2025q4earnings.htm",
+      "tableIndex": 0,
+      "tableEpsReason": "net income and EPS rows have different column counts",
+      "note": "table 0 of exhibit991fy2025q4earnings.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income and EPS rows have different column counts)"
+    },
+    {
+      "key": "YEXT",
+      "end": "2017-01-31",
+      "class": "L4",
+      "accession": "0001628280-17-006152",
+      "url": "https://www.sec.gov/Archives/edgar/data/1614178/000162828017006152/ex991_q1fy18earningsreleas.htm",
+      "tableIndex": 25,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value -16,106,000 (relative difference 0.1052) under label 'Net loss' in table 25 of ex991_q1fy18earningsreleas.htm"
+    },
+    {
+      "key": "ZM",
+      "end": "2019-01-31",
+      "class": "L4",
+      "accession": "0001564590-19-021917",
+      "url": "https://www.sec.gov/Archives/edgar/data/1585521/000156459019021917/zm-ex991_6.htm",
+      "tableIndex": 13,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value 2,530,000 (relative difference 0.5559) under label 'Net income (loss) before provision for income taxes' in table 13 of zm-ex991_6.htm"
+    },
+    {
+      "key": "ZS",
+      "end": "2019-07-31",
+      "class": "L4",
+      "accession": "0001713683-19-000049",
+      "url": "https://www.sec.gov/Archives/edgar/data/1713683/000171368319000049/zs-10312019991.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "no strict net income match in any table; closest net income-like value -7,588,000 (relative difference 0.4382) under label 'Net loss' in table 1 of zs-10312019991.htm"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2012-01-28",
+      "class": "L6",
+      "accession": "0001102624-12-000183",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000110262412000183/",
+      "tableIndex": null,
+      "tableEpsReason": null,
+      "note": "no HTML table in any of the 2 documents of the candidate filings"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2013-02-02",
+      "class": "L6",
+      "accession": "0001102624-13-000340",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000110262413000340/",
+      "tableIndex": null,
+      "tableEpsReason": null,
+      "note": "no HTML table in any of the 2 documents of the candidate filings"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2014-02-01",
+      "class": "L6",
+      "accession": "0001102624-14-000372",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000110262414000372/",
+      "tableIndex": null,
+      "tableEpsReason": null,
+      "note": "no HTML table in any of the 2 documents of the candidate filings"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2016-01-30",
+      "class": "L6",
+      "accession": "0001102624-16-002287",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000110262416002287/",
+      "tableIndex": null,
+      "tableEpsReason": null,
+      "note": "no HTML table in any of the 2 documents of the candidate filings"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2017-01-28",
+      "class": "L6",
+      "accession": "0001102624-17-000136",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000110262417000136/",
+      "tableIndex": null,
+      "tableEpsReason": null,
+      "note": "no HTML table in any of the 2 documents of the candidate filings"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2018-02-03",
+      "class": "L10",
+      "accession": "0001171843-18-002003",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184318002003/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": "net income and EPS rows have different column counts",
+      "note": "table 0 of exh_991.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income and EPS rows have different column counts)"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2019-02-02",
+      "class": "L10",
+      "accession": "0001171843-19-001734",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184319001734/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": "net income and EPS rows have different column counts",
+      "note": "table 0 of exh_991.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income and EPS rows have different column counts)"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2020-02-01",
+      "class": "L10",
+      "accession": "0001171843-20-001682",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184320001682/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": "net income and EPS rows have different column counts",
+      "note": "table 0 of exh_991.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income and EPS rows have different column counts)"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2021-01-30",
+      "class": "L10",
+      "accession": "0001171843-21-001707",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184321001707/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": "net income and EPS rows have different column counts",
+      "note": "table 0 of exh_991.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income and EPS rows have different column counts)"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2022-01-29",
+      "class": "L10",
+      "accession": "0001171843-22-001778",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184322001778/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": "net income and EPS rows have different column counts",
+      "note": "table 0 of exh_991.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income and EPS rows have different column counts)"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2023-01-28",
+      "class": "L10",
+      "accession": "0001171843-23-001553",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184323001553/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": "net income matches more than one column or unit",
+      "note": "table 0 of exh_991.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income matches more than one column or unit)"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2024-02-03",
+      "class": "L2",
+      "accession": "0001171843-24-001352",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184324001352/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of exh_991.htm: net income matches; header 'ZUMIEZ INC.CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS(In thousands, except per share amounts)(Unaudited) Three Mont' names the quarter ending 2024-02-03 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2025-02-01",
+      "class": "L2",
+      "accession": "0001171843-25-001458",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184325001458/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": null,
+      "note": "table 0 of exh_991.htm: net income matches; header 'ZUMIEZ INC. CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS (In thousands, except per share amounts) (Unaudited) Three M' names the quarter ending 2025-02-01 in a variant form (i) and no other quarter end"
+    },
+    {
+      "key": "ZUMZ",
+      "end": "2026-01-31",
+      "class": "L10",
+      "accession": "0001171843-26-001527",
+      "url": "https://www.sec.gov/Archives/edgar/data/1318008/000117184326001527/exh_991.htm",
+      "tableIndex": 0,
+      "tableEpsReason": "net income matches more than one column or unit",
+      "note": "table 0 of exh_991.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income matches more than one column or unit)"
+    },
+    {
+      "key": "ZWS",
+      "end": "2016-03-31",
+      "class": "L10",
+      "accession": "0001439288-16-000153",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928816000153/ex991q42016.htm",
+      "tableIndex": 9,
+      "tableEpsReason": "net income matches more than one column or unit",
+      "note": "table 9 of ex991q42016.htm: period-named EPS table; net income matches under an accepted label and table_eps rejects it (net income matches more than one column or unit)"
+    },
+    {
+      "key": "ZWS",
+      "end": "2017-03-31",
+      "class": "L8",
+      "accession": "0001439288-17-000034",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928817000034/ex991q42017.htm",
+      "tableIndex": 17,
+      "tableEpsReason": null,
+      "note": "table 17 of ex991q42017.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "ZWS",
+      "end": "2018-03-31",
+      "class": "L8",
+      "accession": "0001439288-18-000017",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928818000017/ex991q42018.htm",
+      "tableIndex": 16,
+      "tableEpsReason": null,
+      "note": "table 16 of ex991q42018.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "ZWS",
+      "end": "2019-03-31",
+      "class": "L8",
+      "accession": "0001439288-19-000018",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928819000018/ex991q42019.htm",
+      "tableIndex": 19,
+      "tableEpsReason": null,
+      "note": "table 19 of ex991q42019.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "ZWS",
+      "end": "2020-03-31",
+      "class": "L8",
+      "accession": "0001439288-20-000088",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928820000088/ex991q42020.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of ex991q42020.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "ZWS",
+      "end": "2022-03-31",
+      "class": "L8",
+      "accession": "0001439288-22-000055",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928822000055/ex99133122.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of ex99133122.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "ZWS",
+      "end": "2023-03-31",
+      "class": "L8",
+      "accession": "0001439288-23-000075",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928823000075/ex99133123.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of ex99133123.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "ZWS",
+      "end": "2024-03-31",
+      "class": "L8",
+      "accession": "0001439288-24-000077",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928824000077/ex991earningsrelease33124.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of ex991earningsrelease33124.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "ZWS",
+      "end": "2025-03-31",
+      "class": "L8",
+      "accession": "0001439288-25-000080",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000143928825000080/ex991earningsrelease33125.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of ex991earningsrelease33125.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    },
+    {
+      "key": "ZWS",
+      "end": "2026-03-31",
+      "class": "L8",
+      "accession": "0001628280-26-026279",
+      "url": "https://www.sec.gov/Archives/edgar/data/1439288/000162828026026279/ex991earningsrelease33126.htm",
+      "tableIndex": 1,
+      "tableEpsReason": null,
+      "note": "table 1 of ex991earningsrelease33126.htm: period-named EPS table; net income matches in column 0 at scale 1e+06, and no diluted per-share row was read"
+    }
+  ]
+}

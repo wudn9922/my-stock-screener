@@ -1,0 +1,10 @@
+{"schemaVersion": 2,
+ "autoPositives": {"L1": 3, "L2": 3, "L3": 3, "L8": 3},
+ "explicitNegatives": [
+  {"key": "TXT", "end": "2016-12-31", "accession": "0001104659-17-024320", "document": "a17-11537_1ex99d1.htm",
+   "tableIndices": [2], "negativeFor": "L2", "mustReject": "next-quarter table (slack and L2)"},
+  {"key": "WLY", "end": "2018-04-30", "accession": "0000107140-18-000012", "document": "exhibit99.htm",
+   "tableIndices": [36], "negativeFor": "L4", "mustReject": "no strict NI match"},
+  {"key": "TRAK", "end": "2020-06-30", "accession": "0001654954-20-010594", "document": "ex991.htm",
+   "tableIndices": [1], "negativeFor": "L5", "mustReject": "no quarter column"}],
+ "autoNegatives": ["L1-year-header", "L8-non-gaap-diluted-row"]}

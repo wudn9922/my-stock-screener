@@ -1,0 +1,7 @@
+{
+  "rows": [
+    {"key": "ABC", "end": "2024-12-31", "stored": 0.25, "reason": "no table shows this quarter's net income"},
+    {"key": "XYZ", "end": "2024-12-31", "stored": 0.45, "reason": "no table shows this quarter's net income"},
+    {"key": "ABC", "end": "2024-09-30", "stored": 0.20, "reason": "EPS sign differs from net income"}
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "source": "official SEC dataset documentation pages and PDFs",
+  "docs": {
+    "financial_statement_data_sets": {
+      "url": "https://www.sec.gov/data-research/sec-markets-data/financial-statement-data-sets",
+      "status": 200,
+      "title": "SEC.gov | Financial Statement Data Sets Lock",
+      "retrieved_at": "2026-10-18T10:04:51Z",
+      "bytes": 14704,
+      "sha256": "c73b87668f6bf2ddd08a34f0d750621ef2aa1a2e3a8fff8e5b49880d666e818b",
+      "zip_links_found": 71,
+      "sample_zip_links": [
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2009q1.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2009q2.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2009q3.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2009q4.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2010q1.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2010q2.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2010q3.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2010q4.zip"
+      ],
+      "lock_interstitial": true,
+      "wire_bytes": 14704,
+      "actual_http_status": 200
+    },
+    "financial_statement_data_sets_layout": {
+      "url": "https://www.sec.gov/dera/data/financial-statement-data-sets.html",
+      "status": 200,
+      "title": "SEC.gov | Financial Statement Data Sets Lock",
+      "retrieved_at": "2026-10-18T10:06:04Z",
+      "bytes": 14712,
+      "sha256": "da7f00840a1fb57696550ab604d5e06ed5d0d6a2a49753a4b8245190f3b4b2be",
+      "zip_links_found": 71,
+      "sample_zip_links": [
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2009q1.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2009q2.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2009q3.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2009q4.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2010q1.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2010q2.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2010q3.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2010q4.zip"
+      ],
+      "lock_interstitial": true,
+      "wire_bytes": 14712,
+      "actual_http_status": 200
+    },
+    "financial_statement_notes_data_sets": {
+      "url": "https://www.sec.gov/data-research/sec-markets-data/financial-statement-notes-data-sets",
+      "status": 200,
+      "title": "SEC.gov | Financial Statement and Notes Data Sets Lock",
+      "retrieved_at": "2026-10-18T10:04:51Z",
+      "bytes": 14990,
+      "sha256": "774a83fb1f7c364187d22301a5b1e1835341ac9f95abd1464d1090ec47c3f0c1",
+      "zip_links_found": 79,
+      "sample_zip_links": [
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2009q1_notes.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2009q2_notes.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2009q3_notes.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2009q4_notes.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2010q1_notes_1.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2010q2_notes_0.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2010q3_notes_0.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2010q4_notes.zip"
+      ],
+      "lock_interstitial": true,
+      "wire_bytes": 14990,
+      "actual_http_status": 200
+    },
+    "financial_statement_notes_layout": {
+      "url": "https://www.sec.gov/dera/data/financial-statement-and-notes-data-set.html",
+      "status": 200,
+      "title": "SEC.gov | Financial Statement and Notes Data Sets Lock",
+      "retrieved_at": "2026-10-18T10:06:05Z",
+      "bytes": 14990,
+      "sha256": "774a83fb1f7c364187d22301a5b1e1835341ac9f95abd1464d1090ec47c3f0c1",
+      "zip_links_found": 79,
+      "sample_zip_links": [
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2009q1_notes.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2009q2_notes.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2009q3_notes.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2009q4_notes.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2010q1_notes_1.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2010q2_notes_0.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2010q3_notes_0.zip",
+        "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/2010q4_notes.zip"
+      ],
+      "lock_interstitial": true,
+      "wire_bytes": 14990,
+      "actual_http_status": 200
+    },
+    "financial_statement_data_sets_pdf": {
+      "url": "https://www.sec.gov/files/financial-statement-data-sets.pdf",
+      "status": 200,
+      "retrieved_at": "2026-10-18T10:07:18Z",
+      "content_type": "application/pdf",
+      "bytes": 312788,
+      "wire_bytes": 312788,
+      "sha256": "6358825422f5ce34680917b6a1835b4934c4f6f4146892a34e87c643f725a13e",
+      "actual_http_status": 200
+    },
+    "financial_statement_notes_data_sets_pdf": {
+      "url": "https://www.sec.gov/files/aqfsn_1.pdf",
+      "status": 200,
+      "retrieved_at": "2026-10-18T10:07:00Z",
+      "content_type": "application/pdf",
+      "bytes": 269165,
+      "wire_bytes": 269165,
+      "sha256": "79183411d7b9b09629fd9245d028a94f0cf53bb59deed18f9f8fc2697c3c5681",
+      "actual_http_status": 200
+    }
+  },
+  "metrics": {
+    "network_requests_in_this_replay": 0,
+    "cache_hits": 6,
+    "retries": 0
+  },
+  "end_to_end_metrics": {
+    "actual_http_requests": 6,
+    "successful_http_responses": 6,
+    "http_status_counts": {
+      "200": 6
+    },
+    "wire_bytes_received": 641349,
+    "decoded_bytes_received": 641349,
+    "retries": 0,
+    "rate_limit_requests_per_second": 4.0,
+    "note": "Six initial official documentation URLs were requested; the later metrics field below is only a cache replay."
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "source_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046921000009/ofg10k2020.htm",
+  "accession": "0001030469-21-000009",
+  "filing_date": "2021-02-26",
+  "form": "10-K",
+  "corroborating_source": {
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046921000012/ofg8kexhibit991q21.htm",
+    "accession": "0001030469-21-000012",
+    "filing_date": "2021-04-21",
+    "form": "8-K EX-99.1",
+    "filing_lag_after_q4_days": 111,
+    "text_excerpt": "1Q21 Highlights Earnings: EPS diluted was $0.56 compared to $0.42 in 4Q20 and $0.00 in 1Q20."
+  },
+  "ticker": "OFG",
+  "cik": "0001030469",
+  "fiscal_year": 2020,
+  "q4_target": {
+    "q4_end": "2020-12-31",
+    "q4_start_estimate": "2020-10-01",
+    "q4_end_matches_local_annual_end": true
+  },
+  "location": "10-K Business / financial overview, “Fourth quarter of 2020: Increased Earnings & Revenues”; same Q4 amount corroborated in the SEC 1Q21 EX-99.1 highlights.",
+  "source_text_excerpt": "Fourth quarter of 2020: Increased Earnings & Revenues: Earnings per share (“EPS”) diluted of $0.42 compared to a loss of $0.05 in the fourth quarter of 2019. Results reflected pre-tax merger and restructuring charges of $10.1 million compared to $21.5 million and total core revenues were $132.8 million compared to $98.4 million in such quarter.",
+  "diluted_eps_fact": {
+    "concept": "custom:ManagementDisclosedQuarterlyDilutedEps",
+    "context": {
+      "start": "2020-10-01",
+      "end": "2020-12-31",
+      "dimensions": []
+    },
+    "unit_measures": [
+      "iso4217:USD",
+      "xbrli:shares"
+    ],
+    "value": 0.42,
+    "row_text": "Earnings per share (EPS) diluted of $0.42 for Fourth quarter of 2020",
+    "table_text": "SEC 10-K business overview: fourth quarter 2020 increased earnings and revenues; merger and restructuring charges are described as part of results, with no EPS adjustment label. 1Q21 SEC EX-99.1 independently compares diluted EPS $0.56 with $0.42 in 4Q20.",
+    "gaap_evidence": "The SEC 10-K and 8-K use unqualified EPS/diluted EPS terminology; the release separately identifies Non-GAAP measures and does not label this EPS adjusted or core. The 10-K’s 2020 annual financial statements report GAAP diluted EPS $1.32."
+  },
+  "reported_value_classification": "unadjusted GAAP diluted EPS; verified by exact quarter text in 10-K and exact 4Q20 comparator in SEC 8-K",
+  "original_xbrl_tag": "none; prose disclosure, not an Inline XBRL fact",
+  "share_split_review": {
+    "basis": "as reported",
+    "split_events_after_q4": [],
+    "applied_to_reported_value": false
+  },
+  "same_period_database_value": null
+}
