@@ -1,10 +1,12 @@
 name: defeatbeta probe (manual, read-only)
 run-name: "defeatbeta probe (read-only; not a fill source)"
 
-# Manual only. Downloads the defeatbeta/yahoo-finance-data dataset card and data/US/stock_statement.parquet from
-# Hugging Face, compares the quarterly diluted EPS rows with the repo's existing US Q4 EPS numbers, and uploads the
-# report as the artifact defeatbeta-probe. It fills no value, writes nothing to the repo, commits nothing, and makes
-# no request to the SEC.
+# Manual only. Job probe (contents: read): downloads the defeatbeta/yahoo-finance-data dataset card and
+# data/US/stock_statement.parquet from Hugging Face, compares the quarterly diluted EPS rows with the repo's existing
+# US Q4 EPS numbers, and uploads the report as the artifact defeatbeta-probe.
+# Job commit (the only job with write access): takes the report from that artifact and commits it to
+# the orphan branch runs/source-probes under docs/report/source-probes/defeatbeta/<run_id>/. Nothing is written to
+# main, no value is filled, and no request is made to the SEC.
 
 on:
   workflow_dispatch:
@@ -110,3 +112,117 @@ jobs:
           name: defeatbeta-probe
           path: ${{ runner.temp }}/artifact/
           if-no-files-found: error
+
+  commit:
+    needs: probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    concurrency:
+      group: defeatbeta-probe-runs
+      cancel-in-progress: false
+    env:
+      RUN_ID: ${{ github.run_id }}
+      RUNS_BRANCH: runs/source-probes
+    steps:
+      - name: Download the report artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: defeatbeta-probe
+          path: ${{ runner.temp }}/report-in
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Commit the report to runs/source-probes
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/report-in/probe-report.json"
+          [ -f "$src" ] || { echo "::error::probe-report.json is missing from the defeatbeta-probe artifact"; exit 1; }
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]] || { echo "::error::RUN_ID is not numeric"; exit 1; }
+          prefix="docs/report/source-probes/defeatbeta/$RUN_ID"
+          wt="$RUNNER_TEMP/runs-wt"
+          main_sha="$(git rev-parse HEAD)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          pushed=0
+          for attempt in 1 2 3 4; do
+            git worktree remove --force "$wt" 2>/dev/null || true
+            rm -rf "$wt"
+            git worktree prune
+            if git ls-remote --exit-code --heads origin "$RUNS_BRANCH" >/dev/null 2>&1; then
+              git fetch -q origin "$RUNS_BRANCH"
+              git worktree add -q --detach "$wt" FETCH_HEAD
+            else
+              git worktree add -q --orphan -b "probe-commit-$RUN_ID-$attempt" "$wt"
+            fi
+            mkdir -p "$wt/$prefix"
+            cp "$src" "$wt/$prefix/probe-report.json"
+            git -C "$wt" add -- "$prefix/probe-report.json"
+            git -C "$wt" diff --cached --name-status -z > "$RUNNER_TEMP/staged.z"
+            python3 -I - "$RUN_ID" "$RUNNER_TEMP/staged.z" "$wt/$prefix/probe-report.json" <<'GUARD'
+          import json, sys
+
+          run_id, staged_file, report_file = sys.argv[1], sys.argv[2], sys.argv[3]
+          prefix = f"docs/report/source-probes/defeatbeta/{run_id}"
+          expected = f"{prefix}/probe-report.json"
+          PROTECTED = ("docs/", "atlas/", "tests/", ".github/")
+          fail = []
+          if not run_id.isdigit():
+              fail.append(f"run id {run_id!r} is not numeric")
+          with open(staged_file, "rb") as handle:
+              parts = handle.read().decode("utf-8").split("\0")
+          if parts and parts[-1] == "":
+              parts.pop()
+          if len(parts) % 2:
+              fail.append("the staged list is malformed")
+          entries = list(zip(parts[0::2], parts[1::2]))
+          for status, path in entries:
+              segments = path.split("/")
+              if status != "A":
+                  fail.append(f"{path}: status {status}; only additions may be committed")
+              elif path.startswith("/") or "\\" in path or any(s in ("", ".", "..") for s in segments):
+                  fail.append(f"{path}: not a plain relative path")
+              elif path.startswith(PROTECTED) and not path.startswith(prefix + "/"):
+                  fail.append(f"{path}: protected path on main, outside {prefix}/")
+              elif not path.startswith(prefix + "/"):
+                  fail.append(f"{path}: outside {prefix}/")
+          if entries != [("A", expected)]:
+              fail.append(f"the commit must add exactly {expected}; staged: {entries}")
+          try:
+              with open(report_file, encoding="utf-8") as handle:
+                  report = json.load(handle)
+          except (OSError, ValueError) as error:
+              fail.append(f"the report is unreadable: {error}")
+          else:
+              if report.get("schema") != "defeatbeta-probe-v1":
+                  fail.append("the report schema is not defeatbeta-probe-v1")
+              if report.get("readOnly") is not True or report.get("fillsValues") is not False \
+                      or report.get("writesEpsValues") is not False:
+                  fail.append("the report flags are not read-only with no values written")
+              allowed = {"agreementRate", "wilsonLower95"}
+              def walk(node, key, where):
+                  if isinstance(node, dict):
+                      for name, value in node.items():
+                          walk(value, name, f"{where}.{name}")
+                  elif isinstance(node, list):
+                      for index, value in enumerate(node):
+                          walk(value, key, f"{where}[{index}]")
+                  elif isinstance(node, float) and key not in allowed:
+                      fail.append(f"{where}: a float outside {sorted(allowed)}; the report holds counts, keys and flags only")
+              walk(report, "", "report")
+          if fail:
+              for message in fail:
+                  print(f"::error::{message}")
+              sys.exit(1)
+          print(f"guard passed: {expected}")
+          GUARD
+            git -C "$wt" commit -q -m "defeatbeta probe run $RUN_ID: report output [main $main_sha]"
+            if git -C "$wt" push -q origin "HEAD:refs/heads/$RUNS_BRANCH"; then
+              pushed=1
+              break
+            fi
+            sleep $((2 ** attempt))
+          done
+          [ "$pushed" = 1 ] || { echo "::error::push to $RUNS_BRANCH failed after 4 attempts"; exit 1; }
