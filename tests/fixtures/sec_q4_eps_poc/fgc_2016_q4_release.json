@@ -1,0 +1,54 @@
+{
+  "source_url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001425/ex99-1.htm",
+  "accession": "0001387131-17-001425",
+  "filing_date": "2017-03-16",
+  "form": "8-K EX-99.1",
+  "ticker": "FGC",
+  "cik": "0001591890",
+  "historical_filer_name": "1347 Property Insurance Holdings, Inc.",
+  "fiscal_year": 2016,
+  "q4_target": {
+    "q4_end": "2016-12-31",
+    "q4_start_estimate": "2016-10-01",
+    "q4_end_matches_local_annual_end": true
+  },
+  "location": "Exhibit 99.1, Consolidated Statements of Comprehensive (Loss) Income; Three months ended December 31, 2016 column; Diluted row under (Loss) Earnings per share attributable to common shareholders.",
+  "source_text_excerpt": "Unaudited / audited comparative table; Three months ended December 31, 2016 and 2015; (Loss) Earnings per share – net (loss) income attributable to common shareholders: Basic $ 0.27 $ 0.09 $ — $ (0.27 ) Diluted $ 0.27 $ 0.09 $ — $ (0.27 ). The same exhibit separately reports annual earnings per share before catastrophe events of $1.07.",
+  "diluted_eps_fact": {
+    "concept": "custom:ReleaseQuarterlyDilutedEps",
+    "context": {
+      "start": "2016-10-01",
+      "end": "2016-12-31",
+      "dimensions": []
+    },
+    "unit_measures": [
+      "iso4217:USD",
+      "xbrli:shares"
+    ],
+    "value": 0.27,
+    "row_text": "Diluted $ 0.27 $ 0.09 $ — $ (0.27)",
+    "table_text": "Consolidated Statements of Comprehensive (Loss) Income; unaudited Three months ended December 31, 2016 / 2015. (Loss) Earnings per share attributable to common shareholders: Basic; Diluted; Weighted average common shares outstanding.",
+    "gaap_evidence": "Primary consolidated statement of operations/income; the per-share row is attributable to common shareholders and is explicitly labeled Diluted."
+  },
+  "excluded_non_gaap_annual_candidate": {
+    "value": 1.07,
+    "period": "year ended December 31, 2016",
+    "label": "Earnings per share before catastrophe events",
+    "location": "Separate annual reconciliation table; not diluted Q4 GAAP EPS."
+  },
+  "share_split_review": {
+    "basis": "as reported in 2016 filing",
+    "later_split_events": [
+      [
+        "2024-11-01",
+        0.04
+      ],
+      [
+        "2026-02-13",
+        0.2
+      ]
+    ],
+    "applied_to_reported_value": false,
+    "local_q4_eps_for_same_period": null
+  }
+}

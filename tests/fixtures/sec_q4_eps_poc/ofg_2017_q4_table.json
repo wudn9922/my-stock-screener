@@ -1,0 +1,32 @@
+{
+  "source_url": "https://www.sec.gov/Archives/edgar/data/1030469/000103046918000021/ofg10k12312017.htm",
+  "accession": "0001030469-18-000021",
+  "filing_date": "2018-03-13",
+  "form": "10-K",
+  "ticker": "OFG",
+  "cik": "0001030469",
+  "fiscal_year": 2017,
+  "q4_target": {
+    "q4_end": "2017-12-31",
+    "q4_start_estimate": "2017-10-01",
+    "q4_end_matches_local_annual_end": true
+  },
+  "location": "Table 17 — Selected Quarterly Financial Data; Earnings Data / Per Share Data; December 31, 2017 column; Diluted row",
+  "source_text_excerpt": "March 31, June 30, September 30, December 31, Total 2017 2017 2017 2017 2017 EARNINGS DATA: (In thousands, except per share data) Interest income $ 86,178 $ 85,940 $ 90,355 $ 83,174 $ 345,647 Interest expense 11,560 10,377 9,877 9,661 41,475 Net interest income 74,618 75,563 80,478 73,513 304,172 Provision for loan and lease losses 17,654 26,536 44,042 24,907 113,139 Net interest income after provision for loan and lease losses 56,964 49,027 36,436 48,606 191,033 Non-interest income 19,074 24,886 17,912 16,815 78,687 Non-interest expenses 51,684 52,816 50,469 46,662 201,631 Income before taxes 24,354 21,097 3,879 18,759 68,089 Income tax expense 9,204 3,993 560 1,686 15,443 Net income 15,150 17,104 3,319 17,073 52,646 Less: dividends on preferred stock (3,465) (3,466) (3,465) (3,466) (13,862) Income available to common shareholders $ 11,685 $ 13,638 $ (146) $ 13,607 $ 38,784 PER SHARE DATA: Basic $ 0.27 $ 0.30 $ - $ 0.31 $ 0.88 Diluted $ 0.26 $ 0.30 $ - $ 0.30 $ 0.88 ",
+  "diluted_eps_fact": {
+    "concept": "custom:SelectedQuarterlyDilutedEps",
+    "context": {
+      "start": "2017-10-01",
+      "end": "2017-12-31",
+      "dimensions": []
+    },
+    "unit_measures": [
+      "iso4217:USD",
+      "xbrli:shares"
+    ],
+    "value": 0.3,
+    "row_text": "Diluted $ 0.26 $ 0.30 $ - $ 0.30 $ 0.88",
+    "table_text": "March 31, June 30, September 30, December 31, Total 2017 2017 2017 2017 2017 EARNINGS DATA: (In thousands, except per share data) Interest income $ 86,178 $ 85,940 $ 90,355 $ 83,174 $ 345,647 Interest expense 11,560 10,377 9,877 9,661 41,475 Net interest income 74,618 75,563 80,478 73,513 304,172 Provision for loan and lease losses 17,654 26,536 44,042 24,907 113,139 Net interest income after provision for loan and lease losses 56,964 49,027 36,436 48,606 191,033 Non-interest income 19,074 24,886 17,912 16,815 78,687 Non-interest expenses 51,684 52,816 50,469 46,662 201,631 Income before taxes 24,354 21,097 3,879 18,759 68,089 Income tax expense 9,204 3,993 560 1,686 15,443 Net income 15,150 17,104 3,319 17,073 52,646 Less: dividends on preferred stock (3,465) (3,466) (3,465) (3,466) (13,862) Income available to common shareholders $ 11,685 $ 13,638 $ (146) $ 13,607 $ 38,784 PER SHARE DATA: Basic $ 0.27 $ 0.30 $ - $ 0.31 $ 0.88 Diluted $ 0.26 $ 0.30 $ - $ 0.30 $ 0.88 ",
+    "gaap_evidence": "Quarterly results table lists net income, dividends on preferred stock, income available to common shareholders, then Basic and Diluted per-share rows; no adjusted or non-GAAP label applies to this table."
+  }
+}

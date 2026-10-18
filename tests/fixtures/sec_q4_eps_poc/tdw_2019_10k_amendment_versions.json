@@ -1,0 +1,30 @@
+{
+  "ticker": "TDW",
+  "fiscal_year": 2019,
+  "target_q4_end": "2019-12-31",
+  "target_q4_start": "2019-10-01",
+  "original_10k": {
+    "source_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459020008191/tdw-10k_20191231.htm",
+    "accession": "0001564590-20-008191",
+    "filing_date": "2020-03-02",
+    "q4_fact": {
+      "concept": "us-gaap:EarningsPerShareDiluted",
+      "context": {
+        "start": "2019-10-01",
+        "end": "2019-12-31",
+        "dimensions": []
+      },
+      "value": -1.52
+    }
+  },
+  "amended_10ka": {
+    "source_url": "https://www.sec.gov/Archives/edgar/data/98222/000156459020019722/tdw-10ka_20191231.htm",
+    "accession": "0001564590-20-019722",
+    "filing_date": "2020-04-29",
+    "http_status": 200,
+    "parse_status": "parsed",
+    "eps_facts_extracted_for_comparison": 0,
+    "interpretation": "The source C parser did not extract a matching Q4 fact from the 10-K/A. This is not evidence the amendment lacks a disclosure; version comparison must remain incomplete unless the actual amendment text is checked."
+  },
+  "source": "Partial normalized fixture from the actual SEC filings and the POC parser output; the original SEC documents remain at the URLs above."
+}

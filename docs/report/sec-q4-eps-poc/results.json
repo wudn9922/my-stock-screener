@@ -1,0 +1,5311 @@
+{
+  "version": 2,
+  "sample_id": "sec-q4-diluted-eps-poc-20261018",
+  "sample_freeze_sha256": "89dcb33135d2abbb0297617bed371233d20b3341a1419504ae6768e36d58caa2",
+  "source_commit": "fccf858d16e773df861e4424880d7f8264d699ff",
+  "classification_source": "docs/report/q4-eps-missing-classification.json",
+  "classification_sha256": "249ec9db253b3180a25f7a9b34130cb4b5e7b0e1e02fffcf5ab9805873bbd61e",
+  "retrieved_at": "2026-10-18T12:46:16Z",
+  "classification_legend": {
+    "A": "Verified direct Q4 EPS: SEC 原始文件有明確單季 GAAP diluted 數值。",
+    "B": "Candidate: 有候選數值，但股類、符號、GAAP、期間、版本或拆股仍有疑義。",
+    "C": "Derived/annual evidence only: 有年度或部分季度 EPS 線索，不以推算值填欄位。",
+    "D": "Completed SEC search found no direct Q4 EPS and no usable annual/quarterly evidence.",
+    "E": "Technical failure or incomplete period mapping; never treated as no disclosure."
+  },
+  "period_results": [
+    {
+      "ticker": "BNC",
+      "company_name": "BNB Standard Corp",
+      "cik": "0001482541",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2014,
+      "frozen_q4_end": "2014-12-31",
+      "missing_reason": "q4_net_income_missing",
+      "classification": "C",
+      "verified_q4_eps": null,
+      "unverified_candidate": null,
+      "result": "年度 EPS 與部分季度資料可用；10-K/8-K 搜尋範圍未找到可直接採用的 Q4 diluted EPS。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001493152-15-001473"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2015q2"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001493152-15-001473"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2015q2"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001493152-15-001473",
+            "form": "10-K",
+            "filing_date": "2015-04-16",
+            "report_date": "2014-12-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215001473/form10-k.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 1,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001493152-15-000092",
+            "filing_date": "2015-01-08",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000092/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000092/form8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000092/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-000109",
+            "filing_date": "2015-01-09",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000109/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000109/form8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000109/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-2.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000109/ex99-2.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-000132",
+            "filing_date": "2015-01-13",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000132/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000132/form8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000132/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-000665",
+            "filing_date": "2015-02-26",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000665/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000665/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000665/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-000682",
+            "filing_date": "2015-02-27",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000682/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000682/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000682/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-000685",
+            "filing_date": "2015-02-27",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000685/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000685/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-000723",
+            "filing_date": "2015-03-03",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000723/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-ka.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215000723/form8-ka.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-001501",
+            "filing_date": "2015-04-17",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215001501/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215001501/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-15-001584",
+            "filing_date": "2015-04-23",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215001584/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215001584/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315215001584/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "BNC",
+      "company_name": "BNB Standard Corp",
+      "cik": "0001482541",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2024,
+      "frozen_q4_end": "2025-01-31",
+      "missing_reason": "q4_net_income_missing",
+      "classification": "E",
+      "verified_q4_eps": null,
+      "unverified_candidate": null,
+      "result": "凍結期末 2025-01-31 與 SEC FY2024 年報期末 2024-12-31 不同，無法把年報當作該凍結期別。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001641172-25-000913"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2025q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001641172-25-000913"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2025q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001641172-25-000913",
+            "form": "10-K",
+            "filing_date": "2025-03-27",
+            "report_date": "2024-12-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/1482541/000164117225000913/form10-k.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 0,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001493152-25-006050",
+            "filing_date": "2025-02-12",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315225006050/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2024,
+                "frozen_q4_end": "2025-01-31",
+                "window_end": "2024-12-31",
+                "diagnostic_only": true
+              },
+              {
+                "ticker": "BNC",
+                "fy": 2024,
+                "frozen_q4_end": "2025-01-31",
+                "window_end": "2025-01-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315225006050/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315225006050/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1_001.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000149315225006050/ex99-1_001.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              }
+            ]
+          },
+          {
+            "accession": "0001641172-25-002000",
+            "filing_date": "2025-04-01",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000164117225002000/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2024,
+                "frozen_q4_end": "2025-01-31",
+                "window_end": "2024-12-31",
+                "diagnostic_only": true
+              },
+              {
+                "ticker": "BNC",
+                "fy": 2024,
+                "frozen_q4_end": "2025-01-31",
+                "window_end": "2025-01-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000164117225002000/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000164117225002000/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1_001.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000164117225002000/ex99-1_001.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              }
+            ]
+          },
+          {
+            "accession": "0001641172-25-009265",
+            "filing_date": "2025-05-08",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1482541/000164117225009265/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "BNC",
+                "fy": 2024,
+                "frozen_q4_end": "2025-01-31",
+                "window_end": "2025-01-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000164117225009265/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000164117225009265/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1_001.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1482541/000164117225009265/ex99-1_001.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "QXL",
+      "company_name": "QUANTUM X LABS INC.",
+      "cik": "0000797542",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2014,
+      "frozen_q4_end": "2014-12-31",
+      "missing_reason": "q4_net_income_missing",
+      "classification": "C",
+      "verified_q4_eps": null,
+      "unverified_candidate": null,
+      "result": "年報的 Fourth Quarter 表是股價 High/Low，不是 EPS；僅有年度/部分季度 EPS 線索。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001295345-15-000048"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2015q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001295345-15-000048"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2015q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001295345-15-000048",
+            "form": "10-K",
+            "filing_date": "2015-03-12",
+            "report_date": "2014-12-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000048/zxsi12312014.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 1,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001295345-15-000002",
+            "filing_date": "2015-01-02",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000002/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "zxsi01022015.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000002/zxsi01022015.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001295345-15-000020",
+            "filing_date": "2015-02-03",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000020/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8k02032015.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000020/form8k02032015.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001295345-15-000030",
+            "filing_date": "2015-02-13",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000030/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "zxsi02132015.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000030/zxsi02132015.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001295345-15-000051",
+            "filing_date": "2015-03-16",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000051/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "zxsi8k_03162015.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000051/zxsi8k_03162015.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001295345-15-000059",
+            "filing_date": "2015-03-24",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000059/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8k03242015.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000059/form8k03242015.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001295345-15-000102",
+            "filing_date": "2015-04-30",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000102/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8k04302015.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/797542/000129534515000102/form8k04302015.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "QXL",
+      "company_name": "QUANTUM X LABS INC.",
+      "cik": "0000797542",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2019,
+      "frozen_q4_end": "2019-12-31",
+      "missing_reason": "q4_net_income_missing",
+      "classification": "C",
+      "verified_q4_eps": null,
+      "unverified_candidate": null,
+      "result": "年報的 Fourth Quarter 表是股價 High/Low，不是 EPS；僅有年度/部分季度 EPS 線索。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001493152-20-004372"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2020q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001493152-20-004372"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2020q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001493152-20-004372",
+            "form": "10-K",
+            "filing_date": "2020-03-20",
+            "report_date": "2019-12-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/797542/000149315220004372/form10-k.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 2,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001493152-20-000007",
+            "filing_date": "2020-01-02",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000149315220000007/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/797542/000149315220000007/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-20-001694",
+            "filing_date": "2020-02-06",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000149315220001694/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/797542/000149315220001694/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-20-002870",
+            "filing_date": "2020-02-24",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/797542/000149315220002870/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "QXL",
+                "fy": 2019,
+                "frozen_q4_end": "2019-12-31",
+                "window_end": "2019-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/797542/000149315220002870/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "FGC",
+      "company_name": "FG Communities Holdings Inc.",
+      "cik": "0001591890",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2016,
+      "frozen_q4_end": "2016-12-31",
+      "missing_reason": "annual_diluted_eps_missing",
+      "classification": "A",
+      "verified_q4_eps": 0.27,
+      "unverified_candidate": null,
+      "result": "SEC 8-K EX-99.1 明確列示 GAAP diluted Q4 EPS。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001387131-17-001422"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2017q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001387131-17-001422"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2017q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001387131-17-001422",
+            "form": "10-K",
+            "filing_date": "2017-03-16",
+            "report_date": "2016-12-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001422/pih-10k_123116.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 2,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001387131-17-001258",
+            "filing_date": "2017-03-08",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001258/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2016,
+                "frozen_q4_end": "2016-12-31",
+                "window_end": "2016-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "pih-8k_030517.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001258/pih-8k_030517.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001258/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1_img001.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001258/ex99-1_img001.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              }
+            ]
+          },
+          {
+            "accession": "0001387131-17-001260",
+            "filing_date": "2017-03-08",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001260/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2016,
+                "frozen_q4_end": "2016-12-31",
+                "window_end": "2016-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "pih-8ka_122716.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001260/pih-8ka_122716.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001387131-17-001425",
+            "filing_date": "2017-03-16",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001425/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2016,
+                "frozen_q4_end": "2016-12-31",
+                "window_end": "2016-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "pih-8k_031617.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001425/pih-8k_031617.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001425/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001387131-17-001993",
+            "filing_date": "2017-04-07",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001993/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2016,
+                "frozen_q4_end": "2016-12-31",
+                "window_end": "2016-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "pih-8k_040317.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001993/pih-8k_040317.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "FGC",
+      "company_name": "FG Communities Holdings Inc.",
+      "cik": "0001591890",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2022,
+      "frozen_q4_end": "2022-12-31",
+      "missing_reason": "annual_diluted_eps_missing",
+      "classification": "A",
+      "verified_q4_eps": -0.03,
+      "unverified_candidate": null,
+      "result": "SEC 8-K EX-99.1 明確分開單季和年度欄，GAAP 表及敘述一致。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001493152-23-008861"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2023q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001493152-23-008861"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2023q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001493152-23-008861",
+            "form": "10-K",
+            "filing_date": "2023-03-24",
+            "report_date": "2022-12-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223008861/form10-k.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 1,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001493152-23-002541",
+            "filing_date": "2023-01-26",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002541/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002541/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002541/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1_001.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002541/ex99-1_001.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-23-002542",
+            "filing_date": "2023-01-26",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1_001.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_001.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_002.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_002.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_003.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_003.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_004.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_004.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_005.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_005.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_006.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_006.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_007.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_007.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_008.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_008.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_009.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_009.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_010.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_010.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_011.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_011.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_012.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_012.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_013.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_013.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_014.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_014.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_015.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_015.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_016.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223002542/ex99-1_016.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-23-008865",
+            "filing_date": "2023-03-24",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223008865/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "FGC",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223008865/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223008865/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1_001.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223008865/ex99-1_001.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "WRAP",
+      "company_name": "WRAP TECHNOLOGIES, INC.",
+      "cik": "0001702924",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2017,
+      "frozen_q4_end": "2017-12-31",
+      "missing_reason": "annual_diluted_eps_missing",
+      "classification": "C",
+      "verified_q4_eps": null,
+      "unverified_candidate": null,
+      "result": "年度/部分季度資料可用；10-K/8-K 搜尋範圍未找到可直接採用的 Q4 diluted EPS。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001654954-18-002199"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2018q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001654954-18-002199"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2018q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001654954-18-002199",
+            "form": "10-K",
+            "filing_date": "2018-03-06",
+            "report_date": "2017-12-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/1702924/000165495418002199/wrap10k_dec312017.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 2,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001654954-18-000244",
+            "filing_date": "2018-01-09",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1702924/000165495418000244/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "WRAP",
+                "fy": 2017,
+                "frozen_q4_end": "2017-12-31",
+                "window_end": "2017-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "wrap8k_jan42018.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1702924/000165495418000244/wrap8k_jan42018.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1702924/000165495418000244/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "WRAP",
+      "company_name": "WRAP TECHNOLOGIES, INC.",
+      "cik": "0001702924",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2022,
+      "frozen_q4_end": "2022-12-31",
+      "missing_reason": "annual_diluted_eps_missing",
+      "classification": "A",
+      "verified_q4_eps": -0.09,
+      "unverified_candidate": null,
+      "result": "SEC 8-K EX-99.1 明確列示 GAAP basic-and-diluted Q4 EPS。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001437749-23-011737",
+          "0001437749-23-005218"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_absent_from_sub",
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2023q1",
+          "2023q2"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001437749-23-011737",
+          "0001437749-23-005218"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2023q1",
+          "2023q2"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001437749-23-005218",
+            "form": "10-K",
+            "filing_date": "2023-03-02",
+            "report_date": "2022-12-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923005218/wrap20221231_10k.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 1,
+            "quarterly_excerpt_count": 0
+          },
+          {
+            "accession": "0001437749-23-011737",
+            "form": "10-K/A",
+            "filing_date": "2023-05-01",
+            "report_date": "2022-12-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923011737/wrap20221231_10ka.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 1,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001851734-23-000054",
+            "filing_date": "2023-02-10",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1702924/000185173423000054/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "WRAP",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "wrap20230210_8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1702924/000185173423000054/wrap20230210_8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001437749-23-005259",
+            "filing_date": "2023-03-03",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923005259/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "WRAP",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "wrap20230302_8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923005259/wrap20230302_8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex_483215.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923005259/ex_483215.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001437749-23-008064",
+            "filing_date": "2023-03-27",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923008064/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "WRAP",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "wrap20230327_8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923008064/wrap20230327_8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex_493555.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923008064/ex_493555.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001437749-23-010660",
+            "filing_date": "2023-04-19",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923010660/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "WRAP",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "wrap20230419_8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923010660/wrap20230419_8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex_502847.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923010660/ex_502847.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001437749-23-011139",
+            "filing_date": "2023-04-26",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923011139/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "WRAP",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "wrap20230425_8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923011139/wrap20230425_8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "PCSA",
+      "company_name": "Processa Pharmaceuticals, Inc.",
+      "cik": "0001533743",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2012,
+      "frozen_q4_end": "2012-12-31",
+      "missing_reason": "q1_q3_incomplete",
+      "classification": "E",
+      "verified_q4_eps": null,
+      "unverified_candidate": null,
+      "result": "目前 CIK 的 SEC submissions 沒有可連結至 FY2012 的申報；歷史 CIK/公司承接映射不完整，不能判定沒有披露。",
+      "source_a_fsds": {
+        "status": "no target accession linked to this CIK/period",
+        "related_accessions": [],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [],
+        "calendar_quarters": [],
+        "http_status": null,
+        "parse_status": "target accession unavailable"
+      },
+      "source_b_notes": {
+        "status": "no target accession linked to this CIK/period",
+        "related_accessions": [],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [],
+        "calendar_quarters": [],
+        "http_status": null,
+        "parse_status": "target accession unavailable"
+      },
+      "source_c_10k": {
+        "status": "no accession linked to current CIK/period",
+        "filings": []
+      },
+      "source_d_8k": {
+        "status": "historical CIK/filing window unavailable",
+        "filings": []
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "PCSA",
+      "company_name": "Processa Pharmaceuticals, Inc.",
+      "cik": "0001533743",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2022,
+      "frozen_q4_end": "2022-12-31",
+      "missing_reason": "q1_q3_incomplete",
+      "classification": "C",
+      "verified_q4_eps": null,
+      "unverified_candidate": null,
+      "result": "10-K 只找到年度 basic-and-diluted EPS；SEC 8-K 文字與已完成的圖片 OCR 均未找到單季 Q4 EPS。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001493152-23-009730"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2023q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001493152-23-009730"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2023q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001493152-23-009730",
+            "form": "10-K",
+            "filing_date": "2023-03-30",
+            "report_date": "2022-12-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009730/form10-k.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 2,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001493152-23-000912",
+            "filing_date": "2023-01-09",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PCSA",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1_001.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_001.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_002.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_002.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_003.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_003.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_004.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_004.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_005.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_005.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_006.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_006.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_007.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_007.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_008.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_008.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_009.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_009.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_010.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_010.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_011.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_011.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_012.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_012.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_013.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_013.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_014.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_014.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_015.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_015.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_016.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_016.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_017.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_017.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_018.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_018.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_019.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_019.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_020.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_020.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_021.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_021.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_022.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_022.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_023.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_023.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_024.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_024.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_025.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_025.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_026.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_026.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_027.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_027.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_028.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_028.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_029.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_029.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_030.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_030.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_031.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_031.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_032.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_032.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_033.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_033.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_034.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_034.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_035.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_035.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_036.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_036.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_037.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_037.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_038.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_038.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_039.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_039.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_040.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223000912/ex99-1_040.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-23-003631",
+            "filing_date": "2023-02-06",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223003631/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PCSA",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223003631/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-23-004481",
+            "filing_date": "2023-02-13",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223004481/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PCSA",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223004481/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223004481/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-23-007564",
+            "filing_date": "2023-03-14",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PCSA",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1_1.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_1.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_10.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_10.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_11.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_11.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_12.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_12.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_13.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_13.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_14.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_14.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_15.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_15.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_16.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_16.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_17.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_17.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_18.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_18.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_19.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_19.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_2.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_2.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_20.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_20.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_21.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_21.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_22.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_22.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_23.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_23.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_3.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_3.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_4.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_4.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_5.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_5.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_6.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_6.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_7.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_7.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_8.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_8.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-1_9.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223007564/ex99-1_9.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-23-008547",
+            "filing_date": "2023-03-22",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223008547/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PCSA",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223008547/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001493152-23-009935",
+            "filing_date": "2023-03-31",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PCSA",
+                "fy": 2022,
+                "frozen_q4_end": "2022-12-31",
+                "window_end": "2022-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "form8-k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/form8-k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1_001.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-1_001.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-2_001.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_001.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2_002.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_002.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2_003.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_003.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2_004.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_004.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2_005.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_005.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2_006.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_006.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2_007.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_007.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2_008.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_008.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2_009.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_009.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2_010.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_010.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2_011.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_011.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2_012.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_012.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2_013.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_013.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "ex99-2_014.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1533743/000149315223009935/ex99-2_014.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "ULBI",
+      "company_name": "ULTRALIFE CORP",
+      "cik": "0000875657",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2014,
+      "frozen_q4_end": "2014-12-31",
+      "missing_reason": "q1_q3_incomplete",
+      "classification": "B",
+      "verified_q4_eps": null,
+      "unverified_candidate": {
+        "value": 0.05,
+        "unit": "USD/share",
+        "source": "SEC 8-K EX-99.1",
+        "accession": "0000875657-15-000003",
+        "filing_date": "2015-02-12",
+        "reason": "per-share amount is not identified as basic or diluted"
+      },
+      "result": "8-K 報告 Q4 每股 0.05 美元，但未說明是 basic 或 diluted，故不接受為 diluted EPS。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0000875657-15-000010"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2015q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0000875657-15-000010"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2015q1"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0000875657-15-000010",
+            "form": "10-K",
+            "filing_date": "2015-03-11",
+            "report_date": "2014-12-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/875657/000087565715000010/ulbik2014.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 2,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0000875657-15-000003",
+            "filing_date": "2015-02-12",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/875657/000087565715000003/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "ULBI",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "ulbi_q42014earnings.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/875657/000087565715000003/ulbi_q42014earnings.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0000875657-15-000013",
+            "filing_date": "2015-03-16",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/875657/000087565715000013/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "ULBI",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "tradingplan10b51.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/875657/000087565715000013/tradingplan10b51.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0000875657-15-000027",
+            "filing_date": "2015-04-30",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/875657/000087565715000027/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "ULBI",
+                "fy": 2014,
+                "frozen_q4_end": "2014-12-31",
+                "window_end": "2014-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "ulbi_8k043015.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/875657/000087565715000027/ulbi_8k043015.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "ULBI",
+      "company_name": "ULTRALIFE CORP",
+      "cik": "0000875657",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2021,
+      "frozen_q4_end": "2021-12-31",
+      "missing_reason": "q1_q3_incomplete",
+      "classification": "A",
+      "verified_q4_eps": -0.07,
+      "unverified_candidate": null,
+      "result": "SEC 8-K EX-99.1 表格明確列示 GAAP Q4 per diluted share。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001437749-22-009863",
+          "0001437749-22-005572"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_absent_from_sub",
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2022q1",
+          "2022q2"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001437749-22-009863",
+          "0001437749-22-005572"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2022q1",
+          "2022q2"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001437749-22-005572",
+            "form": "10-K",
+            "filing_date": "2022-03-08",
+            "report_date": "2021-12-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922005572/ulbi20211231_10k.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 3,
+            "quarterly_excerpt_count": 0
+          },
+          {
+            "accession": "0001437749-22-009863",
+            "form": "10-K/A",
+            "filing_date": "2022-04-27",
+            "report_date": "2021-12-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922009863/ulbi20220426_10ka.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 0,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001437749-22-002307",
+            "filing_date": "2022-02-03",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922002307/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "ULBI",
+                "fy": 2021,
+                "frozen_q4_end": "2021-12-31",
+                "window_end": "2021-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "ulbi20220203_8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922002307/ulbi20220203_8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex_331663.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922002307/ex_331663.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001437749-22-004686",
+            "filing_date": "2022-02-28",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922004686/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "ULBI",
+                "fy": 2021,
+                "frozen_q4_end": "2021-12-31",
+                "window_end": "2021-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "ulbi20220228_8ka.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922004686/ulbi20220228_8ka.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001437749-22-009967",
+            "filing_date": "2022-04-28",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922009967/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "ULBI",
+                "fy": 2021,
+                "frozen_q4_end": "2021-12-31",
+                "window_end": "2021-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "ulbi20220427_8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922009967/ulbi20220427_8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex_365610.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922009967/ex_365610.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001437749-22-010075",
+            "filing_date": "2022-04-28",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922010075/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "ULBI",
+                "fy": 2021,
+                "frozen_q4_end": "2021-12-31",
+                "window_end": "2021-12-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "ulbi20220428_8ka.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922010075/ulbi20220428_8ka.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "ASTC",
+      "company_name": "ASTROTECH Corp",
+      "cik": "0001001907",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2014,
+      "frozen_q4_end": "2014-06-30",
+      "missing_reason": "derivation_rejected",
+      "classification": "A",
+      "verified_q4_eps": -0.04,
+      "unverified_candidate": null,
+      "result": "SEC 8-K EX-99.1 ‘Fourth Quarter Results’ 明確列示 GAAP diluted EPS。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001571049-14-004871"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2014q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001571049-14-004871"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2014q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001571049-14-004871",
+            "form": "10-K",
+            "filing_date": "2014-09-30",
+            "report_date": "2014-06-30",
+            "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004871/t1401825_10k.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 4,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001571049-14-002797",
+            "filing_date": "2014-07-01",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914002797/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "ASTC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-06-30",
+                "window_end": "2014-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "t1401248_8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914002797/t1401248_8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "t1401248_ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914002797/t1401248_ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001571049-14-004194",
+            "filing_date": "2014-08-22",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004194/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "ASTC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-06-30",
+                "window_end": "2014-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "nny1401636_8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004194/nny1401636_8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "nny1401636_ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004194/nny1401636_ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "nny1401636_ex99-2.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004194/nny1401636_ex99-2.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001571049-14-004870",
+            "filing_date": "2014-09-30",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004870/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "ASTC",
+                "fy": 2014,
+                "frozen_q4_end": "2014-06-30",
+                "window_end": "2014-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "t1401849_8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004870/t1401849_8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1logo.jpg",
+                "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004870/ex99-1logo.jpg",
+                "http_status": 200,
+                "parse_status": "unsupported_nontext",
+                "ocr_status": "ok",
+                "ocr_hash_matches": true
+              },
+              {
+                "name": "t1401849_ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004870/t1401849_ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "ASTC",
+      "company_name": "ASTROTECH Corp",
+      "cik": "0001001907",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2019,
+      "frozen_q4_end": "2019-06-30",
+      "missing_reason": "derivation_rejected",
+      "classification": "C",
+      "verified_q4_eps": null,
+      "unverified_candidate": null,
+      "result": "有年度 EPS 和財報資料；已查來源範圍未找到直接 Q4 EPS。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001564590-19-035928"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2019q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001564590-19-035928"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2019q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001564590-19-035928",
+            "form": "10-K",
+            "filing_date": "2019-09-30",
+            "report_date": "2019-06-30",
+            "url": "https://www.sec.gov/Archives/edgar/data/1001907/000156459019035928/astc-10k_20190630.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 3,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001564590-19-034503",
+            "filing_date": "2019-09-11",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1001907/000156459019034503/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "ASTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-06-30",
+                "window_end": "2019-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "astc-8k_20190905.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1001907/000156459019034503/astc-8k_20190905.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-035776",
+            "filing_date": "2019-09-27",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1001907/000156459019035776/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "ASTC",
+                "fy": 2019,
+                "frozen_q4_end": "2019-06-30",
+                "window_end": "2019-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "astc-8k_20190927.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1001907/000156459019035776/astc-8k_20190927.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "astc-ex991_6.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1001907/000156459019035776/astc-ex991_6.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "IGC",
+      "company_name": "IGC Pharma, Inc.",
+      "cik": "0001326205",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2012,
+      "frozen_q4_end": "2012-03-31",
+      "missing_reason": "derivation_rejected",
+      "classification": "C",
+      "verified_q4_eps": null,
+      "unverified_candidate": null,
+      "result": "年報有年度 diluted EPS 與前一曆年季度 pro forma 表，並非該財年 Q4。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001185185-12-001484"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2012q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001185185-12-001484"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2012q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001185185-12-001484",
+            "form": "10-K",
+            "filing_date": "2012-07-16",
+            "report_date": "2012-03-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001484/indiaglobal10k033112.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 2,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001185185-12-000718",
+            "filing_date": "2012-04-06",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512000718/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "IGC",
+                "fy": 2012,
+                "frozen_q4_end": "2012-03-31",
+                "window_end": "2012-03-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "indiaglobalization8k040512.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512000718/indiaglobalization8k040512.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512000718/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001185185-12-001266",
+            "filing_date": "2012-06-01",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001266/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "IGC",
+                "fy": 2012,
+                "frozen_q4_end": "2012-03-31",
+                "window_end": "2012-03-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "indiaglobal8k060112.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001266/indiaglobal8k060112.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001266/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001185185-12-001377",
+            "filing_date": "2012-06-25",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001377/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "IGC",
+                "fy": 2012,
+                "frozen_q4_end": "2012-03-31",
+                "window_end": "2012-03-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "indiaglobal8k062512.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001377/indiaglobal8k062512.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001377/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001185185-12-001394",
+            "filing_date": "2012-06-27",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001394/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "IGC",
+                "fy": 2012,
+                "frozen_q4_end": "2012-03-31",
+                "window_end": "2012-03-31",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "indiaglobal8k062712.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001394/indiaglobal8k062712.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ex99-1.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518512001394/ex99-1.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "IGC",
+      "company_name": "IGC Pharma, Inc.",
+      "cik": "0001326205",
+      "sample_role": "missing_q4_eps",
+      "fiscal_year": 2019,
+      "frozen_q4_end": "2019-03-31",
+      "missing_reason": "derivation_rejected",
+      "classification": "C",
+      "verified_q4_eps": null,
+      "unverified_candidate": null,
+      "result": "有年度與部分季度 EPS 線索；已查來源範圍未找到直接 Q4 EPS。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001185185-19-000890"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2019q2"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001185185-19-000890"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2019q2"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001185185-19-000890",
+            "form": "10-K",
+            "filing_date": "2019-06-14",
+            "report_date": "2019-03-31",
+            "url": "https://www.sec.gov/Archives/edgar/data/1326205/000118518519000890/indiaglob20190331_10k.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 0,
+            "quarterly_excerpt_count": 0
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "no 8-K matched the requested search window",
+        "filings": []
+      },
+      "main_grade_a_audit": null
+    },
+    {
+      "ticker": "PZG",
+      "company_name": "Paramount Gold Nevada Corp.",
+      "cik": "0001629210",
+      "sample_role": "positive_control_grade_a",
+      "fiscal_year": 2016,
+      "frozen_q4_end": "2016-06-30",
+      "missing_reason": null,
+      "classification": "B",
+      "verified_q4_eps": null,
+      "unverified_candidate": {
+        "value": 0.32,
+        "unit": "USD/share",
+        "source": "SEC Notes / FY2016 10-K quarterly table",
+        "accession": "0001564590-16-025274",
+        "filing_date": "2016-09-16",
+        "reason": "source positive magnitude conflicts with main Grade A reportedValue -0.32"
+      },
+      "result": "Notes 與年報季度表列示 +0.32，但 main Grade A fact 為 -0.32；原始表格符號基準有衝突，暫不採用。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001564590-16-025274"
+        ],
+        "eps_candidate_count": 0,
+        "direct_q4_facts": [],
+        "dataset_statuses": [
+          "accession_absent_from_sub"
+        ],
+        "calendar_quarters": [
+          "2016q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001564590-16-025274"
+        ],
+        "eps_candidate_count": 1,
+        "direct_q4_facts": [
+          {
+            "accession": "0001564590-16-025274",
+            "tag": "EarningsPerShareDiluted",
+            "value": "0.3200",
+            "unit": "USD",
+            "date": "20160630",
+            "quarters": "1",
+            "dimensions": []
+          }
+        ],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2016q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001564590-16-025274",
+            "form": "10-K",
+            "filing_date": "2016-09-16",
+            "report_date": "2016-06-30",
+            "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016025274/pzg-10k_20160630.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 2,
+            "quarterly_excerpt_count": 1
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001564590-16-020973",
+            "filing_date": "2016-06-30",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016020973/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PZG",
+                "fy": 2016,
+                "frozen_q4_end": "2016-06-30",
+                "window_end": "2016-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "pzg-8k_20160629.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016020973/pzg-8k_20160629.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-16-021168",
+            "filing_date": "2016-07-12",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016021168/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PZG",
+                "fy": 2016,
+                "frozen_q4_end": "2016-06-30",
+                "window_end": "2016-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "pzg-8k_20160707.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016021168/pzg-8k_20160707.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "pzg-ex991_6.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016021168/pzg-ex991_6.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "pzg-ex992_7.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016021168/pzg-ex992_7.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "pzg-ex993_91.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016021168/pzg-ex993_91.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-16-024174",
+            "filing_date": "2016-08-12",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016024174/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PZG",
+                "fy": 2016,
+                "frozen_q4_end": "2016-06-30",
+                "window_end": "2016-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "pzg-8k_20160810.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016024174/pzg-8k_20160810.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-16-025094",
+            "filing_date": "2016-09-12",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016025094/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PZG",
+                "fy": 2016,
+                "frozen_q4_end": "2016-06-30",
+                "window_end": "2016-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "pzg-8k_20160912.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016025094/pzg-8k_20160912.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "pzg-ex991_42.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016025094/pzg-ex991_42.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-16-025242",
+            "filing_date": "2016-09-15",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016025242/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PZG",
+                "fy": 2016,
+                "frozen_q4_end": "2016-06-30",
+                "window_end": "2016-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "pzg-8k_20160915.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016025242/pzg-8k_20160915.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "pzg-ex991_6.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016025242/pzg-ex991_6.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-16-025307",
+            "filing_date": "2016-09-20",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016025307/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PZG",
+                "fy": 2016,
+                "frozen_q4_end": "2016-06-30",
+                "window_end": "2016-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "pzg-8k_20160920.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016025307/pzg-8k_20160920.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "pzg-ex991_6.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459016025307/pzg-ex991_6.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": {
+        "eps_quality": "A",
+        "is_main_grade_a": true,
+        "as_filed_value": -0.32,
+        "current_basis_value": -0.32,
+        "split_factor": 1,
+        "accession": "0001564590-17-018742",
+        "filing_date": "2017-09-18",
+        "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459017018742/"
+      }
+    },
+    {
+      "ticker": "PZG",
+      "company_name": "Paramount Gold Nevada Corp.",
+      "cik": "0001629210",
+      "sample_role": "positive_control_grade_a",
+      "fiscal_year": 2019,
+      "frozen_q4_end": "2019-06-30",
+      "missing_reason": null,
+      "classification": "A",
+      "verified_q4_eps": -0.09,
+      "unverified_candidate": null,
+      "result": "SEC 年報季度 EPS fact 為 -0.09，並與 main Grade A as-filed value 一致；原始表格以 net loss 語境列示 0.09。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001564590-19-034803"
+        ],
+        "eps_candidate_count": 1,
+        "direct_q4_facts": [
+          {
+            "accession": "0001564590-19-034803",
+            "tag": "EarningsPerShareDiluted",
+            "value": "-0.0900",
+            "unit": "USD",
+            "date": "20190630",
+            "quarters": "1",
+            "dimensions": []
+          }
+        ],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2019q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001564590-19-034803"
+        ],
+        "eps_candidate_count": 1,
+        "direct_q4_facts": [
+          {
+            "accession": "0001564590-19-034803",
+            "tag": "EarningsPerShareDiluted",
+            "value": "-0.0900",
+            "unit": "USD",
+            "date": "20190630",
+            "quarters": "1",
+            "dimensions": []
+          }
+        ],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2019q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001564590-19-034803",
+            "form": "10-K",
+            "filing_date": "2019-09-16",
+            "report_date": "2019-06-30",
+            "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459019034803/pzg-10k_20190630.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 2,
+            "quarterly_excerpt_count": 1
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001564590-19-034706",
+            "filing_date": "2019-09-13",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459019034706/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PZG",
+                "fy": 2019,
+                "frozen_q4_end": "2019-06-30",
+                "window_end": "2019-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "pzg-8k_20190910.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459019034706/pzg-8k_20190910.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "pzg-ex991_8.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459019034706/pzg-ex991_8.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          },
+          {
+            "accession": "0001564590-19-036850",
+            "filing_date": "2019-10-11",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459019036850/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PZG",
+                "fy": 2019,
+                "frozen_q4_end": "2019-06-30",
+                "window_end": "2019-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "pzg-8k_20191008.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459019036850/pzg-8k_20191008.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": {
+        "eps_quality": "A",
+        "is_main_grade_a": true,
+        "as_filed_value": -0.09,
+        "current_basis_value": -0.09,
+        "split_factor": 1,
+        "accession": "0001564590-19-034803",
+        "filing_date": "2019-09-16",
+        "url": "https://www.sec.gov/Archives/edgar/data/1629210/000156459019034803/"
+      }
+    },
+    {
+      "ticker": "PTN",
+      "company_name": "PALATIN TECHNOLOGIES INC",
+      "cik": "0000911216",
+      "sample_role": "positive_control_grade_a",
+      "fiscal_year": 2018,
+      "frozen_q4_end": "2018-06-30",
+      "missing_reason": null,
+      "classification": "A",
+      "verified_q4_eps": 0.06,
+      "unverified_candidate": null,
+      "result": "SEC 年報季度 diluted EPS fact +0.06，與 main Grade A as-filed value 一致。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001654954-18-010150",
+          "0001654954-19-010679"
+        ],
+        "eps_candidate_count": 2,
+        "direct_q4_facts": [
+          {
+            "accession": "0001654954-18-010150",
+            "tag": "EarningsPerShareDiluted",
+            "value": "0.0600",
+            "unit": "USD",
+            "date": "20180630",
+            "quarters": "1",
+            "dimensions": []
+          },
+          {
+            "accession": "0001654954-19-010679",
+            "tag": "EarningsPerShareDiluted",
+            "value": "0.0600",
+            "unit": "USD",
+            "date": "20180630",
+            "quarters": "1",
+            "dimensions": []
+          }
+        ],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2018q3",
+          "2019q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001654954-18-010150",
+          "0001654954-19-010679"
+        ],
+        "eps_candidate_count": 2,
+        "direct_q4_facts": [
+          {
+            "accession": "0001654954-18-010150",
+            "tag": "EarningsPerShareDiluted",
+            "value": "0.0600",
+            "unit": "USD",
+            "date": "20180630",
+            "quarters": "1",
+            "dimensions": []
+          },
+          {
+            "accession": "0001654954-19-010679",
+            "tag": "EarningsPerShareDiluted",
+            "value": "0.0600",
+            "unit": "USD",
+            "date": "20180630",
+            "quarters": "1",
+            "dimensions": []
+          }
+        ],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2018q3",
+          "2019q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001654954-18-010150",
+            "form": "10-K",
+            "filing_date": "2018-09-13",
+            "report_date": "2018-06-30",
+            "url": "https://www.sec.gov/Archives/edgar/data/911216/000165495418010150/ptn_10k.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 6,
+            "quarterly_excerpt_count": 1
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001654954-18-010125",
+            "filing_date": "2018-09-13",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/911216/000165495418010125/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PTN",
+                "fy": 2018,
+                "frozen_q4_end": "2018-06-30",
+                "window_end": "2018-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "ptn_8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/911216/000165495418010125/ptn_8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ptn_ex991.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/911216/000165495418010125/ptn_ex991.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": {
+        "eps_quality": "A",
+        "is_main_grade_a": true,
+        "as_filed_value": 0.06,
+        "current_basis_value": 75.0,
+        "split_factor": 0.0008,
+        "accession": "0001654954-19-010679",
+        "filing_date": "2019-09-12",
+        "url": "https://www.sec.gov/Archives/edgar/data/911216/000165495419010679/"
+      }
+    },
+    {
+      "ticker": "PTN",
+      "company_name": "PALATIN TECHNOLOGIES INC",
+      "cik": "0000911216",
+      "sample_role": "positive_control_grade_a",
+      "fiscal_year": 2019,
+      "frozen_q4_end": "2019-06-30",
+      "missing_reason": null,
+      "classification": "A",
+      "verified_q4_eps": 0.23,
+      "unverified_candidate": null,
+      "result": "SEC 年報季度 diluted EPS fact +0.23，與 main Grade A as-filed value 一致。",
+      "source_a_fsds": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001654954-19-010679"
+        ],
+        "eps_candidate_count": 1,
+        "direct_q4_facts": [
+          {
+            "accession": "0001654954-19-010679",
+            "tag": "EarningsPerShareDiluted",
+            "value": "0.2300",
+            "unit": "USD",
+            "date": "20190630",
+            "quarters": "1",
+            "dimensions": []
+          }
+        ],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2019q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_b_notes": {
+        "status": "HTTP 200 / parsed",
+        "related_accessions": [
+          "0001654954-19-010679"
+        ],
+        "eps_candidate_count": 1,
+        "direct_q4_facts": [
+          {
+            "accession": "0001654954-19-010679",
+            "tag": "EarningsPerShareDiluted",
+            "value": "0.2300",
+            "unit": "USD",
+            "date": "20190630",
+            "quarters": "1",
+            "dimensions": []
+          }
+        ],
+        "dataset_statuses": [
+          "accession_found"
+        ],
+        "calendar_quarters": [
+          "2019q3"
+        ],
+        "http_status": 200,
+        "parse_status": "parsed"
+      },
+      "source_c_10k": {
+        "status": "HTTP 200 / parsed",
+        "filings": [
+          {
+            "accession": "0001654954-19-010679",
+            "form": "10-K",
+            "filing_date": "2019-09-12",
+            "report_date": "2019-06-30",
+            "url": "https://www.sec.gov/Archives/edgar/data/911216/000165495419010679/ptn_10k.htm",
+            "http_status": 200,
+            "parse_status": "parsed",
+            "eps_table_count": 4,
+            "quarterly_excerpt_count": 1
+          }
+        ]
+      },
+      "source_d_8k": {
+        "status": "HTTP 200 / parsed; OCR hash verified",
+        "filings": [
+          {
+            "accession": "0001654954-19-010615",
+            "filing_date": "2019-09-12",
+            "index_url": "https://www.sec.gov/Archives/edgar/data/911216/000165495419010615/index.json",
+            "index_http_status": 200,
+            "complete": true,
+            "period_windows": [
+              {
+                "ticker": "PTN",
+                "fy": 2019,
+                "frozen_q4_end": "2019-06-30",
+                "window_end": "2019-06-30",
+                "diagnostic_only": false
+              }
+            ],
+            "documents": [
+              {
+                "name": "ptn_8k.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/911216/000165495419010615/ptn_8k.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              },
+              {
+                "name": "ptn_ex991.htm",
+                "url": "https://www.sec.gov/Archives/edgar/data/911216/000165495419010615/ptn_ex991.htm",
+                "http_status": 200,
+                "parse_status": "parsed",
+                "ocr_status": null,
+                "ocr_hash_matches": null
+              }
+            ]
+          }
+        ]
+      },
+      "main_grade_a_audit": {
+        "eps_quality": "A",
+        "is_main_grade_a": true,
+        "as_filed_value": 0.23,
+        "current_basis_value": 287.5,
+        "split_factor": 0.0008,
+        "accession": "0001654954-20-010471",
+        "filing_date": "2020-09-25",
+        "url": "https://www.sec.gov/Archives/edgar/data/911216/000165495420010471/"
+      }
+    }
+  ],
+  "verified_disclosures": [
+    {
+      "ticker": "ASTC",
+      "fy": 2014,
+      "source": "SEC 8-K EX-99.1",
+      "url": "https://www.sec.gov/Archives/edgar/data/1001907/000157104914004870/t1401849_ex99-1.htm",
+      "accession": "0001571049-14-004870",
+      "filing_date": "2014-09-30",
+      "q4_end": "2014-06-30",
+      "eps": -0.04,
+      "raw_tag": null,
+      "location": "Exhibit 99.1, ‘Fourth Quarter Results’; sentence for the quarter ended June 30, 2014.",
+      "gaap_diluted_basis": "Release labels results GAAP and explicitly reports the Q4 loss per diluted share; no adjusted qualifier applies.",
+      "split_basis": "As-filed basis; no adjustment applied. Later reverse splits were in 2017 and 2022.",
+      "database_match": "No same-period local Q4 value; not comparable."
+    },
+    {
+      "ticker": "FGC",
+      "fy": 2016,
+      "source": "SEC 8-K EX-99.1",
+      "url": "https://www.sec.gov/Archives/edgar/data/1591890/000138713117001425/ex99-1.htm",
+      "accession": "0001387131-17-001425",
+      "filing_date": "2017-03-16",
+      "q4_end": "2016-12-31",
+      "eps": 0.27,
+      "raw_tag": null,
+      "location": "Exhibit 99.1, unaudited consolidated income statement; Three Months Ended December 31, 2016, Diluted row.",
+      "gaap_diluted_basis": "Primary consolidated statement labels the row Diluted. The annual ‘before catastrophe events’ EPS is adjusted/non-GAAP and excluded.",
+      "split_basis": "As-filed FY2016 basis; no adjustment applied. Later reverse splits were 0.04 (2024) and 0.20 (2026).",
+      "database_match": "No same-period local Q4 value; not comparable."
+    },
+    {
+      "ticker": "FGC",
+      "fy": 2022,
+      "source": "SEC 8-K EX-99.1",
+      "url": "https://www.sec.gov/Archives/edgar/data/1591890/000149315223008865/ex99-1.htm",
+      "accession": "0001493152-23-008865",
+      "filing_date": "2023-03-24",
+      "q4_end": "2022-12-31",
+      "eps": -0.03,
+      "raw_tag": null,
+      "location": "Exhibit 99.1, Q4 earnings narrative and consolidated statement; Three Months Ended December 31, 2022 column.",
+      "gaap_diluted_basis": "Narrative says fully diluted Q4 EPS; primary statement says Basic and diluted net earnings (loss) per common share. The separate annual column is not used.",
+      "split_basis": "As-filed FY2022 basis; no adjustment applied. Later reverse splits were 0.04 (2024) and 0.20 (2026).",
+      "database_match": "No same-period local Q4 value; not comparable."
+    },
+    {
+      "ticker": "WRAP",
+      "fy": 2022,
+      "source": "SEC 8-K EX-99.1",
+      "url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923005259/ex_483215.htm",
+      "accession": "0001437749-23-005259",
+      "filing_date": "2023-03-03",
+      "q4_end": "2022-12-31",
+      "eps": -0.09,
+      "raw_tag": null,
+      "location": "Exhibit 99.1, consolidated statements of operations; first column is Three Months Ended December 31, 2022.",
+      "gaap_diluted_basis": "Primary statement row is Net loss per basic and diluted common share; Q4 column is distinct from the twelve-month columns.",
+      "split_basis": "As-filed FY2022 basis; no post-period split adjustment applied.",
+      "database_match": "No same-period local Q4 value; not comparable."
+    },
+    {
+      "ticker": "ULBI",
+      "fy": 2021,
+      "source": "SEC 8-K EX-99.1",
+      "url": "https://www.sec.gov/Archives/edgar/data/875657/000143774922002307/ex_331663.htm",
+      "accession": "0001437749-22-002307",
+      "filing_date": "2022-02-03",
+      "q4_end": "2021-12-31",
+      "eps": -0.07,
+      "raw_tag": null,
+      "location": "Exhibit 99.1, unaudited Q4 table; Three-Month Period Ended December 31, 2021, Net (Loss) Income Attributable row, Per Diluted Share column.",
+      "gaap_diluted_basis": "The table reports the unadjusted net loss attributable to Ultralife and its per diluted share amount. The separate adjusted net income row is not used.",
+      "split_basis": "As-filed basis; no adjustment applied and no later split identified for this period.",
+      "database_match": "No same-period local Q4 EPS value; the local Q4 EPS is null."
+    }
+  ],
+  "source_success_summary": [
+    {
+      "source": "SEC Financial Statement Data Sets",
+      "planned_targets": 20,
+      "completed_periods": 19,
+      "incomplete_periods": 1,
+      "found_candidate": 3,
+      "verified_direct": 3,
+      "unverifiable": 0,
+      "failure": 0,
+      "single_source_unique_missing": 0,
+      "cumulative_unique_missing": 0,
+      "candidate_periods": [
+        "PZG:2019-06-30",
+        "PTN:2018-06-30",
+        "PTN:2019-06-30"
+      ],
+      "verified_missing_periods": [],
+      "verified_controls": [
+        "PZG:2019-06-30",
+        "PTN:2018-06-30",
+        "PTN:2019-06-30"
+      ]
+    },
+    {
+      "source": "SEC Financial Statement and Notes Data Sets",
+      "planned_targets": 20,
+      "completed_periods": 19,
+      "incomplete_periods": 1,
+      "found_candidate": 4,
+      "verified_direct": 3,
+      "unverifiable": 1,
+      "failure": 0,
+      "single_source_unique_missing": 0,
+      "cumulative_unique_missing": 0,
+      "candidate_periods": [
+        "PZG:2016-06-30",
+        "PZG:2019-06-30",
+        "PTN:2018-06-30",
+        "PTN:2019-06-30"
+      ],
+      "verified_missing_periods": [],
+      "verified_controls": [
+        "PZG:2019-06-30",
+        "PTN:2018-06-30",
+        "PTN:2019-06-30"
+      ],
+      "unverifiable_periods": [
+        "PZG:2016-06-30"
+      ]
+    },
+    {
+      "source": "原始 10-K / 10-K/A",
+      "planned_targets": 20,
+      "completed_periods": 19,
+      "incomplete_periods": 1,
+      "found_candidate": 4,
+      "verified_direct": 3,
+      "unverifiable": 1,
+      "failure": 0,
+      "single_source_unique_missing": 0,
+      "cumulative_unique_missing": 0,
+      "candidate_periods": [
+        "PZG:2016-06-30",
+        "PZG:2019-06-30",
+        "PTN:2018-06-30",
+        "PTN:2019-06-30"
+      ],
+      "verified_missing_periods": [],
+      "verified_controls": [
+        "PZG:2019-06-30",
+        "PTN:2018-06-30",
+        "PTN:2019-06-30"
+      ],
+      "unverifiable_periods": [
+        "PZG:2016-06-30"
+      ]
+    },
+    {
+      "source": "原始 8-K / EX-99.1",
+      "planned_targets": 20,
+      "completed_periods": 19,
+      "incomplete_periods": 1,
+      "found_candidate": 6,
+      "verified_direct": 5,
+      "unverifiable": 1,
+      "failure": 0,
+      "single_source_unique_missing": 5,
+      "cumulative_unique_missing": 5,
+      "candidate_periods": [
+        "ASTC:2014-06-30",
+        "FGC:2016-12-31",
+        "FGC:2022-12-31",
+        "WRAP:2022-12-31",
+        "ULBI:2014-12-31",
+        "ULBI:2021-12-31"
+      ],
+      "verified_missing_periods": [
+        "ASTC:2014-06-30",
+        "FGC:2016-12-31",
+        "FGC:2022-12-31",
+        "WRAP:2022-12-31",
+        "ULBI:2021-12-31"
+      ],
+      "unverifiable_periods": [
+        "ULBI:2014-12-31"
+      ]
+    }
+  ],
+  "network_and_volume": {
+    "rate_limit_requests_per_second": 4,
+    "previous_poc_artifact_snapshot": "229ca59f0 (pre-refreeze SEC POC artifacts)",
+    "refresh_delta_since_previous_poc_artifacts": {
+      "requests": 162,
+      "wire_bytes": 3837738545,
+      "by_source": {
+        "source_a_fsds": {
+          "recorded_request_delta_from_prior_poc": 3,
+          "recorded_wire_byte_delta_from_prior_poc": 255408148,
+          "last_invocation_requests": 0,
+          "last_invocation_wire_bytes": 0,
+          "current_sample_unique_zip_payload_bytes": 1534782067,
+          "current_sample_unique_zip_count": 16
+        },
+        "source_b_notes": {
+          "recorded_request_delta_from_prior_poc": 8,
+          "recorded_wire_byte_delta_from_prior_poc": 3553706342,
+          "last_invocation_requests": 6,
+          "last_invocation_wire_bytes": 2907827416,
+          "current_sample_unique_zip_payload_bytes": 7472961173,
+          "current_sample_unique_zip_count": 16
+        },
+        "source_c_10k": {
+          "requests": 6,
+          "wire_bytes": 807902
+        },
+        "source_d_8k": {
+          "requests": 140,
+          "wire_bytes": 27641670
+        },
+        "submissions": {
+          "requests": 4,
+          "wire_bytes": 85920
+        },
+        "positive_control_supplement": {
+          "requests": 1,
+          "wire_bytes": 88563
+        }
+      },
+      "note": "Source A/B are cumulative artifact-counter deltas versus the previous POC snapshot; C/D, submissions, and the PZG supplement are the recorded acquisition-stage counters. Do not add their cumulative metrics fields again. The current report/render invocation is offline."
+    },
+    "current_sample_unique_archive_payload_bytes": {
+      "source_a_fsds": 1534782067,
+      "source_b_notes": 7472961173,
+      "note": "Sum of the 16 unique quarterly ZIP payload sizes referenced by the frozen sample, including reused responses; not bytes downloaded during this refresh."
+    },
+    "legacy_initial_run_reported_counters": {
+      "requests": 406,
+      "reported_total_bytes": 11190612664,
+      "note": "Previous report total is preserved for traceability only. Its byte total includes a cached Notes ZIP's payload size and is not an exact actual-wire-byte baseline; it is not added to the refresh delta."
+    },
+    "source_metrics": {
+      "official_docs": {
+        "actual_http_requests": 6,
+        "successful_http_responses": 6,
+        "http_status_counts": {
+          "200": 6
+        },
+        "wire_bytes_received": 641349,
+        "decoded_bytes_received": 641349,
+        "retries": 0,
+        "rate_limit_requests_per_second": 4.0,
+        "note": "Six initial official documentation URLs were requested; the later metrics field below is only a cache replay."
+      },
+      "submissions_end_to_end": {
+        "actual_http_requests": 4,
+        "successful_http_responses": 10,
+        "http_status_counts": {
+          "200": 10
+        },
+        "wire_bytes_received": 85920,
+        "cached_responses": 6,
+        "validation_cache_hits": 10,
+        "retries": 0,
+        "rate_limit_requests_per_second": 4.0,
+        "note": "Successful submissions resolution: four fresh official SEC requests and six cache hits produced ten HTTP 200 issuer records; later full-map validation was ten cache hits and zero requests."
+      },
+      "submissions_current_replay": {
+        "sec_http_requests": 0,
+        "wire_bytes_received": 0,
+        "decoded_bytes_received": 0,
+        "cache_hits": 10,
+        "retries": 0,
+        "rate_limit_requests_per_second": 4.0
+      },
+      "source_a_fsds": {
+        "sec_http_requests": 22,
+        "wire_bytes_received": 2096783338,
+        "decoded_bytes_received": 2096783338,
+        "cache_hits": 5,
+        "retries": 0,
+        "reused_existing_accessions": 21,
+        "new_accessions_fetched": 0,
+        "incremental": {
+          "sec_http_requests": 0,
+          "wire_bytes_received": 0,
+          "decoded_bytes_received": 0,
+          "cache_hits": 0,
+          "retries": 0,
+          "reused_existing_accessions": 21,
+          "new_accessions_fetched": 0,
+          "rate_limit_requests_per_second": 4.0
+        },
+        "rate_limit_requests_per_second": 4.0
+      },
+      "source_b_notes": {
+        "sec_http_requests": 26,
+        "wire_bytes_received": 12417858002,
+        "decoded_bytes_received": 12417858002,
+        "cache_hits": 1,
+        "retries": 0,
+        "reused_existing_accessions": 15,
+        "new_accessions_fetched": 6,
+        "incremental": {
+          "sec_http_requests": 6,
+          "wire_bytes_received": 2907827416,
+          "decoded_bytes_received": 2907827416,
+          "cache_hits": 0,
+          "retries": 0,
+          "reused_existing_accessions": 15,
+          "new_accessions_fetched": 6,
+          "rate_limit_requests_per_second": 4.0
+        },
+        "rate_limit_requests_per_second": 4.0
+      },
+      "source_c_10k": {
+        "sec_http_requests": 6,
+        "wire_bytes_received": 807902,
+        "decoded_bytes_received": 8602327,
+        "cache_hits": 15,
+        "retries": 0,
+        "rate_limit_requests_per_second": 4.0
+      },
+      "source_d_8k": {
+        "sec_http_requests": 140,
+        "wire_bytes_received": 27641670,
+        "decoded_bytes_received": 30351633,
+        "cache_hits": 137,
+        "retries": 0,
+        "rate_limit_requests_per_second": 4.0
+      },
+      "positive_control_supplement": {
+        "sec_http_requests": 1,
+        "wire_bytes_received": 88563,
+        "retries": 0
+      }
+    },
+    "observed_collection_window": {
+      "sample_frozen_at": "2026-10-18T12:25:19Z",
+      "last_sec_source_response": "2026-10-18T12:46:16Z",
+      "elapsed_after_freeze_seconds": 1260,
+      "elapsed_note": "約 21 分鐘至最後一筆 SEC source artifact；包括快取重用和解析，不含後續 report/test。"
+    },
+    "responses_note": "主來源 artifact 的實際 SEC HTTP request/byte 數分開呈現；快取讀取不重複計為網路請求。沒有提交 SEC 原始 ZIP。"
+  },
+  "outcomes": {
+    "total_periods": 20,
+    "missing_q4_eps_periods": 16,
+    "verified_direct_missing_periods": 5,
+    "missing_period_classifications": {
+      "A": 5,
+      "B": 1,
+      "C": 8,
+      "E": 2
+    },
+    "current_sample_direct_case_keys": [
+      "FGC:2016-12-31",
+      "FGC:2022-12-31",
+      "WRAP:2022-12-31",
+      "ULBI:2021-12-31",
+      "ASTC:2014-06-30"
+    ],
+    "current_success_rate_within_frozen_missing_periods": "5/16",
+    "prior_version_direct_case_count": 6,
+    "prior_version_note": "舊樣本的 6/16 不適用於 main 分類檔重新凍結後的樣本；OFG 兩期退出，新增 ULBI、PCSA 期別。",
+    "extrapolation_warning": "本次樣本依缺漏類別分層且只含 16 個缺漏期別；不能外推至全市場 7,755 筆。"
+  },
+  "positive_control_audit": {
+    "selected_control_companies": [
+      "PZG",
+      "PTN"
+    ],
+    "selected_controls": [
+      {
+        "ticker": "PZG",
+        "fy": 2016,
+        "q4_end": "2016-06-30",
+        "main_grade_a": {
+          "ticker": "PZG",
+          "fy": 2016,
+          "q4_end": "2016-06-30",
+          "local_eps_diluted": -0.32,
+          "local_source": "sec",
+          "quarterly_derived_flag": 1,
+          "main_eps_quality": "A",
+          "sec_fact": {
+            "concept": "EarningsPerShareDiluted",
+            "unit": "USD/shares",
+            "start": "2016-04-01",
+            "end": "2016-06-30",
+            "durationDays": 90,
+            "form": "10-K",
+            "filed": "2017-09-18",
+            "accession": "0001564590-17-018742",
+            "reportedValue": -0.32,
+            "splitFactor": 1,
+            "value": -0.32,
+            "currency": "USD",
+            "grade": "A",
+            "method": "direct-sec-companyfacts",
+            "cik": "0001629210",
+            "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001629210.json",
+            "filingUrl": "https://www.sec.gov/Archives/edgar/data/1629210/000156459017018742/",
+            "version": {
+              "accession": "0001564590-17-018742",
+              "filed": "2017-09-18",
+              "form": "10-K"
+            }
+          },
+          "is_main_grade_a": true,
+          "present_in_main_missing_classification": false,
+          "ledger_row_entries": {
+            "blocked": [],
+            "overridden": [],
+            "deferred": []
+          },
+          "ledger_verifiedA_aggregate": 5009,
+          "ledger_has_per_row_verifiedA_list": false
+        },
+        "poc_status": "B",
+        "poc_eps_as_filed": null,
+        "poc_note": "Notes 與年報季度表列示 +0.32，但 main Grade A fact 為 -0.32；原始表格符號基準有衝突，暫不採用。"
+      },
+      {
+        "ticker": "PZG",
+        "fy": 2019,
+        "q4_end": "2019-06-30",
+        "main_grade_a": {
+          "ticker": "PZG",
+          "fy": 2019,
+          "q4_end": "2019-06-30",
+          "local_eps_diluted": -0.09,
+          "local_source": "sec",
+          "quarterly_derived_flag": 1,
+          "main_eps_quality": "A",
+          "sec_fact": {
+            "concept": "EarningsPerShareDiluted",
+            "unit": "USD/shares",
+            "start": "2019-04-01",
+            "end": "2019-06-30",
+            "durationDays": 90,
+            "form": "10-K",
+            "filed": "2019-09-16",
+            "accession": "0001564590-19-034803",
+            "reportedValue": -0.09,
+            "splitFactor": 1,
+            "value": -0.09,
+            "currency": "USD",
+            "grade": "A",
+            "method": "direct-sec-companyfacts",
+            "cik": "0001629210",
+            "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001629210.json",
+            "filingUrl": "https://www.sec.gov/Archives/edgar/data/1629210/000156459019034803/",
+            "version": {
+              "accession": "0001564590-19-034803",
+              "filed": "2019-09-16",
+              "form": "10-K"
+            }
+          },
+          "is_main_grade_a": true,
+          "present_in_main_missing_classification": false,
+          "ledger_row_entries": {
+            "blocked": [],
+            "overridden": [],
+            "deferred": []
+          },
+          "ledger_verifiedA_aggregate": 5009,
+          "ledger_has_per_row_verifiedA_list": false
+        },
+        "poc_status": "A",
+        "poc_eps_as_filed": -0.09,
+        "poc_note": "SEC 年報季度 EPS fact 為 -0.09，並與 main Grade A as-filed value 一致；原始表格以 net loss 語境列示 0.09。"
+      },
+      {
+        "ticker": "PTN",
+        "fy": 2018,
+        "q4_end": "2018-06-30",
+        "main_grade_a": {
+          "ticker": "PTN",
+          "fy": 2018,
+          "q4_end": "2018-06-30",
+          "local_eps_diluted": 75.0,
+          "local_source": "sec",
+          "quarterly_derived_flag": 1,
+          "main_eps_quality": "A",
+          "sec_fact": {
+            "concept": "EarningsPerShareDiluted",
+            "unit": "USD/shares",
+            "start": "2018-04-01",
+            "end": "2018-06-30",
+            "durationDays": 90,
+            "form": "10-K",
+            "filed": "2019-09-12",
+            "accession": "0001654954-19-010679",
+            "reportedValue": 0.06,
+            "splitFactor": 0.0008,
+            "value": 75.0,
+            "currency": "USD",
+            "grade": "A",
+            "method": "direct-sec-companyfacts",
+            "cik": "0000911216",
+            "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000911216.json",
+            "filingUrl": "https://www.sec.gov/Archives/edgar/data/911216/000165495419010679/",
+            "version": {
+              "accession": "0001654954-19-010679",
+              "filed": "2019-09-12",
+              "form": "10-K"
+            }
+          },
+          "is_main_grade_a": true,
+          "present_in_main_missing_classification": false,
+          "ledger_row_entries": {
+            "blocked": [],
+            "overridden": [],
+            "deferred": []
+          },
+          "ledger_verifiedA_aggregate": 5009,
+          "ledger_has_per_row_verifiedA_list": false
+        },
+        "poc_status": "A",
+        "poc_eps_as_filed": 0.06,
+        "poc_note": "SEC 年報季度 diluted EPS fact +0.06，與 main Grade A as-filed value 一致。"
+      },
+      {
+        "ticker": "PTN",
+        "fy": 2019,
+        "q4_end": "2019-06-30",
+        "main_grade_a": {
+          "ticker": "PTN",
+          "fy": 2019,
+          "q4_end": "2019-06-30",
+          "local_eps_diluted": 287.5,
+          "local_source": "sec",
+          "quarterly_derived_flag": 1,
+          "main_eps_quality": "A",
+          "sec_fact": {
+            "concept": "EarningsPerShareDiluted",
+            "unit": "USD/shares",
+            "start": "2019-04-01",
+            "end": "2019-06-30",
+            "durationDays": 90,
+            "form": "10-K",
+            "filed": "2020-09-25",
+            "accession": "0001654954-20-010471",
+            "reportedValue": 0.23,
+            "splitFactor": 0.0008,
+            "value": 287.5,
+            "currency": "USD",
+            "grade": "A",
+            "method": "direct-sec-companyfacts",
+            "cik": "0000911216",
+            "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000911216.json",
+            "filingUrl": "https://www.sec.gov/Archives/edgar/data/911216/000165495420010471/",
+            "version": {
+              "accession": "0001654954-20-010471",
+              "filed": "2020-09-25",
+              "form": "10-K"
+            }
+          },
+          "is_main_grade_a": true,
+          "present_in_main_missing_classification": false,
+          "ledger_row_entries": {
+            "blocked": [],
+            "overridden": [],
+            "deferred": []
+          },
+          "ledger_verifiedA_aggregate": 5009,
+          "ledger_has_per_row_verifiedA_list": false
+        },
+        "poc_status": "A",
+        "poc_eps_as_filed": 0.23,
+        "poc_note": "SEC 年報季度 diluted EPS fact +0.23，與 main Grade A as-filed value 一致。"
+      }
+    ],
+    "prior_suggested_controls_nm_tc_tdw": [
+      {
+        "ticker": "NMTC",
+        "fy": 2017,
+        "q4_end": "2017-12-31",
+        "local_eps_diluted": -0.21,
+        "local_source": "sec",
+        "quarterly_derived_flag": null,
+        "main_eps_quality": null,
+        "sec_fact": null,
+        "is_main_grade_a": false,
+        "present_in_main_missing_classification": false,
+        "ledger_row_entries": {
+          "blocked": [],
+          "overridden": [],
+          "deferred": []
+        },
+        "ledger_verifiedA_aggregate": 5009,
+        "ledger_has_per_row_verifiedA_list": false
+      },
+      {
+        "ticker": "NMTC",
+        "fy": 2019,
+        "q4_end": "2019-12-31",
+        "local_eps_diluted": -0.34,
+        "local_source": "sec",
+        "quarterly_derived_flag": null,
+        "main_eps_quality": null,
+        "sec_fact": null,
+        "is_main_grade_a": false,
+        "present_in_main_missing_classification": false,
+        "ledger_row_entries": {
+          "blocked": [],
+          "overridden": [],
+          "deferred": []
+        },
+        "ledger_verifiedA_aggregate": 5009,
+        "ledger_has_per_row_verifiedA_list": false
+      },
+      {
+        "ticker": "TDW",
+        "fy": 2018,
+        "q4_end": "2018-03-31",
+        "local_eps_diluted": -1.67,
+        "local_source": "sec",
+        "quarterly_derived_flag": null,
+        "main_eps_quality": null,
+        "sec_fact": null,
+        "is_main_grade_a": false,
+        "present_in_main_missing_classification": false,
+        "ledger_row_entries": {
+          "blocked": [],
+          "overridden": [],
+          "deferred": []
+        },
+        "ledger_verifiedA_aggregate": 5009,
+        "ledger_has_per_row_verifiedA_list": false
+      },
+      {
+        "ticker": "TDW",
+        "fy": 2019,
+        "q4_end": "2019-03-31",
+        "local_eps_diluted": -0.58,
+        "local_source": "sec",
+        "quarterly_derived_flag": null,
+        "main_eps_quality": null,
+        "sec_fact": null,
+        "is_main_grade_a": false,
+        "present_in_main_missing_classification": false,
+        "ledger_row_entries": {
+          "blocked": [],
+          "overridden": [],
+          "deferred": []
+        },
+        "ledger_verifiedA_aggregate": 5009,
+        "ledger_has_per_row_verifiedA_list": false
+      }
+    ],
+    "ledger_scope_note": "Main classifier/report now exists. Main acceptance ledger has aggregate verifiedA=5009 but no per-row accepted-A list; the selected Grade A controls were audited using main financial-row epsQuality plus secQ4EpsFacts and their SEC accession. NMTC/TDW rows have local values but no row-level A fact, no missing-classification entry, and no blocked/overridden/deferred ledger entries."
+  },
+  "fiscal_period_mismatches": {
+    "confirmed_count": 16,
+    "unmatched_count": 3,
+    "rows": [
+      {
+        "ticker": "TDW",
+        "fy": 2018,
+        "local_fq": 4,
+        "local_q4_end": "2018-03-31",
+        "sec_report_end": "2018-12-31",
+        "accession": "0001564590-19-005545",
+        "filing_date": "2019-02-28",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "TDW",
+        "fy": 2019,
+        "local_fq": 4,
+        "local_q4_end": "2019-03-31",
+        "sec_report_end": "2019-12-31",
+        "accession": "0001564590-20-008191",
+        "filing_date": "2020-03-02",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "TDW",
+        "fy": 2020,
+        "local_fq": 4,
+        "local_q4_end": "2020-03-31",
+        "sec_report_end": "2020-12-31",
+        "accession": "0001437749-21-005037",
+        "filing_date": "2021-03-04",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "TDW",
+        "fy": 2021,
+        "local_fq": 4,
+        "local_q4_end": "2021-03-31",
+        "sec_report_end": "2021-12-31",
+        "accession": "0001437749-22-005725",
+        "filing_date": "2022-03-09",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "TDW",
+        "fy": 2022,
+        "local_fq": 4,
+        "local_q4_end": "2022-03-31",
+        "sec_report_end": "2022-12-31",
+        "accession": "0001437749-23-004829",
+        "filing_date": "2023-02-28",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "TDW",
+        "fy": 2023,
+        "local_fq": 4,
+        "local_q4_end": "2023-03-31",
+        "sec_report_end": "2023-12-31",
+        "accession": "0001437749-24-006108",
+        "filing_date": "2024-02-29",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "TDW",
+        "fy": 2024,
+        "local_fq": 4,
+        "local_q4_end": "2024-03-31",
+        "sec_report_end": "2024-12-31",
+        "accession": "0001437749-25-005487",
+        "filing_date": "2025-02-27",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "TDW",
+        "fy": 2025,
+        "local_fq": 4,
+        "local_q4_end": "2025-03-31",
+        "sec_report_end": "2025-12-31",
+        "accession": "0001437749-26-006391",
+        "filing_date": "2026-03-02",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "TDW",
+        "fy": 2026,
+        "local_fq": 4,
+        "local_q4_end": "2026-03-31",
+        "sec_report_end": null,
+        "accession": null,
+        "filing_date": null,
+        "status": "unmatched_no_same_fy_annual_row"
+      },
+      {
+        "ticker": "NMTC",
+        "fy": 2018,
+        "local_fq": 4,
+        "local_q4_end": "2018-12-31",
+        "sec_report_end": null,
+        "accession": null,
+        "filing_date": null,
+        "status": "unmatched_no_same_fy_annual_row"
+      },
+      {
+        "ticker": "NMTC",
+        "fy": 2019,
+        "local_fq": 4,
+        "local_q4_end": "2019-12-31",
+        "sec_report_end": "2019-09-30",
+        "accession": "0001213900-19-026720",
+        "filing_date": "2019-12-20",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "NMTC",
+        "fy": 2020,
+        "local_fq": 4,
+        "local_q4_end": "2020-12-31",
+        "sec_report_end": "2020-09-30",
+        "accession": "0001213900-20-041661",
+        "filing_date": "2020-12-09",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "NMTC",
+        "fy": 2021,
+        "local_fq": 4,
+        "local_q4_end": "2021-12-31",
+        "sec_report_end": "2021-09-30",
+        "accession": "0001213900-21-065463",
+        "filing_date": "2021-12-15",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "NMTC",
+        "fy": 2022,
+        "local_fq": 4,
+        "local_q4_end": "2022-12-31",
+        "sec_report_end": "2022-09-30",
+        "accession": "0001213900-22-081897",
+        "filing_date": "2022-12-22",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "NMTC",
+        "fy": 2023,
+        "local_fq": 4,
+        "local_q4_end": "2023-12-31",
+        "sec_report_end": "2023-09-30",
+        "accession": "0001213900-23-096120",
+        "filing_date": "2023-12-15",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "NMTC",
+        "fy": 2024,
+        "local_fq": 4,
+        "local_q4_end": "2024-12-31",
+        "sec_report_end": "2024-09-30",
+        "accession": "0001213900-24-109524",
+        "filing_date": "2024-12-17",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "NMTC",
+        "fy": 2025,
+        "local_fq": 4,
+        "local_q4_end": "2025-12-31",
+        "sec_report_end": "2025-09-30",
+        "accession": "0001213900-25-122390",
+        "filing_date": "2025-12-17",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "BNC",
+        "fy": 2024,
+        "local_fq": 4,
+        "local_q4_end": "2025-01-31",
+        "sec_report_end": "2024-12-31",
+        "accession": "0001641172-25-000913",
+        "filing_date": "2025-03-27",
+        "status": "confirmed_mismatch"
+      },
+      {
+        "ticker": "BNC",
+        "fy": 2025,
+        "local_fq": 4,
+        "local_q4_end": "2026-01-31",
+        "sec_report_end": "2026-04-30 (latest retrieved 10-K; fiscal-year label unresolved)",
+        "accession": "0001482541-26-000019",
+        "filing_date": "2026-06-23",
+        "status": "unmatched_local_row_requires_period_mapping"
+      }
+    ],
+    "note": "這些 rows 僅列入診斷；本 PR 不修改 docs/report/financials。TDW local FY2017 Q4 end 2017-03-31 對應舊 3 月財年；公司另有 Nine Month Transition Period Ended 2017-12-31，完整曆年比較自 FY2018 起。本清單 confirmed_mismatch 自 FY2018 起，並另列 FY2017 transition-period gap。",
+    "tdw_transition_period": {
+      "local_fy2017_q4_end": "2017-03-31",
+      "sec_transition_period_end": "2017-12-31",
+      "sec_period_label": "Nine Month Transition Period Ended December 31, 2017",
+      "evidence_accession": "0001564590-20-008191",
+      "evidence_filing_date": "2020-03-02",
+      "evidence_note": "The TDW 2019 10-K comparative quarterly table includes the 2017 nine-month transition period; there is no local Q4 row at 2017-12-31."
+    }
+  },
+  "sample_refreeze": {
+    "removed_tickers": [
+      "DUKR",
+      "OFG",
+      "NMTC",
+      "TDW"
+    ],
+    "added_tickers": [
+      "PCSA",
+      "ULBI",
+      "PZG",
+      "PTN"
+    ],
+    "retained_unchanged_period_count": 12,
+    "changed_main_reasons": [
+      "OFG FY2017/FY2020 are derivation_rejected on main, not q1_q3_incomplete.",
+      "DUKR FY2021 is derivation_rejected on main."
+    ],
+    "prior_membership_audit": {
+      "freeze_sha256": "85d642f65764c8330005a1df30d90752a73f893cebe3ccb4e5b76ed0e2ecf490",
+      "retained_tickers": [
+        "ASTC",
+        "BNC",
+        "FGC",
+        "IGC",
+        "QXL",
+        "WRAP"
+      ],
+      "removed_tickers": [
+        "DUKR",
+        "NMTC",
+        "OFG",
+        "TDW"
+      ],
+      "added_tickers": [
+        "PCSA",
+        "PTN",
+        "PZG",
+        "ULBI"
+      ],
+      "unchanged_selected_periods": [
+        "ASTC:2014:2014-06-30",
+        "ASTC:2019:2019-06-30",
+        "BNC:2014:2014-12-31",
+        "BNC:2024:2025-01-31",
+        "FGC:2016:2016-12-31",
+        "FGC:2022:2022-12-31",
+        "IGC:2012:2012-03-31",
+        "IGC:2019:2019-03-31",
+        "QXL:2014:2014-12-31",
+        "QXL:2019:2019-12-31",
+        "WRAP:2017:2017-12-31",
+        "WRAP:2022:2022-12-31"
+      ]
+    }
+  },
+  "verdict": "PARTIAL",
+  "verdict_basis": "Main classifier refreeze yields 5/16 verified direct missing-period values. SEC 8-K/EX-99.1 adds five unique values. Two frozen periods are incomplete/mismatched; one ULBI candidate and one Grade A control have unresolved issues. This is a small stratified sample and cannot be extrapolated to the 7,755 missing rows.",
+  "sol_xhigh_review": "PARTIAL，無阻擋事項。Sol 6.1 XHigh 唯讀審查核對了樣本凍結與分類、ledger 對照、來源分母與網路統計、TDW transition 期間證據，以及 POC-only diff 範圍。"
+}

@@ -1,0 +1,1639 @@
+{
+  "version": 1,
+  "sample_id": "sec-q4-diluted-eps-poc-20261018",
+  "freeze_revision": 2,
+  "frozen_at": "2026-10-18T12:25:19Z",
+  "source_commit": "fccf858d16e773df861e4424880d7f8264d699ff",
+  "selection_seed": "20261018",
+  "selection_constraints": {
+    "current_directory_and_cik": "ticker must exist in main's US eligibleSymbols and map to one SEC CIK in us-market-progress-summary.json",
+    "classification_source": "docs/report/q4-eps-missing-classification.json",
+    "financial_rows": "US financial rows matched to main's missing-classification report; SEC-sourced Q4; FY 2012–2025",
+    "annual_revenue_proxy": "median of SEC-sourced annual revenue for FY 2019–2025 <= USD 1B",
+    "periods_per_ticker": "earliest eligible fiscal year in 2012–2018 and earliest eligible fiscal year in 2019–2025; no POC SEC response is used in selection",
+    "industry_diversity": "one CIK per category; greedily prefer unused two-digit SIC group",
+    "sorting": "missing-category tickers ranked by SHA-256(seed|category|ticker); controls ranked by revenue proxy, then SHA-256; dates sorted by FY and end date",
+    "popular_ticker_exclusions": [
+      "AAPL",
+      "AMZN",
+      "COIN",
+      "DIS",
+      "ELF",
+      "GOOG",
+      "GOOGL",
+      "IBM",
+      "INTC",
+      "META",
+      "MSFT",
+      "NFLX",
+      "NVDA",
+      "ORCL",
+      "QCOM",
+      "TLRY",
+      "TSLA"
+    ],
+    "positive_control_predicate": "main's q4 answer-set predicate: quarterly.epsQuality[i].epsDiluted is A and secQ4EpsFacts[end].epsDiluted has a numeric fact; SEC-sourced stored value matches the fact and no ledger mutation blocks the row"
+  },
+  "input_audit": {
+    "classification_path": "docs/report/q4-eps-missing-classification.json",
+    "classification_sha256": "249ec9db253b3180a25f7a9b34130cb4b5e7b0e1e02fffcf5ab9805873bbd61e",
+    "classification_counts": {
+      "derivation_rejected": 3891,
+      "annual_diluted_eps_missing": 2171,
+      "q4_net_income_missing": 208,
+      "q1_q3_incomplete": 1485
+    },
+    "acceptance_ledger_path": "docs/report/q4-eps-acceptance-ledger.json",
+    "acceptance_ledger_sha256": "81746fe0aefd88e64665c42d4537cf8ca55cfe62947fe6d2f7d917e3575fe313",
+    "acceptance_ledger": {
+      "schema": "q4-eps-acceptance-ledger-v1",
+      "verifiedA_aggregate": 5009,
+      "nullToA_aggregate": 5,
+      "has_row_level_verifiedA_list": false
+    },
+    "financials_dir": "docs/report/financials/",
+    "financials_files": 4967,
+    "us_financials_missing_q4_eps": 7755,
+    "sec_sourced_eligible_missing_periods_fy2012_2025": 7334,
+    "candidate_pool": {
+      "q4_net_income_missing": {
+        "eligible_tickers_with_early_and_recent_periods": 2,
+        "eligible_periods": 4,
+        "selected_tickers": [
+          "BNC",
+          "QXL"
+        ]
+      },
+      "annual_diluted_eps_missing": {
+        "eligible_tickers_with_early_and_recent_periods": 64,
+        "eligible_periods": 128,
+        "selected_tickers": [
+          "FGC",
+          "WRAP"
+        ]
+      },
+      "q1_q3_incomplete": {
+        "eligible_tickers_with_early_and_recent_periods": 31,
+        "eligible_periods": 62,
+        "selected_tickers": [
+          "PCSA",
+          "ULBI"
+        ]
+      },
+      "derivation_rejected": {
+        "eligible_tickers_with_early_and_recent_periods": 302,
+        "eligible_periods": 604,
+        "selected_tickers": [
+          "ASTC",
+          "IGC"
+        ]
+      },
+      "direct_sec_grade_a_controls": {
+        "eligible_tickers_with_early_and_recent_main_grade_a_periods_and_sec_revenue_le_1bn": 126,
+        "selected_tickers": [
+          "PZG",
+          "PTN"
+        ],
+        "ledger_verifiedA_aggregate": 5009,
+        "ledger_has_row_level_verifiedA_list": false
+      }
+    },
+    "previous_freeze_membership": {
+      "freeze_sha256": "85d642f65764c8330005a1df30d90752a73f893cebe3ccb4e5b76ed0e2ecf490",
+      "retained_tickers": [
+        "ASTC",
+        "BNC",
+        "FGC",
+        "IGC",
+        "QXL",
+        "WRAP"
+      ],
+      "removed_tickers": [
+        "DUKR",
+        "NMTC",
+        "OFG",
+        "TDW"
+      ],
+      "added_tickers": [
+        "PCSA",
+        "PTN",
+        "PZG",
+        "ULBI"
+      ],
+      "unchanged_selected_periods": [
+        "ASTC:2014:2014-06-30",
+        "ASTC:2019:2019-06-30",
+        "BNC:2014:2014-12-31",
+        "BNC:2024:2025-01-31",
+        "FGC:2016:2016-12-31",
+        "FGC:2022:2022-12-31",
+        "IGC:2012:2012-03-31",
+        "IGC:2019:2019-03-31",
+        "QXL:2014:2014-12-31",
+        "QXL:2019:2019-12-31",
+        "WRAP:2017:2017-12-31",
+        "WRAP:2022:2022-12-31"
+      ]
+    },
+    "previous_positive_control_rows_checked_against_main": [
+      {
+        "ticker": "NMTC",
+        "fy": 2017,
+        "q4_end": "2017-12-31",
+        "local_eps_diluted": -0.21,
+        "local_source": "sec",
+        "quarterly_derived_flag": null,
+        "main_eps_quality": null,
+        "sec_fact": null,
+        "is_main_grade_a": false,
+        "present_in_main_missing_classification": false,
+        "ledger_row_entries": {
+          "blocked": [],
+          "overridden": [],
+          "deferred": []
+        },
+        "ledger_verifiedA_aggregate": 5009,
+        "ledger_has_per_row_verifiedA_list": false
+      },
+      {
+        "ticker": "NMTC",
+        "fy": 2019,
+        "q4_end": "2019-12-31",
+        "local_eps_diluted": -0.34,
+        "local_source": "sec",
+        "quarterly_derived_flag": null,
+        "main_eps_quality": null,
+        "sec_fact": null,
+        "is_main_grade_a": false,
+        "present_in_main_missing_classification": false,
+        "ledger_row_entries": {
+          "blocked": [],
+          "overridden": [],
+          "deferred": []
+        },
+        "ledger_verifiedA_aggregate": 5009,
+        "ledger_has_per_row_verifiedA_list": false
+      },
+      {
+        "ticker": "TDW",
+        "fy": 2018,
+        "q4_end": "2018-03-31",
+        "local_eps_diluted": -1.67,
+        "local_source": "sec",
+        "quarterly_derived_flag": null,
+        "main_eps_quality": null,
+        "sec_fact": null,
+        "is_main_grade_a": false,
+        "present_in_main_missing_classification": false,
+        "ledger_row_entries": {
+          "blocked": [],
+          "overridden": [],
+          "deferred": []
+        },
+        "ledger_verifiedA_aggregate": 5009,
+        "ledger_has_per_row_verifiedA_list": false
+      },
+      {
+        "ticker": "TDW",
+        "fy": 2019,
+        "q4_end": "2019-03-31",
+        "local_eps_diluted": -0.58,
+        "local_source": "sec",
+        "quarterly_derived_flag": null,
+        "main_eps_quality": null,
+        "sec_fact": null,
+        "is_main_grade_a": false,
+        "present_in_main_missing_classification": false,
+        "ledger_row_entries": {
+          "blocked": [],
+          "overridden": [],
+          "deferred": []
+        },
+        "ledger_verifiedA_aggregate": 5009,
+        "ledger_has_per_row_verifiedA_list": false
+      }
+    ],
+    "snapshot_sha256": "bccb525c81bbde158563bec5220f2c7b4cb7f51fbdc80b909fc86d7aac1a59e5",
+    "progress_summary_sha256": "5da778a720e86706863a8531a608109ddc7eb90b347f2d5f587fa89bc837f87f"
+  },
+  "sample": [
+    {
+      "ticker": "BNC",
+      "cik": "0001482541",
+      "company_name": "BNB Standard Corp",
+      "sic": 700,
+      "sic_description": "Agricultural Services",
+      "median_2019_2025_sec_revenue_proxy": 9898730.5,
+      "sample_role": "missing_q4_eps",
+      "missing_reason": "q4_net_income_missing",
+      "selection_rank_sha256": "004fd34ab0716bb236502442bceccb25c7c7d42fc4c4d265d5d84ea42d7412f8",
+      "selection_rule": "seeded SHA-256 rank, then greedily prefer an unused two-digit SIC group",
+      "periods": [
+        {
+          "ticker": "BNC",
+          "company_name": "BNB Standard Corp",
+          "cik": "0001482541",
+          "sic": 700,
+          "sic_description": "Agricultural Services",
+          "fy": 2014,
+          "q4_end": "2014-12-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": null,
+          "current_annual_eps_diluted": -0.03,
+          "q1_q3": [
+            {
+              "end": "2014-03-31",
+              "epsDiluted": 0,
+              "netIncome": -53607,
+              "dilutedShares": null,
+              "shareBasis": null
+            },
+            {
+              "end": "2014-06-30",
+              "epsDiluted": -0.02,
+              "netIncome": -976610,
+              "dilutedShares": null,
+              "shareBasis": 48830500.0
+            },
+            {
+              "end": "2014-09-30",
+              "epsDiluted": 0.01,
+              "netIncome": 1479202,
+              "dilutedShares": 112988948,
+              "shareBasis": 112988948
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/BNC.json",
+          "financials_sha256": "15bfaa328185ea8801deef72ba15fa88678e9ec7caaa26d66a8d28e0cf3eeaa8",
+          "split_adjusted": true,
+          "split_events": [
+            [
+              "2022-02-09",
+              0.006667
+            ],
+            [
+              "2024-06-07",
+              0.083333
+            ]
+          ],
+          "existing_quality_level": "limited",
+          "existing_quality_issues": [
+            "split-adjusted",
+            "quarter-annual-mismatch",
+            "debt-approx",
+            "q4-derived"
+          ],
+          "category": "q4_net_income_missing",
+          "classification_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "category_evidence": [
+            "netIncome null"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        },
+        {
+          "ticker": "BNC",
+          "company_name": "BNB Standard Corp",
+          "cik": "0001482541",
+          "sic": 700,
+          "sic_description": "Agricultural Services",
+          "fy": 2024,
+          "q4_end": "2025-01-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": null,
+          "current_annual_eps_diluted": -4.22,
+          "q1_q3": [
+            {
+              "end": "2024-04-30",
+              "epsDiluted": -1.7,
+              "netIncome": -1164441,
+              "dilutedShares": 684266,
+              "shareBasis": 684266
+            },
+            {
+              "end": "2024-07-31",
+              "epsDiluted": null,
+              "netIncome": null,
+              "dilutedShares": null,
+              "shareBasis": null
+            },
+            {
+              "end": "2024-10-31",
+              "epsDiluted": null,
+              "netIncome": null,
+              "dilutedShares": null,
+              "shareBasis": null
+            }
+          ],
+          "quarterly_derived_flag": null,
+          "financials_path": "docs/report/financials/BNC.json",
+          "financials_sha256": "15bfaa328185ea8801deef72ba15fa88678e9ec7caaa26d66a8d28e0cf3eeaa8",
+          "split_adjusted": true,
+          "split_events": [
+            [
+              "2022-02-09",
+              0.006667
+            ],
+            [
+              "2024-06-07",
+              0.083333
+            ]
+          ],
+          "existing_quality_level": "limited",
+          "existing_quality_issues": [
+            "split-adjusted",
+            "quarter-annual-mismatch",
+            "debt-approx",
+            "q4-derived"
+          ],
+          "category": "q4_net_income_missing",
+          "classification_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "category_evidence": [
+            "netIncome null"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        }
+      ]
+    },
+    {
+      "ticker": "QXL",
+      "cik": "0000797542",
+      "company_name": "QUANTUM X LABS INC.",
+      "sic": 7372,
+      "sic_description": "Services-Prepackaged Software",
+      "median_2019_2025_sec_revenue_proxy": 36082500.0,
+      "sample_role": "missing_q4_eps",
+      "missing_reason": "q4_net_income_missing",
+      "selection_rank_sha256": "6a474e06c25d02641953bb7c91cb758136203678d2ec0b11684ddcb55191027a",
+      "selection_rule": "seeded SHA-256 rank, then greedily prefer an unused two-digit SIC group",
+      "periods": [
+        {
+          "ticker": "QXL",
+          "company_name": "QUANTUM X LABS INC.",
+          "cik": "0000797542",
+          "sic": 7372,
+          "sic_description": "Services-Prepackaged Software",
+          "fy": 2014,
+          "q4_end": "2014-12-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": null,
+          "current_annual_eps_diluted": -0.01,
+          "q1_q3": [
+            {
+              "end": "2014-03-31",
+              "epsDiluted": null,
+              "netIncome": -10121,
+              "dilutedShares": null,
+              "shareBasis": null
+            },
+            {
+              "end": "2014-06-30",
+              "epsDiluted": 0,
+              "netIncome": -6807,
+              "dilutedShares": null,
+              "shareBasis": null
+            },
+            {
+              "end": "2014-09-30",
+              "epsDiluted": 0,
+              "netIncome": 0,
+              "dilutedShares": null,
+              "shareBasis": null
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/QXL.json",
+          "financials_sha256": "99d51cd8cf7a0804aefba7a8914cd00ff332c850a3811071786a837b88af239e",
+          "split_adjusted": true,
+          "split_events": [
+            [
+              "2015-03-20",
+              0.25
+            ],
+            [
+              "2019-05-20",
+              0.066667
+            ],
+            [
+              "2022-09-06",
+              0.035714
+            ],
+            [
+              "2025-03-14",
+              0.25
+            ]
+          ],
+          "existing_quality_level": "partial",
+          "existing_quality_issues": [
+            "financial-sector-format",
+            "missing-cashflow",
+            "split-adjusted",
+            "debt-approx",
+            "eps-inconsistent",
+            "q4-derived"
+          ],
+          "category": "q4_net_income_missing",
+          "classification_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "category_evidence": [
+            "netIncome null"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        },
+        {
+          "ticker": "QXL",
+          "company_name": "QUANTUM X LABS INC.",
+          "cik": "0000797542",
+          "sic": 7372,
+          "sic_description": "Services-Prepackaged Software",
+          "fy": 2019,
+          "q4_end": "2019-12-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": null,
+          "current_annual_eps_diluted": -0.08,
+          "q1_q3": [
+            {
+              "end": "2019-03-31",
+              "epsDiluted": 0.91,
+              "netIncome": -249000,
+              "dilutedShares": null,
+              "shareBasis": 273626.3736263736
+            },
+            {
+              "end": "2019-06-30",
+              "epsDiluted": 0.97,
+              "netIncome": -203000,
+              "dilutedShares": null,
+              "shareBasis": 209278.3505154639
+            },
+            {
+              "end": "2019-09-30",
+              "epsDiluted": 0.01,
+              "netIncome": 284000,
+              "dilutedShares": null,
+              "shareBasis": 28400000.0
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/QXL.json",
+          "financials_sha256": "99d51cd8cf7a0804aefba7a8914cd00ff332c850a3811071786a837b88af239e",
+          "split_adjusted": true,
+          "split_events": [
+            [
+              "2015-03-20",
+              0.25
+            ],
+            [
+              "2019-05-20",
+              0.066667
+            ],
+            [
+              "2022-09-06",
+              0.035714
+            ],
+            [
+              "2025-03-14",
+              0.25
+            ]
+          ],
+          "existing_quality_level": "partial",
+          "existing_quality_issues": [
+            "financial-sector-format",
+            "missing-cashflow",
+            "split-adjusted",
+            "debt-approx",
+            "eps-inconsistent",
+            "q4-derived"
+          ],
+          "category": "q4_net_income_missing",
+          "classification_class": "no-q4-net-income",
+          "classification_detail": "netIncome null",
+          "category_evidence": [
+            "netIncome null"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        }
+      ]
+    },
+    {
+      "ticker": "FGC",
+      "cik": "0001591890",
+      "company_name": "FG Communities Holdings Inc.",
+      "sic": 6199,
+      "sic_description": "Finance Services",
+      "median_2019_2025_sec_revenue_proxy": 7595000,
+      "sample_role": "missing_q4_eps",
+      "missing_reason": "annual_diluted_eps_missing",
+      "selection_rank_sha256": "03d31191b698966e64104a778f30aaa7d96f20b2cd602bb2b3a667e713c20d13",
+      "selection_rule": "seeded SHA-256 rank, then greedily prefer an unused two-digit SIC group",
+      "periods": [
+        {
+          "ticker": "FGC",
+          "company_name": "FG Communities Holdings Inc.",
+          "cik": "0001591890",
+          "sic": 6199,
+          "sic_description": "Finance Services",
+          "fy": 2016,
+          "q4_end": "2016-12-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": 1592000,
+          "current_annual_eps_diluted": null,
+          "q1_q3": [
+            {
+              "end": "2016-03-31",
+              "epsDiluted": -0.18,
+              "netIncome": -1115000,
+              "dilutedShares": 6111079,
+              "shareBasis": 6111079
+            },
+            {
+              "end": "2016-06-30",
+              "epsDiluted": 0.22,
+              "netIncome": 1340000,
+              "dilutedShares": 6097043,
+              "shareBasis": 6097043
+            },
+            {
+              "end": "2016-09-30",
+              "epsDiluted": -0.3,
+              "netIncome": -1806000,
+              "dilutedShares": 6022983,
+              "shareBasis": 6022983
+            }
+          ],
+          "quarterly_derived_flag": null,
+          "financials_path": "docs/report/financials/FGC.json",
+          "financials_sha256": "f748b7ac716b205bda34e120ca13481d9f04cf1d801eeb664a8244604272a270",
+          "split_adjusted": true,
+          "split_events": [
+            [
+              "2024-11-01",
+              0.04
+            ],
+            [
+              "2026-02-13",
+              0.2
+            ]
+          ],
+          "existing_quality_level": "limited",
+          "existing_quality_issues": [
+            "financial-sector-format",
+            "split-adjusted",
+            "quarter-annual-mismatch",
+            "q4-eps-from-shares",
+            "debt-approx",
+            "eps-inconsistent",
+            "q4-derived"
+          ],
+          "category": "annual_diluted_eps_missing",
+          "classification_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2016",
+          "category_evidence": [
+            "annual epsDiluted null for fy 2016"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        },
+        {
+          "ticker": "FGC",
+          "company_name": "FG Communities Holdings Inc.",
+          "cik": "0001591890",
+          "sic": 6199,
+          "sic_description": "Finance Services",
+          "fy": 2022,
+          "q4_end": "2022-12-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": 134000,
+          "current_annual_eps_diluted": null,
+          "q1_q3": [
+            {
+              "end": "2022-03-31",
+              "epsDiluted": null,
+              "netIncome": -3823000,
+              "dilutedShares": null,
+              "shareBasis": null
+            },
+            {
+              "end": "2022-06-30",
+              "epsDiluted": null,
+              "netIncome": -5478000,
+              "dilutedShares": 6775501,
+              "shareBasis": 6775501
+            },
+            {
+              "end": "2022-09-30",
+              "epsDiluted": null,
+              "netIncome": 10255000,
+              "dilutedShares": 9333709,
+              "shareBasis": 9333709
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/FGC.json",
+          "financials_sha256": "f748b7ac716b205bda34e120ca13481d9f04cf1d801eeb664a8244604272a270",
+          "split_adjusted": true,
+          "split_events": [
+            [
+              "2024-11-01",
+              0.04
+            ],
+            [
+              "2026-02-13",
+              0.2
+            ]
+          ],
+          "existing_quality_level": "limited",
+          "existing_quality_issues": [
+            "financial-sector-format",
+            "split-adjusted",
+            "quarter-annual-mismatch",
+            "q4-eps-from-shares",
+            "debt-approx",
+            "eps-inconsistent",
+            "q4-derived"
+          ],
+          "category": "annual_diluted_eps_missing",
+          "classification_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2022",
+          "category_evidence": [
+            "annual epsDiluted null for fy 2022"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        }
+      ]
+    },
+    {
+      "ticker": "WRAP",
+      "cik": "0001702924",
+      "company_name": "WRAP TECHNOLOGIES, INC.",
+      "sic": 3480,
+      "sic_description": "Ordnance & Accessories, (No Vehicles/Guided Missiles)",
+      "median_2019_2025_sec_revenue_proxy": 4672000,
+      "sample_role": "missing_q4_eps",
+      "missing_reason": "annual_diluted_eps_missing",
+      "selection_rank_sha256": "08f37abb32f5d0e17d54659cd2bf9d90b8465aa431fd02832b199b6f67874142",
+      "selection_rule": "seeded SHA-256 rank, then greedily prefer an unused two-digit SIC group",
+      "periods": [
+        {
+          "ticker": "WRAP",
+          "company_name": "WRAP TECHNOLOGIES, INC.",
+          "cik": "0001702924",
+          "sic": 3480,
+          "sic_description": "Ordnance & Accessories, (No Vehicles/Guided Missiles)",
+          "fy": 2017,
+          "q4_end": "2017-12-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": -310016,
+          "current_annual_eps_diluted": null,
+          "q1_q3": [
+            {
+              "end": "2017-03-31",
+              "epsDiluted": null,
+              "netIncome": -201755,
+              "dilutedShares": null,
+              "shareBasis": null
+            },
+            {
+              "end": "2017-06-30",
+              "epsDiluted": null,
+              "netIncome": -170230,
+              "dilutedShares": null,
+              "shareBasis": null
+            },
+            {
+              "end": "2017-09-30",
+              "epsDiluted": null,
+              "netIncome": -151544,
+              "dilutedShares": null,
+              "shareBasis": null
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/WRAP.json",
+          "financials_sha256": "0db7c464ce2caa25457489c399c534dfcb33ef4ef8d7655f1f08e9268979a561",
+          "split_adjusted": false,
+          "split_events": [],
+          "existing_quality_level": "good",
+          "existing_quality_issues": [
+            "eps-inconsistent",
+            "q4-derived"
+          ],
+          "category": "annual_diluted_eps_missing",
+          "classification_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2017",
+          "category_evidence": [
+            "annual epsDiluted null for fy 2017"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        },
+        {
+          "ticker": "WRAP",
+          "company_name": "WRAP TECHNOLOGIES, INC.",
+          "cik": "0001702924",
+          "sic": 3480,
+          "sic_description": "Ordnance & Accessories, (No Vehicles/Guided Missiles)",
+          "fy": 2022,
+          "q4_end": "2022-12-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": -3535000,
+          "current_annual_eps_diluted": null,
+          "q1_q3": [
+            {
+              "end": "2022-03-31",
+              "epsDiluted": null,
+              "netIncome": -5432000,
+              "dilutedShares": null,
+              "shareBasis": null
+            },
+            {
+              "end": "2022-06-30",
+              "epsDiluted": null,
+              "netIncome": -4785000,
+              "dilutedShares": null,
+              "shareBasis": null
+            },
+            {
+              "end": "2022-09-30",
+              "epsDiluted": null,
+              "netIncome": -3865000,
+              "dilutedShares": null,
+              "shareBasis": null
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/WRAP.json",
+          "financials_sha256": "0db7c464ce2caa25457489c399c534dfcb33ef4ef8d7655f1f08e9268979a561",
+          "split_adjusted": false,
+          "split_events": [],
+          "existing_quality_level": "good",
+          "existing_quality_issues": [
+            "eps-inconsistent",
+            "q4-derived"
+          ],
+          "category": "annual_diluted_eps_missing",
+          "classification_class": "no-annual-diluted-eps",
+          "classification_detail": "annual epsDiluted null for fy 2022",
+          "category_evidence": [
+            "annual epsDiluted null for fy 2022"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        }
+      ]
+    },
+    {
+      "ticker": "PCSA",
+      "cik": "0001533743",
+      "company_name": "Processa Pharmaceuticals, Inc.",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations",
+      "median_2019_2025_sec_revenue_proxy": 0.0,
+      "sample_role": "missing_q4_eps",
+      "missing_reason": "q1_q3_incomplete",
+      "selection_rank_sha256": "10ed33029d57ccf2cb97d80fead0d361f63ab39c6944b79223c97a43384d5772",
+      "selection_rule": "seeded SHA-256 rank, then greedily prefer an unused two-digit SIC group",
+      "periods": [
+        {
+          "ticker": "PCSA",
+          "company_name": "Processa Pharmaceuticals, Inc.",
+          "cik": "0001533743",
+          "sic": 2834,
+          "sic_description": "Pharmaceutical Preparations",
+          "fy": 2012,
+          "q4_end": "2012-12-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": -782940,
+          "current_annual_eps_diluted": -1.5,
+          "q1_q3": [
+            null,
+            {
+              "end": "2012-06-30",
+              "epsDiluted": -0.31,
+              "netIncome": -475079,
+              "dilutedShares": null,
+              "shareBasis": 1532512.9032258065
+            },
+            {
+              "end": "2012-09-30",
+              "epsDiluted": -0.4,
+              "netIncome": -601882,
+              "dilutedShares": null,
+              "shareBasis": 1504705.0
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/PCSA.json",
+          "financials_sha256": "76d32c874ed3fb125b8815ae0f751397207c4c2319712af10e074506dbb92662",
+          "split_adjusted": true,
+          "split_events": [
+            [
+              "2017-12-08",
+              0.142857
+            ],
+            [
+              "2019-12-23",
+              0.142857
+            ],
+            [
+              "2024-01-22",
+              0.05
+            ],
+            [
+              "2025-12-17",
+              0.04
+            ]
+          ],
+          "existing_quality_level": "partial",
+          "existing_quality_issues": [
+            "financial-sector-format",
+            "split-adjusted",
+            "negative-equity",
+            "debt-approx",
+            "q4-derived"
+          ],
+          "category": "q1_q3_incomplete",
+          "classification_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 rows=0",
+          "category_evidence": [
+            "Q1 rows=0"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        },
+        {
+          "ticker": "PCSA",
+          "company_name": "Processa Pharmaceuticals, Inc.",
+          "cik": "0001533743",
+          "sic": 2834,
+          "sic_description": "Pharmaceutical Preparations",
+          "fy": 2022,
+          "q4_end": "2022-12-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": -13012320,
+          "current_annual_eps_diluted": -34.05,
+          "q1_q3": [
+            {
+              "end": "2022-03-31",
+              "epsDiluted": null,
+              "netIncome": -3227131,
+              "dilutedShares": null,
+              "shareBasis": null
+            },
+            {
+              "end": "2022-06-30",
+              "epsDiluted": -8.0,
+              "netIncome": -5164368,
+              "dilutedShares": 637620.4,
+              "shareBasis": 637620.4
+            },
+            {
+              "end": "2022-09-30",
+              "epsDiluted": -9.25,
+              "netIncome": -6020410,
+              "dilutedShares": 648008.88,
+              "shareBasis": 648008.88
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/PCSA.json",
+          "financials_sha256": "76d32c874ed3fb125b8815ae0f751397207c4c2319712af10e074506dbb92662",
+          "split_adjusted": true,
+          "split_events": [
+            [
+              "2017-12-08",
+              0.142857
+            ],
+            [
+              "2019-12-23",
+              0.142857
+            ],
+            [
+              "2024-01-22",
+              0.05
+            ],
+            [
+              "2025-12-17",
+              0.04
+            ]
+          ],
+          "existing_quality_level": "partial",
+          "existing_quality_issues": [
+            "financial-sector-format",
+            "split-adjusted",
+            "negative-equity",
+            "debt-approx",
+            "q4-derived"
+          ],
+          "category": "q1_q3_incomplete",
+          "classification_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null",
+          "category_evidence": [
+            "Q1 null"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        }
+      ]
+    },
+    {
+      "ticker": "ULBI",
+      "cik": "0000875657",
+      "company_name": "ULTRALIFE CORP",
+      "sic": 3690,
+      "sic_description": "Miscellaneous Electrical Machinery, Equipment & Supplies",
+      "median_2019_2025_sec_revenue_proxy": 131840000,
+      "sample_role": "missing_q4_eps",
+      "missing_reason": "q1_q3_incomplete",
+      "selection_rank_sha256": "1363c5a3b56084392f2e2a5e3dc48e9699e63252a9b966efce55fcc10cef87da",
+      "selection_rule": "seeded SHA-256 rank, then greedily prefer an unused two-digit SIC group",
+      "periods": [
+        {
+          "ticker": "ULBI",
+          "company_name": "ULTRALIFE CORP",
+          "cik": "0000875657",
+          "sic": 3690,
+          "sic_description": "Miscellaneous Electrical Machinery, Equipment & Supplies",
+          "fy": 2014,
+          "q4_end": "2014-12-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": 853000,
+          "current_annual_eps_diluted": -0.12,
+          "q1_q3": [
+            {
+              "end": "2014-03-30",
+              "epsDiluted": null,
+              "netIncome": -1286000,
+              "dilutedShares": null,
+              "shareBasis": null
+            },
+            {
+              "end": "2014-06-29",
+              "epsDiluted": -0.08,
+              "netIncome": -1360000,
+              "dilutedShares": null,
+              "shareBasis": 17000000.0
+            },
+            {
+              "end": "2014-09-28",
+              "epsDiluted": null,
+              "netIncome": -323000,
+              "dilutedShares": null,
+              "shareBasis": null
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/ULBI.json",
+          "financials_sha256": "e6651932f19b798eabb23f83ba9068fdcd70f76c75faea38c358f1a32ffaa70f",
+          "split_adjusted": false,
+          "split_events": [],
+          "existing_quality_level": "good",
+          "existing_quality_issues": [
+            "q4-eps-from-shares",
+            "eps-inconsistent",
+            "q4-derived"
+          ],
+          "category": "q1_q3_incomplete",
+          "classification_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null, Q3 null",
+          "category_evidence": [
+            "Q1 null, Q3 null"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        },
+        {
+          "ticker": "ULBI",
+          "company_name": "ULTRALIFE CORP",
+          "cik": "0000875657",
+          "sic": 3690,
+          "sic_description": "Miscellaneous Electrical Machinery, Equipment & Supplies",
+          "fy": 2021,
+          "q4_end": "2021-12-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": -1131000,
+          "current_annual_eps_diluted": 0.05,
+          "q1_q3": [
+            {
+              "end": "2021-03-31",
+              "epsDiluted": null,
+              "netIncome": 671000,
+              "dilutedShares": 16152000,
+              "shareBasis": 16152000
+            },
+            {
+              "end": "2021-06-30",
+              "epsDiluted": 0.05,
+              "netIncome": 811000,
+              "dilutedShares": 16260000,
+              "shareBasis": 16260000
+            },
+            {
+              "end": "2021-09-30",
+              "epsDiluted": 0.05,
+              "netIncome": -585000,
+              "dilutedShares": 16065000,
+              "shareBasis": 16065000
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/ULBI.json",
+          "financials_sha256": "e6651932f19b798eabb23f83ba9068fdcd70f76c75faea38c358f1a32ffaa70f",
+          "split_adjusted": false,
+          "split_events": [],
+          "existing_quality_level": "good",
+          "existing_quality_issues": [
+            "q4-eps-from-shares",
+            "eps-inconsistent",
+            "q4-derived"
+          ],
+          "category": "q1_q3_incomplete",
+          "classification_class": "q1-q3-incomplete",
+          "classification_detail": "Q1 null",
+          "category_evidence": [
+            "Q1 null"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        }
+      ]
+    },
+    {
+      "ticker": "ASTC",
+      "cik": "0001001907",
+      "company_name": "ASTROTECH Corp",
+      "sic": 3826,
+      "sic_description": "Laboratory Analytical Instruments",
+      "median_2019_2025_sec_revenue_proxy": 750000,
+      "sample_role": "missing_q4_eps",
+      "missing_reason": "derivation_rejected",
+      "selection_rank_sha256": "00607b7bc48e30cdfd08973120bec213bc6bc57b6e1c3f60abb78df296a32cfa",
+      "selection_rule": "seeded SHA-256 rank, then greedily prefer an unused two-digit SIC group",
+      "periods": [
+        {
+          "ticker": "ASTC",
+          "company_name": "ASTROTECH Corp",
+          "cik": "0001001907",
+          "sic": 3826,
+          "sic_description": "Laboratory Analytical Instruments",
+          "fy": 2014,
+          "q4_end": "2014-06-30",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": -820000,
+          "current_annual_eps_diluted": 0.25,
+          "q1_q3": [
+            {
+              "end": "2013-09-30",
+              "epsDiluted": 0.06,
+              "netIncome": 1253000,
+              "dilutedShares": 19470000,
+              "shareBasis": 19470000
+            },
+            {
+              "end": "2013-12-31",
+              "epsDiluted": -0.13,
+              "netIncome": -2554000,
+              "dilutedShares": 19479000,
+              "shareBasis": 19479000
+            },
+            {
+              "end": "2014-03-31",
+              "epsDiluted": -0.15,
+              "netIncome": -2837000,
+              "dilutedShares": 19486000,
+              "shareBasis": 19486000
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/ASTC.json",
+          "financials_sha256": "9cdde79b50491fe58bfba3c117153ab1e785518572997bf6b0b52b876c3113ec",
+          "split_adjusted": false,
+          "split_events": [
+            [
+              "2007-11-29",
+              0.1
+            ],
+            [
+              "2017-10-16",
+              0.2
+            ],
+            [
+              "2022-12-05",
+              0.033333
+            ]
+          ],
+          "existing_quality_level": "good",
+          "existing_quality_issues": [
+            "debt-approx",
+            "eps-inconsistent",
+            "q4-derived"
+          ],
+          "category": "derivation_rejected",
+          "classification_class": "derivation-rejected",
+          "classification_detail": "方法 A 推算 EPS 與 Q4 淨利符號不一致",
+          "category_evidence": [
+            "方法 A 推算 EPS 與 Q4 淨利符號不一致"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        },
+        {
+          "ticker": "ASTC",
+          "company_name": "ASTROTECH Corp",
+          "cik": "0001001907",
+          "sic": 3826,
+          "sic_description": "Laboratory Analytical Instruments",
+          "fy": 2019,
+          "q4_end": "2019-06-30",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": -1742000,
+          "current_annual_eps_diluted": -1.53,
+          "q1_q3": [
+            {
+              "end": "2018-09-30",
+              "epsDiluted": -0.55,
+              "netIncome": -2238000,
+              "dilutedShares": null,
+              "shareBasis": 4069090.9090909087
+            },
+            {
+              "end": "2018-12-31",
+              "epsDiluted": -0.46,
+              "netIncome": -2160000,
+              "dilutedShares": null,
+              "shareBasis": 4695652.173913043
+            },
+            {
+              "end": "2019-03-31",
+              "epsDiluted": -0.25,
+              "netIncome": -1394000,
+              "dilutedShares": null,
+              "shareBasis": 5576000.0
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/ASTC.json",
+          "financials_sha256": "9cdde79b50491fe58bfba3c117153ab1e785518572997bf6b0b52b876c3113ec",
+          "split_adjusted": false,
+          "split_events": [
+            [
+              "2007-11-29",
+              0.1
+            ],
+            [
+              "2017-10-16",
+              0.2
+            ],
+            [
+              "2022-12-05",
+              0.033333
+            ]
+          ],
+          "existing_quality_level": "good",
+          "existing_quality_issues": [
+            "debt-approx",
+            "eps-inconsistent",
+            "q4-derived"
+          ],
+          "category": "derivation_rejected",
+          "classification_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "category_evidence": [
+            "方法 A 股數基準差超過 25%"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        }
+      ]
+    },
+    {
+      "ticker": "IGC",
+      "cik": "0001326205",
+      "company_name": "IGC Pharma, Inc.",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations",
+      "median_2019_2025_sec_revenue_proxy": 1271000,
+      "sample_role": "missing_q4_eps",
+      "missing_reason": "derivation_rejected",
+      "selection_rank_sha256": "00a973d79a6fd171f7e80e01d729ea18caf095658cba3908c041c6714ca5124b",
+      "selection_rule": "seeded SHA-256 rank, then greedily prefer an unused two-digit SIC group",
+      "periods": [
+        {
+          "ticker": "IGC",
+          "company_name": "IGC Pharma, Inc.",
+          "cik": "0001326205",
+          "sic": 2834,
+          "sic_description": "Pharmaceutical Preparations",
+          "fy": 2012,
+          "q4_end": "2012-03-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": -4192094,
+          "current_annual_eps_diluted": -2.66,
+          "q1_q3": [
+            {
+              "end": "2011-06-30",
+              "epsDiluted": -0.04,
+              "netIncome": -869203,
+              "dilutedShares": 20359602,
+              "shareBasis": 20359602
+            },
+            {
+              "end": "2011-09-30",
+              "epsDiluted": -0.04,
+              "netIncome": -789253,
+              "dilutedShares": 20960433,
+              "shareBasis": 20960433
+            },
+            {
+              "end": "2011-12-31",
+              "epsDiluted": -0.09,
+              "netIncome": -1901375,
+              "dilutedShares": 21301092,
+              "shareBasis": 21301092
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/IGC.json",
+          "financials_sha256": "1a48ca25ab1eb14f3c3484926649b4073f4b5aabfdfea86a384cfe68e693c57a",
+          "split_adjusted": false,
+          "split_events": [
+            [
+              "2013-04-19",
+              0.1
+            ]
+          ],
+          "existing_quality_level": "good",
+          "existing_quality_issues": [
+            "debt-approx",
+            "q4-derived"
+          ],
+          "category": "derivation_rejected",
+          "classification_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "category_evidence": [
+            "方法 A 股數基準差超過 25%"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        },
+        {
+          "ticker": "IGC",
+          "company_name": "IGC Pharma, Inc.",
+          "cik": "0001326205",
+          "sic": 2834,
+          "sic_description": "Pharmaceutical Preparations",
+          "fy": 2019,
+          "q4_end": "2019-03-31",
+          "filing_period_source": "sec",
+          "current_q4_eps_diluted": null,
+          "current_q4_net_income": -1578000,
+          "current_annual_eps_diluted": -0.13,
+          "q1_q3": [
+            {
+              "end": "2018-06-30",
+              "epsDiluted": -0.02,
+              "netIncome": -512000,
+              "dilutedShares": null,
+              "shareBasis": 25600000.0
+            },
+            {
+              "end": "2018-09-30",
+              "epsDiluted": -0.03,
+              "netIncome": -859000,
+              "dilutedShares": null,
+              "shareBasis": 28633333.333333336
+            },
+            {
+              "end": "2018-12-31",
+              "epsDiluted": -0.03,
+              "netIncome": -1148000,
+              "dilutedShares": null,
+              "shareBasis": 38266666.66666667
+            }
+          ],
+          "quarterly_derived_flag": 1,
+          "financials_path": "docs/report/financials/IGC.json",
+          "financials_sha256": "1a48ca25ab1eb14f3c3484926649b4073f4b5aabfdfea86a384cfe68e693c57a",
+          "split_adjusted": false,
+          "split_events": [
+            [
+              "2013-04-19",
+              0.1
+            ]
+          ],
+          "existing_quality_level": "good",
+          "existing_quality_issues": [
+            "debt-approx",
+            "q4-derived"
+          ],
+          "category": "derivation_rejected",
+          "classification_class": "derivation-rejected",
+          "classification_detail": "方法 A 股數基準差超過 25%",
+          "category_evidence": [
+            "方法 A 股數基準差超過 25%"
+          ],
+          "classification_path": "docs/report/q4-eps-missing-classification.json"
+        }
+      ]
+    },
+    {
+      "ticker": "PZG",
+      "cik": "0001629210",
+      "company_name": "Paramount Gold Nevada Corp.",
+      "sic": 1000,
+      "sic_description": "Metal Mining",
+      "median_2019_2025_sec_revenue_proxy": 400388,
+      "sample_role": "positive_control_grade_a",
+      "missing_reason": null,
+      "historical_grade_a_status": "confirmed by main epsQuality A plus a row-level SEC Q4 fact; ledger has no accepted-row list and no mutation entry",
+      "selection_rule": "main Grade A Q4 fact; smallest revenue proxy, then fixed seed, with SIC diversity",
+      "periods": [
+        {
+          "ticker": "PZG",
+          "company_name": "Paramount Gold Nevada Corp.",
+          "cik": "0001629210",
+          "sic": 1000,
+          "sic_description": "Metal Mining",
+          "fy": 2016,
+          "q4_end": "2016-06-30",
+          "existing_q4_eps_diluted": -0.32,
+          "existing_q4_source": "sec",
+          "quarterly_derived_flag": 1,
+          "main_grade_a_audit": {
+            "ticker": "PZG",
+            "fy": 2016,
+            "q4_end": "2016-06-30",
+            "local_eps_diluted": -0.32,
+            "local_source": "sec",
+            "quarterly_derived_flag": 1,
+            "main_eps_quality": "A",
+            "sec_fact": {
+              "concept": "EarningsPerShareDiluted",
+              "unit": "USD/shares",
+              "start": "2016-04-01",
+              "end": "2016-06-30",
+              "durationDays": 90,
+              "form": "10-K",
+              "filed": "2017-09-18",
+              "accession": "0001564590-17-018742",
+              "reportedValue": -0.32,
+              "splitFactor": 1,
+              "value": -0.32,
+              "currency": "USD",
+              "grade": "A",
+              "method": "direct-sec-companyfacts",
+              "cik": "0001629210",
+              "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001629210.json",
+              "filingUrl": "https://www.sec.gov/Archives/edgar/data/1629210/000156459017018742/",
+              "version": {
+                "accession": "0001564590-17-018742",
+                "filed": "2017-09-18",
+                "form": "10-K"
+              }
+            },
+            "is_main_grade_a": true,
+            "present_in_main_missing_classification": false,
+            "ledger_row_entries": {
+              "blocked": [],
+              "overridden": [],
+              "deferred": []
+            },
+            "ledger_verifiedA_aggregate": 5009,
+            "ledger_has_per_row_verifiedA_list": false
+          },
+          "financials_path": "docs/report/financials/PZG.json",
+          "financials_sha256": "6e40d52bef5190ce2842338e964ea7538ff050dac0ac2d3217b61a99ddfb2a71",
+          "split_adjusted": false,
+          "split_events": [],
+          "existing_quality_level": "partial"
+        },
+        {
+          "ticker": "PZG",
+          "company_name": "Paramount Gold Nevada Corp.",
+          "cik": "0001629210",
+          "sic": 1000,
+          "sic_description": "Metal Mining",
+          "fy": 2019,
+          "q4_end": "2019-06-30",
+          "existing_q4_eps_diluted": -0.09,
+          "existing_q4_source": "sec",
+          "quarterly_derived_flag": 1,
+          "main_grade_a_audit": {
+            "ticker": "PZG",
+            "fy": 2019,
+            "q4_end": "2019-06-30",
+            "local_eps_diluted": -0.09,
+            "local_source": "sec",
+            "quarterly_derived_flag": 1,
+            "main_eps_quality": "A",
+            "sec_fact": {
+              "concept": "EarningsPerShareDiluted",
+              "unit": "USD/shares",
+              "start": "2019-04-01",
+              "end": "2019-06-30",
+              "durationDays": 90,
+              "form": "10-K",
+              "filed": "2019-09-16",
+              "accession": "0001564590-19-034803",
+              "reportedValue": -0.09,
+              "splitFactor": 1,
+              "value": -0.09,
+              "currency": "USD",
+              "grade": "A",
+              "method": "direct-sec-companyfacts",
+              "cik": "0001629210",
+              "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001629210.json",
+              "filingUrl": "https://www.sec.gov/Archives/edgar/data/1629210/000156459019034803/",
+              "version": {
+                "accession": "0001564590-19-034803",
+                "filed": "2019-09-16",
+                "form": "10-K"
+              }
+            },
+            "is_main_grade_a": true,
+            "present_in_main_missing_classification": false,
+            "ledger_row_entries": {
+              "blocked": [],
+              "overridden": [],
+              "deferred": []
+            },
+            "ledger_verifiedA_aggregate": 5009,
+            "ledger_has_per_row_verifiedA_list": false
+          },
+          "financials_path": "docs/report/financials/PZG.json",
+          "financials_sha256": "6e40d52bef5190ce2842338e964ea7538ff050dac0ac2d3217b61a99ddfb2a71",
+          "split_adjusted": false,
+          "split_events": [],
+          "existing_quality_level": "partial"
+        }
+      ]
+    },
+    {
+      "ticker": "PTN",
+      "cik": "0000911216",
+      "company_name": "PALATIN TECHNOLOGIES INC",
+      "sic": 2834,
+      "sic_description": "Pharmaceutical Preparations",
+      "median_2019_2025_sec_revenue_proxy": 1468457,
+      "sample_role": "positive_control_grade_a",
+      "missing_reason": null,
+      "historical_grade_a_status": "confirmed by main epsQuality A plus a row-level SEC Q4 fact; ledger has no accepted-row list and no mutation entry",
+      "selection_rule": "main Grade A Q4 fact; smallest revenue proxy, then fixed seed, with SIC diversity",
+      "periods": [
+        {
+          "ticker": "PTN",
+          "company_name": "PALATIN TECHNOLOGIES INC",
+          "cik": "0000911216",
+          "sic": 2834,
+          "sic_description": "Pharmaceutical Preparations",
+          "fy": 2018,
+          "q4_end": "2018-06-30",
+          "existing_q4_eps_diluted": 75.0,
+          "existing_q4_source": "sec",
+          "quarterly_derived_flag": 1,
+          "main_grade_a_audit": {
+            "ticker": "PTN",
+            "fy": 2018,
+            "q4_end": "2018-06-30",
+            "local_eps_diluted": 75.0,
+            "local_source": "sec",
+            "quarterly_derived_flag": 1,
+            "main_eps_quality": "A",
+            "sec_fact": {
+              "concept": "EarningsPerShareDiluted",
+              "unit": "USD/shares",
+              "start": "2018-04-01",
+              "end": "2018-06-30",
+              "durationDays": 90,
+              "form": "10-K",
+              "filed": "2019-09-12",
+              "accession": "0001654954-19-010679",
+              "reportedValue": 0.06,
+              "splitFactor": 0.0008,
+              "value": 75.0,
+              "currency": "USD",
+              "grade": "A",
+              "method": "direct-sec-companyfacts",
+              "cik": "0000911216",
+              "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000911216.json",
+              "filingUrl": "https://www.sec.gov/Archives/edgar/data/911216/000165495419010679/",
+              "version": {
+                "accession": "0001654954-19-010679",
+                "filed": "2019-09-12",
+                "form": "10-K"
+              }
+            },
+            "is_main_grade_a": true,
+            "present_in_main_missing_classification": false,
+            "ledger_row_entries": {
+              "blocked": [],
+              "overridden": [],
+              "deferred": []
+            },
+            "ledger_verifiedA_aggregate": 5009,
+            "ledger_has_per_row_verifiedA_list": false
+          },
+          "financials_path": "docs/report/financials/PTN.json",
+          "financials_sha256": "6f2beabfb7befa34894c438767c4658dea10033657acdce56e9ac5d957f52651",
+          "split_adjusted": true,
+          "split_events": [
+            [
+              "2010-09-27",
+              0.1
+            ],
+            [
+              "2022-08-31",
+              0.04
+            ],
+            [
+              "2025-08-12",
+              0.02
+            ]
+          ],
+          "existing_quality_level": "good"
+        },
+        {
+          "ticker": "PTN",
+          "company_name": "PALATIN TECHNOLOGIES INC",
+          "cik": "0000911216",
+          "sic": 2834,
+          "sic_description": "Pharmaceutical Preparations",
+          "fy": 2019,
+          "q4_end": "2019-06-30",
+          "existing_q4_eps_diluted": 287.5,
+          "existing_q4_source": "sec",
+          "quarterly_derived_flag": 1,
+          "main_grade_a_audit": {
+            "ticker": "PTN",
+            "fy": 2019,
+            "q4_end": "2019-06-30",
+            "local_eps_diluted": 287.5,
+            "local_source": "sec",
+            "quarterly_derived_flag": 1,
+            "main_eps_quality": "A",
+            "sec_fact": {
+              "concept": "EarningsPerShareDiluted",
+              "unit": "USD/shares",
+              "start": "2019-04-01",
+              "end": "2019-06-30",
+              "durationDays": 90,
+              "form": "10-K",
+              "filed": "2020-09-25",
+              "accession": "0001654954-20-010471",
+              "reportedValue": 0.23,
+              "splitFactor": 0.0008,
+              "value": 287.5,
+              "currency": "USD",
+              "grade": "A",
+              "method": "direct-sec-companyfacts",
+              "cik": "0000911216",
+              "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000911216.json",
+              "filingUrl": "https://www.sec.gov/Archives/edgar/data/911216/000165495420010471/",
+              "version": {
+                "accession": "0001654954-20-010471",
+                "filed": "2020-09-25",
+                "form": "10-K"
+              }
+            },
+            "is_main_grade_a": true,
+            "present_in_main_missing_classification": false,
+            "ledger_row_entries": {
+              "blocked": [],
+              "overridden": [],
+              "deferred": []
+            },
+            "ledger_verifiedA_aggregate": 5009,
+            "ledger_has_per_row_verifiedA_list": false
+          },
+          "financials_path": "docs/report/financials/PTN.json",
+          "financials_sha256": "6f2beabfb7befa34894c438767c4658dea10033657acdce56e9ac5d957f52651",
+          "split_adjusted": true,
+          "split_events": [
+            [
+              "2010-09-27",
+              0.1
+            ],
+            [
+              "2022-08-31",
+              0.04
+            ],
+            [
+              "2025-08-12",
+              0.02
+            ]
+          ],
+          "existing_quality_level": "good"
+        }
+      ]
+    }
+  ],
+  "freeze_note": "This revision is selected from main's persisted missing-classification report before any SEC request for newly selected periods. Existing SEC findings for retained ticker-periods remain unchanged; no selector replacement is based on SEC outcomes.",
+  "freeze_sha256": "89dcb33135d2abbb0297617bed371233d20b3341a1419504ae6768e36d58caa2"
+}

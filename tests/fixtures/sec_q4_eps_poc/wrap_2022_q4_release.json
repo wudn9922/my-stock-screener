@@ -1,0 +1,33 @@
+{
+  "ticker": "WRAP",
+  "company_name": "Wrap Technologies, Inc.",
+  "cik": "0001702924",
+  "accession": "0001437749-23-005259",
+  "filing_date": "2023-03-03",
+  "form": "8-K EX-99.1",
+  "primary_document_url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923005259/wrap20230302_8k.htm",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/1702924/000143774923005259/ex_483215.htm",
+  "primary_link_excerpt": "<a href=\"ex_483215.htm\">Earnings Release dated March 1, 2023</a>",
+  "q4_start": "2022-10-01",
+  "q4_end": "2022-12-31",
+  "eps": -0.09,
+  "measure_label": "Net loss per basic and diluted common share",
+  "statement_scope": "Unaudited consolidated Statements of Operations",
+  "source_html_excerpt": "<html><body><table><tr><td colspan=\"2\">Three Months Ended December 31,</td><td colspan=\"2\">Twelve Months Ended December 31,</td></tr><tr><td>2022</td><td>2021</td><td>2022</td><td>2021</td></tr><tr><td>Net loss per basic and diluted common share</td><td>$(0.09)</td><td>$(0.13)</td><td>$(0.43)</td><td>$(0.62)</td></tr></table></body></html>",
+  "period_columns": [
+    {"start": "2022-10-01", "end": "2022-12-31", "duration": "three months", "fiscal_label": "Q4 2022"},
+    {"start": "2021-10-01", "end": "2021-12-31", "duration": "three months", "fiscal_label": "Q4 2021"},
+    {"start": "2022-01-01", "end": "2022-12-31", "duration": "twelve months", "fiscal_label": "FY2022"},
+    {"start": "2021-01-01", "end": "2021-12-31", "duration": "twelve months", "fiscal_label": "FY2021"}
+  ],
+  "row_values": ["(0.09)", "(0.13)", "(0.43)", "(0.62)"],
+  "evidence_excerpt": "Consolidated Statements of Operations. Three Months Ended December 31, Twelve Months Ended December 31, 2022 2021 2022 2021. Net loss per basic and diluted common share $(0.09) $(0.13) $(0.43) $(0.62).",
+  "gaap_statement_basis_verified": true,
+  "consolidated_scope_verified": true,
+  "share_class": "common",
+  "split_events_after_q4": [],
+  "split_review_complete": true,
+  "split_adjustment_applied": false,
+  "same_period_database_value": null,
+  "database_comparison": "No same-period local Q4 EPS value exists; not comparable."
+}
