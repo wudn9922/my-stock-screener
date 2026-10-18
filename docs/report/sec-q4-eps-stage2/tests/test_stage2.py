@@ -191,10 +191,11 @@ class ExtractionFailureTests(unittest.TestCase):
 
 class RequestGuardTests(unittest.TestCase):
     def test_hard_cap_blocks_before_any_wire_request(self):
-        guard = stage2.GuardedOpener(cap=0)
-        with self.assertRaises(stage2.RequestCapReached):
-            guard(None)
-        self.assertEqual(guard.attempts, 0)
+        with tempfile.TemporaryDirectory() as temporary:
+            guard = stage2.GuardedOpener(cap=0, ledger_path=Path(temporary) / "ledger.jsonl")
+            with self.assertRaises(stage2.RequestCapReached):
+                guard(None)
+            self.assertEqual(guard.attempts, 0)
 
     def test_first_403_is_recorded_and_stops_immediately(self):
         class FakeOpener:

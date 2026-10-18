@@ -1285,28 +1285,56 @@ def render_report():
     classes = sorted({row.get("classification_class") for row in missing if row.get("classification_class")})
     years = sorted({row.get("period_end_year") for row in missing if row.get("period_end_year")})
     class_rows = []
+    mapping_reason = "same-FY SEC 10-K report end could not be mapped from submissions"
     for klass in classes:
         group = [row for row in missing if row.get("classification_class") == klass]
         verified = sum(row.get("status") == "A_verified_direct_q4_eps" for row in group)
         excluded = sum(row.get("status") == "skipped_fiscal_period_mismatch" for row in group)
-        class_rows.append(f"| `{klass}` | {len(group)} | {len(group)-excluded} | {excluded} | {verified} |")
+        unresolved_mapping = sum(row.get("status") == "E_technical_failure"
+                                 and row.get("technical_reason") == mapping_reason for row in group)
+        candidate = sum(row.get("status") == "B_candidate_needs_verification" for row in group)
+        derived = sum(row.get("status") == "C_derived_only" for row in group)
+        no_direct = sum(row.get("status") == "D_no_direct_disclosure_found" for row in group)
+        technical = sum(row.get("status") == "E_technical_failure" for row in group)
+        class_rows.append(
+            f"| `{klass}` | {len(group)} | {len(group)-excluded} | {excluded} | {unresolved_mapping} | {verified} | {candidate} | {derived} | {no_direct} | {technical} |"
+        )
     year_rows = []
     for year in years:
         group = [row for row in missing if row.get("period_end_year") == year]
         verified = sum(row.get("status") == "A_verified_direct_q4_eps" for row in group)
         excluded = sum(row.get("status") == "skipped_fiscal_period_mismatch" for row in group)
-        year_rows.append(f"| {year} | {len(group)} | {len(group)-excluded} | {excluded} | {verified} |")
+        unresolved_mapping = sum(row.get("status") == "E_technical_failure"
+                                 and row.get("technical_reason") == mapping_reason for row in group)
+        candidate = sum(row.get("status") == "B_candidate_needs_verification" for row in group)
+        derived = sum(row.get("status") == "C_derived_only" for row in group)
+        no_direct = sum(row.get("status") == "D_no_direct_disclosure_found" for row in group)
+        technical = sum(row.get("status") == "E_technical_failure" for row in group)
+        year_rows.append(
+            f"| {year} | {len(group)} | {len(group)-excluded} | {excluded} | {unresolved_mapping} | {verified} | {candidate} | {derived} | {no_direct} | {technical} |"
+        )
     mismatch_rows = [
         f"| {row.get('sample_role')} | {row.get('symbol')} | {row.get('class') or 'control'} | FY{row.get('fy')} | {row.get('local_q4_end')} | {row.get('same_fy_sec_10k_report_end')} |"
         for row in extraction.get("skipped_fiscal_period_mismatches", [])
     ]
     source_counts = {}
     for source in ("8-K/8-K-A", "10-K/10-K-A"):
-        accepted = [row for row in results if row.get("accepted_source") == source]
+        accepted = [row for row in missing
+                    if row.get("status") == "A_verified_direct_q4_eps" and row.get("accepted_source") == source]
         source_counts[source] = len(accepted)
+    control_source_counts = {
+        source: sum(row.get("status") == "A_verified_direct_q4_eps" and row.get("accepted_source") == source
+                    for row in controls)
+        for source in ("8-K/8-K-A", "10-K/10-K-A")
+    }
     missing_den = len(missing)
     verified_total = sum(row.get("status") == "A_verified_direct_q4_eps" for row in missing)
-    eligible_den = sum(row.get("status") != "skipped_fiscal_period_mismatch" for row in missing)
+    not_skipped_den = sum(row.get("status") != "skipped_fiscal_period_mismatch" for row in missing)
+    missing_mapping_count = sum(row.get("status") == "E_technical_failure"
+                                and row.get("technical_reason") == mapping_reason for row in missing)
+    control_mismatch_count = sum(row.get("status") == "skipped_fiscal_period_mismatch" for row in controls)
+    control_mapping_count = sum(row.get("status") == "E_technical_failure"
+                                and row.get("technical_reason") == mapping_reason for row in controls)
     metrics = extraction.get("metrics") or {}
     cmp = comparison.get("metrics") or {}
     content = [
@@ -1318,21 +1346,21 @@ def render_report():
         "",
         "## Missing-period yield by class",
         "",
-        "| Main class | Sampled periods | Eligible after fiscal-end check | Skipped mismatch | Verified direct Q4 EPS |",
-        "|---|---:|---:|---:|---:|",
+        "| Main class | Sampled periods | Not skipped (includes unresolved mapping) | Skipped mismatch | SEC 10-K end mapping unresolved (subset) | A: verified direct | B: candidate | C: derived only | D: no direct found | E: technical/incomplete |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         *class_rows,
         "",
         "## Missing-period yield by period-end year",
         "",
-        "| Period-end year | Sampled periods | Eligible after fiscal-end check | Skipped mismatch | Verified direct Q4 EPS |",
-        "|---:|---:|---:|---:|---:|",
+        "| Period-end year | Sampled periods | Not skipped (includes unresolved mapping) | Skipped mismatch | SEC 10-K end mapping unresolved (subset) | A: verified direct | B: candidate | C: derived only | D: no direct found | E: technical/incomplete |",
+        "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         *year_rows,
         "",
-        f"Verified direct values: **{verified_total}/{missing_den} sampled missing periods ({verified_total/missing_den:.1%})**; excluding {missing_den-eligible_den} fiscal-end mismatches, **{verified_total}/{eligible_den} eligible periods ({verified_total/eligible_den:.1%})**." if missing_den and eligible_den else "Verified direct values: denominator unavailable.",
+        f"Verified direct values: **{verified_total}/{missing_den} sampled missing periods ({verified_total/missing_den:.1%})**. {missing_den-not_skipped_den} were skipped for a confirmed fiscal-end mismatch; {missing_mapping_count} of the {not_skipped_den} not skipped remain E because the same-FY SEC 10-K report end could not be mapped. These mapping-incomplete periods are not evidence of no disclosure." if missing_den else "Verified direct values: denominator unavailable.",
         "",
         "## Control-set comparison",
         "",
-        f"Controls selected: {len(controls)}. SEC extraction accepted {cmp.get('accepted', 0)} direct values; {cmp.get('correct', 0)} matched the answer set within ±0.005; {cmp.get('sign_errors', 0)} sign errors; {cmp.get('unverifiable', 0)} not comparable because the extraction was not verified direct.",
+        f"Controls selected: {len(controls)}. SEC extraction accepted {cmp.get('accepted', 0)} direct values; {cmp.get('correct', 0)} matched the answer set within ±0.005; {cmp.get('sign_errors', 0)} sign errors; {cmp.get('unverifiable', 0)} not comparable because the extraction was not verified direct, including {control_mismatch_count} fiscal-end mismatch skip(s) and {control_mapping_count} unresolved SEC 10-K report-end mapping row(s).",
         f"Accuracy among accepted controls: {cmp.get('accuracy_among_accepted', 'n/a')}.",
         "",
         "## Source contribution",
@@ -1342,6 +1370,8 @@ def render_report():
         f"| 8-K/8-K-A results exhibits (EX-99.1 preferred) | {source_counts['8-K/8-K-A']} |",
         f"| 10-K/10-K-A fallback | {source_counts['10-K/10-K-A']} |",
         "| Cumulative unique periods | " + str(verified_total) + " |",
+        "",
+        f"Positive controls with a verified direct value by source: 8-K/8-K-A **{control_source_counts['8-K/8-K-A']}**; 10-K/10-K-A **{control_source_counts['10-K/10-K-A']}**.",
         "",
         "## Fiscal-period mismatches skipped",
         "",
