@@ -10,14 +10,20 @@ Network use: one GET per distinct symbol to https://api.polygon.io/vX/reference/
 12 seconds, retries included). The key is read from POLYGON_API_KEY, sent only as the apiKey query parameter to
 api.polygon.io, and never printed.
 
-Symbols: the distinct symbols of the missing rows come first, then the symbols of the agreement sets that the missing
-rows do not cover. Agreement sets, all from docs/report/financials (market "US"):
-- b: grade-A Q4 rows (quarterly.epsQuality[i].epsDiluted == "A") with a repo value;
-- a: SEC Q1-Q3 rows (src == "sec", derived != 1) with a repo value;
-- ad: the derived == 1 subset of SEC Q1-Q3 rows, measured the same way.
+Symbols: the distinct symbols of the missing rows come first. Set b (grade-A Q4 rows, quarterly.epsQuality[i].epsDiluted
+== "A") also adds the symbols it covers that have no missing row. Sets a and ad (SEC Q1-Q3 rows, src == "sec"; ad is
+derived == 1, a is derived != 1) are measured only on symbols that have missing rows. All sets come from
+docs/report/financials (market "US").
+
+Split policy: repo values are split-adjusted and Polygon's as-reported values are not, so a row whose period end is
+before a split is flagged split_after_end. Set b is judged on the rows without a split; the split rows are reported
+apart. The gate counts covered, testable rows that differ from the subtraction and have no split after the end.
+
+Tickers: Polygon writes share classes with a dot (BRK-B is requested as BRK.B). Keys and file names keep the repo symbol.
 
 Output: a report of counts, (symbol, end) keys and flags. Polygon values stay in memory during a run. The checkpoint
-keeps flags only, so no EPS value is written to the report, the log or the checkpoint.
+keeps flags only, so no EPS value is written to the report, the log or the checkpoint. The workflow commits the report
+to the runs branch; --check-commit-paths refuses any path outside that run's directory or a protected path.
 
 Unverified: the Polygon path and field names (vX/reference/financials, timeframe, limit, next_url, end_date,
 fiscal_period, filing_date, source_filing_url, financials.income_statement.diluted_earnings_per_share.value). The
@@ -105,6 +111,11 @@ class CheckpointMismatch(ProbeError):
 
 def tolerance(reference):
     return max(ABS_TOL, REL_TOL * abs(reference))
+
+
+def polygon_ticker(symbol):
+    """Polygon writes share classes with a dot (BRK-B is BRK.B). Keys and file names keep the repo symbol."""
+    return symbol.replace("-", ".")
 
 
 def agrees(value, reference):
@@ -250,7 +261,7 @@ def _at(column, i):
     return column[i] if i < len(column) else None
 
 
-def symbol_keys(symbol, doc, missing_rows):
+def symbol_keys(symbol, doc, missing_rows, with_a_sets=True):
     q = doc.get("quarterly") or {}
     ends, fqs, fys = q.get("end") or [], q.get("fq") or [], q.get("fy") or []
     srcs, derived, quals = q.get("src") or [], q.get("derived") or [], q.get("epsQuality") or []
@@ -296,7 +307,7 @@ def symbol_keys(symbol, doc, missing_rows):
         end = date.fromisoformat(ends[i])
         fq = fqs[i]
         value = _at(eps, i)
-        if fq in (1, 2, 3) and _at(srcs, i) == "sec" and value is not None:
+        if with_a_sets and fq in (1, 2, 3) and _at(srcs, i) == "sec" and value is not None:
             group = "ad" if _at(derived, i) == 1 else "a"
             keys.append(Key(group, symbol, end, fq, _at(fys, i), None, value, None, split_after(end)))
         qual = _at(quals, i)
@@ -318,7 +329,7 @@ def build_plan(classification_path, financials_dir):
         symbol = path.stem
         if doc.get("symbol") != symbol:
             raise ProbeError(f"{path.name}: symbol field differs from the file name")
-        found = symbol_keys(symbol, doc, missing.get(symbol, []))
+        found = symbol_keys(symbol, doc, missing.get(symbol, []), with_a_sets=symbol in missing)
         names = [k.name for k in found]
         if len(set(names)) != len(names):
             raise ProbeError(f"{symbol}: two keys share a group, quarter and end")
@@ -477,7 +488,7 @@ class NetworkSource:
                                         urllib.parse.urlencode(query), ""))
 
     def fetch(self, symbol):
-        url = ENDPOINT + "?" + urllib.parse.urlencode({"ticker": symbol, "timeframe": TIMEFRAME,
+        url = ENDPOINT + "?" + urllib.parse.urlencode({"ticker": polygon_ticker(symbol), "timeframe": TIMEFRAME,
                                                        "limit": LIMIT, "apiKey": self._key})
         pages = []
         for _ in range(MAX_PAGES):
@@ -587,6 +598,7 @@ def _finish_measure(m):
 def aggregate(plan, done, input_sha, status, stop_reason):
     planned = Counter()
     planned_by_class, planned_by_fy, testable_planned_by_class = Counter(), Counter(), Counter()
+    planned_b_split = 0
     for symbol in plan.symbols:
         for key in plan.keys[symbol]:
             planned[key.group] += 1
@@ -595,13 +607,16 @@ def aggregate(plan, done, input_sha, status, stop_reason):
                 planned_by_fy[str(key.fy)] += 1
                 if key.subtraction is not None:
                     testable_planned_by_class[key.cls] += 1
+            elif key.group == "b" and key.split_after_end:
+                planned_b_split += 1
     run_by_class, covered_by_class = Counter(), Counter()
     reported_by_class, derived_by_class, covered_by_fy = Counter(), Counter(), Counter()
     status_counts, testable_covered_by_class, equal_by_class = Counter(), Counter(), Counter()
     derived_arithmetic = derived_form = before_window = 0
-    testable_covered = equal = covered_not_testable = not_equal_split_free = 0
-    measures = {"b": _new_measure(planned["b"]), "a": _new_measure(planned["a"]),
-                "ad": _new_measure(planned["ad"])}
+    testable_covered = equal = covered_not_testable = 0
+    not_equal_split_rows = 0
+    measures = {"b": _new_measure(planned["b"] - planned_b_split), "bs": _new_measure(planned_b_split),
+                "a": _new_measure(planned["a"]), "ad": _new_measure(planned["ad"])}
     rows = []
     symbols_done = no_data = records = no_eps = skipped = 0
     for symbol in plan.symbols:
@@ -644,26 +659,28 @@ def aggregate(plan, done, input_sha, status, stop_reason):
                     if flags["equal_subtraction"]:
                         equal += 1
                         equal_by_class[key.cls] += 1
-                    elif not key.split_after_end:
-                        not_equal_split_free += 1
+                    elif key.split_after_end:
+                        not_equal_split_rows += 1
+                continue
+            name = ("bs" if key.split_after_end else "b") if key.group == "b" else key.group
+            measure = measures[name]
+            measure["run"] += 1
+            if not covered:
+                continue
+            measure["compared"] += 1
+            if flags["agree"]:
+                measure["agreements"] += 1
             else:
-                measure = measures[key.group]
-                measure["run"] += 1
-                if not covered:
-                    continue
-                measure["compared"] += 1
-                if flags["agree"]:
-                    measure["agreements"] += 1
-                else:
-                    measure["disagreements"] += 1
-                measure["sign_errors"] += bool(flags["sign_error"])
-                if key.split_after_end:
-                    measure["split_after_end_compared"] += 1
-                    if not flags["agree"]:
-                        measure["split_after_end_disagreements"] += 1
+                measure["disagreements"] += 1
+            measure["sign_errors"] += bool(flags["sign_error"])
+            if key.split_after_end:
+                measure["split_after_end_compared"] += 1
+                if not flags["agree"]:
+                    measure["split_after_end_disagreements"] += 1
     rows.sort(key=lambda r: (r["symbol"], r["end"]))
     run_total = sum(run_by_class.values())
-    gate_count = testable_covered - equal
+    not_equal_all = testable_covered - equal
+    gate_count = not_equal_all - not_equal_split_rows
     return {
         "schema": REPORT_SCHEMA,
         "status": status,
@@ -677,7 +694,7 @@ def aggregate(plan, done, input_sha, status, stop_reason):
             "agreement_only": len(plan.symbols) - len(plan.missing_symbols),
             "done": symbols_done,
             "no_data": no_data,
-            "with_hyphen": sum(1 for s in plan.symbols if "-" in s),
+            "hyphen_mapped_to_dot": sum(1 for s in plan.symbols if polygon_ticker(s) != s),
         },
         "records": {"returned_quarterly": records, "without_eps": no_eps, "non_quarterly_skipped": skipped},
         "missing_rows": {
@@ -702,8 +719,9 @@ def aggregate(plan, done, input_sha, status, stop_reason):
             "not_testable_total": planned["m"] - sum(testable_planned_by_class.values()),
             "testable_covered": testable_covered,
             "equal_to_subtraction": equal,
-            "covered_not_equal_subtraction": testable_covered - equal,
-            "covered_not_equal_subtraction_no_split_after_end": not_equal_split_free,
+            "covered_not_equal_subtraction": not_equal_all,
+            "covered_not_equal_subtraction_split_after_end": not_equal_split_rows,
+            "covered_not_equal_subtraction_no_split_after_end": gate_count,
             "covered_not_testable": covered_not_testable,
             "by_class": {c: {"testable_total": testable_planned_by_class[c],
                              "not_testable": planned_by_class[c] - testable_planned_by_class[c],
@@ -711,14 +729,34 @@ def aggregate(plan, done, input_sha, status, stop_reason):
                              "equal": equal_by_class[c]} for c in CLASS_ORDER},
         },
         "agreement": {
-            "b_grade_a_q4": _finish_measure(measures["b"]),
+            "b_grade_a_q4_no_split_after_end": _finish_measure(measures["b"]),
+            "b_grade_a_q4_split_after_end": _finish_measure(measures["bs"]),
             "a_sec_q1_q3_not_derived": _finish_measure(measures["a"]),
             "a_sec_q1_q3_derived_subset": _finish_measure(measures["ad"]),
         },
-        "gate": {"threshold": GATE_THRESHOLD, "covered_not_equal_subtraction": gate_count,
+        "gate": {"threshold": GATE_THRESHOLD, "covered_not_equal_subtraction_no_split_after_end": gate_count,
                  "met": gate_count >= GATE_THRESHOLD, "complete": status == "complete"},
         "rows": rows,
     }
+
+
+PROTECTED_PREFIXES = ("docs/report/financials/", "docs/report/fundamentals/", "docs/report/q4-8k/",
+                      ".github/", "atlas/", "tests/", "supabase/")
+PROTECTED_NAMES = re.compile(r"(^|/)(growth\.json|answer-set\.json|q4-eps-[^/]*\.json)$")
+
+
+def refused_commit_paths(paths, dest):
+    """Paths that must not be committed: anything outside dest/, anything with a parent reference, and any protected
+    path. Returns the refused paths in input order; an empty list means the commit may proceed."""
+    refused = []
+    for path in paths:
+        if not path:
+            continue
+        inside = path.startswith(dest.rstrip("/") + "/") and ".." not in path.split("/")
+        protected = any(path.startswith(prefix) for prefix in PROTECTED_PREFIXES) or PROTECTED_NAMES.search(path)
+        if not inside or protected:
+            refused.append(path)
+    return refused
 
 
 def write_report(path, report):
@@ -798,6 +836,8 @@ def _scrub(text, secret):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Polygon.io Q4 EPS probe (read-only).")
+    parser.add_argument("--check-commit-paths", metavar="DEST", default=None,
+                        help="read staged paths on stdin; exit 1 if any is outside DEST/ or protected")
     default_tmp = Path(os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()) / "polygon-probe"
     parser.add_argument("--classification", default=str(DEFAULT_CLASSIFICATION))
     parser.add_argument("--financials-dir", default=str(DEFAULT_FINANCIALS_DIR))
@@ -808,6 +848,12 @@ def main(argv=None):
     parser.add_argument("--fresh", action="store_true", help="ignore and replace an existing checkpoint")
     parser.add_argument("--replay-dir", default=None, help="offline: read saved responses instead of calling Polygon")
     args = parser.parse_args(argv)
+    if args.check_commit_paths is not None:
+        paths = [line.strip() for line in sys.stdin if line.strip()]
+        refused = refused_commit_paths(paths, args.check_commit_paths)
+        for path in refused:
+            print(f"refused: {path}", file=sys.stderr)
+        return 1 if refused else 0
 
     log = RunLog(args.log, echo=True)
     secret = ""

@@ -2,6 +2,7 @@
 Run: python3 -m unittest discover -s tests -p "test_probe_polygon_q4.py" -v
 """
 import ast
+import io
 import json
 import os
 import re
@@ -400,6 +401,12 @@ class RetryTests(unittest.TestCase):
         self.assertNotIn(FAKE_KEY, str(caught.exception))
         self.assertEqual(caught.exception.exit_code, 2)
 
+    def test_forbidden_plan_stops_at_once(self):
+        source, opener, _ = self.make([http_error(403)])
+        with self.assertRaises(probe.KeyRejected):
+            source.fetch("AAA")
+        self.assertEqual(len(opener.urls), 1)
+
     def test_key_is_sent_to_api_host_only(self):
         source, opener, _ = self.make([ok({"results": [], "next_url": "https://evil.example/next?cursor=1"})])
         with self.assertRaises(probe.SchemaMismatch):
@@ -422,7 +429,7 @@ class RetryTests(unittest.TestCase):
         source, opener, _ = self.make([ok({"results": []})])
         source.fetch("BRK-B")
         query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(opener.urls[0]).query))
-        self.assertEqual(query["ticker"], "BRK-B")
+        self.assertEqual(query["ticker"], "BRK.B")
         self.assertEqual(query["timeframe"], "quarterly")
         self.assertEqual(query["limit"], str(probe.LIMIT))
         self.assertGreaterEqual(int(query["limit"]), 70)
@@ -500,8 +507,9 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(report["missing_rows"]["covered"], 1)
         self.assertEqual(report["subtraction"]["equal_to_subtraction"], 1)
         self.assertEqual(report["subtraction"]["covered_not_equal_subtraction"], 0)
-        self.assertEqual(report["agreement"]["b_grade_a_q4"]["compared"], 1)
-        self.assertEqual(report["agreement"]["b_grade_a_q4"]["agreements"], 1)
+        self.assertEqual(report["agreement"]["b_grade_a_q4_no_split_after_end"]["compared"], 1)
+        self.assertEqual(report["agreement"]["b_grade_a_q4_no_split_after_end"]["agreements"], 1)
+        self.assertEqual(report["agreement"]["b_grade_a_q4_split_after_end"]["rows_in_set"], 0)
         self.assertEqual(report["records"]["non_quarterly_skipped"], 1)
         self.assertEqual(report["symbols"]["planned_with_missing_rows"], 1)
 
@@ -621,7 +629,113 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(plan.symbols[1], "BBB")
 
 
-# ---------------------------------------------------------------- script and workflow shape
+class PlanScopeTests(unittest.TestCase):
+    def test_only_set_b_adds_symbols_outside_the_missing_rows(self):
+        docs, rows = standard_repo()
+        ccc = repo_doc("CCC", [(2019, 1, 1.0, "sec", None, None), (2019, 2, 1.0, "sec", 1, None)], [(2019, 4.0)])
+        ddd = repo_doc("DDD", [(2019, 1, 1.0, "sec", None, None), (2019, 2, 1.0, "sec", None, None),
+                               (2019, 3, 1.0, "sec", None, None), (2019, 4, 1.5, "sec", None, "A")], [(2019, 4.0)])
+        with tempfile.TemporaryDirectory() as tmp:
+            classification, fin = write_repo(tmp, docs + [ccc, ddd], rows)
+            plan = probe.build_plan(classification, fin)
+        self.assertEqual(plan.symbols, ["AAA", "BBB", "DDD"])  # BBB carries a grade-A Q4 row; CCC has set a only
+        self.assertNotIn("CCC", plan.keys)
+        self.assertEqual({k.group for k in plan.keys["DDD"]}, {"b"})
+        self.assertEqual({k.group for k in plan.keys["AAA"]}, {"m", "a"})
+        self.assertEqual({k.group for k in plan.keys["BBB"]}, {"b"})
+
+
+class SplitAndGateTests(unittest.TestCase):
+    def aggregate_fixture(self):
+        def m(end, fy, subtraction, split=False):
+            return probe.Key("m", "AAA", date.fromisoformat(end), 4, fy, "derivation-rejected", None,
+                             subtraction, split)
+
+        def b(end, fy, reference, split=False):
+            return probe.Key("b", "BBB", date.fromisoformat(end), 4, fy, None, reference, None, split)
+
+        aaa_keys = [m("2019-12-31", 2019, 1.0),                 # covered, equal to subtraction
+                    m("2018-12-31", 2018, 1.0),                 # covered, not equal, no split: the gate row
+                    m("2017-12-31", 2017, 1.0, split=True),     # covered, not equal, split: reported apart
+                    m("2016-12-31", 2016, None)]                # covered, not testable
+        bbb_keys = [b("2019-12-31", 2019, 1.5),                 # agrees, no split
+                    b("2018-12-31", 2018, 1.5, split=True)]     # disagrees and flips sign, split
+        aaa_records = [probe.Record(date(2019, 12, 31), "Q4", 1.0, "2020-02-01", ""),
+                       probe.Record(date(2018, 12, 31), "Q4", 1.5, "2019-02-01", ""),
+                       probe.Record(date(2017, 12, 31), "Q4", 1.5, "2018-02-01", ""),
+                       probe.Record(date(2016, 12, 31), "Q4", 2.0, "2017-02-01", "")]
+        bbb_records = [probe.Record(date(2019, 12, 31), "Q4", 1.5, "2020-02-01", ""),
+                       probe.Record(date(2018, 12, 31), "Q4", -1.5, "2019-02-01", "")]
+        plan = probe.Plan(symbols=["AAA", "BBB"], keys={"AAA": aaa_keys, "BBB": bbb_keys},
+                          missing_symbols=["AAA"], missing_rows=4)
+        done = {}
+        for symbol, keys, records in (("AAA", aaa_keys, aaa_records), ("BBB", bbb_keys, bbb_records)):
+            done[symbol] = {"records": len(records), "no_eps": 0, "skipped": 0,
+                            "keys": probe.evaluate_symbol(keys, records)}
+        return probe.aggregate(plan, done, "sha", "complete", None)
+
+    def test_gate_excludes_split_rows_and_reports_them_apart(self):
+        report = self.aggregate_fixture()
+        sub = report["subtraction"]
+        self.assertEqual(sub["testable_covered"], 3)
+        self.assertEqual(sub["equal_to_subtraction"], 1)
+        self.assertEqual(sub["covered_not_equal_subtraction"], 2)
+        self.assertEqual(sub["covered_not_equal_subtraction_split_after_end"], 1)
+        self.assertEqual(sub["covered_not_equal_subtraction_no_split_after_end"], 1)
+        self.assertEqual(report["gate"]["covered_not_equal_subtraction_no_split_after_end"], 1)
+        self.assertFalse(report["gate"]["met"])
+
+    def test_set_b_is_judged_without_split_rows(self):
+        report = self.aggregate_fixture()
+        clean = report["agreement"]["b_grade_a_q4_no_split_after_end"]
+        split = report["agreement"]["b_grade_a_q4_split_after_end"]
+        self.assertEqual((clean["rows_in_set"], clean["compared"], clean["agreements"]), (1, 1, 1))
+        self.assertEqual((split["rows_in_set"], split["compared"], split["disagreements"]), (1, 1, 1))
+        self.assertEqual(split["sign_errors"], 1)
+        self.assertEqual(clean["sign_errors"], 0)
+
+    def test_hyphenated_symbols_are_counted_as_mapped(self):
+        plan = probe.Plan(symbols=["BRK-B", "AAPL"], keys={"BRK-B": [], "AAPL": []},
+                          missing_symbols=[], missing_rows=0)
+        report = probe.aggregate(plan, {}, "sha", "partial", None)
+        self.assertEqual(report["symbols"]["hyphen_mapped_to_dot"], 1)
+
+    def test_polygon_ticker_maps_dash_to_dot(self):
+        self.assertEqual(probe.polygon_ticker("BRK-B"), "BRK.B")
+        self.assertEqual(probe.polygon_ticker("TAP-A"), "TAP.A")
+        self.assertEqual(probe.polygon_ticker("AAPL"), "AAPL")
+
+
+class CommitGuardTests(unittest.TestCase):
+    DEST = "docs/report/source-probes/polygon/123"
+
+    def test_report_inside_destination_is_allowed(self):
+        self.assertEqual(probe.refused_commit_paths([self.DEST + "/report.json"], self.DEST), [])
+
+    def test_other_run_directory_is_refused(self):
+        refused = probe.refused_commit_paths(["docs/report/source-probes/polygon/999/report.json"], self.DEST)
+        self.assertEqual(len(refused), 1)
+
+    def test_parent_reference_is_refused(self):
+        self.assertTrue(probe.refused_commit_paths([self.DEST + "/../../../growth.json"], self.DEST))
+
+    def test_protected_paths_are_refused(self):
+        for path in ("docs/report/financials/AAPL.json", "docs/report/fundamentals/x.json",
+                     "docs/report/q4-8k/answer-set.json", "docs/report/growth.json",
+                     "docs/report/q4-eps-missing-classification.json", "atlas/scripts/probe_polygon_q4.py",
+                     ".github/workflows/polygon-probe.yml", "main.py"):
+            self.assertTrue(probe.refused_commit_paths([path], self.DEST), path)
+
+    def test_cli_exit_codes_and_no_key_needed(self):
+        with mock.patch("sys.stdin", io.StringIO(self.DEST + "/report.json\n")), \
+                mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(probe.main(["--check-commit-paths", self.DEST]), 0)
+        with mock.patch("sys.stdin", io.StringIO("docs/report/financials/AAPL.json\n")), \
+                mock.patch("sys.stderr", io.StringIO()):
+            self.assertEqual(probe.main(["--check-commit-paths", self.DEST]), 1)
+
+
+
 
 class ScriptShapeTests(unittest.TestCase):
     def test_script_is_stdlib_only(self):
@@ -647,50 +761,76 @@ class ScriptShapeTests(unittest.TestCase):
 class WorkflowShapeTests(unittest.TestCase):
     def setUp(self):
         self.text = WORKFLOW.read_text(encoding="utf-8")
-        self.lines = self.text.splitlines()
+        self.top = self.text.split("\njobs:", 1)[0]
+        self.probe_job = self.text.split("\njobs:", 1)[1].split("\n  commit:", 1)[0]
+        self.commit_job = self.text.split("\n  commit:", 1)[1]
+
+    def steps(self, job_text):
+        return re.split(r"\n\s*- name:", job_text)
 
     def test_manual_only(self):
         self.assertIn("workflow_dispatch:", self.text)
         self.assertNotIn("schedule:", self.text)
         self.assertNotIn("cron", self.text)
 
-    def test_permissions_are_read_only(self):
-        block = self.text.split("permissions:", 1)[1].split("\nconcurrency:", 1)[0]
+    def test_default_permissions_are_read_only(self):
+        block = self.top.split("permissions:", 1)[1].split("\nconcurrency:", 1)[0]
         self.assertIn("contents: read", block)
         self.assertNotIn("write", block)
-        self.assertEqual(len([ln for ln in block.splitlines() if ":" in ln and ln.startswith("  ")]), 1)
+
+    def test_probe_job_has_no_write_permission(self):
+        self.assertNotIn("permissions:", self.probe_job)
+        self.assertNotIn("contents: write", self.probe_job)
+
+    def test_only_the_commit_job_has_write_access(self):
+        self.assertIn("    permissions:\n      contents: write", self.commit_job)
+        self.assertEqual(sum(1 for ln in self.text.splitlines() if ln.strip() == "contents: write"), 1)
+        self.assertIn("needs: probe", self.commit_job)
 
     def test_no_sec_gov(self):
         self.assertNotIn("sec" + ".gov", self.text.lower())
 
     def test_timeout_and_artifact(self):
-        self.assertIn("timeout-minutes: 330", self.text)
-        self.assertIn("name: polygon-probe", self.text)
-        self.assertIn("if-no-files-found: error", self.text)
-        self.assertNotIn("git push", self.text)
-        self.assertNotIn("git commit", self.text)
+        self.assertIn("timeout-minutes: 330", self.probe_job)
+        self.assertIn("name: polygon-probe", self.probe_job)
+        self.assertIn("if-no-files-found: error", self.probe_job)
+        self.assertNotIn("git push", self.probe_job)
+        self.assertNotIn("git commit", self.probe_job)
 
-    def test_secret_passed_only_as_env_to_the_probe_step(self):
+    def test_secret_passed_only_as_env_to_the_run_step(self):
         self.assertEqual(self.text.count("secrets.POLYGON_API_KEY"), 1)
-        steps = re.split(r"\n\s*- name:", self.text)
-        probe_steps = [s for s in steps if "probe_polygon_q4.py" in s]
-        self.assertEqual(len(probe_steps), 1)
-        step = probe_steps[0]
+        run_steps = [st for st in self.steps(self.probe_job) if "python3 -u atlas/scripts/probe_polygon_q4.py" in st]
+        self.assertEqual(len(run_steps), 1)
+        step = run_steps[0]
         self.assertRegex(step, r"env:\s*\n\s+POLYGON_API_KEY: \$\{\{ secrets\.POLYGON_API_KEY \}\}")
         self.assertLess(step.index("POLYGON_API_KEY: ${{ secrets"), step.index("run:"))
-        for other in steps:
-            if other is not step:
+        for other in self.steps(self.text):
+            if "python3 -u atlas/scripts/probe_polygon_q4.py" not in other:
                 self.assertNotIn("POLYGON_API_KEY", other)
-        for line in self.lines:
+        for line in self.text.splitlines():
             if "echo" in line:
                 self.assertNotIn("POLYGON", line)
 
     def test_uploads_report_and_log_only(self):
-        upload = re.split(r"\n\s*- name:", self.text)
-        upload = [s for s in upload if "upload-artifact" in s][0]
+        upload = [st for st in self.steps(self.probe_job) if "upload-artifact" in st][0]
         self.assertIn("report.json", upload)
         self.assertIn("run.log", upload)
         self.assertNotIn("checkpoint", upload)
+
+    def test_commit_job_commits_report_json_only_to_runs_branch(self):
+        self.assertIn("runs/source-probes", self.commit_job)
+        self.assertIn("docs/report/source-probes/polygon/$RUN_ID", self.commit_job)
+        self.assertIn("--check-commit-paths", self.commit_job)
+        self.assertIn("cp \"$src\" \"$wt/$dest/report.json\"", self.commit_job)
+        self.assertNotIn("POLYGON", self.commit_job)
+        self.assertNotIn("secrets.", self.commit_job)
+        self.assertIn("git push -q origin \"HEAD:refs/heads/$RUNS_BRANCH\"", self.commit_job)
+
+    def test_commit_step_refuses_on_guard_failure(self):
+        guard = [ln for ln in self.commit_job.splitlines() if "--check-commit-paths" in ln][0]
+        self.assertIn("printf", guard)
+        self.assertNotIn("|| true", guard)
+        self.assertIn("set -euo pipefail", self.commit_job)
 
 
 if __name__ == "__main__":
