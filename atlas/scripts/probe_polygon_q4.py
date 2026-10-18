@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Read-only probe: does Polygon.io carry a diluted EPS value for the US Q4 rows that the repo is missing?
+"""Read-only probe: does Massive (formerly Polygon.io) carry diluted EPS for the US Q4 rows the repo is missing?
 
 Offline pieces (unit-tested in tests/test_probe_polygon_q4.py): the row and key plan from the repo files, filing
 matching, labels, tolerances, Wilson bounds, the checkpoint and the report. The network piece is NetworkSource, which
 runs only in .github/workflows/polygon-probe.yml. --replay-dir runs the same pipeline over saved responses, offline.
 
-Network use: one GET per distinct symbol to https://api.polygon.io/vX/reference/financials with ticker, timeframe
-"quarterly" and limit 100, plus next_url when Polygon returns one. At most 5 requests per minute (one request every
-12 seconds, retries included). The key is read from POLYGON_API_KEY, sent only as the apiKey query parameter to
-api.polygon.io, and never printed.
+Network use: one GET per distinct symbol to https://api.massive.com/stocks/financials/v1/income-statements with
+tickers, timeframe "quarterly" and limit 100, plus next_url when the API returns one. At most 5 requests per minute (one
+request every 12 seconds, retries included). The key is read from POLYGON_API_KEY, sent only in an
+Authorization: Bearer header (as the vendor's client does), never in a URL, and never printed.
 
 Symbols: the distinct symbols of the missing rows come first. Set b (grade-A Q4 rows, quarterly.epsQuality[i].epsDiluted
 == "A") also adds the symbols it covers that have no missing row. Sets a and ad (SEC Q1-Q3 rows, src == "sec"; ad is
@@ -25,13 +25,14 @@ Output: a report of counts, (symbol, end) keys and flags. Polygon values stay in
 keeps flags only, so no EPS value is written to the report, the log or the checkpoint. The workflow commits the report
 to the runs branch. The commit job checks that commit with an inline guard in the workflow, not with this file.
 
-Unverified: the Polygon path and field names (vX/reference/financials, timeframe, limit, next_url, end_date,
-fiscal_period, filing_date, source_filing_url, financials.income_statement.diluted_earnings_per_share.value). The
-authoring environment could not reach Polygon's documentation. The run stops with SchemaMismatch at the first response
-that does not carry the EPS field.
+Response fields follow the vendor's own client (massive-com/client-python, massive/rest/models/financials.py): flat
+period_end, fiscal_quarter, fiscal_year, timeframe, filing_date, diluted_earnings_per_share. The live API was not
+reachable from the authoring environment, so these are unverified against the live API. The timeframe value "quarterly"
+is a first attempt; if the API rejects a request (HTTP 400 or 422) the run stops with SchemaMismatch.
 
 Exit codes: 0 finished, or stopped at the time budget (see report status); 1 configuration or checkpoint problem;
-2 key rejected; 3 response schema mismatch; 4 rate limit persisted after retries; 5 other API error.
+2 key rejected (HTTP 401 or 403); 3 response schema mismatch or rejected request; 4 rate limit persisted after retries;
+5 other API error; 6 endpoint gone (HTTP 410). Any of 2, 3 or 6 means the probe is dropped.
 """
 import argparse
 import hashlib
@@ -58,8 +59,8 @@ CHECKPOINT_SCHEMA = "polygon-q4-probe-checkpoint-v1"
 REPORT_SCHEMA = "polygon-q4-probe-report-v1"
 CLASS_ORDER = ("no-q4-net-income", "no-annual-diluted-eps", "q1-q3-incomplete", "derivation-rejected", "ledger-blocked")
 
-API_HOST = "api.polygon.io"
-ENDPOINT = f"https://{API_HOST}/vX/reference/financials"
+API_HOST = "api.massive.com"
+ENDPOINT = f"https://{API_HOST}/stocks/financials/v1/income-statements"
 TIMEFRAME = "quarterly"
 LIMIT = 100
 EPS_FIELD = "diluted_earnings_per_share"
@@ -75,10 +76,11 @@ Z95 = 1.959963984540054
 GATE_THRESHOLD = 500
 DEFAULT_BUDGET_MINUTES = 320
 UNVERIFIED_FIELDS = [
-    "GET /vX/reference/financials",
-    "query: ticker, timeframe=quarterly, limit, apiKey",
-    "response: results[].end_date, fiscal_period, timeframe, filing_date, source_filing_url, next_url",
-    "results[].financials.income_statement.diluted_earnings_per_share.value",
+    "GET /stocks/financials/v1/income-statements on api.massive.com (vendor client only; not checked live)",
+    "query: tickers, timeframe=quarterly (first attempt), limit; header: Authorization Bearer (as the vendor client)",
+    "response: results[].period_end, fiscal_quarter, fiscal_year, timeframe, filing_date, next_url,"
+    " diluted_earnings_per_share",
+    "no source URL in the vendor model: the 10-K form test sees no URL",
 ]
 _FORM_10K = re.compile(r"(?<![a-z0-9])10-?k(?![a-z0-9])", re.IGNORECASE)
 
@@ -105,6 +107,10 @@ class ApiError(ProbeError):
 
 class CheckpointMismatch(ProbeError):
     exit_code = 1
+
+
+class EndpointGone(ProbeError):
+    exit_code = 6
 
 
 # ---------------------------------------------------------------- arithmetic
@@ -157,7 +163,11 @@ class ParseState:
     field_seen: bool = False
 
 
-_ABSENT = object()
+def quarter_number(value):
+    """1 to 4 for a quarter, else None. fiscal_quarter is a number in the vendor model; an annual row carries null."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value not in (1, 2, 3, 4):
+        return None
+    return int(value)
 
 
 def parse_page(symbol, payload):
@@ -172,32 +182,27 @@ def parse_page(symbol, payload):
         if timeframe is not None and timeframe != TIMEFRAME:
             skipped += 1
             continue
-        for name in ("end_date", "fiscal_period"):
+        for name in ("period_end", "fiscal_quarter"):
             if name not in item:
                 raise SchemaMismatch(f"{symbol}: a result has no {name}")
-        financials = item.get("financials")
-        if not isinstance(financials, dict) or not isinstance(financials.get("income_statement"), dict):
-            raise SchemaMismatch(f"{symbol}: a result has no financials.income_statement")
-        income = financials["income_statement"]
+        quarter = quarter_number(item["fiscal_quarter"])
+        if quarter is None:
+            skipped += 1
+            continue
         try:
-            end = date.fromisoformat(item["end_date"])
+            end = date.fromisoformat(item["period_end"])
         except (TypeError, ValueError):
-            raise SchemaMismatch(f"{symbol}: end_date is not YYYY-MM-DD") from None
-        if not isinstance(item["fiscal_period"], str):
-            raise SchemaMismatch(f"{symbol}: fiscal_period is not a string")
-        cell = income.get(EPS_FIELD, _ABSENT)
+            raise SchemaMismatch(f"{symbol}: period_end is not YYYY-MM-DD") from None
+        fiscal_period = f"Q{quarter}"
         eps = None
-        if cell is not _ABSENT:
+        if EPS_FIELD in item:
             field_count += 1
-            if not isinstance(cell, dict) or "value" not in cell:
-                raise SchemaMismatch(f"{symbol}: {EPS_FIELD} has no value entry")
-            value = cell["value"]
+            value = item[EPS_FIELD]
             if value is not None:
                 if isinstance(value, bool) or not isinstance(value, (int, float)):
-                    raise SchemaMismatch(f"{symbol}: {EPS_FIELD}.value is not a number")
+                    raise SchemaMismatch(f"{symbol}: {EPS_FIELD} is not a number")
                 eps = float(value)
-        records.append(Record(end, item["fiscal_period"], eps,
-                              str(item.get("filing_date") or ""), str(item.get("source_filing_url") or "")))
+        records.append(Record(end, fiscal_period, eps, str(item.get("filing_date") or ""), ""))
     return records, skipped, field_count
 
 
@@ -212,7 +217,7 @@ def parse_pages(symbol, pages, state):
     if field_count:
         state.field_seen = True
     elif records and not state.field_seen:
-        raise SchemaMismatch(f"{symbol}: no quarterly result carries {EPS_FIELD}; the field name is not confirmed")
+        raise SchemaMismatch(f"{symbol}: no quarterly result carries {EPS_FIELD}; the field is not confirmed")
     stats = {"records": len(records), "no_eps": sum(1 for r in records if r.eps is None), "skipped": skipped}
     return records, stats
 
@@ -436,7 +441,8 @@ class NetworkSource:
             self._pacer.wait()
             self.calls += 1
             request = urllib.request.Request(url, headers={"Accept": "application/json",
-                                                           "User-Agent": "atlas-q4-probe/1"})
+                                                           "User-Agent": "atlas-q4-probe/1",
+                                                           "Authorization": "Bearer " + self._key})
             body, status, retry_after = None, None, None
             try:
                 with self._opener(request, timeout=60) as response:
@@ -460,6 +466,11 @@ class NetworkSource:
             if status in (401, 403):
                 raise KeyRejected(f"Polygon answered HTTP {status} for {symbol}: the key was rejected or the plan "
                                   f"does not include this endpoint. Stopped; nothing was retried.")
+            if status == 410:
+                raise EndpointGone(f"HTTP 410 for {symbol}: the endpoint is gone. Probe dropped; nothing was retried.")
+            if status in (400, 422):
+                raise SchemaMismatch(f"{symbol}: request rejected (HTTP {status}); the parameter values are not "
+                                     f"accepted. Probe dropped.")
             if status == 429:
                 if attempts_429 >= len(RETRY_429_SECONDS):
                     raise RateLimited(f"{symbol}: still rate limited (HTTP 429) after {attempts_429} retries")
@@ -481,15 +492,15 @@ class NetworkSource:
         parts = urllib.parse.urlsplit(next_url)
         if parts.scheme != "https" or parts.netloc != API_HOST:
             raise SchemaMismatch(f"{symbol}: next_url points outside {API_HOST}; not followed")
-        query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
-        if not any(name == "apiKey" for name, _ in query):
-            query.append(("apiKey", self._key))
+        # The key travels in the Authorization header only. A next_url that carries an apiKey parameter has it removed.
+        query = [(name, value) for name, value in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+                 if name != "apiKey"]
         return urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path,
                                         urllib.parse.urlencode(query), ""))
 
     def fetch(self, symbol):
-        url = ENDPOINT + "?" + urllib.parse.urlencode({"ticker": polygon_ticker(symbol), "timeframe": TIMEFRAME,
-                                                       "limit": LIMIT, "apiKey": self._key})
+        url = ENDPOINT + "?" + urllib.parse.urlencode({"tickers": polygon_ticker(symbol), "timeframe": TIMEFRAME,
+                                                       "limit": LIMIT})
         pages = []
         for _ in range(MAX_PAGES):
             payload = self._request(url, symbol)
@@ -706,7 +717,7 @@ def aggregate(plan, done, input_sha, status, stop_reason):
             "covered_derived": sum(derived_by_class.values()),
             "derived_by_arithmetic": derived_arithmetic,
             "derived_by_form_url": derived_form,
-            "derived_form_url_test": "unverified: source_filing_url format not confirmed",
+            "derived_form_url_test": "unverified: the vendor income-statement model carries no source URL",
             "rows_before_response_window": before_window,
             "by_class": {c: {"total": planned_by_class[c], "run": run_by_class[c],
                              "covered": covered_by_class[c], "reported": reported_by_class[c],
