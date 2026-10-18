@@ -529,8 +529,9 @@ class RepoDataTest(unittest.TestCase):
             summary = growth.run(directory, out, NOW)
             self.assertEqual(summary["unreadable"], [])
             # Quarterly YoY runs to 12 quarters (QUARTER_SLOTS) and annual to 10 years (YEAR_SLOTS): the 2026-10-16
-            # financials give about 1.02 MB (743 KB with 4 quarters). 1,100,000 B leaves a small margin.
-            self.assertLess(summary["bytes"], 1_100_000)
+            # financials give about 1.02 MB (743 KB with 4 quarters). With the FinMind Taiwan statements the output is
+            # about 1.49 MB. 1,600,000 B leaves a small margin.
+            self.assertLess(summary["bytes"], 1_600_000)
             with open(out, encoding="utf-8") as file:
                 data = json.load(file)
         markets = {growth.market_of(row[0]) for row in data["rows"]}

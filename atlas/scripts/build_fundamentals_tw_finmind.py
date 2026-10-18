@@ -496,6 +496,11 @@ def by_year(row):
     return years
 
 
+def can_be_single_quarter(quarter, quarters_of_year):
+    """A published value is a single quarter only when Q1 or its same-year predecessor is present."""
+    return quarter == 1 or quarter - 1 in quarters_of_year
+
+
 def field_views(quarters_of_year, at, mode):
     """One field of one year → ({q: single-quarter value}, {q: year-to-date value}), None where not derivable."""
     raw = {q: entry[at] for q, entry in quarters_of_year.items() if entry[at] is not None}
@@ -520,8 +525,8 @@ def field_views(quarters_of_year, at, mode):
                 single[q] = raw[q] - raw[q - 1]
     elif mode in ("quarter", "q4annual"):
         for q in raw:
-            # a quarter whose predecessor is not published (half-year, nine-month figures before listing) is cumulative
-            if (q < 4 or mode == "quarter") and (q == 1 or q - 1 in quarters_of_year):
+            # A quarter after a gap may be cumulative (half-year / nine-month before listing).
+            if (q < 4 or mode == "quarter") and can_be_single_quarter(q, quarters_of_year):
                 single[q] = raw[q]
         for q in (1, 2, 3):
             if q in raw:
