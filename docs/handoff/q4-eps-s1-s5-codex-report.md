@@ -163,3 +163,13 @@
   - Even with the split basis fixed, TRU and the 2 conflicts still fail S3.4.
 - Not done: gate (exit 3 expected; `s3-backtest-summary.json` not committed), S3.6 revision, S4, S5, fill, answer-set edit, code change.
 - Stop: yes. S3 failed (conflicts; partial Wilson 0.908). S3.6 revision needs an Opus decision. Opus decision 2026-10-18: no S3.6 revision; S4 blocked.
+
+## defeatbeta probe (dropped)
+
+- Run 39101695725: completed, success. Report: `docs/report/source-probes/defeatbeta/39101695725/probe-report.json` on branch `runs/source-probes`.
+- Dataset card license: odc-by (stated).
+- Coverage of the 7,755 missing Q4 rows: 942 covered, none before FY2022.
+- Set (b): 166 of 2,649 compared; agreement 0.873; Wilson lower 0.814.
+- Set (a): 80 sign errors.
+- Subtraction test: 490 testable; 415 not equal.
+- Decision: dropped (set b fails the gate).
