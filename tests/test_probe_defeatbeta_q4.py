@@ -10,9 +10,12 @@ import hashlib
 import io
 import json
 import os
+import re
 import socket
+import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from datetime import date
 from unittest import mock
@@ -547,19 +550,179 @@ class OfflineAndWorkflow(ProbeCase):
                 mock.patch.object(socket, "create_connection", side_effect=AssertionError("network use")):
             self.run_probe(documents, [], [statement_row("AAA", "2024-03-30", 1.0)])
 
-    def test_workflow_is_manual_read_only_and_names_no_sec_host(self):
-        with open(WORKFLOW_PATH, encoding="utf-8") as handle:
-            text = handle.read()
+    def test_workflow_is_manual_and_names_no_sec_host(self):
+        text = workflow_text()
         self.assertIn("workflow_dispatch:", text)
         self.assertNotIn("schedule:", text)
-        self.assertIn("permissions:\n  contents: read", text)
-        self.assertNotIn("contents: write", text)
         self.assertNotIn("sec.gov", text.lower())
-        self.assertNotIn("git push", text)
-        self.assertNotIn("git commit", text)
         self.assertIn("if-no-files-found: error", text)
         self.assertIn("name: defeatbeta-probe", text)
         self.assertIn("https://huggingface.co/datasets/defeatbeta/yahoo-finance-data/resolve/main", text)
+
+
+def workflow_text():
+    with open(WORKFLOW_PATH, encoding="utf-8") as handle:
+        return handle.read()
+
+
+def job_blocks(text):
+    """{job name: block text}. Job keys sit at two-space indentation under the top-level jobs: key."""
+    jobs_at = text.index("\njobs:\n") + 1
+    body = text[jobs_at:]
+    headers = list(re.finditer(r"^  ([A-Za-z][\w-]*):\n", body, re.M))
+    blocks = {}
+    for position, header in enumerate(headers):
+        end = headers[position + 1].start() if position + 1 < len(headers) else len(body)
+        blocks[header.group(1)] = body[header.end():end]
+    return blocks
+
+
+def commit_guard_source():
+    """The guard script embedded in the workflow's commit step, de-indented from the YAML run block."""
+    match = re.search(r"<<'GUARD'\n(.*?)\n[ ]*GUARD\n", workflow_text(), re.S)
+    if match is None:
+        raise AssertionError("the commit guard heredoc is missing from the workflow")
+    return textwrap.dedent(match.group(1)) + "\n"
+
+
+class WorkflowPermissions(unittest.TestCase):
+    def test_top_level_permission_is_read_only(self):
+        self.assertIn("permissions:\n  contents: read\n\njobs:", workflow_text())
+
+    def test_contents_write_appears_only_in_the_commit_job(self):
+        text = workflow_text()
+        blocks = job_blocks(text)
+        self.assertEqual(set(blocks), {"probe", "commit"})
+        self.assertNotIn("contents: write", blocks["probe"])
+        self.assertEqual(blocks["commit"].count("contents: write"), 1)
+        self.assertEqual(text.count("contents: write"), 1)
+        self.assertIn("needs: probe", blocks["commit"])
+
+    def test_git_writes_happen_only_in_the_commit_job(self):
+        blocks = job_blocks(workflow_text())
+        for word in ("push -q origin", "commit -q -m", "worktree add -q"):
+            self.assertNotIn(word, blocks["probe"], word)
+            self.assertIn(word, blocks["commit"], word)
+
+    def test_commit_job_targets_the_orphan_branch_and_the_run_directory(self):
+        commit = job_blocks(workflow_text())["commit"]
+        self.assertIn("RUNS_BRANCH: runs/source-probes", commit)
+        self.assertIn('prefix="docs/report/source-probes/defeatbeta/$RUN_ID"', commit)
+        self.assertIn("--orphan", commit)
+        self.assertNotIn("refs/heads/main", commit)
+
+
+VALID_REPORT = {
+    "schema": "defeatbeta-probe-v1",
+    "readOnly": True,
+    "fillsValues": False,
+    "writesEpsValues": False,
+    "coverage": {"total": {"missing": 3, "covered": 1}},
+    "agreement": {"setB": {"compared": 5, "agreementRate": 0.8, "wilsonLower95": 0.4, "signErrors": 0}},
+}
+
+
+class CommitGuard(unittest.TestCase):
+    """The path guard and the report check inside the workflow's commit step, run as shipped."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = self._tmp.name
+        self.guard_path = os.path.join(self.tmp, "guard.py")
+        with open(self.guard_path, "w", encoding="utf-8") as handle:
+            handle.write(commit_guard_source())
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def run_guard(self, run_id, entries, report=VALID_REPORT):
+        staged = os.path.join(self.tmp, "staged.z")
+        with open(staged, "wb") as handle:
+            handle.write("".join(f"{status}\0{path}\0" for status, path in entries).encode("utf-8"))
+        report_path = os.path.join(self.tmp, "probe-report.json")
+        with open(report_path, "w", encoding="utf-8") as handle:
+            if isinstance(report, str):
+                handle.write(report)
+            else:
+                json.dump(report, handle)
+        result = subprocess.run([sys.executable, "-I", self.guard_path, run_id, staged, report_path],
+                                capture_output=True, text=True)
+        return result.returncode, result.stdout + result.stderr
+
+    @staticmethod
+    def own(run_id="123"):
+        return f"docs/report/source-probes/defeatbeta/{run_id}/probe-report.json"
+
+    def test_accepts_exactly_the_run_report(self):
+        code, output = self.run_guard("123", [("A", self.own())])
+        self.assertEqual(code, 0, output)
+        self.assertIn("guard passed", output)
+
+    def test_refuses_paths_outside_the_run_directory(self):
+        for path in ("docs/report/source-probes/defeatbeta/124/probe-report.json",
+                     "docs/report/source-probes/other/123/probe-report.json",
+                     "scratch/probe-report.json"):
+            code, output = self.run_guard("123", [("A", path)])
+            self.assertNotEqual(code, 0, path)
+            self.assertIn("outside", output, path)
+
+    def test_refuses_protected_paths_on_main(self):
+        for path in ("docs/report/financials/AAPL.json", "atlas/scripts/probe_defeatbeta_q4.py",
+                     "tests/test_probe_defeatbeta_q4.py", ".github/workflows/defeatbeta-probe.yml"):
+            code, output = self.run_guard("123", [("A", path)])
+            self.assertNotEqual(code, 0, path)
+            self.assertIn("protected", output, path)
+
+    def test_refuses_traversal_absolute_and_empty_segments(self):
+        for path in ("docs/report/source-probes/defeatbeta/123/../../../../atlas/x.py",
+                     "/docs/report/source-probes/defeatbeta/123/probe-report.json",
+                     "docs/report/source-probes/defeatbeta/123//probe-report.json",
+                     "docs/report/source-probes/defeatbeta/123/./probe-report.json"):
+            code, output = self.run_guard("123", [("A", path)])
+            self.assertNotEqual(code, 0, path)
+
+    def test_refuses_modifications_and_deletions(self):
+        code, output = self.run_guard("123", [("M", self.own())])
+        self.assertNotEqual(code, 0)
+        self.assertIn("only additions", output)
+        code, _ = self.run_guard("123", [("D", self.own())])
+        self.assertNotEqual(code, 0)
+
+    def test_refuses_an_extra_file_beside_the_report(self):
+        code, output = self.run_guard("123", [("A", self.own()),
+                                              ("A", "docs/report/source-probes/defeatbeta/123/README.md")])
+        self.assertNotEqual(code, 0)
+        self.assertIn("must add exactly", output)
+
+    def test_refuses_an_eps_like_float_outside_the_allowed_keys(self):
+        report = json.loads(json.dumps(VALID_REPORT))
+        report["coverage"]["total"]["bogusEps"] = 7.31337
+        code, output = self.run_guard("123", [("A", self.own())], report=report)
+        self.assertNotEqual(code, 0)
+        self.assertIn("counts, keys and flags only", output)
+
+    def test_allows_the_two_rate_floats(self):
+        code, output = self.run_guard("123", [("A", self.own())], report=VALID_REPORT)
+        self.assertEqual(code, 0, output)
+
+    def test_refuses_a_report_that_is_not_read_only(self):
+        report = dict(VALID_REPORT, fillsValues=True)
+        code, output = self.run_guard("123", [("A", self.own())], report=report)
+        self.assertNotEqual(code, 0)
+        self.assertIn("flags", output)
+        code, output = self.run_guard("123", [("A", self.own())], report=dict(VALID_REPORT, schema="other"))
+        self.assertNotEqual(code, 0)
+        self.assertIn("schema", output)
+
+    def test_refuses_an_unreadable_report(self):
+        code, output = self.run_guard("123", [("A", self.own())], report="{not json")
+        self.assertNotEqual(code, 0)
+        self.assertIn("unreadable", output)
+
+    def test_refuses_a_non_numeric_run_id(self):
+        code, output = self.run_guard("12a", [("A", "docs/report/source-probes/defeatbeta/12a/probe-report.json")])
+        self.assertNotEqual(code, 0)
+        self.assertIn("not numeric", output)
 
 
 if __name__ == "__main__":
