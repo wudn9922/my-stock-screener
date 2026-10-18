@@ -7,8 +7,8 @@ runs only in .github/workflows/polygon-probe.yml. --replay-dir runs the same pip
 
 Network use: one GET per distinct symbol to https://api.massive.com/stocks/financials/v1/income-statements with
 tickers, timeframe "quarterly" and limit 100, plus next_url when the API returns one. At most 5 requests per minute (one
-request every 12 seconds, retries included). The key is read from POLYGON_API_KEY, sent only as the apiKey query
-parameter to api.massive.com, and never printed.
+request every 12 seconds, retries included). The key is read from POLYGON_API_KEY, sent only in an
+Authorization: Bearer header (as the vendor's client does), never in a URL, and never printed.
 
 Symbols: the distinct symbols of the missing rows come first. Set b (grade-A Q4 rows, quarterly.epsQuality[i].epsDiluted
 == "A") also adds the symbols it covers that have no missing row. Sets a and ad (SEC Q1-Q3 rows, src == "sec"; ad is
@@ -77,7 +77,7 @@ GATE_THRESHOLD = 500
 DEFAULT_BUDGET_MINUTES = 320
 UNVERIFIED_FIELDS = [
     "GET /stocks/financials/v1/income-statements on api.massive.com (vendor client only; not checked live)",
-    "query: tickers, timeframe=quarterly (first attempt), limit, apiKey (the vendor client sends a Bearer header)",
+    "query: tickers, timeframe=quarterly (first attempt), limit; header: Authorization Bearer (as the vendor client)",
     "response: results[].period_end, fiscal_quarter, fiscal_year, timeframe, filing_date, next_url,"
     " diluted_earnings_per_share",
     "no source URL in the vendor model: the 10-K form test sees no URL",
@@ -163,11 +163,11 @@ class ParseState:
     field_seen: bool = False
 
 
-def fiscal_period_of(symbol, value):
-    """fiscal_quarter is a number in the vendor model; only 1 to 4 are quarters."""
+def quarter_number(value):
+    """1 to 4 for a quarter, else None. fiscal_quarter is a number in the vendor model; an annual row carries null."""
     if isinstance(value, bool) or not isinstance(value, (int, float)) or value not in (1, 2, 3, 4):
-        raise SchemaMismatch(f"{symbol}: fiscal_quarter is not 1 to 4")
-    return f"Q{int(value)}"
+        return None
+    return int(value)
 
 
 def parse_page(symbol, payload):
@@ -185,11 +185,15 @@ def parse_page(symbol, payload):
         for name in ("period_end", "fiscal_quarter"):
             if name not in item:
                 raise SchemaMismatch(f"{symbol}: a result has no {name}")
+        quarter = quarter_number(item["fiscal_quarter"])
+        if quarter is None:
+            skipped += 1
+            continue
         try:
             end = date.fromisoformat(item["period_end"])
         except (TypeError, ValueError):
             raise SchemaMismatch(f"{symbol}: period_end is not YYYY-MM-DD") from None
-        fiscal_period = fiscal_period_of(symbol, item["fiscal_quarter"])
+        fiscal_period = f"Q{quarter}"
         eps = None
         if EPS_FIELD in item:
             field_count += 1
@@ -437,7 +441,8 @@ class NetworkSource:
             self._pacer.wait()
             self.calls += 1
             request = urllib.request.Request(url, headers={"Accept": "application/json",
-                                                           "User-Agent": "atlas-q4-probe/1"})
+                                                           "User-Agent": "atlas-q4-probe/1",
+                                                           "Authorization": "Bearer " + self._key})
             body, status, retry_after = None, None, None
             try:
                 with self._opener(request, timeout=60) as response:
@@ -487,15 +492,15 @@ class NetworkSource:
         parts = urllib.parse.urlsplit(next_url)
         if parts.scheme != "https" or parts.netloc != API_HOST:
             raise SchemaMismatch(f"{symbol}: next_url points outside {API_HOST}; not followed")
-        query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
-        if not any(name == "apiKey" for name, _ in query):
-            query.append(("apiKey", self._key))
+        # The key travels in the Authorization header only. A next_url that carries an apiKey parameter has it removed.
+        query = [(name, value) for name, value in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+                 if name != "apiKey"]
         return urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path,
                                         urllib.parse.urlencode(query), ""))
 
     def fetch(self, symbol):
         url = ENDPOINT + "?" + urllib.parse.urlencode({"tickers": polygon_ticker(symbol), "timeframe": TIMEFRAME,
-                                                       "limit": LIMIT, "apiKey": self._key})
+                                                       "limit": LIMIT})
         pages = []
         for _ in range(MAX_PAGES):
             payload = self._request(url, symbol)

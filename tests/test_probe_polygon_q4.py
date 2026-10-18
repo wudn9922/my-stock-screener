@@ -64,11 +64,13 @@ class FakeOpener:
     def __init__(self, queue, clock=None):
         self.queue = list(queue)
         self.urls = []
+        self.auth = []
         self.times = []
         self.clock = clock
 
     def __call__(self, request, timeout=None):
         self.urls.append(request.full_url)
+        self.auth.append(request.get_header("Authorization"))
         self.times.append(self.clock() if self.clock else None)
         item = self.queue.pop(0) if self.queue else FakeResponse(json.dumps({"results": []}).encode())
         if isinstance(item, Exception):
@@ -81,7 +83,7 @@ def ok(payload):
 
 
 def http_error(code, headers=None):
-    return urllib.error.HTTPError(f"https://api.massive.com/stocks/financials/v1/income-statements?apiKey={FAKE_KEY}",
+    return urllib.error.HTTPError("https://api.massive.com/stocks/financials/v1/income-statements",
                                   code, "err", headers or {}, None)
 
 
@@ -313,16 +315,38 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(records[0].filing_date, "2020-02-01")
         self.assertEqual(stats["no_eps"], 0)
 
-    def test_period_end_and_fiscal_quarter_are_checked(self):
+    def test_period_end_is_checked_for_quarterly_rows(self):
         for bad in ({"period_end": "2019-13-40"}, {"period_end": 20191231}):
             row = dict(item("2019-12-31", 4, 1.0), **bad)
             with self.assertRaises(probe.SchemaMismatch):
                 probe.parse_pages("TEST", [{"results": [row]}], probe.ParseState())
-        for fq in (5, 0, 2.5, True, "4"):
-            with self.assertRaises(probe.SchemaMismatch, msg=repr(fq)):
-                probe.parse_pages("TEST", [{"results": [item("2019-12-31", fq, 1.0)]}], probe.ParseState())
         records, _ = probe.parse_pages("TEST", [{"results": [item("2019-12-31", 4.0, 1.0)]}], probe.ParseState())
         self.assertEqual(records[0].fiscal_period, "Q4")
+
+    def test_fiscal_quarter_outside_one_to_four_is_skipped_and_counted(self):
+        for fq in (5, 0, 2.5, True, "4", None):
+            records, stats = probe.parse_pages("TEST", [{"results": [item("2019-12-31", fq, 1.0)]}],
+                                               probe.ParseState())
+            self.assertEqual(records, [], repr(fq))
+            self.assertEqual(stats["skipped"], 1, repr(fq))
+
+    def test_annual_row_is_skipped_and_counted_and_quarterly_row_still_parses(self):
+        annual = item("2019-12-31", None, 4.0, timeframe="quarterly")   # annual row: fiscal_quarter null
+        annual_by_timeframe = item("2019-12-31", None, 4.0, timeframe="annual")
+        quarterly = item("2019-12-31", 4, 1.25)
+        records, stats = probe.parse_pages("TEST", [{"results": [annual, annual_by_timeframe, quarterly]}],
+                                           probe.ParseState())
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].fiscal_period, "Q4")
+        self.assertEqual(records[0].eps, 1.25)
+        self.assertEqual(stats["skipped"], 2)
+        self.assertEqual(stats["records"], 1)
+
+    def test_page_with_only_annual_rows_does_not_raise(self):
+        state = probe.ParseState()
+        records, stats = probe.parse_pages("TEST", [{"results": [item("2019-12-31", None, 4.0)]}], state)
+        self.assertEqual(records, [])
+        self.assertEqual(stats["skipped"], 1)
 
     def test_field_absent_everywhere_stops_on_first_response(self):
         state = probe.ParseState()
@@ -457,7 +481,31 @@ class RetryTests(unittest.TestCase):
         self.assertEqual(len(pages), 2)
         self.assertIn("cursor=abc", opener.urls[1])
         self.assertTrue(opener.urls[1].startswith("https://api.massive.com/stocks/financials/v1/income-statements"))
-        self.assertIn("apiKey=" + urllib.parse.quote(FAKE_KEY, safe=""), opener.urls[1])
+        self.assertEqual(opener.auth, ["Bearer " + FAKE_KEY, "Bearer " + FAKE_KEY])
+        self.assertNotIn(FAKE_KEY, opener.urls[1])
+
+    def test_no_request_url_contains_the_key(self):
+        """Synthetic responses: the key goes in the Authorization header on every request, in no URL."""
+        scenarios = {
+            "plain": [ok({"results": [item("2019-12-31", 4, 1.0)]})],
+            "paged": [ok({"results": [item("2019-12-31", 4, 1.0)],
+                          "next_url": "https://api.massive.com/stocks/financials/v1/income-statements?cursor=a"}),
+                      ok({"results": [item("2018-12-31", 4, 0.9)]})],
+            "next_url_carries_a_key": [
+                ok({"results": [item("2019-12-31", 4, 1.0)],
+                    "next_url": "https://api.massive.com/stocks/financials/v1/income-statements?cursor=b&apiKey="
+                                + FAKE_KEY}),
+                ok({"results": [item("2018-12-31", 4, 0.9)]})],
+            "retried": [http_error(429, {"Retry-After": "1"}), ok({"results": [item("2019-12-31", 4, 1.0)]})],
+        }
+        for name, queue in scenarios.items():
+            source, opener, _ = self.make(queue)
+            source.fetch("AAA")
+            self.assertTrue(opener.urls, name)
+            for url in opener.urls:
+                self.assertNotIn(FAKE_KEY, url, name)
+                self.assertNotIn("apiKey", url, name)
+            self.assertEqual(set(opener.auth), {"Bearer " + FAKE_KEY}, name)
 
     def test_request_uses_tickers_timeframe_and_limit(self):
         source, opener, _ = self.make([ok({"results": []})])
@@ -468,6 +516,8 @@ class RetryTests(unittest.TestCase):
         query = dict(urllib.parse.parse_qsl(parts.query))
         self.assertEqual(query["tickers"], "BRK.B")
         self.assertNotIn("ticker", query)
+        self.assertNotIn("apiKey", query)
+        self.assertEqual(opener.auth, ["Bearer " + FAKE_KEY])
         self.assertEqual(query["timeframe"], "quarterly")
         self.assertEqual(query["limit"], str(probe.LIMIT))
         self.assertGreaterEqual(int(query["limit"]), 70)
