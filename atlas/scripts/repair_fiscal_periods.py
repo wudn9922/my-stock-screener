@@ -316,12 +316,18 @@ def _quarter_spacing_residual(symbol, row):
 
 
 def plan_path(path, flagged_by_file):
-    """Plan the repair for one financials file. Returns None for files that are not US."""
+    """Plan the repair for one financials file on disk. Returns None for files that are not US."""
     document = _json_file(path)
     if document.get("market") != "US":
         return None
-    symbol = document.get("symbol") or path.stem
-    flagged_file = flagged_by_file.get(path.name)
+    plan = plan_document(document, path.name, flagged_by_file.get(path.name))
+    plan["path"] = path
+    return plan
+
+
+def plan_document(document, file_name, flagged_file):
+    """Plan the repair for one US document, in memory. flagged_file is the detector's entry or None."""
+    symbol = document.get("symbol") or Path(file_name).stem
     flagged_ends, flagged_q4_ends = _flagged_row_ends(flagged_file)
     old_annual = section_items(document, "annual")
     old_quarterly = section_items(document, "quarterly")
@@ -339,7 +345,7 @@ def plan_path(path, flagged_by_file):
     diffs = label_differences(old_annual, old_quarterly, new_annual, new_quarterly)
     label_rows_changed = len(diffs["annual"]) + len(diffs["quarterly"])
     if label_rows_changed and not flagged_ends:
-        raise AssertionError(f"{path.name}: label changes in a file without a flagged quarterly row")
+        raise AssertionError(f"{file_name}: label changes in a file without a flagged quarterly row")
     input_mismatches, input_mismatches_marked = input_q4_mismatch_counts(
         document, old_annual, old_quarterly,
     )
@@ -371,7 +377,7 @@ def plan_path(path, flagged_by_file):
     after_result = fiscal_detector.analyze(after_document)
 
     return {
-        "path": path,
+        "file": file_name,
         "document": document,
         "symbol": symbol,
         "flaggedFilePresent": bool(flagged_file),
@@ -723,6 +729,235 @@ def apply_repairs(financials_dir, dry_run_report, excluded=APPLY_EXCLUDED_SYMBOL
     }
 
 
+FIXPOINT_MAX_PASSES = 5
+FIXPOINT_REPORT_PATH = ROOT / "docs" / "report" / "fiscal-period-fixpoint-dryrun.json"
+DETECTOR_REPORT_PATH = ROOT / "docs" / "report" / "fiscal-period-mismatch.json"
+EPS_ACTION_COUNTS = {"newly-derived": "newlyDerived", "nulled": "nulled", "changed": "changed"}
+
+
+def detector_flag_entry(document, file_name):
+    """The detector's flagged entry for one in-memory document, or None when the detector does not flag it."""
+    result = fiscal_detector.analyze(document)
+    if not result["rules"]:
+        return None
+    return {
+        "file": file_name,
+        "affectedQ4": result["affectedQ4"],
+        "otherQuarterFlags": result["otherQuarterFlags"],
+    }
+
+
+def converge(run_pass, max_passes=FIXPOINT_MAX_PASSES):
+    """Run passes until one makes no change, stopping after max_passes.
+
+    run_pass(number) makes one pass and returns the list of changes it made; an empty list means no
+    change. Returns (the change list of each pass run, converged). converged is True only when the
+    last pass run made no change.
+    """
+    if max_passes < 1:
+        raise ValueError("max_passes must be at least 1")
+    results = []
+    for number in range(1, max_passes + 1):
+        changes = run_pass(number)
+        results.append(changes)
+        if not changes:
+            return results, True
+    return results, False
+
+
+def _eps_changes_by_action(record):
+    counts = {name: 0 for name in EPS_ACTION_COUNTS.values()}
+    counts["reDerivedNoChange"] = 0
+    for row in record["q4EpsChanges"]:
+        if row["action"] in EPS_ACTION_COUNTS:
+            counts[EPS_ACTION_COUNTS[row["action"]]] += 1
+        elif row["action"] == "re-derived":
+            counts["reDerivedNoChange"] += 1
+    return counts
+
+
+def run_fixpoint(financials_dir, excluded=APPLY_EXCLUDED_SYMBOLS, max_passes=FIXPOINT_MAX_PASSES):
+    """Re-plan the repair in memory, pass after pass, until a pass makes no change. Writes nothing.
+
+    Pass 1 plans every US file as it is on disk. A later pass plans only the files that the previous
+    pass changed, because a file that did not change would plan exactly what it planned before, and
+    that plan was empty. Each pass's change set goes through the same planner and diff as the dry run,
+    and is checked with verify_written_change before the in-memory document moves on. Excluded
+    symbols are planned in pass 1 and reported, but never changed in memory.
+    """
+    financials_dir = Path(financials_dir)
+    flagged_by_file = {
+        entry["file"]: entry for entry in fiscal_detector.build_report(financials_dir)["flaggedFiles"]
+    }
+    disk_paths = {path.name: path for path in sorted(financials_dir.glob("*.json"))}
+    states = {}
+    active = []
+    excluded_plans = {}
+    pass_reports = []
+
+    def run_pass(number):
+        nonlocal active
+        names = list(active)
+        if number == 1:
+            plans = (
+                plan for plan in (plan_path(path, flagged_by_file) for path in disk_paths.values())
+                if plan is not None
+            )
+        else:
+            plans = (
+                plan_document(states[name], name, detector_flag_entry(states[name], name))
+                for name in names
+            )
+        report = {
+            "pass": number, "filesPlanned": 0, "filesChanged": 0,
+            "quarterlyLabelRows": 0, "annualLabelRows": 0,
+            "eps": {"newlyDerived": 0, "nulled": 0, "changed": 0, "reDerivedNoChange": 0},
+        }
+        changes = []
+        for plan in plans:
+            name, symbol, record = plan["file"], plan["symbol"], plan["record"]
+            if symbol in excluded:
+                if number == 1:
+                    excluded_plans[symbol] = {
+                        "file": name,
+                        "quarterlyLabelRows": len(record["quarterlyLabelChanges"]),
+                        "annualLabelRows": len(record["annualLabelChanges"]),
+                        "eps": _eps_changes_by_action(record),
+                    }
+                continue
+            report["filesPlanned"] += 1
+            eps = _eps_changes_by_action(record)
+            report["eps"]["reDerivedNoChange"] += eps["reDerivedNoChange"]
+            diff = normalized_diff(record)
+            if not diff:
+                continue
+            before = plan["document"]
+            updated = apply_diff(before, diff)
+            verify_written_change(before, updated, diff)
+            states[name] = updated
+            changes.append({"file": name, "symbol": symbol, "diff": diff, "record": record})
+            report["filesChanged"] += 1
+            report["quarterlyLabelRows"] += len(record["quarterlyLabelChanges"])
+            report["annualLabelRows"] += len(record["annualLabelChanges"])
+            for key in ("newlyDerived", "nulled", "changed"):
+                report["eps"][key] += eps[key]
+        pass_reports.append(report)
+        active = [change["file"] for change in changes]
+        return changes
+
+    results, converged = converge(run_pass, max_passes)
+    return _fixpoint_report(
+        financials_dir, disk_paths, states, results, converged, pass_reports, excluded_plans,
+        excluded, max_passes,
+    )
+
+
+def _fixpoint_report(financials_dir, disk_paths, states, results, converged, pass_reports,
+                     excluded_plans, excluded, max_passes):
+    eps_by_pass = []
+    for number, changes in enumerate(results, start=1):
+        for change in changes:
+            for row in change["record"]["q4EpsChanges"]:
+                if row["action"] in WRITE_EPS_ACTIONS:
+                    eps_by_pass.append({
+                        "pass": number, "symbol": change["symbol"], "file": change["file"],
+                        "end": row["end"], "field": row["field"], "action": row["action"],
+                        "old": row["old"], "new": row["new"],
+                    })
+
+    label_rows = defaultdict(dict)
+    eps_vs_phase2 = []
+    guarded_changes = []
+    non_derived_changes = []
+    unexpected_changes = []
+    changed_files = set()
+    q4_same_fy_mismatches = {"excludedSymbols": 0, "otherSymbols": 0}
+    for name in sorted(disk_paths):
+        disk = _json_file(disk_paths[name])
+        if disk.get("market") != "US":
+            continue
+        document = states.get(name, disk)
+        result = fiscal_detector.analyze(document)
+        bucket = "excludedSymbols" if disk["symbol"] in excluded else "otherSymbols"
+        q4_same_fy_mismatches[bucket] += sum(
+            fiscal_detector.Q4_VS_ANNUAL in row["rules"] for row in result["affectedQ4"]
+        )
+        if name not in states:
+            continue
+        marks = disk["quarterly"].get(DERIVED_COLUMN) or []
+        leaves = leaf_changes(disk, document)
+        if leaves:
+            changed_files.add(name)
+        for path, (old_json, new_json) in sorted(leaves.items(), key=lambda item: str(item[0])):
+            if path[0] in PROTECTED_TOP_LEVEL or (path[0] == "quarterly" and path[1] in PROTECTED_QUARTERLY_COLUMNS):
+                guarded_changes.append(path)
+            elif path[0] in ("annual", "quarterly") and path[1] in ("fy", "fq"):
+                row = label_rows[(name, path[0], path[2])]
+                row.setdefault("symbol", disk["symbol"])
+                row.setdefault("end", disk[path[0]]["end"][path[2]])
+                row.setdefault("fields", {})[path[1]] = {"old": json.loads(old_json), "new": json.loads(new_json)}
+            elif path[0] == "quarterly" and path[1] == "values":
+                if old_json != "null" and not (path[-1] < len(marks) and marks[path[-1]]):
+                    non_derived_changes.append(path)
+                eps_vs_phase2.append({
+                    "file": name, "symbol": disk["symbol"], "end": disk["quarterly"]["end"][path[-1]],
+                    "field": path[2], "old": json.loads(old_json), "new": json.loads(new_json),
+                })
+            else:
+                unexpected_changes.append(path)
+
+    first_pass_files = {change["file"] for change in results[0]} if results else set()
+    mismatch_report = _json_file(DETECTOR_REPORT_PATH) if DETECTOR_REPORT_PATH.exists() else {"flaggedFiles": []}
+    flagged_in_mismatch = {entry["file"] for entry in mismatch_report.get("flaggedFiles", [])}
+    outside = sorted(changed_files - flagged_in_mismatch - first_pass_files)
+    excluded_files = {entry["file"] for entry in excluded_plans.values()}
+
+    excluded_totals = {"files": len(excluded_plans), "quarterlyLabelRows": 0, "annualLabelRows": 0,
+                       "eps": 0}
+    for entry in excluded_plans.values():
+        excluded_totals["quarterlyLabelRows"] += entry["quarterlyLabelRows"]
+        excluded_totals["annualLabelRows"] += entry["annualLabelRows"]
+        excluded_totals["eps"] += sum(entry["eps"].values())
+
+    return {
+        "version": 1,
+        "generatedBy": "atlas/scripts/repair_fiscal_periods.py --fixpoint",
+        "scope": {
+            "market": "US",
+            "startingState": "the current docs/report/financials/ files, read only",
+            "writes": "none",
+            "maxPasses": max_passes,
+            "excludedSymbols": sorted(excluded),
+        },
+        "converged": converged,
+        "passesRun": len(results),
+        "passes": pass_reports,
+        "cumulativeVsStartingState": {
+            "files": len(changed_files),
+            "quarterlyLabelRows": sum(1 for key in label_rows if key[1] == "quarterly"),
+            "annualLabelRows": sum(1 for key in label_rows if key[1] == "annual"),
+            "epsValues": len(eps_vs_phase2),
+        },
+        "excluded": {"notApplied": excluded_totals, "bySymbol": dict(sorted(excluded_plans.items()))},
+        "epsActionsByPass": eps_by_pass,
+        "epsValuesVsStartingState": sorted(
+            eps_vs_phase2, key=lambda row: (row["file"], row["end"], row["field"]),
+        ),
+        "labelRowsVsStartingState": [
+            {"file": name, "symbol": row["symbol"], "section": section, "end": row["end"], **row["fields"]}
+            for (name, section, _index), row in sorted(label_rows.items())
+        ],
+        "checks": {
+            "guardedFieldChanges": len(guarded_changes),
+            "nonDerivedEpsChanges": len(non_derived_changes),
+            "unexpectedLeafChanges": len(unexpected_changes),
+            "q4EndAnnualEndRowsWithSameFyAnnual": q4_same_fy_mismatches,
+            "changedFilesOutsideMismatchReportOrFirstPass": outside,
+            "excludedFilesChanged": len(changed_files & excluded_files),
+        },
+    }
+
+
 def write_report(path, report):
     path.parent.mkdir(parents=True, exist_ok=True)
     content = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
@@ -747,11 +982,17 @@ def parse_args(argv=None):
                       help="read local US files and write only the dry-run report")
     mode.add_argument("--apply", action="store_true",
                       help="write exactly the dry-run changes to docs/report/financials/ (not excluded symbols)")
+    mode.add_argument("--fixpoint", action="store_true",
+                      help="re-plan in memory until a pass makes no change (at most 5 passes); writes nothing")
     parser.add_argument("--financials-dir", type=Path, default=DEFAULT_FINANCIALS_DIR)
     parser.add_argument("--output", type=Path, default=DEFAULT_REPORT_PATH,
                         help="dry-run report path (dry-run mode only)")
     parser.add_argument("--dry-run-report", type=Path, default=DEFAULT_REPORT_PATH,
                         help="dry-run report that --apply must reproduce (apply mode only)")
+    parser.add_argument("--fixpoint-output", type=Path, default=FIXPOINT_REPORT_PATH,
+                        help="fixed-point summary path (fixpoint mode only)")
+    parser.add_argument("--max-passes", type=int, default=FIXPOINT_MAX_PASSES,
+                        help=f"fixed-point pass cap (fixpoint mode only; default {FIXPOINT_MAX_PASSES})")
     return parser.parse_args(argv)
 
 
@@ -806,6 +1047,25 @@ def main(argv=None):
         except ApplyError as error:
             raise SystemExit(f"apply stopped: {error}")
         _print_apply_summary(summary)
+        return
+
+    if args.fixpoint:
+        fixpoint_path = args.fixpoint_output.resolve()
+        if os.path.commonpath((str(financials_dir), str(fixpoint_path))) == str(financials_dir):
+            raise SystemExit("the fixed-point report must not be written under docs/report/financials/")
+        report = run_fixpoint(financials_dir, max_passes=args.max_passes)
+        write_report(fixpoint_path, report)
+        for entry in report["passes"]:
+            eps = entry["eps"]
+            print(
+                f"pass {entry['pass']}: files changed {entry['filesChanged']} of {entry['filesPlanned']} planned; "
+                f"label rows {entry['quarterlyLabelRows']} quarterly, {entry['annualLabelRows']} annual; "
+                f"Q4 EPS {eps['newlyDerived']} newly derived, {eps['nulled']} nulled, {eps['changed']} changed"
+            )
+        print(f"converged: {report['converged']} after {report['passesRun']} pass(es)")
+        print(fixpoint_path)
+        if not report["converged"]:
+            raise SystemExit(1)
         return
 
     output_path = args.output.resolve()

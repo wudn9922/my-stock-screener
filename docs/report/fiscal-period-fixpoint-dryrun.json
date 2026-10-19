@@ -1,0 +1,2738 @@
+{
+  "checks": {
+    "changedFilesOutsideMismatchReportOrFirstPass": [],
+    "excludedFilesChanged": 0,
+    "guardedFieldChanges": 0,
+    "nonDerivedEpsChanges": 0,
+    "q4EndAnnualEndRowsWithSameFyAnnual": {
+      "excludedSymbols": 30,
+      "otherSymbols": 0
+    },
+    "unexpectedLeafChanges": 0
+  },
+  "converged": false,
+  "cumulativeVsStartingState": {
+    "annualLabelRows": 0,
+    "epsValues": 5,
+    "files": 70,
+    "quarterlyLabelRows": 195
+  },
+  "epsActionsByPass": [
+    {
+      "action": "newly-derived",
+      "end": "2026-06-30",
+      "field": "epsDiluted",
+      "file": "HRB.json",
+      "new": 2.23,
+      "old": null,
+      "pass": 1,
+      "symbol": "HRB"
+    },
+    {
+      "action": "newly-derived",
+      "end": "2025-12-31",
+      "field": "epsBasic",
+      "file": "OSK.json",
+      "new": 2.12,
+      "old": null,
+      "pass": 1,
+      "symbol": "OSK"
+    },
+    {
+      "action": "newly-derived",
+      "end": "2025-12-31",
+      "field": "epsDiluted",
+      "file": "OSK.json",
+      "new": 2.1,
+      "old": null,
+      "pass": 1,
+      "symbol": "OSK"
+    },
+    {
+      "action": "newly-derived",
+      "end": "2025-12-31",
+      "field": "epsBasic",
+      "file": "MRDN.json",
+      "new": -7.43,
+      "old": null,
+      "pass": 2,
+      "symbol": "MRDN"
+    },
+    {
+      "action": "newly-derived",
+      "end": "2025-12-31",
+      "field": "epsDiluted",
+      "file": "MRDN.json",
+      "new": -7.43,
+      "old": null,
+      "pass": 2,
+      "symbol": "MRDN"
+    }
+  ],
+  "epsValuesVsStartingState": [
+    {
+      "end": "2026-06-30",
+      "field": "epsDiluted",
+      "file": "HRB.json",
+      "new": 2.23,
+      "old": null,
+      "symbol": "HRB"
+    },
+    {
+      "end": "2025-12-31",
+      "field": "epsBasic",
+      "file": "MRDN.json",
+      "new": -7.43,
+      "old": null,
+      "symbol": "MRDN"
+    },
+    {
+      "end": "2025-12-31",
+      "field": "epsDiluted",
+      "file": "MRDN.json",
+      "new": -7.43,
+      "old": null,
+      "symbol": "MRDN"
+    },
+    {
+      "end": "2025-12-31",
+      "field": "epsBasic",
+      "file": "OSK.json",
+      "new": 2.12,
+      "old": null,
+      "symbol": "OSK"
+    },
+    {
+      "end": "2025-12-31",
+      "field": "epsDiluted",
+      "file": "OSK.json",
+      "new": 2.1,
+      "old": null,
+      "symbol": "OSK"
+    }
+  ],
+  "excluded": {
+    "bySymbol": {
+      "AIOT": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "AIOT.json",
+        "quarterlyLabelRows": 6
+      },
+      "BRT": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "BRT.json",
+        "quarterlyLabelRows": 28
+      },
+      "CHRN": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "CHRN.json",
+        "quarterlyLabelRows": 2
+      },
+      "DXLG": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "DXLG.json",
+        "quarterlyLabelRows": 0
+      },
+      "EUDA": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "EUDA.json",
+        "quarterlyLabelRows": 2
+      },
+      "FCUV": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "FCUV.json",
+        "quarterlyLabelRows": 7
+      },
+      "GRNQ": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "GRNQ.json",
+        "quarterlyLabelRows": 1
+      },
+      "IMMR": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "IMMR.json",
+        "quarterlyLabelRows": 7
+      },
+      "NTST": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "NTST.json",
+        "quarterlyLabelRows": 0
+      },
+      "ODYS": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "ODYS.json",
+        "quarterlyLabelRows": 16
+      },
+      "RJET": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "RJET.json",
+        "quarterlyLabelRows": 4
+      },
+      "TRUG": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "TRUG.json",
+        "quarterlyLabelRows": 4
+      },
+      "UA": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "UA.json",
+        "quarterlyLabelRows": 14
+      },
+      "UAA": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "UAA.json",
+        "quarterlyLabelRows": 14
+      },
+      "VFC": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "VFC.json",
+        "quarterlyLabelRows": 29
+      },
+      "VTOL": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "VTOL.json",
+        "quarterlyLabelRows": 4
+      },
+      "YUMC": {
+        "annualLabelRows": 0,
+        "eps": {
+          "changed": 0,
+          "newlyDerived": 0,
+          "nulled": 0,
+          "reDerivedNoChange": 0
+        },
+        "file": "YUMC.json",
+        "quarterlyLabelRows": 0
+      }
+    },
+    "notApplied": {
+      "annualLabelRows": 0,
+      "eps": 0,
+      "files": 17,
+      "quarterlyLabelRows": 138
+    }
+  },
+  "generatedBy": "atlas/scripts/repair_fiscal_periods.py --fixpoint",
+  "labelRowsVsStartingState": [
+    {
+      "end": "2015-03-31",
+      "file": "ABVC.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "ABVC"
+    },
+    {
+      "end": "2015-06-30",
+      "file": "ABVC.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "ABVC"
+    },
+    {
+      "end": "2015-09-30",
+      "file": "ABVC.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "ABVC"
+    },
+    {
+      "end": "2017-03-31",
+      "file": "ABVC.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "ABVC"
+    },
+    {
+      "end": "2017-06-30",
+      "file": "ABVC.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "ABVC"
+    },
+    {
+      "end": "2017-09-30",
+      "file": "ABVC.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "ABVC"
+    },
+    {
+      "end": "2012-03-31",
+      "file": "ADM.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "ADM"
+    },
+    {
+      "end": "2012-06-30",
+      "file": "ADM.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "ADM"
+    },
+    {
+      "end": "2021-09-30",
+      "file": "AENT.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2021,
+        "old": 2022
+      },
+      "section": "quarterly",
+      "symbol": "AENT"
+    },
+    {
+      "end": "2021-12-31",
+      "file": "AENT.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2021,
+        "old": 2022
+      },
+      "section": "quarterly",
+      "symbol": "AENT"
+    },
+    {
+      "end": "2022-06-30",
+      "file": "AERT.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2022,
+        "old": 2023
+      },
+      "section": "quarterly",
+      "symbol": "AERT"
+    },
+    {
+      "end": "2022-09-30",
+      "file": "AERT.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2022,
+        "old": 2023
+      },
+      "section": "quarterly",
+      "symbol": "AERT"
+    },
+    {
+      "end": "2022-12-31",
+      "file": "AERT.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "fy": {
+        "new": 2022,
+        "old": 2023
+      },
+      "section": "quarterly",
+      "symbol": "AERT"
+    },
+    {
+      "end": "2012-03-31",
+      "file": "AGNT.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "AGNT"
+    },
+    {
+      "end": "2012-06-30",
+      "file": "AGNT.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "AGNT"
+    },
+    {
+      "end": "2013-03-31",
+      "file": "ALKS.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "ALKS"
+    },
+    {
+      "end": "2020-09-30",
+      "file": "ALMU.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2020,
+        "old": 2021
+      },
+      "section": "quarterly",
+      "symbol": "ALMU"
+    },
+    {
+      "end": "2020-12-31",
+      "file": "ALMU.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2020,
+        "old": 2021
+      },
+      "section": "quarterly",
+      "symbol": "ALMU"
+    },
+    {
+      "end": "2021-03-31",
+      "file": "ALMU.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "ALMU"
+    },
+    {
+      "end": "2021-06-30",
+      "file": "ALMU.json",
+      "fq": {
+        "new": 1,
+        "old": 4
+      },
+      "fy": {
+        "new": 2022,
+        "old": 2021
+      },
+      "section": "quarterly",
+      "symbol": "ALMU"
+    },
+    {
+      "end": "2016-03-31",
+      "file": "AREC.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "AREC"
+    },
+    {
+      "end": "2016-06-30",
+      "file": "AREC.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "AREC"
+    },
+    {
+      "end": "2016-09-30",
+      "file": "AREC.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "AREC"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "ARTL.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "ARTL"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "ARTL.json",
+      "fq": {
+        "new": 1,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "ARTL"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "ARTL.json",
+      "fq": {
+        "new": 2,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "ARTL"
+    },
+    {
+      "end": "2016-03-31",
+      "file": "ASTH.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "ASTH"
+    },
+    {
+      "end": "2023-09-30",
+      "file": "ATCH.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2023,
+        "old": 2024
+      },
+      "section": "quarterly",
+      "symbol": "ATCH"
+    },
+    {
+      "end": "2023-12-31",
+      "file": "ATCH.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2023,
+        "old": 2024
+      },
+      "section": "quarterly",
+      "symbol": "ATCH"
+    },
+    {
+      "end": "2024-03-31",
+      "file": "ATCH.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "ATCH"
+    },
+    {
+      "end": "2019-03-31",
+      "file": "ATPC.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "ATPC"
+    },
+    {
+      "end": "2019-06-30",
+      "file": "ATPC.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "ATPC"
+    },
+    {
+      "end": "2013-08-31",
+      "file": "AYTU.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "fy": {
+        "new": 2013,
+        "old": 2014
+      },
+      "section": "quarterly",
+      "symbol": "AYTU"
+    },
+    {
+      "end": "2013-04-30",
+      "file": "BBLG.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "BBLG"
+    },
+    {
+      "end": "2015-03-31",
+      "file": "BRFH.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "BRFH"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "CATX.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "CATX"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "CATX.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "CATX"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "CATX.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "CATX"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "CATX.json",
+      "fq": {
+        "new": 2,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "CATX"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "CMP.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "CMP"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "CMP.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "CMP"
+    },
+    {
+      "end": "2012-04-30",
+      "file": "COSM.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "COSM"
+    },
+    {
+      "end": "2025-06-30",
+      "file": "CSR.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "CSR"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "CSR.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "CSR"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "CSR.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "CSR"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "CSR.json",
+      "fq": {
+        "new": 1,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "CSR"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "CSR.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2026,
+        "old": 2027
+      },
+      "section": "quarterly",
+      "symbol": "CSR"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "CTGO.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "CTGO"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "CTGO.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "CTGO"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "CTGO.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "CTGO"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "CTGO.json",
+      "fq": {
+        "new": 2,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "CTGO"
+    },
+    {
+      "end": "2012-04-30",
+      "file": "CWST.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "CWST"
+    },
+    {
+      "end": "2013-04-30",
+      "file": "CWST.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "CWST"
+    },
+    {
+      "end": "2014-04-30",
+      "file": "CWST.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "CWST"
+    },
+    {
+      "end": "2016-03-31",
+      "file": "CYRX.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "CYRX"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "CZWI.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "CZWI"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "CZWI.json",
+      "fq": {
+        "new": 1,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "CZWI"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "CZWI.json",
+      "fq": {
+        "new": 2,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "CZWI"
+    },
+    {
+      "end": "2013-06-30",
+      "file": "DECK.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2013,
+        "old": 2014
+      },
+      "section": "quarterly",
+      "symbol": "DECK"
+    },
+    {
+      "end": "2013-09-30",
+      "file": "DECK.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2013,
+        "old": 2014
+      },
+      "section": "quarterly",
+      "symbol": "DECK"
+    },
+    {
+      "end": "2013-12-31",
+      "file": "DECK.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "fy": {
+        "new": 2013,
+        "old": 2014
+      },
+      "section": "quarterly",
+      "symbol": "DECK"
+    },
+    {
+      "end": "2017-04-29",
+      "file": "DY.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2017,
+        "old": 2018
+      },
+      "section": "quarterly",
+      "symbol": "DY"
+    },
+    {
+      "end": "2017-07-29",
+      "file": "DY.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2017,
+        "old": 2018
+      },
+      "section": "quarterly",
+      "symbol": "DY"
+    },
+    {
+      "end": "2017-10-28",
+      "file": "DY.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "DY"
+    },
+    {
+      "end": "2018-06-30",
+      "file": "ELF.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2018,
+        "old": 2019
+      },
+      "section": "quarterly",
+      "symbol": "ELF"
+    },
+    {
+      "end": "2018-09-30",
+      "file": "ELF.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2018,
+        "old": 2019
+      },
+      "section": "quarterly",
+      "symbol": "ELF"
+    },
+    {
+      "end": "2018-12-31",
+      "file": "ELF.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "fy": {
+        "new": 2018,
+        "old": 2019
+      },
+      "section": "quarterly",
+      "symbol": "ELF"
+    },
+    {
+      "end": "2019-03-31",
+      "file": "ELF.json",
+      "fq": {
+        "new": 1,
+        "old": 4
+      },
+      "fy": {
+        "new": 2020,
+        "old": 2019
+      },
+      "section": "quarterly",
+      "symbol": "ELF"
+    },
+    {
+      "end": "2015-03-31",
+      "file": "ELOX.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "ELOX"
+    },
+    {
+      "end": "2015-06-30",
+      "file": "ELOX.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "ELOX"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "EYPT.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "EYPT"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "EYPT.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "EYPT"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "EYPT.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "EYPT"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "EYPT.json",
+      "fq": {
+        "new": 2,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "EYPT"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "FOR.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "FOR"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "FOR.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "FOR"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "HNVR.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "HNVR"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "HNVR.json",
+      "fq": {
+        "new": 1,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "HNVR"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "HNVR.json",
+      "fq": {
+        "new": 2,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "HNVR"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "HRB.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "fy": {
+        "new": 2026,
+        "old": 2027
+      },
+      "section": "quarterly",
+      "symbol": "HRB"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "HTB.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "HTB"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "HTB.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "HTB"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "HTB.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "HTB"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "HTB.json",
+      "fq": {
+        "new": 2,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "HTB"
+    },
+    {
+      "end": "2013-09-30",
+      "file": "HURA.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2013,
+        "old": 2014
+      },
+      "section": "quarterly",
+      "symbol": "HURA"
+    },
+    {
+      "end": "2013-12-31",
+      "file": "HURA.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2013,
+        "old": 2014
+      },
+      "section": "quarterly",
+      "symbol": "HURA"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "HURA.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "HURA"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "HURA.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "HURA"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "HURA.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "HURA"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "HURA.json",
+      "fq": {
+        "new": 2,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "HURA"
+    },
+    {
+      "end": "2023-03-31",
+      "file": "HUT.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "HUT"
+    },
+    {
+      "end": "2023-06-30",
+      "file": "HUT.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "HUT"
+    },
+    {
+      "end": "2019-03-31",
+      "file": "INSE.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "INSE"
+    },
+    {
+      "end": "2019-06-30",
+      "file": "INSE.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "INSE"
+    },
+    {
+      "end": "2019-09-30",
+      "file": "INSE.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "INSE"
+    },
+    {
+      "end": "2017-03-31",
+      "file": "IQST.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "IQST"
+    },
+    {
+      "end": "2017-06-30",
+      "file": "IQST.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "IQST"
+    },
+    {
+      "end": "2021-06-30",
+      "file": "KD.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2021,
+        "old": 2022
+      },
+      "section": "quarterly",
+      "symbol": "KD"
+    },
+    {
+      "end": "2021-09-30",
+      "file": "KD.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2021,
+        "old": 2022
+      },
+      "section": "quarterly",
+      "symbol": "KD"
+    },
+    {
+      "end": "2021-12-31",
+      "file": "KD.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "fy": {
+        "new": 2021,
+        "old": 2022
+      },
+      "section": "quarterly",
+      "symbol": "KD"
+    },
+    {
+      "end": "2011-10-31",
+      "file": "LEXX.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "fy": {
+        "new": 2011,
+        "old": 2012
+      },
+      "section": "quarterly",
+      "symbol": "LEXX"
+    },
+    {
+      "end": "2012-01-31",
+      "file": "LEXX.json",
+      "fq": {
+        "new": 1,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "LEXX"
+    },
+    {
+      "end": "2012-04-30",
+      "file": "LEXX.json",
+      "fq": {
+        "new": 2,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "LEXX"
+    },
+    {
+      "end": "2025-10-03",
+      "file": "LHX.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "LHX"
+    },
+    {
+      "end": "2026-01-02",
+      "file": "LHX.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "LHX"
+    },
+    {
+      "end": "2026-04-03",
+      "file": "LHX.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "LHX"
+    },
+    {
+      "end": "2026-07-03",
+      "file": "LHX.json",
+      "fq": {
+        "new": 2,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "LHX"
+    },
+    {
+      "end": "2014-09-30",
+      "file": "LNAI.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2014,
+        "old": 2015
+      },
+      "section": "quarterly",
+      "symbol": "LNAI"
+    },
+    {
+      "end": "2014-12-31",
+      "file": "LNAI.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2014,
+        "old": 2015
+      },
+      "section": "quarterly",
+      "symbol": "LNAI"
+    },
+    {
+      "end": "2015-03-31",
+      "file": "LNAI.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "LNAI"
+    },
+    {
+      "end": "2014-06-30",
+      "file": "LOOP.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2014,
+        "old": 2015
+      },
+      "section": "quarterly",
+      "symbol": "LOOP"
+    },
+    {
+      "end": "2014-09-30",
+      "file": "LOOP.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2014,
+        "old": 2015
+      },
+      "section": "quarterly",
+      "symbol": "LOOP"
+    },
+    {
+      "end": "2014-12-31",
+      "file": "LOOP.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "LOOP"
+    },
+    {
+      "end": "2026-03-28",
+      "file": "MAGN.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "MAGN"
+    },
+    {
+      "end": "2026-06-27",
+      "file": "MAGN.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "MAGN"
+    },
+    {
+      "end": "2015-02-26",
+      "file": "MCS.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "MCS"
+    },
+    {
+      "end": "2015-05-28",
+      "file": "MCS.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "MCS"
+    },
+    {
+      "end": "2022-12-31",
+      "file": "MOBX.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "fy": {
+        "new": 2022,
+        "old": 2023
+      },
+      "section": "quarterly",
+      "symbol": "MOBX"
+    },
+    {
+      "end": "2016-06-30",
+      "file": "MODD.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "fy": {
+        "new": 2016,
+        "old": 2017
+      },
+      "section": "quarterly",
+      "symbol": "MODD"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "MRDN.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "MRDN"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "MRDN.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "MRDN"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "MRDN.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "MRDN"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "MRDN.json",
+      "fq": {
+        "new": 2,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "MRDN"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "MYGN.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "MYGN"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "MYGN.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "MYGN"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "MYGN.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "MYGN"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "MYGN.json",
+      "fq": {
+        "new": 2,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "MYGN"
+    },
+    {
+      "end": "2018-03-31",
+      "file": "NIXX.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "NIXX"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "NMTC.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "NMTC"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "NMTC.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "NMTC"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "ORMP.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "ORMP"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "ORMP.json",
+      "fq": {
+        "new": 1,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "ORMP"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "ORMP.json",
+      "fq": {
+        "new": 2,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "ORMP"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "OSK.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "OSK"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "OSK.json",
+      "fq": {
+        "new": 1,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "OSK"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "PBFS.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "PBFS"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "PBFS.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "PBFS"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "PBFS.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "PBFS"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "PBFS.json",
+      "fq": {
+        "new": 2,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "PBFS"
+    },
+    {
+      "end": "2011-06-30",
+      "file": "POWW.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2011,
+        "old": 2012
+      },
+      "section": "quarterly",
+      "symbol": "POWW"
+    },
+    {
+      "end": "2011-09-30",
+      "file": "POWW.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2011,
+        "old": 2012
+      },
+      "section": "quarterly",
+      "symbol": "POWW"
+    },
+    {
+      "end": "2011-12-31",
+      "file": "POWW.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "fy": {
+        "new": 2011,
+        "old": 2012
+      },
+      "section": "quarterly",
+      "symbol": "POWW"
+    },
+    {
+      "end": "2012-03-31",
+      "file": "POWW.json",
+      "fq": {
+        "new": 1,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "POWW"
+    },
+    {
+      "end": "2012-06-30",
+      "file": "POWW.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2012,
+        "old": 2013
+      },
+      "section": "quarterly",
+      "symbol": "POWW"
+    },
+    {
+      "end": "2017-06-30",
+      "file": "POWW.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2017,
+        "old": 2018
+      },
+      "section": "quarterly",
+      "symbol": "POWW"
+    },
+    {
+      "end": "2017-09-30",
+      "file": "POWW.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2017,
+        "old": 2018
+      },
+      "section": "quarterly",
+      "symbol": "POWW"
+    },
+    {
+      "end": "2017-12-31",
+      "file": "POWW.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "fy": {
+        "new": 2017,
+        "old": 2018
+      },
+      "section": "quarterly",
+      "symbol": "POWW"
+    },
+    {
+      "end": "2022-06-30",
+      "file": "RDZN.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2022,
+        "old": 2023
+      },
+      "section": "quarterly",
+      "symbol": "RDZN"
+    },
+    {
+      "end": "2022-09-30",
+      "file": "RDZN.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2022,
+        "old": 2023
+      },
+      "section": "quarterly",
+      "symbol": "RDZN"
+    },
+    {
+      "end": "2022-12-31",
+      "file": "RDZN.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "fy": {
+        "new": 2022,
+        "old": 2023
+      },
+      "section": "quarterly",
+      "symbol": "RDZN"
+    },
+    {
+      "end": "2018-03-31",
+      "file": "REBN.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "REBN"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "RGLD.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "RGLD"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "RGLD.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "RGLD"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "RGLD.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "RGLD"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "RGLD.json",
+      "fq": {
+        "new": 2,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "RGLD"
+    },
+    {
+      "end": "2025-06-30",
+      "file": "RIME.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "RIME"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "RIME.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "RIME"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "RIME.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "RIME"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "RIME.json",
+      "fq": {
+        "new": 1,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "RIME"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "RIME.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2026,
+        "old": 2027
+      },
+      "section": "quarterly",
+      "symbol": "RIME"
+    },
+    {
+      "end": "2013-02-28",
+      "file": "RLMD.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "RLMD"
+    },
+    {
+      "end": "2013-05-31",
+      "file": "RLMD.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "RLMD"
+    },
+    {
+      "end": "2019-03-31",
+      "file": "RLMD.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "RLMD"
+    },
+    {
+      "end": "2019-06-30",
+      "file": "RLMD.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "RLMD"
+    },
+    {
+      "end": "2016-05-31",
+      "file": "SKY.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "fy": {
+        "new": 2016,
+        "old": 2017
+      },
+      "section": "quarterly",
+      "symbol": "SKY"
+    },
+    {
+      "end": "2013-04-30",
+      "file": "SKYE.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "SKYE"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "SPHR.json",
+      "fq": {
+        "new": 3,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "SPHR"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "SPHR.json",
+      "fq": {
+        "new": 4,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "SPHR"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "SPHR.json",
+      "fq": {
+        "new": 1,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "SPHR"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "SPHR.json",
+      "fq": {
+        "new": 2,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "SPHR"
+    },
+    {
+      "end": "2023-12-31",
+      "file": "SRXH.json",
+      "fq": {
+        "new": 4,
+        "old": 1
+      },
+      "fy": {
+        "new": 2023,
+        "old": 2024
+      },
+      "section": "quarterly",
+      "symbol": "SRXH"
+    },
+    {
+      "end": "2012-03-31",
+      "file": "TBCH.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "TBCH"
+    },
+    {
+      "end": "2012-06-30",
+      "file": "TBCH.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "TBCH"
+    },
+    {
+      "end": "2012-09-30",
+      "file": "TBCH.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "TBCH"
+    },
+    {
+      "end": "2025-06-30",
+      "file": "TDW.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "TDW"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "TDW.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "TDW"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "TDW.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "TDW"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "TDW.json",
+      "fq": {
+        "new": 1,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "TDW"
+    },
+    {
+      "end": "2026-06-30",
+      "file": "TDW.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2026,
+        "old": 2027
+      },
+      "section": "quarterly",
+      "symbol": "TDW"
+    },
+    {
+      "end": "2019-11-30",
+      "file": "TLRY.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2019,
+        "old": 2020
+      },
+      "section": "quarterly",
+      "symbol": "TLRY"
+    },
+    {
+      "end": "2012-06-30",
+      "file": "VIVS.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2012,
+        "old": 2013
+      },
+      "section": "quarterly",
+      "symbol": "VIVS"
+    },
+    {
+      "end": "2012-09-30",
+      "file": "VIVS.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2012,
+        "old": 2013
+      },
+      "section": "quarterly",
+      "symbol": "VIVS"
+    },
+    {
+      "end": "2012-12-31",
+      "file": "VIVS.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "fy": {
+        "new": 2012,
+        "old": 2013
+      },
+      "section": "quarterly",
+      "symbol": "VIVS"
+    },
+    {
+      "end": "2013-03-31",
+      "file": "VIVS.json",
+      "fq": {
+        "new": 1,
+        "old": 4
+      },
+      "fy": {
+        "new": 2014,
+        "old": 2013
+      },
+      "section": "quarterly",
+      "symbol": "VIVS"
+    },
+    {
+      "end": "2013-03-31",
+      "file": "WKSP.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "section": "quarterly",
+      "symbol": "WKSP"
+    },
+    {
+      "end": "2013-06-30",
+      "file": "WKSP.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "WKSP"
+    },
+    {
+      "end": "2013-09-30",
+      "file": "WKSP.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "section": "quarterly",
+      "symbol": "WKSP"
+    },
+    {
+      "end": "2017-06-30",
+      "file": "XAIR.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2017,
+        "old": 2018
+      },
+      "section": "quarterly",
+      "symbol": "XAIR"
+    },
+    {
+      "end": "2017-09-30",
+      "file": "XAIR.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2017,
+        "old": 2018
+      },
+      "section": "quarterly",
+      "symbol": "XAIR"
+    },
+    {
+      "end": "2017-12-31",
+      "file": "XAIR.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "fy": {
+        "new": 2017,
+        "old": 2018
+      },
+      "section": "quarterly",
+      "symbol": "XAIR"
+    },
+    {
+      "end": "2013-06-30",
+      "file": "XBIO.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "section": "quarterly",
+      "symbol": "XBIO"
+    },
+    {
+      "end": "2025-06-30",
+      "file": "ZWS.json",
+      "fq": {
+        "new": 2,
+        "old": 1
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "ZWS"
+    },
+    {
+      "end": "2025-09-30",
+      "file": "ZWS.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "ZWS"
+    },
+    {
+      "end": "2025-12-31",
+      "file": "ZWS.json",
+      "fq": {
+        "new": 4,
+        "old": 3
+      },
+      "fy": {
+        "new": 2025,
+        "old": 2026
+      },
+      "section": "quarterly",
+      "symbol": "ZWS"
+    },
+    {
+      "end": "2026-03-31",
+      "file": "ZWS.json",
+      "fq": {
+        "new": 1,
+        "old": 4
+      },
+      "section": "quarterly",
+      "symbol": "ZWS"
+    }
+  ],
+  "passes": [
+    {
+      "annualLabelRows": 0,
+      "eps": {
+        "changed": 0,
+        "newlyDerived": 3,
+        "nulled": 0,
+        "reDerivedNoChange": 0
+      },
+      "filesChanged": 70,
+      "filesPlanned": 4950,
+      "pass": 1,
+      "quarterlyLabelRows": 76
+    },
+    {
+      "annualLabelRows": 0,
+      "eps": {
+        "changed": 0,
+        "newlyDerived": 2,
+        "nulled": 0,
+        "reDerivedNoChange": 0
+      },
+      "filesChanged": 52,
+      "filesPlanned": 70,
+      "pass": 2,
+      "quarterlyLabelRows": 56
+    },
+    {
+      "annualLabelRows": 0,
+      "eps": {
+        "changed": 0,
+        "newlyDerived": 0,
+        "nulled": 0,
+        "reDerivedNoChange": 0
+      },
+      "filesChanged": 38,
+      "filesPlanned": 52,
+      "pass": 3,
+      "quarterlyLabelRows": 40
+    },
+    {
+      "annualLabelRows": 0,
+      "eps": {
+        "changed": 0,
+        "newlyDerived": 0,
+        "nulled": 0,
+        "reDerivedNoChange": 0
+      },
+      "filesChanged": 19,
+      "filesPlanned": 38,
+      "pass": 4,
+      "quarterlyLabelRows": 19
+    },
+    {
+      "annualLabelRows": 0,
+      "eps": {
+        "changed": 0,
+        "newlyDerived": 0,
+        "nulled": 0,
+        "reDerivedNoChange": 0
+      },
+      "filesChanged": 4,
+      "filesPlanned": 19,
+      "pass": 5,
+      "quarterlyLabelRows": 4
+    }
+  ],
+  "passesRun": 5,
+  "scope": {
+    "excludedSymbols": [
+      "AIOT",
+      "BRT",
+      "CHRN",
+      "DXLG",
+      "EUDA",
+      "FCUV",
+      "GRNQ",
+      "IMMR",
+      "NTST",
+      "ODYS",
+      "RJET",
+      "TRUG",
+      "UA",
+      "UAA",
+      "VFC",
+      "VTOL",
+      "YUMC"
+    ],
+    "market": "US",
+    "maxPasses": 5,
+    "startingState": "the current docs/report/financials/ files, read only",
+    "writes": "none"
+  },
+  "version": 1
+}
