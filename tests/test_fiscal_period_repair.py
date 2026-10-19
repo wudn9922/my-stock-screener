@@ -185,5 +185,240 @@ class FiscalPeriodRepairTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), first)
 
 
+class FixpointConvergenceTests(unittest.TestCase):
+    """Convergence logic and the pass cap for --fixpoint. Nothing here writes to docs/report/financials/."""
+
+    def test_converge_stops_at_the_first_pass_that_makes_no_change(self):
+        calls = []
+
+        def run_pass(number):
+            calls.append(number)
+            return [] if number == 1 else ["unexpected"]
+
+        results, converged = repair.converge(run_pass)
+        self.assertTrue(converged)
+        self.assertEqual(calls, [1])
+        self.assertEqual(results, [[]])
+
+    def test_converge_runs_changing_passes_until_a_quiet_pass(self):
+        changes = {1: ["a", "b"], 2: ["c"], 3: []}
+        results, converged = repair.converge(lambda number: changes[number])
+        self.assertTrue(converged)
+        self.assertEqual(results, [["a", "b"], ["c"], []])
+
+    def test_converge_is_capped_at_five_passes_and_reports_no_convergence(self):
+        calls = []
+
+        def run_pass(number):
+            calls.append(number)
+            return ["still changing"]
+
+        results, converged = repair.converge(run_pass)
+        self.assertEqual(repair.FIXPOINT_MAX_PASSES, 5)
+        self.assertFalse(converged)
+        self.assertEqual(calls, [1, 2, 3, 4, 5])
+        self.assertEqual(len(results), 5)
+
+    def test_converge_honours_a_smaller_cap(self):
+        results, converged = repair.converge(lambda number: ["x"], max_passes=2)
+        self.assertFalse(converged)
+        self.assertEqual(len(results), 2)
+
+    def test_converge_rejects_a_cap_below_one(self):
+        with self.assertRaises(ValueError):
+            repair.converge(lambda number: [], max_passes=0)
+
+
+def chain_document(symbol):
+    """Five rows whose labels need two changing passes (the third pass makes no change)."""
+    rows = [("2022-06-30", 2023, 1), ("2022-09-30", 2023, 2), ("2023-03-31", 2023, 4),
+            ("2023-09-30", 2024, 2), ("2023-12-31", 2023, 3)]
+    return {
+        "version": 4, "symbol": symbol, "market": "US", "currency": "USD", "foreignReporter": False,
+        "fyEndMonth": 12,
+        "annual": {"end": ["2023-12-31"], "fy": [2023], "src": ["sec"],
+                   "values": {"netIncome": [400], "dilutedShares": [100]}},
+        "quarterly": {
+            "end": [end for end, _, _ in rows], "fy": [fy for _, fy, _ in rows],
+            "fq": [fq for _, _, fq in rows], "src": ["sec"] * len(rows),
+            "values": {"netIncome": [50] * len(rows), "dilutedShares": [100] * len(rows)},
+        },
+    }
+
+
+def q4_eps_fixture(symbol):
+    """A flagged file whose derived Q4 EPS can no longer be derived after one pass."""
+    values = {"epsDiluted": [0.5, 0.5, 0.5, 2.5], "epsBasic": [0.5, 0.5, 0.5, 2.5],
+              "netIncome": [50, 50, 50, 250], "dilutedShares": [100, 100, 100, 100]}
+    return {
+        "version": 4, "symbol": symbol, "market": "US", "currency": "USD", "foreignReporter": False,
+        "fyEndMonth": 12,
+        "annual": {"end": ["2023-12-31"], "fy": [2023], "src": ["sec"],
+                   "values": {"epsDiluted": [4.0], "epsBasic": [4.0], "netIncome": [400], "dilutedShares": [100]}},
+        "quarterly": {"end": ["2023-03-31", "2023-06-30", "2023-09-30", "2024-01-31"],
+                      "fy": [2023, 2023, 2023, 2023], "fq": [1, 2, 3, 4], "src": ["sec"] * 4,
+                      "derived": [None, None, None, 1], "values": values},
+    }
+
+
+class FixpointDriverTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.directory = Path(self._tmp.name) / "financials"
+        self.directory.mkdir()
+
+    def write(self, name, document):
+        (self.directory / name).write_text(
+            json.dumps(document, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
+
+    def snapshot(self):
+        return {path.name: path.read_bytes() for path in self.directory.glob("*.json")}
+
+    def test_chain_converges_in_three_passes_with_the_last_pass_making_no_change(self):
+        self.write("CHAIN.json", chain_document("CHAIN"))
+        before = self.snapshot()
+
+        report = repair.run_fixpoint(self.directory)
+
+        self.assertTrue(report["converged"])
+        self.assertEqual(report["passesRun"], 3)
+        self.assertEqual([entry["filesChanged"] for entry in report["passes"]], [1, 1, 0])
+        self.assertEqual([entry["quarterlyLabelRows"] for entry in report["passes"]], [4, 1, 0])
+        self.assertEqual(report["cumulativeVsStartingState"]["quarterlyLabelRows"], 5)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_cap_stops_a_chain_that_has_not_settled(self):
+        self.write("CHAIN.json", chain_document("CHAIN"))
+
+        report = repair.run_fixpoint(self.directory, max_passes=2)
+
+        self.assertFalse(report["converged"])
+        self.assertEqual(report["passesRun"], 2)
+        self.assertEqual([entry["filesChanged"] for entry in report["passes"]], [1, 1])
+
+    def test_default_cap_is_five_and_a_single_change_converges_in_two_passes(self):
+        self.write("CHAIN.json", chain_document("CHAIN"))
+        self.write("CLEAN.json", {**chain_document("CLEAN"), "quarterly": {
+            "end": ["2023-03-31", "2023-06-30", "2023-09-30", "2023-12-31"], "fy": [2023] * 4, "fq": [1, 2, 3, 4],
+            "src": ["sec"] * 4, "values": {"netIncome": [50] * 4, "dilutedShares": [100] * 4}}})
+        report = repair.run_fixpoint(self.directory)
+        self.assertEqual(report["scope"]["maxPasses"], 5)
+        self.assertTrue(report["converged"])
+
+        other = Path(self._tmp.name) / "single"
+        other.mkdir()
+        (other / "FLAG.json").write_text(
+            json.dumps(q4_eps_fixture("FLAG"), ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
+        single = repair.run_fixpoint(other)
+        self.assertTrue(single["converged"])
+        self.assertEqual([entry["filesChanged"] for entry in single["passes"]], [1, 0])
+        self.assertEqual(single["checks"]["nonDerivedEpsChanges"], 0)
+        self.assertEqual(single["checks"]["guardedFieldChanges"], 0)
+        nulled = [row for row in single["epsActionsByPass"] if row["action"] == "nulled"]
+        self.assertEqual(sorted(row["field"] for row in nulled), ["epsBasic", "epsDiluted"])
+
+    def test_excluded_symbol_is_planned_and_reported_but_never_changed(self):
+        self.write("UA.json", q4_eps_fixture("UA"))
+        before = self.snapshot()
+
+        report = repair.run_fixpoint(self.directory)
+
+        self.assertEqual(report["passesRun"], 1)
+        self.assertEqual(report["excluded"]["bySymbol"]["UA"]["quarterlyLabelRows"], 1)
+        self.assertEqual(report["cumulativeVsStartingState"]["files"], 0)
+        self.assertEqual(report["checks"]["excludedFilesChanged"], 0)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_fixpoint_writes_nothing_under_the_financials_directory(self):
+        self.write("CHAIN.json", chain_document("CHAIN"))
+        self.write("FLAG.json", q4_eps_fixture("FLAG"))
+        before = self.snapshot()
+        names_before = sorted(path.name for path in self.directory.iterdir())
+
+        repair.run_fixpoint(self.directory)
+
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(sorted(path.name for path in self.directory.iterdir()), names_before)
+
+
+class FixpointApplyTests(unittest.TestCase):
+    """--apply-fixpoint: writes exactly the listed changes, checks each pending file first, and is idempotent."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.directory = Path(self._tmp.name) / "financials"
+        self.directory.mkdir()
+
+    def write(self, name, document):
+        (self.directory / name).write_text(
+            json.dumps(document, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
+
+    def snapshot(self):
+        return {path.name: path.read_bytes() for path in self.directory.glob("*.json")}
+
+    def dry_run(self, max_passes=10):
+        # The committed report is JSON, so the apply sees the same round-tripped structure.
+        return json.loads(json.dumps(repair.run_fixpoint(self.directory, max_passes=max_passes)))
+
+    def test_apply_writes_the_chain_and_a_second_apply_writes_nothing(self):
+        self.write("CHAIN.json", chain_document("CHAIN"))
+        original = self.snapshot()
+        dry = self.dry_run()
+        self.assertTrue(dry["converged"])
+
+        first = repair.apply_fixpoint(self.directory, dry, max_passes=10)
+
+        self.assertEqual(first["written"], {"files": 1, "quarterlyLabelRows": 5,
+                                            "eps": {"newlyDerived": 0, "nulled": 0, "changed": 0}})
+        self.assertNotEqual(self.snapshot(), original)
+        after_first = self.snapshot()
+        self.assertEqual(repair.run_fixpoint(self.directory, max_passes=10)["passesRun"], 1)
+        second = repair.apply_fixpoint(self.directory, dry, max_passes=10)
+        self.assertEqual(second["written"]["files"], 0)
+        self.assertEqual(second["alreadyApplied"], 1)
+        self.assertEqual(self.snapshot(), after_first)
+
+    def test_tampered_dry_run_stops_before_any_file_is_written(self):
+        self.write("CHAIN.json", chain_document("CHAIN"))
+        self.write("FLAG.json", q4_eps_fixture("FLAG"))
+        before = self.snapshot()
+        dry = self.dry_run()
+        self.assertTrue(any(row["file"] == "CHAIN.json" for row in dry["labelRowsVsStartingState"]))
+        for row in dry["labelRowsVsStartingState"]:
+            if row["file"] == "CHAIN.json" and "fy" in row:
+                row["fy"]["new"] = 1999
+                break
+
+        with self.assertRaises(repair.ApplyError):
+            repair.apply_fixpoint(self.directory, dry, max_passes=10)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_excluded_symbol_is_never_written_even_if_a_dry_run_lists_it(self):
+        self.write("UA.json", q4_eps_fixture("UA"))
+        before = self.snapshot()
+        dry = self.dry_run()
+        self.assertEqual(dry["cumulativeVsStartingState"]["files"], 0)
+        dry["epsValuesVsStartingState"].append({
+            "file": "UA.json", "symbol": "UA", "end": "2024-01-31", "field": "epsBasic",
+            "old": 2.5, "new": None,
+        })
+
+        with self.assertRaises(repair.ApplyError):
+            repair.apply_fixpoint(self.directory, dry, max_passes=10)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_unconverged_dry_run_is_refused(self):
+        self.write("CHAIN.json", chain_document("CHAIN"))
+        before = self.snapshot()
+        dry = self.dry_run(max_passes=2)
+        self.assertFalse(dry["converged"])
+
+        with self.assertRaises(repair.ApplyError):
+            repair.apply_fixpoint(self.directory, dry, max_passes=10)
+        self.assertEqual(self.snapshot(), before)
+
+
 if __name__ == "__main__":
     unittest.main()
