@@ -249,10 +249,15 @@ def compare_controls():
     sample_sha_path = STAGE / "sample.sha256"
     extraction_sha_path = STAGE / "extraction.sha256"
     # Freeze checks precede loading answer-set values.
-    sample_commit = stage2.assert_committed(sample_path.relative_to(ROOT))
+    sample_rel = sample_path.relative_to(ROOT)
+    stage2.assert_committed(sample_rel)
     stage2.assert_committed(sample_sha_path.relative_to(ROOT))
-    extraction_commit = stage2.assert_committed(extraction_path.relative_to(ROOT))
+    extraction_rel = extraction_path.relative_to(ROOT)
+    stage2.assert_committed(extraction_rel)
     stage2.assert_committed(extraction_sha_path.relative_to(ROOT))
+    sample_commit = stage2.git("log", "-1", "--format=%H", "--", str(sample_rel))
+    extraction_commit = stage2.git("log", "-1", "--format=%H", "--", str(extraction_rel))
+    comparison_base_commit = stage2.git("rev-parse", "HEAD")
     sample_sha = stage2.sha256_file(sample_path)
     extraction_sha = stage2.sha256_file(extraction_path)
     if sample_sha != sample_sha_path.read_text(encoding="ascii").split()[0]:
@@ -273,6 +278,7 @@ def compare_controls():
         "sample_commit": sample_commit,
         "extraction_sha256": extraction_sha,
         "extraction_commit": extraction_commit,
+        "comparison_base_commit": comparison_base_commit,
         "answer_set_sha256": stage2.sha256_file(answer_path),
         **comparison,
     }
@@ -285,6 +291,12 @@ def compare_controls():
 
 def _status_counts(rows):
     return Counter(row.get("status", "unknown") for row in rows)
+
+
+def _format_number(value):
+    if value is None:
+        return "—"
+    return f"{float(value):.4f}".rstrip("0").rstrip(".")
 
 
 def render_report():
@@ -319,9 +331,46 @@ def render_report():
         )
     mismatches = extraction.get("skipped_fiscal_period_mismatches", [])
     mismatch_rows = [
-        f"| {row.get('sample_role')} | {row.get('symbol')} | {row.get('classification_class') or 'control'} | "
+        f"| {row.get('sample_role')} | {row.get('symbol')} | "
+        f"{row.get('classification_class') or row.get('class') or 'control'} | "
         f"FY{row.get('fy')} | {row.get('local_q4_end')} | {row.get('same_fy_sec_10k_report_end')} |"
         for row in mismatches
+    ]
+    direct_rows = []
+    for row in accepted_missing:
+        accepted = row.get("accepted") or {}
+        evidence = (
+            f"GAAP: {accepted.get('gaap_evidence')}; diluted={accepted.get('diluted')} "
+            f"(row label); period: {accepted.get('fiscal_quarter')}; "
+            f"{accepted.get('consolidated_scope_evidence')}; {accepted.get('share_class_evidence')}"
+        )
+        direct_rows.append(
+            f"| {row.get('symbol')} | FY{row.get('fy')} / {row.get('q4_end')} | "
+            f"{accepted.get('value_as_filed')} | {accepted.get('source')} | "
+            f"[{accepted.get('accession')}]({accepted.get('source_url')}) | "
+            f"{accepted.get('filing_date')} | {accepted.get('row_text', '').replace('|', '\\|')} | {evidence} | "
+            f"{(accepted.get('split_basis') or {}).get('value_basis')} |"
+        )
+    unique_missing_by_source = {
+        source: sum(row.get("status") == "A_verified_direct_q4_eps"
+                    and row.get("accepted_source") == source for row in missing)
+        for source in ("8-K/8-K-A", "10-K/10-K-A")
+    }
+    control_source_counts = {
+        source: sum(row.get("status") == "A_verified_direct_q4_eps"
+                    and (row.get("accepted") or {}).get("source") == source for row in controls)
+        for source in ("8-K/8-K-A", "10-K/10-K-A")
+    }
+    incorrect_controls = [row for row in comparison.get("rows", [])
+                          if row.get("correct_within_0_005") is False]
+    incorrect_rows = [
+        f"| {row.get('symbol')} | FY{row.get('fy')} / {row.get('q4_end')} | "
+        f"{_format_number(row.get('extracted_eps_as_filed'))} as filed; current-basis comparator "
+        f"{_format_number(row.get('extracted_eps_current_basis'))} | "
+        f"{_format_number(row.get('answer_set_eps_current_basis'))} | "
+        f"{_format_number(row.get('absolute_difference_current_basis'))} | "
+        f"{row.get('extraction_accession')} vs {row.get('answer_set_accession')} |"
+        for row in incorrect_controls
     ]
     metrics = extraction.get("metrics") or {}
     missing_share = len(accepted_missing) / len(missing) if missing else 0.0
@@ -332,8 +381,13 @@ def render_report():
         f"Frozen sample `{sample['sample_id']}` used new seed `{sample['selection_seed']}`. "
         f"Sample SHA-256 `{stage2.sha256_file(STAGE / 'sample.json')}`; extraction SHA-256 "
         f"`{stage2.sha256_file(STAGE / 'extraction.json')}`.",
+        f"Sample freeze commit `{comparison.get('sample_commit')}`; extraction freeze commit "
+        f"`{comparison.get('extraction_commit')}`; comparison base commit `{comparison.get('comparison_base_commit')}`.",
         f"Regression fix commit `{sample['regression_fix_commit']}`; main base `{sample['base_commit']}`.",
         f"One SEC extraction run: complete **{extraction.get('complete')}**, stop reason `{extraction.get('stopped_reason')}`.",
+        f"The run completed its query plan, with status E (technical failure/incomplete) for "
+        f"**{sum(row.get('status') == 'E_technical_failure' for row in missing)} missing periods** and "
+        f"**{sum(row.get('status') == 'E_technical_failure' for row in controls)} controls**; a completed run does not mean every period was resolved.",
         "", "## Missing-period yield by classification", "",
         "| Main class | Sampled periods | A: verified direct | B: candidate | C: annual/non-quarter only | D: no direct found | E: incomplete | Skipped fiscal-end mismatch |",
         "|---|---:|---:|---:|---:|---:|---:|---:|", *class_rows,
@@ -343,6 +397,15 @@ def render_report():
         "",
         f"Verified direct Q4 EPS: **{len(accepted_missing)}/{len(missing)} sampled missing periods ({missing_share:.1%})**; "
         f"yield bar ≥20%: **{'PASS' if yield_pass else 'FAIL'}**. The denominator includes periods skipped for a fiscal-end mismatch.",
+        "", "### Verified missing-period value", "",
+        "| Ticker | Fiscal period | EPS as filed | Source | SEC accession / URL | Filing date | Original row label | GAAP / diluted / period / scope evidence | Split basis |",
+        "|---|---|---:|---|---|---|---|---|---|",
+        *(direct_rows or ["| — | — | — | — | — | — | — | — | — |"]),
+        "",
+        f"Unique missing-period values by source: 8-K/8-K-A **{unique_missing_by_source['8-K/8-K-A']}**; "
+        f"10-K/10-K-A **{unique_missing_by_source['10-K/10-K-A']}**. "
+        f"Accepted control values by source: 8-K/8-K-A **{control_source_counts['8-K/8-K-A']}**; "
+        f"10-K/10-K-A **{control_source_counts['10-K/10-K-A']}**.",
         "", "## Control accuracy and acceptance bar", "",
         f"Controls accepted: **{stats['accepted']}/60**; correct within ±0.005: **{stats['correct']}**; "
         f"incorrect: **{stats['incorrect']}**; sign errors: **{stats['sign_errors']}**; "
@@ -350,13 +413,21 @@ def render_report():
         f"`{stats['accuracy_among_accepted']}`.",
         f"Control bar (≥50 accepted, every accepted value correct, zero sign errors): **{'PASS' if control_pass else 'FAIL'}**.",
         "Controls were compared only after the extraction JSON and its SHA-256 were committed. No extraction rule was changed after the comparison.",
+        "", "### Control mismatches", "",
+        "| Ticker | Fiscal period | SEC value as filed / comparison basis | Answer-set value | Absolute difference | Source accessions |",
+        "|---|---|---|---:|---:|---|",
+        *(incorrect_rows or ["| — | — | — | — | — | — |"]),
+        "",
+        "CTSO is the sole mismatch on the frozen split-normalized comparison basis: its 2022 8-K value is -0.21 as filed; the recorded "
+        "future split factor is 0.05, which the frozen comparator converts to -4.20, while the answer set has -0.25. The cause of that "
+        "difference remains unresolved. It is counted as incorrect, with no sign error. The comparison logic was not changed after this result.",
         "", "## Fiscal-period mismatches skipped", "",
         f"Skipped **{len(mismatches)}** sampled periods because the local Q4 end differs from the same-FY SEC 10-K report end.",
         "", "| Sample role | Ticker | Class | FY | Local Q4 end | SEC 10-K report end |",
         "|---|---|---|---:|---|---|", *(mismatch_rows or ["| — | — | — | — | — | — |"]),
         "", "## SEC requests, bytes, and controls", "",
-        f"Wire request attempts: **{metrics.get('network_request_attempts', 0)} / 12,000**; decoded wire bytes: "
-        f"**{metrics.get('decoded_bytes_received', 0)}**; raw wire bytes: **{metrics.get('wire_bytes_received', 0)}**; "
+        f"Wire request attempts: **{metrics.get('network_request_attempts', 0)} / 12,000**; decoded network-response bytes: "
+        f"**{metrics.get('decoded_bytes_received', 0)}**; raw wire bytes received: **{metrics.get('wire_bytes_received', 0)}**; "
         f"decoded cached-body bytes examined: **{metrics.get('decoded_cached_body_bytes_examined', 0)}**; "
         f"decoded response bytes examined total: **{metrics.get('decoded_response_body_bytes_examined', 0)}**; "
         f"cache hits: **{metrics.get('cache_hits', 0)}**; retries: **{metrics.get('retries', 0)}**.",
