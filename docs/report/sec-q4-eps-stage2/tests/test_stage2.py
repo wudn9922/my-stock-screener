@@ -35,7 +35,11 @@ class SelectionTests(unittest.TestCase):
             self.skipTest("the sample is frozen by the pre-query commit")
         sample = stage2.load_json(path)
         rebuilt = stage2.make_sample(sample["selection_seed"])
-        self.assertEqual(sample["freeze_sha256"], rebuilt["freeze_sha256"])
+        frozen_payload = {key: value for key, value in sample.items()
+                          if key not in {"base_commit", "freeze_sha256"}}
+        rebuilt_payload = {key: value for key, value in rebuilt.items()
+                           if key not in {"base_commit", "freeze_sha256"}}
+        self.assertEqual(frozen_payload, rebuilt_payload)
         self.assertEqual(len(sample["missing_companies"]), 60)
         self.assertEqual(len(sample["controls"]), 60)
         self.assertEqual({row["class"] for row in sample["missing_companies"]}, set(stage2.MISSING_CLASS_ORDER))

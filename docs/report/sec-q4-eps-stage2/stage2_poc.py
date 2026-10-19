@@ -415,10 +415,10 @@ class SEC403(RuntimeError):
 
 class GuardedOpener:
     """Counts every wire attempt and blocks before exceeding the task's hard cap."""
-    def __init__(self, cap=MAX_REQUESTS, *, ledger_path=STAGE / "source-ledger.jsonl", sleeper=None):
+    def __init__(self, cap=MAX_REQUESTS, *, ledger_path=None, sleeper=None):
         import time
         self.cap = cap
-        self.ledger_path = Path(ledger_path)
+        self.ledger_path = Path(ledger_path or STAGE / "source-ledger.jsonl")
         self.sleeper = sleeper or time.sleep
         self.run_start_attempts = 0
         self.attempts = 0
@@ -504,11 +504,16 @@ class Stage2SecClient(poc.SecClient):
         return response
 
     def metrics(self):
+        response_bodies = [response.get("body", b"") for response in self.responses.values()]
+        cache_bodies = [response.get("body", b"") for response in self.responses.values()
+                        if response.get("cache_hit")]
         return {
             "network_request_attempts": self.guard.attempts - self.guard.run_start_attempts,
             "cumulative_network_request_attempts": self.guard.attempts,
             "decoded_bytes_received": self.bytes_received,
             "wire_bytes_received": self.wire_bytes_received,
+            "decoded_response_body_bytes_examined": sum(map(len, response_bodies)),
+            "decoded_cached_body_bytes_examined": sum(map(len, cache_bodies)),
             "cache_hits": self.cache_hits,
             "retries": self.retries,
             "rate_limit_max_requests_per_second": 4,
@@ -517,8 +522,8 @@ class Stage2SecClient(poc.SecClient):
         }
 
 
-def append_ledger(client, path=STAGE / "source-ledger.jsonl"):
-    path = Path(path)
+def append_ledger(client, path=None):
+    path = Path(path or STAGE / "source-ledger.jsonl")
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as stream:
         for entry in client.ledger:
@@ -526,10 +531,10 @@ def append_ledger(client, path=STAGE / "source-ledger.jsonl"):
     client.ledger.clear()
 
 
-def write_extraction_checkpoint(payload, client, path=STAGE / "extraction.json"):
+def write_extraction_checkpoint(payload, client, path=STAGE / "extraction.json", *, ledger_path=None):
     payload["metrics"] = client.metrics()
     dump_json(path, payload)
-    append_ledger(client)
+    append_ledger(client, ledger_path)
 
 
 def _filing_rows(payload):
@@ -684,8 +689,53 @@ def _parse_money(value):
         return None
 
 
+def _row_numeric_value(row, columns):
+    """Read a cell value that SEC exhibits split across currency/value/sign cells."""
+    found = {}
+    columns = sorted(set(columns))
+    # Some SEC HTML puts the closing parenthesis in a separate cell whose
+    # header omits the year even though it belongs to the dated EPS column.
+    for column in tuple(columns):
+        if column > 0 and row[column - 1].strip() in {"(", "$"}:
+            columns.append(column - 1)
+        if column + 1 < len(row) and row[column + 1].strip() in {")", "("}:
+            columns.append(column + 1)
+    columns = sorted(set(columns))
+    allowed = set(columns)
+    for start in columns:
+        for width in (1, 2, 3):
+            span = list(range(start, start + width))
+            if not all(index in allowed and index < len(row) for index in span):
+                continue
+            value = _parse_money(" ".join(row[index] for index in span))
+            if value is not None:
+                found.setdefault(value, span)
+    if len(found) == 1:
+        value, span = next(iter(found.items()))
+        return value, span
+    return None, None
+
+
+def _eps_row_context(grid, row_index):
+    """Carry a nearby EPS section label down to Basic/Diluted/value rows."""
+    section = ""
+    for previous in grid[:row_index]:
+        label = (previous[0] if previous else "").strip()
+        has_row_values = any(cell.strip() for cell in previous[1:])
+        if label and not has_row_values and re.search(
+                r"(?:earnings?|income|loss)\s+per\s+(?:basic\s+|diluted\s+)?share|per\s+(?:common\s+)?share", label, re.I):
+            section = label
+        elif label and re.search(r"weighted\s+average|shares\s+outstanding", label, re.I):
+            section = ""
+    current = (grid[row_index][0] if grid[row_index] else "").strip()
+    if section and current and (re.fullmatch(r"(?:basic|diluted)", current, re.I)
+                                or re.search(r"per\s+(?:common\s+)?share", current, re.I)):
+        return f"{section} {current}".strip()
+    return current
+
+
 def table_eps_candidates(body, target, *, source_url, filing, split_events):
-    """Extract only direct table rows with explicit diluted EPS and a single, dated three-month column."""
+    """Extract direct diluted EPS from dated Q4 columns, including split-cell tables."""
     from lxml import html as lxml_html
     try:
         root = lxml_html.fromstring(body)
@@ -694,22 +744,22 @@ def table_eps_candidates(body, target, *, source_url, filing, split_events):
     candidates = []
     for table in root.xpath("//table"):
         table_text = poc.html_plain_text(table)
-        if not re.search(r"per\s+(?:(?:basic|diluted|fully)\s+)*(?:and\s+(?:basic|diluted)\s+)?(?:common\s+)?share", table_text, re.I):
-            continue
-        adjusted = bool(re.search(r"adjusted|non.?gaap", table_text, re.I))
+        parent_text = poc.html_plain_text(table.getparent()) if table.getparent() is not None else ""
+        scope_text = f"{table_text} {parent_text}"
         grid = _grid_rows(table)
         for row_index, row in enumerate(grid):
-            label = row[0] if row else ""
-            if not re.search(r"diluted", label, re.I) or not re.search(
-                    r"per\s+(?:(?:basic|diluted|fully)\s+)*(?:and\s+(?:basic|diluted)\s+)?(?:common\s+)?share", label, re.I):
+            label = _eps_row_context(grid, row_index)
+            if not re.search(r"diluted", label, re.I) or not re.search(r"share", label, re.I):
                 continue
-            if re.search(r"adjusted|non.?gaap|basic\s+earnings?\s+per\s+share\s+only", label, re.I):
+            if re.search(r"weighted\s+average|shares\s+used\s+to\s+compute", label, re.I):
+                continue
+            if re.search(r"adjusted|non.?gaap", label, re.I):
                 continue
             # Continuing/discontinued operations EPS is not the total GAAP EPS requested.
             # Require an explicit total net income/loss or earnings row label.
             if re.search(r"continuing\s+operations|discontinued\s+operations|segment", label, re.I):
                 continue
-            if not re.search(r"\b(?:net\s+income|net\s+loss|net\s+earnings|earnings)\b", label, re.I):
+            if not re.search(r"\bnet\b.{0,40}\b(?:income|loss|earnings)\b|\bearnings\b", label, re.I):
                 continue
             headers = [" ".join(grid[h][col].strip() for h in range(row_index) if col < len(grid[h]) and grid[h][col].strip())
                        for col in range(len(row))]
@@ -723,19 +773,16 @@ def table_eps_candidates(body, target, *, source_url, filing, split_events):
                         and re.search(r"three\s+months|three-month|quarter", heading_lower)
                         and not re.search(r"twelve\s+months|year\s+ended|fiscal\s+year", heading_lower)):
                     matches.append(col)
-            if len(matches) != 1:
+            if not matches:
                 continue
-            column = matches[0]
-            value = _parse_money(row[column]) if column < len(row) else None
+            value, value_columns = _row_numeric_value(row, matches)
             if value is None:
                 continue
-            gaap_context = bool(re.search(r"\bGAAP\b|consolidated\s+(?:statements?|statement)\s+of\s+(?:operations|income|earnings)", table_text, re.I))
-            common_scope = bool(re.search(r"common\s+share", label, re.I))
-            consolidated = bool(re.search(r"consolidated", table_text, re.I))
-            class_unclear = bool(re.search(r"class\s+[A-Z]|class of common", table_text, re.I))
+            gaap_context = bool(re.search(r"\bGAAP\b|consolidated\s+(?:statements?|statement)\s+of\s+(?:operations|income|earnings)", scope_text, re.I))
+            common_scope = bool(re.search(r"common\s+share|attributable\s+to\s+[A-Z][A-Za-z .,&'-]+", label, re.I))
+            consolidated = bool(re.search(r"consolidated", scope_text, re.I))
+            class_unclear = bool(re.search(r"class\s+[A-Z]|class of common", label, re.I))
             issues = []
-            if adjusted:
-                issues.append("non_gaap_context_possible")
             if not gaap_context:
                 issues.append("gaap_statement_basis_unverified")
             if not common_scope:
@@ -752,13 +799,16 @@ def table_eps_candidates(body, target, *, source_url, filing, split_events):
                 "verified": not issues,
                 "value": value,
                 "concept": None,
-                "row_text": " | ".join(row),
+                "row_text": label,
+                "raw_row_cells": row,
                 "table_text": table_text[:6000],
                 "context": {"start": target.get("q4_start_estimate"), "end": target["q4_end"],
                             "duration_basis": "explicit three-month fiscal-Q4 column"},
                 "locator": {"table_xpath": table.getroottree().getpath(table),
-                            "row_xpath": row_xpath, "column_index": column, "column_header": headers[column]},
-                "gaap_evidence": "GAAP or consolidated statement label in this source table" if gaap_context else None,
+                            "row_xpath": row_xpath, "column_index": value_columns[0],
+                            "value_column_span": value_columns,
+                            "column_header": headers[value_columns[0]]},
+                "gaap_evidence": "GAAP or consolidated statement label in the table's source context" if gaap_context else None,
                 "consolidated_scope_evidence": "consolidated statement/table heading" if consolidated else None,
                 "share_class_evidence": "common share stated in the EPS row" if common_scope else None,
                 "diluted": True,
@@ -1036,10 +1086,15 @@ def _mark_pending_as_technical_failure(payload, reason):
             item.update({"status": "E_technical_failure", "technical_reason": reason})
 
 
-def run_extraction(sample_path=STAGE / "sample.json", output_path=STAGE / "extraction.json"):
+def run_extraction(sample_path=STAGE / "sample.json", output_path=STAGE / "extraction.json", *,
+                   stage_dir=None, cache_dir=None, state_path=None):
     sample_path = Path(sample_path)
     if not sample_path.is_absolute():
         sample_path = ROOT / sample_path
+    stage_dir = Path(stage_dir or STAGE)
+    if not stage_dir.is_absolute():
+        stage_dir = ROOT / stage_dir
+    ledger_path = stage_dir / "source-ledger.jsonl"
     commit = assert_committed(sample_path.relative_to(ROOT))
     sample = load_json(sample_path)
     check_sample(sample)
@@ -1072,10 +1127,10 @@ def run_extraction(sample_path=STAGE / "sample.json", output_path=STAGE / "extra
     output_path = Path(output_path)
     if not output_path.is_absolute():
         output_path = ROOT / output_path
-    cache_dir = Path("/tmp/sec-q4-eps-stage2-cache")
-    opener = GuardedOpener(MAX_REQUESTS)
+    cache_dir = Path(cache_dir or "/tmp/sec-q4-eps-stage2-cache")
+    opener = GuardedOpener(MAX_REQUESTS, ledger_path=ledger_path)
     client = Stage2SecClient(cache_dir=cache_dir, opener=opener)
-    state_path = Path("/tmp/sec-q4-eps-stage2-run-state.json")
+    state_path = Path(state_path or (Path("/tmp") / f"{stage_dir.name}-run-state.json"))
     try:
         # Resolve filings for every sampled issuer first; this call is metadata-only, not EPS extraction.
         issuer_filings = {}
@@ -1084,7 +1139,7 @@ def run_extraction(sample_path=STAGE / "sample.json", output_path=STAGE / "extra
             url = f"https://data.sec.gov/submissions/CIK{cik}.json"
             response = client.get(url, context={"kind": "submissions", "cik": cik,
                                                 "symbols": sorted({row['symbol'] for row in rows})})
-            append_ledger(client)
+            append_ledger(client, ledger_path)
             if response.get("status") != 200 or response.get("error"):
                 issuer_filings[cik] = {"filings": [], "status": "technical_failure",
                                        "error": response.get("error"), "http_status": response.get("status")}
@@ -1095,11 +1150,11 @@ def run_extraction(sample_path=STAGE / "sample.json", output_path=STAGE / "extra
                 issuer_filings[cik] = {"filings": [], "status": "parser_failure", "error": str(error)}
                 continue
             filings = resolve_issuer_filings(client, issuer, rows, submission)
-            append_ledger(client)
+            append_ledger(client, ledger_path)
             issuer_filings[cik] = {"filings": filings, "status": "resolved", "name": submission.get("name")}
 
         for target, item in zip(targets, payload["period_results"]):
-            write_extraction_checkpoint(payload, client, output_path)
+            write_extraction_checkpoint(payload, client, output_path, ledger_path=ledger_path)
             issuer_result = issuer_filings.get(target["cik"], {})
             if issuer_result.get("status") != "resolved":
                 item["status"] = "E_technical_failure"
@@ -1158,7 +1213,7 @@ def run_extraction(sample_path=STAGE / "sample.json", output_path=STAGE / "extra
                 eightk_candidates.extend(evidence)
                 if failure:
                     eightk_failures.append(failure)
-                write_extraction_checkpoint(payload, client, output_path)
+                write_extraction_checkpoint(payload, client, output_path, ledger_path=ledger_path)
             item["source_d"]["candidates"] = eightk_candidates
             d_status, d_chosen, d_reason, d_candidates = _classify_candidates(eightk_candidates)
             item["source_d"]["status"] = d_status or ("searched" if not eightk_failures else "E_technical_failure")
@@ -1190,7 +1245,7 @@ def run_extraction(sample_path=STAGE / "sample.json", output_path=STAGE / "extra
                     c_candidates.extend(evidence)
                     if status != "parsed":
                         c_failures.append(status)
-                    write_extraction_checkpoint(payload, client, output_path)
+                    write_extraction_checkpoint(payload, client, output_path, ledger_path=ledger_path)
                 item["source_c"]["candidates"] = c_candidates
                 c_status, c_chosen, c_reason, _ = _classify_candidates(c_candidates)
                 item["source_c"]["status"] = c_status or ("searched" if not c_failures else "E_technical_failure")
@@ -1234,7 +1289,7 @@ def run_extraction(sample_path=STAGE / "sample.json", output_path=STAGE / "extra
                     "diluted_evidence": accepted.get("diluted_evidence"),
                     "split_basis": accepted.get("split_basis"),
                 }
-            write_extraction_checkpoint(payload, client, output_path)
+            write_extraction_checkpoint(payload, client, output_path, ledger_path=ledger_path)
 
         payload["complete"] = True
         payload["stopped_reason"] = "completed"
@@ -1257,11 +1312,11 @@ def run_extraction(sample_path=STAGE / "sample.json", output_path=STAGE / "extra
             payload, "extraction stopped before this period completed its search")
         raise
     finally:
-        append_ledger(client)
+        append_ledger(client, ledger_path)
         payload["metrics"] = client.metrics()
         payload["metrics"]["unique_sec_urls"] = len(client.responses)
-        payload["source_ledger_entries"] = sum(1 for _ in (STAGE / "source-ledger.jsonl").open(encoding="utf-8")) \
-            if (STAGE / "source-ledger.jsonl").exists() else 0
+        payload["source_ledger_entries"] = sum(1 for _ in ledger_path.open(encoding="utf-8")) \
+            if ledger_path.exists() else 0
         dump_json(output_path, payload)
         dump_json(state_path, {"sample_sha256": sample.get("freeze_sha256"),
                                "complete": payload.get("complete"), "stopped_reason": payload.get("stopped_reason"),
