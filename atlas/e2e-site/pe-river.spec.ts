@@ -10,12 +10,26 @@ import { mockSite } from './mocks';
  */
 const reportDir = resolve(import.meta.dirname, '../../docs/report/financials');
 const body = (key: string) => (existsSync(resolve(reportDir, `${key}.json`)) ? readFileSync(resolve(reportDir, `${key}.json`), 'utf8') : null);
+const syntheticTaiwanNoEps = (() => {
+  const fixture = JSON.parse(readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials/tsmc-twd.json'), 'utf8')) as {
+    symbol: string;
+    annual: { values: Record<string, (number | null)[]> };
+    quarterly: { values: Record<string, (number | null)[]> };
+  };
+  fixture.symbol = '1312.TW';
+  for (const series of [fixture.annual, fixture.quarterly]) {
+    for (const field of ['epsDiluted', 'epsBasic']) {
+      series.values[field] = series.values[field]!.map(() => null);
+    }
+  }
+  return JSON.stringify(fixture);
+})();
 
-async function mockPeRiver(page: Page, options: Parameters<typeof mockSite>[1] = {}) {
+async function mockPeRiver(page: Page, options: Parameters<typeof mockSite>[1] = {}, financials: Record<string, string> = {}) {
   await mockSite(page, options);
   await page.route('**/my-stock-screener/report/financials/*.json', (route) => {
     const key = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop()!.replace(/\.json$/, ''));
-    const text = body(key);
+    const text = financials[key] ?? body(key);
     return text ? route.fulfill({ status: 200, contentType: 'application/json', body: text }) : route.fulfill({ status: 404, body: 'not found' });
   });
 }
@@ -33,7 +47,7 @@ async function openCard(section: Locator) {
 /** Element screenshots would include the sticky header and tab bar on top of the card. */
 const unstick = (page: Page) => page.addStyleTag({ content: '.fin-head{position:static!important}.bottom-nav,nav[aria-label]{display:none!important}' });
 
-test('US stock: river with five labelled multiples, percentile, basis block, no horizontal scroll', async ({ page }, info) => {
+test('US stock: annual-only river with five labelled multiples, percentile, basis block, no horizontal scroll', async ({ page }, info) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   await mockPeRiver(page);
@@ -44,13 +58,15 @@ test('US stock: river with five labelled multiples, percentile, basis block, no 
   // Folded head: the current multiple and its percentile in one line (before the chart mounts).
   await expect(card(page).locator('.fin-fold-summary')).toContainText(/目前本益比 [\d.]+x · 歷史第 \d+ 百分位/);
   await expect(card(page).locator('.fin-big-unit')).toHaveText('目前本益比');
+  await expect(card(page).locator('.fin-period')).toContainText('年度');
+  await expect(card(page).locator('.fin-period')).not.toContainText('TTM');
   await expect(card(page).locator('.fin-chip').first()).toContainText(/歷史第 \d+ 百分位/);
   await expect(card(page).locator('.fin-chip').nth(1)).toContainText(/相對歷史中位數（[\d.]+x）(溢價|折價)/);
   await expect(card(page).locator('.pe-river-legend li')).toHaveCount(5);
   await expect(card(page).locator('.pe-river-chart canvas').first()).toBeVisible();
   const basis = card(page).locator('.pe-river-basis');
   await expect(basis).toContainText('資料日');
-  await expect(basis).toContainText('EPS 口徑');
+  await expect(basis).toContainText('年度稀釋 EPS');
   await expect(basis).toContainText('有效樣本');
   await expect(basis).toContainText('涵蓋');
   await expect(card(page)).toContainText('歷史本益比不代表未來，僅供研究參考');
@@ -88,26 +104,25 @@ test('NVDA (split-adjusted file): river is drawn and split-adjustment is stated'
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
 });
 
-test('Taiwan 2330: only annual EPS is long enough, so the river is drawn with a short-history warning', async ({ page }, info) => {
+test('Taiwan 2330: current P/E uses the latest trailing-four-quarter EPS', async ({ page }, info) => {
   await mockPeRiver(page);
   await page.goto('./?page=financials&symbol=2330.TW');
   await openCard(card(page));
   await expect(card(page)).toHaveAttribute('data-state', 'ok');
-  await expect(card(page).locator('.pe-river-warn')).toContainText('歷史偏短');
-  await expect(card(page).locator('.pe-river-basis')).toContainText('年度');
-  await expect(card(page).locator('.pe-river-basis')).toContainText('涵蓋');
+  await expect(card(page).locator('.fin-period')).toContainText('TTM');
+  await expect(card(page).locator('.pe-river-basis')).toContainText('TTM');
   await unstick(page);
   await card(page).scrollIntoViewIfNeeded();
   await card(page).screenshot({ path: info.outputPath(`pe-river-2330-${info.project.name}.png`) });
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
 });
 
-test('Taiwan stock with too little EPS history shows the empty state, not a chart', async ({ page }, info) => {
-  await mockPeRiver(page);
+test('Taiwan synthetic file without EPS shows the empty state, not a chart', async ({ page }, info) => {
+  await mockPeRiver(page, {}, { '1312.TW': syntheticTaiwanNoEps });
   await page.goto('./?page=financials&symbol=1312.TW');
   await openCard(card(page));
   await expect(card(page)).toHaveAttribute('data-state', 'unavailable');
-  await expect(card(page)).toContainText('歷史資料不足，無法畫出本益比河流');
+  await expect(card(page)).toContainText('沒有可用的 EPS 資料，無法畫出本益比河流');
   await expect(card(page)).toContainText('歷史本益比不代表未來');
   await expect(card(page).locator('canvas')).toHaveCount(0);
   await unstick(page);

@@ -7,6 +7,7 @@ import { mockSite } from './mocks';
 const fixtures: Record<string, string> = Object.fromEntries(
   [
     ['AAPL', 'us-full.json'],
+    ['BRK-B', 'us-full.json'],
     ['2330.TW', 'tsmc-twd.json'],
     ['JPM', 'bank.json'],
     ['ZLOS', 'loss-maker.json'],
@@ -15,6 +16,45 @@ const fixtures: Record<string, string> = Object.fromEntries(
   ].map(([key, file]) => [key, readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials', file!), 'utf8')]),
 );
 const trackedAAPL = readFileSync(resolve(import.meta.dirname, '../../docs/report/financials/AAPL.json'), 'utf8');
+const syntheticTaiwan60 = (() => {
+  const fixture = JSON.parse(fixtures['2330.TW']!) as {
+    quarterly: { end: string[]; fy: number[]; fq: number[]; values: Record<string, (number | null)[]> };
+    quality: { quarters: number };
+  };
+  const quarterIndex = 2010 * 4 + 2; // 2010 Q3 through 2025 Q2: 60 fiscal quarters.
+  fixture.quarterly.end = Array.from({ length: 60 }, (_, index) => {
+    const fiscalQuarterIndex = quarterIndex + index;
+    const year = Math.floor(fiscalQuarterIndex / 4);
+    const quarter = (fiscalQuarterIndex % 4) + 1;
+    return new Date(Date.UTC(year, quarter * 3, 0)).toISOString().slice(0, 10);
+  });
+  fixture.quarterly.fy = fixture.quarterly.end.map((end) => new Date(`${end}T00:00:00Z`).getUTCFullYear());
+  fixture.quarterly.fq = Array.from({ length: 60 }, (_, index) => ((quarterIndex + index) % 4) + 1);
+  for (const [field, values] of Object.entries(fixture.quarterly.values)) {
+    fixture.quarterly.values[field] = Array.from({ length: 60 }, (_, index) => values[index % values.length] ?? null);
+  }
+  fixture.quality.quarters = 60;
+  return JSON.stringify(fixture);
+})();
+const mutateAaplFixture = (mutate: (fixture: { annual: { end: string[]; fy: (number | null)[]; fq: (number | null)[]; src: string[]; values: Record<string, (number | null)[]> }; quality: { issues: string[] } }) => void) => {
+  const fixture = JSON.parse(fixtures.AAPL!) as { annual: { end: string[]; fy: (number | null)[]; fq: (number | null)[]; src: string[]; values: Record<string, (number | null)[]> }; quality: { issues: string[] } };
+  mutate(fixture);
+  return JSON.stringify(fixture);
+};
+const annualEpsMissing = mutateAaplFixture((fixture) => {
+  fixture.annual.values.epsDiluted = fixture.annual.end.map(() => null);
+  fixture.annual.values.epsBasic = fixture.annual.end.map(() => null);
+});
+const annualEpsSummed = mutateAaplFixture((fixture) => {
+  fixture.quality.issues = [...fixture.quality.issues, 'eps-annual-summed'];
+});
+const noAnnualRows = mutateAaplFixture((fixture) => {
+  fixture.annual.end = [];
+  fixture.annual.fy = [];
+  fixture.annual.fq = [];
+  fixture.annual.src = [];
+  for (const field of Object.keys(fixture.annual.values)) fixture.annual.values[field] = [];
+});
 
 async function mockFinancials(
   page: Page,
@@ -80,20 +120,76 @@ test('annual cards: ten labelled bars, tap shows formula inputs, notes are hones
   expect(errors).toEqual([]);
 });
 
-test('quarterly view: twelve bars with only latest / max / min labelled; URL keeps p=q', async ({ page }) => {
+test('US financials stay annual-only and link to Futu with a safe new-tab anchor', async ({ page }) => {
   await mockFinancials(page);
-  await page.goto('./?page=financials&symbol=AAPL');
+  await page.goto('./?page=financials&symbol=AAPL&p=q');
+  await expect(page).toHaveURL(/page=financials&symbol=AAPL$/);
+  await expect(page.getByRole('group', { name: '期間' })).toHaveCount(0);
+  await expect(page.locator('.fin-quarter')).toHaveCount(0);
+  const growth = page.locator('.fin-card[data-group="growth"]');
+  await expect(growth.locator('.fin-bar')).toHaveCount(10);
+  const futu = page.getByRole('link', { name: '在富途查看更詳細財報', exact: true });
+  await expect(futu).toHaveAttribute('href', 'https://www.futunn.com/stock/AAPL-US');
+  await expect(futu).toHaveAttribute('target', '_blank');
+  await expect(futu).toHaveAttribute('rel', 'noopener noreferrer');
+  await expect(page.locator('.financials-page a[href^="https://www.futunn.com/"]')).toHaveCount(1);
+
+  await page.goto('./?page=financials&symbol=BRK.B');
+  await expect(page.getByRole('link', { name: '在富途查看更詳細財報', exact: true })).toHaveAttribute(
+    'href',
+    'https://www.futunn.com/stock/BRK.B-US',
+  );
+});
+
+test('Taiwan quarterly view keeps sparse labels and trailing-four-quarter ROE', async ({ page }) => {
+  await mockFinancials(page, {}, { '2330.TW': syntheticTaiwan60 });
+  await page.goto('./?page=financials&symbol=2330.TW');
   await page.getByRole('group', { name: '期間' }).getByRole('button', { name: '季度' }).click();
-  await expect(page).toHaveURL(/page=financials&symbol=AAPL&p=q/);
+  await expect(page).toHaveURL(/page=financials&symbol=2330\.TW&p=q/);
   const growth = page.locator('.fin-card[data-group="growth"]');
   await expect(growth.locator('.fin-bar')).toHaveCount(12);
   expect(await growth.locator('.fin-value').count()).toBeLessThanOrEqual(3);
-  await expect(page.locator('.fin-depth')).toContainText('目前 15 季');
+  await expect(page.locator('.fin-depth')).toContainText('目前 60 季');
   const returns = page.locator('.fin-card[data-group="returns"]');
   await openFold(returns);
   await expect(returns.locator('.fin-detail')).toContainText('近 4 季');
-  await growth.locator('.fin-bar').nth(2).click();
-  expect(await growth.locator('.fin-value').count()).toBeLessThanOrEqual(4);
+});
+
+test('missing annual EPS stays as a dash when quarterly EPS exists', async ({ page }) => {
+  await mockFinancials(page, {}, { AAPL: annualEpsMissing });
+  await page.goto('./?page=financials&symbol=AAPL&p=q');
+  await expect(page.getByRole('group', { name: '期間' })).toHaveCount(0);
+  await expect(page.locator('.fin-quarter')).toHaveCount(0);
+  await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();
+  const epsRow = page.locator('.fin-table tbody tr').filter({ hasText: /^EPS/ });
+  await expect(epsRow.locator('.fin-cell-value')).toHaveCount(10);
+  await expect(epsRow.locator('.fin-cell-value')).toHaveText(Array(10).fill('—'));
+  const keyMetrics = page.locator('.fin-key');
+  await openFold(keyMetrics);
+  await expect(keyMetrics.locator('.fin-key-tile').nth(3).locator('.fin-key-value')).toHaveText('—');
+});
+
+test('US quarterly-only files do not fall back to quarterly figures', async ({ page }) => {
+  await mockFinancials(page, {}, { AAPL: noAnnualRows });
+  await page.goto('./?page=financials&symbol=AAPL');
+  await expect(page.getByRole('group', { name: '期間' })).toHaveCount(0);
+  await expect(page.locator('.fin-quarter')).toHaveCount(0);
+  await expect(page.locator('.fin-card[data-group="growth"] .fin-bar')).toHaveCount(0);
+  await expect(page.locator('.fin-card[data-group="growth"] .fin-empty')).toBeVisible();
+  await expect(page.locator('.fin-depth')).toContainText('0 年');
+});
+
+test('US annual EPS marked as quarter-summed is hidden from statements and P/E', async ({ page }) => {
+  await mockFinancials(page, {}, { AAPL: annualEpsSummed });
+  await page.goto('./?page=financials&symbol=AAPL');
+  await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();
+  const epsRow = page.locator('.fin-table tbody tr').filter({ hasText: /^EPS/ });
+  await expect(epsRow.locator('.fin-cell-value')).toHaveText(Array(10).fill('—'));
+  const river = page.locator('.pe-river');
+  await openFold(river);
+  await expect(river).toHaveAttribute('data-state', 'unavailable');
+  await expect(river.locator('.pe-river-empty')).toHaveAttribute('data-reason', 'no-eps');
+  await expect(river).not.toContainText('TTM');
 });
 
 test('table mode: frozen metric column, latest period first, horizontal scroll inside the card', async ({ page }) => {
@@ -120,18 +216,25 @@ test('table mode: frozen metric column, latest period first, horizontal scroll i
   await expect(page.locator('.fin-table')).toBeVisible();
 });
 
-test('tracked US file exposes the 15th annual and 60th quarterly periods in the full table', async ({ page }) => {
+test('tracked US file exposes all 15 annual periods and no quarterly table option', async ({ page }) => {
   await mockFinancials(page, {}, { AAPL: trackedAAPL });
   await page.goto('./?page=financials&symbol=AAPL');
   await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();
+  await expect(page.getByRole('group', { name: '期間' })).toHaveCount(0);
+  await expect(page.locator('.fin-quarter')).toHaveCount(0);
   const table = page.locator('.fin-table');
   const annualHeaders = table.locator('thead th');
   expect(await annualHeaders.count()).toBeGreaterThanOrEqual(16);
   await annualHeaders.nth(15).scrollIntoViewIfNeeded();
   await expect(annualHeaders.nth(15)).toContainText(/^FY\d{4}/);
   await expect(page.locator('.fin-table-note')).toContainText('所有已取得期別');
+});
 
-  await page.getByRole('group', { name: '期間' }).getByRole('button', { name: '季度' }).click();
+test('Taiwan synthetic file exposes the oldest of 60 quarters inside the scrollable table', async ({ page }) => {
+  await mockFinancials(page, {}, { '2330.TW': syntheticTaiwan60 });
+  await page.goto('./?page=financials&symbol=2330.TW&p=q');
+  await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();
+  const table = page.locator('.fin-table');
   const quarterlyHeaders = table.locator('thead th');
   expect(await quarterlyHeaders.count()).toBeGreaterThanOrEqual(61);
   await quarterlyHeaders.nth(60).scrollIntoViewIfNeeded();
@@ -142,6 +245,7 @@ test('tracked US file exposes the 15th annual and 60th quarterly periods in the 
     return cell.right > viewport.left && cell.left < viewport.right;
   });
   expect(reachable).toBe(true);
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
 });
 
 test('bank, loss-maker, Taiwan and short-history files', async ({ page }) => {
@@ -175,8 +279,9 @@ test('bank, loss-maker, Taiwan and short-history files', async ({ page }) => {
   await expect(page.locator('.fin-card[data-group="growth"] .fin-chart-title')).toContainText('兆元');
   await expect(page.locator('.fin-depth')).toContainText('目前約 4 年');
 
-  await page.goto('./?page=financials&symbol=NVO&p=q');
+  await page.goto('./?page=financials&symbol=NVO');
   await expect(page.locator('.fin-quality')).toHaveText('資料有限');
+  await expect(page.getByRole('group', { name: '期間' })).toHaveCount(0);
   await expect(page.locator('.fin-card[data-group="growth"] .fin-card-note')).toContainText('非每 ADR');
 });
 
@@ -193,22 +298,33 @@ test('missing, garbled and index symbols', async ({ page }) => {
   await expect(page.getByText('選擇一檔股票', { exact: true })).toBeVisible();
 });
 
-test('back to the chart and switching stocks from the header search', async ({ page }) => {
+test('back to the chart and switching from a US stock keeps the annual-only period', async ({ page }) => {
   await mockFinancials(page);
   await page.goto('./?page=financials&symbol=AAPL&p=q');
+  await expect(page).toHaveURL(/page=financials&symbol=AAPL$/);
   await page.getByRole('button', { name: '搜尋其他股票' }).click();
   await page.locator('.fin-search input').fill('2330');
   await page.locator('.fin-search .search-results li').filter({ hasText: '台積電' }).first().click();
-  await expect(page).toHaveURL(/symbol=2330\.TW&p=q/);
+  await expect(page).toHaveURL(/symbol=2330\.TW$/);
   await expect(page.locator('.fin-title')).toContainText('2330');
+  await expect(page.getByRole('group', { name: '期間' }).getByRole('button', { name: '年度' })).toHaveAttribute('aria-pressed', 'true');
   // 「K線」 replaces the old back button: same destination, same symbol.
   await page.getByRole('navigation', { name: '個股頁面' }).getByRole('button', { name: 'K線', exact: true }).click();
   await expect(page).toHaveURL(/page=chart&symbol=2330\.TW/);
 });
 
+test('Taiwan financials retain the quarterly controls and do not show a Futu link', async ({ page }) => {
+  await mockFinancials(page);
+  await page.goto('./?page=financials&symbol=2330.TW&p=q');
+  const period = page.getByRole('group', { name: '期間' });
+  await expect(period.getByRole('button', { name: '季度' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.fin-quarter')).toBeVisible();
+  await expect(page.getByRole('link', { name: '在富途查看更詳細財報' })).toHaveCount(0);
+});
+
 const stockTabs = (page: Page) => page.getByRole('navigation', { name: '個股頁面' });
 
-test('K線｜財務 keeps the symbol, the chart timeframe and the annual or quarterly choice', async ({ page }) => {
+test('K線｜財務 keeps the symbol and chart timeframe while US financials stay annual', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   await mockFinancials(page);
@@ -232,18 +348,20 @@ test('K線｜財務 keeps the symbol, the chart timeframe and the annual or quar
   await expect(page).toHaveURL(/page=financials&symbol=AAPL&tf=1W$/);
   await expect(page.locator('.fin-title')).toContainText('AAPL');
   await expect(financialsTab).toHaveAttribute('aria-current', 'page');
-  await page.getByRole('group', { name: '期間' }).getByRole('button', { name: '季度' }).click();
-  await expect(page).toHaveURL(/page=financials&symbol=AAPL&tf=1W&p=q$/);
+  await expect(page.getByRole('group', { name: '期間' })).toHaveCount(0);
+  await page.goto('./?page=financials&symbol=AAPL&tf=1W&p=q');
+  await expect(page).toHaveURL(/page=financials&symbol=AAPL&tf=1W$/);
 
   await tabs.getByRole('button', { name: 'K線', exact: true }).click();
   await expect(page).toHaveURL(/page=chart&symbol=AAPL&tf=1W$/);
   await expect(page.getByTestId('active-symbol')).toHaveText('AAPL');
   await expect(page.getByTestId('ohlc-header')).toContainText('O ', { timeout: 20000 });
 
-  // Back on the financials tab the quarterly choice from before is still in place.
+  // Returning to financials keeps the chart timeframe and still shows annual figures.
   await stockTabs(page).getByRole('button', { name: '財務', exact: true }).click();
-  await expect(page).toHaveURL(/page=financials&symbol=AAPL&tf=1W&p=q$/);
-  await expect(page.locator('.fin-depth')).toContainText('季');
+  await expect(page).toHaveURL(/page=financials&symbol=AAPL&tf=1W$/);
+  await expect(page.getByRole('group', { name: '期間' })).toHaveCount(0);
+  await expect(page.locator('.fin-quarter')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -297,8 +415,14 @@ test('YoY line over money and EPS bars only, and the chart range follows the fil
   await expect(growth.locator('.fin-bar')).toHaveCount(15);
   await growth.locator('.fin-bar').nth(0).click();
   await expect(growth.locator('.fin-detail')).toContainText('YoY');
+  await expect(page.getByRole('group', { name: '期間' })).toHaveCount(0);
+  await expect(page.locator('.fin-quarter')).toHaveCount(0);
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+});
 
-  await page.getByRole('group', { name: '期間' }).getByRole('button', { name: '季度' }).click();
+test('Taiwan synthetic 60-quarter history enables the full chart range', async ({ page }) => {
+  await mockFinancials(page, {}, { '2330.TW': syntheticTaiwan60 });
+  await page.goto('./?page=financials&symbol=2330.TW&p=q');
   const quarterRange = page.getByRole('group', { name: '圖表區間' });
   await expect(quarterRange.getByRole('button', { name: '12季', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(quarterRange.getByRole('button', { name: '60季', exact: true })).toBeEnabled();
@@ -350,17 +474,22 @@ test('three statements: lines switch between values and YoY, absent lines say �
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
 });
 
-test('ADR page links to the Taiwan home listing and keeps the period', async ({ page }) => {
+test('annual-only ADR page links to Futu and the Taiwan home listing', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   await mockFinancials(page);
-  await page.goto('./?page=financials&symbol=TSM&p=q');
+  await page.goto('./?page=financials&symbol=TSM');
+  await expect(page.getByRole('group', { name: '期間' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '在富途查看更詳細財報', exact: true })).toHaveAttribute(
+    'href',
+    'https://www.futunn.com/stock/TSM-US',
+  );
   await expect(page.locator('.fin-home-listing')).toContainText('也可查看');
   await expect(page.locator('.fin-home-link')).toHaveText('2330.TW（台股）財報');
   await expect(page.locator('.fin-home-ratio')).toHaveText('1 ADR ＝ 5 股普通股');
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
   await page.locator('.fin-home-link').click();
-  await expect(page).toHaveURL(/symbol=2330\.TW&p=q/);
+  await expect(page).toHaveURL(/symbol=2330\.TW$/);
   await expect(page.locator('.fin-title')).toContainText('台積電');
   await expect(page.locator('.fin-home-link')).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -379,27 +508,21 @@ test('foreign file with EPS on the ADR basis: the basis note replaces the per-or
   expect(errors).toEqual([]);
 });
 
-test('layout: 當季財報 first, then growth (EPS first) and profitability (ratios first), then folded sections', async ({ page }, info) => {
+test('layout: annual growth (EPS first) and profitability (ratios first), then folded sections', async ({ page }, info) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   await mockFinancials(page, {}, { AAPL: trackedAAPL });
   await page.goto('./?page=financials&symbol=AAPL');
-  const strip = page.locator('.fin-quarter');
-  await expect(strip.locator('.fin-quarter-cell')).toHaveCount(4);
-  await expect(strip.locator('.fin-quarter-period')).toHaveText(/^FY\d{4} Q[1-4]$/);
-  expect(await strip.locator('.fin-quarter-label').allTextContents()).toEqual(['EPS·美元', '營收·億美元', '毛利率', '淨利率']);
-  // The strip shows actual values only: no expectation or estimate column.
-  expect((await strip.textContent()) ?? '').not.toMatch(/預期|估計|共識|NaN/);
+  await expect(page.getByRole('group', { name: '期間' })).toHaveCount(0);
+  await expect(page.locator('.fin-quarter')).toHaveCount(0);
 
   const top = (selector: string) => page.evaluate((query) => document.querySelector(query)!.getBoundingClientRect().top + window.scrollY, selector);
   const order = {
-    strip: await top('.fin-quarter'),
     growth: await top('.fin-card[data-group="growth"]'),
     profit: await top('.fin-card[data-group="profitability"]'),
     folds: await top('.fin-folds'),
     notes: await top('.fin-notes'),
   };
-  expect(order.strip).toBeLessThan(order.growth);
   expect(order.growth).toBeLessThanOrEqual(order.profit);
   expect(order.profit).toBeLessThan(order.folds);
   expect(order.folds).toBeLessThan(order.notes);
@@ -461,10 +584,10 @@ test('table: each cell shows its value with the year-over-year change under it; 
   await page.locator('.fin-table-card').screenshot({ path: info.outputPath(`financials-table-yoy-${info.project.name}.png`) });
 });
 
-test('當季財報 on a 390px phone: one compact row, no horizontal scroll, no cell overflows', async ({ page }, info) => {
+test('Taiwan QuarterStrip on a 390px phone has one compact row without overflow', async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await mockFinancials(page, {}, { AAPL: trackedAAPL });
-  await page.goto('./?page=financials&symbol=AAPL');
+  await mockFinancials(page);
+  await page.goto('./?page=financials&symbol=2330.TW');
   const strip = page.locator('.fin-quarter');
   await expect(strip.locator('.fin-quarter-cell')).toHaveCount(4);
   const box = (await strip.boundingBox())!;

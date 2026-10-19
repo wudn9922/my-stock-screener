@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { PageProps } from './pageProps';
 import { PageState, Skeleton } from '../ui/PageState';
-import { financialsKey, loadFinancials, type FinancialsLoadResult, type PeriodKind } from '../fundamentals/FinancialHistory';
+import { emptySeries, financialsKey, loadFinancials, type FinancialsLoadResult, type PeriodKind } from '../fundamentals/FinancialHistory';
 import { METRIC_GROUPS, type MetricGroupId, type MetricId } from '../fundamentals/financialMetrics';
 import type { Timeframe } from '../market-data/MarketDataProvider';
 import { twListingForAdr } from '../fundamentals/adrListings';
@@ -18,6 +18,7 @@ import { PeRiverCard } from '../ui/financials/PeRiverCard';
 import { SummaryChips } from '../ui/financials/SummaryChips';
 import { ChipsSection } from '../ui/financials/ChipsCard';
 import { isChipsPageSymbol } from '../report/twChips';
+import { TAIWAN_SYMBOL_REGEX } from '../market-data/MarketProfile';
 import { CHART_PERIODS, adrEpsNote, buildView, cardSummaryLine, depthText, provenanceText } from '../ui/financials/financialsView';
 import '../ui/financials.css';
 
@@ -78,7 +79,9 @@ function cardNote(group: MetricGroupId, issues: readonly string[], foreignReport
 }
 
 export default function FinancialsPage({ report, navigate, symbol, p, tf }: FinancialsPageProps) {
-  const kind: PeriodKind = p === 'q' ? 'quarterly' : 'annual';
+  const isTaiwanSymbol = !!symbol && (TAIWAN_SYMBOL_REGEX.test(symbol) || /^\d{4,6}[A-Z]?$/.test(symbol));
+  const showQuarterly = isTaiwanSymbol;
+  const kind: PeriodKind = showQuarterly && p === 'q' ? 'quarterly' : 'annual';
   const [mode, setMode] = useState<DisplayMode>(readMode);
   const [loaded, setLoaded] = useState<{ symbol: string; result: FinancialsLoadResult } | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -134,14 +137,36 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
 
   const result = loaded && loaded.symbol === symbol ? loaded.result : null;
   const history = result?.status === 'ok' ? result.data : null;
-  // A file with only one period type still opens on the other one.
-  const effectiveKind: PeriodKind = history && !history[kind].end.length ? (kind === 'annual' ? 'quarterly' : 'annual') : kind;
+  // US statements remain annual-only even when a stale URL asks for quarters or annual data is absent.
+  // Taiwan keeps its existing period fallback.
+  const effectiveKind: PeriodKind = history && showQuarterly && !history[kind].end.length ? (kind === 'annual' ? 'quarterly' : 'annual') : kind;
+  const displayHistory = useMemo(() => {
+    if (!history) return null;
+    const maskSummedAnnualEps = history.market === 'US' && history.quality.issues.includes('eps-annual-summed');
+    const annual = maskSummedAnnualEps
+      ? {
+          ...history.annual,
+          values: {
+            ...history.annual.values,
+            epsDiluted: history.annual.end.map(() => null),
+            epsBasic: history.annual.end.map(() => null),
+          },
+        }
+      : history.annual;
+    // The US P/E river can only use annual EPS; quarter rows are hidden from every UI-derived calculation.
+    const quarterly = history.market === 'US' ? emptySeries() : history.quarterly;
+    return { ...history, annual, quarterly };
+  }, [history]);
   const span = spans[effectiveKind];
-  const annualView = useMemo(() => (history ? buildView(history, 'annual') : null), [history]);
-  // The 「當季財報」 strip always shows the newest quarter, whatever period type the rest of the page is on.
-  const quarterlyView = useMemo(() => (history ? buildView(history, 'quarterly') : null), [history]);
+  const annualView = useMemo(() => (displayHistory ? buildView(displayHistory, 'annual') : null), [displayHistory]);
+  const quarterlyView = useMemo(() => (displayHistory && showQuarterly ? buildView(displayHistory, 'quarterly') : null), [displayHistory, showQuarterly]);
   // The chart range applies to the period type on screen; the summary tiles keep the default annual window.
-  const view = useMemo(() => (history ? buildView(history, effectiveKind, span) : null), [history, effectiveKind, span]);
+  const view = useMemo(() => (displayHistory ? buildView(displayHistory, effectiveKind, span) : null), [displayHistory, effectiveKind, span]);
+
+  useEffect(() => {
+    if (showQuarterly || p !== 'q') return;
+    navigate({ page: 'financials', ...(symbol ? { symbol } : {}), ...(tf ? { tf } : {}) }, { replace: true });
+  }, [showQuarterly, p, navigate, symbol, tf]);
 
   const onKind = useCallback(
     (next: PeriodKind) =>
@@ -150,18 +175,22 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
           page: 'financials',
           ...(symbol ? { symbol } : {}),
           ...(tf ? { tf } : {}),
-          ...(next === 'quarterly' ? { p: 'q' as const } : {}),
+          ...(showQuarterly && next === 'quarterly' ? { p: 'q' as const } : {}),
         },
         { replace: true },
       ),
-    [navigate, symbol, tf],
+    [navigate, symbol, tf, showQuarterly],
   );
   const onMode = (next: DisplayMode) => {
     setMode(next);
     writeMode(next);
   };
   // Changing the stock keeps the period type but not the chart timeframe, which belonged to the previous symbol.
-  const onSymbol = (picked: SearchResult) => navigate({ page: 'financials', symbol: picked.symbol, ...(p ? { p } : {}) });
+  const onSymbol = (picked: SearchResult) => navigate({
+    page: 'financials',
+    symbol: picked.symbol,
+    ...(p && (TAIWAN_SYMBOL_REGEX.test(picked.symbol) || /^\d{4,6}[A-Z]?$/.test(picked.symbol)) ? { p } : {}),
+  });
   const homeListing = twListingForAdr(symbol);
   const onHomeListing = (listing: { tw: string }) => navigate({ page: 'financials', symbol: listing.tw, ...(p ? { p } : {}) });
   const onBack = () => navigate(symbol ? { page: 'chart', symbol, ...(tf ? { tf } : {}) } : { page: 'chart' });
@@ -184,7 +213,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
     );
   else if (result.status !== 'ok')
     body = <PageState kind="error" title={result.status === 'invalid' ? '財報資料無法辨識' : '財報資料載入失敗'} message={result.message} onRetry={() => setAttempt((n) => n + 1)} />;
-  else if (history && view && annualView && quarterlyView) {
+  else if (history && displayHistory && view && annualView && (!showQuarterly || quarterlyView)) {
     const issues = history.quality.issues;
     const splitEvents = history.split.events;
     const adrNote = adrEpsNote(history);
@@ -192,7 +221,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
       <MetricCard
         key={group.id}
         group={group}
-        history={history}
+        history={displayHistory}
         view={view}
         metric={metricOf[group.id] ?? group.metrics.find((id) => view.metrics[id].window.some((i) => view.metrics[id].values[i] !== null)) ?? group.metrics[0]!}
         onMetric={(id) => setMetricOf((current) => ({ ...current, [group.id]: id }))}
@@ -205,14 +234,14 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
     const folded = METRIC_GROUPS.filter((group) => !OPEN_GROUPS.includes(group.id));
     body = (
       <>
-        <QuarterStrip history={history} quarterly={quarterlyView} />
+        {showQuarterly && quarterlyView && <QuarterStrip history={displayHistory} quarterly={quarterlyView} />}
         {mode === 'table' ? (
-          <StatementTable history={history} view={view} />
+          <StatementTable history={displayHistory} view={view} />
         ) : (
           <>
             <SpanControl
               kind={effectiveKind}
-              count={history[effectiveKind].end.length}
+              count={displayHistory[effectiveKind].end.length}
               span={span}
               onSpan={(next) => setSpans((current) => ({ ...current, [effectiveKind]: next }))}
             />
@@ -220,15 +249,15 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
           </>
         )}
         <div className="fin-folds">
-          <KeyMetrics history={history} view={view} />
-          <SummaryChips history={history} annual={annualView} current={view} />
-          <PeRiverCard history={history} />
+          <KeyMetrics history={displayHistory} view={view} />
+          <SummaryChips history={displayHistory} annual={annualView} current={view} />
+          <PeRiverCard history={displayHistory} />
           {mode === 'table' ? null : folded.map(metricCard)}
         </div>
         <div className="fin-notes">
-          <p className="fin-depth">{depthText(history, effectiveKind)}</p>
+          <p className="fin-depth">{depthText(displayHistory, effectiveKind)}</p>
           <p>
-            {provenanceText(history, effectiveKind)}
+            {provenanceText(displayHistory, effectiveKind)}
             {history.checkedAt ? ` · 資料更新日 ${formatDateTime(history.checkedAt, false)}` : ''}
             {` · 金額單位：財報幣別 ${history.currency}`}
           </p>
@@ -254,6 +283,8 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
         name={name}
         history={history}
         kind={kind}
+        showQuarterly={showQuarterly}
+        futuHref={symbol && key && !isTaiwanSymbol ? `https://www.futunn.com/stock/${encodeURIComponent(symbol)}-US` : null}
         mode={mode}
         localSymbols={localSymbols}
         homeListing={homeListing}
@@ -267,7 +298,9 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
       {symbol && isChipsPageSymbol(symbol) && <ChipsSection symbol={symbol} />}
       <footer className="page-foot fin-foot">
         <span>
-          限制：Yahoo 只提供約 4 年年度、5–8 季季度財報，本站逐季累積、無法往回補（部分美股另以 SEC 申報補歷史，台股另以 FinMind〔源自公開資訊觀測站〕回溯至 2015 年）；比率由本頁依公式計算，可能與公司公告口徑不同；有息負債可能含租賃負債。
+          {showQuarterly
+            ? '限制：Yahoo 只提供約 4 年年度、5–8 季季度財報，本站逐季累積、無法往回補（部分美股另以 SEC 申報補歷史，台股另以 FinMind〔源自公開資訊觀測站〕回溯至 2015 年）；比率由本頁依公式計算，可能與公司公告口徑不同；有息負債可能含租賃負債。'
+            : '限制：美股頁僅顯示財報原有的年度數字，缺少的年度欄位以「—」呈現；比率由本頁依年度數字計算，可能與公司公告口徑不同；有息負債可能含租賃負債。'}
         </span>
         <span>僅供研究參考，非投資建議。</span>
       </footer>
