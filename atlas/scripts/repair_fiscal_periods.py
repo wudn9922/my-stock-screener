@@ -1,17 +1,24 @@
-"""Create a local-only report of US fiscal-period label and derived Q4 EPS changes.
+"""Report or apply the US fiscal-period label and derived Q4 EPS repair.
 
 Run from any directory with:
     python atlas/scripts/repair_fiscal_periods.py --dry-run
+    python atlas/scripts/repair_fiscal_periods.py --apply
 
-The command reads docs/report/financials/*.json and writes only
-docs/report/fiscal-period-repair-dryrun.json. It never contacts SEC or changes a financials file.
+--dry-run reads docs/report/financials/*.json and writes only
+docs/report/fiscal-period-repair-dryrun.json.
+
+--apply writes, to docs/report/financials/, exactly the changes the dry-run report lists, for
+every symbol except APPLY_EXCLUDED_SYMBOLS. It writes no other file. Every file is checked before
+any file is written: a file with dry-run changes must be either untouched (its planned changes
+equal the dry-run changes) or already applied (each dry-run value holds its new value). It never
+contacts SEC.
 """
 import argparse
 import copy
 import json
 import os
 import tempfile
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 from build_financials import (
@@ -22,12 +29,31 @@ from build_financials import (
     fiscal_label_eligible_ends,
     fill_q4_eps,
 )
+from build_valuation_us import write_atomic
 import detect_fiscal_period_mismatch as fiscal_detector
 
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_FINANCIALS_DIR = ROOT / "docs" / "report" / "financials"
 DEFAULT_REPORT_PATH = ROOT / "docs" / "report" / "fiscal-period-repair-dryrun.json"
+
+# Transition-year symbols whose fiscal-label repair is a later task. --apply never writes their
+# files; their dry-run changes are reported separately.
+APPLY_EXCLUDED_SYMBOLS = frozenset({
+    "AIOT", "BRT", "CHRN", "DXLG", "EUDA", "FCUV", "GRNQ", "IMMR", "NTST", "ODYS",
+    "RJET", "TRUG", "UA", "UAA", "VFC", "VTOL", "YUMC",
+})
+
+# Q4 EPS actions that change a stored value. "re-derived" leaves the stored value as it is.
+WRITE_EPS_ACTIONS = ("changed", "nulled", "newly-derived")
+# Top-level keys and quarterly columns that --apply must never change.
+PROTECTED_TOP_LEVEL = ("secQ4EpsFacts", "epsOverrides", "q4EpsEstimates")
+PROTECTED_QUARTERLY_COLUMNS = ("epsQuality",)
+_ABSENT = "<absent>"
+
+
+class ApplyError(ValueError):
+    """Raised when the planned changes do not match the dry run or a write check fails."""
 
 
 def section_items(document, name):
@@ -289,6 +315,91 @@ def _quarter_spacing_residual(symbol, row):
     }
 
 
+def plan_path(path, flagged_by_file):
+    """Plan the repair for one financials file. Returns None for files that are not US."""
+    document = _json_file(path)
+    if document.get("market") != "US":
+        return None
+    symbol = document.get("symbol") or path.stem
+    flagged_file = flagged_by_file.get(path.name)
+    flagged_ends, flagged_q4_ends = _flagged_row_ends(flagged_file)
+    old_annual = section_items(document, "annual")
+    old_quarterly = section_items(document, "quarterly")
+    new_annual = copy.deepcopy(old_annual)
+    new_quarterly = copy.deepcopy(old_quarterly)
+    fallback_month = document.get("fyEndMonth")
+    if not isinstance(fallback_month, int) or not 1 <= fallback_month <= 12:
+        fallback_month = None
+    eligible_ends = fiscal_label_eligible_ends(old_annual, old_quarterly)
+    assign_fiscal_labels(
+        new_annual, new_quarterly, fallback_end_month=fallback_month,
+        eligible_quarter_ends=eligible_ends,
+    )
+
+    diffs = label_differences(old_annual, old_quarterly, new_annual, new_quarterly)
+    label_rows_changed = len(diffs["annual"]) + len(diffs["quarterly"])
+    if label_rows_changed and not flagged_ends:
+        raise AssertionError(f"{path.name}: label changes in a file without a flagged quarterly row")
+    input_mismatches, input_mismatches_marked = input_q4_mismatch_counts(
+        document, old_annual, old_quarterly,
+    )
+    derived = infer_existing_derived_q4_eps(
+        document, old_annual, old_quarterly, eligible_ends=flagged_q4_ends,
+        alternate_annual=new_annual, alternate_quarterly=new_quarterly,
+    )
+    q4_diffs = q4_eps_differences(
+        old_annual, old_quarterly, new_annual, new_quarterly, derived,
+        document=document, eligible_ends=eligible_ends,
+    )
+
+    qblock = document.get("quarterly") or {}
+    ends = qblock.get("end") if isinstance(qblock.get("end"), list) else []
+    marks = qblock.get(DERIVED_COLUMN) or []
+    derived_q4_rows = sum(
+        index < len(marks) and bool(marks[index]) and end in flagged_q4_ends
+        for index, end in enumerate(ends)
+    )
+
+    after_document = dict(document)
+    after_annual = dict(document.get("annual") or {})
+    after_annual["fy"] = [item.get("fy") for item in new_annual]
+    after_quarterly = dict(qblock)
+    after_quarterly["fy"] = [item.get("fy") for item in new_quarterly]
+    after_quarterly["fq"] = [item.get("fq") for item in new_quarterly]
+    after_document["annual"] = after_annual
+    after_document["quarterly"] = after_quarterly
+    after_result = fiscal_detector.analyze(after_document)
+
+    return {
+        "path": path,
+        "document": document,
+        "symbol": symbol,
+        "flaggedFilePresent": bool(flagged_file),
+        "flaggedEnds": flagged_ends,
+        "derivedRecognized": derived,
+        "q4Diffs": q4_diffs,
+        "derivedQ4Rows": derived_q4_rows,
+        "inputQ4Mismatches": input_mismatches,
+        "inputQ4MismatchesMarked": input_mismatches_marked,
+        "afterQ4Mismatches": sum(
+            fiscal_detector.Q4_VS_ANNUAL in row["rules"] for row in after_result["affectedQ4"]
+        ),
+        "afterSpacingResiduals": [
+            _quarter_spacing_residual(symbol, row)
+            for row in after_result["affectedQ4"]
+            if fiscal_detector.QUARTER_SPACING in row["rules"]
+        ],
+        "record": {
+            "symbol": symbol,
+            "detectorFlaggedRowCount": len(flagged_ends),
+            "labelRowsChanged": label_rows_changed,
+            "annualLabelChanges": diffs["annual"],
+            "quarterlyLabelChanges": diffs["quarterly"],
+            "q4EpsChanges": q4_diffs,
+        },
+    }
+
+
 def build_report(financials_dir):
     files = []
     counts = defaultdict(int)
@@ -309,42 +420,13 @@ def build_report(financials_dir):
     after_spacing_residuals = []
     after_q4_mismatches = 0
     for path in sorted(financials_dir.glob("*.json"), key=lambda item: item.name):
-        document = _json_file(path)
-        if document.get("market") != "US":
+        plan = plan_path(path, flagged_by_file)
+        if plan is None:
             continue
-        symbol = document.get("symbol") or path.stem
-        flagged_file = flagged_by_file.get(path.name)
-        flagged_ends, flagged_q4_ends = _flagged_row_ends(flagged_file)
-        old_annual = section_items(document, "annual")
-        old_quarterly = section_items(document, "quarterly")
-        new_annual = copy.deepcopy(old_annual)
-        new_quarterly = copy.deepcopy(old_quarterly)
-        fallback_month = document.get("fyEndMonth")
-        if not isinstance(fallback_month, int) or not 1 <= fallback_month <= 12:
-            fallback_month = None
-        eligible_ends = fiscal_label_eligible_ends(old_annual, old_quarterly)
-        assign_fiscal_labels(
-            new_annual, new_quarterly, fallback_end_month=fallback_month,
-            eligible_quarter_ends=eligible_ends,
-        )
-
-        diffs = label_differences(old_annual, old_quarterly, new_annual, new_quarterly)
-        label_rows_changed = len(diffs["annual"]) + len(diffs["quarterly"])
-        if label_rows_changed and not flagged_ends:
-            raise AssertionError(f"{path.name}: label changes in a file without a flagged quarterly row")
-        input_mismatches, input_mismatches_marked = input_q4_mismatch_counts(
-            document, old_annual, old_quarterly,
-        )
-        derived = infer_existing_derived_q4_eps(
-            document, old_annual, old_quarterly, eligible_ends=flagged_q4_ends,
-            alternate_annual=new_annual, alternate_quarterly=new_quarterly,
-        )
+        derived = plan["derivedRecognized"]
         recognized_derived_eps_values += len(derived)
         recognized_derived_eps_rows.update(end for end, _field in derived)
-        q4_diffs = q4_eps_differences(
-            old_annual, old_quarterly, new_annual, new_quarterly, derived,
-            document=document, eligible_ends=eligible_ends,
-        )
+        q4_diffs = plan["q4Diffs"]
         for row in q4_diffs:
             eps_field_actions[row["field"]][{
                 "re-derived": "reDerived",
@@ -352,48 +434,26 @@ def build_report(financials_dir):
                 "nulled": "nulled",
                 "newly-derived": "newlyDerived",
             }[row["action"]]] += 1
-
-        qblock = document.get("quarterly") or {}
-        ends = qblock.get("end") if isinstance(qblock.get("end"), list) else []
-        marks = qblock.get(DERIVED_COLUMN) or []
-        derived_q4_rows = sum(
-            index < len(marks) and bool(marks[index]) and end in flagged_q4_ends
-            for index, end in enumerate(ends)
-        )
-
-        after_document = dict(document)
-        after_annual = dict(document.get("annual") or {})
-        after_annual["fy"] = [item.get("fy") for item in new_annual]
-        after_quarterly = dict(qblock)
-        after_quarterly["fy"] = [item.get("fy") for item in new_quarterly]
-        after_quarterly["fq"] = [item.get("fq") for item in new_quarterly]
-        after_document["annual"] = after_annual
-        after_document["quarterly"] = after_quarterly
-        after_result = fiscal_detector.analyze(after_document)
-        after_q4_mismatches += sum(
-            fiscal_detector.Q4_VS_ANNUAL in row["rules"]
-            for row in after_result["affectedQ4"]
-        )
-        after_spacing_residuals.extend(
-            _quarter_spacing_residual(symbol, row)
-            for row in after_result["affectedQ4"]
-            if fiscal_detector.QUARTER_SPACING in row["rules"]
-        )
+        record = plan["record"]
+        label_rows_changed = record["labelRowsChanged"]
+        flagged_ends = plan["flaggedEnds"]
+        after_q4_mismatches += plan["afterQ4Mismatches"]
+        after_spacing_residuals.extend(plan["afterSpacingResiduals"])
 
         counts["usFiles"] += 1
-        counts["annualRowsChanged"] += len(diffs["annual"])
-        counts["quarterlyRowsChanged"] += len(diffs["quarterly"])
+        counts["annualRowsChanged"] += len(record["annualLabelChanges"])
+        counts["quarterlyRowsChanged"] += len(record["quarterlyLabelChanges"])
         counts["labelRowsChanged"] += label_rows_changed
         counts["filesWithLabelChanges"] += bool(label_rows_changed)
-        counts["filesWithFlaggedRows"] += bool(flagged_file)
+        counts["filesWithFlaggedRows"] += plan["flaggedFilePresent"]
         counts["filesWithFlaggedQuarterRows"] += bool(flagged_ends)
         counts["filesWithoutFlaggedQuarterRowsWithLabelChanges"] += bool(
             not flagged_ends and label_rows_changed
         )
         counts["baselineFlaggedRows"] += len(flagged_ends)
-        counts["q4RowsWithDerivedMarker"] += derived_q4_rows
-        counts["inputQ4EndAnnualEndMismatchRows"] += input_mismatches
-        counts["inputQ4EndAnnualEndMismatchRowsWithDerivedFlag"] += input_mismatches_marked
+        counts["q4RowsWithDerivedMarker"] += plan["derivedQ4Rows"]
+        counts["inputQ4EndAnnualEndMismatchRows"] += plan["inputQ4Mismatches"]
+        counts["inputQ4EndAnnualEndMismatchRowsWithDerivedFlag"] += plan["inputQ4MismatchesMarked"]
         counts["q4RowsAffected"] += len({row["end"] for row in q4_diffs})
         counts["q4RowsWouldBeDerived"] += len({
             row["end"] for row in q4_diffs if row["action"] in ("newly-derived", "re-derived", "changed")
@@ -406,14 +466,7 @@ def build_report(financials_dir):
         counts["q4ValuesChanged"] += sum(row["action"] == "changed" for row in q4_diffs)
         counts["q4ValuesNulled"] += sum(row["action"] == "nulled" for row in q4_diffs)
 
-        files.append({
-            "symbol": symbol,
-            "detectorFlaggedRowCount": len(flagged_ends),
-            "labelRowsChanged": label_rows_changed,
-            "annualLabelChanges": diffs["annual"],
-            "quarterlyLabelChanges": diffs["quarterly"],
-            "q4EpsChanges": q4_diffs,
-        })
+        files.append(record)
 
     if counts["filesWithFlaggedRows"] != baseline_detector["totals"]["filesFlagged"]:
         raise AssertionError("per-file detector flag count does not match the detector report")
@@ -480,6 +533,196 @@ def build_report(financials_dir):
     }
 
 
+def normalized_diff(record):
+    """The changes --apply writes for one file, as a frozenset of (section, end, field, old, new).
+
+    Label changes are fy/fq values. EPS changes are Q4 values that the dry run changes (changed,
+    nulled, newly-derived). Re-derived values keep their stored value, so they are not changes.
+    Values are JSON text so that int and float differences are compared exactly.
+    """
+    changes = set()
+    for section, key in (("annual", "annualLabelChanges"), ("quarterly", "quarterlyLabelChanges")):
+        for row in record[key]:
+            for field in ("fy", "fq"):
+                if row["old"][field] != row["new"][field]:
+                    changes.add((section, row["end"], field,
+                                 json.dumps(row["old"][field]), json.dumps(row["new"][field])))
+    for row in record["q4EpsChanges"]:
+        if row["action"] in WRITE_EPS_ACTIONS:
+            changes.add(("quarterly", row["end"], f"values.{row['field']}",
+                         json.dumps(row["old"]), json.dumps(row["new"])))
+    return frozenset(changes)
+
+
+def _end_index(block, end):
+    ends = block.get("end")
+    if not isinstance(ends, list) or ends.count(end) != 1:
+        raise ApplyError(f"period end {end} must appear exactly once in its section")
+    return ends.index(end)
+
+
+def apply_diff(document, diff):
+    """Return a copy of document with exactly the normalized diff applied."""
+    updated = copy.deepcopy(document)
+    for section, end, field, _old_json, new_json in sorted(diff):
+        block = updated[section]
+        index = _end_index(block, end)
+        value = json.loads(new_json)
+        if field.startswith("values."):
+            column = block["values"][field[len("values."):]]
+            column[index] = value
+        else:
+            block[field][index] = value
+    return updated
+
+
+def leaf_changes(before, after, path=()):
+    """Map each JSON path whose value differs between before and after to (old_json, new_json)."""
+    if isinstance(before, dict) and isinstance(after, dict):
+        changes = {}
+        for key in set(before) | set(after):
+            if key not in before or key not in after:
+                changes[path + (key,)] = (
+                    json.dumps(before.get(key, _ABSENT)), json.dumps(after.get(key, _ABSENT)),
+                )
+            else:
+                changes.update(leaf_changes(before[key], after[key], path + (key,)))
+        return changes
+    if isinstance(before, list) and isinstance(after, list) and len(before) == len(after):
+        changes = {}
+        for index, (old, new) in enumerate(zip(before, after)):
+            changes.update(leaf_changes(old, new, path + (index,)))
+        return changes
+    if json.dumps(before) != json.dumps(after):
+        return {path: (json.dumps(before), json.dumps(after))}
+    return {}
+
+
+def verify_written_change(before, after, diff):
+    """Check that the only leaves that differ are the dry-run changes, and that no guarded value moved."""
+    actual = leaf_changes(before, after)
+    expected = {}
+    for section, end, field, old_json, new_json in diff:
+        index = _end_index(before[section], end)
+        expected[(section, *field.split("."), index)] = (old_json, new_json)
+    if actual != expected:
+        raise ApplyError("the rewritten document differs from the dry-run changes")
+    for path, (old_json, _new_json) in actual.items():
+        if path[0] in PROTECTED_TOP_LEVEL or (path[0] == "quarterly" and path[1] in PROTECTED_QUARTERLY_COLUMNS):
+            raise ApplyError(f"guarded path changed: {path}")
+        if path[0] == "quarterly" and path[1] == "values" and old_json != "null":
+            marks = before["quarterly"].get(DERIVED_COLUMN) or []
+            if path[-1] >= len(marks) or not marks[path[-1]]:
+                raise ApplyError(f"non-derived EPS value would change: {path}")
+
+
+def _diff_summary(record):
+    """Changed rows per section and Q4 EPS actions for one file, as the dry run records them."""
+    actions = Counter(
+        row["action"] for row in record["q4EpsChanges"] if row["action"] in WRITE_EPS_ACTIONS
+    )
+    return {
+        "annualLabelRows": len(record["annualLabelChanges"]),
+        "quarterlyLabelRows": len(record["quarterlyLabelChanges"]),
+        "eps": {action: actions.get(action, 0) for action in WRITE_EPS_ACTIONS},
+    }
+
+
+def diff_status(document, diff):
+    """'pending' when every dry-run change still holds its old value, 'applied' when every one holds its new value.
+
+    Anything else (a value that is neither, or a file half-way between the two) stops the apply.
+    """
+    statuses = set()
+    for section, end, field, old_json, new_json in diff:
+        block = document[section]
+        index = _end_index(block, end)
+        current = block["values"][field[len("values."):]][index] if field.startswith("values.") else block[field][index]
+        current_json = json.dumps(current)
+        if current_json == old_json:
+            statuses.add("pending")
+        elif current_json == new_json:
+            statuses.add("applied")
+        else:
+            raise ApplyError(f"{end} {field} holds {current_json}, neither the dry-run old nor new value")
+    if statuses == {"pending"}:
+        return "pending"
+    if statuses == {"applied"}:
+        return "applied"
+    raise ApplyError("a file is partly applied; nothing was written")
+
+
+def apply_repairs(financials_dir, dry_run_report, excluded=APPLY_EXCLUDED_SYMBOLS):
+    """Write exactly the dry-run changes for non-excluded files. Returns a summary dict.
+
+    Every file is checked before anything is written: a file with dry-run changes must be either
+    entirely pending (all old values) or entirely applied (all new values); a file without dry-run
+    changes must have no planned change. The plan for a pending file must equal its dry-run changes.
+    Re-planning an applied file can propose further changes; they are reported, never written.
+    Each rewritten document is verified against the dry run before it replaces the file.
+    """
+    expected_by_symbol = {entry["symbol"]: entry for entry in dry_run_report["files"]}
+    baseline = fiscal_detector.build_report(financials_dir)
+    flagged_by_file = {entry["file"]: entry for entry in baseline["flaggedFiles"]}
+
+    pending = []
+    applied = []
+    replan_after_apply = []
+    for path in sorted(financials_dir.glob("*.json"), key=lambda item: item.name):
+        plan = plan_path(path, flagged_by_file)
+        if plan is None:
+            continue
+        symbol = plan["symbol"]
+        planned = normalized_diff(plan["record"])
+        expected_entry = expected_by_symbol.get(symbol)
+        expected = normalized_diff(expected_entry) if expected_entry else frozenset()
+        if not expected:
+            if planned:
+                raise ApplyError(f"{path.name}: planned changes are not in the dry run; nothing was written")
+            continue
+        if diff_status(plan["document"], expected) == "applied":
+            applied.append(symbol)
+            if planned:
+                replan_after_apply.append({"symbol": symbol, **_diff_summary(plan["record"])})
+            continue
+        if planned != expected:
+            raise ApplyError(f"{path.name}: planned changes differ from the dry run; nothing was written")
+        pending.append({
+            "path": path, "symbol": symbol, "excluded": symbol in excluded,
+            "document": plan["document"], "diff": expected, "record": plan["record"],
+        })
+
+    rewrites = []
+    for item in pending:
+        if item["excluded"]:
+            continue
+        updated = apply_diff(item["document"], item["diff"])
+        verify_written_change(item["document"], updated, item["diff"])
+        rewrites.append((item, updated))
+
+    written = []
+    for item, updated in rewrites:
+        write_atomic(str(item["path"]), updated)
+        if json.loads(item["path"].read_text(encoding="utf-8")) != updated:
+            raise ApplyError(f"{item['path'].name}: the written file does not match the verified document")
+        written.append(item)
+
+    return {
+        "written": [
+            {"symbol": item["symbol"], "file": item["path"].name, **_diff_summary(item["record"])}
+            for item in written
+        ],
+        "excluded": [
+            {"symbol": item["symbol"], **_diff_summary(item["record"])}
+            for item in sorted(
+                (item for item in pending if item["excluded"]), key=lambda item: item["symbol"],
+            )
+        ],
+        "alreadyApplied": sorted(applied),
+        "replanAfterApply": replan_after_apply,
+    }
+
+
 def write_report(path, report):
     path.parent.mkdir(parents=True, exist_ok=True)
     content = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
@@ -499,19 +742,73 @@ def write_report(path, report):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dry-run", action="store_true", required=True,
-                        help="read local US files and write only the dry-run report")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--dry-run", action="store_true",
+                      help="read local US files and write only the dry-run report")
+    mode.add_argument("--apply", action="store_true",
+                      help="write exactly the dry-run changes to docs/report/financials/ (not excluded symbols)")
     parser.add_argument("--financials-dir", type=Path, default=DEFAULT_FINANCIALS_DIR)
-    parser.add_argument("--output", type=Path, default=DEFAULT_REPORT_PATH)
+    parser.add_argument("--output", type=Path, default=DEFAULT_REPORT_PATH,
+                        help="dry-run report path (dry-run mode only)")
+    parser.add_argument("--dry-run-report", type=Path, default=DEFAULT_REPORT_PATH,
+                        help="dry-run report that --apply must reproduce (apply mode only)")
     return parser.parse_args(argv)
+
+
+def _print_apply_summary(summary):
+    def totals(rows):
+        eps = Counter()
+        for row in rows:
+            eps.update(row["eps"])
+        return {
+            "files": len(rows),
+            "annualLabelRows": sum(row["annualLabelRows"] for row in rows),
+            "quarterlyLabelRows": sum(row["quarterlyLabelRows"] for row in rows),
+            "eps": {action: eps.get(action, 0) for action in WRITE_EPS_ACTIONS},
+        }
+
+    applied = totals(summary["written"])
+    print(
+        f"applied: {applied['files']} files written; annual label rows {applied['annualLabelRows']}, "
+        f"quarterly label rows {applied['quarterlyLabelRows']}; Q4 EPS values "
+        f"{applied['eps']['newly-derived']} newly derived, {applied['eps']['nulled']} nulled, "
+        f"{applied['eps']['changed']} changed"
+    )
+    excluded = totals(summary["excluded"])
+    print(
+        f"excluded, not written: {excluded['files']} files; annual label rows "
+        f"{excluded['annualLabelRows']}, quarterly label rows {excluded['quarterlyLabelRows']}; "
+        f"Q4 EPS values {sum(excluded['eps'].values())}"
+    )
+    for row in summary["excluded"]:
+        print(f"  excluded {row['symbol']}: quarterly label rows {row['quarterlyLabelRows']}, "
+              f"annual label rows {row['annualLabelRows']}, Q4 EPS values {sum(row['eps'].values())}")
+    print(f"already applied (every dry-run change holds its new value): {len(summary['alreadyApplied'])} files")
+    replan = summary["replanAfterApply"]
+    print(
+        f"re-plan of applied files proposes further changes: {len(replan)} files, "
+        f"{sum(row['quarterlyLabelRows'] + row['annualLabelRows'] for row in replan)} label rows, "
+        f"{sum(sum(row['eps'].values()) for row in replan)} Q4 EPS values; not in the dry run, not written"
+    )
 
 
 def main(argv=None):
     args = parse_args(argv)
     financials_dir = args.financials_dir.resolve()
-    output_path = args.output.resolve()
     if not financials_dir.is_dir():
         raise SystemExit(f"financials directory not found: {financials_dir}")
+
+    if args.apply:
+        with args.dry_run_report.open(encoding="utf-8") as file:
+            dry_run_report = json.load(file)
+        try:
+            summary = apply_repairs(financials_dir, dry_run_report)
+        except ApplyError as error:
+            raise SystemExit(f"apply stopped: {error}")
+        _print_apply_summary(summary)
+        return
+
+    output_path = args.output.resolve()
     if os.path.commonpath((str(financials_dir), str(output_path))) == str(financials_dir):
         raise SystemExit("the dry-run report must not be written under docs/report/financials/")
     report = build_report(financials_dir)
