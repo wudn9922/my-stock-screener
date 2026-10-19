@@ -777,7 +777,15 @@ def _eps_changes_by_action(record):
 
 
 def run_fixpoint(financials_dir, excluded=APPLY_EXCLUDED_SYMBOLS, max_passes=FIXPOINT_MAX_PASSES):
+    """Return the fixed-point dry-run report. Writes nothing. See compute_fixpoint."""
+    return compute_fixpoint(financials_dir, excluded, max_passes)[0]
+
+
+def compute_fixpoint(financials_dir, excluded=APPLY_EXCLUDED_SYMBOLS, max_passes=FIXPOINT_MAX_PASSES):
     """Re-plan the repair in memory, pass after pass, until a pass makes no change. Writes nothing.
+
+    Returns (report, states, disk_paths): states maps each changed file name to its in-memory document
+    after all passes.
 
     Pass 1 plans every US file as it is on disk. A later pass plans only the files that the previous
     pass changed, because a file that did not change would plan exactly what it planned before, and
@@ -846,10 +854,11 @@ def run_fixpoint(financials_dir, excluded=APPLY_EXCLUDED_SYMBOLS, max_passes=FIX
         return changes
 
     results, converged = converge(run_pass, max_passes)
-    return _fixpoint_report(
+    report = _fixpoint_report(
         financials_dir, disk_paths, states, results, converged, pass_reports, excluded_plans,
         excluded, max_passes,
     )
+    return report, states, disk_paths
 
 
 def _fixpoint_report(financials_dir, disk_paths, states, results, converged, pass_reports,
@@ -958,6 +967,86 @@ def _fixpoint_report(financials_dir, disk_paths, states, results, converged, pas
     }
 
 
+def fixpoint_expected_diffs(dry_run):
+    """Map each file in a fixed-point dry-run report to its cumulative changes, as normalized diff tuples.
+
+    Label rows carry fy and/or fq at the top of the row. EPS rows carry the field and the old and new
+    values. Values are JSON text, as in normalized_diff.
+    """
+    expected = defaultdict(set)
+    for row in dry_run["labelRowsVsStartingState"]:
+        for field in ("fy", "fq"):
+            if field in row:
+                expected[row["file"]].add((
+                    row["section"], row["end"], field,
+                    json.dumps(row[field]["old"]), json.dumps(row[field]["new"]),
+                ))
+    for row in dry_run["epsValuesVsStartingState"]:
+        expected[row["file"]].add((
+            "quarterly", row["end"], f"values.{row['field']}",
+            json.dumps(row["old"]), json.dumps(row["new"]),
+        ))
+    return {name: frozenset(diffs) for name, diffs in expected.items()}
+
+
+def apply_fixpoint(financials_dir, dry_run, excluded=APPLY_EXCLUDED_SYMBOLS, max_passes=FIXPOINT_MAX_PASSES):
+    """Write the fixed-point changes listed in dry_run to financials_dir. Returns a summary dict.
+
+    The re-plan is recomputed from the files on disk with the same code as the dry run. Every file
+    the dry run lists is then checked before anything is written: it is either pending (every listed
+    change still holds its old value; the re-plan must produce exactly the listed changes) or already
+    applied (every listed change holds its new value; the re-plan must make no further change). A
+    re-plan that changes any file the dry run does not list, or a file that is only partly applied,
+    stops the apply. Writes go through write_atomic, one file at a time.
+    """
+    if not dry_run.get("converged"):
+        raise ApplyError("the fixed-point dry run did not converge; nothing was written")
+    expected = fixpoint_expected_diffs(dry_run)
+    report, states, disk_paths = compute_fixpoint(financials_dir, excluded, max_passes)
+    if not report["converged"]:
+        raise ApplyError("the re-plan did not converge within the cap; nothing was written")
+    unlisted = sorted(set(states) - set(expected))
+    if unlisted:
+        raise ApplyError(f"the re-plan changes files the dry run does not list: {unlisted}")
+
+    pending = []
+    applied = []
+    for name in sorted(expected):
+        disk = _json_file(disk_paths[name])
+        if disk.get("symbol") in excluded:
+            raise ApplyError(f"{name}: an excluded symbol is listed in the fixed-point dry run")
+        diff = expected[name]
+        if diff_status(disk, diff) == "applied":
+            if name in states:
+                raise ApplyError(f"{name}: already applied, but the re-plan proposes further changes")
+            applied.append(name)
+            continue
+        if name not in states:
+            raise ApplyError(f"{name}: the dry run lists changes that the re-plan does not make")
+        verify_written_change(disk, states[name], diff)
+        pending.append(name)
+
+    for name in pending:
+        path = disk_paths[name]
+        write_atomic(str(path), states[name])
+        if json.loads(path.read_text(encoding="utf-8")) != states[name]:
+            raise ApplyError(f"{name}: the written file does not match the verified document")
+
+    def counts(names):
+        label_rows = sum(len({end for _section, end, field, _o, _n in expected[name] if not field.startswith("values.")})
+                         for name in names)
+        eps = Counter()
+        for name in names:
+            for _section, end, field, old_json, new_json in expected[name]:
+                if field.startswith("values."):
+                    eps["changed" if old_json != "null" and new_json != "null" else
+                        "nulled" if new_json == "null" else "newlyDerived"] += 1
+        return {"files": len(names), "quarterlyLabelRows": label_rows,
+                "eps": {key: eps.get(key, 0) for key in ("newlyDerived", "nulled", "changed")}}
+
+    return {"written": counts(pending), "alreadyApplied": len(applied)}
+
+
 def write_report(path, report):
     path.parent.mkdir(parents=True, exist_ok=True)
     content = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
@@ -984,6 +1073,8 @@ def parse_args(argv=None):
                       help="write exactly the dry-run changes to docs/report/financials/ (not excluded symbols)")
     mode.add_argument("--fixpoint", action="store_true",
                       help="re-plan in memory until a pass makes no change (at most 5 passes); writes nothing")
+    mode.add_argument("--apply-fixpoint", action="store_true",
+                      help="write exactly the changes listed in the fixed-point dry-run report to docs/report/financials/")
     parser.add_argument("--financials-dir", type=Path, default=DEFAULT_FINANCIALS_DIR)
     parser.add_argument("--output", type=Path, default=DEFAULT_REPORT_PATH,
                         help="dry-run report path (dry-run mode only)")
@@ -991,6 +1082,8 @@ def parse_args(argv=None):
                         help="dry-run report that --apply must reproduce (apply mode only)")
     parser.add_argument("--fixpoint-output", type=Path, default=FIXPOINT_REPORT_PATH,
                         help="fixed-point summary path (fixpoint mode only)")
+    parser.add_argument("--fixpoint-report", type=Path, default=FIXPOINT_REPORT_PATH,
+                        help="fixed-point dry-run report that --apply-fixpoint must reproduce")
     parser.add_argument("--max-passes", type=int, default=FIXPOINT_MAX_PASSES,
                         help=f"fixed-point pass cap (fixpoint mode only; default {FIXPOINT_MAX_PASSES})")
     return parser.parse_args(argv)
@@ -1038,6 +1131,22 @@ def main(argv=None):
     financials_dir = args.financials_dir.resolve()
     if not financials_dir.is_dir():
         raise SystemExit(f"financials directory not found: {financials_dir}")
+
+    if args.apply_fixpoint:
+        with args.fixpoint_report.open(encoding="utf-8") as file:
+            dry_run = json.load(file)
+        try:
+            summary = apply_fixpoint(financials_dir, dry_run, max_passes=args.max_passes)
+        except ApplyError as error:
+            raise SystemExit(f"fixpoint apply stopped: {error}")
+        written = summary["written"]
+        eps = written["eps"]
+        print(
+            f"fixpoint applied: {written['files']} files written; quarterly label rows "
+            f"{written['quarterlyLabelRows']}; Q4 EPS values {eps['newlyDerived']} newly derived, "
+            f"{eps['nulled']} nulled, {eps['changed']} changed; already applied {summary['alreadyApplied']} files"
+        )
+        return
 
     if args.apply:
         with args.dry_run_report.open(encoding="utf-8") as file:
