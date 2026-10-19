@@ -10,12 +10,12 @@
     },
     "unexpectedLeafChanges": 0
   },
-  "converged": false,
+  "converged": true,
   "cumulativeVsStartingState": {
     "annualLabelRows": 0,
     "epsValues": 5,
     "files": 70,
-    "quarterlyLabelRows": 195
+    "quarterlyLabelRows": 196
   },
   "epsActionsByPass": [
     {
@@ -2007,6 +2007,20 @@
       "symbol": "POWW"
     },
     {
+      "end": "2012-09-30",
+      "file": "POWW.json",
+      "fq": {
+        "new": 3,
+        "old": 2
+      },
+      "fy": {
+        "new": 2012,
+        "old": 2013
+      },
+      "section": "quarterly",
+      "symbol": "POWW"
+    },
+    {
       "end": "2017-06-30",
       "file": "POWW.json",
       "fq": {
@@ -2706,9 +2720,35 @@
       "filesPlanned": 19,
       "pass": 5,
       "quarterlyLabelRows": 4
+    },
+    {
+      "annualLabelRows": 0,
+      "eps": {
+        "changed": 0,
+        "newlyDerived": 0,
+        "nulled": 0,
+        "reDerivedNoChange": 0
+      },
+      "filesChanged": 1,
+      "filesPlanned": 4,
+      "pass": 6,
+      "quarterlyLabelRows": 1
+    },
+    {
+      "annualLabelRows": 0,
+      "eps": {
+        "changed": 0,
+        "newlyDerived": 0,
+        "nulled": 0,
+        "reDerivedNoChange": 0
+      },
+      "filesChanged": 0,
+      "filesPlanned": 1,
+      "pass": 7,
+      "quarterlyLabelRows": 0
     }
   ],
-  "passesRun": 5,
+  "passesRun": 7,
   "scope": {
     "excludedSymbols": [
       "AIOT",
@@ -2730,7 +2770,7 @@
       "YUMC"
     ],
     "market": "US",
-    "maxPasses": 5,
+    "maxPasses": 10,
     "startingState": "the current docs/report/financials/ files, read only",
     "writes": "none"
   },
