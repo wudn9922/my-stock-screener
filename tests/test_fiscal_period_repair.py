@@ -104,6 +104,16 @@ class FiscalPeriodRepairTests(unittest.TestCase):
         self.assertEqual(labels(before_annual), labels(annual))
         self.assertEqual(labels(before_quarterly), labels(quarterly))
 
+    def test_unflagged_file_has_no_existing_quarter_label_targets(self):
+        doc = document("AAPL")
+        annual = stored_items(doc, "annual")
+        quarterly = stored_items(doc, "quarterly")
+        targets = fin.fiscal_label_eligible_ends(annual, quarterly)
+        self.assertEqual(targets, set())
+        before = labels(quarterly)
+        fin.assign_fiscal_labels(annual, quarterly, eligible_quarter_ends=targets)
+        self.assertEqual(labels(quarterly), before)
+
     def test_no_annual_periods_keep_the_callers_current_behavior(self):
         quarter = [{"end": "2023-01-07", "fy": None, "fq": None, "values": {}}]
         fin.assign_fiscal_labels([], quarter)

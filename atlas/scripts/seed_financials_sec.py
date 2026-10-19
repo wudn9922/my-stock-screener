@@ -131,6 +131,7 @@ from build_financials import (
     finite_number,
     fill_q4_eps,
     fy_end_month,
+    fiscal_label_eligible_ends,
     market_of,
     merge_events,
     merge_revisions,
@@ -1987,7 +1988,10 @@ def merge_into_document(previous, sec, key, now, fetch_splits=None):
 
     # Fiscal labels exactly as build_financials.update_document
     end_month = fy_end_month([p["end"] for p in annual])
-    assign_fiscal_labels(annual, quarterly, fallback_end_month=end_month)
+    eligible_ends = fiscal_label_eligible_ends(annual, quarterly)
+    assign_fiscal_labels(
+        annual, quarterly, fallback_end_month=end_month, eligible_quarter_ends=eligible_ends,
+    )
     counts["droppedDuplicate"] = _dedupe_labels(annual, quarterly)
     # Q4 EPS on the basis the periods hold now (split adjusted, fiscal labels set): extraction could not derive
     # it across a split (an annual EPS restated after the split next to Q1..Q3 still pre-split, NFLX 2023-2024),
@@ -2710,7 +2714,10 @@ def upgrade_document(previous, sec, key, now, fetch_splits=None):
     info["splitAdjusted"] = adjusted
 
     end_month = fy_end_month([p["end"] for p in annual]) or 12
-    assign_fiscal_labels(annual, quarterly, fallback_end_month=end_month)
+    eligible_ends = fiscal_label_eligible_ends(annual, quarterly)
+    assign_fiscal_labels(
+        annual, quarterly, fallback_end_month=end_month, eligible_quarter_ends=eligible_ends,
+    )
 
     revisions = merge_revisions(yahoo["revisions"], revised_a + revised_q, annual, quarterly, renamed)
     flags = {item["kind"] for item in revisions}

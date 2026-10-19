@@ -74,7 +74,8 @@ from datetime import timezone
 from typing import NamedTuple
 
 from build_financials import (
-    ISSUES, KEEP_ANNUAL, KEEP_QUARTERLY, SAME_PERIOD_DAYS, VERSION, assign_fiscal_labels, clean_value,
+    ISSUES, KEEP_ANNUAL, KEEP_QUARTERLY, SAME_PERIOD_DAYS, VERSION, assign_fiscal_labels,
+    clean_value, fiscal_label_eligible_ends,
     financials_key, fy_end_month, market_of, parse_day, period, quality, write_section,
 )
 from build_valuation_us import finite_number, read_json, write_atomic
@@ -401,7 +402,10 @@ def _document(result, key, now, basis=IFRS_BASIS):
     annual = [period(p["end"], p["values"], SRC) for p in result.annual[-KEEP_ANNUAL:]]
     quarterly = [period(p["end"], p["values"], SRC) for p in result.quarterly[-KEEP_QUARTERLY:]]
     end_month = fy_end_month([p["end"] for p in annual])
-    assign_fiscal_labels(annual, quarterly, fallback_end_month=end_month or 12)
+    eligible_ends = fiscal_label_eligible_ends(annual, quarterly)
+    assign_fiscal_labels(
+        annual, quarterly, fallback_end_month=end_month or 12, eligible_quarter_ends=eligible_ends,
+    )
     grade = quality(annual, quarterly, set(), True)
     codes = {basis.code} | ({basis.code + "-fallback"} if result.fallback else set())
     grade["issues"] += sorted(code for code in codes if code not in ISSUES)

@@ -1116,7 +1116,45 @@ def fiscal_quarter(end, end_month):
     return index // 12, quarter
 
 
-def assign_fiscal_labels(annual, quarterly, fallback_end_month=None):
+def fiscal_label_eligible_ends(annual, quarterly):
+    """Quarter ends flagged by the offline fiscal-period detector, plus rows without labels.
+
+    Keeping existing, unflagged rows stable avoids changing fiscal labels in files where the
+    detector found no evidence of a fiscal-period mismatch. New rows have no labels yet and are
+    included so each ingestion path can label them.
+    """
+    from detect_fiscal_period_mismatch import analyze
+
+    document = {
+        "annual": {
+            "end": [item.get("end") for item in annual],
+            "fy": [
+                item.get("fy") if isinstance(item.get("fy"), int) and not isinstance(item.get("fy"), bool)
+                else fiscal_year(item.get("end"))
+                for item in annual
+            ],
+        },
+        "quarterly": {
+            "end": [item.get("end") for item in quarterly],
+            "fy": [item.get("fy") for item in quarterly],
+            "fq": [item.get("fq") for item in quarterly],
+        },
+    }
+    result = analyze(document)
+    eligible = {
+        row["end"]
+        for row in result["affectedQ4"] + result["otherQuarterFlags"]
+    }
+    eligible.update(
+        item.get("end") for item in quarterly
+        if not isinstance(item.get("fy"), int)
+        or isinstance(item.get("fy"), bool)
+        or item.get("fq") not in (1, 2, 3, 4)
+    )
+    return eligible
+
+
+def assign_fiscal_labels(annual, quarterly, fallback_end_month=None, eligible_quarter_ends=None):
     """Assign annual FYs and quarterly FY/FQs, using each actual annual end as the anchor.
 
     A quarter belongs to the first annual end on or after it, provided that end is within 371 days.
@@ -1143,7 +1181,10 @@ def assign_fiscal_labels(annual, quarterly, fallback_end_month=None):
     def month_index(day):
         return day.year * 12 + day.month - 1
 
+    eligible = None if eligible_quarter_ends is None else set(eligible_quarter_ends)
     for item in quarterly:
+        if eligible is not None and item.get("end") not in eligible:
+            continue
         quarter_day = parse_day(item["end"])
         effective_quarter = effective(item["end"])
         owner = next(
@@ -1335,7 +1376,10 @@ def update_document(previous, payload, key, now, fetch_splits=None):
     end_month = fy_end_month([p["end"] for p in annual])
     if end_month is None and market == "TW":
         end_month = 12     # Taiwan companies report on the calendar year
-    assign_fiscal_labels(annual, quarterly, fallback_end_month=end_month)
+    eligible_ends = fiscal_label_eligible_ends(annual, quarterly) if market == "US" else None
+    assign_fiscal_labels(
+        annual, quarterly, fallback_end_month=end_month, eligible_quarter_ends=eligible_ends,
+    )
 
     revisions = merge_revisions(stored["revisions"], revised_a + revised_q, annual, quarterly, renamed)
     flags = {r["kind"] for r in revisions}
