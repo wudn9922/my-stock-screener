@@ -14,6 +14,8 @@ export interface FinancialsHeaderProps {
   name: string | null;
   history: FinancialHistory | null;
   kind: PeriodKind;
+  showQuarterly: boolean;
+  futuHref: string | null;
   mode: DisplayMode;
   localSymbols: readonly LocalSymbol[];
   /** Taiwan listing of the ADR being viewed: the header links to its financials. */
@@ -31,12 +33,14 @@ export interface FinancialsHeaderProps {
  * search box and quality note open below the rows.
  */
 export function FinancialsHeader({
-  symbol, name, history, kind, mode, localSymbols, homeListing, onBack, onKind, onMode, onSymbol, onHomeListing,
+  symbol, name, history, kind, showQuarterly, futuHref, mode, localSymbols, homeListing, onBack, onKind, onMode, onSymbol, onHomeListing,
 }: FinancialsHeaderProps) {
   const [searching, setSearching] = useState(!symbol);
   const [qualityOpen, setQualityOpen] = useState(false);
   const level = history?.quality.level ?? null;
   const issues = history?.quality.issues ?? [];
+  const visibleIssues = history?.market === 'US' ? issues.filter((issue) => issue !== 'quarterly-ytd-suspected') : issues;
+  const visibleRevisions = history?.market === 'US' ? history.quality.revisions.filter((revision) => revision.period === 'annual') : history?.quality.revisions ?? [];
   return (
     <header className="fin-head">
       <div className="fin-head-row fin-head-main">
@@ -54,19 +58,28 @@ export function FinancialsHeader({
           {history && <span className="fin-currency">{history.currency}</span>}
         </div>
       </div>
-      <div className="fin-head-row controls">
-        <div className="segmented compact" role="group" aria-label="期間">
-          {(
-            [
-              ['annual', '年度'],
-              ['quarterly', '季度'],
-            ] as const
-          ).map(([value, label]) => (
-            <button key={value} type="button" className={kind === value ? 'active' : ''} aria-pressed={kind === value} onClick={() => onKind(value)}>
-              {label}
-            </button>
-          ))}
+      {futuHref && (
+        <div className="fin-head-row fin-outbound-row">
+          <a className="fin-futu-link" href={futuHref} target="_blank" rel="noopener noreferrer">
+            在富途查看更詳細財報
+          </a>
         </div>
+      )}
+      <div className="fin-head-row controls">
+        {showQuarterly && (
+          <div className="segmented compact" role="group" aria-label="期間">
+            {(
+              [
+                ['annual', '年度'],
+                ['quarterly', '季度'],
+              ] as const
+            ).map(([value, label]) => (
+              <button key={value} type="button" className={kind === value ? 'active' : ''} aria-pressed={kind === value} onClick={() => onKind(value)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="segmented compact" role="group" aria-label="顯示方式">
           {(
             [
@@ -134,22 +147,24 @@ export function FinancialsHeader({
         <div className="fin-quality-panel" role="note">
           <p>
             <b>{level ? LEVEL_TEXT[level] : '品質未標示'}</b>
-            ：年度 {history.annual.end.length} 期、季度 {history.quarterly.end.length} 期。
+            {history.market === 'US'
+              ? `：年度 ${history.annual.end.length} 期。`
+              : `：年度 ${history.annual.end.length} 期、季度 ${history.quarterly.end.length} 期。`}
           </p>
-          {issues.length ? (
+          {visibleIssues.length ? (
             <ul>
-              {issues.map((code) => (
+              {visibleIssues.map((code) => (
                 <li key={code}>{issueText(code)}</li>
               ))}
             </ul>
           ) : (
             <p>沒有發現資料問題。</p>
           )}
-          {history.quality.revisions.length > 0 && (
+          {visibleRevisions.length > 0 && (
             <>
-              <p className="fin-revisions-title">修訂紀錄（最近 {Math.min(5, history.quality.revisions.length)} 筆）</p>
+              <p className="fin-revisions-title">修訂紀錄（最近 {Math.min(5, visibleRevisions.length)} 筆）</p>
               <ul>
-                {history.quality.revisions
+                {visibleRevisions
                   .slice(-5)
                   .reverse()
                   .map((revision) => (

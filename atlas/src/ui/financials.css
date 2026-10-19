@@ -29,6 +29,17 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+.fin-outbound-row {
+  margin-top: -4px;
+}
+.fin-futu-link {
+  color: var(--accent-text);
+  font-size: 12px;
+  text-decoration: none;
+}
+.fin-futu-link:hover {
+  text-decoration: underline;
+}
 .fin-head-tools {
   display: flex;
   align-items: center;
