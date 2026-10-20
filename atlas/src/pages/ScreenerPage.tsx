@@ -61,12 +61,15 @@ import {
   maValue,
   toneClass,
 } from '../ui/format';
-import { parseRoute, serializeRoute } from '../app/routes';
+import { serializeRoute } from '../app/routes';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { PageState } from '../ui/PageState';
 import '../ui/filter-sheet.css';
 import '../ui/screener-status.css';
 import { EarningsBadge } from '../ui/EarningsBadge';
+import { createWatchlist } from '../watchlists/model';
+import { watchlistStore } from '../watchlists/store';
+import '../ui/research.css';
 
 const ROW_HEIGHT = 64;
 const OVERSCAN = 8;
@@ -228,12 +231,6 @@ function Row({
 }
 
 /** The screener's `f` parameter, read from the address bar (the site router keeps it there). */
-function urlFilterParam(): string | undefined {
-  if (typeof window === 'undefined') return undefined;
-  const { route } = parseRoute(window.location.search, 'screener');
-  return route.page === 'screener' ? route.f : undefined;
-}
-
 /** Shortest 52-week window among rows that do not have a full year yet (median of the short ones). */
 function shortHighWindow(items: readonly GroupItem[]): number | null {
   const bars = items.map((item) => item.metrics?.hiBars ?? 0).filter((n) => n > 0);
@@ -302,9 +299,10 @@ function useGrowth(wanted: boolean, market: 'TW' | 'US') {
 function ScreenerView({
   report,
   group: requested,
+  f: appliedFilter,
   navigate,
   openChart,
-}: { report: Report; group?: string } & Pick<PageProps, 'navigate' | 'openChart'>) {
+}: { report: Report; group?: string; f?: string } & Pick<PageProps, 'navigate' | 'openChart'>) {
   const groups = report.groups;
   const universeMarket = universeMarketOf(requested);
   const { state: universe, retry: retryUniverse } = useUniverse(universeMarket);
@@ -318,7 +316,7 @@ function ScreenerView({
   const market = group?.market ?? 'TW';
 
   // Conditions: the URL's `f` first, otherwise the last ones applied for this market.
-  const urlF = urlFilterParam();
+  const urlF = appliedFilter;
   const filterText = urlF ?? readStoredFilters(market) ?? '';
   const filters = useMemo(() => parseFilters(filterText), [filterText]);
   const routeTo = useCallback(
@@ -340,6 +338,9 @@ function ScreenerView({
   const [view, setView] = useState<StatusView>('all');
   const [sort, setSort] = useState<SortMode>('default');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [savingList, setSavingList] = useState(false);
+  const [listName, setListName] = useState('');
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
   const [draftNeedsGrowth, setDraftNeedsGrowth] = useState(false);
   const [scroll, setScroll] = useState({ top: 0, height: 600 });
@@ -486,6 +487,18 @@ function ScreenerView({
         </label>
         <span className="result-count">{resultCountText(items, viewItems.length, activeView, hasUnmatched)}</span>
       </div>
+      <div className="save-watchlist">
+        <button type="button" className="ghost-button" disabled={universePending} onClick={() => { setSavingList((previous) => !previous); setListName(group.name); }}>存成自選清單</button>
+        <button type="button" className="text-button" onClick={() => navigate({ page: 'console' })}>開啟我的清單／控制台</button>
+        {savingList && <form className="save-watchlist" onSubmit={(event) => {
+          event.preventDefault();
+          try {
+            const list = createWatchlist({ name: listName, market, group: group.key, filters: serializeFilters(filters), maList: group.maList.length ? group.maList.slice(0, 4) : [20, 50, 200] });
+            watchlistStore().save(list); navigate({ page: 'console', list: list.id });
+          } catch (error) { setSaveError(error instanceof Error ? error.message : '清單儲存失敗'); }
+        }}><input aria-label="自選清單名稱" value={listName} onChange={(event) => setListName(event.target.value)} maxLength={40} required /><button type="submit" className="primary-button">儲存並追蹤清單</button></form>}
+        {saveError && <span role="alert">{saveError}</span>}
+      </div>
       {hasUnmatched && (
         <div className="segmented compact status-seg" role="group" aria-label="成功與未成功股票">
           {STATUS_VIEWS.map((mode) => (
@@ -616,7 +629,7 @@ function ScreenerView({
   );
 }
 
-export default function ScreenerPage({ report, reload, navigate, openChart, group }: PageProps & { group?: string }) {
+export default function ScreenerPage({ report, reload, navigate, openChart, group, f }: PageProps & { group?: string; f?: string }) {
   return (
     <div className="page screener-page">
       <div className="page-head">
@@ -628,7 +641,7 @@ export default function ScreenerPage({ report, reload, navigate, openChart, grou
         </div>
       </div>
       <ReportGate report={report} reload={reload}>
-        {(data) => <ScreenerView report={data} group={group} navigate={navigate} openChart={openChart} />}
+        {(data) => <ScreenerView report={data} group={group} f={f} navigate={navigate} openChart={openChart} />}
       </ReportGate>
     </div>
   );

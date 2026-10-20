@@ -108,12 +108,9 @@ REPORT_LIFF_URL = (
     f"{REPORT_LIFF_ID}"
 )
 
-# 原本的參數控制台 LIFF，保持不變
+# 舊 LIFF ID 保留供既有捷徑辨識；新報告入口直接開啟 Atlas 內的控制台。
 SETTING_LIFF_ID = "2010330411-SbwvRXRN"
-SETTING_LIFF_URL = (
-    "https://liff.line.me/"
-    f"{SETTING_LIFF_ID}"
-)
+SETTING_LIFF_URL = f"{REPORT_LIFF_URL}?page=console"
 
 # 原本另一套控制台，保持不變
 BITGET_SETTING_URL = (

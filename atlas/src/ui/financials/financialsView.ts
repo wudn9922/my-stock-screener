@@ -33,8 +33,8 @@ import { toneClass } from '../format';
  * Pure (no React), so it is unit-tested with the synthetic fixtures.
  */
 
-/** Default bars per chart: annual 10 years, quarterly 12 quarters (the table shows every period). */
-export const CHART_PERIODS: Record<PeriodKind, number> = { annual: 10, quarterly: 12 };
+/** Default bars per chart: annual 10 years, quarterly five years (the table shows every period). */
+export const CHART_PERIODS: Record<PeriodKind, number> = { annual: 10, quarterly: 20 };
 /** Range choices offered on the charts: years for annual, quarters for quarterly. */
 export const SPAN_OPTIONS: Record<PeriodKind, readonly number[]> = { annual: [5, 10, 15], quarterly: [12, 20, 40, 60] };
 

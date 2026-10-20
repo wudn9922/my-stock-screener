@@ -1,4 +1,12 @@
-## Current review: SEC bootstrap and Taiwan public verification (2026-10-08)
+## Current review: unified console extension (2026-10-20)
+
+The user explicitly authorized the unified parameter console, multiple saved screening/manual lists, last-opening membership comparisons, optional Supabase persistence and existing breakout monitoring, quarterly US statement presentation, peer comparison, rotation tracking, health disclosure and the reachable Apply action. See [implementation and deployment checklist](docs/UNIFIED_CONSOLE.md) and [ADR-014](docs/architecture/ADR-014-unified-console.md).
+
+Primary review covers source completeness, tenant-scoped API access and optimistic concurrency, separation of daily observations from last-opening baselines, failed-data preservation, quarterly/annual navigation and source/null integrity. Browser regressions detected duplicate sibling React keys for the financial header/peer section when switching symbols; the peer key now has its own prefix. Tests also cover short viewports and the fixed Apply footer. New list storage does not replace existing chart IndexedDB. Independent review and physical Safari UAT are not claimed.
+
+Supabase migration/service activation, true-account cross-device verification and real notifications remain pending. No live database writes or notifications were performed. This branch is for PR review and must not be merged automatically. The final verification record is maintained in UNIFIED_CONSOLE.md.
+
+## Historical review: SEC bootstrap and Taiwan public verification (2026-10-08)
 
 **Status: engineering, deployment, and public verification complete; physical-device UAT and independent review remain pending.** Commit [3feb6337aeab4e686c0f61e259bece7250be3d40](https://github.com/wudn9922/lightweight-drawing-lab/commit/3feb6337aeab4e686c0f61e259bece7250be3d40) completed Actions run [37785146220](https://github.com/wudn9922/lightweight-drawing-lab/actions/runs/37785146220) at 2026-10-08T13:36:11Z. TLS HTTP verification passed at 13:38:04.608649+00:00; public iPhone WebKit passed at 13:37:56.193Z. Evidence: [HTTP](docs/taiwan-financial-live-http.json), [browser](docs/taiwan-financial-live-browser.json). All 16 seeded SEC packs are publicly validated; NVO/QQQ/SPY/TSM remain unavailable after SEC 403/cooldown, with no fresh runner data claimed. The latest hosted 26-symbol market refresh reports 20 available, 2 partial (`0050.TW` lacks 1W/1M; AMZN 1M was omitted after source quote agreement failed), and 4 retained-stale (`NVO`, `XOM`, `SPY`, `TSM`). Retained market packs keep their original observation dates and are not current-quote claims. XOM's market-pack status is separate from its SEC seed (two quarterly, zero annual facts).
 

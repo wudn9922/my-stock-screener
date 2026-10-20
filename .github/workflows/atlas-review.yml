@@ -1,0 +1,56 @@
+name: Atlas PR verification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'atlas/**'
+      - 'breakout_alert/**'
+      - 'supabase/functions/user-settings/**'
+      - 'tests/test_atlas_watchlists.py'
+      - '.github/workflows/atlas-review.yml'
+permissions:
+  contents: read
+concurrency:
+  group: atlas-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: atlas/package-lock.json
+      - name: Install dependencies
+        working-directory: atlas
+        run: npm ci
+      - name: Unit tests, lint and build
+        working-directory: atlas
+        run: |
+          npm test
+          npm run lint
+          npm run build
+          npm run build:pages
+          npm run refresh:watchlists
+      - name: Install browsers
+        working-directory: atlas
+        run: npx playwright install --with-deps chromium webkit
+      - name: Desktop, phone and WebKit regressions
+        working-directory: atlas
+        run: npm run test:site -- unified-console.spec.ts screener-filters.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline breakout integration
+        run: |
+          pip install requests
+          python -m unittest discover -s tests -p 'test_atlas_watchlists.py' -v
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: atlas-review-browser-evidence
+          path: atlas/test-results/site
+          retention-days: 7

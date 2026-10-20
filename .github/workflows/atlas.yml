@@ -146,6 +146,19 @@ jobs:
           VITE_MARKET_PROXY_URL: ${{ vars.MARKET_PROXY_URL || 'https://bxhqpfeberqbtxymghyt.supabase.co/functions/v1/market-chart' }}
         run: npm run build:pages
 
+      # Opt-in only: apply supabase/manual/atlas_watchlists.sql and deploy user-settings first.
+      # Daily observations preserve the last-opening baseline and never send notifications here.
+      - name: Refresh saved watchlist observations
+        if: vars.ATLAS_WATCHLIST_SYNC_ENABLED == '1'
+        continue-on-error: true
+        working-directory: atlas
+        env:
+          ATLAS_WATCHLIST_SYNC_ENABLED: '1'
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_USER_ID: ${{ secrets.SUPABASE_USER_ID }}
+        run: npm run refresh:watchlists
+
       - name: Replace docs/atlas with build output
         run: |
           set -euo pipefail

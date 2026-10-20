@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+const chromiumLaunch = process.env.ATLAS_CHROMIUM_PATH ? { launchOptions: { executablePath: process.env.ATLAS_CHROMIUM_PATH } } : {};
 export default defineConfig({
   testDir: 'e2e',
   timeout: 45000,
@@ -15,9 +16,9 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop-chromium',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
+      use: { ...devices['Desktop Chrome'], ...chromiumLaunch, viewport: { width: 1440, height: 900 } },
     },
-    { name: 'mobile-chromium', use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
+    { name: 'mobile-chromium', use: { ...devices['iPhone 13'], ...chromiumLaunch, defaultBrowserType: 'chromium' } },
     { name: 'ipad-webkit', use: { ...devices['iPad Pro 11'] } },
     { name: 'iphone-webkit', use: { ...devices['iPhone 13'] } },
   ],

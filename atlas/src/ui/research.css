@@ -1,0 +1,54 @@
+.research-disclosure { margin: 24px 0 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.research-disclosure > summary { padding: 16px; cursor: pointer; font-weight: 650; min-height: 48px; }
+.research-disclosure > summary > span { margin-left: 8px; font-size: 12px; color: var(--text-3); font-weight: 400; }
+.research-disclosure-body { padding: 0 16px 16px; }
+.research-disclosure .muted, .console-page .muted { color: var(--text-3); font-size: 12px; line-height: 1.7; }
+.research-table-scroll { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.research-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.research-table th, .research-table td { padding: 12px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.research-table th:first-child { text-align: left; }
+.research-table th small { display: block; max-width: 210px; white-space: normal; font-size: 11px; color: var(--text-3); font-weight: 400; }
+.research-table thead th { color: var(--text-2); font-size: 12px; }
+.data-health { margin: 24px clamp(12px, 3vw, 32px) 32px; font-size: 13px; }
+.health-entries { padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.health-entries li { padding: 12px; border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+.health-entries li > div { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.health-entries small, .health-entries p { color: var(--text-3); font-size: 12px; overflow-wrap: anywhere; }
+.health-warning { color: var(--warning, #e8b768); }
+.console-tabs { margin-bottom: 20px; width: fit-content; }
+.console-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 14px 0; }
+.console-actions h2 { margin: 0; margin-right: auto; font-size: 19px; }
+.console-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; align-items: end; margin: 18px 0; }
+.console-form label, .console-actions label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-2); }
+.console-form .wide { grid-column: 1 / -1; }
+.console-page input:not([type='checkbox']), .console-page select, .console-page textarea { max-width: 100%; min-height: 44px; padding: 9px 12px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 8px; font: inherit; }
+.console-page textarea { min-height: 80px; resize: vertical; }
+.console-page .console-check { display: flex; flex-direction: row; align-items: center; gap: 10px; min-height: 44px; }
+.console-check input { accent-color: var(--accent); width: 20px; height: 20px; }
+.console-card { padding: 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.console-message { padding: 12px 14px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-2); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.watchlist-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0; }
+.watchlist-tabs .chip { min-height: 44px; display: flex; gap: 8px; align-items: center; }
+.watchlist-tabs small { color: var(--text-3); }
+.watchlist-counts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
+.watchlist-counts > div { padding: 16px 8px; border: 1px solid var(--border); border-radius: 10px; text-align: center; background: var(--surface-2); }
+.watchlist-counts b { display: block; font-size: 25px; font-variant-numeric: tabular-nums; }
+.watchlist-counts span { color: var(--text-2); font-size: 12px; }
+.watchlist-changes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.watchlist-changes h3 { font-size: 13px; }
+.watchlist-changes p { font-size: 12px; color: var(--text-2); overflow-wrap: anywhere; }
+.saved-member-list { list-style: none; padding: 0; max-height: 520px; overflow-y: auto; }
+.saved-member-list li { border-bottom: 1px solid var(--border); }
+.saved-member-list button { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 10px 4px; text-align: left; background: none; border: 0; color: var(--text); }
+.saved-member-list small { color: var(--text-3); white-space: nowrap; }
+.save-watchlist { padding: 12px 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.save-watchlist input { min-height: 42px; padding: 8px 12px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); border-radius: 8px; }
+.rotation-state { padding: 4px 8px; border-radius: 6px; background: var(--surface-2); color: var(--text-2); font-size: 12px; }
+.rotation-state.leading, .rotation-state.improving { color: var(--accent-text); background: var(--accent-soft); }
+@media (max-width: 640px) {
+  .console-card { padding: 12px; }
+  .console-actions > input, .console-actions > label { width: 100%; }
+  .saved-member-list button { flex-direction: column; gap: 5px; align-items: flex-start; }
+  .research-disclosure > summary > span { display: block; margin-left: 14px; margin-top: 5px; }
+  .health-entries { grid-template-columns: 1fr; }
+}

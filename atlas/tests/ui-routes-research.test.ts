@@ -54,7 +54,7 @@ describe('financials route', () => {
     expect(route('?page=financials&symbol=AAPL')).toEqual({ page: 'financials', symbol: 'AAPL' });
     expect(route('?page=financials&symbol=aapl&p=q')).toEqual({ page: 'financials', symbol: 'AAPL', p: 'q' });
     expect(route('?page=financials&symbol=2330.TW&p=Q')).toEqual({ page: 'financials', symbol: '2330.TW', p: 'q' });
-    expect(route('?page=financials&symbol=AAPL&p=a')).toEqual({ page: 'financials', symbol: 'AAPL' });
+    expect(route('?page=financials&symbol=AAPL&p=a')).toEqual({ page: 'financials', symbol: 'AAPL', p: 'a' });
     expect(route('?page=financials&symbol=AAPL&p=bogus')).toEqual({ page: 'financials', symbol: 'AAPL' });
     expect(route('?page=financials')).toEqual({ page: 'financials' });
     expect(route('?page=financial&symbol=AAPL')).toEqual({ page: 'financials', symbol: 'AAPL' });

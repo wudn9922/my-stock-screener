@@ -1,6 +1,8 @@
 ﻿from datetime import datetime, timezone
 
 import requests
+import os
+import re
 
 from breakout_alert.config import (
     get_supabase_rest_url,
@@ -234,6 +236,7 @@ class SupabaseStore:
     # index_configs 本次是否成功載入；
     # 失敗時不能把大盤指數的狀態列當成孤兒清掉。
     index_configs_loaded = False
+    watchlists_loaded = False
 
     def __init__(self):
         self.rest_url = (
@@ -603,6 +606,102 @@ class SupabaseStore:
 
         return configs
 
+    def get_watchlist_monitor_configs(self):
+        """Opt-in Atlas lists reuse the existing MA breakout engine/notifier.
+
+        Only the configured user's synced lists are read. Malformed or stale
+        snapshots never authorize deleting a previous alert baseline.
+        """
+        self.watchlists_loaded = False
+        if os.environ.get("ATLAS_WATCHLIST_SYNC_ENABLED") != "1":
+            return []
+        try:
+            rows = self._request("GET", "atlas_watchlists", params={
+                "select": "id,line_user_id,definition,updated_at",
+                "line_user_id": f"eq.{self.user_id}",
+            })
+            if not isinstance(rows, list):
+                raise ValueError("watchlists response must be a list")
+            configs = []
+            complete = True
+            for row in rows:
+                if not isinstance(row, dict) or row.get("line_user_id") != self.user_id:
+                    complete = False
+                    continue
+                definition = row.get("definition")
+                if not isinstance(definition, dict):
+                    complete = False
+                    continue
+                if definition.get("monitorBreakouts") is False:
+                    continue
+                if definition.get("monitorBreakouts") is not True:
+                    complete = False
+                    continue
+                list_id = str(row.get("id") or "")
+                market = definition.get("market")
+                periods = definition.get("maList")
+                if (not re.fullmatch(r"[0-9a-fA-F-]{36}", list_id)
+                        or definition.get("id") != list_id
+                        or market not in {"TW", "US"}
+                        or not isinstance(periods, list)
+                        or not 1 <= len(periods) <= 4
+                        or any(type(period) is not int or not 1 <= period <= 1000 for period in periods)
+                        or len(set(periods)) != len(periods)):
+                    complete = False
+                    continue
+                if definition.get("kind") == "manual":
+                    symbols = definition.get("symbols")
+                    if not isinstance(symbols, list):
+                        complete = False
+                        continue
+                    members = [{"symbol": ticker} for ticker in symbols]
+                elif definition.get("kind") == "rules":
+                    history = definition.get("history") or []
+                    if not isinstance(history, list) or not history or not isinstance(history[-1], dict):
+                        complete = False
+                        continue
+                    latest = history[-1]
+                    try:
+                        data_day = datetime.strptime(str(latest.get("date")), "%Y-%m-%d").date()
+                        age = (datetime.now(timezone.utc).date() - data_day).days
+                    except (TypeError, ValueError):
+                        complete = False
+                        continue
+                    if age < -1 or age > 7:
+                        complete = False
+                        continue
+                    members = latest.get("members")
+                else:
+                    complete = False
+                    continue
+                if not isinstance(members, list):
+                    complete = False
+                    continue
+                seen = set()
+                for member in members:
+                    ticker = member.get("symbol") if isinstance(member, dict) else None
+                    if not isinstance(ticker, str) or not re.fullmatch(r"[A-Z0-9^][A-Z0-9.^=-]{0,31}", ticker):
+                        complete = False
+                        continue
+                    if (market == "TW") != bool(re.search(r"\.(TW|TWO)$", ticker)):
+                        complete = False
+                        continue
+                    if ticker in seen:
+                        continue
+                    seen.add(ticker)
+                    configs.append({
+                        "stock_id": None, "line_user_id": self.user_id,
+                        "group_id": f"watchlist_{list_id}", "raw_group_id": f"watchlist_{list_id}",
+                        "group_name": str(definition.get("name") or "Atlas 自選清單"),
+                        "ticker": normalize_ticker(ticker, market), "market": market,
+                        "ma_list": sorted(periods), "is_dynamic_group": True,
+                    })
+            self.watchlists_loaded = complete
+            return configs
+        except Exception as exc:
+            print(f"⚠️ Atlas 清單設定未就緒，本次保留狀態並略過清單提醒：{type(exc).__name__}")
+            return []
+
     def get_monitor_configs(self):
         groups = self.get_groups()
         stocks = self.get_user_stocks()
@@ -800,6 +899,7 @@ class SupabaseStore:
                     f"｜MA={ma_list}"
                 )
 
+        monitor_configs.extend(self.get_watchlist_monitor_configs())
         monitor_configs.extend(
             self.get_index_monitor_configs()
         )
@@ -1180,6 +1280,7 @@ class SupabaseStore:
             for row in rows
             if row.get("group_id")
             != ADMIN_INDEX_GROUP_ID
+            and not str(row.get("group_id") or "").startswith("watchlist_")
         ]
 
         deleted = self._delete_orphan_rows(
@@ -1188,6 +1289,10 @@ class SupabaseStore:
             max_delete_ratio,
             "股票"
         )
+
+        if self.watchlists_loaded:
+            watchlist_rows = [row for row in rows if str(row.get("group_id") or "").startswith("watchlist_")]
+            deleted += self._delete_orphan_rows(watchlist_rows, stock_keys, max_delete_ratio, "Atlas 清單")
 
         # 大盤指數設定本次沒載入成功時，
         # 不能把它們的狀態列視為孤兒。

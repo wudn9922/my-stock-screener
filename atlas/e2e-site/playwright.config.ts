@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+const chromiumLaunch = process.env.ATLAS_CHROMIUM_PATH ? { launchOptions: { executablePath: process.env.ATLAS_CHROMIUM_PATH } } : {};
 
 /** Screener-site shell (report pages, search, navigation) against mocked report and market data. */
 export default defineConfig({
@@ -18,8 +19,8 @@ export default defineConfig({
     timezoneId: 'Asia/Taipei',
   },
   projects: [
-    { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
-    { name: 'mobile-chromium', use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
+    { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'], ...chromiumLaunch, viewport: { width: 1440, height: 900 } } },
+    { name: 'mobile-chromium', use: { ...devices['iPhone 13'], ...chromiumLaunch, defaultBrowserType: 'chromium' } },
     { name: 'iphone-webkit', use: { ...devices['iPhone 13'] } },
   ],
   webServer: {

@@ -102,8 +102,8 @@ describe('YoY alignment and sign rules', () => {
 });
 
 describe('chart range', () => {
-  it('defaults stay 10 years and 12 quarters', () => {
-    expect(CHART_PERIODS).toEqual({ annual: 10, quarterly: 12 });
+  it('defaults to 10 years and five years of quarters', () => {
+    expect(CHART_PERIODS).toEqual({ annual: 10, quarterly: 20 });
     const view = buildView(history(annualRows(19)), 'annual');
     expect(view.metrics.revenue.window).toHaveLength(10);
   });

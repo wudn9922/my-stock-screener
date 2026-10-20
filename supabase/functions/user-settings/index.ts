@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { validateWatchlist, watchlistId, watchlistVersion } from "./watchlists.ts";
 
 /**
  * 自選股設定頁（my-stock-backend/index.html）的讀寫入口。
@@ -289,6 +290,50 @@ Deno.serve(async (request: Request) => {
 
       return !!data;
     };
+
+    if (action.startsWith("watchlists.")) {
+      const dbError = (error: { code?: string; message?: string }) => {
+        if (error.code === "42P01" || error.code === "PGRST205") throw new HttpError(503, "雲端清單資料表尚未部署，請先套用 atlas_watchlists.sql");
+        if (error.code === "23505") throw new HttpError(409, "雲端已有這組清單，請先載入雲端版本再同步");
+        throw error;
+      };
+      if (action === "watchlists.list") {
+        const { data, error } = await supabase.from("atlas_watchlists")
+          .select("id,definition,updated_at").eq("line_user_id", lineUserId).order("updated_at", { ascending: false });
+        if (error) dbError(error);
+        return jsonResponse({ ok: true, data: data ?? [] });
+      }
+      if (action === "watchlists.save") {
+        let definition: ReturnType<typeof validateWatchlist>;
+        let expected: string | null;
+        try { definition = validateWatchlist(body.definition); expected = body.expectedUpdatedAt == null ? null : watchlistVersion(body.expectedUpdatedAt); }
+        catch (error) { throw new HttpError(400, error instanceof Error ? error.message : "清單格式不正確"); }
+        if (expected === null) {
+          const { count, error: countError } = await supabase.from("atlas_watchlists").select("id", { count: "exact", head: true }).eq("line_user_id", lineUserId);
+          if (countError) dbError(countError);
+          if ((count ?? 0) >= 30) throw new HttpError(400, "雲端清單最多 30 組");
+          const { data, error } = await supabase.from("atlas_watchlists").insert({ id: definition.id, line_user_id: lineUserId, definition }).select("id,definition,updated_at").single();
+          if (error) dbError(error);
+          return jsonResponse({ ok: true, data });
+        }
+        const { data, error } = await supabase.from("atlas_watchlists").update({ definition })
+          .eq("line_user_id", lineUserId).eq("id", definition.id).eq("updated_at", expected).select("id,definition,updated_at").maybeSingle();
+        if (error) dbError(error);
+        if (!data) throw new HttpError(409, "雲端清單已在其他裝置更新；本機資料未覆寫，請先載入雲端版本");
+        return jsonResponse({ ok: true, data });
+      }
+      if (action === "watchlists.delete") {
+        let id: string, expected: string;
+        try { id = watchlistId(body.id); expected = watchlistVersion(body.expectedUpdatedAt); }
+        catch (error) { throw new HttpError(400, error instanceof Error ? error.message : "版本不正確"); }
+        const { data, error } = await supabase.from("atlas_watchlists").delete().eq("line_user_id", lineUserId)
+          .eq("id", id).eq("updated_at", expected).select("id");
+        if (error) dbError(error);
+        if (!data?.length) throw new HttpError(409, "雲端版本已變更，請重新載入再刪除");
+        return jsonResponse({ ok: true, data });
+      }
+      throw new HttpError(400, "Unknown watchlist action");
+    }
 
     if (action === "groups.list") {
       const { data, error } = await supabase

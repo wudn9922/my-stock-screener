@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { ChevronDown, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { useDialogFocus } from './useDialogFocus';
 import { formatDateTime } from './format';
 import type { GrowthFile } from '../fundamentals/GrowthProvider';
@@ -463,6 +464,7 @@ export function FilterSheet(props: FilterSheetProps) {
   const [draft, setDraft] = useState<FilterState>(value);
   const [terms, setTerms] = useState<GateTermsMap>(() => termsOf(value));
   const sheetRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: number; y: number; dy: number } | null>(null);
   // Each opening starts from the applied conditions.
   useEffect(() => {
@@ -471,6 +473,22 @@ export function FilterSheet(props: FilterSheetProps) {
     setTerms(termsOf(value));
   }, [open]);
   useDialogFocus(open, DIALOG_ID);
+  useEffect(() => {
+    if (!open) return;
+    const viewport = window.visualViewport;
+    const resize = () => {
+      const backdrop = backdropRef.current;
+      if (!backdrop) return;
+      backdrop.style.height = `${viewport?.height ?? window.innerHeight}px`;
+      backdrop.style.top = `${viewport?.offsetTop ?? 0}px`;
+      backdrop.style.bottom = 'auto';
+    };
+    resize();
+    viewport?.addEventListener('resize', resize);
+    viewport?.addEventListener('scroll', resize);
+    window.addEventListener('resize', resize);
+    return () => { viewport?.removeEventListener('resize', resize); viewport?.removeEventListener('scroll', resize); window.removeEventListener('resize', resize); };
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const key = (event: KeyboardEvent) => {
@@ -589,8 +607,8 @@ export function FilterSheet(props: FilterSheetProps) {
     .filter((text): text is string => text !== null)
     .join('；');
 
-  return (
-    <div className="fs-backdrop" onClick={onClose}>
+  return createPortal(
+    <div className="fs-backdrop" ref={backdropRef} onClick={onClose}>
       <div
         ref={sheetRef}
         className="fs-sheet"
@@ -879,6 +897,7 @@ export function FilterSheet(props: FilterSheetProps) {
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.fullscreenElement ?? document.body,
   );
 }

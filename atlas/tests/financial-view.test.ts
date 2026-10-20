@@ -33,15 +33,15 @@ describe('financials view model', () => {
     expect(oiFieldText(undefined)).toBeNull();
   });
 
-  it('charts the latest 10 years / 12 quarters and keeps every period for the table', () => {
+  it('charts the latest 10 years / 20 quarters and keeps every period for the table', () => {
     const us = fixture('us-full.json');
     const annual = buildView(us, 'annual');
     expect(annual.metrics.revenue.window).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     const quarterly = buildView(us, 'quarterly');
-    expect(quarterly.metrics.revenue.window).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+    expect(quarterly.metrics.revenue.window).toEqual(Array.from({ length: 15 }, (_, index) => index));
     expect(quarterly.metrics.revenue.values).toHaveLength(15);
     // Quarterly CAGR compares the same fiscal quarter (FY2023 Q3 → FY2025 Q3).
-    expect(quarterly.metrics.revenue.cagr).toMatchObject({ from: '2023-07-01', to: '2025-06-28' });
+    expect(quarterly.metrics.revenue.cagr).toMatchObject({ from: '2022-06-25', to: '2025-06-28' });
     // Margins get a window average instead of a CAGR.
     expect(annual.metrics.grossMargin.cagr).toBeNull();
     expect(annual.metrics.grossMargin.average!.count).toBe(10);

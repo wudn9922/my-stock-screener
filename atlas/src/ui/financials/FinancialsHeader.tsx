@@ -39,8 +39,8 @@ export function FinancialsHeader({
   const [qualityOpen, setQualityOpen] = useState(false);
   const level = history?.quality.level ?? null;
   const issues = history?.quality.issues ?? [];
-  const visibleIssues = history?.market === 'US' ? issues.filter((issue) => issue !== 'quarterly-ytd-suspected') : issues;
-  const visibleRevisions = history?.market === 'US' ? history.quality.revisions.filter((revision) => revision.period === 'annual') : history?.quality.revisions ?? [];
+  const visibleIssues = issues;
+  const visibleRevisions = history?.quality.revisions ?? [];
   return (
     <header className="fin-head">
       <div className="fin-head-row fin-head-main">
@@ -150,9 +150,7 @@ export function FinancialsHeader({
         <div className="fin-quality-panel" role="note">
           <p>
             <b>{level ? LEVEL_TEXT[level] : '品質未標示'}</b>
-            {history.market === 'US'
-              ? `：年度 ${history.annual.end.length} 期。`
-              : `：年度 ${history.annual.end.length} 期、季度 ${history.quarterly.end.length} 期。`}
+            {`：年度 ${history.annual.end.length} 期、季度 ${history.quarterly.end.length} 期。`}
           </p>
           {visibleIssues.length ? (
             <ul>
