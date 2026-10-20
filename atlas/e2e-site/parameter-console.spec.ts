@@ -127,6 +127,9 @@ test('list creation, monitoring changes and renaming sync automatically; deletio
   await page.getByRole('textbox', { name: '重新命名清單' }).fill('重新命名策略');
   await page.getByRole('button', { name: '儲存名稱', exact: true }).click();
   await expect.poll(() => current().name).toBe('重新命名策略');
+  const previousSave = current().updatedAt;
+  await page.getByRole('button', { name: '儲存名稱', exact: true }).click();
+  await expect.poll(() => current().updatedAt).toBeGreaterThan(previousSave);
   cloud.state.failDelete = true;
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '刪除清單', exact: true }).click();

@@ -44,6 +44,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
   const settingsKey = selected
     ? JSON.stringify([
         selected.id,
+        selected.updatedAt,
         selected.name,
         selected.group,
         selected.filters,
