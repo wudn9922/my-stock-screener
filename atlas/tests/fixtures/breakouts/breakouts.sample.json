@@ -102,10 +102,10 @@
  "markets": {
   "tw": {
    "asOf": "2026-10-09",
-   "universe": "台股上市櫃普通股（4碼、非0開頭）",
+   "universe": "全市場台股上市＋上櫃普通股",
    "universeCount": 1000,
    "evaluated": 900,
-   "stale": 100,
+   "stale": 80,
    "weekendBars": 0,
    "boxMaxWidthPct": 14.0,
    "anomalies": {
@@ -380,11 +380,18 @@
       }
      }
     }
-   }
+   },
+   "scope": "full",
+   "coverage": {
+    "loaded": 980,
+    "missing": 20
+   },
+   "listingAsOf": "2026-10-09",
+   "listingSource": "synthetic full-market listings"
   },
   "us": {
    "asOf": "2026-10-09",
-   "universe": "S&P 500 成分股",
+   "universe": "全市場美股普通股與 ADR（NYSE／NASDAQ／NYSE American 等）",
    "universeCount": 503,
    "evaluated": 500,
    "stale": 3,
@@ -662,7 +669,14 @@
       }
      }
     }
-   }
+   },
+   "scope": "full",
+   "coverage": {
+    "loaded": 503,
+    "missing": 0
+   },
+   "listingAsOf": "2026-10-09",
+   "listingSource": "synthetic full-market listings"
   }
  }
 }

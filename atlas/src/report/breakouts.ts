@@ -70,6 +70,10 @@ export interface BreakoutWindow {
   strategies: Record<string, BreakoutStats>;
 }
 export interface BreakoutMarket {
+  scope: 'full' | 'legacy';
+  coverage: { loaded: number; missing: number } | null;
+  listingAsOf: string | null;
+  listingSource: string;
   asOf: string | null;
   universe: string;
   universeCount: number;
@@ -191,6 +195,10 @@ const windowSchema = z
 
 const marketSchema = z
   .object({
+    scope: z.unknown().optional(),
+    coverage: z.unknown().optional(),
+    listingAsOf: optionalText,
+    listingSource: text,
     asOf: optionalText,
     universe: text,
     universeCount: countOf,
@@ -209,8 +217,16 @@ const marketSchema = z
     }
     if (!Object.keys(windows).length) return null;
     const anomalies = record(market.anomalies);
+    const coverage = record(market.coverage);
+    const loaded = finiteOrNull(coverage.loaded);
+    const missing = finiteOrNull(coverage.missing);
+    const full = market.scope === 'full' && loaded !== null && missing !== null &&
+      Number.isInteger(loaded) && Number.isInteger(missing) && loaded >= market.evaluated && missing >= 0 &&
+      loaded + missing === market.universeCount && loaded - market.evaluated === market.stale;
     return {
       ...market,
+      scope: full ? 'full' : 'legacy',
+      coverage: full ? { loaded, missing } : null,
       anomalies: {
         stocks: countOf.parse(anomalies.stocks),
         days: countOf.parse(anomalies.days),

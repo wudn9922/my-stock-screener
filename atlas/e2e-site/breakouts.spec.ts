@@ -36,7 +36,7 @@ test('Taiwan shows breakout win rates above the breadth card, with window switch
   await mockBreakouts(page);
   await page.goto('./?page=markets&market=tw');
   const section = card(page);
-  await expect(section.getByRole('heading', { name: /突破進場法勝率/ })).toContainText('台股');
+  await expect(section.getByRole('heading', { name: /全市場進場成功率/ })).toContainText('台股');
   await expect(section.locator('.bo-asof')).toHaveText('資料日 2026/10/09');
   // Placed directly above the breadth card in the side column.
   const order = await page.locator('.markets-side > section.card').evaluateAll((nodes) => nodes.map((node) => node.className));
@@ -48,13 +48,13 @@ test('Taiwan shows breakout win rates above the breadth card, with window switch
   await expect(section.locator('.bo-list .bo-row')).toHaveCount(3);
   const high20 = row(page, '突破新高進場法');
   await expect(high20.locator('.bo-win')).toContainText('54.0%');
-  await expect(high20).toContainText('同日市場上漲比例');
-  await expect(high20).toContainText('59.0%');
+  await expect(high20).toContainText('成功／成熟訊號樣本');
+  await expect(section).not.toContainText('同日市場');
   await expect(high20).toContainText('250／300');
   await expect(high20.locator('.bo-tag')).toHaveCount(0);
   await expect(high20).toContainText('135／250');
   await expect(row(page, '突破20EMA進場法')).toContainText('66.7%');
-  await expect(section.locator('.bo-sub').first()).toContainText('兩者分母不同');
+  await expect(section.locator('.bo-sub').first()).toContainText('成功樣本／成熟訊號樣本');
 
   // 近1週: a low sample is flagged, unmatured and empty rows show a friendly note instead of a rate.
   await windows.getByRole('button', { name: '近1週' }).click();
@@ -72,7 +72,7 @@ test('Taiwan shows breakout win rates above the breadth card, with window switch
     has: page.locator('summary', { hasText: '口徑說明' }),
   });
   await method.locator('summary').click();
-  for (const text of ['不含當日', '已滿 3 個交易日', '同一進場日', '存活者偏差', '門檻 14%', '可評估 900／1,000 檔'])
+  for (const text of ['不含當日', '已滿 3 個交易日', '沒有訊號的股票不進分母', '存活者偏差', '門檻 14%', '全市場名單 1,000 檔', '歷史缺漏 20 檔'])
     await expect(method).toContainText(text);
   await noOverflow(page);
   expect(errors).toEqual([]);
@@ -81,9 +81,10 @@ test('Taiwan shows breakout win rates above the breadth card, with window switch
 test('United States uses its own market and other markets have no breakout card', async ({ page }) => {
   await mockBreakouts(page);
   await page.goto('./?page=markets&market=us');
-  await expect(card(page).getByRole('heading', { name: /突破進場法勝率/ })).toContainText('美股');
+  await expect(card(page).getByRole('heading', { name: /全市場進場成功率/ })).toContainText('美股');
   await expect(row(page, '突破新高進場法').locator('.bo-win')).toContainText('47.3%');
-  await expect(card(page).locator('.bo-foot')).toContainText('S&P 500 成分股');
+  await expect(card(page).locator('.bo-foot')).toContainText('全市場美股普通股與 ADR');
+  await expect(card(page)).not.toContainText('S&P 500');
   for (const name of ['日本', '韓國', '歐洲']) {
     await page.getByRole('tab', { name: new RegExp(name) }).click();
     await expect(page.getByRole('tab', { name: new RegExp(name) })).toHaveAttribute('aria-selected', 'true');
@@ -124,4 +125,14 @@ test('legacy reports do not substitute another strategy for missing EMA results'
   await expect(row(page, '突破20EMA進場法')).toContainText('報表尚未提供此方法');
   await expect(row(page, '突破20EMA進場法').locator('.bo-win')).toHaveCount(0);
   await expect(row(page, '突破新高進場法').locator('.bo-win')).toContainText('54.0%');
+});
+
+test('a legacy partial-market report is never presented as full-market success', async ({ page }) => {
+  await mockSite(page);
+  const partial = JSON.parse(body);
+  for (const market of Object.values(partial.markets) as { scope?: string }[]) delete market.scope;
+  await page.route('**/my-stock-screener/report/breakouts.json', route => route.fulfill({ json: partial }));
+  await page.goto('./?page=markets&market=us');
+  await expect(card(page).getByRole('status')).toContainText('舊的部分市場樣本不列入');
+  await expect(card(page).locator('.bo-win')).toHaveCount(0);
 });

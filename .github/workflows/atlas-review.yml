@@ -9,6 +9,10 @@ on:
       - 'tests/test_atlas_watchlists.py'
       - 'tests/test_breakouts.py'
       - 'scripts/build_breakouts.py'
+      - 'scripts/build_full_market_breakouts.py'
+      - 'tests/test_full_market_breakouts.py'
+      - '.github/workflows/universe-full.yml'
+      - '.github/workflows/schedule.yml'
       - 'docs/report/breakouts.json'
       - '.github/workflows/atlas-review.yml'
 permissions:
@@ -52,9 +56,33 @@ jobs:
           pip install requests numpy pandas
           python -m unittest discover -s tests -p 'test_atlas_watchlists.py' -v
           python -m unittest discover -s tests -p 'test_breakouts.py' -v
+          python -m unittest discover -s tests -p 'test_full_market_breakouts.py' -v
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: atlas-review-browser-evidence
           path: atlas/test-results/site
+          retention-days: 7
+  full-market-report:
+    # Read the default branch's existing cache; no data downloads, credentials or cache writes.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy pandas
+      - uses: actions/cache/restore@v4
+        with:
+          path: .cache/universe-full
+          key: full-market-breakout-review-${{ github.run_id }}
+          restore-keys: universe-full-v1-
+      - name: Build real full-market entry success rates offline
+        run: python scripts/build_full_market_breakouts.py --cache-dir .cache/universe-full --out /tmp/full-market-breakouts/breakouts.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-market-breakouts
+          path: /tmp/full-market-breakouts/breakouts.json
+          if-no-files-found: error
           retention-days: 7

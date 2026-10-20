@@ -553,7 +553,7 @@ class FrontendFixtureContractTest(unittest.TestCase):
         market = bo.build_market({**filler(), "X": make_bars(flat_then([101.0, 102, 102, 102]))}, "測試", "tw")
         for key in ("tw", "us"):
             sample = fixture["markets"][key]
-            self.assertEqual(set(sample), set(market), key)
+            self.assertEqual(set(sample), set(market) | {"scope", "coverage", "listingAsOf", "listingSource"}, key)
             self.assertEqual(set(sample["anomalies"]), set(market["anomalies"]), key)
             self.assertEqual(set(sample["windows"]), set(market["windows"]), key)
             for window_key, window in sample["windows"].items():

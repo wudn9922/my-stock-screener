@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Rocket } from 'lucide-react';
 import {
   DEFAULT_BREAKOUT_PARAMS,
-  edgeVsBase,
   loadBreakouts,
   sampleLevel,
   type BreakoutMarket,
@@ -24,7 +23,6 @@ const DEFAULT_WINDOW = '1m';
 
 const rate = (value: number | null) => (value === null ? '—' : `${value.toFixed(1)}%`);
 const count = (value: number) => value.toLocaleString('zh-TW');
-const points = (value: number | null) => (value === null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(1)}`);
 const clampPct = (value: number | null) => (value === null ? 0 : Math.min(100, Math.max(0, value)));
 
 function StrategyRow({ meta, stats, params }: { meta: BreakoutStrategyMeta; stats: BreakoutStats | undefined; params: BreakoutParams }) {
@@ -49,36 +47,30 @@ function StrategyRow({ meta, stats, params }: { meta: BreakoutStrategyMeta; stat
     );
 
   const low = level === 'low';
-  const edge = edgeVsBase(stats);
   return (
     <li className={`bo-row${low ? ' low' : ''}`} data-sample={level}>
       {head(
         <>
           {low ? <span className="bo-tag">樣本偏少，參考性低</span> : null}
-          <b className="bo-win" aria-label={`勝率 ${rate(stats.winRate)}`}>
-            <small>策略勝率</small>
+          <b className="bo-win" aria-label={`進場成功率 ${rate(stats.winRate)}`}>
+            <small>進場成功率</small>
             {rate(stats.winRate)}
           </b>
         </>,
       )}
-      <div className="bo-bar" role="img" aria-label={`策略勝率 ${rate(stats.winRate)}，同日市場上漲比例 ${rate(stats.baseRate)}`}>
+      <div className="bo-bar" role="img" aria-label={`進場成功率 ${rate(stats.winRate)}`}>
         <i style={{ width: `${clampPct(stats.winRate)}%` }} />
-        {stats.baseRate !== null ? <span className="bo-base-mark" style={{ left: `${clampPct(stats.baseRate)}%` }} /> : null}
       </div>
       <dl className="bo-metrics">
         <div>
-          <dt>同日市場上漲比例</dt>
-          <dd>{rate(stats.baseRate)}</dd>
-        </div>
-        <div>
-          <dt>勝率−基準（百分點）</dt>
-          <dd className={toneClass(edge)}>{points(edge)}</dd>
-        </div>
-        <div>
-          <dt>獲利／成熟樣本</dt>
+          <dt>成功／成熟訊號樣本</dt>
           <dd>
             {stats.wins === null ? '—' : count(stats.wins)}／{count(stats.maturedN)}
           </dd>
+        </div>
+        <div>
+          <dt>歷史足夠的股票</dt>
+          <dd>{count(stats.eligible)} 檔</dd>
         </div>
         <div>
           <dt>樣本（成熟／全部）</dt>
@@ -124,17 +116,19 @@ function Methodology({ data, current, params, windowLabel }: { data: BreakoutMar
       <ul className="bo-method">
         <li>
           <b>樣本</b>
-          {data.universe}；資料日 {formatDateTime(data.asOf, false)}，可評估 {count(data.evaluated)}／{count(data.universeCount)} 檔。資料日沒有成交或
-          CSV 未更新的 {count(data.stale)} 檔不列入。
+          {data.universe}；資料日 {formatDateTime(data.asOf, false)}，全市場名單 {count(data.universeCount)} 檔，資料日有效日線 {count(data.evaluated)} 檔。
+          歷史缺漏 {count(data.coverage?.missing ?? 0)} 檔、資料日未成交／停更 {count(data.stale)} 檔不列入；各方法另排除回看歷史不足的股票。
+          {data.listingAsOf ? ` 名單日期 ${formatDateTime(data.listingAsOf, false)}。` : ''}{data.listingSource ? ` 名單來源 ${data.listingSource}。` : ''}
         </li>
         <li>
           <b>窗口</b>
           {windows}。{windowLabel}自 {formatDateTime(current.start, false)} 起。
         </li>
         <li>
-          <b>買法與勝率</b>
-          突破日收盤買進，以資料日收盤計算報酬；策略勝率＝符合該進場法且報酬 &gt; 0 的成熟樣本數 ÷
-          該方法的成熟樣本數（持平不算勝）。「低於進場參考價／線」＝資料日收盤低於進場當日固定的前高、箱頂或 EMA20。
+          <b>進場與成功</b>
+          掃描全市場所有股票，突破日收盤進場；成功＝進場後至少滿 {params.matureDays} 個交易日，且資料日收盤高於進場價。
+          進場成功率＝成功樣本數 ÷ 出現該進場訊號且已成熟的樣本數（持平不算成功）。沒有訊號的股票不進分母，未成熟或資料不足不當成失敗。
+          「低於進場參考價／線」＝資料日收盤低於進場當日固定的前高、箱頂或 EMA20。
           {holdDays.length ? ` 本窗口平均持有約 ${Math.min(...holdDays).toFixed(1)}～${Math.max(...holdDays).toFixed(1)} 個交易日。` : ''}
         </li>
         <li>
@@ -142,10 +136,6 @@ function Methodology({ data, current, params, windowLabel }: { data: BreakoutMar
           只統計突破後已滿 {params.matureDays} 個交易日的突破
           {current.maturedThrough ? `（突破日在 ${formatDateTime(current.maturedThrough, false)} 以前）` : ''}
           ；太新的突破還沒有結果，只算在「全部」筆數。成熟樣本少於 {params.minSample} 筆時標示「樣本偏少，參考性低」。
-        </li>
-        <li>
-          <b>同日市場基準</b>
-          每筆成熟突破配對同一進場日，計算統計母體中全部可評估股票從該日收盤持有到資料日的上漲比例，再對所有突破平均（同日訊號多的日期權重較高，持有天數相同）。策略勝率的分母是符合訊號的成熟樣本，市場基準的分母是同日可評估股票，因此兩者不一定相同；差值只表示本次樣本的比較結果，不代表已證明策略有效。美股統計母體依下方名單範圍，並非所有美國上市股票。
         </li>
         <li>
           <b>定義</b>
@@ -166,7 +156,7 @@ function Methodology({ data, current, params, windowLabel }: { data: BreakoutMar
         </li>
         <li>
           <b>偏誤</b>
-          名單是「現在」的成分股，含存活者偏差；日 K 約 200 根，120 日前高只涵蓋約半年；台股為未還原股價，持有期間除息會壓低報酬。短窗口結果受單一事件影響大，僅供研究參考，非投資建議。
+          名單是「現在」的上市股票，含存活者偏差；快取最多保留 320 根日 K。各筆訊號持有至資料日，持有期間不同，並非固定天數或實際成交回測；未扣交易成本，股利未還原，除息可能壓低報酬。短窗口結果受單一事件影響大，僅供研究參考。
         </li>
       </ul>
     </details>
@@ -201,12 +191,6 @@ function BreakoutBody({ data, params }: { data: BreakoutMarket; params: Breakout
             </button>
           ))}
         </div>
-        <span className="bo-legend" aria-hidden="true">
-          <i className="win" />
-          勝率
-          <i className="base" />
-          同日市場基準
-        </span>
       </div>
       <label className="bo-lookback">
         新高回看期間
@@ -218,17 +202,17 @@ function BreakoutBody({ data, params }: { data: BreakoutMarket; params: Breakout
           ))}
         </select>
       </label>
-      <p className="bo-sub">策略勝率只計符合進場訊號的股票；市場基準計同一進場日的全部可評估股票，兩者分母不同。</p>
+      <p className="bo-sub">全市場訊號成功率＝成功樣本／成熟訊號樣本。成功：進場後至少滿 {params.matureDays} 個交易日，資料日收盤高於進場價。</p>
       <StrategyList strategies={main} current={current} params={params} />
       <Methodology data={data} current={current} params={params} windowLabel={active.label} />
       <p className="bo-foot">
-        {data.universe}，可評估 {count(data.evaluated)}／{count(data.universeCount)} 檔。統計只用已滿 {params.matureDays} 個交易日的成熟突破。
+        {data.universe}。全市場名單 {count(data.universeCount)} 檔，資料日有效日線 {count(data.evaluated)} 檔；歷史缺漏 {count(data.coverage?.missing ?? 0)}、未成交／停更 {count(data.stale)} 檔。
       </p>
     </>
   );
 }
 
-/** Win rates of simple breakout entries over the last week / month, against the whole-market base rate. */
+/** Conditional entry success across the full stock universe; legacy partial-universe results stay hidden. */
 export function BreakoutCard({ market }: { market: BreakoutMarketKey }) {
   const [result, setResult] = useState<BreakoutsLoadResult | null>(null);
   useEffect(() => {
@@ -245,22 +229,24 @@ export function BreakoutCard({ market }: { market: BreakoutMarketKey }) {
   const data = result?.status === 'ok' ? result.data.markets[market] : undefined;
   const params = result?.status === 'ok' ? result.data.params : DEFAULT_BREAKOUT_PARAMS;
   return (
-    <section className="card breakout-card" aria-label={`${name}突破進場法勝率`} aria-busy={result === null}>
+    <section className="card breakout-card" aria-label={`${name}全市場進場成功率`} aria-busy={result === null}>
       <header className="card-head">
         <h2>
           <Rocket size={16} aria-hidden="true" />
-          突破進場法勝率
+          全市場進場成功率
           <small>{name}</small>
         </h2>
-        {data?.asOf ? <span className="bo-asof">資料日 {formatDateTime(data.asOf, false)}</span> : null}
+        {data?.scope === 'full' && data.asOf ? <span className="bo-asof">資料日 {formatDateTime(data.asOf, false)}</span> : null}
       </header>
       <div className="bo-body">
         {result === null ? (
           <p className="muted-text" role="status">
             載入中…
           </p>
-        ) : data ? (
+        ) : data?.scope === 'full' ? (
           <BreakoutBody data={data} params={params} />
+        ) : data ? (
+          <p className="muted-text" role="status">全市場進場成功率尚未產生；舊的部分市場樣本不列入。</p>
         ) : (
           <p className="muted-text" role="status">
             {result.status === 'ok' ? `${name}的突破勝率尚未產生。` : result.message}

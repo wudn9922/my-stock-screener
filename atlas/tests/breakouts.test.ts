@@ -22,6 +22,13 @@ const stats = (overrides: Partial<BreakoutStats> = {}): BreakoutStats => ({
 });
 
 describe('breakouts schema', () => {
+  it('does not accept an unsupported full-market claim without consistent coverage', () => {
+    const raw = structuredClone(sample) as { markets: { tw: { coverage?: unknown }; us: unknown } };
+    delete raw.markets.tw.coverage;
+    const parsed = parseBreakouts(raw);
+    expect(parsed.status).toBe('ok');
+    if (parsed.status === 'ok') expect(parsed.data.markets.tw!.scope).toBe('legacy');
+  });
   it('parses the job output: params, both markets, windows and strategies', () => {
     const result = parseBreakouts(sample);
     expect(result.status).toBe('ok');
@@ -61,7 +68,9 @@ describe('breakouts schema', () => {
       upRate: 48,
       avgReturn: -0.3,
     });
-    expect(markets.us!.universe).toBe('S&P 500 成分股');
+    expect(markets.us!.universe).toBe('全市場美股普通股與 ADR（NYSE／NASDAQ／NYSE American 等）');
+    expect(markets.us!.scope).toBe('full');
+    expect(tw.coverage).toEqual({ loaded: 980, missing: 20 });
   });
 
   it('tolerates unknown fields, numeric strings, bad strategies and missing params', () => {
@@ -99,6 +108,7 @@ describe('breakouts schema', () => {
     expect(Object.keys(result.data.markets)).toEqual(['tw']);
     const tw = result.data.markets.tw!;
     expect(tw.evaluated).toBe(12);
+    expect(tw.scope).toBe('legacy');
     expect(Object.keys(tw.windows)).toEqual(['1w']);
     expect(Object.keys(tw.windows['1w']!.strategies)).toEqual(['high20']);
     expect(tw.windows['1w']!.strategies.high20).toMatchObject({
