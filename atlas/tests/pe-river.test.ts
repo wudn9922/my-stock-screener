@@ -488,4 +488,12 @@ describe('with the financials fixtures', () => {
       reason: 'foreign',
     });
   });
+  it('does not label already rescaled ADR EPS as ordinary-share EPS', () => {
+    const result = buildPeRiver(fixture('adr-rescaled.json'), weekly('2016-01-04', '2025-10-06', () => 100), opts('2025-10-08'));
+    expect(result).toMatchObject({ status: 'unavailable', reason: 'foreign' });
+    if (result.status === 'unavailable') {
+      expect(result.message).toContain('EPS 已按每 ADR 換算');
+      expect(result.message).not.toContain('EPS 為每普通股');
+    }
+  });
 });

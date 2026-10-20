@@ -1,4 +1,10 @@
-## Current review: unified console extension (2026-10-20)
+## Current review: parameter console follow-up (2026-10-20)
+
+Selected watchlists now auto-save authenticated settings and delete cloud-first through a serialized per-list queue. Permanent stock MAs are dormant ungrouped stocks records; they survive list/member removal and only override an active member's defaults. The daily report and breakout consumers both exclude dormant rows. The Edge Function requires ATLAS_FIXED_PARAMETERS_ENABLED=1 after consumer deployment to avoid old monitor builds treating the new reserved group as active.
+
+The parameter list restores search and group filters with an approximately five-row scroll area. Native edit/delete dialogs keep errors visible and provide confirm/cancel. Review [ADR-015](docs/architecture/ADR-015-fixed-stock-parameters.md) and the rollout in [UNIFIED_CONSOLE.md](docs/UNIFIED_CONSOLE.md). Actual offline test/CI results are recorded in the follow-up PR. Production deployment, real-account acceptance, physical Safari and independent review remain unverified.
+
+## Historical review: unified console extension (2026-10-20)
 
 The user explicitly authorized the unified parameter console, multiple saved screening/manual lists, last-opening membership comparisons, optional Supabase persistence and existing breakout monitoring, quarterly US statement presentation, peer comparison, rotation tracking, health disclosure and the reachable Apply action. See [implementation and deployment checklist](docs/UNIFIED_CONSOLE.md) and [ADR-014](docs/architecture/ADR-014-unified-console.md).
 

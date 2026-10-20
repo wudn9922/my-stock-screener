@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   FIXED_PARAMETER_GROUPS,
+  FIXED_STOCK_GROUP,
+  parameterMAs,
   parseMovingAverages,
   settingsApi,
   type IndexParameter,
@@ -8,6 +10,7 @@ import {
   type ParameterStock,
 } from '../cloud/settingsApi';
 import { DEFAULT_LIFF_ID } from '../cloud/lineIdentity';
+import { ConsoleDialog } from './ConsoleDialog';
 
 /** The original control panel's authenticated API, rendered inside the Atlas shell. */
 export function ParameterConsole() {
@@ -19,7 +22,14 @@ export function ParameterConsole() {
   const [ticker, setTicker] = useState('');
   const [groupId, setGroupId] = useState('tw_g1');
   const [mas, setMas] = useState('20, 50, 200');
-  const [editing, setEditing] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const [filterGroup, setFilterGroup] = useState('all');
+  const [dialog, setDialog] = useState<{
+    stock: ParameterStock;
+    mode: 'edit' | 'delete';
+  } | null>(null);
+  const [editMas, setEditMas] = useState('');
+  const [editGroup, setEditGroup] = useState('');
   const [groupName, setGroupName] = useState('');
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -47,21 +57,26 @@ export function ParameterConsole() {
     event.preventDefault();
     void run(async () => {
       await settingsApi('stocks.save', {
-        ...(editing ? { id: editing } : {}),
         ticker: ticker.trim().toUpperCase(),
         groupId,
-        mas: parseMovingAverages(mas),
+        mas: fixedForTicker && groupId !== FIXED_STOCK_GROUP ? parameterMAs(fixedForTicker) : parseMovingAverages(mas),
       });
       await reload();
       setTicker('');
-      setEditing(null);
       setMessage('股票與均線參數已儲存；每日報告於下次排程更新。');
     });
   };
   const names: Record<string, string> = {
     ...FIXED_PARAMETER_GROUPS,
+    [FIXED_STOCK_GROUP]: '無分組（固定參數）',
     ...Object.fromEntries(groups.map((group) => [`custom_${group.id}`, group.name])),
   };
+  const fixedForTicker = stocks.find((stock) => stock.ticker === ticker.trim().toUpperCase() && stock.group_id === FIXED_STOCK_GROUP);
+  const filteredStocks = stocks.filter(
+    (stock) =>
+      (filterGroup === 'all' || stock.group_id === filterGroup) &&
+      `${stock.ticker} ${names[stock.group_id] ?? stock.group_id}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
+  );
   return (
     <section className="parameter-console" aria-label="原有均線參數控制台">
       <h2>均線參數與雲端分組</h2>
@@ -112,22 +127,41 @@ export function ParameterConsole() {
           />
         </label>
         <button type="submit" className="primary-button" disabled={busy}>
-          {editing ? '更新股票參數' : '新增股票參數'}
+          新增股票參數
         </button>
-        {editing && (
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => {
-              setEditing(null);
-              setTicker('');
-            }}
-          >
-            取消編輯
-          </button>
-        )}
       </form>
-      <div className="research-table-scroll">
+      {fixedForTicker && (
+        <p className="muted">
+          此股票已有固定均線 {parameterMAs(fixedForTicker).join(' / ')}
+          ，加入分組時沿用此參數。
+        </p>
+      )}
+      <div className="console-actions parameter-filters">
+        <label>
+          搜尋已有參數股票
+          <input
+            type="search"
+            aria-label="搜尋已有參數股票"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="輸入股票代號或分組名稱"
+          />
+        </label>
+        <label>
+          篩選組別
+          <select aria-label="已有參數股票組別" value={filterGroup} onChange={(event) => setFilterGroup(event.target.value)}>
+            <option value="all">全部組別</option>
+            {Object.entries(names).map(([key, name]) => (
+              <option key={key} value={key}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="muted">{filteredStocks.length} 筆</span>
+      </div>
+      <p className="muted">無分組的固定參數會持續保存，優先於分組與清單的均線；股票在分組或啟用監控的清單中時才會監控。</p>
+      <div className="research-table-scroll parameter-stock-scroll" role="region" aria-label="已有參數股票清單" tabIndex={0}>
         <table className="research-table" aria-label="雲端股票參數">
           <thead>
             <tr>
@@ -138,7 +172,7 @@ export function ParameterConsole() {
             </tr>
           </thead>
           <tbody>
-            {stocks.map((stock) => (
+            {filteredStocks.map((stock) => (
               <tr key={stock.id}>
                 <th>{stock.ticker}</th>
                 <td>{names[stock.group_id] ?? stock.group_id}</td>
@@ -149,10 +183,10 @@ export function ParameterConsole() {
                     className="text-button"
                     disabled={busy}
                     onClick={() => {
-                      setTicker(stock.ticker);
-                      setGroupId(stock.group_id);
-                      setMas([stock.ma1, stock.ma2, stock.ma3, stock.ma4].filter((n) => n > 0).join(', '));
-                      setEditing(stock.id);
+                      setMessage('');
+                      setEditGroup(stock.group_id);
+                      setEditMas(parameterMAs(stock).join(', '));
+                      setDialog({ stock, mode: 'edit' });
                     }}
                   >
                     編輯
@@ -162,11 +196,8 @@ export function ParameterConsole() {
                     className="text-button"
                     disabled={busy}
                     onClick={() => {
-                      if (confirm(`確定刪除 ${stock.ticker} 的這組參數？`))
-                        void run(async () => {
-                          await settingsApi('stocks.delete', { id: stock.id });
-                          await reload();
-                        });
+                      setMessage('');
+                      setDialog({ stock, mode: 'delete' });
                     }}
                   >
                     刪除
@@ -176,7 +207,112 @@ export function ParameterConsole() {
             ))}
           </tbody>
         </table>
+        {!filteredStocks.length && <p className="muted">沒有符合搜尋與組別的股票。</p>}
       </div>
+      {dialog && (
+        <ConsoleDialog
+          title={dialog.mode === 'edit' ? `編輯 ${dialog.stock.ticker} 均線參數` : '確定刪除？'}
+          busy={busy}
+          onClose={() => setDialog(null)}
+        >
+          {message && (
+            <p role="alert" className="console-message">
+              {message}
+            </p>
+          )}
+          {dialog.mode === 'edit' ? (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void run(async () => {
+                  await settingsApi('stocks.save', {
+                    id: dialog.stock.id,
+                    ticker: dialog.stock.ticker,
+                    groupId: editGroup,
+                    mas: parseMovingAverages(editMas),
+                  });
+                  await reload();
+                  setDialog(null);
+                  setMessage('股票均線參數已儲存到 Supabase。');
+                });
+              }}
+            >
+              <label>
+                組別
+                <select
+                  aria-label="編輯股票組別"
+                  value={editGroup}
+                  disabled={busy || dialog.stock.group_id === FIXED_STOCK_GROUP}
+                  onChange={(event) => setEditGroup(event.target.value)}
+                >
+                  {Object.entries(names).map(([key, name]) => (
+                    <option key={key} value={key}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                均線參數
+                <textarea
+                  aria-label="編輯股票均線參數"
+                  value={editMas}
+                  onChange={(event) => setEditMas(event.target.value)}
+                  required
+                  disabled={busy}
+                />
+              </label>
+              <p>
+                填入 1～4 個不重複的整數（1～1000），用逗號分隔。
+                {dialog.stock.group_id !== FIXED_STOCK_GROUP &&
+                  stocks.some((stock) => stock.ticker === dialog.stock.ticker && stock.group_id === FIXED_STOCK_GROUP) &&
+                  '此股票另有固定參數；實際監控優先使用固定參數，請從「無分組」編輯該筆設定。'}
+              </p>
+              <div className="console-actions">
+                <button type="submit" className="primary-button" disabled={busy}>
+                  確認編輯
+                </button>
+                <button type="button" className="ghost-button" disabled={busy} onClick={() => setDialog(null)}>
+                  取消編輯
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <p>
+                確定刪除 {dialog.stock.ticker} 在「
+                {names[dialog.stock.group_id] ?? dialog.stock.group_id}
+                」的參數？
+                {dialog.stock.group_id === FIXED_STOCK_GROUP
+                  ? '刪除固定參數後，仍在分組或清單內的股票會改用該分組或清單的均線。'
+                  : '其他組別與已保存的固定參數會保留。'}
+              </p>
+              <div className="console-actions">
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      await settingsApi('stocks.delete', {
+                        id: dialog.stock.id,
+                      });
+                      await reload();
+                      setDialog(null);
+                      setMessage('這筆股票參數已刪除。');
+                    })
+                  }
+                >
+                  確認刪除
+                </button>
+                <button type="button" className="ghost-button" disabled={busy} onClick={() => setDialog(null)}>
+                  取消刪除
+                </button>
+              </div>
+            </>
+          )}
+        </ConsoleDialog>
+      )}
       <details className="research-disclosure">
         <summary>管理自訂分組</summary>
         <div className="research-disclosure-body">
@@ -247,7 +383,11 @@ export function ParameterConsole() {
               busy={busy}
               onSave={(values) =>
                 void run(async () => {
-                  await settingsApi('admin.index.save', { ticker: index.ticker, name: index.name, mas: parseMovingAverages(values) });
+                  await settingsApi('admin.index.save', {
+                    ticker: index.ticker,
+                    name: index.name,
+                    mas: parseMovingAverages(values),
+                  });
                   setMessage(`${index.ticker} 大盤參數已儲存`);
                 })
               }

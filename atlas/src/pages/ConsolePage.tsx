@@ -3,12 +3,14 @@ import type { PageProps } from './pageProps';
 import { ParameterConsole } from '../ui/ParameterConsole';
 import { watchlistStore } from '../watchlists/store';
 import { createWatchlist, evaluateWatchlist, visitWatchlist, watchlistSchema, type WatchlistVisit } from '../watchlists/model';
-import { refreshCloudWatchlist, pushCloudWatchlist } from '../watchlists/cloud';
+import { refreshCloudWatchlist } from '../watchlists/cloud';
+import { watchlistCloudSync } from '../watchlists/sync';
 import { startLineIdentity } from '../cloud/lineIdentity';
 import { activeChips, needsGrowth, parseFilters } from './screenerFilters';
 import { loadUniverse, UNIVERSE_GROUP_KEYS, universeMarketOf } from '../report/universe';
 import { loadMarketGrowth } from '../fundamentals/GrowthProvider';
-import { parseMovingAverages, settingsApi } from '../cloud/settingsApi';
+import { FIXED_STOCK_GROUP, parameterMAs, parseMovingAverages, settingsApi, type ParameterStock } from '../cloud/settingsApi';
+import { FixedStockParameters } from '../ui/FixedStockParameters';
 import { formatDateTime, displayTicker } from '../ui/format';
 import type { GroupItem } from '../report/schema';
 import '../ui/research.css';
@@ -17,6 +19,7 @@ type CloudList = { id: string; definition: unknown; updated_at: string };
 
 export default function ConsolePage({ report, navigate, openChart, list: requested }: PageProps & { list?: string }) {
   const store = watchlistStore();
+  const sync = watchlistCloudSync(store);
   const { document, error: storageError } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const selected = document.lists.find((entry) => entry.id === requested) ?? document.lists[0];
   const [tab, setTab] = useState<'lists' | 'parameters'>('lists');
@@ -34,7 +37,68 @@ export default function ConsolePage({ report, navigate, openChart, list: request
   const [market, setMarket] = useState<'TW' | 'US'>('TW');
   const [renaming, setRenaming] = useState('');
   const imported = useRef<HTMLInputElement>(null);
-  const remoteVersions = useRef(new Map<string, string>());
+  const [editingStock, setEditingStock] = useState<string | null>(null);
+  const [fixedParameters, setFixedParameters] = useState<Record<string, number[]>>({});
+  const [syncCount, setSyncCount] = useState(0);
+  const seenSettings = useRef(new Map<string, string>());
+  const settingsKey = selected
+    ? JSON.stringify([
+        selected.id,
+        selected.updatedAt,
+        selected.name,
+        selected.group,
+        selected.filters,
+        selected.symbols,
+        selected.maList,
+        selected.monitorBreakouts,
+      ])
+    : '';
+  useEffect(() => {
+    if (!selected) return;
+    const previous = seenSettings.current.get(selected.id);
+    seenSettings.current.set(selected.id, settingsKey);
+    // Opening a linked list must read the daily collector before writing anything.
+    if (previous === settingsKey || (previous === undefined && selected.cloud)) return;
+    let active = true;
+    setSyncCount((count) => count + 1);
+    void sync
+      .sync(selected.id)
+      .then((saved) => {
+        if (active) setCloudMessage(saved ? '清單設定已自動同步到 Supabase。' : '清單已保存在本機；從 LINE 登入後，儲存設定即可自動同步。');
+      })
+      .catch((caught) => {
+        if (active)
+          setCloudMessage(
+            `設定已保存在本機，自動同步未完成：${caught instanceof Error ? caught.message : '雲端讀寫失敗'}。可按「重試同步」再次儲存。`,
+          );
+      })
+      .finally(() => {
+        setSyncCount((count) => count - 1);
+      });
+    return () => {
+      active = false;
+    };
+  }, [settingsKey, sync]);
+  useEffect(() => {
+    let active = true;
+    void startLineIdentity()
+      .then(async (identity) => {
+        if (!identity) return;
+        const stocks = await settingsApi<ParameterStock[]>('stocks.list');
+        if (active)
+          setFixedParameters(
+            Object.fromEntries(
+              stocks.filter((stock) => stock.group_id === FIXED_STOCK_GROUP).map((stock) => [stock.ticker, parameterMAs(stock)]),
+            ),
+          );
+      })
+      .catch(() => {
+        /* Individual editing reports authenticated load failures in its dialog. */
+      });
+    return () => {
+      active = false;
+    };
+  }, [tab]);
   useEffect(() => {
     setRenaming(selected?.name ?? '');
   }, [selected?.id, selected?.name]);
@@ -74,21 +138,28 @@ export default function ConsolePage({ report, navigate, openChart, list: request
       if (!active) return;
       const latest = store.getSnapshot().document.lists.find((entry) => entry.id === selected.id);
       if (!latest || latest.filters !== selected.filters || latest.group !== selected.group) return;
+      const baseline = (latest.lastOpenedAt ?? 0) > (base.lastOpenedAt ?? 0) ? latest : base;
+      const history = [...new Map([...base.history, ...latest.history].map((row) => [row.date, row])).values()]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(-90);
       const result = visitWatchlist(
-        { ...latest, history: base.history, lastViewed: base.lastViewed, lastOpenedAt: base.lastOpenedAt, cloud: base.cloud },
+        {
+          ...latest,
+          history,
+          lastViewed: baseline.lastViewed,
+          lastOpenedAt: baseline.lastOpenedAt,
+          cloud: latest.cloud?.version === selected.cloud?.version ? base.cloud : latest.cloud,
+        },
         members,
         dataDate.slice(0, 10),
       );
       store.save(result.list);
       setVisit(result);
-      if (result.list.cloud && (await startLineIdentity())?.userId === result.list.cloud.userId) {
-        try {
-          const synced = await pushCloudWatchlist(result.list);
-          const current = store.getSnapshot().document.lists.find((entry) => entry.id === synced.id);
-          if (active && current?.lastOpenedAt === synced.lastOpenedAt && current.updatedAt === synced.updatedAt) store.save(synced);
-        } catch (caught) {
-          if (active) setCloudMessage(`本機比較已完成，但本次開啟紀錄未同步：${caught instanceof Error ? caught.message : '同步失敗'}`);
-        }
+      try {
+        // Also queue an observation behind a not-yet-finished first cloud create.
+        await sync.sync(result.list.id);
+      } catch (caught) {
+        if (active) setCloudMessage(`自動同步未完成：${caught instanceof Error ? caught.message : '同步失敗'}。本機清單仍保留，已完成的比較結果未變。`);
       }
     })()
       .catch((caught) => {
@@ -125,21 +196,22 @@ export default function ConsolePage({ report, navigate, openChart, list: request
   const saveCloud = () =>
     void cloud(async () => {
       if (!selected) return;
-      const linked = selected.cloud ? null : remoteVersions.current.get(selected.id);
-      const identity = await startLineIdentity();
-      const synced = await pushCloudWatchlist(
-        linked && identity ? { ...selected, cloud: { userId: identity.userId, version: linked } } : selected,
+      const saved = await sync.sync(selected.id);
+      setCloudMessage(
+        saved
+          ? '此清單與突破監控選項已同步到 Supabase；服務端監控需啟用新版突破提醒部署。'
+          : '請從 LINE 開啟 Atlas 並登入後同步。本機清單仍保留。',
       );
-      store.save(synced);
-      remoteVersions.current.set(selected.id, synced.cloud!.version);
-      setCloudMessage('此清單與突破監控選項已同步到 Supabase；服務端監控需啟用新版突破提醒部署。');
     });
   const importCloud = (row: CloudList) =>
     void cloud(async () => {
       const identity = await startLineIdentity();
       if (!identity) throw new Error('請從 LINE 開啟 Atlas 並登入。');
       const definition = watchlistSchema.parse(row.definition);
-      store.save({ ...definition, cloud: { userId: identity.userId, version: row.updated_at } });
+      store.save({
+        ...definition,
+        cloud: { userId: identity.userId, version: row.updated_at },
+      });
       navigate({ page: 'console', list: row.id });
       setAttempt((value) => value + 1);
       setCloudMessage('雲端清單已匯入；之後開啟會先讀取每日紀錄，再比較上次開啟時的名單。');
@@ -166,7 +238,14 @@ export default function ConsolePage({ report, navigate, openChart, list: request
       if (!symbols.length) throw new Error('請至少輸入一個完整代號，例如 2330.TW 或 NVDA。');
       if (symbols.some((symbol) => (market === 'TW' ? !/\.(TW|TWO)$/.test(symbol) : /\.(TW|TWO)$/.test(symbol))))
         throw new Error('請使用所選市場的完整代號；台股包含 .TW 或 .TWO。');
-      const next = createWatchlist({ name, market, group: UNIVERSE_GROUP_KEYS[market], kind: 'manual', filters: '', symbols });
+      const next = createWatchlist({
+        name,
+        market,
+        group: UNIVERSE_GROUP_KEYS[market],
+        kind: 'manual',
+        filters: '',
+        symbols,
+      });
       store.save(next);
       navigate({ page: 'console', list: next.id });
       setCreating(false);
@@ -179,7 +258,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
     ? universeMarketOf(selected.group)
       ? `${selected.market === 'TW' ? '台股' : '美股'}全市場`
       : report.status === 'ok'
-        ? report.report.groups.find((group) => group.key === selected.group)?.name ?? '已儲存的選股群組'
+        ? (report.report.groups.find((group) => group.key === selected.group)?.name ?? '已儲存的選股群組')
         : '已儲存的選股群組'
     : '';
 
@@ -306,15 +385,17 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                 <button
                   type="button"
                   className="text-button"
+                  disabled={cloudBusy}
                   onClick={() => {
-                    if (confirm(`確定刪除本機清單「${selected.name}」？已同步的雲端副本需另外刪除。`))
-                      action(() => {
-                        store.remove(selected.id);
+                    if (confirm(`確定刪除清單「${selected.name}」？已連結的 Supabase 清單也會一起刪除；個股固定參數會保留。`))
+                      void cloud(async () => {
+                        await sync.remove(selected.id);
                         navigate({ page: 'console' });
+                        setCloudMessage('清單已刪除；個股固定參數仍保留。');
                       });
                   }}
                 >
-                  刪除本機清單
+                  刪除清單
                 </button>
               </div>
               <p className="muted">
@@ -335,8 +416,11 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                     checked={selected.monitorBreakouts}
                     onChange={(event) =>
                       action(() => {
-                        store.save({ ...selected, monitorBreakouts: event.target.checked, updatedAt: Date.now() });
-                        setCloudMessage('監控選項已在本機儲存；請同步到 Supabase，讓已部署的新版突破服務取得設定。');
+                        store.save({
+                          ...selected,
+                          monitorBreakouts: event.target.checked,
+                          updatedAt: Date.now(),
+                        });
                       })
                     }
                   />
@@ -351,7 +435,13 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                     onBlur={(event) =>
                       action(() => {
                         const values = parseMovingAverages(event.target.value);
-                        store.save(watchlistSchema.parse({ ...selected, maList: values, updatedAt: Date.now() }));
+                        store.save(
+                          watchlistSchema.parse({
+                            ...selected,
+                            maList: values,
+                            updatedAt: Date.now(),
+                          }),
+                        );
                       })
                     }
                   />
@@ -368,7 +458,15 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                       ?.members.slice(0, 100)
                       .map((entry) => (
                         <li key={entry.symbol}>
-                          <button type="button" onClick={() => openChart({ symbol: entry.symbol, name: entry.name })}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openChart({
+                                symbol: entry.symbol,
+                                name: entry.name,
+                              })
+                            }
+                          >
                             {displayTicker(entry.symbol)} {entry.name}
                           </button>
                         </li>
@@ -416,12 +514,28 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                       <li key={entry.symbol}>
                         <button
                           type="button"
-                          onClick={() => openChart({ symbol: entry.symbol, name: entry.name, tf: '1D', maList: selected.maList })}
+                          className="member-chart-button"
+                          onClick={() =>
+                            openChart({
+                              symbol: entry.symbol,
+                              name: entry.name,
+                              tf: '1D',
+                              maList: fixedParameters[entry.symbol] ?? selected.maList,
+                            })
+                          }
                         >
                           <span>
                             <b>{displayTicker(entry.symbol)}</b> {entry.name}
                           </span>
                           <small>連續入選 {entry.streak} 個已確認交易日</small>
+                        </button>
+                        <button
+                          type="button"
+                          className="text-button member-parameter-button"
+                          onClick={() => setEditingStock(entry.symbol)}
+                          aria-label={`設定 ${entry.symbol} 固定均線參數`}
+                        >
+                          {fixedParameters[entry.symbol] ? `固定均線 ${fixedParameters[entry.symbol].join(' / ')}` : '設定個股均線'}
                         </button>
                       </li>
                     ))}
@@ -444,7 +558,13 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                     className="console-actions"
                     onSubmit={(event) => {
                       event.preventDefault();
-                      action(() => store.save({ ...selected, name: renaming, updatedAt: Date.now() }));
+                      action(() =>
+                        store.save({
+                          ...selected,
+                          name: renaming,
+                          updatedAt: Date.now(),
+                        }),
+                      );
                     }}
                   >
                     <input
@@ -459,24 +579,11 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                     </button>
                   </form>
                   <button type="button" className="primary-button" disabled={cloudBusy} onClick={saveCloud}>
-                    同步此清單到 Supabase
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    disabled={!selected.cloud}
-                    onClick={() =>
-                      action(() => {
-                        store.save({ ...selected, cloud: undefined });
-                        setAttempt((value) => value + 1);
-                      })
-                    }
-                  >
-                    解除雲端連結，保留本機清單
+                    重試同步
                   </button>
                   <p className="muted">
-                    本機功能可直接使用。雲端清單需先部署資料表與新版 user-settings
-                    函式，登入後才可同步；突破提醒服務也需部署新版。尚未完成部署時不會顯示已同步。
+                    登入 LINE 後，建立清單、儲存名稱與修改監控設定會自動同步；刪除時一併刪除雲端清單。雲端清單需先部署資料表與新版
+                    user-settings 函式；失敗時保留本機並顯示重試提示。
                   </p>
                 </div>
               </details>
@@ -493,7 +600,6 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                   void cloud(async () => {
                     const rows = await settingsApi<CloudList[]>('watchlists.list');
                     setCloudLists(rows);
-                    rows.forEach((row) => remoteVersions.current.set(row.id, row.updated_at));
                     setCloudMessage(`已載入 ${rows.length} 組雲端清單；選擇匯入後才會更新本機。`);
                   })
                 }
@@ -523,11 +629,18 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                       className="text-button"
                       disabled={cloudBusy}
                       onClick={() => {
-                        if (confirm('確定刪除這組雲端清單並停止其突破監控？本機副本會保留。'))
+                        if (confirm('確定刪除這組清單並停止其突破監控？同 ID 的本機清單也會刪除，個股固定參數會保留。'))
                           void cloud(async () => {
-                            await settingsApi('watchlists.delete', { id: row.id, expectedUpdatedAt: row.updated_at });
+                            const local = store.getSnapshot().document.lists.find((entry) => entry.id === row.id);
+                            if (local?.cloud) await sync.remove(row.id);
+                            else {
+                              await settingsApi('watchlists.delete', {
+                                id: row.id,
+                                expectedUpdatedAt: row.updated_at,
+                              });
+                              if (local) store.remove(row.id);
+                            }
                             setCloudLists((previous) => previous.filter((entry) => entry.id !== row.id));
-                            remoteVersions.current.delete(row.id);
                           });
                       }}
                     >
@@ -538,6 +651,22 @@ export default function ConsolePage({ report, navigate, openChart, list: request
               })}
             </div>
           </details>
+          {syncCount > 0 && <p role="status">正在自動同步清單設定…</p>}
+          {editingStock && selected && (
+            <FixedStockParameters
+              ticker={editingStock}
+              defaults={fixedParameters[editingStock] ?? selected.maList}
+              onClose={() => setEditingStock(null)}
+              onSaved={(values) => {
+                setFixedParameters((previous) => ({
+                  ...previous,
+                  [editingStock]: values,
+                }));
+                setEditingStock(null);
+                setCloudMessage(`${editingStock} 固定均線已永久保存到 Supabase，出榜後仍保留。`);
+              }}
+            />
+          )}
           {cloudMessage && (
             <p role="status" className="console-message">
               {cloudMessage}
