@@ -531,13 +531,16 @@ test('layout: annual growth (EPS first) and profitability (ratios first), then f
   await expect(page.getByRole('group', { name: '期間' })).toHaveCount(1);
   await expect(page.locator('.fin-quarter')).toHaveCount(1);
 
-  const top = (selector: string) => page.evaluate((query) => document.querySelector(query)!.getBoundingClientRect().top + window.scrollY, selector);
-  const order = {
-    growth: await top('.fin-card[data-group="growth"]'),
-    profit: await top('.fin-card[data-group="profitability"]'),
-    folds: await top('.fin-folds'),
-    notes: await top('.fin-notes'),
-  };
+  // Sample one layout frame so entrance animations cannot move between reads.
+  const order = await page.evaluate(() => {
+    const top = (query: string) => document.querySelector(query)!.getBoundingClientRect().top;
+    return {
+      growth: top('.fin-card[data-group="growth"]'),
+      profit: top('.fin-card[data-group="profitability"]'),
+      folds: top('.fin-folds'),
+      notes: top('.fin-notes'),
+    };
+  });
   expect(order.growth).toBeLessThanOrEqual(order.profit);
   expect(order.profit).toBeLessThan(order.folds);
   expect(order.folds).toBeLessThan(order.notes);

@@ -119,6 +119,7 @@ test('Taiwan deep link opens a theme sheet whose constituents chart with .TW sym
   await expect(sheet.locator('.constituent')).toHaveCount(5);
   await expect(sheet.locator('.stat-row.head').locator('..')).toContainText('加權指數');
   await sheet.locator('.constituent-head').first().click();
+  await sheet.locator('.mini-chart').scrollIntoViewIfNeeded();
   await expect(sheet.locator('.mini-chart[data-status="ready"]')).toBeVisible();
   await sheet.getByRole('button', { name: '開啟圖表' }).click();
   await expect(page).toHaveURL(/page=chart&symbol=\d{4}\.(TW|TWO)/);
