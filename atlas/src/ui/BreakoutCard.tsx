@@ -126,8 +126,10 @@ function Methodology({ data, current, params, windowLabel }: { data: BreakoutMar
         </li>
         <li>
           <b>進場與成功</b>
-          掃描全市場所有股票，突破日收盤進場；成功＝進場後至少滿 {params.matureDays} 個交易日，且資料日收盤高於進場價。
+          掃描全市場所有股票；成功＝進場後至少滿 {params.matureDays} 個交易日，且資料日收盤高於進場價。
           進場成功率＝成功樣本數 ÷ 出現該進場訊號且已成熟的樣本數（持平不算成功）。沒有訊號的股票不進分母，未成熟或資料不足不當成失敗。
+          波段突破採理論停買進場：開盤已高於前高時以開盤價，否則以波段高點作進場價；不以當天收盤價替代盤中進場價。
+          箱型與20EMA維持訊號日收盤進場。日線無法證明實際成交價，未模擬最小跳動、滑價與費用。
           「低於進場參考價／線」＝資料日收盤低於進場當日固定的前高、箱頂或 EMA20。
           {holdDays.length ? ` 本窗口平均持有約 ${Math.min(...holdDays).toFixed(1)}～${Math.max(...holdDays).toFixed(1)} 個交易日。` : ''}
         </li>
@@ -143,11 +145,14 @@ function Methodology({ data, current, params, windowLabel }: { data: BreakoutMar
             .filter((meta) => !meta.volume && meta.definition)
             .map((meta) => `${meta.label}：${meta.definition}${meta.kind === 'box' && data.boxMaxWidthPct !== null ? `（門檻 ${data.boxMaxWidthPct}%）` : ''}`)
             .join('；')}
-          。收盤需嚴格大於參考價，剛好等於不算；前高與箱頂不含當日，EMA20 包含當日收盤，與圖表 EMA 使用相同起算方式。
+          。波段高點以前 {params.swingPivotLeft} 根及後 {params.swingPivotRight} 根日線確認，右側日線收盤後的下一根才可觸發，避免提前使用尚未確認的高點。
+          使用最近已確認的波段高點，例如123的2號高點；不額外要求完整123或較高低點。盤中最高價嚴格超過前高即觸發，收盤跌回仍計入。
+          箱型與20EMA採收盤嚴格大於參考價；EMA20 包含當日收盤，與圖表使用相同起算方式。
         </li>
         <li>
           <b>去重</b>
-          同一檔、同一買進法在窗口內只取第一次新突破；突破前 {params.cooldownDays ?? '—'} 個交易日內已突破過視為同一波上漲，不重複計。
+          波段法每個已確認高點只記第一次突破，不設10日冷卻；不同波段在同一窗口可各自入選，因此訊號筆數可能多於股票檔數。
+          箱型與20EMA維持原本 {params.cooldownDays ?? '—'} 日冷卻與同一檔／方法／窗口只取第一次新突破。
         </li>
         <li>
           <b>資料處理</b>
@@ -166,7 +171,6 @@ function Methodology({ data, current, params, windowLabel }: { data: BreakoutMar
 function BreakoutBody({ data, params }: { data: BreakoutMarket; params: BreakoutParams }) {
   const windows = params.windows.filter((entry) => data.windows[entry.key]);
   const [selected, setSelected] = useState(DEFAULT_WINDOW);
-  const [highLookback, setHighLookback] = useState('20');
   const active = windows.find((entry) => entry.key === selected) ?? windows[0];
   if (!active) return <p className="muted-text">沒有可顯示的統計窗口。</p>;
   const current = data.windows[active.key]!;
@@ -174,7 +178,7 @@ function BreakoutBody({ data, params }: { data: BreakoutMarket; params: Breakout
     ...(params.strategies.find((meta) => meta.key === key) ?? DEFAULT_BREAKOUT_PARAMS.strategies.find((meta) => meta.key === key)!),
     label,
   });
-  const main = [method(`high${highLookback}`, '突破新高進場法'), method('box20', '箱型突破進場法'), method('ema20', '突破20EMA進場法')];
+  const main = [method('swingHigh', '突破波段前高進場法'), method('box20', '箱型突破進場法'), method('ema20', '突破20EMA進場法')];
   return (
     <>
       <div className="bo-toolbar">
@@ -192,16 +196,7 @@ function BreakoutBody({ data, params }: { data: BreakoutMarket; params: Breakout
           ))}
         </div>
       </div>
-      <label className="bo-lookback">
-        新高回看期間
-        <select aria-label="新高回看期間" value={highLookback} onChange={(event) => setHighLookback(event.target.value)}>
-          {[20, 60, 120].map((days) => (
-            <option key={days} value={days}>
-              前 {days} 日高
-            </option>
-          ))}
-        </select>
-      </label>
+      <p className="bo-sub">前高採已確認的波段高點；盤中突破即觸發，不要求收盤站穩或放量。</p>
       <p className="bo-sub">全市場訊號成功率＝成功樣本／成熟訊號樣本。成功：進場後至少滿 {params.matureDays} 個交易日，資料日收盤高於進場價。</p>
       <StrategyList strategies={main} current={current} params={params} />
       <Methodology data={data} current={current} params={params} windowLabel={active.label} />

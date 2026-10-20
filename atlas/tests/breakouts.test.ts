@@ -39,14 +39,16 @@ describe('breakouts schema', () => {
     expect(params.windows[0]).toEqual({ key: '1w', days: 5, label: '近1週' });
     expect(params.matureDays).toBe(3);
     expect(params.minSample).toBe(20);
-    expect(params.strategies).toHaveLength(9);
-    expect(params.strategies.filter((meta) => !meta.volume).map((meta) => meta.key)).toEqual(['high20', 'high60', 'high120', 'box20', 'ema20']);
-    expect(params.strategies[0]!.definition).toContain('不含當日');
+    expect(params.strategies).toHaveLength(3);
+    expect(params.strategies.map((meta) => meta.key)).toEqual(['swingHigh', 'box20', 'ema20']);
+    expect(params.strategies[0]!.definition).toContain('波段高點');
+    expect(params.swingPivotLeft).toBe(2);
+    expect(params.swingPivotRight).toBe(2);
     const tw = markets.tw!;
     expect(tw.asOf).toBe('2026-10-09');
     expect(tw.evaluated).toBe(900);
     expect(tw.anomalies).toEqual({ stocks: 3, days: 4 });
-    expect(tw.windows['1m']!.strategies.high20).toEqual(
+    expect(tw.windows['1m']!.strategies.swingHigh).toEqual(
       stats({
         eligible: 880,
         n: 300,

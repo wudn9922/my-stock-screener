@@ -37,12 +37,14 @@ export interface BreakoutParams {
   volumeLookback: number | null;
   volumeMultiple: number | null;
   boxLookback: number | null;
+  swingPivotLeft: number;
+  swingPivotRight: number;
   strategies: BreakoutStrategyMeta[];
 }
 export interface BreakoutStats {
   /** Stocks with enough clean history to evaluate the strategy over the whole window. */
   eligible: number;
-  /** First fresh breakout per stock inside the window, matured or not. */
+  /** Swing: one event per pivot; box/EMA: first fresh event per stock/window. Includes unmatured events. */
   n: number;
   /** Breakouts held at least `matureDays` trading days; every rate below uses only these. */
   maturedN: number;
@@ -103,15 +105,10 @@ export const DEFAULT_BREAKOUT_PARAMS: BreakoutParams = {
   volumeLookback: 20,
   volumeMultiple: 1.5,
   boxLookback: 20,
+  swingPivotLeft: 2,
+  swingPivotRight: 2,
   strategies: [
-    ...[20, 60, 120].map((n) => ({
-      key: `high${n}`,
-      label: `突破${n}日高`,
-      kind: 'high',
-      lookback: n,
-      volume: false,
-      definition: '',
-    })),
+    { key: 'swingHigh', label: '突破波段前高', kind: 'swing', lookback: null, volume: false, definition: '' },
     {
       key: 'box20',
       label: '突破20日箱型',
@@ -126,22 +123,6 @@ export const DEFAULT_BREAKOUT_PARAMS: BreakoutParams = {
       kind: 'ema',
       lookback: 20,
       volume: false,
-      definition: '',
-    },
-    ...[20, 60, 120].map((n) => ({
-      key: `high${n}Vol`,
-      label: `突破${n}日高＋放量`,
-      kind: 'high',
-      lookback: n,
-      volume: true,
-      definition: '',
-    })),
-    {
-      key: 'box20Vol',
-      label: '突破20日箱型＋放量',
-      kind: 'box',
-      lookback: 20,
-      volume: true,
       definition: '',
     },
   ],
@@ -267,6 +248,8 @@ function parseParams(value: unknown): BreakoutParams {
     volumeLookback: optional('volumeLookback', defaults.volumeLookback),
     volumeMultiple: optional('volumeMultiple', defaults.volumeMultiple),
     boxLookback: optional('boxLookback', defaults.boxLookback),
+    swingPivotLeft: positiveInt(raw.swingPivotLeft) ?? defaults.swingPivotLeft,
+    swingPivotRight: positiveInt(raw.swingPivotRight) ?? defaults.swingPivotRight,
     strategies: strategies.length ? strategies : defaults.strategies,
   };
 }

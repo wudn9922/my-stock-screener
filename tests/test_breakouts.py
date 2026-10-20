@@ -32,12 +32,13 @@ def weekdays_ending(last, count):
     return list(reversed(out))
 
 
-def make_bars(closes, last=AS_OF, highs=None, lows=None, volumes=None, dates=None):
+def make_bars(closes, last=AS_OF, highs=None, lows=None, volumes=None, dates=None, opens=None):
     """與 data/*.csv 同欄位（High/Low/Close/Volume）的 DataFrame；預設 High = Low = Close、量 1000。"""
     dates = pd.DatetimeIndex(dates if dates is not None else weekdays_ending(last, len(closes)))
     closes = [float(c) for c in closes]
     return pd.DataFrame(
         {
+            "Open": [float(o) for o in opens] if opens is not None else closes,
             "High": [float(h) for h in highs] if highs is not None else closes,
             "Low": [float(v) for v in lows] if lows is not None else closes,
             "Close": closes,
@@ -378,6 +379,7 @@ def random_universe(seed, count=40, length=170, last=AS_OF):
             rows.append((day, high, low, close, volume))
         frame = pd.DataFrame(rows, columns=["Date", "High", "Low", "Close", "Volume"]).set_index("Date")
         frame.index = pd.DatetimeIndex(frame.index)
+        frame["Open"] = frame["Close"]
         frames[f"R{index:02d}"] = frame
     return frames
 
@@ -459,6 +461,8 @@ def naive_stats(frames, market_key, as_of):
                 base[day] = sum(1 for x in returns if x > 0) / len(returns)
         result = {}
         for spec in bo.STRATEGIES:
+            if spec["kind"] == "swing":
+                continue  # Independently checked by test_swing_breakouts.py's pivot oracle.
             n = matured = wins = fails = eligible = 0
             base_rates = []
             for rows in stocks.values():
@@ -549,7 +553,8 @@ class FrontendFixtureContractTest(unittest.TestCase):
         path = os.path.join(ROOT, "atlas", "tests", "fixtures", "breakouts", "breakouts.sample.json")
         with open(path, encoding="utf-8") as file:
             fixture = json.load(file)
-        self.assertEqual(fixture["params"], bo.params_meta())
+        import build_full_market_breakouts as full
+        self.assertEqual(fixture["params"], full.params_meta())
         market = bo.build_market({**filler(), "X": make_bars(flat_then([101.0, 102, 102, 102]))}, "測試", "tw")
         for key in ("tw", "us"):
             sample = fixture["markets"][key]
@@ -560,7 +565,7 @@ class FrontendFixtureContractTest(unittest.TestCase):
                 produced = market["windows"][window_key]
                 self.assertEqual(set(window), set(produced))
                 self.assertEqual(set(window["market"]), set(produced["market"]))
-                self.assertEqual(set(window["strategies"]), set(produced["strategies"]))
+                self.assertEqual(set(window["strategies"]), set(full.ACTIVE_STRATEGIES))
                 for stats_ in window["strategies"].values():
                     self.assertEqual(set(stats_), set(produced["strategies"]["high20"]))
 
@@ -607,7 +612,7 @@ class MainTest(unittest.TestCase):
         datetime.fromisoformat(payload["generatedAt"])
         self.assertEqual([w["key"] for w in payload["params"]["windows"]], ["1w", "1m"])
         self.assertEqual(payload["params"]["matureDays"], 3)
-        self.assertEqual(len(payload["params"]["strategies"]), 9)
+        self.assertEqual(len(payload["params"]["strategies"]), 10)
         tw = payload["markets"]["tw"]
         self.assertEqual(tw["universeCount"], 3)
         self.assertEqual(tw["universe"], "台股上市櫃普通股（4碼、非0開頭）")

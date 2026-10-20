@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """全市場進場成功率：只讀 universe-full 的完整名單與日線快取，不連網、不退回 S&P 500。
 
-共用 build_breakouts 的訊號、去重與成熟樣本計算；成功＝進場日收盤買入後，至少經過
-3 個交易日，資料日收盤高於進場價。資料缺漏、未成熟與沒有訊號都不當成失敗。
+共用 build_breakouts 的訊號與成熟樣本計算；成功＝進場後至少經過 3 個交易日，資料日收盤高於進場價。
+波段突破以 max(開盤價, 已確認波段高點) 作理論停買價格；箱型與20EMA以訊號日收盤進場。
+資料缺漏、未成熟與沒有訊號都不當成失敗。
 名單過期、快取不足或有效日線涵蓋率不足時保留既有報表，回傳失敗。
 """
 
@@ -25,6 +26,15 @@ LABELS = {
     "us": "全市場美股普通股與 ADR（NYSE／NASDAQ／NYSE American 等）",
 }
 DEFAULT_CACHE = os.path.join(bo.REPO_ROOT, ".cache", "universe-full")
+ACTIVE_STRATEGIES = (bo.SWING_KEY, "box20", "ema20")
+
+
+def params_meta():
+    params = bo.params_meta()
+    params["strategies"] = [spec for spec in params["strategies"] if spec["key"] in ACTIVE_STRATEGIES]
+    params["strategies"].sort(key=lambda spec: ACTIVE_STRATEGIES.index(spec["key"]))
+    params["entry"] = "波段前高突破以 max(開盤價, 波段高點) 作理論停買進場價；箱型與20EMA以訊號日收盤進場"
+    return params
 
 
 def load_inputs(cache_dir, today):
@@ -67,6 +77,7 @@ def load_inputs(cache_dir, today):
 
 def build_payload(inputs, generated_at):
     payload = bo.build_breakouts_payload(inputs, generated_at)
+    payload["params"] = params_meta()
     for key, market in payload["markets"].items():
         spec = inputs[key]
         loaded = len(spec["frames"])
@@ -75,6 +86,8 @@ def build_payload(inputs, generated_at):
             coverage={"loaded": loaded, "missing": spec["listed"] - loaded},
             listingAsOf=spec["listingAsOf"], listingSource=spec["listingSource"],
         )
+        for window in market["windows"].values():
+            window["strategies"] = {name: window["strategies"][name] for name in ACTIVE_STRATEGIES}
     return payload
 
 
@@ -108,7 +121,7 @@ def main(argv=None):
         print(f"✅ {key.upper()} 全市場進場成功率：{market['asOf']}，有效日線 {market['evaluated']}/{market['universeCount']} 檔，"
               f"缺漏 {market['coverage']['missing']}、未成交／停更 {market['stale']} 檔")
         for window_key, window in market["windows"].items():
-            for strategy in ("high20", "high60", "high120", "box20", "ema20"):
+            for strategy in ACTIVE_STRATEGIES:
                 stats = window["strategies"][strategy]
                 print(f"   {window_key} {strategy}: 成功 {stats['wins']}/{stats['maturedN']}，成功率 {stats['winRate']}%")
     return 0

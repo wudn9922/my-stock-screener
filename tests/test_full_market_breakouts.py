@@ -59,9 +59,10 @@ class FullMarketBreakoutsTest(unittest.TestCase):
         # Only SMALL signals. LARGE/MICRO have no signal, and must not dilute 1/1 to 1/3.
         for key in ("tw", "us"):
             market = self.build()["markets"][key]
-            for method in ("high20", "box20", "ema20"):
+            for method in ("box20", "ema20"):
                 stats = market["windows"]["1w"]["strategies"][method]
                 self.assertEqual((stats["n"], stats["maturedN"], stats["wins"], stats["winRate"]), (1, 1, 1, 100))
+            self.assertEqual(set(market["windows"]["1w"]["strategies"]), {"swingHigh", "box20", "ema20"})
 
     def test_missing_or_incomplete_history_does_not_shrink_the_listing(self):
         os.remove(full.uc.bars_path(self.cache, "MICRO"))

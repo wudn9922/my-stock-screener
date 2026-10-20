@@ -21,33 +21,19 @@
   "volumeLookback": 20,
   "volumeMultiple": 1.5,
   "boxLookback": 20,
+  "swingPivotLeft": 2,
+  "swingPivotRight": 2,
   "minEvaluated": 200,
-  "entry": "突破日收盤買進",
+  "entry": "波段前高突破以 max(開盤價, 波段高點) 作理論停買進場價；箱型與20EMA以訊號日收盤進場",
   "mark": "asOf 收盤標記",
   "strategies": [
    {
-    "key": "high20",
-    "label": "突破20日高",
-    "kind": "high",
-    "lookback": 20,
+    "key": "swingHigh",
+    "label": "突破波段前高",
+    "kind": "swing",
+    "lookback": null,
     "volume": false,
-    "definition": "收盤 > 前 20 個有效交易日（不含當日）的最高價"
-   },
-   {
-    "key": "high60",
-    "label": "突破60日高",
-    "kind": "high",
-    "lookback": 60,
-    "volume": false,
-    "definition": "收盤 > 前 60 個有效交易日（不含當日）的最高價"
-   },
-   {
-    "key": "high120",
-    "label": "突破120日高",
-    "kind": "high",
-    "lookback": 120,
-    "volume": false,
-    "definition": "收盤 > 前 120 個有效交易日（不含當日）的最高價"
+    "definition": "波段高點以左右各 2 根日線確認，右側 2 根收盤後才可使用；盤中最高價 > 最近已確認的波段高點即觸發，每個高點只取首次突破，不要求完整123型態、放量或冷卻期"
    },
    {
     "key": "box20",
@@ -56,38 +42,6 @@
     "lookback": 20,
     "volume": false,
     "definition": "前 20 個有效交易日（不含當日）高低區間 (最高−最低)/最低 ≤ 門檻，且收盤 > 箱頂"
-   },
-   {
-    "key": "high20Vol",
-    "label": "突破20日高＋放量",
-    "kind": "high",
-    "lookback": 20,
-    "volume": true,
-    "definition": "收盤 > 前 20 個有效交易日（不含當日）的最高價；且當日量 ≥ 前 20 日均量 × 1.5"
-   },
-   {
-    "key": "high60Vol",
-    "label": "突破60日高＋放量",
-    "kind": "high",
-    "lookback": 60,
-    "volume": true,
-    "definition": "收盤 > 前 60 個有效交易日（不含當日）的最高價；且當日量 ≥ 前 20 日均量 × 1.5"
-   },
-   {
-    "key": "high120Vol",
-    "label": "突破120日高＋放量",
-    "kind": "high",
-    "lookback": 120,
-    "volume": true,
-    "definition": "收盤 > 前 120 個有效交易日（不含當日）的最高價；且當日量 ≥ 前 20 日均量 × 1.5"
-   },
-   {
-    "key": "box20Vol",
-    "label": "突破20日箱型＋放量",
-    "kind": "box",
-    "lookback": 20,
-    "volume": true,
-    "definition": "前 20 個有效交易日（不含當日）高低區間 (最高−最低)/最低 ≤ 門檻，且收盤 > 箱頂；且當日量 ≥ 前 20 日均量 × 1.5"
    },
    {
     "key": "ema20",
@@ -131,7 +85,7 @@
       "avgReturn": -0.3
      },
      "strategies": {
-      "high20": {
+      "swingHigh": {
        "eligible": 880,
        "n": 60,
        "maturedN": 25,
@@ -144,85 +98,7 @@
        "baseAvgReturn": -0.31,
        "wins": 10
       },
-      "high60": {
-       "eligible": 870,
-       "n": 30,
-       "maturedN": 12,
-       "winRate": 50.0,
-       "avgReturn": 0.4,
-       "medianReturn": 0.1,
-       "failRate": 33.3,
-       "avgHoldDays": 3.5,
-       "baseRate": 45.0,
-       "baseAvgReturn": -0.2,
-       "wins": 6
-      },
-      "high120": {
-       "eligible": 860,
-       "n": 9,
-       "maturedN": 0,
-       "winRate": null,
-       "avgReturn": null,
-       "medianReturn": null,
-       "failRate": null,
-       "avgHoldDays": null,
-       "baseRate": null,
-       "baseAvgReturn": null,
-       "wins": 0
-      },
       "box20": {
-       "eligible": 880,
-       "n": 0,
-       "maturedN": 0,
-       "winRate": null,
-       "avgReturn": null,
-       "medianReturn": null,
-       "failRate": null,
-       "avgHoldDays": null,
-       "baseRate": null,
-       "baseAvgReturn": null,
-       "wins": 0
-      },
-      "high20Vol": {
-       "eligible": 880,
-       "n": 50,
-       "maturedN": 21,
-       "winRate": 42.9,
-       "avgReturn": -0.7,
-       "medianReturn": -0.5,
-       "failRate": 47.6,
-       "avgHoldDays": 3.4,
-       "baseRate": 44.2,
-       "baseAvgReturn": -0.3,
-       "wins": 9
-      },
-      "high60Vol": {
-       "eligible": 870,
-       "n": 20,
-       "maturedN": 8,
-       "winRate": 50.0,
-       "avgReturn": 0.1,
-       "medianReturn": 0.0,
-       "failRate": 37.5,
-       "avgHoldDays": 3.5,
-       "baseRate": 45.1,
-       "baseAvgReturn": -0.2,
-       "wins": 4
-      },
-      "high120Vol": {
-       "eligible": 860,
-       "n": 5,
-       "maturedN": 0,
-       "winRate": null,
-       "avgReturn": null,
-       "medianReturn": null,
-       "failRate": null,
-       "avgHoldDays": null,
-       "baseRate": null,
-       "baseAvgReturn": null,
-       "wins": 0
-      },
-      "box20Vol": {
        "eligible": 880,
        "n": 0,
        "maturedN": 0,
@@ -237,16 +113,16 @@
       },
       "ema20": {
        "eligible": 880,
-       "n": 60,
-       "maturedN": 45,
-       "winRate": 66.7,
+       "n": 15,
+       "maturedN": 12,
+       "winRate": 50,
        "avgReturn": 2.5,
        "medianReturn": 1.5,
        "failRate": 20,
        "avgHoldDays": 7,
        "baseRate": 51.1,
        "baseAvgReturn": 1.2,
-       "wins": 30
+       "wins": 6
       }
      }
     },
@@ -261,7 +137,7 @@
       "avgReturn": 5.1
      },
      "strategies": {
-      "high20": {
+      "swingHigh": {
        "eligible": 880,
        "n": 300,
        "maturedN": 250,
@@ -273,32 +149,6 @@
        "baseRate": 59.0,
        "baseAvgReturn": 5.0,
        "wins": 135
-      },
-      "high60": {
-       "eligible": 870,
-       "n": 140,
-       "maturedN": 100,
-       "winRate": 52.0,
-       "avgReturn": 6.0,
-       "medianReturn": 4.0,
-       "failRate": 38.5,
-       "avgHoldDays": 9.8,
-       "baseRate": 58.5,
-       "baseAvgReturn": 5.2,
-       "wins": 52
-      },
-      "high120": {
-       "eligible": 860,
-       "n": 90,
-       "maturedN": 68,
-       "winRate": 54.4,
-       "avgReturn": 6.8,
-       "medianReturn": 4.4,
-       "failRate": 36.8,
-       "avgHoldDays": 9.1,
-       "baseRate": 60.3,
-       "baseAvgReturn": 5.4,
-       "wins": 37
       },
       "box20": {
        "eligible": 880,
@@ -312,58 +162,6 @@
        "baseRate": 57.8,
        "baseAvgReturn": 4.9,
        "wins": 54
-      },
-      "high20Vol": {
-       "eligible": 880,
-       "n": 260,
-       "maturedN": 220,
-       "winRate": 56.8,
-       "avgReturn": 5.6,
-       "medianReturn": 3.5,
-       "failRate": 31.8,
-       "avgHoldDays": 10.1,
-       "baseRate": 58.7,
-       "baseAvgReturn": 5.0,
-       "wins": 125
-      },
-      "high60Vol": {
-       "eligible": 870,
-       "n": 100,
-       "maturedN": 77,
-       "winRate": 58.4,
-       "avgReturn": 8.1,
-       "medianReturn": 5.0,
-       "failRate": 33.8,
-       "avgHoldDays": 9.9,
-       "baseRate": 58.6,
-       "baseAvgReturn": 5.1,
-       "wins": 45
-      },
-      "high120Vol": {
-       "eligible": 860,
-       "n": 60,
-       "maturedN": 44,
-       "winRate": 63.6,
-       "avgReturn": 9.6,
-       "medianReturn": 6.0,
-       "failRate": 29.5,
-       "avgHoldDays": 9.0,
-       "baseRate": 60.6,
-       "baseAvgReturn": 5.5,
-       "wins": 28
-      },
-      "box20Vol": {
-       "eligible": 880,
-       "n": 118,
-       "maturedN": 86,
-       "winRate": 60.5,
-       "avgReturn": 4.2,
-       "medianReturn": 2.6,
-       "failRate": 30.2,
-       "avgHoldDays": 10.0,
-       "baseRate": 57.0,
-       "baseAvgReturn": 4.8,
-       "wins": 52
       },
       "ema20": {
        "eligible": 880,
@@ -420,7 +218,7 @@
       "avgReturn": -0.3
      },
      "strategies": {
-      "high20": {
+      "swingHigh": {
        "eligible": 495,
        "n": 40,
        "maturedN": 14,
@@ -433,85 +231,7 @@
        "baseAvgReturn": 0.9,
        "wins": 3
       },
-      "high60": {
-       "eligible": 870,
-       "n": 30,
-       "maturedN": 12,
-       "winRate": 50.0,
-       "avgReturn": 0.4,
-       "medianReturn": 0.1,
-       "failRate": 33.3,
-       "avgHoldDays": 3.5,
-       "baseRate": 45.0,
-       "baseAvgReturn": -0.2,
-       "wins": 6
-      },
-      "high120": {
-       "eligible": 860,
-       "n": 9,
-       "maturedN": 0,
-       "winRate": null,
-       "avgReturn": null,
-       "medianReturn": null,
-       "failRate": null,
-       "avgHoldDays": null,
-       "baseRate": null,
-       "baseAvgReturn": null,
-       "wins": 0
-      },
       "box20": {
-       "eligible": 880,
-       "n": 0,
-       "maturedN": 0,
-       "winRate": null,
-       "avgReturn": null,
-       "medianReturn": null,
-       "failRate": null,
-       "avgHoldDays": null,
-       "baseRate": null,
-       "baseAvgReturn": null,
-       "wins": 0
-      },
-      "high20Vol": {
-       "eligible": 880,
-       "n": 50,
-       "maturedN": 21,
-       "winRate": 42.9,
-       "avgReturn": -0.7,
-       "medianReturn": -0.5,
-       "failRate": 47.6,
-       "avgHoldDays": 3.4,
-       "baseRate": 44.2,
-       "baseAvgReturn": -0.3,
-       "wins": 9
-      },
-      "high60Vol": {
-       "eligible": 870,
-       "n": 20,
-       "maturedN": 8,
-       "winRate": 50.0,
-       "avgReturn": 0.1,
-       "medianReturn": 0.0,
-       "failRate": 37.5,
-       "avgHoldDays": 3.5,
-       "baseRate": 45.1,
-       "baseAvgReturn": -0.2,
-       "wins": 4
-      },
-      "high120Vol": {
-       "eligible": 860,
-       "n": 5,
-       "maturedN": 0,
-       "winRate": null,
-       "avgReturn": null,
-       "medianReturn": null,
-       "failRate": null,
-       "avgHoldDays": null,
-       "baseRate": null,
-       "baseAvgReturn": null,
-       "wins": 0
-      },
-      "box20Vol": {
        "eligible": 880,
        "n": 0,
        "maturedN": 0,
@@ -526,16 +246,16 @@
       },
       "ema20": {
        "eligible": 495,
-       "n": 60,
-       "maturedN": 45,
-       "winRate": 66.7,
+       "n": 15,
+       "maturedN": 12,
+       "winRate": 50,
        "avgReturn": 2.5,
        "medianReturn": 1.5,
        "failRate": 20,
        "avgHoldDays": 7,
        "baseRate": 51.1,
        "baseAvgReturn": 1.2,
-       "wins": 30
+       "wins": 6
       }
      }
     },
@@ -550,7 +270,7 @@
       "avgReturn": 5.1
      },
      "strategies": {
-      "high20": {
+      "swingHigh": {
        "eligible": 495,
        "n": 150,
        "maturedN": 110,
@@ -562,32 +282,6 @@
        "baseRate": 58.4,
        "baseAvgReturn": 0.8,
        "wins": 52
-      },
-      "high60": {
-       "eligible": 870,
-       "n": 140,
-       "maturedN": 100,
-       "winRate": 52.0,
-       "avgReturn": 6.0,
-       "medianReturn": 4.0,
-       "failRate": 38.5,
-       "avgHoldDays": 9.8,
-       "baseRate": 58.5,
-       "baseAvgReturn": 5.2,
-       "wins": 52
-      },
-      "high120": {
-       "eligible": 860,
-       "n": 90,
-       "maturedN": 68,
-       "winRate": 54.4,
-       "avgReturn": 6.8,
-       "medianReturn": 4.4,
-       "failRate": 36.8,
-       "avgHoldDays": 9.1,
-       "baseRate": 60.3,
-       "baseAvgReturn": 5.4,
-       "wins": 37
       },
       "box20": {
        "eligible": 880,
@@ -601,58 +295,6 @@
        "baseRate": 57.8,
        "baseAvgReturn": 4.9,
        "wins": 54
-      },
-      "high20Vol": {
-       "eligible": 880,
-       "n": 260,
-       "maturedN": 220,
-       "winRate": 56.8,
-       "avgReturn": 5.6,
-       "medianReturn": 3.5,
-       "failRate": 31.8,
-       "avgHoldDays": 10.1,
-       "baseRate": 58.7,
-       "baseAvgReturn": 5.0,
-       "wins": 125
-      },
-      "high60Vol": {
-       "eligible": 870,
-       "n": 100,
-       "maturedN": 77,
-       "winRate": 58.4,
-       "avgReturn": 8.1,
-       "medianReturn": 5.0,
-       "failRate": 33.8,
-       "avgHoldDays": 9.9,
-       "baseRate": 58.6,
-       "baseAvgReturn": 5.1,
-       "wins": 45
-      },
-      "high120Vol": {
-       "eligible": 860,
-       "n": 60,
-       "maturedN": 44,
-       "winRate": 63.6,
-       "avgReturn": 9.6,
-       "medianReturn": 6.0,
-       "failRate": 29.5,
-       "avgHoldDays": 9.0,
-       "baseRate": 60.6,
-       "baseAvgReturn": 5.5,
-       "wins": 28
-      },
-      "box20Vol": {
-       "eligible": 880,
-       "n": 118,
-       "maturedN": 86,
-       "winRate": 60.5,
-       "avgReturn": 4.2,
-       "medianReturn": 2.6,
-       "failRate": 30.2,
-       "avgHoldDays": 10.0,
-       "baseRate": 57.0,
-       "baseAvgReturn": 4.8,
-       "wins": 52
       },
       "ema20": {
        "eligible": 495,

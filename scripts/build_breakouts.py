@@ -2,7 +2,12 @@
 """
 近一週／近一月全市場「突破買進法」勝率 → docs/report/breakouts.json。
 
-只讀 data/ 內的日 K CSV（Date,Open,High,Low,Close,Volume），universe 與市場寬度（build_breadth.py）相同：
+全市場產品由 build_full_market_breakouts.py 呼叫本計算引擎，只發布波段前高、箱型、20EMA 三法。
+舊 N 日前高與放量變體保留作相容／研究用途，不再作為產品的「突破前高」。
+波段前高採 swing_breakouts.py 的已確認轉折；盤中嚴格突破即觸發，每個轉折一次，沒有時間冷卻。
+波段法理論進場價＝max(當日開盤, 已確認波段高點)，每個新波段都可貢獻樣本；其餘方法維持收盤進場。
+
+本檔舊命令列模式只讀 data/ 內的日 K CSV（Date,Open,High,Low,Close,Volume），universe 與市場寬度（build_breadth.py）相同：
 台股上市櫃普通股（4 碼、非 0 開頭）、美股 S&P 500 ∩ data/（名單取得失敗時退回 data/ 內所有美股 CSV）。
 
 口徑（全部寫進輸出的 params，前端照抄顯示）：
@@ -50,6 +55,7 @@ from build_breadth import (  # noqa: E402
     us_tickers_from_main,
     write_json_atomic,
 )
+from swing_breakouts import PIVOT_LEFT, PIVOT_RIGHT, SWING_KEY, swing_high_signals  # noqa: E402
 
 BREAKOUTS_JSON_VERSION = 1
 HIGH_LOOKBACKS = (20, 60, 120)
@@ -67,7 +73,7 @@ JUMP_LIMIT = 0.30
 # asOf 當日有有效 K 線的股票少於這個數量就視為輸入不足：不覆蓋舊檔並回傳錯誤
 MIN_EVALUATED = 200
 ANOMALY_LIST_LIMIT = 20
-PRICE_COLUMNS = ("High", "Low", "Close")
+PRICE_COLUMNS = ("Open", "High", "Low", "Close")
 
 DEFAULT_DATA_DIR = os.path.join(REPO_ROOT, "data")
 DEFAULT_OUT = os.path.join(REPO_ROOT, "docs", "report", "breakouts.json")
@@ -103,6 +109,11 @@ def _strategy_specs():
         "key": "ema20", "label": "突破20EMA", "kind": "ema", "lookback": 20, "volume": False,
         "definition": "前日收盤 ≤ 前日 EMA20，且當日收盤 > 當日 EMA20；EMA 以最初 20 日收盤均值起算，之後以 2/21 平滑",
     })
+    specs.append({
+        "key": SWING_KEY, "label": "突破波段前高", "kind": "swing", "lookback": None, "volume": False,
+        "definition": f"波段高點以左右各 {PIVOT_LEFT} 根日線確認，右側 {PIVOT_RIGHT} 根收盤後才可使用；"
+                      "盤中最高價 > 最近已確認的波段高點即觸發，每個高點只取首次突破，不要求完整123型態、放量或冷卻期",
+    })
     return specs
 
 
@@ -122,6 +133,8 @@ def clean_bars(bars, as_of, jump_limit=JUMP_LIMIT):
     close = bars["Close"].astype(float)
     clean = pd.DataFrame(
         {
+            # No invented open: legacy callers without it cannot produce swing entries.
+            "Open": bars["Open"].astype(float) if "Open" in bars else np.nan,
             "Close": close,
             "High": np.maximum(bars["High"].astype(float), close),
             "Low": np.minimum(bars["Low"].astype(float), close),
@@ -177,6 +190,9 @@ def strategy_signals(clean, box_max_width):
 
     out = {}
     for spec in STRATEGIES:
+        if spec["kind"] == "swing":
+            out[spec["key"]] = swing_high_signals(clean)
+            continue
         fresh, level, known = (ema_fresh, ema_level, ema_known) if spec["kind"] == "ema" else base[spec["lookback"]]
         if spec["kind"] == "box":
             fresh = fresh & tight
@@ -259,6 +275,7 @@ def build_market(frames, universe_label, market_key, as_of=None):
                 # 每根K在交易日曆上的位置；不在日曆上的日期（只有少數 CSV 有資料的日子）為 -1
                 "pos": np.array([position.get(day, -1) for day in clean.index]),
                 "close": clean["Close"].to_numpy(),
+                "open": clean["Open"].to_numpy(),
                 "signals": {
                     key: (fresh.to_numpy(), level.to_numpy(), known.to_numpy())
                     for key, (fresh, level, known) in signals.items()
@@ -293,22 +310,27 @@ def build_market(frames, universe_label, market_key, as_of=None):
                 fresh, level, known = stock["signals"][spec["key"]]
                 in_window = np.flatnonzero(mask)
                 # 窗口第一天就要有完整回看＋冷卻期，才能確定窗口內第一次突破真的是「第一次」
-                if not len(in_window) or not known[in_window[0]]:
+                swing = spec["kind"] == "swing"
+                if not len(in_window) or not (known[in_window].any() if swing else known[in_window[0]]):
                     continue
                 eligible += 1
                 hits = np.flatnonzero(mask & fresh)
                 if not len(hits):
                     continue
-                index = hits[0]
                 last_close = stock["close"][-1]
-                events.append(
-                    {
-                        "date": calendar[stock["pos"][index]],
-                        "ret": last_close / stock["close"][index] - 1,
-                        "hold": int(last_position - stock["pos"][index]),
-                        "fail": bool(last_close < level[index]),
-                    }
-                )
+                # All distinct swing pivots count, including multiple waves in one window.
+                for index in hits if swing else hits[:1]:
+                    # Stop-entry approximation: a gap above the pivot fills at the open.
+                    # Daily bars cannot establish actual tick fills, fees or slippage.
+                    entry = max(stock["open"][index], level[index]) if swing else stock["close"][index]
+                    events.append(
+                        {
+                            "date": calendar[stock["pos"][index]],
+                            "ret": last_close / entry - 1,
+                            "hold": int(last_position - stock["pos"][index]),
+                            "fail": bool(last_close < level[index]),
+                        }
+                    )
             strategies[spec["key"]] = summarize(events, eligible, base_by_day)
 
         matured_days = [day for day in window_days if last_position - position[day] >= MATURE_DAYS and day in base_by_day]
@@ -360,6 +382,8 @@ def params_meta():
         "volumeLookback": VOLUME_LOOKBACK,
         "volumeMultiple": VOLUME_MULTIPLE,
         "boxLookback": BOX_LOOKBACK,
+        "swingPivotLeft": PIVOT_LEFT,
+        "swingPivotRight": PIVOT_RIGHT,
         "minEvaluated": MIN_EVALUATED,
         "entry": "突破日收盤買進",
         "mark": "asOf 收盤標記",
