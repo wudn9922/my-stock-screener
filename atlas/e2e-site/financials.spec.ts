@@ -120,7 +120,7 @@ test('annual cards: ten labelled bars, tap shows formula inputs, notes are hones
   expect(errors).toEqual([]);
 });
 
-test('US financials stay annual-only and link to Futu with a safe new-tab anchor', async ({ page }) => {
+test('US financials stay annual-only and offer safe web and app links', async ({ page }) => {
   await mockFinancials(page);
   await page.goto('./?page=financials&symbol=AAPL&p=q');
   await expect(page).toHaveURL(/page=financials&symbol=AAPL$/);
@@ -128,17 +128,29 @@ test('US financials stay annual-only and link to Futu with a safe new-tab anchor
   await expect(page.locator('.fin-quarter')).toHaveCount(0);
   const growth = page.locator('.fin-card[data-group="growth"]');
   await expect(growth.locator('.fin-bar')).toHaveCount(10);
-  const futu = page.getByRole('link', { name: '在富途查看更詳細財報', exact: true });
-  await expect(futu).toHaveAttribute('href', 'https://www.futunn.com/stock/AAPL-US');
-  await expect(futu).toHaveAttribute('target', '_blank');
-  await expect(futu).toHaveAttribute('rel', 'noopener noreferrer');
+  const webLink = page.getByRole('link', { name: '在富途網頁查看財報', exact: true });
+  await expect(webLink).toHaveAttribute('href', 'https://www.futunn.com/stock/AAPL-US');
+  await expect(webLink).toHaveAttribute('target', '_blank');
+  await expect(webLink).toHaveAttribute('rel', 'noopener noreferrer');
+  const appLink = page.getByRole('link', { name: '在富途 App 開啟', exact: true });
+  await expect(appLink).toHaveAttribute('href', 'ftnn://quote/2/AAPL/');
+  expect(await appLink.getAttribute('target')).toBeNull();
   await expect(page.locator('.financials-page a[href^="https://www.futunn.com/"]')).toHaveCount(1);
+  await expect(page.locator('.financials-page a[href^="ftnn://"]')).toHaveCount(1);
 
   await page.goto('./?page=financials&symbol=BRK.B');
-  await expect(page.getByRole('link', { name: '在富途查看更詳細財報', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: '在富途網頁查看財報', exact: true })).toHaveAttribute(
     'href',
     'https://www.futunn.com/stock/BRK.B-US',
   );
+  await expect(page.getByRole('link', { name: '在富途 App 開啟', exact: true })).toHaveAttribute('href', 'ftnn://quote/2/BRK.B/');
+
+  await page.goto('./?page=financials&symbol=BRK-B');
+  await expect(page.getByRole('link', { name: '在富途網頁查看財報', exact: true })).toHaveAttribute(
+    'href',
+    'https://www.futunn.com/stock/BRK-B-US',
+  );
+  await expect(page.getByRole('link', { name: '在富途 App 開啟', exact: true })).toHaveAttribute('href', 'ftnn://quote/2/BRK-B/');
 });
 
 test('Taiwan quarterly view keeps sparse labels and trailing-four-quarter ROE', async ({ page }) => {
@@ -294,6 +306,8 @@ test('missing, garbled and index symbols', async ({ page }) => {
   await expect(page.getByRole('button', { name: '重新載入' })).toBeVisible();
   await page.goto('./?page=financials&symbol=%5EGSPC');
   await expect(page.getByText('沒有個股財報', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: '在富途網頁查看財報' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '在富途 App 開啟' })).toHaveCount(0);
   await page.goto('./?page=financials');
   await expect(page.getByText('選擇一檔股票', { exact: true })).toBeVisible();
 });
@@ -319,7 +333,8 @@ test('Taiwan financials retain the quarterly controls and do not show a Futu lin
   const period = page.getByRole('group', { name: '期間' });
   await expect(period.getByRole('button', { name: '季度' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.fin-quarter')).toBeVisible();
-  await expect(page.getByRole('link', { name: '在富途查看更詳細財報' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '在富途網頁查看財報' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '在富途 App 開啟' })).toHaveCount(0);
 });
 
 const stockTabs = (page: Page) => page.getByRole('navigation', { name: '個股頁面' });
@@ -480,10 +495,11 @@ test('annual-only ADR page links to Futu and the Taiwan home listing', async ({ 
   await mockFinancials(page);
   await page.goto('./?page=financials&symbol=TSM');
   await expect(page.getByRole('group', { name: '期間' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: '在富途查看更詳細財報', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: '在富途網頁查看財報', exact: true })).toHaveAttribute(
     'href',
     'https://www.futunn.com/stock/TSM-US',
   );
+  await expect(page.getByRole('link', { name: '在富途 App 開啟', exact: true })).toHaveAttribute('href', 'ftnn://quote/2/TSM/');
   await expect(page.locator('.fin-home-listing')).toContainText('也可查看');
   await expect(page.locator('.fin-home-link')).toHaveText('2330.TW（台股）財報');
   await expect(page.locator('.fin-home-ratio')).toHaveText('1 ADR ＝ 5 股普通股');
