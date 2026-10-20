@@ -134,14 +134,18 @@ test('Taiwan synthetic file without EPS shows the empty state, not a chart', asy
 
 test('loading placeholder first, and a price failure is local to the card with a working retry', async ({ page }) => {
   await mockPeRiver(page, { failingSymbols: ['AAPL'] });
+  let release!: () => void;
+  const responseGate = new Promise<void>((resolve) => { release = resolve; });
   await page.route('https://edge.test/functions/v1/market-chart**', async (route) => {
-    await new Promise((resolveTimeout) => setTimeout(resolveTimeout, 400));
+    await responseGate;
     await route.fallback();
   });
   await page.goto('./?page=financials&symbol=AAPL');
-  await openCard(card(page));
-  await expect(card(page)).toHaveAttribute('data-state', 'loading');
-  await expect(card(page).getByRole('status', { name: /載入股價與本益比河流中/ })).toBeVisible();
+  try {
+    await openCard(card(page));
+    await expect(card(page)).toHaveAttribute('data-state', 'loading');
+    await expect(card(page).getByRole('status', { name: /載入股價與本益比河流中/ })).toBeVisible();
+  } finally { release(); }
   await expect(card(page)).toHaveAttribute('data-state', 'error');
   await expect(card(page)).toContainText('股價資料載入失敗');
   await expect(card(page).getByRole('button', { name: '重新載入' })).toBeVisible();

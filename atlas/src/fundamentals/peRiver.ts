@@ -305,8 +305,12 @@ export function buildPeRiver(history: FinancialHistory, bars: readonly PriceBar[
   if (sorted.length === 0) return unavailable('no-bars', '沒有股價資料，無法畫出本益比河流。');
   if (options.priceBasis !== 'split-adjusted')
     return unavailable('price-basis', '股價資料未確認已還原股票分割，與 EPS 口徑可能不一致，不畫本益比河流。');
-  if (history.foreignReporter || history.quality.issues.includes('foreign-filer'))
-    return unavailable('foreign', '外國發行人的 EPS 為每普通股，股價為每 ADR，口徑不同，不畫本益比河流。');
+  if (history.foreignReporter || history.quality.issues.includes('foreign-filer')) {
+    const message = history.adrRatio
+      ? '此外國發行人的 EPS 已按每 ADR 換算；本站尚未支援此類財報的本益比河流。'
+      : '外國發行人的 EPS 為每普通股，股價為每 ADR，口徑不同，不畫本益比河流。';
+    return unavailable('foreign', message);
+  }
   const priceCurrency = history.market === 'TW' ? 'TWD' : 'USD';
   if (history.currency !== priceCurrency || history.quality.issues.includes('foreign-currency') || history.quality.issues.includes('currency-changed'))
     return unavailable('currency', `財報幣別（${history.currency}）與股價幣別（${priceCurrency}）不一致，不畫本益比河流。`);

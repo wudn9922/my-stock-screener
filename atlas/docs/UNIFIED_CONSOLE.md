@@ -42,7 +42,7 @@
 ### 參數控制台後續修改的本機結果（2026-10-20）
 
 - clean npm ci、typecheck、lint、normal build 與 Pages build 通過。
-- Vitest：77 files／917 tests 通過；實際 user-settings handler 與寫入佇列共 13 tests 於最後修正後另重跑通過。
+- Vitest：77 files／918 tests 通過；實際 user-settings handler 與寫入佇列共 13 tests 於最後修正後另重跑通過。
 - Python 完整 suite：1,347 tests 通過，涵蓋固定參數的帳號隔離、無分組不監控、重新入榜套用，以及實際每日報告 loader。
 - 桌面／手機 Chromium：控制台與原整合 24 tests 通過；圖表／指標／畫線／提醒／備份 8 tests 通過。兩種尺寸的編輯框與清單截圖已檢查。
 - 第一次補測發現開啟紀錄失敗訊息會蓋過設定失敗訊息，已統一為自動同步未完成並明示本機保留，重跑通過。

@@ -517,6 +517,7 @@ test('foreign file with EPS on the ADR basis: the basis note replaces the per-or
   await page.goto('./?page=financials&symbol=TSM&p=a');
   const notes = page.locator('.fin-notes');
   await expect(notes).toContainText('EPS 以每單位 ADR 計（1 ADR ＝ 5 股普通股，由 SEC 每股數字換算）');
+  await expect(page.locator('.pe-river')).toHaveAttribute('data-state', 'unavailable');
   await expect(notes).not.toContainText('EPS 為每普通股');
   await expect(page.locator('.financials-page')).not.toContainText('EPS 為每普通股');
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
