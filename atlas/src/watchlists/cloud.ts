@@ -32,6 +32,7 @@ export async function refreshCloudWatchlist(local: SavedWatchlist): Promise<Save
 export async function pushCloudWatchlist(list: SavedWatchlist): Promise<SavedWatchlist> {
   const identity = await startLineIdentity();
   if (!identity) throw new Error('請從 LINE 開啟 Atlas 並登入後同步。');
+  if (list.cloud && list.cloud.userId !== identity.userId) throw new Error('此清單連結到其他 LINE 帳號；請切回原帳號後同步。');
   const expected = list.cloud?.userId === identity.userId ? list.cloud.version : null;
   const row = await settingsApi<CloudWatchlist>('watchlists.save', { definition: list, expectedUpdatedAt: expected });
   return { ...list, cloud: { userId: identity.userId, version: row.updated_at } };

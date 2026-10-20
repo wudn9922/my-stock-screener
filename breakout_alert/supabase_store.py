@@ -38,6 +38,7 @@ GROUP_DISPLAY_NAMES = {
 VALID_GROUP_KEYS = set(
     GROUP_DISPLAY_NAMES
 )
+FIXED_STOCK_GROUP_ID = "ungrouped"
 
 # 大盤指數（index_configs 表）的均線提醒使用固定群組。
 # 目前監控時段只有台股與美股，其他市場的指數（歐洲、日韓）略過。
@@ -230,6 +231,26 @@ def get_ma_list(stock):
             ma_list.append(ma_period)
 
     return sorted(set(ma_list))
+
+
+def parameter_ticker_key(ticker):
+    ticker = str(ticker or "").strip().upper()
+    if ticker.isdigit():
+        return f"{ticker}.TW"
+    return ticker if ticker.endswith((".TW", ".TWO")) else ticker.replace(".", "-")
+
+
+def fixed_parameter_map(stocks, user_id):
+    """Dormant preferences do not confer membership or notification consent."""
+    result = {}
+    for stock in stocks:
+        if stock.get("line_user_id") != user_id or stock.get("group_id") != FIXED_STOCK_GROUP_ID:
+            continue
+        ticker = parameter_ticker_key(stock.get("ticker"))
+        periods = get_ma_list(stock)
+        if ticker and periods and len(periods) <= 4 and all(1 <= period <= 1000 for period in periods):
+            result[ticker] = periods
+    return result
 
 
 class SupabaseStore:
@@ -606,7 +627,7 @@ class SupabaseStore:
 
         return configs
 
-    def get_watchlist_monitor_configs(self):
+    def get_watchlist_monitor_configs(self, fixed_parameters=None):
         """Opt-in Atlas lists reuse the existing MA breakout engine/notifier.
 
         Only the configured user's synced lists are read. Malformed or stale
@@ -694,7 +715,7 @@ class SupabaseStore:
                         "group_id": f"watchlist_{list_id}", "raw_group_id": f"watchlist_{list_id}",
                         "group_name": str(definition.get("name") or "Atlas 自選清單"),
                         "ticker": normalize_ticker(ticker, market), "market": market,
-                        "ma_list": sorted(periods), "is_dynamic_group": True,
+                        "ma_list": (fixed_parameters or {}).get(parameter_ticker_key(ticker), sorted(periods)), "is_dynamic_group": True,
                     })
             self.watchlists_loaded = complete
             return configs
@@ -705,6 +726,7 @@ class SupabaseStore:
     def get_monitor_configs(self):
         groups = self.get_groups()
         stocks = self.get_user_stocks()
+        fixed_parameters = fixed_parameter_map(stocks, self.user_id)
 
         group_mapping = (
             self.build_group_mapping(
@@ -731,7 +753,7 @@ class SupabaseStore:
                 )
                 continue
 
-            if raw_group_id == "admin_index":
+            if raw_group_id in {"admin_index", FIXED_STOCK_GROUP_ID}:
                 continue
 
             group_info = group_mapping.get(
@@ -827,9 +849,7 @@ class SupabaseStore:
 
             # 優先使用 stocks 個別均線；
             # 若沒有有效均線，才使用 groups 預設均線。
-            ma_list = get_ma_list(
-                stock
-            )
+            ma_list = fixed_parameters.get(parameter_ticker_key(ticker)) or get_ma_list(stock)
 
             if not ma_list:
                 ma_list = sorted(
@@ -899,7 +919,7 @@ class SupabaseStore:
                     f"｜MA={ma_list}"
                 )
 
-        monitor_configs.extend(self.get_watchlist_monitor_configs())
+        monitor_configs.extend(self.get_watchlist_monitor_configs(fixed_parameters))
         monitor_configs.extend(
             self.get_index_monitor_configs()
         )

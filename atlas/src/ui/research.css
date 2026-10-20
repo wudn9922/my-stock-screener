@@ -41,6 +41,21 @@
 .saved-member-list li { border-bottom: 1px solid var(--border); }
 .saved-member-list button { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 10px 4px; text-align: left; background: none; border: 0; color: var(--text); }
 .saved-member-list small { color: var(--text-3); white-space: nowrap; }
+.saved-member-list li:has(.member-parameter-button) { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.saved-member-list .member-chart-button { flex: 1; min-width: 180px; }
+.saved-member-list .member-parameter-button { width: auto; flex: 0 0 auto; font-size: 12px; color: var(--accent-text); }
+.parameter-stock-scroll { max-height: 375px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--border); border-radius: 8px; }
+.parameter-stock-scroll tbody tr { height: 64px; }
+.parameter-stock-scroll thead { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.parameter-stock-scroll td button { min-height: 44px; }
+.parameter-dialog { width: min(580px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); box-sizing: border-box; overflow: auto; padding: 24px; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 14px; box-shadow: 0 24px 80px #0008; }
+.parameter-dialog::backdrop { background: #0009; }
+.parameter-dialog h2 { font-size: 20px; margin: 0 0 18px; }
+.parameter-dialog p { font-size: 13px; line-height: 1.7; color: var(--text-2); }
+.parameter-dialog label { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.parameter-dialog textarea, .parameter-dialog select { box-sizing: border-box; width: 100%; min-height: 44px; padding: 12px; font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 8px; }
+.parameter-dialog textarea { min-height: 140px; resize: vertical; font-size: 18px; }
+.parameter-dialog button { min-height: 44px; }
 .save-watchlist { padding: 12px 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .save-watchlist input { min-height: 42px; padding: 8px 12px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); border-radius: 8px; }
 .rotation-state { padding: 4px 8px; border-radius: 6px; background: var(--surface-2); color: var(--text-2); font-size: 12px; }

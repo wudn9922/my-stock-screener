@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 import pandas as pd
 import requests
 import yfinance as yf
+from breakout_alert.supabase_store import FIXED_STOCK_GROUP_ID, fixed_parameter_map, parameter_ticker_key
 
 
 # =========================================================================
@@ -1072,6 +1073,7 @@ def load_configs_from_supabase(
 
         matched_user_count = 0
         loaded_count = 0
+        fixed_parameters = fixed_parameter_map(stocks_data, target_user_id)
 
         for stock_item in stocks_data:
             stock_user_id = str(
@@ -1115,9 +1117,9 @@ def load_configs_from_supabase(
                 )
                 continue
 
-            if group_id == "admin_index":
+            if group_id in {"admin_index", FIXED_STOCK_GROUP_ID}:
                 print(
-                    "ℹ️ 略過 admin_index："
+                    f"ℹ️ 略過 {group_id}："
                     f"{ticker}"
                 )
                 continue
@@ -1182,11 +1184,7 @@ def load_configs_from_supabase(
                 )
 
             # 股票均線優先；全為 0 或空值時繼承群組均線
-            stock_ma_list = (
-                get_stock_ma_list(
-                    stock_item
-                )
-            )
+            stock_ma_list = fixed_parameters.get(parameter_ticker_key(ticker)) or get_stock_ma_list(stock_item)
 
             if stock_ma_list:
                 final_ma_list = stock_ma_list

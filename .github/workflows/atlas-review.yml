@@ -40,7 +40,7 @@ jobs:
         run: npx playwright install --with-deps chromium webkit
       - name: Desktop, phone and WebKit regressions
         working-directory: atlas
-        run: npm run test:site -- unified-console.spec.ts screener-filters.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts
+        run: npm run test:site -- parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

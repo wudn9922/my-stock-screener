@@ -57,6 +57,8 @@ const FIXED_GROUP_IDS = new Set([
   "us_g4",
 ]);
 const ADMIN_GROUP_ID = "admin_index";
+// A persistent preference, excluded from report/monitor membership by both consumers.
+const FIXED_STOCK_GROUP_ID = "ungrouped";
 const TICKER_PATTERN = /^[A-Z0-9.^_-]{1,30}$/;
 const GROUP_NAME_MAX = 30;
 const MAX_GROUPS_PER_USER = 50;
@@ -267,7 +269,7 @@ Deno.serve(async (request: Request) => {
 
     // 固定分組，或使用者自己的自訂分組（stocks.group_id 存成 custom_<groups.id>）
     const ownsGroup = async (groupId: string) => {
-      if (FIXED_GROUP_IDS.has(groupId)) {
+      if (FIXED_GROUP_IDS.has(groupId) || groupId === FIXED_STOCK_GROUP_ID) {
         return true;
       }
 
@@ -329,7 +331,13 @@ Deno.serve(async (request: Request) => {
         const { data, error } = await supabase.from("atlas_watchlists").delete().eq("line_user_id", lineUserId)
           .eq("id", id).eq("updated_at", expected).select("id");
         if (error) dbError(error);
-        if (!data?.length) throw new HttpError(409, "雲端版本已變更，請重新載入再刪除");
+        if (!data?.length) {
+          const { data: current, error: readError } = await supabase.from("atlas_watchlists").select("id")
+            .eq("line_user_id", lineUserId).eq("id", id).maybeSingle();
+          if (readError) dbError(readError);
+          if (current) throw new HttpError(409, "雲端版本已變更，請重新載入再刪除");
+          // A list already deleted on another device is successfully absent.
+        }
         return jsonResponse({ ok: true, data });
       }
       throw new HttpError(400, "Unknown watchlist action");
@@ -405,7 +413,6 @@ Deno.serve(async (request: Request) => {
 
     if (action === "groups.delete") {
       const id = parseId(body.id);
-
       const { count, error: countError } = await supabase
         .from("stocks")
         .select("id", { count: "exact", head: true })
@@ -453,6 +460,11 @@ Deno.serve(async (request: Request) => {
       const ticker = parseTicker(body.ticker);
       const groupId = String(body.groupId ?? "").trim();
       const mas = parseMovingAverages(body.mas);
+      // Older monitor builds treat unknown groups as active. Enable only after both
+      // consumers have been deployed with explicit dormant-row exclusion.
+      if (groupId === FIXED_STOCK_GROUP_ID && Deno.env.get("ATLAS_FIXED_PARAMETERS_ENABLED") !== "1") {
+        throw new HttpError(503, "個股固定參數尚未啟用，需先完成服務更新；目前未儲存");
+      }
 
       if (!groupId || groupId === ADMIN_GROUP_ID || !(await ownsGroup(groupId))) {
         throw new HttpError(400, "分組不存在或沒有權限");
@@ -479,10 +491,14 @@ Deno.serve(async (request: Request) => {
         if (error) {
           throw error;
         }
-
+        if (!data?.length) throw new HttpError(404, "這筆股票參數不存在或沒有權限");
         return jsonResponse({ ok: true, data: data ?? [] });
       }
 
+      // An existing preference remains editable even when the stock limit is reached.
+      const { data: existing, error: existingError } = await supabase.from("stocks").select("id")
+        .eq("line_user_id", lineUserId).eq("ticker", ticker).eq("group_id", groupId).maybeSingle();
+      if (existingError) throw existingError;
       const { count, error: countError } = await supabase
         .from("stocks")
         .select("id", { count: "exact", head: true })
@@ -492,7 +508,7 @@ Deno.serve(async (request: Request) => {
         throw countError;
       }
 
-      if ((count ?? 0) >= MAX_STOCKS_PER_USER) {
+      if (!existing && (count ?? 0) >= MAX_STOCKS_PER_USER) {
         throw new HttpError(400, "自選股數量已達上限");
       }
 
@@ -524,7 +540,7 @@ Deno.serve(async (request: Request) => {
       if (error) {
         throw error;
       }
-
+      if (!data?.length) throw new HttpError(404, "這筆股票參數不存在或已刪除");
       return jsonResponse({ ok: true, data: data ?? [] });
     }
 
