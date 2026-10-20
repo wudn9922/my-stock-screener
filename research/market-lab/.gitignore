@@ -1,0 +1,5 @@
+.cache/
+__pycache__/
+*.py[cod]
+reports/event-study-results.parquet
+reports/event-study-results.csv.gz

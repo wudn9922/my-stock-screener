@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "frozen_on": "2026-10-19",
+  "observable_at": "close_t",
+  "entry": "open_t_plus_1",
+  "holding_sessions": [1, 2, 5, 10, 20, 60],
+  "families": [
+    {"type": "daily_return", "thresholds": [0.03, 0.05, 0.08, 0.10], "directions": ["up", "down"]},
+    {"type": "overnight_gap", "thresholds": [0.03, 0.05, 0.08], "directions": ["up", "down"]},
+    {"type": "streak", "lengths": [3, 5], "directions": ["up", "down"]},
+    {"type": "new_extreme", "windows": [20, 60, 120, 252], "directions": ["high", "low"]},
+    {"type": "volume_spike", "multiples": [2.0, 3.0], "baseline": "prior_20d_median"},
+    {"type": "high_volume_small_move", "volume_multiple": 2.0, "max_abs_returns": [0.005, 0.01]},
+    {"type": "price_volume_divergence", "up_day_return_min": 0.02, "up_day_volume_max": 0.5, "down_day_return_max": -0.02, "down_day_volume_min": 2.0},
+    {"type": "volatility_expansion", "ratios": [1.5, 2.0], "metrics": ["rv5_to_prior60_median", "true_range_to_prior20_atr"]},
+    {"type": "compression_expansion", "window": 20, "reference_window": 252, "compression_quantile": 0.20, "return_trigger": 0.02, "range_trigger": 0.03},
+    {"type": "sma_cross", "pairs": [[5, 20], [20, 50], [50, 200]], "directions": ["up", "down"]},
+    {"type": "ma_deviation", "windows": [20, 50, 200], "thresholds": [0.10, 0.20], "directions": ["up", "down"]},
+    {"type": "failed_level", "windows": [20, 60, 120], "directions": ["breakout", "breakdown"]},
+    {"type": "trend_flip", "prior_return_window": 5, "prior_threshold": 0.10, "daily_trigger": 0.03},
+    {"type": "otc_index_return", "symbol": "^TWOII", "thresholds": [0.03, 0.05], "directions": ["up", "down"]},
+    {"type": "market_breadth", "thresholds": [0.90, 0.95], "directions": ["advance", "decline"], "min_symbols": 100}
+  ]
+}

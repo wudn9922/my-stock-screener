@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "frozen_on": "2026-10-19",
+  "ranking_cost_round_trip_bps_by_market": {"US": 25, "TW": 50},
+  "sensitivity_cost_round_trip_bps_by_market": {"US": [0, 10, 25, 50], "TW": [0, 30, 50, 100, 150]},
+  "holding_sessions": [2, 5, 10, 20],
+  "max_open_positions_per_symbol": 1,
+  "long_only": true,
+  "liquidity_filter_median_20d_turnover": {"US": 1000000, "TW": 10000000},
+  "position_size_adv_fraction_scenario": 0.01,
+  "select_top_n_per_market_by_training_net_sharpe": 3,
+  "candidates": [
+    {"base_id": "breakout20", "event_id": "new_high_20", "family": "momentum"},
+    {"base_id": "breakout60", "event_id": "new_high_60", "family": "momentum"},
+    {"base_id": "breakout120", "event_id": "new_high_120", "family": "momentum"},
+    {"base_id": "extreme_up3", "event_id": "daily_return_up_03", "family": "momentum"},
+    {"base_id": "fade_down3", "event_id": "daily_return_down_03", "family": "mean_reversion"},
+    {"base_id": "fade_down5", "event_id": "daily_return_down_05", "family": "mean_reversion"},
+    {"base_id": "fade_down8", "event_id": "daily_return_down_08", "family": "mean_reversion"},
+    {"base_id": "fade_gap3", "event_id": "overnight_gap_down_03", "family": "gap_reversal"},
+    {"base_id": "volume_upday", "composite": "volume_ge_2_and_return_ge_2pct", "family": "volume_momentum"},
+    {"base_id": "cross520", "event_id": "sma_cross_5_20_up", "family": "trend_following"},
+    {"base_id": "cross2050", "event_id": "sma_cross_20_50_up", "family": "trend_following"},
+    {"base_id": "reverse_breakdown20", "event_id": "failed_breakdown_20", "family": "event_reversal"}
+  ]
+}

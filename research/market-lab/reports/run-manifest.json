@@ -1,0 +1,75 @@
+{
+  "generated_at": "2026-10-19T18:56:11+00:00",
+  "repo_sha": "7e0a1fa12ac74d3d848fa88ea7ad7d47369645b2",
+  "data_fingerprint": "00689ffe17d4ca948ae6f0e613f2dbf56b3836db7a7fe5b9494305c3176880da",
+  "price_file_count": 1547,
+  "equity_count": 1546,
+  "event_definition_count": 72,
+  "event_signal_count": 850285,
+  "bootstrap_replicates": 2000,
+  "strategy_candidate_count": 48,
+  "strategy_ranking_cost_bps_by_market": {
+    "US": 25,
+    "TW": 50
+  },
+  "strategy_cost_scenarios_bps_by_market": {
+    "US": [
+      0,
+      10,
+      25,
+      50
+    ],
+    "TW": [
+      0,
+      30,
+      50,
+      100,
+      150
+    ]
+  },
+  "holdout_previously_evaluated": true,
+  "holdout_status": "exposed_test_window",
+  "oos_strategy_count": 6,
+  "oos_pass_count": 0,
+  "event_result_storage": "event-study-results.parquet",
+  "pyarrow_available": true,
+  "pyarrow_version": "26.0.0",
+  "cache_reused": true,
+  "market_periods": {
+    "US": {
+      "train": {
+        "start": "2025-10-06",
+        "end": "2026-05-19",
+        "n_sessions": 156
+      },
+      "validation": {
+        "start": "2026-05-20",
+        "end": "2026-08-04",
+        "n_sessions": 52
+      },
+      "test": {
+        "start": "2026-08-05",
+        "end": "2026-10-16",
+        "n_sessions": 52
+      }
+    },
+    "TW": {
+      "train": {
+        "start": "2025-08-22",
+        "end": "2026-05-07",
+        "n_sessions": 168
+      },
+      "validation": {
+        "start": "2026-05-08",
+        "end": "2026-07-27",
+        "n_sessions": 56
+      },
+      "test": {
+        "start": "2026-07-28",
+        "end": "2026-10-19",
+        "n_sessions": 57
+      }
+    }
+  },
+  "model_execution": "Codex GPT-6 active model; Cloud reports no multi-model delegation capabilities; Sol/Luna/Gemini were not available for delegated execution."
+}
