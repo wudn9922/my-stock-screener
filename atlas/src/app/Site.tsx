@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ChartCandlestick, Flame, Globe, LayoutDashboard, ListFilter, Search, Settings, X } from 'lucide-react';
+import { ChartCandlestick, Flame, Globe, LayoutDashboard, ListFilter, Search, Settings, SlidersHorizontal, X } from 'lucide-react';
 import { useRoute } from './useRoute';
 import type { Page, Route } from './routes';
 import { SCREENER_HOSTING } from './HostingMode';
@@ -12,6 +12,7 @@ import { PageState } from '../ui/PageState';
 import type { ChartRequest } from './chartRequest';
 import type { Timeframe } from '../market-data/MarketDataProvider';
 import './siteNav.css';
+import { DataHealthPanel } from '../ui/DataHealthPanel';
 
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
@@ -21,6 +22,7 @@ const ScreenerPage = lazy(() => import('../pages/ScreenerPage'));
 const FinancialsPage = lazy(() => import('../pages/FinancialsPage'));
 // The workspace (engine, drawings, panels) loads only when the chart opens.
 const ChartPage = lazy(() => import('./ChartPage'));
+const ConsolePage = lazy(() => import('../pages/ConsolePage'));
 
 /** The report pages exist only where the daily report is published (the screener site). */
 const DEFAULT_PAGE: Page =
@@ -34,6 +36,7 @@ const NAV: { page: Page; label: string; icon: typeof Globe }[] = [
   { page: 'themes', label: '題材', icon: Flame },
   { page: 'screener', label: '選股', icon: ListFilter },
   { page: 'chart', label: '圖表', icon: ChartCandlestick },
+  { page: 'console', label: '控制台', icon: SlidersHorizontal },
 ];
 const PAGE_TITLES: Record<Page, string> = {
   markets: '大盤',
@@ -42,6 +45,7 @@ const PAGE_TITLES: Record<Page, string> = {
   screener: '選股',
   chart: '圖表',
   financials: '財報分析',
+  console: '參數控制台',
 };
 const RATES_TITLE = '美債與利率';
 
@@ -148,7 +152,7 @@ export function Site() {
   );
   // 「K線｜財務」 round trips keep the annual/quarterly choice of the financials page. It is remembered here
   // (the chart URL stays as it was); the financials URL itself carries `p`.
-  const periodMemory = useRef<'q' | undefined>(undefined);
+  const periodMemory = useRef<'q' | 'a' | undefined>(undefined);
   useEffect(() => {
     if (route.page === 'financials') periodMemory.current = route.p;
   }, [route]);
@@ -232,7 +236,8 @@ export function Site() {
           {route.page === 'markets' && <MarketsPage {...pageProps} market={route.market} />}
           {route.page === 'world' && <WorldPage {...pageProps} view={route.view} />}
           {route.page === 'themes' && <ThemesPage {...pageProps} theme={route.theme} market={route.market} view={route.v} />}
-          {route.page === 'screener' && <ScreenerPage {...pageProps} group={route.group} />}
+          {route.page === 'screener' && <ScreenerPage {...pageProps} group={route.group} f={route.f} />}
+          {route.page === 'console' && <ConsolePage {...pageProps} list={route.list} />}
           {route.page === 'financials' && <FinancialsPage {...pageProps} symbol={route.symbol} p={route.p} tf={route.tf} />}
         </Suspense>
         {chartVisited.current && (
@@ -249,6 +254,7 @@ export function Site() {
             </div>
           </Suspense>
         )}
+        <DataHealthPanel report={reportState} />
       </main>
       <nav className="site-tabbar" aria-label="主要頁面">
         {NAV.map(({ page, label, icon: Icon }) => (

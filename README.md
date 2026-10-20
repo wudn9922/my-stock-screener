@@ -51,6 +51,9 @@ gcloud scheduler jobs create http daily-stock-screener \
 
 ## Atlas 研究終端
 
+Atlas 也整合參數控制台：`atlas/?page=console` 可管理原有均線參數與多組條件／手動清單，選股頁可保存篩選策略。財報支援季度與下方同業比較，題材頁提供輪動追蹤，頁尾提供資料健康總覽。
+清單的 Supabase 同步、每日歷史收集及突破監控啟用仍需部署資料表與服務；操作與未完成部署事項見 [整合說明](atlas/docs/UNIFIED_CONSOLE.md)。
+
 Atlas 是內嵌在每日報告裡的研究工具（Vite/React，原始碼在 `atlas/`），提供畫圖、技術指標、財報與回測。
 
 - 網址：<https://wudn9922.github.io/my-stock-screener/atlas/>

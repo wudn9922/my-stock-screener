@@ -383,7 +383,8 @@ h3 {
   overscroll-behavior: contain;
 }
 .site.on-chart .site-main {
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .chart-page-host {
   height: 100%;

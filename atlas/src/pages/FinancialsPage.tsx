@@ -17,16 +17,18 @@ import { StatementTable } from '../ui/financials/StatementTable';
 import { PeRiverCard } from '../ui/financials/PeRiverCard';
 import { SummaryChips } from '../ui/financials/SummaryChips';
 import { ChipsSection } from '../ui/financials/ChipsCard';
+import { PeerComparison } from '../ui/financials/PeerComparison';
 import { isChipsPageSymbol } from '../report/twChips';
 import { TAIWAN_SYMBOL_REGEX } from '../market-data/MarketProfile';
 import { CHART_PERIODS, adrEpsNote, buildView, cardSummaryLine, depthText, provenanceText } from '../ui/financials/financialsView';
 import '../ui/financials.css';
+import { dataHealth } from '../report/dataHealth';
 
 export interface FinancialsPageProps extends PageProps {
   /** Normalized upper-case symbol from `?symbol=`; absent when the URL names none. */
   symbol?: string;
-  /** `'q'` for quarterly figures (`?p=q`); undefined means annual. */
-  p?: 'q';
+  /** Explicit period selection; US defaults to quarters and Taiwan to annual. */
+  p?: 'q' | 'a';
   /** Chart timeframe the 「K線」 tab returns to (`?tf=`). */
   tf?: Timeframe;
 }
@@ -80,8 +82,9 @@ function cardNote(group: MetricGroupId, issues: readonly string[], foreignReport
 
 export default function FinancialsPage({ report, navigate, symbol, p, tf }: FinancialsPageProps) {
   const isTaiwanSymbol = !!symbol && (TAIWAN_SYMBOL_REGEX.test(symbol) || /^\d{4,6}[A-Z]?$/.test(symbol));
-  const showQuarterly = isTaiwanSymbol;
-  const kind: PeriodKind = showQuarterly && p === 'q' ? 'quarterly' : 'annual';
+  const key = financialsKey(symbol);
+  const showQuarterly = key !== null || isTaiwanSymbol;
+  const kind: PeriodKind = p === 'a' ? 'annual' : p === 'q' || !isTaiwanSymbol ? 'quarterly' : 'annual';
   const [mode, setMode] = useState<DisplayMode>(readMode);
   const [loaded, setLoaded] = useState<{ symbol: string; result: FinancialsLoadResult } | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -89,7 +92,6 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
   const [metricOf, setMetricOf] = useState<Partial<Record<MetricGroupId, MetricId>>>({});
   const [spans, setSpans] = useState<Record<PeriodKind, number>>({ annual: CHART_PERIODS.annual, quarterly: CHART_PERIODS.quarterly });
   const localSymbols = useMemo(() => reportSymbols(report.status === 'ok' ? report.report : null), [report]);
-  const key = financialsKey(symbol);
 
   useEffect(() => {
     if (!symbol) return;
@@ -137,8 +139,13 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
 
   const result = loaded && loaded.symbol === symbol ? loaded.result : null;
   const history = result?.status === 'ok' ? result.data : null;
-  // US statements remain annual-only even when a stale URL asks for quarters or annual data is absent.
-  // Taiwan keeps its existing period fallback.
+  useEffect(() => {
+    if (!symbol || !result) return;
+    dataHealth.record(result.status === 'ok'
+      ? { id: 'financials', label: `${symbol} 財報`, status: 'ok', date: result.data.generatedAt, source: result.data.source, detail: `${result.data.quarterly.end.length} 季、${result.data.annual.end.length} 年；品質 ${result.data.quality.level ?? '未評定'}；缺值仍以「—」呈現` }
+      : { id: 'financials', label: `${symbol} 財報`, status: result.status, detail: result.message });
+  }, [symbol, result]);
+  // Preserve each source's quarterly periods; missing quarters are never filled from annual EPS.
   const effectiveKind: PeriodKind = history && showQuarterly && !history[kind].end.length ? (kind === 'annual' ? 'quarterly' : 'annual') : kind;
   const displayHistory = useMemo(() => {
     if (!history) return null;
@@ -153,9 +160,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
           },
         }
       : history.annual;
-    // The US P/E river can only use annual EPS; quarter rows are hidden from every UI-derived calculation.
-    const quarterly = history.market === 'US' ? emptySeries() : history.quarterly;
-    return { ...history, annual, quarterly };
+    return { ...history, annual };
   }, [history]);
   const span = spans[effectiveKind];
   const annualView = useMemo(() => (displayHistory ? buildView(displayHistory, 'annual') : null), [displayHistory]);
@@ -175,7 +180,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
           page: 'financials',
           ...(symbol ? { symbol } : {}),
           ...(tf ? { tf } : {}),
-          ...(showQuarterly && next === 'quarterly' ? { p: 'q' as const } : {}),
+          p: next === 'quarterly' ? 'q' : 'a',
         },
         { replace: true },
       ),
@@ -189,7 +194,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
   const onSymbol = (picked: SearchResult) => navigate({
     page: 'financials',
     symbol: picked.symbol,
-    ...(p && (TAIWAN_SYMBOL_REGEX.test(picked.symbol) || /^\d{4,6}[A-Z]?$/.test(picked.symbol)) ? { p } : {}),
+    p: effectiveKind === 'quarterly' ? 'q' : 'a',
   });
   const homeListing = twListingForAdr(symbol);
   const onHomeListing = (listing: { tw: string }) => navigate({ page: 'financials', symbol: listing.tw, ...(p ? { p } : {}) });
@@ -251,7 +256,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
         <div className="fin-folds">
           <KeyMetrics history={displayHistory} view={view} />
           <SummaryChips history={displayHistory} annual={annualView} current={view} />
-          <PeRiverCard history={displayHistory} />
+          <PeRiverCard history={history.market === 'US' ? { ...displayHistory, quarterly: emptySeries() } : displayHistory} />
           {mode === 'table' ? null : folded.map(metricCard)}
         </div>
         <div className="fin-notes">
@@ -282,7 +287,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
         symbol={symbol}
         name={name}
         history={history}
-        kind={kind}
+        kind={effectiveKind}
         showQuarterly={showQuarterly}
         futuHref={symbol && key && !isTaiwanSymbol ? `https://www.futunn.com/stock/${encodeURIComponent(symbol)}-US` : null}
         mode={mode}
@@ -296,11 +301,12 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
       />
       {body}
       {symbol && isChipsPageSymbol(symbol) && <ChipsSection symbol={symbol} />}
+      {history && displayHistory && <PeerComparison key={`peers-${history.symbol}`} history={displayHistory} kind={effectiveKind} navigate={navigate} />}
       <footer className="page-foot fin-foot">
         <span>
           {showQuarterly
             ? '限制：Yahoo 只提供約 4 年年度、5–8 季季度財報，本站逐季累積、無法往回補（部分美股另以 SEC 申報補歷史，台股另以 FinMind〔源自公開資訊觀測站〕回溯至 2015 年）；比率由本頁依公式計算，可能與公司公告口徑不同；有息負債可能含租賃負債。'
-            : '限制：美股頁僅顯示財報原有的年度數字，缺少的年度欄位以「—」呈現；比率由本頁依年度數字計算，可能與公司公告口徑不同；有息負債可能含租賃負債。'}
+            : '限制：缺少的財報欄位以「—」呈現；比率由本頁依所選期間計算，可能與公司公告口徑不同。'}
         </span>
         <span>僅供研究參考，非投資建議。</span>
       </footer>

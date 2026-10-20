@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
+import { ThemeRotationCard } from '../ui/ThemeRotationCard';
 import type { PageProps } from './pageProps';
 import { PageState } from '../ui/PageState';
 import ThemesMap from './ThemesMap';
@@ -418,6 +419,7 @@ function ThemesView({
         </>
       )}
 
+      <ThemeRotationCard data={data} onOpen={open} />
       <footer className="page-foot">
         {industryMap ? (
           <>

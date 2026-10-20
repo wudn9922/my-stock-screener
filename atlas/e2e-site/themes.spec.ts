@@ -48,6 +48,7 @@ test('a tile opens the detail sheet with description, constituents and an expand
   await expect(sheet.locator('.versus-svg')).toBeVisible();
   await expect(sheet.locator('.constituent')).toHaveCount(6);
   await sheet.locator('.constituent-head').first().click();
+  await sheet.locator('.mini-chart').scrollIntoViewIfNeeded();
   await expect(sheet.locator('.mini-chart[data-status="ready"]')).toBeVisible();
   await sheet.getByRole('button', { name: '開啟圖表' }).click();
   await expect(page).toHaveURL(/page=chart&symbol=/);
@@ -74,13 +75,13 @@ test('missing themes.json shows the not-generated state', async ({ page }) => {
   await expect(page.getByText('題材資料尚未產生')).toBeVisible();
 });
 
-test('phone tab bar keeps six buttons on one row', async ({ page }) => {
+test('phone tab bar keeps seven buttons including the console on one row', async ({ page }) => {
   await mockThemes(page);
   await page.goto('./?page=themes');
   const bar = page.locator('.site-tabbar');
   if (!(await bar.isVisible())) test.skip(true, 'desktop layout has the side rail instead');
   const boxes = await bar.locator('button').evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().toJSON()));
-  expect(boxes).toHaveLength(6);
+  expect(boxes).toHaveLength(7);
   expect(new Set(boxes.map((b) => Math.round(b.top))).size).toBe(1);
   for (const box of boxes) expect(box.width).toBeGreaterThanOrEqual(44);
 });

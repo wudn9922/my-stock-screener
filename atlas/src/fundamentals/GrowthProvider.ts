@@ -260,6 +260,7 @@ export class GrowthProvider {
   private readonly now: () => number;
   private entry: { at: number; failed: boolean; promise: Promise<GrowthFile | null> } | null = null;
   private lastGood: GrowthFile | null = null;
+  get lastLoadFailed(): boolean { return this.entry?.failed ?? false; }
 
   constructor(base = `${import.meta.env?.BASE_URL ?? '/'}valuation/`, options: GrowthProviderOptions = {}) {
     this.url = options.url ?? `${base.endsWith('/') ? base : `${base}/`}us-growth.json`;
@@ -269,9 +270,9 @@ export class GrowthProvider {
   }
 
   /** The parsed file, or null when it is not built yet / invalid / offline (and nothing loaded before). */
-  load(): Promise<GrowthFile | null> {
+  load(refresh = false): Promise<GrowthFile | null> {
     const cached = this.entry;
-    if (cached && this.now() - cached.at < (cached.failed ? RETRY_AFTER_FAILURE_MS : RELOAD_AFTER_MS)) return cached.promise;
+    if (!refresh && cached && this.now() - cached.at < (cached.failed ? RETRY_AFTER_FAILURE_MS : RELOAD_AFTER_MS)) return cached.promise;
     const entry = { at: this.now(), failed: false, promise: Promise.resolve<GrowthFile | null>(null) };
     entry.promise = (async () => {
       try {
@@ -294,11 +295,12 @@ export class GrowthProvider {
 
 let defaultProvider: GrowthProvider | null = null;
 let reportProvider: GrowthProvider | null = null;
+export function growthSourceStatus() { return { reportFailed: reportProvider?.lastLoadFailed ?? false, yahooFailed: defaultProvider?.lastLoadFailed ?? false }; }
 
 /** Shared default instance reading `${BASE_URL}valuation/us-growth.json` (US quarterly, Yahoo). */
-export function loadGrowth(): Promise<GrowthFile | null> {
+export function loadGrowth(refresh = false): Promise<GrowthFile | null> {
   defaultProvider ??= new GrowthProvider();
-  return defaultProvider.load();
+  return defaultProvider.load(refresh);
 }
 
 /** `report/growth.json`, a sibling of latest.json. */
@@ -307,17 +309,17 @@ export function reportGrowthUrl(report = reportUrl()): string {
 }
 
 /** Shared instance reading `report/growth.json` (Taiwan and US, quarterly and annual). */
-export function loadReportGrowth(): Promise<GrowthFile | null> {
+export function loadReportGrowth(refresh = false): Promise<GrowthFile | null> {
   reportProvider ??= new GrowthProvider('', { url: reportGrowthUrl(), parse: parseReportGrowth });
-  return reportProvider.load();
+  return reportProvider.load(refresh);
 }
 
 /**
  * The growth data for a market: Taiwan = growth.json; US = growth.json merged with us-growth.json (Yahoo).
  * Either source failing only removes its part; null when neither is available.
  */
-export async function loadMarketGrowth(market: 'TW' | 'US'): Promise<GrowthFile | null> {
-  if (market === 'TW') return loadReportGrowth();
-  const [yahoo, financials] = await Promise.all([loadGrowth(), loadReportGrowth()]);
+export async function loadMarketGrowth(market: 'TW' | 'US', refresh = false): Promise<GrowthFile | null> {
+  if (market === 'TW') return loadReportGrowth(refresh);
+  const [yahoo, financials] = await Promise.all([loadGrowth(refresh), loadReportGrowth(refresh)]);
   return mergeGrowth(yahoo, financials);
 }
