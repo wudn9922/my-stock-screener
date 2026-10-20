@@ -58,10 +58,13 @@ export function FinancialsHeader({
           {history && <span className="fin-currency">{history.currency}</span>}
         </div>
       </div>
-      {futuHref && (
+      {futuHref && symbol && (
         <div className="fin-head-row fin-outbound-row">
           <a className="fin-futu-link" href={futuHref} target="_blank" rel="noopener noreferrer">
-            在富途查看更詳細財報
+            在富途網頁查看財報
+          </a>
+          <a className="fin-futu-link" href={`ftnn://quote/2/${encodeURIComponent(symbol)}/`}>
+            在富途 App 開啟
           </a>
         </div>
       )}
