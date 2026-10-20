@@ -16,7 +16,10 @@ import {
 import { formatDateTime, formatPercent, toneClass } from './format';
 import './breakouts.css';
 
-const MARKET_NAMES: Record<BreakoutMarketKey, string> = { tw: '台股', us: '美股' };
+const MARKET_NAMES: Record<BreakoutMarketKey, string> = {
+  tw: '台股',
+  us: '美股',
+};
 const DEFAULT_WINDOW = '1m';
 
 const rate = (value: number | null) => (value === null ? '—' : `${value.toFixed(1)}%`);
@@ -32,10 +35,9 @@ function StrategyRow({ meta, stats, params }: { meta: BreakoutStrategyMeta; stat
       {status}
     </div>
   );
-  if (!stats || level === 'ineligible')
-    return <li className="bo-row muted">{head(<span className="bo-note">日K長度不足，無法計算</span>)}</li>;
-  if (level === 'none')
-    return <li className="bo-row muted">{head(<span className="bo-note">窗口內沒有新突破</span>)}</li>;
+  if (!stats) return <li className="bo-row muted">{head(<span className="bo-note">報表尚未提供此方法</span>)}</li>;
+  if (level === 'ineligible') return <li className="bo-row muted">{head(<span className="bo-note">日K長度不足，無法計算</span>)}</li>;
+  if (level === 'none') return <li className="bo-row muted">{head(<span className="bo-note">窗口內沒有新突破</span>)}</li>;
   if (level === 'pending')
     return (
       <li className="bo-row muted">
@@ -54,27 +56,29 @@ function StrategyRow({ meta, stats, params }: { meta: BreakoutStrategyMeta; stat
         <>
           {low ? <span className="bo-tag">樣本偏少，參考性低</span> : null}
           <b className="bo-win" aria-label={`勝率 ${rate(stats.winRate)}`}>
-            <small>勝率</small>
+            <small>策略勝率</small>
             {rate(stats.winRate)}
           </b>
         </>,
       )}
-      <div
-        className="bo-bar"
-        role="img"
-        aria-label={`勝率 ${rate(stats.winRate)}，同期全市場上漲比例 ${rate(stats.baseRate)}`}
-      >
+      <div className="bo-bar" role="img" aria-label={`策略勝率 ${rate(stats.winRate)}，同日市場上漲比例 ${rate(stats.baseRate)}`}>
         <i style={{ width: `${clampPct(stats.winRate)}%` }} />
         {stats.baseRate !== null ? <span className="bo-base-mark" style={{ left: `${clampPct(stats.baseRate)}%` }} /> : null}
       </div>
       <dl className="bo-metrics">
         <div>
-          <dt>同期全市場上漲</dt>
+          <dt>同日市場上漲比例</dt>
           <dd>{rate(stats.baseRate)}</dd>
         </div>
         <div>
-          <dt>勝率−同期</dt>
+          <dt>勝率−基準（百分點）</dt>
           <dd className={toneClass(edge)}>{points(edge)}</dd>
+        </div>
+        <div>
+          <dt>獲利／成熟樣本</dt>
+          <dd>
+            {stats.wins === null ? '—' : count(stats.wins)}／{count(stats.maturedN)}
+          </dd>
         </div>
         <div>
           <dt>樣本（成熟／全部）</dt>
@@ -91,7 +95,7 @@ function StrategyRow({ meta, stats, params }: { meta: BreakoutStrategyMeta; stat
           <dd className={toneClass(stats.medianReturn)}>{formatPercent(stats.medianReturn)}</dd>
         </div>
         <div>
-          <dt>跌回突破價</dt>
+          <dt>低於進場參考價／線</dt>
           <dd>{rate(stats.failRate)}</dd>
         </div>
       </dl>
@@ -129,7 +133,8 @@ function Methodology({ data, current, params, windowLabel }: { data: BreakoutMar
         </li>
         <li>
           <b>買法與勝率</b>
-          突破日收盤買進，以資料日收盤計算報酬；勝率＝報酬 &gt; 0 的比例（持平不算勝）。「跌回突破價」＝資料日收盤已低於突破參考價（前高或箱頂）。
+          突破日收盤買進，以資料日收盤計算報酬；策略勝率＝符合該進場法且報酬 &gt; 0 的成熟樣本數 ÷
+          該方法的成熟樣本數（持平不算勝）。「低於進場參考價／線」＝資料日收盤低於進場當日固定的前高、箱頂或 EMA20。
           {holdDays.length ? ` 本窗口平均持有約 ${Math.min(...holdDays).toFixed(1)}～${Math.max(...holdDays).toFixed(1)} 個交易日。` : ''}
         </li>
         <li>
@@ -139,8 +144,8 @@ function Methodology({ data, current, params, windowLabel }: { data: BreakoutMar
           ；太新的突破還沒有結果，只算在「全部」筆數。成熟樣本少於 {params.minSample} 筆時標示「樣本偏少，參考性低」。
         </li>
         <li>
-          <b>同期全市場</b>
-          每筆成熟突破配對同一進場日，計算全部可評估股票從該日收盤持有到資料日的上漲比例，再對所有突破平均（持有天數相同）。勝率要高於它，才代表突破本身比隨便買更好，而不是大盤一起漲。
+          <b>同日市場基準</b>
+          每筆成熟突破配對同一進場日，計算統計母體中全部可評估股票從該日收盤持有到資料日的上漲比例，再對所有突破平均（同日訊號多的日期權重較高，持有天數相同）。策略勝率的分母是符合訊號的成熟樣本，市場基準的分母是同日可評估股票，因此兩者不一定相同；差值只表示本次樣本的比較結果，不代表已證明策略有效。美股統計母體依下方名單範圍，並非所有美國上市股票。
         </li>
         <li>
           <b>定義</b>
@@ -148,10 +153,7 @@ function Methodology({ data, current, params, windowLabel }: { data: BreakoutMar
             .filter((meta) => !meta.volume && meta.definition)
             .map((meta) => `${meta.label}：${meta.definition}${meta.kind === 'box' && data.boxMaxWidthPct !== null ? `（門檻 ${data.boxMaxWidthPct}%）` : ''}`)
             .join('；')}
-          。收盤需嚴格大於參考價，剛好等於不算；參考價只用突破日之前的 K 線。
-          {params.volumeMultiple !== null && params.volumeLookback !== null
-            ? ` 放量＝當日量 ≥ 前 ${params.volumeLookback} 日均量 × ${params.volumeMultiple}。`
-            : ''}
+          。收盤需嚴格大於參考價，剛好等於不算；前高與箱頂不含當日，EMA20 包含當日收盤，與圖表 EMA 使用相同起算方式。
         </li>
         <li>
           <b>去重</b>
@@ -159,8 +161,8 @@ function Methodology({ data, current, params, windowLabel }: { data: BreakoutMar
         </li>
         <li>
           <b>資料處理</b>
-          成交量為 0 的日子視為無效日，缺日不補；週末 K 線視為資料錯誤（本次 {count(data.weekendBars)} 根）。單日收盤漲跌幅超過{' '}
-          {params.jumpLimitPct ?? '—'}% 視為疑似分割、減資或資料錯誤，只用異常日之後的 K 線（本次 {count(data.anomalies.stocks)} 檔）。
+          成交量為 0 的日子視為無效日，缺日不補；週末 K 線視為資料錯誤（本次 {count(data.weekendBars)} 根）。單日收盤漲跌幅超過 {params.jumpLimitPct ?? '—'}%
+          視為疑似分割、減資或資料錯誤，只用異常日之後的 K 線（本次 {count(data.anomalies.stocks)} 檔）。
         </li>
         <li>
           <b>偏誤</b>
@@ -174,12 +176,15 @@ function Methodology({ data, current, params, windowLabel }: { data: BreakoutMar
 function BreakoutBody({ data, params }: { data: BreakoutMarket; params: BreakoutParams }) {
   const windows = params.windows.filter((entry) => data.windows[entry.key]);
   const [selected, setSelected] = useState(DEFAULT_WINDOW);
+  const [highLookback, setHighLookback] = useState('20');
   const active = windows.find((entry) => entry.key === selected) ?? windows[0];
   if (!active) return <p className="muted-text">沒有可顯示的統計窗口。</p>;
   const current = data.windows[active.key]!;
-  const main = params.strategies.filter((meta) => !meta.volume);
-  const volume = params.strategies.filter((meta) => meta.volume);
-  const base = current.market;
+  const method = (key: string, label: string): BreakoutStrategyMeta => ({
+    ...(params.strategies.find((meta) => meta.key === key) ?? DEFAULT_BREAKOUT_PARAMS.strategies.find((meta) => meta.key === key)!),
+    label,
+  });
+  const main = [method(`high${highLookback}`, '突破新高進場法'), method('box20', '箱型突破進場法'), method('ema20', '突破20EMA進場法')];
   return (
     <>
       <div className="bo-toolbar">
@@ -200,23 +205,21 @@ function BreakoutBody({ data, params }: { data: BreakoutMarket; params: Breakout
           <i className="win" />
           勝率
           <i className="base" />
-          同期全市場
+          同日市場基準
         </span>
       </div>
+      <label className="bo-lookback">
+        新高回看期間
+        <select aria-label="新高回看期間" value={highLookback} onChange={(event) => setHighLookback(event.target.value)}>
+          {[20, 60, 120].map((days) => (
+            <option key={days} value={days}>
+              前 {days} 日高
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="bo-sub">策略勝率只計符合進場訊號的股票；市場基準計同一進場日的全部可評估股票，兩者分母不同。</p>
       <StrategyList strategies={main} current={current} params={params} />
-      <p className="bo-base">
-        同期全市場：{active.label}內 {count(base.entryDays)} 個已滿 {params.matureDays} 日的進場日，持有到資料日上漲比例{' '}
-        <b>{rate(base.upRate)}</b>、平均報酬 <b className={toneClass(base.avgReturn)}>{formatPercent(base.avgReturn)}</b>
-      </p>
-      {volume.length ? (
-        <details className="bo-details">
-          <summary>
-            放量確認
-            {params.volumeMultiple !== null ? `（量 ≥ ${params.volumeLookback ?? 20} 日均量 ×${params.volumeMultiple}）` : ''}
-          </summary>
-          <StrategyList strategies={volume} current={current} params={params} />
-        </details>
-      ) : null}
       <Methodology data={data} current={current} params={params} windowLabel={active.label} />
       <p className="bo-foot">
         {data.universe}，可評估 {count(data.evaluated)}／{count(data.universeCount)} 檔。統計只用已滿 {params.matureDays} 個交易日的成熟突破。
@@ -242,11 +245,11 @@ export function BreakoutCard({ market }: { market: BreakoutMarketKey }) {
   const data = result?.status === 'ok' ? result.data.markets[market] : undefined;
   const params = result?.status === 'ok' ? result.data.params : DEFAULT_BREAKOUT_PARAMS;
   return (
-    <section className="card breakout-card" aria-label={`${name}突破買進勝率`} aria-busy={result === null}>
+    <section className="card breakout-card" aria-label={`${name}突破進場法勝率`} aria-busy={result === null}>
       <header className="card-head">
         <h2>
           <Rocket size={16} aria-hidden="true" />
-          突破買進勝率
+          突破進場法勝率
           <small>{name}</small>
         </h2>
         {data?.asOf ? <span className="bo-asof">資料日 {formatDateTime(data.asOf, false)}</span> : null}

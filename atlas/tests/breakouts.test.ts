@@ -1,25 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  DEFAULT_BREAKOUT_PARAMS,
-  breakoutsUrl,
-  edgeVsBase,
-  fetchBreakouts,
-  parseBreakouts,
-  sampleLevel,
-  type BreakoutStats,
-} from '../src/report/breakouts';
+import { DEFAULT_BREAKOUT_PARAMS, breakoutsUrl, edgeVsBase, fetchBreakouts, parseBreakouts, sampleLevel, type BreakoutStats } from '../src/report/breakouts';
 
 // Synthetic contract fixture (not market data); tests/test_breakouts.py checks it against the job output.
-const sample = JSON.parse(
-  readFileSync(resolve(import.meta.dirname, 'fixtures/breakouts/breakouts.sample.json'), 'utf8'),
-) as Record<string, unknown>;
+const sample = JSON.parse(readFileSync(resolve(import.meta.dirname, 'fixtures/breakouts/breakouts.sample.json'), 'utf8')) as Record<string, unknown>;
 
 const stats = (overrides: Partial<BreakoutStats> = {}): BreakoutStats => ({
   eligible: 100,
   n: 40,
   maturedN: 30,
+  wins: null,
   winRate: 55,
   avgReturn: 1.2,
   medianReturn: 0.8,
@@ -41,19 +32,35 @@ describe('breakouts schema', () => {
     expect(params.windows[0]).toEqual({ key: '1w', days: 5, label: '近1週' });
     expect(params.matureDays).toBe(3);
     expect(params.minSample).toBe(20);
-    expect(params.strategies).toHaveLength(8);
-    expect(params.strategies.filter((meta) => !meta.volume).map((meta) => meta.key)).toEqual(['high20', 'high60', 'high120', 'box20']);
+    expect(params.strategies).toHaveLength(9);
+    expect(params.strategies.filter((meta) => !meta.volume).map((meta) => meta.key)).toEqual(['high20', 'high60', 'high120', 'box20', 'ema20']);
     expect(params.strategies[0]!.definition).toContain('不含當日');
     const tw = markets.tw!;
     expect(tw.asOf).toBe('2026-10-09');
     expect(tw.evaluated).toBe(900);
     expect(tw.anomalies).toEqual({ stocks: 3, days: 4 });
-    expect(tw.windows['1m']!.strategies.high20).toEqual(stats({
-      eligible: 880, n: 300, maturedN: 250, winRate: 54, avgReturn: 4.9, medianReturn: 3.1,
-      failRate: 35, avgHoldDays: 10.2, baseRate: 59, baseAvgReturn: 5,
-    }));
+    expect(tw.windows['1m']!.strategies.high20).toEqual(
+      stats({
+        eligible: 880,
+        n: 300,
+        maturedN: 250,
+        wins: 135,
+        winRate: 54,
+        avgReturn: 4.9,
+        medianReturn: 3.1,
+        failRate: 35,
+        avgHoldDays: 10.2,
+        baseRate: 59,
+        baseAvgReturn: 5,
+      }),
+    );
     expect(tw.windows['1w']!.strategies.box20!.winRate).toBeNull();
-    expect(tw.windows['1w']!.market).toEqual({ entryDays: 2, pairs: 1800, upRate: 48, avgReturn: -0.3 });
+    expect(tw.windows['1w']!.market).toEqual({
+      entryDays: 2,
+      pairs: 1800,
+      upRate: 48,
+      avgReturn: -0.3,
+    });
     expect(markets.us!.universe).toBe('S&P 500 成分股');
   });
 
@@ -70,7 +77,13 @@ describe('breakouts schema', () => {
             '1w': {
               days: '5',
               strategies: {
-                high20: { n: '4', maturedN: 2, winRate: '50.0', baseRate: 'x', extra: 1 },
+                high20: {
+                  n: '4',
+                  maturedN: 2,
+                  winRate: '50.0',
+                  baseRate: 'x',
+                  extra: 1,
+                },
                 broken: 'not an object',
               },
             },
@@ -88,22 +101,46 @@ describe('breakouts schema', () => {
     expect(tw.evaluated).toBe(12);
     expect(Object.keys(tw.windows)).toEqual(['1w']);
     expect(Object.keys(tw.windows['1w']!.strategies)).toEqual(['high20']);
-    expect(tw.windows['1w']!.strategies.high20).toMatchObject({ n: 4, maturedN: 2, winRate: 50, baseRate: null, eligible: 0 });
-    expect(tw.windows['1w']!.market).toEqual({ entryDays: 0, pairs: 0, upRate: null, avgReturn: null });
+    expect(tw.windows['1w']!.strategies.high20).toMatchObject({
+      n: 4,
+      maturedN: 2,
+      winRate: 50,
+      baseRate: null,
+      eligible: 0,
+    });
+    expect(tw.windows['1w']!.market).toEqual({
+      entryDays: 0,
+      pairs: 0,
+      upRate: null,
+      avgReturn: null,
+    });
     expect(result.data.params).toEqual(DEFAULT_BREAKOUT_PARAMS);
   });
 
   it('keeps valid params entries and falls back per field', () => {
     const result = parseBreakouts({
-      params: { windows: [{ key: '1m', days: 21 }, { days: 5 }], minSample: 'bad', strategies: [{ key: 'box20', label: '箱型' }] },
-      markets: { us: { windows: { '1m': { strategies: { box20: { n: 1 } } } } } },
+      params: {
+        windows: [{ key: '1m', days: 21 }, { days: 5 }],
+        minSample: 'bad',
+        strategies: [{ key: 'box20', label: '箱型' }],
+      },
+      markets: {
+        us: { windows: { '1m': { strategies: { box20: { n: 1 } } } } },
+      },
     });
     expect(result.status).toBe('ok');
     if (result.status !== 'ok') return;
     expect(result.data.params.windows).toEqual([{ key: '1m', days: 21, label: '1m' }]);
     expect(result.data.params.minSample).toBe(20);
     expect(result.data.params.strategies).toEqual([
-      { key: 'box20', label: '箱型', kind: '', lookback: null, volume: false, definition: '' },
+      {
+        key: 'box20',
+        label: '箱型',
+        kind: '',
+        lookback: null,
+        volume: false,
+        definition: '',
+      },
     ]);
   });
 
@@ -126,7 +163,10 @@ describe('breakouts loading', () => {
     const respond = (body: string, status = 200) => vi.fn(async () => new Response(body, { status }));
     expect((await fetchBreakouts('u', respond('nope', 404) as unknown as typeof fetch)).status).toBe('missing');
     const failed = await fetchBreakouts('u', respond('x', 503) as unknown as typeof fetch);
-    expect(failed).toMatchObject({ status: 'error', message: '突破勝率暫時無法取得（HTTP 503）。' });
+    expect(failed).toMatchObject({
+      status: 'error',
+      message: '突破勝率暫時無法取得（HTTP 503）。',
+    });
     const offline = vi.fn(async () => {
       throw new TypeError('offline');
     });

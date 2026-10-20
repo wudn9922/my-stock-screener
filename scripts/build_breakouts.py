@@ -17,6 +17,8 @@
 - 突破箱型：前 BOX_LOOKBACK 個有效日（不含當日）的 (最高−最低)/最低 ≤ 市場門檻（台股 14%、美股 10%，
   約為兩市場 20 日高低區間的下四分位數），且收盤 > 箱頂（＝前 20 日最高價）。
 - 放量變體：當日成交量 ≥ 前 20 個有效日均量 × 1.5（均量不含當日）。
+- 突破20EMA：前日收盤 ≤ 前日 EMA20，當日收盤 > 當日 EMA20。EMA 以最初 20 日收盤均值起算，
+  之後以 2/21 平滑；前 10 個有效日沒有向上穿越才算新訊號。EMA 只用截至當日收盤的資料。
 - 同一波不重複：突破當日之前 COOLDOWN 個有效日都沒有「收盤 > 各自前 N 日高」才算新突破；
   每檔每個策略在窗口內只取第一次新突破。回看資料不足（< N + COOLDOWN 根）的股票不納入該策略。
 - 窗口：近 1 週＝日曆上最後 5 個交易日（含 asOf），近 1 月＝最後 21 個交易日。
@@ -97,6 +99,10 @@ def _strategy_specs():
                     + (f"；且當日量 ≥ 前 {VOLUME_LOOKBACK} 日均量 × {VOLUME_MULTIPLE}" if volume else ""),
                 }
             )
+    specs.append({
+        "key": "ema20", "label": "突破20EMA", "kind": "ema", "lookback": 20, "volume": False,
+        "definition": "前日收盤 ≤ 前日 EMA20，且當日收盤 > 當日 EMA20；EMA 以最初 20 日收盤均值起算，之後以 2/21 平滑",
+    })
     return specs
 
 
@@ -156,9 +162,22 @@ def strategy_signals(clean, box_max_width):
     box_bottom = low.shift(1).rolling(BOX_LOOKBACK, min_periods=BOX_LOOKBACK).min()
     tight = ((box_level - box_bottom) / box_bottom <= box_max_width + 1e-12).fillna(False)
 
+    # Same SMA seed and alpha as Atlas's chart EMA; never seed with future observations.
+    ema_level = pd.Series(np.nan, index=close.index, dtype=float)
+    if len(close) >= 20:
+        value = float(close.iloc[:20].mean())
+        ema_level.iloc[19] = value
+        for i in range(20, len(close)):
+            value += (float(close.iloc[i]) - value) * (2 / 21)
+            ema_level.iloc[i] = value
+    cross = (close > ema_level) & (close.shift(1) <= ema_level.shift(1))
+    recent_crosses = cross.shift(1, fill_value=False).astype(int).rolling(COOLDOWN_DAYS).sum()
+    ema_known = ema_level.shift(COOLDOWN_DAYS + 1).notna()
+    ema_fresh = cross & (recent_crosses == 0) & ema_known
+
     out = {}
     for spec in STRATEGIES:
-        fresh, level, known = base[spec["lookback"]]
+        fresh, level, known = (ema_fresh, ema_level, ema_known) if spec["kind"] == "ema" else base[spec["lookback"]]
         if spec["kind"] == "box":
             fresh = fresh & tight
         if spec["volume"]:
@@ -181,7 +200,8 @@ def summarize(events, eligible, base_by_day, mature_days=MATURE_DAYS):
     統計只用成熟樣本（hold ≥ mature_days）；基準以每筆成熟突破的進場日配對後平均。
     """
     matured = [event for event in events if event["hold"] >= mature_days]
-    out = {"eligible": eligible, "n": len(events), "maturedN": len(matured)}
+    out = {"eligible": eligible, "n": len(events), "maturedN": len(matured),
+           "wins": int(sum(event["ret"] > 0 for event in matured))}
     if not matured:
         out.update(
             winRate=None, avgReturn=None, medianReturn=None, failRate=None,

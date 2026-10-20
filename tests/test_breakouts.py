@@ -62,6 +62,20 @@ def stats(market, strategy, window="1m"):
 
 
 class StrategySignalTest(unittest.TestCase):
+    def test_ema20_uses_chart_seed_crossing_and_not_repeated_days_above(self):
+        closes = flat_then([99, 101, 102, 103])
+        _, fresh, level, known = self.fresh(make_bars(closes), "ema20")
+        self.assertTrue(known.iloc[-4:].all())
+        self.assertAlmostEqual(level.iloc[-4], 100 - 2 / 21)
+        self.assertAlmostEqual(level.iloc[-3], (100 - 2 / 21) * 19 / 21 + 101 * 2 / 21)
+        self.assertEqual(fresh.iloc[-4:].tolist(), [False, True, False, False])
+
+    def test_ema20_equality_is_not_a_cross_and_recent_crosses_cool_down(self):
+        _, fresh, _, _ = self.fresh(make_bars(flat_then([100])), "ema20")
+        self.assertFalse(fresh.iloc[-1])
+        _, fresh, _, _ = self.fresh(make_bars(flat_then([99, 101, 99, 101])), "ema20")
+        self.assertEqual(fresh.iloc[-4:].tolist(), [False, True, False, False])
+
     def fresh(self, bars, key="high20", width=0.14):
         clean, _ = bo.clean_bars(bars, bars.index[-1])
         fresh, level, known = bo.strategy_signals(clean, width)[key]
@@ -395,18 +409,32 @@ def naive_stats(frames, market_key, as_of):
 
     raw_cache = {}
 
-    def raw(rows, i, n):
-        key = (id(rows), n)
+    def reference(rows, i, spec):
+        if spec["kind"] != "ema":
+            return prior_high(rows, i, spec["lookback"])
+        if i < 19:
+            return None
+        value = sum(row[3] for row in rows[:20]) / 20
+        for j in range(20, i + 1):
+            value = value + (rows[j][3] - value) * 2 / 21
+        return value
+
+    def raw(rows, i, spec):
+        n = spec["lookback"]
+        key = (id(rows), spec["kind"], n)
         if key not in raw_cache:
-            levels = [prior_high(rows, j, n) for j in range(len(rows))]
+            levels = [reference(rows, j, spec) for j in range(len(rows))]
             raw_cache[key] = [level is not None and rows[j][3] > level for j, level in enumerate(levels)]
+            if spec["kind"] == "ema":
+                above = raw_cache[key]
+                raw_cache[key] = [j >= 20 and above[j] and not above[j - 1] for j in range(len(rows))]
         return raw_cache[key][i]
 
     def signal(rows, i, spec):
         n = spec["lookback"]
-        if i < n + bo.COOLDOWN_DAYS or not raw(rows, i, n):
+        if i < n + bo.COOLDOWN_DAYS or not raw(rows, i, spec):
             return False
-        if any(raw(rows, j, n) for j in range(i - bo.COOLDOWN_DAYS, i)):
+        if any(raw(rows, j, spec) for j in range(i - bo.COOLDOWN_DAYS, i)):
             return False
         if spec["kind"] == "box":
             top = prior_high(rows, i, n)
@@ -445,7 +473,7 @@ def naive_stats(frames, market_key, as_of):
                         if hold >= bo.MATURE_DAYS:
                             matured += 1
                             wins += rows[-1][3] > rows[i][3]
-                            fails += rows[-1][3] < prior_high(rows, i, spec["lookback"])
+                            fails += rows[-1][3] < reference(rows, i, spec)
                             base_rates.append(base[rows[i][0]])
                         break
             result[spec["key"]] = (eligible, n, matured, wins, fails, base_rates)
@@ -468,6 +496,7 @@ class NaiveReferenceTest(unittest.TestCase):
                         self.assertEqual(got["eligible"], eligible, label)
                         self.assertEqual(got["n"], n, label)
                         self.assertEqual(got["maturedN"], matured, label)
+                        self.assertEqual(got["wins"], wins, label)
                         if matured:
                             self.assertEqual(got["winRate"], round(wins / matured * 100, 1), label)
                             self.assertEqual(got["failRate"], round(fails / matured * 100, 1), label)
@@ -578,13 +607,13 @@ class MainTest(unittest.TestCase):
         datetime.fromisoformat(payload["generatedAt"])
         self.assertEqual([w["key"] for w in payload["params"]["windows"]], ["1w", "1m"])
         self.assertEqual(payload["params"]["matureDays"], 3)
-        self.assertEqual(len(payload["params"]["strategies"]), 8)
+        self.assertEqual(len(payload["params"]["strategies"]), 9)
         tw = payload["markets"]["tw"]
         self.assertEqual(tw["universeCount"], 3)
         self.assertEqual(tw["universe"], "台股上市櫃普通股（4碼、非0開頭）")
         result = tw["windows"]["1w"]["strategies"]["high20"]
         self.assertEqual(set(result), {
-            "eligible", "n", "maturedN", "winRate", "avgReturn", "medianReturn",
+            "eligible", "n", "maturedN", "wins", "winRate", "avgReturn", "medianReturn",
             "failRate", "avgHoldDays", "baseRate", "baseAvgReturn",
         })
         self.assertEqual(result["winRate"], 100.0)

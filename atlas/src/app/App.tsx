@@ -46,6 +46,7 @@ import { useDialogFocus } from '../ui/useDialogFocus';
 import { useChartFocus } from '../ui/useChartFocus';
 import { IconButton } from '../ui/IconButton';
 import { StockTabs } from '../ui/StockTabs';
+import { StockVolatility } from '../ui/StockVolatility';
 import { DrawingToolGlyph, DrawingToolPicker } from '../ui/DrawingToolPicker';
 import { Watchlist, companies } from '../ui/Watchlist';
 import { IndicatorPanel } from '../ui/IndicatorPanel';
@@ -994,16 +995,19 @@ export function App({
           <small>{market.currency}</small>
         </div>
         {!isIndex && providerId !== 'demo' && (
-          <dl className="ws-valuation" data-testid="valuation">
-            <div title={peTitle(`本益比（${peFigures?.fiscalYear ?? '年度'} EPS）`, peFigures?.pe ?? null)}>
-              <dt>本益比</dt>
-              <dd className={peFigures?.peLoss ? 'pe-loss' : undefined}>{formatPe(peFigures?.pe, !!peFigures?.peLoss)}</dd>
-            </div>
-            <div title={peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}>
-              <dt>本益比 TTM</dt>
-              <dd className={peFigures?.peTtmLoss ? 'pe-loss' : undefined}>{formatPe(peFigures?.peTtm, !!peFigures?.peTtmLoss)}</dd>
-            </div>
-          </dl>
+          <div className="ws-stock-statistics">
+            <dl className="ws-valuation" data-testid="valuation">
+              <div title={peTitle(`本益比（${peFigures?.fiscalYear ?? '年度'} EPS）`, peFigures?.pe ?? null)}>
+                <dt>本益比</dt>
+                <dd className={peFigures?.peLoss ? 'pe-loss' : undefined}>{formatPe(peFigures?.pe, !!peFigures?.peLoss)}</dd>
+              </div>
+              <div title={peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}>
+                <dt>本益比 TTM</dt>
+                <dd className={peFigures?.peTtmLoss ? 'pe-loss' : undefined}>{formatPe(peFigures?.peTtm, !!peFigures?.peTtmLoss)}</dd>
+              </div>
+            </dl>
+            <StockVolatility symbol={symbol} provider={providers[providerId]} reloadToken={reloadToken} />
+          </div>
         )}
         {onOpenFinancials && !isIndex && providerId !== 'demo' && (
           <StockTabs active="chart" onSelect={(tab) => tab === 'financials' && onOpenFinancials(symbol, tf)} />

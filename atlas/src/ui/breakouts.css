@@ -33,6 +33,21 @@
   font-size: 12px;
   color: var(--text-3);
 }
+.bo-lookback {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.bo-lookback select {
+  min-height: 40px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+}
 .bo-legend i {
   display: inline-block;
   flex-shrink: 0;

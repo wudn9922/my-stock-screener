@@ -1,4 +1,14 @@
-## Current review: parameter console follow-up (2026-10-20)
+## Current review: daily volatility and breakout entry methods (2026-10-20)
+
+Individual-stock chart headers show Wilder ATR(20)% and the mean of the last 20 daily (high-low)/previous-close percentages below P/E. They request daily bars through the selected normalized provider independently of the chart interval, exclude unfinished sessions, require 21 valid bars and use the last daily close for ATR%. Symbol/provider/reload identity and cancellation prevent old values leaking into a new request. Expandable help shows formulas, the data date, cache status and price-basis limitations. No chart engine or drawing model changes.
+
+Markets now displays three method families: prior-high breakout (20/60/120-day selection), 20-day box breakout, and EMA20 upward crossing. EMA uses the chart's initial 20-close SMA seed and alpha 2/21, with ten-session crossing cooldown, causal warmup and the existing first-event/maturity policies. Returns still mark the entry close against the report-date close; the entry reference line is frozen for failure counts. The report adds exact winning counts; legacy reports show missing EMA results rather than substituting another method. Legacy volume variants remain in the data contract only.
+
+Strategy win rate and the signal-date-matched universe benchmark retain their different denominators. The page names both, shows winning/matured/total samples and explains date weighting. The separate window-wide market summary has been removed to avoid comparing two different benchmark weightings. US coverage remains the current S&P 500 intersected with available CSV history, not all US listings. The checked-in report was regenerated from local CSVs and the 503-constituent public [S&P 500 snapshot](https://github.com/datasets/s-and-p-500-companies/blob/main/data/constituents.csv); the scheduled job keeps its existing Wikipedia/fallback source policy.
+
+See [calculation and verification record](docs/VOLATILITY_BREAKOUT_VERIFICATION.md). Independent review and physical Safari verification are not claimed. Submit for PR review only; do not merge or enable automatic merging.
+
+## Historical review: parameter console follow-up (2026-10-20)
 
 Selected watchlists now auto-save authenticated settings and delete cloud-first through a serialized per-list queue. Permanent stock MAs are dormant ungrouped stocks records; they survive list/member removal and only override an active member's defaults. The daily report and breakout consumers both exclude dormant rows. The Edge Function requires ATLAS_FIXED_PARAMETERS_ENABLED=1 after consumer deployment to avoid old monitor builds treating the new reserved group as active.
 

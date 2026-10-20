@@ -19,7 +19,7 @@ export interface BreakoutStrategyMeta {
   label: string;
   kind: string;
   lookback: number | null;
-  /** Volume-confirmed variant (shown in the details section, not the main list). */
+  /** Legacy volume-confirmed variant, retained in reports but omitted from the three method families. */
   volume: boolean;
   definition: string;
 }
@@ -46,6 +46,8 @@ export interface BreakoutStats {
   n: number;
   /** Breakouts held at least `matureDays` trading days; every rate below uses only these. */
   maturedN: number;
+  /** Exact numerator; absent in legacy reports, never reconstructed from a rounded rate. */
+  wins: number | null;
   winRate: number | null;
   avgReturn: number | null;
   medianReturn: number | null;
@@ -59,7 +61,12 @@ export interface BreakoutWindow {
   days: number;
   start: string | null;
   maturedThrough: string | null;
-  market: { entryDays: number; pairs: number; upRate: number | null; avgReturn: number | null };
+  market: {
+    entryDays: number;
+    pairs: number;
+    upRate: number | null;
+    avgReturn: number | null;
+  };
   strategies: Record<string, BreakoutStats>;
 }
 export interface BreakoutMarket {
@@ -93,10 +100,46 @@ export const DEFAULT_BREAKOUT_PARAMS: BreakoutParams = {
   volumeMultiple: 1.5,
   boxLookback: 20,
   strategies: [
-    ...[20, 60, 120].map((n) => ({ key: `high${n}`, label: `突破${n}日高`, kind: 'high', lookback: n, volume: false, definition: '' })),
-    { key: 'box20', label: '突破20日箱型', kind: 'box', lookback: 20, volume: false, definition: '' },
-    ...[20, 60, 120].map((n) => ({ key: `high${n}Vol`, label: `突破${n}日高＋放量`, kind: 'high', lookback: n, volume: true, definition: '' })),
-    { key: 'box20Vol', label: '突破20日箱型＋放量', kind: 'box', lookback: 20, volume: true, definition: '' },
+    ...[20, 60, 120].map((n) => ({
+      key: `high${n}`,
+      label: `突破${n}日高`,
+      kind: 'high',
+      lookback: n,
+      volume: false,
+      definition: '',
+    })),
+    {
+      key: 'box20',
+      label: '突破20日箱型',
+      kind: 'box',
+      lookback: 20,
+      volume: false,
+      definition: '',
+    },
+    {
+      key: 'ema20',
+      label: '突破20EMA',
+      kind: 'ema',
+      lookback: 20,
+      volume: false,
+      definition: '',
+    },
+    ...[20, 60, 120].map((n) => ({
+      key: `high${n}Vol`,
+      label: `突破${n}日高＋放量`,
+      kind: 'high',
+      lookback: n,
+      volume: true,
+      definition: '',
+    })),
+    {
+      key: 'box20Vol',
+      label: '突破20日箱型＋放量',
+      kind: 'box',
+      lookback: 20,
+      volume: true,
+      definition: '',
+    },
   ],
 };
 
@@ -111,6 +154,7 @@ const statsSchema = z.object({
   eligible: countOf,
   n: countOf,
   maturedN: countOf,
+  wins: z.preprocess(finiteOrNull, z.number().int().nonnegative().nullable().catch(null)),
   winRate: pctOf,
   avgReturn: pctOf,
   medianReturn: pctOf,
@@ -126,7 +170,12 @@ const windowSchema = z
     start: optionalText,
     maturedThrough: optionalText,
     market: z
-      .object({ entryDays: countOf, pairs: countOf, upRate: pctOf, avgReturn: pctOf })
+      .object({
+        entryDays: countOf,
+        pairs: countOf,
+        upRate: pctOf,
+        avgReturn: pctOf,
+      })
       .optional()
       .transform((value) => value ?? { entryDays: 0, pairs: 0, upRate: null, avgReturn: null }),
     strategies: z.unknown().optional(),
@@ -162,7 +211,10 @@ const marketSchema = z
     const anomalies = record(market.anomalies);
     return {
       ...market,
-      anomalies: { stocks: countOf.parse(anomalies.stocks), days: countOf.parse(anomalies.days) },
+      anomalies: {
+        stocks: countOf.parse(anomalies.stocks),
+        days: countOf.parse(anomalies.days),
+      },
       windows,
     };
   });
@@ -220,9 +272,7 @@ export const breakoutsSchema = z.object({
     }),
 });
 
-export type BreakoutsLoadResult =
-  | { status: 'ok'; data: Breakouts; url: string }
-  | { status: 'missing' | 'invalid' | 'error'; message: string; url: string };
+export type BreakoutsLoadResult = { status: 'ok'; data: Breakouts; url: string } | { status: 'missing' | 'invalid' | 'error'; message: string; url: string };
 
 /** `breakouts.json` sits next to `latest.json` (or next to `VITE_REPORT_URL`). */
 export function breakoutsUrl(
@@ -246,19 +296,24 @@ export function parseBreakouts(data: unknown, url = ''): BreakoutsLoadResult {
 }
 
 /** Fetches and validates the file. Network, HTTP and JSON failures resolve to a friendly state. */
-export async function fetchBreakouts(
-  url = breakoutsUrl(),
-  fetcher: typeof fetch = fetch,
-  signal?: AbortSignal,
-): Promise<BreakoutsLoadResult> {
+export async function fetchBreakouts(url = breakoutsUrl(), fetcher: typeof fetch = fetch, signal?: AbortSignal): Promise<BreakoutsLoadResult> {
   let response: Response;
   try {
     response = await fetcher(url, { cache: 'no-cache', signal });
   } catch {
-    return { status: 'error', message: '無法連線取得突破勝率，請稍後再試。', url };
+    return {
+      status: 'error',
+      message: '無法連線取得突破勝率，請稍後再試。',
+      url,
+    };
   }
   if (response.status === 404) return { status: 'missing', message: MISSING, url };
-  if (!response.ok) return { status: 'error', message: `突破勝率暫時無法取得（HTTP ${response.status}）。`, url };
+  if (!response.ok)
+    return {
+      status: 'error',
+      message: `突破勝率暫時無法取得（HTTP ${response.status}）。`,
+      url,
+    };
   let data: unknown;
   try {
     // An SPA fallback can answer with index.html; treat non-JSON as an unreadable file.

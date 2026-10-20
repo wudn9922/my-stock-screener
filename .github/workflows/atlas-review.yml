@@ -7,6 +7,9 @@ on:
       - 'breakout_alert/**'
       - 'supabase/functions/user-settings/**'
       - 'tests/test_atlas_watchlists.py'
+      - 'tests/test_breakouts.py'
+      - 'scripts/build_breakouts.py'
+      - 'docs/report/breakouts.json'
       - '.github/workflows/atlas-review.yml'
 permissions:
   contents: read
@@ -40,14 +43,15 @@ jobs:
         run: npx playwright install --with-deps chromium webkit
       - name: Desktop, phone and WebKit regressions
         working-directory: atlas
-        run: npm run test:site -- parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts
+        run: npm run test:site -- parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts breakouts.spec.ts stock-volatility.spec.ts
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Offline breakout integration
         run: |
-          pip install requests
+          pip install requests numpy pandas
           python -m unittest discover -s tests -p 'test_atlas_watchlists.py' -v
+          python -m unittest discover -s tests -p 'test_breakouts.py' -v
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
