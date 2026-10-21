@@ -1,3 +1,13 @@
+## Current review: optional daily share-volume threshold (2026-10-21)
+
+Daily collection no longer filters the Taiwan ticker list by traded shares, and the daily MA20 scan no longer imposes Taiwan/US volume minima. Low-volume and zero-volume CSVs continue updating. The existing Taiwan listing rules, US S&P 500 daily list, MA20 conditions and separate full-market workflow retain their scope.
+
+The screener's 「每日成交股數」 condition defaults to unrestricted. Presets and a custom non-negative integer input use shares in both markets (1 Taiwan lot = 1,000 shares). A positive threshold is inclusive; empty/zero clears it. The `vol:N` URL token uses the existing per-market filter storage, chip removal, reset and sharing paths. Missing share counts are excluded when an available threshold runs; groups without share data show the existing unavailable-condition treatment. Invalid custom inputs block Apply.
+
+Verification: `npm ci` from the existing lockfile/cache; 892 Vitest tests passed; lint and TypeScript checks passed; normal and Pages builds passed (`VITE_PUBLIC_BASE=/my-stock-screener/atlas/`). Python collection/metrics/full-universe regressions: 88 passed. Final browser cases: 6 desktop/mobile Chromium plus 3 iPhone WebKit passed. Reviewed screenshots in `.cache/volume-filter-screenshots/` confirm the custom input and preset layout fit the mobile sheet. Earlier browser attempts exposed incorrect test expectations for matched/unmatched counts and filtered totals; corrected fixtures/assertions were rerun. WebKit required locally extracted libraries and a downloaded launcher adjustment to preserve `LD_LIBRARY_PATH`; these are environment setup only. Browser tests use synthetic data and do not establish physical-device behavior or live full-market refresh performance.
+
+Independent review is unavailable; no independent sign-off is claimed. The source changes and verified build outputs are local; the public site will receive the selector when the normal publishing workflow runs.
+
 ## Current review: parameter console follow-up (2026-10-20)
 
 Selected watchlists now auto-save authenticated settings and delete cloud-first through a serialized per-list queue. Permanent stock MAs are dormant ungrouped stocks records; they survive list/member removal and only override an active member's defaults. The daily report and breakout consumers both exclude dormant rows. The Edge Function requires ATLAS_FIXED_PARAMETERS_ENABLED=1 after consumer deployment to avoid old monitor builds treating the new reserved group as active.

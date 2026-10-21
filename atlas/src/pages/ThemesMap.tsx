@@ -297,7 +297,7 @@ function IndustryMap({
       />
       <p className="map-foot">
         資料日 {model.asOf ? formatDateTime(model.asOf, false) : '—'} · {model.universe}
-        {model.scope === 'full' ? '（全市場）' : '（流動性篩選名單，非全市場）'}，涵蓋 {coverage.total.toLocaleString('en-US')} 檔，其中{' '}
+        {model.scope === 'full' ? '（全市場）' : '（每日掃描名單，非全市場）'}，涵蓋 {coverage.total.toLocaleString('en-US')} 檔，其中{' '}
         {coverage.classified.toLocaleString('en-US')} 檔有產業分類。顏色＝{PERIOD_LABELS[period]}報酬，以{weightText}計算。大小＝{sizeText}
         {modeText}。
         {model.basis === 'cap' && coverage.withCap < coverage.total ? ` ${coverage.total - coverage.withCap} 檔缺市值，計入大小與加權時視為 0。` : ''}

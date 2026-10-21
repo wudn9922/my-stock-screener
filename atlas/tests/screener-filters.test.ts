@@ -39,6 +39,19 @@ const item = (symbol: string, metrics: Record<string, unknown> | null, extra: Re
   groupItemSchema.parse({ symbol, close: 100, changePct: 1, maList: [20], maValues: { 20: 95 }, metrics, ...extra });
 
 describe('filter encoding', () => {
+  it('round-trips share thresholds and rejects invalid values while preserving old links', () => {
+    expect(serializeFilters(state('vol:250000;vr:1.2'))).toBe('vr:1.2;vol:250000');
+    for (const value of ['0', '-1', '1.5', 'Infinity', '9007199254740992', '10:20', '']) {
+      expect(state(`vol:${value}`).vol).toBeNull();
+    }
+    expect(state('vr:1.2').vol).toBeNull();
+    const data: Record<string, string> = {};
+    const store = { getItem: (key: string) => data[key] ?? null, setItem: (key: string, value: string) => { data[key] = value; } } as unknown as Storage;
+    writeStoredFilters('TW', 'vol:1000000', store);
+    writeStoredFilters('US', 'vol:100000', store);
+    expect(state(readStoredFilters('TW', store)).vol).toBe(1_000_000);
+    expect(state(readStoredFilters('US', store)).vol).toBe(100_000);
+  });
   it('parses the documented example and serializes it canonically', () => {
     const parsed = state('chg:0:3;ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;vr:1.5;eps:2:20;rev:10');
     expect(parsed).toEqual({
@@ -50,6 +63,7 @@ describe('filter encoding', () => {
       rs3: null,
       rs1: null,
       vr: 1.5,
+      vol: null,
       eps: { quarters: 2, min: 20, share: 100 },
       rev: { quarters: 1, min: 10, share: 100 },
       epsY: null,
@@ -120,6 +134,24 @@ describe('applyFilters', () => {
 
   it('returns everything with no conditions', () => {
     expect(applyFilters(TW, EMPTY_FILTERS, tw)).toHaveLength(TW.length);
+  });
+
+  it('filters traded shares inclusively in both markets without depending on metrics or volume ratio', () => {
+    const rows = [
+      item('LOW', null, { volume: 99_999 }),
+      item('BOUNDARY', null, { volume: 100_000 }),
+      item('HIGH', null, { volume: 1_000_000 }),
+      item('ZERO', null, { volume: 0 }),
+      item('UNKNOWN', null),
+    ];
+    for (const market of ['TW', 'US'] as const) {
+      expect(applyFilters(rows, EMPTY_FILTERS, { market })).toEqual(rows);
+      expect(applyFilters(rows, state('vol:100000'), { market }).map((row) => row.symbol)).toEqual(['BOUNDARY', 'HIGH']);
+    }
+    expect(filterAvailability([rows[3]!], tw).vol).toBeNull();
+    expect(filterAvailability([rows[4]!], tw).vol).toContain('沒有成交股數資料');
+    expect(activeChips(state('vol:1000000'))[0]?.label).toBe('成交股數 ≥100 萬股');
+    expect(serializeFilters(removeFilter(state('vol:1000000'), 'vol'))).toBe('');
   });
 
   it('matches each technical condition against the fixture', () => {

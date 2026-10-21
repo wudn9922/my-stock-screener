@@ -13,9 +13,11 @@ import {
   TREND_FLAGS,
   TREND_LABELS,
   VOLUME_PRESETS,
+  SHARE_VOLUME_PRESETS,
   YEAR_PRESETS,
   enoughPeriods,
   formatRange,
+  formatShares,
   gateCountText,
   gateLabel,
   gateSentence,
@@ -462,6 +464,7 @@ function Disclosure({
 export function FilterSheet(props: FilterSheetProps) {
   const { open, market, value, availability, growth, growthLoading, onNeedGrowth, onClose } = props;
   const [draft, setDraft] = useState<FilterState>(value);
+  const [volumeText, setVolumeText] = useState(value.vol === null ? '' : String(value.vol));
   const [terms, setTerms] = useState<GateTermsMap>(() => termsOf(value));
   const sheetRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -470,6 +473,7 @@ export function FilterSheet(props: FilterSheetProps) {
   useEffect(() => {
     if (!open) return;
     setDraft(value);
+    setVolumeText(value.vol === null ? '' : String(value.vol));
     setTerms(termsOf(value));
   }, [open]);
   useDialogFocus(open, DIALOG_ID);
@@ -506,6 +510,11 @@ export function FilterSheet(props: FilterSheetProps) {
   if (!open) return null;
 
   const update = (patch: Partial<FilterState>) => setDraft((previous) => ({ ...previous, ...patch }));
+  const volumeInvalid = volumeText.trim() !== '' && (!/^\d+$/.test(volumeText.trim()) || !Number.isSafeInteger(Number(volumeText)));
+  const setShareVolume = (vol: number | null) => {
+    setVolumeText(vol === null ? '' : String(vol));
+    update({ vol });
+  };
   const setGateMin = (key: GateKey, min: number | null) => update({ [key]: min === null ? null : gateFor(key, terms[key], min) });
   /** Periods or 成長佔比 of a block: kept for later, and applied at once when the block already has a threshold. */
   const setGateTerms = (key: GateKey, patch: Partial<GateTerms>) => {
@@ -640,6 +649,37 @@ export function FilterSheet(props: FilterSheetProps) {
           </button>
         </header>
         <div className="fs-body">
+          <Section title="每日成交股數" unavailable={availability.vol} hint="以最近一個交易日的成交股數篩選，台美股都以「股」計算（台股 1 張＝1,000 股）。預設不限；留白或輸入 0 可取消門檻。">
+            <Choice
+              label="成交股數門檻"
+              value={draft.vol}
+              options={[{ value: null, label: '不限' }, ...SHARE_VOLUME_PRESETS.map((value) => ({ value, label: `≥${formatShares(value)}` }))]}
+              onChange={(vol) => setShareVolume(toggleVolume(draft.vol, vol))}
+            />
+            <div className="fs-number-row">
+              <label className="fs-number">
+                <span>至少</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  enterKeyHint="done"
+                  placeholder="不限"
+                  aria-label="自訂成交股數下限（股）"
+                  aria-invalid={volumeInvalid}
+                  aria-describedby={volumeInvalid ? 'fs-volume-error' : undefined}
+                  value={volumeText}
+                  onChange={(event) => {
+                    const text = event.target.value;
+                    setVolumeText(text);
+                    if (text.trim() === '') update({ vol: null });
+                    else if (/^\d+$/.test(text.trim()) && Number.isSafeInteger(Number(text))) update({ vol: Number(text) || null });
+                  }}
+                />
+                <span>股</span>
+              </label>
+            </div>
+            {volumeInvalid && <p id="fs-volume-error" className="fs-unavailable" role="alert">請輸入有效的非負整數股數。</p>}
+          </Section>
           <Section title="今日漲跌" unavailable={availability.chg}>
             <div className="fs-chips" role="group" aria-label="今日漲跌快選">
               {CHANGE_PRESETS.map((preset) => {
@@ -889,10 +929,10 @@ export function FilterSheet(props: FilterSheetProps) {
           </Section>
         </div>
         <footer className="fs-foot">
-          <button type="button" className="ghost-button" onClick={() => setDraft({ ...EMPTY_FILTERS, tr: [] })}>
+          <button type="button" className="ghost-button" onClick={() => { setDraft({ ...EMPTY_FILTERS, tr: [] }); setVolumeText(''); }}>
             重設
           </button>
-          <button type="button" className="primary-button fs-apply" onClick={() => props.onApply(draft)}>
+          <button type="button" className="primary-button fs-apply" disabled={volumeInvalid} onClick={() => props.onApply(draft)}>
             {wantsGrowth && (growth === undefined || growthLoading) ? '套用' : `套用（${count.toLocaleString('en-US')} 檔）`}
           </button>
         </footer>

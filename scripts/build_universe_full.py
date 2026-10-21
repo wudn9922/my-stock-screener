@@ -1,6 +1,6 @@
 """
 全市場 universe：台股上市＋上櫃普通股、美股各交易所普通股與 ADR 的選股指標，寫入 docs/report/universe.json
-（scope: "full"；指標與 main.py 的流動性名單同一套 report_metrics.build_universe，只是名單擴大、RS 百分位在擴大後的
+（scope: "full"；指標與 main.py 的每日掃描名單同一套 report_metrics.build_universe，只是名單擴大、RS 百分位在擴大後的
 名單內計算），並附加 sector / industry / marketCap 欄。
 
   python -u scripts/build_universe_full.py [--markets TW,US] [--budget 2400] [--cache-dir .cache/universe-full]
@@ -19,7 +19,7 @@
 3. 完整快取的股票直接接上當日 K；缺口、價格調整（除權、減資、分割）與還沒有完整歷史的股票逐檔向 Yahoo chart
    請求（REQUEST_DELAY 間隔、429 退避、總時間 --budget 秒），沒做完的下次繼續。
 4. 只輸出有完整歷史、近 5 個交易日有 K、近 20 根不是全部零成交的股票；某市場名單中有完整歷史的比例低於
-   PUBLISH_COVERAGE（冷啟動尚未補齊）時不寫入該市場（保留原內容，選股頁仍顯示 main.py 的流動性名單）。
+   PUBLISH_COVERAGE（冷啟動尚未補齊）時不寫入該市場（保留原內容，選股頁仍顯示 main.py 的每日掃描名單）。
 5. 逐市場寫入 universe.json：只替換這次建好的市場，其他市場原樣保留；內容沒變時不改檔。
 """
 import argparse
