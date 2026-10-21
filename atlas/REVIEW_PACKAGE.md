@@ -1,4 +1,16 @@
-## Current review: parameter console follow-up (2026-10-20)
+## Current review: screener filter composition (2026-10-21)
+
+The filter drawer uses orange accents, category navigation, removable draft chips and growth-condition cards. EPS and revenue gates can each have multiple quarterly or annual instances, combined with AND. Repeated `eps`, `epsy`, `rev`, and `revy` URL tokens preserve these instances. Removing the first instance promotes the next instance of that metric; saved single-condition strategies remain compatible. Malformed growth tokens are ignored without erasing valid conditions.
+
+`acc:1` retains quarterly EPS acceleration; `accy:1` selects annual acceleration. Both tokens require both periods to accelerate. Each compares the latest two consecutive YoY slots for its period, with the existing turnaround and missing-data policy and no cross-period fallback. Row detail tooltips include every stacked gate. The existing EPS streak is kept in a collapsed advanced section: unlike an annual gate, it requires YoY strictly above zero and stops at missing years or flat/declining EPS.
+
+Filter limits increase from 300 to 2,000 characters consistently in routes, local/saved-list validation and the user-settings Edge Function. Existing persisted strings require no migration. Cloud support for longer strategies requires deploying the changed Edge Function. No deployment is claimed.
+
+Verification: clean `npm ci`, full unit suite (928 passed), production build and lint/typecheck passed. All 38 desktop/mobile Chromium filter cases passed, including no horizontal overflow, annual-vs-quarterly acceleration, stacked EPS/revenue rules, preview counts, reload, per-instance removal, draft cancellation and reset. After the final extra-gate input correction (clearing a threshold keeps its card available for editing), all 8 focused desktop/mobile regressions passed and lint/production build passed again. WebKit could not be installed because the managed outbound policy rejects both official download hosts with HTTP 403 (Domain forbidden). No Safari or independent review sign-off is claimed.
+
+Review scope: `src/pages/screenerFilters.ts`, `src/pages/screenerItems.ts`, `src/pages/ScreenerPage.tsx`, `src/ui/FilterSheet.tsx`, `src/ui/filter-sheet.css`, `src/app/routes.ts`, `src/watchlists/model.ts`, `../supabase/functions/user-settings/watchlists.ts`, and the screener unit/browser regressions. Confirm AND behavior, independent annual/quarterly acceleration, per-instance removal, URL and saved-strategy restoration, draft cancellation/reset, missing data, turnaround handling and phone overflow.
+
+## Historical review: parameter console follow-up (2026-10-20)
 
 Selected watchlists now auto-save authenticated settings and delete cloud-first through a serialized per-list queue. Permanent stock MAs are dormant ungrouped stocks records; they survive list/member removal and only override an active member's defaults. The daily report and breakout consumers both exclude dormant rows. The Edge Function requires ATLAS_FIXED_PARAMETERS_ENABLED=1 after consumer deployment to avoid old monitor builds treating the new reserved group as active.
 

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_FILTERS,
+  FILTER_PARAM_MAX,
   FILTER_STORAGE_KEY,
   NO_METRICS_REASON,
   NO_GROWTH_REASON,
@@ -90,7 +91,7 @@ describe('filter encoding', () => {
     expect(state('')).toEqual(EMPTY_FILTERS);
     expect(state(null)).toEqual(EMPTY_FILTERS);
     const junk = state('zzz:1;chg:a:b;hi:0;hi:500;rs:0;rs:150;vr:-1;eps:9:20;eps:x;tr:up,a20,A50;ema20::;;:;rev:1:x');
-    expect(junk).toEqual({ ...EMPTY_FILTERS, tr: ['a20', 'a50'] });
+    expect(junk).toEqual({ ...EMPTY_FILTERS, tr: ['a20', 'a50'], eps: { quarters: 9, min: 20, share: 100 } });
     // Reversed bounds are swapped; the last duplicate wins.
     expect(state('chg:5:-2;hi:5;hi:20')).toMatchObject({ chg: { min: -2, max: 5 }, hi: 20 });
     expect(serializeFilters(EMPTY_FILTERS)).toBe('');
@@ -109,7 +110,7 @@ describe('filter encoding', () => {
     expect(parseRoute(`?page=screener&f=${f}`).route).toEqual({ page: 'screener', f });
     expect(parseRoute('?page=screener&group=tw_g1').route).toEqual({ page: 'screener', group: 'tw_g1' });
     expect(parseRoute('?page=screener&f=<script>').route).toEqual({ page: 'screener' });
-    expect(parseRoute(`?page=screener&f=${'a'.repeat(301)}`).route).toEqual({ page: 'screener' });
+    expect(parseRoute(`?page=screener&f=${'a'.repeat(FILTER_PARAM_MAX + 1)}`).route).toEqual({ page: 'screener' });
     expect(parseRoute(`?liff.state=${encodeURIComponent(`/?page=screener&group=us_g1&f=${f}`)}`).route).toEqual({ page: 'screener', group: 'us_g1', f });
   });
 });

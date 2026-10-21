@@ -45,7 +45,8 @@ export function validateWatchlist(value: unknown) {
   if (raw.kind !== 'rules' && raw.kind !== 'manual') throw new Error('清單種類不正確');
   const group = text(raw.group, 80);
   if (!/^[A-Za-z0-9_.:-]{1,80}$/.test(group)) throw new Error('清單來源群組不正確');
-  const filters = text(raw.filters, 300);
+  // Keep in sync with Atlas FILTER_PARAM_MAX; repeated fundamental gates share this encoding.
+  const filters = text(raw.filters, 2000);
   if (filters && !/^[A-Za-z0-9:.,;_~-]+$/.test(filters)) throw new Error('篩選條件格式不正確');
   if (!Array.isArray(raw.symbols) || raw.symbols.length > 500) throw new Error('手動清單最多 500 檔');
   const symbols = [...new Set(raw.symbols.map(ticker))];

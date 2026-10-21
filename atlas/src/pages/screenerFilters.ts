@@ -18,7 +18,8 @@ import { growthKey, type GrowthFile, type GrowthRecord } from '../fundamentals/G
  *   periods are left out of that count. Fewer than ceil(N/2) periods with data is 「資料不足」: kept only with nd:keep.
  *   The old `N:X` and `X` shapes mean P = 100. See `growthGatePasses`.
  * - epss:N: EPS grew for at least N fiscal years in a row, counting back from the latest one (see `epsStreak`)
- * - acc:1: EPS growth accelerates (the latest quarter's YoY is above the previous quarter's)
+ * - Repeated eps / epsy / rev / revy tokens add independent conditions, all combined with AND.
+ * - acc:1 / accy:1: quarterly / annual EPS growth accelerates (the latest YoY is above the previous one).
  * - tn:0: loss-to-profit turnarounds do NOT count as growth: in an EPS gate they count as a decline, in the streak and
  *   acceleration they are missing (the default counts them as growth, in any period of the window)
  * - nd:keep keeps stocks whose fundamentals are missing (the default excludes them)
@@ -47,6 +48,12 @@ export interface YearGate {
   /** 成長佔比 P (1–100, default 100). */
   share: number;
 }
+export type FundamentalKind = 'eps' | 'rev' | 'epsY' | 'revY';
+/** Additional instances of a fundamental gate. Primary fields keep existing saved strategies compatible. */
+export type ExtraGrowthGate =
+  | { kind: 'eps' | 'rev'; gate: GrowthGate }
+  | { kind: 'epsY' | 'revY'; gate: YearGate };
+export type AccelPeriod = 'quarterly' | 'annual';
 /** The newest quarters judged by a quarterly gate (growth.json QUARTER_SLOTS). */
 export const MAX_GATE_QUARTERS = 12;
 /** Annual YoY values in growth.json (build_growth.py YEAR_SLOTS): the longest annual window. */
@@ -98,6 +105,10 @@ export interface FilterState {
   epss: number | null;
   /** EPS growth accelerates: the latest quarter's YoY is above the previous quarter's. */
   accel: boolean;
+  /** Annual acceleration can be applied independently, or together with quarterly acceleration. */
+  accelY?: boolean;
+  /** Repeated fundamental conditions, all combined with AND. */
+  extraGates?: ExtraGrowthGate[];
   /** Loss-to-profit turnarounds count as growth (in any period of the window). */
   turn: boolean;
   /** Keep stocks with missing fundamentals instead of excluding them. */
@@ -130,8 +141,8 @@ export const toggleVolume = (current: number | null, next: number | null): numbe
 /** An applied threshold that is not one of the presets (an old link): shown as 「目前條件」, no preset lit. */
 export const isCustomVolume = (value: number | null): value is number => value !== null && !VOLUME_PRESETS.includes(value);
 
-export const FILTER_PARAM_MAX = 300;
-export const FILTER_PARAM_PATTERN = /^[A-Za-z0-9:.,;_~-]{1,300}$/;
+export const FILTER_PARAM_MAX = 2000;
+export const FILTER_PARAM_PATTERN = /^[A-Za-z0-9:.,;_~-]{1,2000}$/;
 
 const number = (text: string | undefined): number | null => {
   if (text === undefined) return null;
@@ -197,12 +208,16 @@ export function parseFilters(value: string | null | undefined): FilterState {
     else if (key === 'vr') {
       const vr = number(parts[0]);
       state.vr = vr !== null && vr > 0 ? vr : null;
-    } else if (key === 'eps') state.eps = quarterGate(parts);
-    else if (key === 'rev') state.rev = quarterGate(parts);
-    else if (key === 'epsy') state.epsY = yearGate(parts);
-    else if (key === 'revy') state.revY = yearGate(parts);
-    else if (key === 'epss') state.epss = streakOf(parts);
+    } else if (key === 'eps' || key === 'rev' || key === 'epsy' || key === 'revy') {
+      const kind = key === 'epsy' ? 'epsY' : key === 'revy' ? 'revY' : key;
+      const gate = kind === 'epsY' || kind === 'revY' ? yearGate(parts) : quarterGate(parts);
+      if (gate) {
+        if (!state[kind]) Object.assign(state, { [kind]: gate });
+        else state.extraGates = [...(state.extraGates ?? []), { kind, gate } as ExtraGrowthGate];
+      }
+    } else if (key === 'epss') state.epss = streakOf(parts);
     else if (key === 'acc') state.accel = parts[0]?.trim() !== '0';
+    else if (key === 'accy') state.accelY = parts[0]?.trim() !== '0';
     else if (key === 'tn') state.turn = parts[0]?.trim() !== '0';
     else if (key === 'nd') state.keepMissing = parts[0]?.trim().toLowerCase() === 'keep';
   }
@@ -233,9 +248,12 @@ export function serializeFilters(state: FilterState): string {
   if (state.epss !== null) tokens.push(`epss:${state.epss}`);
   if (state.rev) tokens.push(gateParam('rev', state.rev.quarters, state.rev.min, state.rev.share));
   if (state.revY) tokens.push(gateParam('revy', state.revY.years, state.revY.min, state.revY.share));
+  for (const { kind, gate } of state.extraGates ?? [])
+    tokens.push(gateParam(kind.toLowerCase(), 'years' in gate ? gate.years : gate.quarters, gate.min, gate.share));
   if (state.accel) tokens.push('acc:1');
+  if (state.accelY) tokens.push('accy:1');
   // `tn` only matters with an EPS condition, `nd` with any fundamental one.
-  if (!state.turn && (state.eps || state.epsY || state.epss !== null || state.accel)) tokens.push('tn:0');
+  if (!state.turn && hasEpsCondition(state)) tokens.push('tn:0');
   if (state.keepMissing && needsGrowth(state)) tokens.push('nd:keep');
   let text = '';
   for (const token of tokens) {
@@ -310,21 +328,21 @@ export function growthGatePasses(
   return growth * 100 >= (gate.share ?? SHARE_DEFAULT) * measured;
 }
 
-/** EPS acceleration: yes / no, or unknown when the two quarters cannot be compared. */
-export function epsAccelStatus(record: GrowthRecord | null, includeTurn: boolean): 'yes' | 'no' | 'unknown' {
+/** Compare consecutive YoY rates of the chosen period; never substitute quarterly data for annual data. */
+export function epsAccelStatus(record: GrowthRecord | null, includeTurn: boolean, period: AccelPeriod = 'quarterly'): 'yes' | 'no' | 'unknown' {
   if (!record) return 'unknown';
-  const latest = record.epsYoY[0] ?? null;
-  const previous = record.epsYoY[1] ?? null;
-  const latestTurn = includeTurn && (record.epsTurnQ[0] ?? false);
+  const values = period === 'annual' ? record.epsYoYAnnual : record.epsYoY;
+  const turns = period === 'annual' ? record.epsTurnAnnual : record.epsTurnQ;
+  const latest = values[0] ?? null;
+  const previous = values[1] ?? null;
+  const latestTurn = includeTurn && (turns[0] ?? false);
   if (latest !== null && previous !== null) return latest > previous ? 'yes' : 'no';
-  // Turned to a profit right after a growth quarter: the sharpest acceleration.
+  // Turned to a profit after a period with a numeric YoY: preserve the existing turnaround rule.
   if (latestTurn && previous !== null) return 'yes';
-  // The quarter before was the turnaround (no number to beat) or the latest quarter lost money.
-  if (latest !== null && includeTurn && (record.epsTurnQ[1] ?? false)) return 'no';
+  // The previous period was a turnaround (no numeric rate to beat).
+  if (latest !== null && includeTurn && (turns[1] ?? false)) return 'no';
   return 'unknown';
 }
-
-export type FundamentalKind = 'eps' | 'rev' | 'epsY' | 'revY';
 
 /**
  * EPS growth streak: how many fiscal years in a row, counting back from the latest one (index 0), have an annual
@@ -393,17 +411,17 @@ export function streakCoverage(items: readonly GroupItem[], growth: GrowthFile |
   return covered;
 }
 
-/** How many of the rows have the two quarters needed to tell whether EPS growth accelerates. */
-export function accelCoverage(items: readonly GroupItem[], growth: GrowthFile | null | undefined, includeTurn: boolean): number {
+/** How many rows have comparable YoY values for the chosen acceleration period. */
+export function accelCoverage(items: readonly GroupItem[], growth: GrowthFile | null | undefined, includeTurn: boolean, period: AccelPeriod = 'quarterly'): number {
   let covered = 0;
-  for (const item of items) if (epsAccelStatus(growthRecordFor(item, growth), includeTurn) !== 'unknown') covered += 1;
+  for (const item of items) if (epsAccelStatus(growthRecordFor(item, growth), includeTurn, period) !== 'unknown') covered += 1;
   return covered;
 }
 
 // ---------------------------------------------------------- availability
 
-export type FilterKey = 'chg' | 'ema20' | 'tr' | 'hi' | 'rs' | 'rs3' | 'rs1' | 'vr' | 'eps' | 'rev' | 'epsY' | 'revY' | 'epss' | 'accel';
-export const FILTER_KEYS: readonly FilterKey[] = ['chg', 'ema20', 'tr', 'hi', 'rs', 'rs3', 'rs1', 'vr', 'eps', 'rev', 'epsY', 'revY', 'epss', 'accel'];
+export type FilterKey = 'chg' | 'ema20' | 'tr' | 'hi' | 'rs' | 'rs3' | 'rs1' | 'vr' | 'eps' | 'rev' | 'epsY' | 'revY' | 'epss' | 'accel' | 'accelY';
+export const FILTER_KEYS: readonly FilterKey[] = ['chg', 'ema20', 'tr', 'hi', 'rs', 'rs3', 'rs1', 'vr', 'eps', 'rev', 'epsY', 'revY', 'epss', 'accel', 'accelY'];
 /** SMA distances are no longer a filter, but the trend flags still need them; their availability is tracked too. */
 export type TrendMaKey = 'ma20' | 'ma50' | 'ma200';
 
@@ -459,6 +477,7 @@ export function filterAvailability(items: readonly GroupItem[], context: FilterC
     revY: fundamentals((record) => someNumber(record.revYoYAnnual)),
     epss: fundamentals((record) => someNumber(record.epsYoYAnnual, record.epsTurnAnnual)),
     accel: fundamentals((record) => record.epsYoY.length > 1 || record.epsTurnQ[0] === true),
+    accelY: fundamentals((record) => record.epsYoYAnnual.some((value) => value !== null) || record.epsTurnAnnual.some(Boolean)),
   };
 }
 
@@ -528,12 +547,26 @@ export function applyFilters(items: readonly GroupItem[], state: FilterState, co
       const status = epsAccelStatus(record(item), turn);
       return status === 'yes' || (status === 'unknown' && keepMissing);
     });
+  if (state.accelY && !available.accelY)
+    tests.push((item) => {
+      const status = epsAccelStatus(record(item), turn, 'annual');
+      return status === 'yes' || (status === 'unknown' && keepMissing);
+    });
+  for (const { kind, gate } of state.extraGates ?? []) {
+    if (available[kind]) continue;
+    tests.push((item) => {
+      const r = record(item);
+      const values = kind === 'eps' ? r?.epsYoY : kind === 'epsY' ? r?.epsYoYAnnual : kind === 'rev' ? r?.revYoY : r?.revYoYAnnual;
+      const turns = kind === 'eps' ? r?.epsTurnQ : kind === 'epsY' ? r?.epsTurnAnnual : [];
+      return growthGatePasses(values, gate, keepMissing, turns ?? [], turn);
+    });
+  }
   return tests.length ? items.filter((item) => tests.every((test) => test(item))) : [...items];
 }
 
 // ----------------------------------------------------------------- chips
 
-export type ChipId = Exclude<FilterKey, 'tr'> | `tr:${TrendFlag}` | 'turn';
+export type ChipId = Exclude<FilterKey, 'tr'> | `tr:${TrendFlag}` | `growth:${number}` | 'turn';
 export interface FilterChip {
   id: ChipId;
   key: FilterKey;
@@ -601,8 +634,13 @@ export function activeChips(state: FilterState, availability?: FilterAvailabilit
   if (state.epss !== null) chips.push({ id: 'epss', key: 'epss', label: streakLabel(state.epss) });
   if (state.rev) chips.push({ id: 'rev', key: 'rev', label: gateLabel('營收', state.rev) });
   if (state.revY) chips.push({ id: 'revY', key: 'revY', label: yearGateLabel('營收', state.revY) });
-  if (state.accel) chips.push({ id: 'accel', key: 'accel', label: 'EPS 成長加速' });
-  if (!state.turn && (state.eps || state.epsY || state.epss !== null || state.accel)) chips.push({ id: 'turn', key: 'eps', label: '不含虧轉盈' });
+  (state.extraGates ?? []).forEach(({ kind, gate }, index) => {
+    const name = kind.startsWith('eps') ? 'EPS' : '營收';
+    chips.push({ id: `growth:${index}`, key: kind, label: 'years' in gate ? yearGateLabel(name, gate) : gateLabel(name, gate) });
+  });
+  if (state.accel) chips.push({ id: 'accel', key: 'accel', label: '季度 EPS 成長加速' });
+  if (state.accelY) chips.push({ id: 'accelY', key: 'accelY', label: '年度 EPS 成長加速' });
+  if (!state.turn && hasEpsCondition(state)) chips.push({ id: 'turn', key: 'eps', label: '不含虧轉盈' });
   return chips.map((chip) => ({
     ...chip,
     unavailable: !availability
@@ -621,16 +659,28 @@ export function countFilters(state: FilterState): number {
 export function removeFilter(state: FilterState, id: ChipId): FilterState {
   const next: FilterState = { ...state, tr: [...state.tr] };
   if (id.startsWith('tr:')) next.tr = next.tr.filter((flag) => `tr:${flag}` !== id);
-  else if (id === 'chg' || id === 'ema20' || id === 'eps' || id === 'rev' || id === 'epsY' || id === 'revY' || id === 'epss') next[id] = null;
+  else if (id.startsWith('growth:')) next.extraGates = (state.extraGates ?? []).filter((_, index) => `growth:${index}` !== id);
+  else if (id === 'eps' || id === 'rev' || id === 'epsY' || id === 'revY') {
+    const index = next.extraGates?.findIndex(({ kind }) => kind === id) ?? -1;
+    if (index >= 0) {
+      Object.assign(next, { [id]: next.extraGates![index].gate });
+      next.extraGates = next.extraGates!.filter((_, i) => i !== index);
+    } else next[id] = null;
+  } else if (id === 'chg' || id === 'ema20' || id === 'epss') next[id] = null;
   else if (id === 'hi' || id === 'rs' || id === 'rs3' || id === 'rs1' || id === 'vr') next[id] = null;
   else if (id === 'accel') next.accel = false;
+  else if (id === 'accelY') next.accelY = false;
   else if (id === 'turn') next.turn = true;
   return next;
 }
 
 /** True when the state needs the growth data. */
 export function needsGrowth(state: FilterState): boolean {
-  return !!(state.eps || state.rev || state.epsY || state.revY || state.epss !== null || state.accel);
+  return !!(state.eps || state.rev || state.epsY || state.revY || state.epss !== null || state.accel || state.accelY || state.extraGates?.length);
+}
+
+function hasEpsCondition(state: FilterState): boolean {
+  return !!(state.eps || state.epsY || state.epss !== null || state.accel || state.accelY || state.extraGates?.some(({ kind }) => kind.startsWith('eps')));
 }
 
 // --------------------------------------------------------------- storage

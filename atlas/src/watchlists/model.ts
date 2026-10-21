@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { GroupItem } from '../report/schema';
 import type { GrowthFile } from '../fundamentals/GrowthProvider';
-import { activeChips, applyFilters, filterAvailability, parseFilters, serializeFilters } from '../pages/screenerFilters';
+import { activeChips, applyFilters, filterAvailability, FILTER_PARAM_MAX, parseFilters, serializeFilters } from '../pages/screenerFilters';
 
 const symbol = z.string().regex(/^[A-Z0-9^][A-Z0-9.^=-]{0,31}$/);
 const member = z.object({ symbol, name: z.string().max(200) });
@@ -26,7 +26,7 @@ export const watchlistSchema = z.object({
   market: z.enum(['TW', 'US']),
   group: z.string().min(1).max(80),
   kind: z.enum(['rules', 'manual']),
-  filters: z.string().max(300),
+  filters: z.string().max(FILTER_PARAM_MAX),
   symbols: z.array(symbol).max(500).default([]),
   maList: z
     .array(z.number().int().min(1).max(1000))

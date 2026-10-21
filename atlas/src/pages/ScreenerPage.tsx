@@ -374,10 +374,10 @@ function ScreenerView({
     [viewItems, context, query],
   );
   const coverage = useCallback(
-    (kind: FundamentalKind | 'accel' | 'streak', periods: number, includeTurn: boolean) => ({
+    (kind: FundamentalKind | 'accel' | 'accelY' | 'streak', periods: number, includeTurn: boolean) => ({
       covered:
-        kind === 'accel'
-          ? accelCoverage(viewItems, growth, includeTurn)
+        kind === 'accel' || kind === 'accelY'
+          ? accelCoverage(viewItems, growth, includeTurn, kind === 'accelY' ? 'annual' : 'quarterly')
           : kind === 'streak'
             ? streakCoverage(viewItems, growth, periods, includeTurn)
             : gateCoverage(viewItems, growth, kind, periods, includeTurn),
