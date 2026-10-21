@@ -29,7 +29,7 @@
 ### 固定個股參數的部署順序（本次未執行正式部署）
 
 1. 先更新使用 main.py 的每日報告工作與 Python 突破監控／查詢服務。新版本明確排除 ungrouped 的監控資格，只對已在分組／啟用監控清單中的股票套用同帳號固定參數。舊版突破程式會推斷未知組別為監控群組，因此不可先開放建立固定參數。
-2. 再部署新版 user-settings。沿用 stocks 表與既有 (line_user_id,ticker,group_id) 唯一索引，不需要新表；確認沒有額外限制 ungrouped 的自訂 DB constraint。
+2. 先套用 `supabase/manual/stocks_fixed_parameters.sql`：正式環境另有 (line_user_id,ticker) 唯一限制，會讓 ungrouped 記錄與同股票的分組記錄互相阻擋；改為只限制非 ungrouped 記錄的部分唯一索引。再部署新版 user-settings。沿用 stocks 表與既有 (line_user_id,ticker,group_id) 唯一索引，不需要新表。
 3. 確認所有消費者都已更新後，才在 Edge Function 設定 ATLAS_FIXED_PARAMETERS_ENABLED=1。未啟用時保存固定參數回 503，介面保留輸入並顯示原因；原有分組參數不受影響。
 4. 真帳號驗收「保存 → 出榜／刪清單 → 仍保留 → 再入榜／加分組 → 使用固定參數」，並確認無分組記錄不單獨產生報告或提醒。關閉開關只阻止新增／修改固定參數，已部署消費者仍會正確排除其獨立監控資格。
 
