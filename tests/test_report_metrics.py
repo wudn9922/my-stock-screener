@@ -417,7 +417,7 @@ class UniverseTest(unittest.TestCase):
         self.assertEqual(set(payload["markets"]), {"TW", "US"})
         tw = payload["markets"]["TW"]
         self.assertEqual(tw["benchmark"], "^TWII")
-        self.assertEqual(tw["universe"], "台股上市／上櫃掃描名單（不限成交股數）")
+        self.assertEqual(tw["universe"], "台股上市／上櫃資料名單（收集不限股數；LINE 全市場潛伏清單當日成交≥100萬股）")
         self.assertEqual(payload["markets"]["US"]["universe"], "S&P 500 成分股")
         self.assertEqual(tw["scope"], "liquid")
         self.assertEqual(payload["markets"]["US"]["benchmark"], "SPY")

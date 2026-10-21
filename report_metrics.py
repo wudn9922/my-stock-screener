@@ -49,9 +49,10 @@ MARKET_BENCHMARKS = {
     "US": "SPY"
 }
 
-# main.py 的每日掃描名單（無成交股數門檻；保留舊 scope=liquid 的相容格式）
+# 行情收集與選股資料名單不限成交股數；LINE tw_all 報告另外篩選最新日 K 至少 100 萬股。
+# 保留舊 scope=liquid 的相容格式。
 UNIVERSE_LABELS = {
-    "TW": "台股上市／上櫃掃描名單（不限成交股數）",
+    "TW": "台股上市／上櫃資料名單（收集不限股數；LINE 全市場潛伏清單當日成交≥100萬股）",
     "US": "S&P 500 成分股"
 }
 

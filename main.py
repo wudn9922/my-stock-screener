@@ -21,8 +21,8 @@ from breakout_alert.supabase_store import FIXED_STOCK_GROUP_ID, fixed_parameter_
 # =========================================================================
 # 全域核心參數
 # =========================================================================
-# 只用於每日報告「台股-全市場潛伏」名單；資料下載與更新不設成交股數門檻（低量股日 K 照常更新）。
-TW_REPORT_MIN_VOLUME = 1_000_000
+# 僅供每日 LINE 報告 tw_all 清單；行情下載與 CSV 更新不設成交股數門檻。
+TW_MIN_VOLUME = 1_000_000
 
 HTTP_HEADERS = {
     "User-Agent": (
@@ -2378,7 +2378,8 @@ def scan_market(tickers, report_min_volume=0):
                 )
 
     # -----------------------------------------------------------------
-    # 讀取完成更新的 CSV，執行 MA20 篩選；成交股數由選股頁決定
+    # 全部 CSV 更新後才篩選報告清單：台股最新日 K 至少 100 萬股；美股不限。
+    # 這裡的台股成交股數門檻只影響每日 LINE 報告 tw_all，不影響行情收集。
     # -----------------------------------------------------------------
     for ticker in tickers:
         csv_path = os.path.join(
@@ -2406,6 +2407,8 @@ def scan_market(tickers, report_min_volume=0):
             latest_volume = safe_float(
                 df["Volume"].iloc[-1]
             )
+
+            is_tw_stock = ticker.endswith((".TW", ".TWO"))
 
             if latest_volume < report_min_volume:
                 continue
@@ -2448,11 +2451,6 @@ def scan_market(tickers, report_min_volume=0):
             title = (
                 f"(現價:{price:.2f} | "
                 f"距MA20:{diff_pct:.2f}%)"
-            )
-
-            is_tw_stock = (
-                ticker.endswith(".TW")
-                or ticker.endswith(".TWO")
             )
 
             display_name = (
@@ -7888,7 +7886,7 @@ def main():
 
     tw_all = scan_market(
         tw_tickers,
-        report_min_volume=TW_REPORT_MIN_VOLUME
+        report_min_volume=TW_MIN_VOLUME
     )
 
     # -----------------------------------------------------------------
