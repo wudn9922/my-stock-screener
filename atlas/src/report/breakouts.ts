@@ -3,8 +3,8 @@ import { reportUrl } from './loadReport';
 import { countOf, finiteOrNull, optionalText, pctOf, text } from './breadth';
 
 /**
- * Breakout win rates (`report/breakouts.json`, written by scripts/build_breakouts.py from the local
- * daily bars of the same universes as the breadth card).
+ * Full-market breakout outcome comparisons (`report/breakouts.json`). Legacy flat return
+ * fields remain readable, but the UI requires an explicitly versioned, validated comparison.
  *
  * Tolerant like breadth.ts: unknown fields are ignored, numbers may arrive as strings, a strategy or
  * window that does not parse is dropped, and a market without any usable window is left out instead
@@ -13,13 +13,22 @@ import { countOf, finiteOrNull, optionalText, pctOf, text } from './breadth';
 
 export const BREAKOUT_MARKET_KEYS = ['tw', 'us'] as const;
 export type BreakoutMarketKey = (typeof BREAKOUT_MARKET_KEYS)[number];
+export const SUCCESS_MODEL = 'four-rules-v1';
+export const OUTCOME_KEYS = ['hold5', 'nextHigh', 'firstHit', 'targetAndNext'] as const;
+export type OutcomeKey = (typeof OUTCOME_KEYS)[number];
+export const OUTCOME_RULES: { key: OutcomeKey; label: string; short: string; description: string }[] = [
+  { key: 'hold5', label: '守住關鍵點', short: '五日守住', description: '後續5個交易日內，最低價未碰到關鍵點下方5%，即算成功。' },
+  { key: 'nextHigh', label: '隔日再創高', short: '隔日創高', description: '下一個交易日的最高價，高於突破日最高價，即算成功。' },
+  { key: 'firstHit', label: '先觸發判定', short: '先觸發', description: '先跌到−5%判失敗；先漲到＋5%或隔日先創高判成功。五日守住−5%也成功，先成立後不改判。' },
+  { key: 'targetAndNext', label: '漲幅與續強', short: '目標＋續強', description: '五日內碰到關鍵點上方5%，且隔日再創高，兩項都成立才成功。' },
+];
 
 export interface BreakoutStrategyMeta {
   key: string;
   label: string;
   kind: string;
   lookback: number | null;
-  /** Volume-confirmed variant (shown in the details section, not the main list). */
+  /** Legacy volume-confirmed variant, retained in reports but omitted from the three method families. */
   volume: boolean;
   definition: string;
 }
@@ -37,15 +46,28 @@ export interface BreakoutParams {
   volumeLookback: number | null;
   volumeMultiple: number | null;
   boxLookback: number | null;
+  swingMethod: 'atr-reversal-v1' | 'atr-reversal-v2' | 'fractal-v1' | 'unknown';
+  successModel: typeof SUCCESS_MODEL | null;
+  successAtrPeriod: number;
+  closeBufferAtr: number;
+  observationDays: number;
+  barrierPct: number;
+  swingAtrPeriod: number | null;
+  swingReversalAtr: number | null;
+  /** Only describes legacy local-pivot reports; never infer ATR waves from old counts. */
+  swingPivotLeft: number;
+  swingPivotRight: number;
   strategies: BreakoutStrategyMeta[];
 }
 export interface BreakoutStats {
-  /** Stocks with enough clean history to evaluate the strategy over the whole window. */
+  /** Usable swing references in the window; box/EMA require whole-window warmup. */
   eligible: number;
-  /** First fresh breakout per stock inside the window, matured or not. */
+  /** Swing retries failed closes until qualified; box/EMA take the first fresh event per window. */
   n: number;
-  /** Breakouts held at least `matureDays` trading days; every rate below uses only these. */
+  /** Legacy as-of return cohort; the four public rates use comparison.completeN instead. */
   maturedN: number;
+  /** Exact numerator; absent in legacy reports, never reconstructed from a rounded rate. */
+  wins: number | null;
   winRate: number | null;
   avgReturn: number | null;
   medianReturn: number | null;
@@ -54,15 +76,41 @@ export interface BreakoutStats {
   /** Share of the whole universe up from the same entry days to asOf (matched to the breakouts). */
   baseRate: number | null;
   baseAvgReturn: number | null;
+  comparison: BreakoutComparison | null;
+}
+export interface BreakoutOutcome {
+  wins: number;
+  failures: number;
+  evaluatedN: number;
+  winRate: number | null;
+}
+export interface BreakoutComparison {
+  n: number;
+  completeN: number;
+  pendingN: number;
+  missingN: number;
+  commonFailedN: number;
+  sameBarFailedN: number;
+  rules: Partial<Record<OutcomeKey, BreakoutOutcome>>;
 }
 export interface BreakoutWindow {
   days: number;
   start: string | null;
   maturedThrough: string | null;
-  market: { entryDays: number; pairs: number; upRate: number | null; avgReturn: number | null };
+  observedThrough: string | null;
+  market: {
+    entryDays: number;
+    pairs: number;
+    upRate: number | null;
+    avgReturn: number | null;
+  };
   strategies: Record<string, BreakoutStats>;
 }
 export interface BreakoutMarket {
+  scope: 'full' | 'legacy';
+  coverage: { loaded: number; missing: number } | null;
+  listingAsOf: string | null;
+  listingSource: string;
   asOf: string | null;
   universe: string;
   universeCount: number;
@@ -79,7 +127,7 @@ export interface Breakouts {
   markets: Partial<Record<BreakoutMarketKey, BreakoutMarket>>;
 }
 
-/** What the job writes today; used when `params` is missing or partly unreadable. */
+/** Safe fallbacks: missing method metadata must not relabel old results as ATR waves. */
 export const DEFAULT_BREAKOUT_PARAMS: BreakoutParams = {
   windows: [
     { key: '1w', days: 5, label: '近1週' },
@@ -92,11 +140,34 @@ export const DEFAULT_BREAKOUT_PARAMS: BreakoutParams = {
   volumeLookback: 20,
   volumeMultiple: 1.5,
   boxLookback: 20,
+  swingMethod: 'unknown',
+  successModel: null,
+  successAtrPeriod: 14,
+  closeBufferAtr: 0.1,
+  observationDays: 5,
+  barrierPct: 5,
+  swingAtrPeriod: null,
+  swingReversalAtr: null,
+  swingPivotLeft: 2,
+  swingPivotRight: 2,
   strategies: [
-    ...[20, 60, 120].map((n) => ({ key: `high${n}`, label: `突破${n}日高`, kind: 'high', lookback: n, volume: false, definition: '' })),
-    { key: 'box20', label: '突破20日箱型', kind: 'box', lookback: 20, volume: false, definition: '' },
-    ...[20, 60, 120].map((n) => ({ key: `high${n}Vol`, label: `突破${n}日高＋放量`, kind: 'high', lookback: n, volume: true, definition: '' })),
-    { key: 'box20Vol', label: '突破20日箱型＋放量', kind: 'box', lookback: 20, volume: true, definition: '' },
+    { key: 'swingHigh', label: '突破波段前高', kind: 'swing', lookback: null, volume: false, definition: '' },
+    {
+      key: 'box20',
+      label: '突破20日箱型',
+      kind: 'box',
+      lookback: 20,
+      volume: false,
+      definition: '',
+    },
+    {
+      key: 'ema20',
+      label: '突破20EMA',
+      kind: 'ema',
+      lookback: 20,
+      volume: false,
+      definition: '',
+    },
   ],
 };
 
@@ -107,10 +178,32 @@ const positiveInt = (value: unknown): number | null => {
   return number !== null && number > 0 ? Math.floor(number) : null;
 };
 
+const outcomeSchema = z.object({ wins: countOf, failures: countOf, evaluatedN: countOf, winRate: pctOf });
+function parseComparison(value: unknown, signals: number): BreakoutComparison | null {
+  const raw = record(value);
+  if (raw.model !== SUCCESS_MODEL) return null;
+  const numbers = ['n', 'completeN', 'pendingN', 'missingN', 'commonFailedN', 'sameBarFailedN'] as const;
+  const counts = Object.fromEntries(numbers.map((key) => [key, finiteOrNull(raw[key])])) as Record<(typeof numbers)[number], number | null>;
+  if (numbers.some((key) => counts[key] === null || !Number.isInteger(counts[key]) || counts[key]! < 0)) return null;
+  const { n, completeN, pendingN, missingN, commonFailedN, sameBarFailedN } = counts as Record<(typeof numbers)[number], number>;
+  if (n !== signals || n !== completeN + pendingN + missingN || commonFailedN > completeN || sameBarFailedN > completeN - commonFailedN) return null;
+  const rules: BreakoutComparison['rules'] = {};
+  for (const key of OUTCOME_KEYS) {
+    const parsed = outcomeSchema.safeParse(record(raw.rules)[key]);
+    if (!parsed.success) continue;
+    const entry = parsed.data;
+    const rateValid = completeN ? entry.winRate !== null && Math.abs(entry.winRate - entry.wins / completeN * 100) <= 0.050001 : entry.winRate === null;
+    if (entry.evaluatedN !== completeN || entry.wins + entry.failures !== completeN || entry.wins > completeN - commonFailedN || !rateValid) continue;
+    rules[key] = entry;
+  }
+  return { n, completeN, pendingN, missingN, commonFailedN, sameBarFailedN, rules };
+}
+
 const statsSchema = z.object({
   eligible: countOf,
   n: countOf,
   maturedN: countOf,
+  wins: z.preprocess(finiteOrNull, z.number().int().nonnegative().nullable().catch(null)),
   winRate: pctOf,
   avgReturn: pctOf,
   medianReturn: pctOf,
@@ -118,15 +211,22 @@ const statsSchema = z.object({
   avgHoldDays: pctOf,
   baseRate: pctOf,
   baseAvgReturn: pctOf,
-});
+  comparison: z.unknown().optional(),
+}).transform((stats): BreakoutStats => ({ ...stats, comparison: parseComparison(stats.comparison, stats.n) }));
 
 const windowSchema = z
   .object({
     days: countOf,
     start: optionalText,
     maturedThrough: optionalText,
+    observedThrough: optionalText,
     market: z
-      .object({ entryDays: countOf, pairs: countOf, upRate: pctOf, avgReturn: pctOf })
+      .object({
+        entryDays: countOf,
+        pairs: countOf,
+        upRate: pctOf,
+        avgReturn: pctOf,
+      })
       .optional()
       .transform((value) => value ?? { entryDays: 0, pairs: 0, upRate: null, avgReturn: null }),
     strategies: z.unknown().optional(),
@@ -142,6 +242,10 @@ const windowSchema = z
 
 const marketSchema = z
   .object({
+    scope: z.unknown().optional(),
+    coverage: z.unknown().optional(),
+    listingAsOf: optionalText,
+    listingSource: text,
     asOf: optionalText,
     universe: text,
     universeCount: countOf,
@@ -160,9 +264,20 @@ const marketSchema = z
     }
     if (!Object.keys(windows).length) return null;
     const anomalies = record(market.anomalies);
+    const coverage = record(market.coverage);
+    const loaded = finiteOrNull(coverage.loaded);
+    const missing = finiteOrNull(coverage.missing);
+    const full = market.scope === 'full' && loaded !== null && missing !== null &&
+      Number.isInteger(loaded) && Number.isInteger(missing) && loaded >= market.evaluated && missing >= 0 &&
+      loaded + missing === market.universeCount && loaded - market.evaluated === market.stale;
     return {
       ...market,
-      anomalies: { stocks: countOf.parse(anomalies.stocks), days: countOf.parse(anomalies.days) },
+      scope: full ? 'full' : 'legacy',
+      coverage: full ? { loaded, missing } : null,
+      anomalies: {
+        stocks: countOf.parse(anomalies.stocks),
+        days: countOf.parse(anomalies.days),
+      },
       windows,
     };
   });
@@ -190,6 +305,11 @@ function parseParams(value: unknown): BreakoutParams {
       definition: typeof entry.definition === 'string' ? entry.definition.trim() : '',
     }));
   const optional = (key: string, fallback: number | null) => finiteOrNull(raw[key]) ?? fallback;
+  const atrPeriod = positiveInt(raw.swingAtrPeriod);
+  const reversal = finiteOrNull(raw.swingReversalAtr);
+  const atrWaves = (raw.swingMethod === 'atr-reversal-v1' || raw.swingMethod === 'atr-reversal-v2') && atrPeriod !== null && reversal !== null && reversal > 0;
+  const legacyPivots = (raw.swingMethod === undefined || raw.swingMethod === 'fractal-v1') &&
+    positiveInt(raw.swingPivotLeft) !== null && positiveInt(raw.swingPivotRight) !== null;
   return {
     windows: windows.length ? windows : defaults.windows,
     matureDays: positiveInt(raw.matureDays) ?? defaults.matureDays,
@@ -199,6 +319,17 @@ function parseParams(value: unknown): BreakoutParams {
     volumeLookback: optional('volumeLookback', defaults.volumeLookback),
     volumeMultiple: optional('volumeMultiple', defaults.volumeMultiple),
     boxLookback: optional('boxLookback', defaults.boxLookback),
+    swingMethod: atrWaves ? raw.swingMethod as 'atr-reversal-v1' | 'atr-reversal-v2' : legacyPivots ? 'fractal-v1' : 'unknown',
+    successModel: raw.successModel === SUCCESS_MODEL && raw.sameBarPolicy === 'conservative-failure' &&
+      Number(raw.successAtrPeriod) === 14 && Number(raw.closeBufferAtr) === 0.1 && Number(raw.observationDays) === 5 && Number(raw.barrierPct) === 5 ? SUCCESS_MODEL : null,
+    successAtrPeriod: positiveInt(raw.successAtrPeriod) ?? defaults.successAtrPeriod,
+    closeBufferAtr: finiteOrNull(raw.closeBufferAtr) ?? defaults.closeBufferAtr,
+    observationDays: positiveInt(raw.observationDays) ?? defaults.observationDays,
+    barrierPct: finiteOrNull(raw.barrierPct) ?? defaults.barrierPct,
+    swingAtrPeriod: atrWaves ? atrPeriod : null,
+    swingReversalAtr: atrWaves ? reversal : null,
+    swingPivotLeft: positiveInt(raw.swingPivotLeft) ?? defaults.swingPivotLeft,
+    swingPivotRight: positiveInt(raw.swingPivotRight) ?? defaults.swingPivotRight,
     strategies: strategies.length ? strategies : defaults.strategies,
   };
 }
@@ -220,9 +351,7 @@ export const breakoutsSchema = z.object({
     }),
 });
 
-export type BreakoutsLoadResult =
-  | { status: 'ok'; data: Breakouts; url: string }
-  | { status: 'missing' | 'invalid' | 'error'; message: string; url: string };
+export type BreakoutsLoadResult = { status: 'ok'; data: Breakouts; url: string } | { status: 'missing' | 'invalid' | 'error'; message: string; url: string };
 
 /** `breakouts.json` sits next to `latest.json` (or next to `VITE_REPORT_URL`). */
 export function breakoutsUrl(
@@ -246,19 +375,24 @@ export function parseBreakouts(data: unknown, url = ''): BreakoutsLoadResult {
 }
 
 /** Fetches and validates the file. Network, HTTP and JSON failures resolve to a friendly state. */
-export async function fetchBreakouts(
-  url = breakoutsUrl(),
-  fetcher: typeof fetch = fetch,
-  signal?: AbortSignal,
-): Promise<BreakoutsLoadResult> {
+export async function fetchBreakouts(url = breakoutsUrl(), fetcher: typeof fetch = fetch, signal?: AbortSignal): Promise<BreakoutsLoadResult> {
   let response: Response;
   try {
     response = await fetcher(url, { cache: 'no-cache', signal });
   } catch {
-    return { status: 'error', message: '無法連線取得突破勝率，請稍後再試。', url };
+    return {
+      status: 'error',
+      message: '無法連線取得突破勝率，請稍後再試。',
+      url,
+    };
   }
   if (response.status === 404) return { status: 'missing', message: MISSING, url };
-  if (!response.ok) return { status: 'error', message: `突破勝率暫時無法取得（HTTP ${response.status}）。`, url };
+  if (!response.ok)
+    return {
+      status: 'error',
+      message: `突破勝率暫時無法取得（HTTP ${response.status}）。`,
+      url,
+    };
   let data: unknown;
   try {
     // An SPA fallback can answer with index.html; treat non-JSON as an unreadable file.

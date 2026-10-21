@@ -103,14 +103,7 @@ jobs:
         timeout-minutes: 15
         run: python scripts/build_breadth.py
 
-      # 突破買進法勝率（近一週／近一月）：只讀 data/ 的日 K，universe 與市場寬度相同。
-      # 輸入不足（asOf 有效股票太少）或失敗時保留上次的 breakouts.json，不影響報告與其他步驟；
-      # 輸出由下方 Commit 步驟的 git add -A docs/report 一併提交。
-      - name: Build breakout win rates
-        if: steps.guard.outputs.skip != 'true'
-        continue-on-error: true
-        timeout-minutes: 15
-        run: python scripts/build_breakouts.py
+      # 進場成功率由 universe-full.yml 使用完整市場名單與日線快取產生，避免本流程的部分名單覆蓋全市場報表。
 
       # ✨ 已修改：注入 Imgur 金鑰，讓自動截圖流能順利上傳並傳入 LINE
       - name: Run Dify Wall Street Report
