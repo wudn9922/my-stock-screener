@@ -1081,6 +1081,54 @@
   font-size: 11px;
   color: var(--text-3);
 }
+.ws-stock-statistics {
+  min-width: 0;
+}
+.ws-volatility-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 2px 0 0;
+  padding-left: 10px;
+}
+.ws-volatility-values div {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.ws-volatility-values dt, .ws-volatility-info {
+  color: var(--text-3);
+  font-size: 10px;
+}
+.ws-volatility-values dd {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ws-volatility-info {
+  position: relative;
+  margin: 2px 0 0 10px;
+}
+.ws-volatility-info summary {
+  cursor: pointer;
+  min-height: 22px;
+  line-height: 22px;
+}
+.ws-volatility-info p {
+  position: absolute;
+  z-index: 40;
+  width: min(340px, 75vw);
+  margin: 0;
+  padding: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.6;
+  box-shadow: 0 4px 18px #0003;
+}
 .ws-valuation {
   display: flex;
   gap: 4px;
@@ -1612,8 +1660,16 @@
   .ws-quote small {
     display: none;
   }
-  .ws-valuation {
+  .ws-stock-statistics {
     grid-area: valuation;
+  }
+  .ws-volatility-values {
+    padding-left: 8px;
+  }
+  .ws-volatility-info {
+    margin-left: 8px;
+  }
+  .ws-valuation {
     padding-left: 8px;
     gap: 0;
   }
@@ -1621,7 +1677,7 @@
     flex-direction: row;
     align-items: baseline;
     gap: 5px;
-    min-height: 40px;
+    min-height: 24px;
     padding: 0 12px 0 0;
     border-left: 0;
   }
