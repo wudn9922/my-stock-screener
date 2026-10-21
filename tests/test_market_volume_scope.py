@@ -49,5 +49,25 @@ class MarketVolumeScopeTest(unittest.TestCase):
                 self.assertEqual(saved.index[-1], '2026-10-20')
 
 
+    def test_report_floor_filters_list_but_still_updates_low_volume_csv(self):
+        dates = pd.bdate_range(end='2026-10-20', periods=30)
+        frames = {
+            symbol: pd.DataFrame({'Open': 10., 'High': 11., 'Low': 9., 'Close': 10., 'Volume': volume}, index=dates)
+            for symbol, volume in [('1101.TW', 1_000), ('2330.TW', 2_000_000)]
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            for symbol, frame in frames.items():
+                frame.iloc[:-2].to_csv(Path(directory) / f'{symbol}.csv')
+            with patch.object(main, 'DATA_DIR', directory), \
+                 patch.object(main, 'download_market_data', return_value=frames['2330.TW']), \
+                 patch.object(main, 'extract_yfinance_data', side_effect=lambda _data, symbol: frames[symbol]), \
+                 patch.object(main, 'build_stock_data', return_value={}), \
+                 patch('sys.stdout', new_callable=io.StringIO):
+                matches = main.scan_market(list(frames), report_min_volume=main.TW_REPORT_MIN_VOLUME)
+            self.assertEqual({item['ticker'] for item in matches}, {'2330.TW'})
+            for symbol in frames:
+                saved = pd.read_csv(Path(directory) / f'{symbol}.csv', index_col=0)
+                self.assertEqual(saved.index[-1], '2026-10-20')
+
 if __name__ == '__main__':
     unittest.main()

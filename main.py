@@ -21,6 +21,9 @@ from breakout_alert.supabase_store import FIXED_STOCK_GROUP_ID, fixed_parameter_
 # =========================================================================
 # 全域核心參數
 # =========================================================================
+# 只用於每日報告「台股-全市場潛伏」名單；資料下載與更新不設成交股數門檻（低量股日 K 照常更新）。
+TW_REPORT_MIN_VOLUME = 1_000_000
+
 HTTP_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -2050,7 +2053,8 @@ def download_market_data(
 
     return pd.DataFrame()
 
-def scan_market(tickers):
+def scan_market(tickers, report_min_volume=0):
+    # report_min_volume 只篩報告名單；所有 tickers 的 CSV 都會先下載更新。
     os.makedirs(
         DATA_DIR,
         exist_ok=True
@@ -2402,6 +2406,9 @@ def scan_market(tickers):
             latest_volume = safe_float(
                 df["Volume"].iloc[-1]
             )
+
+            if latest_volume < report_min_volume:
+                continue
 
             df["MA20"] = (
                 df["Close"]
@@ -7880,7 +7887,8 @@ def main():
     tw_tickers = get_tw_tickers()
 
     tw_all = scan_market(
-        tw_tickers
+        tw_tickers,
+        report_min_volume=TW_REPORT_MIN_VOLUME
     )
 
     # -----------------------------------------------------------------
