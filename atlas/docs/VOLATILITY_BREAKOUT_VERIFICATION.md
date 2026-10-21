@@ -35,4 +35,21 @@ The interface keeps four compact outcome choices, three cards, sample and missin
 - Frontend: **927 tests in 78 files passed** on the final full run. One initial SEC fixture exceeded its existing five-second timeout while Python/build/browser jobs ran concurrently; no SEC source or timeout was changed. A sequential full rerun passed all 927 tests in 23 seconds.
 - CI uploads successful panel screenshots as review artifacts. Final real-report source run, artifact digest, coverage and rates are recorded with the committed report in the PR description. No local subset result is presented as full market.
 
+## Verified real report
+
+The committed JSON is the exact output of [read-only source run 39568611989](https://github.com/wudn9922/my-stock-screener/actions/runs/39568611989/job/119116912119), at source head `b9003e9b2baf2072d34656fa18cdef050d09d099`. It restored `universe-full-v1-39433983829-1`; artifact `12331201685` ZIP SHA-256 is `b5b19c7a8b99056dd9131ec01d3d91d25e40f82ac9e3227a19f552b0c59d86f8`. Exact artifact bytes, version/model keys, coverage arithmetic, signal = complete + pending + missing, common/tie failure bounds, numerator/denominator/rate arithmetic and cross-rule invariants were verified before installation.
+
+Both markets are dated **2026-10-19**. Taiwan lists 1,979/evaluates 1,948 stocks (31 stale/non-trading); US lists 5,347/evaluates 5,282 (65 stale/non-trading). No history file is missing; per-attempt forward candle gaps are separately excluded. Month-window full-market rates:
+
+|Market / entry|Complete samples|Hold5|Next high|First event|Target AND next high|
+|---|---:|---:|---:|---:|---:|
+|TW swing|873|341 / 39.1%|295 / 33.8%|383 / 43.9%|244 / 27.9%|
+|TW box|398|347 / 87.2%|218 / 54.8%|357 / 89.7%|165 / 41.5%|
+|TW EMA20|1,103|860 / 78.0%|537 / 48.7%|880 / 79.8%|313 / 28.4%|
+|US swing|1,063|299 / 28.1%|254 / 23.9%|357 / 33.6%|179 / 16.8%|
+|US box|238|173 / 72.7%|126 / 52.9%|185 / 77.7%|52 / 21.8%|
+|US EMA20|2,118|1,142 / 53.9%|925 / 43.7%|1,367 / 64.5%|561 / 26.5%|
+
+Real-report desktop-TW and phone-US rendering was checked against all three first-event rates, the 12-cell comparison matrix, overflow and runtime errors (zero). These screenshots use the real statistics artifact with unrelated quote/report fixtures; they are not live quote or physical-device evidence. The PR description links the final head's CI result after the data commit.
+
 Current-list survivorship, truncated cached history, missing sessions, unadjusted corporate actions and daily OHLC order limits remain. No independent review or physical Safari verification is claimed. Submit and update PR #147 only; do not merge or enable auto-merge.

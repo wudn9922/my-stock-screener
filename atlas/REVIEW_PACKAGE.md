@@ -12,6 +12,8 @@ The full-market builder still restores complete exchange lists/histories, never 
 
 Local verification: full Python suite 1,395 passed, including 84 focused breakout checks (38 shared/legacy, 6 full-market, 22 wave, 18 new outcome cases). Lint, typecheck and both builds passed; 20 desktop/phone Chromium breakout and volatility cases passed. All 927 frontend tests passed on the final full run; final CI results are recorded in the verification file and PR description. No independent reviewer or physical Safari sign-off is claimed.
 
+Verified data: the real report from read-only run 39568611989 / job 119116912119 restores cache universe-full-v1-39433983829-1, with the artifact digest and full 3×4 results in the verification record. Both markets are dated 2026-10-19, with TW 1,948/1,979 and US 5,282/5,347 valid/listed stocks. Real-statistics desktop/phone renders match the artifact and have no runtime errors or horizontal overflow.
+
 ## Previous review: daily volatility and breakout entry methods (2026-10-20)
 
 Individual-stock chart headers show Wilder ATR(20)% and the mean of the last 20 daily (high-low)/previous-close percentages below P/E. They request daily bars through the selected normalized provider independently of the chart interval, exclude unfinished sessions, require 21 valid bars and use the last daily close for ATR%. Symbol/provider/reload identity and cancellation prevent old values leaking into a new request. Expandable help shows formulas, the data date, cache status and price-basis limitations. No chart engine or drawing model changes.
