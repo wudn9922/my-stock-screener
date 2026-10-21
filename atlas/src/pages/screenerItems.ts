@@ -128,9 +128,10 @@ export function rowMetricPills(sort: SortMode, state: FilterState, maList: reado
   if (state.hi !== null) add('hi');
   if (state.vr !== null) add('vr');
   if (state.eps || state.accel) add('eps');
-  if (state.epsY) add('epsY');
+  if (state.epsY || state.accelY) add('epsY');
   if (state.rev) add('rev');
   if (state.revY) add('revY');
+  for (const entry of state.extraGates ?? []) add(entry.kind);
   if (state.epss !== null) add('epss');
   if (state.ema20) add('ema20');
   const technical = keys.filter((key) => !GROWTH_PILLS.includes(key)).slice(0, MAX_PILLS);
@@ -145,12 +146,11 @@ export interface PillContent {
 }
 
 /** The growth gate a metric pill counts its periods against (the applied condition of that metric), or null. */
-export function gateForPill(state: FilterState, key: MetricPill): GrowthGate | YearGate | null {
-  if (key === 'eps') return state.eps;
-  if (key === 'rev') return state.rev;
-  if (key === 'epsY') return state.epsY;
-  if (key === 'revY') return state.revY;
-  return null;
+export function gateForPill(state: FilterState, key: MetricPill): GrowthGate | YearGate | (GrowthGate | YearGate)[] | null {
+  if (key !== 'eps' && key !== 'rev' && key !== 'epsY' && key !== 'revY') return null;
+  const gates = [state[key], ...(state.extraGates ?? []).filter(({ kind }) => kind === key).map(({ gate }) => gate)]
+    .filter((gate): gate is GrowthGate | YearGate => gate !== null);
+  return gates.length > 1 ? gates : gates[0] ?? null;
 }
 
 /**
@@ -162,7 +162,7 @@ export function metricPill(
   key: MetricPill,
   growth?: GrowthFile | null,
   includeTurn = true,
-  gate: GrowthGate | YearGate | null = null,
+  gate: GrowthGate | YearGate | (GrowthGate | YearGate)[] | null = null,
 ): PillContent | null {
   const m = item.metrics;
   switch (key) {
@@ -211,9 +211,11 @@ export function metricPill(
       const latest = values[0] ?? null;
       const name = { eps: 'EPS', rev: '營收', epsY: 'EPS年', revY: '營收年' }[key];
       const detail = growthDetail(record, isEps);
-      const tally = gate ? gateTallyOfPill(gate, values, turns, includeTurn, annual) : null;
+      const gates = Array.isArray(gate) ? gate : gate ? [gate] : [];
+      const tallies = gates.map((entry) => gateTallyOfPill(entry, values, turns, includeTurn, annual));
+      const tally = tallies[0] ?? null;
       const tallyText = tally ? ` 成${tally.growth}／衰${tally.decline}` : '';
-      const tallyTitle = tally ? `；${tally.text}` : '';
+      const tallyTitle = tallies.length ? `；${tallies.map((entry) => entry.text).join('；')}` : '';
       if (latest === null && turns[0])
         return {
           text: `${name} 轉盈${tallyText}`,

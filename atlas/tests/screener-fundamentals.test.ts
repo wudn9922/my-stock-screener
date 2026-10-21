@@ -22,13 +22,17 @@ import {
   streakCoverage,
   needsGrowth,
   parseFilters,
+  readStoredFilters,
+  writeStoredFilters,
   removeFilter,
   serializeFilters,
   streakPasses,
   NO_GROWTH_REASON,
   type FilterState,
 } from '../src/pages/screenerFilters';
-import { metricPill, rowMetricPills, filterAndSortItems } from '../src/pages/screenerItems';
+import { metricPill, rowMetricPills, filterAndSortItems, gateForPill } from '../src/pages/screenerItems';
+import { createWatchlist, evaluateWatchlist, watchlistSchema } from '../src/watchlists/model';
+import { validateWatchlist } from '../../supabase/functions/user-settings/watchlists';
 import { parseUniverse } from '../src/report/universe';
 import { groupItemSchema, type GroupItem } from '../src/report/schema';
 import {
@@ -41,6 +45,7 @@ import {
   type GrowthFile,
 } from '../src/fundamentals/GrowthProvider';
 import { parseRoute, serializeRoute } from '../src/app/routes';
+import { WatchlistStore } from '../src/watchlists/store';
 
 const universe = parseUniverse(JSON.parse(readFileSync('tests/fixtures/screener/universe.json', 'utf8')));
 if (universe.status !== 'ok') throw new Error('universe fixture');
@@ -112,8 +117,11 @@ describe('f encoding of the fundamental conditions', () => {
     expect(state('epss:3:5').epss).toBeNull(); // one number only
     expect(state('epss:abc').epss).toBeNull();
     expect(state('epss:10').epss).toBe(10);
-    // Upper case keys and a repeated token: the last one wins.
-    expect(state('EPSY:1:5;epsy:3:7').epsY).toEqual({ years: 3, min: 7, share: 100 });
+    // Upper case keys are accepted; repeated fundamental tokens now stack.
+    expect(state('EPSY:1:5;epsy:3:7')).toMatchObject({
+      epsY: { years: 1, min: 5, share: 100 },
+      extraGates: [{ kind: 'epsY', gate: { years: 3, min: 7, share: 100 } }],
+    });
   });
 
   it('only writes tn / nd when they matter', () => {
@@ -454,7 +462,7 @@ describe('fundamental filters on the market lists', () => {
       'EPS 年增 近3年皆≥10%',
       '營收 YoY ≥0%',
       '營收 年增 近2年皆≥5%',
-      'EPS 成長加速',
+      '季度 EPS 成長加速',
       '不含虧轉盈',
     ]);
     expect(chips.every((chip) => chip.unavailable === null)).toBe(true);
@@ -739,5 +747,129 @@ describe('growth terms in the link: periods, threshold and 成長佔比 P', () =
     expect(text.length).toBeLessThanOrEqual(FILTER_PARAM_MAX);
     expect(state(text)).toEqual(widest); // nothing dropped
     expect(parseRoute(serializeRoute({ page: 'screener', group: 'universe-tw', f: text })).route).toEqual({ page: 'screener', group: 'universe-tw', f: text });
+  });
+});
+
+describe('stacked fundamentals and annual EPS acceleration', () => {
+  it('combines share volume with stacked gates through shared URLs, market memory and saved strategies', () => {
+    const base = reportGrowth.items.get('2330-TW')!;
+    const histories = [[25, 15, 15, 15, 15], [25, 15, 15, 15, 15], [25, 5, 5, 5, 5], [15, 15, 15, 15, 15], [25, 15, 15, 15, 15]];
+    const items = histories.map((_, i) => ({ ...plain(`TEST${i}`), volume: [1_000_000, 999_999, 2_000_000, 2_000_000, null][i] }));
+    const data = { ...reportGrowth, items: new Map(histories.map((epsYoYAnnual, i) => [`TEST${i}`, { ...base, epsYoYAnnual, epsTurnAnnual: [] }])) };
+    const filters = 'vol:1000000;epsy:5:10;epsy:1:20';
+    const context = { market: 'TW' as const, growth: data };
+    expect(symbols(applyFilters(items, state(filters), context))).toEqual(['TEST0']);
+    expect(symbols(applyFilters(items, state(`${filters};nd:keep`), context))).toEqual(['TEST0']);
+    expect(symbols(applyFilters(items, removeFilter(state(filters), 'vol'), context))).toEqual(['TEST0', 'TEST1', 'TEST4']);
+    expect(symbols(applyFilters(items, removeFilter(state(filters), 'epsY'), context))).toEqual(['TEST0', 'TEST2']);
+    expect(symbols(applyFilters(items, removeFilter(state(filters), 'growth:0'), context))).toEqual(['TEST0', 'TEST3']);
+    const route = parseRoute(serializeRoute({ page: 'screener', group: 'universe-tw', f: filters })).route;
+    expect(route).toEqual({ page: 'screener', group: 'universe-tw', f: filters });
+    const values = new Map<string, string>();
+    const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } } as Storage;
+    writeStoredFilters('TW', filters, storage);
+    writeStoredFilters('US', 'vol:100000;rev:4:10;rev:1:20', storage);
+    expect(readStoredFilters('TW', storage)).toBe(filters);
+    expect(readStoredFilters('US', storage)).toBe('vol:100000;rev:4:10;rev:1:20');
+    const list = createWatchlist({ name: '成交量與年度成長', market: 'TW', group: 'universe-tw', filters });
+    new WatchlistStore(storage).save(list);
+    const restored = new WatchlistStore(storage).getSnapshot().document.lists[0];
+    expect(validateWatchlist(restored).filters).toBe(filters);
+    expect(evaluateWatchlist(restored, items, data).map(({ symbol }) => symbol)).toEqual(['TEST0']);
+  });
+  it('keeps every repeated EPS/revenue gate through links and removes exactly one instance', () => {
+    const s = state('eps:4:10;eps:1:30;epsy:5:10:75;epsy:1:20;rev:4:0;rev:1:15;revy:5:0;revy:1:10;acc:1;accy:1;tn:0;nd:keep');
+    const text = serializeFilters(s);
+    expect(state(text)).toEqual(s);
+    expect(activeChips(s).map((chip) => chip.id)).toEqual(['eps', 'epsY', 'rev', 'revY', 'growth:0', 'growth:1', 'growth:2', 'growth:3', 'accel', 'accelY', 'turn']);
+    expect(activeChips(removeFilter(s, 'growth:1'))).toHaveLength(10);
+    expect(serializeFilters(removeFilter(s, 'growth:1'))).not.toContain('epsy:1:20');
+    expect(removeFilter(s, 'epsY').epsY).toEqual({ years: 1, min: 20, share: 100 });
+    expect(serializeFilters(removeFilter(s, 'epsY'))).toContain('epsy:1:20');
+    expect(serializeFilters(removeFilter(s, 'epsY'))).not.toContain('epsy:5:10:75');
+    expect(parseRoute(serializeRoute({ page: 'screener', f: text })).route).toEqual({ page: 'screener', f: text });
+  });
+
+  it.each(['eps', 'epsy', 'rev', 'revy'])('ANDs repeated %s gates instead of keeping only the last threshold', (key) => {
+    const a = `${key}:3:10:75`;
+    const b = `${key}:1:20`;
+    const one = applyFilters(TW, state(a), tw);
+    const two = new Set(symbols(applyFilters(TW, state(b), tw)));
+    const combined = applyFilters(TW, state(`${a};${b}`), tw);
+    expect(combined).toEqual(one.filter((item) => two.has(item.symbol)));
+    expect(combined.length).toBeGreaterThan(0);
+    expect(combined.length).toBeLessThan(TW.length);
+    expect(applyFilters(TW, state(`vol:10000000;${a};${b}`), tw)).toEqual(
+      combined.filter((item) => item.volume !== null && item.volume !== undefined && item.volume >= 10_000_000),
+    );
+  });
+
+  it('requires both five-year consistency and one-year growth, with independent missing-data and turnaround rules', () => {
+    const base = reportGrowth.items.get('2330-TW')!;
+    const histories = [[25, 15, 15, 15, 15], [25, 5, 5, 5, 5], [15, 15, 15, 15, 15], [25, null, null, null, null], [null, 15, 15, 15, 15]];
+    const items = histories.map((_, i) => plain(`TEST${i}`));
+    const data = { ...reportGrowth, items: new Map(histories.map((epsYoYAnnual, i) => [`TEST${i}`, { ...base, epsYoYAnnual, epsTurnAnnual: [i === 4] }])) };
+    const context = { market: 'TW' as const, growth: data };
+    expect(symbols(applyFilters(items, state('epsy:5:10;epsy:1:20'), context))).toEqual(['TEST0', 'TEST4']);
+    expect(symbols(applyFilters(items, state('epsy:5:10;epsy:1:20;nd:keep'), context))).toEqual(['TEST0', 'TEST3', 'TEST4']);
+    expect(symbols(applyFilters(items, state('epsy:5:10;epsy:1:20;tn:0;nd:keep'), context))).toEqual(['TEST0', 'TEST3']);
+  });
+
+  it('compares annual YoY independently from quarterly YoY, including missing and turnaround cases', () => {
+    const base = reportGrowth.items.get('2330-TW')!;
+    const r = { ...base, epsYoY: [40, 10], epsYoYAnnual: [10, 20], epsTurnQ: [], epsTurnAnnual: [] };
+    expect(epsAccelStatus(r, true)).toBe('yes');
+    expect(epsAccelStatus(r, true, 'annual')).toBe('no');
+    expect(epsAccelStatus({ ...r, epsYoYAnnual: [20, 10] }, true, 'annual')).toBe('yes');
+    expect(epsAccelStatus({ ...r, epsYoYAnnual: [10, 10] }, true, 'annual')).toBe('no');
+    expect(epsAccelStatus({ ...r, epsYoYAnnual: [null, 10] }, true, 'annual')).toBe('unknown');
+    expect(epsAccelStatus({ ...r, epsYoYAnnual: [null, 10], epsTurnAnnual: [true] }, true, 'annual')).toBe('yes');
+    expect(epsAccelStatus({ ...r, epsYoYAnnual: [null, 10], epsTurnAnnual: [true] }, false, 'annual')).toBe('unknown');
+    expect(epsAccelStatus({ ...r, epsYoYAnnual: [20, null], epsTurnAnnual: [false, true] }, true, 'annual')).toBe('no');
+    expect(epsAccelStatus(null, true, 'annual')).toBe('unknown');
+  });
+
+  it('filters annual acceleration alone, together with quarterly acceleration, and through saved strategies', () => {
+    const base = reportGrowth.items.get('2330-TW')!;
+    const items = [plain('BOTH'), plain('QUARTER'), plain('ANNUAL'), plain('MISSING')];
+    const data = { ...reportGrowth, items: new Map([
+      ['BOTH', { ...base, epsYoY: [30, 10], epsYoYAnnual: [30, 10] }],
+      ['QUARTER', { ...base, epsYoY: [30, 10], epsYoYAnnual: [10, 30] }],
+      ['ANNUAL', { ...base, epsYoY: [10, 30], epsYoYAnnual: [30, 10] }],
+      ['MISSING', { ...base, epsYoY: [30, 10], epsYoYAnnual: [] }],
+    ]) };
+    const context = { market: 'TW' as const, growth: data };
+    expect(symbols(applyFilters(items, state('accy:1'), context))).toEqual(['BOTH', 'ANNUAL']);
+    expect(symbols(applyFilters(items, state('acc:1;accy:1'), context))).toEqual(['BOTH']);
+    expect(symbols(applyFilters(items, state('accy:1;nd:keep'), context))).toEqual(['BOTH', 'ANNUAL', 'MISSING']);
+    expect(accelCoverage(items, data, true, 'annual')).toBe(3);
+    expect(accelCoverage(items, data, true)).toBe(4);
+    const s = state('epsy:2:0;epsy:1:20;accy:1;tn:0');
+    const list = createWatchlist({ name: '年度成長', market: 'TW', group: 'universe-tw', filters: serializeFilters(s) });
+    expect(evaluateWatchlist(list, items, data).map(({ symbol }) => symbol)).toEqual(['BOTH', 'ANNUAL']);
+    expect(rowMetricPills('default', state('accy:1'), [])).toContain('epsY');
+    expect(needsGrowth(state('accy:1'))).toBe(true);
+    expect(activeChips(state('accy:1'))[0].label).toBe('年度 EPS 成長加速');
+    expect(removeFilter(state('accy:1'), 'accelY').accelY).toBe(false);
+  });
+
+  it('preserves strategies beyond the old 300-character limit in routes, local schema and cloud validation', () => {
+    const filters = 'vol:1000000;' + Array.from({ length: 30 }, (_, i) => `epsy:${i % 10 + 1}:${i}:75`).join(';') + ';accy:1';
+    expect(filters.length).toBeGreaterThan(300);
+    const text = serializeFilters(state(filters));
+    expect(activeChips(state(text))).toHaveLength(32);
+    expect(parseRoute(serializeRoute({ page: 'screener', f: text })).route).toEqual({ page: 'screener', f: text });
+    const list = createWatchlist({ name: '疊加策略', market: 'TW', group: 'universe-tw', filters: text });
+    expect(watchlistSchema.parse(list).filters).toBe(text);
+    expect(validateWatchlist(list).filters).toBe(text);
+  });
+
+  it('includes every stacked gate in row detail tooltips', () => {
+    const s = state('epsy:5:10;epsy:1:20');
+    const pill = metricPill(row('2330.TW'), 'epsY', reportGrowth, true, gateForPill(s, 'epsY'))!;
+    expect(pill.title).toContain('近5年');
+    expect(pill.title).toContain('近1年');
+    expect(pill.title).toContain('YoY ≥ 10%');
+    expect(pill.title).toContain('YoY ≥ 20%');
   });
 });

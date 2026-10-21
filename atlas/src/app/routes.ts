@@ -29,7 +29,7 @@ export const DEFAULT_MARKET: MarketKey = 'tw';
 const GROUP_KEY = /^[A-Za-z0-9_.:-]{1,80}$/;
 const THEME_KEY = /^[a-z0-9-]{1,40}$/;
 /** Screener filter conditions (pages/screenerFilters.ts encoding). */
-const FILTER_PARAM = /^[A-Za-z0-9:.,;_~-]{1,300}$/;
+const FILTER_PARAM = /^[A-Za-z0-9:.,;_~-]{1,2000}$/;
 const MAX_SYMBOL = 32;
 const pageAliases: Record<string, Page> = {
   markets: 'markets',

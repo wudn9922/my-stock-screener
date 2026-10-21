@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import { ChevronDown, X } from 'lucide-react';
+import { BarChart3, Check, ChevronDown, Layers3, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useDialogFocus } from './useDialogFocus';
 import { formatDateTime } from './format';
@@ -15,22 +15,24 @@ import {
   VOLUME_PRESETS,
   SHARE_VOLUME_PRESETS,
   YEAR_PRESETS,
+  activeChips,
   enoughPeriods,
   formatRange,
   formatShares,
   gateCountText,
-  gateLabel,
   gateSentence,
   isCustomVolume,
   needsGrowth,
+  removeFilter,
+  serializeFilters,
   toggleVolume,
   trendFlagUnavailable,
-  yearGateLabel,
   type FilterAvailability,
   type FilterRange,
   type FilterState,
   type FundamentalKind,
   type GrowthGate,
+  type ExtraGrowthGate,
   type YearGate,
 } from '../pages/screenerFilters';
 import './filter-sheet.css';
@@ -51,7 +53,7 @@ export interface FilterSheetProps {
   growth: GrowthFile | null | undefined;
   growthLoading: boolean;
   /** How many of the group's rows have the data a growth condition needs (the rest are excluded, or kept with `nd:keep`). */
-  coverage: (kind: FundamentalKind | 'accel' | 'streak', periods: number, includeTurn: boolean) => { covered: number; total: number };
+  coverage: (kind: FundamentalKind | 'accel' | 'accelY' | 'streak', periods: number, includeTurn: boolean) => { covered: number; total: number };
   /** The draft uses a fundamental condition: load the growth file. */
   onNeedGrowth: () => void;
   /** Shortest 52-week window among the rows when it is not a full year yet. */
@@ -340,9 +342,12 @@ function GrowthGateBlock({
   gate,
   blocked,
   note,
+  coverageSummary,
   coveredOf,
   onTerms,
   onMin,
+  onRemove,
+  allowUnlimited = true,
 }: {
   title: string;
   unit: '季' | '年';
@@ -353,10 +358,13 @@ function GrowthGateBlock({
   gate: GrowthGate | YearGate | null;
   blocked: string | null;
   note: string | null;
+  coverageSummary: string | null;
   /** Rows with enough periods for a period count (null while loading). */
   coveredOf: ((count: number) => number) | null;
   onTerms: (patch: Partial<GateTerms>) => void;
   onMin: (min: number | null) => void;
+  onRemove?: () => void;
+  allowUnlimited?: boolean;
 }) {
   if (blocked)
     return (
@@ -369,8 +377,11 @@ function GrowthGateBlock({
   const { periods, share } = terms;
   const min = gate?.min ?? null;
   return (
-    <div className="fs-block" role="group" aria-label={title}>
-      <div className="fs-sub">{title}</div>
+    <div className={`fs-block fs-gate-card ${gate ? 'is-active' : ''}`} role="group" aria-label={title}>
+      <div className="fs-gate-head">
+        <div className="fs-sub">{title}{gate && <span className="fs-enabled"><Check size={12} />已啟用</span>}</div>
+        {onRemove && <button type="button" className="icon-button fs-remove" aria-label={`移除${title}`} onClick={onRemove}><Trash2 size={16} /></button>}
+      </div>
       <div className="fs-term">
         <span className="fs-term-name">期數</span>
         <Choice label={`${title} · 期數`} value={periods} onChange={(count) => onTerms({ periods: count ?? 1 })} options={periodChoices(unit, periods, coveredOf)} compact />
@@ -386,21 +397,21 @@ function GrowthGateBlock({
         />
       </div>
       <div className="fs-term">
-        <span className="fs-term-name">幅度 X</span>
-        <Choice label={`${title} · 幅度`} value={min} onChange={onMin} options={GROWTH_OPTIONS} compact />
+        <span className="fs-term-name">成長幅度</span>
+        <Choice label={`${title} · 幅度`} value={min} onChange={onMin} options={allowUnlimited ? GROWTH_OPTIONS : GROWTH_OPTIONS.filter((option) => option.value !== null)} compact />
         <TermInput
           label={`${title} · 幅度 X（%）`}
           value={min}
           unit="%"
           min={-10000}
           max={10000}
-          allowEmpty
-          hint="請輸入數字（可負數、小數），留空即不限"
+          allowEmpty={allowUnlimited}
+          hint={allowUnlimited ? '請輸入數字（可負數、小數），留空即不限' : '請輸入數字（可負數、小數）'}
           onCommit={onMin}
         />
       </div>
       <div className="fs-term">
-        <span className="fs-term-name">成長佔比 P</span>
+        <span className="fs-term-name">成長期數佔比</span>
         <Choice label={`${title} · 成長佔比`} value={share} onChange={(next) => onTerms({ share: next ?? SHARE_DEFAULT })} options={SHARE_OPTIONS} compact />
         <TermInput
           label={`${title} · 成長佔比 P（%）`}
@@ -415,15 +426,16 @@ function GrowthGateBlock({
       {gate ? (
         <>
           <p className="fs-rule">{gateSentence(subject, unit, periods, gate.min, share)}</p>
-          <p className="fs-hint">
+          <details className="fs-details"><summary>計算方式與資料涵蓋</summary><p className="fs-hint">
             每一期 YoY ≥ {Number(gate.min.toFixed(2))}% 記為成長，低於則為衰退；{gateCountText(periods, share)}即通過（{periods} {unit}皆有資料時）。
             缺資料的期數不計入；有資料的期數不足 {enoughPeriods(periods)} 期時依「資料不足時排除」處理。
-          </p>
+          </p>{note && <p className="fs-hint fs-coverage">{note}</p>}</details>
         </>
       ) : (
         <p className="fs-hint">選擇或輸入幅度 X 後才會套用（期數與成長佔比 P 會保留）。</p>
       )}
-      {note && <p className="fs-hint fs-coverage">{note}</p>}
+      {!gate && note && <p className="fs-hint fs-coverage">{note}</p>}
+      {gate && coverageSummary && <p className="fs-hint fs-coverage">{coverageSummary}</p>}
     </div>
   );
 }
@@ -466,6 +478,7 @@ export function FilterSheet(props: FilterSheetProps) {
   const [draft, setDraft] = useState<FilterState>(value);
   const [volumeText, setVolumeText] = useState(value.vol === null ? '' : String(value.vol));
   const [terms, setTerms] = useState<GateTermsMap>(() => termsOf(value));
+  const [category, setCategory] = useState<'all' | 'technical' | 'fundamental'>('all');
   const sheetRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: number; y: number; dy: number } | null>(null);
@@ -483,7 +496,9 @@ export function FilterSheet(props: FilterSheetProps) {
     const resize = () => {
       const backdrop = backdropRef.current;
       if (!backdrop) return;
-      backdrop.style.height = `${viewport?.height ?? window.innerHeight}px`;
+      const height = viewport?.height ?? window.innerHeight;
+      backdrop.style.height = `${height}px`;
+      backdrop.classList.toggle('fs-short', height <= 360);
       backdrop.style.top = `${viewport?.offsetTop ?? 0}px`;
       backdrop.style.bottom = 'auto';
     };
@@ -554,7 +569,7 @@ export function FilterSheet(props: FilterSheetProps) {
   const growthPending = growth === undefined || growthLoading;
   // Nothing at all to filter on (data missing, or none of the rows has any): one explanation for the whole block.
   const fundamentalsBlocked =
-    !growthPending && availability.eps && availability.rev && availability.epsY && availability.revY && availability.accel
+    !growthPending && availability.eps && availability.rev && availability.epsY && availability.revY && availability.accel && availability.accelY
       ? availability.eps
       : null;
   const benchmark = market === 'US' ? 'S&P 500（SPY）' : '加權指數（^TWII）';
@@ -569,7 +584,7 @@ export function FilterSheet(props: FilterSheetProps) {
     const counts = YEAR_PRESETS.map((years) => `≥${years} 年 ${props.coverage('streak', years, draft.turn).covered.toLocaleString('en-US')}`);
     return `各年數涵蓋檔數：${counts.join(' · ')} 檔（共 ${total.toLocaleString('en-US')} 檔）`;
   })();
-  const coverageText = (kind: FundamentalKind | 'accel' | 'streak', count: number, applied: boolean) => {
+  const coverageText = (kind: FundamentalKind | 'accel' | 'accelY' | 'streak', count: number, applied: boolean) => {
     if (growth === undefined) return growthLoading ? '基本面資料載入中…' : null;
     if (growthLoading) return '基本面資料載入中…';
     const { covered, total } = props.coverage(kind, count, draft.turn);
@@ -580,8 +595,8 @@ export function FilterSheet(props: FilterSheetProps) {
     const metric = kind.startsWith('eps') || kind === 'streak' ? 'EPS' : '營收';
     // A streak needs every one of its years (no gap); a growth block needs ceil(N / 2) of its N periods with data.
     const need =
-      kind === 'accel'
-        ? '最近 2 季的 EPS YoY'
+      kind === 'accel' || kind === 'accelY'
+        ? `最近 2 ${kind === 'accelY' ? '年' : '季'}的 EPS YoY`
         : kind === 'streak'
           ? `最近 ${count} 年每一年都有 ${metric} YoY`
           : `近 ${count} ${unit}中至少 ${enoughPeriods(count)} ${unit}的 ${metric} YoY`;
@@ -596,7 +611,13 @@ export function FilterSheet(props: FilterSheetProps) {
 
   const gateBlock = (key: GateKey, title: string, unit: '季' | '年', subject: string) => {
     const blocked = growthPending ? null : availability[key];
+    const coverageSummary = (periods: number) => {
+      if (growthPending || blocked) return null;
+      const { covered, total } = props.coverage(key, periods, draft.turn);
+      return `${covered.toLocaleString('en-US')} / ${total.toLocaleString('en-US')} 檔有足夠財報資料${covered < total ? ` · 其餘${draft.keepMissing ? '保留' : '排除'}` : ''}`;
+    };
     return (
+      <div className="fs-gate-stack">
       <GrowthGateBlock
         title={title}
         unit={unit}
@@ -605,16 +626,57 @@ export function FilterSheet(props: FilterSheetProps) {
         gate={draft[key]}
         blocked={blocked}
         note={blocked ? null : coverageText(key, terms[key].periods, draft[key] !== null)}
+        coverageSummary={coverageSummary(terms[key].periods)}
         coveredOf={growthPending ? null : (periods) => props.coverage(key, periods, draft.turn).covered}
         onTerms={(patch) => setGateTerms(key, patch)}
         onMin={(min) => setGateMin(key, min)}
+        onRemove={draft[key] ? () => {
+          const next = removeFilter(draft, key);
+          setDraft(next);
+          setTerms((previous) => ({ ...previous, [key]: termsOf(next)[key] }));
+        } : undefined}
       />
+      {(draft.extraGates ?? []).map((entry, index) => {
+        if (entry.kind !== key) return null;
+        const { gate } = entry;
+        const extraTerms = { periods: 'years' in gate ? gate.years : gate.quarters, share: gate.share };
+        const extraTitle = `${title} · 條件 ${1 + (draft.extraGates ?? []).slice(0, index + 1).filter((item) => item.kind === key).length}`;
+        const replace = (nextGate: GrowthGate | YearGate | null) => {
+          if (!nextGate) setDraft(removeFilter(draft, `growth:${index}`));
+          else update({ extraGates: (draft.extraGates ?? []).map((item, i) => i === index ? { kind: key, gate: nextGate } as ExtraGrowthGate : item) });
+        };
+        return <GrowthGateBlock
+          key={`${key}:${index}`}
+          title={extraTitle}
+          unit={unit}
+          subject={subject}
+          terms={extraTerms}
+          gate={gate}
+          blocked={null}
+          note={coverageText(key, extraTerms.periods, true)}
+          coverageSummary={coverageSummary(extraTerms.periods)}
+          coveredOf={growthPending ? null : (periods) => props.coverage(key, periods, draft.turn).covered}
+          onTerms={(patch) => replace(gateFor(key, { ...extraTerms, ...patch }, gate.min))}
+          onMin={(min) => replace(min === null ? null : gateFor(key, extraTerms, min))}
+          onRemove={() => replace(null)}
+          allowUnlimited={false}
+        />;
+      })}
+      {!blocked && <button
+        type="button"
+        className="fs-add-condition"
+        disabled={!draft[key] || serializeFilters(draft).length > 1800}
+        title={!draft[key] ? '先設定第一組成長幅度，再新增條件' : serializeFilters(draft).length > 1800 ? '條件已達可分享連結的長度上限' : undefined}
+        onClick={() => update({ extraGates: [...(draft.extraGates ?? []), { kind: key, gate: gateFor(key, { periods: 1, share: SHARE_DEFAULT }, 0) } as ExtraGrowthGate] })}
+      ><Plus size={15} />新增{title}條件<span>同時滿足</span></button>}
+      </div>
     );
   };
-  const revenueCount = (draft.rev ? 1 : 0) + (draft.revY ? 1 : 0);
-  const revenueSummary = [draft.rev ? gateLabel('營收', draft.rev) : null, draft.revY ? yearGateLabel('營收', draft.revY) : null]
-    .filter((text): text is string => text !== null)
-    .join('；');
+  const draftChips = activeChips(draft, availability);
+  const revenueChips = draftChips.filter((chip) => chip.key === 'rev' || chip.key === 'revY');
+  const revenueCount = revenueChips.length;
+  const revenueSummary = revenueChips.map((chip) => chip.label).join('；');
+  const fundamentalCount = draftChips.filter((chip) => ['eps', 'epsY', 'rev', 'revY', 'epss', 'accel', 'accelY'].includes(chip.key)).length;
 
   return createPortal(
     <div className="fs-backdrop" ref={backdropRef} onClick={onClose}>
@@ -639,7 +701,7 @@ export function FilterSheet(props: FilterSheetProps) {
         </div>
         <header className="fs-head">
           <div>
-            <b id="fs-title">篩選條件</b>
+            <b id="fs-title"><SlidersHorizontal size={19} />篩選條件</b>
             <small>
               {market === 'TW' ? '台股' : '美股'} · {props.groupName}
             </small>
@@ -648,7 +710,25 @@ export function FilterSheet(props: FilterSheetProps) {
             <X size={18} />
           </button>
         </header>
+        <div className="fs-content">
+        <nav className="fs-categories" aria-label="篩選分類">
+          {([
+            ['all', '全部條件', Layers3, draftChips.length],
+            ['technical', '行情與技術', BarChart3, draftChips.length - fundamentalCount],
+            ['fundamental', '基本面', SlidersHorizontal, fundamentalCount],
+          ] as const).map(([key, label, Icon, selected]) => <button key={key} type="button" aria-pressed={category === key} onClick={() => setCategory(key)}><Icon size={16} />{label}{selected > 0 && <span>{selected}</span>}</button>)}
+        </nav>
+        {draftChips.length > 0 && <div className="fs-selection" aria-label="草稿條件">
+          <span>已選 {draftChips.length} 項<span className="fs-and">全部滿足</span></span>
+          <div>{draftChips.map((chip) => <button key={chip.id} type="button" title={chip.unavailable ?? undefined} aria-label={`移除${chip.label}`} onClick={() => {
+            const next = removeFilter(draft, chip.id);
+            setDraft(next);
+            if (chip.id === 'vol') setVolumeText('');
+            setTerms(termsOf(next));
+          }}>{chip.label}{chip.unavailable && '（暫不套用）'}<X size={12} /></button>)}</div>
+        </div>}
         <div className="fs-body">
+          <div hidden={category === 'fundamental'}>
           <Section title="每日成交股數" unavailable={availability.vol} hint="以最近一個交易日的成交股數篩選，台美股都以「股」計算（台股 1 張＝1,000 股）。預設不限；留白或輸入 0 可取消門檻。">
             <Choice
               label="成交股數門檻"
@@ -815,7 +895,11 @@ export function FilterSheet(props: FilterSheetProps) {
             )}
           </Section>
 
+          </div>
+          <div hidden={category === 'technical'}>
           <Section title="基本面（EPS／營收成長）" unavailable={fundamentalsBlocked}>
+            <p className="fs-stack-note"><Layers3 size={17} /><span>同一指標可新增多個條件，全部同時滿足才入選。<small>例如：近 5 年 EPS 年增皆 ≥ 10%，且最近 1 年 ≥ 20%。</small></span></p>
+            <details className="fs-details fs-method"><summary>年增率與資料來源說明</summary>
             <p className="fs-hint fs-lead">
               年增率（YoY）一律和「去年同期」比：季度比去年同一季，年度比前一個會計年度。每一期 YoY ≥ 幅度 X% 記為成長，低於則為衰退；
               近 N 期中，成長期數 ÷ 有資料的期數 ≥ 成長佔比 P% 才通過（P 預設 100%，即每一期都要成長）。缺資料的期數不計入。
@@ -823,8 +907,11 @@ export function FilterSheet(props: FilterSheetProps) {
                 ? ' 台股季度由官方綜合損益表的年度累計數相減而得（第 4 季＝全年－前三季）；FinMind 歷史資料同樣源自觀測站，單季或累計由其數字判定；股票股利（配股）不追溯調整，配股的公司 EPS 年增率會偏低。'
                 : ' 美股第 4 季多由「全年－前三季」推算；外國發行人（20-F）多只有年度資料，以申報幣別計算。'}
             </p>
+            </details>
             {gateBlock('eps', '季度 EPS 成長', '季', 'EPS 年增')}
             {gateBlock('epsY', '年度 EPS 成長', '年', 'EPS 年增')}
+            <Disclosure id="screener-streak" title="進階：嚴格連續成長" count={draft.epss === null ? 0 : 1} summary={draft.epss === null ? null : `EPS 連續成長 ≥${draft.epss} 年`}>
+            <p className="fs-hint">年度成長條件可設定幅度與成長佔比，並略過部分缺資料的年度；此條件要求每一年 EPS 年增率嚴格 ＞ 0，持平或資料缺口都會中斷。只需一般盈餘成長篩選時，使用上方「年度 EPS 成長」即可。</p>
             <div className="fs-block" role="group" aria-label="EPS 連續成長年數">
               <div className="fs-sub">EPS 連續成長年數</div>
               {availability.epss && !growthPending ? (
@@ -861,27 +948,40 @@ export function FilterSheet(props: FilterSheetProps) {
                 </>
               )}
             </div>
+            </Disclosure>
 
             <div className="fs-block" role="group" aria-label="成長進階選項">
               <div className="fs-sub">進階</div>
-              {availability.accel && !growthPending ? (
+              {availability.accel && availability.accelY && !growthPending ? (
                 <p className="fs-unavailable">EPS 成長加速：{availability.accel}</p>
               ) : (
+                <div className="fs-acceleration" role="group" aria-label="EPS 成長加速週期">
                 <label className="fs-switch">
                   <input
                     type="checkbox"
                     role="switch"
-                    checked={draft.accel}
+                    checked={draft.accel || !!draft.accelY}
                     aria-label="EPS 成長加速"
-                    onChange={(event) => update({ accel: event.target.checked })}
+                    onChange={(event) => update({ accel: event.target.checked && (growthPending || !availability.accel), accelY: event.target.checked && !growthPending && !!availability.accel })}
                   />
                   <span className="fs-switch-track" aria-hidden="true" />
                   <span>
                     EPS 成長加速
-                    <small>最新一季的 EPS 年增率 ＞ 前一季的年增率（例：前一季 +10%、最新一季 +25%）。</small>
-                    {draft.accel && coverageText('accel', 2, true) && <small className="fs-coverage">{coverageText('accel', 2, true)}</small>}
+                    <small>{draft.accelY && !draft.accel ? '最新一年的 EPS 年增率 ＞ 前一年的年增率' : '最新一季的 EPS 年增率 ＞ 前一季的年增率'}（例：前期 +10%、最新一期 +25%）。{draft.accel && draft.accelY ? '年度與季度皆須加速。' : ''}</small>
                   </span>
                 </label>
+                {(draft.accel || draft.accelY) && <>
+                  <Choice label="EPS 成長加速 · 週期" value={draft.accelY ? (draft.accel ? 3 : 2) : 1} onChange={(period) => update({ accel: period === 1 || period === 3, accelY: period === 2 || period === 3 })} options={[
+                    { value: 1, label: '季度', disabled: !!availability.accel && !growthPending && !draft.accel },
+                    { value: 2, label: '年度', disabled: !!availability.accelY && !growthPending && !draft.accelY },
+                    { value: 3, label: '年度＋季度', disabled: !!(availability.accel || availability.accelY) && !growthPending && !(draft.accel && draft.accelY) },
+                  ]} />
+                  <details className="fs-details"><summary>加速條件的資料涵蓋</summary>
+                    {draft.accel && <p className="fs-hint fs-coverage">{availability.accel || coverageText('accel', 2, true)}</p>}
+                    {draft.accelY && <p className="fs-hint fs-coverage">{availability.accelY || coverageText('accelY', 2, true)}</p>}
+                  </details>
+                </>}
+                </div>
               )}
               <label className="fs-switch">
                 <input
@@ -927,9 +1027,11 @@ export function FilterSheet(props: FilterSheetProps) {
                   : '開啟面板後載入基本面資料。'}
             </p>
           </Section>
+          </div>
+        </div>
         </div>
         <footer className="fs-foot">
-          <button type="button" className="ghost-button" onClick={() => { setDraft({ ...EMPTY_FILTERS, tr: [] }); setVolumeText(''); }}>
+          <button type="button" className="ghost-button" onClick={() => { setDraft({ ...EMPTY_FILTERS, tr: [] }); setTerms(termsOf(EMPTY_FILTERS)); setVolumeText(''); }}>
             重設
           </button>
           <button type="button" className="primary-button fs-apply" disabled={volumeInvalid} onClick={() => props.onApply(draft)}>

@@ -245,6 +245,7 @@ test('annual windows: the periods a group cannot cover are disabled, and the str
     await expect(periods.getByRole('button', { name })).toBeDisabled();
     await expect(periods.getByRole('button', { name })).toHaveAttribute('title', /沒有足夠/);
   }
+  await sheet.getByRole('button', { name: /^進階：嚴格連續成長/ }).click();
   const streak = sheet.getByRole('group', { name: 'EPS 連續成長年數' });
   await streak.scrollIntoViewIfNeeded();
   await expect(streak.getByRole('button', { name: '≥10 年' })).toBeDisabled();
@@ -283,6 +284,7 @@ test('EPS growth streak: picked in the sheet, applied, shown in the rows and kep
   await page.goto('./?page=screener&group=universe-tw');
   await expect(page.locator('.screener-row').first()).toBeVisible();
   const sheet = await openSheet(page);
+  await sheet.getByRole('button', { name: /^進階：嚴格連續成長/ }).click();
   const streak = sheet.getByRole('group', { name: 'EPS 連續成長年數' });
   await streak.scrollIntoViewIfNeeded();
   await streak.getByRole('button', { name: '≥3 年' }).click();
@@ -304,6 +306,7 @@ test('EPS growth streak: picked in the sheet, applied, shown in the rows and kep
     `符合 ${expected.length} / ${twUniverse.length}`,
   );
   const again = await openSheet(page);
+  await again.getByRole('button', { name: /^進階：嚴格連續成長/ }).click();
   await expect(again.getByRole('group', { name: 'EPS 連續成長年數' }).getByRole('button', { name: '≥3 年' })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -371,4 +374,96 @@ test('the revenue block is a disclosure: closed by default with its conditions i
   await expect(quarterlyRevenue.getByRole('button', { name: '近 4 季', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(quarterlyRevenue.getByRole('textbox', { name: '季度營收成長 · 幅度 X（%）' })).toHaveValue('10');
   if (shotDir) await page.screenshot({ path: `${shotDir}/fundamentals-revenue-open-${info.project.name}.png` });
+});
+
+test('stacked annual EPS conditions survive apply, reload, removal, cancel and reset', async ({ page }, info) => {
+  await mockSite(page, { report: buildReport(20), fundamentals: true });
+  await page.goto('./?page=screener&group=universe-tw');
+  await expect(page.locator('.screener-row').first()).toBeVisible();
+  const sheet = await openSheet(page);
+  await sheet.getByRole('navigation', { name: '篩選分類' }).getByRole('button', { name: /^基本面/ }).click();
+  await expect(sheet.getByRole('region', { name: '今日漲跌' })).toBeHidden();
+  await expect(sheet.getByRole('button', { name: /^進階：嚴格連續成長/ })).toHaveAttribute('aria-expanded', 'false');
+  const first = sheet.getByRole('group', { name: '年度 EPS 成長', exact: true });
+  await first.getByRole('button', { name: '近 5 年', exact: true }).click();
+  await first.getByRole('button', { name: '≥10%', exact: true }).click();
+  await sheet.getByRole('button', { name: /^新增年度 EPS 成長條件/ }).click();
+  const second = sheet.getByRole('group', { name: '年度 EPS 成長 · 條件 2', exact: true });
+  const threshold = second.getByRole('textbox', { name: '年度 EPS 成長 · 條件 2 · 幅度 X（%）', exact: true });
+  await threshold.fill('');
+  await expect(threshold).toHaveAttribute('aria-invalid', 'true');
+  await expect(second).toBeVisible();
+  await threshold.fill('20');
+  await expect(threshold).toHaveAttribute('aria-invalid', 'false');
+  await expect(first.locator('.fs-rule')).toHaveText('近 5 年的 EPS 年增皆 ≥ 10%');
+  await expect(second.locator('.fs-rule')).toHaveText('最近 1 年的 EPS 年增 ≥ 20%');
+  const expected = annualPassers(5, 10).filter((row) => annualPassers(1, 20).some((other) => row[0] === other[0]));
+  await expect(sheet.getByRole('button', { name: /^套用/ })).toHaveText(`套用（${expected.length} 檔）`);
+  if (shotDir) await page.screenshot({ path: `${shotDir}/stacked-annual-${info.project.name}.png` });
+  await sheet.getByRole('button', { name: /^套用/ }).click();
+  expect(new URL(page.url()).searchParams.get('f')).toBe('epsy:5:10;epsy:1:20');
+  const chips = page.getByRole('group', { name: '已套用的篩選條件' });
+  await expect(chips.locator('.active-filters-count')).toContainText(`符合 ${expected.length} / ${twUniverse.length}`);
+  await page.reload();
+  await expect(chips).toContainText('EPS 年增 近5年皆≥10%');
+  await expect(chips).toContainText('EPS 年增 ≥20%');
+  const again = await openSheet(page);
+  await expect(again.getByRole('group', { name: '年度 EPS 成長 · 條件 2', exact: true }).getByRole('button', { name: '≥20%', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await again.getByRole('button', { name: '移除年度 EPS 成長', exact: true }).click();
+  await expect(again.getByRole('group', { name: '年度 EPS 成長', exact: true }).locator('.fs-rule')).toHaveText('最近 1 年的 EPS 年增 ≥ 20%');
+  await again.getByRole('button', { name: '關閉篩選', exact: true }).click();
+  expect(new URL(page.url()).searchParams.get('f')).toBe('epsy:5:10;epsy:1:20');
+  const reset = await openSheet(page);
+  await reset.getByRole('button', { name: '重設', exact: true }).click();
+  await expect(reset.getByLabel('草稿條件')).toHaveCount(0);
+  await expect(reset.getByRole('group', { name: '年度 EPS 成長', exact: true }).getByRole('textbox', { name: '年度 EPS 成長 · 期數（年）', exact: true })).toHaveValue('1');
+  await reset.getByRole('button', { name: /^套用/ }).click();
+  expect(new URL(page.url()).searchParams.has('f')).toBe(false);
+});
+
+for (const [title, token, revenue] of [['季度 EPS 成長', 'eps', false], ['季度營收成長', 'rev', true], ['年度營收成長', 'revy', true]] as const) {
+  test(`${title}: add and remove a second independent condition`, async ({ page }) => {
+    await mockSite(page, { report: buildReport(20), fundamentals: true });
+    await page.goto(`./?page=screener&group=universe-tw&f=${token}:3:10`);
+    const sheet = await openSheet(page);
+    await sheet.getByRole('navigation', { name: '篩選分類' }).getByRole('button', { name: /^基本面/ }).click();
+    if (revenue) await sheet.getByRole('button', { name: /^營收/ }).click();
+    await sheet.getByRole('button', { name: new RegExp(`^新增${title}條件`) }).click();
+    const second = sheet.getByRole('group', { name: `${title} · 條件 2`, exact: true });
+    await second.getByRole('button', { name: '≥30%', exact: true }).click();
+    await expect(sheet.getByLabel('草稿條件')).toContainText('≥30%');
+    await second.getByRole('button', { name: `移除${title} · 條件 2`, exact: true }).click();
+    await expect(sheet.getByRole('group', { name: `${title} · 條件 2`, exact: true })).toHaveCount(0);
+    await expect(sheet.getByRole('group', { name: title, exact: true }).locator('.fs-rule')).toContainText('≥ 10%');
+    await sheet.getByRole('button', { name: /^套用/ }).click();
+    expect(new URL(page.url()).searchParams.get('f')).toBe(`${token}:3:10`);
+  });
+}
+
+test('EPS acceleration switches between annual and quarterly data and can require both', async ({ page }, info) => {
+  await mockSite(page, { report: buildReport(20), fundamentals: true });
+  await page.goto('./?page=screener&group=universe-tw&f=acc:1');
+  const sheet = await openSheet(page);
+  await sheet.getByRole('navigation', { name: '篩選分類' }).getByRole('button', { name: /^基本面/ }).click();
+  const period = sheet.getByRole('group', { name: 'EPS 成長加速 · 週期', exact: true });
+  await period.getByRole('button', { name: '年度', exact: true }).click();
+  await expect(sheet.getByRole('group', { name: 'EPS 成長加速週期', exact: true })).toContainText('最新一年的 EPS 年增率 ＞ 前一年的年增率');
+  const expected = fixtureGrowth.rows.filter((row) => {
+    const values = row[7] as (number | null)[];
+    const turns = row[10] as number;
+    return twUniverse.includes(String(row[0])) && values[1] != null && ((values[0] != null && values[0] > values[1]) || (values[0] == null && (turns & 1) === 1));
+  });
+  await expect(sheet.getByRole('button', { name: /^套用/ })).toHaveText(`套用（${expected.length} 檔）`);
+  if (shotDir) await page.screenshot({ path: `${shotDir}/annual-acceleration-${info.project.name}.png` });
+  await sheet.getByRole('button', { name: /^套用/ }).click();
+  expect(new URL(page.url()).searchParams.get('f')).toBe('accy:1');
+  await expect(page.getByRole('group', { name: '已套用的篩選條件' })).toContainText('年度 EPS 成長加速');
+  await page.reload();
+  const again = await openSheet(page);
+  const control = again.getByRole('group', { name: 'EPS 成長加速 · 週期', exact: true });
+  await expect(control.getByRole('button', { name: '年度', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await control.getByRole('button', { name: '年度＋季度', exact: true }).click();
+  await expect(again.getByRole('group', { name: 'EPS 成長加速週期', exact: true })).toContainText('年度與季度皆須加速');
+  await again.getByRole('button', { name: /^套用/ }).click();
+  expect(new URL(page.url()).searchParams.get('f')).toBe('acc:1;accy:1');
 });

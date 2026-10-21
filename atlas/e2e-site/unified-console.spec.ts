@@ -41,6 +41,29 @@ test('apply remains clickable after scrolling a long sheet and shrinking the vis
   await expect(page).toHaveURL(/f=chg/);
 });
 
+test('Apply stays inside the visual viewport when a keyboard leaves the layout viewport tall', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 700 });
+  await mockSite(page, { report: buildReport(20), fundamentals: true });
+  await page.goto('./?page=screener&group=tw_all&f=vol:1000000;epsy:5:10;epsy:1:20');
+  await page.getByRole('button', { name: /篩選條件/ }).click();
+  const sheet = page.getByRole('dialog', { name: '篩選條件' });
+  await sheet.locator('.fs-body').evaluate((node) => { node.scrollTop = node.scrollHeight; });
+  await page.evaluate(() => {
+    // Mobile keyboards can shrink visualViewport without resizing window.innerHeight.
+    Object.defineProperty(window.visualViewport!, 'height', { configurable: true, get: () => 280 });
+    Object.defineProperty(window.visualViewport!, 'offsetTop', { configurable: true, get: () => 0 });
+    window.visualViewport!.dispatchEvent(new Event('resize'));
+  });
+  const apply = sheet.getByRole('button', { name: /^套用/ });
+  await expect.poll(async () => {
+    const box = await apply.boundingBox();
+    return box !== null && box.y >= 0 && box.y + box.height <= 280 && box.height >= 44;
+  }).toBe(true);
+  await apply.click();
+  await expect(sheet).not.toBeVisible();
+  expect(new URL(page.url()).searchParams.get('f')).toBe('vol:1000000;epsy:5:10;epsy:1:20');
+});
+
 test('multiple saved lists preserve independent rules, opening diffs, streaks, and the monitoring choice', async ({ page }) => {
   const report = buildReport(20) as {
     reportDate: string;
