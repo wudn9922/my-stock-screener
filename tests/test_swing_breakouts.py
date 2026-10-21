@@ -1,140 +1,214 @@
-"""波段前高：確認時間、盤中觸發、每個波段一次、理論停買價格與獨立逐日參考。"""
+"""Substantial price waves: sideways rejection, causal confirmation and actual user examples."""
+import json
 import math
-import random
+from pathlib import Path
 import unittest
 
 import numpy as np
+import pandas as pd
 
-from test_breakouts import AS_OF, bo, make_bars
-from swing_breakouts import swing_high_signals
-
-
-def bars(highs, closes=None, opens=None):
-    # Synthetic candles with long upper wicks make the intraday/close distinction explicit.
-    return make_bars(closes or [100] * len(highs), highs=highs, lows=[90] * len(highs),
-                     opens=opens or [100] * len(highs))
+from test_breakouts import bo, make_bars
+from swing_breakouts import swing_high_signals, swing_high_trace, wilder_atr
 
 
-def slow_reference(frame):
-    """Independent exhaustive oracle: find every completed historical pivot for each entry day."""
-    highs = frame["High"].tolist()
-    opens = frame["Open"].tolist()
-    hits, levels = [], []
-    for day in range(len(highs)):
-        pivots = [p for p in range(2, day - 2)
-                  if all(highs[p] >= highs[j] for j in (p - 2, p - 1))
-                  and all(highs[p] > highs[j] for j in (p + 1, p + 2))]
-        if not pivots:
-            levels.append(math.nan)
-            hits.append(False)
-            continue
-        pivot = max(pivots)
-        level = highs[pivot]
-        levels.append(level)
-        hits.append(math.isfinite(opens[day]) and opens[day] > 0 and highs[day] > level
-                    and not any(highs[prior] > level for prior in range(pivot + 3, day)))
-    return hits, levels
+def candles(closes, highs=None, lows=None, opens=None):
+    return make_bars(closes, highs=highs or [v + .5 for v in closes],
+                     lows=lows or [v - .5 for v in closes], opens=opens or closes)
+
+
+def wave(tail=()):
+    # A genuine rise followed by a >2 ATR pullback, unlike small local zigzags.
+    return candles([100] * 40 + [102, 104, 106, 108, 110, 109, 107] + list(tail))
 
 
 class SwingSignalsTest(unittest.TestCase):
-    def test_uses_the_recent_swing_even_when_an_older_n_day_high_is_higher(self):
-        frame = bars([150] + [100] * 30 + [102, 110, 108, 107, 111])
-        fresh, level, _ = swing_high_signals(frame)
-        self.assertTrue(fresh.iloc[-1])
-        self.assertEqual(level.iloc[-1], 110)
-        # Add a much higher high inside 20 days, but before the more recent swing.
-        frame.iloc[-15, frame.columns.get_loc("High")] = 140
-        clean, _ = bo.clean_bars(frame, frame.index[-1])
-        signals = bo.strategy_signals(clean, 0.14)
-        self.assertTrue(signals["swingHigh"][0].iloc[-1])
-        self.assertFalse(signals["high20"][0].iloc[-1])
+    def test_atr_uses_twenty_known_previous_closes_and_wilder_smoothing(self):
+        frame = candles([100] * 22)
+        frame.iloc[21, frame.columns.get_loc('High')] = 103
+        atr = wilder_atr(frame)
+        self.assertTrue(atr.iloc[:20].isna().all())
+        self.assertEqual(atr.iloc[20], 1)
+        self.assertEqual(atr.iloc[21], (19 + 3.5) / 20)
 
-    def test_rising_n_day_highs_without_a_confirmed_turn_do_not_count(self):
-        frame = bars([100] * 40 + [101, 102, 103, 104, 105])
-        fresh, _, _ = swing_high_signals(frame)
-        self.assertFalse(fresh.any())
+    def test_sideways_local_peaks_do_not_replace_the_substantial_swing(self):
+        frame = wave([108, 107, 108, 107, 108, 107, 111])
+        trace = swing_high_trace(frame)
+        self.assertEqual(len(trace.highs), 1)
+        self.assertEqual(trace.highs[0].price, 110.5)
+        self.assertTrue((trace.levels.iloc[47:] == 110.5).all())
+        self.assertEqual(np.flatnonzero(trace.fresh).tolist(), [53])
 
-    def test_a_pivot_is_first_usable_after_its_right_hand_candles_have_closed(self):
-        frame = bars([100, 102, 110, 108, 107, 111])
-        fresh, level, known = swing_high_signals(frame)
-        self.assertTrue(level.iloc[:5].isna().all())
-        self.assertFalse(known.iloc[:5].any())
-        self.assertEqual((fresh.iloc[5], level.iloc[5]), (True, 110))
+    def test_continuous_rise_or_decline_has_no_invented_confirmed_peak(self):
+        for tail in ([101 + i for i in range(30)], [99 - i for i in range(30)]):
+            trace = swing_high_trace(candles([100] * 40 + tail))
+            self.assertFalse(trace.fresh.any())
+            self.assertEqual(trace.highs, ())
 
-    def test_touch_is_not_break_and_close_back_below_the_pivot_still_counts(self):
-        frame = bars([100, 102, 110, 108, 107, 110, 111])
-        fresh, _, _ = swing_high_signals(frame)
-        self.assertEqual(fresh.tolist(), [False] * 6 + [True])
-        self.assertLess(frame["Close"].iloc[-1], 110)
+    def test_pullback_is_confirmed_at_close_and_usable_only_next_bar(self):
+        trace = swing_high_trace(wave([108]))
+        self.assertEqual([(p.pivot_index, p.confirmed_index) for p in trace.highs], [(44, 46)])
+        self.assertTrue(math.isnan(trace.levels.iloc[46]))
+        self.assertFalse(trace.known.iloc[46])
+        self.assertEqual(trace.levels.iloc[47], 110.5)
+        self.assertEqual(trace.pivot_indices.iloc[47], 44)
+        self.assertEqual(trace.confirmed_indices.iloc[47], 46)
 
-    def test_equal_high_plateau_selects_the_last_peak_before_the_decline(self):
-        fresh, level, _ = swing_high_signals(bars([100, 105, 110, 110, 108, 107, 111]))
-        self.assertEqual(fresh.tolist(), [False] * 6 + [True])
-        self.assertEqual(level.iloc[-1], 110)
+    def test_intraday_wick_cannot_confirm_a_wave_without_close_reversal(self):
+        frame = wave().iloc[:46].copy()
+        frame.iloc[-1, frame.columns.get_loc('Low')] = 90
+        self.assertEqual(swing_high_trace(frame).highs, ())
 
-    def test_the_reference_does_not_roll_off_after_a_fixed_number_of_days(self):
-        fresh, level, _ = swing_high_signals(bars([100, 102, 110, 108, 107] + [100] * 70 + [111]))
-        self.assertEqual(level.iloc[-1], 110)
-        self.assertEqual(np.flatnonzero(fresh).tolist(), [75])
+    def test_reversal_distance_is_frozen_at_extreme_not_inflated_by_pullback(self):
+        frame = wave()
+        frame.iloc[-1, frame.columns.get_loc('Low')] = 90
+        trace = swing_high_trace(frame)
+        self.assertEqual(trace.highs[0].confirmed_index, 46)
+        self.assertAlmostEqual(trace.highs[0].reversal_distance, 2 * trace.atr.iloc[44])
+        self.assertLess(trace.highs[0].reversal_distance, 2 * trace.atr.iloc[46])
 
-    def test_one_break_per_pivot_and_new_waves_need_no_ten_day_cooldown(self):
-        fresh, _, _ = swing_high_signals(bars([100, 102, 110, 108, 107, 111, 109, 108, 112, 113, 114]))
-        self.assertEqual(np.flatnonzero(fresh).tolist(), [5, 8])
+    def test_strict_touch_does_not_break_but_intraday_break_close_below_does(self):
+        frame = wave([108, 110, 109])
+        frame.iloc[-1, frame.columns.get_loc('High')] = 112
+        trace = swing_high_trace(frame)
+        self.assertFalse(trace.fresh.iloc[-2])  # high == 110.5
+        self.assertTrue(trace.fresh.iloc[-1])
+        self.assertLess(frame['Close'].iloc[-1], trace.levels.iloc[-1])
 
-    def test_higher_low_and_full_123_are_not_extra_filters(self):
-        frame = bars([100, 102, 110, 108, 107, 111])
-        frame.iloc[4, frame.columns.get_loc("Low")] = 80  # Lower than the initial low.
-        self.assertTrue(swing_high_signals(frame)[0].iloc[-1])
+    def test_reference_does_not_expire_or_repeat_after_a_fixed_day_count(self):
+        trace = swing_high_trace(wave([107] * 70 + [111, 112]))
+        self.assertEqual(trace.levels.iloc[-1], 110.5)
+        self.assertEqual(np.flatnonzero(trace.fresh).tolist(), [117])
 
-    def test_missing_open_never_invents_a_gap_entry(self):
-        frame = bars([100, 102, 110, 108, 107, 111]).drop(columns="Open")
-        fresh, _, known = swing_high_signals(frame)
-        self.assertFalse(fresh.any())
-        self.assertFalse(known.any())
+    def test_missing_open_cannot_invent_an_entry(self):
+        trace = swing_high_trace(wave([108, 111]).drop(columns='Open'))
+        self.assertFalse(trace.fresh.any())
+        self.assertFalse(trace.known.any())
 
-    def test_randomized_signal_and_reference_levels_match_exhaustive_oracle(self):
-        for seed in range(8):
-            rng = random.Random(seed)
-            frame = bars([100 + rng.randrange(25) for _ in range(90)])
-            expected, levels = slow_reference(frame)
-            fresh, actual, _ = swing_high_signals(frame)
-            self.assertEqual(fresh.tolist(), expected, f"seed={seed}")
-            np.testing.assert_allclose(actual.to_numpy(), levels, equal_nan=True)
-            for end in (15, 40, 75):
-                prefix = swing_high_signals(frame.iloc[:end])
-                self.assertEqual(prefix[0].tolist(), expected[:end])
+    def test_trough_candle_high_cannot_be_reused_as_a_later_rising_leg_peak(self):
+        frame = candles([100] * 40 + [100, 103, 100])
+        frame.iloc[40, frame.columns.get_loc('High')] = 120
+        frame.iloc[40, frame.columns.get_loc('Low')] = 98
+        trace = swing_high_trace(frame)
+        self.assertTrue(all(p.pivot_index != 40 for p in trace.highs))
+
+    def test_prices_scaled_to_another_currency_preserve_the_same_waves(self):
+        frame = wave([108, 111, 108, 109, 113, 110])
+        original = swing_high_trace(frame)
+        scaled = frame.copy()
+        for column in ('Open', 'High', 'Low', 'Close'):
+            scaled[column] *= 31.7
+        actual = swing_high_trace(scaled)
+        self.assertEqual(actual.fresh.tolist(), original.fresh.tolist())
+        np.testing.assert_allclose(actual.levels / 31.7, original.levels, equal_nan=True)
+
+    def test_future_prices_cannot_repaint_past_signal_level_or_dates(self):
+        for seed in range(6):
+            rng = np.random.default_rng(seed)
+            frame = candles(np.exp(np.cumsum(rng.normal(0, .018, 160))) * 100)
+            full = swing_high_trace(frame)
+            for end in (21, 47, 90, 130):
+                prefix = swing_high_trace(frame.iloc[:end])
+                for name in ('fresh', 'levels', 'known', 'pivot_indices', 'confirmed_indices', 'atr'):
+                    pd.testing.assert_series_equal(getattr(prefix, name), getattr(full, name).iloc[:end])
+                self.assertEqual(prefix.highs, tuple(p for p in full.highs if p.confirmed_index < end))
+
+    def test_invalid_parameters_fail_explicitly(self):
+        for value in (0, -1, float('inf'), float('nan'), True):
+            with self.assertRaises(ValueError):
+                swing_high_signals(wave(), reversal_atr=value)
+        for value in (0, -1, 2.5, True):
+            with self.assertRaises(ValueError):
+                swing_high_signals(wave(), atr_period=value)
+
+
+class ReviewedMarketExamplesTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        path = Path(__file__).parent / 'fixtures/breakouts/swing_review_cases.json'
+        fixture = json.loads(path.read_text())
+        cls.frames = {}
+        for symbol, rows in fixture['symbols'].items():
+            frame = pd.DataFrame(rows, columns=fixture['columns'])
+            frame['Date'] = pd.to_datetime(frame['Date'])
+            frame = frame.set_index('Date')
+            cls.frames[symbol] = bo.clean_bars(frame, frame.index[-1])[0]
+
+    def test_3230_retains_august_high_and_does_not_buy_the_october_sideways_pivot(self):
+        frame = self.frames['3230.TWO']
+        trace = swing_high_trace(frame)
+        self.assertTrue(trace.fresh.loc['2026-08-27'])
+        self.assertAlmostEqual(trace.levels.loc['2026-08-27'], 47.25)
+        self.assertFalse(trace.fresh.loc['2026-10-01'])
+        self.assertEqual(trace.levels.loc['2026-10-01'], 48.75)
+        pivot = int(trace.pivot_indices.loc['2026-10-01'])
+        self.assertEqual(str(frame.index[pivot].date()), '2026-08-28')
+
+    def test_3287_keeps_the_september_wick_instead_of_creating_a_sideways_high(self):
+        frame = self.frames['3287.TWO']
+        trace = swing_high_trace(frame)
+        self.assertTrue(trace.fresh.loc['2026-10-12'])
+        self.assertEqual(trace.levels.loc['2026-10-12'], 45)
+        pivot = int(trace.pivot_indices.loc['2026-10-12'])
+        self.assertEqual(str(frame.index[pivot].date()), '2026-09-21')
+        self.assertFalse(any(frame.index[p.pivot_index].month == 10 for p in trace.highs))
+
+    def test_veev_no_longer_buys_the_small_september_local_peak(self):
+        trace = swing_high_trace(self.frames['VEEV'])
+        self.assertFalse(trace.fresh.loc['2026-09-24'])
+        self.assertAlmostEqual(trace.levels.loc['2026-09-24'], 296.24, places=2)
+        self.assertTrue(trace.fresh.loc['2026-10-09'])
+        self.assertAlmostEqual(trace.levels.loc['2026-10-09'], 291.4, places=2)
+
+    def test_2305_preserves_the_reviewed_threshold_and_signal(self):
+        frame = self.frames['2305.TW']
+        trace = swing_high_trace(frame)
+        self.assertTrue(trace.fresh.loc['2026-10-13'])
+        self.assertEqual(trace.levels.loc['2026-10-13'], 72.5)
+        self.assertEqual(str(frame.index[int(trace.pivot_indices.loc['2026-10-13'])].date()), '2026-09-30')
+
+    def test_mu_failed_close_keeps_the_same_key_for_the_next_days_breakout(self):
+        frame = self.frames['MU']
+        trace = swing_high_trace(frame)
+        self.assertTrue(trace.fresh.loc['2026-09-21'])
+        self.assertTrue(trace.fresh.loc['2026-09-22'])
+        self.assertAlmostEqual(trace.levels.loc['2026-09-21'], 1042.4, places=2)
+        self.assertEqual(trace.levels.loc['2026-09-21'], trace.levels.loc['2026-09-22'])
+        self.assertEqual(trace.pivot_indices.loc['2026-09-21'], trace.pivot_indices.loc['2026-09-22'])
+        self.assertFalse(trace.fresh.loc['2026-09-23'])  # Qualified close consumed this high.
 
 
 class SwingEntryStatsTest(unittest.TestCase):
     def evaluate(self, frame):
-        return bo.build_market({"X": frame}, "synthetic", "tw")["windows"]["1m"]["strategies"]["swingHigh"]
+        return bo.build_market({'X': frame}, 'synthetic', 'tw')['windows']['1m']['strategies']['swingHigh']
 
-    def test_intraday_break_but_close_below_is_a_loss_not_a_cheap_close_entry(self):
-        frame = bars([100, 102, 110, 108, 107, 112, 109, 109, 109],
-                     closes=[100, 100, 100, 100, 100, 105, 108, 108, 108])
+    def test_intraday_break_close_below_is_not_a_cheap_close_entry(self):
+        frame = wave([108, 109, 109, 109, 109])
+        frame.iloc[48, frame.columns.get_loc('High')] = 112
         stats = self.evaluate(frame)
-        self.assertEqual((stats["n"], stats["maturedN"], stats["wins"]), (1, 1, 0))
-        self.assertEqual(stats["avgReturn"], round((108 / 110 - 1) * 100, 2))
+        self.assertEqual((stats['n'], stats['maturedN'], stats['wins']), (1, 1, 0))
+        self.assertEqual(stats['avgReturn'], round((109 / 110.5 - 1) * 100, 2))
 
-    def test_gap_above_pivot_uses_the_open_not_the_old_pivot(self):
-        frame = bars([100, 102, 110, 108, 107, 118, 114, 114, 114],
-                     closes=[100, 100, 100, 100, 100, 116, 112, 112, 112],
-                     opens=[100, 100, 100, 100, 100, 115, 112, 112, 112])
+    def test_gap_above_pivot_uses_open_and_keeps_one_entry_per_wave(self):
+        frame = wave([108, 116, 112, 112, 112])
+        frame.iloc[48, frame.columns.get_loc('Open')] = 115
+        frame.iloc[48, frame.columns.get_loc('High')] = 118
+        frame.iloc[48, frame.columns.get_loc('Low')] = 114
         stats = self.evaluate(frame)
-        self.assertEqual(stats["wins"], 0)
-        self.assertEqual(stats["avgReturn"], round((112 / 115 - 1) * 100, 2))
+        self.assertEqual((stats['n'], stats['maturedN'], stats['wins']), (1, 1, 0))
+        self.assertEqual(stats['avgReturn'], round((112 / 115 - 1) * 100, 2))
 
-    def test_distinct_waves_within_one_window_each_contribute_a_sample(self):
-        stats = self.evaluate(bars([100, 102, 110, 108, 107, 111, 109, 108, 112, 109, 108, 107]))
-        self.assertEqual((stats["eligible"], stats["n"], stats["maturedN"]), (1, 2, 2))
+    def test_separate_substantial_waves_can_enter_inside_ten_days(self):
+        frame = wave([108, 111, 108, 109, 113, 112, 111, 110])
+        stats = self.evaluate(frame)
+        self.assertEqual((stats['eligible'], stats['n'], stats['maturedN']), (1, 2, 2))
 
-    def test_all_past_signals_and_returns_are_unchanged_by_future_bars(self):
-        frame = bars([100, 102, 110, 108, 107, 111, 109, 108, 112, 109, 108, 107])
+    def test_asof_cutoff_does_not_use_future_confirmations_or_prices(self):
+        frame = wave([108, 111, 108, 109, 113, 112, 111, 110])
         cutoff = frame.index[-4]
-        with_future = bo.build_market({"X": frame}, "synthetic", "tw", as_of=cutoff)
-        truncated = bo.build_market({"X": frame.loc[:cutoff]}, "synthetic", "tw")
+        with_future = bo.build_market({'X': frame}, 'synthetic', 'tw', as_of=cutoff)
+        truncated = bo.build_market({'X': frame.loc[:cutoff]}, 'synthetic', 'tw')
         self.assertEqual(with_future, truncated)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

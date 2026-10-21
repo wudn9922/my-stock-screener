@@ -123,7 +123,10 @@ def main(argv=None):
         for window_key, window in market["windows"].items():
             for strategy in ACTIVE_STRATEGIES:
                 stats = window["strategies"][strategy]
-                print(f"   {window_key} {strategy}: 成功 {stats['wins']}/{stats['maturedN']}，成功率 {stats['winRate']}%")
+                comparison = stats['comparison']
+                print(f"   {window_key} {strategy}: 嘗試 {comparison['n']}，完整 {comparison['completeN']}，等待 {comparison['pendingN']}，缺日 {comparison['missingN']}，當日失敗 {comparison['commonFailedN']}")
+                for rule, value in comparison['rules'].items():
+                    print(f"      {rule}: {value['wins']}/{value['evaluatedN']}，成功率 {value['winRate']}%")
     return 0
 
 

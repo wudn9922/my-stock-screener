@@ -11,7 +11,11 @@ on:
       - 'scripts/build_breakouts.py'
       - 'scripts/build_full_market_breakouts.py'
       - 'scripts/swing_breakouts.py'
+      - 'scripts/breakout_outcomes.py'
+      - 'scripts/preview_swing_breakouts.py'
       - 'tests/test_swing_breakouts.py'
+      - 'tests/test_breakout_outcomes.py'
+      - 'tests/fixtures/breakouts/**'
       - 'tests/test_full_market_breakouts.py'
       - '.github/workflows/universe-full.yml'
       - '.github/workflows/schedule.yml'
@@ -50,6 +54,13 @@ jobs:
       - name: Desktop, phone and WebKit regressions
         working-directory: atlas
         run: npm run test:site -- parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts breakouts.spec.ts stock-volatility.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atlas-breakout-previews
+          path: atlas/test-results/site/**/four-outcome-card.png
+          if-no-files-found: ignore
+          retention-days: 7
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -60,6 +71,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_full_market_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_swing_breakouts.py' -v
+          python -m unittest discover -s tests -p 'test_breakout_outcomes.py' -v
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

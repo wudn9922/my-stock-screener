@@ -18,6 +18,7 @@ const stats = (overrides: Partial<BreakoutStats> = {}): BreakoutStats => ({
   avgHoldDays: 9,
   baseRate: 50,
   baseAvgReturn: 0.5,
+  comparison: null,
   ...overrides,
 });
 
@@ -42,13 +43,17 @@ describe('breakouts schema', () => {
     expect(params.strategies).toHaveLength(3);
     expect(params.strategies.map((meta) => meta.key)).toEqual(['swingHigh', 'box20', 'ema20']);
     expect(params.strategies[0]!.definition).toContain('波段高點');
-    expect(params.swingPivotLeft).toBe(2);
-    expect(params.swingPivotRight).toBe(2);
+    expect(params.swingMethod).toBe('atr-reversal-v2');
+    expect(params.successModel).toBe('four-rules-v1');
+    expect(params.successAtrPeriod).toBe(14);
+    expect(params.observationDays).toBe(5);
+    expect(params.swingAtrPeriod).toBe(20);
+    expect(params.swingReversalAtr).toBe(2);
     const tw = markets.tw!;
     expect(tw.asOf).toBe('2026-10-09');
     expect(tw.evaluated).toBe(900);
     expect(tw.anomalies).toEqual({ stocks: 3, days: 4 });
-    expect(tw.windows['1m']!.strategies.swingHigh).toEqual(
+    expect(tw.windows['1m']!.strategies.swingHigh).toMatchObject(
       stats({
         eligible: 880,
         n: 300,
@@ -61,6 +66,15 @@ describe('breakouts schema', () => {
         avgHoldDays: 10.2,
         baseRate: 59,
         baseAvgReturn: 5,
+        comparison: {
+          n: 300, completeN: 220, pendingN: 75, missingN: 5, commonFailedN: 44, sameBarFailedN: 3,
+          rules: {
+            hold5: { wins: 110, failures: 110, evaluatedN: 220, winRate: 50 },
+            nextHigh: { wins: 99, failures: 121, evaluatedN: 220, winRate: 45 },
+            firstHit: { wins: 121, failures: 99, evaluatedN: 220, winRate: 55 },
+            targetAndNext: { wins: 88, failures: 132, evaluatedN: 220, winRate: 40 },
+          },
+        },
       }),
     );
     expect(tw.windows['1w']!.strategies.box20!.winRate).toBeNull();
@@ -154,6 +168,48 @@ describe('breakouts schema', () => {
         definition: '',
       },
     ]);
+  });
+
+  it('keeps old pivot reports distinct and rejects incomplete ATR-wave metadata', () => {
+    const raw = structuredClone(sample) as { params: Record<string, unknown> };
+    delete raw.params.swingMethod;
+    delete raw.params.swingAtrPeriod;
+    delete raw.params.swingReversalAtr;
+    raw.params.swingPivotLeft = 2;
+    raw.params.swingPivotRight = 2;
+    const legacy = parseBreakouts(raw);
+    expect(legacy.status).toBe('ok');
+    if (legacy.status === 'ok') {
+      expect(legacy.data.params.swingMethod).toBe('fractal-v1');
+      expect(legacy.data.params.swingReversalAtr).toBeNull();
+    }
+    raw.params.swingMethod = 'atr-reversal-v1';
+    raw.params.swingAtrPeriod = 20;
+    raw.params.swingReversalAtr = -2;
+    const invalid = parseBreakouts(raw);
+    expect(invalid.status).toBe('ok');
+    if (invalid.status === 'ok') expect(invalid.data.params.swingMethod).toBe('unknown');
+  });
+
+  it('validates the shared outcome cohort and never borrows a legacy rate', () => {
+    const raw = structuredClone(sample) as { markets: { tw: { windows: Record<string, { strategies: Record<string, { comparison: Record<string, unknown> }> }> } } };
+    const comparison = raw.markets.tw.windows['1m']!.strategies.swingHigh!.comparison;
+    comparison.completeN = 999;
+    const result = parseBreakouts(raw);
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') expect(result.data.markets.tw!.windows['1m']!.strategies.swingHigh!.comparison).toBeNull();
+  });
+
+  it('keeps a missing rule missing without substituting the other three', () => {
+    const raw = structuredClone(sample) as { markets: { tw: { windows: Record<string, { strategies: Record<string, { comparison: { rules: Record<string, unknown> } }> }> } } };
+    delete raw.markets.tw.windows['1m']!.strategies.swingHigh!.comparison.rules.firstHit;
+    const result = parseBreakouts(raw);
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      const rules = result.data.markets.tw!.windows['1m']!.strategies.swingHigh!.comparison!.rules;
+      expect(rules.firstHit).toBeUndefined();
+      expect(rules.hold5?.winRate).toBe(50);
+    }
   });
 
   it('reports a document without any market as missing and a non-object as invalid', () => {

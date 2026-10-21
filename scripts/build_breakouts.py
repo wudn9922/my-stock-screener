@@ -4,8 +4,10 @@
 
 全市場產品由 build_full_market_breakouts.py 呼叫本計算引擎，只發布波段前高、箱型、20EMA 三法。
 舊 N 日前高與放量變體保留作相容／研究用途，不再作為產品的「突破前高」。
-波段前高採 swing_breakouts.py 的已確認轉折；盤中嚴格突破即觸發，每個轉折一次，沒有時間冷卻。
+波段前高採 swing_breakouts.py 的 ATR 波段；盤中嚴格突破即記嘗試，收盤失敗保留關鍵點可重試。
 波段法理論進場價＝max(當日開盤, 已確認波段高點)，每個新波段都可貢獻樣本；其餘方法維持收盤進場。
+產品四種勝率使用 comparison 欄位：共通收盤門檻＋同一批後續完整5交易日資料，第三組採先觸發判定。
+原本持有至asOf的平面統計欄位僅保留供舊格式與研究相容，新畫面不使用這些欄位作四組勝率。
 
 本檔舊命令列模式只讀 data/ 內的日 K CSV（Date,Open,High,Low,Close,Volume），universe 與市場寬度（build_breadth.py）相同：
 台股上市櫃普通股（4 碼、非 0 開頭）、美股 S&P 500 ∩ data/（名單取得失敗時退回 data/ 內所有美股 CSV）。
@@ -55,9 +57,10 @@ from build_breadth import (  # noqa: E402
     us_tickers_from_main,
     write_json_atomic,
 )
-from swing_breakouts import PIVOT_LEFT, PIVOT_RIGHT, SWING_KEY, swing_high_signals  # noqa: E402
+from swing_breakouts import ATR_PERIOD, REVERSAL_ATR, SWING_KEY, SWING_METHOD, swing_high_signals, wilder_atr  # noqa: E402
+from breakout_outcomes import GATE_ATR_PERIOD, OBSERVATION_DAYS, evaluate_attempt, summarize_attempts, success_params  # noqa: E402
 
-BREAKOUTS_JSON_VERSION = 1
+BREAKOUTS_JSON_VERSION = 2
 HIGH_LOOKBACKS = (20, 60, 120)
 BOX_LOOKBACK = 20
 # 箱型寬度門檻：(箱頂−箱底)/箱底。依 data/ 實際分布（2026-10，20 日高低區間的約下四分位數）挑選：
@@ -111,8 +114,10 @@ def _strategy_specs():
     })
     specs.append({
         "key": SWING_KEY, "label": "突破波段前高", "kind": "swing", "lookback": None, "volume": False,
-        "definition": f"波段高點以左右各 {PIVOT_LEFT} 根日線確認，右側 {PIVOT_RIGHT} 根收盤後才可使用；"
-                      "盤中最高價 > 最近已確認的波段高點即觸發，每個高點只取首次突破，不要求完整123型態、放量或冷卻期",
+        "definition": f"收盤自低點上漲至少 {REVERSAL_ATR:g} 倍 ATR({ATR_PERIOD}) 才形成上升段；"
+                      f"其最高影線在後續收盤回落至少 {REVERSAL_ATR:g} 倍該高點當時 ATR 後確認，下一根才可使用；"
+                      "橫盤小反彈不取代前高。盤中最高價嚴格超過已確認波段高點即觸發，"
+                      "收盤未達關鍵點＋0.1ATR(14)則保留前高，後續可重試；合格收盤後同高點不重複，不要求完整123型態、放量或冷卻期",
     })
     return specs
 
@@ -276,6 +281,8 @@ def build_market(frames, universe_label, market_key, as_of=None):
                 "pos": np.array([position.get(day, -1) for day in clean.index]),
                 "close": clean["Close"].to_numpy(),
                 "open": clean["Open"].to_numpy(),
+                "bars": clean,
+                "atr14": wilder_atr(clean, GATE_ATR_PERIOD),
                 "signals": {
                     key: (fresh.to_numpy(), level.to_numpy(), known.to_numpy())
                     for key, (fresh, level, known) in signals.items()
@@ -305,6 +312,7 @@ def build_market(frames, universe_label, market_key, as_of=None):
         strategies = {}
         for spec in STRATEGIES:
             events = []
+            attempts = []
             eligible = 0
             for stock, mask in zip(stocks, masks):
                 fresh, level, known = stock["signals"][spec["key"]]
@@ -320,6 +328,8 @@ def build_market(frames, universe_label, market_key, as_of=None):
                 last_close = stock["close"][-1]
                 # All distinct swing pivots count, including multiple waves in one window.
                 for index in hits if swing else hits[:1]:
+                    if spec['key'] in (SWING_KEY, 'box20', 'ema20'):
+                        attempts.append(evaluate_attempt(stock['bars'], index, float(level[index]), stock['atr14'], calendar, position))
                     # Stop-entry approximation: a gap above the pivot fills at the open.
                     # Daily bars cannot establish actual tick fills, fees or slippage.
                     entry = max(stock["open"][index], level[index]) if swing else stock["close"][index]
@@ -332,12 +342,15 @@ def build_market(frames, universe_label, market_key, as_of=None):
                         }
                     )
             strategies[spec["key"]] = summarize(events, eligible, base_by_day)
+            if spec['key'] in (SWING_KEY, 'box20', 'ema20'):
+                strategies[spec['key']]['comparison'] = summarize_attempts(attempts)
 
         matured_days = [day for day in window_days if last_position - position[day] >= MATURE_DAYS and day in base_by_day]
         windows[window_key] = {
             "days": days,
             "start": start.strftime("%Y-%m-%d"),
             "maturedThrough": calendar[-1 - MATURE_DAYS].strftime("%Y-%m-%d") if len(calendar) > MATURE_DAYS else None,
+            "observedThrough": calendar[-1 - OBSERVATION_DAYS].strftime("%Y-%m-%d") if len(calendar) > OBSERVATION_DAYS else None,
             "market": {
                 "entryDays": len(matured_days),
                 "pairs": sum(base_by_day[day][1] for day in matured_days),
@@ -374,6 +387,7 @@ def build_market(frames, universe_label, market_key, as_of=None):
 def params_meta():
     """口徑參數（前端的口徑說明直接讀這裡）。"""
     return {
+        **success_params(),
         "windows": [{"key": key, "days": days, "label": label} for key, days, label in WINDOWS],
         "matureDays": MATURE_DAYS,
         "minSample": MIN_SAMPLE,
@@ -382,10 +396,11 @@ def params_meta():
         "volumeLookback": VOLUME_LOOKBACK,
         "volumeMultiple": VOLUME_MULTIPLE,
         "boxLookback": BOX_LOOKBACK,
-        "swingPivotLeft": PIVOT_LEFT,
-        "swingPivotRight": PIVOT_RIGHT,
+        "swingMethod": SWING_METHOD,
+        "swingAtrPeriod": ATR_PERIOD,
+        "swingReversalAtr": REVERSAL_ATR,
         "minEvaluated": MIN_EVALUATED,
-        "entry": "突破日收盤買進",
+        "entry": "波段前高突破以 max(開盤價, 波段高點) 作理論停買進場價；其餘方法以訊號日收盤進場",
         "mark": "asOf 收盤標記",
         "strategies": [
             {key: spec[key] for key in ("key", "label", "kind", "lookback", "volume", "definition")} for spec in STRATEGIES

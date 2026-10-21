@@ -1,4 +1,18 @@
-## Current review: daily volatility and breakout entry methods (2026-10-20)
+## Current review: three entries and four success rules (2026-10-21)
+
+User authorized updating PR #147, including the earlier ATR20%/mean-intraday-range feature, the reviewed substantial swing definition, three entry methods, four success rules and a styled comparison panel. Do not merge or enable auto-merge.
+
+Swing waves require a close rebound of 2 × Wilder ATR20 from a trough, followed by a close reversal of 2 × the extreme-date ATR from the highest wick. Distances are frozen at extrema and confirmations become usable next bar. Sideways micro-pivots do not replace a reference. A strict intraday break is recorded as an attempt. A close below key + 0.1 × Wilder ATR14 fails all four outcomes but keeps the same wave high armed; later days may retry. A qualified close consumes that high. Frozen real-data regressions include MU's failed September 21 / retried September 22 entry, 3230, 3287, VEEV and 2305. No complete historical Livermore/1-2-3 system is claimed.
+
+All methods share one five-complete-market-session cohort (D+1 through D+5). Rule 1 survives key −5%; rule 2 exceeds the signal-day high on D+1; rule 3 resolves the FIRST stop/target/next-day-high event, or succeeds after five-day survival; rule 4 requires target +5% AND next-day higher high, without an added −5% veto. Signal-day close failure overrides all. Opening gaps establish known order; otherwise opposing events on the same daily candle conservatively lose. Resolved first-event outcomes never change with later price action. Pending/missing observations never become failures. Legacy as-of-profit fields are retained for compatibility and never shown as the four new rates.
+
+The market panel has a four-choice outcome selector, three method cards, exact numerator/cohort counts, pending/missing counts, and a collapsible 3×4 comparison matrix. It supports keyboard/native button interactions, phone targets, horizontal overflow containment, empty/pending/partial/legacy/error states and a short shared-failure explanation with detailed methodology. Old report versions wait for recomputation rather than relabelling earlier rates. Preview images use the production pivot trace and explicitly shade missing stock candles; guessed fixed-offset pivot dates are not used.
+
+The full-market builder still restores complete exchange lists/histories, never shrinks its denominator to local CSVs and preserves the previous file if coverage is insufficient. PR CI recomputes a real artifact read-only; the resulting verified JSON is committed separately. Local subset trials are never published as full-market results. No production account, database, cache or notification writes are made.
+
+Local verification: full Python suite 1,395 passed, including 84 focused breakout checks (38 shared/legacy, 6 full-market, 22 wave, 18 new outcome cases). Lint, typecheck and both builds passed; 20 desktop/phone Chromium breakout and volatility cases passed. All 927 frontend tests passed on the final full run; final CI results are recorded in the verification file and PR description. No independent reviewer or physical Safari sign-off is claimed.
+
+## Previous review: daily volatility and breakout entry methods (2026-10-20)
 
 Individual-stock chart headers show Wilder ATR(20)% and the mean of the last 20 daily (high-low)/previous-close percentages below P/E. They request daily bars through the selected normalized provider independently of the chart interval, exclude unfinished sessions, require 21 valid bars and use the last daily close for ATR%. Symbol/provider/reload identity and cancellation prevent old values leaking into a new request. Expandable help shows formulas, the data date, cache status and price-basis limitations. No chart engine or drawing model changes.
 

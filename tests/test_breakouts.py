@@ -462,7 +462,7 @@ def naive_stats(frames, market_key, as_of):
         result = {}
         for spec in bo.STRATEGIES:
             if spec["kind"] == "swing":
-                continue  # Independently checked by test_swing_breakouts.py's pivot oracle.
+                continue  # Covered by wave regressions and prefix/scale invariance in test_swing_breakouts.py.
             n = matured = wins = fails = eligible = 0
             base_rates = []
             for rows in stocks.values():
@@ -566,8 +566,8 @@ class FrontendFixtureContractTest(unittest.TestCase):
                 self.assertEqual(set(window), set(produced))
                 self.assertEqual(set(window["market"]), set(produced["market"]))
                 self.assertEqual(set(window["strategies"]), set(full.ACTIVE_STRATEGIES))
-                for stats_ in window["strategies"].values():
-                    self.assertEqual(set(stats_), set(produced["strategies"]["high20"]))
+                for strategy_key, stats_ in window["strategies"].items():
+                    self.assertEqual(set(stats_), set(produced["strategies"][strategy_key]))
 
 
 class MainTest(unittest.TestCase):
@@ -608,7 +608,7 @@ class MainTest(unittest.TestCase):
         self.assertEqual(code, 0)
         with open(self.out, encoding="utf-8") as file:
             payload = json.load(file)
-        self.assertEqual(payload["version"], 1)
+        self.assertEqual(payload["version"], bo.BREAKOUTS_JSON_VERSION)
         datetime.fromisoformat(payload["generatedAt"])
         self.assertEqual([w["key"] for w in payload["params"]["windows"]], ["1w", "1m"])
         self.assertEqual(payload["params"]["matureDays"], 3)
