@@ -49,15 +49,16 @@ MARKET_BENCHMARKS = {
     "US": "SPY"
 }
 
-# main.py 的流動性名單（全市場資料 scope=full 建好之前、或它過期時使用）
+# 行情收集與選股資料名單不限成交股數；LINE tw_all 報告另外篩選最新日 K 至少 100 萬股。
+# 保留舊 scope=liquid 的相容格式。
 UNIVERSE_LABELS = {
-    "TW": "台股流動性名單（當日成交≥100萬股）",
+    "TW": "台股上市／上櫃資料名單（收集不限股數；LINE 全市場潛伏清單當日成交≥100萬股）",
     "US": "S&P 500 成分股"
 }
 
 # scripts/build_universe_full.py 在指標欄位之後附加的公司資料欄（選填；main.py 的檔案沒有）
 UNIVERSE_PROFILE_FIELDS = ["sector", "industry", "marketCap"]
-# 既有檔案中 scope=full 的市場，asOf 不早於 main.py 同市場 asOf 這麼多天就保留（不被流動性名單覆蓋）
+# 既有檔案中 scope=full 的市場，asOf 不早於 main.py 同市場 asOf 這麼多天就保留（不被每日掃描名單覆蓋）
 FULL_FRESH_DAYS = 5
 
 RETURN_PERIODS = (5, 21, 63)
@@ -835,7 +836,7 @@ def combine_universe_markets(parts, generated_at=None, report_date=None):
 
 def keep_fresh_full_markets(payload, existing, today=None):
     """
-    main.py 寫檔前呼叫：既有檔案中夠新的 scope=full 市場原樣保留，其餘市場用 main.py 的流動性名單。
+    main.py 寫檔前呼叫：既有檔案中夠新的 scope=full 市場原樣保留，其餘市場用 main.py 的每日掃描名單。
     回傳 (新文件, 保留的市場清單)。
     """
     payload_fields = fields_of(payload)
@@ -887,7 +888,7 @@ def full_rs_distribution(document, market, reference_as_of=None, today=None):
 
 def adopt_full_rs_distribution(universes, existing, today=None):
     """
-    main.py 的流動性名單算完後呼叫：該市場若有夠新的全市場檔，RS 百分位改用全市場的 rs63 分布
+    main.py 的每日掃描名單算完後呼叫：該市場若有夠新的全市場檔，RS 百分位改用全市場的 rs63 分布
     （報告群組與自選股的 RS 百分位與選股頁全市場一致）。就地修改，回傳改用的市場清單。
     """
     adopted = []

@@ -250,6 +250,13 @@
   color: var(--text-3);
   margin-top: 6px;
 }
+.fs-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
 .fs-body {
   flex: 1;
   min-height: 0;
@@ -1040,4 +1047,15 @@
     animation: none;
     transition: none;
   }
+}
+
+/* Keep Apply reachable when the keyboard or a short window leaves little height.
+   Navigation and selected chips must share the scroll area with the conditions. */
+.fs-short .fs-content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.fs-short .fs-body {
+  flex: none;
+  overflow: visible;
 }

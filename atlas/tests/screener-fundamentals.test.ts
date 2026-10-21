@@ -22,6 +22,8 @@ import {
   streakCoverage,
   needsGrowth,
   parseFilters,
+  readStoredFilters,
+  writeStoredFilters,
   removeFilter,
   serializeFilters,
   streakPasses,
@@ -43,6 +45,7 @@ import {
   type GrowthFile,
 } from '../src/fundamentals/GrowthProvider';
 import { parseRoute, serializeRoute } from '../src/app/routes';
+import { WatchlistStore } from '../src/watchlists/store';
 
 const universe = parseUniverse(JSON.parse(readFileSync('tests/fixtures/screener/universe.json', 'utf8')));
 if (universe.status !== 'ok') throw new Error('universe fixture');
@@ -748,6 +751,32 @@ describe('growth terms in the link: periods, threshold and 成長佔比 P', () =
 });
 
 describe('stacked fundamentals and annual EPS acceleration', () => {
+  it('combines share volume with stacked gates through shared URLs, market memory and saved strategies', () => {
+    const base = reportGrowth.items.get('2330-TW')!;
+    const histories = [[25, 15, 15, 15, 15], [25, 15, 15, 15, 15], [25, 5, 5, 5, 5], [15, 15, 15, 15, 15], [25, 15, 15, 15, 15]];
+    const items = histories.map((_, i) => ({ ...plain(`TEST${i}`), volume: [1_000_000, 999_999, 2_000_000, 2_000_000, null][i] }));
+    const data = { ...reportGrowth, items: new Map(histories.map((epsYoYAnnual, i) => [`TEST${i}`, { ...base, epsYoYAnnual, epsTurnAnnual: [] }])) };
+    const filters = 'vol:1000000;epsy:5:10;epsy:1:20';
+    const context = { market: 'TW' as const, growth: data };
+    expect(symbols(applyFilters(items, state(filters), context))).toEqual(['TEST0']);
+    expect(symbols(applyFilters(items, state(`${filters};nd:keep`), context))).toEqual(['TEST0']);
+    expect(symbols(applyFilters(items, removeFilter(state(filters), 'vol'), context))).toEqual(['TEST0', 'TEST1', 'TEST4']);
+    expect(symbols(applyFilters(items, removeFilter(state(filters), 'epsY'), context))).toEqual(['TEST0', 'TEST2']);
+    expect(symbols(applyFilters(items, removeFilter(state(filters), 'growth:0'), context))).toEqual(['TEST0', 'TEST3']);
+    const route = parseRoute(serializeRoute({ page: 'screener', group: 'universe-tw', f: filters })).route;
+    expect(route).toEqual({ page: 'screener', group: 'universe-tw', f: filters });
+    const values = new Map<string, string>();
+    const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } } as Storage;
+    writeStoredFilters('TW', filters, storage);
+    writeStoredFilters('US', 'vol:100000;rev:4:10;rev:1:20', storage);
+    expect(readStoredFilters('TW', storage)).toBe(filters);
+    expect(readStoredFilters('US', storage)).toBe('vol:100000;rev:4:10;rev:1:20');
+    const list = createWatchlist({ name: '成交量與年度成長', market: 'TW', group: 'universe-tw', filters });
+    new WatchlistStore(storage).save(list);
+    const restored = new WatchlistStore(storage).getSnapshot().document.lists[0];
+    expect(validateWatchlist(restored).filters).toBe(filters);
+    expect(evaluateWatchlist(restored, items, data).map(({ symbol }) => symbol)).toEqual(['TEST0']);
+  });
   it('keeps every repeated EPS/revenue gate through links and removes exactly one instance', () => {
     const s = state('eps:4:10;eps:1:30;epsy:5:10:75;epsy:1:20;rev:4:0;rev:1:15;revy:5:0;revy:1:10;acc:1;accy:1;tn:0;nd:keep');
     const text = serializeFilters(s);
@@ -770,6 +799,9 @@ describe('stacked fundamentals and annual EPS acceleration', () => {
     expect(combined).toEqual(one.filter((item) => two.has(item.symbol)));
     expect(combined.length).toBeGreaterThan(0);
     expect(combined.length).toBeLessThan(TW.length);
+    expect(applyFilters(TW, state(`vol:10000000;${a};${b}`), tw)).toEqual(
+      combined.filter((item) => item.volume !== null && item.volume !== undefined && item.volume >= 10_000_000),
+    );
   });
 
   it('requires both five-year consistency and one-year growth, with independent missing-data and turnaround rules', () => {
@@ -822,10 +854,10 @@ describe('stacked fundamentals and annual EPS acceleration', () => {
   });
 
   it('preserves strategies beyond the old 300-character limit in routes, local schema and cloud validation', () => {
-    const filters = Array.from({ length: 30 }, (_, i) => `epsy:${i % 10 + 1}:${i}:75`).join(';') + ';accy:1';
+    const filters = 'vol:1000000;' + Array.from({ length: 30 }, (_, i) => `epsy:${i % 10 + 1}:${i}:75`).join(';') + ';accy:1';
     expect(filters.length).toBeGreaterThan(300);
     const text = serializeFilters(state(filters));
-    expect(activeChips(state(text))).toHaveLength(31);
+    expect(activeChips(state(text))).toHaveLength(32);
     expect(parseRoute(serializeRoute({ page: 'screener', f: text })).route).toEqual({ page: 'screener', f: text });
     const list = createWatchlist({ name: '疊加策略', market: 'TW', group: 'universe-tw', filters: text });
     expect(watchlistSchema.parse(list).filters).toBe(text);

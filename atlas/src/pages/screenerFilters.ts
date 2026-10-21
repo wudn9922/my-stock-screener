@@ -12,6 +12,7 @@ import { growthKey, type GrowthFile, type GrowthRecord } from '../fundamentals/G
  * - hi: within N% of the 52-week high; rs: RS percentile ≥ N (rank within the market's universe);
  *   rs3 / rs1: 3-month / 1-month relative return vs the market's benchmark index > N%
  * - vr: volume vs the previous session ≥ N (today ÷ yesterday)
+ * - vol: daily traded shares ≥ N (integer shares, not lots; absent = unrestricted)
  * - eps / rev: `N:X[:P]` quarterly YoY gate, epsy / revy: `N:X[:P]` annual one. Over the latest N periods (quarters
  *   1–12, years 1–10) a period is growth when its YoY ≥ X% (a turnaround counts, see tn), otherwise a decline; the
  *   stock passes when growth ÷ periods with data ≥ P% (the share, 1–100, default 100 = every period). Missing
@@ -96,6 +97,8 @@ export interface FilterState {
   /** 1-month relative return vs the benchmark index > N%. */
   rs1: number | null;
   vr: number | null;
+  /** Minimum daily traded shares; null means no volume threshold. */
+  vol: number | null;
   eps: GrowthGate | null;
   rev: GrowthGate | null;
   /** Annual EPS / revenue YoY. */
@@ -124,6 +127,7 @@ export const EMPTY_FILTERS: FilterState = Object.freeze({
   rs3: null,
   rs1: null,
   vr: null,
+  vol: null,
   eps: null,
   rev: null,
   epsY: null,
@@ -136,6 +140,9 @@ export const EMPTY_FILTERS: FilterState = Object.freeze({
 
 /** Volume-vs-previous-day thresholds offered by the filter sheet (a link may carry any other positive number). */
 export const VOLUME_PRESETS: readonly number[] = [1.1, 1.2, 1.5];
+export const SHARE_VOLUME_PRESETS: readonly number[] = [100_000, 500_000, 1_000_000, 5_000_000, 10_000_000];
+export const formatShares = (shares: number): string =>
+  shares >= 10_000 && shares % 10_000 === 0 ? `${(shares / 10_000).toLocaleString('en-US')} 萬股` : `${shares.toLocaleString('en-US')} 股`;
 /** Tapping the applied preset again clears it. */
 export const toggleVolume = (current: number | null, next: number | null): number | null => (next === current ? null : next);
 /** An applied threshold that is not one of the presets (an old link): shown as 「目前條件」, no preset lit. */
@@ -208,6 +215,9 @@ export function parseFilters(value: string | null | undefined): FilterState {
     else if (key === 'vr') {
       const vr = number(parts[0]);
       state.vr = vr !== null && vr > 0 ? vr : null;
+    } else if (key === 'vol') {
+      const vol = parts.length === 1 ? number(parts[0]) : null;
+      state.vol = vol !== null && Number.isSafeInteger(vol) && vol > 0 ? vol : null;
     } else if (key === 'eps' || key === 'rev' || key === 'epsy' || key === 'revy') {
       const kind = key === 'epsy' ? 'epsY' : key === 'revy' ? 'revY' : key;
       const gate = kind === 'epsY' || kind === 'revY' ? yearGate(parts) : quarterGate(parts);
@@ -243,6 +253,7 @@ export function serializeFilters(state: FilterState): string {
   if (state.rs3 !== null) tokens.push(`rs3:${formatNumber(state.rs3)}`);
   if (state.rs1 !== null) tokens.push(`rs1:${formatNumber(state.rs1)}`);
   if (state.vr !== null) tokens.push(`vr:${formatNumber(state.vr)}`);
+  if (state.vol !== null) tokens.push(`vol:${state.vol}`);
   if (state.eps) tokens.push(gateParam('eps', state.eps.quarters, state.eps.min, state.eps.share));
   if (state.epsY) tokens.push(gateParam('epsy', state.epsY.years, state.epsY.min, state.epsY.share));
   if (state.epss !== null) tokens.push(`epss:${state.epss}`);
@@ -420,8 +431,8 @@ export function accelCoverage(items: readonly GroupItem[], growth: GrowthFile | 
 
 // ---------------------------------------------------------- availability
 
-export type FilterKey = 'chg' | 'ema20' | 'tr' | 'hi' | 'rs' | 'rs3' | 'rs1' | 'vr' | 'eps' | 'rev' | 'epsY' | 'revY' | 'epss' | 'accel' | 'accelY';
-export const FILTER_KEYS: readonly FilterKey[] = ['chg', 'ema20', 'tr', 'hi', 'rs', 'rs3', 'rs1', 'vr', 'eps', 'rev', 'epsY', 'revY', 'epss', 'accel', 'accelY'];
+export type FilterKey = 'chg' | 'ema20' | 'tr' | 'hi' | 'rs' | 'rs3' | 'rs1' | 'vr' | 'vol' | 'eps' | 'rev' | 'epsY' | 'revY' | 'epss' | 'accel' | 'accelY';
+export const FILTER_KEYS: readonly FilterKey[] = ['chg', 'ema20', 'tr', 'hi', 'rs', 'rs3', 'rs1', 'vr', 'vol', 'eps', 'rev', 'epsY', 'revY', 'epss', 'accel', 'accelY'];
 /** SMA distances are no longer a filter, but the trend flags still need them; their availability is tracked too. */
 export type TrendMaKey = 'ma20' | 'ma50' | 'ma200';
 
@@ -471,6 +482,7 @@ export function filterAvailability(items: readonly GroupItem[], context: FilterC
     rs3: reason(any((item) => item.metrics?.rs63)),
     rs1: reason(any((item) => item.metrics?.rs21)),
     vr: reason(any((item) => item.metrics?.volVsPrev)),
+    vol: any((item) => item.volume) ? null : '此群組沒有成交股數資料',
     eps: fundamentals((record) => someNumber(record.epsYoY, record.epsTurnQ)),
     rev: fundamentals((record) => someNumber(record.revYoY)),
     epsY: fundamentals((record) => someNumber(record.epsYoYAnnual, record.epsTurnAnnual)),
@@ -522,12 +534,13 @@ export function applyFilters(items: readonly GroupItem[], state: FilterState, co
   const ema20 = state.ema20;
   if (ema20 && !available.ema20) tests.push((item) => inRange(item.metrics?.ema20 ?? null, ema20));
   for (const flag of state.tr) if (!trendFlagUnavailable(flag, available)) tests.push(TREND_TESTS[flag]);
-  const { hi, rs, rs3, rs1, vr, eps, rev, epsY, revY, epss, accel, turn, keepMissing } = state;
+  const { hi, rs, rs3, rs1, vr, vol, eps, rev, epsY, revY, epss, accel, turn, keepMissing } = state;
   if (hi !== null && !available.hi) tests.push((item) => (item.metrics?.fromHi52 ?? -Infinity) >= -hi);
   if (rs !== null && !available.rs) tests.push((item) => (item.metrics?.rsRank ?? -Infinity) >= rs);
   if (rs3 !== null && !available.rs3) tests.push((item) => (item.metrics?.rs63 ?? -Infinity) > rs3);
   if (rs1 !== null && !available.rs1) tests.push((item) => (item.metrics?.rs21 ?? -Infinity) > rs1);
   if (vr !== null && !available.vr) tests.push((item) => (item.metrics?.volVsPrev ?? -Infinity) >= vr);
+  if (vol !== null && !available.vol) tests.push((item) => (item.volume ?? -Infinity) >= vol);
   const record = (item: GroupItem) => growthRecordFor(item, context.growth);
   if (eps && !available.eps)
     tests.push((item) => {
@@ -629,6 +642,7 @@ export function activeChips(state: FilterState, availability?: FilterAvailabilit
   if (state.rs1 !== null)
     chips.push({ id: 'rs1', key: 'rs1', label: state.rs1 === 0 ? '1月強於大盤' : `1月相對強弱 >${signed(state.rs1)}%` });
   if (state.vr !== null) chips.push({ id: 'vr', key: 'vr', label: `量比 ≥${formatNumber(state.vr)}` });
+  if (state.vol !== null) chips.push({ id: 'vol', key: 'vol', label: `成交股數 ≥${formatShares(state.vol)}` });
   if (state.eps) chips.push({ id: 'eps', key: 'eps', label: gateLabel('EPS', state.eps) });
   if (state.epsY) chips.push({ id: 'epsY', key: 'epsY', label: yearGateLabel('EPS', state.epsY) });
   if (state.epss !== null) chips.push({ id: 'epss', key: 'epss', label: streakLabel(state.epss) });
@@ -667,7 +681,7 @@ export function removeFilter(state: FilterState, id: ChipId): FilterState {
       next.extraGates = next.extraGates!.filter((_, i) => i !== index);
     } else next[id] = null;
   } else if (id === 'chg' || id === 'ema20' || id === 'epss') next[id] = null;
-  else if (id === 'hi' || id === 'rs' || id === 'rs3' || id === 'rs1' || id === 'vr') next[id] = null;
+  else if (id === 'hi' || id === 'rs' || id === 'rs3' || id === 'rs1' || id === 'vr' || id === 'vol') next[id] = null;
   else if (id === 'accel') next.accel = false;
   else if (id === 'accelY') next.accelY = false;
   else if (id === 'turn') next.turn = true;

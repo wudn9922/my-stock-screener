@@ -39,7 +39,7 @@ export const UNIVERSE_FIELDS = [
 /**
  * Optional profile columns written by the full-market build (scripts/build_universe_full.py) after the
  * metric columns: `sector`, `industry` (text or null) and `marketCap` (market currency or null). Files
- * without them (the liquidity list written by main.py) parse exactly as before.
+ * without them (the daily scan list written by main.py) parse exactly as before.
  */
 export const UNIVERSE_PROFILE_FIELDS = ['sector', 'industry', 'marketCap'] as const;
 

@@ -1,7 +1,39 @@
 {
- "version": 1,
+ "version": 2,
  "generatedAt": "2026-10-09T10:00:00+00:00",
  "params": {
+  "successModel": "four-rules-v1",
+  "successAtrPeriod": 14,
+  "closeBufferAtr": 0.1,
+  "observationDays": 5,
+  "barrierPct": 5.0,
+  "sameBarPolicy": "conservative-failure",
+  "outcomeRules": [
+   {
+    "key": "hold5",
+    "label": "守住關鍵點",
+    "shortLabel": "五日守住",
+    "definition": "突破後5個交易日內，最低價未碰到固定關鍵點下方5%即成功；碰到即失敗。"
+   },
+   {
+    "key": "nextHigh",
+    "label": "隔日再創高",
+    "shortLabel": "隔日創高",
+    "definition": "下一個市場交易日最高價嚴格高於突破日最高價即成功，否則失敗。"
+   },
+   {
+    "key": "firstHit",
+    "label": "先觸發判定",
+    "shortLabel": "先觸發",
+    "definition": "先碰關鍵點下方5%則失敗；先碰上方5%或隔日先創高則成功；5日都未碰下方5%也成功。先成立後不被後續走勢改寫。"
+   },
+   {
+    "key": "targetAndNext",
+    "label": "漲幅與續強",
+    "shortLabel": "目標＋續強",
+    "definition": "突破後5個交易日內碰到固定關鍵點上方5%，且隔日最高價高於突破日最高價，兩項皆成立才成功；不另加下方5%否決。"
+   }
+  ],
   "windows": [
    {
     "key": "1w",
@@ -21,33 +53,20 @@
   "volumeLookback": 20,
   "volumeMultiple": 1.5,
   "boxLookback": 20,
+  "swingMethod": "atr-reversal-v2",
+  "swingAtrPeriod": 20,
+  "swingReversalAtr": 2.0,
   "minEvaluated": 200,
-  "entry": "突破日收盤買進",
+  "entry": "波段前高突破以 max(開盤價, 波段高點) 作理論停買進場價；箱型與20EMA以訊號日收盤進場",
   "mark": "asOf 收盤標記",
   "strategies": [
    {
-    "key": "high20",
-    "label": "突破20日高",
-    "kind": "high",
-    "lookback": 20,
+    "key": "swingHigh",
+    "label": "突破波段前高",
+    "kind": "swing",
+    "lookback": null,
     "volume": false,
-    "definition": "收盤 > 前 20 個有效交易日（不含當日）的最高價"
-   },
-   {
-    "key": "high60",
-    "label": "突破60日高",
-    "kind": "high",
-    "lookback": 60,
-    "volume": false,
-    "definition": "收盤 > 前 60 個有效交易日（不含當日）的最高價"
-   },
-   {
-    "key": "high120",
-    "label": "突破120日高",
-    "kind": "high",
-    "lookback": 120,
-    "volume": false,
-    "definition": "收盤 > 前 120 個有效交易日（不含當日）的最高價"
+    "definition": "收盤自低點上漲至少 2 倍 ATR(20) 才形成上升段；其最高影線在後續收盤回落至少 2 倍該高點當時 ATR 後確認，下一根才可使用；橫盤小反彈不取代前高。盤中最高價嚴格超過已確認波段高點即觸發，收盤未達關鍵點＋0.1ATR(14)則保留前高，後續可重試；合格收盤後同高點不重複，不要求完整123型態、放量或冷卻期"
    },
    {
     "key": "box20",
@@ -58,46 +77,22 @@
     "definition": "前 20 個有效交易日（不含當日）高低區間 (最高−最低)/最低 ≤ 門檻，且收盤 > 箱頂"
    },
    {
-    "key": "high20Vol",
-    "label": "突破20日高＋放量",
-    "kind": "high",
+    "key": "ema20",
+    "label": "突破20EMA",
+    "kind": "ema",
     "lookback": 20,
-    "volume": true,
-    "definition": "收盤 > 前 20 個有效交易日（不含當日）的最高價；且當日量 ≥ 前 20 日均量 × 1.5"
-   },
-   {
-    "key": "high60Vol",
-    "label": "突破60日高＋放量",
-    "kind": "high",
-    "lookback": 60,
-    "volume": true,
-    "definition": "收盤 > 前 60 個有效交易日（不含當日）的最高價；且當日量 ≥ 前 20 日均量 × 1.5"
-   },
-   {
-    "key": "high120Vol",
-    "label": "突破120日高＋放量",
-    "kind": "high",
-    "lookback": 120,
-    "volume": true,
-    "definition": "收盤 > 前 120 個有效交易日（不含當日）的最高價；且當日量 ≥ 前 20 日均量 × 1.5"
-   },
-   {
-    "key": "box20Vol",
-    "label": "突破20日箱型＋放量",
-    "kind": "box",
-    "lookback": 20,
-    "volume": true,
-    "definition": "前 20 個有效交易日（不含當日）高低區間 (最高−最低)/最低 ≤ 門檻，且收盤 > 箱頂；且當日量 ≥ 前 20 日均量 × 1.5"
+    "volume": false,
+    "definition": "前日收盤 ≤ 前日 EMA20，且當日收盤 > 當日 EMA20；EMA 以最初 20 日收盤均值起算，之後以 2/21 平滑"
    }
   ]
  },
  "markets": {
   "tw": {
    "asOf": "2026-10-09",
-   "universe": "台股上市櫃普通股（4碼、非0開頭）",
+   "universe": "全市場台股上市＋上櫃普通股",
    "universeCount": 1000,
    "evaluated": 900,
-   "stale": 100,
+   "stale": 80,
    "weekendBars": 0,
    "boxMaxWidthPct": 14.0,
    "anomalies": {
@@ -123,7 +118,7 @@
       "avgReturn": -0.3
      },
      "strategies": {
-      "high20": {
+      "swingHigh": {
        "eligible": 880,
        "n": 60,
        "maturedN": 25,
@@ -133,31 +128,43 @@
        "failRate": 52.0,
        "avgHoldDays": 3.4,
        "baseRate": 44.0,
-       "baseAvgReturn": -0.31
-      },
-      "high60": {
-       "eligible": 870,
-       "n": 30,
-       "maturedN": 12,
-       "winRate": 50.0,
-       "avgReturn": 0.4,
-       "medianReturn": 0.1,
-       "failRate": 33.3,
-       "avgHoldDays": 3.5,
-       "baseRate": 45.0,
-       "baseAvgReturn": -0.2
-      },
-      "high120": {
-       "eligible": 860,
-       "n": 9,
-       "maturedN": 0,
-       "winRate": null,
-       "avgReturn": null,
-       "medianReturn": null,
-       "failRate": null,
-       "avgHoldDays": null,
-       "baseRate": null,
-       "baseAvgReturn": null
+       "baseAvgReturn": -0.31,
+       "wins": 10,
+       "comparison": {
+        "model": "four-rules-v1",
+        "n": 60,
+        "completeN": 0,
+        "pendingN": 60,
+        "missingN": 0,
+        "commonFailedN": 0,
+        "sameBarFailedN": 0,
+        "rules": {
+         "hold5": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "nextHigh": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "firstHit": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "targetAndNext": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         }
+        }
+       }
       },
       "box20": {
        "eligible": 880,
@@ -169,57 +176,94 @@
        "failRate": null,
        "avgHoldDays": null,
        "baseRate": null,
-       "baseAvgReturn": null
+       "baseAvgReturn": null,
+       "wins": 0,
+       "comparison": {
+        "model": "four-rules-v1",
+        "n": 0,
+        "completeN": 0,
+        "pendingN": 0,
+        "missingN": 0,
+        "commonFailedN": 0,
+        "sameBarFailedN": 0,
+        "rules": {
+         "hold5": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "nextHigh": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "firstHit": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "targetAndNext": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         }
+        }
+       }
       },
-      "high20Vol": {
+      "ema20": {
        "eligible": 880,
-       "n": 50,
-       "maturedN": 21,
-       "winRate": 42.9,
-       "avgReturn": -0.7,
-       "medianReturn": -0.5,
-       "failRate": 47.6,
-       "avgHoldDays": 3.4,
-       "baseRate": 44.2,
-       "baseAvgReturn": -0.3
-      },
-      "high60Vol": {
-       "eligible": 870,
-       "n": 20,
-       "maturedN": 8,
-       "winRate": 50.0,
-       "avgReturn": 0.1,
-       "medianReturn": 0.0,
-       "failRate": 37.5,
-       "avgHoldDays": 3.5,
-       "baseRate": 45.1,
-       "baseAvgReturn": -0.2
-      },
-      "high120Vol": {
-       "eligible": 860,
-       "n": 5,
-       "maturedN": 0,
-       "winRate": null,
-       "avgReturn": null,
-       "medianReturn": null,
-       "failRate": null,
-       "avgHoldDays": null,
-       "baseRate": null,
-       "baseAvgReturn": null
-      },
-      "box20Vol": {
-       "eligible": 880,
-       "n": 0,
-       "maturedN": 0,
-       "winRate": null,
-       "avgReturn": null,
-       "medianReturn": null,
-       "failRate": null,
-       "avgHoldDays": null,
-       "baseRate": null,
-       "baseAvgReturn": null
+       "n": 15,
+       "maturedN": 12,
+       "winRate": 50,
+       "avgReturn": 2.5,
+       "medianReturn": 1.5,
+       "failRate": 20,
+       "avgHoldDays": 7,
+       "baseRate": 51.1,
+       "baseAvgReturn": 1.2,
+       "wins": 6,
+       "comparison": {
+        "model": "four-rules-v1",
+        "n": 15,
+        "completeN": 0,
+        "pendingN": 15,
+        "missingN": 0,
+        "commonFailedN": 0,
+        "sameBarFailedN": 0,
+        "rules": {
+         "hold5": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "nextHigh": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "firstHit": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "targetAndNext": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         }
+        }
+       }
       }
-     }
+     },
+     "observedThrough": "2026-10-02"
     },
     "1m": {
      "days": 21,
@@ -232,7 +276,7 @@
       "avgReturn": 5.1
      },
      "strategies": {
-      "high20": {
+      "swingHigh": {
        "eligible": 880,
        "n": 300,
        "maturedN": 250,
@@ -242,99 +286,155 @@
        "failRate": 35.0,
        "avgHoldDays": 10.2,
        "baseRate": 59.0,
-       "baseAvgReturn": 5.0
-      },
-      "high60": {
-       "eligible": 870,
-       "n": 140,
-       "maturedN": 100,
-       "winRate": 52.0,
-       "avgReturn": 6.0,
-       "medianReturn": 4.0,
-       "failRate": 38.5,
-       "avgHoldDays": 9.8,
-       "baseRate": 58.5,
-       "baseAvgReturn": 5.2
-      },
-      "high120": {
-       "eligible": 860,
-       "n": 90,
-       "maturedN": 68,
-       "winRate": 54.4,
-       "avgReturn": 6.8,
-       "medianReturn": 4.4,
-       "failRate": 36.8,
-       "avgHoldDays": 9.1,
-       "baseRate": 60.3,
-       "baseAvgReturn": 5.4
+       "baseAvgReturn": 5.0,
+       "wins": 135,
+       "comparison": {
+        "model": "four-rules-v1",
+        "n": 300,
+        "completeN": 220,
+        "pendingN": 75,
+        "missingN": 5,
+        "commonFailedN": 44,
+        "sameBarFailedN": 3,
+        "rules": {
+         "hold5": {
+          "wins": 110,
+          "failures": 110,
+          "evaluatedN": 220,
+          "winRate": 50.0
+         },
+         "nextHigh": {
+          "wins": 99,
+          "failures": 121,
+          "evaluatedN": 220,
+          "winRate": 45.0
+         },
+         "firstHit": {
+          "wins": 121,
+          "failures": 99,
+          "evaluatedN": 220,
+          "winRate": 55.0
+         },
+         "targetAndNext": {
+          "wins": 88,
+          "failures": 132,
+          "evaluatedN": 220,
+          "winRate": 40.0
+         }
+        }
+       }
       },
       "box20": {
        "eligible": 880,
        "n": 130,
        "maturedN": 95,
-       "winRate": 57.1,
+       "winRate": 56.8,
        "avgReturn": 3.7,
        "medianReturn": 2.2,
        "failRate": 33.7,
        "avgHoldDays": 10.0,
        "baseRate": 57.8,
-       "baseAvgReturn": 4.9
+       "baseAvgReturn": 4.9,
+       "wins": 54,
+       "comparison": {
+        "model": "four-rules-v1",
+        "n": 130,
+        "completeN": 95,
+        "pendingN": 30,
+        "missingN": 5,
+        "commonFailedN": 19,
+        "sameBarFailedN": 3,
+        "rules": {
+         "hold5": {
+          "wins": 66,
+          "failures": 29,
+          "evaluatedN": 95,
+          "winRate": 69.5
+         },
+         "nextHigh": {
+          "wins": 57,
+          "failures": 38,
+          "evaluatedN": 95,
+          "winRate": 60.0
+         },
+         "firstHit": {
+          "wins": 71,
+          "failures": 24,
+          "evaluatedN": 95,
+          "winRate": 74.7
+         },
+         "targetAndNext": {
+          "wins": 47,
+          "failures": 48,
+          "evaluatedN": 95,
+          "winRate": 49.5
+         }
+        }
+       }
       },
-      "high20Vol": {
+      "ema20": {
        "eligible": 880,
-       "n": 260,
-       "maturedN": 220,
-       "winRate": 56.8,
-       "avgReturn": 5.6,
-       "medianReturn": 3.5,
-       "failRate": 31.8,
-       "avgHoldDays": 10.1,
-       "baseRate": 58.7,
-       "baseAvgReturn": 5.0
-      },
-      "high60Vol": {
-       "eligible": 870,
-       "n": 100,
-       "maturedN": 77,
-       "winRate": 58.4,
-       "avgReturn": 8.1,
-       "medianReturn": 5.0,
-       "failRate": 33.8,
-       "avgHoldDays": 9.9,
-       "baseRate": 58.6,
-       "baseAvgReturn": 5.1
-      },
-      "high120Vol": {
-       "eligible": 860,
        "n": 60,
-       "maturedN": 44,
-       "winRate": 63.6,
-       "avgReturn": 9.6,
-       "medianReturn": 6.0,
-       "failRate": 29.5,
-       "avgHoldDays": 9.0,
-       "baseRate": 60.6,
-       "baseAvgReturn": 5.5
-      },
-      "box20Vol": {
-       "eligible": 880,
-       "n": 118,
-       "maturedN": 86,
-       "winRate": 60.5,
-       "avgReturn": 4.2,
-       "medianReturn": 2.6,
-       "failRate": 30.2,
-       "avgHoldDays": 10.0,
-       "baseRate": 57.0,
-       "baseAvgReturn": 4.8
+       "maturedN": 45,
+       "winRate": 66.7,
+       "avgReturn": 2.5,
+       "medianReturn": 1.5,
+       "failRate": 20,
+       "avgHoldDays": 7,
+       "baseRate": 51.1,
+       "baseAvgReturn": 1.2,
+       "wins": 30,
+       "comparison": {
+        "model": "four-rules-v1",
+        "n": 60,
+        "completeN": 45,
+        "pendingN": 10,
+        "missingN": 5,
+        "commonFailedN": 9,
+        "sameBarFailedN": 3,
+        "rules": {
+         "hold5": {
+          "wins": 27,
+          "failures": 18,
+          "evaluatedN": 45,
+          "winRate": 60.0
+         },
+         "nextHigh": {
+          "wins": 22,
+          "failures": 23,
+          "evaluatedN": 45,
+          "winRate": 48.9
+         },
+         "firstHit": {
+          "wins": 29,
+          "failures": 16,
+          "evaluatedN": 45,
+          "winRate": 64.4
+         },
+         "targetAndNext": {
+          "wins": 15,
+          "failures": 30,
+          "evaluatedN": 45,
+          "winRate": 33.3
+         }
+        }
+       }
       }
-     }
+     },
+     "observedThrough": "2026-10-02"
     }
-   }
+   },
+   "scope": "full",
+   "coverage": {
+    "loaded": 980,
+    "missing": 20
+   },
+   "listingAsOf": "2026-10-09",
+   "listingSource": "synthetic full-market listings"
   },
   "us": {
    "asOf": "2026-10-09",
-   "universe": "S&P 500 成分股",
+   "universe": "全市場美股普通股與 ADR（NYSE／NASDAQ／NYSE American 等）",
    "universeCount": 503,
    "evaluated": 500,
    "stale": 3,
@@ -363,7 +463,7 @@
       "avgReturn": -0.3
      },
      "strategies": {
-      "high20": {
+      "swingHigh": {
        "eligible": 495,
        "n": 40,
        "maturedN": 14,
@@ -373,31 +473,43 @@
        "failRate": 50.0,
        "avgHoldDays": 3.4,
        "baseRate": 65.4,
-       "baseAvgReturn": 0.9
-      },
-      "high60": {
-       "eligible": 870,
-       "n": 30,
-       "maturedN": 12,
-       "winRate": 50.0,
-       "avgReturn": 0.4,
-       "medianReturn": 0.1,
-       "failRate": 33.3,
-       "avgHoldDays": 3.5,
-       "baseRate": 45.0,
-       "baseAvgReturn": -0.2
-      },
-      "high120": {
-       "eligible": 860,
-       "n": 9,
-       "maturedN": 0,
-       "winRate": null,
-       "avgReturn": null,
-       "medianReturn": null,
-       "failRate": null,
-       "avgHoldDays": null,
-       "baseRate": null,
-       "baseAvgReturn": null
+       "baseAvgReturn": 0.9,
+       "wins": 3,
+       "comparison": {
+        "model": "four-rules-v1",
+        "n": 40,
+        "completeN": 0,
+        "pendingN": 40,
+        "missingN": 0,
+        "commonFailedN": 0,
+        "sameBarFailedN": 0,
+        "rules": {
+         "hold5": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "nextHigh": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "firstHit": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "targetAndNext": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         }
+        }
+       }
       },
       "box20": {
        "eligible": 880,
@@ -409,57 +521,94 @@
        "failRate": null,
        "avgHoldDays": null,
        "baseRate": null,
-       "baseAvgReturn": null
+       "baseAvgReturn": null,
+       "wins": 0,
+       "comparison": {
+        "model": "four-rules-v1",
+        "n": 0,
+        "completeN": 0,
+        "pendingN": 0,
+        "missingN": 0,
+        "commonFailedN": 0,
+        "sameBarFailedN": 0,
+        "rules": {
+         "hold5": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "nextHigh": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "firstHit": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "targetAndNext": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         }
+        }
+       }
       },
-      "high20Vol": {
-       "eligible": 880,
-       "n": 50,
-       "maturedN": 21,
-       "winRate": 42.9,
-       "avgReturn": -0.7,
-       "medianReturn": -0.5,
-       "failRate": 47.6,
-       "avgHoldDays": 3.4,
-       "baseRate": 44.2,
-       "baseAvgReturn": -0.3
-      },
-      "high60Vol": {
-       "eligible": 870,
-       "n": 20,
-       "maturedN": 8,
-       "winRate": 50.0,
-       "avgReturn": 0.1,
-       "medianReturn": 0.0,
-       "failRate": 37.5,
-       "avgHoldDays": 3.5,
-       "baseRate": 45.1,
-       "baseAvgReturn": -0.2
-      },
-      "high120Vol": {
-       "eligible": 860,
-       "n": 5,
-       "maturedN": 0,
-       "winRate": null,
-       "avgReturn": null,
-       "medianReturn": null,
-       "failRate": null,
-       "avgHoldDays": null,
-       "baseRate": null,
-       "baseAvgReturn": null
-      },
-      "box20Vol": {
-       "eligible": 880,
-       "n": 0,
-       "maturedN": 0,
-       "winRate": null,
-       "avgReturn": null,
-       "medianReturn": null,
-       "failRate": null,
-       "avgHoldDays": null,
-       "baseRate": null,
-       "baseAvgReturn": null
+      "ema20": {
+       "eligible": 495,
+       "n": 15,
+       "maturedN": 12,
+       "winRate": 50,
+       "avgReturn": 2.5,
+       "medianReturn": 1.5,
+       "failRate": 20,
+       "avgHoldDays": 7,
+       "baseRate": 51.1,
+       "baseAvgReturn": 1.2,
+       "wins": 6,
+       "comparison": {
+        "model": "four-rules-v1",
+        "n": 15,
+        "completeN": 0,
+        "pendingN": 15,
+        "missingN": 0,
+        "commonFailedN": 0,
+        "sameBarFailedN": 0,
+        "rules": {
+         "hold5": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "nextHigh": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "firstHit": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         },
+         "targetAndNext": {
+          "wins": 0,
+          "failures": 0,
+          "evaluatedN": 0,
+          "winRate": null
+         }
+        }
+       }
       }
-     }
+     },
+     "observedThrough": "2026-10-02"
     },
     "1m": {
      "days": 21,
@@ -472,7 +621,7 @@
       "avgReturn": 5.1
      },
      "strategies": {
-      "high20": {
+      "swingHigh": {
        "eligible": 495,
        "n": 150,
        "maturedN": 110,
@@ -482,95 +631,151 @@
        "failRate": 45.5,
        "avgHoldDays": 10.0,
        "baseRate": 58.4,
-       "baseAvgReturn": 0.8
-      },
-      "high60": {
-       "eligible": 870,
-       "n": 140,
-       "maturedN": 100,
-       "winRate": 52.0,
-       "avgReturn": 6.0,
-       "medianReturn": 4.0,
-       "failRate": 38.5,
-       "avgHoldDays": 9.8,
-       "baseRate": 58.5,
-       "baseAvgReturn": 5.2
-      },
-      "high120": {
-       "eligible": 860,
-       "n": 90,
-       "maturedN": 68,
-       "winRate": 54.4,
-       "avgReturn": 6.8,
-       "medianReturn": 4.4,
-       "failRate": 36.8,
-       "avgHoldDays": 9.1,
-       "baseRate": 60.3,
-       "baseAvgReturn": 5.4
+       "baseAvgReturn": 0.8,
+       "wins": 52,
+       "comparison": {
+        "model": "four-rules-v1",
+        "n": 150,
+        "completeN": 110,
+        "pendingN": 35,
+        "missingN": 5,
+        "commonFailedN": 22,
+        "sameBarFailedN": 3,
+        "rules": {
+         "hold5": {
+          "wins": 49,
+          "failures": 61,
+          "evaluatedN": 110,
+          "winRate": 44.5
+         },
+         "nextHigh": {
+          "wins": 38,
+          "failures": 72,
+          "evaluatedN": 110,
+          "winRate": 34.5
+         },
+         "firstHit": {
+          "wins": 55,
+          "failures": 55,
+          "evaluatedN": 110,
+          "winRate": 50.0
+         },
+         "targetAndNext": {
+          "wins": 27,
+          "failures": 83,
+          "evaluatedN": 110,
+          "winRate": 24.5
+         }
+        }
+       }
       },
       "box20": {
        "eligible": 880,
        "n": 130,
        "maturedN": 95,
-       "winRate": 57.1,
+       "winRate": 56.8,
        "avgReturn": 3.7,
        "medianReturn": 2.2,
        "failRate": 33.7,
        "avgHoldDays": 10.0,
        "baseRate": 57.8,
-       "baseAvgReturn": 4.9
+       "baseAvgReturn": 4.9,
+       "wins": 54,
+       "comparison": {
+        "model": "four-rules-v1",
+        "n": 130,
+        "completeN": 95,
+        "pendingN": 30,
+        "missingN": 5,
+        "commonFailedN": 19,
+        "sameBarFailedN": 3,
+        "rules": {
+         "hold5": {
+          "wins": 61,
+          "failures": 34,
+          "evaluatedN": 95,
+          "winRate": 64.2
+         },
+         "nextHigh": {
+          "wins": 52,
+          "failures": 43,
+          "evaluatedN": 95,
+          "winRate": 54.7
+         },
+         "firstHit": {
+          "wins": 66,
+          "failures": 29,
+          "evaluatedN": 95,
+          "winRate": 69.5
+         },
+         "targetAndNext": {
+          "wins": 38,
+          "failures": 57,
+          "evaluatedN": 95,
+          "winRate": 40.0
+         }
+        }
+       }
       },
-      "high20Vol": {
-       "eligible": 880,
-       "n": 260,
-       "maturedN": 220,
-       "winRate": 56.8,
-       "avgReturn": 5.6,
-       "medianReturn": 3.5,
-       "failRate": 31.8,
-       "avgHoldDays": 10.1,
-       "baseRate": 58.7,
-       "baseAvgReturn": 5.0
-      },
-      "high60Vol": {
-       "eligible": 870,
-       "n": 100,
-       "maturedN": 77,
-       "winRate": 58.4,
-       "avgReturn": 8.1,
-       "medianReturn": 5.0,
-       "failRate": 33.8,
-       "avgHoldDays": 9.9,
-       "baseRate": 58.6,
-       "baseAvgReturn": 5.1
-      },
-      "high120Vol": {
-       "eligible": 860,
+      "ema20": {
+       "eligible": 495,
        "n": 60,
-       "maturedN": 44,
-       "winRate": 63.6,
-       "avgReturn": 9.6,
-       "medianReturn": 6.0,
-       "failRate": 29.5,
-       "avgHoldDays": 9.0,
-       "baseRate": 60.6,
-       "baseAvgReturn": 5.5
-      },
-      "box20Vol": {
-       "eligible": 880,
-       "n": 118,
-       "maturedN": 86,
-       "winRate": 60.5,
-       "avgReturn": 4.2,
-       "medianReturn": 2.6,
-       "failRate": 30.2,
-       "avgHoldDays": 10.0,
-       "baseRate": 57.0,
-       "baseAvgReturn": 4.8
+       "maturedN": 45,
+       "winRate": 66.7,
+       "avgReturn": 2.5,
+       "medianReturn": 1.5,
+       "failRate": 20,
+       "avgHoldDays": 7,
+       "baseRate": 51.1,
+       "baseAvgReturn": 1.2,
+       "wins": 30,
+       "comparison": {
+        "model": "four-rules-v1",
+        "n": 60,
+        "completeN": 45,
+        "pendingN": 10,
+        "missingN": 5,
+        "commonFailedN": 9,
+        "sameBarFailedN": 3,
+        "rules": {
+         "hold5": {
+          "wins": 24,
+          "failures": 21,
+          "evaluatedN": 45,
+          "winRate": 53.3
+         },
+         "nextHigh": {
+          "wins": 20,
+          "failures": 25,
+          "evaluatedN": 45,
+          "winRate": 44.4
+         },
+         "firstHit": {
+          "wins": 27,
+          "failures": 18,
+          "evaluatedN": 45,
+          "winRate": 60.0
+         },
+         "targetAndNext": {
+          "wins": 13,
+          "failures": 32,
+          "evaluatedN": 45,
+          "winRate": 28.9
+         }
+        }
+       }
       }
-     }
+     },
+     "observedThrough": "2026-10-02"
     }
-   }
+   },
+   "scope": "full",
+   "coverage": {
+    "loaded": 503,
+    "missing": 0
+   },
+   "listingAsOf": "2026-10-09",
+   "listingSource": "synthetic full-market listings"
   }
  }
 }
