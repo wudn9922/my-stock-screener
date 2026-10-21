@@ -1,4 +1,18 @@
-## Current review: three entries and four success rules (2026-10-21)
+## Current review: optional daily share-volume threshold (2026-10-21)
+
+Daily collection does not filter the Taiwan ticker list by traded shares, so low-volume and zero-volume CSVs continue updating. After all CSV downloads/updates, the daily LINE report's Taiwan `tw_all` MA20 list requires the latest bar's volume to be at least `TW_MIN_VOLUME = 1_000_000` shares. This report-only threshold applies to both `.TW` and `.TWO`; the US S&P 500 MA20 list has no volume threshold. The full-market screener data remains unrestricted by volume, and its optional page filter is unchanged.
+
+The screener's 「每日成交股數」 condition defaults to unrestricted. Presets and a custom non-negative integer input use shares in both markets (1 Taiwan lot = 1,000 shares). A positive threshold is inclusive; empty/zero clears it. The `vol:N` URL token uses the existing per-market filter storage, chip removal, reset and sharing paths. Missing share counts are excluded when an available threshold runs; groups without share data show the existing unavailable-condition treatment. Invalid custom inputs block Apply.
+
+Report-only follow-up regression coverage confirms new and existing low-volume listed/OTC stocks are downloaded and written to CSV while excluded from `tw_all`; exactly 1,000,000 shares qualifies, earlier bars do not determine the threshold, and low/zero-volume US stocks still match the MA20 report. README and universe metadata distinguish unrestricted collection from the Taiwan LINE report's minimum. Full Python verification: `python -m unittest discover -s tests -v`, 1,354 tests passed in 134.863 seconds. The screener-page source, frontend tests and browser tests were not changed by this report-only follow-up.
+
+Verification: `npm ci` from the existing lockfile/cache; 920 Vitest tests passed against latest main; lint and TypeScript checks passed; normal and Pages builds passed (`VITE_PUBLIC_BASE=/my-stock-screener/atlas/`). Python collection/metrics/full-universe regressions: 88 passed. Final browser cases: 6 desktop/mobile Chromium plus 3 iPhone WebKit passed. Reviewed screenshots in `.cache/volume-filter-screenshots/` confirm the custom input and preset layout fit the mobile sheet. Earlier browser attempts exposed incorrect test expectations for matched/unmatched counts and filtered totals; corrected fixtures/assertions were rerun. WebKit required locally extracted libraries and a downloaded launcher adjustment to preserve `LD_LIBRARY_PATH`; these are environment setup only. Browser tests use synthetic data and do not establish physical-device behavior or live full-market refresh performance.
+
+The changes are based on main `674bdaa77`. The original audit recovered 23,211 bars in the older workspace; after retaining newer main data, this PR inserts 16,606 bars into 630 CSVs, preserves all existing main rows, and does not recreate 31 files removed by main. The report records both the prior audit summary and the integration baseline. Backfill and OHLC cleanup regressions add 6 passed Python cases to the 88 collection/metrics/universe cases above.
+
+Independent review is unavailable; no independent sign-off is claimed. The public site will receive the selector when the normal publishing workflow runs.
+
+## Previous review: three entries and four success rules (2026-10-21)
 
 User authorized updating PR #147, including the earlier ATR20%/mean-intraday-range feature, the reviewed substantial swing definition, three entry methods, four success rules and a styled comparison panel. Do not merge or enable auto-merge.
 

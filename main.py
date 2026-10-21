@@ -21,8 +21,8 @@ from breakout_alert.supabase_store import FIXED_STOCK_GROUP_ID, fixed_parameter_
 # =========================================================================
 # 全域核心參數
 # =========================================================================
+# 僅供每日 LINE 報告 tw_all 清單；行情下載與 CSV 更新不設成交股數門檻。
 TW_MIN_VOLUME = 1_000_000
-US_MIN_VOLUME = 100_000
 
 HTTP_HEADERS = {
     "User-Agent": (
@@ -1440,7 +1440,7 @@ def send_line_message(
 # =========================================================================
 # 台美股清單
 # =========================================================================
-def get_tw_tickers(min_volume):
+def get_tw_tickers():
     tickers = []
 
     twse_url = (
@@ -1481,12 +1481,6 @@ def get_tw_tickers(min_volume):
                 else None
             )
 
-            volume_col = (
-                "成交股數"
-                if "成交股數" in df_twse.columns
-                else None
-            )
-
             for _, row in df_twse.iterrows():
                 try:
                     code = str(
@@ -1507,16 +1501,6 @@ def get_tw_tickers(min_volume):
                             ticker,
                             row.get(name_col, "")
                         )
-
-                    if volume_col:
-                        volume = float(
-                            str(
-                                row[volume_col]
-                            ).replace(",", "")
-                        )
-
-                        if volume < min_volume:
-                            continue
 
                     tickers.append(ticker)
 
@@ -1597,31 +1581,7 @@ def get_tw_tickers(min_volume):
                     company_name
                 )
 
-                volume = 0.0
-
-                for volume_key in [
-                    "TradingShares",
-                    "TradingVolume",
-                    "成交股數"
-                ]:
-                    if volume_key not in item:
-                        continue
-
-                    try:
-                        volume = float(
-                            str(
-                                item[volume_key]
-                            ).replace(",", "")
-                        )
-                        break
-                    except (
-                        TypeError,
-                        ValueError
-                    ):
-                        continue
-
-                if volume >= min_volume:
-                    tickers.append(ticker)
+                tickers.append(ticker)
 
             break
 
@@ -1725,7 +1685,7 @@ def build_stock_data(
     此函數只改變圖表資料格式，不改變：
     - 股票篩選
     - 均線計算
-    - 成交量門檻
+    - 選股頁的成交量條件
     - Supabase 參數
     """
 
@@ -2093,10 +2053,8 @@ def download_market_data(
 
     return pd.DataFrame()
 
-def scan_market(
-    tickers,
-    min_volume
-):
+def scan_market(tickers, report_min_volume=0):
+    # report_min_volume 只篩報告名單；所有 tickers 的 CSV 都會先下載更新。
     os.makedirs(
         DATA_DIR,
         exist_ok=True
@@ -2420,7 +2378,8 @@ def scan_market(
                 )
 
     # -----------------------------------------------------------------
-    # 讀取完成更新的 CSV，執行成交量及 MA20 篩選
+    # 全部 CSV 更新後才篩選報告清單：台股最新日 K 至少 100 萬股；美股不限。
+    # 這裡的台股成交股數門檻只影響每日 LINE 報告 tw_all，不影響行情收集。
     # -----------------------------------------------------------------
     for ticker in tickers:
         csv_path = os.path.join(
@@ -2449,7 +2408,9 @@ def scan_market(
                 df["Volume"].iloc[-1]
             )
 
-            if latest_volume < min_volume:
+            is_tw_stock = ticker.endswith((".TW", ".TWO"))
+
+            if latest_volume < report_min_volume:
                 continue
 
             df["MA20"] = (
@@ -2490,11 +2451,6 @@ def scan_market(
             title = (
                 f"(現價:{price:.2f} | "
                 f"距MA20:{diff_pct:.2f}%)"
-            )
-
-            is_tw_stock = (
-                ticker.endswith(".TW")
-                or ticker.endswith(".TWO")
             )
 
             display_name = (
@@ -7387,7 +7343,7 @@ def write_report_universe(
         report_date=report_date
     )
 
-    # 既有檔案中夠新的全市場（scope=full）市場保留，不被流動性名單覆蓋
+    # 既有檔案中夠新的全市場（scope=full）市場保留，不被每日掃描名單覆蓋
     payload, kept = report_metrics.keep_fresh_full_markets(
         payload,
         report_metrics.read_universe_json(report_dir)
@@ -7926,13 +7882,11 @@ def main():
         "📊 開始掃描台股全市場"
     )
 
-    tw_tickers = get_tw_tickers(
-        TW_MIN_VOLUME
-    )
+    tw_tickers = get_tw_tickers()
 
     tw_all = scan_market(
         tw_tickers,
-        min_volume=TW_MIN_VOLUME
+        report_min_volume=TW_MIN_VOLUME
     )
 
     # -----------------------------------------------------------------
@@ -7945,8 +7899,7 @@ def main():
     us_tickers = get_us_tickers()
 
     us_all = scan_market(
-        us_tickers,
-        min_volume=US_MIN_VOLUME
+        us_tickers
     )
 
     # -----------------------------------------------------------------

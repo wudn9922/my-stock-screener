@@ -4,6 +4,51 @@ import { buildReport, mockSite } from './mocks';
 // Set SCREENSHOT_DIR to keep a picture of the sheet (used for manual visual checks, not by CI).
 const shotDir = process.env.SCREENSHOT_DIR;
 
+test('daily share threshold is optional, customizable, persisted and removable', async ({ page }, info) => {
+  const report = buildReport(20);
+  const groups = report.groups as { key: string; items: { volume: number | null; status: string }[] }[];
+  const group = groups.find((entry) => entry.key === 'tw_g1')!;
+  const volumes = [99_999, 100_000, 1_000_000, null, 0, 250_000];
+  group.items.forEach((entry, index) => { entry.volume = volumes[index]!; entry.status = 'matched'; });
+  await mockSite(page, { report });
+  await page.goto('./?page=screener&group=tw_g1');
+  await expect(page.locator('.result-count')).toHaveText('6 檔');
+  await page.getByRole('button', { name: '篩選條件' }).click();
+  const sheet = page.getByRole('dialog', { name: '篩選條件' });
+  const volume = sheet.getByRole('region', { name: '每日成交股數' });
+  await expect(volume.getByRole('button', { name: '不限', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await volume.getByRole('button', { name: '≥100 萬股', exact: true }).click();
+  await expect(sheet.getByRole('button', { name: '套用（1 檔）' })).toBeEnabled();
+  await sheet.getByRole('button', { name: '套用（1 檔）' }).click();
+  await expect(page.locator('.result-count')).toHaveText('1 / 6 檔');
+  await expect(page).toHaveURL(/vol(?::|%3A)1000000/);
+
+  await page.getByRole('button', { name: /篩選條件/ }).click();
+  const custom = sheet.getByRole('textbox', { name: '自訂成交股數下限（股）' });
+  await custom.fill('-1');
+  await expect(custom).toHaveAttribute('aria-invalid', 'true');
+  await expect(sheet.getByRole('button', { name: /套用/ })).toBeDisabled();
+  await custom.fill('250000');
+  await expect(sheet.getByRole('button', { name: '套用（2 檔）' })).toBeEnabled();
+  if (shotDir) await page.screenshot({ path: `${shotDir}/filters-shares-${info.project.name}.png` });
+  await sheet.getByRole('button', { name: '套用（2 檔）' }).click();
+  await page.reload();
+  await expect(page.locator('.result-count')).toHaveText('2 / 6 檔');
+  await expect(page.getByRole('group', { name: '已套用的篩選條件' })).toContainText('成交股數 ≥25 萬股');
+  await page.goto('./?page=screener&group=tw_g1');
+  await expect(page.locator('.result-count')).toHaveText('2 / 6 檔');
+  await expect(page).toHaveURL(/vol(?::|%3A)250000/);
+  await page.getByRole('button', { name: /移除.*成交股數/ }).click();
+  await expect(page.locator('.result-count')).toHaveText('6 檔');
+  await page.getByRole('button', { name: '篩選條件' }).click();
+  await custom.fill('100000');
+  await expect(sheet.getByRole('button', { name: '套用（3 檔）' })).toBeEnabled();
+  await custom.fill('0');
+  await expect(sheet.getByRole('button', { name: '套用（6 檔）' })).toBeEnabled();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
+
 test('filter sheet offers EMA20 distance and the 1.1 / 1.2 / 1.5 volume presets', async ({ page }, info) => {
   await mockSite(page, { report: buildReport(20) });
   await page.goto('./?page=screener&group=tw_g1');
