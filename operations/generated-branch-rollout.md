@@ -1,6 +1,6 @@
 # 再生輸出分支：保留政策、切換與回滾
 
-PR #154 已合併，但仍未 seed、未設定 `GENERATED_BRANCH_MODE`、未切換 Pages。這份後續修改落實 owner 的保留政策：K 線與財報留 main，截圖只留最新版本，勝率每 20 個日曆天留快照。開關關閉時仍將產物提交 main；兩種模式都禁止清除 K 線 CSV、都會產生勝率快照。本次不刪除現有資料、不改寫 main、不執行正式切換、不建立遠端 generated、不合併 PR。`trim-history.yml` 在所有模式都維持停用，只有 read 權限並拒絕執行。
+本流程的預期切換起點是：PR #154 已合併，尚未 seed、未設定 `GENERATED_BRANCH_MODE`、未切換 Pages；執行前必須由 owner 確認這些前置狀態。這份後續修改落實 owner 的保留政策：K 線與財報留 main，截圖只留最新版本，勝率每 20 個日曆天留快照。開關關閉時仍將產物提交 main；兩種模式都禁止清除 K 線 CSV、都會產生勝率快照。本次不刪除現有資料、不改寫 main、不執行正式切換、不建立遠端 generated、不合併 PR。`trim-history.yml` 在所有模式都維持停用，只有 read 權限並拒絕執行。
 
 ## 盤點與容量
 
@@ -87,6 +87,8 @@ GENERATED_BRANCH_MODE=1 python scripts/generated_branch.py publish daily
 切換後不要手動將整個 `docs/report` 再生輸出提交 main。`data/*.csv` 是 main 的永久紀錄，正常更新必須提交；PR 2 不能 git-rm 或 ignore `data/*.csv`、financials、任何人工紀錄。
 
 ## Owner 切換順序
+
+PR #155 的實際 CI 曾讀到 `GENERATED_BRANCH_MODE=1`，且既有 generated 含舊政策的 K 線 CSV，因此新白名單在 restore／live overlay 階段拒絕該 tree。這與上述預期起點不同；此時不能直接 seed 或切換，也不能為了通過 CI 忽略 K 線保護。須先由 owner 核對 main 已完整保留全部 K 線，另行確認既有分支的政策遷移或回復前置狀態，再執行以下流程。本 PR 不修改這些正式設定或正式分支。
 
 1. PR #154 已合併；先 Review 並由 owner 合併這份保留政策後續 PR，再開始切換。本次工作只開 PR，不代為合併。先暫停排程／外部 dispatch，**等待所有 in-flight writer 與 chained workflow_run 完成**；確認沒有舊模式 run 還能寫 main。這一步避免 seed 與設定變數之間遺漏最後一次輸出。暫停的 workflow 名單：schedule、atlas、financials、fundamentals、universe-full、research-data、tw-chips、themes-tw、refresh-us-rates、q4-8k-backfill、keepalive；記錄原本哪些已停用，之後不要誤啟用。
 2. **先 seed**：在 owner 的完整 clone 執行 `python scripts/generated_branch.py verify --ref origin/main`，再執行 `python scripts/generated_branch.py seed --push`。後者會重新 fetch main、驗證每個搬移 blob、建立 orphan generated；若遠端已有 generated 則拒絕覆寫，必須先查明原因。使用 owner 可寫 workflow 的既有 git 憑證（PAT 需 workflow scope，或 fine-grained token 的 Workflows write）；因為初次建立固定的 relay workflow，不能使用一般 workflow 的 GITHUB_TOKEN 來 seed。這是憑證權限，沒有新增模式開關。此時 variable 仍未設定。
