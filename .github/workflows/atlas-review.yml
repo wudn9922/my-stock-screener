@@ -112,6 +112,18 @@ jobs:
           restore-keys: universe-full-v1-
       - name: Build real full-market entry success rates offline
         run: python scripts/build_full_market_breakouts.py --cache-dir .cache/universe-full --out /tmp/full-market-breakouts/breakouts.json
+      - name: Reuse the existing full-market cache for research history
+        run: |
+          mkdir -p /tmp/full-market-research
+          cp -a docs/report/research/institutions.json docs/report/research/institutions /tmp/full-market-research/
+          python scripts/build_research.py volume --cache .cache/universe-full --out /tmp/full-market-research
+          python scripts/build_research.py institutional --days 0 --budget 0 --cache .cache/universe-full --out /tmp/full-market-research
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-market-research
+          path: /tmp/full-market-research
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: full-market-breakouts
