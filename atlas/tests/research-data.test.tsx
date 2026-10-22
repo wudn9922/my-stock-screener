@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -12,12 +12,44 @@ import {
   fetchResearch,
   type VolumeFeature,
 } from "../src/report/research";
+import { decodeResearchRecord } from "../src/report/researchStore";
 import { holderBaseline, largeHolderSchema } from "../src/report/twChips";
 import { parseRoute, serializeRoute } from "../src/app/routes";
 import { HistoryPlot, num, pct, Provenance } from "../src/ui/research/Common";
 import { dispositionStatus } from "../src/ui/research/OfficialAlerts";
 const root = resolve(import.meta.dirname, "../../docs/report/research");
-const json = (p: string) => JSON.parse(readFileSync(resolve(root, p), "utf8"));
+const rawJson = (p: string) =>
+  JSON.parse(readFileSync(resolve(root, p), "utf8"));
+const json = (p: string) => {
+  const match = /^(volume|institutions)\/(.+)\.json$/.exec(p);
+  if (match && !["TW", "TWO", "US"].includes(match[2]!)) {
+    const module = match[1]!,
+      symbol = match[2]!;
+    const market =
+      module === "volume"
+        ? /\.(TW|TWO)$/.test(symbol)
+          ? "TW"
+          : "US"
+        : symbol.split(".").at(-1)!;
+    const spec = rawJson(`${module}.json`).storage.markets[market];
+    return decodeResearchRecord(
+      rawJson(spec.path)[spec.records[symbol][2]],
+      spec.shapes,
+    );
+  }
+  return rawJson(p);
+};
+const allStocks = (module: string) => {
+  const markets = rawJson(`${module}.json`).storage.markets as Record<
+    string,
+    { path: string; shapes: Record<string, string[]> }
+  >;
+  return Object.values(markets).flatMap((spec) =>
+    (rawJson(spec.path) as unknown[]).map((record) =>
+      decodeResearchRecord(record, spec.shapes),
+    ),
+  );
+};
 const feature = (up: boolean, rvol: number | null): VolumeFeature => ({
   date: "2026-10-01",
   close: 100,
@@ -34,11 +66,10 @@ const feature = (up: boolean, rvol: number | null): VolumeFeature => ({
 afterEach(() => vi.unstubAllGlobals());
 describe("actual generated public research contracts", () => {
   it("validates every institutional shard and preserves negative values", () => {
-    const files = readdirSync(resolve(root, "institutions"));
-    expect(files.length).toBeGreaterThan(1000);
-    for (const file of files) {
-      const result = institutionsSchema.safeParse(json(`institutions/${file}`));
-      expect(result.success, file).toBe(true);
+    const stocks = allStocks("institutions");
+    expect(stocks.length).toBeGreaterThan(1000);
+    for (const stock of stocks) {
+      expect(institutionsSchema.safeParse(stock).success).toBe(true);
     }
     expect(
       institutionsSchema
@@ -47,10 +78,8 @@ describe("actual generated public research contracts", () => {
     ).toBe(true);
   }, 30000);
   it("validates every daily price-volume shard", () => {
-    for (const file of readdirSync(resolve(root, "volume")))
-      expect(volumeSchema.safeParse(json(`volume/${file}`)).success, file).toBe(
-        true,
-      );
+    for (const stock of allStocks("volume"))
+      expect(volumeSchema.safeParse(stock).success).toBe(true);
   }, 30000);
   it("validates actual official alerts, SEC and world sources", () => {
     expect(alertsSchema.safeParse(json("alerts.json")).success).toBe(true);
@@ -69,7 +98,7 @@ describe("actual generated public research contracts", () => {
         ),
     );
     await expect(
-      fetchResearch("volume/NVDA", volumeSchema, undefined, "NVDA"),
+      fetchResearch("volume/NVDA", volumeSchema, undefined, "AAPL"),
     ).rejects.toThrow("股票代號不符");
   });
   it("distinguishes unavailable HTTP from malformed schema", async () => {

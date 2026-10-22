@@ -2,6 +2,12 @@
 
 交付分支：`codex/seven-research-modules`；[PR #152](https://github.com/wudn9922/my-stock-screener/pull/152)。起點為最新 main `f82e42d776f5fec58786c2ac5cd0dd9e6f195f9b`。依最後指示，**不合併、不部署正式站**。以下「可用」是 PR／測試建置可用，不表示正式網站已更新。全程由同一模型實作與自我審查，沒有其他模型或外部 AI 審核。
 
+## PR #152 營運修正（2026-10-22）
+
+依追加要求，改為兩個來源時段、一個發布 job、每次至多一個 commit；所有抓取 job 為 contents: read，僅發布 job 為 contents: write。SEC 僅使用 secrets.SEC_USER_AGENT，未設定時清楚跳過並保留資料。研究資料由 10,389 檔／158,722,480 bytes 整併為 12 檔／103,409,630 bytes，原 10,384 筆股票／日期記錄逐筆語意核對保留。所有檔案的 timestamp-only 實際重跑均無 bytes／mtime 變化；手機改以 HTTP 206 讀取單股區段。舊段落中「個股分檔」與單獨發布方式已由此版本取代。
+
+完整營運驗收、儲存增量估計及限制見 [RESEARCH_OPERATIONS.md](RESEARCH_OPERATIONS.md)。本次仍僅推送原 PR 分支，不合併、不執行正式部署。
+
 ## 功能矩陣
 
 | 模組 | 功能／前端 | 後端／實際來源 | 已取得歷史 | 排程 | 單元測試 | 手機 E2E | 正式部署 | 外部限制 |

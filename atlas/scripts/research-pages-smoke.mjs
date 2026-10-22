@@ -29,6 +29,8 @@ for (const [name, type, settings] of [
       research.push({
         path: new URL(response.url()).pathname,
         status: response.status(),
+        range: response.headers()["content-range"] ?? null,
+        bytes: Number(response.headers()["content-length"] ?? 0),
       });
   });
   try {
@@ -90,7 +92,10 @@ for (const [name, type, settings] of [
         errors.length === 0 &&
         overflow <= 1 &&
         research.length >= 5 &&
-        research.every((r) => r.status === 200),
+        research.every((r) => r.status === 200 || r.status === 206) &&
+        research.some(
+          (r) => r.status === 206 && r.bytes > 0 && r.bytes < 100000,
+        ),
     });
   } catch (error) {
     await page

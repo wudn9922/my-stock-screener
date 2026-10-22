@@ -29,6 +29,7 @@ from research_metrics import (
     enrich_turnover_snapshot,
 )
 from research_sources import parse_alerts, parse_flows, parse_market_turnover
+from research_store import MarketStore
 
 FLOW_URLS = {
     "TW": "https://www.twse.com.tw/rwd/zh/fund/T86?date={ymd}&selectType=ALLBUT0999&response=json",
@@ -52,6 +53,8 @@ def institutional(args):
     wanted = members["TW"]
     index = read(args.out / "institutions.json", {})
     sources = dict(index.get("sources", {}))
+    flows = MarketStore(args.out, "institutions")
+    quotes = MarketStore(args.out, "turnover")
     for market, template in FLOW_URLS.items():
         old = sources.get(market)
         dates = set((old or {}).get("dates", []))
@@ -62,9 +65,11 @@ def institutional(args):
             if time.monotonic() - start > args.budget:
                 break
             day = args.as_of - timedelta(days=offset)
-            turnover_path = args.out / "turnover" / market / (day.isoformat() + ".json")
+            turnover_day = day.isoformat()
             if day.weekday() > 4 or (
-                day.isoformat() in dates and offset > 1 and turnover_path.exists()
+                day.isoformat() in dates
+                and offset > 1
+                and turnover_day in quotes.records[market]
             ):
                 continue
             cache = args.cache / "institutions" / market / (day.isoformat() + ".json")
@@ -88,11 +93,11 @@ def institutional(args):
                     )
                 dates.add(day.isoformat())
                 # Market-wide official daily cash input, independent of institutional fill prices.
-                if offset <= 1 or not turnover_path.exists():
+                if offset <= 1 or turnover_day not in quotes.records[market]:
                     quote_url = TURNOVER_URLS[market].format(
                         ymd=day.strftime("%Y%m%d"), slash=day.strftime("%Y/%m/%d")
                     )
-                    previous_quote = read(turnover_path)
+                    previous_quote = quotes.get(turnover_day, market=market)
                     try:
                         quote_rows = parse_market_turnover(
                             http.get(quote_url), market, day.isoformat()
@@ -102,8 +107,8 @@ def institutional(args):
                         }
                         if len(quote_rows) < len(target) * 0.5:
                             raise SourceError("Official turnover coverage below 50%")
-                        write(
-                            turnover_path,
+                        quotes.put(
+                            turnover_day,
                             dict(
                                 meta(
                                     "TWSE/TPEx official daily turnover",
@@ -115,18 +120,20 @@ def institutional(args):
                                 volumeUnit="shares",
                                 rows=quote_rows,
                             ),
+                            market=market,
                         )
                     except SourceError as exc:
                         print("Turnover retained / proxy fallback:", exc, flush=True)
                         if previous_quote:
-                            write(
-                                turnover_path,
+                            quotes.put(
+                                turnover_day,
                                 retain(
                                     previous_quote,
                                     "TWSE/TPEx official daily turnover",
                                     quote_url,
                                     exc,
                                 ),
+                                market=market,
                             )
                         if getattr(exc, "status", None) in (403, 429):
                             break
@@ -166,14 +173,10 @@ def institutional(args):
         }
         for m, source in sources.items()
     }
-    # Public raw inputs survive cache eviction, with a bounded rolling archive.
-    for market in FLOW_URLS:
-        for obsolete in sorted((args.out / "turnover" / market).glob("*.json"))[:-120]:
-            obsolete.unlink()
-    turnover = {
-        m: {p.stem: read(p) for p in (args.out / "turnover" / m).glob("*.json")}
-        for m in FLOW_URLS
-    }
+    # Public raw inputs survive cache eviction, bounded to 120 sessions per market.
+    for market, records in quotes.records.items():
+        quotes.records[market] = {d: records[d] for d in sorted(records)[-120:]}
+    turnover = quotes.records
     for symbol in sorted(wanted):
         market = symbol.split(".")[-1]
         source = sources[market]
@@ -186,8 +189,7 @@ def institutional(args):
                 if quote:
                     row["market"] = quote
                 rows.append(row)
-        path = args.out / "institutions" / (symbol + ".json")
-        prior = read(path, {})
+        prior = flows.get(symbol, {})
         # Rehydrate from published shards when Actions cache was evicted.
         merged = {r["date"]: r for r in prior.get("rows", [])}
         merged.update({r["date"]: {**merged.get(r["date"], {}), **r} for r in rows})
@@ -244,8 +246,8 @@ def institutional(args):
             r["netVolumePct"] = (
                 r["foreign"]["net"] / volume * 100 if volume and volume > 0 else None
             )
-        write(
-            path,
+        flows.put(
+            symbol,
             dict(
                 meta(
                     source["source"],
@@ -286,9 +288,7 @@ def institutional(args):
         m: dict(
             universe=sum(s.endswith("." + m) for s in wanted),
             covered=sum(
-                (args.out / "institutions" / (s + ".json")).exists()
-                for s in wanted
-                if s.endswith("." + m)
+                flows.get(s) is not None for s in wanted if s.endswith("." + m)
             ),
         )
         for m in FLOW_URLS
@@ -299,6 +299,8 @@ def institutional(args):
             version=1,
             generatedAt=stamp(),
             sources=sources,
+            storage=flows.save(),
+            turnoverStorage=quotes.save(),
             universe=len(wanted),
             covered=counts,
             receipts=http.receipts[-10:],
@@ -309,19 +311,15 @@ def institutional(args):
 
 def volume(args):
     members, paths, counts, latest = universe(), market_paths(args.cache), {}, {}
+    store = MarketStore(args.out, "volume")
+    packs = MarketStore(args.out, "turnover").records
     turnover = {
-        m: {
-            p.stem: read(p).get("rows", {})
-            for p in (args.out / "turnover" / m).glob("*.json")
-        }
-        for m in FLOW_URLS
+        m: {d: pack.get("rows", {}) for d, pack in rows.items()}
+        for m, rows in packs.items()
     }
     cash_metadata = {
-        m: [
-            {k: v for k, v in read(p).items() if k != "rows"}
-            for p in (args.out / "turnover" / m).glob("*.json")
-        ]
-        for m in FLOW_URLS
+        m: [{k: v for k, v in pack.items() if k != "rows"} for pack in rows.values()]
+        for m, rows in packs.items()
     }
 
     def cash_source(symbol, asof):
@@ -332,9 +330,11 @@ def volume(args):
 
     for market, symbols in members.items():
         count = 0
+        refresh_market = getattr(args, "market", "all") in ("all", market)
         for symbol in sorted(symbols):
-            path = args.out / "volume" / (symbol + ".json")
-            previous = read(path)
+            previous = store.get(symbol)
+            if not refresh_market:
+                continue
             if symbol not in paths:
                 if previous:
                     if market == "TW":
@@ -349,7 +349,7 @@ def volume(args):
                         )
                     stale = (args.as_of - date.fromisoformat(previous["asOf"])).days > 5
                     previous["status"] = "stale" if stale else "ok"
-                    write(path, previous)
+                    store.put(symbol, previous)
                 continue
             rows = price_rows(paths[symbol])
             # Existing CSV caches are completed-session history. Do not include today's row before close.
@@ -377,8 +377,8 @@ def volume(args):
                 continue
             asof = stats.pop("asOf")
             stale = (args.as_of - date.fromisoformat(asof)).days > 5
-            write(
-                args.out / "volume" / (symbol + ".json"),
+            store.put(
+                symbol,
                 dict(
                     meta(
                         "Existing daily OHLCV cache",
@@ -400,11 +400,7 @@ def volume(args):
             )
             count += 1
             latest[market] = max(latest.get(market, ""), asof)
-        existing = [
-            read(args.out / "volume" / (s + ".json"))
-            for s in symbols
-            if (args.out / "volume" / (s + ".json")).exists()
-        ]
+        existing = [store.get(s) for s in symbols if store.get(s) is not None]
         count = len(existing)
         latest[market] = max((r["asOf"] for r in existing), default=None)
         report_members = symbols & {p.stem for p in (ROOT / "data").glob("*.csv")}
@@ -414,10 +410,7 @@ def volume(args):
             coveragePct=count / len(symbols) * 100 if symbols else None,
             dailyReport=dict(
                 universe=len(report_members),
-                covered=sum(
-                    (args.out / "volume" / (s + ".json")).exists()
-                    for s in report_members
-                ),
+                covered=sum(store.get(s) is not None for s in report_members),
             ),
             asOf=latest.get(market),
             scope="existing full-market cache + daily-report CSV union",
@@ -425,7 +418,11 @@ def volume(args):
     write(
         args.out / "volume.json",
         dict(
-            version=1, methodVersion="research-v1", generatedAt=stamp(), markets=counts
+            version=1,
+            methodVersion="research-v1",
+            generatedAt=stamp(),
+            markets=counts,
+            storage=store.save(),
         ),
     )
 
@@ -515,6 +512,7 @@ def main():
     p.add_argument("module", choices=["institutional", "volume", "alerts"])
     p.add_argument("--out", type=Path, default=ROOT / "docs/report/research")
     p.add_argument("--cache", type=Path, default=ROOT / ".cache/universe-full")
+    p.add_argument("--market", choices=["all", "TW", "US"], default="all")
     p.add_argument("--days", type=int, default=95)
     p.add_argument("--budget", type=int, default=600)
     p.add_argument("--as-of", type=date.fromisoformat, default=date.today())

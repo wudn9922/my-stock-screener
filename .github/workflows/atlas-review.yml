@@ -10,6 +10,7 @@ on:
       - 'scripts/build_world_assets.py'
       - 'scripts/build_tw_chips.py'
       - 'tests/test_research.py'
+      - 'tests/test_research_operations.py'
       - 'tests/fixtures/research/**'
       - '.github/workflows/research-data.yml'
       - 'breakout_alert/**'
@@ -72,7 +73,7 @@ jobs:
           mkdir -p /tmp/research-pages/my-stock-screener
           cp -a atlas/dist-pages /tmp/research-pages/my-stock-screener/atlas
           ln -s "$GITHUB_WORKSPACE/docs/report" /tmp/research-pages/my-stock-screener/report
-          python3 -m http.server 4188 --bind 127.0.0.1 --directory /tmp/research-pages > /tmp/research-pages-server.log 2>&1 &
+          python3 scripts/serve_research_preview.py --port 4188 --directory /tmp/research-pages > /tmp/research-pages-server.log 2>&1 &
           pages_server_pid=$!
           trap 'kill "$pages_server_pid"' EXIT
           for attempt in 1 2 3 4 5; do
@@ -103,8 +104,9 @@ jobs:
           python-version: '3.12'
       - name: Offline breakout integration
         run: |
-          pip install requests numpy pandas openpyxl xlrd lxml
+          pip install requests numpy pandas openpyxl xlrd lxml pyyaml
           python -m unittest discover -s tests -p test_research.py -v
+          python -m unittest discover -s tests -p test_research_operations.py -v
           python -m unittest discover -s tests -p test_tw_chips.py -v
           python -m unittest discover -s tests -p 'test_atlas_watchlists.py' -v
           python -m unittest discover -s tests -p 'test_breakouts.py' -v

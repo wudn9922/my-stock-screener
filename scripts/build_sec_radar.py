@@ -17,9 +17,10 @@ import time
 import urllib.error
 import urllib.request
 from research_io import ROOT, SourceError, meta, read, retain, stamp, universe, write
+from research_store import MarketStore
 
 sys.path.insert(0, str(ROOT / "atlas/scripts"))
-from seed_financials_sec import parse_ticker_map, resolve_user_agent, TICKERS_URL
+from seed_financials_sec import parse_ticker_map, TICKERS_URL
 
 ITEMS = {
     "1.01": ("agreement", "重大正式協議"),
@@ -54,7 +55,11 @@ class NotPublished(SourceError):
 class SecHttp:
     def __init__(self, state, opener=urllib.request.urlopen, sleeper=time.sleep):
         self.state, self.opener, self.sleep, self.last = state, opener, sleeper, 0
-        self.agent = resolve_user_agent(os.environ)
+        self.agent = os.environ.get("SEC_USER_AGENT", "").strip()
+        if not self.agent:
+            raise ValueError(
+                "SEC_USER_AGENT is required; no fallback identity is permitted"
+            )
         self.successful = 0
 
     def get(self, url):
@@ -293,6 +298,13 @@ def radar_events(events, since):
 
 
 def build(args):
+    if not os.environ.get("SEC_USER_AGENT", "").strip():
+        print(
+            "::notice::SEC module skipped: secrets.SEC_USER_AGENT is not set; existing SEC snapshots are unchanged.",
+            flush=True,
+        )
+        return
+    store = MarketStore(args.out, "sec")
     state = read(args.cache / "sec-radar-state.json", {})
     previous = read(args.out / "sec-radar.json", {})
     http = SecHttp(state)
@@ -301,13 +313,14 @@ def build(args):
     error = None
     indexed = set(state.get("indexedDates", []))
     checked = dict(previous.get("checkedSymbols", {}))
+    event_times = {e["id"]: e.get("fetchedAt") for e in previous.get("events", [])}
     allsymbols = universe()["US"]
     rows = {}
 
     def add(row):
         symbol = row["symbol"]
         if symbol not in rows:
-            stored = read(args.out / "sec" / f"{symbol}.json", {})
+            stored = store.get(symbol, {})
             rows[symbol] = {e["id"]: e for e in stored.get("events", [])}
         old = rows[symbol].get(row["id"])
         if old and old.get("summaryStatus") == "parsed":
@@ -317,7 +330,7 @@ def build(args):
                 items=old["items"],
                 categories=old["categories"],
                 title=old["title"],
-                fetchedAt=old["fetchedAt"],
+                fetchedAt=event_times.get(old["id"]),
             )
         rows[symbol][row["id"]] = row
 
@@ -389,10 +402,7 @@ def build(args):
             )
             if symbol not in rows:
                 rows[symbol] = {
-                    e["id"]: e
-                    for e in read(args.out / "sec" / f"{symbol}.json", {}).get(
-                        "events", []
-                    )
+                    e["id"]: e for e in store.get(symbol, {}).get("events", [])
                 }
         # Parse followed issuers before a historical index refusal can consume the remaining budget.
         for symbol in priority:
@@ -449,8 +459,8 @@ def build(args):
             for r in values
             if r["date"] >= (args.as_of - timedelta(days=400)).isoformat()
         ]
-        write(
-            args.out / "sec" / f"{symbol}.json",
+        store.put(
+            symbol,
             dict(
                 meta(
                     "SEC EDGAR",
@@ -465,9 +475,16 @@ def build(args):
                 coverage=checked.get(symbol),
             ),
         )
+    # Acquisition clocks belong to the index, never the market archive. Preserve
+    # known event receipts while rebuilding the radar from timestamp-free records.
+    for group in rows.values():
+        event_times.update({e["id"]: e.get("fetchedAt") for e in group.values()})
     recent = []
-    for path in (args.out / "sec").glob("*.json"):
-        recent += read(path, {}).get("events", [])
+    for record in store.records["US"].values():
+        recent += [
+            dict(e, fetchedAt=event_times.get(e["id"]))
+            for e in record.get("events", [])
+        ]
     state.update(indexedDates=sorted(indexed), checkedAt=stamp())
     write(args.cache / "sec-radar-state.json", state)
     write(
@@ -482,6 +499,7 @@ def build(args):
                 stamp() if http.successful else previous.get("fetchedAt"),
             ),
             version=1,
+            storage=store.save(),
             universe=len(allsymbols),
             mapped=sum(s in mapping for s in allsymbols),
             checkedSymbols=checked,

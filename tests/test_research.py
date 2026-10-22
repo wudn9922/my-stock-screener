@@ -12,6 +12,8 @@ from datetime import date
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from research_io import SourceError, retain, read, write, market_paths, Http
+from research_store import MarketStore
+from unittest.mock import patch
 from research_metrics import (
     enrich_turnover_snapshot,
     volume_features,
@@ -365,7 +367,10 @@ class SecAndWorld(unittest.TestCase):
             )
 
         state = {}
-        client = SecHttp(state, opener=opener, sleeper=lambda s: None)
+        with patch.dict(
+            "os.environ", {"SEC_USER_AGENT": "Test Suite tests@example.com"}
+        ):
+            client = SecHttp(state, opener=opener, sleeper=lambda s: None)
         with self.assertRaises(Cooldown):
             client.get("https://data.sec.gov/test")
         with self.assertRaises(Cooldown):
@@ -389,7 +394,10 @@ class SecAndWorld(unittest.TestCase):
         def opener(req, **kw):
             raise urllib.error.HTTPError(req.full_url, 404, "unpublished", {}, None)
 
-        client = SecHttp({}, opener=opener, sleeper=lambda s: None)
+        with patch.dict(
+            "os.environ", {"SEC_USER_AGENT": "Test Suite tests@example.com"}
+        ):
+            client = SecHttp({}, opener=opener, sleeper=lambda s: None)
         with self.assertRaises(NotPublished):
             client.get("https://www.sec.gov/Archives/test.idx")
 
@@ -579,9 +587,12 @@ class CacheEvictionRecovery(unittest.TestCase):
             result = read(root / "volume.json")["markets"]["TW"]
             self.assertEqual(result["covered"], 1)
             self.assertEqual(result["coveragePct"], 50)
-            self.assertEqual(read(root / "volume/TEST.TW.json")["status"], "stale")
             self.assertEqual(
-                read(root / "volume/TEST.TW.json")["windows"], snapshot["windows"]
+                MarketStore(root, "volume").get("TEST.TW")["status"], "stale"
+            )
+            self.assertEqual(
+                MarketStore(root, "volume").get("TEST.TW")["windows"],
+                snapshot["windows"],
             )
 
     def test_offline_institution_recalculation_does_not_clear_source_failure(self):

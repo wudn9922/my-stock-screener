@@ -8,13 +8,17 @@ from datetime import datetime, timezone
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from research_io import read, write, universe
 from research_io import ROOT, stamp
+from research_store import MarketStore
 
 r = ROOT / "docs/report/research"
 u = universe()
+volumes = MarketStore(r, "volume")
+flows_store = MarketStore(r, "institutions")
+turnover = MarketStore(r, "turnover")
 raw = read(ROOT / "docs/report/universe.json")
 health = {"methodVersion": "research-v1", "generatedAt": stamp()}
 for market, symbols in u.items():
-    rows = [read(r / "volume" / f"{s}.json") for s in symbols]
+    rows = [volumes.get(s) for s in symbols]
     rows = [x for x in rows if x]
     health[market] = {
         "listed": raw["markets"][market]["counts"]["listed"],
@@ -34,7 +38,7 @@ for market, symbols in u.items():
         "latest": max(x["asOf"] for x in rows),
     }
     if market == "TW":
-        flows = [read(r / "institutions" / f"{s}.json") for s in symbols]
+        flows = [flows_store.get(s) for s in symbols]
         flows = [x for x in flows if x]
         health[market]["institutions"] = {
             "snapshots": len(flows),
@@ -88,18 +92,14 @@ health["world"] = {
 }
 health["turnover"] = {
     m: {
-        "dates": len(list((r / "turnover" / m).glob("*.json"))),
-        "first": min(
-            (p.stem for p in (r / "turnover" / m).glob("*.json")), default=None
-        ),
-        "latest": max(
-            (p.stem for p in (r / "turnover" / m).glob("*.json")), default=None
-        ),
+        "dates": len(turnover.records[m]),
+        "first": min(turnover.records[m], default=None),
+        "latest": max(turnover.records[m], default=None),
     }
     for m in ("TW", "TWO")
 }
 health["TW"]["officialADV20Complete"] = sum(
-    (read(r / "volume" / f"{s}.json") or {})
+    (volumes.get(s) or {})
     .get("amountAverages", {})
     .get("20", {})
     .get("officialObservations")

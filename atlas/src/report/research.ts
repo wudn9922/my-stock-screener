@@ -1,6 +1,7 @@
 /** Versioned public research contracts. Fetches never change user settings or provider. */
 import { z } from "zod";
 import { reportUrl } from "./loadReport";
+import { fetchMarketRecord, requireResearchResponse } from "./researchStore";
 const n = z.number().finite();
 const nullable = n.nullable();
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -10,10 +11,10 @@ const meta = z.object({
   sourceUrl: z.string().url(),
   asOf: day.nullable(),
   status: z.enum(["ok", "stale", "unavailable", "error"]),
-  fetchedAt: z.string().nullable(),
+  fetchedAt: z.string().nullable().default(null),
   publishedAt: z.string().nullable(),
   missingReason: z.string().nullable(),
-  generatedAt: z.string(),
+  generatedAt: z.string().optional(),
 });
 export type ResearchMeta = z.infer<typeof meta>;
 const flow = z.object({ buy: n.nonnegative(), sell: n.nonnegative(), net: n });
@@ -172,7 +173,7 @@ const secEvent = z.object({
   summary: z.string().nullable(),
   summaryStatus: z.enum(["parsed", "unparsed"]),
   sourceUrl: z.string().url(),
-  fetchedAt: z.string(),
+  fetchedAt: z.string().nullable(),
   amendment: z.boolean(),
 });
 export const secSchema = meta.extend({
@@ -223,17 +224,26 @@ export async function fetchResearch<T>(
   signal?: AbortSignal,
   symbol?: string,
 ): Promise<T> {
-  const response = await fetch(researchUrl(path), {
-    signal,
-    cache: "no-cache",
-  });
-  if (!response.ok)
-    throw new Error(
-      response.status === 404
-        ? "這個資料集尚未收錄，歷史覆蓋累積中。"
-        : `資料來源暫時無法取得（HTTP ${response.status}）。`,
+  const stock = /^(volume|institutions)\/([^/]+)$/.exec(path);
+  let raw: unknown;
+  if (stock) {
+    if (symbol && stock[2] !== symbol)
+      throw new Error("股票代號不符，已拒絕顯示其他股票資料。");
+    raw = await fetchMarketRecord(
+      stock[1] as "volume" | "institutions",
+      stock[2]!,
+      researchUrl,
+      signal,
     );
-  const result = schema.safeParse(await response.json());
+  } else {
+    const response = await fetch(researchUrl(path), {
+      signal,
+      cache: "no-cache",
+    });
+    requireResearchResponse(response);
+    raw = await response.json();
+  }
+  const result = schema.safeParse(raw);
   if (!result.success) throw new Error("研究資料格式驗證失敗，請稍後重試。");
   if (symbol && (result.data as { symbol?: string }).symbol !== symbol)
     throw new Error("股票代號不符，已拒絕顯示其他股票資料。");

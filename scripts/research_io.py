@@ -28,16 +28,24 @@ def read(path, default=None):
         return default
 
 
+RUN_TIMESTAMPS = {"generatedAt", "fetchedAt", "checkedAt"}
+
+
+def semantic(value):
+    """Run clocks are not data; publication/acceptance dates remain significant."""
+    if isinstance(value, dict):
+        return {k: semantic(v) for k, v in value.items() if k not in RUN_TIMESTAMPS}
+    if isinstance(value, list):
+        return [semantic(v) for v in value]
+    return value
+
+
 def write(path, value):
     """Never truncate a good file, never emit NaN; avoid timestamp-only git churn."""
     path = Path(path)
     old = read(path)
-    if isinstance(old, dict) and isinstance(value, dict):
-        ignore = {"generatedAt", "checkedAt", "fetchedAt"}
-        if {k: v for k, v in old.items() if k not in ignore} == {
-            k: v for k, v in value.items() if k not in ignore
-        }:
-            return
+    if old is not None and semantic(old) == semantic(value):
+        return
     body = (
         json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         + "\n"

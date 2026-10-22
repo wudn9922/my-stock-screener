@@ -13,9 +13,16 @@ async function setup(page: Page) {
     if (!/^[A-Za-z0-9_./-]+\.json$/.test(relative))
       return route.fulfill({ status: 400 });
     try {
+      const body = readFileSync(resolve(report, "research", relative));
+      const range = /^bytes=(\d+)-(\d+)$/.exec(
+        route.request().headers()["range"] ?? "",
+      );
       return route.fulfill({
+        status: range ? 206 : 200,
         contentType: "application/json",
-        body: readFileSync(resolve(report, "research", relative), "utf8"),
+        body: range
+          ? body.subarray(Number(range[1]), Number(range[2]) + 1)
+          : body,
       });
     } catch {
       return route.fulfill({ status: 404, body: "not recorded" });
@@ -162,7 +169,7 @@ test("chart research panel leaves candles mounted and settings intact", async ({
 });
 test("missing research has a separate honest state", async ({ page }) => {
   await setup(page);
-  await page.route("**/research/volume/AAPL.json", (route) =>
+  await page.route("**/research/volume.json", (route) =>
     route.fulfill({ status: 503 }),
   );
   await page.goto("./?page=financials&symbol=AAPL");
