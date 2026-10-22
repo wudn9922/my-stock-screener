@@ -69,7 +69,7 @@ no annual money fact of a mapped concept: a concept name to check against the ta
 import os
 import re
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import timezone
 from typing import NamedTuple
 
@@ -227,6 +227,7 @@ class IfrsResult:
     concepts: dict = field(default_factory=dict)
     fallback: bool = False
     skip: str | None = None
+    restatement_revisions: list = field(default_factory=list)
 
 
 def _fact(point):
@@ -353,7 +354,36 @@ def _periods(index, cache, currency, frequency, basis=IFRS_BASIS):
     return items
 
 
-def extract(companyfacts, basis=IFRS_BASIS):
+def extract(companyfacts, basis=IFRS_BASIS, prefer_latest_filing=False):
+    result = _extract(companyfacts, basis)
+    if prefer_latest_filing and result.currency:
+        from sec_restatements import filings, select_rows
+        def coherent_rows(payload):
+            single = _extract(payload, basis)
+            # A 20-F may explicitly disclose restated 3-month comparatives. Use only
+            # reported quarters from this accession; never split a 6/9-month period.
+            quarterly_basis = replace(basis, interim_forms=basis.interim_forms | basis.annual_forms)
+            quarters = _periods(_index(payload, basis), {}, single.currency, "quarterly", quarterly_basis)
+            return single.annual, quarters
+        existence = {concept for name in EXISTENCE_FIELDS for concept, _ in basis.concepts[name]}
+        result.annual, result.quarterly, result.restatement_revisions = select_rows(
+            companyfacts, result.annual, result.quarterly,
+            coherent_rows,
+            filings(companyfacts, basis.taxonomy, existence, basis.annual_forms, {result.currency}),
+            filings(companyfacts, basis.taxonomy, existence, basis.annual_forms | basis.interim_forms,
+                    {result.currency}, (80, 120)),
+        )
+        result.concepts = {
+            field_name: sorted({item["concepts"][field_name] for item in result.annual + result.quarterly
+                                if field_name in item.get("concepts", {})})
+            for field_name in basis.concepts
+        }
+        result.concepts = {name: concepts for name, concepts in result.concepts.items() if concepts}
+        result.fallback = any(item.get("fallback", False) for item in result.annual + result.quarterly)
+    return result
+
+
+def _extract(companyfacts, basis=IFRS_BASIS):
     """companyfacts payload → IfrsResult (pure and deterministic; see the module docstring)."""
     result = IfrsResult()
     index = _index(companyfacts, basis)
@@ -399,8 +429,8 @@ def apply_gate(grade, annual):
 
 def _document(result, key, now, basis=IFRS_BASIS):
     now = now.replace(tzinfo=timezone.utc) if now.tzinfo is None else now.astimezone(timezone.utc)
-    annual = [period(p["end"], p["values"], SRC) for p in result.annual[-KEEP_ANNUAL:]]
-    quarterly = [period(p["end"], p["values"], SRC) for p in result.quarterly[-KEEP_QUARTERLY:]]
+    annual = [period(p["end"], p["values"], SRC, p.get("extra")) for p in result.annual[-KEEP_ANNUAL:]]
+    quarterly = [period(p["end"], p["values"], SRC, p.get("extra")) for p in result.quarterly[-KEEP_QUARTERLY:]]
     end_month = fy_end_month([p["end"] for p in annual])
     eligible_ends = fiscal_label_eligible_ends(annual, quarterly)
     assign_fiscal_labels(
@@ -431,39 +461,43 @@ def _document(result, key, now, basis=IFRS_BASIS):
     return document
 
 
-def _build(companyfacts, key, now, basis):
+def _build(companyfacts, key, now, basis, prefer_latest_filing=False):
     if financials_key(key) != key or market_of(key) != "US":
         return None, "not-us-key"
-    result = extract(companyfacts, basis)
+    result = extract(companyfacts, basis, prefer_latest_filing)
     if result.skip:
         return None, result.skip
-    return _document(result, key, now, basis), None
+    document = _document(result, key, now, basis)
+    if prefer_latest_filing:
+        from sec_restatements import preserve_quality
+        preserve_quality(document, None, getattr(result, "restatement_revisions", []), now.date().isoformat())
+    return document, None
 
 
-def build_document(companyfacts, key, now):
+def build_document(companyfacts, key, now, prefer_latest_filing=False):
     """
     One ticker's IFRS document from its companyfacts payload → (document, None) or (None, skip reason).
     key: the financials key (US); now: the run's aware datetime (generatedAt / checkedAt).
     """
-    return _build(companyfacts, key, now, IFRS_BASIS)
+    return _build(companyfacts, key, now, IFRS_BASIS, prefer_latest_filing)
 
 
-def build_us_gaap_document(companyfacts, key, now):
+def build_us_gaap_document(companyfacts, key, now, prefer_latest_filing=False):
     """
     One ticker's US GAAP foreign-filer document (the us-gaap taxonomy, see US_GAAP_FOREIGN_BASIS) →
     (document, None) or (None, skip reason). Same arguments as build_document.
     """
-    return _build(companyfacts, key, now, US_GAAP_FOREIGN_BASIS)
+    return _build(companyfacts, key, now, US_GAAP_FOREIGN_BASIS, prefer_latest_filing)
 
 
-def build_foreign_document(companyfacts, key, now):
+def build_foreign_document(companyfacts, key, now, prefer_latest_filing=False):
     """
     The foreign document of one ticker (--foreign and --upgrade): the IFRS document, or the US GAAP one when the
     payload has no ifrs-full facts at all ("no-ifrs") → (document, None) or (None, reason of the last basis tried).
     """
-    document, reason = build_document(companyfacts, key, now)
+    document, reason = build_document(companyfacts, key, now, prefer_latest_filing)
     if document is None and reason == IFRS_BASIS.no_facts:
-        document, reason = build_us_gaap_document(companyfacts, key, now)
+        document, reason = build_us_gaap_document(companyfacts, key, now, prefer_latest_filing)
     return document, reason
 
 

@@ -379,6 +379,8 @@ class SecResult:
     dropped_quarters: list = field(default_factory=list)
     arbiter: dict = field(default_factory=dict)
     dropped: dict = field(default_factory=dict)
+    restatement_revisions: list = field(default_factory=list)
+    prefer_latest_filing: bool = False
 
 
 class _Fact(NamedTuple):
@@ -1536,7 +1538,43 @@ def _drop_colliding_quarters(built):
     return kept, sorted(dropped)
 
 
-def extract_periods(companyfacts, reference=None):
+def extract_periods(companyfacts, reference=None, prefer_latest_filing=False):
+    """Legacy selection by default; opt in to whole rows from the latest reporting accession."""
+    result = _extract_periods(companyfacts, reference)
+    if not prefer_latest_filing:
+        return result
+    from sec_restatements import filings, select_rows
+    def coherent_rows(payload):
+        extracted = _extract_periods(payload, reference)
+        for frequency in ("annual", "quarterly"):
+            for item in getattr(extracted, frequency):
+                identity = (frequency, item["end"])
+                item["selectedConcepts"] = extracted.period_concepts.get(identity, {})
+                item["selectedIssues"] = extracted.period_issues.get(identity, set())
+        return extracted.annual, extracted.quarterly
+    existence = {concept for name in EXISTENCE_FIELDS for concept, _ in CONCEPTS[name]}
+    candidates = filings(companyfacts, "us-gaap", existence, ANNUAL_FORMS, {"USD"})
+    result.annual, result.quarterly, result.restatement_revisions = select_rows(
+        companyfacts, result.annual, result.quarterly,
+        coherent_rows, candidates,
+        filings(companyfacts, "us-gaap", existence, ANNUAL_FORMS | QUARTERLY_FORMS, {"USD"}, (80, 120)),
+    )
+    result.prefer_latest_filing = True
+    for frequency in ("annual", "quarterly"):
+        for item in getattr(result, frequency):
+            identity = (frequency, item["end"])
+            if "selectedConcepts" in item:
+                result.period_concepts[identity] = item.pop("selectedConcepts")
+                result.period_issues[identity] = item.pop("selectedIssues")
+    result.concepts = {name: sorted({concept for used in result.period_concepts.values()
+                                    for concept in used.get(name, [])}) for name in CONCEPTS}
+    result.concepts = {name: concepts for name, concepts in result.concepts.items() if concepts}
+    if result.restatement_revisions:
+        result.issues.add("restated")
+    return result
+
+
+def _extract_periods(companyfacts, reference=None):
     """
     SEC companyfacts payload → SecResult (pure, deterministic; see the module docstring for the
     rules). When result.skip is set the payload must not produce a document; annual / quarterly may
@@ -1737,7 +1775,12 @@ def _merge_section(old, new, frequency, today_iso):
             if target["end"] != end:
                 renamed[target["end"]] = end
         extra.update(item["extra"])
-        result.append(period(end, item["values"], SRC, extra))
+        values = item["values"]
+        if item["extra"].get("secKeepAsReported"):
+            values = dict(targets[0]["values"]) if targets else {}
+            for name in Q4_PER_SHARE_FIELDS:
+                values.pop(name, None)
+        result.append(period(end, values, SRC, extra))
     gap = OVERLAP_DAYS[frequency]
     for index, item in enumerate(periods):
         if index in matched:
@@ -1926,6 +1969,14 @@ def merge_into_document(previous, sec, key, now, fetch_splits=None):
         "annual": sorted(sec.annual, key=lambda p: p["end"])[-KEEP_ANNUAL:],
         "quarterly": sorted(sec.quarterly, key=lambda p: p["end"])[-KEEP_QUARTERLY:],
     }
+    if sec.prefer_latest_filing:
+        # Refresh every existing comparable row, even outside the normal refresh cap:
+        # a retained old Q4 must not escape the basis check beside a restated annual.
+        for frequency, items in (("annual", sec.annual), ("quarterly", sec.quarterly)):
+            selected_ends = {p["end"] for p in new[frequency]}
+            new[frequency] += [p for p in items if p["end"] not in selected_ends and any(
+                abs(days_between(p["end"], old["end"])) <= _window(frequency) for old in stored[frequency]
+            )]
     new = {
         frequency: [period(p["end"], p["values"], SRC, p["extra"]) for p in items]
         for frequency, items in new.items()
@@ -2069,6 +2120,21 @@ def merge_into_document(previous, sec, key, now, fetch_splits=None):
 
     counts.update(annual=len(annual), quarterly=len(quarterly), yahooDiffers=len(revised))
     info.update(counts=counts, issues=list(grade["issues"]), level=grade["level"], dropped=dict(sec.dropped))
+    if sec.prefer_latest_filing:
+        from sec_restatements import preserve_quality
+        audit = []
+        written_ends = {frequency: {raw: written for written, raw in mapping.items()}
+                        for frequency, mapping in aligned.items()}
+        for entry in sec.restatement_revisions:
+            if (entry["period"], entry["end"]) not in fresh:
+                continue
+            revision_entry = dict(entry)
+            end = written_ends[entry["period"]].get(entry["end"], entry["end"])
+            if end != entry["end"]:
+                revision_entry.update(end=end, secEnd=entry["end"])
+            audit.append(revision_entry)
+        preserve_quality(document, previous, audit, today_iso)
+        info["issues"] = list(document["quality"]["issues"])
     return document, info
 
 
@@ -2853,7 +2919,16 @@ def parse_args(argv):
                              "nothing written)")
     parser.add_argument("--state", help="--foreign check state, git-ignored "
                                         "(default <repo>/.cache/sec-ifrs-state.json)")
+    parser.add_argument("--prefer-latest-filing", action="store_true",
+                        help="opt in to accession-coherent latest annual comparatives (report only in this PR)")
+    parser.add_argument("--restatement-report", metavar="JSON",
+                        help="write a dry-run JSON and Markdown report for every stored US file; never apply")
+    parser.add_argument("--restatement-cache", help="companyfacts cache for the report (supports offline replay)")
     args = parser.parse_args(argv)
+    if args.prefer_latest_filing and not args.restatement_report:
+        parser.error("--prefer-latest-filing currently requires --restatement-report; apply is deferred")
+    if args.restatement_report and (args.out or args.due or args.foreign or args.upgrade or args.tickers or args.limit):
+        parser.error("--restatement-report scans every US file; cannot combine with write/selection modes")
     if args.due and args.foreign:
         parser.error("--due and --foreign cannot be combined")
     if args.upgrade and not args.foreign:
@@ -2998,6 +3073,16 @@ def main(argv=None, *, client=None, now=None, environ=None, yahoo_factory=None, 
     """
     environ = os.environ if environ is None else environ
     args = parse_args(argv)
+    if args.restatement_report:
+        from report_sec_restatements import main as report_main
+        report_args = ["--report", args.restatement_report]
+        if args.prefer_latest_filing:
+            report_args.append("--prefer-latest-filing")
+        if args.restatement_cache:
+            report_args += ["--cache-dir", args.restatement_cache]
+        if args.report_dir:
+            report_args += ["--report-dir", args.report_dir]
+        return report_main(report_args)
     user_agent = None
     if not args.dry_run:
         reason = refusal_reason(environ)
