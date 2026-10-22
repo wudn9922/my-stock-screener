@@ -197,15 +197,25 @@ export const secSchema = meta.extend({
 export type SecRadar = z.infer<typeof secSchema>;
 const asset = meta.extend({
   name: z.string().optional(),
+  symbol: z.string().optional(),
+  providerSymbol: z.string().optional(),
+  pricePrecision: n.int().min(0).max(8).optional(),
+  candlePath: z
+    .string()
+    .regex(/^candles\/[a-z]+\.json$/)
+    .optional(),
+  priceBasis: z.string().optional(),
+  contract: z.string().nullable().optional(),
+  excludedInvalidOHLC: n.int().nonnegative().optional(),
   frequency: z.enum(["daily", "weekly", "monthly"]).optional(),
   unit: z.string().optional(),
   instrumentType: z.string().optional(),
   latest: n.optional(),
   history: z.array(z.tuple([day, n])).optional(),
   changes: z.record(z.string(), nullable).optional(),
-  baseCurrency: z.string().optional(),
-  quoteCurrency: z.string().optional(),
-  quoteDirection: z.string().optional(),
+  baseCurrency: z.string().nullish(),
+  quoteCurrency: z.string().nullish(),
+  quoteDirection: z.string().nullish(),
 });
 export const worldAssetsSchema = z.object({
   version: z.literal(1),

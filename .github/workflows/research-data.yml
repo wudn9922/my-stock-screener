@@ -192,7 +192,7 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin main
-          if ! git diff --quiet "$SOURCE_SHA" origin/main -- 'scripts/*research*.py' scripts/build_sec_radar.py scripts/build_world_assets.py 'atlas/src/report/research*.ts' .github/workflows/research-data.yml; then
+          if ! git diff --quiet "$SOURCE_SHA" origin/main -- 'scripts/*research*.py' scripts/build_sec_radar.py scripts/build_world_assets.py 'atlas/src/report/research*.ts' .github/workflows/research-data.yml .github/generated-paths.json scripts/generated_branch.py; then
             echo '::error::Research implementation changed during collection; rerun on current main.'
             exit 1
           fi
@@ -211,12 +211,12 @@ jobs:
           for attempt in 1 2 3; do
             git fetch origin main
             git reset --hard origin/main
-            if ! git diff --quiet "$SOURCE_SHA" HEAD -- 'scripts/*research*.py' scripts/build_sec_radar.py scripts/build_world_assets.py 'atlas/src/report/research*.ts' .github/workflows/research-data.yml; then
+            if ! git diff --quiet "$SOURCE_SHA" HEAD -- 'scripts/*research*.py' scripts/build_sec_radar.py scripts/build_world_assets.py 'atlas/src/report/research*.ts' .github/workflows/research-data.yml .github/generated-paths.json scripts/generated_branch.py; then
               echo '::error::Research implementation changed during collection; rerun on current main.'
               exit 1
             fi
             python scripts/research_publish.py overlay --dest docs/report/research --artifacts /tmp/research-artifacts
-            git add docs/report/research
+            git add docs/report/research data
             if git diff --cached --quiet; then
               echo 'No research data changes; no commit or Pages deployment.'
               exit 0

@@ -27,8 +27,8 @@ import {
   RefreshCw,
   Search,
 } from 'lucide-react';
-import { AppStore } from './AppStore';
-import { cloudSyncState, startDrawingSync, type CloudSyncState } from '../cloud/startDrawingSync';
+import { chartStore as store, initializeChartStore } from './chartStore';
+import { cloudSyncState, type CloudSyncState } from '../cloud/startDrawingSync';
 import { ChartEngine } from '../chart/ChartEngine';
 import { DemoProvider } from '../market-data/DemoProvider';
 import { YahooProvider } from '../market-data/YahooProvider';
@@ -101,7 +101,6 @@ const dockTabs: { id: DockTab; icon: typeof List }[] = [
   { id: 'alerts', icon: BellRing },
   { id: 'settings', icon: Settings2 },
 ];
-const store = new AppStore();
 const cloudLabels: Record<CloudSyncState, string> = {
   off: '已儲存於本機',
   syncing: '同步雲端中…',
@@ -116,7 +115,6 @@ const cloudTitles: Record<CloudSyncState, string | undefined> = {
   error: '雲端同步失敗，畫線已存在這台裝置，稍後會自動重試',
   expired: 'LINE 登入已過期，畫線已存在這台裝置；從 LINE 重新開啟即可同步',
 };
-let storeInitialized = false;
 const mobileMedia = window.matchMedia('(max-width:1099px)');
 const subscribeMobile = (cb: () => void) => {
   mobileMedia.addEventListener('change', cb);
@@ -316,16 +314,7 @@ export function App({
     };
   }, [centerActiveTimeframe]);
   useEffect(() => {
-    if (storeInitialized) return;
-    storeInitialized = true;
-    void store.initialize().then(() => {
-      // The screener site serves delayed market data; settings saved by earlier versions may name
-      // providers that the static site no longer publishes.
-      const provider = store.getSnapshot().app.provider;
-      if (SCREENER_HOSTING && provider !== 'market' && provider !== 'demo') store.updateApp({ provider: 'market' });
-      // Cloud drawing sync: only inside LINE (report LIFF); elsewhere drawings stay on this device.
-      if (SCREENER_HOSTING) void startDrawingSync(store);
-    });
+    void initializeChartStore();
   }, []);
   useEffect(() => {
     if (!state.ready || !hostRef.current || !headerRef.current || !sourceRef.current) return;

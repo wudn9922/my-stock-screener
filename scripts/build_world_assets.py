@@ -1,6 +1,7 @@
-"""Official EIA daily spot energy, World Bank monthly metals, Federal Reserve H.10 daily FX.
+"""Build drawable world OHLC snapshots and retain daily K-line CSV records.
 
-No paid keys, browser secrets, futures stitching or interpolation. Monthly 1d/1w is N/A.
+Legacy statistical-price parsers remain available for existing reproducibility tests;
+the scheduled build uses research_candles, with explicit futures/FX provenance.
 """
 
 from __future__ import annotations
@@ -218,109 +219,9 @@ def series(history, name, source, url, frequency, unit, kind, http, **extra):
 
 
 def build(out):
-    previous = read(out, {})
-    assets = dict(previous.get("series", {}))
-    http = Http(delay=0.75)
-    for key, name, area, code, unit in ENERGY:
-        url = f"https://www.eia.gov/dnav/{area}/hist_xls/{code}.xls"
-        try:
-            assets[key] = series(
-                parse_eia(http.get(url)),
-                name,
-                "US EIA",
-                url,
-                "daily",
-                unit,
-                "spot",
-                http,
-            )
-        except SourceError as exc:
-            assets[key] = retain(assets.get(key), "US EIA", url, exc)
-    workbook = WB
-    try:
-        workbook = discover_wb_workbook(http.get(WB_LANDING)) or WB
-    except SourceError as exc:
-        print("World Bank landing unavailable; using verified current workbook:", exc)
-    try:
-        metals = parse_wb(http.get(workbook))
-        for key, name, column, unit in METALS:
-            candidate = series(
-                metals[column],
-                name,
-                "World Bank Pink Sheet",
-                workbook,
-                "monthly",
-                unit,
-                "monthly-physical-market-benchmark",
-                http,
-            )
-            assets[key] = preserve_observation_date(candidate, assets.get(key))
-    except SourceError as exc:
-        for key, _, _, _ in METALS:
-            assets[key] = retain(
-                assets.get(key), "World Bank Pink Sheet", workbook, exc
-            )
-    ecb = None
-    for key, name, code, base, quote in FX:
-        url = f"https://www.federalreserve.gov/releases/h10/hist/dat00_{code}.htm"
-        try:
-            assets[key] = series(
-                parse_h10(http.get(url)),
-                name,
-                "Federal Reserve H.10",
-                url,
-                "daily",
-                f"{quote}/{base}",
-                "statistical-fx",
-                http,
-                baseCurrency=base,
-                quoteCurrency=quote,
-                quoteDirection=f"每 1 {base} 兌 {quote}",
-                timezone="America/New_York",
-            )
-        except SourceError as exc:
-            if base != "EUR" and quote == "TWD":
-                assets[key] = retain(assets.get(key), "Federal Reserve H.10", url, exc)
-                continue
-            try:
-                if ecb is None:
-                    ecb = http.get(ECB)
-                assets[key] = series(
-                    parse_ecb(ecb, base, quote),
-                    name,
-                    "ECB daily reference rates",
-                    ECB,
-                    "daily",
-                    f"{quote}/{base}",
-                    "statistical-fx",
-                    http,
-                    baseCurrency=base,
-                    quoteCurrency=quote,
-                    quoteDirection=f"每 1 {base} 兌 {quote}",
-                    timezone="Europe/Frankfurt",
-                    calculation="EUR reference cross: EUR/quote divided by EUR/base, same observation date",
-                    fallbackReason=str(exc),
-                )
-            except SourceError as fallback:
-                assets[key] = retain(
-                    assets.get(key), "ECB / Federal Reserve", ECB, fallback
-                )
-    write(
-        out,
-        dict(
-            version=1,
-            methodVersion="research-v1",
-            generatedAt=stamp(),
-            series=assets,
-            receipts=http.receipts,
-            licensing={
-                "EIA": "https://www.eia.gov/about/copyrights_reuse.php",
-                "Federal Reserve": "https://www.federalreserve.gov/disclaimer.htm",
-                "World Bank": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
-            },
-            limitations="Statistical daily observations are delayed, not bank retail rates or live FX. World Bank monthly series are monthly averages, not futures or live spot quotes.",
-        ),
-    )
+    from research_candles import build_world_candles
+
+    build_world_candles(out)
 
 
 if __name__ == "__main__":

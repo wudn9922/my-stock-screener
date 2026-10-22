@@ -1,117 +1,90 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { ChartCandlestick, ChevronDown, X } from 'lucide-react';
 import { MiniChart } from './MiniChart';
+import { DrawableCandleChart } from './DrawableCandleChart';
+import { getDailyBars } from '../app/dataSources';
+import type { Bar } from '../market-data/MarketDataProvider';
 import { useDialogFocus } from './useDialogFocus';
-import { formatDateTime, formatPercent, formatPrice, toneClass } from './format';
+import { formatPercent, formatPrice, toneClass } from './format';
 import { PERIODS, PERIOD_LABELS, type PeriodKey, type Theme, type ThemeConstituent, type ThemesData } from '../report/themes';
 import type { OpenChartOptions } from '../app/Site';
 import {
-  CHART_RANGES,
   MIN_VALID_FOR_RANK,
   breadthLabel,
-  chartData,
   relativeTo,
-  type ChartRange,
 } from '../pages/themesView';
 
-const W = 340;
-const H = 156;
-const PAD = { top: 10, right: 52, bottom: 20, left: 6 };
-const THEME_COLOR = '#3987e5';
-const BENCH_COLOR = '#9aa3b2';
 const CLOSE_DRAG = 90;
 
-function pct(index: number) {
-  return `${index > 0 ? '+' : ''}${index.toFixed(1)}%`;
-}
-
-/** Theme index versus the benchmark (SPY or 加權指數), both rebased to 0% on the first visible day. Drag or hover to read a day. */
-function VersusChart({ theme, data }: { theme: Theme; data: ThemesData }) {
-  const [range, setRange] = useState<ChartRange>('3m');
-  const [hover, setHover] = useState<number | null>(null);
-  const chart = useMemo(() => chartData(theme, data, range), [theme, data, range]);
-  const count = chart.dates.length;
-  const geometry = useMemo(() => {
-    if (count < 2) return null;
-    const values = [...chart.theme, ...chart.bench];
-    const lo = Math.min(...values, 100);
-    const hi = Math.max(...values, 100);
-    const span = hi - lo || 1;
-    const pad = span * 0.08;
-    const min = lo - pad;
-    const max = hi + pad;
-    const x = (i: number) => PAD.left + (i / (count - 1)) * (W - PAD.left - PAD.right);
-    const y = (v: number) => PAD.top + (1 - (v - min) / (max - min)) * (H - PAD.top - PAD.bottom);
-    const path = (series: number[]) => series.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join('');
-    const step = span > 60 ? 25 : span > 24 ? 10 : span > 10 ? 5 : 2;
-    const ticks: number[] = [];
-    for (let t = Math.ceil((min - 100) / step) * step; t <= max - 100; t += step) ticks.push(t);
-    return { x, y, themePath: path(chart.theme), benchPath: path(chart.bench), ticks, min, max };
-  }, [chart, count]);
-  const shown = hover ?? count - 1;
-  const move = (event: ReactPointerEvent<SVGSVGElement>) => {
-    const box = event.currentTarget.getBoundingClientRect();
-    const px = ((event.clientX - box.left) / box.width) * W;
-    const ratio = (px - PAD.left) / (W - PAD.left - PAD.right);
-    setHover(Math.max(0, Math.min(count - 1, Math.round(ratio * (count - 1)))));
-  };
-  if (!geometry) return <p className="detail-muted">這個題材還沒有足夠的走勢資料。</p>;
-  const t = chart.theme[shown]! - 100;
-  const b = chart.bench[shown]! - 100;
+/** Tradable ETF/constituent OHLC. Equal-weight close indexes have no observed intraday high/low. */
+function ThemeCandleChart({ theme, data }: { theme: Theme; data: ThemesData }) {
+  const options = [
+    ...new Map([
+      ...(theme.etf
+        ? [[theme.etf.symbol, `${theme.etf.symbol}・參考 ETF`] as const]
+        : []),
+      ...theme.constituents.map(
+        (c) => [c.symbol, `${c.symbol}・${c.name}`] as const,
+      ),
+    ]).entries(),
+  ];
+  const [symbol, setSymbol] = useState(options[0]?.[0] ?? "");
+  const [loaded, setLoaded] = useState<{
+    symbol: string;
+    bars: Bar[];
+    error?: string;
+  }>();
+  useEffect(() => {
+    let active = true;
+    if (symbol)
+      void getDailyBars(symbol).then(
+        (bars) => {
+          if (active) setLoaded({ symbol, bars });
+        },
+        (e) => {
+          if (active)
+            setLoaded({
+              symbol,
+              bars: [],
+              error: e instanceof Error ? e.message : "K線載入失敗",
+            });
+        },
+      );
+    return () => {
+      active = false;
+    };
+  }, [symbol]);
+  const current = loaded?.symbol === symbol ? loaded : undefined;
   return (
-    <div className="versus">
-      <div className="versus-head">
-        <div className="versus-legend">
-          <span>
-            <i style={{ background: THEME_COLOR }} />
-            題材
-            <b className={`num ${toneClass(t)}`}>{pct(t)}</b>
-          </span>
-          <span>
-            <i className="dashed" style={{ borderColor: BENCH_COLOR }} />
-            {data.benchmark.label}
-            <b className={`num ${toneClass(b)}`}>{pct(b)}</b>
-          </span>
-          <span className="versus-date">{formatDateTime(chart.dates[shown], false)}</span>
-        </div>
-        <div className="segmented compact" role="group" aria-label="走勢區間">
-          {CHART_RANGES.map((item) => (
-            <button key={item.key} type="button" className={item.key === range ? 'active' : ''} aria-pressed={item.key === range} onClick={() => setRange(item.key)}>
-              {item.label}
-            </button>
+    <section aria-label="題材K線">
+      <label className="candle-toolbar">
+        K線標的
+        <select
+          aria-label="題材K線標的"
+          value={symbol}
+          onChange={(e) => setSymbol(e.target.value)}
+        >
+          {options.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
           ))}
-        </div>
-      </div>
-      <svg
-        className="versus-svg"
-        viewBox={`0 0 ${W} ${H}`}
-        role="img"
-        aria-label={`題材指數與 ${data.benchmark.label} 走勢比較，區間起點為 0%`}
-        onPointerMove={move}
-        onPointerDown={move}
-        onPointerLeave={() => setHover(null)}
-      >
-        {geometry.ticks.map((tick) => (
-          <g key={tick}>
-            <line className={tick === 0 ? 'zero' : 'grid'} x1={PAD.left} x2={W - PAD.right} y1={geometry.y(100 + tick)} y2={geometry.y(100 + tick)} />
-            <text className="axis" x={W - PAD.right + 6} y={geometry.y(100 + tick) + 3.5}>
-              {tick > 0 ? `+${tick}%` : `${tick}%`}
-            </text>
-          </g>
-        ))}
-        <path d={geometry.benchPath} fill="none" stroke={BENCH_COLOR} strokeWidth="1.6" strokeDasharray="4 3" strokeLinejoin="round" />
-        <path d={geometry.themePath} fill="none" stroke={THEME_COLOR} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
-        <text className="axis" x={PAD.left} y={H - 5}>
-          {formatDateTime(chart.dates[0], false).slice(5)}
-        </text>
-        <text className="axis" x={W - PAD.right} y={H - 5} textAnchor="end">
-          {formatDateTime(chart.dates[count - 1], false).slice(5)}
-        </text>
-        <line className="cursor" x1={geometry.x(shown)} x2={geometry.x(shown)} y1={PAD.top} y2={H - PAD.bottom} />
-        <circle cx={geometry.x(shown)} cy={geometry.y(chart.bench[shown]!)} r="3" fill={BENCH_COLOR} />
-        <circle cx={geometry.x(shown)} cy={geometry.y(chart.theme[shown]!)} r="3.5" fill={THEME_COLOR} />
-      </svg>
-    </div>
+        </select>
+      </label>
+      <p className="detail-muted">
+        圖表：{symbol}；上方報酬與寬度統計：題材等權組合。
+      </p>
+      <DrawableCandleChart
+        key={symbol}
+        identity={`theme:${data.market}:${theme.key}:${symbol}`}
+        marketSymbol={symbol}
+        bars={current?.bars ?? []}
+        source={symbol || theme.name}
+        unit={data.market === "tw" ? "TWD" : "USD"}
+        loading={!current && !!symbol}
+        error={current?.error}
+      />
+    </section>
   );
 }
 
@@ -332,7 +305,7 @@ export function ThemeDetail({
             </span>
           </div>
 
-          <VersusChart theme={theme} data={data} />
+          <ThemeCandleChart theme={theme} data={data} />
 
           <section className="detail-constituents" aria-label="成分股">
             <div className="constituents-head">

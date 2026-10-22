@@ -95,6 +95,15 @@ class GeneratedStorageTests(unittest.TestCase):
             self.store.assemble(self.base, self.seed, b)
             self.assertEqual(gb.digest_tree(a), gb.digest_tree(b))
 
+    def test_world_candle_records_stay_on_main_and_report_is_overwritten_on_generated(self):
+        self.write("data/world/CMD-WTI.csv", b"Date,Open,High,Low,Close,Volume\n2026-10-21,1,3,0,2,100\n")
+        self.write("docs/report/research/world-assets.json", b'{"version":1}')
+        self.store.publish("research")
+        main, generated = self.remote("main"), self.remote("generated")
+        self.assertIn("data/world/CMD-WTI.csv", self.store.entries(main))
+        self.assertNotIn("data/world/CMD-WTI.csv", self.store.entries(generated))
+        self.assertEqual(self.body(generated, "docs/report/research/world-assets.json"), b'{"version":1}')
+
     def test_publish_only_owned_changes_preserves_main_index_and_records(self):
         self.write("docs/report/latest.json", b"new latest")
         self.write("docs/report/financials/AAPL.json", b"must not leak")
