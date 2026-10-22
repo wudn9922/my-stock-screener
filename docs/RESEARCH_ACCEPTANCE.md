@@ -45,11 +45,11 @@ ADV 使用本幣每日成交金額（缺官方 amount 則 close×volume 代理�
 | 最近 20 日 ADV 全部採官方成交金額 | 1,816 | 0（明示收盤×量代理） |
 | 法人報表至少一筆 | 1,966（上市 1,086、上櫃 880） | 不適用 |
 | 法人完整 60 日外資觀測 | 1,522 | 不適用 |
-| 外資 20 日估計具完整價量配對／有正淨買超參考價 | 1,589／1,919 | 不適用 |
+| 外資 20 日估計具完整價量配對／有正淨買超參考價 | 1,599／1,916 | 不適用 |
 
 快照有值不等於每一個指標都完整；介面保留各指標觀測數、低可信度與 N/A。TDCC 最新分級覆蓋上述 1,978 檔，歷史仍只有 1 週。SEC 可對應 5,332／5,339 檔 CIK，但這**不是全部公司均已查完 90 日申報**：逐股查詢只有 38 檔，每日索引已收錄 10-13、14、15、16、19、20、21；事件涉及 961 個發行人。公告資料是事件筆數，不把沒有公告等同於資料缺失，也不把來源不可用視為正常。
 
-全市場產物來自 [Actions run 39723556039](https://github.com/wudn9922/my-stock-screener/actions/runs/39723556039) 的 `full-market-research`，來源 commit `6029e62d65bd5d7241420edc16a803b04cb2f54a`，之後用 130 份官方成交輸入更新成交金額指標與法人價格估計，保留既有價量訊號。匯入產物時保留 649 檔較新的日報快照，沒有以較舊 cache 倒退資料。產物追溯見 [full-market-artifact.json](research-verification/full-market-artifact.json)。另實抓 TPEx 回補最早日 07-20，808 檔普通股解析結果與原 cache 完全相同，見 [日期／雜湊驗證](research-verification/tpex-history-check.json)。
+全市場產物來自 [Actions run 39723556039](https://github.com/wudn9922/my-stock-screener/actions/runs/39723556039) 的 `full-market-research`，來源 commit `6029e62d65bd5d7241420edc16a803b04cb2f54a`，之後用 130 份官方成交輸入更新成交金額指標與法人價格估計，保留既有價量訊號。匯入產物時保留 649 檔較新的日報快照，沒有以較舊 cache 倒退資料。產物追溯見 [full-market-artifact.json](research-verification/full-market-artifact.json)。再以 [完整 cache 的官方成交對帳產物](research-verification/full-market-cash-reconciliation.json) 核對：價量指標沒有數值變動；390 份法人快照採用完整 cache 的價格輸入／精度及公司行動檢查，20 日完整配對增至 1,599 檔，保守排除不一致基準後 1,916 檔有參考價。所有資料日未倒退。另實抓 TPEx 回補最早日 07-20，808 檔普通股解析結果與原 cache 完全相同，見 [日期／雜湊驗證](research-verification/tpex-history-check.json)。
 
 ## 執行過的驗證
 

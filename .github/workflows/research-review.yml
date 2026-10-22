@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/**'
+      - 'docs/report/research/**'
       - 'tests/**'
       - 'atlas/scripts/**'
       - 'requirements.txt'
