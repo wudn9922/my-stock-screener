@@ -87,7 +87,7 @@ jobs:
 
       - name: Check Python Syntax
         if: steps.guard.outputs.skip != 'true'
-        run: python -m py_compile main.py
+        run: python -m py_compile main.py dify_report.py
 
       
       # 這裡把 Supabase 金鑰直接餵給 Python

@@ -1437,6 +1437,48 @@ def send_line_message(
         return None
 
 
+def send_line_messages_combined(
+    messages,
+    access_token,
+    user_id,
+    max_length=4900
+):
+    """
+    把多段簡短訊息合併成一則 LINE 文字訊息再推播。
+
+    各段之間空一行；合併後超過 LINE 單則 5000 字上限時，
+    以「整段」為單位拆成最少則數，不會把單一段落切成兩半。
+    """
+    chunks = []
+    current = ""
+
+    for message in messages:
+        message = str(message or "").strip()
+
+        if not message:
+            continue
+
+        if not current:
+            current = message
+        elif len(current) + 2 + len(message) <= max_length:
+            current = f"{current}\n\n{message}"
+        else:
+            chunks.append(current)
+            current = message
+
+    if current:
+        chunks.append(current)
+
+    for chunk in chunks:
+        send_line_message(
+            chunk,
+            access_token,
+            user_id
+        )
+
+    return len(chunks)
+
+
 # =========================================================================
 # 台美股清單
 # =========================================================================
@@ -8118,11 +8160,9 @@ def main():
         f"｜熱門 {stock_count('us_g4')}"
     )
 
-    send_line_message(
-        line_message_stocks,
-        access_token,
-        line_push_user_id
-    )
+    # 股票、大盤（週一再加類股）合併成一則 LINE 訊息，
+    # 在下方類股區塊結束後一次送出
+    pending_line_messages = [line_message_stocks]
 
     # -----------------------------------------------------------------
     # 原本的大盤分類與趨勢推播
@@ -8222,12 +8262,10 @@ def main():
         INDEX_LINE_LEGEND
     )
 
-    send_line_message(
+    pending_line_messages.append(
         "\n".join(
             line_index_lines
-        ),
-        access_token,
-        line_push_user_id
+        )
     )
 
     # -----------------------------------------------------------------
@@ -8245,14 +8283,18 @@ def main():
         )
 
         # LINE 送精簡版；sectors_message 的完整文字留給網頁（Atlas 報告 JSON）
-        send_line_message(
+        pending_line_messages.append(
             build_sector_line_message(
                 today_str,
                 sector_summary
-            ),
-            access_token,
-            line_push_user_id
+            )
         )
+
+    send_line_messages_combined(
+        pending_line_messages,
+        access_token,
+        line_push_user_id
+    )
 
     # -----------------------------------------------------------------
     # 選股篩選器：全市場 universe 與群組指標（report_metrics.py）
