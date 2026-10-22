@@ -158,8 +158,7 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          # -A 才會把「已被清理的過期 CSV」的刪除動作一起提交
-          # docs/report：Atlas 報告 JSON；data：歷史資料
+          # data/*.csv 是永久 K 線紀錄，不再清除過期檔；開關關閉時仍與報告一起留 main。
           git add -A docs/report data
           git commit -m "Auto-update daily data and report JSON" || echo "No changes to commit"
           # Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試

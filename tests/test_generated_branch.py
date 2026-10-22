@@ -1,10 +1,12 @@
 """Real git integration tests: isolated bare origin, no network or production writes."""
 import importlib.util
+import ast
 import json
 import os
 from pathlib import Path
 import subprocess
 import tempfile
+import textwrap
 import unittest
 from unittest.mock import patch
 
@@ -39,6 +41,7 @@ class GeneratedStorageTests(unittest.TestCase):
             "docs/atlas/assets/old.js": b"old bundle",
             "docs/report/latest.json": b'{"latest":1}',
             "docs/report/universe.json": b'{"universe":1}',
+            "docs/report/breakouts-archive/2026-09-01.json": b'{"asOf":"2026-09-01"}',
             "docs/report/series/index.json": b'{"series":1}',
             "docs/report/rates.json": b'{"rates":1}',
             "docs/report/growth.json": b'{"growth":1}',
@@ -106,7 +109,7 @@ class GeneratedStorageTests(unittest.TestCase):
         self.assertEqual(self.git("rev-parse", "HEAD"), self.base)
         self.assertEqual(self.git("write-tree"), index_before)
 
-    def test_deleted_assets_and_new_csv_survive_pr2_main_removal(self):
+    def test_pr2_removes_only_outputs_and_new_csv_stays_on_main(self):
         # Simulate PR2: remove only moved paths from main, keep all old history.
         for path in self.store.entries(self.base):
             if self.store.moved(path):
@@ -122,13 +125,103 @@ class GeneratedStorageTests(unittest.TestCase):
         generated = self.remote("generated")
         self.assertNotIn("docs/atlas/assets/old.js", self.store.entries(generated))
         self.assertIn("docs/atlas/assets/new.js", self.store.entries(generated))
-        self.assertIn("data/NEW.csv", self.store.entries(generated))
+        self.assertNotIn("data/NEW.csv", self.store.entries(generated))
+        main = self.remote("main")
+        self.assertEqual(self.body(main, "data/NEW.csv"), b"Date,Close\n2026-10-22,2")
+        self.assertEqual(self.body(main, "data/AAPL.csv"), self.files["data/AAPL.csv"])
         self.assertEqual(self.body(self.base, "data/AAPL.csv"), self.files["data/AAPL.csv"])
         with tempfile.TemporaryDirectory() as t:
             target = Path(t) / "site"
             self.store.assemble("HEAD", generated, target)
             self.assertEqual((target / "report/financials/AAPL.json").read_bytes(), b'{"eps":1}')
             self.assertEqual((target / "index.html").read_bytes(), self.files["docs/index.html"])
+
+    def test_daily_preserves_main_csvs_during_restore_and_publishes_k_line_history(self):
+        new = self.files["data/AAPL.csv"] + b"2026-10-22,2\n"
+        self.write("data/AAPL.csv", new)
+        self.store.restore()
+        self.assertEqual(Path("data/AAPL.csv").read_bytes(), new)
+        self.store.publish("daily")
+        main = self.remote("main")
+        self.assertEqual(self.body(main, "data/AAPL.csv"), new)
+        self.assertEqual(self.body(self.base, "data/AAPL.csv"), self.files["data/AAPL.csv"])
+        self.assertEqual(self.git("merge-base", self.base, main), self.base)
+        self.assertNotIn("data/AAPL.csv", self.store.entries(self.remote("generated")))
+
+    def test_daily_refuses_to_publish_csv_deletions(self):
+        Path("data/AAPL.csv").unlink()
+        with self.assertRaisesRegex(ValueError, "Refusing to delete owner-retained K-line"):
+            self.store.publish("daily")
+        self.assertEqual(self.remote("main"), self.base)
+
+    def test_legacy_main_publisher_keeps_committing_csvs_with_switch_off(self):
+        function = next(n for n in ast.parse((REPO / "main.py").read_text(encoding="utf-8-sig")).body
+                        if isinstance(n, ast.FunctionDef) and n.name == "push_report_to_github")
+
+        def run_git_command(command):
+            # Use the isolated repo identity, without touching the user's global config.
+            if command[:2] == ["git", "config"]:
+                return 0
+            return subprocess.run(command, capture_output=True).returncode
+
+        namespace = {"os": os, "subprocess": subprocess, "run_git_command": run_git_command}
+        exec(compile(ast.Module(body=[function], type_ignores=[]), "main.py", "exec"), namespace)
+        self.git("branch", "--set-upstream-to=origin/main", "main")
+        self.write("data/AAPL.csv", b"updated retained K-line")
+        with patch.dict(os.environ, {"GENERATED_BRANCH_MODE": ""}):
+            self.assertTrue(namespace["push_report_to_github"]())
+        main = self.remote("main")
+        self.assertEqual(self.body(main, "data/AAPL.csv"), b"updated retained K-line")
+        self.assertEqual(self.body(self.base, "data/AAPL.csv"), self.files["data/AAPL.csv"])
+        self.assertEqual(self.remote("generated"), self.seed)
+
+    def test_legacy_universe_workflow_commits_archives_with_switch_off(self):
+        snapshot = "docs/report/breakouts-archive/2026-10-22.json"
+        self.write(snapshot, b"immutable full-market snapshot")
+        self.write("docs/report/breakouts.json", b"current full-market snapshot")
+        self.git("branch", "--set-upstream-to=origin/main", "main")
+        workflow = (REPO / ".github/workflows/universe-full.yml").read_text()
+        block = workflow.split("      - name: Commit and Push changes\n", 1)[1]
+        script = textwrap.dedent(block.split("        run: |\n", 1)[1])
+        with patch.dict(os.environ, {"GENERATED_BRANCH_MODE": ""}):
+            subprocess.run(["bash", "-e", "-c", script], check=True, capture_output=True)
+        self.assertEqual(self.body(self.remote("main"), snapshot), b"immutable full-market snapshot")
+        self.assertEqual(self.remote("generated"), self.seed)
+
+    def test_archive_snapshots_are_append_only_and_survive_daily_squash(self):
+        old = "docs/report/breakouts-archive/2026-09-01.json"
+        new = "docs/report/breakouts-archive/2026-10-22.json"
+        self.write(new, b"new immutable snapshot")
+        self.store.publish("universe")
+        self.store.squash()
+        tip = self.remote("generated")
+        self.assertEqual(self.body(tip, old), self.files[old])
+        self.assertEqual(self.body(tip, new), b"new immutable snapshot")
+        for content in (b"rewritten old snapshot", None):
+            with self.subTest(content=content):
+                if content is None:
+                    Path(old).unlink()
+                else:
+                    self.write(old, content)
+                with self.assertRaisesRegex(ValueError, "append-only"):
+                    self.store.publish("universe")
+                self.assertEqual(self.remote("generated"), tip)
+
+    def test_restore_refuses_to_remove_or_rewrite_local_archives(self):
+        old = "docs/report/breakouts-archive/2026-09-01.json"
+        mtime = Path(old).stat().st_mtime_ns
+        self.store.restore()
+        self.assertEqual(Path(old).stat().st_mtime_ns, mtime)
+        self.write(old, b"different archive bytes")
+        with self.assertRaisesRegex(ValueError, "Refusing to delete or rewrite an archived"):
+            self.store.restore()
+        self.assertEqual(Path(old).read_bytes(), b"different archive bytes")
+        self.write(old, self.files[old])
+        new = "docs/report/breakouts-archive/2026-10-22.json"
+        self.write(new, b"not on generated yet")
+        with self.assertRaisesRegex(ValueError, "Refusing to delete or rewrite an archived"):
+            self.store.restore()
+        self.assertTrue(Path(new).is_file())
 
     def test_financials_split_to_main_and_generated(self):
         self.write("docs/report/financials/AAPL.json", b"new permanent eps")
@@ -218,6 +311,7 @@ class GeneratedStorageTests(unittest.TestCase):
         commit = self.store.rollback_branch("rollback/generated-test")
         self.assertEqual(self.body(commit, "docs/report/latest.json"), b"latest rollback payload")
         self.assertEqual(self.body(commit, "docs/report/financials/AAPL.json"), self.files["docs/report/financials/AAPL.json"])
+        self.assertEqual(self.body(commit, "data/AAPL.csv"), self.files["data/AAPL.csv"])
         self.assertNotIn(gb.RELAY, self.store.entries(commit))
         self.assertEqual(self.git("merge-base", commit, self.base), self.base)
         self.assertEqual(self.remote("main"), self.base)
@@ -262,7 +356,12 @@ class InventoryTests(unittest.TestCase):
             expected = "regenerated" if store.moved(row["path"]) else "record"
             self.assertEqual(row["classification"], expected, row["path"])
             self.assertTrue(row["reason"])
-        self.assertEqual(len(rows), 9635)
+            if row["path"].startswith("data/"):
+                self.assertEqual(row["reason"], "owner-retained K-line history")
+        baseline = json.loads((REPO / "operations/generated-baseline.json").read_text())
+        self.assertEqual(len(rows), baseline["inventory_files"])
+        self.assertEqual(sum(r["classification"] == "regenerated" for r in rows), baseline["regenerated_files"])
+        self.assertEqual(sum(r["classification"] == "record" for r in rows), baseline["record_files"])
 
     def test_main_embedded_publisher_cannot_push_when_switch_is_enabled(self):
         # Execute the actual publisher without importing main's network clients.

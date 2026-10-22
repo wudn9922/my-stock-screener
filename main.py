@@ -42,10 +42,7 @@ BACKFILL_ENABLED = False
 BACKFILL_MIN_ROWS = 240
 BACKFILL_MAX_PER_RUN = 200
 
-# 超過此天數沒有新 K 線的 CSV 會被自動清除
-STALE_CSV_DAYS = 45
-# 單次最多刪除全部 CSV 的比例，超過視為異常不刪
-STALE_CSV_MAX_DELETE_RATIO = 0.5
+# data/*.csv 是永久 K 線紀錄，不再依日期或掃描名單刪除。
 
 
 # =========================================================================
@@ -92,11 +89,6 @@ TPEX_TRADING_INDEX_LEGACY_URL = (
     "https://www.tpex.org.tw/web/stock/aftertrading/"
     "daily_trading_index/st41_result.php"
 )
-
-# prune_stale_csv 不會刪除的 CSV（長期歷史快取，不是掃描用的個股）
-STALE_CSV_EXCLUDE = {
-    f"{TPEX_OTC_SYMBOL}.csv"
-}
 
 # =========================================================================
 # LIFF、報告與畫線同步
@@ -4755,71 +4747,14 @@ def get_csv_last_date(csv_path):
 
 def prune_stale_csv(
     data_dir=DATA_DIR,
-    max_age_days=STALE_CSV_DAYS
+    max_age_days=None
 ):
+    """K 線 CSV 是 owner 永久保留的紀錄；保留呼叫介面，但永不刪檔。
+
+    掉出名單、下市、過期或損壞的 CSV 仍留在 main 與完整 git 歷史中。
+    data_dir／max_age_days 只為既有呼叫相容而保留，不再用於清理。
     """
-    刪除最後一根 K 線已超過 max_age_days 天沒更新的 CSV。
-
-    掉出掃描名單、下市或已從群組移除的股票不會再被更新，
-    它們的 CSV 會因此逐漸過期並被清掉，避免 repo 無限膨脹。
-    仍在名單內的股票每天都會更新，不會被刪除。
-    """
-    if not os.path.isdir(data_dir):
-        return 0
-
-    now = datetime.now()
-    csv_paths = [
-        os.path.join(data_dir, name)
-        for name in os.listdir(data_dir)
-        if name.endswith(".csv")
-        and name not in STALE_CSV_EXCLUDE
-    ]
-
-    stale_paths = []
-
-    for csv_path in csv_paths:
-        last_date = get_csv_last_date(
-            csv_path
-        )
-
-        if last_date is None:
-            continue
-
-        if (
-            now - last_date
-        ).days > max_age_days:
-            stale_paths.append(csv_path)
-
-    # 安全閥：資料來源整批異常時，不要一次刪光
-    if (
-        csv_paths
-        and len(stale_paths)
-        > len(csv_paths)
-        * STALE_CSV_MAX_DELETE_RATIO
-    ):
-        print(
-            "⚠️ 過期 CSV 數量異常"
-            f"（{len(stale_paths)}/"
-            f"{len(csv_paths)}），"
-            "略過清理"
-        )
-        return 0
-
-    for csv_path in stale_paths:
-        try:
-            os.remove(csv_path)
-        except OSError as exc:
-            print(
-                f"⚠️ 刪除失敗 {csv_path}："
-                f"{exc}"
-            )
-
-    print(
-        f"🧹 已清除過期 CSV："
-        f"{len(stale_paths)} 檔"
-    )
-
-    return len(stale_paths)
+    return 0
 
 
 def push_report_to_github():
@@ -5881,7 +5816,7 @@ def write_ohlcv_csv_atomic(df, csv_path):
 
     file_descriptor, tmp_path = tempfile.mkstemp(
         prefix=".tmp-",
-        suffix=".csv",
+        suffix=".tmp",
         dir=directory
     )
 

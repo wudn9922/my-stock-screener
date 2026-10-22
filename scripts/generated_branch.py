@@ -50,6 +50,9 @@ class Storage:
         if self.config["branch"] != "generated":
             raise ValueError("Storage branch must be exactly generated")
         self.patterns = sorted({p for v in self.config["owners"].values() for p in v})
+        self.append_only = self.config.get("append_only", [])
+        if any(p.startswith("data/") for p in self.patterns):
+            raise ValueError("Owner-retained K-line history must stay on main")
         self.state = Path(git("rev-parse", "--absolute-git-dir").decode().strip()) / "generated-state.json"
 
     def moved(self, path):
@@ -108,6 +111,10 @@ class Storage:
                 target = Path(destination) / path.removeprefix(prefix)
                 if target.is_symlink():
                     raise ValueError("Refusing symlink: " + str(target))
+                if target.is_file() and target.read_bytes() == body:
+                    if target.stat().st_mode & 0o777 != int(mode, 8) & 0o777:
+                        target.chmod(int(mode, 8) & 0o777)
+                    continue
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(body)
                 target.chmod(int(mode, 8) & 0o777)
@@ -151,6 +158,10 @@ class Storage:
             if folder.exists():
                 paths.update(p.as_posix() for p in folder.rglob("*") if p.is_file())
         for path in paths:
+            if matches(path, self.append_only) and Path(path).exists():
+                if path not in entries or git("hash-object", "--", path).decode().strip() != entries[path][1]:
+                    raise ValueError("Refusing to delete or rewrite an archived snapshot: " + path)
+        for path in paths:
             if self.moved(path) and path not in entries:
                 Path(path).unlink(missing_ok=True)
         self.write_blobs({p: e for p, e in entries.items() if p != RELAY}, ".")
@@ -175,6 +186,11 @@ class Storage:
 
     def publish_one(self, branch, base, patterns, message):
         delta, original = self.changed(base, patterns)
+        for path, entry in delta.items():
+            if branch == "main" and matches(path, ["data/*.csv"]) and entry is None:
+                raise ValueError("Refusing to delete owner-retained K-line history: " + path)
+            if matches(path, self.append_only) and (entry is None or path in original):
+                raise ValueError("Archived snapshots are append-only: " + path)
         if not delta:
             print(f"No {branch} changes")
             return False
@@ -197,13 +213,13 @@ class Storage:
             if result.returncode == 0:
                 return True
             # Fetch and replay this exact owner's patch on the new parent, including
-            # after a concurrent weekly squash. Never force a producer push.
+            # after a concurrent daily squash. Never force a producer push.
             time.sleep(attempt + 1)
         raise RuntimeError(f"Push to {branch} failed after five fetch/rebase retries")
 
     def publish(self, owner):
         state = json.loads(self.state.read_text())  # no restore => fail closed
-        # Publish durable financial records first; never put them on generated.
+        # Publish durable K-line / financial records first; never put them on generated.
         records = self.config["records"].get(owner, [])
         if records:
             self.publish_one("main", state["main"], records, f"Update {owner} records")
@@ -215,7 +231,7 @@ class Storage:
             head = self.fetch()
             self.validate(self.entries(head))
             tree = git("rev-parse", head + "^{tree}").decode().strip()
-            commit = self.commit(tree, "Weekly generated snapshot (current tree unchanged)")
+            commit = self.commit(tree, "Daily generated snapshot (current tree unchanged)")
             assert git("rev-parse", commit + "^{tree}").decode().strip() == tree
             result = subprocess.run(["git", "push", f"--force-with-lease=refs/heads/generated:{head}",
                                      "origin", f"{commit}:refs/heads/generated"], check=False)

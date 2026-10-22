@@ -20,6 +20,7 @@ venv/
 .coverage
 # 全市場 universe 的日 K 快取（scripts/build_universe_full.py；在 Actions cache 保存，不提交）
 .cache/
+data/.tmp-*
 
 # 作業系統
 .DS_Store
