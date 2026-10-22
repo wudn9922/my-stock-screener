@@ -1,0 +1,99 @@
+name: MA Recommendations
+
+# 建議均線（ma-selector 的 production 選擇：SMA、規則 B＋短期 rescue；規則在 ma-selector repo，這裡不改）
+# → docs/report/ma-selector/<ticker>.json＋index.json，Atlas 圖表的「建議均線」卡片讀這裡。
+# 股票清單＝data/*.csv（全台股＋S&P 500，略過 ^ 指數）；每檔重抓 Yahoo 5 年日K（data/ 只有約 10 個月，不夠）。
+# 每週六台灣時間約 10:17（UTC 02:17）跑一次；抓不到的股票沿用上一次的檔案，成功率 < 50% 時不寫檔。
+# GENERATED_BRANCH_MODE=1 時從 generated 分支還原舊檔、只發布 owner `ma`（.github/generated-paths.json）；否則照舊提交到 main。
+on:
+  schedule:
+    - cron: '17 2 * * 6'
+  workflow_dispatch:
+    inputs:
+      ma_selector_ref:
+        description: 'ma-selector 的分支／commit（預設 main）'
+        required: false
+        default: 'main'
+      limit:
+        description: '只跑前 N 檔（測試用；空白＝全部）'
+        required: false
+        default: ''
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ma-recommendations
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Restore generated inputs
+        id: generated_restore
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        run: python scripts/generated_branch.py restore
+
+      - name: Checkout ma-selector
+        uses: actions/checkout@v4
+        with:
+          repository: wudn9922/ma-selector
+          ref: ${{ github.event.inputs.ma_selector_ref || 'main' }}
+          path: _ma-selector
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install --quiet pandas numpy pyarrow
+
+      - name: Build recommendations
+        env:
+          LIMIT: ${{ github.event.inputs.limit }}
+        run: |
+          python -u _ma-selector/scripts/build_recommendations.py \
+            --from-dir data --out docs/report/ma-selector --workers 4 ${LIMIT:+--limit "$LIMIT"}
+          python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          d = json.load(open('docs/report/ma-selector/index.json'))
+          print(f"### 建議均線\n要求 {d['requested']} 檔、更新 {d['updated']} 檔、可用 {len(d['symbols'])} 檔、失敗 {len(d['failed'])} 檔（基準 {d['referenceAsof']}）")
+          for f in d['failed'][:30]: print(f"- {f['ticker']}：{f['reason']}")
+          EOF
+
+      - name: Remove ma-selector checkout
+        if: always()
+        run: rm -rf _ma-selector
+
+      - name: Publish owned outputs to generated
+        if: vars.GENERATED_BRANCH_MODE == '1' && steps.generated_restore.outcome == 'success'
+        run: python scripts/generated_branch.py publish ma
+
+      - name: Commit and Push changes
+        if: vars.GENERATED_BRANCH_MODE != '1'
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A docs/report/ma-selector
+          git commit -q -m "Auto-update MA recommendations" || { echo "No changes to commit"; exit 0; }
+          # 每日報告與其他 workflow 也會推送到 main，失敗時重新 rebase 後重試
+          for attempt in 1 2 3; do
+            git pull --rebase
+            if git push; then
+              exit 0
+            fi
+            echo "推送失敗（第 ${attempt} 次），稍後重試"
+            sleep $((attempt * 15))
+          done
+          exit 1

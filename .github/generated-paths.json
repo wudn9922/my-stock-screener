@@ -10,7 +10,8 @@
     "research": ["docs/report/research/**"],
     "chips": ["docs/report/tw-chips.json"],
     "themes": ["docs/report/themes-tw.json"],
-    "rates": ["docs/report/rates.json", "docs/report/rates-history.json"]
+    "rates": ["docs/report/rates.json", "docs/report/rates-history.json"],
+    "ma": ["docs/report/ma-selector/**"]
   },
   "append_only": ["docs/report/breakouts-archive/*.json"],
   "records": {

@@ -6,10 +6,13 @@ export function FixedStockParameters({
   ticker,
   defaults,
   onClose,
+  prefill = false,
   onSaved,
 }: {
   ticker: string;
   defaults: number[];
+  /** Keep `defaults` in the input (e.g. a recommendation) and show the saved values separately instead of loading them. */
+  prefill?: boolean;
   onClose: () => void;
   onSaved: (values: number[]) => void;
 }) {
@@ -19,6 +22,7 @@ export function FixedStockParameters({
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [saved, setSaved] = useState<number[] | null>(null);
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -28,7 +32,8 @@ export function FixedStockParameters({
       .then((stocks) => {
         const fixed = stocks.find((stock) => stock.ticker === ticker && stock.group_id === FIXED_STOCK_GROUP);
         if (active) {
-          if (fixed) setMas(parameterMAs(fixed).join(', '));
+          setSaved(fixed ? parameterMAs(fixed) : null);
+          if (fixed && !prefill) setMas(parameterMAs(fixed).join(', '));
           setReady(true);
         }
       })
@@ -41,7 +46,7 @@ export function FixedStockParameters({
     return () => {
       active = false;
     };
-  }, [ticker, attempt]);
+  }, [ticker, attempt, prefill]);
   const save = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
@@ -64,6 +69,7 @@ export function FixedStockParameters({
     <ConsoleDialog title={`${ticker} 固定均線參數`} busy={busy} onClose={onClose}>
       <p>固定參數會保存到 Supabase，出榜或刪除清單後仍保留。只有此股票在分組或已啟用監控的清單中時才使用，優先於分組與清單的預設均線。</p>
       {loading && <p role="status">正在載入已保存的參數…</p>}
+      {prefill && ready && <p role="status">{saved ? `目前已保存：${saved.join(' / ')}；儲存後會被取代。` : '目前沒有已保存的固定參數。'}</p>}
       {error && (
         <p role="alert" className="console-message">
           {error}
