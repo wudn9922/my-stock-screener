@@ -33,3 +33,39 @@ class LineIndexSummaryTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipIf(main is None, "main.py dependencies not installed")
+class CombinedLineMessagesTest(unittest.TestCase):
+    def send(self, messages, **kwargs):
+        sent = []
+
+        def fake_send(message, access_token, user_id):
+            sent.append(message)
+            return 200
+
+        original = main.send_line_message
+        main.send_line_message = fake_send
+        try:
+            count = main.send_line_messages_combined(messages, "t", "U1", **kwargs)
+        finally:
+            main.send_line_message = original
+        return count, sent
+
+    def test_short_messages_become_one(self):
+        count, sent = self.send(["stocks", "index", "sector"])
+        self.assertEqual(count, 1)
+        self.assertEqual(sent, ["stocks\n\nindex\n\nsector"])
+
+    def test_blank_messages_are_skipped(self):
+        count, sent = self.send(["stocks", "", None, "  "])
+        self.assertEqual((count, sent), (1, ["stocks"]))
+
+    def test_overflow_splits_on_message_boundaries(self):
+        a, b, c = "a" * 40, "b" * 40, "c" * 40
+        count, sent = self.send([a, b, c], max_length=90)
+        self.assertEqual(count, 2)
+        self.assertEqual(sent, [f"{a}\n\n{b}", c])
+
+    def test_nothing_to_send(self):
+        self.assertEqual(self.send([]), (0, []))
