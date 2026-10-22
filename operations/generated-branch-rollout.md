@@ -40,7 +40,7 @@
 - `q4-8k-backfill.yml` 只還原讀取輸入；fill 仍寫入 `backfill/q4-8k` 供審核，diagnose／backtest 仍寫 `runs/q4-8k`。財報、`q4-8k-state.json`、答案集不會送到 generated。既有 `95184ade77cd30c565d3873e9f9050f3ec7c0054` pin 不變。
 - `keepalive.yml` 僅每月提交 root `keepalive.txt` 到 main，沒有搬移範圍，保留原行為。
 - 每週 squash 使用最新 generated tree 建立無 parent commit，驗證 tree SHA 相等，且只執行 `--force-with-lease=refs/heads/generated:<已讀取 SHA>`。遇到併發更新重新讀取再做；程式沒有 force main 的路徑。
-- Pages workflow 以 main 靜態文件加上 generated 的 docs 白名單組裝 `_site/`，用 `actions/upload-pages-artifact@v3`、`actions/deploy-pages@v4` 部署。main 與 generated 的 push、所有現有 main writer 的 `workflow_run`、seed／squash 完成、手動觸發都支援；失敗流程也可能已儲存有效的部分輸出，因此完成時仍檢查最新 tree。
+- Pages workflow 以 main 靜態文件加上 generated 的 docs 白名單組裝 `_site/`，用 `actions/upload-pages-artifact@v3`、`actions/deploy-pages@v4` 部署。main 與 generated 的 push、所有現有 main writer 的 `workflow_run`、squash 完成、手動觸發都支援；失敗流程也可能已儲存有效的部分輸出，因此完成時仍檢查最新 tree。
 - `GITHUB_TOKEN` 的 push 不會引發另一個 push workflow，所以 producer 的 `workflow_run` 是必要的。純 orphan 分支不含 main workflows，故 seed 另放一個固定的最小 `.github/workflows/generated-pages-relay.yml`；外部使用者／token push generated 時，relay 呼叫 **main 上**的 reusable Pages workflow。generated 除再生輸出之外只允許這個固定 relay；restore／assemble／squash 發現 code 或 record 混入就拒絕。
 - Pages 共用 `assembled-pages` concurrency，取消較舊 run，每次讀最新 main／generated tip，讓最後一次部署反映最新資料。
 
@@ -54,7 +54,7 @@
 | universe／breakouts／chips／themes-tw／rates | 各 workflow 在 builder 前 restore；`.cache/universe-full` 的 Actions cache 保持原樣 |
 | research institutional／volume／alerts／SEC／world | 每個 collector 與 publisher 都 restore；artifact 模組 allowlist、checksum 驗證及 collectors 無 write credentials 的分隔保留 |
 | `scripts/research_{coverage,storage_audit,store}.py`、本機 screener／OHLCV／swing 工具、Atlas preview／驗收工具 | 本機先執行下列 restore 命令；CLI 的預設檔案路徑不變。這些工具不會假設 main 永遠帶著 current cache |
-| `atlas-review.yml` | PR 檢查也在測試／預覽前 restore，PR 2 刪除副本後仍能讀到 inputs |
+| `atlas-review.yml`（含 full-market-report job）、`research-review.yml` | 所有 PR reader jobs 也在測試／預覽前 restore，PR 2 刪除副本後仍能讀到 inputs |
 | Atlas `src/report/*`、`StaticSeriesProvider`、財報讀取端 | 原本同源 `../report/`、`report/series`、`financials/` 與 research 子 JSON URL 全部由相同 docs layout 提供；以全站逐檔 SHA-256 比較覆蓋 |
 | LINE report link／LIFF app | `REPORT_LIFF_URL`、Atlas Pages base 均不改；網站根報告、Atlas、report JSON、圖片的 Pages URL 不變；raw 圖片傳輸例外如上 |
 | Supabase `market-chart`、`user-settings`／Cloud Run `breakout_alert`、Discord query | 搜尋程式及兩個 Dockerfile，沒有從 checkout 的 docs/data 讀取或從 raw/main 取這些輸出的依賴；Docker 明確只 COPY breakout_alert，`.dockerignore` 排除 docs/data。Supabase 的 Pages CORS origin 保持相同；資料仍走外部行情 API／Supabase |
@@ -74,8 +74,8 @@ GENERATED_BRANCH_MODE=1 python scripts/generated_branch.py publish daily
 ## Owner 切換順序
 
 1. Review 並自行合併 **PR 1**。本次工作只開 PR，不代為合併。先暫停排程／外部 dispatch，**等待所有 in-flight writer 與 chained workflow_run 完成**；確認沒有舊模式 run 還能寫 main。這一步避免 seed 與設定變數之間遺漏最後一次輸出。暫停的 workflow 名單：schedule、atlas、financials、fundamentals、universe-full、research-data、tw-chips、themes-tw、refresh-us-rates、q4-8k-backfill、keepalive；記錄原本哪些已停用，之後不要誤啟用。
-2. **先 seed**：在 main 手動執行 `Seed generated snapshot`（`generated-seed.yml`），或於完整 clone 使用 `python scripts/generated_branch.py seed --push`。它會重新 fetch main、驗證每個搬移 blob、建立 orphan generated；若遠端已有 generated 則拒絕覆寫，必須先查明原因。此時 variable 仍未設定。
-3. **設定 repository variable `GENERATED_BRANCH_MODE=1`**。檢查 generated 的 current files 與 seed run 成功；不要將同名 secret／其他開關當成替代。
+2. **先 seed**：在 owner 的完整 clone 執行 `python scripts/generated_branch.py verify --ref origin/main`，再執行 `python scripts/generated_branch.py seed --push`。後者會重新 fetch main、驗證每個搬移 blob、建立 orphan generated；若遠端已有 generated 則拒絕覆寫，必須先查明原因。使用 owner 可寫 workflow 的既有 git 憑證（PAT 需 workflow scope，或 fine-grained token 的 Workflows write）；因為初次建立固定的 relay workflow，不能使用一般 workflow 的 GITHUB_TOKEN 來 seed。這是憑證權限，沒有新增模式開關。此時 variable 仍未設定。
+3. **設定 repository variable `GENERATED_BRANCH_MODE=1`**。檢查 generated 的 current files 與 seed 命令成功；不要將同名 secret／其他開關當成替代。
 4. **Settings → Pages → Build and deployment → Source：GitHub Actions**。既有 custom domain／路徑不變。若 `github-pages` environment 有 deployment branch 限制，允許 main 與 generated relay 的部署 ref。手動觸發 `Deploy assembled Pages`，確認成功與 summary 容量；再恢復原本啟用的 producers／外部排程。generated 只是儲存分支，**不要**把 branch Pages 改成從 generated/docs 發布，否則會缺少 main 的財報及紀錄。
 5. **觀察至少完整一天**：daily、Atlas、financials→fundamentals、universe、research 兩個市場時段、themes-tw、chips、rates 都須有成功 run；手動-only workflow 可檢查設定／按需執行。確認每次 producer 結束後都有 Pages run、頁面時間正確、LINE／LIFF 圖表與 research 子檔可載入，main diff 只有白名單 records／fixture／keepalive／code，generated 沒有 financials 或手工紀錄。若有同檔衝突，重跑該 producer；不要 force push。
 6. **然後才開第二個小 PR**：僅對 manifest 選出的 regenerate 檔案 `git rm` main 副本，加適當 ignore 防止本機誤提交；保留 main 的全部歷史、financials、fundamentals 永久狀態與人工紀錄。為保留舊 raw/main PNG 連結，保留兩個凍結 PNG 副本並在 PR 2 說明這個相容例外。先檢查 seed 成功證據、generated 有所有 current outputs；生成器合法刪除的過期 hashed Atlas bundle 與 CSV 應以 seed manifest 和 producer run 追溯，不能把意外缺檔當作清理。PR 2 diff 必須只有已核准搬移路徑與 ignore 規則，沒有新 generator 行為。此 PR 也不要自行合併。

@@ -19,7 +19,6 @@ on:
       - Taiwan Theme Rotation
       - Refresh US Rates
       - Squash generated snapshot
-      - Seed generated snapshot
       - 🔄 GitHub Actions 永久續命腳本
     types: [completed]
 
