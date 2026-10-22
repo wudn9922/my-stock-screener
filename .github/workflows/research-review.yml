@@ -27,6 +27,15 @@ jobs:
         env:
           GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
         run: python scripts/generated_branch.py restore
+      - name: Overlay world snapshots changed by this PR
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
+          git diff --name-only --diff-filter=AM -z "$PR_BASE_SHA" HEAD -- docs/report/research/world-assets.json docs/report/research/candles |
+            xargs -0 -r git restore --source=HEAD --
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
