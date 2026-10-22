@@ -144,6 +144,23 @@ Client: `getValuation(symbol)` / `new ValuationProvider(base).getValuation(symbo
 → `number | null` (null for missing or non-positive EPS); `describePe` adds `negativeEarnings` and a
 reason; `summarizeValuation(valuation, price)` returns both P/E figures.
 
+### Recommended moving averages (ma-selector)
+
+`report/ma-selector/<SYMBOL>.json` (+ `index.json`), written weekly by `.github/workflows/ma-recommendations.yml`,
+which checks out the public `wudn9022/ma-selector` repository and runs its `scripts/build_recommendations.py` for every
+`data/*.csv` symbol (TW + S&P 500, indices skipped; 5 years of Yahoo daily bars per symbol). The selection is
+ma-selector's production SMA selector, unchanged (scores vs. its 83-stock reference, gap 15, long/short reversal
+backtest, rule B + short-range rescue); Atlas only displays it. Shape:
+`{"version":1,"ticker","kind":"SMA","asof","bars","limited","referenceAsof","suitability":{"short","long"},"ranges":[{"key":"short|medium|long","min","max","windowYears","final","candidates":[{"period","score","sarReturn","sarDrawdown","sarWinRate","sarTrades"}]}]}`.
+Symbols that fail or have < 376 bars keep their previous file; nothing is written below a 50 % success rate.
+
+Client: `fetchMaRecommendation(symbol)` (`src/report/maRecommendation.ts`; 404 or an SPA-fallback body → `missing`).
+`ui/MaRecommendation.tsx` sits under the volatility row in the chart header: short · medium · long picks, a panel with
+the candidates and reversal returns, "套用到圖表" (adds the missing ones as daily SMA indicators by id and switches to
+1D), "固定為個股參數" (the console's `FixedStockParameters` dialog prefilled with the picks; saves
+`stocks.save` with `groupId: 'ungrouped'`, so the same LINE login and `ATLAS_FIXED_PARAMETERS_ENABLED` gate apply),
+and a link to the Streamlit app (`MA_SELECTOR_URL`, overridable with `VITE_MA_SELECTOR_URL`) with `?ticker=`.
+
 ## Commands (run from `atlas/`)
 
 ```sh
@@ -175,6 +192,9 @@ Checks: `npm test`, `npm run lint`, `npx tsc -b`.
   commits and pushes with `git pull --rebase --autostash` and 3 retries. Generated data lives only in
   git-ignored paths, and any tracked file the build touched is restored before pulling (the earlier
   failure: `screener-symbols.mjs` rewrote the tracked `scripts/market-symbols.json`, blocking the rebase).
+- `.github/workflows/ma-recommendations.yml` (concurrency `ma-recommendations`): Saturdays 02:17 UTC or on dispatch
+  (`ma_selector_ref`, `limit` inputs). Rewrites only `docs/report/ma-selector/`; pushes with `git pull --rebase` and
+  3 retries.
 - `.github/workflows/supabase-functions.yml`: deploys `market-chart` on pushes touching
   `supabase/functions/market-chart/**` or on dispatch; skipped with a notice when
   `SUPABASE_ACCESS_TOKEN` is missing.

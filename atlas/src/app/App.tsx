@@ -47,6 +47,7 @@ import { useChartFocus } from '../ui/useChartFocus';
 import { IconButton } from '../ui/IconButton';
 import { StockTabs } from '../ui/StockTabs';
 import { StockVolatility } from '../ui/StockVolatility';
+import { MaRecommendation } from '../ui/MaRecommendation';
 import { DrawingToolGlyph, DrawingToolPicker } from '../ui/DrawingToolPicker';
 import { Watchlist, companies } from '../ui/Watchlist';
 import { IndicatorPanel } from '../ui/IndicatorPanel';
@@ -1007,6 +1008,7 @@ export function App({
               </div>
             </dl>
             <StockVolatility symbol={symbol} provider={providers[providerId]} reloadToken={reloadToken} />
+            <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} onNotice={setNotice} />
           </div>
         )}
         {onOpenFinancials && !isIndex && providerId !== 'demo' && (
