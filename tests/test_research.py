@@ -32,7 +32,15 @@ from build_sec_radar import (
     NotPublished,
     radar_events,
 )
-from build_world_assets import changes, parse_ecb, parse_h10, parse_eia, parse_wb
+from build_world_assets import (
+    changes,
+    parse_ecb,
+    parse_h10,
+    parse_eia,
+    parse_wb,
+    discover_wb_workbook,
+    preserve_observation_date,
+)
 
 FIX = Path(__file__).parent / "fixtures/research"
 
@@ -595,6 +603,38 @@ class CacheEvictionRecovery(unittest.TestCase):
             self.assertEqual(source["status"], "stale")
             self.assertEqual(source["missingReason"], "403")
             self.assertEqual(source["fetchedAt"], "original")
+
+
+class WorldBankCurrentRelease(unittest.TestCase):
+    def test_verified_2026_workbook_monthly_values(self):
+        result = parse_wb((FIX / "worldbank-monthly.xlsx").read_bytes())
+        self.assertEqual(result["Gold"][-1], ["2026-09-01", 4319.0])
+        self.assertEqual(result["Silver"][-1], ["2026-09-01", 64.6])
+        self.assertEqual(result["Copper"][-1], ["2026-09-01", 14474.0])
+        self.assertIsNone(changes(result["Gold"], "monthly")["1d"])
+
+    def test_official_monthly_link_discovery_rejects_other_hosts_and_annual(self):
+        url = "https://thedocs.worldbank.org/en/doc/release-2027/related/CMO-Historical-Data-Monthly.xlsx"
+        self.assertEqual(
+            discover_wb_workbook(('<a href="' + url + '">Monthly prices</a>').encode()),
+            url,
+        )
+        self.assertIsNone(
+            discover_wb_workbook(
+                b'<a href="https://evil.example/CMO-Historical-Data-Monthly.xlsx">data</a>'
+            )
+        )
+        self.assertIsNone(
+            discover_wb_workbook(url.replace("Monthly", "Annual").encode())
+        )
+
+    def test_source_cannot_replace_newer_observations_with_retired_workbook(self):
+        with self.assertRaises(SourceError):
+            preserve_observation_date({"asOf": "2024-12-01"}, {"asOf": "2026-09-01"})
+        self.assertEqual(
+            preserve_observation_date({"asOf": "2026-09-01"}, {"asOf": "2026-09-01"}),
+            {"asOf": "2026-09-01"},
+        )
 
 
 if __name__ == "__main__":

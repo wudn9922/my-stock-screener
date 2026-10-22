@@ -31,73 +31,86 @@ for (const [name, type, settings] of [
         status: response.status(),
       });
   });
-  await page.goto(base + "?page=world&view=commodities");
-  await page.getByRole("heading", { name: "WTI 原油" }).waitFor();
-  await page.screenshot({
-    path:
-      out +
-      "/" +
-      (name === "iphone-webkit" ? "iphone-world.png" : "desktop-world.png"),
-    fullPage: false,
-  });
-  await page.getByRole("button", { name: "匯率", exact: true }).click();
-  await page.getByRole("heading", { name: "USD/TWD", exact: true }).waitFor();
-  for (const symbol of ["2330.TW", "6488.TWO", "AAPL"]) {
-    await page.goto(base + "?page=financials&symbol=" + symbol);
-    const volume = page
-      .locator("details.data-research")
-      .filter({
+  try {
+    await page.goto(base + "?page=world&view=commodities");
+    await page.getByRole("heading", { name: "WTI 原油" }).waitFor();
+    await page.screenshot({
+      path:
+        out +
+        "/" +
+        (name === "iphone-webkit" ? "iphone-world.png" : "desktop-world.png"),
+      fullPage: false,
+    });
+    await page.getByRole("button", { name: "匯率", exact: true }).click();
+    await page.getByRole("heading", { name: "USD/TWD", exact: true }).waitFor();
+    for (const symbol of ["2330.TW", "6488.TWO", "AAPL"]) {
+      await page.goto(base + "?page=financials&symbol=" + symbol);
+      const volume = page.locator("details.data-research").filter({
         has: page.locator(":scope > summary", { hasText: "價量分析" }),
       });
-    await volume.locator(":scope > summary").click();
-    await volume.getByText("上漲縮量比例", { exact: true }).waitFor();
-    if (symbol === "2330.TW" && name === "iphone-webkit") {
-      await volume.scrollIntoViewIfNeeded();
-      await page.screenshot({
-        path: resolve(out, "iphone-stock.png"),
-        fullPage: false,
-      });
-    }
-    if (symbol !== "AAPL") {
-      const flow = page
-        .locator("details.data-research")
-        .filter({
+      await volume.locator(":scope > summary").click();
+      await volume.getByText("上漲縮量比例", { exact: true }).waitFor();
+      if (symbol === "2330.TW" && name === "iphone-webkit") {
+        await volume.scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: resolve(out, "iphone-stock.png"),
+          fullPage: false,
+        });
+      }
+      if (symbol !== "AAPL") {
+        const flow = page.locator("details.data-research").filter({
           has: page.locator(":scope > summary", { hasText: "法人買賣超" }),
         });
-      await flow.locator(":scope > summary").click();
-      await flow
-        .getByText("法人買超日價格區間（估計）", { exact: true })
-        .waitFor();
-    } else {
-      const sec = page
-        .locator("details.data-research")
-        .filter({
+        await flow.locator(":scope > summary").click();
+        await flow
+          .getByText("法人買超日價格區間（估計）", { exact: true })
+          .waitFor();
+      } else {
+        const sec = page.locator("details.data-research").filter({
           has: page.locator(":scope > summary", { hasText: "SEC 8-K" }),
         });
-      await sec.locator(":scope > summary").click();
-      await sec.getByText(/CIK 對應/).waitFor();
+        await sec.locator(":scope > summary").click();
+        await sec.getByText(/CIK 對應/).waitFor();
+      }
     }
+    const overflow = await page.evaluate(() =>
+      Math.max(
+        document.scrollingElement.scrollWidth - innerWidth,
+        document.getElementById("main").scrollWidth -
+          document.getElementById("main").clientWidth,
+      ),
+    );
+    results.push({
+      project: name,
+      source: "Unmocked Pages build with actual committed report JSON",
+      research,
+      errors,
+      horizontalOverflow: overflow,
+      passed:
+        errors.length === 0 &&
+        overflow <= 1 &&
+        research.length >= 5 &&
+        research.every((r) => r.status === 200),
+    });
+  } catch (error) {
+    await page
+      .screenshot({
+        path: resolve(out, name + "-failure.png"),
+        fullPage: false,
+      })
+      .catch(() => {});
+    await writeFile(
+      resolve(out, name + "-failure.json"),
+      JSON.stringify(
+        { url: page.url(), message: String(error), errors, research },
+        null,
+        2,
+      ) + "\n",
+    );
+    throw error;
+  } finally {
+    await browser.close();
   }
-  const overflow = await page.evaluate(() =>
-    Math.max(
-      document.scrollingElement.scrollWidth - innerWidth,
-      document.getElementById("main").scrollWidth -
-        document.getElementById("main").clientWidth,
-    ),
-  );
-  results.push({
-    project: name,
-    source: "Unmocked Pages build with actual committed report JSON",
-    research,
-    errors,
-    horizontalOverflow: overflow,
-    passed:
-      errors.length === 0 &&
-      overflow <= 1 &&
-      research.length >= 5 &&
-      research.every((r) => r.status === 200),
-  });
-  await browser.close();
 }
 await writeFile(
   resolve(out, "pages-live-smoke.json"),

@@ -59,7 +59,11 @@ test("world four options, historical source frequency, reload and browser back",
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "WTI 原油" })).toBeVisible();
   await expect(page.getByText("月資料（整月均價）").first()).toBeVisible();
-  await expect(page.getByText("資料較舊／沿用快照").first()).toBeVisible();
+  const gold = page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "黃金", exact: true }) });
+  await expect(gold.getByText("月資料不適用").first()).toBeVisible();
+  await expect(gold).toContainText("World Bank Pink Sheet");
   await page.getByRole("button", { name: "匯率", exact: true }).click();
   await expect(page).toHaveURL(/view=fx/);
   await expect(

@@ -148,8 +148,10 @@ describe("accessible summaries", () => {
     expect(pct(null)).toBe("N/A");
   });
   it("stale snapshot retains original date visibly", () => {
-    const data = worldAssetsSchema.parse(json("world-assets.json")).series
-      .gold!;
+    const data = {
+      ...worldAssetsSchema.parse(json("world-assets.json")).series.gold!,
+      status: "stale" as const,
+    };
     const html = renderToStaticMarkup(<Provenance data={data} />);
     expect(html).toContain(data.asOf);
     expect(html).toContain("資料較舊");

@@ -16,7 +16,8 @@ from xlrd.biffh import XLRDError
 import pandas as pd
 from research_io import ROOT, Http, SourceError, meta, read, retain, stamp, write
 
-WB = "https://thedocs.worldbank.org/en/doc/5d903e848db1d1b83e0ec8f744e55570-0350012021/related/CMO-Historical-Data-Monthly.xlsx"
+WB_LANDING = "https://www.worldbank.org/en/research/commodity-markets"
+WB = "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx"
 ENERGY = [
     ("wti", "WTI 原油", "pet", "RWTCd", "USD/桶"),
     ("brent", "Brent 原油", "pet", "RBRTEd", "USD/桶"),
@@ -35,6 +36,23 @@ FX = [
     ("usdkrw", "USD/KRW", "ko", "USD", "KRW"),
 ]
 ECB = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.csv"
+
+
+def discover_wb_workbook(body):
+    """Follow only the official current monthly workbook, never arbitrary landing-page URLs."""
+    match = re.search(
+        r"https://thedocs\.worldbank\.org/en/doc/[a-zA-Z0-9-]+/related/CMO-Historical-Data-Monthly\.xlsx",
+        body.decode("utf-8", errors="replace"),
+    )
+    return match.group(0) if match else None
+
+
+def preserve_observation_date(candidate, previous):
+    if previous and previous.get("asOf") and candidate["asOf"] < previous["asOf"]:
+        raise SourceError(
+            "Source observation date moved backwards; retaining newer snapshot"
+        )
+    return candidate
 
 
 def parse_ecb(body, base, quote):
@@ -218,22 +236,30 @@ def build(out):
             )
         except SourceError as exc:
             assets[key] = retain(assets.get(key), "US EIA", url, exc)
+    workbook = WB
     try:
-        metals = parse_wb(http.get(WB))
+        workbook = discover_wb_workbook(http.get(WB_LANDING)) or WB
+    except SourceError as exc:
+        print("World Bank landing unavailable; using verified current workbook:", exc)
+    try:
+        metals = parse_wb(http.get(workbook))
         for key, name, column, unit in METALS:
-            assets[key] = series(
+            candidate = series(
                 metals[column],
                 name,
                 "World Bank Pink Sheet",
-                WB,
+                workbook,
                 "monthly",
                 unit,
                 "monthly-physical-market-benchmark",
                 http,
             )
+            assets[key] = preserve_observation_date(candidate, assets.get(key))
     except SourceError as exc:
         for key, _, _, _ in METALS:
-            assets[key] = retain(assets.get(key), "World Bank Pink Sheet", WB, exc)
+            assets[key] = retain(
+                assets.get(key), "World Bank Pink Sheet", workbook, exc
+            )
     ecb = None
     for key, name, code, base, quote in FX:
         url = f"https://www.federalreserve.gov/releases/h10/hist/dat00_{code}.htm"
