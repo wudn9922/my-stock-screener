@@ -1,0 +1,21 @@
+{
+  "branch": "generated",
+  "owners": {
+    "screenshots": ["docs/wsj.png", "docs/barrons.png"],
+    "daily": ["data/*.csv", "docs/index.html", "docs/wsj.png", "docs/barrons.png", "docs/report/latest.json", "docs/report/universe.json", "docs/report/breadth.json", "docs/report/series/**", "docs/report/themes.json", "docs/report/rates.json", "docs/report/rates-history.json"],
+    "atlas": ["docs/atlas/**"],
+    "financials": ["docs/report/growth.json"],
+    "fundamentals": ["docs/report/fundamentals/tw.json", "docs/report/fundamentals/us-sec.json", "docs/report/fundamentals/tw-finmind.json", "docs/report/growth.json"],
+    "universe": ["docs/report/universe.json", "docs/report/breakouts.json"],
+    "research": ["docs/report/research/**"],
+    "chips": ["docs/report/tw-chips.json"],
+    "themes": ["docs/report/themes-tw.json"],
+    "rates": ["docs/report/rates.json", "docs/report/rates-history.json"]
+  },
+  "records": {
+    "financials": ["docs/report/financials/**"],
+    "fundamentals": ["docs/report/financials/**", "docs/report/fundamentals/tw-financials-finmind.json"],
+    "atlas": ["docs/.nojekyll"],
+    "rates": ["tests/fixtures/rates/sample-rates.json", "tests/fixtures/rates/sample-rates-history.json", "atlas/tests/fixtures/rates/backend-sample-rates.json", "atlas/tests/fixtures/rates/backend-sample-rates-history.json"]
+  }
+}

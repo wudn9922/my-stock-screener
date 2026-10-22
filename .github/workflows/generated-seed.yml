@@ -1,0 +1,22 @@
+name: Seed generated snapshot
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: generated-maintenance
+  cancel-in-progress: false
+jobs:
+  seed:
+    # Run before setting the switch. Seeding only creates; it cannot replace a branch.
+    if: vars.GENERATED_BRANCH_MODE != '1' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - run: git fetch --no-tags origin main
+      - name: Prove byte-identical Pages assembly before seeding
+        run: python scripts/generated_branch.py verify --ref origin/main
+      - name: Create orphan generated branch with all current selected blobs
+        run: python scripts/generated_branch.py seed --push

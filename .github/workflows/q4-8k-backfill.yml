@@ -70,6 +70,15 @@ jobs:
             git checkout -q -B q4-8k-readonly origin/main
           fi
 
+      - name: Restore generated reader inputs using main's storage helper
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        env:
+          GENERATED_BRANCH_MODE: '1'
+        run: |
+          git show origin/main:scripts/generated_branch.py > "$RUNNER_TEMP/generated_branch.py"
+          git show origin/main:.github/generated-paths.json > "$RUNNER_TEMP/generated-paths.json"
+          python "$RUNNER_TEMP/generated_branch.py" --config "$RUNNER_TEMP/generated-paths.json" restore
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

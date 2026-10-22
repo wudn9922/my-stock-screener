@@ -4823,6 +4823,10 @@ def prune_stale_csv(
 
 
 def push_report_to_github():
+    if os.environ.get("GENERATED_BRANCH_MODE") == "1":
+        # schedule.yml publishes the complete daily snapshot after all builders.
+        print("GENERATED_BRANCH_MODE=1：交由 workflow 提交 generated 分支")
+        return True
     run_git_command(
         [
             "git",

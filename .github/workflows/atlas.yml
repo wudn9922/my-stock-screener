@@ -15,6 +15,7 @@ on:
       - '.github/workflows/atlas.yml'
 
 env:
+  GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
@@ -45,6 +46,11 @@ jobs:
         with:
           ref: main
           fetch-depth: 1
+
+      - name: Restore generated inputs
+        id: generated_restore
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        run: python scripts/generated_branch.py restore
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
@@ -183,7 +189,12 @@ jobs:
           du -sh docs/atlas
           du -sh docs/atlas/symbols docs/atlas/valuation 2>/dev/null || true
 
+      - name: Publish owned outputs to generated and durable records to main
+        if: vars.GENERATED_BRANCH_MODE == '1' && steps.generated_restore.outcome == 'success'
+        run: python scripts/generated_branch.py publish atlas
+
       - name: Commit and push docs/atlas
+        if: vars.GENERATED_BRANCH_MODE != '1'
         run: |
           set -euo pipefail
           git config --local user.name "github-actions[bot]"

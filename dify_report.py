@@ -161,20 +161,27 @@ def capture_and_upload_screenshots():
     # 將截圖推送到 GitHub，提供 LINE 可公開讀取的圖片網址
     print("正在將截圖同步至 GitHub...")
 
-    os.system('git config --local user.name "github-actions[bot]"')
-    os.system(
-        'git config --local user.email '
-        '"github-actions[bot]@users.noreply.github.com"'
-    )
-    os.system("git add docs/wsj.png docs/barrons.png")
-    os.system(
-        'git commit -m "Update financial news screenshots" '
-        '|| echo "截圖沒有變化"'
-    )
-    os.system("git push")
+    generated_mode = os.environ.get("GENERATED_BRANCH_MODE") == "1"
+    if generated_mode:
+        # LINE fetches images immediately. Publish first, then use generated's raw URL.
+        import subprocess
+        import sys
+        subprocess.run([sys.executable, "scripts/generated_branch.py", "publish", "screenshots"], check=True)
+    else:
+        os.system('git config --local user.name "github-actions[bot]"')
+        os.system(
+            'git config --local user.email '
+            '"github-actions[bot]@users.noreply.github.com"'
+        )
+        os.system("git add docs/wsj.png docs/barrons.png")
+        os.system(
+            'git commit -m "Update financial news screenshots" '
+            '|| echo "截圖沒有變化"'
+        )
+        os.system("git push")
 
     repo = os.environ.get("GITHUB_REPOSITORY")
-    branch = os.environ.get("GITHUB_REF_NAME", "main")
+    branch = "generated" if generated_mode else os.environ.get("GITHUB_REF_NAME", "main")
 
     # 避免 LINE 取得 GitHub Raw 舊快取
     cache_version = int(time.time())
