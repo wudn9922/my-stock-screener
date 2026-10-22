@@ -81,7 +81,25 @@ jobs:
           retention-days: 7
       - name: Install browsers
         working-directory: atlas
-        run: npx playwright install --with-deps chromium webkit
+        timeout-minutes: 8
+        run: |
+          # The runner's Azure HTTP mirror stalled on two attempts. Keep Ubuntu's
+          # signed packages, but fetch them from the official HTTPS archive.
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          apt = Path('/etc/apt')
+          paths = [apt / 'sources.list', *apt.glob('*mirrors*.txt'),
+                   *(apt / 'sources.list.d').glob('*.list'),
+                   *(apt / 'sources.list.d').glob('*.sources')]
+          for path in paths:
+              if path.is_file():
+                  original = path.read_text()
+                  updated = original.replace('http://azure.archive.ubuntu.com/ubuntu',
+                                             'https://archive.ubuntu.com/ubuntu')
+                  if updated != original:
+                      path.write_text(updated)
+          PY
+          npx playwright install --with-deps chromium webkit
       - name: Real Pages data on desktop and iPhone WebKit
         run: |
           mkdir -p /tmp/research-pages/my-stock-screener
