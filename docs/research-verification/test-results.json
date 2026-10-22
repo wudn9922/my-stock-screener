@@ -3,17 +3,17 @@
   "checks": [
     {
       "name": "Python full suite",
-      "passed": 1457,
+      "passed": 1459,
       "failed": 0,
-      "logSha256": "4bbfd9e11842c3c98dfce61c8ed46fd6beac7b1bce49f5206c82d8cfbaabaf86",
-      "bytes": 59974
+      "logSha256": "815f2e51bd5d1f88ddaba7b4b4180613edcea975e9d48b07f4455c310d7272bf",
+      "bytes": 59976
     },
     {
       "name": "Research semantic tests",
-      "passed": 55,
+      "passed": 57,
       "failed": 0,
-      "logSha256": "1a72807f30775a58c3176dd7dd2f0acef2c12cd1c09af2a2662f62ee2518b1f9",
-      "bytes": 503
+      "logSha256": "1707a5882995d6ac4422a5bd75216f2865b94d00a7f870120a0db3d142306c4a",
+      "bytes": 505
     },
     {
       "name": "Vitest full suite",
@@ -26,15 +26,15 @@
       "name": "Final real-shard schema validation",
       "passed": 17,
       "failed": 0,
-      "logSha256": "eeb64ac89352b4b1a8ac2ff872c2f9a783f7740750521ad55570364543d07656",
+      "logSha256": "a92365671b2020e1f20519837ba8b65f01a92983150b0efb67ea7dcb93b64b14",
       "bytes": 221
     },
     {
       "name": "New desktop/mobile/WebKit E2E",
       "passed": 15,
       "failed": 0,
-      "logSha256": "73fc8db7fb93977b1dd99e022b525493851418f1218b8f37b957446288725787",
-      "bytes": 4894
+      "logSha256": "5b9e675e0efdfdb691eabcaf00c0186ed3b0ada57d925632480b8edcf85118f8",
+      "bytes": 4896
     },
     {
       "name": "Existing site regressions",

@@ -1,0 +1,69 @@
+{
+  "methodVersion": "research-v1",
+  "markets": {
+    "TW": {
+      "dispositions": 98,
+      "officialPeriodsParsed": 98,
+      "unknownPeriods": 0
+    },
+    "TWO": {
+      "dispositions": 126,
+      "officialPeriodsParsed": 126,
+      "unknownPeriods": 0
+    }
+  },
+  "sources": {
+    "TW:notice": {
+      "methodVersion": "research-v1",
+      "source": "TWSE/TPEx official announcement",
+      "sourceUrl": "https://openapi.twse.com.tw/v1/announcement/notice",
+      "asOf": "2026-10-21",
+      "publishedAt": null,
+      "fetchedAt": "2026-10-22T07:16:31+00:00",
+      "generatedAt": "2026-10-22T07:16:31+00:00",
+      "status": "ok",
+      "missingReason": null,
+      "historyFrom": "2026-07-19",
+      "historyUrl": "https://www.twse.com.tw/announcement/notice?startDate=20260719&endDate=20261022&response=json"
+    },
+    "TW:disposal": {
+      "methodVersion": "research-v1",
+      "source": "TWSE/TPEx official announcement",
+      "sourceUrl": "https://openapi.twse.com.tw/v1/announcement/punish",
+      "asOf": "2026-10-20",
+      "publishedAt": null,
+      "fetchedAt": "2026-10-22T07:16:35+00:00",
+      "generatedAt": "2026-10-22T07:16:35+00:00",
+      "status": "ok",
+      "missingReason": null,
+      "historyFrom": "2026-07-19",
+      "historyUrl": "https://www.twse.com.tw/announcement/punish?startDate=20260719&endDate=20261022&response=json"
+    },
+    "TWO:notice": {
+      "methodVersion": "research-v1",
+      "source": "TWSE/TPEx official announcement",
+      "sourceUrl": "https://www.tpex.org.tw/openapi/v1/tpex_trading_warning_information",
+      "asOf": "2026-10-21",
+      "publishedAt": null,
+      "fetchedAt": "2026-10-22T07:16:39+00:00",
+      "generatedAt": "2026-10-22T07:16:39+00:00",
+      "status": "ok",
+      "missingReason": null,
+      "historyFrom": "2026-07-19",
+      "historyUrl": "https://www.tpex.org.tw/www/zh-tw/bulletin/attention?startDate=2026/07/19&endDate=2026/10/22&response=json"
+    },
+    "TWO:disposal": {
+      "methodVersion": "research-v1",
+      "source": "TWSE/TPEx official announcement",
+      "sourceUrl": "https://www.tpex.org.tw/openapi/v1/tpex_disposal_information",
+      "asOf": "2026-10-21",
+      "publishedAt": null,
+      "fetchedAt": "2026-10-22T07:16:42+00:00",
+      "generatedAt": "2026-10-22T07:16:42+00:00",
+      "status": "ok",
+      "missingReason": null,
+      "historyFrom": "2026-07-19",
+      "historyUrl": "https://www.tpex.org.tw/www/zh-tw/bulletin/disposal?startDate=2026/07/19&endDate=2026/10/22&response=json"
+    }
+  }
+}
