@@ -18,6 +18,7 @@ on:
       - Taiwan Chips
       - Taiwan Theme Rotation
       - Refresh US Rates
+      - MA Recommendations
       - Squash generated snapshot
       - 🔄 GitHub Actions 永久續命腳本
     types: [completed]
