@@ -1,0 +1,29 @@
+{
+  "url": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+  "fetchedAt": "2026-10-22T06:51:52+00:00",
+  "lastModified": "Fri, 02 Oct 2026 18:57:55 GMT",
+  "sha256": "ea1c350827878ea3bbe30e3cda16a13fd3bd5b409b8458940dc94a36b5a33154",
+  "bytes": 586099,
+  "officialLanding": "https://www.worldbank.org/en/research/commodity-markets",
+  "frequency": "monthly",
+  "latest": {
+    "gold": {
+      "asOf": "2026-09-01",
+      "latest": 4319.0,
+      "unit": "USD/金衡盎司",
+      "status": "ok"
+    },
+    "silver": {
+      "asOf": "2026-09-01",
+      "latest": 64.6,
+      "unit": "USD/金衡盎司",
+      "status": "ok"
+    },
+    "copper": {
+      "asOf": "2026-09-01",
+      "latest": 14474.0,
+      "unit": "USD/公噸",
+      "status": "ok"
+    }
+  }
+}

@@ -90,7 +90,7 @@ from datetime import date, datetime, timedelta, timezone
 
 CHIPS_JSON_VERSION = 1
 FOREIGN_HISTORY_DAYS = 120
-HOLDER_HISTORY_WEEKS = 52
+HOLDER_HISTORY_WEEKS = 53  # 52-week delta needs the baseline plus 52 observations
 # 單日或單次下載解析出的股票數，至少要涵蓋名單中該市場股票的這個比例，否則視為格式或內容有問題
 MIN_COVERAGE = 0.5
 # 最終輸出至少要有名單的這個比例的個股有資料
@@ -138,7 +138,7 @@ TDCC_LEVEL = (("持股分級",), ("分級",), ("level",))
 TDCC_PEOPLE = (("人數",), ("people",), ("holders",))
 TDCC_TOTAL_LEVEL = 17
 
-NODATA_PATTERN = re.compile(r"沒有符合|無符合|無資料|查無|尚無|尚未|no data", re.IGNORECASE)
+NODATA_PATTERN = re.compile(r"沒有符合|無符合|無資料|查無|尚無|尚未|查詢日期大於可查詢最大日期|no data", re.IGNORECASE)
 BLANK_VALUES = {"", "-", "--", "---", "—", "－", "n/a", "na", "x", "null", "none", "nan", "不適用", "無"}
 
 
@@ -408,6 +408,52 @@ def parse_qfii(data, label: str = "外資持股") -> ParseResult:
     return ParseResult("error", notes=notes, message=f"{label}：" + ("；".join(notes) or "找不到可用欄位"))
 
 
+def parse_tdcc_distribution(data, wanted=None) -> ParseResult:
+    """Official inventory denominator; levels 12–15 (>400k), 15 (>1m), never 16.
+
+    Require complete grades and reconcile rounded published percentages (0.03pp
+    per grade); malformed stocks are omitted, never represented as zero.
+    """
+    groups = {}
+    for row in csv.DictReader(io.StringIO(decode_payload(data))):
+        code = _clean_code(row.get('證券代號'))
+        day = parse_date(row.get('資料日期'))
+        level = to_number(row.get('持股分級'))
+        if not code or not day or level is None or (wanted is not None and code not in wanted):
+            continue
+        group = groups.setdefault((day, code), {})
+        if level in group:
+            return ParseResult('error', message='TDCC duplicate grade')
+        group[int(level)] = (to_number(row.get('人數')), to_number(row.get('股數')), to_number(row.get('占集保庫存數比例%')))
+    if not groups:
+        return ParseResult('error', message='TDCC distribution headers/data unavailable')
+    latest = max(day for day, _ in groups)
+    rows = {}
+    for (day, code), grades in groups.items():
+        if day != latest or not all(i in grades for i in [*range(1, 16), 17]):
+            continue
+        total_people, total_shares, _ = grades[17]
+        if total_people is None or total_shares is None or total_people < 0 or total_people != int(total_people) or total_shares <= 0:
+            continue
+        if any(p is None or s is None or pct is None or p < 0 or s < 0 or p != int(p) or s != int(s) or not 0 <= pct <= 100
+               for i, (p, s, pct) in grades.items() if i in range(1, 16)):
+            continue
+        if sum(grades[i][0] for i in range(1, 16)) != total_people:
+            continue
+        result = dict(date=day, count=int(total_people), totalShares=int(total_shares))
+        good = True
+        for key, levels in [('over400', range(12, 16)), ('over1000', [15])]:
+            shares = sum(grades[i][1] for i in levels)
+            pct = shares / total_shares * 100
+            published = sum(grades[i][2] for i in levels)
+            if not 0 <= pct <= 100 or abs(pct - published) > .03 * len(levels):
+                good = False
+            result[key] = dict(pct=round(pct, 6), people=int(sum(grades[i][0] for i in levels)), shares=int(shares), publishedPct=published)
+        if good:
+            rows[code] = result
+    return ParseResult('ok' if rows else 'error', date=latest, rows=rows, message='' if rows else 'TDCC distribution validation failed')
+
+
 def parse_tdcc_holders(data, wanted=None) -> ParseResult:
     """集保戶股權分散表 CSV → ParseResult（rows: {證券代號: 總股東人數}，date: 資料日期）。"""
     text = decode_payload(data)
@@ -651,7 +697,7 @@ def serialize_payload(payload) -> str:
         return json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
 
     stock_lines = ",\n".join(f"{dump(symbol)}:{dump(entry)}" for symbol, entry in payload["stocks"].items())
-    head = ",".join(f'{dump(key)}:{dump(payload[key])}' for key in ("version", "generatedAt", "sources", "axes"))
+    head = ",".join(f'{dump(key)}:{dump(payload[key])}' for key in ("version", "generatedAt", "sources", "axes", "distributionMethod") if key in payload)
     return "{" + head + ',"stocks":{\n' + stock_lines + "\n}}\n"
 
 
@@ -843,7 +889,7 @@ def update_foreign(history: History, endpoints, fetch, targets, member_codes, lo
     return outcome
 
 
-def update_holders(history: History, fetch, wanted_codes, url=TDCC_URL, log=print) -> Outcome:
+def update_holders(history: History, fetch, wanted_codes, url=TDCC_URL, log=print, distributions=None) -> Outcome:
     outcome = Outcome("ok")
 
     def fail(message):
@@ -858,6 +904,15 @@ def update_holders(history: History, fetch, wanted_codes, url=TDCC_URL, log=prin
     except FetchError as exc:
         return fail(f"集保: {exc}")
     parsed = parse_tdcc_holders(body, wanted=wanted_codes)
+    if distributions is not None:
+        large = parse_tdcc_distribution(body, wanted=wanted_codes)
+        if large.status == 'ok':
+            for code, row in large.rows.items():
+                existing = {r['date']: r for r in distributions.get(code, [])}
+                existing[row['date']] = row
+                distributions[code] = [existing[d] for d in sorted(existing)][-HOLDER_HISTORY_WEEKS:]
+        else:
+            outcome.notes.append('大戶分級資料未取得完整有效分級，保留已累積歷史；總股東人數獨立更新')
     outcome.notes.extend(parsed.notes)
     if parsed.status != "ok":
         return fail(parsed.message)
@@ -951,6 +1006,7 @@ def run(args, fetch=None, now=None, env=None) -> int:
         "tpex": history_from_payload(old_foreign_axes.get("tpex"), old_stocks, "foreign", lambda s: s.endswith(".TWO")),
     }
     holders = history_from_payload(old_axes.get("holders"), old_stocks, "holders", lambda s: True)
+    distributions = {s.split('.')[0]: e['largeHolders'] for s, e in old_stocks.items() if isinstance(e.get('largeHolders'), list)}
 
     if fetch is None:
         fetcher = Fetcher(timeout=(10, args.timeout), retries=args.retries, delay=args.delay)
@@ -961,6 +1017,7 @@ def run(args, fetch=None, now=None, env=None) -> int:
 
     extra_templates = [t for t in (args.tpex_url or []) + ([os.environ["TPEX_QFII_URL"]] if os.environ.get("TPEX_QFII_URL") else []) if t.strip()]
     outcomes = {}
+    unexpected_errors = []
     plans = [("twse", twse_endpoints()), ("tpex", tpex_endpoints(extra_templates))]
     for key, endpoints in plans:
         print(f"[{SOURCE_LABELS[key]}] 外資持股")
@@ -971,11 +1028,13 @@ def run(args, fetch=None, now=None, env=None) -> int:
             else:
                 outcomes[key] = update_foreign(foreign[key], endpoints, fetch, targets, members[key])
         except Exception as exc:  # noqa: BLE001 - 單一來源的任何錯誤都不能拖垮其他來源
+            unexpected_errors.append(exc)
             outcomes[key] = Outcome("stale" if foreign[key].dates else "unavailable", "本次更新發生例外", errors=[f"{type(exc).__name__}: {exc}"])
     print(f"[{SOURCE_LABELS['tdcc']}] 總股東人數")
     try:
-        outcomes["tdcc"] = update_holders(holders, tdcc_fetch, members["twse"] | members["tpex"])
+        outcomes["tdcc"] = update_holders(holders, tdcc_fetch, members["twse"] | members["tpex"], distributions=distributions)
     except Exception as exc:  # noqa: BLE001
+        unexpected_errors.append(exc)
         outcomes["tdcc"] = Outcome("stale" if holders.dates else "unavailable", "本次更新發生例外", errors=[f"{type(exc).__name__}: {exc}"])
 
     histories = {"twse": foreign["twse"], "tpex": foreign["tpex"], "tdcc": holders}
@@ -1003,6 +1062,15 @@ def run(args, fetch=None, now=None, env=None) -> int:
         reporter.row(SOURCE_LABELS[key], outcome.status, sources[key]["asOf"], detail)
 
     payload = build_payload(universe, foreign, holders, sources, now.replace(microsecond=0).isoformat())
+    for symbol, entry in payload['stocks'].items():
+        if symbol.split('.')[0] in distributions:
+            entry['largeHolders'] = distributions[symbol.split('.')[0]]
+    distribution_asof = max((r[-1]['date'] for r in distributions.values() if r), default=None)
+    distribution_ok = distribution_asof == sources['tdcc']['asOf'] and outcomes['tdcc'].status == 'ok'
+    payload['distributionMethod'] = {'version': 1, 'sourceUrl': TDCC_URL, 'asOf': distribution_asof, 'status': 'ok' if distribution_ok else 'stale' if distributions else 'unavailable',
+        'fetchedAt': now.replace(microsecond=0).isoformat() if distribution_ok else (previous or {}).get('distributionMethod', {}).get('fetchedAt'), 'publishedAt': None,
+        'thresholds': '12–15: >400,000 shares; 15: >1,000,000 shares; denominator: level 17 inventory; exclude level 16',
+        'history': 'Latest public download only; prior observations retained, never synthesized.'}
     problems = validate_payload(payload, len(universe))
     if problems:
         reporter.warn("輸出驗證未通過，不覆蓋舊檔：" + "；".join(problems))
@@ -1021,7 +1089,7 @@ def run(args, fetch=None, now=None, env=None) -> int:
             print(f"✅ 輸出 {args.out}：{len(payload['stocks'])} 檔有資料，{len(text) / 1024:.0f} KiB")
             reporter.row("輸出", "written", None, f"{len(payload['stocks'])} 檔有資料，{len(text) / 1024:.0f} KiB")
     reporter.write_summary()
-    return 0
+    return 1 if unexpected_errors else 0
 
 
 def main(argv=None, fetch=None, now=None, env=None) -> int:

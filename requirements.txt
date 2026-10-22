@@ -6,6 +6,8 @@ yfinance
 pandas
 supabase
 requests
+openpyxl>=3.1,<4
+xlrd>=2,<3
 exchange-calendars>=4.5,<5.0
 tzdata>=2024.1
 gunicorn>=22.0,<24.0

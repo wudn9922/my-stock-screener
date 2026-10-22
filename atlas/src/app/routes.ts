@@ -16,7 +16,7 @@ export type Page = (typeof PAGES)[number];
 export type Route =
   | { page: 'markets'; market: MarketKey }
   /** `view` is only present for the world-index sub-view; the default (rates) view is just `{ page: 'world' }`. */
-  | { page: 'world'; view?: 'indices' }
+  | { page: 'world'; view?: 'indices' | 'commodities' | 'fx' }
   /** `market` is only present for Taiwan (`'tw'`); omitted means the US themes. `v: 'map'` shows the heatmap; omitted means the list. */
   | { page: 'themes'; theme?: string; market?: 'tw'; v?: 'map' }
   | { page: 'screener'; group?: string; f?: string }
@@ -48,12 +48,12 @@ const pageAliases: Record<string, Page> = {
   financial: 'financials',
 };
 /** Page aliases that also select a sub-view of their page (rates is the world page's default view, so no `view`). */
-const viewAliases: Record<string, { page: Page; view?: 'indices' }> = {
+const viewAliases: Record<string, { page: Page; view?: 'indices' | 'commodities' | 'fx' }> = {
   rates: { page: 'world' },
   bonds: { page: 'world' },
 };
 
-function resolveAlias(name: string | undefined): { page: Page; view?: 'indices' } | undefined {
+function resolveAlias(name: string | undefined): { page: Page; view?: 'indices' | 'commodities' | 'fx' } | undefined {
   if (!name) return undefined;
   const withView = viewAliases[name];
   if (withView) return withView;
@@ -104,7 +104,7 @@ export function unwrapLiffState(params: URLSearchParams): { params: URLSearchPar
   return { params: merged, path };
 }
 
-function pageFromPath(path: string): { page: Page; view?: 'indices' } | undefined {
+function pageFromPath(path: string): { page: Page; view?: 'indices' | 'commodities' | 'fx' } | undefined {
   const segments = path.split('/').filter(Boolean).map((segment) => segment.toLowerCase());
   for (let i = segments.length - 1; i >= 0; i--) {
     const found = resolveAlias(segments[i]!.replace(/\.html?$/, ''));
@@ -165,7 +165,7 @@ export function parseRoute(search: string, fallback: Page = 'markets'): ParsedRo
   } else if (page === 'world') {
     // `view` is only kept for 'indices'; rates (including the old `view=rates`) is the default and stays `{ page: 'world' }`.
     const view = resolved?.page === 'world' && resolved.view ? resolved.view : params.get('view')?.trim().toLowerCase();
-    route = view === 'indices' ? { page, view } : { page };
+    route = view === 'indices' || view === 'commodities' || view === 'fx' ? { page, view } : { page };
   } else if (page === 'financials') {
     const p = params.get('p')?.trim().toLowerCase();
     const tf = parseLaunchTimeframe(params.get('tf') ?? params.get('timeframe'));

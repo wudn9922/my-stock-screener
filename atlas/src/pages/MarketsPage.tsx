@@ -1,3 +1,5 @@
+import { OfficialAlerts } from '../ui/research/OfficialAlerts';
+import { SecRadar } from '../ui/research/SecRadar';
 import { useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { PageProps } from './pageProps';
@@ -186,6 +188,8 @@ export default function MarketsPage({ report, reload, navigate, openChart, marke
       <ReportGate report={report} reload={reload}>
         {(data) => <MarketView report={data} market={market} openChart={openChart} />}
       </ReportGate>
+      {market === 'tw' && <OfficialAlerts/>}
+      {market === 'us' && <SecRadar/>}
       <footer className="page-foot">
         <span>延遲行情，僅供研究參考，非投資建議。</span>
         <ChartAttribution />

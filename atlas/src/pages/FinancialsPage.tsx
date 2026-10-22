@@ -16,6 +16,10 @@ import { SpanControl } from '../ui/financials/SpanControl';
 import { StatementTable } from '../ui/financials/StatementTable';
 import { PeRiverCard } from '../ui/financials/PeRiverCard';
 import { SummaryChips } from '../ui/financials/SummaryChips';
+import { VolumePanel } from '../ui/research/VolumePanel';
+import { InstitutionPanel } from '../ui/research/InstitutionPanel';
+import { OfficialAlerts } from '../ui/research/OfficialAlerts';
+import { SecRadar } from '../ui/research/SecRadar';
 import { ChipsSection } from '../ui/financials/ChipsCard';
 import { PeerComparison } from '../ui/financials/PeerComparison';
 import { isChipsPageSymbol } from '../report/twChips';
@@ -300,7 +304,9 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
         onHomeListing={onHomeListing}
       />
       {body}
-      {symbol && isChipsPageSymbol(symbol) && <ChipsSection symbol={symbol} />}
+      {symbol && isChipsPageSymbol(symbol) && <><ChipsSection symbol={symbol} /><InstitutionPanel key={symbol} symbol={symbol}/><OfficialAlerts symbol={symbol}/></>}
+      {symbol && key && <VolumePanel key={`volume-${symbol}`} symbol={symbol}/>}
+      {symbol && key && !isTaiwanSymbol && <SecRadar symbol={symbol}/>}
       {history && displayHistory && <PeerComparison key={`peers-${history.symbol}`} history={displayHistory} kind={effectiveKind} navigate={navigate} />}
       <footer className="page-foot fin-foot">
         <span>
