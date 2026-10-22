@@ -597,7 +597,7 @@ def merge_revisions(previous, new, annual, quarterly, renamed):
         if item["end"] not in ends.get(frequency, ()):
             continue
         identity = (item.get("kind"), frequency, item["end"], item.get("field"), item.get("new"))
-        if item.get("kind") == "restated" and item.get("accn") and item.get("originalAccn"):
+        if item.get("kind") in ("restated", "basis-unrestated") and item.get("accn") and item.get("originalAccn"):
             identity += (item.get("old"), item["accn"], item.get("filed"),
                          item["originalAccn"], item.get("originalFiled"))
         if identity in seen:
@@ -607,10 +607,10 @@ def merge_revisions(previous, new, annual, quarterly, renamed):
     result.sort(key=lambda r: (str(r.get("seen")), r["period"], r["end"], str(r.get("field")), r["kind"]))
     # New opt-in SEC audit records must retain every original filed value on later
     # ordinary refreshes too. Legacy revisions (without originalAccn) keep their cap.
-    protected = [r for r in result if r.get("kind") == "restated" and r.get("accn") and r.get("originalAccn")]
+    protected = [r for r in result if r.get("kind") in ("restated", "basis-unrestated") and r.get("accn") and r.get("originalAccn")]
     if not protected:
         return result[-KEEP_REVISIONS:]
-    ordinary = [r for r in result if not (r.get("kind") == "restated" and r.get("accn") and r.get("originalAccn"))]
+    ordinary = [r for r in result if not (r.get("kind") in ("restated", "basis-unrestated") and r.get("accn") and r.get("originalAccn"))]
     return sorted(ordinary[-KEEP_REVISIONS:] + protected,
                   key=lambda r: (str(r.get("seen")), r["period"], r["end"], str(r.get("field")), r["kind"]))
 

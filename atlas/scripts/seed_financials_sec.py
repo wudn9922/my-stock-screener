@@ -1538,8 +1538,8 @@ def _drop_colliding_quarters(built):
     return kept, sorted(dropped)
 
 
-def extract_periods(companyfacts, reference=None, prefer_latest_filing=False):
-    """Legacy selection by default; opt in to whole rows from the latest reporting accession."""
+def extract_periods(companyfacts, reference=None, prefer_latest_filing=False, current=None):
+    """Legacy selection by default; opt in to material later-filing restatements."""
     result = _extract_periods(companyfacts, reference)
     if not prefer_latest_filing:
         return result
@@ -1554,10 +1554,19 @@ def extract_periods(companyfacts, reference=None, prefer_latest_filing=False):
         return extracted.annual, extracted.quarterly
     existence = {concept for name in EXISTENCE_FIELDS for concept, _ in CONCEPTS[name]}
     candidates = filings(companyfacts, "us-gaap", existence, ANNUAL_FORMS, {"USD"})
+    baseline = read_sections(current) if current is not None else None
+    if baseline is not None:
+        result.annual, result.quarterly = baseline["annual"], baseline["quarterly"]
+        factor = adr_eps_factor(current)
+        if factor not in (None, 1):
+            for items in (result.annual, result.quarterly):
+                for item in items:
+                    scale_sec_to_adr(item["values"], 1 / factor)
     result.annual, result.quarterly, result.restatement_revisions = select_rows(
         companyfacts, result.annual, result.quarterly,
         coherent_rows, candidates,
         filings(companyfacts, "us-gaap", existence, ANNUAL_FORMS | QUARTERLY_FORMS, {"USD"}, (80, 120)),
+        compare_current=current is not None, current_document=current,
     )
     result.prefer_latest_filing = True
     for frequency in ("annual", "quarterly"):
@@ -1963,6 +1972,14 @@ def merge_into_document(previous, sec, key, now, fetch_splits=None):
         return None, info
     if stored is None:
         stored = read_sections({"version": VERSION})
+
+    if sec.prefer_latest_filing and info["previous"] == "ok":
+        from sec_restatements import overlay_document
+        document = overlay_document(previous, sec.annual, sec.quarterly, sec.restatement_revisions, now,
+                                    factor=adr_eps_factor(previous))
+        info.update(issues=document.get("quality", {}).get("issues", []),
+                    level=document.get("quality", {}).get("level"))
+        return document, info
 
     # The newest 20 annual / 60 quarterly SEC periods (copies: the SecResult is never modified)
     new = {
@@ -2920,7 +2937,7 @@ def parse_args(argv):
     parser.add_argument("--state", help="--foreign check state, git-ignored "
                                         "(default <repo>/.cache/sec-ifrs-state.json)")
     parser.add_argument("--prefer-latest-filing", action="store_true",
-                        help="opt in to accession-coherent latest annual comparatives (report only in this PR)")
+                        help="opt in to >2% income restatements, retaining omitted fields (report only)")
     parser.add_argument("--restatement-report", metavar="JSON",
                         help="write a dry-run JSON and Markdown report for every stored US file; never apply")
     parser.add_argument("--restatement-cache", help="companyfacts cache for the report (supports offline replay)")

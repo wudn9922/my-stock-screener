@@ -354,7 +354,7 @@ def _periods(index, cache, currency, frequency, basis=IFRS_BASIS):
     return items
 
 
-def extract(companyfacts, basis=IFRS_BASIS, prefer_latest_filing=False):
+def extract(companyfacts, basis=IFRS_BASIS, prefer_latest_filing=False, current=None):
     result = _extract(companyfacts, basis)
     if prefer_latest_filing and result.currency:
         from sec_restatements import filings, select_rows
@@ -366,12 +366,23 @@ def extract(companyfacts, basis=IFRS_BASIS, prefer_latest_filing=False):
             quarters = _periods(_index(payload, basis), {}, single.currency, "quarterly", quarterly_basis)
             return single.annual, quarters
         existence = {concept for name in EXISTENCE_FIELDS for concept, _ in basis.concepts[name]}
+        if current is not None:
+            from build_financials import read_sections, adr_eps_factor
+            baseline = read_sections(current)
+            result.annual, result.quarterly = baseline["annual"], baseline["quarterly"]
+            factor = adr_eps_factor(current)
+            if factor not in (None, 1):
+                for item in result.annual + result.quarterly:
+                    for name in ("epsBasic", "epsDiluted"):
+                        if item["values"].get(name) is not None:
+                            item["values"][name] /= factor
         result.annual, result.quarterly, result.restatement_revisions = select_rows(
             companyfacts, result.annual, result.quarterly,
             coherent_rows,
             filings(companyfacts, basis.taxonomy, existence, basis.annual_forms, {result.currency}),
             filings(companyfacts, basis.taxonomy, existence, basis.annual_forms | basis.interim_forms,
                     {result.currency}, (80, 120)),
+            compare_current=current is not None, current_document=current,
         )
         result.concepts = {
             field_name: sorted({item["concepts"][field_name] for item in result.annual + result.quarterly

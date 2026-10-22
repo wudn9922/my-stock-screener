@@ -1,7 +1,7 @@
-"""Opt-in, accession-coherent comparative rows. No I/O and no acceptance-gate rules.
+"""Opt-in material comparative restatements. No I/O and no acceptance-gate rules.
 
 fy/fp describe the filing's focus, not the comparative's year; use actual duration dates.
-Missing values in the selected filing stay missing. An accession is deliberately a
+Missing values in a restating filing retain their current value with a mixed-basis audit. An accession is deliberately a
 conservative basis boundary: equal numbers in different filings do not prove a basis.
 """
 import copy
@@ -58,95 +58,188 @@ def _near(left, right):
     return abs((_day(left) - _day(right)).days) <= 5
 
 
-def select_rows(payload, annual, quarterly, extract, candidates, quarter_candidates=()):
-    """Return coherent annual/quarterly rows and original annual revisions.
+INCOME_FIELDS = frozenset({
+    "revenue", "costOfRevenue", "grossProfit", "operatingIncome", "pretaxIncome",
+    "taxProvision", "netIncome", "epsBasic", "epsDiluted", "interestExpense",
+})
 
-    extract is the legacy pure extractor on a single-accession payload. Its normal
-    concept, unit, plausibility and share-basis checks still apply inside that filing.
+
+def material_fields(before, after):
+    """Strictly >2%, measured against the current value; missing is not a restatement."""
+    return sorted(field for field in INCOME_FIELDS
+                  if before.get(field) is not None and after.get(field) is not None
+                  and before[field] != after[field]
+                  and (before[field] == 0 or (abs(after[field] - before[field]) > .02 * abs(before[field])
+                       and not math.isclose(abs(after[field] - before[field]), .02 * abs(before[field]), rel_tol=1e-12, abs_tol=1e-12))))
+
+
+def _merge_filed_row(old, filed, basis, revisions, frequency, original=None):
+    audit_start = len(revisions)
+    new = copy.deepcopy(old)
+    provided = {field: value for field, value in filed["values"].items() if value is not None}
+    retained = sorted(field for field, value in old["values"].items()
+                      if value is not None and field not in provided)
+    new["values"].update(provided)
+    if filed.get("extra", {}).get("derived"):
+        new.setdefault("extra", {})["derived"] = 1
+    new.setdefault("extra", {})[BASIS] = {**basis, "reportedFields": sorted(provided), "retainedFields": retained}
+    issues = list(new["extra"].get("secRestatementIssues") or [])
+    for code in (["restated", "mixed-basis"] if retained else ["restated"]):
+        if code not in issues:
+            issues.append(code)
+    new["extra"]["secRestatementIssues"] = issues
+    for field in retained:
+        revisions.append({"kind": "basis-unrestated", "period": frequency, "end": old["end"],
+                          "field": field, "old": old["values"][field], "new": old["values"][field],
+                          "accn": basis["accn"], "filed": basis["filed"],
+                          "originalAccn": basis.get("originalAccn"), "originalFiled": basis.get("originalFiled"),
+                          "reason": "not-reported-in-restating-filing; current-value-retained"})
+    for field, value in provided.items():
+        before = (original or old)["values"].get(field)
+        if before != value:
+            revisions.append({"kind": "restated", "period": frequency, "end": old["end"],
+                              "field": field, "old": before, "new": value,
+                              "accn": basis["accn"], "filed": basis["filed"],
+                              "originalAccn": basis.get("originalAccn"),
+                              "originalFiled": basis.get("originalFiled")})
+    if frequency == "annual" and basis.get("end") and basis["end"] != old["end"]:
+        for entry in revisions[audit_start:]:
+            entry["secEnd"] = basis["end"]
+    return new
+
+
+def select_rows(payload, annual, quarterly, extract, candidates, quarter_candidates=(), compare_current=False, current_document=None):
+    """Switch only materially restated annuals; preserve all omitted current fields.
+
+    Stored-document callers compare against current values. Extraction without a stored
+    document compares first vs later filings, retaining legacy values for missing fields.
     """
     cache = {}
-
     def rows(filing):
-        accn = filing["accn"]
-        if accn not in cache:
-            cache[accn] = extract(accession_payload(payload, accn))
-        return cache[accn]
+        if filing["accn"] not in cache:
+            extracted = extract(accession_payload(payload, filing["accn"]))
+            # A document-wide adjusted flag does not prove that an individual
+            # historical row was adjusted. Infer its existing units from the
+            # row's shares/EPS and known split ratios, never change the document.
+            split = (current_document or {}).get("split") or {}
+            if split.get("adjusted") and split.get("events"):
+                from build_financials import clean_value
+                for frequency, items in enumerate(extracted):
+                    references = annual if frequency == 0 else quarterly
+                    window = 10 if frequency == 0 else 25
+                    for item in items:
+                        matches = [p for p in references if abs((_day(p["end"]) - _day(item["end"])).days) <= window]
+                        if not matches:
+                            continue
+                        target = min(matches, key=lambda p: abs((_day(p["end"]) - _day(item["end"])).days))["values"]
+                        values = item["values"]
+                        ratios = [ratio for day, ratio in split["events"] if day > item["end"] and ratio > 0]
+                        known = {1.0}
+                        for start in range(len(ratios)):
+                            product = 1.0
+                            for ratio in ratios[start:]:
+                                product *= ratio
+                                known.update((product, 1 / product))
+                        def compatible(ratio):
+                            possible = [f for f in known if abs(ratio / f - 1) <= .02]
+                            return min(possible, key=lambda f: abs(ratio / f - 1)) if possible else None
+                        factor = None
+                        if values.get("dilutedShares") and target.get("dilutedShares"):
+                            factor = compatible(target["dilutedShares"] / values["dilutedShares"])
+                        if factor is None and any(values.get(field) is not None and target.get(field) is not None
+                                                  and not material_fields({field: target[field]}, {field: values[field]})
+                                                  for field in EPS):
+                            factor = 1.0
+                        for field in EPS:
+                            if factor is not None:
+                                break
+                            before, after = target.get(field), values.get(field)
+                            if not before or not after or before * after <= 0:
+                                continue
+                            if target.get("netIncome") and values.get("netIncome"):
+                                inferred = abs((target["netIncome"] / before) / (values["netIncome"] / after))
+                                factor = compatible(inferred)
+                            if factor is None:
+                                factor = compatible(after / before)
+                        item.setdefault("extra", {})["secShareBasisFactor"] = factor or 1.0
+                        if factor is not None and factor != 1:
+                            for field in EPS:
+                                if values.get(field) is not None:
+                                    values[field] = clean_value(values[field] / factor)
+                            if values.get("dilutedShares") is not None:
+                                values["dilutedShares"] = clean_value(values["dilutedShares"] * factor)
+            cache[filing["accn"]] = extracted
+        return cache[filing["accn"]]
 
-    selected, originals, years = [], [], []
+    selected, revisions, years = [], [], []
     for old in annual:
-        options = [f for f in candidates if _near(old["end"], f["end"])]
+        options = [f for f in candidates if abs((_day(old["end"]) - _day(f["end"])).days) <= 10]
         if not options:
             selected.append(copy.deepcopy(old))
             continue
         latest = max(options, key=lambda f: (f["filed"], f["accn"], f["end"], f["start"]))
         first = min(options, key=lambda f: (f["filed"], f["accn"], f["end"], f["start"]))
-        new = next((p for p in rows(latest)[0] if _near(p["end"], old["end"])), None)
-        original = next((p for p in rows(first)[0] if _near(p["end"], old["end"])), old)
-        # A filing can lack usable values after validation. Never borrow another filing's row.
-        new = copy.deepcopy(new) if new is not None else {**copy.deepcopy(old), "values": {}}
-        new["end"] = old["end"]
-        changed = any(original["values"].get(field) is not None
-                      and new["values"].get(field) is not None
-                      and value != original["values"][field]
-                      for field, value in new["values"].items())
-        basis = {**latest, "restated": changed}
-        new.setdefault("extra", {})[BASIS] = basis
-        selected.append(new)
+        filed = next((p for p in rows(latest)[0] if _near(p["end"], latest["end"])), None)
+        original = old if compare_current else next((p for p in rows(first)[0]
+                                                     if _near(p["end"], first["end"])), old)
+        trigger = material_fields(original["values"], filed["values"]) if filed else []
+        prior = old.get("extra", {}).get(BASIS) or {}
+        later = (latest["filed"], latest["accn"]) > (first["filed"], first["accn"])
+        if prior.get("filed"):
+            later = (latest["filed"], latest["accn"]) > (prior["filed"], prior.get("accn") or "")
+        if not later or not trigger:
+            selected.append(copy.deepcopy(old))
+            continue
+        basis = {**latest, "restated": True, "switched": True, "triggerFields": trigger,
+                 "originalAccn": first["accn"], "originalFiled": first["filed"],
+                 "shareFactor": filed.get("extra", {}).get("secShareBasisFactor", 1.0)}
+        selected.append(_merge_filed_row(old, filed, basis, revisions, "annual", original))
         years.append((basis, rows(latest)[1]))
-        if new["values"] != original["values"]:
-            for field in sorted(set(original["values"]) | set(new["values"])):
-                before, after = original["values"].get(field), new["values"].get(field)
-                if before != after:
-                    originals.append({"kind": "restated", "period": "annual", "end": old["end"],
-                                      "field": field, "old": before, "new": after,
-                                      "accn": latest["accn"], "filed": latest["filed"],
-                                      "originalAccn": first["accn"], "originalFiled": first["filed"]})
+
     quarters = []
     quarterly = list(quarterly)
     for basis, _ in years:
-        if (basis["restated"] and not any(_near(p["end"], basis["end"]) for p in quarterly)
+        if (not any(_near(p["end"], basis["end"]) for p in quarterly)
                 and any(_day(basis["start"]) <= _day(p["end"]) < _day(basis["end"]) for p in quarterly)):
             quarterly.append({"end": basis["end"], "src": "sec", "values": {},
                               "extra": {"secKeepAsReported": True}})
     for old in sorted(quarterly, key=lambda p: p["end"]):
-        year = next(((b, qs) for b, qs in years
-                     if _day(b["start"]) <= _day(old["end"]) <= _day(b["end"]) + timedelta(days=5)), None)
+        year = next(((b, qs) for b, qs in years if
+                     _day(b["start"]) <= _day(old["end"]) <= _day(b["end"]) + timedelta(days=10)), None)
         new = copy.deepcopy(old)
-        if year is not None:
+        if year:
             basis, same_filing = year
-            replacement = next((p for p in same_filing if _near(p["end"], old["end"])), None)
+            matches = [p for p in same_filing if abs((_day(p["end"]) - _day(old["end"])).days) <= 25]
+            replacement = min(matches, key=lambda p: abs((_day(p["end"]) - _day(old["end"])).days)) if matches else None
             if replacement is not None:
-                new = copy.deepcopy(replacement)
-                new["end"] = old["end"]
-                new.setdefault("extra", {})[BASIS] = dict(basis)
-                new["extra"][BLOCKED] = None
-                new["extra"]["secKeepAsReported"] = False
+                replacement = copy.deepcopy(replacement)
+                quarter_factor = replacement.get("extra", {}).get("secShareBasisFactor", 1.0)
+                annual_factor = basis.get("shareFactor", 1.0)
+                if quarter_factor != annual_factor:
+                    from build_financials import clean_value
+                    for field in EPS:
+                        if replacement["values"].get(field) is not None:
+                            replacement["values"][field] = clean_value(replacement["values"][field] * quarter_factor / annual_factor)
+                    if replacement["values"].get("dilutedShares") is not None:
+                        replacement["values"]["dilutedShares"] = clean_value(replacement["values"]["dilutedShares"] * annual_factor / quarter_factor)
                 options = [f for f in quarter_candidates if _near(f["end"], old["end"])]
-                if options:
+                original = old
+                if options and not compare_current:
                     first = min(options, key=lambda f: (f["filed"], f["accn"], f["end"], f["start"]))
-                    original = next((p for p in rows(first)[1] if _near(p["end"], old["end"])), None)
-                    if original is not None:
-                        for field in sorted(set(original["values"]) | set(new["values"])):
-                            before, after = original["values"].get(field), new["values"].get(field)
-                            if before != after:
-                                originals.append({"kind": "restated", "period": "quarterly", "end": old["end"],
-                                                  "field": field, "old": before, "new": after,
-                                                  "accn": basis["accn"], "filed": basis["filed"],
-                                                  "originalAccn": first["accn"], "originalFiled": first["filed"]})
+                    original = next((p for p in rows(first)[1] if _near(p["end"], old["end"])), old)
+                    basis = {**basis, "originalAccn": first["accn"], "originalFiled": first["filed"]}
+                new = _merge_filed_row(old, replacement, basis, revisions, "quarterly", original)
+                new["extra"].update({BLOCKED: None, "secKeepAsReported": False})
             else:
-                new.setdefault("extra", {})[BASIS] = {
-                    "accn": None, "asReported": True,
-                    "annualAccn": basis["accn"], "annualFiled": basis["filed"],
-                }
-            if basis["restated"] and _near(old["end"], basis["end"]) and replacement is None:
-                # Legacy extraction may already have derived Q4. Keep directly reported EPS
-                # only; an aggregate derived flag cannot establish per-field provenance.
+                new.setdefault("extra", {})[BASIS] = {"accn": None, "asReported": True,
+                    "annualAccn": basis["accn"], "annualFiled": basis["filed"], "switchedYear": True}
+            if abs((_day(old["end"]) - _day(basis["end"])).days) <= 25:
                 for field in EPS:
-                    if not _direct_eps(payload, old["end"], field, new["values"].get(field)):
+                    if replacement is None or replacement["values"].get(field) is None:
                         new["values"].pop(field, None)
-                new["extra"][BLOCKED] = REASON
+                        new["extra"][BLOCKED] = REASON
         quarters.append(new)
-    return selected, quarters, originals
+    return selected, quarters, revisions
 
 
 def _direct_eps(payload, end, field, value):
@@ -175,7 +268,10 @@ def same_basis(year, pieces):
     if basis is None or not basis.get("restated"):
         return True
     accn = basis.get("accn")
-    return bool(accn) and all(p.get("extra", {}).get(BASIS, {}).get("accn") == accn for p in pieces)
+    return (bool(accn) and not any(field in basis.get("retainedFields", []) for field in EPS)
+            and all(p.get("extra", {}).get(BASIS, {}).get("accn") == accn
+                    and not any(field in p.get("extra", {}).get(BASIS, {}).get("retainedFields", []) for field in EPS)
+                    for p in pieces))
 
 
 def preserve_quality(document, previous, revisions, seen):
@@ -191,5 +287,142 @@ def preserve_quality(document, previous, revisions, seen):
             audit.append(entry)
     if audit:
         grade["revisions"] = audit
+    if any(r.get("kind") == "basis-unrestated" for r in revisions) and "mixed-basis" not in grade["issues"]:
+        grade["issues"].append("mixed-basis")
     if revisions and "restated" not in grade["issues"]:
         grade["issues"].append("restated")
+
+def overlay_document(previous, annual, quarterly, revisions, now, factor=None):
+    """Apply only switched rows in memory, preserving dates, labels and every other cell.
+
+    No regular merge, split adjustment, label assignment or deduplication runs here.
+    The only permitted nulls are Q4 EPS of switched years lacking restated inputs.
+    """
+    import build_financials as fin
+    document = copy.deepcopy(previous)
+    current = fin.read_sections(previous)
+    candidates = {"annual": copy.deepcopy(annual), "quarterly": copy.deepcopy(quarterly)}
+    revisions = copy.deepcopy(revisions)
+    if factor not in (None, 1):
+        for items in candidates.values():
+            for item in items:
+                for field in EPS:
+                    if item["values"].get(field) is not None:
+                        item["values"][field] = fin.clean_value(item["values"][field] * factor)
+                if item["values"].get("dilutedShares") is not None:
+                    item["values"]["dilutedShares"] = fin.clean_value(item["values"]["dilutedShares"] / factor)
+    if factor not in (None, 1):
+        for revision in revisions:
+            multiplier = factor if revision.get("field") in EPS else (1 / factor if revision.get("field") == "dilutedShares" else 1)
+            for key in ("old", "new"):
+                if revision.get(key) is not None:
+                    revision[key] *= multiplier
+    switched, audit, derived_fills = {}, [], []
+    for item in candidates["annual"]:
+        basis = item.get("extra", {}).get(BASIS) or {}
+        if not basis.get("restated"):
+            continue
+        matches = [p for p in current["annual"] if abs((_day(p["end"]) - _day(item["end"])).days) <= 10]
+        old = min(matches, key=lambda p: abs((_day(p["end"]) - _day(item["end"])).days)) if matches else None
+        provided = {field: value for field, value in item["values"].items()
+                    if value is not None and field not in basis.get("retainedFields", [])}
+        trigger = material_fields(old["values"], provided) if old else []
+        if not trigger:
+            continue
+        basis = {**basis, "switched": True, "triggerFields": trigger}
+        changed = _merge_filed_row(old, {"values": provided}, basis, audit, "annual")
+        switched[old["end"]] = changed
+    if not switched:
+        return document
+
+    # Fiscal labels are read verbatim. Only internal fallbacks are inferred for old
+    # documents lacking labels; their stored columns are never regenerated.
+    for frequency in ("annual", "quarterly"):
+        block = previous.get(frequency) or {}
+        by_end = {p["end"]: p for p in current[frequency]}
+        for index, end in enumerate(block.get("end", [])):
+            item = by_end[end]
+            item["fy"] = (block.get("fy") or [None] * len(by_end))[index]
+            item["fq"] = (block.get("fq") or [None] * len(by_end))[index]
+    if any(p.get("fy") is None for rows in current.values() if isinstance(rows, list)
+           for p in rows if isinstance(p, dict) and "end" in p):
+        fin.assign_fiscal_labels(current["annual"], current["quarterly"], fallback_end_month=previous.get("fyEndMonth") or 12)
+    changed_quarters = {}
+    for end, year in switched.items():
+        original_year = next(p for p in current["annual"] if p["end"] == end)
+        year["fy"], year["fq"] = original_year["fy"], original_year.get("fq")
+        basis = year["extra"][BASIS]
+        for old in current["quarterly"]:
+            if old.get("fy") != year["fy"]:
+                continue
+            candidate = next((p for p in candidates["quarterly"] if p["end"] == old["end"]), None)
+            candidate_basis = (candidate or {}).get("extra", {}).get(BASIS) or {}
+            same = candidate_basis.get("accn") == basis.get("accn") and bool(basis.get("accn"))
+            if same:
+                provided = {field: value for field, value in candidate["values"].items()
+                            if value is not None and field not in candidate_basis.get("retainedFields", [])}
+                new = _merge_filed_row(old, {"values": provided, "extra": candidate.get("extra", {})}, candidate_basis, audit, "quarterly")
+            else:
+                new = copy.deepcopy(old)
+                new["extra"][BASIS] = {"accn": None, "asReported": True,
+                    "annualAccn": basis.get("accn"), "annualFiled": basis.get("filed"), "switchedYear": True}
+            new["fy"], new["fq"] = old["fy"], old["fq"]
+            changed_quarters[old["end"]] = new
+        pieces = [p for p in changed_quarters.values() if p.get("fy") == year["fy"]]
+        for q4 in [p for p in pieces if p.get("fq") == 4]:
+            q4_basis = q4["extra"].get(BASIS) or {}
+            original_q4 = next(p for p in current["quarterly"] if p["end"] == q4["end"])
+            for field in EPS:
+                if q4_basis.get("accn") == basis.get("accn") and field in q4_basis.get("reportedFields", []):
+                    continue
+                inputs = [[p for p in pieces if p.get("fq") == number] for number in (1, 2, 3)]
+                coherent = all(len(found) == 1 and found[0]["extra"].get(BASIS, {}).get("accn") == basis.get("accn")
+                               and field in found[0]["extra"].get(BASIS, {}).get("reportedFields", []) for found in inputs)
+                if not coherent:
+                    q4["values"].pop(field, None)
+                    q4["extra"][BLOCKED] = REASON
+                elif field in basis.get("reportedFields", []):
+                    # Attempt the unchanged numerical gate only with a complete restated
+                    # basis. If it rejects the derivation, retain the existing EPS.
+                    before = q4["values"].pop(field, None)
+                    q4["extra"][BASIS] = {**basis, "retainedFields": []}
+                    derived_fills.extend(fin.fill_q4_eps([year], pieces))
+                    if q4["values"].get(field) is None and before is not None:
+                        q4["values"][field] = before
+                if original_q4["values"].get(field) != q4["values"].get(field):
+                    audit.append({"kind": "restated", "period": "quarterly", "end": q4["end"], "field": field,
+                                  "old": original_q4["values"].get(field), "new": q4["values"].get(field),
+                                  "accn": basis.get("accn"), "filed": basis.get("filed"),
+                                  "originalAccn": basis.get("originalAccn"),
+                                  "reason": (q4["extra"].get(BLOCKED) or REASON) if q4["values"].get(field) is None else "same-basis-Q4-derivation"})
+
+    for frequency, changed in (("annual", switched), ("quarterly", changed_quarters)):
+        block = document[frequency]
+        for end, item in changed.items():
+            index = block["end"].index(end)
+            fields = set(item["values"]) | set(block.get("values", {}))
+            for field in fields:
+                value = item["values"].get(field)
+                column = block.setdefault("values", {}).get(field)
+                if column is None and value is not None:
+                    column = block["values"][field] = [None] * len(block["end"])
+                if column is not None:
+                    # Missing inputs can only erase EPS of a switched Q4.
+                    if value is not None or (frequency == "quarterly" and item.get("fq") == 4 and field in EPS):
+                        column[index] = value
+            for name, value in item["extra"].items():
+                if name not in {BASIS, BLOCKED, "secRestatementIssues", "derived"}:
+                    continue
+                column = block.setdefault(name, [None] * len(block["end"]))
+                column[index] = copy.deepcopy(value)
+    # Keep the earliest filed originals as well as the current pre-switch values.
+    actual_ends = {"annual": set(switched), "quarterly": set(changed_quarters)}
+    audit += [r for r in revisions if r.get("end") in actual_ends.get(r.get("period"), ())]
+    erased_eps = {(end, field) for end, item in changed_quarters.items() if item.get("fq") == 4
+                  for field in EPS if item["values"].get(field) is None}
+    audit = [r for r in audit if not (r.get("kind") == "basis-unrestated" and r.get("period") == "quarterly"
+                                     and (r.get("end"), r.get("field")) in erased_eps)]
+    preserve_quality(document, previous, audit, now.date().isoformat())
+    if derived_fills and "q4-derived" not in document["quality"]["issues"]:
+        document["quality"]["issues"].append("q4-derived")
+    return document

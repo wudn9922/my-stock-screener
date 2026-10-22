@@ -54,13 +54,129 @@ class RestatedComparativesTests(unittest.TestCase):
         # fy=2025/fp=FY labels the later filing, not this comparative's fiscal year.
         self.assertEqual(annual["end"], "2023-12-31")
 
-    def test_whole_annual_row_never_borrows_missing_balance_from_older_accession(self):
+    def test_missing_balance_is_retained_and_flagged_instead_of_nulled(self):
         payload = fixture("synthetic-quarterly.json")
         selected = sec.extract_periods(payload, prefer_latest_filing=True)
         annual = row(selected, "annual", "2023-12-31")
         self.assertEqual(annual["values"]["revenue"], 2000)
         self.assertEqual(annual["values"]["netIncome"], 200)
-        self.assertNotIn("totalAssets", annual["values"])
+        self.assertEqual(annual["values"]["totalAssets"], 9000)
+        self.assertIn("mixed-basis", annual["extra"]["secRestatementIssues"])
+        audit = next(r for r in selected.restatement_revisions
+                     if r["kind"] == "basis-unrestated" and r["field"] == "totalAssets")
+        self.assertEqual((audit["old"], audit["new"]), (9000, 9000))
+
+    def test_unchanged_later_comparative_does_not_switch_or_normalize_anything(self):
+        from sec_restatements import material_fields
+        payload = fixture("synthetic-quarterly.json")
+        original = sec.extract_periods(original_only(payload))
+        original.skip = None
+        previous, _ = sec.merge_into_document(None, original, "TEST", NOW)
+        for concept in payload["facts"]["us-gaap"].values():
+            for facts in concept["units"].values():
+                for fact in facts:
+                    if fact["accn"] == "restated-2024" and fact["end"].startswith("2023"):
+                        fact["val"] *= 2 if fact["val"] != 100 else 1
+        # Deliberately noncanonical dates and old flags must survive byte-for-byte.
+        previous["annual"]["end"][-1] = "2024-01-06"
+        previous["quality"]["issues"].append("existing-flag")
+        proposed, reason = report.preview_document(previous, payload, NOW, True)
+        self.assertIsNone(reason)
+        self.assertEqual(proposed, previous)
+        self.assertEqual(material_fields({"epsBasic": 1}, {"epsBasic": 1.02}), [])
+        self.assertEqual(material_fields({"netIncome": -100}, {"netIncome": -102}), [])
+        self.assertEqual(material_fields({"netIncome": 0}, {"netIncome": 1}), ["netIncome"])
+
+    def test_q4_nulling_is_limited_to_switched_years_and_other_cells_are_unchanged(self):
+        from sec_restatements import overlay_document
+        years, quarters = [], []
+        for year in (2022, 2023, 2024):
+            years.append(fin.period(f"{year}-12-31", {"revenue": 100, "netIncome": 10, "totalAssets": 9000}, "sec"))
+            for end in ("03-31", "06-30", "09-30", "12-31"):
+                quarters.append(fin.period(f"{year}-{end}", {"netIncome": 2.5, "epsBasic": 1, "epsDiluted": 1}, "sec"))
+        fin.assign_fiscal_labels(years, quarters, fallback_end_month=12)
+        previous = {"version": fin.VERSION, "symbol": "TEST", "market": "US", "currency": "USD",
+                    "annual": fin.write_section(years, {}, False), "quarterly": fin.write_section(quarters, {}, True)}
+        candidate = copy.deepcopy(years[1])
+        candidate["values"] = {"revenue": 50, "netIncome": 5}
+        candidate["extra"][BASIS] = {"accn": "restated", "filed": "2025-02-20", "restated": True}
+        proposed = overlay_document(previous, [candidate], [], [], NOW)
+        self.assertEqual(proposed["annual"]["end"], previous["annual"]["end"])
+        self.assertEqual(proposed["quarterly"]["end"], previous["quarterly"]["end"])
+        self.assertEqual(proposed["annual"]["values"]["totalAssets"], [9000] * 3)
+        for field in ("epsBasic", "epsDiluted"):
+            self.assertEqual(proposed["quarterly"]["values"][field][3], 1)
+            self.assertIsNone(proposed["quarterly"]["values"][field][7])
+            self.assertEqual(proposed["quarterly"]["values"][field][11], 1)
+        changes, q4 = report.document_changes(previous, proposed)
+        self.assertTrue(all(c["end"].startswith("2023") for c in changes))
+        self.assertEqual(len(q4), 2)
+        self.assertTrue(all(c["field"] in ("epsBasic", "epsDiluted") for c in changes if c["new"] is None))
+
+    def test_current_missing_field_is_preserved_with_period_mixed_basis_audit(self):
+        payload = fixture("synthetic-quarterly.json")
+        original = sec.extract_periods(original_only(payload))
+        original.skip = None
+        previous, _ = sec.merge_into_document(None, original, "TEST", NOW)
+        previous["annual"]["values"]["totalAssets"][-1] = 123456
+        proposed, reason = report.preview_document(previous, payload, NOW, True)
+        self.assertIsNone(reason)
+        self.assertEqual(proposed["annual"]["values"]["totalAssets"][-1], 123456)
+        self.assertIn("mixed-basis", proposed["quality"]["issues"])
+        self.assertIn("mixed-basis", proposed["annual"]["secRestatementIssues"][-1])
+        entry = next(r for r in proposed["quality"]["revisions"] if r["kind"] == "basis-unrestated"
+                     and r["period"] == "annual" and r["field"] == "totalAssets")
+        self.assertEqual((entry["old"], entry["new"]), (123456, 123456))
+        self.assertEqual(proposed["annual"]["end"], previous["annual"]["end"])
+
+    def test_existing_split_adjustment_is_not_an_eps_restatement(self):
+        payload = fixture("synthetic-quarterly.json")
+        original = sec.extract_periods(original_only(payload))
+        original.skip = None
+        previous, _ = sec.merge_into_document(None, original, "TEST", NOW)
+        for frequency in ("annual", "quarterly"):
+            for field in ("epsBasic", "epsDiluted"):
+                previous[frequency]["values"][field] = [value / 4 if value is not None else None
+                                                       for value in previous[frequency]["values"][field]]
+            if "dilutedShares" in previous[frequency]["values"]:
+                previous[frequency]["values"]["dilutedShares"] = [value * 4 if value is not None else None
+                    for value in previous[frequency]["values"]["dilutedShares"]]
+        previous["split"] = {"adjusted": True, "events": [["2025-06-01", 4]]}
+        for concept in payload["facts"]["us-gaap"].values():
+            for facts in concept["units"].values():
+                for fact in facts:
+                    if fact["accn"] == "restated-2024" and fact["end"].startswith("2023") and fact["val"] != 100:
+                        fact["val"] *= 2
+        proposed, _ = report.preview_document(previous, payload, NOW, True)
+        self.assertEqual(proposed, previous)
+
+    def test_global_split_flag_does_not_rebase_a_row_already_in_reported_units(self):
+        payload = fixture("synthetic-quarterly.json")
+        original = sec.extract_periods(original_only(payload))
+        original.skip = None
+        previous, _ = sec.merge_into_document(None, original, "TEST", NOW)
+        previous["split"] = {"adjusted": True, "events": [["2025-06-01", 4]]}
+        for concept in payload["facts"]["us-gaap"].values():
+            for facts in concept["units"].values():
+                for fact in facts:
+                    if fact["accn"] == "restated-2024" and fact["end"].startswith("2023") and fact["val"] != 100:
+                        fact["val"] *= 2
+        proposed, _ = report.preview_document(previous, payload, NOW, True)
+        self.assertEqual(proposed, previous)
+
+    def test_switched_quarters_use_the_annual_rows_existing_share_basis(self):
+        payload = fixture("synthetic-quarterly.json")
+        original = sec.extract_periods(original_only(payload))
+        original.skip = None
+        previous, _ = sec.merge_into_document(None, original, "TEST", NOW)
+        # Historical annual was adjusted, while the stored quarters were not.
+        for field in ("epsBasic", "epsDiluted"):
+            previous["annual"]["values"][field][-1] /= 4
+        previous["split"] = {"adjusted": True, "events": [["2025-06-01", 4]]}
+        proposed, _ = report.preview_document(previous, payload, NOW, True)
+        self.assertEqual(proposed["annual"]["values"]["epsDiluted"][-1], .5)
+        self.assertEqual(proposed["quarterly"]["values"]["epsDiluted"], [.125] * 4)
+        self.assertEqual(sum(proposed["quarterly"]["values"]["epsDiluted"]), .5)
 
     def test_restated_quarters_allow_q4_eps_on_one_accession(self):
         selected = sec.extract_periods(fixture("synthetic-quarterly.json"), prefer_latest_filing=True)
@@ -171,7 +287,8 @@ class RestatedComparativesTests(unittest.TestCase):
         annual = row(selected, "annual", "2023-12-31")
         quarter = row(selected, "quarterly", "2023-03-31")
         self.assertEqual(annual["values"]["revenue"], 2000)
-        self.assertNotIn("totalAssets", annual["values"])
+        self.assertEqual(annual["values"]["totalAssets"], 9000)
+        self.assertIn("mixed-basis", annual["extra"]["secRestatementIssues"])
         self.assertEqual(quarter["values"]["epsDiluted"], .5)
         self.assertEqual(annual["extra"][BASIS]["accn"], quarter["extra"][BASIS]["accn"])
 
@@ -248,6 +365,7 @@ class RestatedComparativesTests(unittest.TestCase):
         previous = {"version": fin.VERSION, "symbol": "TEST", "market": "US", "currency": "USD",
                     "annual": fin.write_section([annual], {}, False),
                     "quarterly": fin.write_section([q4], {}, True)}
+        annual["values"]["netIncome"] = 50
         annual["extra"][BASIS] = {"accn": "restated", "filed": "2016-02-20", "restated": True}
         protected = fin.period("2000-12-31", {}, "sec", {
             "secKeepAsReported": True, BLOCKED: "restated-quarterly-values-unavailable"})
