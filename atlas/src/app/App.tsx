@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   Activity,
   BellRing,
@@ -81,9 +81,11 @@ import type { LocalSymbol } from '../ui/SymbolSearch';
 import '../ui/workspace.css';
 
 type Panel = 'indicators' | 'drawings' | 'backtest' | 'alerts' | 'settings';
-type DockTab = 'watchlist' | Panel;
+const StockResearch = lazy(() => import('../ui/research/StockResearch'));
+type DockTab = 'watchlist' | 'research' | Panel;
 const panelNames: Record<DockTab, string> = {
   watchlist: '自選清單',
+  research: '價量與官方公告',
   indicators: '指標',
   drawings: '畫線物件',
   backtest: '策略回測',
@@ -92,6 +94,7 @@ const panelNames: Record<DockTab, string> = {
 };
 const dockTabs: { id: DockTab; icon: typeof List }[] = [
   { id: 'watchlist', icon: List },
+  { id: 'research', icon: Search },
   { id: 'indicators', icon: Activity },
   { id: 'drawings', icon: Layers },
   { id: 'backtest', icon: FlaskConical },
@@ -242,14 +245,16 @@ export function App({
     }
     return () => abort.abort();
   }, [state.ready, symbol, providerId, timeframeKey, reloadToken]);
+  const [researchDock, setResearchDock] = useState(false);
   const storedTab = state.app.workspace.rightTab;
   const right = state.app.workspace.rightOpen,
-    rightTab: DockTab = watchlistDock ? 'watchlist' : storedTab === 'financials' ? 'indicators' : storedTab;
+    rightTab: DockTab = researchDock ? 'research' : watchlistDock ? 'watchlist' : storedTab === 'financials' ? 'indicators' : storedTab;
   const setRight = (rightOpen: boolean) =>
     store.updateApp({ workspace: { ...store.getSnapshot().app.workspace, rightOpen } });
   const setRightTab = (tab: DockTab) => {
     setWatchlistDock(tab === 'watchlist');
-    if (tab !== 'watchlist') store.updateApp({ workspace: { ...store.getSnapshot().app.workspace, rightTab: tab } });
+    setResearchDock(tab === 'research');
+    if (tab !== 'watchlist' && tab !== 'research') store.updateApp({ workspace: { ...store.getSnapshot().app.workspace, rightTab: tab } });
   };
   const tablet = mobile && window.innerWidth >= 768;
   const modal = active && ((!!sheet && !tablet) || help || drawingPickerOpen);
@@ -890,6 +895,8 @@ export function App({
     <PanelBoundary key={`${symbol}:${panel}`}>
       {panel === 'watchlist' ? (
         watchPanel
+      ) : panel === 'research' ? (
+        <Suspense fallback={<p>載入研究面板…</p>}><StockResearch key={symbol} symbol={symbol} simulated={providerId === 'demo'}/></Suspense>
       ) : panel === 'indicators' ? (
         indicatorPanel
       ) : panel === 'drawings' ? (
@@ -1013,6 +1020,7 @@ export function App({
           <StockTabs active="chart" onSelect={(tab) => tab === 'financials' && onOpenFinancials(symbol, tf)} />
         )}
         <div className="ws-header-actions">
+          {!isIndex && <IconButton label="價量與官方公告" onClick={() => openPanel('research')}><Search size={17}/></IconButton>}
           {providerId === 'demo' && (
             <button
               className="demo-switch"

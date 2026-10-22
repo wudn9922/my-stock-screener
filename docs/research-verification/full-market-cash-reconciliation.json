@@ -1,0 +1,11 @@
+{
+  "run": 39736088978,
+  "artifactId": 12407222698,
+  "sourceCommit": "1f5953e6660ad2afb95671fea01863f02a3a38f1",
+  "sha256": "5657cc5878fdec4eb2fbfa00e61cbfed199fabda72ba65a284377797bfd4c714",
+  "researchCodeIdenticalAt": "95c8a2e665efa7e4672598f3ca5f27f12c2cda92",
+  "institutionShardsAligned": 390,
+  "canonicalVolumeMetricChanges": 0,
+  "noDateRegression": true,
+  "note": "Full cache supplies consistent canonical price inputs for corporate-action checks and complete-history matching; unchanged volume computations retained. Optional null/zero metadata ignored only when comparing semantics."
+}

@@ -119,6 +119,40 @@ export interface StockChips {
   foreignSourceKey: 'twse' | 'tpex';
   foreignSource: ChipSource | null;
   holdersSource: ChipSource | null;
+  largeHolders?: LargeHolder[];
+}
+
+const largeGroup = z.object({
+  pct: z.number().min(0).max(100),
+  people: z.number().int().nonnegative(),
+  shares: z.number().int().nonnegative(),
+});
+export const largeHolderSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  count: z.number().int().nonnegative(),
+  totalShares: z.number().positive(),
+  over400: largeGroup,
+  over1000: largeGroup,
+});
+export type LargeHolder = z.infer<typeof largeHolderSchema>;
+
+/** Calendar-week comparisons do not silently cross missing weeks. */
+export function holderBaseline(
+  rows: LargeHolder[],
+  weeks: number,
+): LargeHolder | null {
+  const latest = rows.at(-1);
+  if (!latest) return null;
+  const target = Date.parse(latest.date) - weeks * 7 * 86400000;
+  return (
+    [...rows]
+      .reverse()
+      .find(
+        (r) =>
+          Date.parse(r.date) <= target &&
+          target - Date.parse(r.date) <= 3 * 86400000,
+      ) ?? null
+  );
 }
 
 /** Aligns a series to the end of its date axis; a length mismatch trims the older side instead of misplacing points. */
@@ -168,6 +202,16 @@ export function chipsForSymbol(data: ChipsFile, symbol: string): StockChips {
   const entry = data.stocks[key];
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return out;
   const record = entry as Record<string, unknown>;
+  out.largeHolders = (
+    Array.isArray(record.largeHolders) ? record.largeHolders : []
+  )
+    .flatMap((row) => {
+      const parsed = largeHolderSchema.safeParse(row);
+      return parsed.success ? [parsed.data] : [];
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+
 
   const foreign = foreignSchema.safeParse(record.foreign);
   if (foreign.success && foreign.data.pct !== null && foreign.data.asOf) {

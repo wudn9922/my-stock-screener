@@ -11,7 +11,7 @@ export default defineConfig({
     ...(!isStaticHosting ? [yahooProxy(), secProxy()] : []),
     versionedServiceWorker(),
   ],
-  test: { include: ['tests/**/*.test.ts'] },
+  test: { include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'] },
   server: { host: '0.0.0.0', port: 5173 },
   preview: { port: 4173 },
   build: {

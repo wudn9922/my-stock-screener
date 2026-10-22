@@ -1,0 +1,179 @@
+{
+  "checkedAt": "2026-10-22T08:43:39.454Z",
+  "results": [
+    {
+      "project": "desktop-chromium",
+      "source": "Unmocked Pages build with actual committed report JSON",
+      "research": [
+        {
+          "path": "/my-stock-screener/report/research/world-assets.json",
+          "status": 200,
+          "range": null,
+          "bytes": 666463
+        },
+        {
+          "path": "/my-stock-screener/report/research/world-assets.json",
+          "status": 200,
+          "range": null,
+          "bytes": 666463
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume.json",
+          "status": 200,
+          "range": null,
+          "bytes": 205852
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume/TW.json",
+          "status": 206,
+          "range": "bytes 1563789-1568889/9640799",
+          "bytes": 5101
+        },
+        {
+          "path": "/my-stock-screener/report/research/institutions.json",
+          "status": 200,
+          "range": null,
+          "bytes": 1339292
+        },
+        {
+          "path": "/my-stock-screener/report/research/institutions/TW.json",
+          "status": 206,
+          "range": "bytes 8414198-8454853/33466411",
+          "bytes": 40656
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume.json",
+          "status": 200,
+          "range": null,
+          "bytes": 205852
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume/TW.json",
+          "status": 206,
+          "range": "bytes 7056642-7061699/9640799",
+          "bytes": 5058
+        },
+        {
+          "path": "/my-stock-screener/report/research/institutions.json",
+          "status": 200,
+          "range": null,
+          "bytes": 1339292
+        },
+        {
+          "path": "/my-stock-screener/report/research/institutions/TWO.json",
+          "status": 206,
+          "range": "bytes 15046588-15082489/22032851",
+          "bytes": 35902
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume.json",
+          "status": 200,
+          "range": null,
+          "bytes": 205852
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume/US.json",
+          "status": 206,
+          "range": "bytes 53345-58370/25880522",
+          "bytes": 5026
+        },
+        {
+          "path": "/my-stock-screener/report/research/sec-radar.json",
+          "status": 200,
+          "range": null,
+          "bytes": 711723
+        }
+      ],
+      "errors": [],
+      "horizontalOverflow": 0,
+      "passed": true
+    },
+    {
+      "project": "iphone-webkit",
+      "source": "Unmocked Pages build with actual committed report JSON",
+      "research": [
+        {
+          "path": "/my-stock-screener/report/research/world-assets.json",
+          "status": 200,
+          "range": null,
+          "bytes": 666463
+        },
+        {
+          "path": "/my-stock-screener/report/research/world-assets.json",
+          "status": 200,
+          "range": null,
+          "bytes": 666463
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume.json",
+          "status": 200,
+          "range": null,
+          "bytes": 205852
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume/TW.json",
+          "status": 206,
+          "range": "bytes 1563789-1568889/9640799",
+          "bytes": 5101
+        },
+        {
+          "path": "/my-stock-screener/report/research/institutions.json",
+          "status": 200,
+          "range": null,
+          "bytes": 1339292
+        },
+        {
+          "path": "/my-stock-screener/report/research/institutions/TW.json",
+          "status": 206,
+          "range": "bytes 8414198-8454853/33466411",
+          "bytes": 40656
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume.json",
+          "status": 200,
+          "range": null,
+          "bytes": 205852
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume/TW.json",
+          "status": 206,
+          "range": "bytes 7056642-7061699/9640799",
+          "bytes": 5058
+        },
+        {
+          "path": "/my-stock-screener/report/research/institutions.json",
+          "status": 200,
+          "range": null,
+          "bytes": 1339292
+        },
+        {
+          "path": "/my-stock-screener/report/research/institutions/TWO.json",
+          "status": 206,
+          "range": "bytes 15046588-15082489/22032851",
+          "bytes": 35902
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume.json",
+          "status": 200,
+          "range": null,
+          "bytes": 205852
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume/US.json",
+          "status": 206,
+          "range": "bytes 53345-58370/25880522",
+          "bytes": 5026
+        },
+        {
+          "path": "/my-stock-screener/report/research/sec-radar.json",
+          "status": 200,
+          "range": null,
+          "bytes": 711723
+        }
+      ],
+      "errors": [],
+      "horizontalOverflow": 0,
+      "passed": true
+    }
+  ]
+}

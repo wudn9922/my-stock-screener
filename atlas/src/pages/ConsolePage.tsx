@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
 import type { PageProps } from './pageProps';
+import { SecRadar } from '../ui/research/SecRadar';
 import { ParameterConsole } from '../ui/ParameterConsole';
 import { watchlistStore } from '../watchlists/store';
 import { createWatchlist, evaluateWatchlist, visitWatchlist, watchlistSchema, type WatchlistVisit } from '../watchlists/model';
@@ -292,6 +293,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
               {error || storageError}
             </p>
           )}
+          {selected?.market === 'US' && <SecRadar key={selected.id} symbols={activeVisit?.members.map(m=>m.symbol) ?? selected.symbols}/>}
           <div className="console-actions">
             <button type="button" className="primary-button" onClick={() => navigate({ page: 'screener', group: 'universe-tw' })}>
               以篩選條件建立清單

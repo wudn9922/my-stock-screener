@@ -1,0 +1,13 @@
+{
+  "result": "PASS",
+  "unchangedFiles": 12,
+  "changedFiles": 0,
+  "changedBytes": 0,
+  "records": {
+    "volume": 7317,
+    "institutions": 1966,
+    "sec": 971,
+    "turnover": 130
+  },
+  "check": "All real records re-encoded with changed generatedAt/fetchedAt; SHA-256 and mtime_ns unchanged for every research file."
+}
