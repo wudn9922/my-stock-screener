@@ -1,0 +1,27 @@
+name: Research Python verification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - 'atlas/scripts/**'
+      - 'requirements.txt'
+      - '.github/workflows/research-review.yml'
+permissions:
+  contents: read
+concurrency:
+  group: research-python-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v

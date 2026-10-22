@@ -1,0 +1,94 @@
+name: Research public data
+on:
+  schedule:
+    - cron: '23 0,8,14,20 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Calendar backfill days (resumable, bounded by job budget)'
+        default: '95'
+  push:
+    branches: [main]
+    paths: ['scripts/*research*.py', 'scripts/build_sec_radar.py', 'scripts/build_world_assets.py', '.github/workflows/research-data.yml']
+permissions:
+  contents: write
+concurrency:
+  group: research-public-data
+  cancel-in-progress: false
+jobs:
+  refresh:
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [institutional, volume, alerts, sec, world]
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pandas requests openpyxl xlrd lxml
+      - uses: actions/cache/restore@v4
+        with:
+          path: .cache/universe-full
+          key: research-read-full-market-${{ github.run_id }}-${{ matrix.module }}
+          restore-keys: universe-full-v1-
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            .cache/research
+            .cache/universe-full/institutions
+          key: research-${{ matrix.module }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: research-${{ matrix.module }}-
+      - name: Offline semantic tests
+        run: python -m unittest discover -s tests -p test_research.py -v
+      - name: Refresh independent module
+        env:
+          MODULE: ${{ matrix.module }}
+          BACKFILL_DAYS: ${{ inputs.days || '95' }}
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT || 'SecSeed w556087587@gmail.com' }}
+        run: |
+          set -euo pipefail
+          case "$MODULE" in
+            institutional|volume|alerts) python scripts/build_research.py "$MODULE" --days "$BACKFILL_DAYS" --budget 600 ;;
+            sec) python scripts/build_sec_radar.py --days "$BACKFILL_DAYS" --budget 600 ;;
+            world) python scripts/build_world_assets.py ;;
+          esac
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: |
+            .cache/research
+            .cache/universe-full/institutions
+          key: research-${{ matrix.module }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Publish only this module's snapshots
+        env:
+          MODULE: ${{ matrix.module }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          case "$MODULE" in
+            institutional) git add docs/report/research/institutions.json docs/report/research/institutions/ ;;
+            volume) git add docs/report/research/volume.json docs/report/research/volume/ ;;
+            alerts) git add docs/report/research/alerts.json ;;
+            sec) git add docs/report/research/sec-radar.json docs/report/research/sec/ ;;
+            world) git add docs/report/research/world-assets.json ;;
+          esac
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Refresh research $MODULE"
+          for attempt in 1 2 3; do
+            git pull --rebase origin main
+            if git push origin HEAD:main; then exit 0; fi
+            sleep $((attempt * 5))
+          done
+          exit 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: research-${{ matrix.module }}
+          path: docs/report/research/*.json
+          retention-days: 7

@@ -17,6 +17,7 @@ import {
 } from '../../report/twChips';
 import { formatDateTime, toneClass } from '../format';
 import '../chips.css';
+import { LargeHolders } from '../research/LargeHolders';
 
 const FOREIGN_SOURCE_NAMES = { twse: '證交所', tpex: '櫃買中心' } as const;
 
@@ -121,6 +122,7 @@ function HoldersCard({ chips, symbol }: { chips: StockChips; symbol: string }) {
           {sourceNote(chips.holdersSource)}
           <p className="fin-chart-title">近 {holders.series.filter((value) => value !== null).length} 週</p>
           <Sparkline values={holders.series} dates={holders.dates} label={`${symbol} 總股東人數走勢`} unit=" 人" digits={0} />
+          <LargeHolders rows={chips.largeHolders ?? []} />
           <p className="chip-def">
             口徑：集保戶股權分散表第 17 級（合計）人數，每週公布一次，不含第 16 級差異數調整；本站逐週累積，歷史長度以實際累積為準。僅呈現人數與走勢，不代表買賣訊號。
           </p>

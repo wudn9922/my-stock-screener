@@ -1,0 +1,44 @@
+[
+  {
+    "fixture": "twset86.json",
+    "rawSha256": "357f13c15a8cd3e42b4da5c2487ae5d82ff1092033ec1c81ba26375a8d195aef",
+    "retrievedDate": "2026-10-22",
+    "note": "Actual source response, row-trimmed; test-only, never bundled."
+  },
+  {
+    "fixture": "tpext86.json",
+    "rawSha256": "9e07e7288dea1fa85fd0c98787f8a83265992188fbacb2d39c437770aedfe06c",
+    "retrievedDate": "2026-10-22",
+    "note": "Actual source response, row-trimmed; test-only, never bundled."
+  },
+  {
+    "fixture": "twsenhist2.json",
+    "rawSha256": "180187eab296348d7438fb46e3a9ebd81c749965f0ffbb52c65c5c0d192fd683",
+    "retrievedDate": "2026-10-22",
+    "note": "Actual source response, row-trimmed; test-only, never bundled."
+  },
+  {
+    "fixture": "pnhist.json",
+    "rawSha256": "002b944dea17fcfbd7461f1b82a028160aea413fa9e81852c8416cdbd2bb9d20",
+    "retrievedDate": "2026-10-22",
+    "note": "Actual source response, row-trimmed; test-only, never bundled."
+  },
+  {
+    "fixture": "pphist.json",
+    "rawSha256": "23d2e6499e286b9188af4e30c5048376cb9729784271d79518b739f24a050bc0",
+    "retrievedDate": "2026-10-22",
+    "note": "Actual source response, row-trimmed; test-only, never bundled."
+  },
+  {
+    "fixture": "sec.json",
+    "rawSha256": "c24afa8dfdd359593f193c737a5af2d49f172f81fe83b7019d7d7e2e3fc2cb5f",
+    "retrievedDate": "2026-10-22",
+    "note": "Actual source response, row-trimmed; test-only, never bundled."
+  },
+  {
+    "fixture": "tickers.json",
+    "rawSha256": "2fa1116adcb69cdd9d834ca4fd868c1e3d97ef45b3679da058529a8922673897",
+    "retrievedDate": "2026-10-22",
+    "note": "Actual source response, row-trimmed; test-only, never bundled."
+  }
+]
