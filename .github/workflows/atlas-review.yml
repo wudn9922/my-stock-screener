@@ -41,6 +41,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Restore generated inputs for PR readers after cutover
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        env:
+          GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
+        run: python scripts/generated_branch.py restore
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -125,6 +130,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Restore generated inputs for full-market readers
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        env:
+          GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
+        run: python scripts/generated_branch.py restore
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

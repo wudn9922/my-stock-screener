@@ -10,6 +10,7 @@ on:
   workflow_dispatch:
 
 env:
+  GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
@@ -33,6 +34,11 @@ jobs:
         with:
           ref: main
 
+      - name: Restore generated inputs
+        id: generated_restore
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        run: python scripts/generated_branch.py restore
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -44,8 +50,12 @@ jobs:
       - name: Build Taiwan theme rotation
         run: python -u scripts/build_themes.py --market tw
 
+      - name: Publish owned outputs to generated and durable records to main
+        if: (always()) && vars.GENERATED_BRANCH_MODE == '1' && steps.generated_restore.outcome == 'success'
+        run: python scripts/generated_branch.py publish themes
+
       - name: Commit and Push changes
-        if: always()
+        if: (always()) && vars.GENERATED_BRANCH_MODE != '1'
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
