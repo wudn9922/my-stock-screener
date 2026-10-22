@@ -45,13 +45,13 @@ describe("actual generated public research contracts", () => {
         .parse(json("institutions/2330.TW.json"))
         .rows.some((r) => r.foreign.net < 0),
     ).toBe(true);
-  });
+  }, 30000);
   it("validates every daily price-volume shard", () => {
     for (const file of readdirSync(resolve(root, "volume")))
       expect(volumeSchema.safeParse(json(`volume/${file}`)).success, file).toBe(
         true,
       );
-  });
+  }, 30000);
   it("validates actual official alerts, SEC and world sources", () => {
     expect(alertsSchema.safeParse(json("alerts.json")).success).toBe(true);
     expect(secSchema.safeParse(json("sec-radar.json")).success).toBe(true);

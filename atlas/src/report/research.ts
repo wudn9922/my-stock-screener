@@ -65,6 +65,7 @@ export const institutionsSchema = meta.extend({
   currency: z.literal("TWD"),
   unit: z.literal("shares"),
   rows: z.array(observation),
+  marketPriceSource: meta.nullable().optional(),
   summary: z.record(
     z.enum(["foreign", "trust", "dealer"]),
     z.object({ windows: z.record(z.string(), flowWindow), streak: n }),
@@ -77,6 +78,7 @@ export const institutionsSchema = meta.extend({
 });
 export type Institutions = z.infer<typeof institutionsSchema>;
 const feature = z.object({
+  officialVolume: nullable.optional(),
   date: day,
   close: nullable,
   volume: nullable,
@@ -89,8 +91,14 @@ const feature = z.object({
   rangePct: nullable,
   missingReason: z.string().nullable(),
 });
-const average = z.object({ value: nullable, observations: n, requested: n });
+const average = z.object({
+  officialObservations: n.int().nonnegative().optional(),
+  value: nullable,
+  observations: n,
+  requested: n,
+});
 export const volumeSchema = meta.extend({
+  marketAmountSource: meta.nullable().optional(),
   symbol: z.string(),
   market: z.enum(["TW", "US"]),
   currency: z.enum(["TWD", "USD"]),

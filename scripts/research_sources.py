@@ -229,3 +229,49 @@ def parse_alerts(body, market, kind, url, fetched):
                 )
             )
     return out
+
+
+def parse_market_turnover(body, market, expected_date):
+    """Official shares / TWD amount; no inference from bid/ask lot columns."""
+    out = {}
+    for headers, rows, actual in tables(body):
+        fields = [clean(h) for h in headers]
+        code_name = "證券代號" if market == "TW" else "代號"
+        amount_name = "成交金額" if market == "TW" else "成交金額(元)"
+        close_name = "收盤價" if market == "TW" else "收盤"
+        if not all(
+            name in fields for name in (code_name, amount_name, close_name, "成交股數")
+        ):
+            continue
+        if actual != expected_date:
+            raise SourceError("Official turnover report date missing/mismatched")
+        indices = [
+            fields.index(k) for k in (code_name, close_name, "成交股數", amount_name)
+        ]
+        for row in rows:
+            code = str(row[indices[0]]).strip()
+            if not re.fullmatch("[1-9][0-9]{3}", code):
+                continue
+            close, volume, amount = [to_number(row[i]) for i in indices[1:]]
+            if (
+                close is None or volume == 0
+            ):  # no closing trade, not an invented zero-price day
+                continue
+            if (
+                any(v is None or v <= 0 for v in (close, volume, amount))
+                or int(volume) != volume
+            ):
+                raise SourceError("Invalid official shares / TWD amount")
+            average = amount / volume
+            if "均價" in fields:
+                published = to_number(row[fields.index("均價")])
+                if published is not None and abs(average - published) > 0.03:
+                    raise SourceError(
+                        "TPEx published average disagrees with amount/shares"
+                    )
+            out[code + "." + market] = dict(
+                close=close, volume=int(volume), amount=amount, average=average
+            )
+    if not out:
+        raise SourceError("No dated official stock turnover table")
+    return out

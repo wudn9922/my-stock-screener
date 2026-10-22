@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'atlas/**'
+      - 'docs/report/research/**'
       - 'scripts/*research*.py'
       - 'scripts/build_sec_radar.py'
       - 'scripts/build_world_assets.py'
@@ -116,8 +117,9 @@ jobs:
         run: |
           mkdir -p /tmp/full-market-research
           cp -a docs/report/research/institutions.json docs/report/research/institutions /tmp/full-market-research/
-          python scripts/build_research.py volume --cache .cache/universe-full --out /tmp/full-market-research
+          if [ -d docs/report/research/turnover ]; then cp -a docs/report/research/turnover /tmp/full-market-research/; fi
           python scripts/build_research.py institutional --days 0 --budget 0 --cache .cache/universe-full --out /tmp/full-market-research
+          python scripts/build_research.py volume --cache .cache/universe-full --out /tmp/full-market-research
       - uses: actions/upload-artifact@v4
         with:
           name: full-market-research

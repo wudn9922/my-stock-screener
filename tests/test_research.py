@@ -11,15 +11,16 @@ import urllib.error
 from datetime import date
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from research_io import SourceError, retain, read, write
+from research_io import SourceError, retain, read, write, market_paths, Http
 from research_metrics import (
+    enrich_turnover_snapshot,
     volume_features,
     volume_stats,
     structure,
     cost_estimate,
     institutional_summary,
 )
-from research_sources import parse_flows, parse_alerts
+from research_sources import parse_flows, parse_alerts, parse_market_turnover
 from build_tw_chips import parse_tdcc_distribution
 from build_sec_radar import (
     event,
@@ -426,6 +427,23 @@ class SecAndWorld(unittest.TestCase):
         self.assertEqual(next["history"], prev["history"])
         self.assertEqual(next["fetchedAt"], "original")
 
+    def test_newer_report_history_wins_over_older_full_market_cache(self):
+        from unittest.mock import patch
+        import research_io
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "data").mkdir()
+            (root / "cache/bars").mkdir(parents=True)
+            report = root / "data/AAPL.csv"
+            cached = root / "cache/bars/AAPL.csv"
+            report.write_text("Date,Close\n2026-10-21,100\n")
+            cached.write_text("Date,Close\n2026-10-20,99\n")
+            with patch.object(research_io, "ROOT", root):
+                self.assertEqual(market_paths(root / "cache")["AAPL"], report)
+                cached.write_text("Date,Close\n2026-10-21,100\n")
+                self.assertEqual(market_paths(root / "cache")["AAPL"], cached)
+
     def test_snapshot_atomic_rejects_nan(self):
         with tempfile.TemporaryDirectory() as temp:
             p = Path(temp) / "file.json"
@@ -433,6 +451,150 @@ class SecAndWorld(unittest.TestCase):
             with self.assertRaises(ValueError):
                 write(p, {"value": float("nan")})
             self.assertEqual(read(p), {"value": 1})
+
+
+class OfficialTurnover(unittest.TestCase):
+    def test_verified_twse_shares_twd_and_date(self):
+        result = parse_market_turnover(
+            (FIX / "twse_amount.json").read_bytes(), "TW", "2026-10-21"
+        )["2330.TW"]
+        self.assertEqual(result["volume"], 27095005)
+        self.assertEqual(result["amount"], 65515856247)
+        self.assertAlmostEqual(result["average"], 2418.004951355425)
+        with self.assertRaises(SourceError):
+            parse_market_turnover(
+                (FIX / "twse_amount.json").read_bytes(), "TW", "2026-10-20"
+            )
+
+    def test_verified_tpex_published_average_and_reordered_columns(self):
+        data = json.loads((FIX / "tpex_amount.json").read_text())
+        table = data["tables"][0]
+        table["fields"].reverse()
+        table["data"] = [row[::-1] for row in table["data"]]
+        result = parse_market_turnover(data, "TWO", "2026-10-21")["6488.TWO"]
+        self.assertEqual(result["volume"], 8903488)
+        self.assertAlmostEqual(result["average"], 883.0870648671622)
+        table["data"][0][table["fields"].index("均價")] = "1"
+        with self.assertRaises(SourceError):
+            parse_market_turnover(data, "TWO", "2026-10-21")
+
+    def test_cash_enrichment_preserves_causal_volume_and_matches_full_recalculation(
+        self,
+    ):
+        rows = bars()
+        quotes = {
+            r["date"]: dict(amount=2000000 + i, volume=999) for i, r in enumerate(rows)
+        }
+        before = volume_stats(rows)
+        after = enrich_turnover_snapshot(before, quotes)
+        rebuilt = volume_stats(
+            [
+                dict(r, amount=quotes[r["date"]]["amount"], officialVolume=999)
+                for r in rows
+            ]
+        )
+        for key in (
+            "amountAverages",
+            "amountTotals",
+            "amihud20",
+            "amihudObservations",
+            "features",
+            "latest",
+        ):
+            self.assertEqual(after[key], rebuilt[key])
+        for key in ("volumeAverages", "volumeTotals", "windows", "volumePercentile"):
+            self.assertEqual(after[key], before[key])
+        self.assertEqual(after["latest"]["volume"], 100)
+        self.assertEqual(after["latest"]["officialVolume"], 999)
+
+    def test_official_market_vwap_is_not_close_proxy_and_basis_mismatch_excluded(self):
+        prices = [dict(date="2026-10-21", close=100, volume=100)]
+        flows = [
+            dict(
+                flow("2026-10-21", 100),
+                market=dict(close=100, volume=200, amount=20200),
+            )
+        ]
+        result = cost_estimate(flows, prices, 1, "foreign")
+        self.assertEqual(result["reference"], 101)
+        self.assertEqual(result["priceBasis"], "official-market-VWAP")
+        prices[0]["close"] = 50
+        result = cost_estimate(flows, prices, 1, "foreign")
+        self.assertIsNone(result["reference"])
+        self.assertEqual(result["observations"], 0)
+
+    def test_partial_http_response_is_source_failure(self):
+        from unittest.mock import patch
+        from http.client import IncompleteRead
+
+        with patch("urllib.request.urlopen", side_effect=IncompleteRead(b"partial")):
+            with self.assertRaises(SourceError):
+                Http(delay=0).get("https://www.twse.com.tw/test")
+
+
+class CacheEvictionRecovery(unittest.TestCase):
+    def test_volume_manifest_counts_retained_snapshots_when_csv_cache_evicted(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        from build_research import volume
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            snapshot = dict(
+                volume_stats(bars()), symbol="TEST.TW", asOf="2026-02-14", status="ok"
+            )
+            write(root / "volume/TEST.TW.json", snapshot)
+            args = SimpleNamespace(
+                cache=root / "missing-cache", out=root, as_of=date(2026, 10, 22)
+            )
+            with patch(
+                "build_research.universe",
+                return_value={"TW": {"TEST.TW", "MISSING.TW"}, "US": set()},
+            ), patch("build_research.market_paths", return_value={}):
+                volume(args)
+            result = read(root / "volume.json")["markets"]["TW"]
+            self.assertEqual(result["covered"], 1)
+            self.assertEqual(result["coveragePct"], 50)
+            self.assertEqual(read(root / "volume/TEST.TW.json")["status"], "stale")
+            self.assertEqual(
+                read(root / "volume/TEST.TW.json")["windows"], snapshot["windows"]
+            )
+
+    def test_offline_institution_recalculation_does_not_clear_source_failure(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        from build_research import institutional
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            write(
+                root / "institutions.json",
+                {
+                    "sources": {
+                        "TW": {
+                            "dates": ["2026-10-21"],
+                            "status": "stale",
+                            "missingReason": "403",
+                            "fetchedAt": "original",
+                        }
+                    }
+                },
+            )
+            args = SimpleNamespace(
+                cache=root / "missing-cache",
+                out=root,
+                as_of=date(2026, 10, 22),
+                days=0,
+                budget=0,
+            )
+            with patch(
+                "build_research.universe", return_value={"TW": set(), "US": set()}
+            ), patch("build_research.market_paths", return_value={}):
+                institutional(args)
+            source = read(root / "institutions.json")["sources"]["TW"]
+            self.assertEqual(source["status"], "stale")
+            self.assertEqual(source["missingReason"], "403")
+            self.assertEqual(source["fetchedAt"], "original")
 
 
 if __name__ == "__main__":

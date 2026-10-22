@@ -63,6 +63,7 @@ def volume_features(rows):
         )
         f = dict(
             date=row["date"],
+            officialVolume=row.get("officialVolume"),
             close=row.get("close"),
             volume=row.get("volume"),
             valid=bool(valid),
@@ -156,6 +157,7 @@ def volume_stats(rows):
         if w in (5, 20):
             result["amountAverages"][str(w)] = dict(
                 value=avg([r["amount"] for r in good]),
+                officialObservations=sum(r["amountBasis"] == "official" for r in good),
                 observations=len(good),
                 requested=w,
             )
@@ -222,6 +224,50 @@ def volume_stats(rows):
     return result
 
 
+def enrich_turnover_snapshot(snapshot, quotes):
+    """Refresh cash-only metrics from dated official inputs, preserving canonical OHLCV signals.
+
+    The published 21 features contain all observations required by ADV5/20 and
+    Amihud20, so this also works after the full-market CSV cache is evicted.
+    """
+    result = dict(snapshot)
+    features = [dict(row) for row in snapshot["features"]]
+    for row in features:
+        quote = quotes.get(row["date"])
+        if quote:
+            row.update(
+                amount=quote["amount"],
+                amountBasis="official",
+                officialVolume=quote["volume"],
+            )
+    result["features"] = features
+    result["latest"] = features[-1]
+    result["amountAverages"] = dict(snapshot["amountAverages"])
+    result["amountTotals"] = dict(snapshot["amountTotals"])
+    for window in (5, 20):
+        good = [row for row in features[-window:] if row["valid"]]
+        result["amountAverages"][str(window)] = dict(
+            value=avg([r["amount"] for r in good]),
+            observations=len(good),
+            requested=window,
+            officialObservations=sum(r["amountBasis"] == "official" for r in good),
+        )
+        result["amountTotals"][str(window)] = (
+            sum(r["amount"] for r in good) if good else None
+        )
+    amihud = [
+        abs(r["returnPct"] / 100) / r["amount"] * 1e6
+        for r in features[-20:]
+        if r["returnPct"] is not None and positive(r["amount"])
+    ]
+    result["amihud20"], result["amihudObservations"] = avg(amihud), len(amihud)
+    risks = [r for r in snapshot["risks"] if r != "低成交金額（本幣門檻）"]
+    if (result["amountAverages"]["20"]["value"] or 0) < 1e6:
+        risks.append("低成交金額（本幣門檻）")
+    result["risks"] = risks
+    return result
+
+
 def institutional_summary(rows, market_dates=None):
     rows = sorted(rows, key=lambda r: r["date"])
     out = {}
@@ -267,6 +313,16 @@ def cost_estimate(flows, prices, window, role, market_dates=None):
             or flow.get(role) is None
         ):
             continue
+        p = dict(p)
+        quote = flow.get("market")
+        if quote and positive(quote.get("volume")) and positive(quote.get("amount")):
+            # Exclude mismatched share/price adjustment bases instead of mixing split vintages.
+            if (
+                not positive(quote.get("close"))
+                or abs(p["close"] / quote["close"] - 1) > 0.005
+            ):
+                continue
+            p.update(volume=quote["volume"], amount=quote["amount"])
         if p.get("action"):
             continue
         valid.append((flow, p))
@@ -291,7 +347,11 @@ def cost_estimate(flows, prices, window, role, market_dates=None):
         closeHigh=max(closes) if closes else None,
         low=min(vwaps) if vwaps else None,
         high=max(vwaps) if vwaps else None,
-        distancePct=change(current["close"], ref) if current else None,
+        distancePct=(
+            change(current["close"], ref)
+            if current and not current.get("action")
+            else None
+        ),
         priceBasis=(
             "official-market-VWAP"
             if buys and all(positive(p.get("amount")) for _, p in buys)

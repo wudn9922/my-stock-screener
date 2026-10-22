@@ -65,9 +65,10 @@ function VolumeData({ symbol }: { symbol: string }) {
   return (
     <>
       <Provenance data={data} />
+      {data.marketAmountSource && <Provenance data={data.marketAmountSource} />}
       <dl className="research-stats">
         <Stat
-          label="最新完整交易日成交量（股）"
+          label="最新完整日 K 成交量（股）"
           value={num(data.latest.volume, 0)}
         />
         <Stat
@@ -83,6 +84,13 @@ function VolumeData({ symbol }: { symbol: string }) {
                   : "門檻範圍內"
           }
         />
+        {data.latest.officialVolume != null && (
+          <Stat
+            label="官方同日成交股數（股）"
+            value={num(data.latest.officialVolume, 0)}
+            note="價量結構沿用日K來源；官方量供對照與法人比率"
+          />
+        )}
         {[5, 20, 60].map((w) => (
           <Stat
             key={w}
@@ -96,7 +104,7 @@ function VolumeData({ symbol }: { symbol: string }) {
             key={`adv${w}`}
             label={`ADV${w}（${data.currency}）`}
             value={num(data.amountAverages[w]?.value, 0)}
-            note="成交金額採收盤×量代理；含當日"
+            note={`官方 ${data.amountAverages[w]?.officialObservations ?? 0}/${data.amountAverages[w]?.observations ?? 0} 筆；其餘採收盤×量代理，含當日`}
           />
         ))}
         <Stat
@@ -311,7 +319,9 @@ function VolumeData({ symbol }: { symbol: string }) {
         固定使用既有已收盤日
         K；零量、缺值、停牌相鄰日、已知公司行動及未確認的大幅跳價不產生價量訊號。RVOL
         分母只取當日前 20
-        個有效成交日；一般均量含當日。價格：來源拆股還原、未還原股息；成交量調整無法獨立核實，除權息／拆股仍可能影響比較。不同幣別成交金額不直接跨市場排序。門檻是工具設定，非投資訊號。
+        個有效成交日；一般均量含當日。價格：來源拆股還原、未還原股息；成交量調整無法獨立核實，除權息／拆股仍可能影響比較。台股成交金額優先取官方同日值，成交量維持既有日
+        K
+        口徑，可能與官方量不同。不同幣別成交金額不直接跨市場排序。門檻是工具設定，非投資訊號。
       </p>
     </>
   );

@@ -72,7 +72,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           case "$MODULE" in
-            institutional) git add docs/report/research/institutions.json docs/report/research/institutions/ ;;
+            institutional) git add docs/report/research/institutions.json docs/report/research/institutions/; if [ -d docs/report/research/turnover ]; then git add docs/report/research/turnover/; fi ;;
             volume) git add docs/report/research/volume.json docs/report/research/volume/ ;;
             alerts) git add docs/report/research/alerts.json ;;
             sec) git add docs/report/research/sec-radar.json docs/report/research/sec/ ;;

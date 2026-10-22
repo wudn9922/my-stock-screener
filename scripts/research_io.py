@@ -3,6 +3,7 @@
 from __future__ import annotations
 import csv
 import hashlib
+import http.client
 import io
 import json
 import os
@@ -50,6 +51,10 @@ def write(path, value):
 class SourceError(Exception):
     """Expected remote/format failure, safe to retain the previous snapshot."""
 
+    def __init__(self, message, status=None):
+        super().__init__(message)
+        self.status = status
+
 
 class Http:
     def __init__(self, user_agent=None, delay=0.6, timeout=35):
@@ -78,8 +83,15 @@ class Http:
                 }
                 self.receipts.append(receipt)
                 return body
-        except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            raise SourceError(f"{url}: {exc}") from exc
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            OSError,
+            http.client.HTTPException,
+        ) as exc:
+            raise SourceError(
+                f"{url}: {exc}", status=getattr(exc, "code", None)
+            ) from exc
 
     def json(self, url):
         try:
@@ -148,8 +160,25 @@ def price_rows(path):
         ]
 
 
+def csv_asof(path):
+    """Canonical ascending daily CSVs; never let an older cache hide a newer report bar."""
+    import re
+
+    with Path(path).open("rb") as file:
+        file.seek(max(0, Path(path).stat().st_size - 2048))
+        lines = file.read().decode("utf-8").splitlines()
+    for line in reversed(lines):
+        day = line.split(",", 1)[0].strip().strip('"')[:10]
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
+            return day
+    return ""
+
+
 def market_paths(cache):
-    """Full-market cache takes precedence. data/ is explicitly reported as partial coverage."""
+    """Freshest existing daily history; equal dates prefer the full-market cache."""
     paths = {p.stem: p for p in (ROOT / "data").glob("*.csv")}
-    paths.update({p.stem: p for p in (Path(cache) / "bars").glob("*.csv")})
+    for path in (Path(cache) / "bars").glob("*.csv"):
+        old = paths.get(path.stem)
+        if old is None or csv_asof(path) >= csv_asof(old):
+            paths[path.stem] = path
     return paths

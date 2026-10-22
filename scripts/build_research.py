@@ -22,12 +22,21 @@ from research_io import (
     universe,
     write,
 )
-from research_metrics import cost_estimate, institutional_summary, volume_stats
-from research_sources import parse_alerts, parse_flows
+from research_metrics import (
+    cost_estimate,
+    institutional_summary,
+    volume_stats,
+    enrich_turnover_snapshot,
+)
+from research_sources import parse_alerts, parse_flows, parse_market_turnover
 
 FLOW_URLS = {
     "TW": "https://www.twse.com.tw/rwd/zh/fund/T86?date={ymd}&selectType=ALLBUT0999&response=json",
     "TWO": "https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade?type=Daily&date={slash}&id=&response=csv",
+}
+TURNOVER_URLS = {
+    "TW": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date={ymd}&type=ALLBUT0999",
+    "TWO": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date={slash}&id=&response=json",
 }
 ALERT_URLS = {
     "TW:notice": "https://openapi.twse.com.tw/v1/announcement/notice",
@@ -53,7 +62,10 @@ def institutional(args):
             if time.monotonic() - start > args.budget:
                 break
             day = args.as_of - timedelta(days=offset)
-            if day.weekday() > 4 or (day.isoformat() in dates and offset > 1):
+            turnover_path = args.out / "turnover" / market / (day.isoformat() + ".json")
+            if day.weekday() > 4 or (
+                day.isoformat() in dates and offset > 1 and turnover_path.exists()
+            ):
                 continue
             cache = args.cache / "institutions" / market / (day.isoformat() + ".json")
             try:
@@ -75,6 +87,50 @@ def institutional(args):
                         f"{market}: coverage below 50%, refusing partial date"
                     )
                 dates.add(day.isoformat())
+                # Market-wide official daily cash input, independent of institutional fill prices.
+                if offset <= 1 or not turnover_path.exists():
+                    quote_url = TURNOVER_URLS[market].format(
+                        ymd=day.strftime("%Y%m%d"), slash=day.strftime("%Y/%m/%d")
+                    )
+                    previous_quote = read(turnover_path)
+                    try:
+                        quote_rows = parse_market_turnover(
+                            http.get(quote_url), market, day.isoformat()
+                        )
+                        quote_rows = {
+                            s: q for s, q in quote_rows.items() if s in wanted
+                        }
+                        if len(quote_rows) < len(target) * 0.5:
+                            raise SourceError("Official turnover coverage below 50%")
+                        write(
+                            turnover_path,
+                            dict(
+                                meta(
+                                    "TWSE/TPEx official daily turnover",
+                                    quote_url,
+                                    day.isoformat(),
+                                    fetched=stamp(),
+                                ),
+                                currency="TWD",
+                                volumeUnit="shares",
+                                rows=quote_rows,
+                            ),
+                        )
+                    except SourceError as exc:
+                        print("Turnover retained / proxy fallback:", exc, flush=True)
+                        if previous_quote:
+                            write(
+                                turnover_path,
+                                retain(
+                                    previous_quote,
+                                    "TWSE/TPEx official daily turnover",
+                                    quote_url,
+                                    exc,
+                                ),
+                            )
+                        if getattr(exc, "status", None) in (403, 429):
+                            break
+
             except SourceError as exc:
                 error = str(exc)
                 print(error, flush=True)
@@ -85,8 +141,13 @@ def institutional(args):
                     "TWSE T86" if market == "TW" else "TPEx dailyTrade",
                     template,
                     max(dates),
-                    "stale" if error else "ok",
-                    error,
+                    (
+                        "stale"
+                        if error
+                        else "ok" if refreshed else (old or {}).get("status", "ok")
+                    ),
+                    error
+                    or ((old or {}).get("missingReason") if not refreshed else None),
                     stamp() if refreshed else (old or {}).get("fetchedAt"),
                 ),
                 dates=sorted(dates)[-120:],
@@ -105,6 +166,14 @@ def institutional(args):
         }
         for m, source in sources.items()
     }
+    # Public raw inputs survive cache eviction, with a bounded rolling archive.
+    for market in FLOW_URLS:
+        for obsolete in sorted((args.out / "turnover" / market).glob("*.json"))[:-120]:
+            obsolete.unlink()
+    turnover = {
+        m: {p.stem: read(p) for p in (args.out / "turnover" / m).glob("*.json")}
+        for m in FLOW_URLS
+    }
     for symbol in sorted(wanted):
         market = symbol.split(".")[-1]
         source = sources[market]
@@ -112,12 +181,16 @@ def institutional(args):
         for day in source.get("dates", []):
             raw = cached_dates[market][day]
             if symbol in raw:
-                rows.append(raw[symbol])
+                row = dict(raw[symbol])
+                quote = turnover[market].get(day, {}).get("rows", {}).get(symbol)
+                if quote:
+                    row["market"] = quote
+                rows.append(row)
         path = args.out / "institutions" / (symbol + ".json")
         prior = read(path, {})
         # Rehydrate from published shards when Actions cache was evicted.
         merged = {r["date"]: r for r in prior.get("rows", [])}
-        merged.update({r["date"]: r for r in rows})
+        merged.update({r["date"]: {**merged.get(r["date"], {}), **r} for r in rows})
         rows = [merged[d] for d in sorted(merged)][-120:]
         if not rows:
             continue
@@ -125,13 +198,51 @@ def institutional(args):
         # Exclude intraday CSV rows. Cached prices are source-split-adjusted, dividend-unadjusted.
         p = [r for r in p if r["date"] <= args.as_of.isoformat()]
         pmap = {r["date"]: r for r in p}
+        # Official same-day closes can complete E's price inputs when a report/cache lags.
+        latest_canonical = max(p, key=lambda x: x["date"]) if p else None
+        for day, pack in turnover[market].items():
+            quote = pack.get("rows", {}).get(symbol)
+            if quote and day not in pmap:
+                action = (
+                    "unverified-price-basis"
+                    if latest_canonical
+                    and day > latest_canonical["date"]
+                    and latest_canonical.get("close")
+                    and abs(quote["close"] / latest_canonical["close"] - 1) > 0.105
+                    else None
+                )
+                extra = dict(
+                    date=day,
+                    close=quote["close"],
+                    volume=quote["volume"],
+                    amount=quote["amount"],
+                    action=action,
+                )
+                p.append(extra)
+                pmap[day] = extra
+        # A suspected split/adjustment break must not mix native price scales in E.
+        ordered = sorted(p, key=lambda x: x["date"])
+        breaks = [
+            b["date"]
+            for a, b in zip(ordered, ordered[1:])
+            if a.get("close")
+            and b.get("close")
+            and abs(b["close"] / a["close"] - 1) > 0.4
+        ]
+        if breaks:
+            for row in p:
+                if row["date"] <= max(breaks):
+                    row["action"] = row.get("action") or "unverified-price-basis-break"
+
         for r in rows:
+            quote = turnover[market].get(r["date"], {}).get("rows", {}).get(symbol)
+            if quote:
+                r["market"] = quote
             price = pmap.get(r["date"])
             r["close"] = price.get("close") if price else None
+            volume = r.get("market", {}).get("volume") or ((price or {}).get("volume"))
             r["netVolumePct"] = (
-                r["foreign"]["net"] / price["volume"] * 100
-                if price and (price.get("volume") or 0) > 0
-                else None
+                r["foreign"]["net"] / volume * 100 if volume and volume > 0 else None
             )
         write(
             path,
@@ -157,6 +268,17 @@ def institutional(args):
                     }
                     for role in ("foreign", "trust", "dealer")
                 },
+                marketPriceSource=(
+                    {
+                        k: v
+                        for k, v in max(
+                            turnover[market].values(), key=lambda x: x["asOf"]
+                        ).items()
+                        if k != "rows"
+                    }
+                    if turnover[market]
+                    else None
+                ),
                 priceBasis="source-split-adjusted; dividends unadjusted; corporate-action share consistency not independently verified",
             ),
         )
@@ -187,10 +309,47 @@ def institutional(args):
 
 def volume(args):
     members, paths, counts, latest = universe(), market_paths(args.cache), {}, {}
+    turnover = {
+        m: {
+            p.stem: read(p).get("rows", {})
+            for p in (args.out / "turnover" / m).glob("*.json")
+        }
+        for m in FLOW_URLS
+    }
+    cash_metadata = {
+        m: [
+            {k: v for k, v in read(p).items() if k != "rows"}
+            for p in (args.out / "turnover" / m).glob("*.json")
+        ]
+        for m in FLOW_URLS
+    }
+
+    def cash_source(symbol, asof):
+        candidates = [
+            m for m in cash_metadata.get(symbol.split(".")[-1], []) if m["asOf"] <= asof
+        ]
+        return max(candidates, key=lambda m: m["asOf"]) if candidates else None
+
     for market, symbols in members.items():
         count = 0
         for symbol in sorted(symbols):
+            path = args.out / "volume" / (symbol + ".json")
+            previous = read(path)
             if symbol not in paths:
+                if previous:
+                    if market == "TW":
+                        quotes = {
+                            d: rows[symbol]
+                            for d, rows in turnover[symbol.split(".")[-1]].items()
+                            if symbol in rows
+                        }
+                        previous = enrich_turnover_snapshot(previous, quotes)
+                        previous["marketAmountSource"] = cash_source(
+                            symbol, previous["asOf"]
+                        )
+                    stale = (args.as_of - date.fromisoformat(previous["asOf"])).days > 5
+                    previous["status"] = "stale" if stale else "ok"
+                    write(path, previous)
                 continue
             rows = price_rows(paths[symbol])
             # Existing CSV caches are completed-session history. Do not include today's row before close.
@@ -206,6 +365,13 @@ def volume(args):
                 if r["date"] < now.date().isoformat()
                 or (closed and r["date"] == now.date().isoformat())
             ]
+            if market == "TW":
+                exchange = symbol.split(".")[-1]
+                for row in rows:
+                    quote = turnover[exchange].get(row["date"], {}).get(symbol)
+                    if quote:
+                        row["amount"] = quote["amount"]
+                        row["officialVolume"] = quote["volume"]
             stats = volume_stats(rows)
             if not stats:
                 continue
@@ -226,11 +392,21 @@ def volume(args):
                     market=market,
                     currency="TWD" if market == "TW" else "USD",
                     priceBasis="source-split-adjusted; dividend-unadjusted; volume adjustment not independently verified",
+                    marketAmountSource=(
+                        cash_source(symbol, asof) if market == "TW" else None
+                    ),
                     **stats,
                 ),
             )
             count += 1
             latest[market] = max(latest.get(market, ""), asof)
+        existing = [
+            read(args.out / "volume" / (s + ".json"))
+            for s in symbols
+            if (args.out / "volume" / (s + ".json")).exists()
+        ]
+        count = len(existing)
+        latest[market] = max((r["asOf"] for r in existing), default=None)
         report_members = symbols & {p.stem for p in (ROOT / "data").glob("*.csv")}
         counts[market] = dict(
             universe=len(symbols),

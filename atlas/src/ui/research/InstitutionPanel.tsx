@@ -43,6 +43,7 @@ function InstitutionData({ symbol }: { symbol: string }) {
   return (
     <>
       <Provenance data={data} />
+      {data.marketPriceSource && <Provenance data={data.marketPriceSource} />}
       <div className="research-controls">
         <label>
           法人
@@ -140,7 +141,7 @@ function InstitutionData({ symbol }: { symbol: string }) {
           </table>
         </div>
         <p className="source-note">
-          外資＝不含外資自營商之外陸資＋外資自營商；投信獨立；自營商＝自行買賣＋避險。各分項依官方股數核對合計，不由外資持股比率變動推算。最新外資自營商淨額{" "}
+          外資＝不含外資自營商之外陸資＋外資自營商；投信獨立；自營商＝自行買賣＋避險。各分項依官方股數核對合計，不由外資持股比率變動推算。淨額占量比優先使用同日官方成交股數，缺少時才採既有日K量。最新外資自營商淨額{" "}
           {num(last?.foreignDealer.net)} 股，自營商自行買賣{" "}
           {num(last?.dealerOwn.net)} 股、避險 {num(last?.dealerHedge.net)} 股。
         </p>
@@ -191,7 +192,7 @@ function InstitutionData({ symbol }: { symbol: string }) {
                   <tr>
                     <th>日期</th>
                     <th>正向淨買超（股）</th>
-                    <th>市場均價代理 TWD</th>
+                    <th>市場日均價／收盤代理 TWD</th>
                     <th>收盤 TWD</th>
                   </tr>
                 </thead>
@@ -212,8 +213,8 @@ function InstitutionData({ symbol }: { symbol: string }) {
             Σ（每日市場均價 × max(淨買超股數, 0)）÷ Σ max(淨買超股數,
             0)；分母為零＝N/A。
             {cost.priceBasis === "official-market-VWAP"
-              ? "使用官方成交值÷成交量。"
-              : "日 K 無官方成交值時採收盤價代理，非法人逐筆成交均價。"}
+              ? "使用官方市場成交值÷成交股數，仍非法人逐筆成交均價。"
+              : "未配對官方成交值的日期採收盤價代理；股價還原口徑相差超過 0.5% 的日期排除，不混入估計。"}
             淨買賣超無法辨識原有庫存、個別帳戶或賣出歸屬，因此不是實際持倉成本或防守價。拆股後的價格／歷史股數可能不同口徑，區間只供公開資料研究；資料不足不推估補值。
           </p>
         </>
