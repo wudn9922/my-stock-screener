@@ -310,3 +310,9 @@ Accepted: recursive clock-insensitive writes; seven market archives with stable 
 Accepted: two source-timed schedules, market-selective volume, fresh Taiwan turnover artifact dependency, one non-force publish commit per run, collectors read-only without persisted credentials, checksum/path validation before overlay, main-only publication and research-code race guard. Missing SEC secret skips with no request and no snapshot change; fallback identity removed from the radar.
 
 Measured payload 158,722,480 → 103,409,630 bytes, 10,389 → 12 files. Full real-data clock-only replay made no byte/mtime changes. Growth replay measured 1,907,836 bytes delta-packed; budget 2–4 MB/day packed, or roughly 23 MB/day before server packing, with documented source/backfill uncertainty. Existing PR history retained, no force push. No production run, merge, external AI or independent-review claim. Evidence and reproducible commands: `docs/RESEARCH_OPERATIONS.md`.
+
+## 可畫線世界／題材圖表自我審查
+
+以 main adfb6c7da 為基準另開 PR。重用 5.2.1 ChartEngine 與 Drawing Primitive；AppStore 初始化抽成共用 singleton，沒有新增資料庫或改登入，研究 namespace 與週期隔離。原物料／FX 真實日 OHLC；期貨明示 source-stitched front contract，FX 保持方向並排除無法通過 OHLC 邊界的來源資料。題材選參考 ETF／成分股，沒有假造等權組合高低價；其他題材統計／清單保留。
+
+只新增 K 線永久 CSV，日期合併拒絕刪歷史；current metadata 與 JSON 視圖覆寫。白名單／checksum artifact handoff 延伸至 CSV；generated publisher records 將其保留 main。沒有操作正式開關、force main、合併或刪除既有資料。覆蓋、實際樣本、供應商限制、重現指令：docs/DRAWABLE_RESEARCH_CHARTS.md。同模型自我審查，沒有外部 AI。

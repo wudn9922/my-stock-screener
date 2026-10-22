@@ -15,6 +15,7 @@
   "append_only": ["docs/report/breakouts-archive/*.json"],
   "records": {
     "daily": ["data/*.csv"],
+    "research": ["data/world/*.csv"],
     "financials": ["docs/report/financials/**"],
     "fundamentals": ["docs/report/financials/**", "docs/report/fundamentals/tw-financials-finmind.json"],
     "atlas": ["docs/.nojekyll"],

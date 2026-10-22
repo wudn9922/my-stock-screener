@@ -36,6 +36,11 @@ for (const [name, type, settings] of [
   try {
     await page.goto(base + "?page=world&view=commodities");
     await page.getByRole("heading", { name: "WTI 原油" }).waitFor();
+    await page.waitForFunction(() =>
+      document
+        .querySelector('[data-chart-identity="world:CMD-WTI"] .candle-ohlc')
+        ?.textContent?.includes("O "),
+    );
     await page.screenshot({
       path:
         out +
@@ -45,6 +50,11 @@ for (const [name, type, settings] of [
     });
     await page.getByRole("button", { name: "匯率", exact: true }).click();
     await page.getByRole("heading", { name: "USD/TWD", exact: true }).waitFor();
+    await page.waitForFunction(() =>
+      document
+        .querySelector('[data-chart-identity="world:FX-USDTWD"] .candle-ohlc')
+        ?.textContent?.includes("O "),
+    );
     for (const symbol of ["2330.TW", "6488.TWO", "AAPL"]) {
       await page.goto(base + "?page=financials&symbol=" + symbol);
       const volume = page.locator("details.data-research").filter({

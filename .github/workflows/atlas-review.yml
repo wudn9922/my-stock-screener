@@ -96,7 +96,7 @@ jobs:
           retention-days: 7
       - name: Desktop, phone and WebKit regressions
         working-directory: atlas
-        run: npm run test:site -- parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts breakouts.spec.ts stock-volatility.spec.ts research-modules.spec.ts
+        run: npm run test:site -- parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts breakouts.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -111,6 +111,7 @@ jobs:
         run: |
           pip install requests numpy pandas openpyxl xlrd lxml pyyaml
           python -m unittest discover -s tests -p test_research.py -v
+          python -m unittest discover -s tests -p test_research_candles.py -v
           python -m unittest discover -s tests -p test_research_operations.py -v
           python -m unittest discover -s tests -p test_tw_chips.py -v
           python -m unittest discover -s tests -p 'test_atlas_watchlists.py' -v
