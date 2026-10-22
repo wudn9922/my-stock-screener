@@ -11,8 +11,8 @@
 | C 異常量／流動性／價量結構 | 可用：可調門檻，5/10/20 日四項比例保留分子／分母、RVOL、ADV、Amihud、零量／有效樣本與風險 | 重用既有 `data/` 與全市場日 K cache；較新的日報優先，同日期採完整 cache | 現有 universe 全部 7,317 檔已有快照；各指標仍依有效樣本數判定 | 新獨立 job 已設定 | 通過（含因果窗口、缺值、公司行動等） | 通過；另有畫線／週期隔離回歸 | 未部署 | 不是所有股票都有完整 60 日／可用 RVOL；數量見下表 |
 | D 注意／處置 | 可用：搜尋、市場／種類／公告區間篩選、30/60/90 日次數、原因、限制、歷史及官方原文 | TWSE／TPEx 四種正式來源及歷史端點已實測 | 2026-07-19 起查詢，2,364 筆事件；最新公告日依來源分別顯示 | 新獨立 job 已設定 | 通過 | 通過 | 未部署 | 公告期間外是否順延／解除須官方確認；不自行宣稱解除或明日必處置 |
 | E 法人買超日價格區間（估計） | 可用：三類法人、5/20/60 日、正買超日數／價格範圍／加權代理／距離與覆蓋率 | 官方法人股數＋TWSE／TPEx 同日成交值與量，既有日 K 檢查價格基準；每筆估計日及基準可查 | 兩市場各 65 日官方市場成交輸入；不足／價格基準不符會顯示配對筆數 | 隨 A 獨立更新 | 通過 | 通過 | 未部署 | 官方市場日均價優先，缺值才明示收盤代理；價格基準不符者排除。不是實際法人均價／庫存成本 |
-| F SEC 8-K／8-K/A | 可用：1/7/30/90 日、股票／分類／原始修訂、個股及自選清單、官方原文 | SEC ticker map、submissions、分頁、每日索引與文件；CIK＋Accession 去重、股別別名保留、進度／冷卻 | 1,195 個去重事件、33 個修訂；7 個每日索引及 16 檔逐股查詢；22 筆有實際內容節錄 | 新獨立 job 已設定 | 通過 | 通過 | 未部署 | **EXTERNAL BLOCKER（部分歷史／內容）：**SEC 間歇 403，已持久化冷卻；其餘保留「內容尚未解析」，不編造摘要 |
-| G 世界原物料／匯率 | 可用：四個穩定 URL、6 原物料、5 匯率、單位／方向／頻率、歷史圖與期間變化 | EIA、World Bank、Fed H.10；ECB 同日交叉匯率備援亦已驗證 | 能源日資料到 2026-10-20，匯率到 10-16；金銀銅月資料到 **2024-12** | 新獨立 job 已設定 | 通過（方向／頻率／曆月／過期 YTD） | 通過，含返回／重載 | 未部署 | **EXTERNAL BLOCKER（新金屬價格）：**World Bank 下載檔過舊，商品入口 403；FRED 替代序列請求逾時。舊月資料明確標 stale，1d/1w／當年 YTD 不假算 |
+| F SEC 8-K／8-K/A | 可用：1/7/30/90 日、股票／分類／原始修訂、個股及自選清單、官方原文 | SEC ticker map、submissions、分頁、每日索引與文件；CIK＋Accession 去重、股別別名保留、進度／冷卻 | 1,254 個去重事件、33 個修訂；7 個每日索引及 38 檔逐股查詢；22 筆有實際內容節錄 | 新獨立 job 已設定 | 通過 | 通過 | 未部署 | **EXTERNAL BLOCKER（部分歷史／內容）：**SEC 間歇 403，已持久化冷卻；其餘保留「內容尚未解析」，不編造摘要 |
+| G 世界原物料／匯率 | 可用：四個穩定 URL、6 原物料、5 匯率、單位／方向／頻率、歷史圖與期間變化 | EIA、World Bank、Fed H.10；ECB 同日交叉匯率備援亦已驗證 | 能源日資料到 2026-10-20，匯率到 10-16；金銀銅月資料到 **2026-09** | 新獨立 job 已設定 | 通過（方向／頻率／曆月／過期 YTD） | 通過，含返回／重載 | 未部署 | 已找到並驗證 2026 年版 World Bank 月資料，解除舊檔限制。金銀銅維持月均基準；1d/1w 為 N/A，沒有冒充每日即時行情 |
 
 新排程在未來獲准 merge 後才會生效；本次沒有執行 main 的資料發布或正式部署 workflow。PR 的 full-market job 僅讀取既有 cache 並上傳產物，沒有新增行情請求或寫入 main。所有正式資料日期、來源與覆蓋統計另存 [coverage.json](research-verification/coverage.json)。
 
@@ -26,7 +26,7 @@
 - **2330 外資近 20 日估計**：5 個正淨買超日，以同日官方成交金額／官方股數加權，參考價 **2,522.8199 TWD**，市場日均價區間 2,472.4275～2,567.1145；買超日收盤區間 2,480～2,575，10-21 收盤 2,420，距參考價 −4.0756%。公式為 `Σ(當日市場均價或明示代理 × max(淨買超,0)) / Σmax(淨買超,0)`；本例是市場日均價代理估計，非法人實際成交／剩餘庫存成本。
 - **2330 官方市場成交，2026-10-21**：成交金額 65,515,856,247 TWD，官方股數 27,095,005，市場日均價 2,418.00495；ADV20 為 66,053,541,742.55 TWD（20/20 官方金額）。原日 K 成交量與官方股數不同，價量訊號維持原日 K，官方量另列對照；不把官方成交值除以另一來源的量。
 - **SEC 實際內容**：AAPL，2026-09-01，Accession `0001140361-26-035325`，Item 5.02，已取得 [官方 8-K/A 原文](https://www.sec.gov/Archives/edgar/data/320193/000114036126035325/ef20081427_8ka.htm)。內容節錄只來自文件文字，分類標題來自正式 Item，不由 Item 猜測事件細節。
-- **EIA／Fed**：WTI 107.89 USD/桶（10-20）；USD/TWD 32.4000、EUR/USD 1.1231（10-16），各自表示每 1 USD 兌 TWD／每 1 EUR 兌 USD。金價 2,648.01 USD/金衡盎司只屬 **2024-12 月均基準**，不稱目前金價。
+- **EIA／Fed**：WTI 107.89 USD/桶（10-20）；USD/TWD 32.4000、EUR/USD 1.1231（10-16），各自表示每 1 USD 兌 TWD／每 1 EUR 兌 USD。金價 4,319.00、銀價 64.60 USD/金衡盎司、銅價 14,474.00 USD/公噸，均為 **2026-09 月均基準**，不稱每日即時行情。
 
 ADV 使用本幣每日成交金額（缺官方 amount 則 close×volume 代理）。Amihud 為 `mean(abs(日報酬小數)/當日本幣成交金額)×1,000,000`。日內高低振幅不是 bid-ask spread。資產變化採實際觀測日、曆月／曆年基準，不補值；來源不同頻率不冒充每日行情。完整公式、原始欄位、精度、時間基準、限制及每個實際 URL 見 [RESEARCH_DATA.md](RESEARCH_DATA.md)。
 
@@ -47,17 +47,17 @@ ADV 使用本幣每日成交金額（缺官方 amount 則 close×volume 代理�
 | 法人完整 60 日外資觀測 | 1,522 | 不適用 |
 | 外資 20 日估計具完整價量配對／有正淨買超參考價 | 1,589／1,919 | 不適用 |
 
-快照有值不等於每一個指標都完整；介面保留各指標觀測數、低可信度與 N/A。TDCC 最新分級覆蓋上述 1,978 檔，歷史仍只有 1 週。SEC 可對應 5,332／5,339 檔 CIK，但這**不是全部公司均已查完 90 日申報**：逐股查詢只有 16 檔，每日索引已收錄 10-13、14、15、16、19、20、21；事件涉及 941 個發行人。公告資料是事件筆數，不把沒有公告等同於資料缺失，也不把來源不可用視為正常。
+快照有值不等於每一個指標都完整；介面保留各指標觀測數、低可信度與 N/A。TDCC 最新分級覆蓋上述 1,978 檔，歷史仍只有 1 週。SEC 可對應 5,332／5,339 檔 CIK，但這**不是全部公司均已查完 90 日申報**：逐股查詢只有 38 檔，每日索引已收錄 10-13、14、15、16、19、20、21；事件涉及 961 個發行人。公告資料是事件筆數，不把沒有公告等同於資料缺失，也不把來源不可用視為正常。
 
-全市場產物來自 [Actions run 39723556039](https://github.com/wudn9922/my-stock-screener/actions/runs/39723556039) 的 `full-market-research`，來源 commit `6029e62d65bd5d7241420edc16a803b04cb2f54a`，之後用 130 份官方成交輸入更新現金指標與法人價格估計，保留既有價量訊號。合併時保留 649 檔較新的日報快照，沒有以較舊 cache 倒退資料。產物追溯見 [full-market-artifact.json](research-verification/full-market-artifact.json)。另實抓 TPEx 回補最早日 07-20，808 檔普通股解析結果與原 cache 完全相同，見 [日期／雜湊驗證](research-verification/tpex-history-check.json)。
+全市場產物來自 [Actions run 39723556039](https://github.com/wudn9922/my-stock-screener/actions/runs/39723556039) 的 `full-market-research`，來源 commit `6029e62d65bd5d7241420edc16a803b04cb2f54a`，之後用 130 份官方成交輸入更新成交金額指標與法人價格估計，保留既有價量訊號。匯入產物時保留 649 檔較新的日報快照，沒有以較舊 cache 倒退資料。產物追溯見 [full-market-artifact.json](research-verification/full-market-artifact.json)。另實抓 TPEx 回補最早日 07-20，808 檔普通股解析結果與原 cache 完全相同，見 [日期／雜湊驗證](research-verification/tpex-history-check.json)。
 
 ## 執行過的驗證
 
 | 指令／檢查 | 實際結果 |
 |---|---|
 | `npm ci` | 通過（現有 lockfile，無新增 npm 依賴） |
-| `python -m unittest discover -s tests` | **本機 1,454 通過、0 失敗**（包含最新日報優先、官方現金成交與 cache 失效復原測試）；CI 實際結果以 PR checks 為準 |
-| `python -m unittest discover -s tests -p test_research.py` | **52 通過、0 失敗** |
+| `python -m unittest discover -s tests` | **本機 1,457 通過、0 失敗**（包含最新日報優先、官方成交金額與 cache 失效復原測試）；CI 實際結果以 PR checks 為準 |
+| `python -m unittest discover -s tests -p test_research.py` | **55 通過、0 失敗** |
 | `python -m unittest discover -s tests -p test_tw_chips.py` | **44 通過、0 失敗** |
 | `npm run typecheck`／`npm run lint` | 通過 |
 | `npm test` | **957 通過，79 檔**；包含新增 17 項實際全市場 Schema／SSR／路由／缺值測試 |
@@ -68,13 +68,13 @@ ADV 使用本幣每日成交金額（缺官方 amount 則 close×volume 代理�
 | `npm run test:browser -- drawing-v1.spec.ts timeframe-scope.spec.ts --project=desktop-chromium --project=mobile-chromium --project=iphone-webkit` | **6 通過**，含畫線操作、週期隔離、重載、匯出與原鎖定狀態 |
 | 實際 Pages 建置、未 mock 的桌面／iPhone WebKit HTTP 冒煙 | **2 專案通過**；各 8 筆研究 JSON 均 HTTP 200、0 page error、0 橫向溢出，見 [receipt](research-verification/pages-live-smoke.json) |
 | `actionlint` 三份新增／調整 workflow | 通過 |
-| 官方端點小規模抓取＋65 日回補 | 實際執行；SEC 限流、FRED 逾時及舊金屬序列均保留真實狀態 |
+| 官方端點小規模抓取＋65 日回補 | 實際執行；SEC 限流仍保留真實狀態；World Bank 2026 版下載已驗證，可取代過期舊檔 |
 
 PR Actions 現在也執行 `npm run test:research-pages`：啟動實際 Pages 建置與完整 report 目錄，不攔截 HTTP 資料，並上傳 `research-pages-live` 截圖與結果。
 
 Vitest 原先只探索 `.test.ts`，已擴充包含 `.test.tsx`，並實際執行新增 17 項測試。第一輪 GitHub Python 工作因舊測試需要 `origin/main`／歷史 commit 而失敗，已將 checkout 設為完整歷史，沒有略過該測試。全市場 Schema 測試在並行讀取大量實際檔案時曾超過預設 5 秒，已對兩項全量驗證設定 30 秒預算，重跑 957 項全數通過。最終 CI／提交狀態請直接查看 [PR checks](https://github.com/wudn9922/my-stock-screener/pull/152/checks)，本文件不把排隊中的工作預寫成 PASS。
 
-本機等價 Pages 實測已通過；新增可重跑腳本後的一次啟動，被 Cloud 自動審批服務以用量上限拒絕，未執行，沒有列為本機 PASS。最終腳本另交由 PR CI 的 `Real Pages data on desktop and iPhone WebKit` 步驟實際驗證。
+本機等價 Pages 實測已通過；新增可重跑腳本後的一次啟動曾被 Cloud 自動審批服務以用量上限拒絕，沒有冒記為 PASS。冷卻重設後已重試成功。PR CI 第一輪真實 Pages 測試也找到預設 build base 與網站 URL 不符，已明確以 `/my-stock-screener/atlas/` 建置，並重跑驗證；原建置腳本的開發預設未改動。
 
 WebKit 使用 Playwright iPhone 13 模擬。Cloud 缺少的系統庫下載並解壓到 `/tmp`，未修改系統安裝；測試確實啟動瀏覽器，不是只跳過依賴檢查。這不是實體 iPhone Safari 效能認證。已檢視 [iPhone 世界頁](research-verification/iphone-world.png)、[iPhone 個股](research-verification/iphone-stock.png)、[桌面世界頁](research-verification/desktop-world.png)；主要數值可讀、來源日期可換行、無頁面橫向溢出，表格只在卡片內捲動。
 
@@ -104,4 +104,4 @@ python -m http.server 4188 --bind 127.0.0.1 --directory /tmp/atlas-pr-review
 # 另驗證 view=indices / 預設美債、個股財報籌碼及研究面板、返回與重載。
 ```
 
-目前剩下的是資料來源與覆蓋限制：TDCC 歷史需逐週累積；SEC 被拒絕的歷史／文件會按冷卻續跑；金銀銅尚無本次可驗證的新免費合法報價。這些限制均未以零值、假資料、固定測試例或捏造內容取代。
+目前剩下的是資料來源與覆蓋限制：TDCC 歷史需逐週累積；SEC 已實測冷卻後續跑，逐股檢查從 16 增至 38、去重事件增加 59 筆；被拒絕的歷史／文件會繼續按冷卻續跑；金銀銅使用已驗證的免費官方月資料，仍不是每日即時價格。這些限制均未以零值、假資料、固定測試例或捏造內容取代。

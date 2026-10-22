@@ -3,38 +3,38 @@
   "checks": [
     {
       "name": "Python full suite",
-      "passed": 1454,
+      "passed": 1457,
       "failed": 0,
-      "logSha256": "70e1c4fa7ba555449444dcce6077ad8cde6e5177c76801624344b158a956d7f3",
-      "bytes": 59970
+      "logSha256": "4bbfd9e11842c3c98dfce61c8ed46fd6beac7b1bce49f5206c82d8cfbaabaf86",
+      "bytes": 59974
     },
     {
       "name": "Research semantic tests",
-      "passed": 52,
+      "passed": 55,
       "failed": 0,
-      "logSha256": "4bba3b9ba549c5f529168e136b36ad6a3fbc5409c97ce4859f2df88773e188b6",
-      "bytes": 500
+      "logSha256": "1a72807f30775a58c3176dd7dd2f0acef2c12cd1c09af2a2662f62ee2518b1f9",
+      "bytes": 503
     },
     {
       "name": "Vitest full suite",
       "passed": 957,
       "failed": 0,
-      "logSha256": "7caf9bb909bc0957cc8189edbba273221209748dc7c289e498c2687199fd63cc",
-      "bytes": 272
+      "logSha256": "9374ea3d4f7fed101ec2527045befca9e553950f1b91b1e8826e5bb8b1d3ce65",
+      "bytes": 273
     },
     {
       "name": "Final real-shard schema validation",
       "passed": 17,
       "failed": 0,
-      "logSha256": "1d9b5d794644431aba49c7d6589319c0af091996c1a150720fdd9b996a444834",
+      "logSha256": "fbca41af6a6918780d14a42206386a083be1f79441d63d8fcdef91fff943ac8d",
       "bytes": 221
     },
     {
       "name": "New desktop/mobile/WebKit E2E",
       "passed": 15,
       "failed": 0,
-      "logSha256": "0ccada427b4b7a1f893e70738c34c8dd8cff601b633e99e466afc4a4040418be",
-      "bytes": 4890
+      "logSha256": "73fc8db7fb93977b1dd99e022b525493851418f1218b8f37b957446288725787",
+      "bytes": 4894
     },
     {
       "name": "Existing site regressions",
@@ -56,5 +56,7 @@
   "normalBuild": "passed",
   "pagesBuild": "passed",
   "actionlint": "passed",
-  "unmockedPagesProjects": 2
+  "unmockedPagesProjects": 2,
+  "unmockedPagesCommand": "npm run test:research-pages",
+  "unmockedPagesLogSha256": "39a6ad1229de9269e0f0e708bb839a7cac242573fd41c9b6bdf520f41717410d"
 }
