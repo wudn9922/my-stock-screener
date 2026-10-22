@@ -597,12 +597,22 @@ def merge_revisions(previous, new, annual, quarterly, renamed):
         if item["end"] not in ends.get(frequency, ()):
             continue
         identity = (item.get("kind"), frequency, item["end"], item.get("field"), item.get("new"))
+        if item.get("kind") in ("restated", "basis-unrestated") and item.get("accn") and item.get("originalAccn"):
+            identity += (item.get("old"), item["accn"], item.get("filed"),
+                         item["originalAccn"], item.get("originalFiled"))
         if identity in seen:
             continue
         seen.add(identity)
         result.append(item)
     result.sort(key=lambda r: (str(r.get("seen")), r["period"], r["end"], str(r.get("field")), r["kind"]))
-    return result[-KEEP_REVISIONS:]
+    # New opt-in SEC audit records must retain every original filed value on later
+    # ordinary refreshes too. Legacy revisions (without originalAccn) keep their cap.
+    protected = [r for r in result if r.get("kind") in ("restated", "basis-unrestated") and r.get("accn") and r.get("originalAccn")]
+    if not protected:
+        return result[-KEEP_REVISIONS:]
+    ordinary = [r for r in result if not (r.get("kind") in ("restated", "basis-unrestated") and r.get("accn") and r.get("originalAccn"))]
+    return sorted(ordinary[-KEEP_REVISIONS:] + protected,
+                  key=lambda r: (str(r.get("seen")), r["period"], r["end"], str(r.get("field")), r["kind"]))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1002,7 +1012,15 @@ def fill_q4_eps(annual, quarterly):
         item = _single(found) if fq == 4 else None
         year = _single(years.get(fy, []))
         pieces = [_single(quarters.get((fy, number), [])) for number in (1, 2, 3)]
-        if item is None or year is None or any(piece is None for piece in pieces):
+        if item is None or year is None:
+            continue
+        from sec_restatements import BLOCKED, REASON, same_basis
+        if any(piece is None for piece in pieces):
+            if year.get("extra", {}).get("secFilingBasis", {}).get("restated"):
+                item.setdefault("extra", {})[BLOCKED] = "restated-quarterly-eps-inputs-unavailable"
+            continue
+        if not same_basis(year, [item, *pieces]):
+            item.setdefault("extra", {})[BLOCKED] = REASON
             continue
         if eps_inconsistent(year["values"]):
             continue
@@ -1049,7 +1067,9 @@ def repair_q4_document(document):
         columns = block.get("values") or {}
         items = [
             {
-                "end": end, "fy": fys[index], "fq": fqs[index], "src": sources[index], "extra": {},
+                "end": end, "fy": fys[index], "fq": fqs[index], "src": sources[index],
+                "extra": {key: block[key][index] for key in ("secFilingBasis", "secQ4EpsBlockedReason")
+                          if isinstance(block.get(key), list) and len(block[key]) == count},
                 "values": {field: column[index] for field, column in columns.items()},
             }
             for index, end in enumerate(ends)
