@@ -47,6 +47,7 @@ def institutional(args):
         old = sources.get(market)
         dates = set((old or {}).get("dates", []))
         error = None
+        refreshed = False
         # newest first guarantees current data before cold history consumes the budget
         for offset in range(args.days):
             if time.monotonic() - start > args.budget:
@@ -56,7 +57,7 @@ def institutional(args):
                 continue
             cache = args.cache / "institutions" / market / (day.isoformat() + ".json")
             try:
-                raw = read(cache)
+                raw = None if offset <= 1 else read(cache)
                 if raw is None:
                     url = template.format(
                         ymd=day.strftime("%Y%m%d"), slash=day.strftime("%Y/%m/%d")
@@ -64,6 +65,7 @@ def institutional(args):
                     raw = parse_flows(http.get(url), market, day.isoformat())
                     if raw:
                         write(cache, raw)
+                        refreshed = True
                 if not raw:
                     continue  # closed/unpublished; no synthetic zero day or cached empty response
                 covered = {s: r for s, r in raw.items() if s in wanted}
@@ -85,7 +87,7 @@ def institutional(args):
                     max(dates),
                     "stale" if error else "ok",
                     error,
-                    (old or {}).get("fetchedAt") if error else stamp(),
+                    stamp() if refreshed else (old or {}).get("fetchedAt"),
                 ),
                 dates=sorted(dates)[-120:],
             )

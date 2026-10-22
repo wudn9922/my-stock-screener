@@ -11,6 +11,8 @@ import io
 from datetime import date, timedelta
 from pathlib import Path
 import re
+from zipfile import BadZipFile
+from xlrd.biffh import XLRDError
 import pandas as pd
 from research_io import ROOT, Http, SourceError, meta, read, retain, stamp, write
 
@@ -106,7 +108,10 @@ def changes(history, frequency, today=None):
             if prior
             and prior[1] != 0
             and (target - date.fromisoformat(prior[0])).days <= tolerance
-            and not (frequency == "monthly" and key in ("1d", "1w"))
+            and not (
+                (frequency == "monthly" and key in ("1d", "1w"))
+                or (frequency == "weekly" and key == "1d")
+            )
             else None
         )
     return result
@@ -132,7 +137,7 @@ def parse_h10(body):
 def parse_eia(body):
     try:
         frame = pd.read_excel(io.BytesIO(body), sheet_name="Data 1", skiprows=2)
-    except (ValueError, KeyError) as exc:
+    except (ValueError, KeyError, BadZipFile, XLRDError) as exc:
         raise SourceError("EIA XLS Data 1 schema changed") from exc
     if len(frame.columns) != 2 or frame.columns[0] != "Date":
         raise SourceError("EIA Date/value columns changed")
@@ -146,7 +151,7 @@ def parse_eia(body):
 def parse_wb(body):
     try:
         frame = pd.read_excel(io.BytesIO(body), sheet_name="Monthly Prices", header=4)
-    except (ValueError, KeyError) as exc:
+    except (ValueError, KeyError, BadZipFile, XLRDError) as exc:
         raise SourceError("World Bank XLSX schema changed") from exc
     out = {}
     for _, _, key, _ in METALS:

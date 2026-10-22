@@ -31,7 +31,7 @@ from build_sec_radar import (
     NotPublished,
     radar_events,
 )
-from build_world_assets import changes, parse_ecb, parse_h10
+from build_world_assets import changes, parse_ecb, parse_h10, parse_eia, parse_wb
 
 FIX = Path(__file__).parent / "fixtures/research"
 
@@ -89,6 +89,10 @@ class OfficialFormats(unittest.TestCase):
         d["tables"][0]["fields"][0] = "unknown"
         with self.assertRaises(SourceError):
             parse_flows(d, "TWO", "2026-10-20")
+
+    def test_tpex_csv_official_date_must_match(self):
+        with self.assertRaises(SourceError):
+            parse_flows((FIX / "tpex.csv").read_bytes(), "TWO", "2026-10-21")
 
     def test_wrong_date_rejected(self):
         with self.assertRaises(SourceError):
@@ -394,6 +398,20 @@ class SecAndWorld(unittest.TestCase):
         result = changes(history, "monthly", today=date(2026, 10, 22))
         self.assertAlmostEqual(result["1m"], 10)
         self.assertIsNone(result["ytd"])
+
+    def test_weekly_is_not_a_daily_return(self):
+        result = changes(
+            [["2026-10-01", 100], ["2026-10-08", 110]],
+            "weekly",
+            today=date(2026, 10, 22),
+        )
+        self.assertIsNone(result["1d"])
+        self.assertAlmostEqual(result["1w"], 10)
+
+    def test_invalid_excel_is_source_error(self):
+        for parser in (parse_eia, parse_wb):
+            with self.assertRaises(SourceError):
+                parser(b"<html>maintenance</html>")
 
     def test_stale_previous_values_and_null_preserved(self):
         prev = dict(

@@ -23,7 +23,8 @@ def tables(body):
             rows = list(csv.reader(io.StringIO(text)))
             for i, row in enumerate(rows):
                 if any(clean(c) in ("證券代號", "代號") for c in row):
-                    return [(row, rows[i + 1 :], None)]
+                    title = " ".join(cell for prefix in rows[:i] for cell in prefix)
+                    return [(row, rows[i + 1 :], parse_date(title))]
             raise SourceError("CSV missing securities header")
     if isinstance(data, list):
         if not data:
@@ -72,6 +73,19 @@ def parse_flows(body, market, expected_date):
             code = str(row[code_i]).strip().strip('="')
             if not re.fullmatch("[1-9][0-9]{3}", code):
                 continue
+            if actual is None:
+                dated = next(
+                    (
+                        parse_date(row[i])
+                        for i, name in enumerate(names)
+                        if name in ("Date", "日期", "資料日期")
+                    ),
+                    None,
+                )
+                if dated != expected_date:
+                    raise SourceError(
+                        "Missing or mismatched official report date; refusing URL-only date inference"
+                    )
             if len(row) != len(names):
                 raise SourceError("row width changed")
 

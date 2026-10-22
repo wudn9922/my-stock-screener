@@ -55,6 +55,7 @@ class SecHttp:
     def __init__(self, state, opener=urllib.request.urlopen, sleeper=time.sleep):
         self.state, self.opener, self.sleep, self.last = state, opener, sleeper, 0
         self.agent = resolve_user_agent(os.environ)
+        self.successful = 0
 
     def get(self, url):
         if self.state.get("cooldownUntil", 0) > time.time():
@@ -72,7 +73,9 @@ class SecHttp:
         )
         try:
             with self.opener(req, timeout=30) as response:
-                return response.read()
+                body = response.read()
+                self.successful += 1
+                return body
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
                 raise NotPublished("SEC HTTP 404") from exc
@@ -476,7 +479,7 @@ def build(args):
                 max((r["date"] for r in recent), default=None),
                 "stale" if error and previous else "unavailable" if error else "ok",
                 error,
-                stamp(),
+                stamp() if http.successful else previous.get("fetchedAt"),
             ),
             version=1,
             universe=len(allsymbols),
