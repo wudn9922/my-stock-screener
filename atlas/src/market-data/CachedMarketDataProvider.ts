@@ -18,6 +18,7 @@ import {
   SESSION_CLOSE_SOURCE_QUALIFIER,
 } from './MarketProfile';
 import { MarketDataUnavailableError } from './ProviderErrors';
+import { isQuarantinedBar, usableBarResult } from './KlineIntegrity';
 
 export const MARKET_CACHE_DATABASE = storageName('atlas-market-cache');
 export const MARKET_CACHE_VERSION = 1;
@@ -139,6 +140,7 @@ function validateValue(
     validateMarket(value.market, expectedSymbol);
     if (value.quote !== undefined) validateQuote(value.quote, expectedSymbol);
     for (const bar of value.bars) {
+      if (isObject(bar) && typeof bar.time === 'number' && isQuarantinedBar(expectedSymbol, bar.time, timeframe as Timeframe)) continue;
       if (
         !isObject(bar) ||
         typeof bar.time !== 'number' ||
@@ -351,7 +353,7 @@ export class CachedMarketDataProvider implements MarketDataProvider {
       () => this.provider.getBars(identity.symbol, timeframe, range),
       signal,
     );
-    return result as BarResult;
+    return usableBarResult(result as BarResult, identity.symbol, timeframe);
   }
 
   async getQuote(symbol: string, signal?: AbortSignal): Promise<Quote> {

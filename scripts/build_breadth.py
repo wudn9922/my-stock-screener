@@ -46,6 +46,9 @@ US_UNIVERSE_LABEL = "S&P 500 成分股"
 US_FALLBACK_LABEL = "S&P 500＋自選美股"
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+from kline_integrity import usable_frame
 DEFAULT_DATA_DIR = os.path.join(REPO_ROOT, "data")
 DEFAULT_OUT = os.path.join(REPO_ROOT, "docs", "report", "breadth.json")
 
@@ -57,6 +60,8 @@ def load_daily_bars(csv_path, price_columns=("Close",)):
     """
     try:
         raw = pd.read_csv(csv_path)
+        if "Date" in raw:
+            raw = usable_frame(raw.set_index("Date"), os.path.basename(csv_path).removesuffix(".csv")).reset_index()
     except Exception:
         return None
     if not {"Date", "Volume", *price_columns}.issubset(raw.columns):

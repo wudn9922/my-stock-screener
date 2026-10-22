@@ -23,6 +23,7 @@ import tempfile
 from datetime import date, datetime, time as dtime, timedelta
 
 import pandas as pd
+from kline_integrity import accept_frame, usable_frame
 
 KEEP_BARS = 320
 # 重疊區間收盤相差超過此比例視為歷史被調整（分割、除權、減資）
@@ -114,19 +115,24 @@ def read_bars(path):
         return pd.DataFrame(columns=PRICE_COLUMNS)
 
     try:
-        return clean(pd.read_csv(path, index_col=0, parse_dates=True))
+        return usable_frame(clean(pd.read_csv(path, index_col=0, parse_dates=True)), os.path.basename(path).removesuffix(".csv"))
     except Exception as exc:  # noqa: BLE001 - a broken file is refetched
         print(f"⚠️ {os.path.basename(path)} 快取讀取失敗：{type(exc).__name__}: {exc}")
         return pd.DataFrame(columns=PRICE_COLUMNS)
 
 
 def _price(value):
+    if 0 < float(value) < 0.00005:
+        return format(float(value), '.15g')
     text = f"{round(float(value), 4):.4f}".rstrip("0").rstrip(".")
     return text if "." in text else text + ".0"
 
 
-def write_bars(path, frame, keep=KEEP_BARS):
+def write_bars(path, frame, keep=KEEP_BARS, refetch=None, now=None):
     """CSV（同 data/*.csv 欄位；價格 4 位小數、成交量整數）原子寫入；回傳寫入的 frame。"""
+    symbol = os.path.basename(path).removesuffix(".csv")
+    frame = accept_frame(frame, symbol, refetch=refetch, now=now,
+                         source_url="https://query1.finance.yahoo.com/v8/finance/chart/" + symbol)
     frame = clean(frame).tail(keep)
     lines = ["Date,Open,High,Low,Close,Volume"]
 
@@ -344,8 +350,8 @@ def snapshot_bar(bar, last_close):
         return (bar["date"], last_close, last_close, last_close, last_close, 0.0)
 
     open_ = bar.get("open") or close
-    high = max(bar.get("high") or close, open_, close)
-    low = min(bar.get("low") or close, open_, close)
+    high = bar.get("high") if bar.get("high") is not None else close
+    low = bar.get("low") if bar.get("low") is not None else close
     return (bar["date"], open_, high, low, close, float(bar.get("volume") or 0.0))
 
 

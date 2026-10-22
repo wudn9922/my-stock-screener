@@ -1,0 +1,2864 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-22T17:04:39.525413+00:00",
+  "commit": "b64adf186f4f241101d13fc90174a998c01643d1",
+  "scope": "checked-out project data; read-only public-source comparison; no deployment verification",
+  "summary": {
+    "ohlcvFiles": 2515,
+    "ohlcvRows": 581891,
+    "invalidOhlcvRows": 3,
+    "financialFiles": 6946,
+    "financialStructureIssues": 0,
+    "restatementPreviewStillOldCells": 2151,
+    "restatementPreviewStillOldSymbols": 580,
+    "officialTurnoverExactMatches": 1945,
+    "officialInstitutionalRowsCompared": 1857,
+    "officialTaiwanYtdRevenueComparisons": 1969,
+    "officialTaiwanYtdRevenueMismatches": 0,
+    "finmindQuarterlyCellsCompared": 162,
+    "finmindQuarterlyCellsDifferent": 1,
+    "secRecentDirectMatches": 69,
+    "secNoDirectComparableFacts": 3,
+    "yahooRecentBarsCompared": 190,
+    "yahooRecentCellsDifferent": 2,
+    "worldAssetPointsCompared": 8045,
+    "worldAssetPointDifferences": 0,
+    "researchStorageRecordsValidated": 10388,
+    "pythonTests": 1544,
+    "pythonTestFailures": 0
+  },
+  "confirmedFindings": [
+    {
+      "id": "historical-restatement-preview-not-applied",
+      "priority": "P1",
+      "classification": "known-latest-basis-differences-still-present",
+      "symbols": 580,
+      "cells": 2151,
+      "annualCells": 2100,
+      "quarterlyCells": 51,
+      "annualPeriods": 1172,
+      "allPeriods": 1208,
+      "previousReport": "sec-restated-comparatives.json",
+      "previousReportGeneratedAt": "2026-10-22T12:51:06+00:00",
+      "previousReportSha256": "13471c443f0b1d64431c065c5289412893c30b74206f562775f6b829f2a99997",
+      "freshOfficialExamples": [
+        {
+          "symbol": "AD",
+          "period": "annual",
+          "end": "2023-12-31",
+          "field": "revenue",
+          "old": 3906000000,
+          "new": 100469000,
+          "accn": "0000821130-26-000012",
+          "filed": "2026-02-20",
+          "reason": "material-income-restatement",
+          "liveFacts": [
+            {
+              "start": "2023-01-01",
+              "end": "2023-12-31",
+              "val": 100469000,
+              "accn": "0000821130-26-000012",
+              "fy": 2025,
+              "fp": "FY",
+              "form": "10-K",
+              "filed": "2026-02-20",
+              "frame": "CY2023"
+            }
+          ]
+        },
+        {
+          "symbol": "AD",
+          "period": "annual",
+          "end": "2024-12-31",
+          "field": "revenue",
+          "old": 3770000000,
+          "new": 102933000,
+          "accn": "0000821130-26-000012",
+          "filed": "2026-02-20",
+          "reason": "material-income-restatement",
+          "liveFacts": [
+            {
+              "start": "2024-01-01",
+              "end": "2024-12-31",
+              "val": 102933000,
+              "accn": "0000821130-26-000012",
+              "fy": 2025,
+              "fp": "FY",
+              "form": "10-K",
+              "filed": "2026-02-20",
+              "frame": "CY2024"
+            }
+          ]
+        }
+      ],
+      "limitation": "580 symbols is a recheck of prior preview against current local files; only AD historical revisions were freshly checked with SEC in this audit; as-reported and restated are different reporting bases"
+    },
+    {
+      "id": "taiwan-negative-net-revenue-stale-fallback",
+      "priority": "P1",
+      "symbol": "2883.TW",
+      "period": "2025-06-30",
+      "field": "revenue",
+      "local": -37448094000,
+      "freshFinmind": -357222000,
+      "freshNetInterestIncome": 18661280000,
+      "freshNetNonInterestIncome": -19018502000,
+      "sourceType": "Revenue",
+      "sourceOriginName": "淨收益",
+      "sourceParserValue": -357222000,
+      "code": "atlas/scripts/build_financials_tw_finmind.py:326",
+      "mechanism": "views removes negative revenue; a null derived field can preserve an existing value during merge. Net revenue for financial firms requires a separate validity policy.",
+      "caveat": "fresh source divergence confirmed; historical reporting basis must be checked before rewriting annual/quarterly series"
+    },
+    {
+      "id": "invalid-ohlcv-ranges",
+      "priority": "P1",
+      "rows": [
+        {
+          "symbol": "3555.TWO",
+          "date": "2026-10-22",
+          "line": 251,
+          "issues": [
+            "low-too-high"
+          ]
+        },
+        {
+          "symbol": "4133.TW",
+          "date": "2026-10-22",
+          "line": 211,
+          "issues": [
+            "low-too-high"
+          ]
+        },
+        {
+          "symbol": "7825.TWO",
+          "date": "2026-08-28",
+          "line": 190,
+          "issues": [
+            "low-too-high"
+          ]
+        }
+      ],
+      "independentlyConfirmedCorrections": [
+        {
+          "symbol": "3555.TWO",
+          "date": "2026-10-22",
+          "local": {
+            "Date": "2026-10-22",
+            "Open": "165.5",
+            "High": "165.5",
+            "Low": "146.5",
+            "Close": "145.0",
+            "Volume": "172074"
+          },
+          "official": {
+            "代號": "3555",
+            "名稱": "博士旺",
+            "收盤": "145.00",
+            "漲跌": "-11.50 ",
+            "開盤": "165.50",
+            "最高": "165.50",
+            "最低": "145.00",
+            "均價": "153.28",
+            "成交股數": "172,291",
+            "成交金額(元)": "26,408,723",
+            "成交筆數": "236",
+            "最後買價": "144.00",
+            "最後買量(張數)": "1",
+            "最後賣價": "147.50",
+            "最後賣量(張數)": "1",
+            "發行股數": "39,998,797",
+            "次日 參考價": "145.00",
+            "次日 漲停價": "159.50",
+            "次日 跌停價": "130.50"
+          }
+        },
+        {
+          "symbol": "4133.TW",
+          "date": "2026-10-22",
+          "local": {
+            "Date": "2026-10-22",
+            "Open": "20.899999618530273",
+            "High": "20.950000762939453",
+            "Low": "20.649999618530273",
+            "Close": "20.600000381469727",
+            "Volume": "74925"
+          },
+          "official": {
+            "證券代號": "4133",
+            "證券名稱": "亞諾法",
+            "成交股數": "75,057",
+            "成交筆數": "131",
+            "成交金額": "1,556,884",
+            "開盤價": "20.90",
+            "最高價": "20.95",
+            "最低價": "20.60",
+            "收盤價": "20.60",
+            "漲跌(+/-)": "<p style= color:green>-</p>",
+            "漲跌價差": "0.30",
+            "最後揭示買價": "20.55",
+            "最後揭示買量": "1",
+            "最後揭示賣價": "20.70",
+            "最後揭示賣量": "1",
+            "本益比": "27.84"
+          }
+        }
+      ],
+      "upstreamMalformedExample": {
+        "symbol": "7825.TWO",
+        "date": "2026-08-28",
+        "provider": "Yahoo",
+        "fields": {
+          "open": 87.0,
+          "volume": 1159969,
+          "close": 95.80000305175781,
+          "low": 94.69999694824219,
+          "high": 105.0
+        },
+        "officialTpexRowAvailable": false,
+        "classification": "malformed-upstream-bar-not-independently-correctable"
+      },
+      "caveat": "Two latest lows are confirmed by both official source and fresh Yahoo. The historical bar remains malformed in Yahoo; the dated TPEx regular-market report has no matching row. Do not invent a replacement low."
+    },
+    {
+      "id": "universe-mixed-observation-dates",
+      "priority": "P2",
+      "market": "TW",
+      "labelledAsOf": "2026-10-21",
+      "officialTpex22OnlyMatches": 799,
+      "officialTpexSameCloseBothDays": 69,
+      "twse21OnlyMatches": 987,
+      "perRowAsOfInSchema": false,
+      "example": {
+        "symbol": "1240.TWO",
+        "universe": 53.7,
+        "official22": 53.7,
+        "csv21": 54.0,
+        "state": "matches-22-only"
+      },
+      "code": [
+        "report_metrics.py:536",
+        "report_metrics.py:614"
+      ],
+      "caveat": "Market label is the modal row date; individual row asOf is discarded in serialized rows."
+    },
+    {
+      "id": "nvda-annual-end-date-drift",
+      "priority": "P2",
+      "symbol": "NVDA",
+      "localEnd": "2026-01-31",
+      "officialEnd": "2026-01-25",
+      "days": 6,
+      "evidence": [
+        {
+          "symbol": "NVDA",
+          "frequency": "annual",
+          "end": "2026-01-31",
+          "field": "revenue",
+          "stored": 215938000000,
+          "official": 215938000000,
+          "officialEnd": "2026-01-25",
+          "concept": "Revenues",
+          "filed": "2026-02-25",
+          "accession": "0001045810-26-000021",
+          "status": "match",
+          "dateDeltaDays": 6
+        },
+        {
+          "symbol": "NVDA",
+          "frequency": "annual",
+          "end": "2026-01-31",
+          "field": "netIncome",
+          "stored": 120067000000,
+          "official": 120067000000,
+          "officialEnd": "2026-01-25",
+          "concept": "NetIncomeLoss",
+          "filed": "2026-02-25",
+          "accession": "0001045810-26-000021",
+          "status": "match",
+          "dateDeltaDays": 6
+        },
+        {
+          "symbol": "NVDA",
+          "frequency": "annual",
+          "end": "2026-01-31",
+          "field": "epsDiluted",
+          "stored": 4.9,
+          "official": 4.9,
+          "officialEnd": "2026-01-25",
+          "concept": "EarningsPerShareDiluted",
+          "filed": "2026-02-25",
+          "accession": "0001045810-26-000021",
+          "status": "match",
+          "dateDeltaDays": 6
+        }
+      ],
+      "caveat": "The three compared financial values match; the period date does not. Seven-day detector tolerance does not flag this difference."
+    }
+  ],
+  "marketComparisons": {
+    "quotes-TW": {
+      "officialUniverseRows": 1077,
+      "storedExactMatches": 1077,
+      "missing": [],
+      "differences": [],
+      "universeComparison": {
+        "matches-21-only": 987,
+        "matches-both-21-and-22": 83,
+        "matches-22-only": 6,
+        "matches-neither": 1
+      },
+      "csvDifferenceCounts": {
+        "volume": 898
+      },
+      "csvDifferenceSamples": [
+        {
+          "symbol": "1101.TW",
+          "field": "volume",
+          "csv": 103299732.0,
+          "official": 103437782
+        },
+        {
+          "symbol": "1102.TW",
+          "field": "volume",
+          "csv": 12080325.0,
+          "official": 12104941
+        },
+        {
+          "symbol": "1103.TW",
+          "field": "volume",
+          "csv": 1090428.0,
+          "official": 1093246
+        },
+        {
+          "symbol": "1104.TW",
+          "field": "volume",
+          "csv": 449311.0,
+          "official": 449604
+        },
+        {
+          "symbol": "1201.TW",
+          "field": "volume",
+          "csv": 1000930.0,
+          "official": 1004136
+        },
+        {
+          "symbol": "1203.TW",
+          "field": "volume",
+          "csv": 16583.0,
+          "official": 17291
+        },
+        {
+          "symbol": "1210.TW",
+          "field": "volume",
+          "csv": 651567.0,
+          "official": 652726
+        },
+        {
+          "symbol": "1213.TW",
+          "field": "volume",
+          "csv": 8000.0,
+          "official": 8725
+        }
+      ],
+      "universeSamples": [
+        {
+          "symbol": "1470.TW",
+          "universe": 24.65,
+          "official22": 24.65,
+          "csv21": 24.299999237060547,
+          "state": "matches-22-only"
+        },
+        {
+          "symbol": "1711.TW",
+          "universe": 44.95,
+          "official22": 44.95,
+          "csv21": 47.20000076293945,
+          "state": "matches-22-only"
+        },
+        {
+          "symbol": "2910.TW",
+          "universe": 23.2,
+          "official22": 23.2,
+          "csv21": 23.299999237060547,
+          "state": "matches-22-only"
+        },
+        {
+          "symbol": "3018.TW",
+          "universe": 10.2,
+          "official22": 10.2,
+          "csv21": 10.5,
+          "state": "matches-22-only"
+        },
+        {
+          "symbol": "3432.TW",
+          "universe": 13.85,
+          "official22": 13.85,
+          "csv21": 13.899999618530273,
+          "state": "matches-22-only"
+        },
+        {
+          "symbol": "5906.TW",
+          "universe": 37.95,
+          "official22": 37.95,
+          "csv21": 36.70000076293945,
+          "state": "matches-22-only"
+        },
+        {
+          "symbol": "8908.TW",
+          "universe": 40.0,
+          "official22": 40.15,
+          "csv21": null,
+          "state": "matches-neither"
+        }
+      ]
+    },
+    "flows-TW": {
+      "officialRows": 1072,
+      "universeRows": 1069,
+      "compared": 1069,
+      "missing": [],
+      "differences": []
+    },
+    "quotes-TWO": {
+      "officialUniverseRows": 868,
+      "storedExactMatches": 868,
+      "missing": [],
+      "differences": [],
+      "universeComparison": {
+        "matches-22-only": 799,
+        "matches-both-21-and-22": 69
+      },
+      "csvDifferenceCounts": {
+        "volume": 610
+      },
+      "csvDifferenceSamples": [
+        {
+          "symbol": "1240.TWO",
+          "field": "volume",
+          "csv": 11061.0,
+          "official": 11344
+        },
+        {
+          "symbol": "1259.TWO",
+          "field": "volume",
+          "csv": 27284.0,
+          "official": 27285
+        },
+        {
+          "symbol": "1264.TWO",
+          "field": "volume",
+          "csv": 11463.0,
+          "official": 11498
+        },
+        {
+          "symbol": "1294.TWO",
+          "field": "volume",
+          "csv": 9420.0,
+          "official": 10129
+        },
+        {
+          "symbol": "1565.TWO",
+          "field": "volume",
+          "csv": 78224.0,
+          "official": 78249
+        },
+        {
+          "symbol": "1569.TWO",
+          "field": "volume",
+          "csv": 24957190.0,
+          "official": 25028633
+        },
+        {
+          "symbol": "1570.TWO",
+          "field": "volume",
+          "csv": 51321.0,
+          "official": 51323
+        },
+        {
+          "symbol": "1584.TWO",
+          "field": "volume",
+          "csv": 320195.0,
+          "official": 320340
+        }
+      ],
+      "universeSamples": [
+        {
+          "symbol": "1240.TWO",
+          "universe": 53.7,
+          "official22": 53.7,
+          "csv21": 54.0,
+          "state": "matches-22-only"
+        },
+        {
+          "symbol": "1259.TWO",
+          "universe": 65.4,
+          "official22": 65.4,
+          "csv21": 62.400001525878906,
+          "state": "matches-22-only"
+        },
+        {
+          "symbol": "1264.TWO",
+          "universe": 247.0,
+          "official22": 247.0,
+          "csv21": 246.5,
+          "state": "matches-22-only"
+        },
+        {
+          "symbol": "1268.TWO",
+          "universe": 177.0,
+          "official22": 177.0,
+          "csv21": 178.5,
+          "state": "matches-22-only"
+        },
+        {
+          "symbol": "1294.TWO",
+          "universe": 49.5,
+          "official22": 49.5,
+          "csv21": 49.599998474121094,
+          "state": "matches-22-only"
+        },
+        {
+          "symbol": "1295.TWO",
+          "universe": 46.75,
+          "official22": 46.75,
+          "csv21": 47.04999923706055,
+          "state": "matches-22-only"
+        },
+        {
+          "symbol": "1565.TWO",
+          "universe": 90.6,
+          "official22": 90.6,
+          "csv21": 90.9000015258789,
+          "state": "matches-22-only"
+        },
+        {
+          "symbol": "1569.TWO",
+          "universe": 86.2,
+          "official22": 86.2,
+          "csv21": 87.5999984741211,
+          "state": "matches-22-only"
+        }
+      ]
+    },
+    "flows-TWO": {
+      "officialRows": 788,
+      "universeRows": 788,
+      "compared": 788,
+      "missing": [],
+      "differences": []
+    }
+  },
+  "secRecentPeriods": [
+    {
+      "symbol": "AD",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "revenue",
+      "stored": 162961000,
+      "official": 162961000,
+      "officialEnd": "2025-12-31",
+      "concept": "Revenues",
+      "filed": "2026-02-20",
+      "accession": "0000821130-26-000012",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AD",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "netIncome",
+      "stored": 48756000,
+      "official": 48756000,
+      "officialEnd": "2025-12-31",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-02-20",
+      "accession": "0000821130-26-000012",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AD",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "epsDiluted",
+      "stored": 0.56,
+      "official": 0.56,
+      "officialEnd": "2025-12-31",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-02-20",
+      "accession": "0000821130-26-000012",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AD",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "revenue",
+      "stored": 52012000,
+      "official": 52012000,
+      "officialEnd": "2026-03-31",
+      "concept": "Revenues",
+      "filed": "2026-05-08",
+      "accession": "0000821130-26-000035",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AD",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "netIncome",
+      "stored": 177795000,
+      "official": 177795000,
+      "officialEnd": "2026-03-31",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-05-08",
+      "accession": "0000821130-26-000035",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AD",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "epsDiluted",
+      "stored": 2.06,
+      "official": 2.06,
+      "officialEnd": "2026-03-31",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-05-08",
+      "accession": "0000821130-26-000035",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AD",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "revenue",
+      "stored": 54070000,
+      "official": 54070000,
+      "officialEnd": "2026-06-30",
+      "concept": "Revenues",
+      "filed": "2026-08-07",
+      "accession": "0000821130-26-000046",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AD",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "netIncome",
+      "stored": 358696000,
+      "official": 358696000,
+      "officialEnd": "2026-06-30",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-08-07",
+      "accession": "0000821130-26-000046",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AD",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "epsDiluted",
+      "stored": 4.15,
+      "official": 4.15,
+      "officialEnd": "2026-06-30",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-08-07",
+      "accession": "0000821130-26-000046",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AAPL",
+      "frequency": "annual",
+      "end": "2025-09-27",
+      "field": "revenue",
+      "stored": 416161000000,
+      "official": 416161000000,
+      "officialEnd": "2025-09-27",
+      "concept": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "filed": "2025-10-31",
+      "accession": "0000320193-25-000079",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AAPL",
+      "frequency": "annual",
+      "end": "2025-09-27",
+      "field": "netIncome",
+      "stored": 112010000000,
+      "official": 112010000000,
+      "officialEnd": "2025-09-27",
+      "concept": "NetIncomeLoss",
+      "filed": "2025-10-31",
+      "accession": "0000320193-25-000079",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AAPL",
+      "frequency": "annual",
+      "end": "2025-09-27",
+      "field": "epsDiluted",
+      "stored": 7.46,
+      "official": 7.46,
+      "officialEnd": "2025-09-27",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2025-10-31",
+      "accession": "0000320193-25-000079",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AAPL",
+      "frequency": "quarterly",
+      "end": "2026-03-28",
+      "field": "revenue",
+      "stored": 111184000000,
+      "official": 111184000000,
+      "officialEnd": "2026-03-28",
+      "concept": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "filed": "2026-05-01",
+      "accession": "0000320193-26-000013",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AAPL",
+      "frequency": "quarterly",
+      "end": "2026-03-28",
+      "field": "netIncome",
+      "stored": 29578000000,
+      "official": 29578000000,
+      "officialEnd": "2026-03-28",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-05-01",
+      "accession": "0000320193-26-000013",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AAPL",
+      "frequency": "quarterly",
+      "end": "2026-03-28",
+      "field": "epsDiluted",
+      "stored": 2.01,
+      "official": 2.01,
+      "officialEnd": "2026-03-28",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-05-01",
+      "accession": "0000320193-26-000013",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AAPL",
+      "frequency": "quarterly",
+      "end": "2026-06-27",
+      "field": "revenue",
+      "stored": 109417000000,
+      "official": 109417000000,
+      "officialEnd": "2026-06-27",
+      "concept": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "filed": "2026-07-31",
+      "accession": "0000320193-26-000020",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AAPL",
+      "frequency": "quarterly",
+      "end": "2026-06-27",
+      "field": "netIncome",
+      "stored": 29789000000,
+      "official": 29789000000,
+      "officialEnd": "2026-06-27",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-07-31",
+      "accession": "0000320193-26-000020",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AAPL",
+      "frequency": "quarterly",
+      "end": "2026-06-27",
+      "field": "epsDiluted",
+      "stored": 2.02,
+      "official": 2.02,
+      "officialEnd": "2026-06-27",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-07-31",
+      "accession": "0000320193-26-000020",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "NVDA",
+      "frequency": "annual",
+      "end": "2026-01-31",
+      "field": "revenue",
+      "stored": 215938000000,
+      "official": 215938000000,
+      "officialEnd": "2026-01-25",
+      "concept": "Revenues",
+      "filed": "2026-02-25",
+      "accession": "0001045810-26-000021",
+      "status": "match",
+      "dateDeltaDays": 6
+    },
+    {
+      "symbol": "NVDA",
+      "frequency": "annual",
+      "end": "2026-01-31",
+      "field": "netIncome",
+      "stored": 120067000000,
+      "official": 120067000000,
+      "officialEnd": "2026-01-25",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-02-25",
+      "accession": "0001045810-26-000021",
+      "status": "match",
+      "dateDeltaDays": 6
+    },
+    {
+      "symbol": "NVDA",
+      "frequency": "annual",
+      "end": "2026-01-31",
+      "field": "epsDiluted",
+      "stored": 4.9,
+      "official": 4.9,
+      "officialEnd": "2026-01-25",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-02-25",
+      "accession": "0001045810-26-000021",
+      "status": "match",
+      "dateDeltaDays": 6
+    },
+    {
+      "symbol": "NVDA",
+      "frequency": "quarterly",
+      "end": "2026-04-26",
+      "field": "revenue",
+      "stored": 81615000000,
+      "official": 81615000000,
+      "officialEnd": "2026-04-26",
+      "concept": "Revenues",
+      "filed": "2026-05-20",
+      "accession": "0001045810-26-000052",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "NVDA",
+      "frequency": "quarterly",
+      "end": "2026-04-26",
+      "field": "netIncome",
+      "stored": 58321000000,
+      "official": 58321000000,
+      "officialEnd": "2026-04-26",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-05-20",
+      "accession": "0001045810-26-000052",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "NVDA",
+      "frequency": "quarterly",
+      "end": "2026-04-26",
+      "field": "epsDiluted",
+      "stored": 2.39,
+      "official": 2.39,
+      "officialEnd": "2026-04-26",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-05-20",
+      "accession": "0001045810-26-000052",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "NVDA",
+      "frequency": "quarterly",
+      "end": "2026-07-26",
+      "field": "revenue",
+      "stored": 96221000000,
+      "official": 96221000000,
+      "officialEnd": "2026-07-26",
+      "concept": "Revenues",
+      "filed": "2026-08-26",
+      "accession": "0001045810-26-000075",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "NVDA",
+      "frequency": "quarterly",
+      "end": "2026-07-26",
+      "field": "netIncome",
+      "stored": 59688000000,
+      "official": 59688000000,
+      "officialEnd": "2026-07-26",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-08-26",
+      "accession": "0001045810-26-000075",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "NVDA",
+      "frequency": "quarterly",
+      "end": "2026-07-26",
+      "field": "epsDiluted",
+      "stored": 2.46,
+      "official": 2.46,
+      "officialEnd": "2026-07-26",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-08-26",
+      "accession": "0001045810-26-000075",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "MSFT",
+      "frequency": "annual",
+      "end": "2026-06-30",
+      "field": "revenue",
+      "stored": 331839000000,
+      "official": 331839000000,
+      "officialEnd": "2026-06-30",
+      "concept": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "filed": "2026-07-29",
+      "accession": "0001193125-26-323660",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "MSFT",
+      "frequency": "annual",
+      "end": "2026-06-30",
+      "field": "netIncome",
+      "stored": 133749000000,
+      "official": 133749000000,
+      "officialEnd": "2026-06-30",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-07-29",
+      "accession": "0001193125-26-323660",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "MSFT",
+      "frequency": "annual",
+      "end": "2026-06-30",
+      "field": "epsDiluted",
+      "stored": 17.95,
+      "official": 17.95,
+      "officialEnd": "2026-06-30",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-07-29",
+      "accession": "0001193125-26-323660",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "MSFT",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "revenue",
+      "stored": 82886000000,
+      "official": 82886000000,
+      "officialEnd": "2026-03-31",
+      "concept": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "filed": "2026-04-29",
+      "accession": "0001193125-26-191507",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "MSFT",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "netIncome",
+      "stored": 31778000000,
+      "official": 31778000000,
+      "officialEnd": "2026-03-31",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-04-29",
+      "accession": "0001193125-26-191507",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "MSFT",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "epsDiluted",
+      "stored": 4.27,
+      "official": 4.27,
+      "officialEnd": "2026-03-31",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-04-29",
+      "accession": "0001193125-26-191507",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "MSFT",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "revenue",
+      "stored": 90007000000,
+      "status": "no-direct-comparable-fact"
+    },
+    {
+      "symbol": "MSFT",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "netIncome",
+      "stored": 35766000000,
+      "status": "no-direct-comparable-fact"
+    },
+    {
+      "symbol": "MSFT",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "epsDiluted",
+      "stored": 4.8,
+      "status": "no-direct-comparable-fact"
+    },
+    {
+      "symbol": "GOOG",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "revenue",
+      "stored": 402836000000,
+      "official": 402836000000,
+      "officialEnd": "2025-12-31",
+      "concept": "Revenues",
+      "filed": "2026-02-05",
+      "accession": "0001652044-26-000018",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "GOOG",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "netIncome",
+      "stored": 132170000000,
+      "official": 132170000000,
+      "officialEnd": "2025-12-31",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-02-05",
+      "accession": "0001652044-26-000018",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "GOOG",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "epsDiluted",
+      "stored": 10.81,
+      "official": 10.81,
+      "officialEnd": "2025-12-31",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-02-05",
+      "accession": "0001652044-26-000018",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "GOOG",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "revenue",
+      "stored": 109896000000,
+      "official": 109896000000,
+      "officialEnd": "2026-03-31",
+      "concept": "Revenues",
+      "filed": "2026-04-30",
+      "accession": "0001652044-26-000048",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "GOOG",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "netIncome",
+      "stored": 62578000000,
+      "official": 62578000000,
+      "officialEnd": "2026-03-31",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-04-30",
+      "accession": "0001652044-26-000048",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "GOOG",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "epsDiluted",
+      "stored": 5.11,
+      "official": 5.11,
+      "officialEnd": "2026-03-31",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-04-30",
+      "accession": "0001652044-26-000048",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "GOOG",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "revenue",
+      "stored": 119796000000,
+      "official": 119796000000,
+      "officialEnd": "2026-06-30",
+      "concept": "Revenues",
+      "filed": "2026-07-23",
+      "accession": "0001652044-26-000071",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "GOOG",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "netIncome",
+      "stored": 112193000000,
+      "official": 112193000000,
+      "officialEnd": "2026-06-30",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-07-23",
+      "accession": "0001652044-26-000071",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "GOOG",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "epsDiluted",
+      "stored": 9.11,
+      "official": 9.11,
+      "officialEnd": "2026-06-30",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-07-23",
+      "accession": "0001652044-26-000071",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AMZN",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "revenue",
+      "stored": 716924000000,
+      "official": 716924000000,
+      "officialEnd": "2025-12-31",
+      "concept": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "filed": "2026-02-06",
+      "accession": "0001018724-26-000004",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AMZN",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "netIncome",
+      "stored": 77670000000,
+      "official": 77670000000,
+      "officialEnd": "2025-12-31",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-02-06",
+      "accession": "0001018724-26-000004",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AMZN",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "epsDiluted",
+      "stored": 7.17,
+      "official": 7.17,
+      "officialEnd": "2025-12-31",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-02-06",
+      "accession": "0001018724-26-000004",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AMZN",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "revenue",
+      "stored": 181519000000,
+      "official": 181519000000,
+      "officialEnd": "2026-03-31",
+      "concept": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "filed": "2026-04-30",
+      "accession": "0001018724-26-000014",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AMZN",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "netIncome",
+      "stored": 30255000000,
+      "official": 30255000000,
+      "officialEnd": "2026-03-31",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-04-30",
+      "accession": "0001018724-26-000014",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AMZN",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "epsDiluted",
+      "stored": 2.78,
+      "official": 2.78,
+      "officialEnd": "2026-03-31",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-04-30",
+      "accession": "0001018724-26-000014",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AMZN",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "revenue",
+      "stored": 200606000000,
+      "official": 200606000000,
+      "officialEnd": "2026-06-30",
+      "concept": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "filed": "2026-07-31",
+      "accession": "0001018724-26-000026",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AMZN",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "netIncome",
+      "stored": 62647000000,
+      "official": 62647000000,
+      "officialEnd": "2026-06-30",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-07-31",
+      "accession": "0001018724-26-000026",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "AMZN",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "epsDiluted",
+      "stored": 5.75,
+      "official": 5.75,
+      "officialEnd": "2026-06-30",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-07-31",
+      "accession": "0001018724-26-000026",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "TSLA",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "revenue",
+      "stored": 94827000000,
+      "official": 94827000000,
+      "officialEnd": "2025-12-31",
+      "concept": "Revenues",
+      "filed": "2026-01-29",
+      "accession": "0001628280-26-003952",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "TSLA",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "netIncome",
+      "stored": 3794000000,
+      "official": 3794000000,
+      "officialEnd": "2025-12-31",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-01-29",
+      "accession": "0001628280-26-003952",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "TSLA",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "epsDiluted",
+      "stored": 1.08,
+      "official": 1.08,
+      "officialEnd": "2025-12-31",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-01-29",
+      "accession": "0001628280-26-003952",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "TSLA",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "revenue",
+      "stored": 22387000000,
+      "official": 22387000000,
+      "officialEnd": "2026-03-31",
+      "concept": "Revenues",
+      "filed": "2026-04-23",
+      "accession": "0001628280-26-026673",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "TSLA",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "netIncome",
+      "stored": 477000000,
+      "official": 477000000,
+      "officialEnd": "2026-03-31",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-04-23",
+      "accession": "0001628280-26-026673",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "TSLA",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "epsDiluted",
+      "stored": 0.13,
+      "official": 0.13,
+      "officialEnd": "2026-03-31",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-04-23",
+      "accession": "0001628280-26-026673",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "TSLA",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "revenue",
+      "stored": 28236000000,
+      "official": 28236000000,
+      "officialEnd": "2026-06-30",
+      "concept": "Revenues",
+      "filed": "2026-07-23",
+      "accession": "0001628280-26-049270",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "TSLA",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "netIncome",
+      "stored": 1114000000,
+      "official": 1114000000,
+      "officialEnd": "2026-06-30",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-07-23",
+      "accession": "0001628280-26-049270",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "TSLA",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "epsDiluted",
+      "stored": 0.32,
+      "official": 0.32,
+      "officialEnd": "2026-06-30",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-07-23",
+      "accession": "0001628280-26-049270",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "JPM",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "revenue",
+      "stored": 182447000000,
+      "official": 182447000000,
+      "officialEnd": "2025-12-31",
+      "concept": "Revenues",
+      "filed": "2026-02-13",
+      "accession": "0001628280-26-008131",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "JPM",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "netIncome",
+      "stored": 57048000000,
+      "official": 57048000000,
+      "officialEnd": "2025-12-31",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-02-13",
+      "accession": "0001628280-26-008131",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "JPM",
+      "frequency": "annual",
+      "end": "2025-12-31",
+      "field": "epsDiluted",
+      "stored": 20.02,
+      "official": 20.02,
+      "officialEnd": "2025-12-31",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-02-13",
+      "accession": "0001628280-26-008131",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "JPM",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "revenue",
+      "stored": 49836000000,
+      "official": 49836000000,
+      "officialEnd": "2026-03-31",
+      "concept": "RevenuesNetOfInterestExpense",
+      "filed": "2026-05-01",
+      "accession": "0001628280-26-029344",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "JPM",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "netIncome",
+      "stored": 16494000000,
+      "official": 16494000000,
+      "officialEnd": "2026-03-31",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-05-01",
+      "accession": "0001628280-26-029344",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "JPM",
+      "frequency": "quarterly",
+      "end": "2026-03-31",
+      "field": "epsDiluted",
+      "stored": 5.94,
+      "official": 5.94,
+      "officialEnd": "2026-03-31",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-05-01",
+      "accession": "0001628280-26-029344",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "JPM",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "revenue",
+      "stored": 57347000000,
+      "official": 57347000000,
+      "officialEnd": "2026-06-30",
+      "concept": "RevenuesNetOfInterestExpense",
+      "filed": "2026-08-06",
+      "accession": "0001628280-26-054343",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "JPM",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "netIncome",
+      "stored": 21155000000,
+      "official": 21155000000,
+      "officialEnd": "2026-06-30",
+      "concept": "NetIncomeLoss",
+      "filed": "2026-08-06",
+      "accession": "0001628280-26-054343",
+      "status": "match",
+      "dateDeltaDays": 0
+    },
+    {
+      "symbol": "JPM",
+      "frequency": "quarterly",
+      "end": "2026-06-30",
+      "field": "epsDiluted",
+      "stored": 7.7,
+      "official": 7.7,
+      "officialEnd": "2026-06-30",
+      "concept": "EarningsPerShareDiluted",
+      "filed": "2026-08-06",
+      "accession": "0001628280-26-054343",
+      "status": "match",
+      "dateDeltaDays": 0
+    }
+  ],
+  "taiwanOfficialYtd": {
+    "companiesCompared": 1976,
+    "revenueCompaniesCompared": 1969,
+    "revenueDifferences": [],
+    "epsCompaniesCompared": 1976,
+    "quarterlyEpsSumDiffersFromCumulativeByOver002": 94,
+    "epsDifferenceExamples": [
+      {
+        "symbol": "5386.TWO",
+        "year": 2026,
+        "quarter": 2,
+        "fields": {
+          "revenue": {
+            "storedQuarterSum": 15146991000,
+            "officialYtd": 15146991000.0,
+            "difference": 0.0,
+            "withinTolerance": true
+          },
+          "epsBasic": {
+            "storedQuarterSum": 57.269999999999996,
+            "officialYtd": 42.93,
+            "difference": 14.339999999999996,
+            "withinTolerance": false
+          }
+        }
+      },
+      {
+        "symbol": "5274.TWO",
+        "year": 2026,
+        "quarter": 2,
+        "fields": {
+          "revenue": {
+            "storedQuarterSum": 7018166000,
+            "officialYtd": 7018166000.0,
+            "difference": 0.0,
+            "withinTolerance": true
+          },
+          "epsBasic": {
+            "storedQuarterSum": 81.68,
+            "officialYtd": 78.28,
+            "difference": 3.4000000000000057,
+            "withinTolerance": false
+          }
+        }
+      },
+      {
+        "symbol": "6944.TW",
+        "year": 2026,
+        "quarter": 2,
+        "fields": {
+          "revenue": {
+            "storedQuarterSum": 9787323000,
+            "officialYtd": 9787323000.0,
+            "difference": 0.0,
+            "withinTolerance": true
+          },
+          "epsBasic": {
+            "storedQuarterSum": 18.83,
+            "officialYtd": 16.5,
+            "difference": 2.3299999999999983,
+            "withinTolerance": false
+          }
+        }
+      },
+      {
+        "symbol": "7610.TW",
+        "year": 2026,
+        "quarter": 2,
+        "fields": {
+          "revenue": {
+            "storedQuarterSum": 2929338000,
+            "officialYtd": 2929338000.0,
+            "difference": 0.0,
+            "withinTolerance": true
+          },
+          "epsBasic": {
+            "storedQuarterSum": 27.189999999999998,
+            "officialYtd": 25.37,
+            "difference": 1.8199999999999967,
+            "withinTolerance": false
+          }
+        }
+      },
+      {
+        "symbol": "3290.TWO",
+        "year": 2026,
+        "quarter": 2,
+        "fields": {
+          "revenue": {
+            "storedQuarterSum": 1857587000,
+            "officialYtd": 1857587000.0,
+            "difference": 0.0,
+            "withinTolerance": true
+          },
+          "epsBasic": {
+            "storedQuarterSum": 2.73,
+            "officialYtd": 4.02,
+            "difference": -1.2899999999999996,
+            "withinTolerance": false
+          }
+        }
+      },
+      {
+        "symbol": "6691.TW",
+        "year": 2026,
+        "quarter": 2,
+        "fields": {
+          "revenue": {
+            "storedQuarterSum": 18111362000,
+            "officialYtd": 18111362000.0,
+            "difference": 0.0,
+            "withinTolerance": true
+          },
+          "epsBasic": {
+            "storedQuarterSum": 18.12,
+            "officialYtd": 17.46,
+            "difference": 0.6600000000000001,
+            "withinTolerance": false
+          }
+        }
+      },
+      {
+        "symbol": "6446.TW",
+        "year": 2026,
+        "quarter": 2,
+        "fields": {
+          "revenue": {
+            "storedQuarterSum": 11976809000,
+            "officialYtd": 11976809000.0,
+            "difference": 0.0,
+            "withinTolerance": true
+          },
+          "epsBasic": {
+            "storedQuarterSum": 11.92,
+            "officialYtd": 11.35,
+            "difference": 0.5700000000000003,
+            "withinTolerance": false
+          }
+        }
+      },
+      {
+        "symbol": "3163.TWO",
+        "year": 2026,
+        "quarter": 2,
+        "fields": {
+          "revenue": {
+            "storedQuarterSum": 1247946000,
+            "officialYtd": 1247946000.0,
+            "difference": 0.0,
+            "withinTolerance": true
+          },
+          "epsBasic": {
+            "storedQuarterSum": 3.96,
+            "officialYtd": 3.5,
+            "difference": 0.45999999999999996,
+            "withinTolerance": false
+          }
+        }
+      },
+      {
+        "symbol": "5511.TWO",
+        "year": 2026,
+        "quarter": 2,
+        "fields": {
+          "revenue": {
+            "storedQuarterSum": 5348633000,
+            "officialYtd": 5348633000.0,
+            "difference": 0.0,
+            "withinTolerance": true
+          },
+          "epsBasic": {
+            "storedQuarterSum": 5.96,
+            "officialYtd": 5.53,
+            "difference": 0.4299999999999997,
+            "withinTolerance": false
+          }
+        }
+      },
+      {
+        "symbol": "7740.TW",
+        "year": 2026,
+        "quarter": 2,
+        "fields": {
+          "revenue": {
+            "storedQuarterSum": 7274083000,
+            "officialYtd": 7274083000.0,
+            "difference": 0.0,
+            "withinTolerance": true
+          },
+          "epsBasic": {
+            "storedQuarterSum": 6.21,
+            "officialYtd": 5.8,
+            "difference": 0.41000000000000014,
+            "withinTolerance": false
+          }
+        }
+      }
+    ],
+    "caveat": "Quarterly EPS is not additive across changing weighted share bases. These are investigation candidates, not 94 confirmed errors."
+  },
+  "finmindComparisons": [
+    {
+      "symbol": "2330.TW",
+      "compared": 30,
+      "differences": [],
+      "latest": [
+        {
+          "date": "2026-06-30",
+          "field": "revenue",
+          "stored": 1270380250000,
+          "source": 1270380250000.0,
+          "equal": true,
+          "type": "Revenue"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "netIncome",
+          "stored": 706561938000,
+          "source": 706561938000.0,
+          "equal": true,
+          "type": "EquityAttributableToOwnersOfParent"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "epsBasic",
+          "stored": 27.25,
+          "source": 27.25,
+          "equal": true,
+          "type": "EPS"
+        }
+      ]
+    },
+    {
+      "symbol": "6488.TWO",
+      "compared": 30,
+      "differences": [],
+      "latest": [
+        {
+          "date": "2026-06-30",
+          "field": "revenue",
+          "stored": 15214310000,
+          "source": 15214310000.0,
+          "equal": true,
+          "type": "Revenue"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "netIncome",
+          "stored": 3779084000,
+          "source": 3779084000.0,
+          "equal": true,
+          "type": "EquityAttributableToOwnersOfParent"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "epsBasic",
+          "stored": 7.9,
+          "source": 7.9,
+          "equal": true,
+          "type": "EPS"
+        }
+      ]
+    },
+    {
+      "symbol": "1101.TW",
+      "compared": 30,
+      "differences": [],
+      "latest": [
+        {
+          "date": "2026-06-30",
+          "field": "revenue",
+          "stored": 38121809000,
+          "source": 38121809000.0,
+          "equal": true,
+          "type": "Revenue"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "netIncome",
+          "stored": 2561591000,
+          "source": 2561591000.0,
+          "equal": true,
+          "type": "EquityAttributableToOwnersOfParent"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "epsBasic",
+          "stored": 0.29,
+          "source": 0.29,
+          "equal": true,
+          "type": "EPS"
+        }
+      ]
+    },
+    {
+      "symbol": "5386.TWO",
+      "compared": 18,
+      "differences": [],
+      "latest": [
+        {
+          "date": "2026-06-30",
+          "field": "revenue",
+          "stored": 6533500000,
+          "source": 6533500000.0,
+          "equal": true,
+          "type": "Revenue"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "netIncome",
+          "stored": 769832000,
+          "source": 769832000.0,
+          "equal": true,
+          "type": "IncomeAfterTaxes"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "epsBasic",
+          "stored": 14.22,
+          "source": 14.22,
+          "equal": true,
+          "type": "EPS"
+        }
+      ]
+    },
+    {
+      "symbol": "5274.TWO",
+      "compared": 18,
+      "differences": [],
+      "latest": [
+        {
+          "date": "2026-06-30",
+          "field": "revenue",
+          "stored": 3871409000,
+          "source": 3871409000.0,
+          "equal": true,
+          "type": "Revenue"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "netIncome",
+          "stored": 1840866000,
+          "source": 1840866000.0,
+          "equal": true,
+          "type": "EquityAttributableToOwnersOfParent"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "epsBasic",
+          "stored": 44.27,
+          "source": 44.27,
+          "equal": true,
+          "type": "EPS"
+        }
+      ]
+    },
+    {
+      "symbol": "3290.TWO",
+      "compared": 18,
+      "differences": [],
+      "latest": [
+        {
+          "date": "2026-06-30",
+          "field": "revenue",
+          "stored": 955386000,
+          "source": 955386000.0,
+          "equal": true,
+          "type": "Revenue"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "netIncome",
+          "stored": 123619000,
+          "source": 123619000.0,
+          "equal": true,
+          "type": "EquityAttributableToOwnersOfParent"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "epsBasic",
+          "stored": 0.08,
+          "source": 0.08,
+          "equal": true,
+          "type": "EPS"
+        }
+      ]
+    },
+    {
+      "symbol": "2883.TW",
+      "compared": 18,
+      "differences": [
+        {
+          "date": "2025-06-30",
+          "field": "revenue",
+          "stored": -37448094000,
+          "source": -357222000.0,
+          "equal": false,
+          "type": "Revenue"
+        }
+      ],
+      "latest": [
+        {
+          "date": "2026-06-30",
+          "field": "revenue",
+          "stored": 38453989000,
+          "source": 38453989000.0,
+          "equal": true,
+          "type": "Revenue"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "netIncome",
+          "stored": 16750427000,
+          "source": 16750427000.0,
+          "equal": true,
+          "type": "EquityAttributableToOwnersOfParent"
+        },
+        {
+          "date": "2026-06-30",
+          "field": "epsBasic",
+          "stored": 0.95,
+          "source": 0.95,
+          "equal": true,
+          "type": "EPS"
+        }
+      ]
+    }
+  ],
+  "yahooComparisons": [
+    {
+      "symbol": "AAPL",
+      "compared": 22,
+      "latest": {
+        "date": "2026-10-21",
+        "open": 339.3599853515625,
+        "high": 345.25,
+        "low": 338.8299865722656,
+        "close": 343.989990234375,
+        "volume": 35577700
+      },
+      "differences": []
+    },
+    {
+      "symbol": "NVDA",
+      "compared": 22,
+      "latest": {
+        "date": "2026-10-21",
+        "open": 220.9600067138672,
+        "high": 222.19000244140625,
+        "low": 217.66000366210938,
+        "close": 221.97000122070312,
+        "volume": 86620400
+      },
+      "differences": []
+    },
+    {
+      "symbol": "MSFT",
+      "compared": 22,
+      "latest": {
+        "date": "2026-10-21",
+        "open": 529.4400024414062,
+        "high": 533.280029296875,
+        "low": 525.02001953125,
+        "close": 532.9500122070312,
+        "volume": 13909900
+      },
+      "differences": []
+    },
+    {
+      "symbol": "AMZN",
+      "compared": 22,
+      "latest": {
+        "date": "2026-10-21",
+        "open": 262.7099914550781,
+        "high": 264.3599853515625,
+        "low": 259.2900085449219,
+        "close": 262.3699951171875,
+        "volume": 31139400
+      },
+      "differences": []
+    },
+    {
+      "symbol": "JPM",
+      "compared": 22,
+      "latest": {
+        "date": "2026-10-21",
+        "open": 337.1199951171875,
+        "high": 337.1199951171875,
+        "low": 332.6499938964844,
+        "close": 335.19000244140625,
+        "volume": 5770600
+      },
+      "differences": []
+    },
+    {
+      "symbol": "2330.TW",
+      "compared": 20,
+      "latest": {
+        "date": "2026-10-22",
+        "open": 2435.0,
+        "high": 2435.0,
+        "low": 2385.0,
+        "close": null,
+        "volume": 27360404
+      },
+      "differences": []
+    },
+    {
+      "symbol": "6488.TWO",
+      "compared": 20,
+      "latest": {
+        "date": "2026-10-22",
+        "open": 896.0,
+        "high": 898.0,
+        "low": 815.0,
+        "close": null,
+        "volume": 10475522
+      },
+      "differences": []
+    },
+    {
+      "symbol": "3555.TWO",
+      "compared": 20,
+      "latest": {
+        "date": "2026-10-22",
+        "open": 165.5,
+        "high": 165.5,
+        "low": 145.0,
+        "close": null,
+        "volume": 172074
+      },
+      "differences": [
+        {
+          "date": "2026-10-22",
+          "field": "low",
+          "stored": 146.5,
+          "liveYahoo": 145.0
+        }
+      ]
+    },
+    {
+      "symbol": "4133.TW",
+      "compared": 20,
+      "latest": {
+        "date": "2026-10-22",
+        "open": 20.899999618530273,
+        "high": 20.950000762939453,
+        "low": 20.600000381469727,
+        "close": null,
+        "volume": 74925
+      },
+      "differences": [
+        {
+          "date": "2026-10-22",
+          "field": "low",
+          "stored": 20.649999618530273,
+          "liveYahoo": 20.600000381469727
+        }
+      ]
+    }
+  ],
+  "worldAssetComparisons": [
+    {
+      "name": "wti",
+      "storedDate": "2026-10-20",
+      "storedLatest": 107.89,
+      "officialLatest": [
+        "2026-10-20",
+        107.89
+      ],
+      "sameDateOfficial": 107.89,
+      "historyCompared": 3753,
+      "historyDifferences": []
+    },
+    {
+      "name": "usdtwd",
+      "storedDate": "2026-10-16",
+      "storedLatest": 32.4,
+      "officialLatest": [
+        "2026-10-16",
+        32.4
+      ],
+      "sameDateOfficial": 32.4,
+      "historyCompared": 3755,
+      "historyDifferences": []
+    },
+    {
+      "name": "gold",
+      "storedDate": "2026-09-01",
+      "storedLatest": 4319.0,
+      "officialLatest": [
+        "2026-09-01",
+        4319.0
+      ],
+      "sameDateOfficial": 4319.0,
+      "historyCompared": 179,
+      "historyDifferences": []
+    },
+    {
+      "name": "silver",
+      "storedDate": "2026-09-01",
+      "storedLatest": 64.6,
+      "officialLatest": [
+        "2026-09-01",
+        64.6
+      ],
+      "sameDateOfficial": 64.6,
+      "historyCompared": 179,
+      "historyDifferences": []
+    },
+    {
+      "name": "copper",
+      "storedDate": "2026-09-01",
+      "storedLatest": 14474.0,
+      "officialLatest": [
+        "2026-09-01",
+        14474.0
+      ],
+      "sameDateOfficial": 14474.0,
+      "historyCompared": 179,
+      "historyDifferences": []
+    }
+  ],
+  "researchStorage": [
+    {
+      "module": "volume",
+      "market": "TW",
+      "records": 1979,
+      "issues": []
+    },
+    {
+      "module": "volume",
+      "market": "US",
+      "records": 5339,
+      "issues": []
+    },
+    {
+      "module": "institutions",
+      "market": "TW",
+      "records": 1086,
+      "issues": []
+    },
+    {
+      "module": "institutions",
+      "market": "TWO",
+      "records": 881,
+      "issues": []
+    },
+    {
+      "module": "turnover",
+      "market": "TW",
+      "records": 66,
+      "issues": []
+    },
+    {
+      "module": "turnover",
+      "market": "TWO",
+      "records": 66,
+      "issues": []
+    },
+    {
+      "module": "sec",
+      "market": "US",
+      "records": 971,
+      "issues": []
+    }
+  ],
+  "investigationCandidates": {
+    "fiscalPeriodDetector": {
+      "filesFlagged": 233,
+      "filesFlaggedByRule": {
+        "fye-month-change": 215,
+        "q4-end-vs-annual-end": 11,
+        "quarter-spacing": 150,
+        "quarter-vs-annual-calendar": 72
+      },
+      "nonQ4RowsFlagged": 400,
+      "q4RowsEvaluatedAgainstAnnual": 44569,
+      "q4RowsFlagged": 51,
+      "q4RowsFlaggedByRule": {
+        "q4-end-vs-annual-end": 30,
+        "quarter-spacing": 21,
+        "quarter-vs-annual-calendar": 30
+      },
+      "q4RowsUnparsedEnd": 0,
+      "q4RowsWithoutSameFyAnnual": 43,
+      "usFiles": 4967,
+      "usQ4Rows": 44612
+    },
+    "fiscalFlaggedSymbols": [
+      "AACG",
+      "ABAT",
+      "ABTC",
+      "ABTS",
+      "ABVC",
+      "ACB",
+      "ADM",
+      "AENT",
+      "AERT",
+      "AGNT",
+      "AIOT",
+      "AIRE",
+      "AIV",
+      "ALKS",
+      "ALMU",
+      "AMSC",
+      "AREC",
+      "ARTL",
+      "ASTH",
+      "ASTL",
+      "ATCH",
+      "ATPC",
+      "AWX",
+      "AYTU",
+      "BBCP",
+      "BBLG",
+      "BBW",
+      "BBY",
+      "BENF",
+      "BIOX",
+      "BLBD",
+      "BNC",
+      "BRFH",
+      "BRT",
+      "BV",
+      "CATX",
+      "CCS",
+      "CELZ",
+      "CHPT",
+      "CHRN",
+      "CLIK",
+      "CMP",
+      "CMPX",
+      "COPR",
+      "COSM",
+      "CRAI",
+      "CRDF",
+      "CSR",
+      "CTGO",
+      "CTOR",
+      "CTRM",
+      "CTXR",
+      "CWST",
+      "CYRX",
+      "CZWI",
+      "DC",
+      "DECK",
+      "DFNS",
+      "DFSC",
+      "DNN",
+      "DRH",
+      "DWSN",
+      "DXC",
+      "DXLG",
+      "DY",
+      "EBMT",
+      "EDSA",
+      "ELF",
+      "ELOX",
+      "ENVB",
+      "ESLA",
+      "ESYN",
+      "ETD",
+      "EUDA",
+      "EYPT",
+      "FABC",
+      "FCUV",
+      "FERG",
+      "FFR",
+      "FLUX",
+      "FNWB",
+      "FOR",
+      "FRPH",
+      "GDOT",
+      "GEF",
+      "GEF-B",
+      "GIL",
+      "GMHS",
+      "GNE",
+      "GPN",
+      "GRNQ",
+      "GROY",
+      "GS",
+      "HAPN",
+      "HASI",
+      "HG",
+      "HKD",
+      "HLSQ",
+      "HNVR",
+      "HRB",
+      "HSDT",
+      "HTB",
+      "HURA",
+      "HUT",
+      "IHRT",
+      "IMMR",
+      "INSE",
+      "IQST",
+      "IVVD",
+      "JAKK",
+      "JBTM",
+      "JEF",
+      "JZXN",
+      "KD",
+      "KDP",
+      "KLXE",
+      "KNOP",
+      "KRMD",
+      "LAKE",
+      "LDOS",
+      "LEXX",
+      "LFCR",
+      "LHX",
+      "LIVN",
+      "LNAI",
+      "LND",
+      "LOOP",
+      "LVO",
+      "MAGN",
+      "MAMA",
+      "MARA",
+      "MBOT",
+      "MC",
+      "MCS",
+      "MDIA",
+      "MG",
+      "MGPI",
+      "MIR",
+      "MNSO",
+      "MOBX",
+      "MODD",
+      "MOS",
+      "MRDN",
+      "MS",
+      "MSCI",
+      "MTA",
+      "MYGN",
+      "NIXX",
+      "NMTC",
+      "NOA",
+      "NOMD",
+      "NOW",
+      "NSPR",
+      "NTRP",
+      "NTST",
+      "NVX",
+      "ODYS",
+      "OGI",
+      "ORMP",
+      "OSK",
+      "PBFS",
+      "PHUN",
+      "POWW",
+      "PPC",
+      "PRGO",
+      "PULM",
+      "PVLA",
+      "QRHC",
+      "RBC",
+      "RCAT",
+      "RCEL",
+      "RDNW",
+      "RDZN",
+      "REBN",
+      "REPX",
+      "RGEN",
+      "RGLD",
+      "RIME",
+      "RJET",
+      "RLMD",
+      "RPAY",
+      "RRR",
+      "RZLT",
+      "SEDG",
+      "SENS",
+      "SFD",
+      "SKIL",
+      "SKY",
+      "SKYE",
+      "SLI",
+      "SMFG",
+      "SMMT",
+      "SNDL",
+      "SPHR",
+      "SRTA",
+      "SRXH",
+      "SURG",
+      "SYM",
+      "TBCH",
+      "TDW",
+      "TENX",
+      "TGLS",
+      "THM",
+      "TISI",
+      "TLRY",
+      "TM",
+      "TONX",
+      "TRUG",
+      "TTWO",
+      "TULP",
+      "TVTX",
+      "UA",
+      "UAA",
+      "UEC",
+      "USGO",
+      "UXIN",
+      "VAL",
+      "VALU",
+      "VCEL",
+      "VFC",
+      "VIVO",
+      "VIVS",
+      "VTOL",
+      "VTS",
+      "WDAY",
+      "WKSP",
+      "WPRT",
+      "XAIR",
+      "XBIO",
+      "XRN",
+      "YUMC",
+      "ZONE",
+      "ZWS"
+    ],
+    "annualQuarterValueDifferencesOver2Pct": 2479,
+    "annualQuarterSymbols": 1151,
+    "annualQuarterCountsByMarketAndField": {
+      "TW:revenue": 1,
+      "US:netIncome": 934,
+      "US:operatingIncome": 618,
+      "US:revenue": 740,
+      "US:capex": 134,
+      "US:operatingCashFlow": 52
+    },
+    "researchVsCsvDifferenceCounts": {
+      "volume": 8707,
+      "close": 37
+    },
+    "researchVsCsvFeaturesCompared": 52465,
+    "caveat": "Fiscal changes, restatement bases and source trading-volume definitions can produce differences; these counts are not confirmed error totals."
+  },
+  "testExecution": {
+    "command": "/tmp/stock-data-audit-venv/bin/python -m unittest discover -s tests",
+    "tests": 1544,
+    "durationSeconds": 101.594,
+    "exitCode": 0,
+    "result": "OK",
+    "logSha256": "7473e7e966d162d5cec5bb14ae03abf7f8c417349f4ac35996b8a0d0c9ad5d95"
+  },
+  "sourceReceipts": [
+    {
+      "name": "fed-twd.csv",
+      "url": "https://www.federalreserve.gov/datadownload/Output.aspx?rel=H10&series=41dfc9cc4897994968e2b2376dcce64f&lastobs=&from=&to=&filetype=csv&label=include&layout=seriescolumn",
+      "retrievedAt": "2026-10-22T16:57:08.861506+00:00",
+      "status": 200,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "contentType": "text/html",
+      "lastModified": "Thu, 22 Oct 2026 16:57:09 GMT"
+    },
+    {
+      "name": "fed-twd.html",
+      "url": "https://www.federalreserve.gov/releases/h10/hist/dat00_ta.htm",
+      "retrievedAt": "2026-10-22T16:58:02.335995+00:00",
+      "status": 200,
+      "bytes": 1130416,
+      "sha256": "eccea333a3c1a0a0ac8c6e06a7ca10d31fd45d8efe7ba5e7a3dc0fabf4f74d3c",
+      "contentType": "text/html",
+      "lastModified": "Mon, 19 Oct 2026 20:15:15 GMT"
+    },
+    {
+      "name": "finmind-1101.json",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockFinancialStatements&data_id=1101&start_date=2024-01-01",
+      "retrievedAt": "2026-10-22T16:57:09.377616+00:00",
+      "status": 200,
+      "bytes": 26025,
+      "sha256": "330be54a8e7cfcb2d742f158d64ab6a830130f891cff23bcb1b4493cc9a39c48",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "finmind-2330.json",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockFinancialStatements&data_id=2330&start_date=2024-01-01",
+      "retrievedAt": "2026-10-22T16:57:09.133771+00:00",
+      "status": 200,
+      "bytes": 27711,
+      "sha256": "81814c8f0255556d9c8f5caa2a52247bd93b7fa0c97bf0bdbb4e4c42deb7d361",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "finmind-2883.json",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockFinancialStatements&data_id=2883&start_date=2025-01-01",
+      "retrievedAt": "2026-10-22T17:00:56.457492+00:00",
+      "status": 200,
+      "bytes": 16456,
+      "sha256": "101ba6fb821b84ef41a072f214d50adb991e9e2fbab8d9b600bf52070223e929",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "finmind-3290.json",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockFinancialStatements&data_id=3290&start_date=2025-01-01",
+      "retrievedAt": "2026-10-22T17:00:55.585933+00:00",
+      "status": 200,
+      "bytes": 13704,
+      "sha256": "49d8c8971c391d4fc713b8624744842e10d0ccd5f4619d830a2e8e2ddff70476",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "finmind-5274.json",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockFinancialStatements&data_id=5274&start_date=2025-01-01",
+      "retrievedAt": "2026-10-22T17:00:55.445586+00:00",
+      "status": 200,
+      "bytes": 13371,
+      "sha256": "7b7aa0ff69ee4f3d49a62099a374b3068b6b10a888b68fc237ec5b67986bbe20",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "finmind-5386.json",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockFinancialStatements&data_id=5386&start_date=2025-01-01",
+      "retrievedAt": "2026-10-22T17:00:55.404366+00:00",
+      "status": 200,
+      "bytes": 11646,
+      "sha256": "b63d588ac16ada60a9ea0e662061063a80ff42003fdba70919bcc9f99a32f256",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "finmind-6488.json",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockFinancialStatements&data_id=6488&start_date=2024-01-01",
+      "retrievedAt": "2026-10-22T16:57:09.186834+00:00",
+      "status": 200,
+      "bytes": 25930,
+      "sha256": "ab99da173b5abae2d1e2ffb5e19cc7a79bc2b62b2415ca5beb40fe8f773a6743",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "sec-AAPL.json",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+      "retrievedAt": "2026-10-22T16:57:13.122488+00:00",
+      "status": 200,
+      "bytes": 3789099,
+      "sha256": "73a86c6aedc31f77cac2ea4df5f80f0b3bd7e6eb58bb4e01444fbedf3afb9c43",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "sec-AD.json",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000821130.json",
+      "retrievedAt": "2026-10-22T16:57:11.971631+00:00",
+      "status": 200,
+      "bytes": 3463847,
+      "sha256": "4bb2ad4e52b5e2ea8e34b8fab4b881009101215fa0c25af5895a4e947c4b7938",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "sec-AMZN.json",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001018724.json",
+      "retrievedAt": "2026-10-22T16:57:16.091529+00:00",
+      "status": 200,
+      "bytes": 4478611,
+      "sha256": "7549fb68446eee40e1f50a166fa06b2d2ee6349e07c8553a4828757e032d3cd4",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "sec-GOOG.json",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001652044.json",
+      "retrievedAt": "2026-10-22T16:57:15.465310+00:00",
+      "status": 200,
+      "bytes": 3164517,
+      "sha256": "a017f26ee88cb4a639d1c1ddb06d53b4afe22f0ac89cabec7cd67c88919fe1c5",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "sec-JPM.json",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000019617.json",
+      "retrievedAt": "2026-10-22T16:57:17.661229+00:00",
+      "status": 200,
+      "bytes": 7994988,
+      "sha256": "e4086579edf22c47b95f52ca48903b60c0ff99a3e5056192ea9d345128a45d33",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "sec-MSFT.json",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+      "retrievedAt": "2026-10-22T16:57:14.589964+00:00",
+      "status": 200,
+      "bytes": 4888108,
+      "sha256": "dd0308149a8e96497989ed7c690b5a49a00bef9ceafbb24638bda41e8ae938dd",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "sec-NVDA.json",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001045810.json",
+      "retrievedAt": "2026-10-22T16:57:13.850976+00:00",
+      "status": 200,
+      "bytes": 4092966,
+      "sha256": "19ef503a5770f5660964b3c3aea6937579d9b359da344afe6a9adf59c63d26ff",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "sec-TSLA.json",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001318605.json",
+      "retrievedAt": "2026-10-22T16:57:17.061225+00:00",
+      "status": 200,
+      "bytes": 3700279,
+      "sha256": "c951e0ae2402dd8cf8f39319928adccc4196b997941fe40b0d4d6b8060802db1",
+      "contentType": "application/json",
+      "lastModified": null
+    },
+    {
+      "name": "tpex-annual-eps.json",
+      "url": "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap14_O",
+      "retrievedAt": "2026-10-22T16:57:08.115870+00:00",
+      "status": 200,
+      "bytes": 325319,
+      "sha256": "e60d73748175dcdb447a8367bc8a679efd89c11c266232522570608c4acc6aa8",
+      "contentType": "application/json",
+      "lastModified": "Thu, 22 Oct 2026 15:30:40 GMT"
+    },
+    {
+      "name": "tpex-flows-20261022.csv",
+      "url": "https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade?type=Daily&date=2026/10/22&id=&response=csv",
+      "retrievedAt": "2026-10-22T16:57:06.670681+00:00",
+      "status": 200,
+      "bytes": 142777,
+      "sha256": "db0f62567b54b0a2da33cc4b36da07984759fceedab07309c9909b41a7fd7bca",
+      "contentType": "application/csv;charset=MS950",
+      "lastModified": null
+    },
+    {
+      "name": "tpex-quotes-20260828.json",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=2026/08/28&id=&response=json",
+      "retrievedAt": "2026-10-22T17:00:55.354349+00:00",
+      "status": 200,
+      "bytes": 1610976,
+      "sha256": "2ed3cc66b09411f4d2c7ba777ff1f944c435c281c50e9950d33423d3e7b620fd",
+      "contentType": "application/json;charset=UTF-8",
+      "lastModified": null
+    },
+    {
+      "name": "tpex-quotes-20261022.json",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=2026/10/22&id=&response=json",
+      "retrievedAt": "2026-10-22T16:57:06.668778+00:00",
+      "status": 200,
+      "bytes": 1949979,
+      "sha256": "968961200b6563ca6d0aaa53d4378ee122a8a38c7d01a3689e3f871aa1a4a825",
+      "contentType": "application/json;charset=UTF-8",
+      "lastModified": null
+    },
+    {
+      "name": "twse-annual-eps.json",
+      "url": "https://openapi.twse.com.tw/v1/opendata/t187ap14_L",
+      "retrievedAt": "2026-10-22T16:57:07.807180+00:00",
+      "status": 200,
+      "bytes": 405110,
+      "sha256": "8a7a2c7609886e761be8f081e384e62e028cd949828b4aa7668cc00a88da1d4f",
+      "contentType": "application/json",
+      "lastModified": "Wed, 21 Oct 2026 21:24:57 GMT"
+    },
+    {
+      "name": "twse-flows-20261022.json",
+      "url": "https://www.twse.com.tw/rwd/zh/fund/T86?date=20261022&selectType=ALLBUT0999&response=json",
+      "retrievedAt": "2026-10-22T16:57:06.670103+00:00",
+      "status": 200,
+      "bytes": 191031,
+      "sha256": "1b99127843e94d783d6473740f0f7faad334a3089ed155a69173f2419c196ddf",
+      "contentType": "application/json;charset=UTF-8",
+      "lastModified": null
+    },
+    {
+      "name": "twse-quotes-20261022.json",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20261022&type=ALLBUT0999",
+      "retrievedAt": "2026-10-22T16:57:06.667652+00:00",
+      "status": 200,
+      "bytes": 248993,
+      "sha256": "8e1631c081785f31ff11db61cdaf9b7312dae44450c2d31ddfe79eedd9648885",
+      "contentType": "application/json;charset=UTF-8",
+      "lastModified": null
+    },
+    {
+      "name": "worldbank.xlsx",
+      "url": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+      "retrievedAt": "2026-10-22T16:57:08.932063+00:00",
+      "status": 200,
+      "bytes": 586099,
+      "sha256": "ea1c350827878ea3bbe30e3cda16a13fd3bd5b409b8458940dc94a36b5a33154",
+      "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "lastModified": "Fri, 02 Oct 2026 18:57:55 GMT"
+    },
+    {
+      "name": "wti.xls",
+      "url": "https://www.eia.gov/dnav/pet/hist_xls/RWTCd.xls",
+      "retrievedAt": "2026-10-22T16:57:08.641158+00:00",
+      "status": 200,
+      "bytes": 471552,
+      "sha256": "7f2f5b92d5330ef9707e25808eb9498a0d59f26f8716caf1adf1692176b23369",
+      "contentType": "application/vnd.ms-excel",
+      "lastModified": "Wed, 21 Oct 2026 15:22:06 GMT"
+    },
+    {
+      "name": "yahoo-2330.TW.json",
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/2330.TW?interval=1d&range=1mo&events=splits",
+      "retrievedAt": "2026-10-22T17:00:54.993318+00:00",
+      "status": 200,
+      "bytes": 2340,
+      "sha256": "a39dc2bc1a37e8da879a35d698b1552ad9b62554ba9bab773d1a9b74aa083b54",
+      "contentType": "application/json;charset=utf-8",
+      "lastModified": null
+    },
+    {
+      "name": "yahoo-3555.TWO.json",
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/3555.TWO?interval=1d&range=1mo&events=splits",
+      "retrievedAt": "2026-10-22T17:00:55.131309+00:00",
+      "status": 200,
+      "bytes": 2141,
+      "sha256": "f9ff442dd0d43ccff743025fb05fb3b2e26bf2c166db0b2cd3504a03f360c800",
+      "contentType": "application/json;charset=utf-8",
+      "lastModified": null
+    },
+    {
+      "name": "yahoo-4133.TW.json",
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/4133.TW?interval=1d&range=1mo&events=splits",
+      "retrievedAt": "2026-10-22T17:00:55.306115+00:00",
+      "status": 200,
+      "bytes": 3220,
+      "sha256": "379d92847d3cabbdd4336d561e21b797ae13100b95d5ef20f89047baa0fbbe1a",
+      "contentType": "application/json;charset=utf-8",
+      "lastModified": null
+    },
+    {
+      "name": "yahoo-6488.TWO.json",
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/6488.TWO?interval=1d&range=1mo&events=splits",
+      "retrievedAt": "2026-10-22T17:00:55.003741+00:00",
+      "status": 200,
+      "bytes": 2252,
+      "sha256": "e89c3698b5e683fa1f1f5704d273526ee299a6dcf52b51697748b14055abe8af",
+      "contentType": "application/json;charset=utf-8",
+      "lastModified": null
+    },
+    {
+      "name": "yahoo-7825.TWO-history.json",
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/7825.TWO?interval=1d&period1=1787788800&period2=1788220800",
+      "retrievedAt": "2026-10-22T17:03:06.166782+00:00",
+      "status": 200,
+      "bytes": 1407,
+      "sha256": "c339988be94959dfb9948766d3c36317535edc987e69bee23e89647baeee5abb",
+      "contentType": "application/json;charset=utf-8",
+      "lastModified": null
+    },
+    {
+      "name": "yahoo-AAPL.json",
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=1mo&events=splits",
+      "retrievedAt": "2026-10-22T17:00:54.591199+00:00",
+      "status": 200,
+      "bytes": 3598,
+      "sha256": "06fde914c09d9e7e59780c54e05e6d0ddf710074f77518c72398982f10521b7b",
+      "contentType": "application/json;charset=utf-8",
+      "lastModified": null
+    },
+    {
+      "name": "yahoo-AMZN.json",
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/AMZN?interval=1d&range=1mo&events=splits",
+      "retrievedAt": "2026-10-22T17:00:54.593414+00:00",
+      "status": 200,
+      "bytes": 3697,
+      "sha256": "675c0944ada1d20f9558af9921275fdd02ca84a2fb670199d5de5babbb1dd68e",
+      "contentType": "application/json;charset=utf-8",
+      "lastModified": null
+    },
+    {
+      "name": "yahoo-JPM.json",
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/JPM?interval=1d&range=1mo&events=splits",
+      "retrievedAt": "2026-10-22T17:00:54.910429+00:00",
+      "status": 200,
+      "bytes": 3603,
+      "sha256": "a71016fcd6225943181f15e9437eef0207234a81a3e228bf77064b746d83312a",
+      "contentType": "application/json;charset=utf-8",
+      "lastModified": null
+    },
+    {
+      "name": "yahoo-MSFT.json",
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/MSFT?interval=1d&range=1mo&events=splits",
+      "retrievedAt": "2026-10-22T17:00:54.593697+00:00",
+      "status": 200,
+      "bytes": 3645,
+      "sha256": "ea896b3e83313b9f49a350bd68ebdc8af79cedc26d19ba579e248ddab4d8d5d9",
+      "contentType": "application/json;charset=utf-8",
+      "lastModified": null
+    },
+    {
+      "name": "yahoo-NVDA.json",
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/NVDA?interval=1d&range=1mo&events=splits",
+      "retrievedAt": "2026-10-22T17:00:54.592639+00:00",
+      "status": 200,
+      "bytes": 3791,
+      "sha256": "d514d2f4192e4d5b95d652f39d9fa0635fa91fa50ff5bd534143fb000ab3dfe7",
+      "contentType": "application/json;charset=utf-8",
+      "lastModified": null
+    }
+  ],
+  "limitations": [
+    "No production website deployment/content comparison.",
+    "No full fresh external audit of all 6,946 financial files or all 581,891 OHLCV rows.",
+    "SEC recent sample covers eight issuers and direct facts only; MSFT Q4 has three noncomparable direct fields.",
+    "TPEx historical regular-market report did not contain 7825 on 2026-08-28.",
+    "Official cumulative EPS and standalone quarterly EPS can use different weighted share bases.",
+    "The attempted Federal Reserve CSV endpoint returned HTTP 200 with an empty body; no values were derived from it. The official H.10 HTML table supplied the verified FX values."
+  ],
+  "changesMade": "Audit JSON and Markdown only; no data values, collector code, workflows, remote state or deployment changed."
+}

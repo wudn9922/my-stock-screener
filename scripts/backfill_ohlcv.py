@@ -19,6 +19,8 @@ import urllib.parse
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
 
 
@@ -45,7 +47,8 @@ def reconcile(local, source):
         day = row["Date"]
         if datetime.fromisoformat(day).weekday() >= 5:
             continue
-        if not all(valid(row.get(c), c) for c in COLUMNS):
+        from kline_integrity import violation
+        if not all(valid(row.get(c), c) for c in COLUMNS) or violation(row):
             continue
         if day not in result:
             result[day] = dict(row)
@@ -160,9 +163,10 @@ def process(path, args, now, cache, backup):
             writer = csv.DictWriter(output, fieldnames=["Date"] + COLUMNS, lineterminator="\n")
             writer.writeheader()
             writer.writerows(merged)
-            temporary = path.with_suffix(".csv.tmp")
-            temporary.write_text(output.getvalue())
-            temporary.replace(path)
+            import pandas as pd
+            from kline_integrity import write_csv
+            frame = pd.read_csv(io.StringIO(output.getvalue()), index_col=0, parse_dates=True)
+            write_csv(path, frame, symbol=symbol, source_url=url, fetched_at=now.isoformat())
             # Verify the written file has no remaining source-confirmed gaps/cells.
             check = list(csv.DictReader(path.open()))
             _, missing, cells = reconcile(check, source)

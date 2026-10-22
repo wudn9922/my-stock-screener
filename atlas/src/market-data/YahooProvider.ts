@@ -9,6 +9,7 @@ import type {
 import { filterBarsByRange, normalizeMarketRange, normalizeSymbol } from './MarketDataProvider';
 import { MarketDataUnavailableError } from './ProviderErrors';
 import { isYahooTimeframe } from './YahooIntervals';
+import { usableBars } from './KlineIntegrity';
 import { STATIC_HOSTING } from '../app/HostingMode';
 import { getMarketProfile, sameMarketProfile, SESSION_CLOSE_SOURCE_QUALIFIER } from './MarketProfile';
 
@@ -65,7 +66,7 @@ export class YahooProvider implements MarketDataProvider {
     if (market.market === 'TW' && result.quote && !sameMarketProfile(result.quote.market, market)) {
       throw new Error('Yahoo Taiwan quote is missing market metadata');
     }
-    const bars = filterBarsByRange(result.bars, normalizedRange);
+    const bars = filterBarsByRange(usableBars(result.bars, normalizedSymbol, timeframe), normalizedRange);
     if (!bars.length) throw new Error('No Yahoo bars in requested range');
     const sessionCloseObservations = result.sessionCloseObservations?.filter(time => bars.some(bar => bar.time === time));
     const source = result.sessionCloseObservations?.length && !sessionCloseObservations?.length

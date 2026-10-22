@@ -22,6 +22,7 @@ export const METRIC_SORTS: readonly SortMode[] = ['rs', 'hi', 'vr', 'ma50', 'r21
 
 export interface SortContext {
   growth?: GrowthFile | null;
+  asOf?: string | null;
 }
 
 /** Latest-quarter EPS YoY (a loss-to-profit turn sorts above every finite value). */
@@ -70,6 +71,16 @@ export function filterAndSortItems(
   else if (sort === 'ma50') filtered.sort(byNumber((item) => maDeviation(item, 50), -1));
   else if (sort === 'r21') filtered.sort(byNumber((item) => item.metrics?.r21, -1));
   else if (sort === 'eps') filtered.sort(byNumber((item) => epsYoY(item, context.growth), -1));
+  // Stable date grouping keeps numeric comparisons within one observation date.
+  // The market's modal date comes first; other dates are explicitly labelled in UI.
+  if (context.asOf && !['default', 'symbol', 'eps'].includes(sort)) {
+    filtered.sort((a, b) => {
+      if (a.asOf === b.asOf) return 0;
+      if (a.asOf === context.asOf) return -1;
+      if (b.asOf === context.asOf) return 1;
+      return (b.asOf ?? '').localeCompare(a.asOf ?? '');
+    });
+  }
   // Failed rows have no prices or metrics: they always close the list, whatever the sort.
   return filtered.some((item) => item.status === 'failed')
     ? [...filtered.filter((item) => item.status !== 'failed'), ...filtered.filter((item) => item.status === 'failed')]

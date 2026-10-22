@@ -64,3 +64,5 @@
   color: var(--warn);
   background: rgba(224, 164, 58, 0.14);
 }
+.row-observation-date { color: var(--text-muted, #a7752e); font-size: 10px; line-height: 1.1; }
+.screener-date-notice { font-size: 12px; color: var(--text-muted, #a7752e); margin: 6px 0; }

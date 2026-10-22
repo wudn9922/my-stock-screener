@@ -48,6 +48,26 @@ def payload(symbol="GC=F"):
 
 
 class CandleSources(unittest.TestCase):
+    def test_latest_completed_invalid_bar_refetches_once_before_the_forming_row(self):
+        from unittest.mock import Mock
+        p = payload()
+        p['chart']['result'][0]['indicators']['quote'][0]['high'][1] = 1
+        retry = Mock(return_value=payload())
+        rows, _ = parse_ohlc(p, 'GC=F', datetime(2026,10,22,18,tzinfo=timezone.utc), refetch=retry)
+        retry.assert_called_once()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[-1][2], 13)
+
+    def test_overnight_active_session_is_excluded_even_if_its_date_is_yesterday(self):
+        p = payload()
+        item = p['chart']['result'][0]
+        start = int(datetime(2026,10,21,22,tzinfo=timezone.utc).timestamp())
+        end = int(datetime(2026,10,22,21,tzinfo=timezone.utc).timestamp())
+        item['timestamp'] = [int(datetime(2026,10,20,4,tzinfo=timezone.utc).timestamp()),start,start+3600]
+        item['meta']['currentTradingPeriod'] = {'regular':{'start':start,'end':end}}
+        rows, _ = parse_ohlc(p,'GC=F',datetime(2026,10,22,18,tzinfo=timezone.utc))
+        self.assertEqual(len(rows),1)
+
     def test_real_ohlc_missing_volume_and_forming_session(self):
         rows, meta = parse_ohlc(
             payload(), "GC=F", datetime(2026, 10, 22, 18, tzinfo=timezone.utc)
@@ -71,16 +91,17 @@ class CandleSources(unittest.TestCase):
         self.assertEqual(meta["excludedInvalidOHLC"], 1)
         self.assertEqual(len(rows), 1)
 
-    def test_negative_futures_prices_are_not_dropped(self):
+    def test_nonpositive_prices_are_rejected_under_the_positive_kline_policy(self):
         p = payload()
         q = p["chart"]["result"][0]["indicators"]["quote"][0]
         q.update(open=[-10] * 3, high=[-8] * 3, low=[-13] * 3, close=[-11] * 3)
-        self.assertLess(parse_ohlc(p, "GC=F")[0][0][4], 0)
+        with self.assertRaises(SourceError):
+            parse_ohlc(p, "GC=F")
 
     def test_csv_noop_atomic_failure_and_historical_deletion_guard(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "x.csv"
-            rows = [["2026-10-20", 1, 3, 0, 2, None]]
+            rows = [["2026-10-20", 1, 3, 0.5, 2, None]]
             save_csv(p, rows)
             before = p.read_bytes(), p.stat().st_mtime_ns
             save_csv(p, rows)
@@ -163,7 +184,8 @@ class CandleSources(unittest.TestCase):
             kept = root / "retained/CMD-WTI.csv"
             rows = read_csv(kept)
             later = date.fromisoformat(rows[-1][0]) + timedelta(days=1)
-            save_csv(kept, rows + [[later.isoformat(), 1, 3, 0, 2, None]])
+            save_csv(kept, rows + [[later.isoformat(), 1, 3, 0.5, 2, None]],
+                     now=datetime.fromisoformat(later.isoformat()).replace(tzinfo=timezone.utc)+timedelta(days=2))
             with self.assertRaisesRegex(ValueError, "retained"):
                 overlay(root / "artifacts", root / "published", root / "retained")
 

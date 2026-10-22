@@ -150,6 +150,7 @@ function Row({
   filters,
   top,
   onOpen,
+  marketDate,
 }: {
   item: GroupItem;
   pe: PeFigures | undefined;
@@ -159,6 +160,7 @@ function Row({
   filters: FilterState;
   top: number;
   onOpen: () => void;
+  marketDate?: string | null;
 }) {
   const tone = toneClass(item.changePct);
   const status = itemStatusOf(item);
@@ -191,6 +193,11 @@ function Row({
         )}
         <EarningsBadge symbol={item.symbol} />
         <small>{item.name !== item.symbol ? item.name : getMarketProfile(item.symbol).market === 'TW' ? '台股' : '美股'}</small>
+        {marketDate && item.asOf !== marketDate && (
+          <small className="row-observation-date" title={`市場資料日 ${marketDate}；本列未與其他日期直接比較`}>
+            {item.asOf ? `資料日 ${item.asOf}` : '資料日不明'}
+          </small>
+        )}
       </span>
       <span className={metricPills.length ? 'row-mas has-metrics' : 'row-mas'}>
         {metricPills.map(({ key, pill }) => (
@@ -361,13 +368,14 @@ function ScreenerView({
   const activeSort = sortModes.includes(sort) ? sort : 'default';
   const wantGrowth = needsGrowth(filters) || activeSort === 'eps' || (sheetOpen && draftNeedsGrowth);
   const { growth, loading: growthLoading } = useGrowth(wantGrowth, market);
-  const context = useMemo<FilterContext>(() => ({ market, growth, growthLoading }), [market, growth, growthLoading]);
+  const observationDate = universeMarketData?.asOf;
+  const context = useMemo<FilterContext>(() => ({ market, growth, growthLoading, asOf: observationDate }), [market, growth, growthLoading, observationDate]);
   const availability = useMemo(() => filterAvailability(groupItems, context), [groupItems, context]);
   const chips = useMemo(() => activeChips(filters, availability), [filters, availability]);
   const filtered = useMemo(() => applyFilters(viewItems, filters, context), [viewItems, filters, context]);
   const items = useMemo(
-    () => filterAndSortItems(filtered, query, activeSort, { growth }),
-    [filtered, query, activeSort, growth],
+    () => filterAndSortItems(filtered, query, activeSort, { growth, asOf: observationDate }),
+    [filtered, query, activeSort, growth, observationDate],
   );
   const countFor = useCallback(
     (draft: FilterState) => filterAndSortItems(applyFilters(viewItems, draft, context), query, 'default').length,
@@ -550,6 +558,11 @@ function ScreenerView({
           {universeMarketData.benchmark === '^TWII' ? '加權指數' : universeMarketData.benchmark} · {universeMarketData.universe}
         </p>
       )}
+      {observationDate && groupItems.some(item => item.asOf !== observationDate) && (
+        <p className="screener-date-notice" role="status">
+          不同資料日分組排序；漲跌、成交量、量比與 RS 條件只比較 {observationDate}，各列另標示不同日期。
+        </p>
+      )}
       {universeMarketData?.note && (
         <button
           type="button"
@@ -578,6 +591,7 @@ function ScreenerView({
                 <div role="listitem" key={item.symbol}>
                   <Row
                     item={item}
+                    marketDate={observationDate}
                     pe={pe[item.symbol]}
                     pills={pills}
                     growth={growth}

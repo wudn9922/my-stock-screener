@@ -187,7 +187,7 @@ class Storage:
     def publish_one(self, branch, base, patterns, message):
         delta, original = self.changed(base, patterns)
         for path, entry in delta.items():
-            if branch == "main" and matches(path, ["data/*.csv"]) and entry is None:
+            if branch == "main" and matches(path, ["data/*.csv", "data/world/*.csv", "docs/report/financials/**"]) and entry is None:
                 raise ValueError("Refusing to delete owner-retained K-line history: " + path)
             if matches(path, self.append_only) and (entry is None or path in original):
                 raise ValueError("Archived snapshots are append-only: " + path)

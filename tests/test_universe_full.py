@@ -246,7 +246,10 @@ class UsSourcesTest(unittest.TestCase):
             {"symbol": "HALT", "regularMarketTime": stamp, "regularMarketPrice": 3.0},
         ], "error": None}}
         bars = us.parse_yahoo_quotes(payload, report_metrics.market_of)
-        self.assertEqual(list(bars), ["AAPL"])
+        # Preserve malformed source observations until the acceptance boundary can
+        # refetch/log them; the parser must not hide them or invent flat prices.
+        self.assertEqual(list(bars), ["AAPL", "HALT"])
+        self.assertIsNone(bars['HALT']['open'])
         self.assertEqual(bars["AAPL"]["date"], "2026-10-13")
         self.assertEqual(bars["AAPL"]["previousClose"], 248.8)
         self.assertEqual(bars["AAPL"]["shares"], 1.5e10)
@@ -777,7 +780,7 @@ class EndToEndTest(unittest.TestCase):
 def full_market(as_of, rows=12):
     return {
         "benchmark": "SPY", "asOf": as_of, "universe": "美股…", "scope": "full",
-        "rows": [[f"S{i}", f"S{i}"] + [None] * 16 + [float(i), None, None, None, "Tech", "Software", 1000 * i]
+        "rows": [[f"S{i}", f"S{i}"] + [None] * 16 + [float(i), None, None, None, as_of, "Tech", "Software", 1000 * i]
                  for i in range(rows)],
     }
 
@@ -824,7 +827,7 @@ class CoexistenceTest(unittest.TestCase):
     def test_remap_by_field_name(self):
         existing = self.existing()
         # 欄位順序不同（舊版檔案）也依名稱對應
-        existing["fields"] = list(reversed(bu.FULL_FIELDS))
+        existing["fields"] = list(reversed(existing["fields"]))
         existing["markets"]["US"]["rows"] = [list(reversed(row)) for row in existing["markets"]["US"]["rows"]]
         combined, _ = report_metrics.keep_fresh_full_markets(self.liquid(), existing)
         row = dict(zip(combined["fields"], combined["markets"]["US"]["rows"][3]))

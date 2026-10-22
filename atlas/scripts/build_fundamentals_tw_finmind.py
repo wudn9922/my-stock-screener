@@ -538,7 +538,8 @@ def field_views(quarters_of_year, at, mode):
             before = cumulate(3)
             single[4] = raw[4] - before if before is not None and same_kind((1, 2, 3, 4)) else None
     if at == 0:
-        single = {q: value for q, value in single.items() if value is None or value >= 0}
+        single = {q: value if value is None or value >= 0 or kinds.get(q) in (1, 2, INTEREST_KIND) else None
+                  for q, value in single.items()}
     return single, {q: value for q, value in ytd.items() if value is not None}
 
 

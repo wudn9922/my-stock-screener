@@ -62,7 +62,10 @@ describe('universe.json', () => {
 
   it('reads the optional profile columns and the full-market scope', () => {
     const fields = [...UNIVERSE_FIELDS, 'sector', 'industry', 'marketCap'];
-    const base = fixture.markets.US!.rows[0]!.slice(0, UNIVERSE_FIELDS.length);
+    const base = UNIVERSE_FIELDS.map(field => {
+      const at = (fixture.fields as string[]).indexOf(field);
+      return at < 0 ? null : fixture.markets.US!.rows[0]![at];
+    });
     const result = parseUniverse({
       fields,
       markets: {

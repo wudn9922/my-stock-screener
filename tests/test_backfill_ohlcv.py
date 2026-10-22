@@ -15,7 +15,7 @@ def bar(day, **values):
 class BackfillTest(unittest.TestCase):
     def test_repair_preserves_existing_prices_and_zero_volume(self):
         local = [bar("2026-10-19", Close="", Volume=0)]
-        rows, added, repaired = module.reconcile(local, [bar("2026-10-19", Open=99), bar("2026-10-20")])
+        rows, added, repaired = module.reconcile(local, [bar("2026-10-19", Open=11), bar("2026-10-20")])
         self.assertEqual(added, ["2026-10-20"])
         self.assertEqual(repaired, [{"date": "2026-10-19", "column": "Close"}])
         self.assertEqual(rows[0]["Open"], 10)

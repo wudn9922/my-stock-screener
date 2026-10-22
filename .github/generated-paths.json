@@ -14,8 +14,9 @@
   },
   "append_only": ["docs/report/breakouts-archive/*.json"],
   "records": {
-    "daily": ["data/*.csv"],
-    "research": ["data/world/*.csv"],
+    "daily": ["data/*.csv", "docs/report/kline-corrections.json"],
+    "research": ["data/world/*.csv", "docs/report/kline-corrections.json"],
+    "universe": ["docs/report/kline-corrections.json"],
     "financials": ["docs/report/financials/**"],
     "fundamentals": ["docs/report/financials/**", "docs/report/fundamentals/tw-financials-finmind.json"],
     "atlas": ["docs/.nojekyll"],

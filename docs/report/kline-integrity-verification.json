@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-22T19:09:13.019126+00:00",
+  "files": 2526,
+  "rows": 595593,
+  "unquarantinedViolations": 0,
+  "quarantinedViolations": 1,
+  "violations": [
+    {
+      "file": "data/7825.TWO.csv",
+      "symbol": "7825.TWO",
+      "date": "2026-08-28",
+      "quarantined": true,
+      "values": {
+        "Open": 87.0,
+        "High": 105.0,
+        "Low": 94.6999969482422,
+        "Close": 95.8000030517578,
+        "Volume": 1159969.0
+      }
+    }
+  ],
+  "correctionLogSha256": "2a3fd6b78a8c149437de2ba7d4b96029051e1eac84a6834cd598c29ea8d70068"
+}

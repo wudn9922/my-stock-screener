@@ -766,11 +766,8 @@ def parse_yahoo_chart(payload, symbol=""):
 
         open_, high, low, close, volume = (number(value) for value in values)
 
-        if close is None or close <= 0 or open_ is None or high is None or low is None:
-            continue
-
         day = local_day(stamp, zone_name, gmtoffset).isoformat()
-        rows[day] = (day, open_, max(high, open_, close), min(low, open_, close), close, max(volume or 0.0, 0.0))
+        rows[day] = (day, open_, high, low, close, volume if volume is not None else 0.0)
 
     splits = []
 
@@ -825,9 +822,6 @@ def parse_yahoo_quotes(payload, market_of):
             value("regularMarketDayLow"), value("regularMarketPrice"),
         )
 
-        if None in (open_, high, low, close) or min(open_, high, low, close) <= 0:
-            continue
-
         zone_name = quote.get("exchangeTimezoneName") or MARKET_TIMEZONES.get(market_of(symbol))
 
         offset = quote.get("gmtOffSetMilliseconds")
@@ -841,8 +835,8 @@ def parse_yahoo_quotes(payload, market_of):
             "symbol": symbol,
             "date": day.isoformat(),
             "open": open_,
-            "high": max(high, open_, close),
-            "low": min(low, open_, close),
+            "high": high,
+            "low": low,
             "close": close,
             "volume": max(value("regularMarketVolume") or 0.0, 0.0),
             "previousClose": value("regularMarketPreviousClose"),

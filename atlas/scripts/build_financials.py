@@ -529,7 +529,6 @@ def merge_section(old, new, frequency, today_iso, renamed=None, filled=None):
     renamed (dict, optional) receives {old end: new end} for periods whose end date moved.
     filled (list, optional) receives (end, field) for every null official value that Yahoo filled.
     """
-    keep = KEEP_ANNUAL if frequency == "annual" else KEEP_QUARTERLY
     periods = [period(p["end"], p["values"], p["src"], p["extra"]) for p in old]
     new = dedupe(new)
     official_ends = [p["end"] for p in periods if p["src"] in OFFICIAL_SOURCES]
@@ -576,9 +575,8 @@ def merge_section(old, new, frequency, today_iso, renamed=None, filled=None):
             renamed[target["end"]] = item["end"]
         target["end"] = item["end"]
     periods.sort(key=lambda p: p["end"])
-    # Drop the oldest periods beyond the cap, but never official ones (nor anything newer than them)
-    while len(periods) > keep and periods[0]["src"] not in OFFICIAL_SOURCES:
-        del periods[0]
+    # Every previously stored financial period is a permanent record. Display
+    # windows may be bounded; storage is never trimmed by those window sizes.
     return periods, revisions
 
 
@@ -1834,14 +1832,7 @@ def run_refresh(symbols, out_dir, fetch, now, budget_seconds, fetch_chart=None,
             last_listed = today_iso
         else:
             last_listed = previous.get("lastListed") if parse_day(previous.get("lastListed")) else today_iso
-            gone = (today - parse_day(last_listed)).days > KEEP_UNLISTED_DAYS
-            if gone and key in documents and not has_official(documents[key]):
-                try:
-                    os.remove(os.path.join(out_dir, key + ".json"))
-                    stats["deleted"].append(key)
-                    continue
-                except OSError as error:
-                    print(f"::warning::{key}.json not deleted: {error}")
+            # Delisting changes refresh eligibility, never permanent retention.
         if key in documents:
             item = dict(items[key])
             item["lastListed"] = last_listed

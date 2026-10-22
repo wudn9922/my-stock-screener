@@ -52,6 +52,10 @@ def validate(root, module):
     expected = set(files_for(root, module))
     assets = world_files(root) if module == "world" else {}
     expected.update(f"_records/{a['symbol']}.csv" for a in assets.values())
+    if module == 'world' and (root / '_kline-corrections.json').exists():
+        expected.add('_kline-corrections.json')
+        from kline_integrity import read_log
+        read_log(root / '_kline-corrections.json')
     found = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()}
     if found != expected:
         raise ValueError(f"Invalid {module} artifact file set: {found ^ expected}")
@@ -68,6 +72,13 @@ def validate(root, module):
         ]:
             if hashlib.sha256((root / relative).read_bytes()).hexdigest() != digest:
                 raise ValueError("World candle/CSV checksum mismatch")
+        from research_candles import read_csv
+        from kline_integrity import violation, quarantined_dates
+        quarantine = root / '_kline-corrections.json'
+        excluded = quarantined_dates(asset['symbol'], quarantine if quarantine.exists() else None)
+        for row in read_csv(root / '_records' / (asset['symbol'] + '.csv')):
+            if row[0] not in excluded and violation(dict(zip(['Open','High','Low','Close','Volume'], row[1:]))):
+                raise ValueError('Invalid unquarantined world OHLC in artifact')
     for storage in (index.get("storage"), index.get("turnoverStorage")):
         if storage is None:
             continue
@@ -91,6 +102,9 @@ def stage(root, dest, module, records_root=None):
         path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(root / relative, path)
     if module == "world":
+        corrections = root.parent / 'kline-corrections.json'
+        if corrections.exists():
+            shutil.copyfile(corrections, target / '_kline-corrections.json')
         for asset in world_files(root).values():
             name = asset["symbol"] + ".csv"
             path = target / "_records" / name
@@ -121,6 +135,12 @@ def overlay(artifacts, dest, records_root=None):
     if not modules:
         raise ValueError("No successful research artifacts to publish")
     for module in modules:
+        correction_artifact = artifacts / module / '_kline-corrections.json'
+        if module == 'world' and correction_artifact.exists():
+            from kline_integrity import read_log, merge_logs, _atomic
+            target = dest.parent / 'kline-corrections.json'
+            merged = merge_logs(read_log(target), read_log(correction_artifact))
+            _atomic(target, json.dumps(merged, ensure_ascii=False, indent=2)+'\n')
         for relative in files_for(artifacts / module, module):
             path = dest / relative
             source = artifacts / module / relative
