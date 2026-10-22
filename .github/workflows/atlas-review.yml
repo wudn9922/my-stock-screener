@@ -62,11 +62,32 @@ jobs:
           name: atlas-pages-pr-build
           path: |
             atlas/dist-pages
-            docs/report/research/*.json
+            docs/report/research/
           retention-days: 7
       - name: Install browsers
         working-directory: atlas
         run: npx playwright install --with-deps chromium webkit
+      - name: Real Pages data on desktop and iPhone WebKit
+        run: |
+          mkdir -p /tmp/research-pages/my-stock-screener
+          cp -a atlas/dist-pages /tmp/research-pages/my-stock-screener/atlas
+          ln -s "$GITHUB_WORKSPACE/docs/report" /tmp/research-pages/my-stock-screener/report
+          python3 -m http.server 4188 --bind 127.0.0.1 --directory /tmp/research-pages > /tmp/research-pages-server.log 2>&1 &
+          pages_server_pid=$!
+          trap 'kill "$pages_server_pid"' EXIT
+          for attempt in 1 2 3 4 5; do
+            if curl -fsS http://127.0.0.1:4188/my-stock-screener/atlas/ -o /dev/null; then break; fi
+            sleep 1
+          done
+          cd atlas
+          npm run test:research-pages
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: research-pages-live
+          path: atlas/test-results/research-pages-live
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Desktop, phone and WebKit regressions
         working-directory: atlas
         run: npm run test:site -- parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts breakouts.spec.ts stock-volatility.spec.ts research-modules.spec.ts

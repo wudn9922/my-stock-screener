@@ -1,0 +1,87 @@
+{
+  "checkedAt": "2026-10-22T05:42:15.862Z",
+  "results": [
+    {
+      "project": "desktop-chromium",
+      "source": "Unmocked Pages build with actual committed report JSON",
+      "research": [
+        {
+          "path": "/my-stock-screener/report/research/world-assets.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/world-assets.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume/2330.TW.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/institutions/2330.TW.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume/6488.TWO.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/institutions/6488.TWO.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume/AAPL.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/sec-radar.json",
+          "status": 200
+        }
+      ],
+      "errors": [],
+      "horizontalOverflow": 0,
+      "passed": true
+    },
+    {
+      "project": "iphone-webkit",
+      "source": "Unmocked Pages build with actual committed report JSON",
+      "research": [
+        {
+          "path": "/my-stock-screener/report/research/world-assets.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/world-assets.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume/2330.TW.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/institutions/2330.TW.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume/6488.TWO.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/institutions/6488.TWO.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/volume/AAPL.json",
+          "status": 200
+        },
+        {
+          "path": "/my-stock-screener/report/research/sec-radar.json",
+          "status": 200
+        }
+      ],
+      "errors": [],
+      "horizontalOverflow": 0,
+      "passed": true
+    }
+  ]
+}
