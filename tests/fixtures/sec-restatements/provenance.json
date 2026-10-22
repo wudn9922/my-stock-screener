@@ -1,0 +1,7 @@
+{
+  "source": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000821130.json",
+  "retrievedAt": "2026-10-22",
+  "sha256": "b4be2305513fb1e535941efdd8d874dc5f32a82eaae91e0e7b58229d5a1b39b1",
+  "selection": "Revenues/USD: FY2022 comparative from the FY2023 filing, plus FY2023 original and latest restated comparative. FY2023 original accn 0000821130-24-000007, restated accn 0000821130-26-000012. No values altered.",
+  "synthetic-quarterly.json": "Handwritten synthetic facts, no SEC provenance claimed; original and restated FY2023 plus a FY2024 annual, with Q1-Q3 disclosed again in the same latest accession."
+}
