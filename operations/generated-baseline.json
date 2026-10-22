@@ -1,0 +1,55 @@
+{
+  "snapshot": "485761e717879f58dff669e40d8b05e5e5029a9e",
+  "inventory_files": 9635,
+  "regenerated_files": 2601,
+  "regenerated_bytes": 162498450,
+  "record_files": 7034,
+  "record_bytes": 173438361,
+  "pages_files": 7120,
+  "pages_bytes": 291796838,
+  "pages_limit_bytes": 1000000000,
+  "inventory_sha256": "ad50ab2ed4ff15e46729b18b64b3478524484d1ba169fc83338d807e2e688eb5",
+  "observed_growth": {
+    "7d": {
+      "regenerated": {
+        "blobs": 23172,
+        "raw_bytes": 852779566,
+        "local_disk_bytes": 118612678,
+        "disk_bytes_per_day": 16944668
+      },
+      "record": {
+        "blobs": 10234,
+        "raw_bytes": 173222531,
+        "local_disk_bytes": 31017027,
+        "disk_bytes_per_day": 4431004
+      },
+      "financials": {
+        "blobs": 10101,
+        "raw_bytes": 128648689,
+        "local_disk_bytes": 25984725,
+        "disk_bytes_per_day": 3712104
+      }
+    },
+    "30d": {
+      "regenerated": {
+        "blobs": 44169,
+        "raw_bytes": 1629050785,
+        "local_disk_bytes": 174270013,
+        "disk_bytes_per_day": 5809000
+      },
+      "record": {
+        "blobs": 15968,
+        "raw_bytes": 743373653,
+        "local_disk_bytes": 57353304,
+        "disk_bytes_per_day": 1911777
+      },
+      "financials": {
+        "blobs": 15795,
+        "raw_bytes": 194644848,
+        "local_disk_bytes": 45520995,
+        "disk_bytes_per_day": 1517366
+      }
+    }
+  },
+  "growth_method": "Distinct new-side blob IDs in git log --raw over docs/, data/, keepalive.txt; sum git cat-file objectsize:disk. Local pack/delta layout and backfills affect estimates; these are not guaranteed GitHub storage deltas."
+}
