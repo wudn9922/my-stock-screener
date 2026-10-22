@@ -45,7 +45,7 @@ test('a tile opens the detail sheet with description, constituents and an expand
   const sheet = page.getByRole('dialog', { name: /光通訊/ });
   await expect(sheet).toBeVisible();
   await expect(sheet).toContainText('光纖');
-  await expect(sheet.locator('.versus-svg')).toBeVisible();
+  await expect(sheet.getByTestId('research-candle-host').locator('canvas').first()).toBeVisible();
   await expect(sheet.locator('.constituent')).toHaveCount(6);
   await sheet.locator('.constituent-head').first().click();
   await sheet.locator('.mini-chart').scrollIntoViewIfNeeded();

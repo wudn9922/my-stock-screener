@@ -4,6 +4,15 @@ on:
     branches: [main]
     paths:
       - 'atlas/**'
+      - 'docs/report/research/**'
+      - 'scripts/*research*.py'
+      - 'scripts/build_sec_radar.py'
+      - 'scripts/build_world_assets.py'
+      - 'scripts/build_tw_chips.py'
+      - 'tests/test_research.py'
+      - 'tests/test_research_operations.py'
+      - 'tests/fixtures/research/**'
+      - '.github/workflows/research-data.yml'
       - 'breakout_alert/**'
       - 'supabase/functions/user-settings/**'
       - 'tests/test_atlas_watchlists.py'
@@ -32,6 +41,20 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Restore generated inputs for PR readers after cutover
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        env:
+          GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
+        run: python scripts/generated_branch.py restore
+      - name: Overlay world snapshots changed by this PR
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
+          git diff --name-only --diff-filter=AM -z "$PR_BASE_SHA" HEAD -- docs/report/research/world-assets.json docs/report/research/candles |
+            xargs -0 -r git restore --source=HEAD --
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -44,16 +67,45 @@ jobs:
         working-directory: atlas
         run: |
           npm test
+          npm run typecheck
           npm run lint
           npm run build
-          npm run build:pages
+          VITE_PUBLIC_BASE=/my-stock-screener/atlas/ npm run build:pages
           npm run refresh:watchlists
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-pages-pr-build
+          path: |
+            atlas/dist-pages
+            docs/report/research/
+          retention-days: 7
       - name: Install browsers
         working-directory: atlas
         run: npx playwright install --with-deps chromium webkit
+      - name: Real Pages data on desktop and iPhone WebKit
+        run: |
+          mkdir -p /tmp/research-pages/my-stock-screener
+          cp -a atlas/dist-pages /tmp/research-pages/my-stock-screener/atlas
+          ln -s "$GITHUB_WORKSPACE/docs/report" /tmp/research-pages/my-stock-screener/report
+          python3 scripts/serve_research_preview.py --port 4188 --directory /tmp/research-pages > /tmp/research-pages-server.log 2>&1 &
+          pages_server_pid=$!
+          trap 'kill "$pages_server_pid"' EXIT
+          for attempt in 1 2 3 4 5; do
+            if curl -fsS http://127.0.0.1:4188/my-stock-screener/atlas/ -o /dev/null; then break; fi
+            sleep 1
+          done
+          cd atlas
+          npm run test:research-pages
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: research-pages-live
+          path: atlas/test-results/research-pages-live
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Desktop, phone and WebKit regressions
         working-directory: atlas
-        run: npm run test:site -- parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts breakouts.spec.ts stock-volatility.spec.ts ma-recommendation.spec.ts
+        run: npm run test:site -- parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts breakouts.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -66,7 +118,11 @@ jobs:
           python-version: '3.12'
       - name: Offline breakout integration
         run: |
-          pip install requests numpy pandas
+          pip install requests numpy pandas openpyxl xlrd lxml pyyaml
+          python -m unittest discover -s tests -p test_research.py -v
+          python -m unittest discover -s tests -p test_research_candles.py -v
+          python -m unittest discover -s tests -p test_research_operations.py -v
+          python -m unittest discover -s tests -p test_tw_chips.py -v
           python -m unittest discover -s tests -p 'test_atlas_watchlists.py' -v
           python -m unittest discover -s tests -p 'test_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_full_market_breakouts.py' -v
@@ -84,6 +140,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Restore generated inputs for full-market readers
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        env:
+          GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
+        run: python scripts/generated_branch.py restore
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -95,6 +156,19 @@ jobs:
           restore-keys: universe-full-v1-
       - name: Build real full-market entry success rates offline
         run: python scripts/build_full_market_breakouts.py --cache-dir .cache/universe-full --out /tmp/full-market-breakouts/breakouts.json
+      - name: Reuse the existing full-market cache for research history
+        run: |
+          mkdir -p /tmp/full-market-research
+          cp -a docs/report/research/institutions.json docs/report/research/institutions /tmp/full-market-research/
+          if [ -d docs/report/research/turnover ]; then cp -a docs/report/research/turnover /tmp/full-market-research/; fi
+          python scripts/build_research.py institutional --days 0 --budget 0 --cache .cache/universe-full --out /tmp/full-market-research
+          python scripts/build_research.py volume --cache .cache/universe-full --out /tmp/full-market-research
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-market-research
+          path: /tmp/full-market-research
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: full-market-breakouts

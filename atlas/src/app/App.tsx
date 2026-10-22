@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   Activity,
   BellRing,
@@ -27,8 +27,8 @@ import {
   RefreshCw,
   Search,
 } from 'lucide-react';
-import { AppStore } from './AppStore';
-import { cloudSyncState, startDrawingSync, type CloudSyncState } from '../cloud/startDrawingSync';
+import { chartStore as store, initializeChartStore } from './chartStore';
+import { cloudSyncState, type CloudSyncState } from '../cloud/startDrawingSync';
 import { ChartEngine } from '../chart/ChartEngine';
 import { DemoProvider } from '../market-data/DemoProvider';
 import { YahooProvider } from '../market-data/YahooProvider';
@@ -82,9 +82,11 @@ import type { LocalSymbol } from '../ui/SymbolSearch';
 import '../ui/workspace.css';
 
 type Panel = 'indicators' | 'drawings' | 'backtest' | 'alerts' | 'settings';
-type DockTab = 'watchlist' | Panel;
+const StockResearch = lazy(() => import('../ui/research/StockResearch'));
+type DockTab = 'watchlist' | 'research' | Panel;
 const panelNames: Record<DockTab, string> = {
   watchlist: '自選清單',
+  research: '價量與官方公告',
   indicators: '指標',
   drawings: '畫線物件',
   backtest: '策略回測',
@@ -93,13 +95,13 @@ const panelNames: Record<DockTab, string> = {
 };
 const dockTabs: { id: DockTab; icon: typeof List }[] = [
   { id: 'watchlist', icon: List },
+  { id: 'research', icon: Search },
   { id: 'indicators', icon: Activity },
   { id: 'drawings', icon: Layers },
   { id: 'backtest', icon: FlaskConical },
   { id: 'alerts', icon: BellRing },
   { id: 'settings', icon: Settings2 },
 ];
-const store = new AppStore();
 const cloudLabels: Record<CloudSyncState, string> = {
   off: '已儲存於本機',
   syncing: '同步雲端中…',
@@ -114,7 +116,6 @@ const cloudTitles: Record<CloudSyncState, string | undefined> = {
   error: '雲端同步失敗，畫線已存在這台裝置，稍後會自動重試',
   expired: 'LINE 登入已過期，畫線已存在這台裝置；從 LINE 重新開啟即可同步',
 };
-let storeInitialized = false;
 const mobileMedia = window.matchMedia('(max-width:1099px)');
 const subscribeMobile = (cb: () => void) => {
   mobileMedia.addEventListener('change', cb);
@@ -243,14 +244,16 @@ export function App({
     }
     return () => abort.abort();
   }, [state.ready, symbol, providerId, timeframeKey, reloadToken]);
+  const [researchDock, setResearchDock] = useState(false);
   const storedTab = state.app.workspace.rightTab;
   const right = state.app.workspace.rightOpen,
-    rightTab: DockTab = watchlistDock ? 'watchlist' : storedTab === 'financials' ? 'indicators' : storedTab;
+    rightTab: DockTab = researchDock ? 'research' : watchlistDock ? 'watchlist' : storedTab === 'financials' ? 'indicators' : storedTab;
   const setRight = (rightOpen: boolean) =>
     store.updateApp({ workspace: { ...store.getSnapshot().app.workspace, rightOpen } });
   const setRightTab = (tab: DockTab) => {
     setWatchlistDock(tab === 'watchlist');
-    if (tab !== 'watchlist') store.updateApp({ workspace: { ...store.getSnapshot().app.workspace, rightTab: tab } });
+    setResearchDock(tab === 'research');
+    if (tab !== 'watchlist' && tab !== 'research') store.updateApp({ workspace: { ...store.getSnapshot().app.workspace, rightTab: tab } });
   };
   const tablet = mobile && window.innerWidth >= 768;
   const modal = active && ((!!sheet && !tablet) || help || drawingPickerOpen);
@@ -312,16 +315,7 @@ export function App({
     };
   }, [centerActiveTimeframe]);
   useEffect(() => {
-    if (storeInitialized) return;
-    storeInitialized = true;
-    void store.initialize().then(() => {
-      // The screener site serves delayed market data; settings saved by earlier versions may name
-      // providers that the static site no longer publishes.
-      const provider = store.getSnapshot().app.provider;
-      if (SCREENER_HOSTING && provider !== 'market' && provider !== 'demo') store.updateApp({ provider: 'market' });
-      // Cloud drawing sync: only inside LINE (report LIFF); elsewhere drawings stay on this device.
-      if (SCREENER_HOSTING) void startDrawingSync(store);
-    });
+    void initializeChartStore();
   }, []);
   useEffect(() => {
     if (!state.ready || !hostRef.current || !headerRef.current || !sourceRef.current) return;
@@ -891,6 +885,8 @@ export function App({
     <PanelBoundary key={`${symbol}:${panel}`}>
       {panel === 'watchlist' ? (
         watchPanel
+      ) : panel === 'research' ? (
+        <Suspense fallback={<p>載入研究面板…</p>}><StockResearch key={symbol} symbol={symbol} simulated={providerId === 'demo'}/></Suspense>
       ) : panel === 'indicators' ? (
         indicatorPanel
       ) : panel === 'drawings' ? (
@@ -1015,6 +1011,7 @@ export function App({
           <StockTabs active="chart" onSelect={(tab) => tab === 'financials' && onOpenFinancials(symbol, tf)} />
         )}
         <div className="ws-header-actions">
+          {!isIndex && <IconButton label="價量與官方公告" onClick={() => openPanel('research')}><Search size={17}/></IconButton>}
           {providerId === 'demo' && (
             <button
               className="demo-switch"

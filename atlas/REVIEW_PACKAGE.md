@@ -278,3 +278,49 @@ Primary ACCEPT HOST-05: update currentpublication summary withauthorizedinstalla
 OwnerenabledPagesSourceworkflow; run37596025627 build+deploySUCCESS. HTML/allassets200 andremoteiPhoneWebKitDemo/SMAlockreload/PWAscope/staticSEC/noAPIs/noerrorsPASS withTLSverificationenabled. Evidence docs/pages-live-http.json/pages-live-browser-smoke.json. PhysicalSafariUATpending. RemoteCloudChromiumblockedbyproxyCAtrust; globalNSSCAmodificationwasrejectedbyautomaticreview duefuturetrustboundary andnotexecuted. No insecureTLSbypass. Alllocal136unit/86browserPASS+10expectedSKIP/lint/buildremainvalid; onlydocs/evidencechangeafterpublication. No V2featurework.
 
 Primary ACCEPT HOST-06: GPT-6.1 Sol High finalread-onlyaudit confirmed liveHTTP/WebKitproof andaccurateCloudChromeBLOCKEDstatus; GPT-6 Luna Max relabeledthe earlierunqualifiedPublicationheading ashistorical. No applicationcodechange. Latestdocs/evidence deploymentrun37596875057 build/deploySUCCESS beforethis finalheading-onlycleanup.
+
+
+## SEC material restated comparatives — PR #153 share-basis/Q4 revision (2026-10-22)
+
+Merged latest main 71bcd1cacd0169286d8353e7e2dfa610c6eff57e into the original codex/sec-restated-comparatives-20261022 branch using merge commit d12e510b6fe82e39ae0b7daa444f0bb2bd25ac1b. The sole conflict was this review package; both sides were retained. No rebase, force-push, PR merge or data apply.
+
+Only a later annual filing with a strictly greater than 2% difference against a current non-per-share income field may switch a period. EPS and dilutedShares cannot trigger switching. Per-share-only switches drop from 379 to zero. Existing per-row split/ADR conversion remains, followed by a conservative integer-factor retention guard (1% relative tolerance; also checks income-adjusted implied share ratios). Suspected share-basis candidates retain all existing per-share fields, recorded as basis-unrestated and mixed-basis, without claiming a ratio alone proves a corporate action. The reported CAPR, GGAL, EJH and HAO examples all remain unchanged.
+
+Missing filing fields retain their current value with existing flags preserved. When Q1–Q3 are not available on the switched annual filing's basis, the entire stored quarterly series, including Q4, remains unchanged; annual and quarterly period issues identify quarterly-as-reported and retain the reason preventing cross-basis derivation. Unapplied quarter candidates do not acquire restatement revisions. Complete coherent restated quarters still permit the unchanged numeric/share/sign/error acceptance gates. No existing Q4 EPS is set to null.
+
+Final dry run: 4,967 US files, 4,960 reviewed and seven explicitly unsupported; 1,172 switched annual periods in 580 symbols (788 revenue/netIncome-triggered periods in 425 symbols); 2,151 changed values. All nulls, including Q4: zero. All 1,599 formerly nulled Q4 EPS cells are retained. Two Q4 cells change: KVHI FY2013 basic/diluted -0.02 to 0.36, directly reported by the same restating filing. There are 1,152 quarterly-as-reported fiscal years. AD FY2023/FY2024 revenue becomes 100,469,000 / 102,933,000, while both quarterly series and Q4 EPS stay unchanged.
+
+The feedback's 33-of-381 count cannot be reproduced literally from the pinned 8f0a8b8e report: it contains 382 annual diluted-EPS changes (376 have two non-null endpoints), and the named factors with relative error <=1% yield 25 cases. All 25 retain existing EPS. JSON shareBasisAudit includes every one of the 382 before/candidate/after outcomes and the exact formula; Markdown also lists a wider 58-case screen for rounding-sensitive review. This wider set is explicitly not proof of a split. No arbitrary list was relabelled as the requested 33 cases.
+
+The full US snapshot was regenerated offline from the existing cache; after the final unapplied-quarter audit guard, all 18 files containing quarterly retention revisions were replayed, with unchanged numeric results. All 4,967 input hashes match the previous report and current files. All null/drift invariants pass. This revision sends zero SEC requests; original identified-UA, <=4 requests/second, first-403 stop and 12,000-request budget remain unchanged.
+
+Reproduce the comparison audit by exporting the prior report first:
+
+```bash
+git show 8f0a8b8e:docs/report/sec-restated-comparatives.json > /tmp/sec-restatements-before-share-fix.json
+python atlas/scripts/report_sec_restatements.py --prefer-latest-filing --offline --workers 4 --cache-dir /workspace/.cache/sec-restatement-cache --comparison-report /tmp/sec-restatements-before-share-fix.json
+```
+
+Final verification: python -m unittest discover -s tests — Ran 1493 tests in 186.294s, OK. All existing cases remain, with superseded null expectations updated to the new preservation policy; 23 focused restatement tests cover the AD example, coherent restated quarters, per-share-only rejection, share-factor retention/audits and switched-year quarterly-as-reported preservation. Main's new test dependencies (xlrd/PyYAML) were installed before the successful full rerun. Atlas: clean npm ci; 964 tests passed; lint and build passed. An initial frontend run during the report hit a 5-second fixture timeout; the unchanged full suite passed after the scan.
+
+No financials data file, frozen Q4 answer set, missing-classification file, acceptance ledger or numeric acceptance gate was changed. Default-off selection remains unchanged; no CLI apply path exists. Independent review is unavailable; no independent sign-off is claimed. New-head CI is tracked in the PR description.
+
+## 2026-10-22 public research extension — same-model self-review
+
+User requested one-model continuous implementation and explicitly prohibited merging. No independent AI review was requested or claimed. See [the acceptance matrix](../docs/RESEARCH_ACCEPTANCE.md) and [source/method contract](../docs/RESEARCH_DATA.md). Primary self-review verified official category totals and CSV report dates, excluded today's volume from RVOL denominators, retained directional numerators/denominators and missing-state distinctions, rejected pre-separation institution categories instead of synthesizing zero, retained 649 newer report snapshots over older cache output, deduplicated SEC accessions across share-class aliases, persisted cooldown, and kept monthly/weekly data out of daily returns. The new chart dock state is transient and does not enter user settings/export schema; chart/indicator/drawing/LINE/authentication implementations were preserved. Local stock/drawing/timeframe regressions passed; final CI is reported by PR #152. Production has not been changed by this PR.
+
+Official daily turnover follow-up: verified dated TWSE MI_INDEX and TPEx dailyQuotes responses; preserved raw market inputs with a 120-session cap. Institutional estimates use amount/shares only from the same official source, exclude incompatible closing-price bases, and still disclose market proxies rather than actual institutional cost. Cash-only enrichment preserves canonical OHLCV signals after cache eviction; tests compare it against full calculation. The full Python CI now checks out repository history required by legacy regression tests.
+
+## PR #152 operations follow-up — same-model self-review
+
+Accepted: recursive clock-insensitive writes; seven market archives with stable shared shape tables; range/200 transport and identity validation; preserve all 10,384 original records including US ticker TW. Run clocks remain in module indexes, SEC event receipt times rehydrate from its index. No chart/storage/auth boundaries changed.
+
+Accepted: two source-timed schedules, market-selective volume, fresh Taiwan turnover artifact dependency, one non-force publish commit per run, collectors read-only without persisted credentials, checksum/path validation before overlay, main-only publication and research-code race guard. Missing SEC secret skips with no request and no snapshot change; fallback identity removed from the radar.
+
+Measured payload 158,722,480 → 103,409,630 bytes, 10,389 → 12 files. Full real-data clock-only replay made no byte/mtime changes. Growth replay measured 1,907,836 bytes delta-packed; budget 2–4 MB/day packed, or roughly 23 MB/day before server packing, with documented source/backfill uncertainty. Existing PR history retained, no force push. No production run, merge, external AI or independent-review claim. Evidence and reproducible commands: `docs/RESEARCH_OPERATIONS.md`.
+
+## 可畫線世界／題材圖表自我審查
+
+以 main adfb6c7da 為基準另開 PR。重用 5.2.1 ChartEngine 與 Drawing Primitive；AppStore 初始化抽成共用 singleton，沒有新增資料庫或改登入，研究 namespace 與週期隔離。原物料／FX 真實日 OHLC；期貨明示 source-stitched front contract，FX 保持方向並排除無法通過 OHLC 邊界的來源資料。題材選參考 ETF／成分股，沒有假造等權組合高低價；其他題材統計／清單保留。
+
+只新增 K 線永久 CSV，日期合併拒絕刪歷史；current metadata 與 JSON 視圖覆寫。白名單／checksum artifact handoff 延伸至 CSV；generated publisher records 將其保留 main。沒有操作正式開關、force main、合併或刪除既有資料。覆蓋、實際樣本、供應商限制、重現指令：docs/DRAWABLE_RESEARCH_CHARTS.md。同模型自我審查，沒有外部 AI。

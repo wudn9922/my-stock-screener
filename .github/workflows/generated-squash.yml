@@ -1,0 +1,23 @@
+name: Squash generated snapshot
+on:
+  schedule:
+    # UTC 22:11 / Taipei 06:11, after evening jobs and the 19:37 UTC fundamentals budget.
+    - cron: '11 22 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: generated-maintenance
+  cancel-in-progress: false
+jobs:
+  squash:
+    if: vars.GENERATED_BRANCH_MODE == '1' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Replace generated history with exactly the same current tree
+        env:
+          GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
+        run: python scripts/generated_branch.py squash

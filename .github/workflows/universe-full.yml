@@ -24,6 +24,7 @@ on:
         default: 'TW,US'
 
 env:
+  GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
@@ -46,6 +47,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+
+      - name: Restore generated inputs
+        id: generated_restore
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        run: python scripts/generated_branch.py restore
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -82,12 +88,20 @@ jobs:
         if: always() && !cancelled()
         run: python -u scripts/build_full_market_breakouts.py --cache-dir .cache/universe-full
 
+      - name: Publish owned outputs to generated and durable records to main
+        if: (always()) && vars.GENERATED_BRANCH_MODE == '1' && steps.generated_restore.outcome == 'success'
+        run: python scripts/generated_branch.py publish universe
+
       - name: Commit and Push changes
-        if: always()
+        if: (always()) && vars.GENERATED_BRANCH_MODE != '1'
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/report/universe.json docs/report/breakouts.json
+          # The same immutable 20-calendar-day snapshots are committed before cutover too.
+          if [ -d docs/report/breakouts-archive ]; then
+            git add -- docs/report/breakouts-archive
+          fi
           git commit -m "Auto-update full-market universe" || { echo "No changes to commit"; exit 0; }
           # 每日報告與 Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試
           for attempt in 1 2 3; do

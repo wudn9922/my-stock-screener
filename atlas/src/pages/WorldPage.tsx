@@ -32,6 +32,7 @@ import { PageState } from '../ui/PageState';
 
 // The rates research view loads only when opened; it has its own data and does not use the daily report.
 const RatesView = lazy(() => import('./RatesView'));
+const WorldAssetsView = lazy(() => import('./WorldAssetsView'));
 
 /** Categorical slots validated for the dark chart surface (fixed order; color follows the index). */
 export const SERIES_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
@@ -384,35 +385,39 @@ function WorldView({ report, openChart }: { report: Report } & Pick<PageProps, '
   );
 }
 
-export default function WorldPage({ report, reload, navigate, openChart, view }: PageProps & { view?: 'indices' }) {
+export default function WorldPage({ report, reload, navigate, openChart, view }: PageProps & { view?: 'indices' | 'commodities' | 'fx' }) {
   // US Treasuries and rates are the default view; `view: 'indices'` shows the world indices.
-  const rates = view !== 'indices';
+  const rates = !view;
+  const assets = view === 'commodities' || view === 'fx';
   return (
     <div className="page world-page">
       <div className="page-head">
         <div>
-          <h2 className="page-title">{rates ? '美債與利率' : '世界指數'}</h2>
-          {!rates && report.status === 'ok' && (
+          <h2 className="page-title">{rates ? '美債與利率' : view === 'commodities' ? '原物料' : view === 'fx' ? '匯率' : '世界指數'}</h2>
+          {view === 'indices' && report.status === 'ok' && (
             <p className="page-sub">
               報告日 {formatDateTime(report.report.reportDate, false)} · 延遲行情
             </p>
           )}
         </div>
-        <div className="segmented compact" role="group" aria-label="世界頁面">
+        <div className="segmented compact research-world-tabs" role="group" aria-label="世界頁面">
           <button type="button" className={rates ? 'active' : ''} aria-pressed={rates} onClick={() => navigate({ page: 'world' })}>
             美債利率
           </button>
           <button
             type="button"
-            className={!rates ? 'active' : ''}
-            aria-pressed={!rates}
+            className={view === 'indices' ? 'active' : ''}
+            aria-pressed={view === 'indices'}
             onClick={() => navigate({ page: 'world', view: 'indices' })}
           >
             指數
           </button>
+          {(['commodities','fx'] as const).map(option => <button key={option} type="button" aria-pressed={view === option} className={view === option ? 'active' : ''} onClick={() => navigate({page:'world',view:option})}>{option === 'commodities' ? '原物料' : '匯率'}</button>)}
         </div>
       </div>
-      {rates ? (
+      {assets ? (
+        <Suspense fallback={<PageState kind="loading" title="載入研究資料…" />}><WorldAssetsView key={view} view={view} /></Suspense>
+      ) : rates ? (
         // Outside ReportGate: the rates data is separate from the daily report.
         <Suspense fallback={<PageState kind="loading" title="載入中…" />}>
           <RatesView navigate={navigate} openChart={openChart} />

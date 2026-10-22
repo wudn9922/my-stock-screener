@@ -9,6 +9,7 @@
     "build:pages": "node scripts/build-pages.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
+    "test:research-pages": "node scripts/research-pages-smoke.mjs",
     "test:pages": "playwright test --config playwright.pages.config.ts",
     "test:browser": "playwright test",
     "lint": "eslint . --max-warnings 0",

@@ -1,0 +1,37 @@
+{
+  "method": "one-session-replay-v1",
+  "files": 12,
+  "bytes": 103409630,
+  "fileBytes": {
+    "alerts.json": 1511155,
+    "institutions/TW.json": 33466411,
+    "institutions/TWO.json": 22032851,
+    "institutions.json": 1339292,
+    "sec/US.json": 563636,
+    "sec-radar.json": 711723,
+    "turnover/TW.json": 4147678,
+    "turnover/TWO.json": 3243248,
+    "volume/TW.json": 9640799,
+    "volume/US.json": 25880522,
+    "volume.json": 205852,
+    "world-assets.json": 666463
+  },
+  "baseline": {
+    "bytes": 158722480,
+    "files": 10389,
+    "volume": 60226280,
+    "institutions": 83271900,
+    "sec": 968132,
+    "turnover": 11387109
+  },
+  "unchangedRunGitBytes": 0,
+  "scheduledCommitsPerTradingWeek": 10,
+  "expectedCommitsPerTradingDayMaximum": 2,
+  "replayThinPackBytes": 1907836,
+  "allSnapshotsCompressedBlobBytesBeforeDeltaPacking": 22583239,
+  "expectedDailyPackedGrowthBytesRange": [
+    1907836,
+    3815672
+  ],
+  "limitations": "Planning estimate from actual latest-session removal; 21 volume features rewound but volume aggregate metrics held fixed. Institutional estimates recomputed from archived official rows; this can also change fallback/adjustment flags. Provider corrections/backfills can exceed this estimate. Server packing/retention is GitHub-controlled; loose new blobs are larger. Existing PR history is retained, not force-rewritten."
+}

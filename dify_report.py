@@ -1,7 +1,10 @@
 
 import json
 import os
+import subprocess
+import sys
 import time
+from datetime import datetime, timezone
 from urllib.parse import quote
 
 from requests.adapters import HTTPAdapter
@@ -20,6 +23,26 @@ DIFY_USER = "github-actions-bot"
 # 可在 GitHub Actions Secrets / Variables 自訂捲動距離
 WSJ_SCROLL_Y = int(os.environ.get("WSJ_SCROLL_Y", "650"))
 BARRONS_SCROLL_Y = int(os.environ.get("BARRONS_SCROLL_Y", "400"))
+
+# WSJ 會擋 GitHub Actions 的資料中心 IP（驗證頁），所以 WSJ 不直接連線，
+# 改截 Internet Archive（Wayback Machine）最近一次的首頁存檔。
+# 存檔比現在舊，超過這個小時數就視為過期、不使用。
+WAYBACK_MAX_AGE_HOURS = int(os.environ.get("WAYBACK_MAX_AGE_HOURS", "36"))
+WAYBACK_AVAILABLE_API = "https://archive.org/wayback/available"
+
+# JPEG 比 PNG 小很多，LINE 圖片大小有限制（約 1MB）
+JPEG_QUALITY = 85
+
+# 防機器人驗證頁的特徵文字與 iframe 網址
+BLOCKED_PAGE_MARKERS = (
+    "Verification Required",
+    "Slide right to secure your access",
+    "there is a robot on the same network",
+)
+BLOCKED_FRAME_URL_MARKERS = (
+    "captcha-delivery.com",
+    "datadome",
+)
 
 # Yahoo Finance 常見的美國交易所代碼與名稱
 US_EXCHANGES = {
@@ -42,18 +65,205 @@ US_EXCHANGES = {
 
 
 
+def is_blocked_page(text):
+    """頁面文字是否為防機器人驗證頁，而不是新聞首頁。"""
+    text = text or ""
+    return any(marker in text for marker in BLOCKED_PAGE_MARKERS)
+
+
+def detect_blocked_page(page, response):
+    """
+    判斷 Playwright 目前頁面是不是防機器人驗證頁，是的話回傳原因。
+
+    驗證頁的文字常放在 iframe 內，只讀主頁面 body 會漏掉，
+    所以檢查 HTTP 狀態碼、iframe 網址與所有 frame 的文字。
+    """
+    status = getattr(response, "status", None)
+
+    if status is not None and status >= 400:
+        return f"HTTP {status}"
+
+    for frame in page.frames:
+        frame_url = str(getattr(frame, "url", "") or "").lower()
+
+        if any(marker in frame_url for marker in BLOCKED_FRAME_URL_MARKERS):
+            return "出現驗證用 iframe"
+
+        try:
+            frame_text = frame.evaluate(
+                "() => document.body ? "
+                "document.body.innerText.slice(0, 3000) : ''"
+            )
+        except Exception as e:
+            print(f"讀取 frame 文字失敗（略過）：{e}")
+            continue
+
+        if is_blocked_page(frame_text):
+            return "頁面出現 Verification Required"
+
+    return None
+
+
+def get_wayback_snapshot(site, page_url, max_age_hours=None):
+    """
+    查詢 Wayback Machine 離現在最近的存檔。
+
+    回傳 (可直接開啟的存檔網址, 存檔時間)。
+    網址使用 if_ 模式，不會顯示 Wayback 工具列。
+    找不到、不是 200、或超過 max_age_hours 都會丟出 RuntimeError。
+    """
+    if max_age_hours is None:
+        max_age_hours = WAYBACK_MAX_AGE_HOURS
+
+    now = datetime.now(timezone.utc)
+    params = {
+        "url": site,
+        "timestamp": now.strftime("%Y%m%d%H%M%S"),
+    }
+
+    closest = None
+    last_error = None
+
+    for attempt in range(1, 4):
+        try:
+            response = requests.get(
+                WAYBACK_AVAILABLE_API,
+                params=params,
+                timeout=30,
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            closest = (
+                data.get("archived_snapshots") or {}
+            ).get("closest")
+            break
+
+        except Exception as e:
+            last_error = e
+            print(f"Wayback 查詢第 {attempt}/3 次失敗：{e}")
+
+            if attempt < 3:
+                time.sleep(5)
+
+    if not closest:
+        raise RuntimeError(
+            f"Wayback 沒有 {site} 的存檔"
+            + (f"（{last_error}）" if last_error else "")
+        )
+
+    if not closest.get("available") or str(closest.get("status")) != "200":
+        raise RuntimeError(
+            f"Wayback 最近存檔不可用：{closest.get('status')}"
+        )
+
+    timestamp = str(closest.get("timestamp", ""))
+
+    try:
+        snapshot_time = datetime.strptime(
+            timestamp, "%Y%m%d%H%M%S"
+        ).replace(tzinfo=timezone.utc)
+    except ValueError:
+        raise RuntimeError(f"Wayback 存檔時間格式錯誤：{timestamp}")
+
+    age_hours = (now - snapshot_time).total_seconds() / 3600
+
+    if age_hours > max_age_hours:
+        raise RuntimeError(
+            f"Wayback 最近存檔已是 {age_hours:.1f} 小時前，"
+            f"超過上限 {max_age_hours} 小時"
+        )
+
+    print(f"Wayback 存檔時間 {timestamp}（{age_hours:.1f} 小時前）")
+
+    return (
+        f"https://web.archive.org/web/{timestamp}if_/{page_url}",
+        snapshot_time,
+    )
+
+
+def publish_screenshots(captured_items):
+    """
+    將截圖推送到 GitHub，提供 LINE 可公開讀取的圖片網址。
+
+    GENERATED_BRANCH_MODE=1 時改由 scripts/generated_branch.py 發佈到
+    generated 分支；否則直接推送到目前分支。
+    推送失敗時（例如其他流程同時推送）先 rebase 再重試一次；
+    仍失敗就不提供圖片網址，避免 LINE 顯示舊圖。
+    """
+    print("正在將截圖同步至 GitHub...")
+
+    generated_mode = os.environ.get("GENERATED_BRANCH_MODE") == "1"
+
+    def git(*args):
+        return subprocess.run(["git", *args]).returncode
+
+    if generated_mode:
+        # LINE 會立刻讀取圖片：先發佈，再使用 generated 分支的 raw 網址
+        pushed = subprocess.run([
+            sys.executable,
+            "scripts/generated_branch.py",
+            "publish",
+            "screenshots",
+        ]).returncode == 0
+    else:
+        git("config", "--local", "user.name", "github-actions[bot]")
+        git(
+            "config", "--local", "user.email",
+            "github-actions[bot]@users.noreply.github.com",
+        )
+
+        # 舊版 PNG 截圖不再使用（其中 WSJ 那張是驗證頁）
+        git(
+            "rm", "-q", "--ignore-unmatch",
+            "docs/wsj.png", "docs/barrons.png",
+        )
+        git("add", *[item["path"] for item in captured_items])
+
+        if git("diff", "--cached", "--quiet") != 0:
+            git("commit", "-q", "-m", "Update financial news screenshots")
+        else:
+            print("截圖沒有變化")
+
+        pushed = git("push") == 0
+
+        if not pushed:
+            print("git push 失敗，嘗試 rebase 後重試...")
+            git("pull", "--rebase")
+            pushed = git("push") == 0
+
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    branch = (
+        "generated"
+        if generated_mode
+        else os.environ.get("GITHUB_REF_NAME", "main")
+    )
+
+    if not pushed or not repo:
+        print("截圖未能同步，LINE 不附圖片。")
+        return
+
+    # 避免 LINE 取得 GitHub Raw 舊快取
+    cache_version = int(time.time())
+
+    for item in captured_items:
+        item["url"] = (
+            f"https://raw.githubusercontent.com/"
+            f"{repo}/{branch}/{item['path']}"
+            f"?v={cache_version}"
+        )
+
+
 def capture_and_upload_screenshots():
     """
-    開啟 WSJ 與 Barron's，向下捲動後截圖。
+    截取 WSJ 與 Barron's 首頁（向下捲動後），存成 JPEG。
 
-    回傳格式：
-    [
-        {
-            "name": "WSJ",
-            "path": "docs/wsj.png",
-            "url": "https://..."
-        }
-    ]
+    WSJ 截 Wayback 存檔（避開防機器人驗證）；Barron's 直接連線。
+    任何一個被擋或失敗都不會被送出，而是記錄在 failures。
+
+    回傳 (captured_items, failures)：
+    captured_items = [{"name": "WSJ", "path": "docs/wsj.jpg", "url": "https://..."}]
+    failures = [{"name": "WSJ", "reason": "..."}]
     """
     print("正在啟動 Firefox，準備截取財經新聞頁面...")
 
@@ -62,19 +272,25 @@ def capture_and_upload_screenshots():
     targets = [
         {
             "name": "WSJ",
-            "url": "https://www.wsj.com",
-            "path": "docs/wsj.png",
+            "url": "https://www.wsj.com/",
+            "path": "docs/wsj.jpg",
             "scroll_y": WSJ_SCROLL_Y,
+            "wayback_site": "wsj.com",
         },
         {
             "name": "Barron's",
             "url": "https://www.barrons.com",
-            "path": "docs/barrons.png",
+            "path": "docs/barrons.jpg",
             "scroll_y": BARRONS_SCROLL_Y,
         },
     ]
 
     captured_items = []
+    failures = []
+
+    def record_failure(name, reason):
+        print(f"{name} 截圖失敗：{reason}")
+        failures.append({"name": name, "reason": str(reason)})
 
     try:
         with sync_playwright() as p:
@@ -106,16 +322,38 @@ def capture_and_upload_screenshots():
 
             for target in targets:
                 try:
+                    page_url = target["url"]
+
+                    if target.get("wayback_site"):
+                        try:
+                            page_url, _ = get_wayback_snapshot(
+                                target["wayback_site"],
+                                target["url"],
+                            )
+                        except Exception as wayback_error:
+                            print(
+                                f"{target['name']} 取得 Wayback 存檔失敗，"
+                                f"改為直接連線：{wayback_error}"
+                            )
+
                     print(f"正在進入 {target['name']} 首頁...")
 
-                    page.goto(
-                        target["url"],
-                        timeout=60000,
+                    response = page.goto(
+                        page_url,
+                        timeout=90000,
                         wait_until="domcontentloaded",
                     )
 
                     # 等候網頁主要內容及延遲載入區塊
-                    page.wait_for_timeout(4000)
+                    page.wait_for_timeout(6000)
+
+                    # 被防機器人擋下時不要截圖，避免把驗證頁送給 Dify 與 LINE
+                    blocked_reason = detect_blocked_page(page, response)
+
+                    if blocked_reason:
+                        raise RuntimeError(
+                            f"網站回傳防機器人驗證頁：{blocked_reason}"
+                        )
 
                     # 向下捲動，避開首頁上方廣告
                     page.evaluate(
@@ -128,6 +366,14 @@ def capture_and_upload_screenshots():
 
                     actual_scroll_y = page.evaluate("window.scrollY")
 
+                    # 驗證頁很短、捲不動；真正的首頁一定捲得動
+                    if actual_scroll_y < target["scroll_y"] / 2:
+                        raise RuntimeError(
+                            f"頁面只能捲到 Y={actual_scroll_y}"
+                            f"（目標 {target['scroll_y']}），"
+                            "可能不是新聞首頁"
+                        )
+
                     print(
                         f"{target['name']} 已捲動至 Y={actual_scroll_y}，"
                         "開始截圖..."
@@ -135,6 +381,8 @@ def capture_and_upload_screenshots():
 
                     page.screenshot(
                         path=target["path"],
+                        type="jpeg",
+                        quality=JPEG_QUALITY,
                         full_page=False,
                         animations="disabled",
                     )
@@ -148,50 +396,24 @@ def capture_and_upload_screenshots():
                     print(f"{target['name']} 截圖完成。")
 
                 except Exception as e:
-                    print(f"{target['name']} 截圖失敗：{e}")
+                    record_failure(target["name"], e)
 
             browser.close()
 
     except Exception as e:
         print(f"Playwright Firefox 啟動失敗：{e}")
 
-    if not captured_items:
-        return []
+        done = {item["name"] for item in captured_items}
+        done |= {item["name"] for item in failures}
 
-    # 將截圖推送到 GitHub，提供 LINE 可公開讀取的圖片網址
-    print("正在將截圖同步至 GitHub...")
+        for target in targets:
+            if target["name"] not in done:
+                record_failure(target["name"], f"瀏覽器啟動失敗：{e}")
 
-    os.system('git config --local user.name "github-actions[bot]"')
-    os.system(
-        'git config --local user.email '
-        '"github-actions[bot]@users.noreply.github.com"'
-    )
-    os.system("git add docs/wsj.png docs/barrons.png")
-    os.system(
-        'git commit -m "Update financial news screenshots" '
-        '|| echo "截圖沒有變化"'
-    )
-    os.system("git push")
+    if captured_items:
+        publish_screenshots(captured_items)
 
-    repo = os.environ.get("GITHUB_REPOSITORY")
-    branch = os.environ.get("GITHUB_REF_NAME", "main")
-
-    # 避免 LINE 取得 GitHub Raw 舊快取
-    cache_version = int(time.time())
-
-    if repo:
-        for item in captured_items:
-            relative_path = item["path"]
-
-            item["url"] = (
-                f"https://raw.githubusercontent.com/"
-                f"{repo}/{branch}/{relative_path}"
-                f"?v={cache_version}"
-            )
-    else:
-        print("找不到 GITHUB_REPOSITORY，無法產生 LINE 圖片網址。")
-
-    return captured_items
+    return captured_items, failures
 
 
 def get_yahoo_chart_metadata(symbol, session):
@@ -735,12 +957,18 @@ def upload_image_to_dify(image_path):
         "Authorization": f"Bearer {DIFY_API_KEY}",
     }
 
+    mime_type = (
+        "image/jpeg"
+        if image_path.lower().endswith((".jpg", ".jpeg"))
+        else "image/png"
+    )
+
     with open(image_path, "rb") as image_file:
         files = {
             "file": (
                 os.path.basename(image_path),
                 image_file,
-                "image/png",
+                mime_type,
             )
         }
 
@@ -830,6 +1058,9 @@ def run_dify_workflow(captured_items, trending_stocks):
 4. 保留公司名稱、股票代碼、人物姓名、數字與專有名詞。
 5. 不要翻譯選單、訂閱按鈕、廣告文字或頁尾。
 6. 無法清楚辨識的內容不要猜測或自行補寫。
+   若某張圖是防機器人驗證頁（例如 Verification Required）
+   而不是新聞首頁，請在該來源下只寫「該來源截圖被網站阻擋」，
+   不要編造任何新聞。
 7. 最後整理熱門美股代碼並提供非常簡短的說明。
 
 目前篩選後的熱門美股代碼：
@@ -1142,8 +1373,83 @@ def split_line_text(text, max_length=4900):
     return chunks
 
 
+def build_image_flex_message(image_urls):
+    """把所有截圖放進同一個 Flex 氣泡，整組只佔一則訊息。"""
+    return {
+        "type": "flex",
+        "altText": "新聞截圖",
+        "contents": {
+            "type": "bubble",
+            "size": "giga",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "paddingAll": "0px",
+                "contents": [
+                    {
+                        "type": "image",
+                        "url": image_url,
+                        "size": "full",
+                        "aspectMode": "fit",
+                        "aspectRatio": "6:5",
+                        "action": {
+                            "type": "uri",
+                            "label": "開啟",
+                            "uri": image_url,
+                        },
+                    }
+                    for image_url in image_urls
+                ],
+            },
+        },
+    }
+
+
+def build_line_messages(message, image_urls, as_flex=True):
+    """
+    組出要推播的訊息：文字報告 + 截圖，通常合計兩則。
+
+    as_flex=False 時改成每張圖一則圖片訊息（Flex 被拒時的備援）。
+    """
+    messages = [
+        {"type": "text", "text": text_chunk}
+        for text_chunk in split_line_text(message)
+    ]
+
+    image_urls = [image_url for image_url in image_urls if image_url]
+
+    if image_urls and as_flex:
+        messages.append(build_image_flex_message(image_urls))
+    else:
+        for image_url in image_urls:
+            messages.append({
+                "type": "image",
+                "originalContentUrl": image_url,
+                "previewImageUrl": image_url,
+            })
+
+    return messages
+
+
+def push_line_messages(messages):
+    """推播至 LINE，失敗時回傳 response 給呼叫端判斷。"""
+    # LINE 一次最多傳送 5 個 message objects；本流程通常只有 2 則
+    return requests.post(
+        "https://api.line.me/v2/bot/message/push",
+        headers={
+            "Authorization": f"Bearer {LINE_ACCESS_TOKEN}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "to": LINE_USER_ID,
+            "messages": messages[:5],
+        },
+        timeout=30,
+    )
+
+
 def send_line_report(message, image_urls):
-    """將 Dify 文字報告及新聞截圖推送至 LINE。"""
+    """將 Dify 文字報告及新聞截圖推送至 LINE（合併為一到兩則訊息）。"""
     print("正在準備 LINE 推播...")
 
     if not LINE_ACCESS_TOKEN:
@@ -1156,57 +1462,32 @@ def send_line_report(message, image_urls):
             "未設定 LINE_USER_ID"
         )
 
-    url = "https://api.line.me/v2/bot/message/push"
-
-    headers = {
-        "Authorization": f"Bearer {LINE_ACCESS_TOKEN}",
-        "Content-Type": "application/json",
-    }
-
-    messages = []
-
-    # LINE 一次最多傳送 5 個 message objects
-    for text_chunk in split_line_text(message):
-        messages.append({
-            "type": "text",
-            "text": text_chunk,
-        })
-
-    for image_url in image_urls:
-        if image_url:
-            messages.append({
-                "type": "image",
-                "originalContentUrl": image_url,
-                "previewImageUrl": image_url,
-            })
+    messages = build_line_messages(message, image_urls)
 
     if not messages:
         print("沒有任何內容可以發送。")
         return
 
-    # 若 Dify 文字很長，需分批推送，每批最多 5 則
-    for index in range(0, len(messages), 5):
-        message_batch = messages[
-            index:index + 5
-        ]
+    response = push_line_messages(messages)
 
-        payload = {
-            "to": LINE_USER_ID,
-            "messages": message_batch,
-        }
+    has_flex = any(m["type"] == "flex" for m in messages)
 
-        response = requests.post(
-            url,
-            headers=headers,
-            json=payload,
-            timeout=30,
+    if not response.ok and has_flex:
+        # Flex 被 LINE 拒絕（例如圖片過大）時，退回一般圖片訊息
+        print(
+            "LINE 拒絕 Flex 訊息，改用一般圖片訊息："
+            f"{response.status_code} {response.text[:300]}"
         )
 
-        if not response.ok:
-            raise RuntimeError(
-                f"LINE 推播失敗："
-                f"{response.status_code} {response.text}"
-            )
+        response = push_line_messages(
+            build_line_messages(message, image_urls, as_flex=False)
+        )
+
+    if not response.ok:
+        raise RuntimeError(
+            f"LINE 推播失敗："
+            f"{response.status_code} {response.text}"
+        )
 
     print("LINE 財經報表與截圖推播成功。")
 
@@ -1214,9 +1495,15 @@ def send_line_report(message, image_urls):
 if __name__ == "__main__":
     try:
         # 1. 向下捲動後截取 WSJ 與 Barron's
-        captured_news = (
+        captured_news, capture_failures = (
             capture_and_upload_screenshots()
         )
+
+        for failure in capture_failures:
+            print(
+                f"::warning title={failure['name']} 截圖失敗::"
+                f"{failure['reason']}"
+            )
 
         # 2. 取得熱門商品，並只保留美國交易所掛牌股票
         stocks_live = fetch_yahoo_realtime_trending(
@@ -1244,9 +1531,13 @@ if __name__ == "__main__":
                     f"{e}"
                 )
 
+                captured_names = "、".join(
+                    item["name"] for item in captured_news
+                )
+
                 report_text = (
                     "⚠️ 今日 AI 新聞翻譯暫時無法完成，"
-                    "已附上 WSJ 與 Barron's 原始新聞截圖。"
+                    f"已附上 {captured_names} 原始新聞截圖。"
                     "\n\n"
                     "📈 今日熱門美股\n"
                     f"{stocks_live or '目前沒有取得符合條件的熱門美股'}"
@@ -1268,6 +1559,16 @@ if __name__ == "__main__":
                     "📈 今日熱門美股\n"
                     f"{stocks_live}"
                 )
+
+        # 部分來源截圖失敗（例如 WSJ 被擋）時，在報告開頭簡短提醒
+        if captured_news and capture_failures:
+            failed_names = "、".join(
+                failure["name"] for failure in capture_failures
+            )
+
+            report_text = (
+                f"⚠️ {failed_names} 今日截圖失敗\n\n{report_text}"
+            ).strip()
 
         # 5. 將兩行利率資訊插入熱門股下方
         report_text = insert_rates_below_trending(

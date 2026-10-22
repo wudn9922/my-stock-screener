@@ -1,0 +1,228 @@
+name: Research public data
+on:
+  schedule:
+    # 19:23 Taipei; after daily screener + full-market cache refresh.
+    - cron: '23 11 * * 1-5'
+    # 00:23/01:23 New York; after 03:17 UTC full-market cache run (60m budget).
+    - cron: '23 5 * * 2-6'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Calendar backfill days (resumable, bounded by job budget)'
+        default: '95'
+  push:
+    branches: [main]
+    paths: ['scripts/*research*.py', 'scripts/build_sec_radar.py', 'scripts/build_world_assets.py', '.github/workflows/research-data.yml']
+env:
+  GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
+
+permissions:
+  contents: read
+concurrency:
+  group: research-public-data
+  cancel-in-progress: false
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      taiwan: ${{ steps.plan.outputs.taiwan }}
+      market: ${{ steps.plan.outputs.market }}
+      modules: ${{ steps.plan.outputs.modules }}
+    steps:
+      - id: plan
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [ "$SCHEDULE" = '23 11 * * 1-5' ]; then
+            echo 'taiwan=true' >> "$GITHUB_OUTPUT"
+            echo 'market=TW' >> "$GITHUB_OUTPUT"
+            echo 'modules=["volume","alerts"]' >> "$GITHUB_OUTPUT"
+          elif [ "$SCHEDULE" = '23 5 * * 2-6' ]; then
+            echo 'taiwan=false' >> "$GITHUB_OUTPUT"
+            echo 'market=US' >> "$GITHUB_OUTPUT"
+            echo 'modules=["volume","sec","world"]' >> "$GITHUB_OUTPUT"
+          else
+            echo 'taiwan=true' >> "$GITHUB_OUTPUT"
+            echo 'market=all' >> "$GITHUB_OUTPUT"
+            echo 'modules=["volume","alerts","sec","world"]' >> "$GITHUB_OUTPUT"
+          fi
+  institutional:
+    needs: plan
+    if: needs.plan.outputs.taiwan == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ vars.GENERATED_BRANCH_MODE == '1' && 'main' || github.ref }}
+      - name: Restore generated inputs
+        id: generated_restore
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        run: python scripts/generated_branch.py restore
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pandas requests
+      - uses: actions/cache/restore@v4
+        with:
+          path: .cache/universe-full
+          key: research-read-full-market-${{ github.run_id }}-institutional
+          restore-keys: universe-full-v1-
+      - uses: actions/cache/restore@v4
+        with:
+          path: .cache/universe-full/institutions
+          key: research-institutional-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: research-institutional-v2-
+      - name: Refresh institutional flows and official turnover
+        env:
+          BACKFILL_DAYS: ${{ inputs.days || '95' }}
+        run: python scripts/build_research.py institutional --days "$BACKFILL_DAYS" --budget 600
+      - name: Stage validated module only
+        run: python scripts/research_publish.py stage institutional --dest /tmp/research-output
+      - uses: actions/upload-artifact@v4
+        with:
+          name: research-snapshot-institutional
+          path: /tmp/research-output
+          retention-days: 7
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .cache/universe-full/institutions
+          key: research-institutional-v2-${{ github.run_id }}-${{ github.run_attempt }}
+  refresh:
+    needs: [plan, institutional]
+    if: always() && needs.plan.result == 'success' && !cancelled()
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.plan.outputs.modules) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ vars.GENERATED_BRANCH_MODE == '1' && 'main' || github.ref }}
+      - name: Restore generated inputs
+        id: generated_restore
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        run: python scripts/generated_branch.py restore
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pandas requests openpyxl xlrd lxml
+      - uses: actions/cache/restore@v4
+        with:
+          path: .cache/universe-full
+          key: research-read-full-market-${{ github.run_id }}-${{ matrix.module }}
+          restore-keys: universe-full-v1-
+      - uses: actions/cache/restore@v4
+        if: matrix.module == 'sec'
+        with:
+          path: .cache/research
+          key: research-sec-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: research-sec-v2-
+      - name: Use this run's official turnover for Taiwan volume
+        if: matrix.module == 'volume' && needs.institutional.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: research-snapshot-institutional
+          path: /tmp/research-institutional
+      - name: Overlay validated institutional artifact
+        if: matrix.module == 'volume' && needs.institutional.result == 'success'
+        run: python scripts/research_publish.py overlay --dest docs/report/research --artifacts /tmp/research-institutional
+      - name: Refresh independent module
+        env:
+          MODULE: ${{ matrix.module }}
+          MARKET: ${{ needs.plan.outputs.market }}
+          BACKFILL_DAYS: ${{ inputs.days || '95' }}
+        run: |
+          set -euo pipefail
+          case "$MODULE" in
+            volume) python scripts/build_research.py volume --market "$MARKET" ;;
+            alerts) python scripts/build_research.py alerts --days "$BACKFILL_DAYS" --budget 600 ;;
+            world) python scripts/build_world_assets.py ;;
+          esac
+      - name: Refresh SEC with operator-provided contact only
+        if: matrix.module == 'sec'
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          BACKFILL_DAYS: ${{ inputs.days || '95' }}
+        run: python scripts/build_sec_radar.py --days "$BACKFILL_DAYS" --budget 600
+      - name: Stage validated module only
+        env:
+          MODULE: ${{ matrix.module }}
+        run: python scripts/research_publish.py stage "$MODULE" --dest /tmp/research-output
+      - uses: actions/upload-artifact@v4
+        with:
+          name: research-snapshot-${{ matrix.module }}
+          path: /tmp/research-output
+          retention-days: 7
+      - uses: actions/cache/save@v4
+        if: always() && matrix.module == 'sec'
+        with:
+          path: .cache/research
+          key: research-sec-v2-${{ github.run_id }}-${{ github.run_attempt }}
+  publish:
+    # Only this job can write; independent failed modules do not discard successful artifacts.
+    needs: [plan, institutional, refresh]
+    if: always() && needs.plan.result == 'success' && !cancelled() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Restore generated inputs
+        id: generated_restore
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        run: python scripts/generated_branch.py restore
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: research-snapshot-*
+          path: /tmp/research-artifacts
+          merge-multiple: true
+      - name: Publish validated research outputs to generated
+        if: vars.GENERATED_BRANCH_MODE == '1' && steps.generated_restore.outcome == 'success'
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          if ! git diff --quiet "$SOURCE_SHA" origin/main -- 'scripts/*research*.py' scripts/build_sec_radar.py scripts/build_world_assets.py 'atlas/src/report/research*.ts' .github/workflows/research-data.yml .github/generated-paths.json scripts/generated_branch.py; then
+            echo '::error::Research implementation changed during collection; rerun on current main.'
+            exit 1
+          fi
+          python scripts/research_publish.py overlay --dest docs/report/research --artifacts /tmp/research-artifacts
+          python scripts/generated_branch.py publish research
+
+      - name: Publish all successful modules in one commit
+        if: vars.GENERATED_BRANCH_MODE != '1'
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git fetch --no-tags --depth=1 origin "$SOURCE_SHA"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            if ! git diff --quiet "$SOURCE_SHA" HEAD -- 'scripts/*research*.py' scripts/build_sec_radar.py scripts/build_world_assets.py 'atlas/src/report/research*.ts' .github/workflows/research-data.yml .github/generated-paths.json scripts/generated_branch.py; then
+              echo '::error::Research implementation changed during collection; rerun on current main.'
+              exit 1
+            fi
+            python scripts/research_publish.py overlay --dest docs/report/research --artifacts /tmp/research-artifacts
+            git add docs/report/research data
+            if git diff --cached --quiet; then
+              echo 'No research data changes; no commit or Pages deployment.'
+              exit 0
+            fi
+            git commit -m 'Refresh research public data'
+            if git push origin HEAD:main; then exit 0; fi
+            sleep $((attempt * 5))
+          done
+          exit 1

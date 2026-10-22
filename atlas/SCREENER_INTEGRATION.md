@@ -193,8 +193,9 @@ Checks: `npm test`, `npm run lint`, `npx tsc -b`.
   git-ignored paths, and any tracked file the build touched is restored before pulling (the earlier
   failure: `screener-symbols.mjs` rewrote the tracked `scripts/market-symbols.json`, blocking the rebase).
 - `.github/workflows/ma-recommendations.yml` (concurrency `ma-recommendations`): Saturdays 02:17 UTC or on dispatch
-  (`ma_selector_ref`, `limit` inputs). Rewrites only `docs/report/ma-selector/`; pushes with `git pull --rebase` and
-  3 retries.
+  (`ma_selector_ref`, `limit` inputs). Rewrites only `docs/report/ma-selector/` (generated-branch owner `ma`); with
+  `GENERATED_BRANCH_MODE=1` it restores and publishes through `scripts/generated_branch.py`, otherwise it pushes to
+  `main` with `git pull --rebase` and 3 retries.
 - `.github/workflows/supabase-functions.yml`: deploys `market-chart` on pushes touching
   `supabase/functions/market-chart/**` or on dispatch; skipped with a notice when
   `SUPABASE_ACCESS_TOKEN` is missing.

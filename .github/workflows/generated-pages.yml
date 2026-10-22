@@ -1,0 +1,60 @@
+name: Deploy assembled Pages
+
+on:
+  push:
+    branches: [main, generated]
+  workflow_dispatch:
+  workflow_call:
+  # GITHUB_TOKEN pushes do not emit new push workflow runs. Include even failed
+  # runs: a producer may have saved a valid partial snapshot before failing.
+  workflow_run:
+    workflows:
+      - Daily Stock Screener
+      - Atlas Research Terminal
+      - Financial Statement History
+      - Official Fundamentals (TW / US)
+      - Full-Market Universe
+      - Research public data
+      - Taiwan Chips
+      - Taiwan Theme Rotation
+      - Refresh US Rates
+      - Squash generated snapshot
+      - 🔄 GitHub Actions 永久續命腳本
+    types: [completed]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Each run checks out the latest tips, including when triggered by an older run.
+concurrency:
+  group: assembled-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: >-
+      vars.GENERATED_BRANCH_MODE == '1' &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Pin latest storage and main snapshots
+        run: |
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main +refs/heads/generated:refs/remotes/origin/generated
+          git rev-parse origin/main origin/generated
+      - name: Assemble original docs layout and enforce Pages size limit
+        run: python scripts/generated_branch.py assemble --main origin/main --generated origin/generated --dest _site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

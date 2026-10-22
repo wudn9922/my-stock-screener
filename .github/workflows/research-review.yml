@@ -1,0 +1,44 @@
+name: Research Python verification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'docs/report/research/**'
+      - 'tests/**'
+      - 'atlas/scripts/**'
+      - 'requirements.txt'
+      - '.github/workflows/research-review.yml'
+permissions:
+  contents: read
+concurrency:
+  group: research-python-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore generated inputs for Python readers
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        env:
+          GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
+        run: python scripts/generated_branch.py restore
+      - name: Overlay world snapshots changed by this PR
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
+          git diff --name-only --diff-filter=AM -z "$PR_BASE_SHA" HEAD -- docs/report/research/world-assets.json docs/report/research/candles |
+            xargs -0 -r git restore --source=HEAD --
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt pyyaml
+      - run: python -m unittest discover -s tests -v

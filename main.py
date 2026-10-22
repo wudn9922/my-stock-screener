@@ -42,10 +42,7 @@ BACKFILL_ENABLED = False
 BACKFILL_MIN_ROWS = 240
 BACKFILL_MAX_PER_RUN = 200
 
-# 超過此天數沒有新 K 線的 CSV 會被自動清除
-STALE_CSV_DAYS = 45
-# 單次最多刪除全部 CSV 的比例，超過視為異常不刪
-STALE_CSV_MAX_DELETE_RATIO = 0.5
+# data/*.csv 是永久 K 線紀錄，不再依日期或掃描名單刪除。
 
 
 # =========================================================================
@@ -92,11 +89,6 @@ TPEX_TRADING_INDEX_LEGACY_URL = (
     "https://www.tpex.org.tw/web/stock/aftertrading/"
     "daily_trading_index/st41_result.php"
 )
-
-# prune_stale_csv 不會刪除的 CSV（長期歷史快取，不是掃描用的個股）
-STALE_CSV_EXCLUDE = {
-    f"{TPEX_OTC_SYMBOL}.csv"
-}
 
 # =========================================================================
 # LIFF、報告與畫線同步
@@ -1435,6 +1427,48 @@ def send_line_message(
         )
 
         return None
+
+
+def send_line_messages_combined(
+    messages,
+    access_token,
+    user_id,
+    max_length=4900
+):
+    """
+    把多段簡短訊息合併成一則 LINE 文字訊息再推播。
+
+    各段之間空一行；合併後超過 LINE 單則 5000 字上限時，
+    以「整段」為單位拆成最少則數，不會把單一段落切成兩半。
+    """
+    chunks = []
+    current = ""
+
+    for message in messages:
+        message = str(message or "").strip()
+
+        if not message:
+            continue
+
+        if not current:
+            current = message
+        elif len(current) + 2 + len(message) <= max_length:
+            current = f"{current}\n\n{message}"
+        else:
+            chunks.append(current)
+            current = message
+
+    if current:
+        chunks.append(current)
+
+    for chunk in chunks:
+        send_line_message(
+            chunk,
+            access_token,
+            user_id
+        )
+
+    return len(chunks)
 
 
 # =========================================================================
@@ -4755,74 +4789,21 @@ def get_csv_last_date(csv_path):
 
 def prune_stale_csv(
     data_dir=DATA_DIR,
-    max_age_days=STALE_CSV_DAYS
+    max_age_days=None
 ):
+    """K 線 CSV 是 owner 永久保留的紀錄；保留呼叫介面，但永不刪檔。
+
+    掉出名單、下市、過期或損壞的 CSV 仍留在 main 與完整 git 歷史中。
+    data_dir／max_age_days 只為既有呼叫相容而保留，不再用於清理。
     """
-    刪除最後一根 K 線已超過 max_age_days 天沒更新的 CSV。
-
-    掉出掃描名單、下市或已從群組移除的股票不會再被更新，
-    它們的 CSV 會因此逐漸過期並被清掉，避免 repo 無限膨脹。
-    仍在名單內的股票每天都會更新，不會被刪除。
-    """
-    if not os.path.isdir(data_dir):
-        return 0
-
-    now = datetime.now()
-    csv_paths = [
-        os.path.join(data_dir, name)
-        for name in os.listdir(data_dir)
-        if name.endswith(".csv")
-        and name not in STALE_CSV_EXCLUDE
-    ]
-
-    stale_paths = []
-
-    for csv_path in csv_paths:
-        last_date = get_csv_last_date(
-            csv_path
-        )
-
-        if last_date is None:
-            continue
-
-        if (
-            now - last_date
-        ).days > max_age_days:
-            stale_paths.append(csv_path)
-
-    # 安全閥：資料來源整批異常時，不要一次刪光
-    if (
-        csv_paths
-        and len(stale_paths)
-        > len(csv_paths)
-        * STALE_CSV_MAX_DELETE_RATIO
-    ):
-        print(
-            "⚠️ 過期 CSV 數量異常"
-            f"（{len(stale_paths)}/"
-            f"{len(csv_paths)}），"
-            "略過清理"
-        )
-        return 0
-
-    for csv_path in stale_paths:
-        try:
-            os.remove(csv_path)
-        except OSError as exc:
-            print(
-                f"⚠️ 刪除失敗 {csv_path}："
-                f"{exc}"
-            )
-
-    print(
-        f"🧹 已清除過期 CSV："
-        f"{len(stale_paths)} 檔"
-    )
-
-    return len(stale_paths)
+    return 0
 
 
 def push_report_to_github():
+    if os.environ.get("GENERATED_BRANCH_MODE") == "1":
+        # schedule.yml publishes the complete daily snapshot after all builders.
+        print("GENERATED_BRANCH_MODE=1：交由 workflow 提交 generated 分支")
+        return True
     run_git_command(
         [
             "git",
@@ -5877,7 +5858,7 @@ def write_ohlcv_csv_atomic(df, csv_path):
 
     file_descriptor, tmp_path = tempfile.mkstemp(
         prefix=".tmp-",
-        suffix=".csv",
+        suffix=".tmp",
         dir=directory
     )
 
@@ -8114,11 +8095,9 @@ def main():
         f"｜熱門 {stock_count('us_g4')}"
     )
 
-    send_line_message(
-        line_message_stocks,
-        access_token,
-        line_push_user_id
-    )
+    # 股票、大盤（週一再加類股）合併成一則 LINE 訊息，
+    # 在下方類股區塊結束後一次送出
+    pending_line_messages = [line_message_stocks]
 
     # -----------------------------------------------------------------
     # 原本的大盤分類與趨勢推播
@@ -8218,12 +8197,10 @@ def main():
         INDEX_LINE_LEGEND
     )
 
-    send_line_message(
+    pending_line_messages.append(
         "\n".join(
             line_index_lines
-        ),
-        access_token,
-        line_push_user_id
+        )
     )
 
     # -----------------------------------------------------------------
@@ -8241,14 +8218,18 @@ def main():
         )
 
         # LINE 送精簡版；sectors_message 的完整文字留給網頁（Atlas 報告 JSON）
-        send_line_message(
+        pending_line_messages.append(
             build_sector_line_message(
                 today_str,
                 sector_summary
-            ),
-            access_token,
-            line_push_user_id
+            )
         )
+
+    send_line_messages_combined(
+        pending_line_messages,
+        access_token,
+        line_push_user_id
+    )
 
     # -----------------------------------------------------------------
     # 選股篩選器：全市場 universe 與群組指標（report_metrics.py）

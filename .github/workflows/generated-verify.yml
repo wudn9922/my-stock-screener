@@ -1,0 +1,34 @@
+name: Generated storage verification
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: generated-verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: git fetch --no-tags origin main
+      - name: Test routing, retry, protected records, squash and rollback primitives
+        run: python -m unittest discover -s tests -p test_generated_branch.py -v
+      - name: Prove every current main docs byte and URL path survives assembly
+        if: vars.GENERATED_BRANCH_MODE != '1'
+        run: python scripts/generated_branch.py verify --ref origin/main --dest _verified_site
+      - name: Check current generated snapshot after cutover
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        run: |
+          git fetch --no-tags origin +refs/heads/generated:refs/remotes/origin/generated
+          python scripts/generated_branch.py assemble --main origin/main --generated origin/generated --dest _site
+      - name: Package the verified Pages tree for review
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: verified-pages
+          path: ${{ vars.GENERATED_BRANCH_MODE == '1' && '_site' || '_verified_site' }}

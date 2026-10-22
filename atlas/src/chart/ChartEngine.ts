@@ -61,6 +61,7 @@ export class ChartEngine {
   controller: DrawingController | null = null;
   mapper: TimeMapper | null = null;
   private symbol = '';
+  private pricePrecision = 2;
   private timeframe: Timeframe = '1D';
   private bars: Bar[] = [];
   private atr: number | null = null;
@@ -178,6 +179,12 @@ export class ChartEngine {
       wickUpColor: colors.up,
       wickDownColor: colors.down,
     });
+    this.renderHeader();
+  }
+  setPricePrecision(digits: number) {
+    this.pricePrecision = Math.max(0, Math.min(8, Math.trunc(digits)));
+    this.candles.applyOptions({ priceFormat: { type: 'price', precision: this.pricePrecision, minMove: 10 ** -this.pricePrecision } });
+    this.chart.applyOptions({ localization: { priceFormatter: (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: this.pricePrecision, maximumFractionDigits: this.pricePrecision }) } });
     this.renderHeader();
   }
   clear() {
@@ -512,7 +519,7 @@ export class ChartEngine {
     const index = this.barIndices.get(b.time) ?? -1,
       previous = index > 0 ? this.bars[index - 1].close : b.open,
       change = b.close - previous;
-    this.header.textContent = `O ${b.open.toFixed(2)}   H ${b.high.toFixed(2)}   L ${b.low.toFixed(2)}   C ${b.close.toFixed(2)}   ${change >= 0 ? '+' : ''}${change.toFixed(2)} (${((change / previous) * 100).toFixed(2)}%)`;
+    this.header.textContent = `O ${b.open.toFixed(this.pricePrecision)}   H ${b.high.toFixed(this.pricePrecision)}   L ${b.low.toFixed(this.pricePrecision)}   C ${b.close.toFixed(this.pricePrecision)}   ${change >= 0 ? '+' : ''}${change.toFixed(this.pricePrecision)} (${((change / previous) * 100).toFixed(2)}%)`;
     this.header.style.color = change >= 0 ? this.upDown.up : this.upDown.down;
     this.renderLegend();
   }

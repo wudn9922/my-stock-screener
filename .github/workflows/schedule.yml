@@ -14,6 +14,7 @@ on:
         default: false
 
 env:
+  GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
@@ -63,7 +64,14 @@ jobs:
       - name: Checkout repository
         if: steps.guard.outputs.skip != 'true'
         uses: actions/checkout@v4
-        
+        with:
+          ref: ${{ vars.GENERATED_BRANCH_MODE == '1' && 'main' || github.ref }}
+
+      - name: Restore generated inputs
+        id: generated_restore
+        if: steps.guard.outputs.skip != 'true' && vars.GENERATED_BRANCH_MODE == '1'
+        run: python scripts/generated_branch.py restore
+
       - name: Set up Python
         if: steps.guard.outputs.skip != 'true'
         uses: actions/setup-python@v5
@@ -79,7 +87,7 @@ jobs:
 
       - name: Check Python Syntax
         if: steps.guard.outputs.skip != 'true'
-        run: python -m py_compile main.py
+        run: python -m py_compile main.py dify_report.py
 
       
       # 這裡把 Supabase 金鑰直接餵給 Python
@@ -141,13 +149,16 @@ jobs:
       # 財報分析中心改由 financials.yml 在本流程成功後另開 runner 執行：
       # 上千次 Yahoo 請求放在這裡會被前面的題材／利率步驟拖累而遭限流（HTTP 429）。
 
+      - name: Publish owned outputs to generated and durable records to main
+        if: (steps.guard.outputs.skip != 'true') && vars.GENERATED_BRANCH_MODE == '1' && steps.generated_restore.outcome == 'success'
+        run: python scripts/generated_branch.py publish daily
+
       - name: Commit and Push changes
-        if: steps.guard.outputs.skip != 'true'
+        if: (steps.guard.outputs.skip != 'true') && vars.GENERATED_BRANCH_MODE != '1'
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          # -A 才會把「已被清理的過期 CSV」的刪除動作一起提交
-          # docs/report：Atlas 報告 JSON；data：歷史資料
+          # data/*.csv 是永久 K 線紀錄，不再清除過期檔；開關關閉時仍與報告一起留 main。
           git add -A docs/report data
           git commit -m "Auto-update daily data and report JSON" || echo "No changes to commit"
           # Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試
