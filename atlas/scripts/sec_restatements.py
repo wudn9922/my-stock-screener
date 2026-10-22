@@ -9,6 +9,7 @@ import math
 from datetime import date, timedelta
 
 EPS = ("epsBasic", "epsDiluted")
+PER_SHARE = frozenset((*EPS, "dilutedShares"))
 BASIS = "secFilingBasis"
 BLOCKED = "secQ4EpsBlockedReason"
 REASON = "annual-and-quarterly-filing-bases-differ; restated-quarterly-values-unavailable"
@@ -60,7 +61,7 @@ def _near(left, right):
 
 INCOME_FIELDS = frozenset({
     "revenue", "costOfRevenue", "grossProfit", "operatingIncome", "pretaxIncome",
-    "taxProvision", "netIncome", "epsBasic", "epsDiluted", "interestExpense",
+    "taxProvision", "netIncome", "interestExpense",
 })
 
 
@@ -73,10 +74,66 @@ def material_fields(before, after):
                        and not math.isclose(abs(after[field] - before[field]), .02 * abs(before[field]), rel_tol=1e-12, abs_tol=1e-12))))
 
 
+def share_basis_ratio(before, after):
+    """Conservative split/ADR suspicion: <=1% relative error from an integer factor.
+
+    This is a retention guard, not evidence to rescale monetary income. It works
+    without a Yahoo split event (ADR ratio changes often have no such event).
+    """
+    for field in (*EPS, "dilutedShares"):
+        old, new = before.get(field), after.get(field)
+        if not old or not new or old * new <= 0:
+            continue
+        raw_ratio = new / old
+        ratios = [(raw_ratio, 3 if field in EPS else 2)]
+        if field in EPS and before.get("netIncome") and after.get("netIncome"):
+            income_ratio = after["netIncome"] / before["netIncome"]
+            if income_ratio > 0:
+                ratios.append((raw_ratio / income_ratio, 2))
+        for ratio, minimum in ratios:
+            factor = max(ratio, 1 / ratio)
+            integer = round(factor)
+            if integer >= minimum and abs(factor / integer - 1) <= .01:
+                return {"field": field, "ratio": ratio, "factor": integer if ratio > 1 else 1 / integer}
+    return None
+
+
+def _quarterly_issue(item):
+    extra = item.setdefault("extra", {})
+    issues = extra.setdefault("secRestatementIssues", [])
+    if "quarterly-as-reported" not in issues:
+        issues.append("quarterly-as-reported")
+    extra[BLOCKED] = REASON
+
+
+def complete_quarters(basis, rows, references):
+    """Require three unique same-accession quarters, with all annual EPS inputs."""
+    fields = [f for f in EPS if f in basis.get("reportedFields", EPS)]
+    end = _day(basis.get("end"))
+    if end is None:
+        return False
+    start = _day(basis.get("start")) or end - timedelta(days=370)
+    relevant = [p for p in references if start <= _day(p["end"]) < end - timedelta(days=25)]
+    if len(relevant) != 3:
+        return False
+    for old in relevant:
+        matches = [p for p in rows if abs((_day(p["end"]) - _day(old["end"])).days) <= 25]
+        if len(matches) != 1 or any(matches[0]["values"].get(f) is None for f in fields):
+            return False
+        marker = matches[0].get("extra", {}).get(BASIS)
+        if marker is not None and (marker.get("accn") != basis.get("accn")
+                or any(f in marker.get("retainedFields", []) for f in fields)):
+            return False
+    return True
+
+
 def _merge_filed_row(old, filed, basis, revisions, frequency, original=None):
     audit_start = len(revisions)
     new = copy.deepcopy(old)
     provided = {field: value for field, value in filed["values"].items() if value is not None}
+    share_guard = share_basis_ratio(old["values"], provided)
+    if share_guard:
+        provided = {field: value for field, value in provided.items() if field not in PER_SHARE}
     retained = sorted(field for field, value in old["values"].items()
                       if value is not None and field not in provided)
     new["values"].update(provided)
@@ -93,7 +150,9 @@ def _merge_filed_row(old, filed, basis, revisions, frequency, original=None):
                           "field": field, "old": old["values"][field], "new": old["values"][field],
                           "accn": basis["accn"], "filed": basis["filed"],
                           "originalAccn": basis.get("originalAccn"), "originalFiled": basis.get("originalFiled"),
-                          "reason": "not-reported-in-restating-filing; current-value-retained"})
+                          "reason": ("split-or-adr-ratio-candidate; existing-share-basis-retained"
+                                     if share_guard and field in PER_SHARE else
+                                     "not-reported-in-restating-filing; current-value-retained")})
     for field, value in provided.items():
         before = (original or old)["values"].get(field)
         if before != value:
@@ -147,7 +206,7 @@ def select_rows(payload, annual, quarterly, extract, candidates, quarter_candida
                         if values.get("dilutedShares") and target.get("dilutedShares"):
                             factor = compatible(target["dilutedShares"] / values["dilutedShares"])
                         if factor is None and any(values.get(field) is not None and target.get(field) is not None
-                                                  and not material_fields({field: target[field]}, {field: values[field]})
+                                                  and abs(values[field] - target[field]) <= .02 * abs(target[field])
                                                   for field in EPS):
                             factor = 1.0
                         for field in EPS:
@@ -194,7 +253,12 @@ def select_rows(payload, annual, quarterly, extract, candidates, quarter_candida
                  "originalAccn": first["accn"], "originalFiled": first["filed"],
                  "shareFactor": filed.get("extra", {}).get("secShareBasisFactor", 1.0)}
         selected.append(_merge_filed_row(old, filed, basis, revisions, "annual", original))
-        years.append((basis, rows(latest)[1]))
+        same_filing = rows(latest)[1]
+        basis["reportedFields"] = selected[-1]["extra"][BASIS]["reportedFields"]
+        if not complete_quarters(basis, same_filing, quarterly):
+            _quarterly_issue(selected[-1])
+            same_filing = []
+        years.append((basis, same_filing))
 
     quarters = []
     quarterly = list(quarterly)
@@ -231,13 +295,13 @@ def select_rows(payload, annual, quarterly, extract, candidates, quarter_candida
                 new = _merge_filed_row(old, replacement, basis, revisions, "quarterly", original)
                 new["extra"].update({BLOCKED: None, "secKeepAsReported": False})
             else:
+                _quarterly_issue(new)
                 new.setdefault("extra", {})[BASIS] = {"accn": None, "asReported": True,
                     "annualAccn": basis["accn"], "annualFiled": basis["filed"], "switchedYear": True}
             if abs((_day(old["end"]) - _day(basis["end"])).days) <= 25:
                 for field in EPS:
                     if replacement is None or replacement["values"].get(field) is None:
-                        new["values"].pop(field, None)
-                        new["extra"][BLOCKED] = REASON
+                        _quarterly_issue(new)
         quarters.append(new)
     return selected, quarters, revisions
 
@@ -296,7 +360,7 @@ def overlay_document(previous, annual, quarterly, revisions, now, factor=None):
     """Apply only switched rows in memory, preserving dates, labels and every other cell.
 
     No regular merge, split adjustment, label assignment or deduplication runs here.
-    The only permitted nulls are Q4 EPS of switched years lacking restated inputs.
+    Existing values are never cleared; incomplete restated quarters remain as reported.
     """
     import build_financials as fin
     document = copy.deepcopy(previous)
@@ -347,11 +411,24 @@ def overlay_document(previous, annual, quarterly, revisions, now, factor=None):
     if any(p.get("fy") is None for rows in current.values() if isinstance(rows, list)
            for p in rows if isinstance(p, dict) and "end" in p):
         fin.assign_fiscal_labels(current["annual"], current["quarterly"], fallback_end_month=previous.get("fyEndMonth") or 12)
-    changed_quarters = {}
+    changed_quarters, restated_quarter_ends = {}, set()
     for end, year in switched.items():
         original_year = next(p for p in current["annual"] if p["end"] == end)
         year["fy"], year["fq"] = original_year["fy"], original_year.get("fq")
         basis = year["extra"][BASIS]
+        basis.setdefault("end", end)
+        references = [p for p in current["quarterly"] if p.get("fy") == year["fy"]]
+        same_rows = [p for p in candidates["quarterly"]
+                     if p.get("extra", {}).get(BASIS, {}).get("accn") == basis.get("accn")]
+        if not complete_quarters(basis, same_rows, references):
+            _quarterly_issue(year)
+            for old in references:
+                new = copy.deepcopy(old)
+                _quarterly_issue(new)
+                new["extra"][BASIS] = {"accn": None, "asReported": True,
+                    "annualAccn": basis.get("accn"), "annualFiled": basis.get("filed"), "switchedYear": True}
+                changed_quarters[old["end"]] = new
+            continue
         for old in current["quarterly"]:
             if old.get("fy") != year["fy"]:
                 continue
@@ -359,6 +436,7 @@ def overlay_document(previous, annual, quarterly, revisions, now, factor=None):
             candidate_basis = (candidate or {}).get("extra", {}).get(BASIS) or {}
             same = candidate_basis.get("accn") == basis.get("accn") and bool(basis.get("accn"))
             if same:
+                restated_quarter_ends.add(old["end"])
                 provided = {field: value for field, value in candidate["values"].items()
                             if value is not None and field not in candidate_basis.get("retainedFields", [])}
                 new = _merge_filed_row(old, {"values": provided, "extra": candidate.get("extra", {})}, candidate_basis, audit, "quarterly")
@@ -379,8 +457,7 @@ def overlay_document(previous, annual, quarterly, revisions, now, factor=None):
                 coherent = all(len(found) == 1 and found[0]["extra"].get(BASIS, {}).get("accn") == basis.get("accn")
                                and field in found[0]["extra"].get(BASIS, {}).get("reportedFields", []) for found in inputs)
                 if not coherent:
-                    q4["values"].pop(field, None)
-                    q4["extra"][BLOCKED] = REASON
+                    _quarterly_issue(q4)
                 elif field in basis.get("reportedFields", []):
                     # Attempt the unchanged numerical gate only with a complete restated
                     # basis. If it rejects the derivation, retain the existing EPS.
@@ -407,8 +484,7 @@ def overlay_document(previous, annual, quarterly, revisions, now, factor=None):
                 if column is None and value is not None:
                     column = block["values"][field] = [None] * len(block["end"])
                 if column is not None:
-                    # Missing inputs can only erase EPS of a switched Q4.
-                    if value is not None or (frequency == "quarterly" and item.get("fq") == 4 and field in EPS):
+                    if value is not None:
                         column[index] = value
             for name, value in item["extra"].items():
                 if name not in {BASIS, BLOCKED, "secRestatementIssues", "derived"}:
@@ -416,13 +492,12 @@ def overlay_document(previous, annual, quarterly, revisions, now, factor=None):
                 column = block.setdefault(name, [None] * len(block["end"]))
                 column[index] = copy.deepcopy(value)
     # Keep the earliest filed originals as well as the current pre-switch values.
-    actual_ends = {"annual": set(switched), "quarterly": set(changed_quarters)}
+    actual_ends = {"annual": set(switched), "quarterly": restated_quarter_ends}
     audit += [r for r in revisions if r.get("end") in actual_ends.get(r.get("period"), ())]
-    erased_eps = {(end, field) for end, item in changed_quarters.items() if item.get("fq") == 4
-                  for field in EPS if item["values"].get(field) is None}
-    audit = [r for r in audit if not (r.get("kind") == "basis-unrestated" and r.get("period") == "quarterly"
-                                     and (r.get("end"), r.get("field")) in erased_eps)]
     preserve_quality(document, previous, audit, now.date().isoformat())
+    if any("quarterly-as-reported" in item.get("extra", {}).get("secRestatementIssues", [])
+           for item in switched.values()) and "quarterly-as-reported" not in document["quality"]["issues"]:
+        document["quality"]["issues"].append("quarterly-as-reported")
     if derived_fills and "q4-derived" not in document["quality"]["issues"]:
         document["quality"]["issues"].append("q4-derived")
     return document

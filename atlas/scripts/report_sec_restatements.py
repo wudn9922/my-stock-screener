@@ -16,7 +16,7 @@ from pathlib import Path
 import build_financials as fin
 import sec_ifrs
 import seed_financials_sec as sec
-from sec_restatements import BASIS, BLOCKED, EPS, preserve_quality
+from sec_restatements import BASIS, BLOCKED, EPS, PER_SHARE, preserve_quality
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -134,6 +134,7 @@ def summarize(entries):
             "symbols": len({c["symbol"] for c in changes}),
             "periods": len({(c["symbol"], c["period"], c["end"]) for c in changes}),
             "fields": len(changes), "bySymbol": dict(sorted(Counter(c["symbol"] for c in changes).items())),
+            "perShareOnlySwitchedPeriods": sum(bool(row["triggerFields"]) and set(row["triggerFields"]) <= PER_SHARE for _, row in switched),
             "switchedPeriods": len(switched), "switchedSymbols": len({symbol for symbol, _ in switched}),
             "revenueOrNetIncomeSwitchedPeriods": len(primary),
             "revenueOrNetIncomeSwitchedSymbols": len({symbol for symbol, _ in primary}),
@@ -157,6 +158,8 @@ def record_comparison(entry, previous, proposed):
             if basis.get("switched"):
                 entry["switchedPeriods"].append({"end": end, "accn": basis.get("accn"), "filed": basis.get("filed"),
                     "triggerFields": basis.get("triggerFields", []), "retainedFields": basis.get("retainedFields", [])})
+    entry["quarterlyAsReportedYears"] = [end for index, end in enumerate(block.get("end", []))
+        if "quarterly-as-reported" in ((block.get("secRestatementIssues") or [None] * len(block["end"]))[index] or [])]
     entry["basisUnrestated"] = [r for r in proposed.get("quality", {}).get("revisions", [])
                                if r.get("kind") == "basis-unrestated"]
     entry["status"] = "reviewed"
@@ -223,6 +226,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prefer-latest-filing", action="store_true", help="default off")
     parser.add_argument("--offline", action="store_true")
+    parser.add_argument("--comparison-report", type=Path, help="previous dry-run JSON for reproducible share-basis outcome audit")
     parser.add_argument("--workers", type=int, default=1, help="offline comparison processes (1-8; no parallel HTTP)")
     parser.add_argument("--report-dir", type=Path, default=ROOT / "docs/report")
     parser.add_argument("--report", type=Path, default=ROOT / "docs/report/sec-restated-comparatives.json")
@@ -320,15 +324,54 @@ def main(argv=None):
     return finish_report(args, entries, now, client, cache_hits, stopped)
 
 
+def comparison_audit(path, entries):
+    """Audit every prior annual EPS change, including any external review's 33 cases.
+
+    Strict factor matches use relative error. Also expose a wider screening set
+    (absolute distance <=.01 on the smaller ratio) so rounded cases are reviewable.
+    The wider screen never controls monetary switching or asserts a corporate action.
+    """
+    prior = json.loads(path.read_text())
+    by_symbol = {e["symbol"]: e for e in entries}
+    factors = (1/3, 1/5, 1/8, 1/10, 10, 20, 25)
+    cases = []
+    previous_switched = [r for e in prior["files"] for r in e.get("switchedPeriods", [])]
+    for entry in prior["files"]:
+        new_entry = by_symbol.get(entry["symbol"], {})
+        for old in entry["changes"]:
+            if old["period"] != "annual" or old["field"] != "epsDiluted":
+                continue
+            new_change = next((c for c in new_entry.get("changes", []) if c["period"] == "annual"
+                               and c["end"] == old["end"] and c["field"] == "epsDiluted"), None)
+            new = new_change["new"] if new_change else old["old"]
+            ratio = old["new"] / old["old"] if old["new"] is not None and old["old"] else None
+            strict = bool(ratio and ratio > 0 and any(abs(ratio / f - 1) <= .01 for f in factors))
+            wide = bool(ratio and ratio > 0 and any(abs(min(ratio, 1/ratio)-min(f, 1/f)) <= .01 for f in factors))
+            switched = any(r["end"] == old["end"] for r in new_entry.get("switchedPeriods", []))
+            cases.append({"symbol": old["symbol"], "end": old["end"], "old": old["old"],
+                "previousCandidate": old["new"], "new": new, "ratio": ratio,
+                "strictRatioMatch": strict, "wideRatioCandidate": wide,
+                "outcome": "kept-existing-basis" if new == old["old"] else "income-restatement-on-existing-basis",
+                "annualSwitched": switched, "accn": old["accn"], "filed": old["filed"]})
+    return {"baselineSha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "baselineHead": "8f0a8b8e067d9cbd305b94dd8dcebed701130377",
+            "perShareOnlySwitchedBefore": sum(bool(r["triggerFields"]) and set(r["triggerFields"]) <= PER_SHARE for r in previous_switched),
+            "perShareOnlySwitchedAfter": summarize(entries)["perShareOnlySwitchedPeriods"],
+            "previousNonNullAnnualDilutedChanges": sum(c["old"] is not None and c["previousCandidate"] is not None for c in cases),
+            "strictRatioCases": sum(c["strictRatioMatch"] for c in cases),
+            "ratioCandidates": [c for c in cases if c["wideRatioCandidate"] or c["strictRatioMatch"]],
+            "allAnnualDilutedOutcomes": cases}
+
+
 def finish_report(args, entries, now, client, cache_hits, stopped):
     counts = summarize(entries)
     # Drift or missing-field erasures are failures, not eligible option changes.
     forbidden = {"as-reported-or-existing-builder-normalization", "existing-builder-period-alignment-or-deduplication"}
     drift = [c for entry in entries for c in entry["changes"] if c["reason"] in forbidden]
-    if args.prefer_latest_filing and (drift or counts["valuesSetToNull"]):
-        raise ValueError("restatement-only invariant violated: normalization drift or non-Q4 null")
+    if args.prefer_latest_filing and (drift or counts["totalValuesSetToNullIncludingQ4"]):
+        raise ValueError("restatement-only invariant violated: normalization drift or any null")
     report = {"generatedAt": now.isoformat(), "preferLatestFiling": args.prefer_latest_filing,
-              "selectionRule": "later-filing; income-statement difference strictly >2% against current values; retain unreported fields",
+              "selectionRule": "later-filing; non-per-share income-statement difference strictly >2%; retain unreported fields and existing share basis; keep as-reported quarters without coherent restated quarters",
               "dryRun": True, "financialFilesWritten": 0, "summary": counts, "stopped": stopped,
               "secAccess": {"requests": client.requests if client else 0, "cacheHits": cache_hits,
                             "maxRequests": 12000, "maxRequestsPerSecond": 4,
@@ -354,16 +397,19 @@ def finish_report(args, entries, now, client, cache_hits, stopped):
             examples[end] = {"before": before, "after": after, "changes": changes,
                              "q4EpsChanges": [c for c in entry["q4EpsChanges"] if c["end"] == end]}
     report["examples"] = {"AD": examples}
+    audit = comparison_audit(args.comparison_report, entries) if args.comparison_report else None
+    if audit:
+        report["shareBasisAudit"] = audit
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, ensure_ascii=False, separators=(",", ":")) + "\n")
     unsupported = [(e["symbol"], e.get("reason", e["status"])) for e in entries if e["status"] != "reviewed"]
     lines = ["# SEC 重大重編比較期試跑", "",
              "僅當較晚申報的營收、淨利或其他損益欄位，相對目前值有嚴格超過 2% 的差異時才切換。未申報欄位保留原值，記錄 basis-unrestated，並對該期間標記 mixed-basis。日期、期間、未切換列及其他 Q4 EPS 原封不動。", "",
-             "同期間須有較晚的年度申報；只有首次年報與現存值不同不視為重編。其他損益欄位含成本、毛利、營業利益、稅前利益、稅費、利息及 EPS；候選值先對齊該列既有拆股／ADR 基準。", "",
+             "同期間須有較晚的年度申報；只有首次年報與現存值不同不視為重編。其他損益欄位含成本、毛利、營業利益、稅前利益、稅費及利息。EPS／股數差異不能觸發切換；拆股／ADR 倍率疑慮的每股欄位保留該列既有基準。", "",
              f"掃描 {counts['files']:,} 份 US 財報；可評估 {counts['reviewed']:,} 份。切換 {counts['switchedPeriods']:,} 個年度期間、{counts['switchedSymbols']:,} 個股票。",
              f"其中營收／淨利觸發：{counts['revenueOrNetIncomeSwitchedPeriods']:,} 個期間、{counts['revenueOrNetIncomeSwitchedSymbols']:,} 個股票；其餘由其他損益欄位觸發。", "",
              f"變動欄位值共 {counts['fields']:,} 個；一般欄位設為 null：{counts['valuesSetToNull']:,}。",
-             f"Q4 EPS 另計：設為 null {counts['q4EpsBecomeNull']:,} 個值、改為非 null 值 {counts['q4EpsChangedNonNull']:,} 個，共影響 {counts['q4EpsAffected']:,} 個值。只有已切換年度欠缺同基準季度輸入時才能清空 Q4 EPS。", "",
+             f"Q4 EPS 另計：設為 null {counts['q4EpsBecomeNull']:,} 個值、改為非 null 值 {counts['q4EpsChangedNonNull']:,} 個，共影響 {counts['q4EpsAffected']:,} 個值。既有 Q4 EPS 一律不清空；已切換年度欠缺同基準季度時，整組季度值保持不變，標記 quarterly-as-reported，禁止跨基準推導。", "",
              "以上是試算，未寫入 docs/report/financials/，未執行合併。原 builder 正規化、日期對齊與去重差異完全排除。逐筆原值、新值、申報來源、切換觸發欄位與保留原值稽核均在同名 JSON。", "",
              "| AD 年度 | 營收原值 | 營收重編值 | 淨利原值 | 淨利重編值 |",
              "| --- | ---: | ---: | ---: | ---: |"]
@@ -372,8 +418,13 @@ def finish_report(args, entries, now, client, cache_hits, stopped):
         lines.append(f"| {end} | {a.get('revenue'):,} | {b.get('revenue'):,} | {a.get('netIncome'):,} | {b.get('netIncome'):,} |")
     lines += ["", "| 欄位 | 變動值數 |", "| --- | ---: |"]
     lines += [f"| {field} | {count:,} |" for field, count in counts["byField"].items()]
+    if audit:
+        lines += ["", f"每股欄位單獨觸發切換：修正前 {audit['perShareOnlySwitchedBefore']} 個期間，修正後 {audit['perShareOnlySwitchedAfter']}。",
+                  f"前版非空 annual epsDiluted 變動 {audit['previousNonNullAnnualDilutedChanges']} 筆。指定因子相對誤差 ≤1% 可重現 {audit['strictRatioCases']} 筆；提供全部候選逐筆結果於 JSON，另以較寬鬆的倍率距離列出 {len(audit['ratioCandidates'])} 筆供對照（不將其當成已證實拆股）。",
+                  "", "| 股票 | 期間 | 原 EPS | 前版候選 | 本版 EPS | 結果 | 嚴格 1% |", "| --- | --- | ---: | ---: | ---: | --- | --- |"]
+        lines += [f"| {c['symbol']} | {c['end']} | {c['old']} | {c['previousCandidate']} | {c['new']} | {c['outcome']} | {c['strictRatioMatch']} |" for c in audit['ratioCandidates']]
     lines += ["", "無法評估（不代表沒有差異）：" + "；".join(f"{key}: {reason}" for key, reason in unsupported) + "。",
-              "Q4 被阻擋時的 accession／filed 是觸發年度基準的申報。一般欄位 null 數排除上面單獨列出的 Q4 EPS 例外；全部 null 均屬該例外。"]
+              "所有欄位（含 Q4 EPS）設為 null 均為 0。quarterly-as-reported 的季度維持原申報序列，並保留禁止跨年度基準推導的理由。"]
     args.report.with_suffix(".md").write_text("\n".join(lines) + "\n")
     print(json.dumps({key: value for key, value in counts.items() if key != "bySymbol"}, ensure_ascii=False), flush=True)
     return 1 if stopped or any(e["status"] in {"error", "offline-cache-missing", "cik-mismatch"} for e in entries) else 0
