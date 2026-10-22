@@ -3,7 +3,7 @@
 import copy
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import sys
 import tempfile
@@ -95,14 +95,16 @@ class CandleSources(unittest.TestCase):
     def test_rerun_source_failure_preserves_candles_and_dates(self):
         class Transport:
             fail = False
+            calls = 0
 
             def json(self, url):
                 from urllib.parse import unquote
 
+                self.calls += 1
                 symbol = unquote(url.split("/chart/")[1].split("?")[0])
                 p = payload(symbol)
                 if self.fail:
-                    raise SourceError("429")
+                    raise SourceError("429", status=429)
                 if symbol.endswith("=X"):
                     p["chart"]["result"][0]["meta"].update(
                         instrumentType="CURRENCY",
@@ -144,7 +146,9 @@ class CandleSources(unittest.TestCase):
                 },
             )
             transport.fail = True
+            before_limit = transport.calls
             build_world_candles(out, data, transport)
+            self.assertEqual(transport.calls, before_limit + 1)
             self.assertEqual(
                 before,
                 {
@@ -157,7 +161,9 @@ class CandleSources(unittest.TestCase):
             overlay(root / "artifacts", root / "published", root / "retained")
             self.assertEqual(len(list((root / "retained").glob("*.csv"))), 11)
             kept = root / "retained/CMD-WTI.csv"
-            save_csv(kept, read_csv(kept) + [["2026-10-22", 1, 3, 0, 2, None]])
+            rows = read_csv(kept)
+            later = date.fromisoformat(rows[-1][0]) + timedelta(days=1)
+            save_csv(kept, rows + [[later.isoformat(), 1, 3, 0, 2, None]])
             with self.assertRaisesRegex(ValueError, "retained"):
                 overlay(root / "artifacts", root / "published", root / "retained")
 
