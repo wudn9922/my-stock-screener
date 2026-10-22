@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts"))
@@ -105,7 +106,69 @@ class FullMarketBreakoutsTest(unittest.TestCase):
         with patch.object(full.bo, "MIN_EVALUATED", 1), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(full.main(["--cache-dir", self.cache, "--out", out]), 0)
         with open(out, encoding="utf-8") as file:
-            self.assertTrue(all(market["scope"] == "full" for market in json.load(file)["markets"].values()))
+            report = json.load(file)
+            self.assertTrue(all(market["scope"] == "full" for market in report["markets"].values()))
+        self.assertEqual(report["asOf"], max(m["asOf"] for m in report["markets"].values()))
+        archive = Path(out).parent / "breakouts-archive" / f"{report['asOf']}.json"
+        self.assertEqual(archive.read_bytes(), Path(out).read_bytes())
+
+
+class BreakoutsArchiveTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.report = Path(self.tmp.name) / "breakouts.json"
+
+    def publish(self, as_of, generated_at="2030-01-01T00:00:00Z"):
+        full.write_json_atomic(str(self.report), {"asOf": as_of, "generatedAt": generated_at, "markets": {}})
+        return full.archive_snapshot(self.report, as_of)
+
+    def test_first_snapshot_is_byte_identical_in_either_mode(self):
+        for mode in ("", "1"):
+            with self.subTest(mode=mode), patch.dict(os.environ, {"GENERATED_BRANCH_MODE": mode}):
+                self.report = Path(self.tmp.name) / f"mode-{mode or 'off'}" / "breakouts.json"
+                snapshot = self.publish("2026-09-30")
+                self.assertEqual(snapshot.name, "2026-09-30.json")
+                self.assertEqual(snapshot.read_bytes(), self.report.read_bytes())
+                self.assertEqual(sorted(p.name for p in snapshot.parent.iterdir()), [snapshot.name])
+
+    def test_19_calendar_days_does_not_archive(self):
+        first = self.publish("2026-09-30")
+        self.assertIsNone(self.publish("2026-10-19"))
+        self.assertEqual(list(first.parent.glob("*.json")), [first])
+
+    def test_20_calendar_days_archives_using_asof_instead_of_generated_at(self):
+        first = self.publish("2026-09-30", "2030-01-01T00:00:00Z")
+        original = first.read_bytes()
+        snapshot = self.publish("2026-10-20", "2030-01-02T00:00:00Z")
+        self.assertEqual(snapshot.name, "2026-10-20.json")
+        self.assertEqual(snapshot.read_bytes(), self.report.read_bytes())
+        self.assertEqual(first.read_bytes(), original)
+        self.assertEqual(len(list(first.parent.glob("*.json"))), 2)
+
+    def test_same_day_rerun_is_an_archive_noop_even_when_report_changes(self):
+        first = self.publish("2026-09-30")
+        original, mtime = first.read_bytes(), first.stat().st_mtime_ns
+        self.assertIsNone(self.publish("2026-09-30", "2030-01-02T00:00:00Z"))
+        self.assertEqual(first.read_bytes(), original)
+        self.assertEqual(first.stat().st_mtime_ns, mtime)
+        self.assertNotEqual(first.read_bytes(), self.report.read_bytes())
+
+    def test_newest_snapshot_is_used_and_older_reports_do_not_backfill_archives(self):
+        self.publish("2026-09-01")
+        self.publish("2026-09-21")
+        self.assertIsNone(self.publish("2026-10-10"))  # newest is 19 days old
+        self.assertIsNone(self.publish("2026-08-01"))
+        self.assertEqual(len(list((self.report.parent / "breakouts-archive").glob("*.json"))), 2)
+
+    def test_combined_asof_is_the_newest_market_data_date(self):
+        markets = {"tw": {"asOf": "2026-10-22"}, "us": {"asOf": "2026-10-21"}}
+        inputs = {key: {"frames": [], "listed": 0, "listingAsOf": "2026-10-22", "listingSource": "fixture"}
+                  for key in markets}
+        with patch.object(full.bo, "build_breakouts_payload", return_value={"markets": markets}):
+            for market in markets.values():
+                market["windows"] = {}
+            self.assertEqual(full.build_payload(inputs, "2030-01-01T00:00:00Z")["asOf"], "2026-10-22")
 
 
 if __name__ == "__main__":

@@ -1,55 +1,76 @@
 {
-  "snapshot": "485761e717879f58dff669e40d8b05e5e5029a9e",
-  "inventory_files": 9635,
-  "regenerated_files": 2601,
-  "regenerated_bytes": 162498450,
-  "record_files": 7034,
-  "record_bytes": 173438361,
-  "pages_files": 7120,
-  "pages_bytes": 291796838,
+  "snapshot": "109d05566213cd3ba76e9d9ab78b69aae370c159",
+  "inventory_files": 9636,
+  "record_files": 9550,
+  "record_bytes": 217582375,
+  "regenerated_files": 86,
+  "regenerated_bytes": 118368959,
+  "pages_files": 7121,
+  "pages_bytes": 291811361,
   "pages_limit_bytes": 1000000000,
-  "inventory_sha256": "ad50ab2ed4ff15e46729b18b64b3478524484d1ba169fc83338d807e2e688eb5",
+  "klines_files": 2515,
+  "klines_bytes": 44139973,
+  "inventory_sha256": "242349c3d741163f5ca567e7fdaa41d8eb2c223aaca39b7616686f3a3550c038",
   "observed_growth": {
     "7d": {
       "regenerated": {
-        "blobs": 23172,
-        "raw_bytes": 852779566,
-        "local_disk_bytes": 118612678,
-        "disk_bytes_per_day": 16944668
+        "blobs": 15339,
+        "raw_bytes": 763616710,
+        "local_disk_bytes": 108281360,
+        "disk_bytes_per_day": 15468766
       },
       "record": {
-        "blobs": 10234,
-        "raw_bytes": 173222531,
-        "local_disk_bytes": 31017027,
-        "disk_bytes_per_day": 4431004
+        "blobs": 17578,
+        "raw_bytes": 298880005,
+        "local_disk_bytes": 53113826,
+        "disk_bytes_per_day": 7587689
       },
       "financials": {
-        "blobs": 10101,
-        "raw_bytes": 128648689,
-        "local_disk_bytes": 25984725,
-        "disk_bytes_per_day": 3712104
+        "blobs": 9641,
+        "raw_bytes": 122144695,
+        "local_disk_bytes": 25315662,
+        "disk_bytes_per_day": 3616523
+      },
+      "klines": {
+        "blobs": 7803,
+        "raw_bytes": 132081270,
+        "local_disk_bytes": 22947965,
+        "disk_bytes_per_day": 3278281
       }
     },
     "30d": {
       "regenerated": {
-        "blobs": 44169,
-        "raw_bytes": 1629050785,
-        "local_disk_bytes": 174270013,
-        "disk_bytes_per_day": 5809000
+        "blobs": 16452,
+        "raw_bytes": 1219719568,
+        "local_disk_bytes": 153024815,
+        "disk_bytes_per_day": 5100827
       },
       "record": {
-        "blobs": 15968,
-        "raw_bytes": 743373653,
-        "local_disk_bytes": 57353304,
-        "disk_bytes_per_day": 1911777
+        "blobs": 43715,
+        "raw_bytes": 1202264661,
+        "local_disk_bytes": 91089059,
+        "disk_bytes_per_day": 3036302
       },
       "financials": {
-        "blobs": 15795,
-        "raw_bytes": 194644848,
-        "local_disk_bytes": 45520995,
-        "disk_bytes_per_day": 1517366
+        "blobs": 15797,
+        "raw_bytes": 195899315,
+        "local_disk_bytes": 45573753,
+        "disk_bytes_per_day": 1519125
+      },
+      "klines": {
+        "blobs": 27744,
+        "raw_bytes": 457556343,
+        "local_disk_bytes": 34228197,
+        "disk_bytes_per_day": 1140940
       }
     }
   },
-  "growth_method": "Distinct new-side blob IDs in git log --raw over docs/, data/, keepalive.txt; sum git cat-file objectsize:disk. Local pack/delta layout and backfills affect estimates; these are not guaranteed GitHub storage deltas."
+  "growth_method": "Distinct new-side blob IDs in git log --raw over docs/, data/, keepalive.txt; sum git cat-file objectsize:disk. Local pack/delta layout and backfills affect estimates; these are not guaranteed GitHub storage deltas.",
+  "generated_retention": {
+    "squash_cron_utc": "11 22 * * *",
+    "breakouts_snapshot_interval_calendar_days": 20,
+    "reference_breakouts_bytes": 13406,
+    "archive_average_bytes_per_day": 670.3,
+    "estimate_note": "Post-squash: one current generated tree plus all immutable snapshots. Archive size estimate uses current breakouts.json; live output sizes vary and unreachable git objects await GitHub GC."
+  }
 }

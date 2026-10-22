@@ -10,7 +10,9 @@
 import argparse
 import os
 import sys
-from datetime import datetime, timezone
+import tempfile
+from datetime import date, datetime, timezone
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -27,6 +29,7 @@ LABELS = {
 }
 DEFAULT_CACHE = os.path.join(bo.REPO_ROOT, ".cache", "universe-full")
 ACTIVE_STRATEGIES = (bo.SWING_KEY, "box20", "ema20")
+ARCHIVE_INTERVAL_DAYS = 20
 
 
 def params_meta():
@@ -77,6 +80,9 @@ def load_inputs(cache_dir, today):
 
 def build_payload(inputs, generated_at):
     payload = bo.build_breakouts_payload(inputs, generated_at)
+    # The report covers different exchange calendars. Retain each market's asOf;
+    # name the combined snapshot after its newest data date, never generatedAt.
+    payload["asOf"] = max((market["asOf"] for market in payload["markets"].values()), default=None)
     payload["params"] = params_meta()
     for key, market in payload["markets"].items():
         spec = inputs[key]
@@ -101,6 +107,35 @@ def insufficient_markets(payload):
     return problems
 
 
+def archive_snapshot(report_path, as_of):
+    """Keep one immutable byte-for-byte report every 20 calendar days.
+
+    A temporary file + exclusive hard link publishes complete JSON without ever
+    replacing an existing archive. Only staging files are removed, never archives.
+    """
+    report_path = Path(report_path)
+    report_date = date.fromisoformat(as_of)
+    if report_date.isoformat() != as_of:
+        raise ValueError("Snapshot asOf must be YYYY-MM-DD")
+    archive_dir = report_path.parent / "breakouts-archive"
+    dates = [date.fromisoformat(p.stem) for p in archive_dir.glob("*.json")]
+    if dates and (report_date - max(dates)).days < ARCHIVE_INTERVAL_DAYS:
+        return None
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    target = archive_dir / f"{as_of}.json"
+    descriptor, staging = tempfile.mkstemp(prefix=".snapshot-", suffix=".tmp", dir=archive_dir)
+    try:
+        with os.fdopen(descriptor, "wb") as file:
+            file.write(report_path.read_bytes())
+        try:
+            os.link(staging, target)
+        except FileExistsError:
+            return None
+    finally:
+        os.unlink(staging)
+    return target
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cache-dir", default=os.environ.get("UNIVERSE_CACHE_DIR") or DEFAULT_CACHE)
@@ -113,9 +148,16 @@ def main(argv=None):
         problems = insufficient_markets(payload)
         if problems:
             raise ValueError("；".join(problems))
-        write_json_atomic(args.out, payload)
     except (OSError, ValueError, TypeError) as exc:
         print(f"❌ 全市場進場成功率未更新，保留原檔：{exc}")
+        return 1
+    try:
+        write_json_atomic(args.out, payload)
+        snapshot = archive_snapshot(args.out, payload["asOf"])
+        if snapshot:
+            print(f"✅ 已保留 20 日勝率快照：{snapshot}")
+    except (OSError, ValueError, TypeError) as exc:
+        print(f"❌ 全市場進場成功率／快照發布失敗（既有快照不變）：{exc}")
         return 1
     for key, market in payload["markets"].items():
         print(f"✅ {key.upper()} 全市場進場成功率：{market['asOf']}，有效日線 {market['evaluated']}/{market['universeCount']} 檔，"

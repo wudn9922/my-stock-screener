@@ -1,7 +1,8 @@
 name: Squash generated snapshot
 on:
   schedule:
-    - cron: '11 21 * * 0'
+    # UTC 22:11 / Taipei 06:11, after evening jobs and the 19:37 UTC fundamentals budget.
+    - cron: '11 22 * * *'
   workflow_dispatch:
 permissions:
   contents: write
