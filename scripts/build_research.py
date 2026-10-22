@@ -439,8 +439,13 @@ def alerts(args):
         market, kind = key.split(":")
         old = sources.get(key)
         try:
-            raw = http.json(url)
-            rows = parse_alerts(raw, market, kind, url, stamp())
+            latest_error = None
+            try:
+                raw = http.json(url)
+                rows = parse_alerts(raw, market, kind, url, stamp())
+            except SourceError as exc:
+                # The separate official history endpoint remains usable during OpenAPI maintenance.
+                latest_error, rows = str(exc), []
             # Placeholder/empty latest feeds cannot establish the effective report day.
             recent = max((r["date"] for r in rows), default=None)
             sources[key] = dict(
@@ -457,11 +462,21 @@ def alerts(args):
             history_rows = parse_alerts(
                 http.json(history_url), market, kind, history_url, stamp()
             )
+            latest_ids = {r["id"] for r in rows}
             for r in history_rows:
-                # Latest feed carries the newest full official disposition text.
-                events.setdefault(r["id"], r)
+                # Re-ingest official history corrections; this run's latest feed retains priority.
+                if r["id"] not in latest_ids:
+                    events[r["id"]] = r
             sources[key]["historyFrom"] = begin.isoformat()
             sources[key]["historyUrl"] = history_url
+            if latest_error:
+                sources[key].update(
+                    sourceUrl=history_url,
+                    fetchedAt=stamp(),
+                    primarySourceStatus="unavailable",
+                    fallbackReason=latest_error,
+                    missingReason="即日開放資料暫時不可用；已使用官方歷史查詢，實際資料日如上。",
+                )
             sources[key]["asOf"] = max(
                 (r["date"] for r in rows + history_rows), default=None
             )

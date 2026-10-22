@@ -73,6 +73,22 @@ def flow(day, net):
 
 
 class OfficialFormats(unittest.TestCase):
+    def test_twse_historical_disposal_period_uses_official_alternate_header(self):
+        rows = parse_alerts(
+            (FIX / "twse-disposal-history.json").read_bytes(),
+            "TW",
+            "disposal",
+            "https://www.twse.com.tw/announcement/punish",
+            "verified-fixture",
+        )
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(
+            all(r["start"] and r["end"] and r["start"] <= r["end"] for r in rows)
+        )
+        self.assertEqual(rows[0]["period"], "115/07/31～115/08/13")
+        self.assertEqual(rows[0]["start"], "2026-07-31")
+        self.assertEqual(rows[0]["end"], "2026-08-13")
+
     def test_twse_shares_negative(self):
         r = parse_flows((FIX / "twset86.json").read_bytes(), "TW", "2026-10-20")
         self.assertEqual(r["3231.TW"]["foreign"]["net"], 32813179)
@@ -635,6 +651,77 @@ class WorldBankCurrentRelease(unittest.TestCase):
             preserve_observation_date({"asOf": "2026-09-01"}, {"asOf": "2026-09-01"}),
             {"asOf": "2026-09-01"},
         )
+
+
+class AlertHistoryCorrections(unittest.TestCase):
+    def test_reingest_repairs_period_and_preserves_this_runs_latest_text(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        from build_research import alerts
+
+        history = json.loads((FIX / "twse-disposal-history.json").read_text())
+        parsed = parse_alerts(history, "TW", "disposal", "history", "fixture")
+        old = dict(
+            parsed[0],
+            start=None,
+            end=None,
+            period=None,
+            content="old stored extraction",
+        )
+        latest = []
+        fail_latest = False
+
+        class FakeHttp:
+            receipts = []
+
+            def __init__(self, **kwargs):
+                pass
+
+            def json(self, url):
+                if "openapi.twse.com.tw" in url and fail_latest:
+                    raise SourceError("HTML maintenance")
+                return latest if "openapi.twse.com.tw" in url else history
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            write(root / "alerts.json", {"events": [old], "sources": {}})
+            args = SimpleNamespace(out=root, as_of=date(2026, 10, 22), days=95)
+            with patch("build_research.Http", FakeHttp), patch(
+                "build_research.ALERT_URLS",
+                {"TW:disposal": "https://openapi.twse.com.tw/v1/announcement/punish"},
+            ):
+                alerts(args)
+                recovered = next(
+                    r
+                    for r in read(root / "alerts.json")["events"]
+                    if r["id"] == old["id"]
+                )
+                self.assertEqual(recovered["period"], parsed[0]["period"])
+                self.assertEqual(recovered["start"], parsed[0]["start"])
+                self.assertNotEqual(recovered["content"], "old stored extraction")
+                latest.append(
+                    {
+                        "Date": old["date"],
+                        "Code": old["symbol"].split(".")[0],
+                        "Name": old["name"],
+                        "DispositionPeriod": parsed[0]["period"],
+                        "Detail": "latest official corrected text",
+                    }
+                )
+                alerts(args)
+                current = next(
+                    r
+                    for r in read(root / "alerts.json")["events"]
+                    if r["id"] == old["id"]
+                )
+                self.assertEqual(current["content"], "latest official corrected text")
+                fail_latest = True
+                alerts(args)
+                source = read(root / "alerts.json")["sources"]["TW:disposal"]
+                self.assertEqual(source["status"], "ok")
+                self.assertEqual(source["primarySourceStatus"], "unavailable")
+                self.assertIn("/announcement/punish?", source["sourceUrl"])
+                self.assertTrue(source["asOf"])
 
 
 if __name__ == "__main__":

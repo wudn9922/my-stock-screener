@@ -196,7 +196,7 @@ def parse_alerts(body, market, kind, url, fetched):
             day = parse_date(get("Date", "公告日期", "公布日期", "日期"))
             if not day:
                 raise SourceError("announcement date missing")
-            period = get("DispositionPeriod", "處置起訖時間")
+            period = get("DispositionPeriod", "處置起訖時間", "處置起迄時間")
             dates = re.findall(r"\d{3,4}[/.-]\d{1,2}[/.-]\d{1,2}|\d{7,8}", period)
             start, end = (list(map(parse_date, dates)) + [None, None])[:2]
             reason = get(
