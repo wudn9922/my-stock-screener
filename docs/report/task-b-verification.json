@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-23T04:00:31.590066+00:00",
+  "generatedAt": "2026-10-23T04:47:07.069908+00:00",
   "branchBase": "2a817c94b39189bf6bbe0f924d88f35cd5cf32de",
   "reviewedReportSha256": "13471c443f0b1d64431c065c5289412893c30b74206f562775f6b829f2a99997",
   "financials": {
@@ -44,10 +44,10 @@
   },
   "tests": {
     "python": {
-      "tests": 1582,
-      "passed": 1581,
+      "tests": 1584,
+      "passed": 1583,
       "failures": 1,
-      "durationSeconds": 124.217,
+      "durationSeconds": 121.866,
       "result": "FAILED",
       "exitCode": 1,
       "failedTest": "test_research_candles.CandleSources.test_all_committed_candles_have_real_bounds_and_matching_records",
@@ -78,7 +78,7 @@
       "exitCode": 0
     },
     "secFocused": {
-      "tests": 37,
+      "tests": 39,
       "result": "OK",
       "exitCode": 0
     },
@@ -94,5 +94,15 @@
   },
   "review": "Primary implementer self-review; no independent human sign-off.",
   "merged": false,
-  "deployed": false
+  "deployed": false,
+  "ordinaryRefreshProtection": {
+    "persistentFlags": [
+      "restated",
+      "mixed-basis",
+      "quarterly-as-reported"
+    ],
+    "originalRevisionsRetained": true,
+    "secEndRetained": true,
+    "reviewedLegacyYahooRowsProtected": 5
+  }
 }

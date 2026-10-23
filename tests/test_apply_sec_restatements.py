@@ -12,6 +12,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "atlas/scripts"))
 import apply_sec_restatements as apply
 import build_growth as growth
+import build_financials as fin
 import report_sec_restatements as preview
 import seed_financials_sec as sec
 from sec_restatements import _merge_filed_row
@@ -186,6 +187,41 @@ class ReviewedApplyTests(unittest.TestCase):
         self.assertEqual(result["end"], "2023-03-31")
         self.assertEqual(result["extra"]["secEnd"], "2023-04-01")
         self.assertEqual(revisions[0]["secEnd"], "2023-04-01")
+
+    def test_ordinary_refresh_retains_restated_history_and_persistent_quality_flags(self):
+        payload = apply.read(self.cache / f"{self.entry['cik']}.json")
+        for concept in payload["facts"]["us-gaap"].values():
+            for unit, rows in concept["units"].items():
+                concept["units"][unit] = [r for r in rows if not (
+                    r["accn"] == "restated-2024" and r.get("start") and
+                    80 <= abs(sec.days_between(r["end"], r["start"])) <= 120)]
+        restated, _ = preview.preview_document(self.old, payload, NOW, True)
+        restated["quarterly"]["secRestatementIssues"][0] = None  # Unaffected rows have null metadata slots.
+        unchanged_quote = {"timeseries": {"result": [{"meta": {"type": ["annualTotalRevenue"]},
+            "annualTotalRevenue": [{"asOfDate": "2023-12-31", "periodType": "12M", "currencyCode": "USD",
+                                    "reportedValue": {"raw": restated["annual"]["values"]["revenue"][-1]}}]}]}}
+        refreshed, _ = fin.update_document(restated, unchanged_quote, "TEST", NOW,
+                                           fetch_splits=lambda: {"chart": {"result": [{"events": {}}]}})
+        self.assertIsNotNone(refreshed)
+        for flag in ("restated", "mixed-basis", "quarterly-as-reported"):
+            self.assertIn(flag, restated["quality"]["issues"])
+            self.assertIn(flag, refreshed["quality"]["issues"])
+        for revision in restated["quality"]["revisions"]:
+            self.assertIn(revision, refreshed["quality"]["revisions"])
+        for frequency in apply.FREQUENCIES:
+            self.assertEqual(restated[frequency].get("secEnd"), refreshed[frequency].get("secEnd"))
+
+    def test_reviewed_sec_values_with_legacy_yahoo_label_cannot_be_reverted_by_yahoo(self):
+        # Five reviewed annual rows still carry their historical Yahoo source label.
+        for reviewed in (True, False):
+            with self.subTest(reviewed=reviewed):
+                old = fin.period("2024-12-31", {"revenue": 100, "netIncome": 10, "epsBasic": 1}, "yahoo",
+                                 {"secFilingBasis": {"restated": reviewed}, "secEnd": "2024-12-29"})
+                incoming = fin.period("2024-12-31", {"revenue": 3906, "netIncome": 54, "epsBasic": 5})
+                result, _ = fin.merge_section([old], [incoming], "annual", "2026-10-23")
+                self.assertEqual(result[0]["values"]["revenue"], 100 if reviewed else 3906)
+                self.assertEqual(result[0]["values"]["epsBasic"], 1 if reviewed else 5)
+                self.assertEqual(result[0]["extra"]["secEnd"], "2024-12-29")
 
     def test_metadata_only_annotation_does_not_change_values_or_labels(self):
         before = copy.deepcopy(self.old)
