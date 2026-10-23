@@ -176,6 +176,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
+      # research_publish imports kline_integrity, which needs pandas.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pandas
       - name: Restore generated inputs
         id: generated_restore
         if: vars.GENERATED_BRANCH_MODE == '1'
