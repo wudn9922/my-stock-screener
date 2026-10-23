@@ -189,6 +189,40 @@ class CandleSources(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "retained"):
                 overlay(root / "artifacts", root / "published", root / "retained")
 
+    def test_snapshot_never_contains_a_bar_the_record_deferred(self):
+        """FX sessions are judged in New York time for the record but in the
+        exchange zone for the snapshot; the snapshot must follow the record."""
+        import research_candles
+
+        class Transport:
+            def json(self, url):
+                from urllib.parse import unquote
+
+                symbol = unquote(url.split("/chart/")[1].split("?")[0])
+                p = payload(symbol)
+                meta = p["chart"]["result"][0]["meta"]
+                if symbol.endswith("=X"):
+                    meta.update(instrumentType="CURRENCY", exchangeTimezoneName="Europe/London",
+                                currency=next(v[3].split("/")[0] for v in ASSETS.values() if v[1] == symbol))
+                return p
+
+        stamps = payload()["chart"]["result"][0]["timestamp"]
+        latest = datetime.fromtimestamp(max(stamps), timezone.utc).date().isoformat()
+        def session_complete(day, symbol, now=None, zone=None):
+            return not (str(day)[:10] == latest and zone == "America/New_York")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            out, data = root / "research/world-assets.json", root / "data"
+            with patch.object(research_candles.kline, "session_complete", session_complete), \
+                 patch.object(research_candles.kline, "LOG_PATH", root / "log.json"):
+                build_world_candles(out, data, Transport())
+            for key, asset in ASSETS.items():
+                record = read_csv(data / (asset[2] + ".csv"))
+                bars = json.loads((out.parent / f"candles/{key}.json").read_text())["bars"]
+                self.assertNotIn(latest, [r[0] for r in record])
+                self.assertEqual(bars, record, key)
+
     def test_all_committed_candles_have_real_bounds_and_matching_records(self):
         root = Path(__file__).resolve().parents[1]
         index = read(root / "docs/report/research/world-assets.json")
