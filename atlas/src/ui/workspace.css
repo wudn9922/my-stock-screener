@@ -1915,3 +1915,76 @@
     top: 80px;
   }
 }
+/* Recommended moving averages (ui/MaRecommendation.tsx): one header row, details panel like the volatility info. */
+.ws-ma-reco {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+.ws-ma-reco-info {
+  position: relative;
+  margin: 2px 0 0 10px;
+  color: var(--text-3);
+  font-size: 10px;
+}
+.ws-ma-reco-info summary {
+  cursor: pointer;
+  min-height: 22px;
+  line-height: 22px;
+}
+.ws-ma-reco-panel {
+  position: absolute;
+  z-index: 40;
+  width: min(360px, 86vw);
+  padding: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.6;
+  box-shadow: 0 4px 18px #0003;
+}
+.ws-ma-reco-panel p {
+  margin: 8px 0;
+  color: var(--text-2);
+}
+.ws-ma-reco-panel a {
+  color: var(--accent-text);
+}
+.ws-ma-reco-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ws-ma-reco-actions button {
+  min-height: 36px;
+}
+.ws-ma-reco-table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.ws-ma-reco-table th,
+.ws-ma-reco-table td {
+  padding: 4px 6px 4px 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-weight: 500;
+  vertical-align: top;
+}
+.ws-ma-reco-table thead th {
+  color: var(--text-3);
+  font-size: 11px;
+}
+.ws-ma-reco-table small {
+  display: block;
+  color: var(--text-3);
+  font-size: 10px;
+}
+@media (max-width: 1099px) {
+  .ws-ma-reco-info {
+    margin-left: 8px;
+  }
+}
