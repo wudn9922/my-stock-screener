@@ -483,7 +483,7 @@ export function provenanceText(history: FinancialHistory, kind: PeriodKind): str
     ).map(([field]) => FIELD_LABELS[field as keyof typeof FIELD_LABELS] ?? field);
     return fields.length ? [`${labelOf.get(series.end[index]!) ?? series.end[index]}：${fields.join('、')}`] : [];
   }) ?? [];
-  const detail = overrides.length ? `；Yahoo Finance 年度欄位回補（${overrides.join('；')}），其餘欄位依原列來源` : '';
+  const detail = overrides.length ? `；Yahoo Finance ${kind === 'annual' ? '年度' : '季度'}欄位回補（${overrides.join('；')}），其餘欄位依原列來源` : '';
   return `資料來源：${parts.join(' ＋ ')}${detail}`;
 }
 

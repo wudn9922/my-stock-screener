@@ -360,3 +360,8 @@ new branch from main containing #164; do not merge. See [policy and replay](../d
 Reviewed whole-period 2% veto across every overlapping field, zero/negative/unit handling, no EPS/shares,
 null-only existing annual rows, preserved unknown flags/revisions, field provenance in notes/table/chart detail,
 Yahoo/SEC/FinMind refresh retention, atomic batch rollback, and independent Git-tree + protected Q4 proof.
+
+Shared provenance notes distinguish annual and quarterly field fills. The existing WebKit MA layout
+regression assumed both desktop valuation and mobile tab elements existed while accepting either as
+the shared row; it now waits for the toggle and measures each available sibling. The same-row and
+zero-overflow assertions remain mandatory; no MA product behavior changed.
