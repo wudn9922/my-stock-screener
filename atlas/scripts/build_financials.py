@@ -165,7 +165,7 @@ ISSUES = (
     "short-history", "financial-sector-format", "missing-cashflow", "missing-balance",
     "split-adjusted", "foreign-currency", "restated", "yahoo-differs", "quarter-annual-mismatch",
     "quarterly-ytd-suspected", "negative-equity", "capex-sign", "currency-changed", "adr-eps-rescaled",
-    "eps-yahoo-only", "q4-eps-from-shares",
+    "eps-yahoo-only", "q4-eps-from-shares", "mixed-basis", "quarterly-as-reported",
 )
 # Quality codes that only sec_ifrs.py writes (its IFRS and US GAAP foreign-filer periods); update_document keeps them
 SEC_FOREIGN_ISSUES = ("ifrs", "ifrs-fallback", "foreign-gaap", "foreign-gaap-fallback")
@@ -464,13 +464,19 @@ def has_sec(document):
     return any(p["src"] == "sec" for p in sections["annual"] + sections["quarterly"])
 
 
+def official_period(item):
+    """An explicitly reviewed SEC basis outranks a legacy Yahoo row label."""
+    basis = item.get("extra", {}).get("secFilingBasis") or {}
+    return item["src"] in OFFICIAL_SOURCES or basis.get("restated") is True
+
+
 def has_official(document):
     """A stored file that holds any official period (SEC or FinMind): never deleted as unlisted."""
     try:
         sections = read_sections(document)
     except ValueError:
         return True     # cannot tell: treat as precious
-    return any(p["src"] in OFFICIAL_SOURCES for p in sections["annual"] + sections["quarterly"])
+    return any(official_period(p) for p in sections["annual"] + sections["quarterly"])
 
 
 def source_label(periods, filled=()):
@@ -531,7 +537,7 @@ def merge_section(old, new, frequency, today_iso, renamed=None, filled=None):
     """
     periods = [period(p["end"], p["values"], p["src"], p["extra"]) for p in old]
     new = dedupe(new)
-    official_ends = [p["end"] for p in periods if p["src"] in OFFICIAL_SOURCES]
+    official_ends = [p["end"] for p in periods if official_period(p)]
     latest_official = max(official_ends) if official_ends else None
     match = same_period_matches(periods, new)
     revisions = []
@@ -547,7 +553,7 @@ def merge_section(old, new, frequency, today_iso, renamed=None, filled=None):
                 periods.append(period(item["end"], item["values"]))
             continue
         target = periods[i]
-        if target["src"] in OFFICIAL_SOURCES:
+        if official_period(target):
             for field in ("revenue", "netIncome"):
                 old_value, new_value = target["values"].get(field), item["values"].get(field)
                 if old_value is not None and new_value is not None:
@@ -1264,6 +1270,11 @@ def reconcile(annual, quarterly):
 
 def quality(annual, quarterly, flags, foreign):
     issues = set(flags) | reconcile(annual, quarterly)
+    # Reviewed restatement metadata survives ordinary Yahoo/SEC refreshes. These
+    # describe retained historical periods, not a transient fetch verdict.
+    for item in annual + quarterly:
+        issues.update(code for code in (item.get("extra", {}).get("secRestatementIssues") or [])
+                      if code in {"restated", "mixed-basis", "quarterly-as-reported"})
     recent = annual[-4:] or quarterly[-4:]
     latest = annual[-1] if annual else (quarterly[-1] if quarterly else None)
 

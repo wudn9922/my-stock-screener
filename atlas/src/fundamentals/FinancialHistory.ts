@@ -57,6 +57,8 @@ export interface EpsQuality {
 export interface FinancialSeries {
   /** Period end dates, ascending (YYYY-MM-DD). */
   end: string[];
+  /** Actual SEC period end; `end` keeps the existing alignment and fiscal labels. */
+  secEnd?: (string | null)[];
   /** Fiscal year as written by the builder (labels are recomputed by financialMetrics.ts). */
   fy: (number | null)[];
   /** Fiscal quarter as written by the builder; all null for annual periods. */
@@ -197,6 +199,7 @@ export function parseSeries(raw: unknown, kind: PeriodKind): FinancialSeries {
   const fq = arrayOf(block.fq);
   const src = arrayOf(block.src);
   const qualities = arrayOf(block.epsQuality);
+  const secEnds = Array.isArray(block.secEnd) ? block.secEnd : null;
   const rawValues = recordOf(block.values);
   const columns = RAW_FIELDS.map((field) => arrayOf(rawValues[field]));
   const byEnd = new Map<string, number>();
@@ -209,6 +212,7 @@ export function parseSeries(raw: unknown, kind: PeriodKind): FinancialSeries {
   const out = emptySeries();
   for (const [end, index] of order) {
     out.end.push(end);
+    if (secEnds) (out.secEnd ??= []).push(validDate(secEnds[index]));
     const year = finiteOrNull(fy[index]);
     out.fy.push(year !== null && Number.isInteger(year) ? year : null);
     const quarter = finiteOrNull(fq[index]);

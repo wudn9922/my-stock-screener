@@ -82,6 +82,9 @@ export function StatementTable({ history, view }: { history: FinancialHistory; v
                 <th key={series.end[index]} scope="col">
                   <b>{periodTitle(index)}</b>
                   <small>{formatDateTime(series.end[index]!, false)}</small>
+                  {series.secEnd?.[index] && series.secEnd[index] !== series.end[index] && (
+                    <small title="SEC 申報的實際期末日；期別對齊維持原日期">SEC {series.secEnd[index]}</small>
+                  )}
                 </th>
               ))}
             </tr>

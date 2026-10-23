@@ -17,6 +17,8 @@ const fixtures: Record<string, string> = Object.fromEntries(
   ].map(([key, file]) => [key, readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials', file!), 'utf8')]),
 );
 const trackedAAPL = readFileSync(resolve(import.meta.dirname, '../../docs/report/financials/AAPL.json'), 'utf8');
+const trackedNVDA = readFileSync(resolve(import.meta.dirname, '../../docs/report/financials/NVDA.json'), 'utf8');
+const trackedAD = readFileSync(resolve(import.meta.dirname, '../../docs/report/financials/AD.json'), 'utf8');
 const syntheticTaiwan60 = (() => {
   const fixture = JSON.parse(fixtures['2330.TW']!) as {
     quarterly: { end: string[]; fy: number[]; fq: number[]; values: Record<string, (number | null)[]> };
@@ -241,6 +243,27 @@ test('tracked US file exposes all annual periods and retains the quarterly optio
   await annualHeaders.nth(15).scrollIntoViewIfNeeded();
   await expect(annualHeaders.nth(15)).toContainText(/^FY\d{4}/);
   await expect(page.locator('.fin-table-note')).toContainText('所有已取得期別');
+});
+
+test('SEC actual period end is visible beside the aligned NVDA FY2026 date', async ({ page }) => {
+  await mockFinancials(page, {}, { NVDA: trackedNVDA });
+  await page.goto('./?page=financials&symbol=NVDA&p=a');
+  await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();
+  const header = page.locator('.fin-table thead th').filter({ hasText: 'FY2026' });
+  await header.scrollIntoViewIfNeeded();
+  await expect(header).toContainText('2026/01/31');
+  await expect(header).toContainText('SEC 2026-01-25');
+});
+
+test('restated AD keeps its quarterly basis warning and original-value audit visible', async ({ page }) => {
+  await mockFinancials(page, {}, { AD: trackedAD });
+  await page.goto('./?page=financials&symbol=AD&p=a');
+  await expect(page.locator('.fin-title')).toContainText('AD');
+  await page.locator('.fin-quality').click();
+  const quality = page.locator('.fin-quality-panel');
+  await expect(quality).toContainText('季度與 Q4 EPS 保留原申報值');
+  await expect(quality).toContainText('重編');
+  await expect(quality).toContainText('修訂紀錄');
 });
 
 test('Taiwan synthetic file exposes the oldest of 60 quarters inside the scrollable table', async ({ page }) => {

@@ -130,6 +130,10 @@ def complete_quarters(basis, rows, references):
 def _merge_filed_row(old, filed, basis, revisions, frequency, original=None):
     audit_start = len(revisions)
     new = copy.deepcopy(old)
+    sec_end = (filed.get("extra", {}).get("secEnd") or filed.get("end")
+               or (basis.get("end") if frequency == "annual" else None))
+    if sec_end:
+        new.setdefault("extra", {})["secEnd"] = sec_end
     provided = {field: value for field, value in filed["values"].items() if value is not None}
     share_guard = share_basis_ratio(old["values"], provided)
     if share_guard:
@@ -161,9 +165,9 @@ def _merge_filed_row(old, filed, basis, revisions, frequency, original=None):
                               "accn": basis["accn"], "filed": basis["filed"],
                               "originalAccn": basis.get("originalAccn"),
                               "originalFiled": basis.get("originalFiled")})
-    if frequency == "annual" and basis.get("end") and basis["end"] != old["end"]:
+    if sec_end and sec_end != old["end"]:
         for entry in revisions[audit_start:]:
-            entry["secEnd"] = basis["end"]
+            entry["secEnd"] = sec_end
     return new
 
 
@@ -394,7 +398,7 @@ def overlay_document(previous, annual, quarterly, revisions, now, factor=None):
         if not trigger:
             continue
         basis = {**basis, "switched": True, "triggerFields": trigger}
-        changed = _merge_filed_row(old, {"values": provided}, basis, audit, "annual")
+        changed = _merge_filed_row(old, {"values": provided, "extra": item.get("extra", {})}, basis, audit, "annual")
         switched[old["end"]] = changed
     if not switched:
         return document
@@ -487,7 +491,7 @@ def overlay_document(previous, annual, quarterly, revisions, now, factor=None):
                     if value is not None:
                         column[index] = value
             for name, value in item["extra"].items():
-                if name not in {BASIS, BLOCKED, "secRestatementIssues", "derived"}:
+                if name not in {BASIS, BLOCKED, "secRestatementIssues", "derived", "secEnd"}:
                     continue
                 column = block.setdefault(name, [None] * len(block["end"]))
                 column[index] = copy.deepcopy(value)
