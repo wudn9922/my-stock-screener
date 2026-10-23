@@ -1,4 +1,13 @@
-## Current review: compact chart header (2026-10-23)
+## Current review: generated-branch PR 2 (2026-10-23)
+
+Generated report copies leave main while source, retained records, old LINE PNGs
+and history remain. Unit and browser research consumers now use frozen source
+excerpts and retained world CSVs; CI additionally validates restored live inputs.
+See [scope, provenance and Pages byte proof](../operations/generated-branch-pr2.md).
+No UI, chart engine or generator behavior changes. Local/CI results are recorded
+in the PR; no independent review or physical-device Safari sign-off is claimed.
+
+## Previous review: compact chart header (2026-10-23)
 
 The volatility row, its explanation, and the recommended-MA row and summary added five rows under the P/E and shrank the phone chart to about 260 px. `ui/StockStatsMenu.tsx` replaces them with one "波動・均線" button (beside the P/E on desktop; on the existing K線／財務 row on phones via a new `stats` grid area) whose panel floats over the chart and closes on Escape or an outside tap (dialogs opened from it do not close it). Both components stay mounted while closed, so data loads as before. Measured with the site e2e mocks: phone chart 260 → 353 px, desktop 553 → 616 px. `MaRecommendation` no longer has its own disclosure and now shows each pick's structural score and every candidate's score, with a note that the starred pick is chosen by the reversal-return gate and is not always the highest score.
 

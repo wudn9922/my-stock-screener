@@ -12,7 +12,8 @@ import build_themes  # noqa: E402
 import themes_synth  # noqa: E402
 import themes_tw  # noqa: E402
 
-UNIVERSE_PATH = os.path.join(ROOT, "docs", "report", "universe.json")
+# A frozen liquidity-list excerpt keeps all registry checks active without caches.
+UNIVERSE_PATH = os.path.join(ROOT, "tests", "fixtures", "generated-inputs", "universe.json")
 REGISTRY_PATH = os.path.join(ROOT, "atlas", "public", "symbols", "taiwan.json")
 TODAY = datetime(2026, 10, 9, 22, 30, tzinfo=timezone.utc)
 SYMBOL_RE = r"^\d{4}\.TWO?$"
@@ -111,7 +112,6 @@ class RegistryTest(unittest.TestCase):
         self.assertEqual(problems, [])
 
 
-@unittest.skipUnless(os.path.exists(UNIVERSE_PATH), "docs/report/universe.json not present")
 class UniverseTest(unittest.TestCase):
     """Constituents must be real listed stocks, and the names must agree with the liquidity list.
 

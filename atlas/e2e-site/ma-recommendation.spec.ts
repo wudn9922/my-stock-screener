@@ -57,6 +57,7 @@ test('chart shows the weekly recommendation, applies it on the daily chart and s
   const card = page.getByTestId('ma-recommendation');
   const toggle = page.getByTestId('stock-stats-toggle');
   // Closed: one button sharing an existing header row (P/E on desktop, K線／財務 on phones); no extra row above the chart.
+  await expect(toggle).toBeVisible();
   await expect(card).toBeHidden();
   await expect(toggle).toBeVisible();
   const row = await page.evaluate(() => {

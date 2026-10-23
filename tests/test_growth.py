@@ -470,7 +470,7 @@ class RepoDataTest(unittest.TestCase):
         import build_fundamentals_tw as tw
 
         directory = os.path.join(ROOT, "docs", "report", "financials")
-        universe_path = os.path.join(ROOT, "docs", "report", "universe.json")
+        universe_path = os.path.join(ROOT, "tests", "fixtures", "generated-inputs", "universe.json")
         if not os.path.isdir(directory) or not os.path.exists(universe_path):
             self.skipTest("no financials / universe")
         with open(universe_path, encoding="utf-8") as file:

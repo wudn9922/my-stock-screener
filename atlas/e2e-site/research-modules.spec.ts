@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { mockSite } from "./mocks";
+import { researchFixtureBody, researchFixtureRoot } from "./research-fixtures";
 const report = resolve(import.meta.dirname, "../../docs/report");
 async function setup(page: Page) {
   await mockSite(page);
@@ -13,7 +14,7 @@ async function setup(page: Page) {
     if (!/^[A-Za-z0-9_./-]+\.json$/.test(relative))
       return route.fulfill({ status: 400 });
     try {
-      const body = readFileSync(resolve(report, "research", relative));
+      const body = researchFixtureBody(relative);
       const range = /^bytes=(\d+)-(\d+)$/.exec(
         route.request().headers()["range"] ?? "",
       );
@@ -31,7 +32,7 @@ async function setup(page: Page) {
   await page.route("**/my-stock-screener/report/tw-chips.json", (route) =>
     route.fulfill({
       contentType: "application/json",
-      body: readFileSync(resolve(report, "tw-chips.json"), "utf8"),
+      body: readFileSync(resolve(researchFixtureRoot, "tw-chips.json"), "utf8"),
     }),
   );
   await page.route("**/my-stock-screener/report/financials/*.json", (route) => {

@@ -1,0 +1,756 @@
+{
+  "main": "b634d0619b73f8ba0ac15b58c87b9cae17ad26fd",
+  "generated": "c4fd63c39e542149607eac7cea4a47f74840be99",
+  "snapshot_root": "a7866b5d18fb066796eeddd6f223c491e223e4b1",
+  "deployed_run": 39927582637,
+  "deployed_artifact_id": 12489284978,
+  "artifact_zip_sha256": "8cc709dfa7ef5977612e650bdf57a323d83f1dbf66c90c9f510aa30c5ff02ff1",
+  "assembled_files": 9632,
+  "assembled_bytes": 307467035,
+  "artifact_differences": 0,
+  "before_main_tree_bytes": 360460386,
+  "removed_bytes": 118440528,
+  "after_main_tree_bytes_before_code_changes": 242019858,
+  "removals": [
+    {
+      "path": "docs/atlas/assets/ChartPage-Db3i1CSy.js",
+      "bytes": 168229,
+      "main_blob": "d2a64475ecde7ea8f9f5cc06a00332279bd5d9b9",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "d2a64475ecde7ea8f9f5cc06a00332279bd5d9b9",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/ChartPage-uhx58cZz.css",
+      "bytes": 28800,
+      "main_blob": "30706627c0707fb7e15cb3a6331cd114318685bb",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "30706627c0707fb7e15cb3a6331cd114318685bb",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/Common-C68rbMGp.js",
+      "bytes": 9676,
+      "main_blob": "37386892b5db6b52c66367fd1ddc08e36cb1dcde",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "37386892b5db6b52c66367fd1ddc08e36cb1dcde",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/Common-CjQH6pkp.css",
+      "bytes": 2561,
+      "main_blob": "85804c9070782547d2efde5daee616e3f2ad5a21",
+      "generated_blob": "85804c9070782547d2efde5daee616e3f2ad5a21",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/assets/ConsolePage-41nugRGk.js",
+      "bytes": 30066,
+      "main_blob": "8f44940949ecdeb16332fd75f4dba18172165b3f",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "8f44940949ecdeb16332fd75f4dba18172165b3f",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/FinancialsPage-C9_XfqYY.css",
+      "bytes": 20046,
+      "main_blob": "bc94fb180bc39acd75c874348b46277f4d501832",
+      "generated_blob": "bc94fb180bc39acd75c874348b46277f4d501832",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/assets/FinancialsPage-MFYMvBFd.js",
+      "bytes": 106615,
+      "main_blob": "f7322489285deb1c9069b2cbe5228f23cb49a6dc",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "f7322489285deb1c9069b2cbe5228f23cb49a6dc",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/IndicatorRegistry-5XHc0IZp.js",
+      "bytes": 442,
+      "main_blob": "dbaabaec836a72979295e26683bf492bfbece605",
+      "generated_blob": "dbaabaec836a72979295e26683bf492bfbece605",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/assets/MarketsPage-COK6gmxB.js",
+      "bytes": 34933,
+      "main_blob": "e83d72f193f6121afb50924208c5e56c3a2d17ed",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "e83d72f193f6121afb50924208c5e56c3a2d17ed",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/MarketsPage-DySQpXND.css",
+      "bytes": 9151,
+      "main_blob": "56f48c8a6d05a1c33f7fd049fd21b277d4dec38c",
+      "generated_blob": "56f48c8a6d05a1c33f7fd049fd21b277d4dec38c",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/assets/MiniChart-BDTJeYVW.js",
+      "bytes": 2518,
+      "main_blob": "b3fc43ab957bb141cad39d425c621603c24103ed",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "b3fc43ab957bb141cad39d425c621603c24103ed",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/OfficialAlerts-XN6Ybp50.js",
+      "bytes": 3989,
+      "main_blob": "9cc0983f5e029ee73ce79666b4181c0eeb795cb2",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "9cc0983f5e029ee73ce79666b4181c0eeb795cb2",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/PanelBoundary-C4A4obPO.js",
+      "bytes": 1290,
+      "main_blob": "b5867a087f2aaec7475832f4a31143d209b2bd10",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "b5867a087f2aaec7475832f4a31143d209b2bd10",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/PanelBoundary-FQPKfJKR.css",
+      "bytes": 704,
+      "main_blob": "57b874ccf3e736d9dd570294c4eda9947cbe8efb",
+      "generated_blob": "57b874ccf3e736d9dd570294c4eda9947cbe8efb",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/assets/PeRiverChart-BRlp7kNP.js",
+      "bytes": 2749,
+      "main_blob": "e79680ce3524a60fc06333990246cd6170269e5a",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "e79680ce3524a60fc06333990246cd6170269e5a",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/RatesView-C14JwVg9.css",
+      "bytes": 10863,
+      "main_blob": "6077505f3f0951547e7e329bff1c8051acaa27e7",
+      "generated_blob": "6077505f3f0951547e7e329bff1c8051acaa27e7",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/assets/RatesView-DGl9dgsC.js",
+      "bytes": 27345,
+      "main_blob": "2602409a3922dba1656ca2bfd993784b38244743",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "2602409a3922dba1656ca2bfd993784b38244743",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/ReportGate-D2iNkZKJ.js",
+      "bytes": 946,
+      "main_blob": "f0c79356f6302867095b0b8f57b3ca701f7f5a65",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "f0c79356f6302867095b0b8f57b3ca701f7f5a65",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/ScreenerPage-BmLGDYB_.js",
+      "bytes": 49842,
+      "main_blob": "3d49f173ddc4922607d5cf987d2f34b2a679638e",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "3d49f173ddc4922607d5cf987d2f34b2a679638e",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/ScreenerPage-BoekOB2m.css",
+      "bytes": 17550,
+      "main_blob": "a8a68fa883a4a1501ad2a395d38384ecf6c7b5dd",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "a8a68fa883a4a1501ad2a395d38384ecf6c7b5dd",
+      "deleted_by_atlas_commit": "6c38516d347554ac0e5f26826366e491ee419db1"
+    },
+    {
+      "path": "docs/atlas/assets/SecRadar-rkqK428n.js",
+      "bytes": 3916,
+      "main_blob": "02cce36003d90a75bf33540d3d2abf7231054f64",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "02cce36003d90a75bf33540d3d2abf7231054f64",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/StockResearch-pRYpEIbs.js",
+      "bytes": 623,
+      "main_blob": "6ceda120a916668481ee172fe6b96e52d79d163b",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "6ceda120a916668481ee172fe6b96e52d79d163b",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/ThemesPage-DJtOMRij.js",
+      "bytes": 56582,
+      "main_blob": "c5492d5a00e0c10081d46fd435ba6928a338706d",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "c5492d5a00e0c10081d46fd435ba6928a338706d",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/ThemesPage-QX4ib2ND.css",
+      "bytes": 17023,
+      "main_blob": "f2ceb0f698787f23671d3ac9b89e0b2e2e8de505",
+      "generated_blob": "f2ceb0f698787f23671d3ac9b89e0b2e2e8de505",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/assets/VolumePanel-BNfJNLAD.js",
+      "bytes": 6920,
+      "main_blob": "6bcac47347391a05c3799139fd5d90c3664f46db",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "6bcac47347391a05c3799139fd5d90c3664f46db",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/WorldAssetsView-BFECOUAT.js",
+      "bytes": 2904,
+      "main_blob": "8897a0e5fc052cf4f8a4923fd8c8311d4ef5c170",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "8897a0e5fc052cf4f8a4923fd8c8311d4ef5c170",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/WorldPage-KiGRfSGF.js",
+      "bytes": 10801,
+      "main_blob": "9c969b985d4f6949a010b6e23ab10a32ae9be1e9",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "9c969b985d4f6949a010b6e23ab10a32ae9be1e9",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/arrow-up-BxowmSjb.js",
+      "bytes": 265,
+      "main_blob": "d4aadb2148058ae8b920a106b4e64ff450feaa75",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "d4aadb2148058ae8b920a106b4e64ff450feaa75",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/chart-h2tyZhBG.js",
+      "bytes": 184760,
+      "main_blob": "cd48a81061ec2a3d781e11ccfcfbb021cdba40fc",
+      "generated_blob": "cd48a81061ec2a3d781e11ccfcfbb021cdba40fc",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/assets/check-DrhPc71Y.js",
+      "bytes": 116,
+      "main_blob": "98f366614c179036c4dcb4e610ef874f583c2e3c",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "98f366614c179036c4dcb4e610ef874f583c2e3c",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/chevron-down-C24WiP8H.js",
+      "bytes": 124,
+      "main_blob": "2267376fc46fea9ad434d3fd8a9b0843f9f108e2",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "2267376fc46fea9ad434d3fd8a9b0843f9f108e2",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/chevron-right-ql12sE3Q.js",
+      "bytes": 126,
+      "main_blob": "4fba85d6b3bfcdcdeb4c1599e82e5927aa7be55a",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "4fba85d6b3bfcdcdeb4c1599e82e5927aa7be55a",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/dataSources-C8cyPMYM.js",
+      "bytes": 38587,
+      "main_blob": "0915d3ceeddc1f16970c0c55a497c0973243e96f",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "0915d3ceeddc1f16970c0c55a497c0973243e96f",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/earth-Bj6GVCvj.js",
+      "bytes": 390,
+      "main_blob": "e18469f8181c115b1cd3e927f7f5c57c54ca8e72",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "e18469f8181c115b1cd3e927f7f5c57c54ca8e72",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/index-6DRa75wV.css",
+      "bytes": 34351,
+      "main_blob": "23a7bba8a638107303d71f0f70b9126caf9b424f",
+      "generated_blob": "23a7bba8a638107303d71f0f70b9126caf9b424f",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/assets/index-EY1u2NtU.js",
+      "bytes": 273107,
+      "main_blob": "77b6737095ca5969435d8fb7c4ff5f253b771d55",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "77b6737095ca5969435d8fb7c4ff5f253b771d55",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/layers-CxAhf3NZ.js",
+      "bytes": 418,
+      "main_blob": "608492040964cbf6ebd59ae0810af2deb212f123",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "608492040964cbf6ebd59ae0810af2deb212f123",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/react-DPIr46qh.js",
+      "bytes": 11880,
+      "main_blob": "0101e230e090fc282e2e94b1f1a588a495618791",
+      "generated_blob": "0101e230e090fc282e2e94b1f1a588a495618791",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/assets/storage-1zPFHilv.js",
+      "bytes": 98532,
+      "main_blob": "1e7e49183f5b898c0c4923b55e91bcdb5e63904b",
+      "generated_blob": "1e7e49183f5b898c0c4923b55e91bcdb5e63904b",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/assets/store-CSwqRp2v.js",
+      "bytes": 17809,
+      "main_blob": "77eac4936f38572523b559469162c59f459b921c",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "77eac4936f38572523b559469162c59f459b921c",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/trash-2-9eE5latU.js",
+      "bytes": 455,
+      "main_blob": "db7edab0683e60937a6c23cd87f5f49b1b3a0cd9",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "db7edab0683e60937a6c23cd87f5f49b1b3a0cd9",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/useDialogFocus-Cyj6tMxY.js",
+      "bytes": 912,
+      "main_blob": "4194cd2f0960c8f7bd35dba301a7e398d202412a",
+      "generated_blob": null,
+      "status": "superseded_hashed_atlas_bundle",
+      "seed_blob": "4194cd2f0960c8f7bd35dba301a7e398d202412a",
+      "deleted_by_atlas_commit": "352bfe3095d0ec10fd54d49418eb8ddf87ff9d66"
+    },
+    {
+      "path": "docs/atlas/assets/worldPerformance-DWYOYGH0.js",
+      "bytes": 1920,
+      "main_blob": "9c75beb096fa1ca9280488add99ff34ee5ac894f",
+      "generated_blob": "9c75beb096fa1ca9280488add99ff34ee5ac894f",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/icon-192.png",
+      "bytes": 961,
+      "main_blob": "b61a77f7c826119fd1f3419e76e5de48c8b56a84",
+      "generated_blob": "b61a77f7c826119fd1f3419e76e5de48c8b56a84",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/icon-512.png",
+      "bytes": 4116,
+      "main_blob": "5303b2b818719211a7efa2a63f470d384f10619b",
+      "generated_blob": "5303b2b818719211a7efa2a63f470d384f10619b",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/icon.svg",
+      "bytes": 519,
+      "main_blob": "ca4e222967972d6e3a725a9d170be2310838e8c5",
+      "generated_blob": "ca4e222967972d6e3a725a9d170be2310838e8c5",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/index.html",
+      "bytes": 1270,
+      "main_blob": "6057fb520b74817c1d781cddfa07d831d4c3afe9",
+      "generated_blob": "c8ecbe393600190c94e7cbe187dd926372359aa2",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/manifest.webmanifest",
+      "bytes": 503,
+      "main_blob": "03adaac74222b392cc800f5bdd593c682945db62",
+      "generated_blob": "03adaac74222b392cc800f5bdd593c682945db62",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/sw.js",
+      "bytes": 3732,
+      "main_blob": "c9e78bad7a48274ba727c7da4bd383e0731ba81a",
+      "generated_blob": "25b15c312307a0331e2878c5f84c4671e7d5b6f8",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/symbols/directory.json",
+      "bytes": 289082,
+      "main_blob": "7d8745bddd886e5b75e4f6d8090540c5f720e575",
+      "generated_blob": "ec9138121c88e010a7d1fe775b138243c77afe28",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/symbols/taiwan.json",
+      "bytes": 197964,
+      "main_blob": "89a5cf9e27f3da0473865e7e2b2ed2452cedd498",
+      "generated_blob": "89a5cf9e27f3da0473865e7e2b2ed2452cedd498",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/valuation/tw-annual.json",
+      "bytes": 217695,
+      "main_blob": "f6d5f87197318ace39a5d3e125b90d9f5ec2941a",
+      "generated_blob": "7b586542c0758f9bfdd6941db963e1638b3b0691",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/valuation/tw.json",
+      "bytes": 296745,
+      "main_blob": "5b1c0804eb0d2dc676dcbf910f84853b370b5dc7",
+      "generated_blob": "2fd8faf4c88bfe8acb5ab3dd1d3bee2235b1a283",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/valuation/us-events.json",
+      "bytes": 60534,
+      "main_blob": "a8eb406ebdbdc062b62486732c0acb39c9d12c52",
+      "generated_blob": "342d59a49bde55e6a9ca9d144e62b83e6e24f646",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/valuation/us-growth.json",
+      "bytes": 194489,
+      "main_blob": "7557010d8198b2cd8e34b685197a8f6dd2ae9d59",
+      "generated_blob": "dbef36741d060c8618e6759fb6d5da2331523d30",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/atlas/valuation/us.json",
+      "bytes": 861636,
+      "main_blob": "43c44db677f729b4da10af2728e338762ebf341e",
+      "generated_blob": "9bb0ceec389601ca2e18d77082e0df9e2fcbd1dc",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/index.html",
+      "bytes": 1223,
+      "main_blob": "43360804f1521cc9a0a0928f793bebf540adc6eb",
+      "generated_blob": "43360804f1521cc9a0a0928f793bebf540adc6eb",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/breadth.json",
+      "bytes": 6291,
+      "main_blob": "f898350bb440062a3f795f4428d3bbe6b0a5784f",
+      "generated_blob": "f898350bb440062a3f795f4428d3bbe6b0a5784f",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/breakouts.json",
+      "bytes": 13406,
+      "main_blob": "2160c6438b38595a3cebbb602f755c5dc4ecfb78",
+      "generated_blob": "7f47809fbde9a3e4c1028b6978756463b0ad77e3",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/fundamentals/tw-finmind.json",
+      "bytes": 2323672,
+      "main_blob": "e7e2117c634c16d59279a003d92533dc9e0b15bc",
+      "generated_blob": "f9270141a2018eb166c9f00e2dbf01b0de9832a5",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/fundamentals/tw.json",
+      "bytes": 632266,
+      "main_blob": "065308d6fda9f252793b6ee99c10b9ea00ba5564",
+      "generated_blob": "8d2526f2cde42ead1ad04222021da720f4add1b0",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/fundamentals/us-sec.json",
+      "bytes": 535269,
+      "main_blob": "f7a93275006d64e53a37c7fd5d1350dcb26560b6",
+      "generated_blob": "348f2a6b05aee7f4797936cd235663d45fd6affa",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/growth.json",
+      "bytes": 1527410,
+      "main_blob": "7e2544fd867dea823368495d4d558831f7b344ab",
+      "generated_blob": "3524b672add357b50f733d56ec8940dff10417a2",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/latest.json",
+      "bytes": 138343,
+      "main_blob": "7eafa9654ef639e6cb90fa5fa9f84be80ca7a1f6",
+      "generated_blob": "7eafa9654ef639e6cb90fa5fa9f84be80ca7a1f6",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/rates-history.json",
+      "bytes": 48368,
+      "main_blob": "288d4b306c2983e37f26fd0f00e5e0fd5f234cdc",
+      "generated_blob": "288d4b306c2983e37f26fd0f00e5e0fd5f234cdc",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/rates.json",
+      "bytes": 5521,
+      "main_blob": "903e51878b4d406843aaece05f177e40800e263e",
+      "generated_blob": "903e51878b4d406843aaece05f177e40800e263e",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/alerts.json",
+      "bytes": 1533776,
+      "main_blob": "7ae0b83df36193f558b5f97bc9ea6d7a6a33010e",
+      "generated_blob": "35bd160d4152b9cd66967e02ebd6248f5c9f2748",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/candles/brent.json",
+      "bytes": 113632,
+      "main_blob": "191793a6579254845bde322d94e5e78d044d578f",
+      "generated_blob": "c6926c5ca50eccc82a85e267e7f2b92ffd63edd2",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/candles/copper.json",
+      "bytes": 114973,
+      "main_blob": "7cd18f8a7de8f1b265c5ac4d7789be87f13b6dec",
+      "generated_blob": "5f206293ea2ee7efcab01ad7277715fa9dbb7523",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/candles/eurusd.json",
+      "bytes": 116499,
+      "main_blob": "a30913b9e3f7342e324965689bdf915d00778911",
+      "generated_blob": "dd1cacbe720f81eb5124b385f0b12935c0c44ca1",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/candles/gas.json",
+      "bytes": 119217,
+      "main_blob": "6ae205e81d91c03b5b2b7d4e474229965fe49594",
+      "generated_blob": "f5cb73cff9969c2003b1188d2f35f10e9adbb194",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/candles/gold.json",
+      "bytes": 104112,
+      "main_blob": "35a0f666f1c3075603ecd11641e5d3da8ac14c78",
+      "generated_blob": "0796c0d1686f99491762c38e155fdaee5a634eb8",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/candles/silver.json",
+      "bytes": 113279,
+      "main_blob": "a342f1e68d11952e3185085089a5ca40fd8946ca",
+      "generated_blob": "11664be29d71db7c59ac6ededf98867767c9a093",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/candles/usdcny.json",
+      "bytes": 112787,
+      "main_blob": "de5c83f58b68f9f3ba044e422f5b00962d40604f",
+      "generated_blob": "3accbbded0c6b7bf724f4433977234cdb8f2ca99",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/candles/usdjpy.json",
+      "bytes": 112072,
+      "main_blob": "85e3601de3cf5b475b05d58fc8d76c2ab3461c47",
+      "generated_blob": "02832a62a77199754b3bf8c8ad0d7d437fdbf4a2",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/candles/usdkrw.json",
+      "bytes": 101893,
+      "main_blob": "34f8d888ff88dd25ba484630c38c074acad1e260",
+      "generated_blob": "0858354c14bcbe3d21e87e8c6a58d4d4a94a78a8",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/candles/usdtwd.json",
+      "bytes": 112719,
+      "main_blob": "9de27e5f6cd2a527c959e68bf26dc0a2b108e427",
+      "generated_blob": "a98e5c33cf0d9581e753108f1b57b473581be8e2",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/candles/wti.json",
+      "bytes": 114779,
+      "main_blob": "a46fab301079d88edd237cfabea0d696834c023b",
+      "generated_blob": "4cfbd6d397677f9198879770becf05c6b6bc79b6",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/institutions.json",
+      "bytes": 1362298,
+      "main_blob": "20f2474757446e6a1d0fc726e52efbc4301deeb0",
+      "generated_blob": "c4e1608840e59ec2d6b50b2e4759f96e2cbecfa6",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/institutions/TW.json",
+      "bytes": 34213756,
+      "main_blob": "8dafc3a76e427a3ba451bb3cbfd4013ff844ea12",
+      "generated_blob": "8f61f567c992a448b74428762ee9439481290c0d",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/institutions/TWO.json",
+      "bytes": 22229251,
+      "main_blob": "d6303d754ac8c241f165bdbffe0d966afbb2976c",
+      "generated_blob": "d6303d754ac8c241f165bdbffe0d966afbb2976c",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/sec-radar.json",
+      "bytes": 711723,
+      "main_blob": "2f5eada5d0f14b9a08002877a7d5158d4c36e534",
+      "generated_blob": "2f5eada5d0f14b9a08002877a7d5158d4c36e534",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/sec/US.json",
+      "bytes": 563636,
+      "main_blob": "85b8ffb91f485f635fd7c2d87e3650902e9490c4",
+      "generated_blob": "85b8ffb91f485f635fd7c2d87e3650902e9490c4",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/turnover/TW.json",
+      "bytes": 4211351,
+      "main_blob": "00d17ec29be808d6094fb2c85c2d84a075df67a9",
+      "generated_blob": "00d17ec29be808d6094fb2c85c2d84a075df67a9",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/turnover/TWO.json",
+      "bytes": 3293281,
+      "main_blob": "6d20ece81e5ead5f39bdee7255b7fd4282150a4d",
+      "generated_blob": "6d20ece81e5ead5f39bdee7255b7fd4282150a4d",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/volume.json",
+      "bytes": 206470,
+      "main_blob": "e67cf5a54339ad814bba33831255b98f25b6040b",
+      "generated_blob": "8e0fcf3dbb414e3d136103f849722ef079b14a8d",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/volume/TW.json",
+      "bytes": 9728720,
+      "main_blob": "8d80266326071c65c5b531c4d9e2cb2e895d47a3",
+      "generated_blob": "15cdbcb09de7206227f49ac27fc5b313a4b9378c",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/volume/US.json",
+      "bytes": 26531128,
+      "main_blob": "fd83981a508fb9f0ea4831f9577a50a7c6fdf114",
+      "generated_blob": "e512cd139d2a311b183f5220f476fa6c5c21c38e",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/research/world-assets.json",
+      "bytes": 10926,
+      "main_blob": "37492b4b3dbf14845d2d5dc51eaa35f44f490011",
+      "generated_blob": "f8f41e49bcb5cb004de79fbecc79584f729336ab",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/series/^TWOII.json",
+      "bytes": 80509,
+      "main_blob": "0a830adf69845a969f174855c69d6d916e42e475",
+      "generated_blob": "0a830adf69845a969f174855c69d6d916e42e475",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/series/index.json",
+      "bytes": 22,
+      "main_blob": "90c4a19772454b8c62ffb0ef6b68dd0508cba934",
+      "generated_blob": "90c4a19772454b8c62ffb0ef6b68dd0508cba934",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/themes-tw.json",
+      "bytes": 88811,
+      "main_blob": "4f31419fd8aaa713de9b738a3d92f6c323687e72",
+      "generated_blob": "036c35c37cfe805e1a7acf3c7491796afc3ae9d4",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/themes.json",
+      "bytes": 99508,
+      "main_blob": "d1a0a7596968afc18e058851e9578afb5ae03082",
+      "generated_blob": "d1a0a7596968afc18e058851e9578afb5ae03082",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/tw-chips.json",
+      "bytes": 2152527,
+      "main_blob": "f785be18a8f6ec8829f6c725d914496137977a64",
+      "generated_blob": "25f48a280082a962a6681afa3e89fd1a38b04e03",
+      "status": "current_on_generated"
+    },
+    {
+      "path": "docs/report/universe.json",
+      "bytes": 1535022,
+      "main_blob": "9c4a7d923c91bd71ca1107378855a99650a75e66",
+      "generated_blob": "d448f2c5821b68f2a2e8561573f536831a09d34b",
+      "status": "current_on_generated"
+    }
+  ],
+  "pre_cutover_snapshot": "bcf6997eab412bda6650cf516181f34e5c7e0728",
+  "original_seed": "d803d90f01bd60d89314f6cc9fb265d67a4037e2",
+  "final_deployment_comparison": {
+    "main": "dc3cceac55bc9b2dfac13cd48e626bea1c219edd",
+    "generated": "dc71621e5113dd9f57794f590764f3b1126a7ba1",
+    "run": 39938009032,
+    "artifact_id": 12494258993,
+    "artifact_zip_sha256": "a08c94b8e6be31520ecdb64d5790c03670fe8987fc223ff1577112bfd3d52e01",
+    "files": 9634,
+    "bytes": 310063479,
+    "differences": 0,
+    "sha256_manifest": "18862b1f849f64cdaf75b960f15cabfda1ae71bf6acb61c3b5af8f87f10e7bbe"
+  }
+}
