@@ -9,6 +9,7 @@ import {
   maSelectorLink,
   recommendedPeriods,
   type MaRecommendationLoadResult,
+  type MaRecommendationRange,
 } from '../report/maRecommendation';
 import { FixedStockParameters } from './FixedStockParameters';
 import './research.css';
@@ -44,6 +45,9 @@ export function applyRecommended(store: AppStore, symbol: string, periods: reado
   return missing;
 }
 
+const scoreText = (score: number | null) => (score === null ? '' : `（${Math.round(score)}）`);
+/** The pick's own structural score (candidates carry it; a pick outside the list has none). */
+const scoreOf = (range: MaRecommendationRange) => range.candidates.find((c) => c.period === range.final)?.score ?? null;
 const percent = (value: number | null) => (value === null ? '—' : `${value > 0 ? '+' : ''}${(value * 100).toFixed(1)}%`);
 
 export function MaRecommendation({
@@ -75,86 +79,89 @@ export function MaRecommendation({
   const periods = data ? recommendedPeriods(data) : [];
   const missing = missingRecommended(indicators, periods);
   const link = maSelectorLink(symbol);
-  const summary = !result ? '建議均線載入中' : data ? `日線至 ${data.asof}${data.limited ? ' · 資料不足 3.5 年' : ''} · 套用／候選` : '尚無建議 · 即時計算';
+  const ranges = data ? MA_RANGE_KEYS.map((key) => data.ranges.find((range) => range.key === key)!) : [];
   return (
     <div className="ws-ma-reco" data-testid="ma-recommendation" aria-busy={!result}>
       <dl className="ws-volatility-values">
-        <div title="ma-selector 依日線選出「最能分出多空」的 SMA：短期 15–33、中期 34–45、長期 46–110（每週更新）。">
+        <div title="ma-selector 依日線選出「最能分出多空」的 SMA：短期 15–33、中期 34–45、長期 46–110（每週更新）。括號內為結構分數。">
           <dt>建議均線</dt>
-          <dd>{data ? MA_RANGE_KEYS.map((key, index) => `${MA_RANGE_LABELS[key].slice(0, 1)} ${periods[index]}`).join(' · ') : '—'}</dd>
+          <dd>
+            {data
+              ? ranges.map((range) => `${MA_RANGE_LABELS[range.key].slice(0, 1)} ${range.final}${scoreText(scoreOf(range))}`).join(' · ')
+              : '—'}
+          </dd>
         </div>
       </dl>
-      <details className="ws-ma-reco-info">
-        <summary>{summary}</summary>
-        <div className="ws-ma-reco-panel">
-          {result && result.status !== 'ok' && <p>{result.message}</p>}
-          {data && (
-            <>
-              <div className="ws-ma-reco-actions">
-                <button
-                  type="button"
-                  className="primary-button"
-                  disabled={!missing.length && timeframe === '1D'}
-                  onClick={() => {
-                    const added = applyRecommended(store, symbol, periods);
-                    onNotice(
-                      added.length
-                        ? `已在日線圖加入 SMA ${added.join(' / ')}。`
-                        : `日線圖已有 SMA ${periods.join(' / ')}，已切換到日線。`,
-                    );
-                  }}
-                >
-                  {missing.length ? '套用到圖表' : timeframe === '1D' ? '已套用' : '切到日線查看'}
-                </button>
-                <button type="button" className="ghost-button" onClick={() => setFixing(true)}>
-                  固定為個股參數
-                </button>
-              </div>
-              <table className="ws-ma-reco-table">
-                <thead>
-                  <tr>
-                    <th scope="col">區間</th>
-                    <th scope="col">候選（★＝建議）</th>
-                    <th scope="col">反手報酬</th>
+      <p className="ws-ma-reco-status">
+        {!result
+          ? '建議均線載入中'
+          : result.status === 'ok'
+            ? `日線至 ${result.data.asof}${result.data.limited ? ' · 資料不足 3.5 年，中長期僅供參考' : ''}`
+            : result.message}
+      </p>
+      {data && (
+        <>
+          <div className="ws-ma-reco-actions">
+            <button
+              type="button"
+              className="primary-button"
+              disabled={!missing.length && timeframe === '1D'}
+              onClick={() => {
+                const added = applyRecommended(store, symbol, periods);
+                onNotice(
+                  added.length ? `已在日線圖加入 SMA ${added.join(' / ')}。` : `日線圖已有 SMA ${periods.join(' / ')}，已切換到日線。`,
+                );
+              }}
+            >
+              {missing.length ? '套用到圖表' : timeframe === '1D' ? '已套用' : '切到日線查看'}
+            </button>
+            <button type="button" className="ghost-button" onClick={() => setFixing(true)}>
+              固定為個股參數
+            </button>
+          </div>
+          <table className="ws-ma-reco-table">
+            <thead>
+              <tr>
+                <th scope="col">區間</th>
+                <th scope="col">候選（分數，★＝建議）</th>
+                <th scope="col">反手報酬</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ranges.map((range) => {
+                const final = range.candidates.find((c) => c.period === range.final);
+                return (
+                  <tr key={range.key}>
+                    <th scope="row">
+                      {MA_RANGE_LABELS[range.key]}
+                      <small>
+                        {range.min}–{range.max}
+                      </small>
+                    </th>
+                    <td>
+                      {(range.candidates.length ? range.candidates : [{ period: range.final, score: null }])
+                        .map((c) => `${c.period === range.final ? '★' : ''}${c.period}${scoreText(c.score)}`)
+                        .join('、')}
+                    </td>
+                    <td>
+                      {percent(final?.sarReturn ?? null)}
+                      {range.windowYears ? <small>近 {range.windowYears} 年</small> : null}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {MA_RANGE_KEYS.map((key) => {
-                    const range = data.ranges.find((r) => r.key === key)!;
-                    const final = range.candidates.find((c) => c.period === range.final);
-                    return (
-                      <tr key={key}>
-                        <th scope="row">
-                          {MA_RANGE_LABELS[key]}
-                          <small>
-                            {range.min}–{range.max}
-                          </small>
-                        </th>
-                        <td>
-                          {range.candidates.length
-                            ? range.candidates.map((c) => `${c.period === range.final ? '★' : ''}${c.period}`).join('、')
-                            : `★${range.final}`}
-                        </td>
-                        <td>
-                          {percent(final?.sarReturn ?? null)}
-                          {range.windowYears ? <small>近 {range.windowYears} 年</small> : null}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <p>
-                候選＝平滑後結構分數與最高分相差 ≤15 分；建議＝多空反手報酬距最佳 ≤5 個百分點者中結構分數最高（短期另有固定的 rescue 規則）。
-                反手報酬為歷史模擬，不代表未來績效。股票適合度 {data.suitability.short === null ? '—' : `${Math.round(data.suitability.short)} / 100`}。
-              </p>
-            </>
-          )}
-          <a href={link} target="_blank" rel="noopener noreferrer">
-            {data ? '在 ma-selector 查看完整候選、判定圖與回測 ↗' : '在 ma-selector 即時計算這檔股票 ↗'}
-          </a>
-        </div>
-      </details>
+                );
+              })}
+            </tbody>
+          </table>
+          <p>
+            分數＝結構分數（0–100）：突破、二日、回測、雜訊、糾結等指標相對 83 檔基準的百分位加權，越高越能分出多空。候選＝與最高分相差 ≤15 分；建議＝多空反手報酬距最佳
+            ≤5 個百分點者中分數最高，所以★不一定是分數最高的那條。反手報酬為歷史模擬，不代表未來績效。股票適合度{' '}
+            {data.suitability.short === null ? '—' : `${Math.round(data.suitability.short)} / 100`}。
+          </p>
+        </>
+      )}
+      <a href={link} target="_blank" rel="noopener noreferrer">
+        {data ? '在 ma-selector 查看完整候選、判定圖與回測 ↗' : '在 ma-selector 即時計算這檔股票 ↗'}
+      </a>
       {fixing && data && (
         <FixedStockParameters
           ticker={symbol}

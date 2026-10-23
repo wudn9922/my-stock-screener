@@ -42,6 +42,7 @@ test('daily volatility stays below PE and is independent of quote and chart time
   await expect(stats).toContainText('2026-10-08');
   expect(intervals).toContain('1d');
   expect(intervals).toContain('1wk');
+  await page.getByTestId('stock-stats-toggle').click();
   const geometry = await page.evaluate(() => ({
     pe: document.querySelector('[data-testid="valuation"]')!.getBoundingClientRect().bottom,
     volatility: document.querySelector('[data-testid="stock-volatility"]')!.getBoundingClientRect().top,
@@ -49,8 +50,12 @@ test('daily volatility stays below PE and is independent of quote and chart time
   }));
   expect(geometry.volatility).toBeGreaterThanOrEqual(geometry.pe);
   expect(geometry.overflow).toBeLessThanOrEqual(0);
+  // The floating panel covers the toolbar on phones; close it before switching timeframe, then reopen.
+  await page.keyboard.press('Escape');
+  await expect(stats).toBeHidden();
   await page.getByRole('button', { name: '週期 1D', exact: true }).click();
   await expect(stats.locator('dd')).toHaveText(['4.00%', '4.00%']);
+  await page.getByTestId('stock-stats-toggle').click();
   await stats.locator('summary').click();
   await expect(stats.locator('p')).toContainText('ATR 原值 4.40，基準收盤 110.00');
   await expect(stats.locator('p')).toContainText('不含隔夜跳空');
