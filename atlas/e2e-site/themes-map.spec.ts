@@ -216,7 +216,7 @@ test('hovering a cell shows both averages, the up share, the market cap and the 
   await expect(tip).toHaveCount(0);
 });
 
-test('long-pressing a cell on a touch screen shows the tooltip without opening the panel', async ({ page, hasTouch }) => {
+test('long-pressing a cell on a touch screen shows the tooltip without opening the panel', async ({ page, hasTouch, browserName }) => {
   test.skip(!hasTouch, 'long press is a touch gesture');
   await mockMap(page);
   await page.goto('./?page=themes&v=map');
@@ -225,10 +225,21 @@ test('long-pressing a cell on a touch screen shows the tooltip without opening t
   const box = (await cell.boundingBox())!;
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
-  const session = await page.context().newCDPSession(page);
-  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-  await expect(page.getByRole('tooltip')).toBeVisible();
-  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  if (browserName === 'chromium') {
+    const session = await page.context().newCDPSession(page);
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    await expect(page.getByRole('tooltip')).toBeVisible();
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await session.detach();
+  } else {
+    // Playwright exposes native touch hold through CDP only on Chromium. Exercise
+    // WebKit's DOM pointer sequence, including the release click suppression.
+    const pointer = { pointerType: 'touch', pointerId: 1, isPrimary: true, clientX: x, clientY: y, buttons: 1 };
+    await cell.dispatchEvent('pointerdown', pointer);
+    await expect(page.getByRole('tooltip')).toBeVisible();
+    await cell.dispatchEvent('pointerup', { ...pointer, buttons: 0 });
+    await cell.dispatchEvent('click');
+  }
   await expect(page).toHaveURL(/page=themes&v=map$/);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('tooltip')).toContainText('市值合計');

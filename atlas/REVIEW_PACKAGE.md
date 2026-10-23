@@ -8,6 +8,8 @@ Verification checkpoint after integrating main: 1,062 Vitest tests passed, inclu
 
 The broad browser run exposed a pre-existing race: a hidden lazy panel assertion succeeded before its chart header mounted, then its synchronous size measurement read a null element. The test now explicitly waits for the header and valuation before retaining the same size assertions. Cloud-chart mocks also intercept drawing requests so test tokens never reach production. A blocked CacheStorage/unregistration cleanup now allows the RAM workspace to render; unit coverage checks both denied cleanup and preservation of unrelated app caches.
 
+The full site sweep also reached a previously unselected heatmap long-press test that called Chromium-only CDP in WebKit. Chromium retains its native touch dispatch; WebKit now exercises the DOM touch-pointer sequence and release-click suppression with the same tooltip, URL and no-dialog assertions. This is not a physical WebKit touch-hold verification. Heatmap regressions are now included in the PR workflow rather than skipped.
+
 The first full Python suite exposed an existing world candle/CSV mismatch (main records had newer completed bars). Real Yahoo source validation succeeded for all 11 assets, all dated 2026-10-22. The corrected candle bundle and one updated natural-gas CSV volume are retained; every candle digest and CSV comparison passes. PR verification now restores the complete hashed world bundle together, including dependencies absent from the older generated snapshot. No K-line history was deleted or fabricated.
 
 ## Previous review: compact chart header (2026-10-23)
