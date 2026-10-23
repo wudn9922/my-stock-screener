@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, useSyncExternalStore, type FormEvent } from 'react';
 import { FIXED_STOCK_GROUP, parameterMAs, parseMovingAverages, settingsApi, type ParameterStock } from '../cloud/settingsApi';
 import { ConsoleDialog } from './ConsoleDialog';
+import { accessState } from '../auth/access';
 
 export function FixedStockParameters({
   ticker,
@@ -16,6 +17,7 @@ export function FixedStockParameters({
   onClose: () => void;
   onSaved: (values: number[]) => void;
 }) {
+  const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
   const [mas, setMas] = useState(defaults.join(', '));
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -67,9 +69,18 @@ export function FixedStockParameters({
   };
   return (
     <ConsoleDialog title={`${ticker} 固定均線參數`} busy={busy} onClose={onClose}>
-      <p>固定參數會保存到 Supabase，出榜或刪除清單後仍保留。只有此股票在分組或已啟用監控的清單中時才使用，優先於分組與清單的預設均線。</p>
+      <p>
+        {access.storageMode === 'cloud'
+          ? '固定參數會保存到你的 Supabase 帳號，出榜或刪除清單後仍保留。'
+          : access.storageMode === 'device'
+            ? '固定參數只保存在這個帳號的裝置空間，不會上傳。'
+            : '固定參數只在本次瀏覽套用，重新載入後清除，不會保存或上傳。'}
+        均線優先於分組與清單的預設值。
+      </p>
       {loading && <p role="status">正在載入已保存的參數…</p>}
-      {prefill && ready && <p role="status">{saved ? `目前已保存：${saved.join(' / ')}；儲存後會被取代。` : '目前沒有已保存的固定參數。'}</p>}
+      {prefill && ready && (
+        <p role="status">{saved ? `目前已保存：${saved.join(' / ')}；儲存後會被取代。` : '目前沒有已保存的固定參數。'}</p>
+      )}
       {error && (
         <p role="alert" className="console-message">
           {error}
@@ -90,7 +101,11 @@ export function FixedStockParameters({
         <p>填入 1～4 個不重複的整數（1～1000），用逗號分隔。</p>
         <div className="console-actions">
           <button type="submit" className="primary-button" disabled={loading || busy || !ready}>
-            確認並永久儲存
+            {access.storageMode === 'none'
+              ? '確認並套用本次參數'
+              : access.storageMode === 'device'
+                ? '確認並儲存到此裝置'
+                : '確認並儲存到雲端'}
           </button>
           {error && (
             <button type="button" className="ghost-button" disabled={busy} onClick={() => setAttempt((value) => value + 1)}>

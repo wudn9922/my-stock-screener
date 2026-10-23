@@ -20,6 +20,7 @@ from breakout_alert.price_provider import (
 from breakout_alert.supabase_store import (
     SupabaseStore,
 )
+from breakout_alert.account_permissions import CloudStorageDenied
 
 
 def print_market_decision(decision):
@@ -378,9 +379,11 @@ def main():
     notifier = DiscordNotifier()
 
     try:
-        monitor_configs = (
-            store.get_monitor_configs()
-        )
+        try:
+            monitor_configs = store.get_monitor_configs()
+        except CloudStorageDenied:
+            print("ℹ️ 此帳號未啟用雲端儲存，略過私人監控與狀態寫入。")
+            return
 
         # 清理失敗不能影響本次監控
         try:

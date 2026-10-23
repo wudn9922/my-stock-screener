@@ -1,3 +1,4 @@
+import { userStorage } from '../../auth/storage';
 import { useMemo, useState } from 'react';
 import type { FinancialHistory } from '../../fundamentals/FinancialHistory';
 import { STATEMENT_TABS, statementRows, type StatementId } from '../../fundamentals/financialStatements';
@@ -17,14 +18,14 @@ const YOY_KEY = 'atlas-financials-yoy-v1';
 /** Remembered per viewer; the year-over-year line is on by default. */
 const readShowYoy = (): boolean => {
   try {
-    return localStorage.getItem(YOY_KEY) !== 'hidden';
+    return userStorage.getItem(YOY_KEY) !== 'hidden';
   } catch {
     return true;
   }
 };
 const writeShowYoy = (show: boolean) => {
   try {
-    localStorage.setItem(YOY_KEY, show ? 'shown' : 'hidden');
+    userStorage.setItem(YOY_KEY, show ? 'shown' : 'hidden');
   } catch {
     /* Remembering the choice is only a convenience. */
   }

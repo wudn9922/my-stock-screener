@@ -1,4 +1,6 @@
 import { storageName } from './HostingMode';
+import { accessState } from '../auth/access';
+import { getStorageContextKey, userStorage } from '../auth/storage';
 
 /**
  * Per-device display conveniences for the site shell (not part of the exported workspace):
@@ -22,7 +24,7 @@ const defaults: SitePreferences = { colors: 'tw', recent: [] };
 
 function read(): SitePreferences {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = userStorage.getItem(KEY);
     if (!raw) return defaults;
     const data = JSON.parse(raw) as Partial<SitePreferences>;
     return {
@@ -39,12 +41,29 @@ function read(): SitePreferences {
 }
 
 let current = read();
+let context = getStorageContextKey();
 const listeners = new Set<() => void>();
 
+function preferences() {
+  const nextContext = getStorageContextKey();
+  if (context !== nextContext) {
+    context = nextContext;
+    current = read();
+  }
+  return current;
+}
+
+accessState.subscribe(() => {
+  preferences();
+  applyColorConvention(current.colors);
+  listeners.forEach((listener) => listener());
+});
+
 function write(next: SitePreferences) {
+  preferences();
   current = next;
   try {
-    localStorage.setItem(KEY, JSON.stringify(next));
+    userStorage.setItem(KEY, JSON.stringify(next));
   } catch {
     /* Display preferences are optional; keep the in-memory value. */
   }
@@ -53,24 +72,31 @@ function write(next: SitePreferences) {
 }
 
 export const sitePreferences = {
+  /** Re-read after an explicit legacy copy; ordinary startup never reads old keys. */
+  refresh() {
+    preferences();
+    current = read();
+    applyColorConvention(current.colors);
+    listeners.forEach((listener) => listener());
+  },
   subscribe(listener: () => void) {
     listeners.add(listener);
     return () => {
       listeners.delete(listener);
     };
   },
-  get: () => current,
+  get: preferences,
   setColors(colors: ColorConvention) {
-    write({ ...current, colors });
+    write({ ...preferences(), colors });
   },
   addRecent(entry: RecentSearch) {
     write({
-      ...current,
-      recent: [entry, ...current.recent.filter((item) => item.symbol !== entry.symbol)].slice(0, MAX_RECENT),
+      ...preferences(),
+      recent: [entry, ...preferences().recent.filter((item) => item.symbol !== entry.symbol)].slice(0, MAX_RECENT),
     });
   },
   clearRecent() {
-    write({ ...current, recent: [] });
+    write({ ...preferences(), recent: [] });
   },
 };
 

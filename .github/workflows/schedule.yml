@@ -97,6 +97,7 @@ jobs:
           LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
           SUPABASE_USER_ID: ${{ secrets.SUPABASE_USER_ID }}
+          ADMIN_LINE_USER_ID: ${{ vars.ADMIN_LINE_USER_ID || 'Ua0037dbd5037b64fc76804c60520ad76' }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           # 讀取設定表用 service role（鎖定匿名讀取後 anon key 讀不到）；未設定時退回 anon key
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

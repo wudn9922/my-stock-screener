@@ -1,14 +1,16 @@
 import { watchlistDocumentSchema, watchlistSchema, type SavedWatchlist, type WatchlistDocument } from './model';
+import { canPersist, getStorageContextKey, userStorage } from '../auth/storage';
 
 export const WATCHLIST_STORAGE_KEY = 'atlas-saved-watchlists-v1';
 const EMPTY: WatchlistDocument = { version: 1, lists: [] };
 type Snapshot = { document: WatchlistDocument; error: string | null };
+const EMPTY_SNAPSHOT: Snapshot = { document: EMPTY, error: null };
 
 /** Separate from the existing chart IndexedDB: failures never erase either store. */
 export class WatchlistStore {
   private snapshot: Snapshot = { document: EMPTY, error: null };
   private listeners = new Set<() => void>();
-  constructor(private storage?: Pick<Storage, 'getItem' | 'setItem'>) {
+  constructor(private storage?: Pick<Storage, 'getItem' | 'setItem'>, private context?: string) {
     try {
       const raw = storage?.getItem(WATCHLIST_STORAGE_KEY);
       if (raw) this.snapshot = { document: watchlistDocumentSchema.parse(JSON.parse(raw)), error: null };
@@ -22,8 +24,12 @@ export class WatchlistStore {
       this.listeners.delete(listener);
     };
   };
-  getSnapshot = () => this.snapshot;
+  getSnapshot = () => this.isActive() ? this.snapshot : EMPTY_SNAPSHOT;
+  private isActive() {
+    return this.context === undefined || this.context === getStorageContextKey();
+  }
   refresh() {
+    if (!this.isActive()) return;
     try {
       const raw = this.storage?.getItem(WATCHLIST_STORAGE_KEY);
       this.snapshot = { document: raw ? watchlistDocumentSchema.parse(JSON.parse(raw)) : EMPTY, error: null };
@@ -33,6 +39,7 @@ export class WatchlistStore {
     this.listeners.forEach((listener) => listener());
   }
   private commit(document: WatchlistDocument) {
+    if (!this.isActive()) throw new Error('帳號或儲存權限已變更，請在目前帳號重新操作。');
     if (this.snapshot.error) throw new Error(this.snapshot.error);
     const parsed = watchlistDocumentSchema.parse(document);
     if (!this.storage) throw new Error('瀏覽器儲存空間不可用，清單尚未儲存。');
@@ -56,28 +63,34 @@ export class WatchlistStore {
     this.commit({ version: 1, lists: this.snapshot.document.lists.filter((entry) => entry.id !== id) });
   }
   exportJson() {
+    this.assertExportAllowed();
     return JSON.stringify(this.snapshot.document, null, 2);
   }
   exportRaw() {
+    this.assertExportAllowed();
     return this.storage?.getItem(WATCHLIST_STORAGE_KEY) ?? this.exportJson();
   }
   importJson(raw: string) {
     this.commit(watchlistDocumentSchema.parse(JSON.parse(raw)));
   }
+  private assertExportAllowed() {
+    if (!this.isActive() || (this.context !== undefined && !canPersist())) throw new Error('目前僅允許本次瀏覽使用，尚未取得保存或匯出權限。');
+  }
 }
 
 let singleton: WatchlistStore | undefined;
+let singletonContext: string | undefined;
+let listening = false;
 export function watchlistStore() {
-  if (!singleton) {
-    let storage: Storage | undefined;
-    try {
-      storage = globalThis.localStorage;
-    } catch {
-      /* Reported on save. */
-    }
-    singleton = new WatchlistStore(storage);
+  const context = getStorageContextKey();
+  if (!singleton || singletonContext !== context) {
+    singletonContext = context;
+    singleton = new WatchlistStore(userStorage, context);
+  }
+  if (!listening) {
+    listening = true;
     globalThis.addEventListener?.('storage', (event) => {
-      if (event.key === WATCHLIST_STORAGE_KEY) singleton?.refresh();
+      if (event.key?.endsWith(WATCHLIST_STORAGE_KEY)) singleton?.refresh();
     });
   }
   return singleton;

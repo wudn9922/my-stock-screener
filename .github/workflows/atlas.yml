@@ -163,6 +163,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_USER_ID: ${{ secrets.SUPABASE_USER_ID }}
+          ADMIN_LINE_USER_ID: ${{ vars.ADMIN_LINE_USER_ID || 'Ua0037dbd5037b64fc76804c60520ad76' }}
         run: npm run refresh:watchlists
 
       - name: Replace docs/atlas with build output

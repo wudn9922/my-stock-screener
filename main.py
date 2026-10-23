@@ -17,6 +17,7 @@ import requests
 import yfinance as yf
 import kline_integrity as kline
 from breakout_alert.supabase_store import FIXED_STOCK_GROUP_ID, fixed_parameter_map, parameter_ticker_key
+from breakout_alert.account_permissions import is_public_report_owner, storage_mode
 
 
 # =========================================================================
@@ -882,11 +883,14 @@ def load_configs_from_supabase(
 
     headers = {
         "apikey": supabase_key,
-        "Authorization": (
-            f"Bearer {supabase_key}"
-        ),
         "Content-Type": "application/json"
     }
+    if supabase_key.startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {supabase_key}"
+
+    if storage_mode(target_user_id, supabase_url, headers=headers, request=requests.get) != "cloud":
+        print("ℹ️ 此帳號未啟用雲端儲存，略過私人群組與均線設定；使用公開預設資料。")
+        return configs, default_index_configs, group_metadata
 
     name_mapping = {
         "台股-權值精選": "tw_g1",
@@ -904,7 +908,8 @@ def load_configs_from_supabase(
             f"{supabase_url}/groups",
             headers=headers,
             params={
-                "select": "*"
+                "select": "*",
+                "line_user_id": f"eq.{target_user_id}"
             },
             timeout=15
         )
@@ -913,7 +918,8 @@ def load_configs_from_supabase(
             f"{supabase_url}/stocks",
             headers=headers,
             params={
-                "select": "*"
+                "select": "*",
+                "line_user_id": f"eq.{target_user_id}"
             },
             timeout=15
         )
@@ -974,6 +980,9 @@ def load_configs_from_supabase(
         # stocks.group_id = custom_22
         # -----------------------------------------------------------------
         for group_item in groups_data:
+            # Enforce identity again even if an unexpected backend ignores the filter.
+            if group_item.get("line_user_id") != target_user_id:
+                continue
             raw_group_id = str(
                 group_item.get("id", "")
             ).strip()
@@ -7202,8 +7211,12 @@ def write_json_atomic(path, payload):
 
 def write_report_json(
     payload,
-    report_dir=REPORT_DIR
+    report_dir=REPORT_DIR,
+    *,
+    source_user_id=None
 ):
+    if not is_public_report_owner(source_user_id):
+        raise PermissionError("Private account reports must not be published to GitHub")
     path = os.path.join(
         report_dir,
         "latest.json"
@@ -7799,6 +7812,12 @@ def main():
         supabase_user_id
     ).strip()
 
+    # This command creates public JSON, chart images and GitHub artifacts. It is
+    # not a per-user report endpoint: never publish another account's settings.
+    if not is_public_report_owner(supabase_user_id):
+        print("ℹ️ 公開日報僅接受管理員帳號；略過私人設定讀取及所有報告產物寫入。")
+        return
+
     print(
         "👤 LINE 推播使用：LINE_USER_ID"
     )
@@ -8284,7 +8303,7 @@ def main():
             unmatched_by_group=unmatched_by_group
         )
 
-        write_report_json(report_payload)
+        write_report_json(report_payload, source_user_id=supabase_user_id)
 
     except Exception as exc:
         print(

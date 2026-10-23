@@ -12,6 +12,7 @@ import {
   type MaRecommendationRange,
 } from '../report/maRecommendation';
 import { FixedStockParameters } from './FixedStockParameters';
+import { parameterStorageMessage } from '../cloud/settingsApi';
 import './research.css';
 
 /** Recommended periods that are not yet a daily SMA on this symbol. */
@@ -170,7 +171,7 @@ export function MaRecommendation({
           onClose={() => setFixing(false)}
           onSaved={(values) => {
             setFixing(false);
-            onNotice(`${symbol} 固定均線 ${values.join(' / ')} 已永久保存到 Supabase（無分組）。`);
+            onNotice(parameterStorageMessage(`${symbol} 固定均線 ${values.join(' / ')}`));
           }}
         />
       )}

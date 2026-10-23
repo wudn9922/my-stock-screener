@@ -188,6 +188,23 @@ class RunnerTest(unittest.TestCase):
     def ma_config(self, ticker="2330.TW", market="TW"):
         return {"ticker": ticker, "market": market, "group_id": "tw_g1", "group_name": "x", "ma_list": [20]}
 
+    def test_denied_storage_skips_private_monitor_and_all_writes(self):
+        from breakout_alert.account_permissions import CloudStorageDenied
+
+        world = World([self.ma_config()], [])
+        def denied(_store):
+            raise CloudStorageDenied("not cloud-authorized")
+        world.patches["SupabaseStore"].get_monitor_configs = denied
+        self.patch(world)
+        runner.main()
+        self.assertEqual(world.quote_calls, [])
+        self.assertEqual(world.analytics_calls, [])
+        self.assertEqual(world.engine_calls, [])
+        self.assertEqual(world.pruned_drawing_states, [])
+        self.assertEqual(world.state_rows, {})
+        self.assertEqual(world.messages, [])
+        self.assertEqual(sorted(world.closed), ["notifier", "prices", "store"])
+
     def test_drawing_engine_crash_does_not_break_ma_flow(self):
         world = World([self.ma_config()], [{"ticker": "2317.TW", "drawings": [horizontal("2317.TW", "a", 100)]}])
         self.patch(world)

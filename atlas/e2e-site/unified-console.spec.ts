@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { buildReport, mockSite } from './mocks';
+import { accessEnvelope, mockDeviceAccount } from './account-fixture';
 
 test('filter application is reachable and changes the rows, URL, and reloaded view', async ({ page }) => {
   await mockSite(page, { report: buildReport(20) });
@@ -65,6 +66,7 @@ test('Apply stays inside the visual viewport when a keyboard leaves the layout v
 });
 
 test('multiple saved lists preserve independent rules, opening diffs, streaks, and the monitoring choice', async ({ page }) => {
+  await mockDeviceAccount(page);
   const report = buildReport(20) as {
     reportDate: string;
     generatedAt: string;
@@ -130,6 +132,7 @@ test('the original parameter API is available inside Atlas and an undeployed clo
   await page.route('**/functions/v1/user-settings', async (route) => {
     const payload = route.request().postDataJSON() as { action: string; ticker: string; groupId: string; mas: number[]; idToken: string };
     expect(payload.idToken).toBe('test-token');
+    if (payload.action === 'access.get') return route.fulfill({ json: accessEnvelope(undefined, 'cloud') });
     if (payload.action.startsWith('watchlists.'))
       return route.fulfill({
         status: 503,
@@ -157,7 +160,7 @@ test('the original parameter API is available inside Atlas and an undeployed clo
   await page.getByRole('combobox', { name: '參數股票分組' }).selectOption('us_g1');
   await page.getByRole('textbox', { name: '股票均線參數' }).fill('20, 50, 200');
   await page.getByRole('button', { name: '新增股票參數', exact: true }).click();
-  await expect(page.getByRole('table', { name: '雲端股票參數' })).toContainText('NVDA');
+  await expect(page.getByRole('table', { name: '個人股票參數' })).toContainText('NVDA');
   await page.goto('./?page=screener&group=tw_all&f=chg:3:');
   await page.getByRole('button', { name: '存成自選清單', exact: true }).click();
   await page.getByRole('button', { name: '儲存並追蹤清單' }).click();

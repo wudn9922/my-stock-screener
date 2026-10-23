@@ -1,3 +1,4 @@
+import { mockDeviceAccount } from './account-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { buildReport, mockSite, screenerFixtures } from './mocks';
 
@@ -25,6 +26,7 @@ test('daily volume AND stacked annual gates survive sharing, market memory and s
     await target.route('**/my-stock-screener/report/universe.json', (route) => route.fulfill({ json: universe }));
     await target.route('**/my-stock-screener/report/growth.json', (route) => route.fulfill({ json: growth }));
   };
+  await mockDeviceAccount(page);
   await setup(page);
   await page.goto('./?page=screener&group=universe-tw&f=epsy:5:10;epsy:1:20');
   await expect(page.locator('.result-count')).toHaveText('3 / 5 檔');
@@ -83,6 +85,7 @@ test('daily volume AND stacked annual gates survive sharing, market memory and s
 });
 
 test('daily share threshold is optional, customizable, persisted and removable', async ({ page }, info) => {
+  await mockDeviceAccount(page);
   const report = buildReport(20);
   const groups = report.groups as { key: string; items: { volume: number | null; status: string }[] }[];
   const group = groups.find((entry) => entry.key === 'tw_g1')!;

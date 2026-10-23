@@ -5,6 +5,7 @@ const scopePath = scopeURL.pathname.endsWith('/')
 const scopeRoot = new URL(scopePath, scopeURL.origin);
 const CACHE_PREFIX = `atlas-shell-${encodeURIComponent(self.registration.scope)}-`;
 const CACHE = `${CACHE_PREFIX}atlas-shell-v1`;
+const SCREENER_MEMORY_ONLY = scopePath.startsWith('/my-stock-screener/');
 const manifestURL = new URL('manifest.webmanifest', scopeRoot);
 const iconURLs = ['icon.svg', 'icon-192.png', 'icon-512.png'].map(
   (path) => new URL(path, scopeRoot),
@@ -52,6 +53,7 @@ async function fetchAndCache(cache, url) {
 }
 
 self.addEventListener('install', (event) => {
+  if (SCREENER_MEMORY_ONLY) { event.waitUntil(self.skipWaiting()); return; }
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE);
@@ -73,13 +75,14 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       for (const name of await caches.keys())
-        if (name.startsWith(CACHE_PREFIX) && name !== CACHE) await caches.delete(name);
+        if (name.startsWith(CACHE_PREFIX) && (SCREENER_MEMORY_ONLY || name !== CACHE)) await caches.delete(name);
       await self.clients.claim();
     })(),
   );
 });
 
 self.addEventListener('fetch', (event) => {
+  if (SCREENER_MEMORY_ONLY) return;
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== 'GET' || !isInScope(url) || isApiPath(url.pathname)) return;

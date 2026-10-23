@@ -27,7 +27,8 @@ import {
   RefreshCw,
   Search,
 } from 'lucide-react';
-import { chartStore as store, initializeChartStore } from './chartStore';
+import { getChartStore, initializeChartStore } from './chartStore';
+import { canPersist } from '../auth/storage';
 import { cloudSyncState, type CloudSyncState } from '../cloud/startDrawingSync';
 import { ChartEngine } from '../chart/ChartEngine';
 import { DemoProvider } from '../market-data/DemoProvider';
@@ -172,6 +173,7 @@ export function App({
   onOpenFinancials,
   reportSymbols = [],
 }: ChartWorkspaceProps = {}) {
+  const store = getChartStore();
   const mobile = useSyncExternalStore(subscribeMobile, () => mobileMedia.matches);
   const preferences = useSyncExternalStore(sitePreferences.subscribe, sitePreferences.get);
   const cloud = useSyncExternalStore(cloudSyncState.subscribe, cloudSyncState.get);
@@ -316,7 +318,7 @@ export function App({
     };
   }, [centerActiveTimeframe]);
   useEffect(() => {
-    void initializeChartStore();
+    void initializeChartStore(store);
   }, []);
   useEffect(() => {
     if (!state.ready || !hostRef.current || !headerRef.current || !sourceRef.current) return;
@@ -694,6 +696,7 @@ export function App({
   const history = store.history(symbol);
   const exportAll = async () => {
     try {
+      if (!canPersist()) throw new Error('此帳號目前僅可暫存，未獲准匯出個人設定。');
       engine.current?.flushView();
       const data = await store.export(),
         blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
@@ -1233,7 +1236,7 @@ export function App({
                 data-testid="save-state"
                 title={cloudTitles[cloud]}
               >
-                {state.storageError ? '儲存失敗' : state.saving ? '儲存中…' : cloudLabels[cloud]}
+                {!canPersist() ? '僅本次瀏覽暫存' : state.storageError ? '儲存失敗' : state.saving ? '儲存中…' : cloudLabels[cloud]}
               </span>
             </span>
             {mobile && drawingControls && (

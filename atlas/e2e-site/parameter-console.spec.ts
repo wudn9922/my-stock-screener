@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { buildReport, mockSite } from './mocks';
+import { accessEnvelope } from './account-fixture';
 import type { SavedWatchlist } from '../src/watchlists/model';
 import type { ParameterStock } from '../src/cloud/settingsApi';
 
@@ -43,6 +44,9 @@ async function mockConsole(page: Page) {
         body: JSON.stringify({ ok: false, error: message }),
       });
     switch (body.action) {
+      case 'access.get':
+        data = accessEnvelope(undefined, 'cloud').data;
+        break;
       case 'stocks.list':
         data = stocks;
         break;
@@ -154,7 +158,7 @@ test('each rule-list member can save permanent ungrouped parameters that survive
     exact: true,
   });
   await dialog.getByRole('textbox', { name: '個股固定均線參數' }).fill('13, 34, 89');
-  await dialog.getByRole('button', { name: '確認並永久儲存' }).click();
+  await dialog.getByRole('button', { name: '確認並儲存到雲端' }).click();
   await expect(dialog).not.toBeVisible();
   expect(cloud.stocks.find((stock) => stock.ticker === ticker && stock.group_id === 'ungrouped')).toMatchObject({
     ma1: 13,
@@ -173,7 +177,7 @@ test('existing parameter stocks support search, group filters, a five-row scroll
   const cloud = await mockConsole(page);
   await page.goto('./?page=console');
   await page.getByRole('button', { name: '均線參數', exact: true }).click();
-  const table = page.getByRole('table', { name: '雲端股票參數' });
+  const table = page.getByRole('table', { name: '個人股票參數' });
   await expect(table.locator('tbody tr')).toHaveCount(9);
   const viewport = page.getByRole('region', { name: '已有參數股票清單' });
   if (process.env.SCREENSHOT_DIR)

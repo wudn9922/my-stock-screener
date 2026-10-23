@@ -117,6 +117,7 @@ class WatchlistMonitorTests(unittest.TestCase):
         from breakout_alert.supabase_store import get_ma_list, parameter_ticker_key, FIXED_STOCK_GROUP_ID
         namespace = {
             'requests': Mock(get=request), 'get_supabase_settings': lambda: ('https://test.invalid/rest/v1', 'test'),
+            'storage_mode': lambda *args, **kwargs: 'cloud',
             'get_default_group_metadata': lambda: {'us_g1': {'market': 'us', 'ma_list': [20]}},
             'get_default_index_configs': lambda: [], 'fixed_parameter_map': fixed_parameter_map,
             'parameter_ticker_key': parameter_ticker_key, 'FIXED_STOCK_GROUP_ID': FIXED_STOCK_GROUP_ID,

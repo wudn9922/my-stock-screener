@@ -1,3 +1,4 @@
+import { mockDeviceAccount } from './account-fixture';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
@@ -206,6 +207,7 @@ test('US annual EPS marked as quarter-summed is hidden from statements and P/E',
 });
 
 test('table mode: frozen metric column, latest period first, horizontal scroll inside the card', async ({ page }) => {
+  await mockDeviceAccount(page);
   await mockFinancials(page);
   await page.goto('./?page=financials&symbol=AAPL&p=a');
   await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();
@@ -606,6 +608,7 @@ test('layout: annual growth (EPS first) and profitability (ratios first), then f
 });
 
 test('table: each cell shows its value with the year-over-year change under it; one switch hides them and is remembered', async ({ page }, info) => {
+  await mockDeviceAccount(page);
   await mockFinancials(page, {}, { AAPL: trackedAAPL });
   await page.goto('./?page=financials&symbol=AAPL&p=a');
   await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();

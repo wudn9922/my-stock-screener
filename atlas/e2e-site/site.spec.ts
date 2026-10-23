@@ -1,3 +1,4 @@
+import { mockDeviceAccount } from './account-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { buildReport, mockSite } from './mocks';
 
@@ -135,7 +136,7 @@ test('world page compares indices and isolates per-row failures', async ({ page 
 test('a missing or broken report shows a friendly state and search still works', async ({ page }) => {
   await mockSite(page, { report: 'missing' });
   await page.goto('./');
-  await expect(page.getByRole('status')).toContainText('今日報告尚未產生');
+  await expect(page.getByRole('status').filter({ hasText: '今日報告尚未產生' })).toBeVisible();
   await page.unroute('**/my-stock-screener/report/latest.json');
   await page.route('**/my-stock-screener/report/latest.json', (route) =>
     route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html>' }),
@@ -148,6 +149,7 @@ test('a missing or broken report shows a friendly state and search still works',
 });
 
 test('color convention defaults to 紅漲綠跌 and can be switched', async ({ page }) => {
+  await mockDeviceAccount(page);
   await mockSite(page);
   await page.goto('./');
   await expect(page.locator('html')).toHaveAttribute('data-colors', 'tw');

@@ -1,12 +1,14 @@
 import { createRoot } from 'react-dom/client';
-import { Site } from './app/Site';
+import { AccessBoundary } from './auth/AccessBoundary';
 import { applyColorConvention } from './app/sitePreferences';
 import { SCREENER_HOSTING } from './app/HostingMode';
-import { DEFAULT_LIFF_ID, isLineInAppBrowser, startLineIdentity } from './cloud/lineIdentity';
+import { accessState, initializeAccess } from './auth/access';
+import { retireScreenerWorker } from './auth/retireWorker';
 import './styles.css';
 // Packaged native builds use their bundled assets, independent of PWA shell updates.
 if (
   'serviceWorker' in navigator &&
+  !SCREENER_HOSTING &&
   import.meta.env.PROD &&
   import.meta.env.VITE_NATIVE_WRAPPER !== '1'
 )
@@ -22,17 +24,18 @@ applyColorConvention();
 const LIFF_START_TIMEOUT_MS = 4000;
 
 async function render() {
-  // Inside LINE, let LIFF consume its login parameters before the router rewrites the URL
-  // (see cloud/lineIdentity.ts). Other browsers render immediately and never load LIFF.
-  if (SCREENER_HOSTING && isLineInAppBrowser()) {
-    const env = import.meta.env ?? {};
+  if (SCREENER_HOSTING) {
+    // No guest storage, SDK outside LINE, cached grant, or automatic legacy-data adoption.
+    // Delayed login may resolve later; the boundary then replaces the entire temporary workspace.
     await Promise.race([
-      startLineIdentity(env.VITE_LIFF_ID || DEFAULT_LIFF_ID).catch(() => null),
+      initializeAccess(),
       new Promise((resolve) => setTimeout(resolve, LIFF_START_TIMEOUT_MS)),
     ]);
+    accessState.allowGuestWhileLoading();
+    await retireScreenerWorker(new URL(import.meta.env.BASE_URL, location.origin).href);
   }
   // The chart workspace loads its axis font itself; the landing page renders immediately.
-  createRoot(document.getElementById('root')!).render(<Site />);
+  createRoot(document.getElementById('root')!).render(<AccessBoundary />);
 }
 
 void render();

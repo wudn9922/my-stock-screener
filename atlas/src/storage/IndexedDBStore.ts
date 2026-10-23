@@ -9,7 +9,8 @@ import {
   type AppSettings,
   type SettingsExport,
 } from './schema';
-import { SCREENER_HOSTING, storageName } from '../app/HostingMode';
+import { SCREENER_HOSTING } from '../app/HostingMode';
+import { getStorageContextKey, persistentDatabaseName, canPersist } from '../auth/storage';
 interface AtlasDB extends DBSchema {
   symbols: { key: string; value: SymbolState };
   app: { key: string; value: AppSettings };
@@ -29,9 +30,16 @@ export const defaultApp: AppSettings = appSchema.parse(
       },
 );
 export class IndexedDBStore {
-  private db: Promise<IDBPDatabase<AtlasDB>>;
-  constructor(name = storageName('atlas-terminal')) {
-    this.db = openDB<AtlasDB>(name, 4, {
+  private db: Promise<IDBPDatabase<AtlasDB>> | null = null;
+  private memory = { app: structuredClone(defaultApp), symbols: [] as SymbolState[] };
+  private memoryAppExists = false;
+  private readonly context = getStorageContextKey();
+  private readonly guarded: boolean;
+  constructor(name?: string) {
+    this.guarded = name === undefined && SCREENER_HOSTING;
+    const database = name ?? persistentDatabaseName('atlas-terminal');
+    if (!database) return;
+    this.db = openDB<AtlasDB>(database, 4, {
       async upgrade(db, oldVersion, _newVersion, tx) {
         if (oldVersion < 1) {
           db.createObjectStore('symbols', { keyPath: 'symbol' });
@@ -70,27 +78,51 @@ export class IndexedDBStore {
       },
     });
   }
+  private assertCurrent() {
+    if (this.guarded && this.context !== getStorageContextKey()) throw new Error('帳號或儲存授權已變更，舊操作已取消。');
+    if (this.guarded && this.db && !canPersist()) throw new Error('登入已過期，目前操作不會保存。');
+  }
   async load() {
+    this.assertCurrent();
+    if (!this.db) return { ...structuredClone(this.memory), appExists: this.memoryAppExists };
     const db = await this.db;
     const [app, symbols] = await Promise.all([db.get('app', 'settings'), db.getAll('symbols')]);
+    this.assertCurrent();
     return {
       app: app ? appSchema.parse(app) : structuredClone(defaultApp),
       symbols: symbols.map((s) => symbolStateSchema.parse(s)),
+      appExists: app !== undefined,
     };
   }
   async saveSymbol(s: SymbolState) {
-    await (await this.db).put('symbols', symbolStateSchema.parse(s));
+    this.assertCurrent();
+    const parsed = symbolStateSchema.parse(s);
+    if (!this.db) {
+      this.memory.symbols = [...this.memory.symbols.filter((row) => row.symbol !== parsed.symbol), structuredClone(parsed)];
+      return;
+    }
+    const db = await this.db;
+    this.assertCurrent();
+    await db.put('symbols', parsed);
   }
   async saveApp(s: AppSettings) {
-    await (await this.db).put('app', appSchema.parse(s), 'settings');
+    this.assertCurrent();
+    const parsed = appSchema.parse(s);
+    if (!this.db) { this.memory.app = structuredClone(parsed); this.memoryAppExists = true; return; }
+    const db = await this.db;
+    this.assertCurrent();
+    await db.put('app', parsed, 'settings');
   }
   async export(): Promise<SettingsExport> {
     const { app, symbols } = await this.load();
     return exportSchema.parse({ version: 4, exportedAt: new Date().toISOString(), app, symbols });
   }
   async import(data: SettingsExport) {
-    const validated = exportSchema.parse(data),
-      db = await this.db;
+    this.assertCurrent();
+    const validated = exportSchema.parse(data);
+    if (!this.db) { this.memory = structuredClone({ app: validated.app, symbols: validated.symbols }); this.memoryAppExists = true; return; }
+    const db = await this.db;
+    this.assertCurrent();
     const tx = db.transaction(['symbols', 'app'], 'readwrite');
     // A request failure can exit before the final await; observe the abort rejection.
     void tx.done.catch(() => undefined);
@@ -100,6 +132,6 @@ export class IndexedDBStore {
     await tx.done;
   }
   async close() {
-    (await this.db).close();
+    (await this.db)?.close();
   }
 }

@@ -2,9 +2,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Page, type Locator } from "@playwright/test";
 import { mockSite } from "./mocks";
+import { mockDeviceAccount, accountDatabase } from "./account-fixture";
 import { researchFixtureBody } from "./research-fixtures";
 const root = resolve(import.meta.dirname, "../src/report/fixtures");
 async function setup(page: Page) {
+  await mockDeviceAccount(page);
   await mockSite(page);
   await page.route("**/my-stock-screener/report/research/**", (route) => {
     const path = new URL(route.request().url()).pathname.split(
@@ -36,8 +38,8 @@ async function setup(page: Page) {
   );
 }
 async function savedCount(page: Page, symbol: string) {
-  return page.evaluate(async (sym) => {
-    const request = indexedDB.open("atlas-terminal-screener");
+  return page.evaluate(async ({ sym, database }) => {
+    const request = indexedDB.open(database);
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -51,7 +53,7 @@ async function savedCount(page: Page, symbol: string) {
       };
       req.onerror = () => reject(req.error);
     });
-  }, symbol);
+  }, { sym: symbol, database: accountDatabase() });
 }
 async function horizontal(page: Page, chart: Locator) {
   await expect(chart.locator("canvas").first()).toBeVisible();

@@ -1,7 +1,7 @@
 name: Deploy Cloud Run (breakout alert)
 
 # 突破監控（Dockerfile.breakout）與 Discord 查詢（Dockerfile.discord-query）合併到 main 後自動建置並部署。
-# 只更新服務的映像；環境變數、secret、排程等既有設定不變。
+# 更新服務映像及帳號儲存政策的管理員 ID；其他既有環境變數、secret、排程不變。
 # 用 Workload Identity Federation 登入 Google Cloud（不需要金鑰檔），一次性設定見 scripts/setup-cloud-run-deploy.sh。
 # 需要的 repository variables（Settings → Secrets and variables → Actions → Variables）：
 #   GCP_WIF_PROVIDER、GCP_DEPLOY_SA、GCP_PROJECT_ID、GCP_REGION
@@ -51,10 +51,15 @@ jobs:
       REGION: ${{ vars.GCP_REGION }}
       SERVICE: ${{ vars[matrix.service_var] }}
       IMAGE: ${{ vars[matrix.image_var] }}
+      ADMIN_LINE_USER_ID: ${{ vars.ADMIN_LINE_USER_ID || 'Ua0037dbd5037b64fc76804c60520ad76' }}
     steps:
       - name: Check configuration
         id: config
         run: |
+          if ! [[ "${ADMIN_LINE_USER_ID}" =~ ^U[0-9a-f]{32}$ ]]; then
+            echo "::error::ADMIN_LINE_USER_ID 格式不正確，停止部署避免帳號政策不一致。"
+            exit 1
+          fi
           missing=""
           for name in WIF_PROVIDER DEPLOY_SA PROJECT_ID REGION SERVICE IMAGE; do
             [ -n "${!name}" ] || missing="${missing} ${name}"
@@ -99,6 +104,7 @@ jobs:
             --image "${IMAGE}:${GITHUB_SHA}" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
+            --update-env-vars "ADMIN_LINE_USER_ID=${ADMIN_LINE_USER_ID}" \
             --quiet
           url=$(gcloud run services describe "${SERVICE}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')
           code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "${url}/health" || true)

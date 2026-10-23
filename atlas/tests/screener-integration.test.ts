@@ -277,29 +277,30 @@ describe('screener-symbols normalization', () => {
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       urls.push(String(url));
       expect((init?.headers as Record<string, string>).apikey).toBe('sb_publishable_k');
+      if (String(url).includes('/atlas_storage_access?')) return new Response('[]');
       if (String(url).includes('/stocks?'))
         return new Response(JSON.stringify([
-          { ticker: '2330', line_user_id: 'U1' },
-          { ticker: 'brk.b', line_user_id: 'U1' },
-          { ticker: 'TSLA', line_user_id: 'U2' },
-          { ticker: '???', line_user_id: 'U1' },
+          { ticker: '2330', line_user_id: 'Ua0037dbd5037b64fc76804c60520ad76' },
+          { ticker: 'brk.b', line_user_id: 'Ua0037dbd5037b64fc76804c60520ad76' },
+          { ticker: 'TSLA', line_user_id: 'U11111111111111111111111111111111' },
+          { ticker: '???', line_user_id: 'Ua0037dbd5037b64fc76804c60520ad76' },
         ]));
       return new Response(JSON.stringify([{ ticker: '^TWII' }, { ticker: '^SOX', enabled: false }]));
     });
     const symbols = await fetchScreenerSymbols(
-      { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_k', SUPABASE_USER_ID: 'U1' },
+      { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_k', SUPABASE_USER_ID: 'Ua0037dbd5037b64fc76804c60520ad76' },
       fetchImpl as unknown as typeof fetch,
       () => undefined,
     );
     expect(symbols).toEqual(['2330.TW', 'BRK-B', '^TWII']);
-    expect(urls[0]).toContain('https://x.supabase.co/rest/v1/stocks?');
-    expect(urls[0]).toContain('line_user_id=eq.U1');
+    expect(urls.find(url => url.includes('/stocks?'))).toContain('https://x.supabase.co/rest/v1/stocks?');
+    expect(urls.find(url => url.includes('/stocks?'))).toContain('line_user_id=eq.Ua0037dbd5037b64fc76804c60520ad76');
   });
 
   it('fails without writing when Supabase errors or returns no stocks', async () => {
-    const env = { SUPABASE_URL: 'https://x.supabase.co/rest/v1', SUPABASE_SERVICE_ROLE_KEY: 'eyJk' };
+    const env = { SUPABASE_URL: 'https://x.supabase.co/rest/v1', SUPABASE_SERVICE_ROLE_KEY: 'eyJk', SUPABASE_USER_ID: 'Ua0037dbd5037b64fc76804c60520ad76' };
     await expect(
-      fetchScreenerSymbols(env, vi.fn(async () => new Response('denied', { status: 401 })) as unknown as typeof fetch, () => undefined),
+      fetchScreenerSymbols(env, vi.fn(async (url: string | URL | Request) => String(url).includes('/atlas_storage_access?') ? new Response('[]') : new Response('denied', { status: 401 })) as unknown as typeof fetch, () => undefined),
     ).rejects.toThrow('HTTP 401');
     await expect(
       fetchScreenerSymbols(env, vi.fn(async () => new Response('[]')) as unknown as typeof fetch, () => undefined),
