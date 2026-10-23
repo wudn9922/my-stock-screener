@@ -183,6 +183,9 @@ def build_world_candles(out, data_dir=None, http=None):
             rows.update({r[0]: r for r in fresh})
             rows = [rows[d] for d in sorted(rows)]
             save_csv(path, rows)
+            # Build the snapshot from the permanent record itself, so a bar the record
+            # deferred (unfinished session) can never appear in the chart snapshot.
+            rows = read_csv(path)
             relative = f"candles/{key}.json"
             excluded_dates = kline.quarantined_dates(identity)
             usable = [r for r in rows if r[0] not in excluded_dates

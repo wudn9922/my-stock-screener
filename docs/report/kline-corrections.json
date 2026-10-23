@@ -479,6 +479,74 @@
       "reason": "unfinished-world-session",
       "id": "a6793655a1db06dd9d8ff3689b27702163d14bfe757022ee7a269508beafdbd8",
       "loggedAt": "2026-10-23T03:40:16.751627+00:00"
+    },
+    {
+      "symbol": "FX-USDJPY",
+      "date": "2026-10-13",
+      "status": "rejected",
+      "old": {
+        "Open": 158.50900268554688,
+        "High": 158.51400756835938,
+        "Low": 157.84100341796875,
+        "Close": 158.52000427246094
+      },
+      "new": null,
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/JPY%3DX",
+      "fetchedAt": "2026-10-23T05:53:30.355589+00:00",
+      "reason": "invalid-world-OHLC",
+      "id": "91adf4e9a78a0f99c8b67161c2f26c9602d1267d9eac27d703c070ca81f0c4ec",
+      "loggedAt": "2026-10-23T05:53:30.356055+00:00"
+    },
+    {
+      "symbol": "FX-USDKRW",
+      "date": "2026-09-24",
+      "status": "rejected",
+      "old": {
+        "Open": 1365.4300537109375,
+        "High": 1376.6400146484375,
+        "Low": 1363.6300048828125,
+        "Close": 1362.5
+      },
+      "new": null,
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/KRW%3DX",
+      "fetchedAt": "2026-10-23T05:53:32.733356+00:00",
+      "reason": "invalid-world-OHLC",
+      "id": "684585f1b9a4ef95d676b9d1813122af03281d0c08caaa88caf40ebddf60bd64",
+      "loggedAt": "2026-10-23T05:53:32.733774+00:00"
+    },
+    {
+      "symbol": "FX-USDKRW",
+      "date": "2026-09-28",
+      "status": "rejected",
+      "old": {
+        "Open": 1356.3399658203125,
+        "High": 1364.989990234375,
+        "Low": 1355.1800537109375,
+        "Close": 1354.510009765625
+      },
+      "new": null,
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/KRW%3DX",
+      "fetchedAt": "2026-10-23T05:53:32.733356+00:00",
+      "reason": "invalid-world-OHLC",
+      "id": "8629e91e1654a9bdc64f72a78cd4088b62abe400889848135b9564b6957ef92e",
+      "loggedAt": "2026-10-23T05:53:32.735068+00:00"
+    },
+    {
+      "symbol": "FX-USDKRW",
+      "date": "2026-10-12",
+      "status": "rejected",
+      "old": {
+        "Open": 1339.8800048828125,
+        "High": 1339.8800048828125,
+        "Low": 1329.050048828125,
+        "Close": 1340.8399658203125
+      },
+      "new": null,
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/KRW%3DX",
+      "fetchedAt": "2026-10-23T05:53:32.733356+00:00",
+      "reason": "invalid-world-OHLC",
+      "id": "774b0c5903bc1836abfb2d40a29f4e68dd2ea133d82492da735c1831e9e66861",
+      "loggedAt": "2026-10-23T05:53:32.736203+00:00"
     }
   ]
 }
