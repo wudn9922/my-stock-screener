@@ -1,6 +1,6 @@
 # Task B：套用已審閱的 SEC 重編比較期
 
-本 PR 接續 Task A，以最新 main `53d705a64911652671208fde8a7c83ca30f875a4` 為基準，套用 #153 已合併的 dry run。套用收據記錄的 Task A 基準 `693d585c7` 與此 main 的財報／growth／Q4 資料相同。沒有合併或部署本 PR。
+本 PR 接續 Task A，以最新 main `2a817c94b39189bf6bbe0f924d88f35cd5cf32de` 為基準，套用 #153 已合併的 dry run。套用收據記錄的 Task A 基準 `693d585c7` 與此 main 的財報／growth／Q4 資料相同。沒有合併或部署本 PR。
 
 ## 寫入結果
 
@@ -52,7 +52,7 @@ python atlas/scripts/apply_sec_restatements.py --apply --cache-dir .cache/task-b
 
 # 已套用的本分支可直接重跑這個離線驗證，不需原始 SEC 快取。
 python atlas/scripts/apply_sec_restatements.py \
-  --verify-against 53d705a64911652671208fde8a7c83ca30f875a4
+  --verify-against 2a817c94b39189bf6bbe0f924d88f35cd5cf32de
 ```
 
 `growth.json` 用同一計算時點與官方來源選擇規則，比較套用前／後結果，只更新此次輸入造成差異的股票；其他市場、其他股票與觀測日老化不會因本次操作改寫。219 列中 `revY` 變動 218 列、`epsY` 7 列、`epsQ` 1 列、`revQ` 1 列、`tY` 2 列（同列可有多欄）。獨立驗證也從 Git 基準重建上述差異，與實際 growth 完整比對。
@@ -64,3 +64,9 @@ python atlas/scripts/apply_sec_restatements.py \
 完整 Python suite、Atlas clean `npm ci`、全部單元測試、typecheck、lint、production build、Pages build；新增瀏覽器回歸驗證 NVDA 日期與 AD 品質／修訂紀錄。實際數量與 CI 狀態列於本 PR 與 [測試收據](report/task-b-verification.json)。
 
 CI 在本 PR 變更套用紀錄時，也會從 PR 基準重新驗證全量財報、growth 與 Q4 受保護資料。獨立驗證讀 Git 基準的檔案清單，因此刪除受保護檔案也會失敗。由主要實作者自我審查，沒有宣稱獨立簽核；WebKit 是 Playwright 模擬，不是實體 iPhone 驗證。
+
+## 目前完整套件的上游阻塞
+
+最新 main 的研究紀錄更新後，完整 Python suite 為 **1,582 項、1 項失敗**：`test_all_committed_candles_have_real_bounds_and_matching_records`。本機可重現商品 CSV 修正後與舊快照的成交量不同；CI 恢復 generated 快照後，匯率快照有 2026-10-22 列、main 永久 CSV 尚停在 10/21。這是不同版本的世界行情輸入不一致；本 PR 沒有改世界行情 CSV、世界收集器或放寬該檢查。
+
+本次 SEC 的 37 項規則／套用測試及完整財報／growth／Q4 差異證明均通過。新增獨立 `sec-write-proof` CI job，直接驗證 PR 財報，避免被其他整合失敗跳過。Atlas 單元、建置及第一輪遠端瀏覽器回歸 230 項通過（另 1 項既有手機導覽列測試於桌機不適用）；整體 CI 仍因世界行情檢查未通過，不能宣稱全部成功。
