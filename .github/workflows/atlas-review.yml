@@ -36,6 +36,26 @@ concurrency:
   group: atlas-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
+  records-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: atlas/package-lock.json
+      - name: Verify Atlas without restoring any generated inputs
+        working-directory: atlas
+        run: |
+          npm ci
+          npm test
+          npm run typecheck
+          npm run lint
+          npm run build
+          VITE_PUBLIC_BASE=/my-stock-screener/atlas/ npm run build:pages
+          npm run refresh:watchlists
   sec-write-proof:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -87,6 +107,7 @@ jobs:
         working-directory: atlas
         run: |
           npm test
+          ATLAS_RESEARCH_DIR=../docs/report/research npx vitest run tests/research-data.test.tsx tests/research-candles.test.ts
           npm run typecheck
           npm run lint
           npm run build

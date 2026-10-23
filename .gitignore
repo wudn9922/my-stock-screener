@@ -28,3 +28,27 @@ Thumbs.db
 
 # 產生器中斷時留下的暫存檔（不要隨 docs/report 一起提交）
 docs/report/**/*.tmp
+
+# Regenerated outputs live on generated; see .github/generated-paths.json.
+# Keep the tracked, frozen PNGs for historical LINE raw/main links.
+/docs/index.html
+/docs/wsj.jpg
+/docs/barrons.jpg
+/docs/atlas/
+/docs/report/latest.json
+/docs/report/universe.json
+/docs/report/breadth.json
+/docs/report/series/
+/docs/report/themes.json
+/docs/report/rates.json
+/docs/report/rates-history.json
+/docs/report/growth.json
+/docs/report/fundamentals/tw.json
+/docs/report/fundamentals/us-sec.json
+/docs/report/fundamentals/tw-finmind.json
+/docs/report/breakouts.json
+/docs/report/breakouts-archive/*.json
+/docs/report/research/
+/docs/report/tw-chips.json
+/docs/report/themes-tw.json
+/docs/report/ma-selector/

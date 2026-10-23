@@ -12,12 +12,15 @@ import {
   fetchResearch,
   type VolumeFeature,
 } from "../src/report/research";
-import { decodeResearchRecord } from "../src/report/researchStore";
+import { decodeResearchRecord, marketIndexSchema } from "../src/report/researchStore";
 import { holderBaseline, largeHolderSchema } from "../src/report/twChips";
 import { parseRoute, serializeRoute } from "../src/app/routes";
 import { HistoryPlot, num, pct, Provenance } from "../src/ui/research/Common";
 import { dispositionStatus } from "../src/ui/research/OfficialAlerts";
-const root = resolve(import.meta.dirname, "../../docs/report/research");
+// Unit tests use a reviewed corpus; CI also runs against the restored live tree.
+const root = process.env.ATLAS_RESEARCH_DIR
+  ? resolve(process.env.ATLAS_RESEARCH_DIR)
+  : resolve(import.meta.dirname, "fixtures/research-public");
 const rawJson = (p: string) =>
   JSON.parse(readFileSync(resolve(root, p), "utf8"));
 const json = (p: string) => {
@@ -64,10 +67,13 @@ const feature = (up: boolean, rvol: number | null): VolumeFeature => ({
   missingReason: null,
 });
 afterEach(() => vi.unstubAllGlobals());
-describe("actual generated public research contracts", () => {
+describe("public research contracts", () => {
   it("validates every institutional shard and preserves negative values", () => {
+    expect(marketIndexSchema.safeParse(rawJson("institutions.json")).success).toBe(true);
     const stocks = allStocks("institutions");
-    expect(stocks.length).toBeGreaterThan(1000);
+    expect(stocks.length).toBeGreaterThan(2);
+    if (process.env.ATLAS_RESEARCH_DIR)
+      expect(stocks.length).toBeGreaterThan(1000);
     for (const stock of stocks) {
       expect(institutionsSchema.safeParse(stock).success).toBe(true);
     }
@@ -78,6 +84,7 @@ describe("actual generated public research contracts", () => {
     ).toBe(true);
   }, 30000);
   it("validates every daily price-volume shard", () => {
+    expect(marketIndexSchema.safeParse(rawJson("volume.json")).success).toBe(true);
     for (const stock of allStocks("volume"))
       expect(volumeSchema.safeParse(stock).success).toBe(true);
   }, 30000);
