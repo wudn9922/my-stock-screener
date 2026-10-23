@@ -332,3 +332,15 @@ Reviewed acceptance/refetch/official fallback, permanent-row preservation, quara
 indicators and calendar aggregation (including offline cache), legitimate negative financial
 net revenues, explicit-null merge precedence, same-date RS ranking and screener date scopes.
 The known 7825 row remains stored and excluded; no unverified price was invented.
+
+
+## Task B — reviewed SEC comparative apply (2026-10-23)
+
+Primary implementer self-review; no independent human sign-off. Separate PR, do not merge.
+
+- Apply pinned #153 report only: 580 symbols, 1,172 annual periods, 2,151 cells; zero nulls, zero lost flags. Every changed original retained in quality.revisions(kind=restated).
+- Independent Git-tree verification compares all 6,947 financial files, retains alignment and EPS grades, proves exact old/new cell equality and all 9 Q4 answer/classification/ledger files byte-identical.
+- 219 growth rows independently rebuilt; unrelated rows retained. NVDA metadata-only secEnd exposes FY2026 2026-01-25 beside unchanged 2026-01-31.
+- Offline preflight rejects drift before any write; batch rolls back on write failure. SEC fetching is separate, identified and bounded; apply makes zero requests.
+- Full Python: 1,582 passed. Atlas clean npm ci, 985 tests / 84 files, typecheck, lint, production and Pages builds passed. Four new desktop/mobile Chromium browser checks passed. Remote CI / WebKit results are recorded in the PR checks.
+- Evidence: docs/SEC_RESTATED_COMPARATIVES_APPLY.md and docs/report/sec-restated-comparatives-{apply,verification}.json.

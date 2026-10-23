@@ -149,6 +149,17 @@ jobs:
           python -m unittest discover -s tests -p 'test_full_market_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_swing_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_breakout_outcomes.py' -v
+      - name: Verify reviewed SEC restatement write set
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
+          if git diff --quiet "$PR_BASE_SHA" HEAD -- docs/report/sec-restated-comparatives-apply.json; then
+            echo "This PR does not apply a SEC restatement manifest."
+            exit 0
+          fi
+          python atlas/scripts/apply_sec_restatements.py --verify-against "$PR_BASE_SHA"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

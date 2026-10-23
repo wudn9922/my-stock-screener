@@ -350,7 +350,8 @@ def _periods(index, cache, currency, frequency, basis=IFRS_BASIS):
                 fallback = fallback or role == "fallback"
                 break
         if any(name in values for name in EXISTENCE_FIELDS):
-            items.append({"end": end.isoformat(), "values": values, "concepts": concepts, "fallback": fallback})
+            items.append({"end": end.isoformat(), "values": values, "concepts": concepts, "fallback": fallback,
+                          "extra": {"secEnd": end.isoformat()}})
     return items
 
 
