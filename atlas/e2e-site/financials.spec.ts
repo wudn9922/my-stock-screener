@@ -654,7 +654,7 @@ test('annual provenance identifies Yahoo fields inside official rows', async ({ 
   await expect(page.locator('.fin-notes')).toContainText('Yahoo Finance 年度欄位回補');
   await expect(page.locator('.fin-notes')).toContainText('現金');
   await page.locator('.fin-card[data-group="growth"] .fin-bar').last().click();
-  await expect(page.locator('.fin-detail .fin-source')).toContainText('SEC ＋ Yahoo 欄位回補');
+  await expect(page.locator('.fin-card[data-group="growth"] .fin-detail .fin-source')).toContainText('SEC ＋ Yahoo 欄位回補');
   await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();
   await expect(page.locator('.fin-table').getByText('SEC ＋ Yahoo 欄位回補', { exact: true })).toBeVisible();
 });
