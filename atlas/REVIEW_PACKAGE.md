@@ -352,3 +352,11 @@ Primary implementer self-review; no independent human sign-off. Separate PR, do 
 - Evidence: docs/SEC_RESTATED_COMPARATIVES_APPLY.md and docs/report/sec-restated-comparatives-{apply,verification}.json.
 
 Task B refresh regression: ordinary updates retain restatement flags, original revision history and secEnd; explicit reviewed SEC basis protects the five legacy-Yahoo-labelled annual rows from being reverted by Yahoo. No additional statement values were written.
+
+## FY2021–FY2025 conservative Yahoo backfill (2026-10-23)
+
+Primary implementer self-review; no independent human sign-off. Replacement for closed, unmerged #151;
+new branch from main containing #164; do not merge. See [policy and replay](../docs/YAHOO_ANNUAL_BACKFILL.md).
+Reviewed whole-period 2% veto across every overlapping field, zero/negative/unit handling, no EPS/shares,
+null-only existing annual rows, preserved unknown flags/revisions, field provenance in notes/table/chart detail,
+Yahoo/SEC/FinMind refresh retention, atomic batch rollback, and independent Git-tree + protected Q4 proof.

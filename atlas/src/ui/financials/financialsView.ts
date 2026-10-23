@@ -446,6 +446,15 @@ const SOURCE_NAMES = { sec: 'SEC EDGAR', finmind: '公開資訊觀測站（FinMi
 /** Short source name of one period (the statement table's 來源 row and the detail card). */
 export const SOURCE_LABEL: Record<PeriodSource, string> = { sec: 'SEC', finmind: 'FinMind', yahoo: 'Yahoo' };
 
+/** A row can contain attributed Yahoo fields without changing the official row source. */
+export function periodSourceText(series: FinancialHistory[PeriodKind], index: number): string {
+  const source = series.src[index] ?? 'yahoo';
+  const supplemented = Object.entries(series.fieldSrc?.[index] ?? {}).some(([field, origin]) =>
+    origin === 'yahoo' && origin !== source && series.values[field as keyof typeof series.values]?.[index] != null,
+  );
+  return SOURCE_LABEL[source] + (supplemented ? ' ＋ Yahoo 欄位回補' : '');
+}
+
 /** 「資料來源：SEC EDGAR（FY2015–FY2020）＋ Yahoo Finance（FY2021–FY2024）」 */
 export function provenanceText(history: FinancialHistory, kind: PeriodKind): string {
   const series = history[kind];
@@ -467,7 +476,15 @@ export function provenanceText(history: FinancialHistory, kind: PeriodKind): str
     const to = labelOf.get(span.to) ?? span.to;
     return `${name}（${from === to ? from : `${from}–${to}`}）`;
   });
-  return `資料來源：${parts.join(' ＋ ')}`;
+  const overrides = series.fieldSrc?.flatMap((sources, index) => {
+    const fields = Object.entries(sources).filter(([field, source]) =>
+      source === 'yahoo' && source !== series.src[index] &&
+      series.values[field as keyof typeof series.values]?.[index] != null,
+    ).map(([field]) => FIELD_LABELS[field as keyof typeof FIELD_LABELS] ?? field);
+    return fields.length ? [`${labelOf.get(series.end[index]!) ?? series.end[index]}：${fields.join('、')}`] : [];
+  }) ?? [];
+  const detail = overrides.length ? `；Yahoo Finance 年度欄位回補（${overrides.join('；')}），其餘欄位依原列來源` : '';
+  return `資料來源：${parts.join(' ＋ ')}${detail}`;
 }
 
 /** A whole number as is; any other factor to two decimals (「2.50」). */

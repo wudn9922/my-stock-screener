@@ -15,7 +15,7 @@ import {
   formatValue,
   moneyScale,
   oiFieldText,
-  SOURCE_LABEL,
+  periodSourceText,
   unitText,
   yoyText,
   type FinancialsView,
@@ -199,7 +199,7 @@ function Detail({
       <div className="fin-detail-head">
         <b>{label.long}</b>
         <span>期末 {formatDateTime(label.end, false)}</span>
-        <span className={`fin-source ${source}`}>{SOURCE_LABEL[source]}</span>
+        <span className={`fin-source ${source}`}>{periodSourceText(history[view.kind], period)}</span>
       </div>
       <div className="fin-detail-value">
         <b>
