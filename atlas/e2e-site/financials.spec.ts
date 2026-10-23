@@ -641,3 +641,20 @@ test('Taiwan QuarterStrip on a 390px phone has one compact row without overflow'
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
   await strip.screenshot({ path: info.outputPath('financials-strip-390.png') });
 });
+
+test('annual provenance identifies Yahoo fields inside official rows', async ({ page }) => {
+  const data = JSON.parse(fixtures['AAPL']!);
+  const count = data.annual.end.length;
+  data.annual.src = Array(count).fill('sec');
+  data.annual.fieldSrc = Array.from({ length: count }, () => ({}));
+  data.annual.fieldSrc[count - 1] = { cash: 'yahoo' };
+  data.annual.values.cash[count - 1] = 123000000;
+  await mockFinancials(page, {}, { AAPL: JSON.stringify(data) });
+  await page.goto('./?page=financials&symbol=AAPL&p=a');
+  await expect(page.locator('.fin-notes')).toContainText('Yahoo Finance 年度欄位回補');
+  await expect(page.locator('.fin-notes')).toContainText('現金');
+  await page.locator('.fin-card[data-group="growth"] .fin-bar').last().click();
+  await expect(page.locator('.fin-card[data-group="growth"] .fin-detail .fin-source')).toContainText('SEC ＋ Yahoo 欄位回補');
+  await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();
+  await expect(page.locator('.fin-table').getByText('SEC ＋ Yahoo 欄位回補', { exact: true })).toBeVisible();
+});

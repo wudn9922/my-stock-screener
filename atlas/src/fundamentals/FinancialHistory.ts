@@ -59,6 +59,8 @@ export interface FinancialSeries {
   end: string[];
   /** Actual SEC period end; `end` keeps the existing alignment and fiscal labels. */
   secEnd?: (string | null)[];
+  /** Field overrides to the row source (e.g. an annual Yahoo null fill in an SEC row). */
+  fieldSrc?: Partial<Record<RawField, PeriodSource>>[];
   /** Fiscal year as written by the builder (labels are recomputed by financialMetrics.ts). */
   fy: (number | null)[];
   /** Fiscal quarter as written by the builder; all null for annual periods. */
@@ -200,6 +202,7 @@ export function parseSeries(raw: unknown, kind: PeriodKind): FinancialSeries {
   const src = arrayOf(block.src);
   const qualities = arrayOf(block.epsQuality);
   const secEnds = Array.isArray(block.secEnd) ? block.secEnd : null;
+  const fieldSources = Array.isArray(block.fieldSrc) ? block.fieldSrc : null;
   const rawValues = recordOf(block.values);
   const columns = RAW_FIELDS.map((field) => arrayOf(rawValues[field]));
   const byEnd = new Map<string, number>();
@@ -213,6 +216,15 @@ export function parseSeries(raw: unknown, kind: PeriodKind): FinancialSeries {
   for (const [end, index] of order) {
     out.end.push(end);
     if (secEnds) (out.secEnd ??= []).push(validDate(secEnds[index]));
+    if (fieldSources) {
+      const rawSources = recordOf(fieldSources[index]);
+      const sources: Partial<Record<RawField, PeriodSource>> = {};
+      for (const field of RAW_FIELDS) {
+        const source = rawSources[field];
+        if (source === 'sec' || source === 'finmind' || source === 'yahoo') sources[field] = source;
+      }
+      (out.fieldSrc ??= []).push(sources);
+    }
     const year = finiteOrNull(fy[index]);
     out.fy.push(year !== null && Number.isInteger(year) ? year : null);
     const quarter = finiteOrNull(fq[index]);

@@ -484,7 +484,8 @@ def source_label(periods, filled=()):
     if any(p["src"] == "sec" for p in periods):
         return SOURCE_MIXED
     if any(p["src"] == "finmind" for p in periods):
-        yahoo = bool(filled) or any(p["src"] == "yahoo" for p in periods)
+        yahoo = bool(filled) or any(p["src"] == "yahoo" or
+            "yahoo" in (p.get("extra", {}).get("fieldSrc") or {}).values() for p in periods)
         return SOURCE_FINMIND_MIXED if yahoo else SOURCE_FINMIND
     return SOURCE
 
@@ -529,6 +530,12 @@ def same_period_matches(periods, new):
     return match
 
 
+def annual_basis_matches(old, incoming):
+    """2% of the stored value; tolerate only floating-point noise at the boundary."""
+    difference, limit = abs(old - incoming), .02 * abs(old)
+    return difference <= limit or math.isclose(difference, limit, rel_tol=1e-12)
+
+
 def merge_section(old, new, frequency, today_iso, renamed=None, filled=None):
     """
     Merge new Yahoo periods into stored ones → (periods ascending, revisions).
@@ -553,7 +560,15 @@ def merge_section(old, new, frequency, today_iso, renamed=None, filled=None):
                 periods.append(period(item["end"], item["values"]))
             continue
         target = periods[i]
-        if official_period(target):
+        backfilled = target["extra"].get("yahooAnnualBackfill")
+        if backfilled:
+            # Historical backfill was approved against every overlapping field.
+            # A different incoming basis cannot extend or rewrite this row.
+            overlaps = [(old, item["values"][field]) for field, old in target["values"].items()
+                        if old is not None and item["values"].get(field) is not None]
+            if not overlaps or any(not annual_basis_matches(old, incoming) for old, incoming in overlaps):
+                continue
+        if official_period(target) or backfilled:
             for field in ("revenue", "netIncome"):
                 old_value, new_value = target["values"].get(field), item["values"].get(field)
                 if old_value is not None and new_value is not None:
@@ -563,10 +578,13 @@ def merge_section(old, new, frequency, today_iso, renamed=None, filled=None):
             # Only fill gaps; per-share fields only as a set, so EPS and share count share a basis
             per_share_free = all(target["values"].get(f) is None for f in PER_SHARE_FIELDS)
             for field, value in item["values"].items():
+                if backfilled and field in PER_SHARE_FIELDS:
+                    continue
                 if field in PER_SHARE_FIELDS and not per_share_free:
                     continue
                 if target["values"].get(field) is None:
                     target["values"][field] = value
+                    target["extra"]["fieldSrc"] = {**(target["extra"].get("fieldSrc") or {}), field: "yahoo"}
                     if filled is not None:
                         filled.append((target["end"], field))
             continue
@@ -1335,6 +1353,18 @@ def write_section(periods, extras, quarterly):
     return section
 
 
+def preserve_backfill_quality(previous, grade, annual):
+    """Backfill does not authorize a daily writer to discard historical audit notes."""
+    if not previous or not any(p["extra"].get("yahooAnnualBackfill") for p in annual):
+        return
+    prior = previous.get("quality") or {}
+    grade["issues"] = list(dict.fromkeys((prior.get("issues") or []) + grade["issues"]))
+    history = list(prior.get("revisions") or [])
+    history.extend(r for r in grade.get("revisions", []) if r not in history)
+    if history:
+        grade["revisions"] = history
+
+
 def update_document(previous, payload, key, now, fetch_splits=None):
     """
     Merge one Yahoo timeseries payload into the stored document (None for a new stock).
@@ -1434,6 +1464,7 @@ def update_document(previous, payload, key, now, fetch_splits=None):
             grade["issues"] += sorted(code for code in codes if code in carried and code not in grade["issues"])
     if revisions:
         grade["revisions"] = revisions
+    preserve_backfill_quality(previous, grade, annual)
     document = {
         "version": VERSION,
         "symbol": key,
