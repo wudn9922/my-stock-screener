@@ -137,12 +137,13 @@ class AnnualBackfill(unittest.TestCase):
     def test_daily_yahoo_refresh_keeps_fills_and_history_without_churn(self):
         for src in ['sec', 'finmind', 'yahoo']:
             doc, _, _ = backfill.backfill_document(document(src), source())
-            for values in [{'revenue': 100}, {'revenue': 500, 'cash': 800}, {'revenue': 100, 'cash': 40}]:
+            for values in [{'revenue': 100}, {'revenue': 500, 'cash': 800}, {'revenue': 100, 'cash': 40}, {'equity': 77}]:
                 with self.subTest(src=src, values=values):
                     refreshed, _ = fin.update_document(doc, payload(values), 'TEST', NOW)
                     i = refreshed['annual']['end'].index('2024-12-31')
                     self.assertEqual(refreshed['annual']['values']['cash'][i], 40)
                     self.assertEqual(refreshed['annual']['values']['revenue'][i], 100)
+                    self.assertIsNone(refreshed['annual']['values'].get('equity', [None] * 3)[i])
                     self.assertEqual(refreshed['annual']['fieldSrc'][i]['cash'], 'yahoo')
                     self.assertTrue(set(doc['quality']['issues']) <= set(refreshed['quality']['issues']))
                     self.assertTrue(all(r in refreshed['quality']['revisions'] for r in doc['quality']['revisions']))

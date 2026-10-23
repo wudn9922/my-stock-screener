@@ -558,9 +558,9 @@ def merge_section(old, new, frequency, today_iso, renamed=None, filled=None):
         if backfilled:
             # Historical backfill was approved against every overlapping field.
             # A different incoming basis cannot extend or rewrite this row.
-            if any(old is not None and item["values"].get(field) is not None
-                   and abs(old - item["values"][field]) > .02 * abs(old)
-                   for field, old in target["values"].items()):
+            overlaps = [(old, item["values"][field]) for field, old in target["values"].items()
+                        if old is not None and item["values"].get(field) is not None]
+            if not overlaps or any(abs(old - incoming) > .02 * abs(old) for old, incoming in overlaps):
                 continue
         if official_period(target) or backfilled:
             for field in ("revenue", "netIncome"):
