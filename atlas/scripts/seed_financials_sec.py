@@ -1476,7 +1476,7 @@ def _annual_period(facts, end, orders):
     _instant_fields(facts, end, ("annual", "quarterly"), values, used, issues, orders)
     if eps_inconsistent(values):
         issues.add("eps-inconsistent")
-    return period(end.isoformat(), values, SRC), used, issues
+    return period(end.isoformat(), values, SRC, {"secEnd": end.isoformat()}), used, issues
 
 
 def _quarter_period(facts, end, orders):
@@ -1511,7 +1511,7 @@ def _quarter_period(facts, end, orders):
     _instant_fields(facts, end, pools, values, used, issues, orders)
     if derived and is_q4:
         issues.add("q4-derived")
-    extra = {DERIVED: 1 if derived else None}
+    extra = {DERIVED: 1 if derived else None, "secEnd": end.isoformat()}
     return period(end.isoformat(), values, SRC, extra), used, issues, filed
 
 
@@ -2943,7 +2943,7 @@ def parse_args(argv):
     parser.add_argument("--restatement-cache", help="companyfacts cache for the report (supports offline replay)")
     args = parser.parse_args(argv)
     if args.prefer_latest_filing and not args.restatement_report:
-        parser.error("--prefer-latest-filing currently requires --restatement-report; apply is deferred")
+        parser.error("--prefer-latest-filing requires --restatement-report; use apply_sec_restatements.py for reviewed apply")
     if args.restatement_report and (args.out or args.due or args.foreign or args.upgrade or args.tickers or args.limit):
         parser.error("--restatement-report scans every US file; cannot combine with write/selection modes")
     if args.due and args.foreign:

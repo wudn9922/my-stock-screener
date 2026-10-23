@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-23T04:47:07.069908+00:00",
+  "branchBase": "2a817c94b39189bf6bbe0f924d88f35cd5cf32de",
+  "reviewedReportSha256": "13471c443f0b1d64431c065c5289412893c30b74206f562775f6b829f2a99997",
+  "financials": {
+    "financialFilesCompared": 6947,
+    "changedValues": 2151,
+    "numericSymbols": 580,
+    "annualPeriods": 1172,
+    "valueDiffEqualsDryRun": true,
+    "otherValueChanges": 0,
+    "valuesSetToNull": 0,
+    "q4EpsSetToNull": 0,
+    "qualityFlagsRemoved": 0,
+    "periodAlignmentChanged": false,
+    "metadataOnlySymbols": [
+      "NVDA"
+    ],
+    "growthRowsRecomputed": 219,
+    "growthEqualsIndependentRebuild": true,
+    "protectedFilesCompared": 9,
+    "protectedFilesUnchanged": true
+  },
+  "receipts": {
+    "apply": "sec-restated-comparatives-apply.json",
+    "verification": "sec-restated-comparatives-verification.json"
+  },
+  "secEnds": {
+    "nonNullPeriods": 1331,
+    "example": {
+      "symbol": "NVDA",
+      "fy": 2026,
+      "end": "2026-01-31",
+      "secEnd": "2026-01-25"
+    }
+  },
+  "sources": {
+    "uniqueCiks": 570,
+    "initialRequests": 570,
+    "http403": 0,
+    "applySecRequests": 0,
+    "cachedReplayRequests": 0
+  },
+  "tests": {
+    "python": {
+      "tests": 1584,
+      "passed": 1583,
+      "failures": 1,
+      "durationSeconds": 121.866,
+      "result": "FAILED",
+      "exitCode": 1,
+      "failedTest": "test_research_candles.CandleSources.test_all_committed_candles_have_real_bounds_and_matching_records",
+      "scope": "Existing world snapshot / permanent CSV versions differ after main research record updates; no world data or ingestion changes in Task B."
+    },
+    "atlas": {
+      "npmCi": "PASS",
+      "tests": 985,
+      "files": 84,
+      "typecheck": "PASS",
+      "lint": "PASS",
+      "build": "PASS",
+      "pagesBuild": "PASS"
+    },
+    "browsersLocal": {
+      "tests": 4,
+      "projects": [
+        "desktop-chromium",
+        "mobile-chromium"
+      ],
+      "result": "PASS"
+    },
+    "ci": "See PR checks; no remote result is assumed in this local receipt.",
+    "pythonBeforeResearchRecordUpdate": {
+      "tests": 1582,
+      "durationSeconds": 121.449,
+      "result": "OK",
+      "exitCode": 0
+    },
+    "secFocused": {
+      "tests": 39,
+      "result": "OK",
+      "exitCode": 0
+    },
+    "firstRemoteAttempt": {
+      "head": "647c1093030a1cb25c560b6d9581f65cd5f09039",
+      "python": "failure: same world snapshot / CSV mismatch",
+      "atlasUnitTests": 985,
+      "atlasBrowserPassed": 230,
+      "atlasBrowserSkipped": 1,
+      "atlasIntegration": "failure: same world snapshot / CSV mismatch",
+      "storage": "success"
+    }
+  },
+  "review": "Primary implementer self-review; no independent human sign-off.",
+  "merged": false,
+  "deployed": false,
+  "ordinaryRefreshProtection": {
+    "persistentFlags": [
+      "restated",
+      "mixed-basis",
+      "quarterly-as-reported"
+    ],
+    "originalRevisionsRetained": true,
+    "secEndRetained": true,
+    "reviewedLegacyYahooRowsProtected": 5
+  }
+}

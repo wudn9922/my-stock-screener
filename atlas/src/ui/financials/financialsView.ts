@@ -410,6 +410,8 @@ export const LEVEL_TEXT: Record<'good' | 'partial' | 'limited', string> = {
 
 /** Plain-Chinese explanations of quality.issues codes. */
 export const ISSUE_TEXT: Record<string, string> = {
+  'mixed-basis': '部分欄位未在重編申報中提供，保留既有數值；同列包含不同申報基準。',
+  'quarterly-as-reported': '年度已重編，但缺少同基準季度資料；季度與 Q4 EPS 保留原申報值。',
   'short-history': '年度資料少於 4 年，成長率與平均值僅供參考。',
   'financial-sector-format': '金融業財報格式：沒有毛利與營業利益，毛利率、營業利益率、業外損益、ROIC、利息保障倍數不適用。',
   'missing-cashflow': '缺少部分現金流量表資料（營業現金流或資本支出），自由現金流可能無法計算。',
