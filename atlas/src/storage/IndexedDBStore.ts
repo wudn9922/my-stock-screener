@@ -32,6 +32,7 @@ export const defaultApp: AppSettings = appSchema.parse(
 export class IndexedDBStore {
   private db: Promise<IDBPDatabase<AtlasDB>> | null = null;
   private memory = { app: structuredClone(defaultApp), symbols: [] as SymbolState[] };
+  private memoryAppExists = false;
   private readonly context = getStorageContextKey();
   private readonly guarded: boolean;
   constructor(name?: string) {
@@ -83,13 +84,14 @@ export class IndexedDBStore {
   }
   async load() {
     this.assertCurrent();
-    if (!this.db) return structuredClone(this.memory);
+    if (!this.db) return { ...structuredClone(this.memory), appExists: this.memoryAppExists };
     const db = await this.db;
     const [app, symbols] = await Promise.all([db.get('app', 'settings'), db.getAll('symbols')]);
     this.assertCurrent();
     return {
       app: app ? appSchema.parse(app) : structuredClone(defaultApp),
       symbols: symbols.map((s) => symbolStateSchema.parse(s)),
+      appExists: app !== undefined,
     };
   }
   async saveSymbol(s: SymbolState) {
@@ -106,7 +108,7 @@ export class IndexedDBStore {
   async saveApp(s: AppSettings) {
     this.assertCurrent();
     const parsed = appSchema.parse(s);
-    if (!this.db) { this.memory.app = structuredClone(parsed); return; }
+    if (!this.db) { this.memory.app = structuredClone(parsed); this.memoryAppExists = true; return; }
     const db = await this.db;
     this.assertCurrent();
     await db.put('app', parsed, 'settings');
@@ -118,7 +120,7 @@ export class IndexedDBStore {
   async import(data: SettingsExport) {
     this.assertCurrent();
     const validated = exportSchema.parse(data);
-    if (!this.db) { this.memory = structuredClone({ app: validated.app, symbols: validated.symbols }); return; }
+    if (!this.db) { this.memory = structuredClone({ app: validated.app, symbols: validated.symbols }); this.memoryAppExists = true; return; }
     const db = await this.db;
     this.assertCurrent();
     const tx = db.transaction(['symbols', 'app'], 'readwrite');

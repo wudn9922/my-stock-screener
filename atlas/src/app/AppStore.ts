@@ -6,6 +6,8 @@ import type { Drawing } from '../drawing/DrawingModel';
 import { DrawingHistory } from '../drawing/DrawingHistory';
 import type { IndicatorInstance } from '../indicators/IndicatorRegistry';
 import type { Timeframe } from '../market-data/MarketDataProvider';
+import { mergeLegacySettings as mergeLegacySettingsData } from '../storage/legacySettings';
+import type { SettingsExport } from '../storage/schema';
 
 type SymbolUpdate = Omit<SymbolState, 'drawings' | 'indicators'> & {
   drawings: Drawing[];
@@ -58,6 +60,8 @@ export class AppStore {
   private histories = new Map<string, DrawingHistory>();
   private pendingSaves = 0;
   private failures = new Map<string, string>();
+  private appHasSavedState = false;
+  private loadedAccountState = false;
   constructor(readonly storage = new IndexedDBStore()) {}
   subscribe = (cb: () => void) => {
     this.listeners.add(cb);
@@ -71,8 +75,11 @@ export class AppStore {
     this.listeners.forEach((cb) => cb());
   }
   async initialize() {
+    this.loadedAccountState = false;
     try {
       const data = await this.storage.load();
+      this.loadedAccountState = true;
+      this.appHasSavedState = data.appExists;
       this.publish({
         ready: true,
         app: data.app,
@@ -120,6 +127,7 @@ export class AppStore {
   }
   updateApp(patch: Partial<AppSettings>) {
     const next = appSchema.parse({ ...this.snapshot.app, ...patch });
+    this.appHasSavedState = true;
     this.publish({ app: next });
     this.persist('app', () => this.storage.saveApp(next));
   }
@@ -305,12 +313,50 @@ export class AppStore {
     const parsed = parseSettings(json);
     await this.flush();
     await this.storage.import(parsed);
+    this.loadedAccountState = true;
     this.histories.clear();
     this.failures.clear();
+    this.appHasSavedState = true;
     this.publish({
       app: parsed.app,
       symbols: Object.fromEntries(parsed.symbols.map((s) => [s.symbol, s])),
       storageError: null,
     });
+  }
+  /** Add legacy items without replacing account records or changing the source database. */
+  async mergeLegacySettings(data: SettingsExport): Promise<{ added: number; conflicts: number }> {
+    if (!this.snapshot.ready || !this.loadedAccountState) throw new Error('帳號資料尚未完整載入，請重新整理後再試；未以舊資料覆寫。');
+    const merged = mergeLegacySettingsData({
+      version: 4, exportedAt: 'account-browser', app: this.snapshot.app,
+      symbols: Object.values(this.snapshot.symbols),
+    }, data, { appExists: this.appHasSavedState });
+    // Publish synchronously in this call, before yielding to the queue or notifying saving
+    // listeners. Every later edit then starts from the merged state. Earlier optimistic edits
+    // are already in this snapshot and their queued writes run before the atomic merge write.
+    this.appHasSavedState = true;
+    this.histories.clear();
+    // Queue the write before publishing: synchronous subscribers can themselves make edits.
+    this.pendingSaves++;
+    const operation = this.queue.then(async () => {
+      await this.storage.import(merged.data);
+      return { added: merged.added, conflicts: merged.conflicts };
+    });
+    this.queue = operation.then(() => {
+      this.failures.delete('legacy-import');
+    }, error => {
+      this.failures.set('legacy-import', '舊版資料匯入失敗：' + String(error));
+    }).finally(() => {
+      this.pendingSaves--;
+      this.publish({
+        saving: this.pendingSaves > 0,
+        storageError: this.failures.size ? [...this.failures.values()].join('; ') : null,
+      });
+    });
+    this.publish({
+      saving: true,
+      app: merged.data.app,
+      symbols: Object.fromEntries(merged.data.symbols.map(symbol => [symbol.symbol, symbol])),
+    });
+    return operation;
   }
 }

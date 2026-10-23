@@ -11,7 +11,7 @@ export const cloudSyncState = {
   subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   get: () => current,
 };
-let active: { context: string; sync: DrawingSync; removeVisibility: () => void } | null = null;
+let active: { context: string; sync: DrawingSync; ready: Promise<void>; removeVisibility: () => void } | null = null;
 export function stopDrawingSync() {
   active?.sync.stop();
   active?.removeVisibility();
@@ -22,10 +22,12 @@ accessState.subscribe(() => { if (active && active.context !== getStorageContext
 
 /** Only an explicitly granted cloud account can pull or push. Timers remain bound to that identity. */
 export async function startDrawingSync(store: SyncStore) {
+  const requestedContext = getStorageContextKey();
   await initializeAccess();
+  if (requestedContext !== getStorageContextKey()) return;
   const context = getStorageContextKey(), identity = currentIdentity();
   if (!identity || accessState.getSnapshot().storageMode !== 'cloud') { stopDrawingSync(); return; }
-  if (active?.context === context) return;
+  if (active?.context === context) return active.ready;
   stopDrawingSync();
   const userId = identity.userId;
   const isCurrent = () => context === getStorageContextKey() && currentIdentity()?.userId === userId && accessState.getSnapshot().storageMode === 'cloud';
@@ -44,7 +46,19 @@ export async function startDrawingSync(store: SyncStore) {
     lastPull = Date.now();
     void sync.pull();
   };
-  active = { context, sync, removeVisibility: () => document.removeEventListener('visibilitychange', onVisible) };
   document.addEventListener('visibilitychange', onVisible);
-  await sync.start();
+  const ready = sync.start();
+  active = { context, sync, ready, removeVisibility: () => document.removeEventListener('visibilitychange', onVisible) };
+  await ready;
+}
+
+/** Finish the account's initial pull before merging opt-in legacy drawings into its workspace. */
+export async function prepareDrawingSyncForImport(store: SyncStore) {
+  const context = getStorageContextKey();
+  await startDrawingSync(store);
+  if (context !== getStorageContextKey() || !active || active.context !== context)
+    throw new Error('帳號或儲存權限已變更，舊版資料匯入已取消。');
+  if (current === 'error' || current === 'expired') await active.sync.pull();
+  if (context !== getStorageContextKey() || current === 'error' || current === 'expired')
+    throw new Error('無法確認帳號目前的雲端畫線，請稍後重試；尚未匯入舊版資料。');
 }

@@ -72,6 +72,13 @@ function write(next: SitePreferences) {
 }
 
 export const sitePreferences = {
+  /** Re-read after an explicit legacy copy; ordinary startup never reads old keys. */
+  refresh() {
+    preferences();
+    current = read();
+    applyColorConvention(current.colors);
+    listeners.forEach((listener) => listener());
+  },
   subscribe(listener: () => void) {
     listeners.add(listener);
     return () => {

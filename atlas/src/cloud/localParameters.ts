@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { ParameterGroup, ParameterStock } from './settingsApi';
 
 type ParameterStorage = Pick<Storage, 'getItem' | 'setItem'>;
-const KEY = 'atlas-parameter-workspace-v1';
+export const PARAMETER_STORAGE_KEY = 'atlas-parameter-workspace-v1';
 const ma = z.number().int().min(0).max(1000);
 const group = z.object({
   id: z.number().int().positive(),
@@ -21,11 +21,24 @@ const stock = z.object({
   ma3: ma,
   ma4: ma,
 });
-const document = z.object({
+export const parameterDocumentSchema = z.object({
   version: z.literal(1),
   nextId: z.number().int().positive(),
   groups: z.array(group).max(50),
   stocks: z.array(stock).max(500),
+}).superRefine((data, context) => {
+  const items = [...data.groups, ...data.stocks];
+  if (new Set(items.map(item => item.id)).size !== items.length || items.some(item => item.id >= data.nextId))
+    context.addIssue({ code: 'custom', message: '參數 ID 重複或序號不正確。' });
+  for (const item of items) {
+    const values = [item.ma1, item.ma2, item.ma3, item.ma4].filter(value => value > 0);
+    if (!values.length || new Set(values).size !== values.length)
+      context.addIssue({ code: 'custom', message: '均線參數需為不重複的正整數。' });
+  }
+  for (const stock of data.stocks) {
+    if (!FIXED_GROUPS.has(stock.group_id) && !data.groups.some(group => stock.group_id === `custom_${group.id}`))
+      context.addIssue({ code: 'custom', message: '股票參數參照不存在的分組。' });
+  }
 });
 const FIXED_GROUPS = new Set(['tw_g1', 'tw_g2', 'us_g1', 'us_g2', 'us_g3', 'us_g4', 'ungrouped']);
 
@@ -55,15 +68,15 @@ function averages(value: unknown) {
 /** The same parameter operations in an account-bound device store or disposable memory. */
 export class LocalParameters {
   constructor(private readonly storage: ParameterStorage) {}
-  private read(): z.infer<typeof document> {
-    const raw = this.storage.getItem(KEY);
+  private read(): z.infer<typeof parameterDocumentSchema> {
+    const raw = this.storage.getItem(PARAMETER_STORAGE_KEY);
     if (!raw) return { version: 1, nextId: 1, groups: [], stocks: [] };
-    const parsed = document.safeParse(JSON.parse(raw));
+    const parsed = parameterDocumentSchema.safeParse(JSON.parse(raw));
     if (!parsed.success) throw new Error('此帳號的裝置參數格式無法辨識；未覆寫原有資料。');
     return parsed.data;
   }
-  private save(data: z.infer<typeof document>) {
-    this.storage.setItem(KEY, JSON.stringify(document.parse(data)));
+  private save(data: z.infer<typeof parameterDocumentSchema>) {
+    this.storage.setItem(PARAMETER_STORAGE_KEY, JSON.stringify(parameterDocumentSchema.parse(data)));
   }
   call(action: string, payload: Record<string, unknown>): unknown {
     const data = this.read();

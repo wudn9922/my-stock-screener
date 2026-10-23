@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore, type FormEvent } from 'react';
 import { accessState, refreshAccess, type StorageMode } from '../auth/access';
 import { settingsApi } from '../cloud/settingsApi';
+import { showLegacyImportAgain } from '../storage/legacyImport';
 
 interface StorageGrant {
   userId: string;
@@ -33,6 +34,11 @@ export function StorageModeNotice() {
         </p>
       )}
       {access.error && <p role="status">{access.error}</p>}
+      {access.ready && access.userId && (access.storageMode === 'device' || access.storageMode === 'cloud') && (
+        <button className="ghost-button" type="button" data-testid="legacy-import-reopen" onClick={() => void showLegacyImportAgain()}>
+          重新檢查舊版資料
+        </button>
+      )}
     </aside>
   );
 }

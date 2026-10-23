@@ -24,6 +24,7 @@ import '../ui/research.css';
 import { accessState, requireCloudAccess } from '../auth/access';
 import { canPersist } from '../auth/storage';
 import { StorageAdminPanel, StorageModeNotice } from '../ui/StorageAdminPanel';
+import { LegacyImportCard } from '../ui/LegacyImportCard';
 
 type CloudList = { id: string; definition: unknown; updated_at: string };
 
@@ -291,6 +292,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         </div>
       </div>
       <StorageModeNotice />
+      <LegacyImportCard />
       <div className="segmented console-tabs" role="group" aria-label="控制台分頁">
         <button type="button" aria-pressed={tab === 'lists'} className={tab === 'lists' ? 'active' : ''} onClick={() => setTab('lists')}>
           自選清單
