@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 import { expect, test, type Page, type Locator } from "@playwright/test";
 import { mockSite } from "./mocks";
 import { mockDeviceAccount, accountDatabase } from "./account-fixture";
-const root = resolve(import.meta.dirname, "../../docs/report");
+import { researchFixtureBody } from "./research-fixtures";
+const root = resolve(import.meta.dirname, "../src/report/fixtures");
 async function setup(page: Page) {
   await mockDeviceAccount(page);
   await mockSite(page);
@@ -16,7 +17,7 @@ async function setup(page: Page) {
     try {
       return route.fulfill({
         contentType: "application/json",
-        body: readFileSync(resolve(root, "research", path)),
+        body: researchFixtureBody(path),
       });
     } catch {
       return route.fulfill({ status: 404 });
@@ -29,8 +30,8 @@ async function setup(page: Page) {
         resolve(
           root,
           new URL(route.request().url()).pathname.endsWith("themes-tw.json")
-            ? "themes-tw.json"
-            : "themes.json",
+            ? "themes-tw.sample.json"
+            : "themes.sample.json",
         ),
       ),
     }),

@@ -3,6 +3,8 @@
 import copy
 import hashlib
 import json
+import os
+import shutil
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import sys
@@ -225,11 +227,44 @@ class CandleSources(unittest.TestCase):
 
     def test_all_committed_candles_have_real_bounds_and_matching_records(self):
         root = Path(__file__).resolve().parents[1]
-        index = read(root / "docs/report/research/world-assets.json")
+        # main retains CSV evidence, not view snapshots. Rebuild offline in a
+        # temporary directory; CI additionally validates its restored live tree.
+        work = self.enterContext(tempfile.TemporaryDirectory())
+        data = Path(work) / "data"
+        shutil.copytree(root / "data/world", data)
+
+        class RetainedSource:
+            def json(self, url):
+                from urllib.parse import unquote
+                ticker = unquote(url.split("/chart/")[1].split("?")[0])
+                name, _, symbol, unit = next(a for a in ASSETS.values() if a[1] == ticker)
+                row = read_csv(data / (symbol + ".csv"))[-1]
+                packet = payload(ticker)
+                item = packet["chart"]["result"][0]
+                item["meta"].update(
+                    instrumentType="CURRENCY" if symbol.startswith("FX-") else "FUTURE",
+                    exchangeTimezoneName="UTC", currency=unit.split("/")[0], shortName=name,
+                )
+                item["timestamp"] = [int(datetime.fromisoformat(row[0]).replace(
+                    hour=12, tzinfo=timezone.utc).timestamp())]
+                item["indicators"]["quote"] = [dict(zip(
+                    ("open", "high", "low", "close", "volume"), ([v] for v in row[1:])
+                ))]
+                return packet
+
+        research = Path(work) / "research"
+        build_world_candles(research / "world-assets.json", data, RetainedSource())
+        self.assertEqual(
+            {p.name: p.read_bytes() for p in data.glob("*.csv")},
+            {p.name: p.read_bytes() for p in (root / "data/world").glob("*.csv")},
+        )
+        if os.environ.get("RESEARCH_REPORT_DIR"):
+            research = Path(os.environ["RESEARCH_REPORT_DIR"])
+        index = read(research / "world-assets.json")
         for key, (_, ticker, symbol, unit) in ASSETS.items():
             a = index["series"][key]
             self.assertEqual(a["providerSymbol"], ticker)
-            body = (root / "docs/report/research" / a["candlePath"]).read_bytes()
+            body = (research / a["candlePath"]).read_bytes()
             self.assertEqual(hashlib.sha256(body).hexdigest(), a["candleSha256"])
             rows = json.loads(body)["bars"]
             self.assertGreater(len(rows), 1000)

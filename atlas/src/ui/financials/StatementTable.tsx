@@ -9,7 +9,7 @@ import {
   displayValues,
   formatNumber,
   moneyScale,
-  SOURCE_LABEL,
+  periodSourceText,
   unitText,
   type FinancialsView,
 } from './financialsView';
@@ -134,7 +134,7 @@ export function StatementTable({ history, view }: { history: FinancialHistory; v
               </th>
               {order.map((index) => (
                 <td key={series.end[index]} className={series.src[index]}>
-                  {SOURCE_LABEL[series.src[index] ?? 'yahoo']}
+                  {periodSourceText(series, index)}
                 </td>
               ))}
             </tr>

@@ -26,7 +26,24 @@ jobs:
         if: vars.GENERATED_BRANCH_MODE == '1'
         run: |
           git fetch --no-tags origin +refs/heads/generated:refs/remotes/origin/generated
-          python scripts/generated_branch.py assemble --main origin/main --generated origin/generated --dest _site
+          python scripts/generated_branch.py assemble --main HEAD --generated origin/generated --dest _site
+          python scripts/generated_branch.py assemble --main origin/main --generated origin/generated --dest _main_site
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, 'scripts')
+          from generated_branch import Storage, digest_tree
+          store = Storage()
+          main, pr = store.entries('origin/main'), store.entries('HEAD')
+          # A PR may deliberately edit durable docs. Everything else must remain
+          # byte-identical; deleting stale main cache copies cannot change Pages.
+          edited_records = {p.removeprefix('docs/') for p in main.keys() | pr.keys()
+                            if p.startswith('docs/') and not store.moved(p)
+                            and main.get(p) != pr.get(p)}
+          before, after = digest_tree('_main_site'), digest_tree('_site')
+          differences = {p for p in before.keys() | after.keys() if before.get(p) != after.get(p)}
+          assert differences <= edited_records, 'Unintended Pages bytes or URL changes: ' + repr(differences - edited_records)
+          print(f'PASS: {len(differences)} Pages differences, all explicit durable-doc edits')
+          PY
       - name: Package the verified Pages tree for review
         uses: actions/upload-pages-artifact@v3
         with:

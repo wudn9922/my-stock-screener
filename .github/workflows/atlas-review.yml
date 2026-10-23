@@ -46,6 +46,50 @@ concurrency:
   group: atlas-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
+  records-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: atlas/package-lock.json
+      - name: Verify Atlas without restoring any generated inputs
+        working-directory: atlas
+        run: |
+          npm ci
+          npm test
+          npm run typecheck
+          npm run lint
+          npm run build
+          VITE_PUBLIC_BASE=/my-stock-screener/atlas/ npm run build:pages
+          npm run refresh:watchlists
+  yahoo-annual-write-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify conservative Yahoo backfill from pinned baseline
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
+          if git diff --quiet "$PR_BASE_SHA" HEAD -- docs/report/yahoo-annual-backfill.json; then
+            echo 'No annual Yahoo apply receipt changed; write proof not applicable.'
+            exit 0
+          fi
+          python -m unittest discover -s tests -p 'test_yahoo_annual_backfill.py' -v
+          BASE=$(python -c "import json; print(json.load(open('docs/report/yahoo-annual-backfill-proof.json'))['base'])")
+          git fetch --no-tags --depth=1 origin "$BASE"
+          python atlas/scripts/backfill_yahoo_annual.py --verify-against "$BASE" --proof /tmp/yahoo-proof.json
   sec-write-proof:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -103,6 +147,7 @@ jobs:
         working-directory: atlas
         run: |
           npm test
+          ATLAS_RESEARCH_DIR=../docs/report/research npx vitest run tests/research-data.test.tsx tests/research-candles.test.ts
           npm run typecheck
           npm run lint
           npm run build

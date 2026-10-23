@@ -355,6 +355,32 @@ class GeneratedStorageTests(unittest.TestCase):
 
 
 class InventoryTests(unittest.TestCase):
+    def test_main_tracks_only_frozen_pngs_and_ignore_rules_protect_records(self):
+        import csv
+        config = json.loads((REPO / ".github/generated-paths.json").read_text())
+        owners = [p for paths in config["owners"].values() for p in paths]
+        frozen = {"docs/wsj.png", "docs/barrons.png"}
+        tracked = set(subprocess.check_output(
+            ["git", "ls-files", "-z"], cwd=REPO).decode().split("\0")) - {""}
+        self.assertEqual({p for p in tracked if gb.matches(p, owners)}, frozen)
+        with (REPO / "operations/generated-path-inventory.tsv").open() as f:
+            records = {r["path"] for r in csv.DictReader(f, delimiter="\t")
+                       if r["classification"] == "record"}
+        self.assertLessEqual(records, tracked)
+        records.update(p for p in tracked if p.startswith(("data/", "tests/fixtures/", "atlas/tests/fixtures/")))
+        records.update(p.replace("**", "future/record.json").replace("*", "future")
+                       for paths in config["records"].values() for p in paths)
+        records.update({"data/world/FUTURE.csv", "docs/report/fundamentals/q4-8k-state.json"})
+        outputs = {p.replace("**", "future/output.json").replace("*", "future") for p in owners} - frozen
+        candidates = sorted(records | outputs | frozen)
+        result = subprocess.run(["git", "check-ignore", "--no-index", "--stdin", "-z"],
+                                cwd=REPO, input=("\0".join(candidates) + "\0").encode(),
+                                capture_output=True, check=False)
+        self.assertIn(result.returncode, (0, 1), result.stderr)
+        ignored = set(result.stdout.decode().split("\0")) - {""}
+        self.assertLessEqual(outputs, ignored)
+        self.assertFalse(ignored & (records | frozen), ignored & (records | frozen))
+
     def test_all_inventory_classifications_agree_with_allowlist(self):
         import csv
         store = gb.Storage(REPO / ".github/generated-paths.json")

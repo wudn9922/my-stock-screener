@@ -1784,7 +1784,21 @@ def _merge_section(old, new, frequency, today_iso):
             if target["end"] != end:
                 renamed[target["end"]] = end
         extra.update(item["extra"])
-        values = item["values"]
+        values = dict(item["values"])
+        # SEC remains authoritative for its own cells; retain separately attributed
+        # annual Yahoo gap fills when this filing still has no value for them.
+        if frequency == "annual" and extra.get("yahooAnnualBackfill"):
+            sources = dict(extra.get("fieldSrc") or {})
+            locks = dict(extra["yahooAnnualBackfill"])
+            for name, value in extra["yahooAnnualBackfill"].items():
+                if values.get(name) is None:
+                    values[name] = value
+                    sources[name] = "yahoo"
+                else:
+                    sources[name] = SRC
+                    locks.pop(name, None)
+            extra["yahooAnnualBackfill"] = locks
+            extra["fieldSrc"] = sources
         if item["extra"].get("secKeepAsReported"):
             values = dict(targets[0]["values"]) if targets else {}
             for name in Q4_PER_SHARE_FIELDS:
@@ -2110,6 +2124,8 @@ def merge_into_document(previous, sec, key, now, fetch_splits=None):
     if revisions:
         grade["revisions"] = revisions
 
+    import build_financials as fin
+    fin.preserve_backfill_quality(previous, grade, annual)
     document = {
         "version": VERSION,
         "symbol": key,
@@ -2826,6 +2842,8 @@ def upgrade_document(previous, sec, key, now, fetch_splits=None):
             merged.setdefault(key_name, value)
         return merged
 
+    import build_financials as fin
+    fin.preserve_backfill_quality(previous, grade, annual)
     document = {
         "version": VERSION,
         "symbol": key,

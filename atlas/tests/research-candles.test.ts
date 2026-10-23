@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   researchBars,
   researchCandlesSchema,
@@ -54,25 +55,23 @@ describe("Research candle contracts", () => {
     for (const id of ids) expect(CANONICAL_SYMBOL_REGEX.test(id)).toBe(true);
     expect(researchDrawingSymbol("world:CMD-WTI")).toBe(ids[0]);
   });
-  it("validates actual committed daily commodity and FX histories", () => {
-    for (const id of [
-      "wti",
-      "brent",
-      "gas",
-      "gold",
-      "silver",
-      "copper",
-      "usdtwd",
-      "usdjpy",
-      "eurusd",
-      "usdcny",
-      "usdkrw",
-    ]) {
-      const raw = JSON.parse(
-        readFileSync(`../docs/report/research/candles/${id}.json`, "utf8"),
-      );
+  it("validates retained daily commodity and FX histories (and live snapshots in CI)", () => {
+    for (const [id, symbol] of Object.entries({
+      wti: "CMD-WTI", brent: "CMD-BRENT", gas: "CMD-GAS", gold: "CMD-GOLD",
+      silver: "CMD-SILVER", copper: "CMD-COPPER", usdtwd: "FX-USDTWD",
+      usdjpy: "FX-USDJPY", eurusd: "FX-EURUSD", usdcny: "FX-USDCNY", usdkrw: "FX-USDKRW",
+    })) {
+      const csv = readFileSync(resolve(import.meta.dirname, `../../data/world/${symbol}.csv`), "utf8");
+      const bars = csv.trim().split(/\r?\n/).slice(1).map((line) => {
+        const [day, ...values] = line.split(",");
+        return [day, ...values.map((v) => v === "" ? null : Number(v))];
+      });
+      const raw = process.env.ATLAS_RESEARCH_DIR
+        ? JSON.parse(readFileSync(resolve(process.env.ATLAS_RESEARCH_DIR, `candles/${id}.json`), "utf8"))
+        : { version: 1, symbol, interval: "1D", bars };
       expect(researchCandlesSchema.safeParse(raw).success, id).toBe(true);
       expect(raw.bars.length).toBeGreaterThan(1000);
+      expect(raw.bars).toEqual(bars);
     }
   });
 });

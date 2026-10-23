@@ -64,11 +64,16 @@ test('chart shows the weekly recommendation, applies it on the daily chart and s
   await expect(toggle).toBeVisible();
   await expect(page.getByTestId('valuation')).toBeVisible();
   await expect(card).toBeHidden();
+  await expect(toggle).toBeVisible();
   const row = await page.evaluate(() => {
-    const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
-    const toggle = box('[data-testid="stock-stats-toggle"]');
-    const shares = (other: DOMRect) => toggle.top < other.bottom && toggle.bottom > other.top;
-    return { shares: shares(box('[data-testid="valuation"]')) || shares(box('.stock-tabs')), overflow: document.scrollingElement!.scrollWidth - innerWidth };
+    const toggle = document.querySelector('[data-testid="stock-stats-toggle"]')!.getBoundingClientRect();
+    const shares = (selector: string) => {
+      const element = document.querySelector(selector);
+      if (!element) return false;
+      const other = element.getBoundingClientRect();
+      return toggle.top < other.bottom && toggle.bottom > other.top;
+    };
+    return { shares: shares('[data-testid="valuation"]') || shares('.stock-tabs'), overflow: document.scrollingElement!.scrollWidth - innerWidth };
   });
   expect(row.shares).toBe(true);
   expect(row.overflow).toBeLessThanOrEqual(0);

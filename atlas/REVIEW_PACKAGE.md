@@ -14,7 +14,16 @@ The broad browser run exposed a pre-existing race: a hidden lazy panel assertion
 
 The full site sweep also reached a previously unselected heatmap long-press test that called Chromium-only CDP in WebKit. Chromium retains its native touch dispatch; WebKit now exercises the DOM touch-pointer sequence and release-click suppression with the same tooltip, URL and no-dialog assertions. This is not a physical WebKit touch-hold verification. Heatmap regressions are now included in the PR workflow rather than skipped.
 
-The first full Python suite exposed an existing world candle/CSV mismatch (main records had newer completed bars). Real Yahoo source validation succeeded for all 11 assets, all dated 2026-10-22. The corrected candle bundle and one updated natural-gas CSV volume are retained; every candle digest and CSV comparison passes. PR verification now restores the complete hashed world bundle together, including dependencies absent from the older generated snapshot. No K-line history was deleted or fabricated.
+Earlier validation corrected an existing world candle/CSV mismatch using all 11 actual sources dated 2026-10-22. The subsequent main generated-branch cutover now owns those regenerated snapshots: this branch follows main and does not reintroduce removed generated copies. Retained world CSV records remain on main; current generated snapshots and offline fixture readers are validated by CI. No K-line history was removed by the legacy import.
+
+## Integrated main: generated-branch PR 2 (2026-10-23)
+
+Generated report copies leave main while source, retained records, old LINE PNGs
+and history remain. Unit and browser research consumers now use frozen source
+excerpts and retained world CSVs; CI additionally validates restored live inputs.
+See [scope, provenance and Pages byte proof](../operations/generated-branch-pr2.md).
+No UI, chart engine or generator behavior changes. Local/CI results are recorded
+in the PR; no independent review or physical-device Safari sign-off is claimed.
 
 ## Previous review: compact chart header (2026-10-23)
 
@@ -370,3 +379,16 @@ Primary implementer self-review; no independent human sign-off. Separate PR, do 
 - Evidence: docs/SEC_RESTATED_COMPARATIVES_APPLY.md and docs/report/sec-restated-comparatives-{apply,verification}.json.
 
 Task B refresh regression: ordinary updates retain restatement flags, original revision history and secEnd; explicit reviewed SEC basis protects the five legacy-Yahoo-labelled annual rows from being reverted by Yahoo. No additional statement values were written.
+
+## FY2021–FY2025 conservative Yahoo backfill (2026-10-23)
+
+Primary implementer self-review; no independent human sign-off. Replacement for closed, unmerged #151;
+new branch from main containing #164; do not merge. See [policy and replay](../docs/YAHOO_ANNUAL_BACKFILL.md).
+Reviewed whole-period 2% veto across every overlapping field, zero/negative/unit handling, no EPS/shares,
+null-only existing annual rows, preserved unknown flags/revisions, field provenance in notes/table/chart detail,
+Yahoo/SEC/FinMind refresh retention, atomic batch rollback, and independent Git-tree + protected Q4 proof.
+
+Shared provenance notes distinguish annual and quarterly field fills. The existing WebKit MA layout
+regression assumed both desktop valuation and mobile tab elements existed while accepting either as
+the shared row; it now waits for the toggle and measures each available sibling. The same-row and
+zero-overflow assertions remain mandatory; no MA product behavior changed.
