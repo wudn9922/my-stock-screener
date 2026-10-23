@@ -55,13 +55,24 @@ test('chart shows the weekly recommendation, applies it on the daily chart and s
   );
   await page.goto('./?page=chart&symbol=2330.TW&tf=1W');
   const card = page.getByTestId('ma-recommendation');
-  await expect(card.locator('dd')).toHaveText('短 24 · 中 38 · 長 89');
-  await expect(card.locator('summary')).toContainText('日線至 2026-10-17');
-  const overflow = await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth);
-  expect(overflow).toBeLessThanOrEqual(0);
+  const toggle = page.getByTestId('stock-stats-toggle');
+  // Closed: one button sharing an existing header row (P/E on desktop, K線／財務 on phones); no extra row above the chart.
+  await expect(card).toBeHidden();
+  const row = await page.evaluate(() => {
+    const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
+    const toggle = box('[data-testid="stock-stats-toggle"]');
+    const shares = (other: DOMRect) => toggle.top < other.bottom && toggle.bottom > other.top;
+    return { shares: shares(box('[data-testid="valuation"]')) || shares(box('.stock-tabs')), overflow: document.scrollingElement!.scrollWidth - innerWidth };
+  });
+  expect(row.shares).toBe(true);
+  expect(row.overflow).toBeLessThanOrEqual(0);
 
-  await card.locator('summary').click();
-  await expect(card.locator('table')).toContainText('20、★24');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(card.locator('dd')).toHaveText('短 24（69） · 中 38（60） · 長 89（99）');
+  await expect(card.locator('.ws-ma-reco-status')).toHaveText('日線至 2026-10-17');
+  await expect(card.locator('table')).toContainText('20（70）、★24（69）');
+  await expect(card).toContainText('★不一定是分數最高的那條');
   await expect(card.locator('table')).toContainText('+15.3%');
   await expect(card.getByRole('link', { name: /在 ma-selector 查看/ })).toHaveAttribute('href', /streamlit\.app\/\?ticker=2330\.TW$/);
   await page.screenshot({ path: testInfo.outputPath('ma-recommendation-panel.png') });
@@ -80,6 +91,14 @@ test('chart shows the weekly recommendation, applies it on the daily chart and s
   await expect(dialog).toBeHidden();
   expect(saves).toEqual([expect.objectContaining({ action: 'stocks.save', ticker: '2330.TW', groupId: 'ungrouped', mas: [24, 38, 89] })]);
   await expect(page.getByText('2330.TW 固定均線 24 / 38 / 89 已永久保存到 Supabase（無分組）。')).toBeVisible();
+  // The panel stays open across the dialog; Escape and an outside tap close it.
+  await expect(card).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(card).toBeHidden();
+  await toggle.click();
+  await expect(card).toBeVisible();
+  await page.getByTestId('header-quote').click();
+  await expect(card).toBeHidden();
 });
 
 test('a symbol without a recommendation links to the live ma-selector instead', async ({ page }) => {
@@ -87,10 +106,9 @@ test('a symbol without a recommendation links to the live ma-selector instead', 
   await page.route('**/my-stock-screener/report/ma-selector/**', (route) => route.fulfill({ status: 404, body: 'not found' }));
   await page.goto('./?page=chart&symbol=NVDA&tf=1D');
   const card = page.getByTestId('ma-recommendation');
-  await expect(card.locator('summary')).toHaveText('尚無建議 · 即時計算');
+  await page.getByTestId('stock-stats-toggle').click();
   await expect(card.locator('dd')).toHaveText('—');
-  await card.locator('summary').click();
-  await expect(card).toContainText('還沒有建議均線');
+  await expect(card.locator('.ws-ma-reco-status')).toContainText('還沒有建議均線');
   await expect(card.getByRole('button')).toHaveCount(0);
   await expect(card.getByRole('link', { name: /即時計算這檔股票/ })).toHaveAttribute('href', /\?ticker=NVDA$/);
 });

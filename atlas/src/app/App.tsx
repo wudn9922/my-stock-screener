@@ -48,6 +48,7 @@ import { IconButton } from '../ui/IconButton';
 import { StockTabs } from '../ui/StockTabs';
 import { StockVolatility } from '../ui/StockVolatility';
 import { MaRecommendation } from '../ui/MaRecommendation';
+import { StockStatsMenu } from '../ui/StockStatsMenu';
 import { DrawingToolGlyph, DrawingToolPicker } from '../ui/DrawingToolPicker';
 import { Watchlist, companies } from '../ui/Watchlist';
 import { IndicatorPanel } from '../ui/IndicatorPanel';
@@ -1003,9 +1004,13 @@ export function App({
                 <dd className={peFigures?.peTtmLoss ? 'pe-loss' : undefined}>{formatPe(peFigures?.peTtm, !!peFigures?.peTtmLoss)}</dd>
               </div>
             </dl>
+          </div>
+        )}
+        {!isIndex && providerId !== 'demo' && (
+          <StockStatsMenu label="波動・均線">
             <StockVolatility symbol={symbol} provider={providers[providerId]} reloadToken={reloadToken} />
             <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} onNotice={setNotice} />
-          </div>
+          </StockStatsMenu>
         )}
         {onOpenFinancials && !isIndex && providerId !== 'demo' && (
           <StockTabs active="chart" onSelect={(tab) => tab === 'financials' && onOpenFinancials(symbol, tf)} />

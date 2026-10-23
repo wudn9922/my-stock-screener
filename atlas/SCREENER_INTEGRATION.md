@@ -155,8 +155,9 @@ backtest, rule B + short-range rescue); Atlas only displays it. Shape:
 Symbols that fail or have < 376 bars keep their previous file; nothing is written below a 50 % success rate.
 
 Client: `fetchMaRecommendation(symbol)` (`src/report/maRecommendation.ts`; 404 or an SPA-fallback body → `missing`).
-`ui/MaRecommendation.tsx` sits under the volatility row in the chart header: short · medium · long picks, a panel with
-the candidates and reversal returns, "套用到圖表" (adds the missing ones as daily SMA indicators by id and switches to
+`ui/MaRecommendation.tsx` sits with the volatility figures in the chart header's "波動・均線" dropdown (`ui/StockStatsMenu.tsx`:
+one button beside the P/E on desktop, on the K線／財務 row on phones; the panel floats over the chart, closes on Escape or an
+outside tap): short · medium · long picks with their structural scores, the candidates with scores and reversal returns, "套用到圖表" (adds the missing ones as daily SMA indicators by id and switches to
 1D), "固定為個股參數" (the console's `FixedStockParameters` dialog prefilled with the picks; saves
 `stocks.save` with `groupId: 'ungrouped'`, so the same LINE login and `ATLAS_FIXED_PARAMETERS_ENABLED` gate apply),
 and a link to the Streamlit app (`MA_SELECTOR_URL`, overridable with `VITE_MA_SELECTOR_URL`) with `?ticker=`.
