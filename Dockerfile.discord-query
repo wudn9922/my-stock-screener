@@ -20,6 +20,9 @@ COPY breakout_alert/__init__.py \
 COPY breakout_alert/config.py \
     /app/breakout_alert/config.py
 
+COPY breakout_alert/account_permissions.py \
+    /app/breakout_alert/account_permissions.py
+
 COPY breakout_alert/supabase_store.py \
     /app/breakout_alert/supabase_store.py
 

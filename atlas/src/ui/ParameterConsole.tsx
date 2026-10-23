@@ -1,19 +1,22 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, useSyncExternalStore, type FormEvent } from 'react';
 import {
   FIXED_PARAMETER_GROUPS,
   FIXED_STOCK_GROUP,
   parameterMAs,
   parseMovingAverages,
   settingsApi,
+  parameterStorageMessage,
   type IndexParameter,
   type ParameterGroup,
   type ParameterStock,
 } from '../cloud/settingsApi';
 import { DEFAULT_LIFF_ID } from '../cloud/lineIdentity';
 import { ConsoleDialog } from './ConsoleDialog';
+import { accessState } from '../auth/access';
 
 /** The original control panel's authenticated API, rendered inside the Atlas shell. */
 export function ParameterConsole() {
+  const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
   const [groups, setGroups] = useState<ParameterGroup[]>([]);
   const [stocks, setStocks] = useState<ParameterStock[]>([]);
   const [indices, setIndices] = useState<IndexParameter[] | null>(null);
@@ -63,7 +66,7 @@ export function ParameterConsole() {
       });
       await reload();
       setTicker('');
-      setMessage('股票與均線參數已儲存；每日報告於下次排程更新。');
+      setMessage(parameterStorageMessage('股票與均線參數'));
     });
   };
   const names: Record<string, string> = {
@@ -79,8 +82,8 @@ export function ParameterConsole() {
   );
   return (
     <section className="parameter-console" aria-label="原有均線參數控制台">
-      <h2>均線參數與雲端分組</h2>
-      <p className="muted">沿用原有股票、分組與大盤參數；修改後由既有每日掃描與突破提醒服務使用。</p>
+      <h2>均線參數與個人分組</h2>
+      <p className="muted">各自設定股票、分組及均線。只有允許雲端保存的帳號，才會交由既有每日掃描與突破提醒服務使用。</p>
       {message && (
         <p role="status" className="console-message">
           {message}
@@ -88,7 +91,7 @@ export function ParameterConsole() {
       )}
       <div className="console-actions">
         <button type="button" className="ghost-button" disabled={busy} onClick={() => void run(reload)}>
-          重新載入雲端參數
+          重新載入參數
         </button>
         <a href={`https://liff.line.me/${DEFAULT_LIFF_ID}?page=console`} className="text-button">
           在 LINE 開啟 Atlas
@@ -160,9 +163,11 @@ export function ParameterConsole() {
         </label>
         <span className="muted">{filteredStocks.length} 筆</span>
       </div>
-      <p className="muted">無分組的固定參數會持續保存，優先於分組與清單的均線；股票在分組或啟用監控的清單中時才會監控。</p>
+      <p className="muted">
+        無分組的固定參數優先於分組與清單的均線；依目前授權選擇暫存、裝置或雲端保存。只有允許雲端保存且啟用監控的帳號才會使用服務端提醒。
+      </p>
       <div className="research-table-scroll parameter-stock-scroll" role="region" aria-label="已有參數股票清單" tabIndex={0}>
-        <table className="research-table" aria-label="雲端股票參數">
+        <table className="research-table" aria-label="個人股票參數">
           <thead>
             <tr>
               <th>股票</th>
@@ -233,7 +238,7 @@ export function ParameterConsole() {
                   });
                   await reload();
                   setDialog(null);
-                  setMessage('股票均線參數已儲存到 Supabase。');
+                  setMessage(parameterStorageMessage('股票均線參數'));
                 });
               }}
             >
@@ -328,7 +333,7 @@ export function ParameterConsole() {
             }}
           >
             <input
-              aria-label="新增雲端分組名稱"
+              aria-label="新增個人分組名稱"
               value={groupName}
               onChange={(event) => setGroupName(event.target.value)}
               maxLength={30}
@@ -361,40 +366,42 @@ export function ParameterConsole() {
           ))}
         </div>
       </details>
-      <details className="research-disclosure">
-        <summary>大盤指數均線參數（管理員）</summary>
-        <div className="research-disclosure-body">
-          <button
-            type="button"
-            className="ghost-button"
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                setIndices(await settingsApi<IndexParameter[]>('admin.index.list'));
-              })
-            }
-          >
-            載入大盤參數
-          </button>
-          {indices?.map((index) => (
-            <IndexEditor
-              key={index.ticker}
-              index={index}
-              busy={busy}
-              onSave={(values) =>
+      {access.isAdmin && access.storageMode === 'cloud' && (
+        <details className="research-disclosure">
+          <summary>大盤指數均線參數（管理員）</summary>
+          <div className="research-disclosure-body">
+            <button
+              type="button"
+              className="ghost-button"
+              disabled={busy}
+              onClick={() =>
                 void run(async () => {
-                  await settingsApi('admin.index.save', {
-                    ticker: index.ticker,
-                    name: index.name,
-                    mas: parseMovingAverages(values),
-                  });
-                  setMessage(`${index.ticker} 大盤參數已儲存`);
+                  setIndices(await settingsApi<IndexParameter[]>('admin.index.list'));
                 })
               }
-            />
-          ))}
-        </div>
-      </details>
+            >
+              載入大盤參數
+            </button>
+            {indices?.map((index) => (
+              <IndexEditor
+                key={index.ticker}
+                index={index}
+                busy={busy}
+                onSave={(values) =>
+                  void run(async () => {
+                    await settingsApi('admin.index.save', {
+                      ticker: index.ticker,
+                      name: index.name,
+                      mas: parseMovingAverages(values),
+                    });
+                    setMessage(`${index.ticker} 大盤參數已儲存`);
+                  })
+                }
+              />
+            ))}
+          </div>
+        </details>
+      )}
     </section>
   );
 }

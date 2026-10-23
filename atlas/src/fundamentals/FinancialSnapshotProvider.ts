@@ -1,6 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import { normalizeSymbol } from '../market-data/MarketDataProvider';
 import { storageName } from '../app/HostingMode';
+import { getStorageContextKey, persistentDatabaseName } from '../auth/storage';
 import type { CompanyFundamentals, FinancialPeriod, FundamentalsProvider } from './FundamentalsProvider';
 import {
   financialSnapshotSchema,
@@ -28,21 +29,48 @@ export interface FinancialSnapshotCache {
 
 /** A disposable, bounded cache. Every pack is revalidated before it can be returned. */
 export class IndexedDbFinancialSnapshotCache implements FinancialSnapshotCache {
-  private db: Promise<IDBPDatabase<FinancialCacheDB>>;
-  constructor(name = CACHE_DATABASE, private now: () => number = Date.now) {
-    this.db = openDB<FinancialCacheDB>(name, 1, {
+  private db?: Promise<IDBPDatabase<FinancialCacheDB>>;
+  private context = getStorageContextKey();
+  private memory = new Map<string, StoredSnapshot>();
+  constructor(private name = CACHE_DATABASE, private now: () => number = Date.now) {}
+
+  private database(context: string) {
+    this.assertContext(context);
+    const name = persistentDatabaseName(this.name);
+    if (!name) return Promise.resolve(null);
+    this.db ??= openDB<FinancialCacheDB>(name, 1, {
       upgrade(db) {
         if (!db.objectStoreNames.contains('snapshots')) {
           db.createObjectStore('snapshots', { keyPath: 'symbol' });
         }
       },
     });
+    return this.db;
+  }
+
+  private ensureContext() {
+    const context = getStorageContextKey();
+    if (context !== this.context) {
+      const old = this.db;
+      this.db = undefined;
+      void old?.then((db) => db.close()).catch(() => undefined);
+      this.memory.clear();
+      this.context = context;
+    }
+    return context;
+  }
+
+  private assertContext(context: string) {
+    if (context !== getStorageContextKey()) throw new DOMException('Account storage context changed', 'AbortError');
   }
 
   async get(symbol: string) {
+    const context = this.ensureContext();
     try {
-      const db = await this.db;
-      const stored = await db.get('snapshots', symbol);
+      const db = await this.database(context);
+      this.assertContext(context);
+      const stored = db ? await db.get('snapshots', symbol) : this.memory.get(symbol);
+      this.assertContext(context);
       if (!stored) return undefined;
       let snapshot: FinancialSnapshot;
       try {
@@ -50,7 +78,8 @@ export class IndexedDbFinancialSnapshotCache implements FinancialSnapshotCache {
         if (snapshot.symbol !== symbol || stored.symbol !== symbol) throw new Error('Cached snapshot symbol mismatch');
       } catch {
         try {
-          await db.delete('snapshots', symbol);
+          if (db) await db.delete('snapshots', symbol);
+          else this.memory.delete(symbol);
         } catch {
           // Invalid entries are never returned, even if best-effort eviction fails.
         }
@@ -58,12 +87,16 @@ export class IndexedDbFinancialSnapshotCache implements FinancialSnapshotCache {
       }
 
       try {
-        const entries = await db.getAll('snapshots');
+        const entries = db ? await db.getAll('snapshots') : [...this.memory.values()];
+        this.assertContext(context);
         const latestAccess = entries.reduce((latest, entry) => Math.max(latest, Number.isFinite(entry.lastAccessed) ? entry.lastAccessed : 0), 0);
-        await db.put('snapshots', { ...stored, lastAccessed: Math.max(this.now(), latestAccess + 1), snapshot });
+        const updated = { ...stored, lastAccessed: Math.max(this.now(), latestAccess + 1), snapshot };
+        if (db) await db.put('snapshots', updated);
+        else this.memory.set(symbol, updated);
       } catch {
         // LRU bookkeeping is optional; keep serving a valid cached pack if storage is read-only/full.
       }
+      this.assertContext(context);
       return structuredClone(snapshot);
     } catch {
       return undefined;
@@ -71,12 +104,22 @@ export class IndexedDbFinancialSnapshotCache implements FinancialSnapshotCache {
   }
 
   async put(value: FinancialSnapshot) {
+    const context = this.ensureContext();
     try {
       const snapshot = financialSnapshotSchema.parse(value);
-      const db = await this.db;
+      const db = await this.database(context);
+      this.assertContext(context);
+      if (!db) {
+        const latestAccess = [...this.memory.values()].reduce((latest, entry) => Math.max(latest, entry.lastAccessed), 0);
+        this.memory.set(snapshot.symbol, { symbol: snapshot.symbol, lastAccessed: Math.max(this.now(), latestAccess + 1), snapshot });
+        const entries = [...this.memory.values()].sort((a, b) => b.lastAccessed - a.lastAccessed);
+        for (const expired of entries.slice(CACHE_LIMIT)) this.memory.delete(expired.symbol);
+        return;
+      }
       const tx = db.transaction('snapshots', 'readwrite');
       void tx.done.catch(() => undefined);
       const current = await tx.store.getAll();
+      this.assertContext(context);
       const latestAccess = current.reduce((latest, entry) => Math.max(latest, Number.isFinite(entry.lastAccessed) ? entry.lastAccessed : 0), 0);
       await tx.store.put({ symbol: snapshot.symbol, lastAccessed: Math.max(this.now(), latestAccess + 1), snapshot });
       const entries = await tx.store.getAll();
@@ -129,6 +172,7 @@ export class FinancialSnapshotProvider implements FundamentalsProvider {
   private readonly fetcher: typeof fetch;
   private readonly cache: FinancialSnapshotCache;
   private metadata = new Map<string, FinancialSnapshotMetadata>();
+  private context = getStorageContextKey();
 
   constructor(options: FinancialSnapshotProviderOptions = {}) {
     this.base = `${(options.base ?? `${import.meta.env.BASE_URL}financial-data/`).replace(/\/?$/, '/')}`;
@@ -138,6 +182,7 @@ export class FinancialSnapshotProvider implements FundamentalsProvider {
   }
 
   getSnapshotMetadata(symbolInput: string): FinancialSnapshotMetadata | undefined {
+    this.ensureContext();
     const symbol = normalizeSymbol(symbolInput);
     const value = this.metadata.get(symbol);
     if (value) {
@@ -162,6 +207,10 @@ export class FinancialSnapshotProvider implements FundamentalsProvider {
     period: FinancialPeriod,
     signal?: AbortSignal,
   ): Promise<CompanyFundamentals[]> {
+    const context = this.ensureContext();
+    const assertCurrent = () => {
+      if (context !== getStorageContextKey()) throw new DOMException('Account storage context changed', 'AbortError');
+    };
     const symbol = normalizeSymbol(symbolInput);
     if (period !== 'quarterly' && period !== 'annual') throw new Error('Unsupported financial period');
     signal?.throwIfAborted();
@@ -173,8 +222,10 @@ export class FinancialSnapshotProvider implements FundamentalsProvider {
         signal,
       });
       signal?.throwIfAborted();
+      assertCurrent();
       if (!response.ok) throw new Error(`Financial snapshot HTTP ${response.status}`);
       pack = financialSnapshotSchema.parse(await response.json());
+      assertCurrent();
       if (pack.symbol !== symbol) throw new Error('Financial snapshot symbol mismatch');
       signal?.throwIfAborted();
       try {
@@ -184,6 +235,7 @@ export class FinancialSnapshotProvider implements FundamentalsProvider {
       }
     } catch (error) {
       signal?.throwIfAborted();
+      assertCurrent();
       let cached: FinancialSnapshot | undefined;
       try {
         cached = await this.cache.get(symbol);
@@ -191,6 +243,7 @@ export class FinancialSnapshotProvider implements FundamentalsProvider {
         cached = undefined;
       }
       signal?.throwIfAborted();
+      assertCurrent();
       if (!cached || cached.symbol !== symbol) {
         this.metadata.delete(symbol);
         throw new FinancialSnapshotUnavailableError(symbol, error);
@@ -199,7 +252,17 @@ export class FinancialSnapshotProvider implements FundamentalsProvider {
       offline = true;
     }
     signal?.throwIfAborted();
+    assertCurrent();
     this.rememberMetadata(symbol, snapshotMetadata(pack, this.now(), offline));
     return structuredClone(pack[period]);
+  }
+
+  private ensureContext() {
+    const context = getStorageContextKey();
+    if (context !== this.context) {
+      this.metadata.clear();
+      this.context = context;
+    }
+    return context;
   }
 }

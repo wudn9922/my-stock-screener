@@ -39,6 +39,11 @@ jobs:
           git fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
           git diff --name-only --diff-filter=AM -z "$PR_BASE_SHA" HEAD -- docs/report/research docs/report/financials docs/report/fundamentals docs/report/universe.json docs/report/growth.json docs/report/kline-corrections.json data |
             xargs -0 -r git restore --source=HEAD --
+          # Restore every dependency of the changed hashed world-candle index,
+          # including files unchanged since main and absent from older generated builds.
+          if ! git diff --quiet "$PR_BASE_SHA" HEAD -- docs/report/research/world-assets.json; then
+            git restore --source=HEAD -- docs/report/research/world-assets.json docs/report/research/candles data/world
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

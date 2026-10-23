@@ -1,3 +1,4 @@
+import { userStorage } from '../auth/storage';
 import type { GroupItem, MetricMa } from '../report/schema';
 import { maDistance, maValue } from '../ui/format';
 import { growthKey, type GrowthFile, type GrowthRecord } from '../fundamentals/GrowthProvider';
@@ -707,16 +708,13 @@ function hasEpsCondition(state: FilterState): boolean {
 /** Last applied conditions per market (`f` text), used when the URL carries none. */
 export const FILTER_STORAGE_KEY = 'atlas-screener-filters-v1';
 
-function storage(): Storage | null {
-  try {
-    return typeof localStorage === 'undefined' ? null : localStorage;
-  } catch {
-    return null;
-  }
+type FilterStorage = Pick<Storage, 'getItem' | 'setItem'>;
+function storage(): FilterStorage {
+  return userStorage;
 }
 
 /** Stored `f` text for a market; null when nothing was saved (or storage is unavailable). */
-export function readStoredFilters(market: 'TW' | 'US', store: Storage | null = storage()): string | null {
+export function readStoredFilters(market: 'TW' | 'US', store: FilterStorage | null = storage()): string | null {
   try {
     const raw = store?.getItem(FILTER_STORAGE_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : null;
@@ -727,7 +725,7 @@ export function readStoredFilters(market: 'TW' | 'US', store: Storage | null = s
   }
 }
 
-export function writeStoredFilters(market: 'TW' | 'US', text: string, store: Storage | null = storage()): void {
+export function writeStoredFilters(market: 'TW' | 'US', text: string, store: FilterStorage | null = storage()): void {
   try {
     if (!store) return;
     let record: Record<string, unknown> = {};

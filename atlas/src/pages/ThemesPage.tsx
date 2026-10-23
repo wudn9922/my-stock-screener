@@ -1,3 +1,4 @@
+import { userStorage } from '../auth/storage';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
 import { ThemeRotationCard } from '../ui/ThemeRotationCard';
@@ -53,7 +54,7 @@ interface ViewPrefs {
 function readPrefs(): ViewPrefs {
   const fallback: ViewPrefs = { period: 'm1', mode: 'return' };
   try {
-    const raw = JSON.parse(localStorage.getItem(VIEW_KEY) ?? 'null') as Partial<ViewPrefs> | null;
+    const raw = JSON.parse(userStorage.getItem(VIEW_KEY) ?? 'null') as Partial<ViewPrefs> | null;
     return {
       period: raw && (PERIODS as readonly string[]).includes(raw.period ?? '') ? (raw.period as PeriodKey) : fallback.period,
       mode: raw?.mode === 'rel' ? 'rel' : 'return',
@@ -65,7 +66,7 @@ function readPrefs(): ViewPrefs {
 
 function writePrefs(prefs: ViewPrefs) {
   try {
-    localStorage.setItem(VIEW_KEY, JSON.stringify(prefs));
+    userStorage.setItem(VIEW_KEY, JSON.stringify(prefs));
   } catch {
     /* A remembered tab is only a convenience. */
   }

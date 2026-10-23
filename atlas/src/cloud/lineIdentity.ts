@@ -1,6 +1,6 @@
 /**
  * LINE identity for cloud drawing sync. Only inside the LINE app (opened from the report LIFF): the LIFF
- * SDK is loaded on demand there and nowhere else, so ordinary browsers keep local-only storage and
+ * SDK is loaded on demand there and nowhere else, so ordinary browsers use transient memory and
  * never download the SDK.
  *
  * liff.init() must run before the router rewrites the URL: a LINE login returns with `code`, `state`,
@@ -16,6 +16,14 @@ const EXPIRY_MARGIN_MS = 60_000;
 const MAX_ATTEMPTS = 2;
 const GUARD_WINDOW_MS = 120_000;
 const GUARD_KEY = 'atlas-liff-attempts';
+// Login attempts are transient too: unidentified visitors must never write sessionStorage.
+const attemptMemory = new Map<string, string>();
+const attemptStore = {
+  getItem: (key: string) => attemptMemory.get(key) ?? null,
+  setItem: (key: string, value: string) => { attemptMemory.set(key, value); },
+  removeItem: (key: string) => { attemptMemory.delete(key); },
+} as Storage;
+let initializedSdk: LiffSdk | null = null;
 
 interface LiffSdk {
   init(config: { liffId: string }): Promise<void>;
@@ -79,14 +87,6 @@ function clearLoginAttempts(storage: Storage | undefined) {
   }
 }
 
-function sessionStore(): Storage | undefined {
-  try {
-    return globalThis.sessionStorage;
-  } catch {
-    return undefined;
-  }
-}
-
 let pending: Promise<LineIdentity | null> | null = null;
 
 /**
@@ -101,29 +101,42 @@ export function startLineIdentity(liffId = DEFAULT_LIFF_ID, now: () => number = 
 /** Resolves to the LINE identity, or null outside LINE / when not logged in / on any LIFF error. */
 async function getLineIdentity(liffId: string, now: () => number): Promise<LineIdentity | null> {
   if (!liffId || !isLineInAppBrowser()) return null;
-  const storage = sessionStore();
+  const storage = attemptStore;
   if (!claimLoginAttempt(storage, now())) {
-    console.warn('LINE login skipped after repeated attempts; drawings stay on this device');
+    console.warn('LINE login skipped after repeated attempts; drawings remain in memory only');
     return null;
   }
   try {
     const liff = await loadSdk();
     await liff.init({ liffId });
+    initializedSdk = liff;
     if (!liff.isLoggedIn()) return null;
     clearLoginAttempts(storage);
-    const decoded = liff.getDecodedIDToken();
-    if (!decoded?.sub) return null;
-    return {
-      userId: decoded.sub,
-      idToken() {
-        const token = liff.getIDToken();
-        const exp = liff.getDecodedIDToken()?.exp;
-        if (!token || (exp && exp * 1000 - EXPIRY_MARGIN_MS < now())) return null;
-        return token;
-      },
-    };
+    return identityFromSdk(liff, now);
   } catch (error) {
-    console.warn('LINE login unavailable; drawings stay on this device', error);
+    console.warn('LINE login unavailable; drawings remain in memory only', error);
     return null;
   }
+}
+
+function identityFromSdk(liff: LiffSdk, now: () => number): LineIdentity | null {
+  if (!liff.isLoggedIn()) return null;
+  const userId = liff.getDecodedIDToken()?.sub;
+  if (!userId) return null;
+  return {
+    userId,
+    idToken() {
+      const token = liff.getIDToken(), decoded = liff.getDecodedIDToken();
+      // A retained callback must never start writing a different LINE account's token.
+      if (!token || decoded?.sub !== userId || typeof decoded.exp !== 'number' || !Number.isFinite(decoded.exp) || decoded.exp * 1000 - EXPIRY_MARGIN_MS < now()) return null;
+      return token;
+    },
+  };
+}
+
+/** Re-read the SDK's current identity, including account switches, without replaying OAuth init. */
+export async function refreshLineIdentity(): Promise<LineIdentity | null> {
+  if (!isLineInAppBrowser()) return null;
+  if (initializedSdk) return identityFromSdk(initializedSdk, Date.now);
+  return startLineIdentity(import.meta.env?.VITE_LIFF_ID || DEFAULT_LIFF_ID);
 }

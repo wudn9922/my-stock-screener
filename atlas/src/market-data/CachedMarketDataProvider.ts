@@ -1,4 +1,5 @@
 import { storageName } from '../app/HostingMode';
+import { getStorageContextKey, persistentDatabaseName } from '../auth/storage';
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type {
   BarResult,
@@ -319,6 +320,8 @@ export class CachedMarketDataProvider implements MarketDataProvider {
   private readonly cacheIdentity: string;
   private readonly inFlight = new Map<string, Promise<CacheValue>>();
   private dbPromise?: Promise<IDBPDatabase<MarketCacheSchema>>;
+  private context = getStorageContextKey();
+  private memory = new Map<string, MarketCacheEntry>();
 
   constructor(
     private readonly provider: MarketDataProvider,
@@ -408,13 +411,15 @@ export class CachedMarketDataProvider implements MarketDataProvider {
     load: () => Promise<CacheValue>,
     signal?: AbortSignal,
   ): Promise<CacheValue> {
+    const context = this.ensureContext();
     let cached: MarketCacheEntry | undefined;
     try {
-      cached = await this.read(identity);
+      cached = await this.read(identity, context);
     } catch (error) {
       if (error instanceof MarketCacheCorruptionError) throw error;
     }
     signal?.throwIfAborted();
+    this.assertContext(context);
     const now = this.now();
     if (cached && cached.expiresAt > now) return labelValue(cached.value, 'cached');
 
@@ -422,10 +427,11 @@ export class CachedMarketDataProvider implements MarketDataProvider {
     if (!pending) {
       pending = (async () => {
         const raw = await load();
+        this.assertContext(context);
         validateValue(identity.kind, raw, identity.symbol, identity.timeframe);
         const fresh = labelValue(raw, 'fresh');
         try {
-          await this.write(identity, fresh);
+          await this.write(identity, fresh, context);
         } catch {
           // The market cache is disposable; a cache quota/private-mode failure
           // must not hide a successful provider response.
@@ -441,25 +447,30 @@ export class CachedMarketDataProvider implements MarketDataProvider {
     try {
       const value = await pending;
       signal?.throwIfAborted();
+      this.assertContext(context);
       return clone(value);
     } catch (error) {
       signal?.throwIfAborted();
+      this.assertContext(context);
       if (isAbortError(error) || !isUnavailable(error)) throw error;
       if (!cached) throw error;
       return labelValue(cached.value, 'stale');
     }
   }
 
-  private async read(identity: CacheIdentity): Promise<MarketCacheEntry | undefined> {
-    const db = await this.database();
-    const entry = await db.get('entries', identity.key);
+  private async read(identity: CacheIdentity, context: string): Promise<MarketCacheEntry | undefined> {
+    const db = await this.database(context);
+    this.assertContext(context);
+    const entry = db ? await db.get('entries', identity.key) : this.memory.get(identity.key);
+    this.assertContext(context);
     if (!entry) return undefined;
     assertIdentity(entry, identity);
     return clone(entry);
   }
 
-  private async write(identity: CacheIdentity, value: CacheValue): Promise<void> {
-    const db = await this.database();
+  private async write(identity: CacheIdentity, value: CacheValue, context: string): Promise<void> {
+    const db = await this.database(context);
+    this.assertContext(context);
     const createdAt = this.now();
     const entry: MarketCacheEntry = {
       ...identity,
@@ -467,6 +478,12 @@ export class CachedMarketDataProvider implements MarketDataProvider {
       expiresAt: createdAt + this.ttlMs,
       value: clone(value),
     };
+    if (!db) {
+      this.memory.set(identity.key, entry);
+      const entries = [...this.memory.values()].sort((a, b) => b.createdAt - a.createdAt);
+      for (const expired of entries.slice(this.maxEntries)) this.memory.delete(expired.key);
+      return;
+    }
     const tx = db.transaction('entries', 'readwrite');
     await tx.store.put(entry);
     const entries = await tx.store.getAll();
@@ -475,8 +492,28 @@ export class CachedMarketDataProvider implements MarketDataProvider {
     await tx.done;
   }
 
-  private database(): Promise<IDBPDatabase<MarketCacheSchema>> {
-    this.dbPromise ??= createDatabase(this.dbName);
+  private database(context: string): Promise<IDBPDatabase<MarketCacheSchema> | null> {
+    this.assertContext(context);
+    const name = persistentDatabaseName(this.dbName);
+    if (!name) return Promise.resolve(null);
+    this.dbPromise ??= createDatabase(name);
     return this.dbPromise;
+  }
+
+  private ensureContext() {
+    const context = getStorageContextKey();
+    if (context !== this.context) {
+      const old = this.dbPromise;
+      this.dbPromise = undefined;
+      void old?.then((db) => db.close()).catch(() => undefined);
+      this.memory.clear();
+      this.inFlight.clear();
+      this.context = context;
+    }
+    return context;
+  }
+
+  private assertContext(context: string) {
+    if (context !== getStorageContextKey()) throw new DOMException('Account storage context changed', 'AbortError');
   }
 }

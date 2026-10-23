@@ -3,6 +3,7 @@ import { runInNewContext } from 'node:vm';
 import { transformSync } from 'esbuild';
 import { describe, expect, it } from 'vitest';
 import { watchlistId, watchlistVersion } from '../../supabase/functions/user-settings/watchlists';
+import * as storageAccess from '../../supabase/functions/_shared/storageAccess';
 
 type Row = Record<string, unknown>;
 /** Exercise the deployed handler's validation and ownership predicates with an offline database. */
@@ -48,6 +49,7 @@ function handlerFixture(seed: Row[] = [], count = seed.length, enabled = true, t
         return query;
       },
       then: (resolve: (result: { data: Row[] | Row | null; error: null; count?: number }) => unknown) => {
+        if (table === 'atlas_storage_access') return Promise.resolve(resolve({ data: null, error: null }));
         if (table !== tableName) throw new Error(`Unexpected table ${table}`);
         let matched = rows.filter((row) => filters.every((filter) => filter(row)));
         if (mode === 'upsert') {
@@ -84,7 +86,7 @@ function handlerFixture(seed: Row[] = [], count = seed.length, enabled = true, t
   runInNewContext(code, {
     Deno: {
       env: {
-        get: (name: string) => (name === 'ATLAS_FIXED_PARAMETERS_ENABLED' ? (enabled ? '1' : '0') : 'configured-test-value'),
+        get: (name: string) => name === 'ADMIN_LINE_USER_ID' ? storageAccess.DEFAULT_ADMIN_LINE_ID : (name === 'ATLAS_FIXED_PARAMETERS_ENABLED' ? (enabled ? '1' : '0') : 'configured-test-value'),
       },
       serve: (callback: typeof handler) => {
         handler = callback;
@@ -93,11 +95,12 @@ function handlerFixture(seed: Row[] = [], count = seed.length, enabled = true, t
     createClient: () => ({ from }),
     watchlistId,
     watchlistVersion,
+    ...storageAccess,
     Request,
     Response,
     URLSearchParams,
     console,
-    fetch: async () => new Response(JSON.stringify({ sub: 'U-owner' }), { status: 200 }),
+    fetch: async () => new Response(JSON.stringify({ sub: storageAccess.DEFAULT_ADMIN_LINE_ID }), { status: 200 }),
   });
   const request = async (body: Row) => {
     const response = await handler(
@@ -117,7 +120,7 @@ describe('user-settings stock parameters', () => {
     const body = { action: 'watchlists.delete', id, expectedUpdatedAt: '2026-10-20T10:00:00Z' };
     const empty = handlerFixture([], 0, true, 'atlas_watchlists');
     expect((await empty.request(body)).status).toBe(200);
-    const changed = handlerFixture([{ id, line_user_id: 'U-owner', updated_at: '2026-10-20T10:01:00Z' }], 1, true, 'atlas_watchlists');
+    const changed = handlerFixture([{ id, line_user_id: storageAccess.DEFAULT_ADMIN_LINE_ID, updated_at: '2026-10-20T10:01:00Z' }], 1, true, 'atlas_watchlists');
     expect((await changed.request(body)).status).toBe(409);
     expect(changed.rows).toHaveLength(1);
   });
@@ -138,19 +141,19 @@ describe('user-settings stock parameters', () => {
   it('stores a dormant per-ticker preference in the verified user account and updates it at the stock limit', async () => {
     const fixed = {
       id: 1,
-      line_user_id: 'U-owner',
+      line_user_id: storageAccess.DEFAULT_ADMIN_LINE_ID,
       ticker: 'NVDA',
       group_id: 'ungrouped',
       ma1: 20,
     };
-    const other = { ...fixed, id: 2, line_user_id: 'U-other' };
+    const other = { ...fixed, id: 2, line_user_id: 'U11111111111111111111111111111111' };
     const fixture = handlerFixture([fixed, other], 500);
     const result = await fixture.request({
       action: 'stocks.save',
       ticker: 'nvda',
       groupId: 'ungrouped',
       mas: [13, 34],
-      line_user_id: 'U-other',
+      line_user_id: 'U11111111111111111111111111111111',
     });
     expect(result.status).toBe(200);
     expect(fixture.rows.find((row) => row.id === 1)).toMatchObject({
@@ -174,7 +177,7 @@ describe('user-settings stock parameters', () => {
   it('does not edit or delete a parameter row owned by another user', async () => {
     const other = {
       id: 1,
-      line_user_id: 'U-other',
+      line_user_id: 'U11111111111111111111111111111111',
       ticker: 'NVDA',
       group_id: 'ungrouped',
       ma1: 20,

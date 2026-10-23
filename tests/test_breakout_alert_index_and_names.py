@@ -334,6 +334,7 @@ class DiscordQueryImageTests(unittest.TestCase):
         copied = [
             "__init__.py",
             "config.py",
+            "account_permissions.py",
             "supabase_store.py",
             "cache_query.py",
             "discord_app.py",

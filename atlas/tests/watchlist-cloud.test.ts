@@ -1,12 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { startLineIdentity } from '../src/cloud/lineIdentity';
+import { requireCloudAccess } from '../src/auth/access';
 import { settingsApi } from '../src/cloud/settingsApi';
 import { refreshCloudWatchlist, pushCloudWatchlist } from '../src/watchlists/cloud';
 import { createWatchlist, recordWatchlistData, visitWatchlist } from '../src/watchlists/model';
 import { WatchlistStore } from '../src/watchlists/store';
 import { WatchlistCloudSync } from '../src/watchlists/sync';
 
-vi.mock('../src/cloud/lineIdentity', () => ({ startLineIdentity: vi.fn() }));
+const permission = vi.hoisted(() => ({ storageMode: 'cloud' as 'none' | 'device' | 'cloud', epoch: 0 }));
+vi.mock('../src/auth/access', () => ({
+  accessState: { getSnapshot: () => permission },
+  requireCloudAccess: vi.fn(),
+}));
+vi.mock('../src/auth/storage', () => ({
+  getStorageContextKey: () => `test:${permission.epoch}:${permission.storageMode}`,
+  canPersist: () => permission.storageMode !== 'none',
+  userStorage: { getItem: () => null, setItem() {} },
+}));
 vi.mock('../src/cloud/settingsApi', () => ({ settingsApi: vi.fn() }));
 const identity = { userId: 'U-test', idToken: () => 'test-token' };
 const members = (...symbols: string[]) => symbols.map((symbol) => ({ symbol, name: symbol }));
@@ -26,7 +35,9 @@ const linked = () => ({
 });
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(startLineIdentity).mockResolvedValue(identity);
+  permission.storageMode = 'cloud';
+  permission.epoch = 0;
+  vi.mocked(requireCloudAccess).mockResolvedValue(identity);
 });
 
 describe('linked cloud observation sync', () => {
@@ -43,7 +54,7 @@ describe('linked cloud observation sync', () => {
   });
   it('does not automatically access a previously linked account after the identity changes', async () => {
     const local = linked();
-    vi.mocked(startLineIdentity).mockResolvedValue({
+    vi.mocked(requireCloudAccess).mockResolvedValue({
       ...identity,
       userId: 'U-other',
     });
@@ -79,6 +90,27 @@ function storedList() {
 }
 
 describe('automatic setting writes and deletion', () => {
+  it.each(['none', 'device'] as const)('keeps %s operations in memory/device only, including linked-list deletion', async (mode) => {
+    permission.storageMode = mode;
+    const { store, list, sync } = storedList();
+    expect(await refreshCloudWatchlist(list)).toBe(list);
+    expect(await sync.sync(list.id)).toBe(false);
+    await sync.remove(list.id);
+    expect(store.getSnapshot().document.lists).toHaveLength(0);
+    expect(requireCloudAccess).not.toHaveBeenCalled();
+    expect(settingsApi).not.toHaveBeenCalled();
+  });
+  it('does not apply a cloud response to another storage context after an account switch', async () => {
+    const { store, list, sync } = storedList();
+    let release!: (value: unknown) => void;
+    vi.mocked(settingsApi).mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+    const pending = sync.sync(list.id);
+    await vi.waitFor(() => expect(settingsApi).toHaveBeenCalledTimes(1));
+    permission.epoch++;
+    release({ updated_at: 'new-version' });
+    await expect(pending).rejects.toThrow('帳號或儲存權限已變更');
+    expect(store.getSnapshot().document.lists[0].cloud?.version).toBe(list.cloud.version);
+  });
   it('serializes rapid edits using the latest server version and preserves edits made during a request', async () => {
     const { store, list, sync } = storedList();
     let release!: () => void;
@@ -141,16 +173,17 @@ describe('automatic setting writes and deletion', () => {
   });
   it('cannot delete a linked list with another account and keeps local-only browser operation available', async () => {
     const { store, list, sync } = storedList();
-    vi.mocked(startLineIdentity).mockResolvedValue({
+    vi.mocked(requireCloudAccess).mockResolvedValue({
       ...identity,
       userId: 'U-other',
     });
     await expect(sync.remove(list.id)).rejects.toThrow('LINE 帳號');
     expect(settingsApi).not.toHaveBeenCalled();
     store.save({ ...list, cloud: undefined });
-    vi.mocked(startLineIdentity).mockResolvedValue(null);
-    expect(await sync.sync(list.id)).toBe(false);
-    await sync.remove(list.id);
+    permission.storageMode = 'none';
+    const localSync = new WatchlistCloudSync(store);
+    expect(await localSync.sync(list.id)).toBe(false);
+    await localSync.remove(list.id);
     expect(store.getSnapshot().document.lists).toHaveLength(0);
     expect(settingsApi).not.toHaveBeenCalled();
   });

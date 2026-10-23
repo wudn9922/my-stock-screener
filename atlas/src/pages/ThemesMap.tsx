@@ -1,3 +1,4 @@
+import { userStorage } from '../auth/storage';
 import { useMemo, useState } from 'react';
 import { PERIOD_LABELS, type PeriodKey, type Theme, type ThemesData } from '../report/themes';
 import { storageName } from '../app/HostingMode';
@@ -52,7 +53,7 @@ interface MapPrefs {
 
 function readPrefs(): MapPrefs {
   try {
-    const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? 'null') as { weight?: unknown; agg?: unknown } | null;
+    const raw = JSON.parse(userStorage.getItem(PREFS_KEY) ?? 'null') as { weight?: unknown; agg?: unknown } | null;
     return { weight: parseWeightMode(raw?.weight), agg: parseAggMode(raw?.agg) };
   } catch {
     return { weight: DEFAULT_WEIGHT_MODE, agg: DEFAULT_AGG_MODE };
@@ -61,7 +62,7 @@ function readPrefs(): MapPrefs {
 
 function writePrefs(prefs: MapPrefs) {
   try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    userStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   } catch {
     /* A remembered mode is only a convenience. */
   }

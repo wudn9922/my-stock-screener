@@ -13,6 +13,7 @@ import type { ChartRequest } from './chartRequest';
 import type { Timeframe } from '../market-data/MarketDataProvider';
 import './siteNav.css';
 import { DataHealthPanel } from '../ui/DataHealthPanel';
+import { StorageNotice } from '../auth/StorageNotice';
 
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
@@ -234,6 +235,7 @@ export function Site() {
         ))}
       </nav>
       <main className="site-main" id="main">
+        {SCREENER_HOSTING && <StorageNotice />}
         <Suspense fallback={pageFallback}>
           {route.page === 'markets' && <MarketsPage {...pageProps} market={route.market} />}
           {route.page === 'world' && <WorldPage {...pageProps} view={route.view} />}

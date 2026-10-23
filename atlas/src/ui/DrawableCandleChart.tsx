@@ -6,7 +6,8 @@ import {
   useSyncExternalStore,
 } from "react";
 import { ChartEngine } from "../chart/ChartEngine";
-import { chartStore as store, initializeChartStore } from "../app/chartStore";
+import { getChartStore, initializeChartStore } from "../app/chartStore";
+import { canPersist } from "../auth/storage";
 import { sitePreferences, upDownColors } from "../app/sitePreferences";
 import { aggregateBars } from "../market-data/StaticSeriesProvider";
 import {
@@ -37,6 +38,7 @@ export function DrawableCandleChart({
   loading?: boolean;
   error?: string;
 }) {
+  const store = getChartStore();
   const symbol = useMemo(() => researchDrawingSymbol(identity), [identity]);
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const prefs = useSyncExternalStore(
@@ -65,7 +67,7 @@ export function DrawableCandleChart({
     [bars, timeframe, market],
   );
   useEffect(() => {
-    void initializeChartStore();
+    void initializeChartStore(store);
   }, []);
   useEffect(() => {
     if (
@@ -274,7 +276,7 @@ export function DrawableCandleChart({
             }).format(new Date(bars.at(-1)!.time * 1000))
           : "—"}{" "}
         · 畫線
-        {state.storageError
+        {!canPersist() ? '僅本次瀏覽暫存' : state.storageError
           ? `儲存失敗：${state.storageError}`
           : state.saving
             ? "儲存中…"

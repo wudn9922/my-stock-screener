@@ -1,3 +1,4 @@
+import { mockDeviceAccount, accountPreference } from './account-fixture';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
@@ -89,6 +90,7 @@ test('view toggle switches between the list and the industry heatmap and keeps t
 });
 
 test('period, weighting and size controls change the map; the industry map offers 1日 to 3月 only', async ({ page }) => {
+  await mockDeviceAccount(page);
   await mockMap(page);
   await page.goto('./?page=themes&market=tw&v=map');
   await expect(cells(page)).toHaveCount(12);
@@ -133,8 +135,9 @@ test('period, weighting and size controls change the map; the industry map offer
 });
 
 test('a stored period beyond 3 months shows as 3月 on the industry map and comes back on the list', async ({ page }) => {
+  await mockDeviceAccount(page);
   await mockMap(page);
-  await page.addInitScript(() => localStorage.setItem('atlas-themes-view-v1', JSON.stringify({ period: 'ytd', mode: 'return' })));
+  await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ period: 'ytd', mode: 'return' })), accountPreference('atlas-themes-view-v1'));
   await page.goto('./?page=themes&v=map');
   const periods = page.getByRole('group', { name: '期間' });
   await expect(periods.getByRole('button', { name: '3月' })).toHaveAttribute('aria-pressed', 'true');
@@ -283,11 +286,10 @@ test('when the universe is missing the theme map still works with equal-size cel
   expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
 });
 
-test('an old stored 成交值 preference still selects the raw size mode', async ({ page }) => {
+test('an old stored 成交值 preference in an authorized account still selects the raw size mode', async ({ page }) => {
+  await mockDeviceAccount(page);
   await mockMap(page);
-  await page.addInitScript(() => {
-    for (const key of ['atlas-themes-map-v1', 'atlas-themes-map-v1-screener']) localStorage.setItem(key, JSON.stringify({ weight: 'turnover' }));
-  });
+  await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ weight: 'turnover' })), accountPreference('atlas-themes-map-v1-screener'));
   await page.goto('./?page=themes&market=tw&v=map');
   await expect(page.getByRole('group', { name: '大小' }).getByRole('button', { name: '市值' })).toHaveAttribute('aria-pressed', 'true');
 });

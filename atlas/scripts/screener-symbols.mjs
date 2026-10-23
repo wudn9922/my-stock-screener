@@ -2,22 +2,32 @@
 // Supabase tables `stocks` and `index_configs`. Node built-ins only (global fetch).
 //
 // Env: SUPABASE_URL (with or without /rest/v1), SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY,
-//      optional SUPABASE_USER_ID (filters stocks.line_user_id).
+//      SUPABASE_USER_ID (must be the public report owner), optional ADMIN_LINE_USER_ID.
 // On any failure, or when Supabase returns no usable symbol, exits non-zero and leaves the
 // existing market-symbols.json untouched.
-import { readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readFile, rename, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 /** Mirrors CANONICAL_SYMBOL_REGEX in src/market-data/MarketProfile.ts (US | Taiwan | ^index). */
 export const ATLAS_SYMBOL_REGEX =
   /^(?:[A-Z][A-Z0-9.^-]{0,14}|[0-9]{4,6}[A-Z]?\.(?:TW|TWO)|\^[A-Z0-9][A-Z0-9.-]{0,14})$/;
 
 /** Screener defaults (main.py get_default_index_configs), used only if index_configs is unavailable. */
-export const DEFAULT_INDEX_TICKERS = ['^TWII', '^TWOII', '^GSPC', '^DJI', '^IXIC', '^RUT', '^SOX'];
+export const DEFAULT_INDEX_TICKERS = [
+  "^TWII",
+  "^TWOII",
+  "^GSPC",
+  "^DJI",
+  "^IXIC",
+  "^RUT",
+  "^SOX",
+];
 
 const PAGE_SIZE = 1000;
 const MAX_PAGES = 50;
+const LINE_ID = /^U[0-9a-f]{32}$/;
+const DEFAULT_ADMIN_LINE_ID = "Ua0037dbd5037b64fc76804c60520ad76";
 
 /**
  * Same rules as the screener's normalize_custom_ticker, plus `.TW` for bare digit codes:
@@ -29,10 +39,10 @@ export function normalizeScreenerTicker(raw) {
   const ticker = String(raw).trim().toUpperCase();
   if (!ticker) return null;
   let symbol;
-  if (ticker.endsWith('.TW') || ticker.endsWith('.TWO')) symbol = ticker;
+  if (ticker.endsWith(".TW") || ticker.endsWith(".TWO")) symbol = ticker;
   else if (/^[0-9]+$/.test(ticker)) symbol = `${ticker}.TW`;
-  else if (ticker.startsWith('^')) symbol = ticker;
-  else symbol = ticker.replaceAll('.', '-');
+  else if (ticker.startsWith("^")) symbol = ticker;
+  else symbol = ticker.replaceAll(".", "-");
   return ATLAS_SYMBOL_REGEX.test(symbol) ? symbol : null;
 }
 
@@ -49,15 +59,19 @@ export function collectSymbols(rawTickers, log = console.log) {
 }
 
 export function supabaseRestUrl(baseUrl) {
-  const base = String(baseUrl ?? '').trim().replace(/\/+$/, '');
-  if (!base) throw new Error('SUPABASE_URL is not set');
-  return base.endsWith('/rest/v1') ? base : `${base}/rest/v1`;
+  const base = String(baseUrl ?? "")
+    .trim()
+    .replace(/\/+$/, "");
+  if (!base) throw new Error("SUPABASE_URL is not set");
+  if (new URL(base).protocol !== "https:")
+    throw new Error("SUPABASE_URL must use HTTPS");
+  return base.endsWith("/rest/v1") ? base : `${base}/rest/v1`;
 }
 
 /** New sb_secret_/sb_publishable_ keys go only in `apikey`; legacy JWT keys also as Bearer. */
 export function supabaseHeaders(key) {
-  const headers = { apikey: key, Accept: 'application/json' };
-  if (key.startsWith('eyJ')) headers.Authorization = `Bearer ${key}`;
+  const headers = { apikey: key, Accept: "application/json" };
+  if (key.startsWith("eyJ")) headers.Authorization = `Bearer ${key}`;
   return headers;
 }
 
@@ -65,51 +79,114 @@ async function getRows(rest, table, query, headers, fetchImpl) {
   const rows = [];
   for (let page = 0; page < MAX_PAGES; page++) {
     const params = new URLSearchParams(query);
-    params.set('limit', String(PAGE_SIZE));
-    params.set('offset', String(page * PAGE_SIZE));
+    params.set("limit", String(PAGE_SIZE));
+    params.set("offset", String(page * PAGE_SIZE));
     const response = await fetchImpl(`${rest}/${table}?${params}`, {
       headers,
       signal: AbortSignal.timeout(20000),
     });
     if (!response.ok) {
-      const body = (await response.text().catch(() => '')).slice(0, 300);
+      const body = (await response.text().catch(() => "")).slice(0, 300);
       throw new Error(`Supabase ${table} HTTP ${response.status} ${body}`);
     }
     const data = await response.json();
-    if (!Array.isArray(data)) throw new Error(`Supabase ${table} returned a non-array response`);
+    if (!Array.isArray(data))
+      throw new Error(`Supabase ${table} returned a non-array response`);
     rows.push(...data);
     if (data.length < PAGE_SIZE) return rows;
   }
-  throw new Error(`Supabase ${table} has more than ${PAGE_SIZE * MAX_PAGES} rows`);
+  throw new Error(
+    `Supabase ${table} has more than ${PAGE_SIZE * MAX_PAGES} rows`,
+  );
 }
 
 /** Fetches stock and index tickers from Supabase and returns the normalized allowlist. */
-export async function fetchScreenerSymbols(env = process.env, fetchImpl = globalThis.fetch, log = console.log) {
+export async function fetchScreenerSymbols(
+  env = process.env,
+  fetchImpl = globalThis.fetch,
+  log = console.log,
+) {
   const rest = supabaseRestUrl(env.SUPABASE_URL);
-  const key = String(env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY || '').trim();
-  if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY is not set');
+  const key = String(
+    env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY || "",
+  ).trim();
+  if (!key)
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY is not set",
+    );
   const headers = supabaseHeaders(key);
-  const userId = String(env.SUPABASE_USER_ID ?? '').trim();
+  const userId = String(env.SUPABASE_USER_ID ?? "").trim();
+  const owner = String(env.ADMIN_LINE_USER_ID || DEFAULT_ADMIN_LINE_ID).trim();
+  // The output is committed to GitHub, so even another cloud-authorized user's
+  // private stock selection must never enter this public allowlist.
+  if (!LINE_ID.test(userId) || !LINE_ID.test(owner) || userId !== owner)
+    throw new Error(
+      "Public market symbols require the configured administrator account",
+    );
+  const requireCloud = async () => {
+    const query = new URLSearchParams({
+      select: "line_user_id,storage_mode",
+      line_user_id: `eq.${userId}`,
+      limit: "2",
+    });
+    const response = await fetchImpl(`${rest}/atlas_storage_access?${query}`, {
+      headers,
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await response.json();
+    const missingTable =
+      !response.ok && ["42P01", "PGRST205"].includes(data?.code);
+    const allowed =
+      response.ok &&
+      Array.isArray(data) &&
+      (data.length === 0 ||
+        (data.length === 1 &&
+          data[0]?.line_user_id === userId &&
+          data[0]?.storage_mode === "cloud"));
+    if (!missingTable && !allowed)
+      throw new Error(
+        "Account cloud storage is disabled or permission is unavailable",
+      );
+  };
 
-  const stockQuery = { select: 'ticker,line_user_id' };
-  if (userId) stockQuery.line_user_id = `eq.${userId}`;
-  const stocks = (await getRows(rest, 'stocks', stockQuery, headers, fetchImpl)).filter(
-    (row) => !userId || String(row?.line_user_id ?? '').trim() === userId,
-  );
-  log(`stocks: ${stocks.length} rows${userId ? ' for SUPABASE_USER_ID' : ''}`);
+  await requireCloud();
+  const stockQuery = {
+    select: "ticker,line_user_id",
+    line_user_id: `eq.${userId}`,
+  };
+  const stocks = (
+    await getRows(rest, "stocks", stockQuery, headers, fetchImpl)
+  ).filter((row) => String(row?.line_user_id ?? "").trim() === userId);
+  log(`stocks: ${stocks.length} rows${userId ? " for SUPABASE_USER_ID" : ""}`);
 
   let indexTickers;
   try {
-    const indices = await getRows(rest, 'index_configs', { select: '*' }, headers, fetchImpl);
-    indexTickers = indices.filter((row) => row?.enabled !== false).map((row) => row?.ticker);
+    await requireCloud();
+    const indices = await getRows(
+      rest,
+      "index_configs",
+      { select: "*" },
+      headers,
+      fetchImpl,
+    );
+    indexTickers = indices
+      .filter((row) => row?.enabled !== false)
+      .map((row) => row?.ticker);
     log(`index_configs: ${indices.length} rows`);
   } catch (error) {
-    log(`index_configs unavailable (${error instanceof Error ? error.message : error}); using screener defaults`);
+    log(
+      `index_configs unavailable (${error instanceof Error ? error.message : error}); using screener defaults`,
+    );
     indexTickers = [];
   }
   if (!indexTickers.length) indexTickers = DEFAULT_INDEX_TICKERS;
-  const stockSymbols = collectSymbols(stocks.map((row) => row?.ticker), log);
-  if (!stockSymbols.length) throw new Error('Supabase returned no valid stock tickers');
+  const stockSymbols = collectSymbols(
+    stocks.map((row) => row?.ticker),
+    log,
+  );
+  if (!stockSymbols.length)
+    throw new Error("Supabase returned no valid stock tickers");
+  await requireCloud();
   return collectSymbols([...stockSymbols, ...indexTickers], log);
 }
 
@@ -120,19 +197,32 @@ async function writeAtomic(path, value) {
 }
 
 async function main() {
-  const output = resolve(dirname(fileURLToPath(import.meta.url)), 'market-symbols.json');
+  const output = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    "market-symbols.json",
+  );
   try {
     const symbols = await fetchScreenerSymbols();
-    const prior = await readFile(output, 'utf8').then(JSON.parse).catch(() => []);
+    const prior = await readFile(output, "utf8")
+      .then(JSON.parse)
+      .catch(() => []);
     const previous = Array.isArray(prior) ? prior : [];
     await writeAtomic(output, JSON.stringify(symbols));
     const added = symbols.filter((symbol) => !previous.includes(symbol));
     const removed = previous.filter((symbol) => !symbols.includes(symbol));
-    console.log(`market-symbols.json: ${symbols.length} symbols (+${added.length} / -${removed.length})`);
+    console.log(
+      `market-symbols.json: ${symbols.length} symbols (+${added.length} / -${removed.length})`,
+    );
   } catch (error) {
-    console.error(`screener-symbols failed; keeping existing market-symbols.json: ${error instanceof Error ? error.message : error}`);
+    console.error(
+      `screener-symbols failed; keeping existing market-symbols.json: ${error instanceof Error ? error.message : error}`,
+    );
     process.exitCode = 1;
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) await main();
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+)
+  await main();

@@ -14,8 +14,18 @@ on:
       - 'tests/fixtures/research/**'
       - '.github/workflows/research-data.yml'
       - 'breakout_alert/**'
+      - 'main.py'
+      - 'Dockerfile.discord-query'
+      - '.github/workflows/cloud-run.yml'
       - 'supabase/functions/user-settings/**'
+      - 'supabase/functions/chart-drawings/**'
+      - 'supabase/functions/_shared/**'
+      - 'supabase/manual/**'
+      - 'supabase/tests/**'
       - 'tests/test_atlas_watchlists.py'
+      - 'tests/test_account_permissions.py'
+      - 'tests/test_drawing_alerts_runner.py'
+      - 'tests/test_breakout_alert_index_and_names.py'
       - 'tests/test_breakouts.py'
       - 'scripts/build_breakouts.py'
       - 'scripts/build_full_market_breakouts.py'
@@ -55,6 +65,12 @@ jobs:
           git fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
           git diff --name-only --diff-filter=AM -z "$PR_BASE_SHA" HEAD -- docs/report/research docs/report/financials docs/report/fundamentals docs/report/universe.json docs/report/growth.json docs/report/kline-corrections.json data |
             xargs -0 -r git restore --source=HEAD --
+          # The index hashes every member of its candle bundle. Restore that complete
+          # bundle when this PR changes it, including members unchanged since main.
+          # A pre-candle generated snapshot otherwise deletes those dependencies.
+          if ! git diff --quiet "$PR_BASE_SHA" HEAD -- docs/report/research/world-assets.json; then
+            git restore --source=HEAD -- docs/report/research/world-assets.json docs/report/research/candles data/world
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -123,7 +139,7 @@ jobs:
           retention-days: 7
       - name: Desktop, phone and WebKit regressions
         working-directory: atlas
-        run: npm run test:site -- parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts data-integrity.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts breakouts.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts
+        run: npm run test:site -- account-privacy.spec.ts parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts data-integrity.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts breakouts.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -134,6 +150,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Offline PostgreSQL account storage enforcement
+        run: |
+          set -euo pipefail
+          pg_bindir="$(pg_config --bindir 2>/dev/null || true)"
+          if [ ! -x "$pg_bindir/initdb" ] || [ ! -x "$pg_bindir/psql" ]; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql
+            pg_bindir="$(find /usr/lib/postgresql -type f -name initdb -printf '%h\n' | sort -Vr | head -n 1)"
+          fi
+          test -x "$pg_bindir/initdb"
+          test -x "$pg_bindir/psql"
+          ATLAS_PG_BIN="$pg_bindir" python supabase/tests/test_account_storage_permissions.py -v
       - name: Offline breakout integration
         env:
           KLINE_CORRECTIONS_LOG: /tmp/test-kline-corrections.json
@@ -145,6 +173,7 @@ jobs:
           python -m unittest discover -s tests -p test_research_operations.py -v
           python -m unittest discover -s tests -p test_tw_chips.py -v
           python -m unittest discover -s tests -p 'test_atlas_watchlists.py' -v
+          python -m unittest discover -s tests -p 'test_account_permissions.py' -v
           python -m unittest discover -s tests -p 'test_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_full_market_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_swing_breakouts.py' -v

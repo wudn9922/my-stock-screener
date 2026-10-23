@@ -1,3 +1,4 @@
+import { userStorage } from '../auth/storage';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { PageProps } from './pageProps';
 import { PageState, Skeleton } from '../ui/PageState';
@@ -40,14 +41,14 @@ export interface FinancialsPageProps extends PageProps {
 const VIEW_KEY = 'atlas-financials-view-v1';
 const readMode = (): DisplayMode => {
   try {
-    return localStorage.getItem(VIEW_KEY) === 'table' ? 'table' : 'chart';
+    return userStorage.getItem(VIEW_KEY) === 'table' ? 'table' : 'chart';
   } catch {
     return 'chart';
   }
 };
 const writeMode = (mode: DisplayMode) => {
   try {
-    localStorage.setItem(VIEW_KEY, mode);
+    userStorage.setItem(VIEW_KEY, mode);
   } catch {
     /* Remembering the view is only a convenience. */
   }

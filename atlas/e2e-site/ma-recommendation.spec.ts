@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
+import { accessEnvelope } from './account-fixture';
 
 // Shape written by ma-selector scripts/build_recommendations.py (synthetic values).
 const recommendation = {
@@ -35,6 +36,7 @@ async function mockLine(page: Page) {
   await page.route('**/functions/v1/user-settings', async (route) => {
     const body = route.request().postDataJSON() as Record<string, unknown>;
     expect(body.idToken).toBe('test-token');
+    if (body.action === 'access.get') return route.fulfill({ json: accessEnvelope(undefined, 'cloud') });
     if (body.action === 'stocks.save') saves.push(body);
     const data =
       body.action === 'stocks.list'
@@ -87,10 +89,10 @@ test('chart shows the weekly recommendation, applies it on the daily chart and s
   await expect(dialog.getByText('目前已保存：20 / 60；儲存後會被取代。')).toBeVisible();
   await expect(dialog.getByRole('textbox', { name: '個股固定均線參數' })).toHaveValue('24, 38, 89');
   await page.screenshot({ path: testInfo.outputPath('ma-recommendation-fix.png') });
-  await dialog.getByRole('button', { name: '確認並永久儲存' }).click();
+  await dialog.getByRole('button', { name: '確認並儲存到雲端' }).click();
   await expect(dialog).toBeHidden();
   expect(saves).toEqual([expect.objectContaining({ action: 'stocks.save', ticker: '2330.TW', groupId: 'ungrouped', mas: [24, 38, 89] })]);
-  await expect(page.getByText('2330.TW 固定均線 24 / 38 / 89 已永久保存到 Supabase（無分組）。')).toBeVisible();
+  await expect(page.getByText('2330.TW 固定均線 24 / 38 / 89已儲存到你的 Supabase 帳號。')).toBeVisible();
   // The panel stays open across the dialog; Escape and an outside tap close it.
   await expect(card).toBeVisible();
   await page.keyboard.press('Escape');

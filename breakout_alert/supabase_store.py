@@ -9,6 +9,7 @@ from breakout_alert.config import (
     get_supabase_service_key,
     get_supabase_user_id,
 )
+from breakout_alert.account_permissions import require_cloud_storage
 
 
 GROUP_NAME_TO_KEY = {
@@ -300,6 +301,14 @@ class SupabaseStore:
         json_body=None,
         extra_headers=None
     ):
+        # Recheck for each operation: revoking a grant must also stop an already
+        # running monitor from saving state or processing private configuration.
+        require_cloud_storage(
+            self.user_id,
+            self.rest_url,
+            headers=dict(self.session.headers),
+            request=self.session.get,
+        )
         headers = {}
 
         if extra_headers:
@@ -347,14 +356,15 @@ class SupabaseStore:
             "groups",
             params={
                 "select": "*",
+                "line_user_id": f"eq.{self.user_id}",
                 "order": "id.asc"
             }
         )
 
-        return rows if isinstance(
-            rows,
-            list
-        ) else []
+        return [
+            row for row in rows
+            if isinstance(row, dict) and row.get("line_user_id") == self.user_id
+        ] if isinstance(rows, list) else []
 
     def get_user_stocks(self):
         rows = self._request(
@@ -373,10 +383,10 @@ class SupabaseStore:
             }
         )
 
-        return rows if isinstance(
-            rows,
-            list
-        ) else []
+        return [
+            row for row in rows
+            if isinstance(row, dict) and row.get("line_user_id") == self.user_id
+        ] if isinstance(rows, list) else []
 
 
     def build_group_mapping(self, groups):

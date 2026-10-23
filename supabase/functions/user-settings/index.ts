@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { validateWatchlist, watchlistId, watchlistVersion } from "./watchlists.ts";
+import { StorageAccessError, adminLineId, getStorageAccess, listStorageGrants, parseStorageUserId, requireCloudStorage, saveStorageGrant } from "../_shared/storageAccess.ts";
 
 /**
  * 自選股設定頁（my-stock-backend/index.html）的讀寫入口。
@@ -33,7 +34,6 @@ const corsHeaders = {
 };
 
 // 與原本 RLS policy 相同的管理員與可修改的大盤代號
-const DEFAULT_ADMIN_LINE_ID = "Ua0037dbd5037b64fc76804c60520ad76";
 const ADMIN_INDEX_TICKERS = new Set([
   "^TWII",
   "^TWOII",
@@ -132,7 +132,9 @@ async function verifyLineIdToken(idToken: string) {
     result.sub ?? "",
   ).trim();
 
-  if (!lineUserId.startsWith("U")) {
+  try {
+    parseStorageUserId(lineUserId);
+  } catch {
     throw new HttpError(401, "Invalid LINE User ID");
   }
 
@@ -266,6 +268,25 @@ Deno.serve(async (request: Request) => {
         },
       },
     );
+
+    const adminId = adminLineId(Deno.env.get("ADMIN_LINE_USER_ID"));
+    // Login/access discovery is read-only. An ungranted user is never enrolled automatically.
+    if (action === "access.get") {
+      const data = await getStorageAccess(supabase, lineUserId, adminId);
+      return jsonResponse({ ok: true, data });
+    }
+    // Policy administration is independent of the owner's personal data storage mode.
+    if (action === "admin.access.list") {
+      const data = await listStorageGrants(supabase, lineUserId, adminId);
+      return jsonResponse({ ok: true, data });
+    }
+    if (action === "admin.access.save") {
+      const data = await saveStorageGrant(supabase, lineUserId, adminId, body);
+      return jsonResponse({ ok: true, data });
+    }
+    // This gate also covers legacy clients and reads of former cloud data after revocation.
+    // It is intentionally checked on every request, not cached at login.
+    await requireCloudStorage(supabase, lineUserId, adminId);
 
     // 固定分組，或使用者自己的自訂分組（stocks.group_id 存成 custom_<groups.id>）
     const ownsGroup = async (groupId: string) => {
@@ -545,10 +566,6 @@ Deno.serve(async (request: Request) => {
     }
 
     if (action === "admin.index.list") {
-      const adminId = (
-        Deno.env.get("ADMIN_LINE_USER_ID") || DEFAULT_ADMIN_LINE_ID
-      ).trim();
-
       if (lineUserId !== adminId) {
         throw new HttpError(403, "僅管理員可查看大盤參數");
       }
@@ -565,10 +582,6 @@ Deno.serve(async (request: Request) => {
     }
 
     if (action === "admin.index.save") {
-      const adminId = (
-        Deno.env.get("ADMIN_LINE_USER_ID") || DEFAULT_ADMIN_LINE_ID
-      ).trim();
-
       if (lineUserId !== adminId) {
         throw new HttpError(403, "僅管理員可修改大盤參數");
       }
@@ -603,6 +616,9 @@ Deno.serve(async (request: Request) => {
 
     throw new HttpError(400, "Invalid action");
   } catch (error) {
+    if (error instanceof StorageAccessError) {
+      return jsonResponse({ ok: false, error: error.message, code: error.code }, error.status);
+    }
     if (error instanceof HttpError) {
       return jsonResponse(
         { ok: false, error: error.message },

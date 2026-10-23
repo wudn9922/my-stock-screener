@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { StorageAccessError, adminLineId, parseStorageUserId, requireCloudStorage } from "../_shared/storageAccess.ts";
 
 /**
  * 圖表畫線的雲端儲存（LINE 使用者各自一份，先向 LINE 驗證 LIFF ID Token，再用 service role 存取）。
@@ -87,7 +88,9 @@ async function verifyLineIdToken(idToken: string) {
     result.sub ?? "",
   ).trim();
 
-  if (!lineUserId.startsWith("U")) {
+  try {
+    parseStorageUserId(lineUserId);
+  } catch {
     throw new Error("Invalid LINE User ID");
   }
 
@@ -197,6 +200,9 @@ Deno.serve(async (request: Request) => {
         },
       },
     );
+
+    // Shared with user-settings: legacy and Atlas routes cannot bypass an owner's grant.
+    await requireCloudStorage(supabase, lineUserId, adminLineId(Deno.env.get("ADMIN_LINE_USER_ID")));
 
     if (action === "atlas.list") {
       const { data, error } = await supabase
@@ -394,6 +400,9 @@ Deno.serve(async (request: Request) => {
       400,
     );
   } catch (error) {
+    if (error instanceof StorageAccessError) {
+      return jsonResponse({ ok: false, error: error.message, code: error.code }, error.status);
+    }
     console.error(error);
 
     const message = error instanceof Error ? error.message : "";

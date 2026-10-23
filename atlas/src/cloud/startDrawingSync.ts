@@ -1,55 +1,50 @@
 import { DrawingSync, createLocalSyncMetaStore, type DrawingSyncStatus, type SyncStore } from './DrawingSync';
 import { DEFAULT_DRAWINGS_URL, createDrawingCloudApi } from './drawingCloudApi';
-import { DEFAULT_LIFF_ID, startLineIdentity } from './lineIdentity';
+import { accessState, currentIdentity, initializeAccess } from '../auth/access';
+import { getStorageContextKey, userStorage } from '../auth/storage';
 
-/** `off`: not inside LINE / not logged in; drawings are stored on this device only. */
 export type CloudSyncState = DrawingSyncStatus | 'off';
-
-const PULL_INTERVAL_MS = 60_000;
-
 let current: CloudSyncState = 'off';
 const listeners = new Set<() => void>();
-
-function setState(next: CloudSyncState) {
-  current = next;
-  listeners.forEach((listener) => listener());
-}
-
-/** For useSyncExternalStore. */
+function setState(next: CloudSyncState) { current = next; listeners.forEach((listener) => listener()); }
 export const cloudSyncState = {
-  subscribe(listener: () => void) {
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
-  },
+  subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   get: () => current,
 };
+let active: { context: string; sync: DrawingSync; removeVisibility: () => void } | null = null;
+export function stopDrawingSync() {
+  active?.sync.stop();
+  active?.removeVisibility();
+  active = null;
+  setState('off');
+}
+accessState.subscribe(() => { if (active && active.context !== getStorageContextKey()) stopDrawingSync(); });
 
-let started = false;
-
-/**
- * Starts cloud drawing sync when the page runs inside LINE with a LIFF login; otherwise does nothing.
- * Re-downloads when the page returns to the foreground (at most once a minute) to pick up edits made
- * on another device.
- */
+/** Only an explicitly granted cloud account can pull or push. Timers remain bound to that identity. */
 export async function startDrawingSync(store: SyncStore) {
-  if (started) return;
-  started = true;
-  const env = import.meta.env ?? {};
-  const identity = await startLineIdentity(env.VITE_LIFF_ID || DEFAULT_LIFF_ID);
-  if (!identity) return;
-  const sync = new DrawingSync(
-    store,
-    createDrawingCloudApi(identity.idToken, env.VITE_DRAWINGS_URL || DEFAULT_DRAWINGS_URL),
-    createLocalSyncMetaStore(identity.userId),
-    { onStatus: setState },
+  await initializeAccess();
+  const context = getStorageContextKey(), identity = currentIdentity();
+  if (!identity || accessState.getSnapshot().storageMode !== 'cloud') { stopDrawingSync(); return; }
+  if (active?.context === context) return;
+  stopDrawingSync();
+  const userId = identity.userId;
+  const isCurrent = () => context === getStorageContextKey() && currentIdentity()?.userId === userId && accessState.getSnapshot().storageMode === 'cloud';
+  const api = createDrawingCloudApi(
+    () => isCurrent() ? currentIdentity()!.idToken() : null,
+    import.meta.env?.VITE_DRAWINGS_URL || DEFAULT_DRAWINGS_URL,
   );
-  await sync.start();
+  const metadata = {
+    getItem: (key: string) => isCurrent() ? userStorage.getItem(key) : null,
+    setItem: (key: string, value: string) => { if (isCurrent()) userStorage.setItem(key, value); },
+  } as Storage;
+  const sync = new DrawingSync(store, api, createLocalSyncMetaStore(userId, metadata), { onStatus: (status) => { if (isCurrent()) setState(status); } });
   let lastPull = Date.now();
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible' || Date.now() - lastPull < PULL_INTERVAL_MS) return;
+  const onVisible = () => {
+    if (!isCurrent() || document.visibilityState !== 'visible' || Date.now() - lastPull < 60_000) return;
     lastPull = Date.now();
     void sync.pull();
-  });
+  };
+  active = { context, sync, removeVisibility: () => document.removeEventListener('visibilitychange', onVisible) };
+  document.addEventListener('visibilitychange', onVisible);
+  await sync.start();
 }

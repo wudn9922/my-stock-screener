@@ -1,0 +1,13 @@
+# ADR-016: Account isolation and owner-controlled persistence
+
+Status: implemented in the PR; production SQL and both Edge Function deployments pending.
+
+The screener deployment resolves a verified LINE account and its server storage policy before opening personal storage. Ordinary browsers do not load LIFF. Guests and ungranted accounts use RAM only; identity verification or policy errors also fail closed to RAM. The existing server-configured owner defaults to cloud, while everyone else defaults to none. No user or grant row is created on login. Only the verified owner can list or change grants, even when the owner's personal storage mode is device or none.
+
+Modes are none, device and cloud. Device persists locally under the verified account; cloud additionally enables the existing authenticated Supabase endpoints. Groups, fixed stock moving averages, saved lists, display preferences, drawing workspaces and disposable financial/market caches follow the same policy. Personal exports are disabled in none mode. Account and mode namespace both localStorage and IndexedDB. Old shared records are retained without being adopted, migrated, uploaded or deleted. Mode transitions do not automatically transfer records.
+
+An account/policy epoch replaces the rendered workspace, chart store, list store and in-memory preference state. Cloud callbacks, queued operations and cache responses are bound to that epoch. The LINE token callback checks the current subject and expiry. Visibility, focus and periodic refresh recheck policy; no browser grant cache allows offline persistence. Screener builds stop installing their service worker and retire only the old screener-scoped shell cache. The separate drawing-lab build retains its existing offline behavior.
+
+Both private-data Edge Functions verify LINE independently, derive ownership from its verified subject, and require a cloud grant before touching personal tables. SQL revokes direct anon/authenticated table privileges, enables RLS, and checks cloud permission again at mutation time. Grant changes and personal writes serialize on a per-account advisory lock. The policy table is bounded and changes only through explicit owner operations. Scheduled consumers also check policy and scope user queries; public GitHub reports accept only the configured owner.
+
+This changes storage routing, not the drawing engine, canonical models, market feeds, authentication provider or trading strategies. Existing production rows remain intact. Rollout, account management, data recovery, verification and the limits of device revocation are documented in [ACCOUNT_STORAGE_PERMISSIONS.md](../../../docs/ACCOUNT_STORAGE_PERMISSIONS.md).
