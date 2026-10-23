@@ -530,6 +530,12 @@ def same_period_matches(periods, new):
     return match
 
 
+def annual_basis_matches(old, incoming):
+    """2% of the stored value; tolerate only floating-point noise at the boundary."""
+    difference, limit = abs(old - incoming), .02 * abs(old)
+    return difference <= limit or math.isclose(difference, limit, rel_tol=1e-12)
+
+
 def merge_section(old, new, frequency, today_iso, renamed=None, filled=None):
     """
     Merge new Yahoo periods into stored ones → (periods ascending, revisions).
@@ -560,7 +566,7 @@ def merge_section(old, new, frequency, today_iso, renamed=None, filled=None):
             # A different incoming basis cannot extend or rewrite this row.
             overlaps = [(old, item["values"][field]) for field, old in target["values"].items()
                         if old is not None and item["values"].get(field) is not None]
-            if not overlaps or any(abs(old - incoming) > .02 * abs(old) for old, incoming in overlaps):
+            if not overlaps or any(not annual_basis_matches(old, incoming) for old, incoming in overlaps):
                 continue
         if official_period(target) or backfilled:
             for field in ("revenue", "netIncome"):

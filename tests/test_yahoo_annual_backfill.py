@@ -69,6 +69,8 @@ class AnnualBackfill(unittest.TestCase):
 
     def test_exact_two_percent_allowed_and_zero_negative_safe(self):
         self.assertFalse(backfill.conflicts({'a': 100, 'b': -100, 'z': 0}, {'a': 102, 'b': -102, 'z': 0}))
+        self.assertFalse(backfill.conflicts({'eps': 2, 'negative': -2}, {'eps': 2.04, 'negative': -2.04}))
+        self.assertTrue(backfill.conflicts({'eps': 2}, {'eps': 2.0400001}))
         self.assertEqual(len(backfill.conflicts({'a': 0, 'b': -100}, {'a': 0.01, 'b': 100})), 2)
 
     def test_unit_mismatch_has_evidence_and_no_fills(self):

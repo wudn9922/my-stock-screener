@@ -87,7 +87,7 @@ def fetch_sources(directory, output, workers=4):
 
 
 def close(left, right):
-    return abs(left - right) <= .02 * abs(left)
+    return fin.annual_basis_matches(left, right)
 
 
 def conflicts(stored, incoming):
