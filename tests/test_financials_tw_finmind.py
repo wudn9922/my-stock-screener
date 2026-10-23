@@ -397,7 +397,8 @@ class MergeTest(unittest.TestCase):
         self.assertEqual(filled, [("2025-03-31", "netIncome")])
         self.assertEqual([item["kind"] for item in revisions], ["yahoo-differs"])
         self.assertEqual(fin.source_label(merged, filled), fin.SOURCE_FINMIND_MIXED)
-        self.assertEqual(fin.source_label(merged, []), fin.SOURCE_FINMIND)
+        self.assertEqual(merged[0]["extra"]["fieldSrc"], {"netIncome": "yahoo"})
+        self.assertEqual(fin.source_label(merged, []), fin.SOURCE_FINMIND_MIXED)
         self.assertEqual(fin.source_label([fin.period("2025-03-31", {}, "finmind")], []), fin.SOURCE_FINMIND)
 
     def test_only_files_with_official_periods_are_protected_from_the_unlisted_rule(self):

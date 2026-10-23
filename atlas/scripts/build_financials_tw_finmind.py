@@ -43,6 +43,7 @@ Status lines: "FinMind statements DONE" (every listed stock fetched once), "PAUS
 FinMind's request limit: run the same command again), "STOPPED" (token refused, or failures in a row).
 """
 import argparse
+import copy
 import json
 import os
 import sys
@@ -436,6 +437,7 @@ def write_stock(out_dir, symbol, annual, quarterly, flags, now, today):
     """Merges the FinMind periods into the stock's file (Yahoo periods fill nulls and newer quarters) and writes it
     when the content changed → 'written' | 'unchanged' | 'corrupt' (a file that cannot be read is never touched)."""
     today_iso = today.isoformat()
+    annual, quarterly = copy.deepcopy(annual), copy.deepcopy(quarterly)
     path = os.path.join(out_dir, symbol + ".json")
     status, stored = fin.load_document(path, symbol)
     if status == "corrupt":
@@ -460,6 +462,20 @@ def write_stock(out_dir, symbol, annual, quarterly, flags, now, today):
         for item in items:
             stored = stored_by_end.get(item["end"])
             if stored is not None:
+                if stored["extra"].get("fieldSrc"):
+                    sources = dict(stored["extra"]["fieldSrc"])
+                    for field in sources:
+                        if field in item["values"]:
+                            sources[field] = SRC
+                    item["extra"]["fieldSrc"] = sources
+                if stored["extra"].get("yahooAnnualBackfill"):
+                    sources = dict(stored["extra"].get("fieldSrc") or {})
+                    item["extra"]["yahooAnnualBackfill"] = dict(stored["extra"]["yahooAnnualBackfill"])
+                    for field in sources:
+                        if field in item["values"]:
+                            sources[field] = SRC
+                            item["extra"]["yahooAnnualBackfill"].pop(field, None)
+                    item["extra"]["fieldSrc"] = sources
                 for field, value in stored["values"].items():
                     if field not in item["values"] and value is not None:
                         item["values"][field] = value
@@ -498,6 +514,7 @@ def write_stock(out_dir, symbol, annual, quarterly, flags, now, today):
     grade["issues"] += [code for code in fin.FINMIND_ISSUES if code in flags and code not in grade["issues"]]
     if revisions:
         grade["revisions"] = revisions
+    fin.preserve_backfill_quality(previous, grade, annual_m)
     document = {
         "version": fin.VERSION, "symbol": symbol, "market": "TW", "currency": "TWD", "foreignReporter": False,
         "generatedAt": now.isoformat().replace("+00:00", "Z"), "checkedAt": today_iso,
