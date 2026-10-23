@@ -53,7 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
-          git diff --name-only --diff-filter=AM -z "$PR_BASE_SHA" HEAD -- docs/report/research/world-assets.json docs/report/research/candles |
+          git diff --name-only --diff-filter=AM -z "$PR_BASE_SHA" HEAD -- docs/report/research docs/report/financials docs/report/fundamentals docs/report/universe.json docs/report/growth.json docs/report/kline-corrections.json data |
             xargs -0 -r git restore --source=HEAD --
       - uses: actions/setup-node@v4
         with:
@@ -81,7 +81,25 @@ jobs:
           retention-days: 7
       - name: Install browsers
         working-directory: atlas
-        run: npx playwright install --with-deps chromium webkit
+        timeout-minutes: 8
+        run: |
+          # The runner's Azure HTTP mirror stalled on two attempts. Keep Ubuntu's
+          # signed packages, but fetch them from the official HTTPS archive.
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          apt = Path('/etc/apt')
+          paths = [apt / 'sources.list', *apt.glob('*mirrors*.txt'),
+                   *(apt / 'sources.list.d').glob('*.list'),
+                   *(apt / 'sources.list.d').glob('*.sources')]
+          for path in paths:
+              if path.is_file():
+                  original = path.read_text()
+                  updated = original.replace('http://azure.archive.ubuntu.com/ubuntu',
+                                             'https://archive.ubuntu.com/ubuntu')
+                  if updated != original:
+                      path.write_text(updated)
+          PY
+          npx playwright install --with-deps chromium webkit
       - name: Real Pages data on desktop and iPhone WebKit
         run: |
           mkdir -p /tmp/research-pages/my-stock-screener
@@ -105,7 +123,7 @@ jobs:
           retention-days: 7
       - name: Desktop, phone and WebKit regressions
         working-directory: atlas
-        run: npm run test:site -- parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts breakouts.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts
+        run: npm run test:site -- parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts data-integrity.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts breakouts.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -117,7 +135,10 @@ jobs:
         with:
           python-version: '3.12'
       - name: Offline breakout integration
+        env:
+          KLINE_CORRECTIONS_LOG: /tmp/test-kline-corrections.json
         run: |
+          cp docs/report/kline-corrections.json "$KLINE_CORRECTIONS_LOG"
           pip install requests numpy pandas openpyxl xlrd lxml pyyaml
           python -m unittest discover -s tests -p test_research.py -v
           python -m unittest discover -s tests -p test_research_candles.py -v

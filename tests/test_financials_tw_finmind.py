@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import tempfile
+from pathlib import Path
 import unittest
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -100,6 +101,42 @@ class ParseTest(unittest.TestCase):
 
 
 class DerivationTest(unittest.TestCase):
+    def test_financial_net_revenue_can_be_negative_in_all_publication_modes(self):
+        for mode, raw in [('quarter', {1: 100, 2: -30, 3: 40, 4: 50}),
+                          ('ytd', {1: 100, 2: 70, 3: 110, 4: 160}),
+                          ('q4annual', {1: 100, 2: -30, 3: 40, 4: 160})]:
+            with self.subTest(mode=mode):
+                singles, _ = ftw.views(raw, mode, {q: 1 for q in raw}, raw)
+                self.assertEqual(singles[2], -30)
+                self.assertEqual(sum(singles.values()), 160)
+        # Ordinary gross revenue is deliberately rejected, represented explicitly.
+        self.assertIsNone(ftw.views({1: 100, 2: -30}, 'quarter', {1: 0, 2: 0})[0][2])
+        self.assertEqual(ftw.views({1: 100, 2: -30}, 'quarter', {1: 2, 2: 2})[0][2], -30)
+
+    def test_negative_financial_revenue_rebuilds_annual_sum(self):
+        parsed, _ = parsed_of('2883', 'quarter', 7, finance=True, years=range(2025, 2026))
+        for q, value in enumerate([100, -30, 40, 50], 1):
+            parsed['pl'][f'2025Q{q}'].update(rev=value, kind=1)
+        annual, quarterly, _ = ftw.derive(parsed, {'pl': 'quarter', 'cf': 'ytd'})
+        self.assertEqual(quarterly[(2025, 2)]['revenue'], -30)
+        self.assertEqual(annual[2025]['revenue'], 160)
+
+    def test_explicit_source_null_cannot_be_overwritten_by_old_finmind_or_yahoo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            annual = [fin.period('2025-12-31', {'revenue': 999, 'netIncome': 10}, 'finmind')]
+            quarterly = [fin.period('2025-06-30', {'revenue': 999, 'netIncome': 3}, 'finmind')]
+            ftw.write_stock(tmp, '2883.TW', annual, quarterly, set(), NOW, TODAY)
+            a = [fin.period('2025-12-31', {'revenue': None, 'netIncome': 10}, 'finmind')]
+            q = [fin.period('2025-06-30', {'revenue': -357222000, 'netIncome': 3}, 'finmind')]
+            ftw.write_stock(tmp, '2883.TW', a, q, set(), NOW, TODAY)
+            stored = json.loads(Path(tmp, '2883.TW.json').read_text())
+            self.assertIsNone(stored['annual']['values'].get('revenue', [None])[0])
+            self.assertEqual(stored['quarterly']['values']['revenue'][0], -357222000)
+            self.assertTrue(any(e['field']=='revenue' and e['new']==-357222000 for e in stored['sourceCorrections']))
+            count = len(stored['sourceCorrections'])
+            ftw.write_stock(tmp, '2883.TW', a, q, set(), NOW, TODAY)
+            self.assertEqual(len(json.loads(Path(tmp, '2883.TW.json').read_text())['sourceCorrections']), count)
+
     def test_each_publication_style_gives_the_single_quarters(self):
         for mode in ("ytd", "quarter", "q4annual"):
             with self.subTest(mode=mode):

@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths:
       - 'scripts/**'
+      - 'kline_integrity.py'
+      - 'main.py'
+      - 'report_metrics.py'
       - 'docs/report/research/**'
       - 'tests/**'
       - 'atlas/scripts/**'
@@ -34,11 +37,16 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
-          git diff --name-only --diff-filter=AM -z "$PR_BASE_SHA" HEAD -- docs/report/research/world-assets.json docs/report/research/candles |
+          git diff --name-only --diff-filter=AM -z "$PR_BASE_SHA" HEAD -- docs/report/research docs/report/financials docs/report/fundamentals docs/report/universe.json docs/report/growth.json docs/report/kline-corrections.json data |
             xargs -0 -r git restore --source=HEAD --
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
       - run: pip install -r requirements.txt pyyaml
-      - run: python -m unittest discover -s tests -v
+      - name: Full Python suite with an isolated correction journal
+        env:
+          KLINE_CORRECTIONS_LOG: /tmp/test-kline-corrections.json
+        run: |
+          cp docs/report/kline-corrections.json "$KLINE_CORRECTIONS_LOG"
+          python -m unittest discover -s tests -v

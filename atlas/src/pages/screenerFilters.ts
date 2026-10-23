@@ -438,6 +438,8 @@ export type TrendMaKey = 'ma20' | 'ma50' | 'ma200';
 
 export interface FilterContext {
   market: 'TW' | 'US';
+  /** Universe's modal observation date; absent for legacy report groups. */
+  asOf?: string | null;
   /** Growth data of the market (see `loadMarketGrowth`): undefined = not loaded (yet), null = unavailable. */
   growth?: GrowthFile | null;
   /** True while the growth data is being fetched. */
@@ -527,6 +529,9 @@ const TREND_TESTS: Record<TrendFlag, (item: GroupItem) => boolean> = {
  * condition needs is excluded; fundamentals follow `keepMissing`.
  */
 export function applyFilters(items: readonly GroupItem[], state: FilterState, context: FilterContext): GroupItem[] {
+  const dateSensitive = state.chg !== null || state.vol !== null || state.vr !== null
+    || state.rs !== null || state.rs1 !== null || state.rs3 !== null;
+  if (context.asOf && dateSensitive) items = items.filter(item => item.asOf === context.asOf);
   const available = filterAvailability(items, context);
   const tests: ((item: GroupItem) => boolean)[] = [];
   const chg = state.chg;

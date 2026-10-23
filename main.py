@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 import pandas as pd
 import requests
 import yfinance as yf
+import kline_integrity as kline
 from breakout_alert.supabase_store import FIXED_STOCK_GROUP_ID, fixed_parameter_map, parameter_ticker_key
 
 
@@ -320,7 +321,7 @@ def get_tw_stock_name(ticker):
     )
 
 
-def extract_yfinance_data(
+def _extract_yfinance_data(
     downloaded_data,
     ticker=None
 ):
@@ -391,6 +392,31 @@ def extract_yfinance_data(
         return df
 
     return pd.DataFrame()
+
+
+def refetch_kline_once(ticker):
+    return _extract_yfinance_data(download_market_data([ticker], "5d"), ticker)
+
+
+def extract_yfinance_data(downloaded_data, ticker=None):
+    frame = _extract_yfinance_data(downloaded_data, ticker)
+    if not ticker or frame.empty or not set(kline.FIELDS).issubset(frame.columns):
+        return frame
+    return kline.accept_frame(
+        frame, ticker, refetch=lambda: refetch_kline_once(ticker),
+        source_url="https://query1.finance.yahoo.com/v8/finance/chart/" + str(ticker),
+        fetched_at=kline.utcnow(),
+    )
+
+
+def write_kline_csv(frame, csv_path):
+    ticker = os.path.basename(csv_path).removesuffix(".csv")
+    return kline.write_csv(
+        csv_path, frame, symbol=ticker, refetch=lambda: refetch_kline_once(ticker),
+        source_url=(TPEX_INDEX_HISTORY_LEGACY_URL if ticker == TPEX_OTC_SYMBOL else
+                    "https://query1.finance.yahoo.com/v8/finance/chart/" + ticker),
+        fetched_at=kline.utcnow(),
+    )
 
 
 def clean_ohlcv_dataframe(df):
@@ -470,7 +496,7 @@ def clean_ohlcv_dataframe(df):
         result.index.dayofweek < 5
     ]
 
-    return result
+    return kline.usable_frame(result)
 
 
 def calculate_return(
@@ -2214,7 +2240,7 @@ def scan_market(tickers, report_min_volume=0):
                     f"{ticker}.csv"
                 )
 
-                df.to_csv(csv_path)
+                write_kline_csv(df, csv_path)
 
                 print(
                     f"✅ {ticker} 初始化完成，"
@@ -2358,7 +2384,7 @@ def scan_market(tickers, report_min_volume=0):
                 )
 
                 if os.path.exists(csv_path):
-                    local_data = pd.read_csv(
+                    local_data = kline.read_csv(
                         csv_path,
                         index_col=0,
                         parse_dates=True
@@ -2394,9 +2420,7 @@ def scan_market(tickers, report_min_volume=0):
                     MAX_DAYS
                 )
 
-                combined.to_csv(
-                    csv_path
-                )
+                write_kline_csv(combined, csv_path)
 
                 print(
                     f"✅ {ticker} CSV 已更新，"
@@ -2425,7 +2449,7 @@ def scan_market(tickers, report_min_volume=0):
             continue
 
         try:
-            df = pd.read_csv(
+            df = kline.read_csv(
                 csv_path,
                 index_col=0,
                 parse_dates=True
@@ -2554,7 +2578,7 @@ def backfill_short_csvs(
 
         try:
             local_data = clean_ohlcv_dataframe(
-                pd.read_csv(
+                kline.read_csv(
                     csv_path,
                     index_col=0,
                     parse_dates=True
@@ -2613,7 +2637,7 @@ def backfill_short_csvs(
                 )
 
                 local_data = clean_ohlcv_dataframe(
-                    pd.read_csv(
+                    kline.read_csv(
                         csv_path,
                         index_col=0,
                         parse_dates=True
@@ -2633,7 +2657,7 @@ def backfill_short_csvs(
                 if len(combined) <= len(local_data):
                     continue
 
-                combined.to_csv(csv_path)
+                write_kline_csv(combined, csv_path)
                 updated.append(ticker)
 
             except Exception as exc:
@@ -3035,7 +3059,7 @@ def process_custom_groups(
 
             if os.path.exists(csv_path):
                 try:
-                    local_data = pd.read_csv(
+                    local_data = kline.read_csv(
                         csv_path,
                         index_col=0,
                         parse_dates=True
@@ -3106,15 +3130,7 @@ def process_custom_groups(
                 keep_days
             ).copy()
 
-            combined[
-                [
-                    "Open",
-                    "High",
-                    "Low",
-                    "Close",
-                    "Volume"
-                ]
-            ].to_csv(csv_path)
+            combined = write_kline_csv(combined[kline.FIELDS], csv_path)
 
             for ma_window in ma_list:
                 combined[
@@ -5697,7 +5713,7 @@ def load_ohlcv_csv(csv_path):
         return pd.DataFrame()
 
     try:
-        local_data = pd.read_csv(
+        local_data = kline.read_csv(
             csv_path,
             index_col=0,
             parse_dates=True
@@ -5840,46 +5856,7 @@ def plan_tpex_months(
 
 
 def write_ohlcv_csv_atomic(df, csv_path):
-    directory = os.path.dirname(csv_path) or "."
-
-    os.makedirs(directory, exist_ok=True)
-
-    output = df[
-        [
-            "Open",
-            "High",
-            "Low",
-            "Close",
-            "Volume"
-        ]
-    ].copy()
-
-    output.index.name = "Date"
-
-    file_descriptor, tmp_path = tempfile.mkstemp(
-        prefix=".tmp-",
-        suffix=".tmp",
-        dir=directory
-    )
-
-    try:
-        with os.fdopen(
-            file_descriptor,
-            "w",
-            encoding="utf-8",
-            newline=""
-        ) as file:
-            output.to_csv(
-                file,
-                date_format="%Y-%m-%d"
-            )
-
-        os.replace(tmp_path, csv_path)
-
-    except Exception:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-        raise
+    return write_kline_csv(df, csv_path)
 
 
 def update_tpex_otc_index_history(

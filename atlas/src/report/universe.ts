@@ -35,6 +35,7 @@ export const UNIVERSE_FIELDS = [
   'rsRank',
   'volVsPrev',
   'turnover20',
+  'asOf',
 ] as const;
 /**
  * Optional profile columns written by the full-market build (scripts/build_universe_full.py) after the
@@ -78,6 +79,11 @@ const MISSING = '全市場篩選資料尚未產生（每日報告更新後提供
 const INVALID = '全市場篩選資料格式無法辨識。';
 
 const textOrNull = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : null);
+const observationDate = (value: unknown): string | null => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const day = new Date(value + 'T00:00:00Z');
+  return Number.isFinite(day.getTime()) && day.toISOString().slice(0, 10) === value ? value : null;
+};
 const SYMBOL = /^[A-Z0-9^][A-Z0-9.^=-]{0,31}$/;
 
 /** `report/universe.json`, a sibling of latest.json. */
@@ -144,7 +150,7 @@ export function universeRowToItem(
     maValues,
     note: null,
     volume: numeric('volume'),
-    asOf: context.asOf,
+    asOf: 'asOf' in index ? observationDate(get('asOf')) : context.asOf,
     metrics,
     ...(hasProfile ? { profile } : {}),
   };

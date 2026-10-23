@@ -27,6 +27,7 @@ import json
 import os
 import sys
 import time
+import pandas as pd
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 
@@ -38,6 +39,7 @@ for path in (ROOT, os.path.join(ROOT, "scripts")):
 import report_metrics  # noqa: E402
 import universe_cache as uc  # noqa: E402
 import universe_sources as src  # noqa: E402
+import kline_integrity as kline  # noqa: E402
 
 TWSE_COMPANIES_URL = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
 TPEX_COMPANIES_URL = "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"
@@ -651,12 +653,25 @@ class Run:
                 bar = (snapshot.get("bars") or {}).get(symbol)
 
                 if bar is not None:
+                    # Validate before snapshot_action can normalize or append a quote.
+                    if kline.violation({k: bar.get(k.lower()) for k in uc.PRICE_COLUMNS}):
+                        raw = pd.DataFrame(
+                            [{k: bar.get(k.lower()) for k in uc.PRICE_COLUMNS}],
+                            index=pd.to_datetime([bar['date']]))
+                        checked = kline.accept_frame(raw, symbol,
+                            refetch=lambda: (self.fetch_raw_chart_once(symbol, RECENT_RANGE),
+                                             'https://query1.finance.yahoo.com/v8/finance/chart/' + symbol, kline.utcnow()), now=self.now,
+                            source_url='https://query1.finance.yahoo.com/v7/finance/quote')
+                        if checked.empty:
+                            continue
+                        bar = dict(bar, **{k.lower():float(checked.iloc[-1][k]) for k in uc.PRICE_COLUMNS})
                     action, detail = uc.snapshot_action(entry, bar, calendar, market)
 
                     if action == "append":
                         path = uc.bars_path(self.cache_dir, symbol)
                         frame = uc.append_row(uc.read_bars(path), detail)
-                        uc.record_frame(self.state, symbol, uc.write_bars(path, frame), self.today)
+                        uc.record_frame(self.state, symbol, uc.write_bars(
+                            path, frame, refetch=lambda: self.fetch_raw_chart_once(symbol, RECENT_RANGE), now=self.now), self.today)
                         self.stats[f"{market}.appended"] += 1
                     elif action == "adjusted":
                         self.log(f"🔁 {symbol}：{detail} → 整檔重抓")
@@ -697,6 +712,10 @@ class Run:
         return queue
 
     # ---- 5. 逐檔請求
+    def fetch_raw_chart_once(self, symbol, range_):
+        rows, _, _ = src.parse_yahoo_chart(self.net.chart(symbol, range_), symbol)
+        return pd.DataFrame([row[1:] for row in rows], index=pd.to_datetime([row[0] for row in rows]), columns=uc.PRICE_COLUMNS)
+
     def fetch_chart(self, symbol, range_):
         """→ DataFrame；429 依 RATE_LIMIT_WAITS 退避重試，仍失敗丟 RateLimited。"""
         for wait in (0,) + RATE_LIMIT_WAITS:
@@ -707,9 +726,11 @@ class Run:
                 self.sleep(wait)
 
             try:
-                rows, _, _ = src.parse_yahoo_chart(self.net.chart(symbol, range_), symbol)
                 market = market_of(symbol)
-                return uc.drop_unfinished(uc.frame_from_rows(rows), market, self.now)
+                raw = self.fetch_raw_chart_once(symbol, range_)
+                checked = kline.accept_frame(raw, symbol, refetch=lambda:self.fetch_raw_chart_once(symbol, range_), now=self.now,
+                    source_url='https://query1.finance.yahoo.com/v8/finance/chart/' + symbol)
+                return uc.drop_unfinished(checked, market, self.now)
             except RateLimited:
                 continue
 
@@ -721,6 +742,15 @@ class Run:
 
         if bar is None or frame.empty:
             return frame
+
+        if kline.violation({k:bar.get(k.lower()) for k in uc.PRICE_COLUMNS}):
+            raw = pd.DataFrame([{k:bar.get(k.lower()) for k in uc.PRICE_COLUMNS}], index=pd.to_datetime([bar['date']]))
+            checked = kline.accept_frame(raw, symbol, now=self.now,
+                refetch=lambda: (frame, 'https://query1.finance.yahoo.com/v8/finance/chart/' + symbol, kline.utcnow()),
+                source_url='https://query1.finance.yahoo.com/v7/finance/quote')
+            if checked.empty:
+                return frame
+            bar = dict(bar, **{k.lower():float(checked.iloc[-1][k]) for k in uc.PRICE_COLUMNS})
 
         market = market_of(symbol)
 
@@ -823,7 +853,7 @@ class Run:
 
             merged = uc.merge_full(old, frame) if kind == "full" else uc.merge_incremental(old, frame)
             merged = self.apply_pending(symbol, merged)
-            written = uc.write_bars(path, merged)
+            written = uc.write_bars(path, merged, refetch=lambda: self.fetch_raw_chart_once(symbol, RECENT_RANGE), now=self.now)
             uc.record_frame(self.state, symbol, written, self.today, full=kind == "full", verified=True)
             self.stats[f"chart.{reason}"] += 1
             done += 1

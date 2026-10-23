@@ -7,6 +7,7 @@ import http.client
 import io
 import json
 import os
+import sys
 from pathlib import Path
 import time
 from datetime import datetime, timezone
@@ -14,6 +15,8 @@ import urllib.error
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 VERSION = "research-v1"
 
 
@@ -152,6 +155,8 @@ def universe():
 
 def price_rows(path):
     from build_tw_chips import to_number
+    from kline_integrity import quarantined_dates, violation
+    excluded = quarantined_dates(Path(path).stem)
 
     with Path(path).open() as f:
         return [
@@ -165,6 +170,7 @@ def price_rows(path):
                 action=r.get("Action") or None,
             )
             for r in csv.DictReader(f)
+            if r["Date"][:10] not in excluded and not violation(r)
         ]
 
 

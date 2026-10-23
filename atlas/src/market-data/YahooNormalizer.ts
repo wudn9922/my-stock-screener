@@ -13,6 +13,7 @@ import {
   SESSION_CLOSE_SOURCE_QUALIFIER,
 } from './MarketDataProvider';
 import { calendarDate, type MarketProfile } from './MarketProfile';
+import { isQuarantinedBar } from './KlineIntegrity';
 const prices = z.array(z.number().finite().nullable());
 const dividendSchema = z.object({
   amount: z.number().finite(),
@@ -122,6 +123,7 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
   }
   let healedDailyClose: BarNormalization['healedDailyClose'];
   for (let i = 0; i < result.timestamp.length; i++) {
+    if (canonicalSymbol && isQuarantinedBar(canonicalSymbol, result.timestamp[i]!, timeframe)) continue;
     const open = q.open[i],
       high = q.high[i],
       low = q.low[i],
@@ -170,10 +172,10 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
     // and this prototype retains its established zero fallback for that field.
     const volume = q.volume?.[i] ?? 0;
     if (
-      open < 0 ||
-      high < 0 ||
-      low < 0 ||
-      close < 0 ||
+      open <= 0 ||
+      high <= 0 ||
+      low <= 0 ||
+      close <= 0 ||
       volume < 0 ||
       high < Math.max(open, close) ||
       low > Math.min(open, close)

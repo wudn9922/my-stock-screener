@@ -15,6 +15,7 @@ import {
   type Timeframe,
 } from './MarketDataProvider';
 import { MarketDataUnavailableError } from './ProviderErrors';
+import { usableBars } from './KlineIntegrity';
 
 /**
  * Official daily series written by the Python report job (main.py) next to the report:
@@ -263,7 +264,7 @@ export class StaticSeriesProvider implements MarketDataProvider {
           throw new Error(`${symbol} 官方序列檔格式錯誤`, { cause: error });
         }
         if (parsed.symbol.trim().toUpperCase() !== symbol) throw new Error(`${symbol} 官方序列檔的代號不符`);
-        const daily = cleanDailyBars(parsed.bars);
+        const daily = usableBars(cleanDailyBars(parsed.bars), symbol, '1D');
         if (!daily.length) throw new MarketDataUnavailableError(`${symbol} 官方序列檔沒有有效的日 K`);
         const data: LoadedSeries = {
           symbol,

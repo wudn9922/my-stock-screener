@@ -15,6 +15,7 @@ from collections import Counter
 from datetime import datetime, timezone
 
 import pandas as pd
+from kline_integrity import usable_frame, read_csv as read_kline_csv
 
 UNIVERSE_VERSION = 1
 UNIVERSE_FILE = "universe.json"
@@ -42,6 +43,7 @@ UNIVERSE_FIELDS = [
     "rsRank",
     "volVsPrev",
     "turnover20",
+    "asOf",
 ]
 
 MARKET_BENCHMARKS = {
@@ -154,7 +156,7 @@ def clean_prices(df):
     result = result[~result.index.isna()]
     result = result[~result.index.duplicated(keep="last")].sort_index()
 
-    return result
+    return usable_frame(result)
 
 
 def read_price_csv(path):
@@ -162,7 +164,7 @@ def read_price_csv(path):
         return pd.DataFrame()
 
     try:
-        return clean_prices(pd.read_csv(path, index_col=0, parse_dates=True))
+        return clean_prices(read_kline_csv(path, index_col=0, parse_dates=True))
     except Exception as exc:
         print(f"⚠️ {os.path.basename(path)} 讀取失敗：{type(exc).__name__}: {exc}")
         return pd.DataFrame()
@@ -544,7 +546,12 @@ def build_universe(tickers, market, data_dir, bench, name_fn=None):
             if pd.Timestamp(record["asOf"]) >= cutoff
         ]
 
-    distribution = assign_rs_rank([record["metrics"] for record in records])
+    # A percentile compares securities observed on the same trading date.
+    by_date = {}
+    for record in records:
+        by_date.setdefault(record["asOf"], []).append(record["metrics"])
+    distributions = {day: assign_rs_rank(metrics) for day, metrics in by_date.items()}
+    distribution = distributions.get(as_of, [])
 
     print(
         f"📊 {market} universe：{len(records)} 檔"
@@ -619,6 +626,7 @@ def record_to_row(record):
         "close": record["close"],
         "changePct": record["changePct"],
         "volume": record["volume"],
+        "asOf": record.get("asOf"),
         "ma20": metrics["ma"]["20"],
         "ma50": metrics["ma"]["50"],
         "ma200": metrics["ma"]["200"],

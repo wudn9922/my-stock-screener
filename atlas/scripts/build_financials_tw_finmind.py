@@ -323,7 +323,11 @@ def views(raw, mode, kinds=None, quarters_of_year=None):
     else:
         return {}, {}
     if kinds is not None:
-        single = {q: value for q, value in single.items() if value >= 0}
+        # Bank/holding-company net revenue can legitimately be negative. An
+        # invalid gross revenue is an explicit source null, not an absent field
+        # that may be replaced with an old Yahoo value during merge.
+        single = {q: value if value >= 0 or kinds.get(q) in (1, 2, fmo.INTEREST_KIND) else None
+                  for q, value in single.items()}
     return single, cumulative
 
 
@@ -399,6 +403,8 @@ def derive(stock, modes, official_annual=None):
                 continue
             if all(per_quarter.get(q) is not None for q in (1, 2, 3, 4)):
                 totals[field] = sum(per_quarter[q] for q in (1, 2, 3, 4))
+            elif all(q in per_quarter for q in (1, 2, 3, 4)):
+                totals[field] = None  # explicitly rejected source component
         official_eps = official_annual.get(year)
         if pl and official_eps is not None:
             totals["epsBasic"] = round(official_eps, 4)
@@ -418,7 +424,7 @@ def derive(stock, modes, official_annual=None):
 def periods_of(annual, quarterly):
     """Derived values → (annual, quarterly) period dicts of build_financials (src finmind), ascending."""
     def values_of(values):
-        return {field: fin.clean_value(value) for field, value in values.items() if value is not None}
+        return {field: fin.clean_value(value) for field, value in values.items()}
     annual_periods = [fin.period(date(year, 12, 31).isoformat(), values_of(values), SRC)
                       for year, values in sorted(annual.items()) if values_of(values)]
     quarterly_periods = [fin.period(tw.quarter_end(year, q).isoformat(), values_of(values), SRC)
@@ -442,8 +448,12 @@ def write_stock(out_dir, symbol, annual, quarterly, flags, now, today):
     new_a_ends, new_q_ends = {p["end"] for p in annual}, {p["end"] for p in quarterly}
     kept_a = [p for p in sections["annual"] if p["src"] == SRC and p["end"] not in new_a_ends] if sections else []
     kept_q = [p for p in sections["quarterly"] if p["src"] == SRC and p["end"] not in new_q_ends] if sections else []
-    # Null values of a new period keep what the file already holds for that period (Yahoo values filled in an
-    # earlier run stay, so the rewrite is the same content and nothing flips back and forth)
+    explicit_nulls = {
+        frequency: {(p["end"], field) for p in items for field, value in p["values"].items() if value is None}
+        for frequency, items in (("annual", annual), ("quarterly", quarterly))
+    }
+    # Only genuinely absent fields may retain a previous fill. A deliberately
+    # produced source value (including null or negative net revenue) is authoritative.
     for items, stored_periods in ((annual, sections["annual"] if sections else []),
                                   (quarterly, sections["quarterly"] if sections else [])):
         stored_by_end = {p["end"]: p for p in stored_periods if p["src"] == SRC}
@@ -451,7 +461,7 @@ def write_stock(out_dir, symbol, annual, quarterly, flags, now, today):
             stored = stored_by_end.get(item["end"])
             if stored is not None:
                 for field, value in stored["values"].items():
-                    if item["values"].get(field) is None and value is not None:
+                    if field not in item["values"] and value is not None:
                         item["values"][field] = value
     base_a = sorted(annual + kept_a, key=lambda item: item["end"])
     base_q = sorted(quarterly + kept_q, key=lambda item: item["end"])
@@ -459,6 +469,18 @@ def write_stock(out_dir, symbol, annual, quarterly, flags, now, today):
     filled = []
     annual_m, revised_a = fin.merge_section(base_a, others_a, "annual", today_iso, renamed["annual"], filled)
     quarterly_m, revised_q = fin.merge_section(base_q, others_q, "quarterly", today_iso, renamed["quarterly"], filled)
+    # Financial statements are permanent records. Generic rolling-window merge
+    # limits must not remove an older stored reporting period.
+    if sections:
+        for frequency, items in (("annual", annual_m), ("quarterly", quarterly_m)):
+            ends = {item['end'] for item in items}
+            items.extend(item for item in sections[frequency] if item['end'] not in ends)
+            items.sort(key=lambda item: item['end'])
+    for frequency, items in (("annual", annual_m), ("quarterly", quarterly_m)):
+        for item in items:
+            for end, field in explicit_nulls[frequency]:
+                if item["end"] == end:
+                    item["values"][field] = None
     for item in annual_m:
         item["fy"] = fin.fiscal_year(item["end"])
     for item in quarterly_m:
@@ -488,6 +510,23 @@ def write_stock(out_dir, symbol, annual, quarterly, flags, now, today):
     if sections:
         for name, value in sections["other"].items():
             document.setdefault(name, value)
+    if previous is not None:
+        audit = list(previous.get('sourceCorrections', []))
+        for frequency in ('annual', 'quarterly'):
+            old = previous.get(frequency, {})
+            new = document.get(frequency, {})
+            positions = {end:i for i,end in enumerate(old.get('end', []))}
+            for i,end in enumerate(new.get('end', [])):
+                if end not in positions:
+                    continue
+                for field in set(old.get('values', {})) | set(new.get('values', {})):
+                    before = old.get('values', {}).get(field, [None]*len(positions))[positions[end]]
+                    after = new.get('values', {}).get(field, [None]*len(new.get('end', [])))[i]
+                    if before != after:
+                        audit.append(dict(period=frequency,end=end,field=field,old=before,new=after,
+                                          seenAt=now.isoformat(),source='FinMind'))
+        if audit:
+            document['sourceCorrections'] = audit
     if previous is not None and fin.same_content(previous, document):
         return "unchanged"                       # checkedAt keeps the last day the content changed
     write_atomic(path, document)

@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "quarantined": [
+    {
+      "symbol": "7825.TWO",
+      "date": "2026-08-28",
+      "reason": "Source repeats invalid OHLC; no independently verifiable replacement; retained permanently"
+    }
+  ],
+  "events": [
+    {
+      "symbol": "7825.TWO",
+      "date": "2026-08-28",
+      "status": "quarantined",
+      "old": {
+        "Open": 87.0,
+        "High": 105.0,
+        "Low": 94.6999969482422,
+        "Close": 95.8000030517578,
+        "Volume": 1159969.0
+      },
+      "new": null,
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/7825.TWO?interval=1d&period1=1787788800&period2=1788220800",
+      "fetchedAt": "2026-10-22T17:03:06.166782+00:00",
+      "reason": "Source repeats invalid OHLC; no independently verifiable replacement; retained permanently",
+      "id": "d292c2ee4ac512095cd5f1f03ed6dabc183451d821be4842845ae79d530cb2b1",
+      "loggedAt": "2026-10-22T18:09:39.367045+00:00"
+    },
+    {
+      "symbol": "3555.TWO",
+      "date": "2026-10-22",
+      "status": "corrected",
+      "old": {
+        "Open": 165.5,
+        "High": 165.5,
+        "Low": 146.5,
+        "Close": 145.0,
+        "Volume": 172074.0
+      },
+      "new": {
+        "Open": 165.5,
+        "High": 165.5,
+        "Low": 145.0,
+        "Close": 145.0,
+        "Volume": 172291.0
+      },
+      "sourceUrl": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=2026%2F10%2F22&id=&response=json",
+      "fetchedAt": "2026-10-22T18:09:50.241001+00:00",
+      "reason": "verified-official-correction",
+      "id": "c5fa46500e507701f126ae09c14807d000f82ce7aaeb8040578aa8fbd98d83cd",
+      "loggedAt": "2026-10-22T18:09:50.248028+00:00"
+    },
+    {
+      "symbol": "4133.TW",
+      "date": "2026-10-22",
+      "status": "corrected",
+      "old": {
+        "Open": 20.899999618530273,
+        "High": 20.950000762939453,
+        "Low": 20.649999618530273,
+        "Close": 20.600000381469727,
+        "Volume": 74925.0
+      },
+      "new": {
+        "Open": 20.9,
+        "High": 20.95,
+        "Low": 20.6,
+        "Close": 20.6,
+        "Volume": 75057.0
+      },
+      "sourceUrl": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20261022&type=ALLBUT0999",
+      "fetchedAt": "2026-10-22T18:09:52.467225+00:00",
+      "reason": "verified-official-correction",
+      "id": "248070790fd0b13ef29dc364f63ca1770920b80538bf7449604b41ab60c6f077",
+      "loggedAt": "2026-10-22T18:09:52.470977+00:00"
+    },
+    {
+      "symbol": "FX-USDJPY",
+      "date": "2026-10-13",
+      "status": "rejected",
+      "old": {
+        "Open": 158.50900268554688,
+        "High": 158.51400756835938,
+        "Low": 157.84100341796875,
+        "Close": 158.52000427246094
+      },
+      "new": null,
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/JPY%3DX",
+      "fetchedAt": "2026-10-22T18:15:40.286863+00:00",
+      "reason": "invalid-world-OHLC",
+      "id": "08388febbbc9da9bcf8367aa5b0871b038e309562cec718244522c0bda40ae26",
+      "loggedAt": "2026-10-22T18:15:40.287255+00:00"
+    },
+    {
+      "symbol": "FX-USDKRW",
+      "date": "2026-09-24",
+      "status": "rejected",
+      "old": {
+        "Open": 1365.4300537109375,
+        "High": 1376.6400146484375,
+        "Low": 1363.6300048828125,
+        "Close": 1362.5
+      },
+      "new": null,
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/KRW%3DX",
+      "fetchedAt": "2026-10-22T18:15:42.628921+00:00",
+      "reason": "invalid-world-OHLC",
+      "id": "302e2a0bf7894c8279dbeaa79cc445ed35743bbcc3e7bf1092220868fde1ea02",
+      "loggedAt": "2026-10-22T18:15:42.629245+00:00"
+    },
+    {
+      "symbol": "FX-USDKRW",
+      "date": "2026-09-28",
+      "status": "rejected",
+      "old": {
+        "Open": 1356.3399658203125,
+        "High": 1364.989990234375,
+        "Low": 1355.1800537109375,
+        "Close": 1354.510009765625
+      },
+      "new": null,
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/KRW%3DX",
+      "fetchedAt": "2026-10-22T18:15:42.628921+00:00",
+      "reason": "invalid-world-OHLC",
+      "id": "8269f61386a9d52d296c795485413c5f6ddfc6d13c49f60b74ca1cfefa08be00",
+      "loggedAt": "2026-10-22T18:15:42.630669+00:00"
+    },
+    {
+      "symbol": "FX-USDKRW",
+      "date": "2026-10-12",
+      "status": "rejected",
+      "old": {
+        "Open": 1339.8800048828125,
+        "High": 1339.8800048828125,
+        "Low": 1329.050048828125,
+        "Close": 1340.8399658203125
+      },
+      "new": null,
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/KRW%3DX",
+      "fetchedAt": "2026-10-22T18:15:42.628921+00:00",
+      "reason": "invalid-world-OHLC",
+      "id": "8a1336f7f32bbc61a5e1f16ddd006d87cba52fa93926658e073236ade7b3611f",
+      "loggedAt": "2026-10-22T18:15:42.631577+00:00"
+    },
+    {
+      "symbol": "^TWII",
+      "date": "2026-10-22",
+      "status": "rejected",
+      "old": {
+        "Open": 46942.75,
+        "High": 47332.1796875,
+        "Low": 46041.4296875,
+        "Close": null,
+        "Volume": 0.0
+      },
+      "new": null,
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/%5ETWII?range=2y&interval=1d",
+      "fetchedAt": "2026-10-22T18:28:45.605801+00:00",
+      "reason": "nonpositive-or-nonfinite-price",
+      "id": "d10b2ebffbec74225e90872173264ea8f236d4b649bb05c5c6588a44c324db52",
+      "loggedAt": "2026-10-22T18:28:45.630082+00:00"
+    },
+    {
+      "symbol": "8047.TWO",
+      "date": "2025-08-01",
+      "status": "rejected",
+      "old": {
+        "Open": null,
+        "High": null,
+        "Low": null,
+        "Close": null,
+        "Volume": null
+      },
+      "new": null,
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/8047.TWO?range=2y&interval=1d",
+      "fetchedAt": "2026-10-22T18:54:00.441669+00:00",
+      "reason": "nonpositive-or-nonfinite-price",
+      "id": "541a5483b2a5d57934d198523b554ae3dd92ba5ab13776633ce8db71cc4ad0e3",
+      "loggedAt": "2026-10-22T18:56:01.890603+00:00"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-22T18:56:08.149825+00:00",
+  "recovery": {
+    "TW.dated-history": 1979,
+    "US.matching-dated-research": 5337,
+    "US.unknown": 0,
+    "US.matching-dated-Yahoo": 1
+  },
+  "modalDates": {
+    "TW": "2026-10-22",
+    "US": "2026-10-21"
+  },
+  "dateDistribution": {
+    "TW": {
+      "2026-10-22": 1946,
+      "2026-10-21": 31,
+      "2026-10-20": 2
+    },
+    "US": {
+      "2026-10-21": 5338
+    }
+  },
+  "sourceRebuilds": [
+    {
+      "symbol": "8047.TWO",
+      "previousClose": 53.45,
+      "source": {
+        "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/8047.TWO?range=2y&interval=1d",
+        "fetchedAt": "2026-10-22T18:54:00.441669+00:00",
+        "sha256": "44ef440feec75fb73c41ee3b1a09b2a9031a0bf48d6c5890862026c302f8c627"
+      },
+      "newClose": 53.447689056396484,
+      "asOf": "2026-10-22"
+    }
+  ],
+  "removedSymbols": 0,
+  "permanentCsvWrites": 0
+}

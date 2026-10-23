@@ -2,6 +2,7 @@ import { snapshotSchema, type MarketSnapshot } from './SnapshotSchema';
 import { filterBarsByRange, normalizeMarketRange, normalizeSymbol, timeframes, type MarketDataProvider, type MarketRange, type Timeframe } from './MarketDataProvider';
 import { MarketDataUnavailableError } from './ProviderErrors';
 import { getMarketProfile, SESSION_CLOSE_SOURCE_QUALIFIER } from './MarketProfile';
+import { isQuarantinedBar, usableBars } from './KlineIntegrity';
 
 /** Same-origin real, delayed snapshots. No CORS proxy, secret, or invented fallback. */
 export class SnapshotProvider implements MarketDataProvider {
@@ -22,7 +23,19 @@ export class SnapshotProvider implements MarketDataProvider {
       request = (async () => {
         const response = await fetch(`${this.base}${encodeURIComponent(symbol)}.json`, { cache: 'no-cache' });
         if (!response.ok) throw new MarketDataUnavailableError(`${symbol} 暫無延遲快照。可用股票見資料來源說明；不會改用模擬價格。`);
-        const parsed = snapshotSchema.parse(await response.json());
+        const raw = await response.json();
+        // Quarantine applies before strict snapshot validation as well as after
+        // offline cache reads. No indicator receives a quarantined daily input.
+        if (raw?.results && typeof raw.results === 'object') {
+          for (const [tf, entry] of Object.entries(raw.results)) {
+            const result = entry as { bars?: { time: number }[]; latestBarAt?: number };
+            if (Array.isArray(result?.bars)) {
+              result.bars = result.bars.filter(bar => !isQuarantinedBar(symbol, bar.time, tf as Timeframe));
+              result.latestBarAt = result.bars.at(-1)?.time;
+            }
+          }
+        }
+        const parsed = snapshotSchema.parse(raw);
         if (parsed.symbol !== symbol) throw new Error('Snapshot symbol mismatch');
         if (parsed.generatedAt > this.now() / 1000 + 300) throw new Error('Snapshot generation time is in the future');
         this.recent.set(symbol, { at: this.now(), data: parsed });
@@ -52,7 +65,7 @@ export class SnapshotProvider implements MarketDataProvider {
     const data = await this.load(symbol, signal);
     const result = data.results[timeframe];
     if (!result) throw new MarketDataUnavailableError(`${symbol} ${timeframe} 暫無可靠快照資料。`);
-    const bars = filterBarsByRange(result.bars, normalizedRange);
+    const bars = filterBarsByRange(usableBars(result.bars, symbol, timeframe), normalizedRange);
     if (!bars.length) throw new Error('No snapshot bars in requested range');
     const sessionCloseObservations = result.sessionCloseObservations?.filter(time => bars.some(bar => bar.time === time));
     const source = this.source(data.generatedAt, data.quote.asOf, !!sessionCloseObservations?.length);

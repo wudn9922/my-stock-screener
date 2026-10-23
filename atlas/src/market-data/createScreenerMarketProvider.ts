@@ -10,6 +10,7 @@ import {
   type Timeframe,
 } from './MarketDataProvider';
 import { StaticSeriesProvider, defaultReportBase } from './StaticSeriesProvider';
+import { usableBarResult } from './KlineIntegrity';
 
 export interface ScreenerMarketProviderOptions {
   /** Supabase `market-chart` function URL; default `import.meta.env.VITE_MARKET_PROXY_URL`. */
@@ -47,7 +48,7 @@ export class ScreenerMarketRouter implements MarketDataProvider {
   }
 
   async getBars(symbol: string, timeframe: Timeframe, range?: MarketRange, signal?: AbortSignal): Promise<BarResult> {
-    return (await this.route(symbol, signal)).getBars(symbol, timeframe, range, signal);
+    return usableBarResult(await (await this.route(symbol, signal)).getBars(symbol, timeframe, range, signal), symbol, timeframe);
   }
 
   async getQuote(symbol: string, signal?: AbortSignal): Promise<Quote> {

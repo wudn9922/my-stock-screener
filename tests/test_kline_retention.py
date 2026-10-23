@@ -34,16 +34,19 @@ class KLineRetentionTest(unittest.TestCase):
         source = Path(__file__).resolve().parents[1] / "main.py"
         tree = ast.parse(source.read_text(encoding="utf-8-sig"))
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "write_ohlcv_csv_atomic")
-        namespace = {"os": os, "tempfile": tempfile}
+        import kline_integrity
+        namespace = {"write_kline_csv": lambda frame, path: kline_integrity.write_csv(path, frame)}
         exec(compile(ast.Module(body=[function], type_ignores=[]), str(source), "exec"), namespace)
-        frame = pd.DataFrame({key: [1] for key in ("Open", "High", "Low", "Close", "Volume")})
+        frame = pd.DataFrame({key: [1] for key in ("Open", "High", "Low", "Close", "Volume")},
+                             index=pd.to_datetime(['2026-10-20']))
         with tempfile.TemporaryDirectory() as temp:
             csv = Path(temp) / "RETAINED.csv"
-            csv.write_bytes(b"permanent historical bars")
-            with patch.object(pd.DataFrame, "to_csv", side_effect=OSError("disk error")):
+            original = b"Date,Open,High,Low,Close,Volume\n2026-10-19,1,1,1,1,1\n"
+            csv.write_bytes(original)
+            with patch("kline_integrity.os.replace", side_effect=OSError("disk error")):
                 with self.assertRaisesRegex(OSError, "disk error"):
                     namespace["write_ohlcv_csv_atomic"](frame, csv)
-            self.assertEqual(csv.read_bytes(), b"permanent historical bars")
+            self.assertEqual(csv.read_bytes(), original)
             self.assertEqual(list(Path(temp).iterdir()), [csv])
 
 

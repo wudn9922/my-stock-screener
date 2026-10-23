@@ -22,7 +22,7 @@ import report_metrics  # noqa: E402
 UNIVERSE_FIELDS = [
     "symbol", "name", "close", "changePct", "volume", "r5", "r21", "r63",
     "ma20", "ma50", "ma200", "ema20", "ma20Slope5", "trend", "hi52", "fromHi52", "hiBars",
-    "rs21", "rs63", "rsRank", "volVsPrev", "turnover20",
+    "rs21", "rs63", "rsRank", "volVsPrev", "turnover20", "asOf",
 ]
 
 

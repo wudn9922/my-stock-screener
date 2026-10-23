@@ -128,9 +128,9 @@ class LoadDailyBarsTest(unittest.TestCase):
             path = os.path.join(tmp, "2330.TW.csv")
             with open(path, "w", encoding="utf-8") as file:
                 file.write("Date,Open,High,Low,Close,Volume\n")
-                file.write("2026-10-08,1,1,1,101,500\n")
-                file.write("2026-10-07,1,1,1,100,400\n")
-                file.write("2026-10-07,1,1,1,100.5,450\n")  # 同一天重複：保留最後一筆
+                file.write("2026-10-08,100,110,99,101,500\n")
+                file.write("2026-10-07,100,110,99,100,400\n")
+                file.write("2026-10-07,100,110,99,100.5,450\n")  # 同一天重複：保留最後一筆
                 file.write("not-a-date,1,1,1,103,600\n")  # 壞日期：丟棄
                 file.write("2026-10-09,1,1,1,,700\n")  # 沒有收盤價：丟棄
             bars = bb.load_daily_bars(path)

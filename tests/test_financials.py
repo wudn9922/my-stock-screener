@@ -390,7 +390,7 @@ class MergeTest(unittest.TestCase):
         old = [fin.period("20%02d-12-31" % year, {"revenue": year}) for year in range(0, 25)]
         new = [fin.period("2025-01-03", {"revenue": 25.0, "netIncome": 1})]
         merged, revisions = fin.merge_section(old, new, "annual", "2026-10-11")
-        self.assertEqual(len(merged), fin.KEEP_ANNUAL)
+        self.assertEqual(len(merged), len(old))  # permanent periods are not a display window
         self.assertEqual(merged[-1]["end"], "2025-01-03")           # ±5 days: same period, new date
         self.assertEqual(merged[-1]["values"], {"revenue": 25, "netIncome": 1})
         self.assertEqual(len(revisions), 1)                          # 24 → 25 is +4%
@@ -923,10 +923,10 @@ class RunTest(unittest.TestCase):
         index["items"]["GHOST"] = dict(index["items"]["OLD"])         # entry without a file
         fin.write_atomic(os.path.join(self.out, "index.json"), index)
         stats = self.run_once(["AAPL"], Fetcher({}))
-        self.assertEqual(stats["deleted"], ["OLD"])
-        self.assertEqual(sorted(self.files()), ["AAPL.json", "KEEP.json", "SEC.json", "STRAY.json", "index.json"])
+        self.assertEqual(stats["deleted"], [])
+        self.assertEqual(sorted(self.files()), ["AAPL.json", "KEEP.json", "OLD.json", "SEC.json", "STRAY.json", "index.json"])
         items = self.index()["items"]
-        self.assertEqual(sorted(items), ["AAPL", "KEEP", "SEC", "STRAY"])
+        self.assertEqual(sorted(items), ["AAPL", "KEEP", "OLD", "SEC", "STRAY"])
         # Unlisted file found without an index entry: the 180 days start now
         self.assertEqual(items["STRAY"]["lastListed"], "2026-10-11")
         self.assertEqual(items["KEEP"]["lastListed"], (TODAY - timedelta(days=179)).isoformat())

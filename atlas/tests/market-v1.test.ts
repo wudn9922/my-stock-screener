@@ -235,7 +235,7 @@ it('validates Yahoo inputs before fetch and rejects empty ranges and zero previo
     );
     await expect(yahoo.getBars('AAPL', '4H')).rejects.toThrow('Yahoo does not provide this timeframe');
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    await expect(yahoo.getQuote('AAPL')).rejects.toThrow('previous close must be positive');
+    await expect(yahoo.getQuote('AAPL')).rejects.toThrow('No Yahoo bars in requested range');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   } finally {
     vi.unstubAllGlobals();
