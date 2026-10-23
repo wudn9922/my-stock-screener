@@ -3,6 +3,7 @@ import { AccessBoundary } from './auth/AccessBoundary';
 import { applyColorConvention } from './app/sitePreferences';
 import { SCREENER_HOSTING } from './app/HostingMode';
 import { accessState, initializeAccess } from './auth/access';
+import { retireScreenerWorker } from './auth/retireWorker';
 import './styles.css';
 // Packaged native builds use their bundled assets, independent of PWA shell updates.
 if (
@@ -31,20 +32,7 @@ async function render() {
       new Promise((resolve) => setTimeout(resolve, LIFF_START_TIMEOUT_MS)),
     ]);
     accessState.allowGuestWhileLoading();
-    if ('serviceWorker' in navigator) {
-      const scope = new URL(import.meta.env.BASE_URL, location.origin).href;
-      const registrations = await navigator.serviceWorker.getRegistrations().catch(() => []);
-      for (const registration of registrations) {
-        if (registration.scope !== scope) continue;
-        // Update old installations to the memory-only passthrough worker, then unregister.
-        await Promise.race([registration.update().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 1000))]);
-        await registration.unregister();
-      }
-      if ('caches' in globalThis) {
-        const prefix = `atlas-shell-${encodeURIComponent(scope)}-`;
-        for (const name of await caches.keys()) if (name.startsWith(prefix)) await caches.delete(name);
-      }
-    }
+    await retireScreenerWorker(new URL(import.meta.env.BASE_URL, location.origin).href);
   }
   // The chart workspace loads its axis font itself; the landing page renders immediately.
   createRoot(document.getElementById('root')!).render(<AccessBoundary />);
