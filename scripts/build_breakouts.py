@@ -157,17 +157,18 @@ def clean_bars(bars, as_of, jump_limit=JUMP_LIMIT):
     return clean, anomalies
 
 
-def strategy_signals(clean, box_max_width):
+def strategy_signals(clean, box_max_width, strategy_specs=None):
     """
     逐日訊號（純函式，只用當日與過去的K線）：{key: (fresh, level, known)}。
     fresh：新突破（含放量／箱型條件）；level：突破參考價（前高或箱頂）；known：回看與冷卻期資料都齊全。
     """
+    specs = STRATEGIES if strategy_specs is None else strategy_specs
     close, high, low, volume = clean["Close"], clean["High"], clean["Low"], clean["Volume"]
     volume_avg = volume.shift(1).rolling(VOLUME_LOOKBACK, min_periods=VOLUME_LOOKBACK).mean()
     volume_ok = (volume >= VOLUME_MULTIPLE * volume_avg).fillna(False)
 
     base = {}
-    for lookback in sorted(set(HIGH_LOOKBACKS) | {BOX_LOOKBACK}):
+    for lookback in sorted({spec["lookback"] for spec in specs if spec["kind"] in ("high", "box")} | {BOX_LOOKBACK}):
         level = high.shift(1).rolling(lookback, min_periods=lookback).max()
         raw = (close > level).fillna(False)
         recent = raw.shift(1, fill_value=False).astype(int).rolling(COOLDOWN_DAYS, min_periods=COOLDOWN_DAYS).sum()
@@ -194,7 +195,7 @@ def strategy_signals(clean, box_max_width):
     ema_fresh = cross & (recent_crosses == 0) & ema_known
 
     out = {}
-    for spec in STRATEGIES:
+    for spec in specs:
         if spec["kind"] == "swing":
             out[spec["key"]] = swing_high_signals(clean)
             continue
@@ -243,17 +244,19 @@ def summarize(events, eligible, base_by_day, mature_days=MATURE_DAYS):
     return out
 
 
-def build_market(frames, universe_label, market_key, as_of=None):
+def build_market(frames, universe_label, market_key, as_of=None, *, strategy_specs=None, window_specs=None):
     """
     單一市場的突破統計（純計算，不讀檔）。
     frames：{symbol: DataFrame（index 為日期，欄位 High、Low、Close、Volume）}
     as_of：預設為各檔最後日期的眾數；指定時只用該日（含）以前的資料。
     """
+    specs = STRATEGIES if strategy_specs is None else strategy_specs
+    windows_to_build = WINDOWS if window_specs is None else window_specs
     universe_count = len(frames)
     # 兩個市場週六日都不交易：週末K線一律視為無效日（2026-09-20 週日曾有 591 檔台股出現
     # 高低價＝漲跌停價、收盤沿用前一日的假K線，會墊高前高並讓箱型失真）
-    weekend_dates = [bars.index[bars.index.dayofweek >= 5] for bars in frames.values()]
-    frames = {symbol: bars[bars.index.dayofweek < 5] for symbol, bars in frames.items()}
+    weekend_dates = [bars.index[bars.index.day_of_week >= 5] for bars in frames.values()]
+    frames = {symbol: bars[bars.index.day_of_week < 5] for symbol, bars in frames.items()}
     frames = {symbol: bars for symbol, bars in frames.items() if not bars.empty}
     if not frames:
         return None
@@ -273,7 +276,7 @@ def build_market(frames, universe_label, market_key, as_of=None):
         if clean is None or clean.index[-1] != as_of:
             continue
         anomaly_rows.extend((day, symbol, change) for day, change in anomalies)
-        signals = strategy_signals(clean, box_max_width)
+        signals = strategy_signals(clean, box_max_width, specs)
         stocks.append(
             {
                 "dates": clean.index,
@@ -291,7 +294,7 @@ def build_market(frames, universe_label, market_key, as_of=None):
         )
 
     windows = {}
-    for window_key, days, _ in WINDOWS:
+    for window_key, days, _ in windows_to_build:
         window_days = calendar[-days:]
         start = window_days[0]
         first_position = last_position - len(window_days) + 1
@@ -310,7 +313,7 @@ def build_market(frames, universe_label, market_key, as_of=None):
         }
 
         strategies = {}
-        for spec in STRATEGIES:
+        for spec in specs:
             events = []
             attempts = []
             eligible = 0

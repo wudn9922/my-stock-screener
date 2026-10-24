@@ -252,7 +252,9 @@ jobs:
   full-market-report:
     # Read the default branch's existing cache; no data downloads, credentials or cache writes.
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Six historical recalculations plus the latest report took 13m31s on the
+    # real cache; leave time for the unchanged research checks and artifacts too.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Restore generated inputs for full-market readers

@@ -1,3 +1,17 @@
+## PR 171 chart and research follow-up (2026-10-24)
+
+This follow-up makes all moving-average candidates individually applicable, defaults newly added chart MAs to fixed 2px widths, and seeds fixed-stock editing from applied daily SMAs only. Existing explicit styles and stored preset data remain compatible. The unused preset UI is removed because indicators already belong to each stock/timeframe; the chart-local shortcut list is now labelled 圖表收藏, with its purpose explained separately from the condition-tracking console lists.
+
+The two daily volatility values are independent controls next to 建議均線. Its floating menu contains the MA candidates, then volume analysis, and subdued official disclosures last; panels stay within the available viewport above navigation. Directional volume ratios compare actual adjacent session volumes while abnormal-volume RVOL20 remains unchanged. The backtest UI uses one SMA/EMA with independent upper-entry and lower-exit percentages, closed-bar crossings and unchanged next-open execution.
+
+Full-market reports recalculate six prior monthly reference dates from cached bars, truncating the input at every date and retaining listing/coverage/sample rules. The UI replaces the near-week switch with monthly histograms, dated current values and a default five-month view. Missing historical coverage is a gap; older generated reports explicitly await the new monthly payload. Current listings imply survivorship bias, disclosed in the calculation note. Historical raw archives remain immutable. Financial column charts expose time zoom, pan and reset while preserving original values, gaps and YoY alignment.
+
+Read-only peer findings returned to the primary engineer and explicitly accepted: support long Taiwan holiday closures when selecting prior reference sessions; include displayed volatility percentages in accessible button names; dismiss a sibling popup during keyboard focus navigation. Each fix has a regression. Verification results and the exact-head Actions run are recorded in the PR. No merge, deployment or production data collection is authorized by this change.
+
+PR 169 had already been merged before this follow-up, so these changes are reviewed separately in PR 171. The broader drawing regressions also refresh two stale expectations from the existing readable-axis/gesture-status design: axis width follows the configured font size and still reserves most of the plot, and picker geometry compares the same active-tool state before and after opening.
+
+The first exact-head CI run exposed moving world candle CSVs paired with frozen browser-fixture metadata. The fixture reader now clips retained real bars at the frozen data date and checks its terminal date/close; the OHLC assertion is unchanged. Real full-market monthly generation completed successfully in 13m31s (TW 1,945/1,981 and US 5,273/5,348 valid current-session histories), but the following research checks exhausted the old 15-minute job budget. That job now allows 30 minutes for the expanded workload with all coverage and result checks intact. Touched calendar filters use pandas' equivalent `day_of_week` property to avoid deprecated-alias warning spam.
+
 ## PR 169 follow-up: Pages disclosures and collector cache (2026-10-24)
 
 The unmocked Pages smoke now expands the SEC 8-K coverage note before its existing visible `CIK 對應` assertion. The other smoke targets remain visible outside the collapsed provenance, stat notes and chart legends; their assertions are unchanged.

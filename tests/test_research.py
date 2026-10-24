@@ -239,15 +239,15 @@ class PriceVolume(unittest.TestCase):
         self.assertIsNone(f[-2]["rvol"])
 
     def test_explicit_eight_of_eleven(self):
-        f = []
+        f = [dict(valid=True, returnPct=None, rvol=None, close=100, volume=100)]
         for i in range(20):
             f.append(
                 dict(
                     valid=True,
                     returnPct=1 if i < 11 else -1,
-                    rvol=0.5 if i < 8 else 2,
+                    rvol=2 if i < 8 else 0.5,
                     close=100,
-                    volume=100,
+                    volume=f[-1]["volume"] * (0.9 if i < 8 else 1.1),
                 )
             )
         v = structure(f, 20)["upShrink"]
@@ -282,9 +282,28 @@ class PriceVolume(unittest.TestCase):
         self.assertEqual(original, volume_features(rows)[:30])
 
     def test_partial_window_exposes_count(self):
-        r = structure(volume_features(bars(24)), 20)
+        r = structure(volume_features(bars(5)), 20)
         self.assertEqual(r["observations"], 4)
         self.assertTrue(r["lowConfidence"])
+
+    def test_directional_ratios_use_prior_day_not_rvol(self):
+        rows = bars(5)
+        for row, volume in zip(rows, [100, 80, 120, 60, 90]):
+            row["volume"] = volume
+        f = volume_features(rows)
+        self.assertTrue(all(row["rvol"] is None for row in f))
+        # All four daily comparisons are usable before RVOL20 warms up.
+        v = structure(f, 4)
+        self.assertEqual(v["observations"], 4)
+        self.assertEqual(v["upShrink"]["pct"], 50)
+        self.assertEqual(v["upExpand"]["pct"], 50)
+
+    def test_directional_ratios_do_not_bridge_zero_missing_action(self):
+        for key, value in [("volume", 0), ("volume", None), ("action", "split")]:
+            rows = bars(5)
+            rows[-2][key] = value
+            v = structure(volume_features(rows), 2)
+            self.assertEqual(v["observations"], 0)
 
     def test_exact_baseline_equal_not_expand(self):
         v = structure(volume_features(bars()), 5)

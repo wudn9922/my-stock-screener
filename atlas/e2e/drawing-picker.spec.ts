@@ -85,11 +85,17 @@ async function openPicker(page: Page) {
   return dialog;
 }
 
-async function addSma14(page: Page) {
+async function addSma14(page: Page, useAtr = false) {
   await page.getByRole('button', { name: '管理指標', exact: true }).click();
   await page.getByLabel('指標類型', { exact: true }).filter({ visible: true }).selectOption('SMA');
   await page.getByLabel('SMA 週期', { exact: true }).filter({ visible: true }).fill('14');
   await page.getByRole('button', { name: '新增 SMA', exact: true }).click();
+  if (useAtr) {
+    await expect.poll(async () => (await readSymbol(page))?.indicators.find((indicator) => indicator.type === 'SMA')).toMatchObject({ lineWidth: 2, widthMode: 'pixels' });
+    await page.getByRole('button', { name: '設定 SMA 14', exact: true }).click();
+    await page.getByLabel('SMA 14 線寬', { exact: true }).selectOption('atr');
+    await page.locator('[data-testid="ma-14"]').getByRole('button', { name: '儲存', exact: true }).click();
+  }
   await page.getByRole('button', { name: '鎖定 SMA 14', exact: true }).click();
   const close = page.getByRole('button', { name: '關閉面板', exact: true });
   if (await close.isVisible()) await close.click();
@@ -190,11 +196,14 @@ test('Drawing Tools picker keeps the chart clear and supports keyboard, backdrop
   }
   await expect.poll(async () => (await readSymbol(page))?.drawings.length ?? 0).toBe(0);
 
+  // Selecting a tool reveals its gesture instructions on phones. Compare the
+  // picker with the same active-tool layout, rather than the earlier idle chart.
+  const activeChartHeight = (await chart.boundingBox())!.height;
   await openPicker(page);
   await page.locator('.drawing-tool-picker-backdrop').click({ position: { x: 4, y: 4 } });
   await expect(page.getByRole('dialog', { name: '繪圖工具', exact: true })).toBeHidden();
   await expect(launcher).toBeFocused();
-  expect((await chart.boundingBox())!.height).toBeCloseTo(chartHeight, 0);
+  expect((await chart.boundingBox())!.height).toBeCloseTo(activeChartHeight, 0);
 
   await page.getByRole('button', { name: '全螢幕圖表', exact: true }).click();
   await expect(page.locator('.app-shell')).toHaveClass(/chart-focus/);
@@ -214,12 +223,12 @@ test('Drawing Tools picker keeps the chart clear and supports keyboard, backdrop
   await expect(page.locator('.app-shell')).not.toHaveClass(/chart-focus/);
 });
 
-test('new drawing and SMA use ATR width defaults and preserve locked symbol/timeframe ownership', async ({
+test('new SMA defaults to 2px and explicitly selected ATR width preserves locked symbol/timeframe ownership', async ({
   page,
 }) => {
   await page.goto('/');
   await loaded(page);
-  await addSma14(page);
+  await addSma14(page, true);
   await addVolume(page);
 
   await chooseDrawingTool(page, '水平線');
@@ -482,6 +491,7 @@ test('price scale auto-sizes naturally for ordinary and million-price labels', a
       await frame();
       return {
         minimumWidth: engine.chart.options().rightPriceScale.minimumWidth,
+        fontSize: engine.chart.options().layout.fontSize,
         axisWidth: engine.candles.priceScale().width(),
         paneWidth: engine.chart.paneSize().width,
         hostWidth: host.clientWidth,
@@ -499,8 +509,10 @@ test('price scale auto-sizes naturally for ordinary and million-price labels', a
 
   expect(measurements.ordinary.minimumWidth).toBe(0);
   expect(measurements.ordinary.axisWidth).toBeGreaterThan(0);
-  expect(measurements.ordinary.axisWidth).toBeLessThan(64);
-  expect(measurements.ordinary.paneWidth).toBeGreaterThan(0);
+  // The accepted platform font is larger on phones than the old compressed face.
+  // Check compact sizing relative to the actual font and preserve room for the plot.
+  expect(measurements.ordinary.axisWidth).toBeLessThan(measurements.ordinary.fontSize * 6);
+  expect(measurements.ordinary.paneWidth).toBeGreaterThan(measurements.ordinary.hostWidth * 0.65);
   expect(measurements.large.axisWidth).toBeGreaterThan(measurements.ordinary.axisWidth);
   expect(measurements.large.axisWidth + measurements.large.paneWidth).toBeLessThanOrEqual(
     measurements.large.hostWidth,

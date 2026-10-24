@@ -28,10 +28,7 @@ export function IndicatorPanel({
   const [period, setPeriod] = useState('24');
   const [indicatorType, setIndicatorType] = useState<IndicatorType>('SMA');
   const [editing, setEditing] = useState<string | null>(null);
-  const [presetName, setPresetName] = useState('');
-  const [selectedPreset, setSelectedPreset] = useState('');
   const [error, setError] = useState('');
-  const presets = store.getSnapshot().app.indicatorPresets;
   const indicatorHome = store.symbol(symbol).preferences.ownershipMigration?.indicatorHome;
   const isVolume = indicatorType === 'Volume';
 
@@ -49,35 +46,11 @@ export function IndicatorPanel({
         source: 'close',
         visible: true,
         locked: false,
-        lineWidth: isVolume ? 2 : 1,
-        widthMode: isVolume ? 'pixels' : 'atr',
+        lineWidth: 2,
+        widthMode: 'pixels',
         color: indicatorColors[indicators.length % indicatorColors.length],
         scope: { timeframe },
       });
-    } catch (caught) {
-      setError(reportError('ui', caught));
-    }
-  };
-
-  const savePreset = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const name = presetName.trim();
-    if (!name) return;
-    setError('');
-    try {
-      store.saveIndicatorPreset(name, symbol);
-      setPresetName('');
-    } catch (caught) {
-      setError(reportError('ui', caught));
-    }
-  };
-
-  const applyPreset = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedPreset) return;
-    setError('');
-    try {
-      store.applyIndicatorPreset(selectedPreset, symbol);
     } catch (caught) {
       setError(reportError('ui', caught));
     }
@@ -123,6 +96,9 @@ export function IndicatorPanel({
       <p className="muted small" data-testid="indicator-scope">
         {symbol} · {timeframe} 股票＋週期專屬
       </p>
+      <HelpDisclosure label="指標儲存說明">
+        指標按目前個股與 K 線週期分開保留；啟用儲存時，新增與修改會自動儲存，不需要另存組合。儲存狀態顯示於圖表下方。
+      </HelpDisclosure>
       {indicatorHome && (
         <p className="muted small" role="note">
           舊均線已歸入 {indicatorHome}；各週期現在獨立。
@@ -177,42 +153,6 @@ export function IndicatorPanel({
           新增
         </button>
       </form>
-      <div className="indicator-presets">
-        <form className="ma-settings" onSubmit={savePreset}>
-          <label>
-            指標組合名稱
-            <input
-              aria-label="指標組合名稱"
-              maxLength={80}
-              value={presetName}
-              onChange={(event) => setPresetName(event.target.value)}
-            />
-          </label>
-          <button className="primary-button" type="submit" disabled={!presetName.trim()}>
-            儲存目前指標為組合
-          </button>
-        </form>
-        <form className="ma-settings" onSubmit={applyPreset}>
-          <label>
-            指標組合
-            <select
-              aria-label="指標組合"
-              value={selectedPreset}
-              onChange={(event) => setSelectedPreset(event.target.value)}
-            >
-              <option value="">選擇組合</option>
-              {presets.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className="primary-button" type="submit" disabled={!selectedPreset}>
-            套用組合
-          </button>
-        </form>
-      </div>
       {indicators.length === 0 && (
         <div className="empty-state">
           加入第一條 SMA
@@ -327,7 +267,7 @@ export function IndicatorPanel({
       <HelpDisclosure label="指標鎖定與線寬說明">
         鎖定後仍可隱藏／顯示，解鎖後才能修改或刪除。
         <br />
-        ATR 線寬＝0.02 × 14 根 K 棒 ATR 換算成像素（1–4 px）；像素模式固定 1–4 px。新增的 SMA／EMA 預設使用 ATR 線寬，已儲存的指標保留原設定。
+        ATR 線寬＝0.02 × 14 根 K 棒 ATR 換算成像素（1–4 px）；像素模式固定 1–4 px。新增的 SMA／EMA 預設為 2px，已儲存的指標保留原設定。
       </HelpDisclosure>
     </section>
   );

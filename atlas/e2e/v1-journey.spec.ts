@@ -185,6 +185,12 @@ test('V1 research journey keeps per-symbol indicators, drawings, alerts and back
   await expectProvider(page, 'demo');
 
   await addIndicator(page, 'SMA', 24);
+  await expect(page.getByLabel('指標組合名稱', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '套用組合', exact: true })).toHaveCount(0);
+  await expect.poll(async () => (await readSymbol(page))?.indicators[0]).toMatchObject({
+    lineWidth: 2,
+    widthMode: 'pixels',
+  });
   const sma24 = page.getByTestId('ma-24');
   await sma24.getByRole('button', { name: '設定 SMA 24', exact: true }).click();
   await sma24.getByLabel('週期', { exact: true }).fill('26');
@@ -221,9 +227,6 @@ test('V1 research journey keeps per-symbol indicators, drawings, alerts and back
   ).toBeDisabled();
   await aaplVolume.getByRole('button', { name: '隱藏 成交量', exact: true }).click();
   await aaplVolume.getByRole('button', { name: '顯示 成交量', exact: true }).click();
-  await page.getByLabel('指標組合名稱', { exact: true }).fill('AAPL mix');
-  await page.getByRole('button', { name: '儲存目前指標為組合', exact: true }).click();
-  await expect.poll(async () => (await readWorkspace(page)).app.indicatorPresets.length).toBe(1);
   await aaplVolume.getByRole('button', { name: '解鎖 成交量', exact: true }).click();
   await expect(
     aaplVolume.getByRole('button', { name: '移除 成交量', exact: true }),
@@ -318,35 +321,20 @@ test('V1 research journey keeps per-symbol indicators, drawings, alerts and back
     .filter({ hasText: '成交量' })
     .getByRole('button', { name: '鎖定 成交量', exact: true })
     .click();
-  await page.getByLabel('指標組合名稱', { exact: true }).fill('NVDA mix');
-  await page.getByRole('button', { name: '儲存目前指標為組合', exact: true }).click();
-  await expect.poll(async () => (await readWorkspace(page)).app.indicatorPresets.length).toBe(2);
-  const nvdaBeforeApply = (await readSymbol(page, 'NVDA'))!;
-  await page.getByLabel('指標組合', { exact: true }).selectOption({ label: 'AAPL mix' });
-  await page.getByRole('button', { name: '套用組合', exact: true }).click();
-  await expect.poll(async () => (await readSymbol(page, 'NVDA'))?.indicators.length ?? 0).toBe(6);
-  const nvdaAfterApply = (await readSymbol(page, 'NVDA'))!;
-  expect(nvdaAfterApply.indicators.map((indicator) => indicator.symbol)).toEqual(
-    Array.from({ length: 6 }, () => 'NVDA'),
-  );
-  expect(new Set(nvdaAfterApply.indicators.map((indicator) => indicator.id)).size).toBe(6);
-  expect(nvdaAfterApply.indicators.slice(0, 3)).toEqual(nvdaBeforeApply.indicators);
-  expect(nvdaAfterApply.indicators[0].locked).toBe(true);
-  expect(nvdaAfterApply.indicators.slice(3).map((indicator) => indicator.type)).toEqual([
-    'SMA',
-    'EMA',
-    'Volume',
-  ]);
-  expect(nvdaAfterApply.indicators.slice(3).every((indicator) => indicator.locked)).toBe(true);
+  const nvdaIndicators = (await readSymbol(page, 'NVDA'))!.indicators;
+  expect(nvdaIndicators).toHaveLength(3);
+  expect(nvdaIndicators.map((indicator) => indicator.type)).toEqual(['SMA', 'EMA', 'Volume']);
+  expect(nvdaIndicators.every((indicator) => indicator.symbol === 'NVDA')).toBe(true);
+  expect(nvdaIndicators[0].locked).toBe(true);
   await switchSymbol(page, 'AAPL');
 
   await openPanel(page, 'backtest');
   const backtest = page.locator('.backtest-panel');
   await expect(backtest).toContainText('模擬資料');
-  await backtest.getByLabel('快線類型', { exact: true }).selectOption('EMA');
-  await backtest.getByLabel('快線週期', { exact: true }).fill('1');
-  await backtest.getByLabel('慢線類型', { exact: true }).selectOption('SMA');
-  await backtest.getByLabel('慢線週期', { exact: true }).fill('2');
+  await backtest.getByLabel('參考均線類型', { exact: true }).selectOption('SMA');
+  await backtest.getByLabel('參考均線週期', { exact: true }).fill('2');
+  await backtest.getByLabel('均線上方百分比', { exact: true }).fill('0');
+  await backtest.getByLabel('均線下方百分比', { exact: true }).fill('0');
   await backtest.getByRole('button', { name: '執行回測', exact: true }).click();
   await expect(backtest.locator('.backtest-results')).toBeVisible();
   await expect(backtest.locator('summary').filter({ hasText: '訊號' })).toHaveText(/^訊號（[1-9]\d*）$/);
@@ -398,7 +386,7 @@ test('V1 research journey keeps per-symbol indicators, drawings, alerts and back
   await page.reload();
   await loaded(page);
   let saved = await readWorkspace(page);
-  expect(saved.app.indicatorPresets.map((preset) => preset.name)).toEqual(['AAPL mix', 'NVDA mix']);
+  expect(saved.app.indicatorPresets).toEqual([]);
   expect(saved.app.workspace).toMatchObject({
     rightOpen: true,
     rightTab: 'settings',
@@ -414,7 +402,7 @@ test('V1 research journey keeps per-symbol indicators, drawings, alerts and back
   expect(saved.app.alerts.find((alert) => alert.kind === 'drawing')?.enabled).toBe(true);
   expect(saved.symbols.find((state) => state.symbol === 'AAPL')?.drawings[0].locked).toBe(true);
   expect(saved.symbols.find((state) => state.symbol === 'AAPL')?.indicators).toHaveLength(3);
-  expect(saved.symbols.find((state) => state.symbol === 'NVDA')?.indicators).toHaveLength(6);
+  expect(saved.symbols.find((state) => state.symbol === 'NVDA')?.indicators).toHaveLength(3);
   await openPanel(page, 'settings');
   await expect(page.locator('.workspace-settings')).toBeVisible();
   await closePanel(page);
@@ -441,10 +429,7 @@ test('V1 research journey keeps per-symbol indicators, drawings, alerts and back
     symbols: SymbolState[];
   };
   expect(exported.version).toBe(4);
-  expect(exported.app.indicatorPresets.map((preset) => preset.name)).toEqual([
-    'AAPL mix',
-    'NVDA mix',
-  ]);
+  expect(exported.app.indicatorPresets).toEqual([]);
 
   await openPanel(page, 'settings');
   await page.getByLabel('啟用除錯模式', { exact: true }).check();

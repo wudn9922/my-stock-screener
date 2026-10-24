@@ -132,9 +132,13 @@ describe("public research contracts", () => {
 });
 describe("causal structure and dates", () => {
   it("keeps 8/11 separately from downward events", () => {
-    const f = Array.from({ length: 20 }, (_, i) =>
-      feature(i < 11, i < 8 ? 0.5 : 2),
-    );
+    const f = [{ ...feature(true, null), volume: 100 }];
+    for (let i = 0; i < 20; i++) {
+      f.push({
+        ...feature(i < 11, i < 8 ? 2 : 0.5),
+        volume: f.at(-1)!.volume! * (i < 8 ? 0.9 : 1.1),
+      });
+    }
     const v = volumeStructure(f, 20);
     expect(v.upShrink).toEqual({
       numerator: 8,
@@ -143,19 +147,56 @@ describe("causal structure and dates", () => {
     });
     expect(v.downExpand).toEqual({ numerator: 9, denominator: 9, pct: 100 });
   });
-  it("N/A when no upward/downward days; missing baseline excluded", () => {
+  it("N/A when no upward/downward days; missing prior session excluded", () => {
     expect(volumeStructure([feature(true, null)], 5).upShrink.pct).toBeNull();
     expect(volumeStructure([feature(true, 0.5)], 5).downExpand.pct).toBeNull();
   });
-  it("threshold changes preserve independent subratios", () => {
+  it("compares adjacent volumes without requiring RVOL20 warmup", () => {
     const v = volumeStructure(
-      [feature(true, 0.7), feature(false, 1.5)],
-      5,
-      0.5,
-      2,
+      [
+        { ...feature(true, null), volume: 100 },
+        { ...feature(true, null), volume: 80 },
+        { ...feature(false, 0.1), volume: 120 },
+        { ...feature(false, 2), volume: 60 },
+        { ...feature(true, 0.1), volume: 90 },
+      ],
+      4,
     );
-    expect(v.upShrink.numerator).toBe(0);
-    expect(v.downExpand.numerator).toBe(0);
+    expect(v.observations).toBe(4);
+    expect(v.upShrink).toEqual({ numerator: 1, denominator: 2, pct: 50 });
+    expect(v.upExpand).toEqual({ numerator: 1, denominator: 2, pct: 50 });
+    expect(v.downShrink).toEqual({ numerator: 1, denominator: 2, pct: 50 });
+    expect(v.downExpand).toEqual({ numerator: 1, denominator: 2, pct: 50 });
+  });
+  it("does not bridge invalid, zero or missing sessions, and equal volume is neutral", () => {
+    for (const previous of [
+      { ...feature(true, 1), valid: false },
+      { ...feature(true, 1), volume: 0 },
+      { ...feature(true, 1), volume: null },
+    ]) {
+      expect(
+        volumeStructure(
+          [feature(true, 1), previous, { ...feature(true, 1), volume: 50 }],
+          1,
+        ).observations,
+      ).toBe(0);
+    }
+    expect(
+      volumeStructure(
+        [feature(true, 1), { ...feature(true, 1), valid: false }],
+        1,
+      ).observations,
+    ).toBe(0);
+    expect(
+      volumeStructure(
+        [feature(true, 1), { ...feature(true, 1), returnPct: null }],
+        1,
+      ).observations,
+    ).toBe(0);
+    const equal = volumeStructure([feature(true, 1), feature(true, 1)], 1);
+    expect(equal.observations).toBe(1);
+    expect(equal.upShrink.numerator).toBe(0);
+    expect(equal.upExpand.numerator).toBe(0);
   });
   it.each(["indices", "commodities", "fx"] as const)(
     "round trips world %s without changing default rates",
@@ -209,6 +250,9 @@ describe("accessible summaries", () => {
     ])
       expect(html).not.toContain(label);
     expect(html).toContain("有效觀測");
+    expect(html).toContain("前一個交易日的成交量");
+    expect(html).not.toContain('aria-label="結構縮量門檻"');
+    expect(html).not.toContain('aria-label="結構放量門檻"');
     expect(html).toContain('class="research-note source-note"');
   });
 

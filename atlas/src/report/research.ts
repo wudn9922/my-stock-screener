@@ -259,21 +259,26 @@ export async function fetchResearch<T>(
     throw new Error("股票代號不符，已拒絕顯示其他股票資料。");
   return result.data;
 }
-export function volumeStructure(
-  features: VolumeFeature[],
-  window: number,
-  shrink = 1,
-  expand = 1,
-) {
+export function volumeStructure(features: VolumeFeature[], window: number) {
+  // Pair before slicing: the first day in a window still needs the immediately
+  // preceding session. Never skip a missing/invalid day to find an older volume.
   const sample = features
+    .map((current, index) => ({ current, previous: features[index - 1] }))
     .slice(-window)
-    .filter((r) => r.valid && r.returnPct !== null && r.rvol !== null);
-  const up = sample.filter((r) => r.returnPct! > 0),
-    down = sample.filter((r) => r.returnPct! < 0);
-  const fraction = (
-    days: VolumeFeature[],
-    test: (r: VolumeFeature) => boolean,
-  ) => {
+    .filter(
+      ({ current, previous }) =>
+        current.valid &&
+        previous?.valid &&
+        current.returnPct !== null &&
+        current.volume !== null &&
+        current.volume > 0 &&
+        previous.volume !== null &&
+        previous.volume > 0,
+    );
+  const up = sample.filter(({ current }) => current.returnPct! > 0),
+    down = sample.filter(({ current }) => current.returnPct! < 0);
+  type Observation = (typeof sample)[number];
+  const fraction = (days: Observation[], test: (r: Observation) => boolean) => {
     const numerator = days.filter(test).length,
       denominator = days.length;
     return {
@@ -284,9 +289,21 @@ export function volumeStructure(
   };
   return {
     observations: sample.length,
-    upShrink: fraction(up, (r) => r.rvol! < shrink),
-    upExpand: fraction(up, (r) => r.rvol! > expand),
-    downExpand: fraction(down, (r) => r.rvol! > expand),
-    downShrink: fraction(down, (r) => r.rvol! < shrink),
+    upShrink: fraction(
+      up,
+      ({ current, previous }) => current.volume! < previous!.volume!,
+    ),
+    upExpand: fraction(
+      up,
+      ({ current, previous }) => current.volume! > previous!.volume!,
+    ),
+    downExpand: fraction(
+      down,
+      ({ current, previous }) => current.volume! > previous!.volume!,
+    ),
+    downShrink: fraction(
+      down,
+      ({ current, previous }) => current.volume! < previous!.volume!,
+    ),
   };
 }

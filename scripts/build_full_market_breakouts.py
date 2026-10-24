@@ -15,6 +15,8 @@ import tempfile
 from datetime import date, datetime, timezone
 from pathlib import Path
 
+import pandas as pd
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import build_breakouts as bo  # noqa: E402
@@ -31,12 +33,16 @@ LABELS = {
 DEFAULT_CACHE = os.path.join(bo.REPO_ROOT, ".cache", "universe-full")
 ACTIVE_STRATEGIES = (bo.SWING_KEY, "box20", "ema20")
 ARCHIVE_INTERVAL_DAYS = 20
+MONTHLY_HISTORY_MONTHS = 6
+MONTHLY_STRATEGIES = tuple(spec for spec in bo.STRATEGIES if spec["key"] in ACTIVE_STRATEGIES)
 
 
 def params_meta():
     params = bo.params_meta()
     params["strategies"] = [spec for spec in params["strategies"] if spec["key"] in ACTIVE_STRATEGIES]
     params["strategies"].sort(key=lambda spec: ACTIVE_STRATEGIES.index(spec["key"]))
+    params["windows"] = [window for window in params["windows"] if window["key"] == "1m"]
+    params["monthlyHistory"] = {"intervalMonths": 1, "months": MONTHLY_HISTORY_MONTHS, "defaultVisibleMonths": 5}
     params["entry"] = "波段前高突破以 max(開盤價, 波段高點) 作理論停買進場價；箱型與20EMA以訊號日收盤進場"
     return params
 
@@ -79,6 +85,46 @@ def load_inputs(cache_dir, today):
     return inputs
 
 
+
+def monthly_history(spec, market_key, latest, months=MONTHLY_HISTORY_MONTHS):
+    """Recalculate each month as it could be measured on that date.
+
+    Calendar targets are anchored to the latest available session (not generatedAt).
+    Holidays move backwards to the last available market session. Every calculation
+    truncates bars at that session, so later prices never mature an earlier signal.
+    The current listing is retained as denominator and its survivorship bias is
+    disclosed by the UI; historical coverage gaps produce no percentage.
+    """
+    reference = pd.Timestamp(latest["asOf"])
+    frames = {symbol: bars[bars.index.day_of_week < 5] for symbol, bars in spec["frames"].items()}
+    frames = {symbol: bars for symbol, bars in frames.items() if not bars.empty}
+    present = bo.present_matrix(frames) if frames else None
+    points = []
+    for offset in range(months, -1, -1):
+        target = reference - pd.DateOffset(months=offset)
+        calendar = bo.trading_days(present, target) if present is not None else []
+        as_of = calendar[-1] if len(calendar) else None
+        point = {"targetDate": target.strftime("%Y-%m-%d"), "asOf": None,
+                 "evaluated": 0, "universeCount": spec["listed"],
+                 "status": "unavailable", "strategies": {}}
+        if as_of is not None:
+            # Truncate before passing to the engine as an additional no-lookahead
+            # boundary (including calendar construction and anomaly detection).
+            clipped = {symbol: bars.loc[bars.index <= as_of] for symbol, bars in frames.items()}
+            clipped = {symbol: bars for symbol, bars in clipped.items() if not bars.empty}
+            measured = latest if offset == 0 else bo.build_market(clipped, spec["universe"], market_key, as_of=as_of,
+                strategy_specs=MONTHLY_STRATEGIES, window_specs=(("1m", 21, "近1月"),))
+            if measured:
+                point.update(asOf=as_of.strftime("%Y-%m-%d"), evaluated=measured["evaluated"])
+                sufficient = spec["listed"] > 0 and measured["evaluated"] / spec["listed"] >= MIN_COVERAGE
+                point["status"] = "ok" if sufficient else "insufficient"
+                if sufficient:
+                    point["strategies"] = {key: value for key, value in measured["windows"].get("1m", {}).get("strategies", {}).items()
+                                           if key in ACTIVE_STRATEGIES}
+        points.append(point)
+    return {"intervalMonths": 1, "referenceDate": reference.strftime("%Y-%m-%d"), "points": points}
+
+
 def build_payload(inputs, generated_at):
     payload = bo.build_breakouts_payload(inputs, generated_at)
     # The report covers different exchange calendars. Retain each market's asOf;
@@ -93,6 +139,7 @@ def build_payload(inputs, generated_at):
             coverage={"loaded": loaded, "missing": spec["listed"] - loaded},
             listingAsOf=spec["listingAsOf"], listingSource=spec["listingSource"],
         )
+        market["monthly"] = monthly_history(spec, key, market) if spec["frames"] else None
         for window in market["windows"].values():
             window["strategies"] = {name: window["strategies"][name] for name in ACTIVE_STRATEGIES}
     return payload

@@ -196,12 +196,22 @@ test("chart research panel leaves candles mounted and settings intact", async ({
   await page.goto("./?page=chart&symbol=AAPL&tf=1D");
   await expect(page.getByTestId("active-symbol")).toHaveText("AAPL");
   await page
-    .getByRole("button", { name: "價量與官方公告", exact: true })
+    .getByRole("button", { name: "建議均線", exact: true })
     .first()
     .click();
   const summary = page.locator("summary").filter({ hasText: "價量分析" });
   await summary.click();
   await expect(page.getByText("上漲縮量比例", { exact: true })).toBeVisible();
+  const menu = page.getByRole("region", { name: "建議均線", exact: true });
+  const official = menu.locator(".stock-official-notices > details > summary");
+  await official.scrollIntoViewIfNeeded();
+  await expect(official).toBeVisible();
+  await expect(official).toContainText("SEC 8-K");
+  const bounds = await menu.evaluate((element) => ({
+    bottom: element.getBoundingClientRect().bottom,
+    navigation: document.querySelector(".site-tabbar")?.getBoundingClientRect(),
+  }));
+  if (bounds.navigation && bounds.navigation.height > 0) expect(bounds.bottom).toBeLessThanOrEqual(bounds.navigation.top);
   expect(await page.locator(".chart-host canvas").count()).toBeGreaterThan(0);
   expect(await noOverflow(page)).toBeLessThanOrEqual(1);
 });

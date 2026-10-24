@@ -24,7 +24,7 @@ function fixture(symbol: string, count = 22) {
   return payload;
 }
 
-test('daily volatility stays below PE and is independent of quote and chart timeframe', async ({ page }, testInfo) => {
+test('independent daily volatility tiles stay beside recommendations and do not follow quote or chart timeframe', async ({ page }, testInfo) => {
   await mockSite(page);
   const intervals: string[] = [];
   await page.route('https://edge.test/functions/v1/market-chart**', (route) => {
@@ -38,28 +38,41 @@ test('daily volatility stays below PE and is independent of quote and chart time
   });
   await page.goto('./?page=chart&symbol=NVDA&tf=1W');
   const stats = page.getByTestId('stock-volatility');
-  await expect(stats.locator('dd')).toHaveText(['4.00%', '4.00%']);
+  await expect(stats.locator('[data-volatility-value]')).toHaveText(['4.00%', '4.00%']);
+  await expect(stats.getByTestId('volatility-atr-toggle')).toHaveAccessibleName('ATR（20）% 4.00%，計算說明');
+  await expect(stats.getByTestId('volatility-range-toggle')).toHaveAccessibleName('20 日平均日內振幅 4.00%，計算說明');
   await expect(stats).toContainText('2026-10-08');
   expect(intervals).toContain('1d');
   expect(intervals).toContain('1wk');
-  await page.getByTestId('stock-stats-toggle').click();
   const geometry = await page.evaluate(() => ({
-    pe: document.querySelector('[data-testid="valuation"]')!.getBoundingClientRect().bottom,
+    recommendation: document.querySelector('[data-testid="stock-stats-toggle"]')!.getBoundingClientRect().top,
     volatility: document.querySelector('[data-testid="stock-volatility"]')!.getBoundingClientRect().top,
     overflow: document.scrollingElement!.scrollWidth - innerWidth,
   }));
-  expect(geometry.volatility).toBeGreaterThanOrEqual(geometry.pe);
+  expect(Math.abs(geometry.volatility - geometry.recommendation)).toBeLessThanOrEqual(12);
   expect(geometry.overflow).toBeLessThanOrEqual(0);
-  // The floating panel covers the toolbar on phones; close it before switching timeframe, then reopen.
-  await page.keyboard.press('Escape');
-  await expect(stats).toBeHidden();
-  await page.getByRole('button', { name: '週期 1D', exact: true }).click();
-  await expect(stats.locator('dd')).toHaveText(['4.00%', '4.00%']);
   await page.getByTestId('stock-stats-toggle').click();
-  await stats.locator('summary').click();
-  await expect(stats.locator('p')).toContainText('ATR 原值 4.40，基準收盤 110.00');
-  await expect(stats.locator('p')).toContainText('不含隔夜跳空');
-  await stats.locator('summary').click();
+  await expect(page.getByTestId('ma-recommendation')).toBeVisible();
+  // The volatility controls remain separate and usable while the MA menu is closed.
+  await page.keyboard.press('Escape');
+  await expect(stats).toBeVisible();
+  await page.getByRole('button', { name: '週期 1D', exact: true }).click();
+  await expect(stats.locator('[data-volatility-value]')).toHaveText(['4.00%', '4.00%']);
+  await stats.getByTestId('volatility-atr-toggle').click();
+  await expect(stats.getByRole('region', { name: 'ATR（20）% 計算說明' })).toContainText('ATR 原值 4.40，基準收盤 110.00');
+  await stats.getByTestId('volatility-range-toggle').click();
+  await expect(stats.getByRole('region', { name: '20 日平均日內振幅 計算說明' })).toContainText('不含隔夜跳空');
+  await page.keyboard.press('Escape');
+  // Keyboard navigation dismisses the previous tile instead of stacking overlapping popups.
+  await stats.getByTestId('volatility-atr-toggle').focus();
+  await page.keyboard.press('Enter');
+  await expect(stats.getByTestId('volatility-atr-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await page.keyboard.press('Tab');
+  await expect(stats.getByTestId('volatility-range-toggle')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(stats.getByTestId('volatility-range-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await expect(stats.getByTestId('volatility-atr-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await page.keyboard.press('Escape');
   await page.screenshot({ path: testInfo.outputPath('volatility-header.png') });
 });
 
@@ -78,19 +91,19 @@ test('switching symbols clears old values; short history shows no invented volat
     });
   });
   await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
-  await expect(page.getByTestId('stock-volatility').locator('dd')).toHaveText(['4.00%', '4.00%']);
+  await expect(page.getByTestId('stock-volatility').locator('[data-volatility-value]')).toHaveText(['4.00%', '4.00%']);
   await page.getByRole('button', { name: /切換股票（目前/ }).click();
   const input = page.getByRole('dialog', { name: '搜尋股票' }).getByRole('combobox', { name: '搜尋股票' });
   await input.fill('NVDA');
   await input.press('Enter');
   await expect(page.getByTestId('active-symbol')).toHaveText('NVDA');
   const stats = page.getByTestId('stock-volatility');
-  await expect(stats.locator('dd')).toHaveText(['—', '—']);
+  await expect(stats.locator('[data-volatility-value]')).toHaveText(['—', '—']);
   await expect(stats).toHaveAttribute('aria-busy', 'true');
   release();
   await expect(stats).toHaveAttribute('aria-busy', 'false');
   await expect(stats).toContainText('至少需 21 根完整日線');
-  await expect(stats.locator('dd')).toHaveText(['—', '—']);
+  await expect(stats.locator('[data-volatility-value]')).toHaveText(['—', '—']);
 });
 
 test('daily request failure leaves the weekly chart usable and shows unavailable values', async ({ page }) => {
@@ -106,7 +119,7 @@ test('daily request failure leaves the weekly chart usable and shows unavailable
   await page.goto('./?page=chart&symbol=NVDA&tf=1W');
   const stats = page.getByTestId('stock-volatility');
   await expect(stats).toContainText('日線暫時無法取得');
-  await expect(stats.locator('dd')).toHaveText(['—', '—']);
+  await expect(stats.locator('[data-volatility-value]')).toHaveText(['—', '—']);
   await expect(page.getByRole('button', { name: '週期 1W', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.tv-lightweight-charts canvas').first()).toBeVisible();
 });

@@ -82,7 +82,8 @@ test('chart shows the weekly recommendation, applies it on the daily chart and s
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await expect(card.locator('dd')).toHaveText('短 24（69） · 中 38（60） · 長 89（99）');
   await expect(card.locator('.ws-ma-reco-status')).toHaveText('日線至 2026-10-17');
-  await expect(card.locator('table')).toContainText('20（70）、★24（69）');
+  await expect(card.getByRole('button', { name: '套用 SMA 20', exact: true })).toHaveText('20（70）');
+  await expect(card.getByRole('button', { name: '套用 SMA 24', exact: true })).toHaveText('★24（69）');
   const explanation = card.locator('.help-disclosure');
   await expect(explanation.locator('.help-disclosure-body')).toBeHidden();
   await explanation.locator('summary').click();
@@ -92,20 +93,29 @@ test('chart shows the weekly recommendation, applies it on the daily chart and s
   await expect(card.getByRole('link', { name: /在 ma-selector 查看/ })).toHaveAttribute('href', /streamlit\.app\/\?ticker=2330\.TW$/);
   await page.screenshot({ path: testInfo.outputPath('ma-recommendation-panel.png') });
 
-  await card.getByRole('button', { name: '套用到圖表' }).click();
+  await expect(card.getByRole('button', { name: '固定為個股參數' })).toBeDisabled();
+  // A non-star candidate can be applied alone; fixing starts from applied MAs, not the three recommendations.
+  await card.getByRole('button', { name: '套用 SMA 20', exact: true }).click();
+  await expect(page.locator('.indicator-chip .indicator-name')).toHaveText(['SMA 20']);
+  await expect(card.getByRole('button', { name: 'SMA 20 已套用', exact: true })).toBeDisabled();
+  await card.getByRole('button', { name: '固定為個股參數' }).click();
+  const onlyApplied = page.getByRole('dialog', { name: '2330.TW 固定均線參數' });
+  await expect(onlyApplied.getByRole('textbox', { name: '個股固定均線參數' })).toHaveValue('20');
+  await onlyApplied.getByRole('button', { name: '取消編輯' }).click();
+  await card.getByRole('button', { name: '套用全部建議' }).click();
   await expect(page.getByRole('status').filter({ hasText: '已在日線圖加入 SMA 24 / 38 / 89' })).toBeVisible();
   await expect(page.getByRole('button', { name: '週期 1D', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(card.getByRole('button', { name: '已套用' })).toBeDisabled();
+  await expect(card.getByRole('button', { name: '建議已套用', exact: true })).toBeDisabled();
 
   await card.getByRole('button', { name: '固定為個股參數' }).click();
   const dialog = page.getByRole('dialog', { name: '2330.TW 固定均線參數' });
   await expect(dialog.getByText('目前已保存：20 / 60；儲存後會被取代。')).toBeVisible();
-  await expect(dialog.getByRole('textbox', { name: '個股固定均線參數' })).toHaveValue('24, 38, 89');
+  await expect(dialog.getByRole('textbox', { name: '個股固定均線參數' })).toHaveValue('20, 24, 38, 89');
   await page.screenshot({ path: testInfo.outputPath('ma-recommendation-fix.png') });
   await dialog.getByRole('button', { name: '確認並儲存到雲端' }).click();
   await expect(dialog).toBeHidden();
-  expect(saves).toEqual([expect.objectContaining({ action: 'stocks.save', ticker: '2330.TW', groupId: 'ungrouped', mas: [24, 38, 89] })]);
-  await expect(page.getByText('2330.TW 固定均線 24 / 38 / 89已儲存到你的 Supabase 帳號。')).toBeVisible();
+  expect(saves).toEqual([expect.objectContaining({ action: 'stocks.save', ticker: '2330.TW', groupId: 'ungrouped', mas: [20, 24, 38, 89] })]);
+  await expect(page.getByText('2330.TW 固定均線 20 / 24 / 38 / 89已儲存到你的 Supabase 帳號。')).toBeVisible();
   // The panel stays open across the dialog; Escape and an outside tap close it.
   await expect(card).toBeVisible();
   await page.keyboard.press('Escape');

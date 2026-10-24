@@ -5,6 +5,7 @@ import { getMarketProfile } from '../market-data/MarketProfile';
 import { resolveSymbolInput, type SymbolCatalogEntry } from '../market-data/SymbolCatalog';
 import { IconButton } from './IconButton';
 import { formatPercent, toneClass } from './format';
+import { HelpDisclosure } from './HelpDisclosure';
 export const companies: Record<string, string> = {
   AAPL: 'Apple Inc.',
   MSFT: 'Microsoft',
@@ -46,12 +47,13 @@ export function Watchlist({
     <>
       <div className="panel-heading">
         <div>
-          <h2>自選清單</h2>
+          <h2>圖表收藏</h2>
         </div>
-        <IconButton label="新增自選股" onClick={() => setAdding(!adding)}>
+        <IconButton label="新增收藏股票" onClick={() => setAdding(!adding)}>
           <Plus size={18} />
         </IconButton>
       </div>
+      <HelpDisclosure label="圖表收藏用途">收藏常看的股票，點選即可切換圖表。收藏存在這台裝置；選股條件與每日追蹤結果可在「控制台 → 自選清單」查看。</HelpDisclosure>
       {adding && (
         <form
           className="watchlist-add"
@@ -70,7 +72,7 @@ export function Watchlist({
         >
           <Search size={16} />
           <input
-            aria-label="自選股代號"
+            aria-label="收藏股票代號"
             placeholder="代號，例如 2330 或 NVDA"
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -82,7 +84,7 @@ export function Watchlist({
       {error && <p role="alert">{error}</p>}
       <div className="watchlist-label">
         <span>代號／名稱</span>
-        <IconButton label="管理自選清單" active={manage} onClick={() => setManage(!manage)}>
+        <IconButton label="管理圖表收藏" active={manage} onClick={() => setManage(!manage)}>
           <Settings2 size={16} />
         </IconButton>
       </div>
@@ -146,7 +148,7 @@ export function Watchlist({
                   <ChevronDown size={13} />
                 </IconButton>
                 <IconButton
-                  label={`從自選清單移除 ${symbol}`}
+                  label={`從圖表收藏移除 ${symbol}`}
                   onClick={() => onChange(symbols.filter((s) => s !== symbol))}
                 >
                   <X size={13} />
@@ -159,7 +161,7 @@ export function Watchlist({
       <div className="watch-footer">
         <span className="status-dot" />
         <span>
-          自選清單只儲存在這台裝置
+          圖表收藏只儲存在這台裝置
           <br />
           <small>可在「工作區設定」匯出備份</small>
         </span>

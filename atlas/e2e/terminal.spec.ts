@@ -168,13 +168,13 @@ test('Horizontal Line, export/import and locked SMA UI guards', async ({ page })
 });
 test('watchlist add, reorder and remove persist', async ({ page }) => {
   await openPanel(page, 'watchlist');
-  await page.getByRole('button', { name: '新增自選股', exact: true }).click();
-  await page.getByLabel('自選股代號', { exact: true }).fill('NVO');
+  await page.getByRole('button', { name: '新增收藏股票', exact: true }).click();
+  await page.getByLabel('收藏股票代號', { exact: true }).fill('NVO');
   await page.getByRole('button', { name: '加入', exact: true }).click();
   await expect(page.getByRole('button', { name: '選擇 NVO', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '管理自選清單', exact: true }).click();
+  await page.getByRole('button', { name: '管理圖表收藏', exact: true }).click();
   await page.getByRole('button', { name: '上移 NVO', exact: true }).click();
-  await page.getByRole('button', { name: '從自選清單移除 AMD', exact: true }).click();
+  await page.getByRole('button', { name: '從圖表收藏移除 AMD', exact: true }).click();
   await closeSheet(page);
   await page.reload();
   await loaded(page);

@@ -6,7 +6,6 @@ import { runBacktest } from '../strategy/BacktestEngine';
 import type {
   MovingAverageType,
   StrategyDirection,
-  StrategyKind,
   StrategyResult,
 } from '../strategy/types';
 import { reportError } from '../errors/UserErrors';
@@ -43,11 +42,10 @@ function dateText(value: number | null | undefined) {
 export function BacktestPanel({ symbol, timeframe, result, market, onResult }: BacktestPanelProps) {
   const currency =
     market?.currency ?? result?.market?.currency ?? getMarketProfile(symbol).currency;
-  const [kind, setKind] = useState<StrategyKind>('ma-cross');
-  const [fastType, setFastType] = useState<MovingAverageType>('SMA');
   const [slowType, setSlowType] = useState<MovingAverageType>('SMA');
-  const [fastPeriod, setFastPeriod] = useState('9');
   const [slowPeriod, setSlowPeriod] = useState('21');
+  const [entryAbovePct, setEntryAbovePct] = useState('0');
+  const [exitBelowPct, setExitBelowPct] = useState('0');
   const [direction, setDirection] = useState<StrategyDirection>('long');
   const [initialCapital, setInitialCapital] = useState('10000');
   const [commissionBps, setCommissionBps] = useState('');
@@ -76,15 +74,16 @@ export function BacktestPanel({ symbol, timeframe, result, market, onResult }: B
       const bars = closedBars({ ...result, market: profile }, timeframe, asOf);
       setClosedBarCount(bars.length);
       if (!bars.length) throw new Error('此週期沒有已收盤的 K 棒可用。');
-      const fast = Number(fastPeriod),
-        slow = Number(slowPeriod),
+      const slow = Number(slowPeriod),
+        upper = Number(entryAbovePct),
+        lower = Number(exitBelowPct),
         capital = Number(initialCapital);
-      if (!Number.isInteger(fast) || fast < 1 || fast > 5000)
-        throw new Error('快線週期必須是 1 到 5000 的整數。');
       if (!Number.isInteger(slow) || slow < 1 || slow > 5000)
-        throw new Error('慢線週期必須是 1 到 5000 的整數。');
-      if (kind === 'ma-cross' && fast >= slow)
-        throw new Error('均線交叉策略的快線週期必須小於慢線週期。');
+        throw new Error('參考均線週期必須是 1 到 5000 的整數。');
+      if (!entryAbovePct.trim() || !Number.isFinite(upper) || upper < 0)
+        throw new Error('均線上方百分比必須大於或等於 0。');
+      if (!exitBelowPct.trim() || !Number.isFinite(lower) || lower < 0 || lower >= 100)
+        throw new Error('均線下方百分比必須介於 0 到 100（不含 100）。');
       if (!Number.isFinite(capital) || capital <= 0)
         throw new Error('初始資金必須大於 0。');
 
@@ -110,12 +109,14 @@ export function BacktestPanel({ symbol, timeframe, result, market, onResult }: B
         config: {
           symbol,
           timeframe,
-          kind,
-          fastType,
+          kind: 'price-cross',
+          fastType: slowType,
           slowType,
-          fastPeriod: fast,
+          fastPeriod: slow,
           slowPeriod: slow,
           direction,
+          entryAbovePct: upper,
+          exitBelowPct: lower,
         },
         closedBars: bars,
         initialCapital: capital,
@@ -160,75 +161,8 @@ export function BacktestPanel({ symbol, timeframe, result, market, onResult }: B
         研究用途：只使用已收盤 K 棒，以下一根 K 棒開盤價模擬成交；訊號不會下單。{adjustedText}
       </HelpDisclosure>
       <form className="research-form" onSubmit={run}>
-        <label>
-          策略
-          <select
-            aria-label="策略類型"
-            value={kind}
-            onChange={(event) => setKind(event.target.value as StrategyKind)}
-          >
-            <option value="ma-cross">均線交叉</option>
-            <option value="price-cross">價格穿越均線</option>
-          </select>
-        </label>
-        {kind === 'ma-cross' && (
-          <>
-            <div className="research-field-row">
-              <label>
-                快線
-                <select
-                  aria-label="快線類型"
-                  value={fastType}
-                  onChange={(event) => setFastType(event.target.value as MovingAverageType)}
-                >
-                  <option value="SMA">SMA</option>
-                  <option value="EMA">EMA</option>
-                </select>
-              </label>
-              <label>
-                快線週期
-                <input
-                  aria-label="快線週期"
-                  type="number"
-                  min="1"
-                  max="5000"
-                  step="1"
-                  value={fastPeriod}
-                  onChange={(event) => setFastPeriod(event.target.value)}
-                  required
-                />
-              </label>
-            </div>
-            <div className="research-field-row">
-              <label>
-                慢線
-                <select
-                  aria-label="慢線類型"
-                  value={slowType}
-                  onChange={(event) => setSlowType(event.target.value as MovingAverageType)}
-                >
-                  <option value="SMA">SMA</option>
-                  <option value="EMA">EMA</option>
-                </select>
-              </label>
-              <label>
-                慢線週期
-                <input
-                  aria-label="慢線週期"
-                  type="number"
-                  min="1"
-                  max="5000"
-                  step="1"
-                  value={slowPeriod}
-                  onChange={(event) => setSlowPeriod(event.target.value)}
-                  required
-                />
-              </label>
-            </div>
-          </>
-        )}
-        {kind === 'price-cross' && (
-          <div className="research-field-row">
+        <p className="small">均線百分比進出場</p>
+        <div className="research-field-row">
             <label>
               參考均線
               <select
@@ -254,7 +188,36 @@ export function BacktestPanel({ symbol, timeframe, result, market, onResult }: B
               />
             </label>
           </div>
-        )}
+        <div className="research-field-row">
+          <label>
+            均線上方 %（{direction === 'long' ? '進場' : '出場'}）
+            <input
+              aria-label="均線上方百分比"
+              type="number"
+              min="0"
+              step="any"
+              value={entryAbovePct}
+              onChange={(event) => setEntryAbovePct(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            均線下方 %（{direction === 'long' ? '出場' : '進場'}）
+            <input
+              aria-label="均線下方百分比"
+              type="number"
+              min="0"
+              max="99.99"
+              step="any"
+              value={exitBelowPct}
+              onChange={(event) => setExitBelowPct(event.target.value)}
+              required
+            />
+          </label>
+        </div>
+        <HelpDisclosure label="均線百分比進出場說明">
+          做多：收盤由下往上超過均線上方指定百分比時進場，收盤由上往下低於均線下方指定百分比時出場；做空則相反。等於門檻不觸發，0% 表示均線本身。訊號均於下一根已收盤 K 棒的開盤價成交。
+        </HelpDisclosure>
         <label>
           部位方向
           <select

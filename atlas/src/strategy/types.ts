@@ -13,6 +13,10 @@ export interface StrategyConfig {
   fastPeriod: number;
   slowPeriod: number;
   direction: StrategyDirection;
+  /** Price-cross upper band, in percentage points above the reference MA. Defaults to 0. */
+  entryAbovePct?: number;
+  /** Price-cross lower band, in percentage points below the reference MA. Defaults to 0. */
+  exitBelowPct?: number;
 }
 
 /** Bars explicitly supplied by the caller as closed. Times are Unix seconds. */

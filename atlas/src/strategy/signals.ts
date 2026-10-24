@@ -26,8 +26,10 @@ export function generateSignals(
     } else {
       const priorAverage = slow[i - 1], currentAverage = slow[i];
       if (priorAverage !== null && currentAverage !== null) {
-        crossedUp = previous.close <= priorAverage && current.close > currentAverage;
-        crossedDown = previous.close >= priorAverage && current.close < currentAverage;
+        const upper = 1 + (config.entryAbovePct ?? 0) / 100;
+        const lower = 1 - (config.exitBelowPct ?? 0) / 100;
+        crossedUp = previous.close <= priorAverage * upper && current.close > currentAverage * upper;
+        crossedDown = previous.close >= priorAverage * lower && current.close < currentAverage * lower;
       }
     }
 

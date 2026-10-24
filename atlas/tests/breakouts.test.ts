@@ -23,6 +23,30 @@ const stats = (overrides: Partial<BreakoutStats> = {}): BreakoutStats => ({
 });
 
 describe('breakouts schema', () => {
+  it('validates monthly recalculations separately and never turns coverage gaps into percentages', () => {
+    const raw = structuredClone(sample) as { markets: { tw: Record<string, unknown> } };
+    const market = raw.markets.tw;
+    const strategies = (market.windows as Record<string, { strategies: unknown }>)['1m']!.strategies;
+    const point = { targetDate: '2026-09-09', asOf: '2026-09-09', evaluated: 900, universeCount: 1000, status: 'ok', strategies };
+    market.monthly = { intervalMonths: 1, referenceDate: market.asOf, points: [
+      point,
+      { ...point, targetDate: '2026-08-09', asOf: '2026-08-07', status: 'insufficient', evaluated: 5 },
+      { ...point, targetDate: '2026-07-09', asOf: '2026-07-10' }, // future session rejected
+      { ...point, targetDate: '2026-06-09', evaluated: 1 }, // unsupported full-market claim rejected
+    ] };
+    const result = parseBreakouts(raw);
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    const monthly = result.data.markets.tw!.monthly!;
+    expect(monthly.referenceDate).toBe('2026-10-09');
+    expect(monthly.points.map(point => point.targetDate)).toEqual(['2026-08-09', '2026-09-09']);
+    expect(monthly.points[0]!.strategies).toEqual({});
+    expect(monthly.points[1]!.strategies.swingHigh!.comparison!.rules.hold5!.winRate).toBe(50);
+    (market.monthly as { referenceDate: string }).referenceDate = '2026-10-10';
+    const wrong = parseBreakouts(raw);
+    if (wrong.status === 'ok') expect(wrong.data.markets.tw!.monthly).toBeNull();
+  });
+
   it('does not accept an unsupported full-market claim without consistent coverage', () => {
     const raw = structuredClone(sample) as { markets: { tw: { coverage?: unknown }; us: unknown } };
     delete raw.markets.tw.coverage;
@@ -36,8 +60,8 @@ describe('breakouts schema', () => {
     if (result.status !== 'ok') return;
     const { params, markets, generatedAt } = result.data;
     expect(generatedAt).toBe('2026-10-09T10:00:00+00:00');
-    expect(params.windows.map((entry) => entry.key)).toEqual(['1w', '1m']);
-    expect(params.windows[0]).toEqual({ key: '1w', days: 5, label: '近1週' });
+    expect(params.windows.map((entry) => entry.key)).toEqual(['1m']);
+    expect(params.windows[0]).toEqual({ key: '1m', days: 21, label: '近1月' });
     expect(params.matureDays).toBe(3);
     expect(params.minSample).toBe(20);
     expect(params.strategies).toHaveLength(3);

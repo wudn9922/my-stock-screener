@@ -15,11 +15,25 @@ import {
 import { FixedStockParameters } from './FixedStockParameters';
 import { parameterStorageMessage } from '../cloud/settingsApi';
 import './research.css';
+import './maRecommendation.css';
 
 /** Recommended periods that are not yet a daily SMA on this symbol. */
 export function missingRecommended(indicators: readonly IndicatorInstance[], periods: readonly number[]): number[] {
   const present = new Set(indicators.filter((i) => i.type === 'SMA' && i.scope.timeframe === '1D').map((i) => i.period));
   return periods.filter((period) => !present.has(period));
+}
+
+/** Fixed parameters represent daily SMAs; include only periods the user has already applied. */
+export function appliedDailySmaPeriods(indicators: readonly IndicatorInstance[]): number[] {
+  return [...new Set(indicators.filter((indicator) => indicator.type === 'SMA' && indicator.scope.timeframe === '1D')
+    .map((indicator) => indicator.period))].sort((a, b) => a - b);
+}
+
+/** A final pick can be outside the scored candidates; it remains selectable as well. */
+export function selectableCandidates(range: MaRecommendationRange) {
+  return range.candidates.some((candidate) => candidate.period === range.final)
+    ? range.candidates
+    : [...range.candidates, { period: range.final, score: null, sarReturn: null, sarDrawdown: null, sarWinRate: null, sarTrades: null }];
 }
 
 /** Adds the missing recommended SMAs to the daily chart and switches to it (the selector works on daily bars). */
@@ -36,7 +50,7 @@ export function applyRecommended(store: AppStore, symbol: string, periods: reado
       source: 'close',
       visible: true,
       locked: false,
-      lineWidth: 1,
+      lineWidth: 2,
       widthMode: 'pixels',
       color: indicatorColors[(used + index) % indicatorColors.length]!,
       scope: { timeframe: '1D' },
@@ -80,6 +94,13 @@ export function MaRecommendation({
   const data = result?.status === 'ok' ? result.data : undefined;
   const periods = data ? recommendedPeriods(data) : [];
   const missing = missingRecommended(indicators, periods);
+  const applied = appliedDailySmaPeriods(indicators);
+  const apply = (selected: readonly number[]) => {
+    const added = applyRecommended(store, symbol, selected);
+    onNotice(added.length
+      ? `已在日線圖加入 SMA ${added.join(' / ')}。`
+      : `日線圖已有 SMA ${selected.join(' / ')}，已切換到日線。`);
+  };
   const link = maSelectorLink(symbol);
   const ranges = data ? MA_RANGE_KEYS.map((key) => data.ranges.find((range) => range.key === key)!) : [];
   return (
@@ -108,16 +129,13 @@ export function MaRecommendation({
               type="button"
               className="primary-button"
               disabled={!missing.length && timeframe === '1D'}
-              onClick={() => {
-                const added = applyRecommended(store, symbol, periods);
-                onNotice(
-                  added.length ? `已在日線圖加入 SMA ${added.join(' / ')}。` : `日線圖已有 SMA ${periods.join(' / ')}，已切換到日線。`,
-                );
-              }}
+              onClick={() => apply(periods)}
             >
-              {missing.length ? '套用到圖表' : timeframe === '1D' ? '已套用' : '切到日線查看'}
+              {missing.length ? '套用全部建議' : timeframe === '1D' ? '建議已套用' : '切到日線查看'}
             </button>
-            <button type="button" className="ghost-button" onClick={() => setFixing(true)}>
+            <button type="button" className="ghost-button" disabled={!applied.length}
+              title={applied.length ? '以已套用的日線 SMA 編輯固定參數' : '請先套用日線 SMA'}
+              onClick={() => setFixing(true)}>
               固定為個股參數
             </button>
           </div>
@@ -125,7 +143,7 @@ export function MaRecommendation({
             <thead>
               <tr>
                 <th scope="col">區間</th>
-                <th scope="col">候選（分數，★＝建議）</th>
+                <th scope="col">候選（點選套用，★＝建議）</th>
                 <th scope="col">反手報酬</th>
               </tr>
             </thead>
@@ -141,9 +159,18 @@ export function MaRecommendation({
                       </small>
                     </th>
                     <td>
-                      {(range.candidates.length ? range.candidates : [{ period: range.final, score: null }])
-                        .map((c) => `${c.period === range.final ? '★' : ''}${c.period}${scoreText(c.score)}`)
-                        .join('、')}
+                      <div className="ws-ma-candidates">
+                        {selectableCandidates(range).map((candidate) => {
+                          const present = applied.includes(candidate.period);
+                          return <button key={candidate.period} type="button" className="ghost-button ws-ma-candidate"
+                            aria-label={present ? `SMA ${candidate.period} 已套用` : `套用 SMA ${candidate.period}`}
+                            disabled={present && timeframe === '1D'}
+                            onClick={() => apply([candidate.period])}>
+                            {candidate.period === range.final ? '★' : ''}{candidate.period}{scoreText(candidate.score)}
+                            {present ? ' ✓' : ''}
+                          </button>;
+                        })}
+                      </div>
                     </td>
                     <td>
                       {percent(final?.sarReturn ?? null)}
@@ -155,7 +182,7 @@ export function MaRecommendation({
             </tbody>
           </table>
           <HelpDisclosure label="建議均線與分數說明">
-            短期 5–20、中期 21–45、長期 46–110（每週更新），括號內為結構分數。分數＝結構分數（0–100）：突破、二日、回測、雜訊、糾結等指標相對 83 檔基準的百分位加權，越高越能分出多空。候選＝與最高分相差 ≤15 分；建議＝多空反手報酬距最佳
+            {ranges.map((range) => `${MA_RANGE_LABELS[range.key]} ${range.min}–${range.max}`).join('、')}（每週更新），括號內為結構分數。分數＝結構分數（0–100）：突破、二日、回測、雜訊、糾結等指標相對 83 檔基準的百分位加權，越高越能分出多空。候選＝與最高分相差 ≤15 分；建議＝多空反手報酬距最佳
             ≤5 個百分點者中分數最高，所以★不一定是分數最高的那條。反手報酬為歷史模擬，不代表未來績效。股票適合度{' '}
             {data.suitability.short === null ? '—' : `${Math.round(data.suitability.short)} / 100`}。
           </HelpDisclosure>
@@ -167,7 +194,7 @@ export function MaRecommendation({
       {fixing && data && (
         <FixedStockParameters
           ticker={symbol}
-          defaults={periods}
+          defaults={applied}
           prefill
           onClose={() => setFixing(false)}
           onSaved={(values) => {

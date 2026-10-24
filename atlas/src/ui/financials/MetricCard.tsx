@@ -60,12 +60,12 @@ export function MetricCard({ group, history, view, metric, onMetric, note, defau
   const series = history[view.kind];
   const windowValues = useMemo(() => data.window.map((index) => data.values[index] ?? null), [data]);
   const scale = useMemo(() => moneyScale(windowValues), [windowValues]);
-  const shown = useMemo(() => displayValues(windowValues, data.unit, scale), [windowValues, data.unit, scale]);
+  const shown = useMemo(() => displayValues(data.values, data.unit, scale), [data.values, data.unit, scale]);
   const digits = digitsFor(shown, data.unit);
   const texts = useMemo(() => shown.map((value) => (value === null ? null : formatNumber(value, digits))), [shown, digits]);
   // Money and EPS get a YoY line over the bars (ratios do not: a percentage of a percentage says little).
   const growthMetric = data.unit === 'money' || data.unit === 'eps';
-  const yoyValues = useMemo(() => data.window.map((index) => data.changes[index]?.value ?? null), [data]);
+  const yoyValues = useMemo(() => data.changes.map((change) => change.value ?? null), [data]);
   const overlay = useMemo(
     () => (growthMetric && yoyValues.some((value) => value !== null) ? { values: yoyValues, label: `${data.label}年增率` } : undefined),
     [growthMetric, yoyValues, data.label],
@@ -73,24 +73,23 @@ export function MetricCard({ group, history, view, metric, onMetric, note, defau
   const [selectedState, setSelected] = useState<{ key: string; index: number } | null>(null);
   // The window is part of the key: a new range re-selects the latest bar instead of a shifted position.
   const resetKey = `${history.symbol}|${view.kind}|${metric}|${data.window[0] ?? ''}|${data.window.length}`;
-  const latestInWindow = data.latestIndex !== null ? data.window.indexOf(data.latestIndex) : -1;
-  const selected = selectedState?.key === resetKey ? selectedState.index : latestInWindow >= 0 ? latestInWindow : data.window.length - 1;
-  const selectedPeriod = data.window[selected];
+  const latestInWindow = data.latestIndex !== null && data.window.includes(data.latestIndex);
+  const selected = selectedState?.key === resetKey ? selectedState.index : latestInWindow ? data.latestIndex! : data.window.at(-1) ?? -1;
+  const selectedPeriod = selected >= 0 ? selected : undefined;
   const unit = unitText(data.unit, history.currency, scale);
   const latest = data.latestIndex === null ? null : data.results[data.latestIndex];
   const chip = yoyText(data.yoy, data.unit);
   const second = data.cagr ? cagrText(data.cagr) : averageText(data.average, data.unit, history.currency);
-  const empty = windowValues.every((value) => value === null);
+  const empty = data.values.every((value) => value === null);
   const quarterly = view.kind === 'quarterly';
   // More than ten annual bars: two-digit years so neighbouring labels do not collide on a phone.
-  const shortYears = !quarterly && data.window.length > CHART_PERIODS.annual;
-  const axis = data.window.map((index, position) => {
-    const label = view.labels[index]!;
+  const shortYears = !quarterly && data.values.length > CHART_PERIODS.annual;
+  const axis = view.labels.map((label, index) => {
     if (!quarterly) return { main: shortYears ? `'${String(label.fy).slice(2)}` : label.short };
-    const showYear = label.fq === 1 || position === 0;
-    return { main: label.short, sub: showYear ? `FY${String(label.fy).slice(2)}` : '' };
+    const year = `FY${String(label.fy).slice(2)}`;
+    return { main: label.short, sub: label.fq === 1 || index === 0 ? year : '', startSub: year };
   });
-  const ariaLabels = data.window.map((index) => {
+  const ariaLabels = data.values.map((_value, index) => {
     const value = data.values[index] ?? null;
     const change = growthMetric ? `，${yoyText(data.changes[index] ?? null, data.unit).text}` : '';
     return `${view.labels[index]!.long} ${data.label} ${value === null ? '無資料' : `${formatValue(value, data.unit, scale)} ${unit}`}${change}`;
@@ -128,7 +127,7 @@ export function MetricCard({ group, history, view, metric, onMetric, note, defau
         )}
         {oiText && <p className="fin-sub">{oiText}</p>}
         <p className="fin-chart-title">
-          {data.label}（{unit}）· {quarterly ? `近 ${data.window.length} 季` : `近 ${data.window.length} 年`}
+          {data.label}（{unit}）
         </p>
         {growthMetric && (
           <p className="fin-legend">
@@ -148,6 +147,7 @@ export function MetricCard({ group, history, view, metric, onMetric, note, defau
           <p className="fin-empty">{data.results[data.results.length - 1]?.reason ?? '沒有資料'}，此指標不顯示。</p>
         ) : (
           <BarChart
+            key={resetKey}
             values={shown}
             texts={texts}
             axis={axis}
@@ -157,6 +157,9 @@ export function MetricCard({ group, history, view, metric, onMetric, note, defau
             onSelect={(index) => setSelected({ key: resetKey, index })}
             title={`${data.label}直條圖`}
             overlay={overlay}
+            initialVisibleCount={data.window.length}
+            periodLabels={view.labels.map((label) => label.long)}
+            periodUnit={quarterly ? '季' : '年'}
           />
         )}
         {!empty && selectedPeriod !== undefined && (

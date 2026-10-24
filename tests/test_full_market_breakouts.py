@@ -117,6 +117,66 @@ class FullMarketBreakoutsTest(unittest.TestCase):
         self.assertEqual(history["snapshots"][0]["markets"], {key: market["asOf"] for key, market in report["markets"].items()})
 
 
+class MonthlyBreakoutsTest(unittest.TestCase):
+    def spec(self, count=260):
+        bars = make_bars([100 + (index // 8 % 2) * 3 for index in range(count)])
+        return {"frames": {"A": bars, "B": bars.copy()}, "listed": 2, "universe": "synthetic full market"}
+
+    def test_six_calendar_months_recalculate_same_monthly_window_and_align_holidays_backwards(self):
+        spec = self.spec()
+        latest = full.bo.build_market(spec["frames"], spec["universe"], "us")
+        result = full.monthly_history(spec, "us", latest)
+        self.assertEqual(result["referenceDate"], AS_OF)
+        self.assertEqual(result["intervalMonths"], 1)
+        self.assertEqual(len(result["points"]), 7)
+        self.assertEqual([point["targetDate"] for point in result["points"]],
+                         [f"2026-{month:02d}-09" for month in range(4, 11)])
+        self.assertTrue(all(point["status"] == "ok" for point in result["points"]))
+        june = result["points"][2]  # June 9 is a session; August9 is Sunday -> August7.
+        august = result["points"][4]
+        self.assertEqual(august["asOf"], "2026-08-07")
+        self.assertTrue(all(point["asOf"] <= point["targetDate"] for point in result["points"]))
+        self.assertEqual(set(june["strategies"]), set(full.ACTIVE_STRATEGIES))
+        self.assertEqual(result["points"][-1]["strategies"],
+                         {key: latest["windows"]["1m"]["strategies"][key] for key in full.ACTIVE_STRATEGIES})
+
+    def test_long_exchange_holiday_uses_the_genuine_previous_session(self):
+        bars = make_bars([100] * 100, last="2026-03-20")
+        # Synthetic TW Lunar New Year closure: the monthly target Feb20 is
+        # eleven calendar days after the previous available session Feb9.
+        bars = bars[(bars.index < "2026-02-10") | (bars.index > "2026-02-20")]
+        spec = {"frames": {"A": bars, "B": bars.copy()}, "listed": 2, "universe": "synthetic TW"}
+        latest = full.bo.build_market(spec["frames"], spec["universe"], "tw")
+        point = full.monthly_history(spec, "tw", latest)["points"][-2]
+        self.assertEqual((point["targetDate"], point["asOf"], point["status"]),
+                         ("2026-02-20", "2026-02-09", "ok"))
+
+    def test_historical_result_matches_truncated_engine_and_future_bars_cannot_mature_it(self):
+        spec = self.spec()
+        latest = full.bo.build_market(spec["frames"], spec["universe"], "us")
+        point = full.monthly_history(spec, "us", latest)["points"][3]
+        clipped = {symbol: bars.loc[:point["asOf"]] for symbol, bars in spec["frames"].items()}
+        expected = full.bo.build_market(clipped, spec["universe"], "us", as_of=point["asOf"])
+        self.assertEqual(point["strategies"], {key: expected["windows"]["1m"]["strategies"][key] for key in full.ACTIVE_STRATEGIES})
+        # Change every future OHLC, including a huge jump. Earlier rates and
+        # pending counts must stay exactly as they could be known at the anchor.
+        for bars in spec["frames"].values():
+            bars.loc[bars.index > point["asOf"], ["Open", "High", "Low", "Close"]] *= 10
+        again = full.monthly_history(spec, "us", latest)["points"][3]
+        self.assertEqual(again, point)
+
+    def test_missing_historical_market_coverage_has_no_percentage_and_is_not_a_failure(self):
+        spec = self.spec(60)
+        latest = full.bo.build_market(spec["frames"], spec["universe"], "us")
+        points = full.monthly_history(spec, "us", latest)["points"]
+        self.assertEqual(points[0]["status"], "unavailable")
+        self.assertEqual(points[0]["strategies"], {})
+        spec["listed"] = 10
+        points = full.monthly_history(spec, "us", latest)["points"]
+        self.assertEqual(points[-1]["status"], "insufficient")
+        self.assertEqual(points[-1]["strategies"], {})
+
+
 class BreakoutsArchiveTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

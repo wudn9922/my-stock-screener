@@ -106,6 +106,19 @@ export interface BreakoutWindow {
   };
   strategies: Record<string, BreakoutStats>;
 }
+export interface BreakoutMonthlyPoint {
+  targetDate: string;
+  asOf: string | null;
+  evaluated: number;
+  universeCount: number;
+  status: 'ok' | 'insufficient' | 'unavailable';
+  strategies: Record<string, BreakoutStats>;
+}
+export interface BreakoutMonthlyHistory {
+  intervalMonths: 1;
+  referenceDate: string;
+  points: BreakoutMonthlyPoint[];
+}
 export interface BreakoutMarket {
   scope: 'full' | 'legacy';
   coverage: { loaded: number; missing: number } | null;
@@ -120,6 +133,7 @@ export interface BreakoutMarket {
   boxMaxWidthPct: number | null;
   anomalies: { stocks: number; days: number };
   windows: Record<string, BreakoutWindow>;
+  monthly: BreakoutMonthlyHistory | null;
 }
 export interface Breakouts {
   generatedAt: string | null;
@@ -130,7 +144,6 @@ export interface Breakouts {
 /** Safe fallbacks: missing method metadata must not relabel old results as ATR waves. */
 export const DEFAULT_BREAKOUT_PARAMS: BreakoutParams = {
   windows: [
-    { key: '1w', days: 5, label: '近1週' },
     { key: '1m', days: 21, label: '近1月' },
   ],
   matureDays: 3,
@@ -240,6 +253,37 @@ const windowSchema = z
     return { ...window, strategies };
   });
 
+const validDate = (value: unknown): value is string => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+};
+function parseMonthly(value: unknown, latestDate: string | null): BreakoutMonthlyHistory | null {
+  const raw = record(value);
+  if (raw.intervalMonths !== 1 || !validDate(raw.referenceDate) || raw.referenceDate !== latestDate || !Array.isArray(raw.points)) return null;
+  const points = new Map<string, BreakoutMonthlyPoint>();
+  for (const value of raw.points) {
+    const point = record(value);
+    if (!validDate(point.targetDate) || point.targetDate > raw.referenceDate ||
+      !(point.asOf === null || validDate(point.asOf) && point.asOf <= point.targetDate) ||
+      !['ok', 'insufficient', 'unavailable'].includes(String(point.status))) continue;
+    const evaluated = finiteOrNull(point.evaluated), universeCount = finiteOrNull(point.universeCount);
+    if (evaluated === null || universeCount === null || !Number.isInteger(evaluated) || !Number.isInteger(universeCount) ||
+      evaluated < 0 || universeCount < evaluated) continue;
+    const status = point.status as BreakoutMonthlyPoint['status'];
+    // A partial-market history point must never acquire a percentage from its stats.
+    if (status === 'ok' && (!point.asOf || !universeCount || evaluated / universeCount < 0.9)) continue;
+    const strategies: Record<string, BreakoutStats> = {};
+    if (status === 'ok') for (const [key, stats] of Object.entries(record(point.strategies))) {
+      const parsed = statsSchema.safeParse(stats);
+      if (parsed.success) strategies[key] = parsed.data;
+    }
+    points.set(point.targetDate, { targetDate: point.targetDate, asOf: point.asOf as string | null,
+      evaluated, universeCount, status, strategies });
+  }
+  return { intervalMonths: 1, referenceDate: raw.referenceDate, points: [...points.values()].sort((a, b) => a.targetDate.localeCompare(b.targetDate)) };
+}
+
 const marketSchema = z
   .object({
     scope: z.unknown().optional(),
@@ -254,6 +298,7 @@ const marketSchema = z
     weekendBars: countOf,
     boxMaxWidthPct: pctOf,
     anomalies: z.unknown().optional(),
+    monthly: z.unknown().optional(),
     windows: z.unknown().optional(),
   })
   .transform((market): BreakoutMarket | null => {
@@ -279,6 +324,7 @@ const marketSchema = z
         days: countOf.parse(anomalies.days),
       },
       windows,
+      monthly: full ? parseMonthly(market.monthly, market.asOf) : null,
     };
   });
 
