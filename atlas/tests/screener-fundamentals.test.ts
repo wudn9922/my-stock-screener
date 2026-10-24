@@ -49,7 +49,7 @@ import { WatchlistStore } from '../src/watchlists/store';
 
 const universe = parseUniverse(JSON.parse(readFileSync('tests/fixtures/screener/universe.json', 'utf8')));
 if (universe.status !== 'ok') throw new Error('universe fixture');
-const TW = universe.universe.markets.TW!.items;
+const TW = universe.universe.markets.TW!.items.map((item, index) => ({ ...item, metrics: item.metrics && { ...item.metrics, volumeAvg20: index % 7 === 0 ? null : (index + 1) * 750_000 } }));
 const US = universe.universe.markets.US!.items;
 const growthText = readFileSync('tests/fixtures/screener/growth.json', 'utf8');
 const reportGrowth = parseReportGrowth(JSON.parse(growthText))!;
@@ -88,7 +88,7 @@ describe('f encoding of the fundamental conditions', () => {
       expect(parsed.turn).toBe(true); // the default still counts a turnaround
       expect(parsed.accel).toBe(false);
       expect(parsed.epsY).toBeNull();
-      expect(serializeFilters(parsed)).toBe(old === 'rev:10' ? 'rev:1:10' : old === 'eps:15' ? 'eps:1:15' : old);
+      expect(serializeFilters(parsed)).toBe(old === 'rev:10' ? 'rev:1:10' : old === 'eps:15' ? 'eps:1:15' : old.replace(/^chg:[^;]+;/, ''));
     }
     // The documented annual shape with a single number means one year.
     expect(state('epsy:15').epsY).toEqual({ years: 1, min: 15, share: 100 });
@@ -754,7 +754,7 @@ describe('stacked fundamentals and annual EPS acceleration', () => {
   it('combines share volume with stacked gates through shared URLs, market memory and saved strategies', () => {
     const base = reportGrowth.items.get('2330-TW')!;
     const histories = [[25, 15, 15, 15, 15], [25, 15, 15, 15, 15], [25, 5, 5, 5, 5], [15, 15, 15, 15, 15], [25, 15, 15, 15, 15]];
-    const items = histories.map((_, i) => ({ ...plain(`TEST${i}`), volume: [1_000_000, 999_999, 2_000_000, 2_000_000, null][i] }));
+    const items = histories.map((_, i) => groupItemSchema.parse({ ...plain(`TEST${i}`), volume: 99_999_999, metrics: { volumeAvg20: [1_000_000, 999_999, 2_000_000, 2_000_000, null][i] } }));
     const data = { ...reportGrowth, items: new Map(histories.map((epsYoYAnnual, i) => [`TEST${i}`, { ...base, epsYoYAnnual, epsTurnAnnual: [] }])) };
     const filters = 'vol:1000000;epsy:5:10;epsy:1:20';
     const context = { market: 'TW' as const, growth: data };
@@ -800,7 +800,7 @@ describe('stacked fundamentals and annual EPS acceleration', () => {
     expect(combined.length).toBeGreaterThan(0);
     expect(combined.length).toBeLessThan(TW.length);
     expect(applyFilters(TW, state(`vol:10000000;${a};${b}`), tw)).toEqual(
-      combined.filter((item) => item.volume !== null && item.volume !== undefined && item.volume >= 10_000_000),
+      combined.filter((item) => (item.metrics?.volumeAvg20 ?? -Infinity) >= 10_000_000),
     );
   });
 

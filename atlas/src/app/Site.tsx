@@ -10,6 +10,7 @@ import { applyColorConvention, sitePreferences } from './sitePreferences';
 import { formatDateTime } from '../ui/format';
 import { PageState } from '../ui/PageState';
 import type { ChartRequest } from './chartRequest';
+import { HelpDisclosure } from '../ui/HelpDisclosure';
 import type { Timeframe } from '../market-data/MarketDataProvider';
 import './siteNav.css';
 import { DataHealthPanel } from '../ui/DataHealthPanel';
@@ -66,7 +67,7 @@ export interface OpenChartOptions {
   symbol: string;
   name?: string;
   tf?: Timeframe;
-  /** Moving averages to add the first time this symbol is opened (report presets). */
+  /** Report metadata only; chart indicators are always chosen by the user. */
   maList?: readonly number[];
 }
 
@@ -89,7 +90,6 @@ export function Site() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const preferences = useSyncExternalStore(sitePreferences.subscribe, sitePreferences.get);
-  const presets = useRef(new Map<string, readonly number[]>());
   const [chartRequest, setChartRequest] = useState<ChartRequest | null>(null);
   const chartVisited = useRef(route.page === 'chart');
   if (route.page === 'chart') chartVisited.current = true;
@@ -99,9 +99,7 @@ export function Site() {
   // A navigation that names a symbol becomes one chart request (URL syncs never repeat it).
   useEffect(() => {
     if (route.page !== 'chart' || !route.symbol) return;
-    const maList = presets.current.get(route.symbol);
-    presets.current.delete(route.symbol);
-    setChartRequest({ id: navId, symbol: route.symbol, timeframe: route.tf, source: navSource, maList: maList ? [...maList] : undefined });
+    setChartRequest({ id: navId, symbol: route.symbol, timeframe: route.tf, source: navSource });
     // Only a new navigation id issues a request; the route is read at that moment.
   }, [navId]);
   // Each page starts at the top (the shell scrolls inside <main>).
@@ -143,7 +141,6 @@ export function Site() {
 
   const openChart = useCallback(
     (options: OpenChartOptions) => {
-      if (options.maList?.length) presets.current.set(options.symbol, options.maList);
       setSearchOpen(false);
       navigate({ page: 'chart', symbol: options.symbol, ...(options.tf ? { tf: options.tf } : {}) });
     },
@@ -338,7 +335,7 @@ export function Site() {
                 <dd>{report?.generatedAt ? formatDateTime(report.generatedAt) : '—'}</dd>
               </div>
             </dl>
-            <p className="dialog-note">行情為延遲資料，僅供研究參考，非投資建議。圖表設定與畫線只儲存在這台裝置。</p>
+            <HelpDisclosure label="行情與儲存說明">行情為延遲資料，僅供研究參考，非投資建議。圖表設定與畫線依帳號儲存權限保留。</HelpDisclosure>
           </div>
         </div>
       )}

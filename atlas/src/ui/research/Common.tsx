@@ -54,28 +54,49 @@ export function Provenance({
     ? (Date.now() - Date.parse(data.asOf)) / 86400000
     : null;
   return (
-    <p className="source-note research-provenance">
-      <a href={data.sourceUrl} target="_blank" rel="noreferrer">
-        {data.source}
-      </a>{" "}
-      · 資料日 {data.asOf ?? "未確認"}
-      {(data.status !== "ok" || (age !== null && age > maxAgeDays)) && (
-        <strong>
-          {" "}
-          ·{" "}
-          {data.status === "unavailable" ? "來源不可用" : "資料較舊／沿用快照"}
-        </strong>
-      )}
-      <br />
-      擷取 {data.fetchedAt ?? "原快取未提供"} · 發布{" "}
-      {data.publishedAt ?? "來源未提供"}
-      {data.missingReason && (
-        <>
-          <br />
-          {data.missingReason}
-        </>
-      )}
-    </p>
+    <details className="source-note research-provenance research-note">
+      <summary>
+        資料來源 · {data.asOf ?? "資料日未確認"}
+        {(data.status !== "ok" || (age !== null && age > maxAgeDays)) && (
+          <span>
+            {" "}
+            ·{" "}
+            {data.status === "unavailable"
+              ? "來源不可用"
+              : "資料較舊／沿用快照"}
+          </span>
+        )}
+      </summary>
+      <p>
+        <a href={data.sourceUrl} target="_blank" rel="noreferrer">
+          {data.source}
+        </a>{" "}
+        · 資料日 {data.asOf ?? "未確認"}
+        <br />
+        擷取 {data.fetchedAt ?? "原快取未提供"} · 發布{" "}
+        {data.publishedAt ?? "來源未提供"}
+        {data.missingReason && (
+          <>
+            <br />
+            {data.missingReason}
+          </>
+        )}
+      </p>
+    </details>
+  );
+}
+export function ResearchNote({
+  children,
+  title = "說明",
+}: {
+  children: ReactNode;
+  title?: string;
+}) {
+  return (
+    <details className="research-note source-note">
+      <summary>{title}</summary>
+      {children}
+    </details>
   );
 }
 export function ResearchDisclosure({
@@ -109,7 +130,11 @@ export function Stat({
     <div>
       <dt>{label}</dt>
       <dd>{value}</dd>
-      {note && <small>{note}</small>}
+      {note && (
+        <ResearchNote>
+          <small>{note}</small>
+        </ResearchNote>
+      )}
     </div>
   );
 }
@@ -203,8 +228,12 @@ export function HistoryPlot({
       />
       <small>
         {points[0]?.[0]} — {points.at(-1)?.[0]}
-        {secondary ? " · 藍／柱：主指標；金：對照指標，各自刻度" : ""}
       </small>
+      {secondary && (
+        <ResearchNote>
+          <small>藍／柱：主指標；金：對照指標，各自刻度。</small>
+        </ResearchNote>
+      )}
     </figure>
   );
 }

@@ -1,3 +1,4 @@
+import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { OfficialAlerts } from '../ui/research/OfficialAlerts';
 import { SecRadar } from '../ui/research/SecRadar';
 import { useMemo } from 'react';
@@ -45,7 +46,7 @@ function IndexCard({ index, onOpen }: { index: IndexStatus; onOpen: () => void }
         </div>
       </div>
       <TrendBadge trend={index.trend} label={index.trendLabel} />
-      <MiniChart symbol={index.symbol} maList={index.maList} height={164} />
+      <MiniChart symbol={index.symbol} height={164} />
       <div className="index-card-foot">
         <span className="ma-legend">
           {index.maList.length ? (
@@ -128,7 +129,7 @@ function MarketView({ report, market, openChart }: { report: Report; market: Mar
               <IndexCard
                 key={index.symbol}
                 index={index}
-                onOpen={() => openChart({ symbol: index.symbol, name: index.name, tf: '1D', maList: index.maList })}
+                onOpen={() => openChart({ symbol: index.symbol, name: index.name, tf: '1D' })}
               />
             ))}
           </div>
@@ -144,10 +145,10 @@ function MarketView({ report, market, openChart }: { report: Report; market: Mar
           </>
         )}
         <LineTextCard title={`${data.flag || meta.flag} ${data.name || meta.name} LINE 摘要`} text={data.lineText} />
-        <p className="source-note">
-          資料來源：{sources.length ? sources.join('、') : '每日量化報告'}
-          {asOf ? ` · 資料時間 ${formatDateTime(asOf)}` : ''}
-        </p>
+        <HelpDisclosure label="資料來源">
+          <p>資料來源：{sources.length ? sources.join('、') : '每日量化報告'}
+          {asOf ? ` · 資料時間 ${formatDateTime(asOf)}` : ''}</p>
+        </HelpDisclosure>
       </aside>
     </div>
   );
@@ -191,7 +192,7 @@ export default function MarketsPage({ report, reload, navigate, openChart, marke
       {market === 'tw' && <OfficialAlerts/>}
       {market === 'us' && <SecRadar/>}
       <footer className="page-foot">
-        <span>延遲行情，僅供研究參考，非投資建議。</span>
+        <HelpDisclosure label="行情備註">延遲行情，僅供研究參考，非投資建議。</HelpDisclosure>
         <ChartAttribution />
       </footer>
     </div>

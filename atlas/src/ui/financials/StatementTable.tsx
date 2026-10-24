@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import type { FinancialHistory } from '../../fundamentals/FinancialHistory';
 import { STATEMENT_TABS, statementRows, type StatementId } from '../../fundamentals/financialStatements';
 import { formatDateTime } from '../format';
+import { FinancialNote } from './FinancialNote';
 import {
   changeCellText,
   digitsFor,
@@ -102,7 +103,7 @@ export function StatementTable({ history, view }: { history: FinancialHistory; v
                       {unitText(row.unit, history.currency, scale)}
                       {row.derived ? ' · 部分推算' : ''}
                     </small>
-                    {row.note && <small className="fin-row-note">{row.note}</small>}
+                    {row.note && <FinancialNote className="fin-row-note" label="欄位說明"><p>{row.note}</p></FinancialNote>}
                   </th>
                   {order.map((index) => {
                     const result = row.results[index]!;
@@ -141,9 +142,9 @@ export function StatementTable({ history, view }: { history: FinancialHistory; v
           </tbody>
         </table>
       </div>
-      <p className="source-note fin-table-note">
+      <FinancialNote className="source-note fin-table-note" label="數字表說明"><p>
         數字表顯示所有已取得期別（圖表只畫近期）。最新期在最左側，向右捲動看較早期別。資本支出、股利、庫藏股以正數表示流出。「—」為無資料或不適用，滑鼠移上或長按可看原因。每格下方的小字為年增率（同期比較：季度對去年同季；年度對前一年），可用右上角「顯示年增率」關閉。
-      </p>
+      </p></FinancialNote>
     </div>
   );
 }

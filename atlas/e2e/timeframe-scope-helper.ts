@@ -76,7 +76,7 @@ async function verifyActivePanel(
   drawings: number,
 ) {
   await expect(page.locator('.indicator-chip')).toHaveCount(titles.length);
-  await expect(page.locator('.indicator-chip .indicator-name')).toHaveText(titles);
+  await expect(page.locator('.indicator-chip .indicator-name')).toHaveText(titles.map(title => title === '成交量' ? '成交量（股）' : title));
   await expect(page.locator('.chart-status')).toContainText(`畫線 ${drawings} 條`);
   await expect(page.locator('.chart-status')).toContainText(`指標 ${titles.length} 個`);
   await openPanel(page, 'indicators');

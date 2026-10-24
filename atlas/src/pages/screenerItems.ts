@@ -1,7 +1,7 @@
 import { itemStatusOf, type GroupItem } from '../report/schema';
 import type { GrowthFile, GrowthOrigin, GrowthRecord } from '../fundamentals/GrowthProvider';
-import { formatPercent, maDistance, maValue, toneClass } from '../ui/format';
-import { epsStreak, gateTally, growthRecordFor, maDeviation, type FilterState, type GrowthGate, type YearGate } from './screenerFilters';
+import { formatPercent, toneClass } from '../ui/format';
+import { epsStreak, gateTally, growthRecordFor, maDeviation, screenerMa, type FixedScreenerMas, type FilterState, type GrowthGate, type YearGate } from './screenerFilters';
 
 export type SortMode = 'default' | 'gain' | 'loss' | 'symbol' | 'ma' | 'rs' | 'hi' | 'vr' | 'ma50' | 'r21' | 'eps';
 export const SORT_LABELS: Record<SortMode, string> = {
@@ -23,6 +23,7 @@ export const METRIC_SORTS: readonly SortMode[] = ['rs', 'hi', 'vr', 'ma50', 'r21
 export interface SortContext {
   growth?: GrowthFile | null;
   asOf?: string | null;
+  fixedMAs?: FixedScreenerMas;
 }
 
 /** Latest-quarter EPS YoY (a loss-to-profit turn sorts above every finite value). */
@@ -48,8 +49,7 @@ export function filterAndSortItems(
           (item.note ?? '').toLowerCase().includes(q),
       )
     : [...items];
-  const firstMa = (item: GroupItem) =>
-    item.maList.length ? maDistance(item.close, maValue(item.maValues, item.maList[0]!)) : null;
+  const firstMa = (item: GroupItem) => screenerMa(item, context.fixedMAs).distance;
   const byNumber = (value: (item: GroupItem) => number | null | undefined, direction: 1 | -1) => (a: GroupItem, b: GroupItem) => {
     const x = value(a) ?? null,
       y = value(b) ?? null;
@@ -144,7 +144,7 @@ export function rowMetricPills(sort: SortMode, state: FilterState, maList: reado
   if (state.revY) add('revY');
   for (const entry of state.extraGates ?? []) add(entry.kind);
   if (state.epss !== null) add('epss');
-  if (state.ema20) add('ema20');
+  if (state.ema20 || sort === 'ma') add('ema20');
   const technical = keys.filter((key) => !GROWTH_PILLS.includes(key)).slice(0, MAX_PILLS);
   const growth = keys.filter((key) => GROWTH_PILLS.includes(key)).slice(0, MAX_GROWTH_PILLS);
   return keys.filter((key) => technical.includes(key) || growth.includes(key));
@@ -174,6 +174,7 @@ export function metricPill(
   growth?: GrowthFile | null,
   includeTurn = true,
   gate: GrowthGate | YearGate | (GrowthGate | YearGate)[] | null = null,
+  fixedMAs?: FixedScreenerMas,
 ): PillContent | null {
   const m = item.metrics;
   switch (key) {
@@ -198,9 +199,11 @@ export function metricPill(
         title: `今日成交量 ÷ 前一交易日成交量 = ${m.volVsPrev.toFixed(2)}`,
         tone: 'flat',
       };
-    case 'ema20':
-      if (m?.ema20 == null) return null;
-      return { text: `EMA20 ${formatPercent(m.ema20, 1)}`, title: '收盤相對 EMA20 的乖離', tone: toneClass(m.ema20) };
+    case 'ema20': {
+      const reference = screenerMa(item, fixedMAs);
+      if (reference.distance === null) return null;
+      return { text: `${reference.label} ${formatPercent(reference.distance, 1)}`, title: `收盤相對 ${reference.label} 的乖離`, tone: toneClass(reference.distance) };
+    }
     case 'ma50': {
       const distance = maDeviation(item, 50);
       if (distance === null) return null;

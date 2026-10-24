@@ -98,6 +98,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/report/universe.json docs/report/breakouts.json
+          if [ -f docs/report/breakouts-history.json ]; then git add -f -- docs/report/breakouts-history.json; fi
           if [ -f docs/report/kline-corrections.json ]; then git add -- docs/report/kline-corrections.json; fi
           # The same immutable 20-calendar-day snapshots are committed before cutover too.
           if [ -d docs/report/breakouts-archive ]; then

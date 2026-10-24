@@ -10,6 +10,7 @@ import type { Report } from '../report/schema';
 import type { LocalSymbol, SearchResult } from '../ui/SymbolSearch';
 import { formatDateTime } from '../ui/format';
 import { FinancialsHeader, type DisplayMode } from '../ui/financials/FinancialsHeader';
+import { FinancialNote } from '../ui/financials/FinancialNote';
 import { KeyMetrics } from '../ui/financials/KeyMetrics';
 import { MetricCard } from '../ui/financials/MetricCard';
 import { QuarterStrip } from '../ui/financials/QuarterStrip';
@@ -264,7 +265,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
           <PeRiverCard history={history.market === 'US' ? { ...displayHistory, quarterly: emptySeries() } : displayHistory} />
           {mode === 'table' ? null : folded.map(metricCard)}
         </div>
-        <div className="fin-notes">
+        <FinancialNote className="fin-notes" label="資料來源與備註">
           <p className="fin-depth">{depthText(displayHistory, effectiveKind)}</p>
           <p>
             {provenanceText(displayHistory, effectiveKind)}
@@ -280,7 +281,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
           )}
           {adrNote && <p>{adrNote}</p>}
           {!adrNote && (history.foreignReporter || issues.includes('foreign-filer')) && <p>外國發行人：EPS 為每普通股，非每 ADR。</p>}
-        </div>
+        </FinancialNote>
       </>
     );
   }
@@ -310,12 +311,14 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
       {symbol && key && !isTaiwanSymbol && <SecRadar symbol={symbol}/>}
       {history && displayHistory && <PeerComparison key={`peers-${history.symbol}`} history={displayHistory} kind={effectiveKind} navigate={navigate} />}
       <footer className="page-foot fin-foot">
-        <span>
+        <FinancialNote label="資料限制與研究說明">
+        <p>
           {showQuarterly
             ? '限制：Yahoo 只提供約 4 年年度、5–8 季季度財報，本站逐季累積、無法往回補（部分美股另以 SEC 申報補歷史，台股另以 FinMind〔源自公開資訊觀測站〕回溯至 2015 年）；比率由本頁依公式計算，可能與公司公告口徑不同；有息負債可能含租賃負債。'
             : '限制：缺少的財報欄位以「—」呈現；比率由本頁依所選期間計算，可能與公司公告口徑不同。'}
-        </span>
-        <span>僅供研究參考，非投資建議。</span>
+        </p>
+        <p>僅供研究參考，非投資建議。</p>
+        </FinancialNote>
       </footer>
     </div>
   );

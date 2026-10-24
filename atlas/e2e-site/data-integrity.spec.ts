@@ -16,7 +16,7 @@ test('mixed universe dates are labelled, grouped and scoped in filters', async (
   const rows = page.locator('.screener-row .row-id b');
   await expect(rows).toHaveText(['1101','2330','1240']);
   // Direct links use the same filter path as the filter sheet.
-  await page.goto('./?page=screener&group=universe-tw&f=chg:0:100');
+  await page.goto('./?page=screener&group=universe-tw&f=rs:1');
   await expect(page.locator('.screener-row .row-id b')).toHaveText(['2330','1101']);
   await expect(page.locator('.row-observation-date')).toHaveCount(0);
 });

@@ -100,7 +100,7 @@ describe('sorting with unmatched rows', () => {
     const shuffled = [failed('F1'), matched('A', 1), failed('F0'), unmatched('U', 5), matched('B', -2)];
     expect(order('gain', shuffled)).toEqual(['U', 'A', 'B', 'F1', 'F0']);
     expect(order('loss', shuffled)).toEqual(['B', 'A', 'U', 'F1', 'F0']);
-    expect(order('ma', shuffled)).toEqual(['U', 'A', 'B', 'F1', 'F0']);
+    expect(order('ma', shuffled)).toEqual(['A', 'U', 'B', 'F1', 'F0']); // no EMA20 references: stable order, failed rows last
     expect(order('symbol', shuffled)).toEqual(['A', 'B', 'U', 'F0', 'F1']);
     expect(order('r21', shuffled).slice(-2)).toEqual(['F1', 'F0']);
   });

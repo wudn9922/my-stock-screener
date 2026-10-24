@@ -60,6 +60,18 @@ describe('universe.json', () => {
     expect(result.universe.markets.TW).toBeUndefined();
   });
 
+  it('reads average volume in shares and keeps old files missing it as null', () => {
+    const result = parseUniverse({
+      fields: ['symbol', 'volume', 'volumeAvg20'],
+      markets: { TW: { rows: [['2330.TW', 900000, 123456.75]] } },
+    });
+    if (result.status !== 'ok') throw new Error('average-volume row must parse');
+    expect(result.universe.markets.TW!.items[0]!.metrics!.volumeAvg20).toBe(123456.75);
+    const old = parseUniverse(fixture);
+    if (old.status !== 'ok') throw new Error('old fixture must parse');
+    expect(old.universe.markets.TW!.items[0]!.metrics!.volumeAvg20).toBeNull();
+  });
+
   it('reads the optional profile columns and the full-market scope', () => {
     const fields = [...UNIVERSE_FIELDS, 'sector', 'industry', 'marketCap'];
     const base = UNIVERSE_FIELDS.map(field => {

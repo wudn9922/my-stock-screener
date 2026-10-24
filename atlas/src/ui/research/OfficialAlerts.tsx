@@ -3,6 +3,7 @@ import { alertsSchema, type OfficialAlert } from "../../report/research";
 import {
   Provenance,
   ResearchDisclosure,
+  ResearchNote,
   Stat,
   Status,
   useResearch,
@@ -56,9 +57,11 @@ function AlertData({ symbol }: { symbol?: string }) {
   const missing = sources.some(([, s]) => s.status !== "ok");
   return (
     <>
-      <p className="source-note">
-        注意公告與處置不同。處置限制、起訖與順延條件以原文為準；超過公告結束日不代表已確認解除。
-      </p>
+      <ResearchNote title="注意與處置說明">
+        <p>
+          注意公告與處置不同。處置限制、起訖與順延條件以原文為準；超過公告結束日不代表已確認解除。
+        </p>
+      </ResearchNote>
       {sources.map(([key, s]) => (
         <Provenance key={key} data={s} />
       ))}

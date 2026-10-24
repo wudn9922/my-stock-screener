@@ -14,6 +14,9 @@ import {
   recordWatchlistData,
   watchlistSchema,
 } from "../src/watchlists/model";
+import { parseFilters } from "../src/pages/screenerFilters";
+import { loadScreenerFixedMAs } from "../src/pages/screenerFixedMAs";
+import type { ParameterStock } from "../src/cloud/settingsApi";
 
 const DEFAULT_ADMIN_LINE_ID = "Ua0037dbd5037b64fc76804c60520ad76";
 const LINE_ID = /^U[0-9a-f]{32}$/;
@@ -64,6 +67,17 @@ export function previousSourceSession(
     ),
   ].sort();
   return dates.at(-1) === asOf ? (dates.at(-2) ?? null) : null;
+}
+
+/** Collector CSV dates are session dates; noon UTC preserves that date in both markets. */
+export function fixedMaBarsFromCsv(csv: string) {
+  const rows = csv.trim().split(/\r?\n/).map(line => line.split(",").map(value => value.replace(/^"|"$/g, "")));
+  const columns = rows.shift() ?? [];
+  const date = columns.indexOf("Date"), close = columns.indexOf("Close");
+  if (date < 0 || close < 0) return [];
+  return rows.map(row => ({ time: Date.parse(`${row[date]?.slice(0, 10)}T12:00:00Z`) / 1000, close: Number(row[close]) }))
+    .filter(bar => Number.isFinite(bar.time) && Number.isFinite(bar.close) && bar.close > 0)
+    .sort((a, b) => a.time - b.time);
 }
 
 /** The same evaluator as the browser, without moving lastViewed/lastOpenedAt. */
@@ -179,6 +193,7 @@ export async function refreshSavedWatchlists() {
     }[];
     if (!Array.isArray(rows))
       throw new Error("Cloud watchlist response is not a list.");
+    let fixedStocks: Promise<ParameterStock[]> | undefined;
     for (const row of rows) {
       try {
         if (row.line_user_id !== user) throw new Error("List owner mismatch");
@@ -199,10 +214,26 @@ export async function refreshSavedWatchlists() {
             : group?.items.find((entry) => entry.asOf)?.asOf
         )?.slice(0, 10);
         if (!items || !asOf) throw new Error("Source/date unavailable");
+        let fixedMAs;
+        if (parseFilters(list.filters).ema20) {
+          if (!fixedStocks) {
+            const stockUrl = new URL(`${base}/rest/v1/stocks`);
+            stockUrl.search = new URLSearchParams({ select: "id,ticker,group_id,ma1,ma2,ma3,ma4", line_user_id: `eq.${user}`, group_id: "eq.ungrouped" }).toString();
+            fixedStocks = request(stockUrl).then(body => {
+              if (!Array.isArray(body)) throw new Error("Fixed parameters unavailable");
+              return body as ParameterStock[];
+            });
+          }
+          fixedMAs = await loadScreenerFixedMAs(items, await fixedStocks, async symbol => {
+            if (!/^[A-Z0-9^][A-Z0-9.^=-]{0,31}$/.test(symbol)) throw new Error("Invalid symbol");
+            return fixedMaBarsFromCsv(await readFile(resolve(root, `data/${symbol}.csv`), "utf8"));
+          });
+        }
         const members = evaluateWatchlist(
           list,
           items,
           list.market === "US" ? mergeGrowth(yahooGrowth, growth) : growth,
+          fixedMAs,
         );
         let previousSession: string | null = null;
         try {

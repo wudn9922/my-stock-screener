@@ -1,3 +1,4 @@
+import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { userStorage } from '../auth/storage';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
@@ -422,20 +423,14 @@ function ThemesView({
 
       <ThemeRotationCard data={data} onOpen={open} />
       <footer className="page-foot">
-        {industryMap ? (
-          <>
-            <span>產業熱力圖依全市場名單計算，口徑見圖下方說明 · 每個交易日更新一次</span>
-            <span>僅供研究參考，非投資建議。</span>
-          </>
-        ) : (
-          <>
-            <span>
-              資料日 {formatDateTime(data.asOf, false)}
-              {age !== null && age > 6 ? `（已 ${age} 天未更新）` : ''} · 題材報酬為成分股等權平均 · 基準 {label} · 每個交易日更新一次
-            </span>
-            <span>題材成分股由人工挑選，僅供研究參考，非投資建議。</span>
-          </>
-        )}
+        <span>資料日 {formatDateTime(data.asOf, false)}{age !== null && age > 6 ? `（已 ${age} 天未更新）` : ''}</span>
+        <HelpDisclosure label="資料與報酬備註">
+          {industryMap ? (
+            <p>產業熱力圖依全市場名單計算，口徑見熱力圖計算說明；每個交易日更新一次。僅供研究參考，非投資建議。</p>
+          ) : (
+            <p>題材報酬為成分股等權平均，基準 {label}，每個交易日更新一次。題材成分股由人工挑選，僅供研究參考，非投資建議。</p>
+          )}
+        </HelpDisclosure>
       </footer>
 
       {selected && (
@@ -528,6 +523,7 @@ export default function ThemesPage({
       <details className="themes-help">
         <summary>這頁怎麼看？</summary>
         {HELP[market]}
+        <p>3 月相對強弱表示題材近 3 個月報酬比基準多（少）多少；「站上 50 日線」表示成分股中股價高於 50 日均線的比例。動能綜合 1 週、1 月、3 月報酬與相對基準的分數，用於題材排名。</p>
         {MAP_HELP}
       </details>
       {state.status === 'loading' ? (

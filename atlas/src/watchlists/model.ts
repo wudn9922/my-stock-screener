@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { GroupItem } from '../report/schema';
 import type { GrowthFile } from '../fundamentals/GrowthProvider';
-import { activeChips, applyFilters, filterAvailability, FILTER_PARAM_MAX, parseFilters, serializeFilters } from '../pages/screenerFilters';
+import { activeChips, applyFilters, filterAvailability, FILTER_PARAM_MAX, parseFilters, serializeFilters, type FixedScreenerMas } from '../pages/screenerFilters';
 
 const symbol = z.string().regex(/^[A-Z0-9^][A-Z0-9.^=-]{0,31}$/);
 const member = z.object({ symbol, name: z.string().max(200) });
@@ -57,11 +57,15 @@ export function evaluateWatchlist(
   list: SavedWatchlist,
   items: readonly GroupItem[],
   growth: GrowthFile | null | undefined,
+  fixedMAs?: FixedScreenerMas,
 ): WatchlistMember[] {
   if (items.some((item) => item.status === 'failed')) throw new Error('部分股票行情載入失敗，暫不判定新入選或出榜；保留上次基準。');
   const filters = parseFilters(list.filters);
-  const availability = filterAvailability(items, { market: list.market, growth, growthLoading: false });
-  const blocked = activeChips(filters, availability).find((chip) => chip.unavailable);
+  if (filters.ema20 && fixedMAs === undefined) throw new Error('固定均線參數尚未取得，保留上次清單，待資料恢復後再比較。');
+  if (filters.ema20 && items.some(item => fixedMAs?.[item.symbol]?.distance === null))
+    throw new Error('部分股票的固定均線行情暫時無法取得，保留上次清單，暫不判定出榜。');
+  const availability = filterAvailability(items, { market: list.market, growth, growthLoading: false, fixedMAs });
+  const blocked = activeChips(filters, availability, list.market, !!fixedMAs && Object.keys(fixedMAs).length > 0).find((chip) => chip.unavailable);
   if (blocked) throw new Error(`${blocked.label}：${blocked.unavailable}。保留上次清單，待資料恢復後再比較。`);
   const source = items.filter((item) => item.status !== 'failed');
   if (list.kind === 'manual') {
@@ -71,6 +75,7 @@ export function evaluateWatchlist(
   return applyFilters(list.kind === 'manual' ? source.filter((item) => list.symbols.includes(item.symbol)) : source, filters, {
     market: list.market,
     growth,
+    fixedMAs,
   }).map(({ symbol, name }) => ({ symbol, name }));
 }
 

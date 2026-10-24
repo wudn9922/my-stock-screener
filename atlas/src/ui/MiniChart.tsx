@@ -3,15 +3,12 @@ import {
   CandlestickSeries,
   ColorType,
   CrosshairMode,
-  LineSeries,
   createChart,
   type IChartApi,
   type UTCTimestamp,
 } from 'lightweight-charts';
 import { getDailyBars } from '../app/dataSources';
 import { sitePreferences, upDownColors } from '../app/sitePreferences';
-import { sma } from '../indicators/MovingAverage';
-import { indicatorColors } from '../indicators/IndicatorRegistry';
 import type { Bar } from '../market-data/MarketDataProvider';
 
 const VISIBLE_BARS = 130;
@@ -42,17 +39,15 @@ export function useNearViewport<T extends Element>(margin = '200px') {
 export type MiniChartStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 /**
- * Compact, non-interactive daily candle chart with the report's moving averages (Atlas engine:
- * Lightweight Charts + Atlas SMA). Page scrolling passes through; the parent handles taps.
+ * Compact daily candles without preset indicators. Page scrolling passes through;
+ * the parent handles taps.
  */
 export function MiniChart({
   symbol,
-  maList,
   height = 150,
   onStatus,
 }: {
   symbol: string;
-  maList: readonly number[];
   height?: number;
   onStatus?: (status: MiniChartStatus, bars: Bar[] | null) => void;
 }) {
@@ -61,7 +56,6 @@ export function MiniChart({
   const [bars, setBars] = useState<Bar[] | null>(null);
   const [status, setStatus] = useState<MiniChartStatus>('idle');
   const colors = useSyncExternalStore(sitePreferences.subscribe, () => sitePreferences.get().colors);
-  const maKey = maList.join(',');
   const statusRef = useRef(onStatus);
   statusRef.current = onStatus;
   useEffect(() => {
@@ -107,7 +101,6 @@ export function MiniChart({
       localization: { locale: 'zh-TW' },
     });
     const visible = bars.slice(-VISIBLE_BARS);
-    const firstTime = visible[0]!.time;
     const candles = chart.addSeries(CandlestickSeries, {
       upColor: up,
       downColor: down,
@@ -126,27 +119,9 @@ export function MiniChart({
         close: bar.close,
       })),
     );
-    maKey
-      .split(',')
-      .filter(Boolean)
-      .map(Number)
-      .forEach((period, index) => {
-        const line = chart.addSeries(LineSeries, {
-          color: indicatorColors[index % indicatorColors.length],
-          lineWidth: 1,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-        });
-        line.setData(
-          sma(bars, period)
-            .filter((point) => point.time >= firstTime)
-            .map((point) => ({ time: point.time as UTCTimestamp, value: point.value })),
-        );
-      });
     chart.timeScale().fitContent();
     return () => chart.remove();
-  }, [bars, colors, maKey]);
+  }, [bars, colors]);
   return (
     <div ref={ref} className="mini-chart" style={{ height }} data-status={status}>
       {status === 'ready' ? (

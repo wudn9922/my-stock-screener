@@ -9,6 +9,4 @@ export interface ChartRequest {
   timeframe?: Timeframe;
   /** `url` (deep link, reload, back/forward) or `app` (search, report lists). */
   source: 'url' | 'app';
-  /** Report moving averages applied as SMA indicators when the symbol has none yet. */
-  maList?: number[];
 }

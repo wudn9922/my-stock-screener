@@ -1,3 +1,4 @@
+import { HelpDisclosure } from './HelpDisclosure';
 import { useEffect, useState, useSyncExternalStore, type FormEvent } from 'react';
 import type { AppStore } from '../app/AppStore';
 import type { DrawingStyle, ToolKind } from '../drawing/DrawingModel';
@@ -68,7 +69,7 @@ export function WorkspaceSettings({ store }: { store: AppStore }) {
         <span>新畫線預設樣式</span>
         <span>本機</span>
       </div>
-      <p className="research-disclaimer">設定與指標組合儲存在這個瀏覽器。「匯出設定」會備份所有股票的畫線、指標與提醒；行情資料不在備份內。</p>
+      <HelpDisclosure label="設定與備份說明">設定與指標組合儲存在這個瀏覽器。「匯出設定」會備份所有股票的畫線、指標與提醒；行情資料不在備份內。</HelpDisclosure>
       <form className="research-form" onSubmit={save}>
         
         <label>
@@ -118,7 +119,7 @@ export function WorkspaceSettings({ store }: { store: AppStore }) {
         {error && <p className="research-error" role="alert">{error}</p>}
         <button className="primary-button" type="submit" style={{ minHeight: 44 }}>儲存新畫線預設樣式</button>
       </form>
-      <p className="small muted">ATR 線寬＝0.02 × 14 根 K 棒 ATR（最小 0.5 像素）；已儲存的線寬維持不變。預設樣式只套用於新畫線。</p>
+      <HelpDisclosure label="預設線寬說明">ATR 線寬＝0.02 × 14 根 K 棒 ATR（最小 0.5 像素）；已儲存的線寬維持不變。預設樣式只套用於新畫線。</HelpDisclosure>
       <section className="settings-subsection" aria-labelledby="indicator-presets-heading">
         <h3 id="indicator-presets-heading">指標組合</h3>
         {!app.indicatorPresets.length ? <p className="small muted">尚未儲存任何組合。</p> : (

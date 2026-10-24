@@ -1,3 +1,4 @@
+import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { userStorage } from '../auth/storage';
 import { useMemo, useState } from 'react';
 import { PERIOD_LABELS, type PeriodKey, type Theme, type ThemesData } from '../report/themes';
@@ -296,7 +297,7 @@ function IndustryMap({
         ariaLabel={`產業熱力圖，${mapModel.cellCount} 個產業、${coverage.total} 檔股票`}
         empty="沒有可顯示的產業。"
       />
-      <p className="map-foot">
+      <HelpDisclosure label="資料與熱力圖計算說明">
         資料日 {model.asOf ? formatDateTime(model.asOf, false) : '—'} · {model.universe}
         {model.scope === 'full' ? '（全市場）' : '（每日掃描名單，非全市場）'}，涵蓋 {coverage.total.toLocaleString('en-US')} 檔，其中{' '}
         {coverage.classified.toLocaleString('en-US')} 檔有產業分類。顏色＝{PERIOD_LABELS[period]}報酬，以{weightText}計算。大小＝{sizeText}
@@ -304,7 +305,7 @@ function IndustryMap({
         {model.basis === 'cap' && coverage.withCap < coverage.total ? ` ${coverage.total - coverage.withCap} 檔缺市值，計入大小與加權時視為 0。` : ''}
         {mapModel.imputed > 0 ? ` ${mapModel.imputed} 個產業沒有大小資料，以中位數代入。` : ''} 成分股少於 {MIN_INDUSTRY_STOCKS} 檔的產業與未分類股票併入「其他」
         {model.twoLevel ? '（同一 sector 內）' : ''}。方塊太小時不顯示文字，滑過或長按可看詳情。
-      </p>
+      </HelpDisclosure>
       {open && (
         <IndustryPanel
           key={open.cell.id}
@@ -398,7 +399,7 @@ function ThemeMap({
         ariaLabel={`題材熱力圖，${mapModel.cellCount} 個題材`}
         empty="沒有可顯示的題材。"
       />
-      <p className="map-foot">
+      <HelpDisclosure label="資料與熱力圖計算說明">
         資料日 {formatDateTime(data.asOf, false)} · 每個方塊是一個題材，不是個股；顏色＝{PERIOD_LABELS[period]}題材報酬（成分股等權平均）。
         {mapModel.mode === 'equal'
           ? hasSize
@@ -408,7 +409,7 @@ function ThemeMap({
               mapModel.mode === 'balanced' ? `；均衡模式取平方根壓縮，每塊至少為中位數方塊的 ${Math.round(BALANCED_FLOOR * 100)}%` : '；小題材會很小，可切回「均衡」'
             }。`}
         {mapModel.imputed > 0 ? ` ${mapModel.imputed} 個題材沒有成交值資料，以中位數代入。` : ''} 方塊太小時不顯示文字，滑過或長按可看詳情。
-      </p>
+      </HelpDisclosure>
     </section>
   );
 }

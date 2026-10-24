@@ -764,10 +764,10 @@ h3 {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 6px 16px;
-  margin-top: 22px;
-  padding-top: 14px;
+  margin-top: 16px;
+  padding-top: 10px;
   border-top: 1px solid var(--border);
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-3);
 }
 .attribution a {
@@ -946,8 +946,8 @@ h3 {
   border-color: var(--border-strong);
 }
 .source-note {
-  margin: 10px 2px 0;
-  font-size: 12px;
+  margin: 6px 2px 0;
+  font-size: 11px;
   color: var(--text-3);
   line-height: 1.6;
 }
@@ -1547,7 +1547,7 @@ h3 {
   font-weight: 600;
 }
 .row-note {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-3);
   overflow: hidden;
   text-overflow: ellipsis;

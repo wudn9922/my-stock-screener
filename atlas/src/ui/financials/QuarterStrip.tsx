@@ -1,6 +1,7 @@
 import type { FinancialHistory } from '../../fundamentals/FinancialHistory';
 import { formatDateTime } from '../format';
 import { provenanceText, quarterStrip, type FinancialsView } from './financialsView';
+import { FinancialNote } from './FinancialNote';
 
 /**
  * 「當季財報」: the newest quarter as one compact row of small cells (period in the head; EPS, revenue, gross
@@ -38,9 +39,9 @@ export function QuarterStrip({ history, quarterly }: { history: FinancialHistory
         </ul>
       )}
       {hasQuarters && (
-        <p className="fin-quarter-caption">
+        <FinancialNote className="fin-quarter-caption" label="當季資料來源"><p>
           資料日 {history.checkedAt ? formatDateTime(history.checkedAt, false) : '—'} · {provenanceText(history, 'quarterly')}
-        </p>
+        </p></FinancialNote>
       )}
     </section>
   );

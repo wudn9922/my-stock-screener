@@ -159,12 +159,14 @@ it('keeps time-keyed volume values independent by id and removes both series on 
     color: '#ffffff',
     visible: true,
     title: '',
+    priceFormat: { type: 'custom', minMove: 1, formatter: expect.any(Function) },
   });
   expect(created[1].applyOptions).toHaveBeenLastCalledWith({
     color: '#ffffff',
     lineWidth: 4,
     visible: true,
     title: '',
+    priceFormat: { type: 'custom', minMove: 1, formatter: expect.any(Function) },
   });
   expect(created[0].setData).toHaveBeenCalledTimes(1);
   expect(created[1].setData).toHaveBeenCalledTimes(1);
@@ -200,4 +202,27 @@ it('keeps time-keyed volume values independent by id and removes both series on 
   expect(removed).toHaveLength(4);
   expect(engine.volumeAverageAt(first.id, 200)).toBeNull();
   engine.clear();
+});
+
+
+it('formats explicit Taiwan volumes in lots while keeping series and calculations in shares', () => {
+  const created: { setData: ReturnType<typeof vi.fn>; applyOptions: ReturnType<typeof vi.fn> }[] = [];
+  const chart = {
+    addSeries: vi.fn(() => {
+      const api = { setData: vi.fn(), applyOptions: vi.fn(), priceScale: () => ({ applyOptions: vi.fn() }) };
+      created.push(api);
+      return api;
+    }),
+    removeSeries: vi.fn(),
+  } as unknown as IChartApi;
+  const engine = new IndicatorEngine(chart);
+  const taiwan = { ...instance('Volume', 'tw-volume'), symbol: '2330.TW' };
+  const us = instance('Volume', 'us-volume');
+  engine.sync([taiwan, us], bars, '1D', 1);
+  const twFormat = created[0].applyOptions.mock.calls.at(-1)![0].priceFormat.formatter;
+  const usFormat = created[2].applyOptions.mock.calls.at(-1)![0].priceFormat.formatter;
+  expect(twFormat(12345)).toBe('12.345 張');
+  expect(usFormat(12345)).toBe('12,345 股');
+  expect(engine.valueAt(taiwan.id, 20)).toBe(200);
+  expect(created[0].setData).toHaveBeenCalledWith(coloredVolume(bars));
 });

@@ -111,6 +111,10 @@ class FullMarketBreakoutsTest(unittest.TestCase):
         self.assertEqual(report["asOf"], max(m["asOf"] for m in report["markets"].values()))
         archive = Path(out).parent / "breakouts-archive" / f"{report['asOf']}.json"
         self.assertEqual(archive.read_bytes(), Path(out).read_bytes())
+        history = json.loads((Path(out).parent / "breakouts-history.json").read_text())
+        self.assertEqual(history["intervalDays"], 20)
+        self.assertEqual(history["snapshots"][0]["asOf"], report["asOf"])
+        self.assertEqual(history["snapshots"][0]["markets"], {key: market["asOf"] for key, market in report["markets"].items()})
 
 
 class BreakoutsArchiveTest(unittest.TestCase):
@@ -169,6 +173,44 @@ class BreakoutsArchiveTest(unittest.TestCase):
             for market in markets.values():
                 market["windows"] = {}
             self.assertEqual(full.build_payload(inputs, "2030-01-01T00:00:00Z")["asOf"], "2026-10-22")
+
+    def test_catalog_lists_real_archive_dates_newest_first_without_rewriting_archives(self):
+        saved = {}
+        for day in ("2026-09-30", "2026-10-20"):
+            full.write_json_atomic(str(self.report), {"asOf": day, "generatedAt": f"{day}T10:00:00Z", "markets": {
+                "tw": {"scope": "full", "asOf": day}, "us": {"scope": "full", "asOf": "2026-09-29"},
+            }})
+            snapshot = full.archive_snapshot(self.report, day)
+            saved[snapshot] = (snapshot.read_bytes(), snapshot.stat().st_mtime_ns)
+        full.write_json_atomic(str(self.report), {"asOf": "2026-10-21", "markets": {}})
+        archive_dir = self.report.parent / "breakouts-archive"
+        (archive_dir / "not-a-date.json").write_text("{}")
+        (archive_dir / "2026-08-01.json").write_text("broken json")
+        (archive_dir / "2026-08-02.json").write_text('{"asOf":"2026-08-03","markets":{"tw":{"scope":"full","asOf":"2026-08-03"}}}')
+        (archive_dir / "2026-08-04.json").write_text('{"asOf":"2026-08-04","markets":{"tw":{"scope":"legacy","asOf":"2026-08-04"}}}')
+        index = json.loads(full.write_archive_index(self.report).read_text())
+        self.assertEqual(index["version"], 1)
+        self.assertEqual([entry["asOf"] for entry in index["snapshots"]], ["2026-10-20", "2026-09-30"])
+        self.assertEqual(index["snapshots"][0]["markets"], {"tw": "2026-10-20", "us": "2026-09-29"})
+        for path, (body, mtime) in saved.items():
+            self.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), (body, mtime))
+
+    def test_catalog_is_empty_without_saved_reports(self):
+        index = json.loads(full.write_archive_index(self.report).read_text())
+        self.assertEqual(index, {"version": 1, "intervalDays": 20, "snapshots": []})
+
+    def test_failed_latest_build_still_indexes_prior_snapshots_without_changing_them(self):
+        full.write_json_atomic(str(self.report), {"asOf": "2026-09-30", "markets": {
+            "tw": {"scope": "full", "asOf": "2026-09-30"},
+        }})
+        snapshot = full.archive_snapshot(self.report, "2026-09-30")
+        original = snapshot.read_bytes()
+        with patch.object(full, "load_inputs", side_effect=ValueError("coverage unavailable")), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(full.main(["--out", str(self.report)]), 1)
+        self.assertEqual(snapshot.read_bytes(), original)
+        self.assertEqual(self.report.read_bytes(), original)
+        index = json.loads((self.report.parent / "breakouts-history.json").read_text())
+        self.assertEqual(index["snapshots"][0]["asOf"], "2026-09-30")
 
 
 if __name__ == "__main__":

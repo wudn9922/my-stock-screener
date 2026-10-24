@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """全市場進場成功率：只讀 universe-full 的完整名單與日線快取，不連網、不退回 S&P 500。
 
-共用 build_breakouts 的訊號與成熟樣本計算；成功＝進場後至少經過 3 個交易日，資料日收盤高於進場價。
+共用 build_breakouts 的訊號與完整 5 日觀察樣本，分別保留四種成功判定口徑。
 波段突破以 max(開盤價, 已確認波段高點) 作理論停買價格；箱型與20EMA以訊號日收盤進場。
 資料缺漏、未成熟與沒有訊號都不當成失敗。
 名單過期、快取不足或有效日線涵蓋率不足時保留既有報表，回傳失敗。
 """
 
 import argparse
+import json
 import os
 import sys
 import tempfile
@@ -136,6 +137,34 @@ def archive_snapshot(report_path, as_of):
     return target
 
 
+def write_archive_index(report_path):
+    """Discover saved reports without changing their immutable bytes.
+
+    Keep the mutable catalog beside the latest report, outside the append-only
+    archive directory. A date is listed only when the corresponding JSON report
+    has that same data date and an explicitly full-market payload.
+    """
+    report_path = Path(report_path)
+    snapshots = []
+    for path in sorted((report_path.parent / "breakouts-archive").glob("*.json"), reverse=True):
+        try:
+            as_of = date.fromisoformat(path.stem).isoformat()
+            if path.stem != as_of:
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            markets = {key: market["asOf"] for key, market in payload["markets"].items()
+                       if key in LABELS and market.get("scope") == "full"
+                       and date.fromisoformat(market["asOf"]).isoformat() == market["asOf"]}
+            if payload.get("asOf") != as_of or not markets:
+                continue
+        except (OSError, ValueError, TypeError, KeyError, AttributeError):
+            continue
+        snapshots.append({"asOf": as_of, "generatedAt": payload.get("generatedAt"), "markets": markets})
+    target = report_path.parent / "breakouts-history.json"
+    write_json_atomic(str(target), {"version": 1, "intervalDays": ARCHIVE_INTERVAL_DAYS, "snapshots": snapshots})
+    return target
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cache-dir", default=os.environ.get("UNIVERSE_CACHE_DIR") or DEFAULT_CACHE)
@@ -150,12 +179,19 @@ def main(argv=None):
             raise ValueError("；".join(problems))
     except (OSError, ValueError, TypeError) as exc:
         print(f"❌ 全市場進場成功率未更新，保留原檔：{exc}")
+        # Existing saved results remain discoverable even if today's coverage
+        # gate prevents publishing a new report.
+        try:
+            write_archive_index(args.out)
+        except (OSError, ValueError, TypeError) as index_exc:
+            print(f"❌ 歷史結果清單未更新：{index_exc}")
         return 1
     try:
         write_json_atomic(args.out, payload)
         snapshot = archive_snapshot(args.out, payload["asOf"])
         if snapshot:
             print(f"✅ 已保留 20 日勝率快照：{snapshot}")
+        write_archive_index(args.out)
     except (OSError, ValueError, TypeError) as exc:
         print(f"❌ 全市場進場成功率／快照發布失敗（既有快照不變）：{exc}")
         return 1

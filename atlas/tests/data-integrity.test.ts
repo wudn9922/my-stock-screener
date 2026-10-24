@@ -35,11 +35,11 @@ describe('K-line quarantine boundary', () => {
 });
 
 describe('per-row universe observation dates', () => {
-  const fields = ['symbol', 'name', 'close', 'changePct', 'volume', 'rsRank', 'rs63', 'asOf'];
+  const fields = ['symbol', 'name', 'close', 'changePct', 'volume', 'rsRank', 'rs63', 'asOf', 'volumeAvg20'];
   const rows = [
-    ['AAPL', 'Apple', 100, 1, 100, 50, 2, '2026-10-21'],
-    ['NVDA', 'Nvidia', 100, 99, 10000, 99, 50, '2026-10-22'],
-    ['MSFT', 'Microsoft', 100, 2, 200, 70, 3, '2026-10-21'],
+    ['AAPL', 'Apple', 100, 1, 100, 50, 2, '2026-10-21', 100],
+    ['NVDA', 'Nvidia', 100, 99, 10000, 99, 50, '2026-10-22', 10000],
+    ['MSFT', 'Microsoft', 100, 2, 200, 70, 3, '2026-10-21', 200],
   ];
   const parse = (columns = fields, values = rows) => {
     const result = parseUniverse({ fields: columns, markets: { US: { benchmark: 'SPY', asOf: '2026-10-21', rows: values } } });
@@ -57,7 +57,7 @@ describe('per-row universe observation dates', () => {
       const sorted = filterAndSortItems(market.items, '', sort, { asOf: market.asOf });
       expect(sorted.at(-1)!.symbol).toBe('NVDA');
     }
-    for (const filter of ['chg:0:100', 'vol:50', 'rs:1']) {
+    for (const filter of ['vol:50', 'rs:1']) {
       expect(applyFilters(market.items, parseFilters(filter), { market: 'US', asOf: market.asOf }).map(row=>row.symbol))
         .toEqual(['AAPL', 'MSFT']);
     }

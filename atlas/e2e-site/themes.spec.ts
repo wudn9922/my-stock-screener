@@ -44,7 +44,11 @@ test('a tile opens the detail sheet with description, constituents and an expand
   await expect(page).toHaveURL(/page=themes&theme=optical/);
   const sheet = page.getByRole('dialog', { name: /光通訊/ });
   await expect(sheet).toBeVisible();
-  await expect(sheet).toContainText('光纖');
+  const introduction = sheet.locator('.detail-about .help-disclosure');
+  await expect(introduction.locator('.help-disclosure-body')).toBeHidden();
+  await introduction.locator('summary').click();
+  await expect(introduction.locator('.help-disclosure-body')).toBeVisible();
+  await expect(introduction.locator('.help-disclosure-body')).toContainText('光纖');
   await expect(sheet.getByTestId('research-candle-host').locator('canvas').first()).toBeVisible();
   await expect(sheet.locator('.constituent')).toHaveCount(6);
   await sheet.locator('.constituent-head').first().click();

@@ -75,11 +75,12 @@ import {
   resolveSymbolInput,
   type SymbolCatalogEntry,
 } from '../market-data/SymbolCatalog';
-import { indicatorColors } from '../indicators/IndicatorRegistry';
 import { marketProvider, getPeFigures, type PeFigures } from './dataSources';
 import { sitePreferences, upDownColors } from './sitePreferences';
 import { displayTicker, formatPercent, formatPe, formatPrice, toneClass } from '../ui/format';
 import type { ChartRequest } from './chartRequest';
+import { marketVolumeUnit } from '../ui/format';
+import { HelpDisclosure } from '../ui/HelpDisclosure';
 import type { LocalSymbol } from '../ui/SymbolSearch';
 import '../ui/workspace.css';
 
@@ -615,27 +616,6 @@ export function App({
               store.updateSymbol(target, (s) => ({ ...s, preferences: { ...s.preferences, timeframe } }));
           }
         }
-        // Report moving averages (daily) become SMA indicators the first time a symbol is opened.
-        const periods = [...new Set(request.maList ?? [])].filter((n) => Number.isInteger(n) && n > 0 && n <= 5000);
-        if (periods.length) {
-          const existing = store.symbol(target).indicators.filter((i) => i.scope.timeframe === '1D' && i.type !== 'Volume');
-          if (!existing.length)
-            periods.forEach((period, index) =>
-              store.addIndicator({
-                id: crypto.randomUUID(),
-                symbol: target,
-                type: 'SMA',
-                period,
-                source: 'close',
-                visible: true,
-                locked: false,
-                lineWidth: 1,
-                widthMode: 'pixels',
-                color: indicatorColors[index % indicatorColors.length]!,
-                scope: { timeframe: '1D' },
-              }),
-            );
-        }
         switchSymbol(target, nextProvider !== store.getSnapshot().app.provider ? nextProvider : undefined);
         if (launch.ignoredTimeframe) message = `網址週期 ${launch.ignoredTimeframe} 無效，已忽略。`;
         if (message) setNotice(message);
@@ -998,15 +978,19 @@ export function App({
         {!isIndex && providerId !== 'demo' && (
           <div className="ws-stock-statistics">
             <dl className="ws-valuation" data-testid="valuation">
-              <div title={peTitle(`本益比（${peFigures?.fiscalYear ?? '年度'} EPS）`, peFigures?.pe ?? null)}>
+              <div>
                 <dt>本益比</dt>
                 <dd className={peFigures?.peLoss ? 'pe-loss' : undefined}>{formatPe(peFigures?.pe, !!peFigures?.peLoss)}</dd>
               </div>
-              <div title={peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}>
+              <div>
                 <dt>本益比 TTM</dt>
                 <dd className={peFigures?.peTtmLoss ? 'pe-loss' : undefined}>{formatPe(peFigures?.peTtm, !!peFigures?.peTtmLoss)}</dd>
               </div>
             </dl>
+            <HelpDisclosure label="本益比說明">
+              <p>{peTitle(`本益比（${peFigures?.fiscalYear ?? '年度'} EPS）`, peFigures?.pe ?? null)}</p>
+              <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}</p>
+            </HelpDisclosure>
           </div>
         )}
         {!isIndex && providerId !== 'demo' && (
@@ -1157,7 +1141,7 @@ export function App({
                       >
                         <span className="indicator-name" style={{ color: i.color }}>
                           {i.type === 'Volume'
-                            ? '成交量'
+                            ? `成交量（${marketVolumeUnit(symbol)}）`
                             : `${i.type} ${i.period}${repeatedPeriod ? ` ${i.source.toUpperCase()}` : ''}`}
                         </span>
                         <span className="indicator-value" data-indicator-value />
@@ -1172,7 +1156,7 @@ export function App({
                   })}
                   {showLegacyVolume && (
                     <div className="legacy-volume-chip" data-legacy-volume>
-                      <span className="indicator-name">成交量</span>
+                      <span className="indicator-name">成交量（{marketVolumeUnit(symbol)}）</span>
                       <span className="indicator-value" data-volume-value />
                       <span className="indicator-average">
                         <span>MA20</span>
@@ -1248,14 +1232,9 @@ export function App({
           <div className="source-strip">
             <div ref={sourceRef} className="data-source" />
             {(STATIC_HOSTING || providerId === 'demo') && (
-              <p
-                className="static-hosting-note"
-                title={`${STATIC_HOSTING ? staticHostingText : ''}${
-                  providerId === 'demo' ? `${STATIC_HOSTING ? ' ' : ''}${demoDataText}` : ''
-                }`}
-              >
-                {providerId === 'demo' ? demoDataText : staticHostingText}
-              </p>
+              <HelpDisclosure label="行情資料說明" className="static-hosting-note">
+                <p>{STATIC_HOSTING ? staticHostingText : ''} {providerId === 'demo' ? demoDataText : ''}</p>
+              </HelpDisclosure>
             )}
             <div className="events-source">{eventsStatus}</div>
           </div>

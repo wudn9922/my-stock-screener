@@ -353,6 +353,69 @@ export const breakoutsSchema = z.object({
 
 export type BreakoutsLoadResult = { status: 'ok'; data: Breakouts; url: string } | { status: 'missing' | 'invalid' | 'error'; message: string; url: string };
 
+const archiveDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+});
+const historyEntry = z.object({
+  asOf: archiveDate,
+  generatedAt: optionalText,
+  markets: z.object({ tw: archiveDate.optional(), us: archiveDate.optional() }),
+});
+export interface BreakoutsHistory {
+  intervalDays: number;
+  snapshots: z.infer<typeof historyEntry>[];
+}
+export type BreakoutsHistoryResult = { status: 'ok'; data: BreakoutsHistory } | { status: 'missing' | 'invalid' | 'error'; message: string };
+
+/** Saved snapshots are selected by their validated data date, never an arbitrary URL. */
+export function breakoutArchiveUrl(asOf: string, latestUrl = breakoutsUrl()): string {
+  return new URL(`breakouts-archive/${archiveDate.parse(asOf)}.json`, latestUrl).href;
+}
+
+export function parseBreakoutsHistory(value: unknown): BreakoutsHistoryResult {
+  const parsed = z.object({ version: z.literal(1), intervalDays: z.number().int().positive(), snapshots: z.array(z.unknown()) }).safeParse(value);
+  if (!parsed.success) return { status: 'invalid', message: '歷史結果清單格式無法辨識。' };
+  const snapshots = new Map<string, z.infer<typeof historyEntry>>();
+  for (const raw of parsed.data.snapshots) {
+    const entry = historyEntry.safeParse(raw);
+    if (entry.success && Object.keys(entry.data.markets).length) snapshots.set(entry.data.asOf, entry.data);
+  }
+  return { status: 'ok', data: { intervalDays: parsed.data.intervalDays, snapshots: [...snapshots.values()].sort((a, b) => b.asOf.localeCompare(a.asOf)) } };
+}
+
+export async function fetchBreakoutsHistory(latestUrl = breakoutsUrl(), fetcher: typeof fetch = fetch): Promise<BreakoutsHistoryResult> {
+  try {
+    const response = await fetcher(new URL('breakouts-history.json', latestUrl).href, { cache: 'no-cache' });
+    if (response.status === 404) return { status: 'missing', message: '尚無已保存的歷史結果。' };
+    if (!response.ok) return { status: 'error', message: '歷史結果清單暫時無法取得。' };
+    try { return parseBreakoutsHistory(JSON.parse(await response.text())); }
+    catch { return { status: 'invalid', message: '歷史結果清單格式無法辨識。' }; }
+  } catch { return { status: 'error', message: '無法連線取得歷史結果清單。' }; }
+}
+
+let sharedHistory: Promise<BreakoutsHistoryResult> | null = null;
+export function loadBreakoutsHistory(refresh = false): Promise<BreakoutsHistoryResult> {
+  if (!sharedHistory || refresh) {
+    const request = fetchBreakoutsHistory().then(result => {
+      if (result.status === 'error' && sharedHistory === request) sharedHistory = null;
+      return result;
+    });
+    sharedHistory = request;
+  }
+  return sharedHistory;
+}
+
+/** Guard against a mislabeled archive so one date cannot display another date's rates. */
+export async function fetchBreakoutSnapshot(asOf: string, latestUrl = breakoutsUrl(), fetcher: typeof fetch = fetch, signal?: AbortSignal): Promise<BreakoutsLoadResult> {
+  const url = breakoutArchiveUrl(asOf, latestUrl);
+  const result = await fetchBreakouts(url, fetcher, signal);
+  if (result.status !== 'ok') return result;
+  const dates = Object.values(result.data.markets).map(market => market.asOf).filter((date): date is string => date !== null);
+  if (!dates.length || [...dates].sort().at(-1) !== asOf) return { status: 'invalid', message: '歷史結果的資料日期不符，請改選其他日期。', url };
+  return result;
+}
+
 /** `breakouts.json` sits next to `latest.json` (or next to `VITE_REPORT_URL`). */
 export function breakoutsUrl(
   base: string = import.meta.env?.BASE_URL ?? '/',

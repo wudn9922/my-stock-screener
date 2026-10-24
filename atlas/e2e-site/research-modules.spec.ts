@@ -77,7 +77,12 @@ test("world four options, historical source frequency, reload and browser back",
     gold.getByTestId("research-candle-host").locator("canvas").first(),
   ).toBeVisible();
   await expect(gold).toContainText("期貨");
-  await expect(gold).toContainText("Yahoo Finance daily OHLC");
+  const goldSource = gold.locator(".research-provenance");
+  await expect(goldSource).not.toHaveAttribute("open");
+  await expect(goldSource.locator("a")).not.toBeVisible();
+  await goldSource.locator(":scope > summary").click();
+  await expect(goldSource.locator("a")).toHaveText("Yahoo Finance daily OHLC");
+  await expect(goldSource.locator("a")).toBeVisible();
   await page.getByRole("button", { name: "匯率", exact: true }).click();
   await expect(page).toHaveURL(/view=fx/);
   await expect(
@@ -114,18 +119,44 @@ test("Taiwan real chips, institutional units, volume structure and symbol separa
     .locator("details.data-research")
     .filter({ has: page.locator("summary", { hasText: "法人買賣超" }) });
   await institutional.locator(":scope > summary").click();
-  await expect(institutional).toContainText("2026-10-21");
-  await institutional.getByRole("combobox").nth(1).selectOption("lots");
-  await expect(institutional).toContainText("買進（張）");
+  await expect(institutional.locator(".research-provenance").first()).toContainText("2026-10-22");
+  // Taiwan quantities are always lots; the former shares/lots selector is gone.
+  await expect(institutional.getByRole("combobox")).toHaveCount(2);
+  await expect(institutional.locator('option[value="shares"], option[value="lots"]')).toHaveCount(0);
+  const dailyBuy = institutional.locator(".research-stats > div").filter({
+    has: page.locator("dt", { hasText: "資料日買進（張）" }),
+  });
+  await expect(dailyBuy.locator("dd")).toHaveText("12,403.967");
+  await expect(institutional.locator(".research-stats dt")).not.toContainText(["（股）"]);
   await expect(institutional).toContainText("法人買超日價格區間（估計）");
+  const costDetails = institutional.locator("details").filter({
+    has: page.locator(":scope > summary", { hasText: "估計使用的實際觀測日" }),
+  });
+  await costDetails.locator(":scope > summary").click();
+  await expect(costDetails.getByRole("columnheader", { name: "正向淨買超（張）" })).toBeVisible();
+  await expect(costDetails.locator("tbody tr").first().locator("td").nth(1)).toHaveText("3,090.73");
   const volume = page
     .locator("details.data-research")
     .filter({ has: page.locator(":scope > summary", { hasText: "價量分析" }) });
   await volume.locator(":scope > summary").click();
-  await expect(volume).toContainText("上漲縮量比例");
-  await expect(volume).toContainText("下跌放量比例");
+  await expect(volume.locator(".research-stats dt")).toHaveText([
+    "異常量 RVOL20", "上漲縮量比例", "下跌放量比例", "上漲放量比例", "下跌縮量比例",
+  ]);
+  await expect(volume.locator(".research-stats dd").first()).toContainText("1.2");
+  await expect(volume.locator("table, svg")).toHaveCount(0);
+  for (const removed of ["ADV", "Amihud", "流動性與完整數據", "近期最大量日期", "價格變化", "連續縮量上漲"])
+    await expect(volume).not.toContainText(removed);
+  await volume.getByLabel("異常放量門檻").fill("1");
+  await expect(volume.locator(".research-stats dd").first()).toContainText("異常放量");
   await volume.getByLabel("價量觀測窗口").selectOption("5");
-  await expect(volume).toContainText("/5 日");
+  const volumeNote = volume.locator(".research-note").filter({
+    has: page.locator(":scope > summary", { hasText: "計算說明" }),
+  });
+  await expect(volumeNote.locator(":scope > summary")).toContainText("/5 日");
+  await expect(volumeNote).not.toHaveAttribute("open");
+  await expect(volumeNote.locator("p").first()).not.toBeVisible();
+  await volumeNote.locator(":scope > summary").click();
+  await expect(volumeNote.locator("p").first()).toBeVisible();
   expect(await noOverflow(page)).toBeLessThanOrEqual(1);
   await page.screenshot({
     path: info.outputPath("research-tw.png"),

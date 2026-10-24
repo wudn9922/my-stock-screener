@@ -6,6 +6,7 @@ import { StockTabs } from '../StockTabs';
 import { displayTicker } from '../format';
 import { adrRatioText, type TwAdrListing } from '../../fundamentals/adrListings';
 import { LEVEL_TEXT, issueText, revisionText } from './financialsView';
+import { FinancialNote } from './FinancialNote';
 
 export type DisplayMode = 'chart' | 'table';
 
@@ -28,9 +29,8 @@ export interface FinancialsHeaderProps {
 }
 
 /**
- * Sticky page head. Row 1: 「K線｜財務」 switch (or back to the chart without a symbol) and the symbol, name
- * and currency. Row 2: period and view switches, with the quality badge and stock search at the end. The
- * search box and quality note open below the rows.
+ * Compact page head: identity, quality and search share the first row. Period and view switches
+ * share the second row; secondary queries are folded. The whole head scrolls with the figures.
  */
 export function FinancialsHeader({
   symbol, name, history, kind, showQuarterly, futuHref, mode, localSymbols, homeListing, onBack, onKind, onMode, onSymbol, onHomeListing,
@@ -57,17 +57,32 @@ export function FinancialsHeader({
           {name && symbol && name.toUpperCase() !== symbol && name !== displayTicker(symbol) && <span className="fin-name">{name}</span>}
           {history && <span className="fin-currency">{history.currency}</span>}
         </div>
-      </div>
-      {futuHref && symbol && (
-        <div className="fin-head-row fin-outbound-row">
-          <a className="fin-futu-link" href={futuHref} target="_blank" rel="noopener noreferrer">
-            在富途網頁查看財報
-          </a>
-          <a className="fin-futu-link" href={`ftnn://quote/2/${encodeURIComponent(symbol)}/`}>
-            在富途 App 開啟
-          </a>
+        <div className="fin-head-tools">
+          {history && level && (
+            <button
+              type="button"
+              className={`fin-quality ${level}`}
+              aria-expanded={qualityOpen}
+              aria-controls="fin-quality-details"
+              onClick={() => setQualityOpen((open) => !open)}
+              title="資料品質說明"
+            >
+              <Info size={12} aria-hidden="true" />
+              {LEVEL_TEXT[level]}
+            </button>
+          )}
+          <button
+            type="button"
+            className={`icon-button fin-search-toggle${searching ? ' active' : ''}`}
+            aria-label={searching ? '關閉搜尋' : '搜尋其他股票'}
+            aria-expanded={searching}
+            aria-controls="fin-symbol-search"
+            onClick={() => setSearching((open) => !open)}
+          >
+            {searching ? <X size={16} /> : <Search size={16} />}
+          </button>
         </div>
-      )}
+      </div>
       <div className="fin-head-row controls">
         {showQuarterly && (
           <div className="segmented compact" role="group" aria-label="期間">
@@ -95,46 +110,28 @@ export function FinancialsHeader({
             </button>
           ))}
         </div>
-        <div className="fin-head-tools">
-          {history && level && (
-            <button
-              type="button"
-              className={`fin-quality ${level}`}
-              aria-expanded={qualityOpen}
-              onClick={() => setQualityOpen((open) => !open)}
-              title="資料品質說明"
-            >
-              <Info size={13} aria-hidden="true" />
-              {LEVEL_TEXT[level]}
-            </button>
-          )}
-          <button
-            type="button"
-            className={`icon-button${searching ? ' active' : ''}`}
-            aria-label={searching ? '關閉搜尋' : '搜尋其他股票'}
-            aria-expanded={searching}
-            onClick={() => setSearching((open) => !open)}
-          >
-            {searching ? <X size={18} /> : <Search size={18} />}
-          </button>
-        </div>
+        {(futuHref && symbol || homeListing && onHomeListing) && (
+          <FinancialNote label="其他查詢" className="fin-other-queries">
+            {futuHref && symbol && (
+              <div className="fin-outbound-row">
+                <a className="fin-futu-link" href={futuHref} target="_blank" rel="noopener noreferrer">在富途網頁查看財報</a>
+                <a className="fin-futu-link" href={`ftnn://quote/2/${encodeURIComponent(symbol)}/`}>在富途 App 開啟</a>
+              </div>
+            )}
+            {homeListing && onHomeListing && (
+              <p className="fin-home-listing">
+                也可查看{' '}
+                <button type="button" className="fin-home-link" title={`${homeListing.twName}（台股）`} onClick={() => onHomeListing(homeListing)}>
+                  {homeListing.tw}（台股）財報
+                </button>
+                <span className="fin-home-ratio">{adrRatioText(homeListing)}</span>
+              </p>
+            )}
+          </FinancialNote>
+        )}
       </div>
-      {homeListing && onHomeListing && (
-        <p className="fin-home-listing">
-          也可查看{' '}
-          <button
-            type="button"
-            className="fin-home-link"
-            title={`${homeListing.twName}（台股）`}
-            onClick={() => onHomeListing(homeListing)}
-          >
-            {homeListing.tw}（台股）財報
-          </button>
-          <span className="fin-home-ratio">{adrRatioText(homeListing)}</span>
-        </p>
-      )}
       {searching && (
-        <div className="fin-search">
+        <div className="fin-search" id="fin-symbol-search">
           <SymbolSearch
             mode="dropdown"
             autoFocus={!!symbol}
@@ -147,7 +144,7 @@ export function FinancialsHeader({
         </div>
       )}
       {qualityOpen && history && (
-        <div className="fin-quality-panel" role="note">
+        <div className="fin-quality-panel" id="fin-quality-details" role="note">
           <p>
             <b>{level ? LEVEL_TEXT[level] : '品質未標示'}</b>
             {`：年度 ${history.annual.end.length} 期、季度 ${history.quarterly.end.length} 期。`}

@@ -1,3 +1,7 @@
+## Atlas interface refinements (2026-10-24)
+
+The requested twelve changes compact financials, remove automatic chart MAs, expose archived entry-success calculations, use 20-session average share volume with Taiwan lot display, align fixed-MA filtering across saved-list evaluations, and reduce permanent explanatory text. [Scope, review triage and data boundaries](docs/UI_REFINEMENTS_2026-10-24.md) document the final behavior. Review findings were returned to the primary engineer and explicitly accepted before implementation. Final verification is recorded in the pull request; no external review, deployment, merge, or physical Safari sign-off is claimed.
+
 ## Current review: account storage authorization (2026-10-23)
 
 Guests and ungranted LINE users can use chart drawing, groups, stock MAs and lists in memory without app-managed persistent writes. The verified owner alone can choose none/device/cloud grants; owner identity is enforced by the server. Device mode scopes all personal storage and disposable caches by account and mode. Account/policy changes replace the workspace and cancel stale operations. No shared legacy record is automatically adopted, migrated, deleted or uploaded. Both Edge Functions and SQL enforce cloud permission, and scheduled consumers reject ungranted private operations and other-account public artifacts. The bounded policy table is changed only by explicit owner actions, never by login. A device-mode owner can still administer grants. Mode-specific notices and non-cloud list renaming preserve usable guest/device behavior.

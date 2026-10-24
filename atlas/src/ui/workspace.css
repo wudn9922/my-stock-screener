@@ -992,6 +992,7 @@
 }
 .app-shell {
   position: relative;
+  isolation: isolate;
   height: 100%;
   min-height: 0;
   display: flex;
@@ -1141,7 +1142,6 @@
   min-height: 44px;
   padding: 2px 10px;
   border-left: 1px solid var(--border);
-  cursor: help;
 }
 .ws-valuation dt {
   font-size: 11px;
@@ -2029,5 +2029,38 @@
   .ws-stats-panel {
     left: auto;
     right: 0;
+  }
+}
+
+/* Sheets stay within the chart viewport, above the site's navigation row. */
+.site .app-shell:not(.chart-focus) > .sheet-backdrop {
+  position: fixed;
+}
+.site .app-shell:not(.chart-focus) > .sheet-backdrop .bottom-sheet {
+  max-height: 100%;
+}
+.ws-stock-statistics > .help-disclosure {
+  margin: 0 0 0 10px;
+  font-size: 10px;
+}
+.ws-stock-statistics > .help-disclosure > summary {
+  min-height: 22px;
+  line-height: 22px;
+}
+
+.source-strip > .help-disclosure {
+  white-space: normal;
+  overflow: visible;
+}
+.source-strip > .help-disclosure[open] {
+  flex-basis: 100%;
+}
+
+@media (max-width: 1099px) {
+  .site .app-shell:not(.chart-focus) > .sheet-backdrop {
+    bottom: calc(var(--tabbar) + var(--safe-bottom));
+  }
+  .site .app-shell:not(.chart-focus) > .sheet-backdrop.tablet-context {
+    padding-bottom: 8px;
   }
 }
