@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex">
+<title>研究終端</title>
+<script>
+  // 保留完整 query（含 LINE LIFF 的 ?liff.state=...）與 hash，交給 Atlas 決定預設頁面
+  (function () {
+    var target = "atlas/" + window.location.search + window.location.hash;
+    window.location.replace(target);
+  })();
+</script>
+<noscript><meta http-equiv="refresh" content="0; url=atlas/"></noscript>
+<style>
+  html, body { height: 100%; margin: 0; background: #0b0e14; color: #cbd5e1; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 16px; text-align: center; line-height: 1.7;
+    font-family: system-ui, -apple-system, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  a { color: #7dd3fc; }
+</style>
+</head>
+<body>
+<p>
+  正在開啟研究終端…<br>
+  <a id="atlas-link" href="atlas/">若沒有自動開啟，請點這裡</a>
+</p>
+<script>
+  document.getElementById("atlas-link").href =
+    "atlas/" + window.location.search + window.location.hash;
+</script>
+</body>
+</html>
