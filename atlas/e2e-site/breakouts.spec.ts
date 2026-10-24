@@ -6,6 +6,9 @@ import { mockSite } from './mocks';
 const body = readFileSync(resolve(import.meta.dirname, '../tests/fixtures/breakouts/breakouts.sample.json'), 'utf8');
 async function mockBreakouts(page: Page, payload: unknown = JSON.parse(body), status = 200) {
   await mockSite(page);
+  await page.route('**/my-stock-screener/report/breakouts-history.json', route => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify({ version: 1, intervalDays: 20, snapshots: [] }),
+  }));
   await page.route('**/my-stock-screener/report/breakouts.json', route => route.fulfill({
     status, contentType: typeof payload === 'string' ? 'text/html' : 'application/json',
     body: typeof payload === 'string' ? payload : JSON.stringify(payload),
@@ -135,4 +138,40 @@ test('partial-market scope remains hidden', async ({ page }) => {
   await page.goto('./?page=markets&market=us');
   await expect(card(page).getByRole('status')).toContainText('舊的部分市場樣本不列入');
   await expect(card(page).locator('.bo-win')).toHaveCount(0);
+});
+
+test('saved 20-day test dates show their own original results and return to the latest report', async ({ page }) => {
+  await mockBreakouts(page);
+  await page.route('**/my-stock-screener/report/breakouts-history.json', route => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify({ version: 1, intervalDays: 20, snapshots: [
+      { asOf: '2026-09-19', generatedAt: '2026-09-19T10:00:00Z', markets: { tw: '2026-09-19', us: '2026-09-18' } },
+      { asOf: '2026-08-30', generatedAt: '2026-08-30T10:00:00Z', markets: { tw: '2026-08-30' } },
+    ] }),
+  }));
+  const archive = JSON.parse(body);
+  archive.generatedAt = '2026-09-19T10:00:00Z';
+  archive.markets.tw.asOf = '2026-09-19';
+  archive.markets.us.asOf = '2026-09-18';
+  const comparison = archive.markets.tw.windows['1m'].strategies.swingHigh.comparison;
+  comparison.rules.hold5 = { wins: 66, failures: 154, evaluatedN: 220, winRate: 30 };
+  await page.route('**/my-stock-screener/report/breakouts-archive/2026-09-19.json', route => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify(archive),
+  }));
+  await page.route('**/my-stock-screener/report/breakouts-archive/2026-08-30.json', route => route.fulfill({ status: 404, body: 'not found' }));
+  await page.goto('./?page=markets&market=tw');
+  const dates = card(page).getByRole('combobox', { name: '進場成功率測試日期' });
+  await expect(dates.locator('option')).toHaveCount(3);
+  await expect(row(page).locator('.bo-win')).toContainText('50.0%');
+  await dates.selectOption('2026-09-19');
+  await expect(card(page).locator('.bo-asof')).toHaveText('資料日 2026/09/19');
+  await expect(row(page).locator('.bo-win')).toContainText('30.0%');
+  await expect(row(page).locator('.bo-ratio')).toContainText('66／220');
+  await expect(card(page).locator('.bo-history')).toContainText('2026/09/19');
+  await dates.selectOption('2026-08-30');
+  await expect(card(page).getByRole('status')).toContainText('突破勝率資料尚未產生');
+  await expect(card(page).locator('.bo-win')).toHaveCount(0);
+  await dates.selectOption('latest');
+  await expect(card(page).locator('.bo-asof')).toHaveText('資料日 2026/10/09');
+  await expect(row(page).locator('.bo-win')).toContainText('50.0%');
+  await noOverflow(page);
 });

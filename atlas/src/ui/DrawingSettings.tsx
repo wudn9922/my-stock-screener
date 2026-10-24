@@ -1,3 +1,4 @@
+import { HelpDisclosure } from './HelpDisclosure';
 import { useEffect, useState, type FormEvent } from 'react';
 import type { AppStore } from '../app/AppStore';
 import { toolNames, type Drawing, type DrawingStyle } from '../drawing/DrawingModel';
@@ -138,7 +139,7 @@ export function DrawingSettings({
               費波那契層級（以逗號分隔）
               <input aria-label="費波那契層級" aria-invalid={!levelsValid} value={levels} disabled={locked} onChange={(event) => setLevels(event.target.value)} />
             </label>
-            <p className="small muted">輸入 2–32 個介於 0 到 1 的不重複數值；未勾選的層級會隱藏。</p>
+            <HelpDisclosure label="費波那契層級說明">輸入 2–32 個介於 0 到 1 的不重複數值；未勾選的層級會隱藏。</HelpDisclosure>
             {levelsValid && parsedLevels.map((level) => (
               <label className="research-checkbox" key={level}>
                 <input type="checkbox" aria-label={`顯示費波那契層級 ${level}`} checked={!draft.hiddenLevels?.includes(level)} disabled={locked} onChange={(event) => setHidden(level, !event.target.checked)} />
@@ -172,7 +173,7 @@ export function DrawingSettings({
           <button type="button" onClick={() => { onCancelGesture(); store.mutateDrawing(drawing.id, 'lock'); }} style={{ minHeight: 44 }} className="ghost-button">解鎖畫線</button>
         )}
       </form>
-      <p className="small muted">ATR 線寬＝0.02 × 14 根 K 棒 ATR 換算成 0.5–4 像素（至少 1 個實體像素）。新畫線預設使用 ATR 線寬，已儲存的畫線保留原設定。預設樣式只套用於之後的新畫線；費波那契預設維持標準七個層級。</p>
+      <HelpDisclosure label="畫線樣式與線寬說明">ATR 線寬＝0.02 × 14 根 K 棒 ATR 換算成 0.5–4 像素（至少 1 個實體像素）。新畫線預設使用 ATR 線寬，已儲存的畫線保留原設定。預設樣式只套用於之後的新畫線；費波那契預設維持標準七個層級。</HelpDisclosure>
     </section>
   );
 }

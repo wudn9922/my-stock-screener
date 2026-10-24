@@ -1059,3 +1059,11 @@
   flex: none;
   overflow: visible;
 }
+
+/* Supporting notes stay behind a tap and use the quieter text hierarchy. */
+.fs-help { margin-top: 4px; }
+.fs-help > summary { width: fit-content; color: var(--text-3); font-size: 11px; }
+.fs-help .fs-hint { margin-top: 0; font-size: 11px; }
+.screener-note:not(.open) { display: block; }
+.screener-note > span { display: block; margin-top: 4px; }
+.row-note { color: var(--text-3); font-size: 10px; font-weight: 400; }

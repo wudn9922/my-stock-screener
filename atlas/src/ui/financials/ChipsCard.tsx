@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FinancialNote } from './FinancialNote';
 import { Globe2, Users } from 'lucide-react';
 import {
   chipsForSymbol,
@@ -78,9 +79,9 @@ function ForeignCard({ chips, symbol }: { chips: StockChips; symbol: string }) {
           {sourceNote(chips.foreignSource)}
           <p className="fin-chart-title">近 {foreign.series.filter((value) => value !== null).length} 個交易日</p>
           <Sparkline values={foreign.series} dates={foreign.dates} label={`${symbol} 外資持股比例走勢`} unit="%" digits={2} />
-          <p className="chip-def">
+          <FinancialNote className="chip-def" label="外資持股口徑"><p>
             口徑：全體外資及陸資持股比率（持有股數 ÷ 發行股數），{sourceName}逐日公布；本站每個交易日收錄一次、逐日累積，歷史長度以實際累積為準。變動以百分點計，僅呈現數字，不代表買賣訊號。
-          </p>
+          </p></FinancialNote>
         </div>
       ) : (
         <p className="chip-empty" role="status">
@@ -123,9 +124,9 @@ function HoldersCard({ chips, symbol }: { chips: StockChips; symbol: string }) {
           <p className="fin-chart-title">近 {holders.series.filter((value) => value !== null).length} 週</p>
           <Sparkline values={holders.series} dates={holders.dates} label={`${symbol} 總股東人數走勢`} unit=" 人" digits={0} />
           <LargeHolders rows={chips.largeHolders ?? []} />
-          <p className="chip-def">
+          <FinancialNote className="chip-def" label="股東人數口徑"><p>
             口徑：集保戶股權分散表第 17 級（合計）人數，每週公布一次，不含第 16 級差異數調整；本站逐週累積，歷史長度以實際累積為準。僅呈現人數與走勢，不代表買賣訊號。
-          </p>
+          </p></FinancialNote>
         </div>
       ) : (
         <p className="chip-empty" role="status">
@@ -155,7 +156,7 @@ export function ChipsSection({ symbol }: { symbol: string }) {
     <section className="fin-chips-section" aria-label="籌碼" aria-busy={result === null}>
       <div className="chip-section-head">
         <h2>籌碼</h2>
-        <p>外資持股比例與總股東人數；官方公開資料，僅呈現數字與走勢。</p>
+        <FinancialNote label="籌碼說明"><p>外資持股比例與總股東人數；官方公開資料，僅呈現數字與走勢。</p></FinancialNote>
       </div>
       {result === null ? (
         <p className="chip-empty" role="status">

@@ -4,20 +4,17 @@
   padding-top: 0;
 }
 
-/* -- Sticky head */
+/* -- Compact scrolling head */
 .fin-head {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 5;
-  margin: 0 -24px 12px;
-  padding: 10px 24px 10px;
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  margin: 0 -24px 10px;
+  padding: 6px 24px;
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 .fin-head-row {
   display: flex;
@@ -30,7 +27,9 @@
   flex-wrap: wrap;
 }
 .fin-outbound-row {
-  margin-top: -4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
 .fin-futu-link {
   color: var(--accent-text);
@@ -43,8 +42,14 @@
 .fin-head-tools {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   margin-left: auto;
+  flex-shrink: 0;
+}
+.fin-head-tools .fin-search-toggle {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
 }
 .fin-back {
   display: inline-flex;
@@ -118,27 +123,26 @@
 .fin-quality {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  min-height: 32px;
-  padding: 0 9px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+  gap: 3px;
+  min-height: 30px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
   flex-shrink: 0;
   border: 1px solid transparent;
 }
 .fin-quality.good {
-  color: var(--accent-text);
-  background: var(--accent-soft);
+  color: var(--text-3);
+  background: transparent;
 }
 .fin-quality.partial {
   color: var(--warn);
-  background: rgba(224, 164, 58, 0.12);
+  background: transparent;
 }
 .fin-quality.limited {
   color: var(--warn);
-  border-color: rgba(224, 164, 58, 0.5);
-  background: rgba(224, 164, 58, 0.06);
+  background: transparent;
 }
 .fin-quality-panel {
   background: var(--surface);
@@ -222,7 +226,7 @@
   margin: 0;
 }
 .fin-notes .fin-depth {
-  color: var(--text-2);
+  color: var(--text-3);
 }
 .fin-warn {
   color: var(--warn);
@@ -271,7 +275,59 @@
   margin: 10px 14px 0;
   font-size: 12px;
   line-height: 1.6;
-  color: var(--warn);
+  color: var(--text-3);
+}
+.fin-explanation {
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+.fin-explanation > summary {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 400;
+}
+.fin-explanation > summary::-webkit-details-marker {
+  display: none;
+}
+.fin-explanation > summary::before {
+  content: '›';
+  display: inline-block;
+  transition: transform 0.15s;
+}
+.fin-explanation[open] > summary::before {
+  transform: rotate(90deg);
+}
+.fin-explanation > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.fin-explanation-content p {
+  margin: 4px 0;
+}
+.fin-other-queries {
+  margin-left: auto;
+}
+.fin-other-queries > .fin-explanation-content {
+  position: absolute;
+  top: 100%;
+  right: 24px;
+  max-width: min(420px, calc(100% - 32px));
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.fin-detail > .fin-explanation {
+  margin-top: 6px;
 }
 .fin-tabs {
   display: flex;
@@ -645,7 +701,34 @@
 @media (max-width: 767px) {
   .fin-head {
     margin: 0 -16px 10px;
-    padding: 8px 16px;
+    padding: 4px 16px;
+  }
+  .fin-head-main {
+    gap: 6px;
+  }
+  .fin-title {
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .fin-title b {
+    font-size: 14px;
+  }
+  .fin-name {
+    display: none;
+  }
+  .fin-head-row.controls {
+    gap: 6px;
+  }
+  .fin-other-queries > .fin-explanation-content {
+    right: 16px;
+  }
+  .fin-head-tools .fin-search-toggle,
+  .fin-quality {
+    min-height: 36px;
+  }
+  .fin-head-tools .fin-search-toggle {
+    height: 36px;
+    width: 36px;
   }
   .fin-cards {
     grid-template-columns: minmax(0, 1fr);
@@ -885,7 +968,7 @@
 }
 .fin-row-note {
   margin-top: 2px;
-  color: var(--warn) !important;
+  color: var(--text-3);
   white-space: normal;
 }
 .fin-row-head {

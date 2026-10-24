@@ -1,3 +1,4 @@
+import { HelpDisclosure } from './HelpDisclosure';
 import { useMemo, useState } from 'react';
 import type { ThemesData } from '../report/themes';
 import { ROTATION_LABELS, themeRotation, type RotationState } from '../pages/themeRotation';
@@ -13,7 +14,7 @@ export function ThemeRotationCard({ data, onOpen }: { data: ThemesData; onOpen: 
         題材輪動追蹤 <span>領先・轉強・轉弱・落後</span>
       </summary>
       <div className="research-disclosure-body">
-        <p className="muted">用各題材相對 {data.benchmark.label} 的近 21 個交易日報酬，以及相對前一個 21 日區間的變化，觀察強弱輪動。</p>
+        <HelpDisclosure label="輪動計算說明">用各題材相對 {data.benchmark.label} 的近 21 個交易日報酬，以及相對前一個 21 日區間的變化，觀察強弱輪動。</HelpDisclosure>
         <div className="console-actions" role="group" aria-label="輪動狀態">
           <button type="button" className="chip" aria-pressed={state === 'all'} onClick={() => setState('all')}>
             全部
@@ -71,10 +72,10 @@ export function ThemeRotationCard({ data, onOpen }: { data: ThemesData; onOpen: 
             </table>
           </div>
         )}
-        <p className="muted">
+        <HelpDisclosure label="狀態與排名說明">
           領先＝相對報酬為正且改善；轉弱＝為正但下滑；落後＝為負且下滑；轉強＝為負但改善。排名變化僅比較兩期皆有資料的題材，並非資金流入流出。
           {entries[0] ? `比較日 ${entries[0].previousDate} → ${entries[0].asOf}。` : ''}
-        </p>
+        </HelpDisclosure>
       </div>
     </details>
   );

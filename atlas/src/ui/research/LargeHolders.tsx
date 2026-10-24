@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { holderBaseline, type LargeHolder } from "../../report/twChips";
-import { HistoryPlot, num, Stat, ResearchDisclosure } from "./Common";
+import {
+  HistoryPlot,
+  num,
+  Stat,
+  ResearchDisclosure,
+  ResearchNote,
+} from "./Common";
 export function LargeHolders({ rows }: { rows: LargeHolder[] }) {
   return (
     <ResearchDisclosure title="大戶持股比例與集保戶人數">
@@ -99,12 +105,14 @@ function LargeHoldersData({ rows }: { rows: LargeHolder[] }) {
         label="集保戶人數／大戶持股比例"
         unit=" 人"
       />
-      <p className="source-note">
-        藍線為集保戶人數、金線為大戶比例（各自刻度，拖曳日期查值）。第 12～15
-        級為超過 400,000 股，第 15 級為超過 1,000,000 股；第 16
-        級差異調整不計入，第 17
-        級庫存股數作分母，並核對官方比例。名稱沿用市場常用「以上」，實際分級為嚴格超過門檻。這是集保戶分布，不代表所有最終受益人已精確歸戶，也不是法人交易資料。公開下載僅最新一週，本站保留已累積歷史；不補造過去一年。
-      </p>
+      <ResearchNote title="分級與歷史資料說明">
+        <p>
+          藍線為集保戶人數、金線為大戶比例（各自刻度，拖曳日期查值）。第 12～15
+          級為超過 400 張，第 15 級為超過 1,000 張；第 16 級差異調整不計入，第
+          17
+          級庫存股數作分母，並核對官方比例。名稱沿用市場常用「以上」，實際分級為嚴格超過門檻。這是集保戶分布，不代表所有最終受益人已精確歸戶，也不是法人交易資料。公開下載僅最新一週，本站保留已累積歷史；不補造過去一年。
+        </p>
+      </ResearchNote>
     </>
   );
 }

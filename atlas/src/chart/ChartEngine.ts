@@ -37,10 +37,7 @@ import { averageTrueRange } from '../indicators/AverageTrueRange';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { marketTimeOptions } from './MarketTimeLabels';
 import { AXIS_FONT_FAMILY, AXIS_TEXT_COLOR, axisFontSize, compactAxisPrice } from './AxisAppearance';
-const compactVolume = new Intl.NumberFormat('en-US', {
-  notation: 'compact',
-  maximumFractionDigits: 2,
-});
+import { formatMarketVolume } from '../ui/format';
 export interface ChartCallbacks {
   defaults?: (type: ToolKind) => Partial<DrawingStyle>;
   commit: (symbol: string, drawings: Drawing[], label: string, timeframe: Timeframe) => void;
@@ -246,6 +243,9 @@ export class ChartEngine {
     this.chart.clearCrosshairPosition();
     this.suppressCrosshairReadout = false;
     this.symbol = symbol;
+    const volumeFormat = { type: 'custom' as const, minMove: 1, formatter: (value: number) => formatMarketVolume(value, symbol) };
+    this.volume.applyOptions({ priceFormat: volumeFormat });
+    this.volumeAverage.applyOptions({ priceFormat: volumeFormat });
     this.timeframe = timeframe;
     this.bars = result.bars;
     this.atr = averageTrueRange(result.bars);
@@ -538,7 +538,7 @@ export class ChartEngine {
         : value === null
           ? 'N/A'
           : format === 'volume'
-            ? compactVolume.format(value)
+            ? formatMarketVolume(value, this.symbol)
             : value.toFixed(2);
     };
     const rows = this.legend.querySelectorAll<HTMLElement>('[data-indicator-id]');

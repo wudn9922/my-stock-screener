@@ -5,7 +5,7 @@ import { validateWatchlist } from '../../supabase/functions/user-settings/watchl
 import { parseMovingAverages } from '../src/cloud/settingsApi';
 
 const members = (...symbols: string[]) => symbols.map((symbol) => ({ symbol, name: symbol }));
-const make = () => createWatchlist({ name: '成長股', market: 'US', group: 'universe-us', filters: 'chg:3:' });
+const make = () => createWatchlist({ name: '成長股', market: 'US', group: 'universe-us', filters: 'rs:80' });
 const storage = () => {
   const data = new Map<string, string>();
   return {

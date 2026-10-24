@@ -1,3 +1,4 @@
+import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
 import type { PageProps } from './pageProps';
 import { SecRadar } from '../ui/research/SecRadar';
@@ -25,6 +26,8 @@ import { accessState, requireCloudAccess } from '../auth/access';
 import { canPersist } from '../auth/storage';
 import { StorageAdminPanel, StorageModeNotice } from '../ui/StorageAdminPanel';
 import { LegacyImportCard } from '../ui/LegacyImportCard';
+import { getDailyBars } from '../app/dataSources';
+import { loadScreenerFixedMAs } from './screenerFixedMAs';
 
 type CloudList = { id: string; definition: unknown; updated_at: string };
 
@@ -149,7 +152,10 @@ export default function ConsolePage({ report, navigate, openChart, list: request
       }
       if (!dataDate) throw new Error('來源缺少資料日期；沒有改動上次名單。');
       const growth = needsGrowth(parseFilters(selected.filters)) ? await loadMarketGrowth(selected.market, attempt > 0) : undefined;
-      const members = evaluateWatchlist(selected, items, growth);
+      const fixedMAs = parseFilters(selected.filters).ema20
+        ? await loadScreenerFixedMAs(items, await settingsApi<ParameterStock[]>('stocks.list'), getDailyBars)
+        : undefined;
+      const members = evaluateWatchlist(selected, items, growth, fixedMAs);
       if (!active) return;
       const latest = store.getSnapshot().document.lists.find((entry) => entry.id === selected.id);
       if (!latest || latest.filters !== selected.filters || latest.group !== selected.group) return;
@@ -441,7 +447,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                 {selected.kind === 'manual'
                   ? `手動固定 ${selected.symbols.length} 檔`
                   : `來源：${sourceName} · ${
-                      activeChips(parseFilters(selected.filters))
+                      activeChips(parseFilters(selected.filters), undefined, selected.market, !!activeVisit?.members.some(member => fixedParameters[member.symbol]?.length))
                         .map((chip) => chip.label)
                         .join('、') || '不限制條件'
                     }`}
@@ -587,9 +593,9 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                   {!activeVisit.members.length && <p>目前沒有符合這組條件的股票。</p>}
                 </>
               )}
-              <p className="muted">
+              <HelpDisclosure label="入選追蹤與比較說明">
                 比較基準是上次開啟此清單的結果。同一資料日重開不增加天數；已同步且啟用每日收集時，會累計每日實際入選紀錄。本機模式只計算已觀察的連續資料日；沒有紀錄的期間不推算，遇資料缺漏保留原基準。
-              </p>
+              </HelpDisclosure>
               <details className="research-disclosure">
                 <summary>{cloudAllowed ? '清單設定與 Supabase 同步' : '清單名稱與設定'}</summary>
                 <div className="research-disclosure-body">

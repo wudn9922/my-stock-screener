@@ -82,6 +82,9 @@ for (const [name, type, settings] of [
           has: page.locator(":scope > summary", { hasText: "SEC 8-K" }),
         });
         await sec.locator(":scope > summary").click();
+        await sec
+          .locator("summary", { hasText: /^查詢覆蓋與申報類型$/ })
+          .click();
         await sec.getByText(/CIK 對應/).waitFor();
       }
     }

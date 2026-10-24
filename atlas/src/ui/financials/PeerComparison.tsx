@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FinancialNote } from './FinancialNote';
 import { loadFinancials, type FinancialHistory, type FinancialsLoadResult, type PeriodKind } from '../../fundamentals/FinancialHistory';
 import { industryPeers, peerFigures, PEER_COLUMNS } from '../../fundamentals/peerComparison';
 import { loadUniverse } from '../../report/universe';
@@ -121,11 +122,11 @@ export function PeerComparison({
               </tbody>
             </table>
           </div>
-          <p className="muted">
+          <FinancialNote label="同業比較說明"><p>
             目前比較{kind === 'quarterly' ? '季度' : '年度'}
             資料；各公司會計年度與最新期末日可能不同，請對照日期。缺值或金融業不適用欄位顯示「—」，滑過數值可查看原因。ROE
             沿用既有財報計算口徑。
-          </p>
+          </p></FinancialNote>
         </div>
       )}
     </details>

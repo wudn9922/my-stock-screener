@@ -20,6 +20,7 @@ import {
   removeFilter,
   serializeFilters,
   toggleVolume,
+  volumeThresholdOf,
   writeStoredFilters,
   type FilterState,
 } from '../src/pages/screenerFilters';
@@ -40,6 +41,16 @@ const item = (symbol: string, metrics: Record<string, unknown> | null, extra: Re
   groupItemSchema.parse({ symbol, close: 100, changePct: 1, maList: [20], maValues: { 20: 95 }, metrics, ...extra });
 
 describe('filter encoding', () => {
+  it('converts Taiwan fractional lots exactly while US thresholds stay integer shares', () => {
+    expect(volumeThresholdOf('1.001', 'TW')).toBe(1001);
+    expect(volumeThresholdOf('0.001', 'TW')).toBe(1);
+    expect(volumeThresholdOf('1000', 'TW')).toBe(1_000_000);
+    expect(volumeThresholdOf('1.001', 'US')).toBeUndefined();
+    expect(volumeThresholdOf('1001', 'US')).toBe(1001);
+    expect(volumeThresholdOf('0', 'TW')).toBeNull();
+    expect(volumeThresholdOf('', 'US')).toBeNull();
+    expect(volumeThresholdOf('9007199254740992', 'US')).toBeUndefined();
+  });
   it('round-trips share thresholds and rejects invalid values while preserving old links', () => {
     expect(serializeFilters(state('vol:250000;vr:1.2'))).toBe('vr:1.2;vol:250000');
     for (const value of ['0', '-1', '1.5', 'Infinity', '9007199254740992', '10:20', '']) {
@@ -56,7 +67,7 @@ describe('filter encoding', () => {
   it('parses the documented example and serializes it canonically', () => {
     const parsed = state('chg:0:3;ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;vr:1.5;eps:2:20;rev:10');
     expect(parsed).toEqual({
-      chg: { min: 0, max: 3 },
+      chg: null,
       ema20: { min: -5, max: 5 },
       tr: ['a20', 'a50', 'stack'],
       hi: 10,
@@ -74,25 +85,25 @@ describe('filter encoding', () => {
       turn: true,
       keepMissing: false,
     });
-    expect(serializeFilters(parsed)).toBe('chg:0:3;ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;vr:1.5;eps:2:20;rev:1:10');
+    expect(serializeFilters(parsed)).toBe('ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;vr:1.5;eps:2:20;rev:1:10');
   });
 
   it('round-trips open ranges, every flag and the missing-data switch', () => {
-    const text = 'chg::-3;ema20:2:;tr:a20,a50,a200,slope,stack,nobear;rs3:0;eps:3:0;nd:keep';
+    const text = 'ema20:2:;tr:a20,a50,a200,slope,stack,nobear;rs3:0;eps:3:0;nd:keep';
     const parsed = state(text);
-    expect(parsed.chg).toEqual({ min: null, max: -3 });
+    expect(parsed.chg).toBeNull();
     expect(parsed.ema20).toEqual({ min: 2, max: null });
     expect(parsed.keepMissing).toBe(true);
     expect(serializeFilters(parsed)).toBe(text);
     expect(serializeFilters(state(serializeFilters(parsed)))).toBe(text);
-    expect(state('chg:~:-3').chg).toEqual({ min: null, max: -3 });
+    expect(state('chg:~:-3').chg).toBeNull();
   });
 
   it('drops the retired MA20 / MA50 / MA200 ranges instead of migrating them', () => {
     expect(state('ma20:-5:5;ma50:-5:5;ma200:-20:20')).toEqual(EMPTY_FILTERS);
     const mixed = state('chg:0:3;ma50:-5:5;ema20:1:4;ma200::;vr:1.1');
-    expect(mixed).toEqual({ ...EMPTY_FILTERS, chg: { min: 0, max: 3 }, ema20: { min: 1, max: 4 }, vr: 1.1 });
-    expect(serializeFilters(mixed)).toBe('chg:0:3;ema20:1:4;vr:1.1');
+    expect(mixed).toEqual({ ...EMPTY_FILTERS, chg: null, ema20: { min: 1, max: 4 }, vr: 1.1 });
+    expect(serializeFilters(mixed)).toBe('ema20:1:4;vr:1.1');
     expect(serializeFilters(mixed)).not.toMatch(/(^|;)ma\d/);
     // Stored (localStorage) values go through the same parser.
     const store = { getItem: () => JSON.stringify({ TW: 'ma50:-5:5;hi:10' }) } as unknown as Storage;
@@ -107,14 +118,15 @@ describe('filter encoding', () => {
     const junk = state('zzz:1;chg:a:b;hi:0;hi:500;rs:0;rs:150;vr:-1;eps:9:20;eps:x;tr:up,a20,A50;ema20::;;:;rev:1:x');
     expect(junk).toEqual({ ...EMPTY_FILTERS, tr: ['a20', 'a50'], eps: { quarters: 9, min: 20, share: 100 } });
     // Reversed bounds are swapped; the last duplicate wins.
-    expect(state('chg:5:-2;hi:5;hi:20')).toMatchObject({ chg: { min: -2, max: 5 }, hi: 20 });
+    expect(state('ema20:5:-2;hi:5;hi:20')).toMatchObject({ ema20: { min: -2, max: 5 }, hi: 20 });
     expect(serializeFilters(EMPTY_FILTERS)).toBe('');
     // nd only matters with a fundamental gate.
     expect(serializeFilters({ ...EMPTY_FILTERS, keepMissing: true })).toBe('');
     const full = serializeFilters(state('chg:-12.345:99.999;ema20:-20:20;tr:a20,a50,a200,slope,stack,nobear;hi:20;rs:90;rs3:0;vr:2;eps:3:25;rev:3:20;nd:keep'));
     expect(full.length).toBeLessThanOrEqual(300);
     expect(full).toMatch(/^[A-Za-z0-9:.,;_~-]+$/);
-    expect(full.startsWith('chg:-12.35:100;')).toBe(true);
+    expect(full.startsWith('ema20:-20:20;')).toBe(true);
+    expect(full).not.toContain('chg:');
   });
 
   it('carries the conditions in the screener route', () => {
@@ -137,21 +149,22 @@ describe('applyFilters', () => {
     expect(applyFilters(TW, EMPTY_FILTERS, tw)).toHaveLength(TW.length);
   });
 
-  it('filters traded shares inclusively in both markets without depending on metrics or volume ratio', () => {
+  it('filters 20-session average volume inclusively in both markets without substituting daily volume', () => {
     const rows = [
-      item('LOW', null, { volume: 99_999 }),
-      item('BOUNDARY', null, { volume: 100_000 }),
-      item('HIGH', null, { volume: 1_000_000 }),
-      item('ZERO', null, { volume: 0 }),
-      item('UNKNOWN', null),
+      item('LOW', { volumeAvg20: 99_999 }, { volume: 50_000_000 }),
+      item('BOUNDARY', { volumeAvg20: 100_000 }, { volume: 1 }),
+      item('HIGH', { volumeAvg20: 1_000_000 }, { volume: 1 }),
+      item('ZERO', { volumeAvg20: 0 }, { volume: 1 }),
+      item('UNKNOWN', null, { volume: 50_000_000 }),
     ];
     for (const market of ['TW', 'US'] as const) {
       expect(applyFilters(rows, EMPTY_FILTERS, { market })).toEqual(rows);
       expect(applyFilters(rows, state('vol:100000'), { market }).map((row) => row.symbol)).toEqual(['BOUNDARY', 'HIGH']);
     }
     expect(filterAvailability([rows[3]!], tw).vol).toBeNull();
-    expect(filterAvailability([rows[4]!], tw).vol).toContain('沒有成交股數資料');
-    expect(activeChips(state('vol:1000000'))[0]?.label).toBe('成交股數 ≥100 萬股');
+    expect(filterAvailability([rows[4]!], tw).vol).toContain('沒有近 20 日平均成交量資料');
+    expect(activeChips(state('vol:1000000'))[0]?.label).toBe('20 日均量 ≥1,000,000 股')
+    expect(activeChips(state('vol:1000000'), undefined, 'TW')[0]?.label).toBe('20 日均量 ≥1,000 張');
     expect(serializeFilters(removeFilter(state('vol:1000000'), 'vol'))).toBe('');
   });
 
@@ -162,8 +175,8 @@ describe('applyFilters', () => {
       expect(result.length).toBeLessThan(TW.length);
       expect(result).toEqual(TW.filter(predicate));
     };
-    check('chg:0:3', (i) => i.changePct! >= 0 && i.changePct! <= 3);
-    check('chg::-3', (i) => i.changePct! <= -3);
+    expect(applyFilters(TW, state('chg:0:3'), tw)).toEqual(TW);
+    expect(applyFilters(TW, { ...EMPTY_FILTERS, chg: { min: 3, max: null } }, tw)).toEqual(TW);
     check('ema20:-5:5', (i) => i.metrics!.ema20 !== null && Math.abs(i.metrics!.ema20) <= 5);
     check('tr:a20', (i) => i.metrics!.ma['20']! > 0);
     check('tr:a200', (i) => (i.metrics!.ma['200'] ?? -1) > 0);
@@ -320,7 +333,6 @@ describe('active chips', () => {
     const s = state('chg:0:3;ema20:-5:5;tr:a20,stack;hi:10;rs:80;rs3:0;vr:1.5;eps:2:20;rev:1:10;nd:keep');
     const chips = activeChips(s);
     expect(chips.map((chip) => chip.label)).toEqual([
-      '今日漲跌 0～+3%',
       'EMA20 乖離 -5～+5%',
       '站上MA20',
       '多頭排列',
@@ -331,7 +343,7 @@ describe('active chips', () => {
       'EPS YoY 近2季皆≥20%',
       '營收 YoY ≥10%',
     ]);
-    expect(countFilters(s)).toBe(10);
+    expect(countFilters(s)).toBe(9);
     let next: FilterState = s;
     for (const chip of chips) next = removeFilter(next, chip.id);
     expect(serializeFilters(next)).toBe('');

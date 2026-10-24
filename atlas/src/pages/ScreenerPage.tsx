@@ -39,7 +39,9 @@ import {
   type FilterContext,
   type FilterState,
   type FundamentalKind,
+  type FixedScreenerMas,
 } from './screenerFilters';
+import { useScreenerFixedMAs } from './useScreenerFixedMAs';
 import {
   UNIVERSE_GROUP_KEYS,
   UNIVERSE_LABELS,
@@ -75,6 +77,7 @@ const ROW_HEIGHT = 64;
 const OVERSCAN = 8;
 const KIND_LABELS: Record<ReportGroup['kind'], string> = { fixed: '精選', custom: '自訂', scan: '掃描' };
 const MARKETS: UniverseMarketKey[] = ['TW', 'US'];
+const EMPTY_GROUP_ITEMS: GroupItem[] = [];
 
 type UniverseState = { status: 'idle' } | { status: 'loading' } | UniverseLoadResult;
 
@@ -148,6 +151,7 @@ function Row({
   pills,
   growth,
   filters,
+  fixedMAs,
   top,
   onOpen,
   marketDate,
@@ -158,6 +162,7 @@ function Row({
   growth: GrowthFile | null | undefined;
   /** The applied conditions: 「含虧轉盈」 (whether a turnaround counts) and the growth gates the pills count against. */
   filters: FilterState;
+  fixedMAs?: FixedScreenerMas;
   top: number;
   onOpen: () => void;
   marketDate?: string | null;
@@ -166,7 +171,7 @@ function Row({
   const status = itemStatusOf(item);
   const ticker = <b>{displayTicker(item.symbol)}</b>;
   const metricPills = pills.flatMap((key) => {
-    const pill = metricPill(item, key, growth, filters.turn, gateForPill(filters, key));
+    const pill = metricPill(item, key, growth, filters.turn, gateForPill(filters, key), fixedMAs);
     return pill ? [{ key, pill }] : [];
   });
   return (
@@ -318,7 +323,7 @@ function ScreenerView({
   const group: ReportGroup | undefined = universeMarket
     ? universeMarketData
       ? universeGroup(universeMarketData)
-      : { key: UNIVERSE_GROUP_KEYS[universeMarket], name: UNIVERSE_LABELS[universeMarket], market: universeMarket, kind: 'scan', maList: [20, 50, 200], items: [] }
+      : { key: UNIVERSE_GROUP_KEYS[universeMarket], name: UNIVERSE_LABELS[universeMarket], market: universeMarket, kind: 'scan', maList: [20, 50, 200], items: EMPTY_GROUP_ITEMS }
     : (groups.find((g) => g.key === requested) ?? groups[0]);
   const market = group?.market ?? 'TW';
 
@@ -355,7 +360,7 @@ function ScreenerView({
   const listRef = useRef<HTMLDivElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
 
-  const groupItems = group?.items ?? [];
+  const groupItems = group?.items ?? EMPTY_GROUP_ITEMS;
   // Fixed and custom groups also list their unmatched / failed stocks; full-market lists never do.
   const counts = useMemo(() => statusCounts(groupItems), [groupItems]);
   const hasUnmatched = !universeMarket && counts.unmatched > 0;
@@ -366,16 +371,18 @@ function ScreenerView({
     (mode) => !METRIC_SORTS.includes(mode) || hasMetrics,
   );
   const activeSort = sortModes.includes(sort) ? sort : 'default';
+  const { fixedMAs, maReferenceReason } = useScreenerFixedMAs(filters.ema20 !== null || sheetOpen || activeSort === 'ma', groupItems);
+  const hasFixedMAs = !!fixedMAs && Object.keys(fixedMAs).length > 0;
   const wantGrowth = needsGrowth(filters) || activeSort === 'eps' || (sheetOpen && draftNeedsGrowth);
   const { growth, loading: growthLoading } = useGrowth(wantGrowth, market);
   const observationDate = universeMarketData?.asOf;
-  const context = useMemo<FilterContext>(() => ({ market, growth, growthLoading, asOf: observationDate }), [market, growth, growthLoading, observationDate]);
+  const context = useMemo<FilterContext>(() => ({ market, growth, growthLoading, asOf: observationDate, fixedMAs, maReferenceReason }), [market, growth, growthLoading, observationDate, fixedMAs, maReferenceReason]);
   const availability = useMemo(() => filterAvailability(groupItems, context), [groupItems, context]);
-  const chips = useMemo(() => activeChips(filters, availability), [filters, availability]);
+  const chips = useMemo(() => activeChips(filters, availability, market, hasFixedMAs), [filters, availability, market, hasFixedMAs]);
   const filtered = useMemo(() => applyFilters(viewItems, filters, context), [viewItems, filters, context]);
   const items = useMemo(
-    () => filterAndSortItems(filtered, query, activeSort, { growth, asOf: observationDate }),
-    [filtered, query, activeSort, growth, observationDate],
+    () => filterAndSortItems(filtered, query, activeSort, { growth, asOf: observationDate, fixedMAs }),
+    [filtered, query, activeSort, growth, observationDate, fixedMAs],
   );
   const countFor = useCallback(
     (draft: FilterState) => filterAndSortItems(applyFilters(viewItems, draft, context), query, 'default').length,
@@ -560,7 +567,7 @@ function ScreenerView({
       )}
       {observationDate && groupItems.some(item => item.asOf !== observationDate) && (
         <p className="screener-date-notice" role="status">
-          不同資料日分組排序；漲跌、成交量、量比與 RS 條件只比較 {observationDate}，各列另標示不同日期。
+          不同資料日分組排序；成交量、量比與 RS 條件只比較 {observationDate}，各列另標示不同日期。
         </p>
       )}
       {universeMarketData?.note && (
@@ -571,7 +578,7 @@ function ScreenerView({
           aria-label={`名單範圍說明：${universeMarketData.note}`}
           onClick={() => setNoteOpen((open) => !open)}
         >
-          {universeMarketData.note}
+          名單範圍說明{noteOpen && <span>{universeMarketData.note}</span>}
         </button>
       )}
       <div className="screener-head" aria-hidden="true">
@@ -596,6 +603,7 @@ function ScreenerView({
                     pills={pills}
                     growth={growth}
                     filters={filters}
+                    fixedMAs={fixedMAs}
                     top={(start + offset) * ROW_HEIGHT}
                     onOpen={() => openChart({ symbol: item.symbol, name: item.name, tf: '1D', maList: item.maList })}
                   />
@@ -625,6 +633,7 @@ function ScreenerView({
         open={sheetOpen}
         market={market}
         groupName={group.name}
+        hasFixedMAs={hasFixedMAs}
         value={filters}
         availability={availability}
         countFor={countFor}
@@ -650,7 +659,7 @@ export default function ScreenerPage({ report, reload, navigate, openChart, grou
         <div>
           <h2 className="page-title">選股</h2>
           {report.status === 'ok' && (
-            <p className="page-sub">每日報告的群組與全市場條件篩選 · 點選股票開啟圖表並套用群組均線</p>
+            <p className="page-sub">每日報告的群組與全市場條件篩選 · 點選股票開啟圖表</p>
           )}
         </div>
       </div>

@@ -760,7 +760,7 @@ class Run:
             self.agreement.append((
                 market,
                 abs(bar["close"] / float(yahoo["Close"]) - 1),
-                (bar["volume"] / float(yahoo["Volume"])) if float(yahoo["Volume"]) > 0 else None,
+                (bar["volume"] / float(yahoo["Volume"])) if bar.get("volume") is not None and float(yahoo["Volume"]) > 0 else None,
             ))
 
         summary = uc.summarize(frame)

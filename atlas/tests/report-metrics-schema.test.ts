@@ -57,6 +57,7 @@ describe('group item metrics', () => {
       volVsPrev: 1.8,
       volRatio: 9.9, // retired field of old reports: other meaning, never read
       turnover20: 1e9,
+      volumeAvg20: '1234.5',
       unknown: 'ignored',
     })!;
     expect(metrics).toEqual({
@@ -77,6 +78,7 @@ describe('group item metrics', () => {
       rsRank: 99,
       volVsPrev: 1.8,
       turnover20: 1e9,
+      volumeAvg20: 1234.5,
     });
     expect(parseMetrics({ trend: 'sideways', rsBench: 'QQQ', ma: 'x', bars: -5 })).toMatchObject({
       trend: null,
@@ -84,6 +86,7 @@ describe('group item metrics', () => {
       ma: { 20: null, 50: null, 200: null },
       ema20: null,
       volVsPrev: null,
+      volumeAvg20: null,
       bars: 0,
       hiBars: 0,
     });

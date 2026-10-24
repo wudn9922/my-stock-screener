@@ -1,3 +1,4 @@
+import { HelpDisclosure } from './HelpDisclosure';
 import { useEffect, useState } from 'react';
 import { Gauge } from 'lucide-react';
 import {
@@ -124,9 +125,9 @@ function BreadthBody({ data }: { data: BreadthMarket }) {
         </table>
       ) : null}
       <BreadthChart history={data.history} />
-      <p className="breadth-foot">
+      <HelpDisclosure label="樣本與歷史說明">
         {data.universe}，當日有成交 {all.count.toLocaleString('zh-TW')} 檔。歷史走勢以目前名單回推，含存活者偏差。
-      </p>
+      </HelpDisclosure>
     </>
   );
 }

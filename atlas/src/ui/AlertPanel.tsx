@@ -1,3 +1,4 @@
+import { HelpDisclosure } from './HelpDisclosure';
 import { useState, useSyncExternalStore, type FormEvent } from 'react';
 import type { Timeframe } from '../market-data/MarketDataProvider';
 import type { Drawing } from '../drawing/DrawingModel';
@@ -91,9 +92,9 @@ export function AlertPanel({
         <span>價格提醒</span>
         <span>{symbol} · {timeframe}</span>
       </div>
-      <p className="research-disclaimer">
+      <HelpDisclosure label="提醒執行範圍">
         提醒只儲存在這台裝置。網頁開啟且在前景時，每分鐘以新收盤的 K 棒檢查一次目前股票與週期；不會在背景執行，也不會推播通知。
-      </p>
+      </HelpDisclosure>
       <form className="research-form" onSubmit={create}>
         <label>
           提醒條件

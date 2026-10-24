@@ -154,6 +154,15 @@ jobs:
 
       # Opt-in only: apply supabase/manual/atlas_watchlists.sql and deploy user-settings first.
       # Daily observations preserve the last-opening baseline and never send notifications here.
+      - name: Restore full-market daily bars for saved watchlists (read-only)
+        if: vars.ATLAS_WATCHLIST_SYNC_ENABLED == '1'
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/universe-full
+          key: atlas-watchlists-universe-read-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: universe-full-v1-
+
       - name: Refresh saved watchlist observations
         if: vars.ATLAS_WATCHLIST_SYNC_ENABLED == '1'
         continue-on-error: true
@@ -164,6 +173,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_USER_ID: ${{ secrets.SUPABASE_USER_ID }}
           ADMIN_LINE_USER_ID: ${{ vars.ADMIN_LINE_USER_ID || 'Ua0037dbd5037b64fc76804c60520ad76' }}
+          UNIVERSE_CACHE_DIR: ${{ github.workspace }}/.cache/universe-full
         run: npm run refresh:watchlists
 
       - name: Replace docs/atlas with build output

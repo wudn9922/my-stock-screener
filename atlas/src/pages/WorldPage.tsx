@@ -1,3 +1,4 @@
+import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import {
@@ -377,9 +378,9 @@ function WorldView({ report, openChart }: { report: Report } & Pick<PageProps, '
             </tbody>
           </table>
         </div>
-        <p className="source-note">
+        <HelpDisclosure label="報酬計算說明">
           報酬率以每日收盤價計算（1週／1月取該日或之前最近一個交易日；今年＝相對去年最後一個交易日）。趨勢標籤來自每日報告。
-        </p>
+        </HelpDisclosure>
       </section>
     </>
   );
@@ -428,7 +429,7 @@ export default function WorldPage({ report, reload, navigate, openChart, view }:
         </ReportGate>
       )}
       <footer className="page-foot">
-        <span>{rates ? '利率資料為每日更新，僅供研究參考，非投資建議。' : '延遲行情，僅供研究參考，非投資建議。'}</span>
+        <HelpDisclosure label="資料備註">{rates ? '利率資料為每日更新，僅供研究參考，非投資建議。' : '延遲行情，僅供研究參考，非投資建議。'}</HelpDisclosure>
         <ChartAttribution />
       </footer>
     </div>

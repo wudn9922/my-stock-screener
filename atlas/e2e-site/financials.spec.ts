@@ -85,6 +85,27 @@ async function openFold(section: Locator) {
   if (!(await section.evaluate((node) => (node as HTMLDetailsElement).open))) await section.locator(':scope > summary').click();
 }
 
+test('financial controls stay compact and the header scrolls away from the figures', async ({ page }) => {
+  await mockFinancials(page);
+  await page.goto('./?page=financials&symbol=AAPL&p=a');
+  const head = page.locator('.fin-head');
+  await expect(head.locator('.fin-head-main .fin-quality')).toBeVisible();
+  await expect(head.locator('.fin-head-main').getByRole('button', { name: '搜尋其他股票' })).toBeVisible();
+  const bounds = await head.boundingBox();
+  expect(bounds!.height).toBeLessThanOrEqual(112);
+  await expect(page.locator('.fin-other-queries')).not.toHaveAttribute('open');
+  await expect(page.locator('.fin-notes')).not.toHaveAttribute('open');
+  const explanation = page.locator('.fin-card[data-group="growth"] .fin-detail > .fin-explanation');
+  await expect(explanation).not.toHaveAttribute('open');
+  await explanation.locator(':scope > summary').click();
+  await expect(explanation.locator('.fin-formula')).toBeVisible();
+  await explanation.locator(':scope > summary').click();
+  const mainTop = await page.locator('#main').evaluate((element) => element.getBoundingClientRect().top);
+  await page.locator('#main').evaluate((element) => { element.scrollTop = 600; });
+  await expect.poll(async () => (await head.boundingBox())!.y + (await head.boundingBox())!.height).toBeLessThan(mainTop);
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+});
+
 test('annual cards: ten labelled bars, tap shows formula inputs, notes are honest', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
@@ -131,6 +152,7 @@ test('US financials retain quarterly figures and safe web and app links', async 
   await expect(page.locator('.fin-quarter')).toHaveCount(1);
   const growth = page.locator('.fin-card[data-group="growth"]');
   await expect(growth.locator('.fin-bar')).toHaveCount(15);
+  await page.locator('.fin-other-queries > summary').click();
   const webLink = page.getByRole('link', { name: '在富途網頁查看財報', exact: true });
   await expect(webLink).toHaveAttribute('href', 'https://www.futunn.com/stock/AAPL-US');
   await expect(webLink).toHaveAttribute('target', '_blank');
@@ -142,6 +164,7 @@ test('US financials retain quarterly figures and safe web and app links', async 
   await expect(page.locator('.financials-page a[href^="ftnn://"]')).toHaveCount(1);
 
   await page.goto('./?page=financials&symbol=BRK.B');
+  await page.locator('.fin-other-queries > summary').click();
   await expect(page.getByRole('link', { name: '在富途網頁查看財報', exact: true })).toHaveAttribute(
     'href',
     'https://www.futunn.com/stock/BRK.B-US',
@@ -149,6 +172,7 @@ test('US financials retain quarterly figures and safe web and app links', async 
   await expect(page.getByRole('link', { name: '在富途 App 開啟', exact: true })).toHaveAttribute('href', 'ftnn://quote/2/BRK.B/');
 
   await page.goto('./?page=financials&symbol=BRK-B');
+  await page.locator('.fin-other-queries > summary').click();
   await expect(page.getByRole('link', { name: '在富途網頁查看財報', exact: true })).toHaveAttribute(
     'href',
     'https://www.futunn.com/stock/BRK-B-US',
@@ -519,6 +543,7 @@ test('ADR page retains period controls and links to Futu and the Taiwan home lis
   await mockFinancials(page);
   await page.goto('./?page=financials&symbol=TSM&p=a');
   await expect(page.getByRole('group', { name: '期間' })).toHaveCount(1);
+  await page.locator('.fin-other-queries > summary').click();
   await expect(page.getByRole('link', { name: '在富途網頁查看財報', exact: true })).toHaveAttribute(
     'href',
     'https://www.futunn.com/stock/TSM-US',

@@ -4,6 +4,7 @@ import { yoy, type MetricGroupId, type MetricId, type MetricInput, type MetricUn
 import { formatDateTime } from '../format';
 import { BarChart } from './BarChart';
 import { FoldCard } from './FoldCard';
+import { FinancialNote } from './FinancialNote';
 import {
   CHART_PERIODS,
   averageText,
@@ -101,7 +102,7 @@ export function MetricCard({ group, history, view, metric, onMetric, note, defau
 
   return (
     <FoldCard className="fin-card" title={group.title} summary={summary} defaultOpen={defaultOpen} dataAttributes={{ 'data-group': group.id }}>
-      {note && <p className="fin-card-note">{note}</p>}
+      {note && <FinancialNote className="fin-card-note" label="財報口徑說明"><p>{note}</p></FinancialNote>}
       <div className="fin-tabs" role="group" aria-label={`${group.title}指標`}>
         {group.metrics.map((id) => (
           <button key={id} type="button" className={id === metric ? 'active' : ''} aria-pressed={id === metric} onClick={() => onMetric(id)}>
@@ -208,6 +209,7 @@ function Detail({
         {result.value !== null && data.unit === 'money' && <small>= {formatExact(result.value, data.unit)} {history.currency}</small>}
         <span className={`fin-chip ${changeChip.tone}`}>{changeChip.text}</span>
       </div>
+      <FinancialNote label="公式與計算說明">
       <p className="fin-formula">
         <span>公式</span>
         {result.formula}
@@ -228,6 +230,7 @@ function Detail({
           {note}
         </p>
       ))}
+      </FinancialNote>
     </div>
   );
 }

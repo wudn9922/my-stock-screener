@@ -6,7 +6,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
-const out = resolve(root, 'test-results/site-dist');
+const out = resolve(root, process.env.SITE_OUT_DIR || 'test-results/site-dist');
 const base = '/my-stock-screener/atlas/';
 execFileSync(process.execPath, [resolve(root, 'node_modules/vite/bin/vite.js'), 'build', '--outDir', out, '--emptyOutDir'], {
   cwd: root,

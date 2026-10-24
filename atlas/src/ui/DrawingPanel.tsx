@@ -1,3 +1,4 @@
+import { HelpDisclosure } from './HelpDisclosure';
 import {
   Eye,
   EyeOff,
@@ -76,11 +77,11 @@ export function DrawingPanel({
           </IconButton>
         </div>
       ))}
-      <p className="small muted">
+      <HelpDisclosure label="畫線鎖定與範圍說明">
         鎖定線條上拖曳會平移圖表。
         <br />
         畫線只屬於目前股票與週期。
-      </p>
+      </HelpDisclosure>
     </section>
   );
 }

@@ -1,3 +1,4 @@
+import { HelpDisclosure } from './HelpDisclosure';
 import { useId, useState, type FormEvent } from 'react';
 import { Eye, EyeOff, LockKeyhole, UnlockKeyhole, Settings2, Trash2, Plus } from 'lucide-react';
 import { IconButton } from './IconButton';
@@ -302,7 +303,7 @@ export function IndicatorPanel({
                   <input type="color" name="color" defaultValue={indicator.color} />
                 </label>
                 {isIndicatorVolume && (
-                  <p className="muted small">顏色套用於 MA 20 均量線；量柱依 K 線漲跌顯示紅綠。</p>
+                  <HelpDisclosure label="成交量顏色說明">顏色套用於 MA 20 均量線；量柱依 K 線漲跌顯示紅綠。</HelpDisclosure>
                 )}
                 {!isIndicatorVolume && (
                   <label>
@@ -323,11 +324,11 @@ export function IndicatorPanel({
           </div>
         );
       })}
-      <p className="small muted">
+      <HelpDisclosure label="指標鎖定與線寬說明">
         鎖定後仍可隱藏／顯示，解鎖後才能修改或刪除。
         <br />
         ATR 線寬＝0.02 × 14 根 K 棒 ATR 換算成像素（1–4 px）；像素模式固定 1–4 px。新增的 SMA／EMA 預設使用 ATR 線寬，已儲存的指標保留原設定。
-      </p>
+      </HelpDisclosure>
     </section>
   );
 }

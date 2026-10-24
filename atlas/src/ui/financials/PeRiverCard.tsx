@@ -5,6 +5,7 @@ import { ZONE_TEXT, buildPeRiver, formatMultiple, zoneOf, type PriceBar } from '
 import { calendarDate, getMarketProfile } from '../../market-data/MarketProfile';
 import { PanelBoundary } from '../PanelBoundary';
 import { FoldCard } from './FoldCard';
+import { FinancialNote } from './FinancialNote';
 import { Skeleton } from '../PageState';
 import { BAND_COLORS, buildRiverChartData } from './peRiverChartData';
 import { coverageText, delayText, epsBasisText, excludedText, percentileText, premiumText, shortWarning, unavailableDetail } from './peRiverText';
@@ -144,7 +145,8 @@ export function PeRiverPanel({
             </li>
           ))}
         </ul>
-        <p className="pe-river-fine">{current ? '右欄為以目前 EPS 乘上該倍數的股價。' : ''}橘黃線為股價，藍色線為 EPS × 歷史本益比倍數（縱軸為對數座標）。</p>
+        <FinancialNote className="pe-river-fine" label="河流圖說明與資料口徑">
+        <p>{current ? '右欄為以目前 EPS 乘上該倍數的股價。' : ''}橘黃線為股價，藍色線為 EPS × 歷史本益比倍數（縱軸為對數座標）。</p>
         {warning && <p className="fin-warn pe-river-warn">{warning}</p>}
         {model.notes.map((note) => (
           <p key={note} className="fin-warn pe-river-warn">
@@ -182,6 +184,7 @@ export function PeRiverPanel({
         <p className="pe-river-fine">
           本益比由本頁財報檔重算，可能與圖表頁標頭的本益比（Yahoo／證交所口徑）略有差異。歷史本益比不代表未來，僅供研究參考。
         </p>
+        </FinancialNote>
       </div>
     );
   }
