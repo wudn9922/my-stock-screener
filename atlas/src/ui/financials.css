@@ -448,6 +448,40 @@
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
 }
+.fin-chart-time {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 5px 0 2px;
+}
+.fin-chart-time button {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.fin-chart-time button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.fin-chart-time button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.fin-chart-window {
+  flex: 1 1 160px;
+  margin-left: 4px;
+  color: var(--text-3);
+  font-size: 10px;
+  line-height: 1.5;
+}
 .fin-zero {
   stroke: var(--border-strong);
   stroke-width: 1;

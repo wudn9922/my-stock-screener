@@ -1,0 +1,13 @@
+.ws-ma-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ws-ma-candidates .ws-ma-candidate {
+  min-height: 32px;
+  padding: 4px 7px;
+  font-variant-numeric: tabular-nums;
+}
+.ws-ma-candidates .ws-ma-candidate:disabled {
+  color: var(--text-3);
+}

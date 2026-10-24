@@ -1,3 +1,13 @@
+## PR 169 chart and research follow-up (2026-10-24)
+
+This follow-up makes all moving-average candidates individually applicable, defaults newly added chart MAs to fixed 2px widths, and seeds fixed-stock editing from applied daily SMAs only. Existing explicit styles and stored preset data remain compatible. The unused preset UI is removed because indicators already belong to each stock/timeframe; the chart-local shortcut list is now labelled 圖表收藏, with its purpose explained separately from the condition-tracking console lists.
+
+The two daily volatility values are independent controls next to 建議均線. Its floating menu contains the MA candidates, then volume analysis, and subdued official disclosures last; panels stay within the available viewport above navigation. Directional volume ratios compare actual adjacent session volumes while abnormal-volume RVOL20 remains unchanged. The backtest UI uses one SMA/EMA with independent upper-entry and lower-exit percentages, closed-bar crossings and unchanged next-open execution.
+
+Full-market reports recalculate six prior monthly reference dates from cached bars, truncating the input at every date and retaining listing/coverage/sample rules. The UI replaces the near-week switch with monthly histograms, dated current values and a default five-month view. Missing historical coverage is a gap; older generated reports explicitly await the new monthly payload. Current listings imply survivorship bias, disclosed in the calculation note. Historical raw archives remain immutable. Financial column charts expose time zoom, pan and reset while preserving original values, gaps and YoY alignment.
+
+Read-only peer findings returned to the primary engineer and explicitly accepted: support long Taiwan holiday closures when selecting prior reference sessions; include displayed volatility percentages in accessible button names; dismiss a sibling popup during keyboard focus navigation. Each fix has a regression. Verification results and the exact-head Actions run are recorded in the PR. No merge, deployment or production data collection is authorized by this change.
+
 ## PR 169 follow-up: Pages disclosures and collector cache (2026-10-24)
 
 The unmocked Pages smoke now expands the SEC 8-K coverage note before its existing visible `CIK 對應` assertion. The other smoke targets remain visible outside the collapsed provenance, stat notes and chart legends; their assertions are unchanged.

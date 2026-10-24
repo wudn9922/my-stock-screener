@@ -34,11 +34,9 @@ function VolumeData({ symbol }: { symbol: string }) {
 
 export function VolumeAnalysis({ data }: { data: VolumeResearch }) {
   const [window, setWindow] = useState(20),
-    [shrink, setShrink] = useState(1),
-    [expand, setExpand] = useState(1),
     [abnormal, setAbnormal] = useState(2),
     [quiet, setQuiet] = useState(0.5);
-  const structure = volumeStructure(data.features, window, shrink, expand);
+  const structure = volumeStructure(data.features, window);
   const ratio = (value: typeof structure.upShrink) =>
     `${value.numerator}/${value.denominator} = ${value.pct === null ? "N/A" : num(value.pct, 1) + "%"}`;
   const abnormalState =
@@ -100,30 +98,6 @@ export function VolumeAnalysis({ data }: { data: VolumeResearch }) {
             ))}
           </select>
         </label>
-        <label>
-          縮量 RVOL &lt;
-          <select
-            aria-label="結構縮量門檻"
-            value={shrink}
-            onChange={(e) => setShrink(Number(e.target.value))}
-          >
-            {[0.5, 0.75, 1].map((v) => (
-              <option key={v}>{v}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          放量 RVOL &gt;
-          <select
-            aria-label="結構放量門檻"
-            value={expand}
-            onChange={(e) => setExpand(Number(e.target.value))}
-          >
-            {[1, 1.5, 2].map((v) => (
-              <option key={v}>{v}</option>
-            ))}
-          </select>
-        </label>
       </div>
       <dl className="research-stats">
         <Stat label="上漲縮量比例" value={ratio(structure.upShrink)} />
@@ -136,12 +110,12 @@ export function VolumeAnalysis({ data }: { data: VolumeResearch }) {
       >
         <p>
           分母為有效上漲／下跌日；無有效上漲或下跌日為
-          N/A。相同成交量不歸入放量或縮量。RVOL 使用當日前 20
-          個有效成交日均量，不含未來資料。
+          N/A。放量／縮量只比較當日與前一個交易日的成交量；相同成交量不歸入任一類。
+          異常量 RVOL20 另外比較當日前 20 個有效成交日均量，不含未來資料。
         </p>
         <p>
           固定使用既有已收盤日
-          K；零量、缺值、停牌相鄰日、已知公司行動及未確認的大幅跳價不產生價量訊號。價格採來源拆股還原、未還原股息；成交量調整無法獨立核實，除權息／拆股仍可能影響比較。門檻是工具設定。
+          K；零量、缺值、停牌相鄰日、已知公司行動及未確認的大幅跳價不產生價量訊號。價格採來源拆股還原、未還原股息；成交量調整無法獨立核實，除權息／拆股仍可能影響比較。
         </p>
         {data.risks.map((risk) => (
           <p key={risk}>{risk}</p>

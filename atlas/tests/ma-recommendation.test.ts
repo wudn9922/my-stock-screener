@@ -9,7 +9,7 @@ import {
   parseMaRecommendation,
   recommendedPeriods,
 } from '../src/report/maRecommendation';
-import { applyRecommended, missingRecommended } from '../src/ui/MaRecommendation';
+import { appliedDailySmaPeriods, applyRecommended, missingRecommended, selectableCandidates } from '../src/ui/MaRecommendation';
 
 // Shape written by ma-selector scripts/build_recommendations.py (core/recommend.py).
 const file = (ticker = '2330.TW') => ({
@@ -47,6 +47,9 @@ describe('ma-selector recommendations', () => {
     if (result.status !== 'ok') return;
     expect(recommendedPeriods(result.data)).toEqual([24, 34, 89]);
     expect(result.data.ranges[0]!.candidates[1]!.sarWinRate).toBeNull();
+    expect(selectableCandidates(result.data.ranges[0]!).map((candidate) => candidate.period)).toEqual([20, 24]);
+    expect(selectableCandidates(result.data.ranges[2]!).map((candidate) => candidate.period)).toEqual([89]);
+    expect(selectableCandidates({ ...result.data.ranges[0]!, final: 30 }).map((candidate) => candidate.period)).toEqual([20, 24, 30]);
   });
 
   it('rejects malformed files, missing ranges and another ticker', () => {
@@ -77,7 +80,28 @@ describe('ma-selector recommendations', () => {
     const state = store.symbol('2330.TW');
     expect(state.preferences.timeframe).toBe('1D');
     expect(state.indicators.filter((i) => i.type === 'SMA' && i.scope.timeframe === '1D').map((i) => i.period).sort()).toEqual([24, 34, 89]);
+    expect(state.indicators.filter((indicator) => indicator.id !== 'a' && indicator.type === 'SMA' && indicator.scope.timeframe === '1D'))
+      .toEqual(expect.arrayContaining([expect.objectContaining({ lineWidth: 2, widthMode: 'pixels' })]));
+    expect(state.indicators.find((indicator) => indicator.id === 'a')!.lineWidth).toBe(1);
     expect(applyRecommended(store, '2330.TW', [24, 34, 89])).toEqual([]);
     expect(store.symbol('2330.TW').indicators).toHaveLength(5);
+  });
+
+  it('applies a non-recommended candidate alone and fixes only the applied daily SMAs', async () => {
+    const store = new AppStore(new IndexedDBStore('ma-candidate-' + crypto.randomUUID()));
+    await store.initialize();
+    expect(appliedDailySmaPeriods(store.symbol('2330.TW').indicators)).toEqual([]);
+    const result = parseMaRecommendation(file(), '2330.TW');
+    if (result.status !== 'ok') throw new Error('Invalid fixture');
+    const candidate = selectableCandidates(result.data.ranges[0]!).find((value) => value.period === 20)!;
+    expect(applyRecommended(store, '2330.TW', [candidate.period])).toEqual([20]);
+    expect(store.symbol('2330.TW').indicators).toHaveLength(1);
+    const applied = store.symbol('2330.TW').indicators[0]!;
+    expect(applied).toMatchObject({ type: 'SMA', period: 20, lineWidth: 2, widthMode: 'pixels', scope: { timeframe: '1D' } });
+    store.addIndicator({ ...applied, id: 'weekly', period: 89, scope: { timeframe: '1W' } });
+    store.addIndicator({ ...applied, id: 'ema', type: 'EMA', period: 34 });
+    store.addIndicator({ ...applied, id: 'duplicate', period: 20 });
+    expect(appliedDailySmaPeriods(store.symbol('2330.TW').indicators)).toEqual([20]);
+    expect(missingRecommended(store.symbol('2330.TW').indicators, recommendedPeriods(result.data))).toEqual([24, 34, 89]);
   });
 });

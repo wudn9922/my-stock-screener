@@ -17,7 +17,9 @@ export default function StockResearch({
         </p>
       )}
       <VolumePanel key={`volume-${symbol}`} symbol={symbol} />
-      {tw ? <OfficialAlerts symbol={symbol} /> : <SecRadar symbol={symbol} />}
+      <div className="stock-official-notices">
+        {tw ? <OfficialAlerts symbol={symbol} /> : <SecRadar symbol={symbol} />}
+      </div>
     </div>
   );
 }

@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { ArrowUpRight, GitBranch, Layers, Rocket, ShieldCheck, Target, Timer } from 'lucide-react';
 import {
   DEFAULT_BREAKOUT_PARAMS, OUTCOME_RULES, SUCCESS_MODEL, loadBreakouts, loadBreakoutsHistory, fetchBreakoutSnapshot,
-  type BreakoutMarket, type BreakoutMarketKey,
+  type BreakoutMarket, type BreakoutMarketKey, type BreakoutMonthlyPoint,
   type BreakoutParams, type BreakoutStats, type BreakoutWindow, type BreakoutsLoadResult, type BreakoutsHistoryResult, type OutcomeKey,
 } from '../report/breakouts';
 import { formatDateTime } from './format';
+import { BreakoutHistoryPlot } from './BreakoutHistoryPlot';
 import './breakouts.css';
 
 const MARKET_NAMES: Record<BreakoutMarketKey, string> = { tw: '台股', us: '美股' };
@@ -32,8 +33,8 @@ function OutcomeSelector({ selected, onSelect }: { selected: OutcomeKey; onSelec
   </div>;
 }
 
-function StrategyRow({ method, stats, rule, params, index }: {
-  method: typeof METHODS[number]; stats: BreakoutStats | undefined; rule: OutcomeKey; params: BreakoutParams; index: number;
+function StrategyRow({ method, stats, rule, params, index, points, months, asOf }: {
+  method: typeof METHODS[number]; stats: BreakoutStats | undefined; rule: OutcomeKey; params: BreakoutParams; index: number; points: BreakoutMonthlyPoint[]; months: number; asOf: string | null;
 }) {
   const comparison = stats?.comparison;
   const outcome = comparison?.rules[rule];
@@ -46,12 +47,10 @@ function StrategyRow({ method, stats, rule, params, index }: {
         <h3 className="bo-label">{method.label}</h3><details className="bo-inline-help"><summary>方法說明</summary><p>{method.hint}</p></details>
       </div></div>
       <b className="bo-win" aria-label={`進場成功率 ${note ? '尚無完整結果' : rate(outcome?.winRate ?? null)}`}>
-        {note ? '—' : rate(outcome?.winRate ?? null)}<small>成功率</small>
+        {note ? '—' : rate(outcome?.winRate ?? null)}<small>{asOf ? formatDateTime(asOf, false) : '資料日'} 測得</small>
       </b>
     </div>
-    <div className="bo-bar" role="img" aria-label={`成功率 ${note ? '尚無完整結果' : rate(outcome?.winRate ?? null)}`}>
-      <i style={{ width: `${note ? 0 : Math.min(100, Math.max(0, outcome?.winRate ?? 0))}%` }} />
-    </div>
+    <BreakoutHistoryPlot points={points} method={method.key} rule={rule} months={months} />
     {note ? <p className="bo-note" role="status">{note}</p> : <p className="bo-ratio">
       <strong>{count(outcome!.wins)}</strong>／{count(outcome!.evaluatedN)} <span>成功／完整訊號樣本</span>
       {low ? <span className="bo-tag">樣本偏少</span> : null}
@@ -89,7 +88,7 @@ function Methodology({ data, current, params }: { data: BreakoutMarket; current:
     <li><b>同批樣本比較</b>訊號日期落在所選窗口內，並有突破後完整 {params.observationDays} 個市場交易日（不含突破日）的日線，才進入四組的分母。
       未成熟與缺日分開列出，不當成失敗。沒有訊號的股票不進分母；成功率＝成功筆數／完整訊號樣本。
       {current.observedThrough ? ` 本次可完整觀察的訊號日期截至 ${formatDateTime(current.observedThrough, false)}。` : ''}
-      近1週的新訊號可能全在等待觀察，切換近1月可查看較完整結果。</li>
+      各柱狀值以該參考日前21個市場交易日的訊號重新計算，不使用參考日之後的K線。</li>
     <li><b>共通失敗優先</b>突破日收盤低於關鍵點＋{params.closeBufferAtr} × Wilder ATR({params.successAtrPeriod})，四組皆失敗，仍保留在分母；等於門檻可通過。
       ATR只使用突破日收盤及之前的資料。關鍵點固定在訊號當日，後續的±{params.barrierPct}%不隨價格移動。</li>
     <li><b>先觸發判定</b>後續逐日依時間檢查：先跌到−5%失敗；先漲到＋5%或隔日先創高成功；五日都未跌到−5%也成功。
@@ -102,25 +101,32 @@ function Methodology({ data, current, params }: { data: BreakoutMarket; current:
       {data.listingAsOf ? ` 名單日期 ${formatDateTime(data.listingAsOf, false)}。` : ''}{data.listingSource ? ` 來源 ${data.listingSource}。` : ''}</li>
     <li><b>價格與限制</b>波段理論進場為 max(開盤價, 關鍵點)，箱型與20EMA為訊號日收盤。日線無法證明實際成交，未模擬最小跳動、滑價與交易成本。
       無成交與缺日不補價，週末K線不採用（本次 {count(data.weekendBars)} 根）；收盤跳價超過 {params.jumpLimitPct ?? 30}% 時只用最後異常日之後的資料。
-      名單是目前上市股票，含存活者偏差；快取最多320根日線，股利未還原，結果僅供研究。</li>
+      名單是目前上市股票，含存活者偏差；歷史也使用這份現有名單，並非當時上市成分。快取最多320根日線，股利未還原，結果僅供研究。歷史有效日線覆蓋未達90%或沒有完整樣本時不畫百分比。</li>
   </ul></details>;
 }
 
 function BreakoutBody({ data, params }: { data: BreakoutMarket; params: BreakoutParams }) {
-  const [selectedWindow, setWindow] = useState('1m');
+  const [months, setMonths] = useState(5);
   const [selectedRule, setRule] = useState<OutcomeKey>('hold5');
-  const windows = params.windows.filter(entry => data.windows[entry.key]);
-  const active = windows.find(entry => entry.key === selectedWindow) ?? windows[0];
-  if (!active) return <p className="muted-text">沒有可顯示的統計窗口。</p>;
+  const current = data.windows['1m'];
+  if (!current) return <p className="muted-text">沒有可顯示的近月統計。</p>;
   if (params.successModel !== SUCCESS_MODEL) return <p className="bo-update" role="status"><Timer size={18} aria-hidden="true" />四種勝率口徑更新中，等待新版全市場報表。舊報酬勝率不混入新口徑。</p>;
-  const current = data.windows[active.key]!;
   const rule = OUTCOME_RULES.find(entry => entry.key === selectedRule)!;
   const complete = Object.values(current.strategies).some(stats => stats.comparison?.completeN);
+  const points: BreakoutMonthlyPoint[] = data.monthly?.points ?? (data.asOf ? [{ targetDate: data.asOf, asOf: data.asOf,
+    evaluated: data.evaluated, universeCount: data.universeCount, status: 'ok', strategies: current.strategies }] : []);
+  const historicalCount = points.filter(point => point.asOf && point.asOf !== data.asOf && point.status === 'ok').length;
   return <>
-    <div className="bo-toolbar"><span className="bo-overline">3 種進場法 · 4 種判定</span><div className="segmented compact" role="group" aria-label="統計窗口">
-      {windows.map(entry => <button type="button" key={entry.key} className={entry.key === active.key ? 'active' : ''}
-        aria-pressed={entry.key === active.key} onClick={() => setWindow(entry.key)}>{entry.label}</button>)}
-    </div></div>
+    <div className="bo-toolbar"><span className="bo-overline">3 種進場法 · 每次回看21個交易日</span>
+      <div className="bo-zoom" role="group" aria-label="成功率圖表時間範圍">
+        <button type="button" aria-label="成功率時間放大" disabled={months === 1} onClick={() => setMonths(value => value === 0 ? 5 : Math.max(1, value - 1))}>＋</button>
+        <label><span className="sr-only">顯示範圍</span><select aria-label="成功率顯示月數" value={months} onChange={event => setMonths(Number(event.target.value))}>
+          {[1, 2, 3, 4, 5, 6].map(value => <option key={value} value={value}>{value}個月</option>)}<option value={0}>全部</option>
+        </select></label>
+        <button type="button" aria-label="成功率時間縮小" disabled={months === 0} onClick={() => setMonths(value => value >= 6 ? 0 : value + 1)}>−</button>
+      </div>
+    </div>
+    {!data.monthly ? <p className="bo-note">每月重算結果尚未產生，目前顯示這個資料日的測試值。</p> : historicalCount < 3 ? <p className="bo-note">歷史有效日線不足，已取得 {historicalCount} 次每月結果；缺少資料的月份留空。</p> : null}
     <OutcomeSelector selected={selectedRule} onSelect={setRule} />
     <details className="bo-details" key={selectedRule}><summary>{rule.label} · 判定說明</summary>
       <div className="bo-rule-description"><p>{rule.description}</p></div>
@@ -128,7 +134,11 @@ function BreakoutBody({ data, params }: { data: BreakoutMarket; params: Breakout
     </details>
     {!complete ? <p className="bo-pending-note"><Timer size={14} aria-hidden="true" />這段訊號仍在觀察或缺少後續日線，尚無完整比較結果。</p> : null}
     <ul className="bo-list">{METHODS.map((method, index) => <StrategyRow key={method.key} method={method} index={index}
-      stats={current.strategies[method.key]} rule={selectedRule} params={params} />)}</ul>
+      stats={current.strategies[method.key]} rule={selectedRule} params={params} points={points} months={months} asOf={data.asOf} />)}</ul>
+    <details className="bo-details"><summary>每月測試數值與涵蓋</summary><div className="bo-table-wrap"><table className="bo-history-table">
+      <thead><tr><th>參考資料日</th>{METHODS.map(method => <th key={method.key}>{method.short}</th>)}<th>有效／名單</th></tr></thead>
+      <tbody>{points.map(point => <tr key={point.targetDate}><th>{point.asOf ?? point.targetDate}</th>{METHODS.map(method => <td key={method.key}>{point.status === 'ok' ? rate(point.strategies[method.key]?.comparison?.rules[selectedRule]?.winRate ?? null) : '資料不足'}</td>)}<td>{count(point.evaluated)}／{count(point.universeCount)}</td></tr>)}</tbody>
+    </table></div></details>
     <ComparisonTable current={current} selected={selectedRule} onSelect={setRule} />
     <Methodology data={data} current={current} params={params} />
     <p className="bo-foot"><i />{data.universe} · 有效日線 {count(data.evaluated)} 檔</p>
@@ -170,7 +180,7 @@ export function BreakoutCard({ market }: { market: BreakoutMarketKey }) {
           {snapshots.map(entry => <option key={entry.asOf} value={entry.asOf}>{formatDateTime(entry.asOf, false)} 保存結果</option>)}
         </select></label>
         {result?.status === 'ok' && result.data.generatedAt ? <small>測試時間 {formatDateTime(result.data.generatedAt)}</small> : null}
-        <details className="bo-inline-help"><summary>保存說明</summary><p>保留每 {history?.status === 'ok' ? history.data.intervalDays : 20} 個日曆天的測試結果；選取日期查看當時原始結果。最新一次顯示目前報表，實際測試時間與行情資料日分開標示。</p></details>
+        <details className="bo-inline-help"><summary>參考日與保存說明</summary><p>以選取報表的最新有效資料日為基準，往前每個日曆月重算一次，共6個月；非交易日退到當時最近的有資料交易日。各次只使用該日以前的K線與完整5日觀察。另保留每 {history?.status === 'ok' ? history.data.intervalDays : 20} 個日曆天的原始報表；舊報表沒有每月重算值時不補造。最新一次的實際測試時間與行情資料日分開標示。</p></details>
         {history && !snapshots.length ? <small>{history.status === 'ok' ? '尚無已保存的歷史結果。' : history.message}</small> : null}
       </div>
       {result === null ? <p className="muted-text" role="status">載入中…</p> : data?.scope === 'full' ? <BreakoutBody key={`${market}:${activeDate}`} data={data} params={params} /> :

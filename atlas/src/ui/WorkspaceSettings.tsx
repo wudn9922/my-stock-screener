@@ -58,18 +58,13 @@ export function WorkspaceSettings({ store }: { store: AppStore }) {
     }
   };
 
-  const removePreset = (id: string) => {
-    const latest = store.getSnapshot().app;
-    store.updateApp({ indicatorPresets: latest.indicatorPresets.filter((preset) => preset.id !== id) });
-  };
-
   return (
     <section className="research-panel workspace-settings" aria-label="工作區設定">
       <div className="section-heading">
         <span>新畫線預設樣式</span>
         <span>本機</span>
       </div>
-      <HelpDisclosure label="設定與備份說明">設定與指標組合儲存在這個瀏覽器。「匯出設定」會備份所有股票的畫線、指標與提醒；行情資料不在備份內。</HelpDisclosure>
+      <HelpDisclosure label="設定與備份說明">啟用儲存時，畫線、指標與設定會自動儲存。「匯出設定」會備份所有股票的畫線、指標與提醒；行情資料不在備份內。</HelpDisclosure>
       <form className="research-form" onSubmit={save}>
         
         <label>
@@ -120,19 +115,6 @@ export function WorkspaceSettings({ store }: { store: AppStore }) {
         <button className="primary-button" type="submit" style={{ minHeight: 44 }}>儲存新畫線預設樣式</button>
       </form>
       <HelpDisclosure label="預設線寬說明">ATR 線寬＝0.02 × 14 根 K 棒 ATR（最小 0.5 像素）；已儲存的線寬維持不變。預設樣式只套用於新畫線。</HelpDisclosure>
-      <section className="settings-subsection" aria-labelledby="indicator-presets-heading">
-        <h3 id="indicator-presets-heading">指標組合</h3>
-        {!app.indicatorPresets.length ? <p className="small muted">尚未儲存任何組合。</p> : (
-          <ul className="preset-list">
-            {app.indicatorPresets.map((preset) => (
-              <li key={preset.id}>
-                <span><b>{preset.name}</b><small>{preset.indicators.length} 個指標</small></span>
-                <button type="button" aria-label={`移除組合 ${preset.name}`} onClick={() => removePreset(preset.id)} style={{ minHeight: 44 }}>移除</button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
       <section className="settings-subsection" aria-labelledby="debug-setting-heading">
         <h3 id="debug-setting-heading">診斷</h3>
         <label className="research-checkbox">

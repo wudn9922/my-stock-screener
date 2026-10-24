@@ -6,7 +6,7 @@ import { expect, type Page } from '@playwright/test';
  */
 export type WorkspacePanel = 'watchlist' | 'indicators' | 'drawings' | 'backtest' | 'alerts' | 'settings';
 export const panelNames: Record<WorkspacePanel, string> = {
-  watchlist: '自選清單',
+  watchlist: '圖表收藏',
   indicators: '指標',
   drawings: '畫線物件',
   backtest: '策略回測',

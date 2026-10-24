@@ -92,29 +92,31 @@ def volume_features(rows):
     return out
 
 
-def structure(features, window, shrink=1.0, expand=1.0):
-    if not (0 < shrink <= expand):
-        raise ValueError("thresholds require 0 < shrink <= expand")
+def structure(features, window):
+    """Directional volume compares adjacent sessions, independently of RVOL20."""
     sample = features[-window:]
     usable = [
-        r
-        for r in sample
-        if r["returnPct"] is not None and r["rvol"] is not None and r["valid"]
+        (r, features[index - 1])
+        for index, r in enumerate(features)
+        if index >= max(1, len(features) - window)
+        and r["returnPct"] is not None and r["valid"]
+        and features[index - 1]["valid"]
+        and positive(r["volume"]) and positive(features[index - 1]["volume"])
     ]
-    up = [r for r in usable if r["returnPct"] > 0]
-    down = [r for r in usable if r["returnPct"] < 0]
+    up = [(r, prev) for r, prev in usable if r["returnPct"] > 0]
+    down = [(r, prev) for r, prev in usable if r["returnPct"] < 0]
     out = dict(
         window=window,
         observations=len(usable),
         lowConfidence=len(usable) < max(5, math.ceil(window * 0.8)),
     )
     for name, days, predicate in [
-        ("upShrink", up, lambda r: r["rvol"] < shrink),
-        ("upExpand", up, lambda r: r["rvol"] > expand),
-        ("downExpand", down, lambda r: r["rvol"] > expand),
-        ("downShrink", down, lambda r: r["rvol"] < shrink),
+        ("upShrink", up, lambda r, prev: r["volume"] < prev["volume"]),
+        ("upExpand", up, lambda r, prev: r["volume"] > prev["volume"]),
+        ("downExpand", down, lambda r, prev: r["volume"] > prev["volume"]),
+        ("downShrink", down, lambda r, prev: r["volume"] < prev["volume"]),
     ]:
-        n = sum(predicate(r) for r in days)
+        n = sum(predicate(r, prev) for r, prev in days)
         out[name] = dict(numerator=n, denominator=len(days), pct=ratio(n, len(days)))
     continuous = len(features) > window and all(
         r["valid"] and r["returnPct"] is not None for r in sample

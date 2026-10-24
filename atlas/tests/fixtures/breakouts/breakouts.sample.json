@@ -36,11 +36,6 @@
   ],
   "windows": [
    {
-    "key": "1w",
-    "days": 5,
-    "label": "近1週"
-   },
-   {
     "key": "1m",
     "days": 21,
     "label": "近1月"
@@ -84,7 +79,12 @@
     "volume": false,
     "definition": "前日收盤 ≤ 前日 EMA20，且當日收盤 > 當日 EMA20；EMA 以最初 20 日收盤均值起算，之後以 2/21 平滑"
    }
-  ]
+  ],
+  "monthlyHistory": {
+   "intervalMonths": 1,
+   "months": 6,
+   "defaultVisibleMonths": 5
+  }
  },
  "markets": {
   "tw": {
@@ -430,7 +430,8 @@
     "missing": 20
    },
    "listingAsOf": "2026-10-09",
-   "listingSource": "synthetic full-market listings"
+   "listingSource": "synthetic full-market listings",
+   "monthly": null
   },
   "us": {
    "asOf": "2026-10-09",
@@ -775,7 +776,8 @@
     "missing": 0
    },
    "listingAsOf": "2026-10-09",
-   "listingSource": "synthetic full-market listings"
+   "listingSource": "synthetic full-market listings",
+   "monthly": null
   }
  }
 }

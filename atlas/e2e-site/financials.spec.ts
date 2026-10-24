@@ -441,6 +441,21 @@ test('key metrics card: seven tiles on the newest period, with YoY and eight min
   await expect(key.locator('.fin-key-tile').nth(4).locator('.fin-chip')).toContainText('百分點');
   await expect(key.locator('.fin-spark')).toHaveCount(7);
   expect(await key.locator('.fin-spark-bar').count()).toBeGreaterThanOrEqual(40);
+  const headlines = await key.locator('.fin-key-value').allTextContents();
+  const range = key.getByRole('group', { name: '關鍵指標迷你柱時間軸' });
+  await expect(key.locator('.fin-spark').first()).toHaveAttribute('aria-label', /8 期$/);
+  const newestRange = await key.locator('.fin-spark').first().getAttribute('aria-label');
+  await range.getByRole('button', { name: '縮小時間軸', exact: true }).click();
+  await expect(key.locator('.fin-spark').first()).toHaveAttribute('aria-label', /12 期$/);
+  await range.getByRole('button', { name: '往前移動時間軸' }).click();
+  await expect(range.getByRole('button', { name: '往後移動時間軸' })).toBeEnabled();
+  await range.getByRole('button', { name: '放大時間軸', exact: true }).click();
+  await expect(key.locator('.fin-spark').first()).toHaveAttribute('aria-label', /8 期$/);
+  await expect(key.locator('.fin-spark').first()).not.toHaveAttribute('aria-label', newestRange!);
+  await expect(key.locator('.fin-key-value')).toHaveText(headlines);
+  await expect(key.locator('.fin-key-period')).toContainText('FY2025');
+  await range.getByRole('button', { name: '重設時間軸' }).click();
+  await expect(key.locator('.fin-spark').first()).toHaveAttribute('aria-label', newestRange!);
   expect(await key.textContent()).not.toContain('NaN');
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
 });
@@ -491,6 +506,32 @@ test('Taiwan synthetic 60-quarter history enables the full chart range', async (
   await expect(quarterRange.getByRole('button', { name: '60季', exact: true })).toBeEnabled();
   await quarterRange.getByRole('button', { name: '60季', exact: true }).click();
   await expect(page.locator('.fin-card[data-group="growth"] .fin-bar')).toHaveCount(60);
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+});
+
+test('financial bar charts independently zoom and move through their full history', async ({ page }) => {
+  await mockFinancials(page, {}, { '2330.TW': syntheticTaiwan60 });
+  await page.goto('./?page=financials&symbol=2330.TW&p=q');
+  const growth = page.locator('.fin-card[data-group="growth"]');
+  const profit = page.locator('.fin-card[data-group="profitability"]');
+  const controls = growth.locator('.fin-chart-time');
+  await expect(growth.locator('.fin-bar')).toHaveCount(20);
+  await controls.getByRole('button', { name: '縮小時間軸', exact: true }).click();
+  await expect(growth.locator('.fin-bar')).toHaveCount(30);
+  await expect(profit.locator('.fin-bar')).toHaveCount(20);
+  const latestLabel = await growth.locator('.fin-bar').last().getAttribute('aria-label');
+  await controls.getByRole('button', { name: '往前移動時間軸' }).click();
+  await expect(growth.locator('.fin-bar').last()).not.toHaveAttribute('aria-label', latestLabel!);
+  const firstPeriod = (await growth.locator('.fin-bar').first().getAttribute('aria-label'))!.match(/^FY\d{4} Q\d/)![0];
+  await growth.locator('.fin-bar').first().click();
+  await expect(growth.locator('.fin-detail-head > b')).toHaveText(firstPeriod);
+  await growth.locator('.fin-bar').first().press('ArrowRight');
+  await expect(growth.locator('.fin-bar').nth(1)).toHaveAttribute('aria-pressed', 'true');
+  await controls.getByRole('button', { name: '放大時間軸', exact: true }).click();
+  await expect(growth.locator('.fin-bar')).toHaveCount(20);
+  await controls.getByRole('button', { name: '重設時間軸' }).click();
+  await expect(growth.locator('.fin-bar').last()).toHaveAttribute('aria-label', latestLabel!);
+  await expect(controls.getByRole('button', { name: '往後移動時間軸' })).toBeDisabled();
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
 });
 

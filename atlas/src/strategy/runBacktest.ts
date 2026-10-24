@@ -49,6 +49,14 @@ function validateInput(input: StrategyInput): Required<ExecutionCosts> & { symbo
   if (config.kind === 'ma-cross' && config.fastPeriod >= config.slowPeriod) {
     throw new Error('MA-cross fastPeriod must be less than slowPeriod');
   }
+  if (config.kind === 'price-cross') {
+    if (!finiteNonnegative(config.entryAbovePct ?? 0)) {
+      throw new Error('entryAbovePct must be finite and nonnegative');
+    }
+    if (!finiteNonnegative(config.exitBelowPct ?? 0) || (config.exitBelowPct ?? 0) >= 100) {
+      throw new Error('exitBelowPct must be finite and between 0 and 100 (exclusive)');
+    }
+  }
   if (!Number.isFinite(initialCapital) || initialCapital <= 0) throw new Error('initialCapital must be positive and finite');
   validateBars(input.closedBars);
   const commissionBps = input.costs?.commissionBps ?? 0;

@@ -84,3 +84,13 @@
 .bo-foot { display: flex; align-items: baseline; gap: 6px; margin: 0; font-size: 10px; line-height: 1.7; color: var(--text-3); }
 .bo-foot i { width: 5px; height: 5px; flex-shrink: 0; border-radius: 50%; background: var(--accent); }
 @media (max-width: 767px) { .bo-toolbar .segmented button, .bo-details > summary, .bo-compare button, .bo-history select, .bo-inline-help > summary { min-height: 44px; } }
+.bo-history-chart { height: 160px; width: 100%; min-width: 0; }
+.bo-history-chart > div { height: 100%; width: 100%; }
+.bo-zoom { display: flex; gap: 4px; align-items: center; }
+.bo-zoom button, .bo-zoom select { min-height: 36px; min-width: 36px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: var(--text-2); font: inherit; font-size: 11px; cursor: pointer; }
+.bo-zoom button:disabled { opacity: .35; cursor: default; }
+.bo-zoom button:focus-visible, .bo-zoom select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bo-history-table { width: 100%; border-collapse: collapse; font-size: 10px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.bo-history-table td, .bo-history-table th { padding: 7px 3px; text-align: right; white-space: nowrap; font-weight: 400; border-bottom: 1px solid var(--border); }
+.bo-history-table th:first-child { text-align: left; }
+@media (max-width: 767px) { .bo-zoom button, .bo-zoom select { min-height: 44px; min-width: 40px; } }

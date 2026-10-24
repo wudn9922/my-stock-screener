@@ -85,11 +85,17 @@ async function openPicker(page: Page) {
   return dialog;
 }
 
-async function addSma14(page: Page) {
+async function addSma14(page: Page, useAtr = false) {
   await page.getByRole('button', { name: '管理指標', exact: true }).click();
   await page.getByLabel('指標類型', { exact: true }).filter({ visible: true }).selectOption('SMA');
   await page.getByLabel('SMA 週期', { exact: true }).filter({ visible: true }).fill('14');
   await page.getByRole('button', { name: '新增 SMA', exact: true }).click();
+  if (useAtr) {
+    await expect.poll(async () => (await readSymbol(page))?.indicators.find((indicator) => indicator.type === 'SMA')).toMatchObject({ lineWidth: 2, widthMode: 'pixels' });
+    await page.getByRole('button', { name: '設定 SMA 14', exact: true }).click();
+    await page.getByLabel('SMA 14 線寬', { exact: true }).selectOption('atr');
+    await page.locator('[data-testid="ma-14"]').getByRole('button', { name: '儲存', exact: true }).click();
+  }
   await page.getByRole('button', { name: '鎖定 SMA 14', exact: true }).click();
   const close = page.getByRole('button', { name: '關閉面板', exact: true });
   if (await close.isVisible()) await close.click();
@@ -214,12 +220,12 @@ test('Drawing Tools picker keeps the chart clear and supports keyboard, backdrop
   await expect(page.locator('.app-shell')).not.toHaveClass(/chart-focus/);
 });
 
-test('new drawing and SMA use ATR width defaults and preserve locked symbol/timeframe ownership', async ({
+test('new SMA defaults to 2px and explicitly selected ATR width preserves locked symbol/timeframe ownership', async ({
   page,
 }) => {
   await page.goto('/');
   await loaded(page);
-  await addSma14(page);
+  await addSma14(page, true);
   await addVolume(page);
 
   await chooseDrawingTool(page, '水平線');

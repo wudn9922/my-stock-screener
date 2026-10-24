@@ -50,13 +50,13 @@ test('three entry cards compare four outcomes with fixed cohorts on desktop and 
   await expect(row(page)).toContainText('先後不明 3 次');
   await section.getByText('比較全部四種勝率', { exact: true }).click();
 
-  const windows = section.getByRole('group', { name: '統計窗口' });
-  await windows.getByRole('button', { name: '近1週' }).click();
-  await expect(row(page)).toContainText('等待5日觀察');
-  await expect(row(page, 'box20')).toContainText('窗口內沒有新突破');
-  await expect(row(page).locator('.bo-win')).toHaveText('—成功率');
-  await windows.getByRole('button', { name: '近1月' }).click();
-  await expect(row(page).locator('.bo-win')).toContainText('55.0%');
+  await expect(section.getByRole('button', { name: '近1週' })).toHaveCount(0);
+  await expect(section.locator('.bo-history-chart')).toHaveCount(3);
+  await expect(section.getByRole('combobox', { name: '成功率顯示月數' })).toHaveValue('5');
+  await section.getByRole('button', { name: '成功率時間放大' }).click();
+  await expect(section.locator('.bo-history-chart').first()).toHaveAttribute('data-visible-months', '4');
+  await section.getByRole('button', { name: '成功率時間縮小' }).click();
+  await expect(section.locator('.bo-history-chart').first()).toHaveAttribute('data-visible-months', '5');
   await section.getByText('計算與資料說明', { exact: true }).click();
   const methodology = section.locator('.bo-method');
   for (const text of ['完整 5 個市場交易日', '先後不明則保守判失敗', '前高仍保留', '隔日可再次突破', 'ATR(20)', '不設10日冷卻', '沒有訊號的股票不進分母', '存活者偏差', '門檻 14%', '全市場名單 1,000 檔', '歷史缺漏 20 檔'])
@@ -173,5 +173,35 @@ test('saved 20-day test dates show their own original results and return to the 
   await dates.selectOption('latest');
   await expect(card(page).locator('.bo-asof')).toHaveText('資料日 2026/10/09');
   await expect(row(page).locator('.bo-win')).toContainText('50.0%');
+  await noOverflow(page);
+});
+
+
+test('monthly recalculations have distinct bars, current values, and a five-month zoom', async ({ page }) => {
+  const payload = JSON.parse(body);
+  const market = payload.markets.tw;
+  market.monthly = { intervalMonths: 1, referenceDate: market.asOf, points: Array.from({ length: 7 }, (_, index) => {
+    const month = index + 4;
+    const strategies = structuredClone(market.windows['1m'].strategies);
+    const wins = 44 + index * 11;
+    strategies.swingHigh.comparison.rules.hold5 = { wins, failures: 220 - wins, evaluatedN: 220, winRate: wins / 220 * 100 };
+    return { targetDate: `2026-${String(month).padStart(2, '0')}-09`, asOf: `2026-${String(month).padStart(2, '0')}-09`,
+      evaluated: 900, universeCount: 1000, status: 'ok', strategies };
+  }) };
+  await mockBreakouts(page, payload);
+  await page.goto('./?page=markets&market=tw');
+  const chart = row(page).getByRole('img', { name: /每月成功率柱狀圖/ });
+  await expect(chart).toHaveAttribute('data-point-count', '7');
+  await expect(chart).toHaveAttribute('data-visible-months', '5');
+  await expect(chart).toHaveAttribute('aria-label', /2026-04-09 20.0%.*2026-10-09 50.0%/);
+  await expect(row(page).locator('.bo-win')).toHaveText('50.0%2026/10/09 測得');
+  await card(page).getByRole('combobox', { name: '成功率顯示月數' }).selectOption('3');
+  await expect(chart).toHaveAttribute('data-visible-months', '3');
+  await card(page).getByRole('combobox', { name: '成功率顯示月數' }).selectOption('0');
+  await expect(chart).toHaveAttribute('data-visible-months', 'all');
+  await expect(chart.locator('canvas').first()).toBeVisible();
+  await card(page).getByText('每月測試數值與涵蓋', { exact: true }).click();
+  await expect(card(page).locator('.bo-history-table tbody tr')).toHaveCount(7);
+  await expect(card(page).locator('.bo-history-table tbody tr').first()).toContainText('20.0%');
   await noOverflow(page);
 });

@@ -68,6 +68,49 @@ describe('strategy indicators and signals', () => {
     expect(result.equity).toHaveLength(3);
   });
 
+  it('uses separate upper-entry and lower-exit percentage bands and next-open execution', () => {
+    const result = runBacktest({
+      config: config({ kind: 'price-cross', entryAbovePct: 5, exitBelowPct: 2 }),
+      closedBars: bars([100, 100, 104, 120, 118, 117, 110, 90], [100, 100, 104, 120, 125, 117, 110, 100]),
+      initialCapital: 1000,
+    });
+    expect(result.signals.map(({ action, time }) => [action, time])).toEqual([
+      ['BUY', 1_700_000_900],
+      ['EXIT', 1_700_001_800],
+    ]);
+    expect(result.markers.map(({ action, price, time }) => [action, price, time])).toEqual([
+      ['BUY', 125, 1_700_001_200],
+      ['EXIT', 100, 1_700_002_100],
+    ]);
+    expect(result.trades[0].pnl).toBeCloseTo(-200);
+  });
+
+  it('treats equality at a percentage band as neutral and reverses actions for short trades', () => {
+    const closedBars = bars([60, 60, 100, 180, 120, 60, 80]);
+    const settings = config({ kind: 'price-cross', entryAbovePct: 25, exitBelowPct: 20 });
+    const long = runBacktest({ config: settings, closedBars, initialCapital: 1000 });
+    expect(long.signals.map(({ action, time }) => [action, time])).toEqual([
+      ['BUY', 1_700_000_900],
+      ['EXIT', 1_700_001_500],
+    ]);
+    const short = runBacktest({ config: { ...settings, direction: 'short' }, closedBars, initialCapital: 1000 });
+    expect(short.signals.map(({ action, time }) => [action, time])).toEqual([
+      ['COVER', 1_700_000_900],
+      ['SELL', 1_700_001_500],
+    ]);
+    expect(short.markers.map(({ action }) => action)).toEqual(['SELL']);
+  });
+
+  it('does not change prior percentage-band signals when future bars are appended', () => {
+    const all = bars([100, 100, 104, 120, 118, 117, 110, 90]);
+    const settings = config({ kind: 'price-cross', slowType: 'EMA', entryAbovePct: 4, exitBelowPct: 2 });
+    const prefix = runBacktest({ config: settings, closedBars: all.slice(0, 6), initialCapital: 1000 });
+    const full = runBacktest({ config: settings, closedBars: all, initialCapital: 1000 });
+    expect(prefix.signals.length).toBeGreaterThan(0);
+    expect(full.signals.filter(({ time }) => time <= all[5].time)).toEqual(prefix.signals);
+    expect(full.markers.filter(({ time }) => time <= all[5].time)).toEqual(prefix.markers);
+  });
+
   it('does not let a later closed bar change an earlier signal or fill it at its own close', () => {
     const prefix = bars([10, 9, 10]);
     const beforeNextBar = runBacktest({ config: config(), closedBars: prefix, initialCapital: 1000 });
@@ -213,6 +256,21 @@ describe('strategy execution and accounting', () => {
 });
 
 describe('strategy validation', () => {
+  it.each([
+    { entryAbovePct: -1 },
+    { entryAbovePct: NaN },
+    { entryAbovePct: Infinity },
+    { exitBelowPct: -1 },
+    { exitBelowPct: 100 },
+    { exitBelowPct: Infinity },
+  ])('rejects invalid price-band percentages %j', (percentages) => {
+    expect(() => runBacktest({
+      config: config({ kind: 'price-cross', ...percentages }),
+      closedBars: bars([100, 110, 90]),
+      initialCapital: 1000,
+    })).toThrow(/Pct/);
+  });
+
   it('rejects invalid ordering, OHLC, periods, and capital instead of guessing', () => {
     const valid = bars([10, 9, 10]);
     expect(() => runBacktest({ config: config(), closedBars: [valid[1], valid[0]], initialCapital: 100 })).toThrow(/strictly increasing/);
