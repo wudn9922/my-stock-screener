@@ -1,0 +1,122 @@
+name: Permanent K-line Backfill
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        options: [backfill, initialize]
+        default: backfill
+        description: 'initialize creates the empty orphan branch once; backfill resumes saved progress'
+      years:
+        default: '2'
+        description: 'Calendar years before today (1–100)'
+      budget:
+        default: '600'
+        description: 'Total Yahoo/source request budget in seconds (30–2400)'
+      markets:
+        default: 'TW,US'
+        description: 'TW,US'
+permissions:
+  contents: read
+# Share the existing producer lock: no concurrent full-market Yahoo download bursts.
+concurrency:
+  group: universe-full
+  cancel-in-progress: false
+jobs:
+  initialize:
+    if: inputs.operation == 'initialize'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install --quiet pandas
+      - name: Create-only orphan branch; never overwrite an existing ref
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/kline_archive_git.py initialize --archive-dir .cache/kline-archive --remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+  fetch:
+    if: inputs.operation == 'backfill'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    outputs:
+      ready: ${{ steps.checkpoint.outputs.ready }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/checkout@v4
+        with:
+          ref: kline-archive
+          path: .cache/kline-archive
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install --quiet pandas requests 'curl_cffi>=0.7,<1'
+      - uses: actions/cache/restore@v4
+        with:
+          path: .cache/universe-full
+          key: universe-full-v1-backfill-${{ github.run_id }}
+          restore-keys: universe-full-v1-
+      - name: Budgeted Yahoo backfill using existing full-market sources and rate limits
+        env:
+          YEARS: ${{ inputs.years }}
+          BUDGET: ${{ inputs.budget }}
+          MARKETS: ${{ inputs.markets }}
+          KLINE_CORRECTIONS_LOG: /tmp/backfill-input-corrections.json
+        run: python -u scripts/backfill_kline_archive.py --archive-dir .cache/kline-archive --years "$YEARS" --budget "$BUDGET" --markets "$MARKETS"
+      - name: Detect resumable checkpoint
+        id: checkpoint
+        if: always() && !cancelled()
+        run: |
+          if [ -f .cache/kline-backfill-payload/operations.json ]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.checkpoint.outputs.ready == 'true'
+        with:
+          name: kline-backfill-${{ github.run_id }}
+          path: .cache/kline-backfill-payload/
+          include-hidden-files: true
+          retention-days: 7
+  publish:
+    needs: fetch
+    if: always() && !cancelled() && needs.fetch.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    concurrency:
+      group: kline-archive-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install --quiet pandas
+      - uses: actions/checkout@v4
+        with:
+          ref: kline-archive
+          path: .cache/kline-archive
+          fetch-depth: 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: kline-backfill-${{ github.run_id }}
+          path: .cache/kline-backfill-payload
+      - name: Merge missing history, preserve conflicts, publish validated archive
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/kline_archive_git.py publish --archive-dir .cache/kline-archive --payload-dir .cache/kline-backfill-payload
+      - name: Reconcile any retained adjustment events with the main journal
+        run: python scripts/kline_archive_git.py journal --archive-dir .cache/kline-archive

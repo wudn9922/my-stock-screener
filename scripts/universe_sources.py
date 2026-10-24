@@ -385,7 +385,7 @@ def parse_twse_day_all(payload, fallback_date=None):
             number(first_value(record, "HighestPrice", "最高價")),
             number(first_value(record, "LowestPrice", "最低價")),
             close if close and close > 0 else None,
-            number(first_value(record, "TradeVolume", "成交股數")) or 0.0,
+            number(first_value(record, "TradeVolume", "成交股數")),
             number(first_value(record, "Change", "漲跌價差")),
             "TW",
         )
@@ -419,7 +419,7 @@ def parse_tpex_daily_quotes(payload, fallback_date=None):
             number(first_value(record, "High", "HighestPrice", "最高")),
             number(first_value(record, "Low", "LowestPrice", "最低")),
             close if close and close > 0 else None,
-            number(first_value(record, "TradingShares", "TradeVolume", "TradingVolume", "成交股數")) or 0.0,
+            number(first_value(record, "TradingShares", "TradeVolume", "TradingVolume", "成交股數")),
             number(first_value(record, "Change", "漲跌")),
             "TWO",
         )

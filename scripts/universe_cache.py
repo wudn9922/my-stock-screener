@@ -1,5 +1,6 @@
 """
-全市場 universe 的日 K 快取（GitHub Actions cache 保存，不提交進 repo）：純函式與檔案讀寫，不連網路。
+全市場 universe 的滾動日 K 運算快取（Actions cache；永久副本另存 kline-archive 分支）。
+純函式與檔案讀寫，不連網路。
 
 目錄（--cache-dir，預設 .cache/universe-full）：
 - bars/<SYMBOL>.csv：Date,Open,High,Low,Close,Volume，與 data/*.csv 同格式同口徑（Yahoo 分割調整後、未含股利還原的
@@ -367,13 +368,13 @@ def drop_unfinished(frame, market, now):
 
 
 def snapshot_bar(bar, last_close):
-    """當日行情 → (YYYY-MM-DD, o, h, l, c, v)；沒有成交時給平盤量 0 的 K（Yahoo 對台股無成交日的寫法）。"""
+    """當日行情 → (YYYY-MM-DD, o, h, l, c, v)；明確零成交量保留 0，未知量保留缺值。"""
     close = bar.get("close")
 
     if close is None:
         if last_close is None:
             return None
-        return (bar["date"], last_close, last_close, last_close, last_close, 0.0)
+        return (bar["date"], last_close, last_close, last_close, last_close, bar.get("volume"))
 
     open_ = bar.get("open") or close
     high = bar.get("high") if bar.get("high") is not None else close

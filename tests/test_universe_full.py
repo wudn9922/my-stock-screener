@@ -417,7 +417,7 @@ class CacheTest(unittest.TestCase):
         self.assertEqual(uc.snapshot_action(dict(entry, last="2026-10-13"), bar, calendar, "TW")[0], "same")
         self.assertEqual(uc.snapshot_action(dict(entry, last="2026-10-14"), bar, calendar, "TW")[0], "older")
         # 無成交：平盤量 0
-        action, row = uc.snapshot_action(entry, dict(bar, close=None, reference=None), calendar, "TW")
+        action, row = uc.snapshot_action(entry, dict(bar, close=None, reference=None, volume=0), calendar, "TW")
         self.assertEqual((action, row), ("append", ("2026-10-13", 100.0, 100.0, 100.0, 100.0, 0.0)))
 
     def test_eligibility(self):

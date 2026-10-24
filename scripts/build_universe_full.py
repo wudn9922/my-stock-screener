@@ -5,7 +5,8 @@
 
   python -u scripts/build_universe_full.py [--markets TW,US] [--budget 2400] [--cache-dir .cache/universe-full]
 
-由 .github/workflows/universe-full.yml 在每日報告成功後執行；日 K 存在 Actions cache（不提交進 repo），
+由 .github/workflows/universe-full.yml 在每日報告成功後執行；日 K 運算副本存在 Actions cache，
+永久副本由 kline_archive.py 接入獨立 orphan 分支（不進 main／Pages）。
 格式見 scripts/universe_cache.py。資料來源與解析見 scripts/universe_sources.py。
 
 每次執行
@@ -170,6 +171,14 @@ class Network:
         if self.crumb:
             params["crumb"] = self.crumb
 
+        return self.get_json(YAHOO_CHART_URL.format(symbol=symbol), params, timeout=30)
+
+    def chart_period(self, symbol, start, end):
+        """Same Yahoo OHLC basis, exact bounded history for permanent-archive backfill."""
+        params = {"period1": int(start.timestamp()), "period2": int(end.timestamp()),
+                  "interval": "1d", "events": "split", "includePrePost": "false"}
+        if self.crumb:
+            params["crumb"] = self.crumb
         return self.get_json(YAHOO_CHART_URL.format(symbol=symbol), params, timeout=30)
 
     def quote(self, symbols):
@@ -639,6 +648,19 @@ class Run:
 
             for symbol in order:
                 entry = self.entry(symbol)
+                archive_dir = getattr(self.args, "archive_dir", None)
+                receipt_path = os.path.join(self.cache_dir, "archive-adjustments", symbol + ".json")
+                if archive_dir and os.path.exists(receipt_path):
+                    import kline_archive as archive
+                    if archive.pending_adjustment(archive_dir, self.cache_dir, symbol):
+                        if uc.can_retry(entry, self.today):
+                            tasks["adjusted"].append(symbol)
+                            if symbol in (snapshot.get("bars") or {}):
+                                self.pending[symbol] = snapshot["bars"][symbol]
+                        continue
+                    # Only disposable cache receipts are retired, never archive records.
+                    os.remove(receipt_path)
+                    os.remove(receipt_path.removesuffix(".json") + ".csv")
 
                 if uc.is_complete(entry) and not os.path.exists(uc.bars_path(self.cache_dir, symbol)):
                     entry.pop("full", None)  # 快取檔不見了：重建完整歷史
@@ -756,7 +778,9 @@ class Run:
 
         if bar.get("close") and bar["date"] in frame.index.strftime("%Y-%m-%d"):
             # 同一天 Yahoo 與官方／報價都有：記錄收盤與成交量的一致程度（日誌中的口徑檢查）
-            yahoo = frame.loc[bar["date"]]
+            # The compatible calculation frame uses zero for unknown shares;
+            # source comparisons must recover the attrs-based missing cells.
+            yahoo = uc._volume_source_frame(frame).loc[bar["date"]]
             self.agreement.append((
                 market,
                 abs(bar["close"] / float(yahoo["Close"]) - 1),
@@ -851,10 +875,48 @@ class Run:
                         continue
                     self.sleep(REQUEST_DELAY)
 
+            archive_adjustment = None
+            archive_dir = getattr(self.args, "archive_dir", None)
+            comparison = uc.compare_overlap(old, frame)
+            pending_receipt = uc.read_json(os.path.join(self.cache_dir, "archive-adjustments", symbol + ".json")) if archive_dir else None
+            needs_archive_adjustment = comparison and not comparison["ok"] or pending_receipt
+            if archive_dir and kind == "full" and needs_archive_adjustment:
+                import kline_archive as archive
+                # Resolve old retained years from Yahoo, never extrapolate a split factor.
+                earliest = archive.first_date(archive_dir, symbol)
+                if earliest and earliest < frame.index[0].strftime("%Y-%m-%d"):
+                    try:
+                        if self.time_left() < 30:
+                            raise RuntimeError("Archive adjustment deferred: history request budget exhausted")
+                        frame = self.fetch_chart(symbol, "max")
+                        self.sleep(REQUEST_DELAY)
+                        if frame.empty or frame.index[0].strftime("%Y-%m-%d") > earliest:
+                            raise RuntimeError("Yahoo adjustment does not cover retained archive history")
+                    except Exception as exc:
+                        uc.record_failure(self.state, symbol, self.today, str(exc))
+                        self.warnings.append(f"{symbol} 永久封存調整延後：{exc}")
+                        if isinstance(exc, RateLimited):
+                            self.chart_stopped = "Yahoo 持續限流（永久封存歷史調整），停止逐檔請求"
+                            break
+                        continue
+                proof = comparison if comparison and not comparison["ok"] else pending_receipt["comparison"]
+                witness = proof["date"]
+                if pd.Timestamp(witness) not in frame.index:
+                    self.warnings.append(f"{symbol} 調整來源缺少比對日，保留原快取與封存")
+                    continue
+                archive_adjustment = {"date": witness, "oldClose": float(old.loc[witness, "Close"]) if comparison and not comparison["ok"] else proof["oldClose"],
+                                      "newClose": float(frame.loc[witness, "Close"]),
+                                      "worst": proof["worst"]}
+                if abs(archive_adjustment["newClose"] / archive_adjustment["oldClose"] - 1) <= uc.PRICE_TOLERANCE:
+                    uc.record_failure(self.state, symbol, self.today, "Archive adjustment endpoints disagree; retained previous cache")
+                    self.warnings.append(f"{symbol} Yahoo 歷史端點調整基準不一致，保留原快取與封存")
+                    continue
             merged = uc.merge_full(old, frame) if kind == "full" else uc.merge_incremental(old, frame)
             merged = self.apply_pending(symbol, merged)
             written = uc.write_bars(path, merged, refetch=lambda: self.fetch_raw_chart_once(symbol, RECENT_RANGE), now=self.now)
             uc.record_frame(self.state, symbol, written, self.today, full=kind == "full", verified=True)
+            if archive_adjustment:
+                archive.stage_adjustment(self.cache_dir, symbol, frame, archive_adjustment, self.now)
             self.stats[f"chart.{reason}"] += 1
             done += 1
 
@@ -959,6 +1021,17 @@ class Run:
 
             if (entry.get("seen") or "") < cutoff:
                 path = uc.bars_path(self.cache_dir, symbol)
+                archive_dir = getattr(self.args, "archive_dir", None)
+                if archive_dir and os.path.exists(path):
+                    import kline_archive as archive
+                    retained = {r[0] for r in archive.symbol_rows(archive_dir, symbol)}
+                    current = archive.read_rows(path)
+                    if any(r[0] not in retained for r in current):
+                        self.stats["pruneDeferredUntilArchived"] += 1
+                        continue
+                    receipt = os.path.join(self.cache_dir, "archive-adjustments", symbol + ".json")
+                    if os.path.exists(receipt) and archive.pending_adjustment(archive_dir, self.cache_dir, symbol):
+                        continue
 
                 if os.path.exists(path):
                     os.remove(path)
@@ -1068,6 +1141,7 @@ def parse_args(argv=None):
     parser.add_argument("--cache-dir", default=os.environ.get("UNIVERSE_CACHE_DIR") or os.path.join(ROOT, ".cache", "universe-full"))
     parser.add_argument("--report-dir", default=os.environ.get("ATLAS_REPORT_DIR") or os.path.join(ROOT, "docs", "report"))
     parser.add_argument("--offline", action="store_true", help="不連網路，只用快取（lists.json、bars/）重建輸出")
+    parser.add_argument("--archive-dir", help="永久日 K 封存唯讀 checkout；調整時在原 Yahoo 預算內涵蓋舊年度")
     args = parser.parse_args(argv)
     args.markets = [part.strip().upper() for part in args.markets.split(",") if part.strip()]
     return args

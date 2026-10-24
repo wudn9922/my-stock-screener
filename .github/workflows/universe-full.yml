@@ -2,7 +2,8 @@ name: Full-Market Universe
 
 # 選股頁「全市場篩選」：台股上市＋上櫃普通股、美股 NYSE／NASDAQ／NYSE American 等交易所普通股與 ADR
 # （scripts/build_universe_full.py → docs/report/universe.json 的 scope: "full" 市場）。
-# - 日 K 存在 Actions cache（.cache/universe-full，不提交進 repo）；每天台股用證交所／櫃買全市場行情、
+# - 日 K 運算快取存在 Actions cache；永久副本在獨立 kline-archive orphan 分支，不進 main／Pages。
+#   每天台股用證交所／櫃買全市場行情、
 #   美股用 Yahoo 批次報價各接一根 K，只有缺口、除權／分割與新股票才逐檔向 Yahoo 請求。
 # - 冷啟動（快取還沒建好）每次在 --budget 秒內盡量補，沒補完的下次繼續；某市場完整歷史未達 90% 前不寫入，
 #   選股頁照舊顯示 main.py 的流動性名單。可手動執行（workflow_dispatch）加快冷啟動。
@@ -36,6 +37,8 @@ concurrency:
 
 jobs:
   build:
+    outputs:
+      archive_payload: ${{ steps.archive_stage.outcome == 'success' }}
     # workflow_run 只有在每日報告成功時才繼續
     if: >-
       github.event_name != 'workflow_run'
@@ -69,19 +72,60 @@ jobs:
           key: universe-full-v1-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: universe-full-v1-
 
+      - name: Shallow checkout permanent K-line archive
+        id: archive_checkout
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: kline-archive
+          path: .cache/kline-archive
+          fetch-depth: 1
+
+      - name: Seed missing rolling bars from permanent archive
+        id: archive_bootstrap
+        if: steps.archive_checkout.outcome == 'success'
+        continue-on-error: true
+        run: python scripts/kline_archive.py bootstrap --archive-dir .cache/kline-archive --cache-dir .cache/universe-full
+
+      - name: Retain accepted cache baseline before rollover or unlisted pruning
+        if: steps.archive_checkout.outcome == 'success'
+        run: python scripts/kline_archive.py stage --archive-dir .cache/kline-archive --cache-dir .cache/universe-full --payload-dir .cache/kline-baseline
+
       - name: Build full-market universe
+        if: steps.archive_checkout.outcome == 'success' && steps.archive_bootstrap.outcome == 'success'
         env:
           UNIVERSE_CACHE_DIR: .cache/universe-full
           UNIVERSE_BUDGET_SECONDS: ${{ inputs.budget || '2400' }}
-        run: python -u scripts/build_universe_full.py --markets "${{ inputs.markets || 'TW,US' }}"
+        run: python -u scripts/build_universe_full.py --markets "${{ inputs.markets || 'TW,US' }}" --archive-dir .cache/kline-archive
 
       # 即使上一步失敗或時間不夠，也保存已補到的日 K，下次接著補
       - name: Save daily-bar cache
+        id: cache_save
         if: always()
         uses: actions/cache/save@v4
         with:
           path: .cache/universe-full
           key: universe-full-v1-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Stage accepted completed sessions for permanent retention
+        id: archive_stage
+        if: always() && !cancelled() && steps.archive_checkout.outcome == 'success' && steps.cache_save.outcome == 'success'
+        run: python scripts/kline_archive.py stage --archive-dir .cache/kline-archive --cache-dir .cache/universe-full --payload-dir .cache/kline-payload --previous-payload .cache/kline-baseline
+
+      - name: Transfer archive append payload
+        if: always() && steps.archive_stage.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kline-daily-${{ github.run_id }}
+          path: .cache/kline-payload/
+          include-hidden-files: true
+          retention-days: 7
+
+      - name: Report unavailable permanent archive
+        if: always() && !cancelled() && (steps.archive_checkout.outcome != 'success' || steps.archive_bootstrap.outcome != 'success')
+        run: |
+          echo '::error::kline-archive checkout unavailable. Initialize once or restore branch access. New full-market collection is paused; existing cache/report publishing continues.'
+          exit 1
 
       # 與全市場選股共用完整名單、歷史快取；不足時保留舊報表，不退回流動性名單或 S&P 500。
       - name: Build full-market entry success rates
@@ -115,3 +159,37 @@ jobs:
             sleep $((attempt * 15))
           done
           exit 1
+
+  archive:
+    needs: build
+    if: always() && !cancelled() && needs.build.outputs.archive_payload == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    concurrency:
+      group: kline-archive-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install --quiet pandas
+      - uses: actions/checkout@v4
+        with:
+          ref: kline-archive
+          path: .cache/kline-archive
+          fetch-depth: 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: kline-daily-${{ github.run_id }}
+          path: .cache/kline-payload
+      - name: Verify, append and push only kline-archive
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/kline_archive_git.py publish --archive-dir .cache/kline-archive --payload-dir .cache/kline-payload
+      - name: Merge archive correction events into the existing main journal
+        run: python scripts/kline_archive_git.py journal --archive-dir .cache/kline-archive
