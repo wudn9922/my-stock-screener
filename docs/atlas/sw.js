@@ -4,7 +4,7 @@ const scopePath = scopeURL.pathname.endsWith('/')
   : `${scopeURL.pathname}/`;
 const scopeRoot = new URL(scopePath, scopeURL.origin);
 const CACHE_PREFIX = `atlas-shell-${encodeURIComponent(self.registration.scope)}-`;
-const CACHE = `${CACHE_PREFIX}atlas-shell-v1-c402920c05b3`;
+const CACHE = `${CACHE_PREFIX}atlas-shell-v1-025100e6bc5e`;
 const SCREENER_MEMORY_ONLY = scopePath.startsWith('/my-stock-screener/');
 const manifestURL = new URL('manifest.webmanifest', scopeRoot);
 const iconURLs = ['icon.svg', 'icon-192.png', 'icon-512.png'].map(
