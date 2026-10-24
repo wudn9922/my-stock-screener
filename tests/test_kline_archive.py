@@ -181,26 +181,131 @@ class ArchiveTests(_ArchiveCase):
         ka.put_symbol(self.archive, "AAPL", [row("2026-01-05")])
         self.assertEqual([r[0] for r in ka.symbol_rows(self.archive, "AAPL")], ["2026-01-02", "2026-01-06"])
 
-    def test_split_rewrites_only_affected_years_and_logs_exact_before_after(self):
-        self.seed(rows=[row("2023-12-29"), row("2024-01-02")])
+    def test_split_three_years_emits_three_hash_audits_and_main_grows_by_at_most_three(self):
+        days = ["2023-01-03", "2023-12-29", "2024-01-02", "2024-12-31", "2025-01-02", "2025-12-31"]
+        self.seed(rows=[row(day) for day in days])
         self.seed("MSFT")
         untouched = (self.archive / "us/MSFT/2025.csv").read_bytes()
         base = self.checkpoint()
-        source = [row("2023-12-29", close=50), row("2024-01-02", close=50), row("2026-10-23", close=55)]
-        proof = {"id": "cache-split", "comparison": {"date": "2024-01-02", "oldClose": 100, "newClose": 50}}
+        old_hashes = {p.stem: ka.digest(p.read_bytes()) for p in (self.archive / "us/AAPL").glob("*.csv")}
+        source = [row(day, close=50) for day in days] + [row("2026-10-23", close=55)]
+        proof = {"id": "cache-split", "comparison": {"date": "2025-12-31", "oldClose": 100, "newClose": 50, "worst": 0.5}}
         result = ka.put_symbol(self.archive, "AAPL", source, correction=proof, fetched_at=NOW.isoformat())
-        self.assertEqual(result["corrected"], 2)
+        self.assertEqual(result["corrected"], 6)
         self.assertEqual(result["added"], 1)
         events = ki.read_log(self.archive / ka.LOG)["events"]
-        self.assertEqual(len(events), 2)
-        self.assertEqual(events[0]["old"]["Close"], 100)
-        self.assertEqual(events[0]["new"]["Close"], 50)
+        self.assertEqual(len(events), 3)
+        for event in events:
+            year = str(event["year"])
+            self.assertEqual(event["new"]["path"], f"us/AAPL/{year}.csv")
+            self.assertEqual(event["old"]["sha256"], old_hashes[year])
+            self.assertEqual(event["new"]["sha256"], ka.digest((self.archive / event["new"]["path"]).read_bytes()))
+            self.assertEqual(event["new"]["rowsChanged"], 2)
+            self.assertEqual(event["comparison"], proof["comparison"])
+            self.assertEqual(event["adjustmentId"], proof["id"])
+            self.assertEqual(event["reason"], "kline-archive/adjustment-year:cache-split")
+            self.assertEqual(event["fetchedAt"], NOW.isoformat())
+            self.assertTrue(event["sourceUrl"].endswith("/AAPL"))
+            self.assertNotIn("Close", event["old"])
         self.assertEqual((self.archive / "us/MSFT/2025.csv").read_bytes(), untouched)
         ka.update_manifest(self.archive)
         ka.verify(self.archive, base)
+        legacy = ka.event("MSFT", row("2026-01-02", close=30), row("2026-01-02"), "corrected", "independent-data-correction")
+        ka.json_write(self.log, ki.merge_logs(ki.read_log(self.log), {"version": 1, "events": [legacy]}))
         ka.merge_main_log(self.archive, self.log)
-        self.assertEqual(len(ki.read_log(self.log)["events"]), 2)
+        self.assertEqual(len(ki.read_log(self.log)["events"]), 4)
+        self.assertFalse(ka.merge_main_log(self.archive, self.log))
         self.assertEqual(ka.put_symbol(self.archive, "AAPL", source, correction=proof)["corrected"], 0)
+        self.assertEqual(len(ki.read_log(self.archive / ka.LOG)["events"]), 3)
+
+    def test_logged_split_does_not_authorize_one_extra_unlogged_old_row_edit(self):
+        self.seed(rows=[row("2025-01-02"), row("2025-12-31")])
+        base = self.checkpoint()
+        proof = {"id": "cache-split", "comparison": {"date": "2025-12-31", "oldClose": 100, "newClose": 50}}
+        ka.put_symbol(self.archive, "AAPL", [row("2025-01-02", close=50), row("2025-12-31", close=50)], correction=proof)
+        ka.update_manifest(self.archive)
+        ka.verify(self.archive, base)
+        path = self.archive / "us/AAPL/2025.csv"
+        path.write_text(ka.csv_text([row("2025-01-02", close=49), row("2025-12-31", close=50)]))
+        ka.update_manifest(self.archive)
+        with self.assertRaisesRegex(ValueError, "Unlogged historical"):
+            ka.verify(self.archive, base)
+
+    def test_transaction_audit_spans_baseline_append_adjustment_and_later_daily_append(self):
+        days = ["2025-12-31", "2026-10-21"]
+        self.seed(rows=[row(day) for day in days])
+        base = self.checkpoint()
+        # The old cache has one accepted session the archive has not seen yet.
+        self.cache_rows("AAPL", [row("2026-10-21"), row("2026-10-22")])
+        baseline = self.root / "baseline"
+        ka.stage_cache(self.cache, self.archive, baseline, NOW)
+        source = [row(day, close=50) for day in days + ["2026-10-22"]]
+        proof = {"date": "2026-10-21", "oldClose": 100, "newClose": 50, "worst": 0.5}
+        ka.stage_adjustment(self.cache, "AAPL", uc.clean(frame(source)), proof, NOW)
+        self.cache_rows("AAPL", source + [row("2026-10-23", close=55)])
+        ka.stage_cache(self.cache, self.archive, self.payload, NOW, previous=baseline)
+        ka.apply_operations(self.archive, self.payload, self.log)
+        ka.verify(self.archive, base)
+        events = ki.read_log(self.archive / ka.LOG)["events"]
+        self.assertEqual(len(events), 2)
+        self.assertEqual(sorted(e["new"]["rowsChanged"] for e in events), [1, 1])
+        self.assertEqual(len(ki.read_log(self.log)["events"]), 2)
+
+        # A baseline can also contain the correction itself. The final same-id
+        # payload appends another session after it without re-correcting old rows.
+        base = self.checkpoint()
+        source = [row(day, close=25) for day in days + ["2026-10-22", "2026-10-23"]]
+        proof = dict(proof, oldClose=50, newClose=25)
+        ka.stage_adjustment(self.cache, "AAPL", uc.clean(frame(source)), proof, NOW)
+        self.cache_rows("AAPL", source)
+        baseline2, payload2 = self.root / "baseline2", self.root / "payload2"
+        ka.stage_cache(self.cache, self.archive, baseline2, NOW)
+        later = NOW + timedelta(days=4)
+        # Use a later completed session for the transaction's appended suffix.
+        path = uc.bars_path(str(self.cache), "AAPL")
+        uc.write_bars(path, frame(source + [row("2026-10-26", close=27)]), now=later)
+        state = uc.load_state(str(self.cache))
+        uc.record_frame(state, "AAPL", uc.read_bars(path), later.date().isoformat(), full=True)
+        uc.save_state(str(self.cache), state)
+        ka.stage_cache(self.cache, self.archive, payload2, later, previous=baseline2)
+        ka.apply_operations(self.archive, payload2, self.log, now=later)
+        ka.verify(self.archive, base)
+        self.assertEqual(len(ki.read_log(self.archive / ka.LOG)["events"]), 4)
+
+    def test_year_hash_receipt_never_allows_a_deleted_date_or_file(self):
+        self.seed(rows=[row("2025-01-02"), row("2025-12-31")])
+        base = self.checkpoint()
+        proof = {"id": "split", "comparison": {"date": "2025-12-31", "oldClose": 100, "newClose": 50}}
+        ka.put_symbol(self.archive, "AAPL", [row("2025-01-02", close=50), row("2025-12-31", close=50)], correction=proof)
+        path = self.archive / "us/AAPL/2025.csv"
+        path.write_text(ka.csv_text([row("2025-12-31", close=50)]))
+        ka.update_manifest(self.archive)
+        with self.assertRaisesRegex(ValueError, "dates deleted"):
+            ka.verify(self.archive, base)
+        path.unlink()
+        ka.update_manifest(self.archive)
+        with self.assertRaisesRegex(ValueError, "file deleted"):
+            ka.verify(self.archive, base)
+
+    def test_multiple_adjustment_hash_edges_accept_a_chain_independent_of_log_order(self):
+        days = ["2025-01-02", "2025-12-31"]
+        self.seed(rows=[row(day) for day in days])
+        base = self.checkpoint()
+        for adjustment, old, new in (("first", 100, 50), ("second", 50, 25)):
+            proof = {"id": adjustment, "comparison": {"date": days[-1], "oldClose": old, "newClose": new}}
+            ka.put_symbol(self.archive, "AAPL", [row(day, close=new) for day in days], correction=proof)
+        log = ki.read_log(self.archive / ka.LOG)
+        log["events"].reverse()
+        ka.json_write(self.archive / ka.LOG, log)
+        ka.update_manifest(self.archive)
+        ka.verify(self.archive, base)
+        # Breaking one hash edge cannot be hidden by the other valid adjustment.
+        log["events"].pop()
+        ka.json_write(self.archive / ka.LOG, log)
+        ki._load_log.cache_clear()
+        ka.update_manifest(self.archive)
+        with self.assertRaisesRegex(ValueError, "Unlogged historical"):
+            ka.verify(self.archive, base)
 
     def test_short_adjustment_download_cannot_truncate_or_mix_old_years(self):
         self.seed(rows=[row("2023-12-29"), row("2024-01-02")])
@@ -257,6 +362,15 @@ class ArchiveTests(_ArchiveCase):
         self.assertFalse(ka.merge_main_log(self.archive, self.log))
         self.assertEqual(self.log.read_text(), content)
         self.assertEqual(self.log.stat().st_mtime_ns, before)
+
+    def test_main_journal_only_copies_compact_adjustments_not_legacy_rows_or_backfills(self):
+        self.seed()
+        ka.put_symbol(self.archive, "AAPL", [row("2024-01-02")], mode="backfill")
+        legacy = ka.event("AAPL", row("2025-12-31", close=50), row("2025-12-31"),
+                          "corrected", "kline-archive/adjustment:legacy-row")
+        ka.add_events(self.archive, [legacy])
+        self.assertFalse(ka.merge_main_log(self.archive, self.log))
+        self.assertFalse(self.log.exists())
 
     def test_verifier_rejects_deletion_and_unlogged_past_edits(self):
         self.seed()
@@ -418,6 +532,26 @@ class BackfillTests(_ArchiveCase):
 
 
 class CollectorAdjustmentTests(_ArchiveCase):
+    def test_twse_tpex_snapshot_volume_lineage_distinguishes_missing_from_zero(self):
+        samples = (
+            (sources.parse_twse_day_all, "2330.TW", "TradeVolume",
+             {"Date": "20261023", "Code": "2330", "OpeningPrice": "100", "HighestPrice": "101", "LowestPrice": "99", "ClosingPrice": "100"}),
+            (sources.parse_tpex_daily_quotes, "6488.TWO", "TradingShares",
+             {"Date": "20261023", "SecuritiesCompanyCode": "6488", "Open": "100", "High": "101", "Low": "99", "Close": "100"}),
+        )
+        for parser, symbol, field, original in samples:
+            for source, expected in ((None, ""), ("--", ""), (0, "0"), ("0", "0"), ("100", "100")):
+                with self.subTest(symbol=symbol, volume=source):
+                    bar = parser([dict(original, **{field: source})])["bars"][symbol]
+                    parsed = uc.frame_from_rows([uc.snapshot_bar(bar, 100)])
+                    self.assertEqual(ka.frame_rows(parsed)[0][-1], expected)
+                    path = uc.bars_path(str(self.cache), symbol)
+                    uc.write_bars(path, parsed, now=NOW)
+                    self.assertEqual(ka.read_rows(path)[0][-1], expected)
+        for source, expected in ((None, ""), (0, "0")):
+            no_price = uc.snapshot_bar({"date": "2026-10-23", "close": None, "volume": source}, 100)
+            self.assertEqual(ka.frame_rows(uc.frame_from_rows([no_price]))[0][-1], expected)
+
     def test_cache_pruning_waits_for_permanent_retention_and_never_prunes_archive(self):
         rows = [row("2026-01-02")]
         self.cache_rows("OLD", rows)

@@ -18,6 +18,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -42,7 +43,8 @@ Prices have four decimals; volume is integer shares or empty when unknown.
 Ordinary daily updates only append completed sessions accepted by universe-full.
 Backfill inserts missing dates with audit records, never replaces disagreements.
 Only a cache-proven history adjustment may correct existing dates; every change
-has old/new values in docs/report/kline-corrections.json. Dates are never removed.
+has per-year old/new SHA-256 audits in docs/report/kline-corrections.json.
+Dates are never removed.
 state/ retains resumable backfill progress and deduplicated conflicts.
 manifest.json reports the actual symbols, market date bounds, rows and byte size.
 
@@ -223,7 +225,9 @@ def merge_main_log(root, destination=None):
         return
     destination = Path(destination or ki.LOG_PATH)
     incoming = {"version": 1, "events": [e for e in ki.read_log(source)["events"]
-                if e["status"] == "corrected" and str(e.get("reason", "")).startswith("kline-archive/adjustment:")]}
+                if e["status"] == "corrected" and str(e.get("reason", "")).startswith("kline-archive/adjustment-year:")]}
+    for record in incoming["events"]:
+        validate_adjustment_audit(record)
     current = ki.read_log(destination)
     known = {e["id"]: e for e in current["events"]}
     if not incoming["events"] or all(known.get(e["id"]) == e for e in incoming["events"]):
@@ -248,7 +252,93 @@ def conflict(root, symbol, row, old, reason):
         json_write(path, state)
 
 
-def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at=None):
+def adjustment_comparison(witness):
+    """Keep the cache witness explicit and finite in every compact receipt."""
+    try:
+        day = witness["date"]
+        old, new = float(witness["oldClose"]), float(witness["newClose"])
+        worst = float(witness.get("worst", round(abs(new / old - 1), 6)))
+        if (date.fromisoformat(day).isoformat() != day or not all(math.isfinite(v) and v > 0 for v in (old, new, worst))
+                or abs(new / old - 1) <= uc.PRICE_TOLERANCE or worst <= uc.PRICE_TOLERANCE):
+            raise ValueError("Not a proven price adjustment")
+    except (KeyError, TypeError, ValueError, ZeroDivisionError) as exc:
+        raise ValueError("Adjustment lacks a cache comparison witness") from exc
+    return {"date": day, "oldClose": old, "newClose": new, "worst": worst}
+
+
+def validate_adjustment_audit(record):
+    try:
+        symbol, year = record["symbol"], str(record["year"])
+        if (not re.fullmatch(r"\d{4}", year)
+                or record["new"]["path"] != f"{market_of(symbol)}/{symbol}/{year}.csv"
+                or date.fromisoformat(record["date"]).isoformat() != record["date"]
+                or not record["date"].startswith(year + "-")
+                or record["status"] != "corrected" or not record["adjustmentId"]
+                or record["reason"] != "kline-archive/adjustment-year:" + record["adjustmentId"]
+                or type(record["new"]["rowsChanged"]) is not int or record["new"]["rowsChanged"] <= 0
+                or not all(re.fullmatch(r"[0-9a-f]{64}", record[key]["sha256"]) for key in ("old", "new"))
+                or record["old"]["sha256"] == record["new"]["sha256"]
+                or set(record["comparison"]) != {"date", "oldClose", "newClose", "worst"}):
+            raise ValueError("Invalid year/hash/adjustment metadata")
+        adjustment_comparison(record["comparison"])
+        identity = digest(json.dumps({k: v for k, v in record.items() if k not in ("id", "loggedAt")}, sort_keys=True).encode())
+        if record["id"] != identity:
+            raise ValueError("Audit content does not match its identifier")
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("Invalid adjustment-year audit") from exc
+
+
+class _AdjustmentBatch:
+    """Coalesce only unpublished work; committed audit events are never rewritten.
+
+    A baseline may append before an adjustment, and the current cache may append
+    after it. The receipt must cover that transaction's actual old -> final file,
+    rather than an intermediate file that was never committed. Disk snapshots
+    bound memory even if many symbols need adjustments in the same artifact.
+    """
+    def __init__(self, root, scratch):
+        self.root, self.scratch = Path(root), Path(scratch)
+        self.watched, self.snapshots, self.pending, self.events = set(), {}, {}, []
+
+    def record(self, path, symbol, adjustment):
+        if symbol not in self.watched:
+            return
+        name = path.relative_to(self.root).as_posix()
+        if name not in self.snapshots:
+            snapshot = self.scratch / name
+            snapshot.parent.mkdir(parents=True, exist_ok=True)
+            if path.exists():
+                shutil.copyfile(path, snapshot)
+            self.snapshots[name] = snapshot
+        if adjustment:
+            previous = self.pending.get(name)
+            if previous and previous["adjustmentId"] != adjustment["adjustmentId"]:
+                self.finish(name)
+                shutil.copyfile(path, self.snapshots[name])
+            self.pending[name] = adjustment
+
+    def finish(self, name):
+        record = self.pending.pop(name, None)
+        if not record:
+            return
+        snapshot, path = self.snapshots[name], self.root / name
+        before = read_rows(snapshot, strict=True) if snapshot.exists() else []
+        after = {r[0]: r for r in read_rows(path, strict=True)}
+        changed = [r[0] for r in before if after.get(r[0]) != r]
+        if not changed:
+            return  # A newly created file has no historical rows to correct.
+        record = dict(record, date=min(changed), old={"sha256": digest(snapshot.read_bytes())},
+                      new=dict(record["new"], sha256=digest(path.read_bytes()), rowsChanged=len(changed)))
+        record["id"] = digest(json.dumps({k: v for k, v in record.items() if k not in ("id", "loggedAt")}, sort_keys=True).encode())
+        self.events.append(record)
+
+    def commit(self):
+        for name in list(self.pending):
+            self.finish(name)
+        add_events(self.root, self.events)
+
+
+def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at=None, _audit=None):
     """Plan first; all writes retain the union of existing dates. No deletion API exists."""
     if mode not in ("daily", "backfill"):
         raise ValueError("Invalid import mode")
@@ -263,11 +353,10 @@ def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at
     by_date = {row[0]: row for row in current}
     last = current[-1][0] if current else None
     if correction:
-        witness = correction.get("comparison", {})
-        old_close, new_close = witness.get("oldClose"), witness.get("newClose")
+        witness = adjustment_comparison(correction.get("comparison", {}))
+        new_close = witness["newClose"]
         source = {row[0]: row for row in incoming}
-        if (not correction.get("id") or not old_close or not new_close
-                or abs(new_close / old_close - 1) <= uc.PRICE_TOLERANCE
+        if (not correction.get("id")
                 or witness.get("date") not in source
                 or abs(float(source[witness["date"]][4]) / new_close - 1) > 0.0001):
             raise ValueError("Adjustment lacks a cache comparison witness")
@@ -278,6 +367,7 @@ def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at
             return {"added": 0, "corrected": 0, "conflicts": 1, "blocked": True}
     counts = {"added": 0, "corrected": 0, "conflicts": 0, "blocked": False}
     changes = set()
+    corrected_dates = {}
     past_insertions = {}
     events = []
     for row in incoming:
@@ -289,8 +379,7 @@ def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at
                 by_date[row[0]] = row
                 changes.add(row[0][:4])
                 counts["corrected"] += 1
-                events.append(event(symbol, row, old, "corrected",
-                                    "kline-archive/adjustment:" + correction["id"], fetched_at))
+                corrected_dates.setdefault(row[0][:4], []).append(row[0])
             else:
                 conflict(root, symbol, row, old, "existing-row-disagrees")
                 counts["conflicts"] += 1
@@ -306,6 +395,20 @@ def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at
         rows = [by_date[day] for day in sorted(by_date) if day.startswith(year + "-")]
         path = Path(root) / market_of(symbol) / symbol / (year + ".csv")
         planned[path] = csv_text(rows)
+        adjustment_event = None
+        if year in corrected_dates:
+            record = dict(symbol=symbol, year=int(year), date=min(corrected_dates[year]), status="corrected",
+                          old={"sha256": digest(path.read_bytes())},
+                          new={"path": path.relative_to(root).as_posix(), "sha256": digest(planned[path].encode()),
+                               "rowsChanged": len(corrected_dates[year])},
+                          comparison=witness, adjustmentId=correction["id"],
+                          sourceUrl=correction.get("sourceUrl") or "https://query1.finance.yahoo.com/v8/finance/chart/" + symbol,
+                          fetchedAt=fetched_at or correction.get("fetchedAt"),
+                          reason="kline-archive/adjustment-year:" + correction["id"])
+            record.update(id=digest(json.dumps(record, sort_keys=True).encode()), loggedAt=ki.utcnow())
+            adjustment_event = record
+            if _audit is None:
+                events.append(record)
         if year in past_insertions:
             record = dict(symbol=symbol, date=min(past_insertions[year]), status="backfilled",
                           old={"sha256": digest(path.read_bytes())} if path.exists() else None,
@@ -314,6 +417,8 @@ def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at
                           fetchedAt=fetched_at, reason="kline-archive/backfill-year")
             record.update(id=digest(json.dumps(record, sort_keys=True).encode()), loggedAt=ki.utcnow())
             events.append(record)
+        if _audit is not None:
+            _audit.record(path, symbol, adjustment_event)
     add_events(root, events)
     for path, content in planned.items():
         atomic(path, content)
@@ -417,6 +522,17 @@ def stage_cache(cache, archive, output, now=None, previous=None):
 
 
 def apply_operations(archive, payload, main_log=None, now=None):
+    with tempfile.TemporaryDirectory(prefix="kline-audit-") as scratch:
+        audit = _AdjustmentBatch(archive, scratch)
+        totals = _apply_operations(archive, payload, now, audit)
+        audit.commit()
+    update_manifest(archive)
+    if main_log:
+        merge_main_log(archive, main_log)
+    return totals
+
+
+def _apply_operations(archive, payload, now, audit):
     archive, payload = Path(archive), Path(payload)
     plan = json_read(payload / "operations.json", None)
     if not plan or plan.get("version") != 1 or plan.get("mode") not in ("daily", "backfill"):
@@ -435,15 +551,16 @@ def apply_operations(archive, payload, main_log=None, now=None):
         if any(not uc.session_done(row[0], market, now) for row in rows):
             raise ValueError("Archive transport includes an unfinished session")
         prepared.append((item, rows))
+    audit.watched.update(item["symbol"] for item, _ in prepared if item.get("correction"))
     totals = {"added": 0, "corrected": 0, "conflicts": 0, "blocked": 0}
     if plan.get("baseline"):
         # Retain already-accepted bars BEFORE rolling eviction / unlisted pruning,
         # then apply the latest source and any proven correction. No old date is lost.
-        baseline = apply_operations(archive, payload / "baseline", now=now)
+        baseline = _apply_operations(archive, payload / "baseline", now, audit)
         for key in totals:
             totals[key] += baseline[key]
     for item, rows in prepared:
-        result = put_symbol(archive, item["symbol"], rows, plan["mode"], item.get("correction"), item.get("fetchedAt"))
+        result = put_symbol(archive, item["symbol"], rows, plan["mode"], item.get("correction"), item.get("fetchedAt"), _audit=audit)
         for key in totals:
             totals[key] += result[key]
     if "progress" in plan:
@@ -456,9 +573,6 @@ def apply_operations(archive, payload, main_log=None, now=None):
             progress["symbols"][symbol] = entry
         progress.update({k: v for k, v in plan["progress"].items() if k != "symbols"})
         json_write(archive / PROGRESS, progress)
-    update_manifest(archive)
-    if main_log:
-        merge_main_log(archive, main_log)
     return totals
 
 
@@ -546,6 +660,9 @@ def verify(root, base=None, summary=None):
     log = ki.read_log(root / LOG)
     if len({e["id"] for e in log["events"]}) != len(log["events"]):
         raise ValueError("Duplicate correction event identifiers")
+    for record in log["events"]:
+        if str(record.get("reason", "")).startswith("kline-archive/adjustment-year:"):
+            validate_adjustment_audit(record)
     if base:
         old_tree = {}
         for item in _git(root, "ls-tree", "-rz", base, "--", "tw", "us").split("\0"):
@@ -565,7 +682,7 @@ def verify(root, base=None, summary=None):
         audit = [e for e in log["events"] if e["id"] not in old_ids]
         old_last = {}
         changed = {}
-        row_audit, file_audit = {}, {}
+        file_audit = {}
         for name in old_tree:
             symbol = name.split("/")[1]
             old_last[symbol] = max(old_last.get(symbol, name), name)
@@ -573,8 +690,8 @@ def verify(root, base=None, summary=None):
             if old_tree.get(name) != metadata["blob"]:
                 changed.setdefault(name.split("/")[1], []).append(name)
         for e in audit:
-            row_audit.setdefault((e["symbol"], e["date"]), []).append(e)
-            if e["status"] == "backfilled" and e.get("reason") == "kline-archive/backfill-year":
+            if ((e["status"] == "backfilled" and e.get("reason") == "kline-archive/backfill-year")
+                    or (e["status"] == "corrected" and str(e.get("reason", "")).startswith("kline-archive/adjustment-year:"))):
                 file_audit.setdefault(e["new"]["path"], []).append(e)
 
         def baseline(name):
@@ -594,24 +711,30 @@ def verify(root, base=None, summary=None):
                 old = {r[0]: r for r in old_rows}
                 if not old.keys() <= {r[0] for r in rows}:
                     raise ValueError(f"Archive dates deleted: {symbol}")
-                file_state = old_hash
-                for e in file_audit.get(name, []):
-                    before = e.get("old")
-                    if (before.get("sha256") if before else None) == file_state:
-                        file_state = e["new"]["sha256"]
-                backfilled = file_state != old_hash and file_state == current[name]["sha256"]
+                # Journal union ordering can differ for events with the same
+                # clock timestamp. Follow exact hash edges, never log order.
+                reachable = {(old_hash, False, False)}
+                pending = list(reachable)
+                while pending:
+                    state, adjusted, backfilled = pending.pop()
+                    for e in file_audit.get(name, []):
+                        before = e.get("old")
+                        if (before.get("sha256") if before else None) != state or e["symbol"] != symbol:
+                            continue
+                        is_adjustment = e["status"] == "corrected"
+                        target = (e["new"]["sha256"], adjusted or is_adjustment, backfilled or not is_adjustment)
+                        if target not in reachable:
+                            reachable.add(target)
+                            pending.append(target)
+                covered = [r for r in reachable if r[0] == current[name]["sha256"] and r[0] != old_hash]
+                adjusted = any(r[1] for r in covered)
+                backfilled = any(r[2] for r in covered)
                 for row in rows:
                     day = row[0]
                     before = old.get(day)
-                    if before == row or (before is None and (day > last or backfilled)):
+                    if before == row or (before is None and (day > last or backfilled)) or (before is not None and adjusted):
                         continue
-                    state = values(before) if before else None
-                    for e in row_audit.get((symbol, day), []):
-                        if (e.get("old") == state and e["status"] == "corrected"
-                                and str(e.get("reason", "")).startswith("kline-archive/adjustment:")):
-                            state = e["new"]
-                    if state != values(row):
-                        raise ValueError(f"Unlogged historical modification: {symbol} {day}")
+                    raise ValueError(f"Unlogged historical modification: {symbol} {day}")
     stored = json_read(root / "manifest.json", None)
     # Verification is read-only: compute expected manifest in memory, restoring no files.
     actual_bytes = sum(p.stat().st_size for p in root.rglob("*") if p.is_file() and ".git" not in p.relative_to(root).parts)

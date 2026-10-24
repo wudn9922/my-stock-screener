@@ -19,7 +19,7 @@ kline-archive (orphan; no main parent)
 
 每年一檔，欄位固定為 `Date,Open,High,Low,Close,Volume`。Yahoo quote OHLC 與既有 universe cache 同口徑：**分割調整後、未含股利還原**；不讀取 adjusted-close 來再還原價格。價格固定四位小數，成交量為整數股數；來源未知的成交量為空白，確定的零成交量為 `0`。無法以四位小數表示為正數的極低價格會明確拒收，不能寫成 `0.0000`。
 
-這次修正全市場來源解析與快取的缺量表示，避免把新的 null 成交量轉為 0。已存在的舊快取數字沒有缺值來源證據，不能事後猜測其 0 是否曾由缺值轉成；封存不假造這項歷史資訊。既有永久 CSV 沒有改寫。
+全市場來源解析將未知量保留為 `None`。快取沿用 `main` 的單一缺量設計：`clean()` 在 `frame.attrs[UNKNOWN_VOLUME_DATES]` 記錄未知日期，數值欄仍補 0 供既有計算使用；合併、來源一致性比較、CSV／封存序列化前依 attrs 還原缺值。因此未知量在快取及封存都寫空白，明確的 0 仍寫 0。已存在且沒有缺值 lineage 的舊快取，不能事後猜測其 0 是否曾由缺值轉成；封存不假造這項歷史資訊。既有永久 CSV 沒有改寫。
 
 封存不設 TTL、KEEP_BARS 或刪除清單。移出 universe、改名、下市或停牌的代號檔案全部保留；新代號建立新目錄，不移走舊代號。`manifest.json` 列出實際代號清單、各市場筆數、最早／最新日期、CSV bytes 與包含 README／狀態／稽核的總 bytes；總大小不包含 Git objects／pack。無資料變化不產生時間戳改寫或空提交。
 
@@ -31,7 +31,7 @@ kline-archive (orphan; no main parent)
 2. 快取檔／完整狀態缺少時，從永久封存取該代號最新 `KEEP_BARS=320` 根回種，再執行原有官方報價、Yahoo 增量補抓、均線與選股流程。已有完整快取不覆寫。
 3. 下載前先暫存已接受的 cache baseline，避免首次啟用時滾動裁切／下市清理先丟掉尚未封存的列；這一步不推送。`Save daily-bar cache` 之後才組成 baseline＋本次資料的封存 artifact。只有狀態完整、CSV 與 state 最後日期一致、已結束交易時段的資料可進入 artifact；來源錯誤與跳過代號明列在輸出中。
 4. 專用 publish job 序列化處理 artifact，重新 depth 1 checkout **當前**封存分支。每天只接在代號原最後日期之後；日常重疊差異留下衝突，不能覆蓋或補入舊日期。通常只改當年 CSV。
-5. 推送前比對基準 commit 驗證：既有檔案／日期不得消失；歷史值改動必須有精確 old/new 修正事件。push 被拒絕時只在 `kline-archive` 做 `git pull --rebase origin kline-archive`，最多三次普通 push。rebase 衝突會 abort 並失敗，不選 ours/theirs、不 reset 丟資料、不強制推送。下一次 producer 會從最新封存重做。
+5. 推送前比對基準 commit 驗證：既有檔案／日期不得消失；歷史值改動必須有精確 old→new SHA-256 年度檔稽核鏈。push 被拒絕時只在 `kline-archive` 做 `git pull --rebase origin kline-archive`，最多三次普通 push。rebase 衝突會 abort 並失敗，不選 ours/theirs、不 reset 丟資料、不強制推送。下一次 producer 會從最新封存重做。
 
 初始化尚未完成、分支無法讀取或封存驗證失敗時，新的全市場採集暫停，避免在沒有永久保存前先裁切舊快取；原 cache／報告的 always 保存與發佈仍繼續。已退出名單的 cache 也須先確認日期已進入永久封存才可清理。不要把「封存來源不可用」當成空白封存重新建立。
 
@@ -41,9 +41,13 @@ kline-archive (orphan; no main parent)
 
 若永久封存比一般 2y 下載更早，builder 在**原請求預算、間隔與 429 退避內**向 Yahoo 取得 max 歷史。沒有足夠時間或來源未涵蓋舊年度時保留原快取／封存、延後重試，不推算縮放係數。未完成的修正 receipt 隨 cache 保留，下一次會繼續驗證；封存已套用後才移除這份可丟棄的 cache receipt。
 
-publish 必須確認修正資料涵蓋原有較早交易日。只修正該股票有變動的年度，所有原日期保留；來源縮短或遺漏舊交易日會阻擋該股票修正並留下衝突，其餘股票仍可封存。每筆改動的舊值、新值、Yahoo URL、擷取時間、receipt ID 都寫入封存分支的 `docs/report/kline-corrections.json`，使用既有 `kline_integrity` 日誌 schema／union 機制。
+publish 必須確認修正資料涵蓋原有較早交易日。只修正該股票有變動的年度，所有原日期保留；來源縮短或遺漏舊交易日會阻擋該股票修正並留下衝突，其餘股票仍可封存。
 
-真正的 adjustment 事件再合併回 main 同名永久日誌；這一步只發佈該 journal，不操作 `data/*.csv`、其他 records 或 generated outputs。main 發生並行 journal 更新時，重新讀取最新 main 並 union，不覆蓋別人的事件。若 journal 發佈失敗，封存分支仍保有所有事件，下次可重播；main checkout 不做 pull/rebase。
+調整日誌採**一次調整／股票／有變動的年度檔一筆**，不再記錄每個歷史列的副本。`docs/report/kline-corrections.json` 保留既有 `kline_integrity` schema／union 機制；事件的 `symbol`、`year`、`new.path`、`old.sha256`、`new.sha256`、`new.rowsChanged`、`comparison`（`date`、`oldClose`、`newClose`、`worst`）、`adjustmentId`、`sourceUrl`、`fetchedAt` 都可追查，`reason` 為 `kline-archive/adjustment-year:<id>`。確切列差異可比較該分支前後 commit 的年度 CSV。例如三年共數百列拆股，只新增三筆年度事件；無變動年度與重跑不新增事件。
+
+驗證會依雜湊連線追蹤舊檔到新檔，不依賴同秒事件的日誌排序；鏈缺一段、只改一列卻沒有新 hash、刪除檔案或日期都會失敗。回補的年度 hash 只能授權插入缺漏日期，不能單獨授權覆寫既有值。同一 artifact 的 baseline 追加、價格修正及之後日 K 追加會合成涵蓋該交易最終檔案的年度紀錄；只整理尚未提交的事件，已提交的歷史日誌不重寫。稽核暫存使用臨時檔，不同時持有全市場歷史 K 線。
+
+只有精簡的 `adjustment-year` 事件會再合併回 main 同名永久日誌；舊的逐列封存事件及回補事件不複製到 main。一次調整新增到 main 的事件數不超過有變動的年度檔數；既有 2.8 MB 主日誌不改寫或刪除。這一步只發佈該 journal，不操作 `data/*.csv`、其他 records 或 generated outputs。main 發生並行 journal 更新時，重新讀取最新 main 並 union，不覆蓋別人的事件。若 journal 發佈失敗，封存分支仍保有所有事件，下次可重播；main checkout 不做 pull/rebase。
 
 ## 一次性歷史回補與續跑
 
@@ -87,6 +91,8 @@ GitHub 平台／有繞過權限的管理員仍有能力移除 repository；這�
 ```sh
 python -m unittest discover -s tests -p 'test_kline_archive*.py' -v
 python -m unittest discover -s tests -p test_universe_full.py -v
+python -m unittest discover -s tests -p '*report_metrics*.py' -v
+KLINE_CORRECTIONS_LOG=/tmp/test-kline-corrections.json python -m unittest discover -s tests -v
 git clone --depth=2 --single-branch --branch kline-archive \
   https://github.com/wudn9922/my-stock-screener.git /tmp/kline-check
 python scripts/kline_archive.py verify --archive-dir /tmp/kline-check --base HEAD^
