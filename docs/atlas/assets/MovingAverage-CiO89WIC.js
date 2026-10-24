@@ -1,1 +1,0 @@
-function l(n,e,s="close"){if(!Number.isInteger(e)||e<1)throw new Error("SMA period must be a positive integer");let i=0;const u=[];for(let t=0;t<n.length;t++)i+=n[t][s],t>=e&&(i-=n[t-e][s]),t>=e-1&&u.push({time:n[t].time,value:i/e});return u}export{l as s};
