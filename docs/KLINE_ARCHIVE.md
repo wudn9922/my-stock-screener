@@ -94,4 +94,8 @@ python scripts/kline_archive.py verify --archive-dir /tmp/kline-check --base HEA
 
 首個 orphan commit 沒有 parent，省略 `--base`。驗證包含日期排序／唯一性、正數 OHLC 與上下界、整數或空白成交量、年度、manifest 實際 bytes、不可刪除日期／檔案、不可重寫既有 audit，以及未登記的歷史改動。`Permanent K-line archive verification` 在相關 PR 跑離線測試；遠端分支存在後也檢查所有 CSV 與最近一次 commit。未初始化時 job summary 會明說 live size 0／尚未驗證 live archive，不冒充全市場驗收。
 
+驗證只常駐全市場的檔案 metadata；K 線逐檔驗證，歷史差異只讀取有變動股票／年度的 baseline，不把全市場新舊 OHLC 同時載入記憶體。日常追加只讀取涉及年度及最後年度；冷啟動回種從最新年度向前取滿 320 根即停止。
+
+另在 `/tmp` 做合成規模驗證：7,000 檔、3,654,000 根、21,000 個年度 CSV，內容總大小 187,090,432 bytes。完整逐檔驗證加上全市場當日追加比對耗時 112.53 秒；Python 程序峰值 RSS 122,072 KiB，Git 子程序個別峰值 97,672 KiB（非整體 runner 同時用量）。此為合成價格的效能測試，沒有推送或冒充真實全市場資料。
+
 大小隨實際股票與歷史變動：例如 7,000 檔 × 252 日 × 每列約 70 bytes，新增 CSV 原始內容約 124 MB／年（約 0.5 MB／交易日）；Git 的 tree/blob/pack 與真實修正另計，不能把 CSV byte 增長冒充 repository 實際儲存量。每次驗證 job 都回報當時真正的檔案總大小。

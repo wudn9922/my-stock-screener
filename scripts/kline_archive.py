@@ -156,14 +156,28 @@ def archive_files(root):
     return result
 
 
-def symbol_rows(root, symbol):
+def symbol_rows(root, symbol, years=None):
     rows = []
     for path in sorted((Path(root) / market_of(symbol) / symbol).glob("*.csv")):
+        if years is not None and path.stem not in years:
+            continue
         part = read_rows(path, strict=True)
         if any(row[0][:4] != path.stem for row in part):
             raise ValueError(f"CSV year mismatch: {path}")
         rows.extend(part)
     return rows
+
+
+def latest_rows(root, symbol, count):
+    rows = []
+    for path in sorted((Path(root) / market_of(symbol) / symbol).glob("*.csv"), reverse=True):
+        part = read_rows(path, strict=True)
+        if any(row[0][:4] != path.stem for row in part):
+            raise ValueError(f"CSV year mismatch: {path}")
+        rows = part + rows
+        if len(rows) >= count:
+            break
+    return rows[-count:]
 
 
 def first_date(root, symbol):
@@ -234,7 +248,11 @@ def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at
     incoming = [normalize(row) for row in incoming]
     if any(b[0] <= a[0] for a, b in zip(incoming, incoming[1:])):
         raise ValueError("Incoming dates must be sorted and unique")
-    current = symbol_rows(root, symbol)
+    years = {r[0][:4] for r in incoming}
+    paths = sorted((Path(root) / market_of(symbol) / symbol).glob("*.csv"))
+    if paths:
+        years.add(paths[-1].stem)  # global last date, even for a backfill of an old year
+    current = symbol_rows(root, symbol, None if correction else years)
     by_date = {row[0]: row for row in current}
     last = current[-1][0] if current else None
     if correction:
@@ -370,7 +388,7 @@ def stage_cache(cache, archive, output, now=None, previous=None):
                 rows = [by_date[day] for day in sorted(by_date)]
             if any(not uc.session_done(row[0], "TW" if market_of(symbol) == "tw" else "US", now) for row in rows):
                 raise ValueError("Cache includes an unfinished session")
-            existing = symbol_rows(archive, symbol)
+            existing = symbol_rows(archive, symbol, {r[0][:4] for r in rows})
             known = {r[0]: r for r in existing}
             # Changed overlaps are retained so the publisher can report conflicts.
             rows = rows if receipt else [r for r in rows if known.get(r[0]) != r]
@@ -474,7 +492,7 @@ def bootstrap(archive, cache, now=None):
         target = Path(uc.bars_path(str(cache), symbol))
         if target.exists() and uc.is_complete(state["symbols"].get(symbol)):
             continue
-        rows = symbol_rows(archive, symbol)[-uc.KEEP_BARS:]
+        rows = latest_rows(archive, symbol, uc.KEEP_BARS)
         rows = [r for r in rows if uc.session_done(r[0], "TW" if market_of(symbol) == "tw" else "US", now)]
         if not rows:
             continue
@@ -507,75 +525,93 @@ def verify(root, base=None, summary=None):
         raise ValueError("Archive not initialized")
     files = archive_files(root)
     current = {}
+    row_count = 0
+    object_format = _git(root, "rev-parse", "--show-object-format") if base else "sha1"
     for path in files:
         rows = read_rows(path, strict=True)
         if any(r[0][:4] != path.stem for r in rows):
             raise ValueError(f"Year/date mismatch: {path}")
-        current[path.relative_to(root).as_posix()] = rows
+        row_count += len(rows)
+        body = path.read_bytes()
+        header = b"blob " + str(len(body)).encode() + b"\0"
+        current[path.relative_to(root).as_posix()] = {
+            "blob": hashlib.new(object_format, header + body).hexdigest(), "sha256": digest(body)}
     log = ki.read_log(root / LOG)
     if len({e["id"] for e in log["events"]}) != len(log["events"]):
         raise ValueError("Duplicate correction event identifiers")
     if base:
-        old_paths = _git(root, "ls-tree", "-r", "--name-only", base).splitlines()
+        old_tree = {}
+        for item in _git(root, "ls-tree", "-rz", base, "--", "tw", "us").split("\0"):
+            if not item:
+                continue
+            metadata, name = item.split("\t", 1)
+            if not re.fullmatch(r"(?:tw|us)/[^/]+/\d{4}\.csv", name):
+                raise ValueError(f"Invalid baseline archive path: {name}")
+            old_tree[name] = metadata.split()[2]
+        if any(name not in current for name in old_tree):
+            raise ValueError("Archive file deleted")
         old_log = json.loads(_git(root, "show", f"{base}:{LOG}"))
         old_ids = {e["id"]: e for e in old_log["events"]}
         new_ids = {e["id"]: e for e in log["events"]}
         if any(new_ids.get(key) != value for key, value in old_ids.items()):
             raise ValueError("Correction history was removed or rewritten")
         audit = [e for e in log["events"] if e["id"] not in old_ids]
-        previous = {}
-        old_hashes = {}
-        for name in old_paths:
-            if not re.fullmatch(r"(?:tw|us)/[^/]+/\d{4}\.csv", name):
-                continue
-            blob = subprocess.check_output(["git", "-C", str(root), "show", f"{base}:{name}"])
-            text = blob.decode()
-            old_hashes[name] = digest(blob)
-            rows = [normalize(row) for row in list(csv.reader(io.StringIO(text)))[1:]]
-            if name not in current:
-                raise ValueError(f"Archive file deleted: {name}")
+        old_last = {}
+        changed = {}
+        row_audit, file_audit = {}, {}
+        for name in old_tree:
             symbol = name.split("/")[1]
-            previous.setdefault(symbol, {}).update({r[0]: r for r in rows})
-        latest = {s: max(rows) for s, rows in previous.items()}
-        new = {}
-        authorized_backfills = set()
-        for name, rows in current.items():
-            new.setdefault(name.split("/")[1], {}).update({r[0]: r for r in rows})
-            state = old_hashes.get(name)
-            for e in audit:
-                before = e.get("old")
-                if (e["status"] == "backfilled" and e.get("reason") == "kline-archive/backfill-year"
-                        and e.get("new", {}).get("path") == name
-                        and (before.get("sha256") if before else None) == state):
-                    state = e["new"]["sha256"]
-            if state == digest((root / name).read_bytes()) and state != old_hashes.get(name):
-                authorized_backfills.add(name)
-        for symbol, rows in previous.items():
-            if not rows.keys() <= new.get(symbol, {}).keys():
-                raise ValueError(f"Archive dates deleted: {symbol}")
-        for symbol, rows in new.items():
-            old = previous.get(symbol, {})
-            for day, row in rows.items():
-                before = old.get(day)
-                if before == row or (before is None and day > latest.get(symbol, "")):
-                    continue
-                path = f"{market_of(symbol)}/{symbol}/{day[:4]}.csv"
-                if before is None and path in authorized_backfills:
-                    continue
-                state = values(before) if before else None
-                for e in audit:
-                    if (e["symbol"] == symbol and e["date"] == day and e.get("old") == state
-                            and e["status"] == "corrected" and str(e.get("reason", "")).startswith("kline-archive/adjustment:")):
-                        state = e["new"]
-                if state != values(row):
-                    raise ValueError(f"Unlogged historical modification: {symbol} {day}")
+            old_last[symbol] = max(old_last.get(symbol, name), name)
+        for name, metadata in current.items():
+            if old_tree.get(name) != metadata["blob"]:
+                changed.setdefault(name.split("/")[1], []).append(name)
+        for e in audit:
+            row_audit.setdefault((e["symbol"], e["date"]), []).append(e)
+            if e["status"] == "backfilled" and e.get("reason") == "kline-archive/backfill-year":
+                file_audit.setdefault(e["new"]["path"], []).append(e)
+
+        def baseline(name):
+            blob = subprocess.check_output(["git", "-C", str(root), "show", f"{base}:{name}"])
+            data = [normalize(r) for r in list(csv.reader(io.StringIO(blob.decode())))[1:]]
+            return data, digest(blob)
+
+        # Only metadata is kept for the whole market. OHLC rows are compared one
+        # symbol/year at a time, so permanent history cannot exhaust runner RAM.
+        for symbol, names in changed.items():
+            last_name = old_last.get(symbol)
+            last_rows, last_hash = baseline(last_name) if last_name else ([], None)
+            last = last_rows[-1][0] if last_rows else ""
+            for name in names:
+                old_rows, old_hash = (last_rows, last_hash) if name == last_name else baseline(name) if name in old_tree else ([], None)
+                rows = read_rows(root / name, strict=True)
+                old = {r[0]: r for r in old_rows}
+                if not old.keys() <= {r[0] for r in rows}:
+                    raise ValueError(f"Archive dates deleted: {symbol}")
+                file_state = old_hash
+                for e in file_audit.get(name, []):
+                    before = e.get("old")
+                    if (before.get("sha256") if before else None) == file_state:
+                        file_state = e["new"]["sha256"]
+                backfilled = file_state != old_hash and file_state == current[name]["sha256"]
+                for row in rows:
+                    day = row[0]
+                    before = old.get(day)
+                    if before == row or (before is None and (day > last or backfilled)):
+                        continue
+                    state = values(before) if before else None
+                    for e in row_audit.get((symbol, day), []):
+                        if (e.get("old") == state and e["status"] == "corrected"
+                                and str(e.get("reason", "")).startswith("kline-archive/adjustment:")):
+                            state = e["new"]
+                    if state != values(row):
+                        raise ValueError(f"Unlogged historical modification: {symbol} {day}")
     stored = json_read(root / "manifest.json", None)
     # Verification is read-only: compute expected manifest in memory, restoring no files.
     actual_bytes = sum(p.stat().st_size for p in root.rglob("*") if p.is_file() and ".git" not in p.relative_to(root).parts)
     csv_bytes = sum(p.stat().st_size for p in files)
     if not stored or stored != update_manifest(root, write=False) or stored["totalBytes"] != actual_bytes or stored["csvBytes"] != csv_bytes:
         raise ValueError("Archive manifest size does not match files")
-    result = {"files": len(files), "rows": sum(len(v) for v in current.values()), "totalBytes": actual_bytes, "csvBytes": csv_bytes}
+    result = {"files": len(files), "rows": row_count, "totalBytes": actual_bytes, "csvBytes": csv_bytes}
     text = "### Permanent K-line archive\n\n" + "\n".join(f"- {k}: {v:,}" for k, v in result.items()) + "\n"
     if summary:
         with open(summary, "a", encoding="utf-8") as stream:

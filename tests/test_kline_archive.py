@@ -280,6 +280,44 @@ class ArchiveTests(_ArchiveCase):
         self.assertEqual(manifest["markets"]["tw"]["firstDate"], "2025-12-31")
         self.assertIn("totalBytes", summary.read_text())
 
+    def test_daily_verification_does_not_materialize_unchanged_old_git_history(self):
+        self.seed(rows=[row("2024-01-02"), row("2025-12-31"), row("2026-01-02")])
+        base = self.checkpoint()
+        ka.put_symbol(self.archive, "AAPL", [row("2026-01-05")])
+        ka.update_manifest(self.archive)
+        original = subprocess.check_output
+        old_reads = []
+
+        def inspect(args, **kwargs):
+            if "show" in args and str(args[-1]).endswith(".csv"):
+                old_reads.append(args[-1])
+            return original(args, **kwargs)
+
+        with patch.object(ka.subprocess, "check_output", side_effect=inspect):
+            ka.verify(self.archive, base)
+        self.assertEqual(old_reads, [f"{base}:us/AAPL/2026.csv"])
+
+    def test_daily_append_does_not_read_unaffected_old_years(self):
+        self.seed(rows=[row("2024-01-02"), row("2025-12-31"), row("2026-01-02")])
+        original = ka.read_rows
+        reads = []
+
+        def inspect(path, **kwargs):
+            reads.append(Path(path).name)
+            return original(path, **kwargs)
+
+        with patch.object(ka, "read_rows", side_effect=inspect):
+            ka.put_symbol(self.archive, "AAPL", [row("2026-01-05")])
+        self.assertEqual(reads, ["2026.csv"])
+
+    def test_an_unlogged_new_old_year_is_rejected(self):
+        self.seed()
+        base = self.checkpoint()
+        ka.atomic(self.archive / "us/AAPL/2024.csv", ka.csv_text([row("2024-01-02")]))
+        ka.update_manifest(self.archive)
+        with self.assertRaisesRegex(ValueError, "Unlogged historical"):
+            ka.verify(self.archive, base)
+
 
 class BackfillTests(_ArchiveCase):
     def test_resume_skips_completed_symbols_across_new_runs(self):
