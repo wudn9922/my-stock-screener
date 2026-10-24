@@ -1,5 +1,6 @@
 """
-全市場 universe 的日 K 快取（GitHub Actions cache 保存，不提交進 repo）：純函式與檔案讀寫，不連網路。
+全市場 universe 的滾動日 K 運算快取（Actions cache；永久副本另存 kline-archive 分支）。
+純函式與檔案讀寫，不連網路。
 
 目錄（--cache-dir，預設 .cache/universe-full）：
 - bars/<SYMBOL>.csv：Date,Open,High,Low,Close,Volume，與 data/*.csv 同格式同口徑（Yahoo 分割調整後、未含股利還原的
@@ -102,7 +103,8 @@ def clean(frame):
     frame = frame[PRICE_COLUMNS].apply(pd.to_numeric, errors="coerce")
     frame = frame.replace([math.inf, -math.inf], math.nan).dropna(subset=["Open", "High", "Low", "Close"])
     frame = frame[frame["Close"] > 0].copy()
-    frame["Volume"] = frame["Volume"].fillna(0).clip(lower=0)
+    # Unknown shares are not a no-trade observation. Aggregation still skips NaN.
+    frame["Volume"] = frame["Volume"].clip(lower=0)
     frame.index = pd.to_datetime(frame.index).normalize()
     frame = frame[~frame.index.duplicated(keep="last")].sort_index()
     frame.index.name = "Date"
@@ -137,9 +139,10 @@ def write_bars(path, frame, keep=KEEP_BARS, refetch=None, now=None):
     lines = ["Date,Open,High,Low,Close,Volume"]
 
     for day, row in zip(frame.index, frame.itertuples(index=False)):
+        volume = "" if pd.isna(row.Volume) else str(int(round(row.Volume)))
         lines.append(
             f"{day:%Y-%m-%d},{_price(row.Open)},{_price(row.High)},{_price(row.Low)},"
-            f"{_price(row.Close)},{int(round(row.Volume))}"
+            f"{_price(row.Close)},{volume}"
         )
 
     write_atomic(path, "\n".join(lines) + "\n")
@@ -341,18 +344,18 @@ def drop_unfinished(frame, market, now):
 
 
 def snapshot_bar(bar, last_close):
-    """當日行情 → (YYYY-MM-DD, o, h, l, c, v)；沒有成交時給平盤量 0 的 K（Yahoo 對台股無成交日的寫法）。"""
+    """當日行情 → (YYYY-MM-DD, o, h, l, c, v)；明確零成交量保留 0，未知量保留缺值。"""
     close = bar.get("close")
 
     if close is None:
         if last_close is None:
             return None
-        return (bar["date"], last_close, last_close, last_close, last_close, 0.0)
+        return (bar["date"], last_close, last_close, last_close, last_close, bar.get("volume"))
 
     open_ = bar.get("open") or close
     high = bar.get("high") if bar.get("high") is not None else close
     low = bar.get("low") if bar.get("low") is not None else close
-    return (bar["date"], open_, high, low, close, float(bar.get("volume") or 0.0))
+    return (bar["date"], open_, high, low, close, bar.get("volume"))
 
 
 def snapshot_action(entry, bar, calendar, market, tolerance=PRICE_TOLERANCE, check_reference=True):

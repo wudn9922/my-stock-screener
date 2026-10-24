@@ -1,0 +1,55 @@
+name: Permanent K-line archive verification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/*kline_archive*.py'
+      - 'scripts/build_universe_full.py'
+      - 'scripts/universe_cache.py'
+      - 'scripts/universe_sources.py'
+      - 'kline_integrity.py'
+      - '.github/generated-paths.json'
+      - 'tests/test_kline_archive*.py'
+      - '.github/workflows/kline-archive*.yml'
+      - '.github/workflows/universe-full.yml'
+      - 'docs/KLINE_ARCHIVE.md'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install --quiet pandas requests pyyaml
+      - name: Offline append, correction, retention, resume and Git retry contracts
+        env:
+          KLINE_CORRECTIONS_LOG: /tmp/archive-test-corrections.json
+        run: |
+          python -m unittest discover -s tests -p 'test_kline_archive*.py' -v
+          python -m unittest discover -s tests -p 'test_universe_full.py' -v
+      - name: Detect initialized archive ref
+        id: remote
+        run: |
+          if [ -n "$(git ls-remote --heads origin refs/heads/kline-archive)" ]; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'kline-archive not initialized; live archive size is 0 bytes. Offline contracts above are verified. Owner must initialize after merge.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.remote.outputs.exists == 'true'
+        with:
+          ref: kline-archive
+          path: .cache/kline-archive
+          fetch-depth: 2
+      - name: Validate every live archive CSV and the latest commit transition
+        if: steps.remote.outputs.exists == 'true'
+        run: |
+          base=()
+          if git -C .cache/kline-archive rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            base=(--base HEAD^)
+          fi
+          python scripts/kline_archive.py verify --archive-dir .cache/kline-archive "${base[@]}"

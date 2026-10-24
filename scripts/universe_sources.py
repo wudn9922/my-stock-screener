@@ -385,7 +385,7 @@ def parse_twse_day_all(payload, fallback_date=None):
             number(first_value(record, "HighestPrice", "最高價")),
             number(first_value(record, "LowestPrice", "最低價")),
             close if close and close > 0 else None,
-            number(first_value(record, "TradeVolume", "成交股數")) or 0.0,
+            number(first_value(record, "TradeVolume", "成交股數")),
             number(first_value(record, "Change", "漲跌價差")),
             "TW",
         )
@@ -419,7 +419,7 @@ def parse_tpex_daily_quotes(payload, fallback_date=None):
             number(first_value(record, "High", "HighestPrice", "最高")),
             number(first_value(record, "Low", "LowestPrice", "最低")),
             close if close and close > 0 else None,
-            number(first_value(record, "TradingShares", "TradeVolume", "TradingVolume", "成交股數")) or 0.0,
+            number(first_value(record, "TradingShares", "TradeVolume", "TradingVolume", "成交股數")),
             number(first_value(record, "Change", "漲跌")),
             "TWO",
         )
@@ -767,7 +767,7 @@ def parse_yahoo_chart(payload, symbol=""):
         open_, high, low, close, volume = (number(value) for value in values)
 
         day = local_day(stamp, zone_name, gmtoffset).isoformat()
-        rows[day] = (day, open_, high, low, close, volume if volume is not None else 0.0)
+        rows[day] = (day, open_, high, low, close, volume)
 
     splits = []
 
@@ -838,7 +838,7 @@ def parse_yahoo_quotes(payload, market_of):
             "high": high,
             "low": low,
             "close": close,
-            "volume": max(value("regularMarketVolume") or 0.0, 0.0),
+            "volume": value("regularMarketVolume"),
             "previousClose": value("regularMarketPreviousClose"),
             "marketState": quote.get("marketState"),
             "shares": value("sharesOutstanding"),
