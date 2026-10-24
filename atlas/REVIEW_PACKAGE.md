@@ -1,4 +1,4 @@
-## PR 169 chart and research follow-up (2026-10-24)
+## PR 171 chart and research follow-up (2026-10-24)
 
 This follow-up makes all moving-average candidates individually applicable, defaults newly added chart MAs to fixed 2px widths, and seeds fixed-stock editing from applied daily SMAs only. Existing explicit styles and stored preset data remain compatible. The unused preset UI is removed because indicators already belong to each stock/timeframe; the chart-local shortcut list is now labelled 圖表收藏, with its purpose explained separately from the condition-tracking console lists.
 
@@ -7,6 +7,8 @@ The two daily volatility values are independent controls next to 建議均線. I
 Full-market reports recalculate six prior monthly reference dates from cached bars, truncating the input at every date and retaining listing/coverage/sample rules. The UI replaces the near-week switch with monthly histograms, dated current values and a default five-month view. Missing historical coverage is a gap; older generated reports explicitly await the new monthly payload. Current listings imply survivorship bias, disclosed in the calculation note. Historical raw archives remain immutable. Financial column charts expose time zoom, pan and reset while preserving original values, gaps and YoY alignment.
 
 Read-only peer findings returned to the primary engineer and explicitly accepted: support long Taiwan holiday closures when selecting prior reference sessions; include displayed volatility percentages in accessible button names; dismiss a sibling popup during keyboard focus navigation. Each fix has a regression. Verification results and the exact-head Actions run are recorded in the PR. No merge, deployment or production data collection is authorized by this change.
+
+PR 169 had already been merged before this follow-up, so these changes are reviewed separately in PR 171. The broader drawing regressions also refresh two stale expectations from the existing readable-axis/gesture-status design: axis width follows the configured font size and still reserves most of the plot, and picker geometry compares the same active-tool state before and after opening.
 
 ## PR 169 follow-up: Pages disclosures and collector cache (2026-10-24)
 

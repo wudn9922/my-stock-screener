@@ -196,11 +196,14 @@ test('Drawing Tools picker keeps the chart clear and supports keyboard, backdrop
   }
   await expect.poll(async () => (await readSymbol(page))?.drawings.length ?? 0).toBe(0);
 
+  // Selecting a tool reveals its gesture instructions on phones. Compare the
+  // picker with the same active-tool layout, rather than the earlier idle chart.
+  const activeChartHeight = (await chart.boundingBox())!.height;
   await openPicker(page);
   await page.locator('.drawing-tool-picker-backdrop').click({ position: { x: 4, y: 4 } });
   await expect(page.getByRole('dialog', { name: '繪圖工具', exact: true })).toBeHidden();
   await expect(launcher).toBeFocused();
-  expect((await chart.boundingBox())!.height).toBeCloseTo(chartHeight, 0);
+  expect((await chart.boundingBox())!.height).toBeCloseTo(activeChartHeight, 0);
 
   await page.getByRole('button', { name: '全螢幕圖表', exact: true }).click();
   await expect(page.locator('.app-shell')).toHaveClass(/chart-focus/);
@@ -488,6 +491,7 @@ test('price scale auto-sizes naturally for ordinary and million-price labels', a
       await frame();
       return {
         minimumWidth: engine.chart.options().rightPriceScale.minimumWidth,
+        fontSize: engine.chart.options().layout.fontSize,
         axisWidth: engine.candles.priceScale().width(),
         paneWidth: engine.chart.paneSize().width,
         hostWidth: host.clientWidth,
@@ -505,8 +509,10 @@ test('price scale auto-sizes naturally for ordinary and million-price labels', a
 
   expect(measurements.ordinary.minimumWidth).toBe(0);
   expect(measurements.ordinary.axisWidth).toBeGreaterThan(0);
-  expect(measurements.ordinary.axisWidth).toBeLessThan(64);
-  expect(measurements.ordinary.paneWidth).toBeGreaterThan(0);
+  // The accepted platform font is larger on phones than the old compressed face.
+  // Check compact sizing relative to the actual font and preserve room for the plot.
+  expect(measurements.ordinary.axisWidth).toBeLessThan(measurements.ordinary.fontSize * 6);
+  expect(measurements.ordinary.paneWidth).toBeGreaterThan(measurements.ordinary.hostWidth * 0.65);
   expect(measurements.large.axisWidth).toBeGreaterThan(measurements.ordinary.axisWidth);
   expect(measurements.large.axisWidth + measurements.large.paneWidth).toBeLessThanOrEqual(
     measurements.large.hostWidth,
