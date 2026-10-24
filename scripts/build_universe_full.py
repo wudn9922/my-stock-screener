@@ -893,6 +893,9 @@ class Run:
                     except Exception as exc:
                         uc.record_failure(self.state, symbol, self.today, str(exc))
                         self.warnings.append(f"{symbol} 永久封存調整延後：{exc}")
+                        if isinstance(exc, RateLimited):
+                            self.chart_stopped = "Yahoo 持續限流（永久封存歷史調整），停止逐檔請求"
+                            break
                         continue
                 proof = comparison if comparison and not comparison["ok"] else pending_receipt["comparison"]
                 witness = proof["date"]

@@ -401,6 +401,19 @@ class CollectorAdjustmentTests(_ArchiveCase):
         self.assertEqual(ka.symbol_rows(self.archive, "AAPL")[0][4], "100.0000")
         self.assertFalse((self.cache / "archive-adjustments/AAPL.json").exists())
 
+    def test_max_history_429_stops_the_remaining_daily_request_queue(self):
+        self.seed(rows=[row("2020-01-02"), row("2026-10-22")])
+        self.cache_rows("AAPL", [row("2026-10-22")])
+        original = Path(uc.bars_path(str(self.cache), "AAPL")).read_bytes()
+        args = bu.parse_args(["--cache-dir", str(self.cache), "--archive-dir", str(self.archive), "--budget", "120"])
+        job = bu.Run(args, now=NOW, sleep=lambda _: None, log=lambda _: None)
+        fresh = frame([row("2026-10-22", close=50)])
+        with patch.object(job, "fetch_chart", side_effect=[fresh, bu.RateLimited(429, "AAPL")]) as fetch:
+            job.execute([("AAPL", "full", "adjusted"), ("MSFT", "full", "new")])
+        self.assertEqual(fetch.call_count, 2)
+        self.assertIsNotNone(job.chart_stopped)
+        self.assertEqual(Path(uc.bars_path(str(self.cache), "AAPL")).read_bytes(), original)
+
     def test_yahoo_missing_volume_never_becomes_zero_during_parsing(self):
         payload = {"chart": {"result": [{"meta": {"exchangeTimezoneName": "America/New_York"},
             "timestamp": [int(datetime(2026, 10, 23, 15, tzinfo=timezone.utc).timestamp())],
