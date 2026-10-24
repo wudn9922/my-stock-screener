@@ -10,6 +10,8 @@ Read-only peer findings returned to the primary engineer and explicitly accepted
 
 PR 169 had already been merged before this follow-up, so these changes are reviewed separately in PR 171. The broader drawing regressions also refresh two stale expectations from the existing readable-axis/gesture-status design: axis width follows the configured font size and still reserves most of the plot, and picker geometry compares the same active-tool state before and after opening.
 
+The first exact-head CI run exposed moving world candle CSVs paired with frozen browser-fixture metadata. The fixture reader now clips retained real bars at the frozen data date and checks its terminal date/close; the OHLC assertion is unchanged. Real full-market monthly generation completed successfully in 13m31s (TW 1,945/1,981 and US 5,273/5,348 valid current-session histories), but the following research checks exhausted the old 15-minute job budget. That job now allows 30 minutes for the expanded workload with all coverage and result checks intact. Touched calendar filters use pandas' equivalent `day_of_week` property to avoid deprecated-alias warning spam.
+
 ## PR 169 follow-up: Pages disclosures and collector cache (2026-10-24)
 
 The unmocked Pages smoke now expands the SEC 8-K coverage note before its existing visible `CIK 對應` assertion. The other smoke targets remain visible outside the collapsed provenance, stat notes and chart legends; their assertions are unchanged.

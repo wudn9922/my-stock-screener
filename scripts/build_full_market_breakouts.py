@@ -96,7 +96,7 @@ def monthly_history(spec, market_key, latest, months=MONTHLY_HISTORY_MONTHS):
     disclosed by the UI; historical coverage gaps produce no percentage.
     """
     reference = pd.Timestamp(latest["asOf"])
-    frames = {symbol: bars[bars.index.dayofweek < 5] for symbol, bars in spec["frames"].items()}
+    frames = {symbol: bars[bars.index.day_of_week < 5] for symbol, bars in spec["frames"].items()}
     frames = {symbol: bars for symbol, bars in frames.items() if not bars.empty}
     present = bo.present_matrix(frames) if frames else None
     points = []
