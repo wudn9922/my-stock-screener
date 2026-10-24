@@ -62,9 +62,11 @@ def backfill(archive_dir, cache_dir, payload_dir, years=2, budget=1800, markets=
             raise RuntimeError("Yahoo unavailable; archive and saved progress untouched")
         try:
             frame = job.fetch_chart(symbol, bu.FULL_RANGE)
-            frame = frame[frame.index.date >= target]
+            # Empty/rejected source frames can have a plain Index without .date.
+            if not frame.empty:
+                frame = frame[frame.index.date >= target]
             if frame.empty:
-                raise ValueError("Yahoo returned no completed sessions in the requested period")
+                raise ValueError(f"no data from source: Yahoo returned no valid completed sessions for {symbol} in the requested period")
             rows = archive.frame_rows(frame)
             relative = f"{archive.market_of(symbol)}/{symbol}.csv"
             content = archive.csv_text(rows)

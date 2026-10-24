@@ -454,6 +454,60 @@ class ArchiveTests(_ArchiveCase):
 
 
 class BackfillTests(_ArchiveCase):
+    def test_empty_or_invalid_chart_payload_records_no_source_data_without_rows(self):
+        self.seed("SVA")
+        before = {p.relative_to(self.archive): p.read_bytes() for p in self.archive.rglob("*") if p.is_file()}
+
+        def chart(quote, day="2026-10-23"):
+            stamp = int(datetime.fromisoformat(day + "T15:00:00+00:00").timestamp())
+            return {"chart": {"result": [{"meta": {"exchangeTimezoneName": "America/New_York"},
+                "timestamp": [stamp], "indicators": {"quote": [quote]}}], "error": None}}
+
+        valid = {"open": [100], "high": [101], "low": [99], "close": [100], "volume": [1000]}
+        cases = {
+            "empty-result": {"chart": {"result": [], "error": None}},
+            "null-result": {"chart": {"result": None, "error": None}},
+            "empty-timestamps": {"chart": {"result": [{"timestamp": [], "indicators": {"quote": [{}]}}]}},
+            "all-null": chart({key: [None] for key in valid}),
+            # SVA's live response: one zero-open bar is rejected by OHLC validation.
+            "zero-open": chart(dict(valid, open=[0])),
+            "outside-period": chart(valid, "2024-10-23"),
+        }
+        for name, payload in cases.items():
+            with self.subTest(payload=name):
+                class Net:
+                    def connect_yahoo(self):
+                        pass
+
+                    def chart(self, symbol, _range):
+                        return payload
+
+                output = self.payload / name
+                plan = bf.backfill(self.archive, self.cache, output, budget=60, markets="US", now=NOW,
+                                   net=Net(), sleep=lambda _: None, listing={"US": {"SVA": {}}})
+                entry = plan["progress"]["symbols"]["SVA"]
+                self.assertEqual(entry["status"], "retry")
+                self.assertIn("no data from source", entry["error"])
+                self.assertIn("SVA", entry["error"])
+                self.assertIn("no valid completed sessions", entry["error"])
+                self.assertEqual(entry["failReason"], entry["error"])
+                self.assertEqual(entry["fails"], 1)
+                self.assertEqual(entry["retryAfter"], "2026-10-25")
+                self.assertFalse(plan["symbols"])
+                self.assertFalse(list(output.rglob("*.csv")))
+                self.assertFalse(list(self.cache.rglob("*.csv")))
+                self.assertEqual(ka.json_read(output / "operations.json", {}), plan)
+                self.assertEqual(before, {p.relative_to(self.archive): p.read_bytes()
+                                          for p in self.archive.rglob("*") if p.is_file()})
+
+        # The publisher persists only the retry checkpoint, with no data conflict.
+        self.assertEqual(ka.apply_operations(self.archive, output),
+                         {"added": 0, "corrected": 0, "conflicts": 0, "blocked": 0})
+        self.assertEqual(ka.json_read(self.archive / ka.PROGRESS, {})["symbols"]["SVA"], entry)
+        after = {p.relative_to(self.archive): p.read_bytes() for p in self.archive.rglob("*")
+                 if p.is_file() and p.relative_to(self.archive).as_posix() not in (ka.PROGRESS, "manifest.json")}
+        self.assertEqual(after, {p: content for p, content in before.items() if p.as_posix() != "manifest.json"})
+
     def test_backfill_stages_attrs_unknown_volume_as_empty_and_explicit_zero_as_zero(self):
         compatible = uc.clean(frame([row("2026-10-22", volume=None), row("2026-10-23", volume=0)]))
         with patch.object(bu.Run, "connect_yahoo", return_value=True), patch.object(bu.Run, "fetch_chart", return_value=compatible):
