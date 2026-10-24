@@ -1,3 +1,11 @@
+## PR 169 follow-up: Pages disclosures and collector cache (2026-10-24)
+
+The unmocked Pages smoke now expands the SEC 8-K coverage note before its existing visible `CIK 對應` assertion. The other smoke targets remain visible outside the collapsed provenance, stat notes and chart legends; their assertions are unchanged.
+
+The optional daily watchlist job restores the newest `universe-full-v1-` daily-bar cache through `actions/cache/restore` only. The collector prefers `data/<symbol>.csv`, then reads the cache's `bars/<symbol>.csv` only when the primary file is absent, with the existing CSV parser and report-session alignment. Missing fixed references still preserve observations and now name the affected symbols. Filesystem-backed tests cover cache-only Taiwan and US stocks, excluding newer sessions, primary-source priority and both sources missing.
+
+Local validation: 1,151 unit tests, lint, normal/Pages builds, 10 disposable PostgreSQL permission tests and all 10 offline integration suites (238 tests) passed. Browser and final CI outcomes are recorded in the PR. No production collector, deployment or merge is invoked.
+
 ## Atlas interface refinements (2026-10-24)
 
 The requested twelve changes compact financials, remove automatic chart MAs, expose archived entry-success calculations, use 20-session average share volume with Taiwan lot display, align fixed-MA filtering across saved-list evaluations, and reduce permanent explanatory text. [Scope, review triage and data boundaries](docs/UI_REFINEMENTS_2026-10-24.md) document the final behavior. Review findings were returned to the primary engineer and explicitly accepted before implementation. Final verification is recorded in the pull request; no external review, deployment, merge, or physical Safari sign-off is claimed.

@@ -62,8 +62,9 @@ export function evaluateWatchlist(
   if (items.some((item) => item.status === 'failed')) throw new Error('部分股票行情載入失敗，暫不判定新入選或出榜；保留上次基準。');
   const filters = parseFilters(list.filters);
   if (filters.ema20 && fixedMAs === undefined) throw new Error('固定均線參數尚未取得，保留上次清單，待資料恢復後再比較。');
-  if (filters.ema20 && items.some(item => fixedMAs?.[item.symbol]?.distance === null))
-    throw new Error('部分股票的固定均線行情暫時無法取得，保留上次清單，暫不判定出榜。');
+  const missingFixedSymbols = filters.ema20 ? items.filter(item => fixedMAs?.[item.symbol]?.distance === null).map(item => item.symbol) : [];
+  if (missingFixedSymbols.length)
+    throw new Error(`固定均線行情暫時無法取得（${missingFixedSymbols.join('、')}），保留上次清單，暫不判定出榜。`);
   const availability = filterAvailability(items, { market: list.market, growth, growthLoading: false, fixedMAs });
   const blocked = activeChips(filters, availability, list.market, !!fixedMAs && Object.keys(fixedMAs).length > 0).find((chip) => chip.unavailable);
   if (blocked) throw new Error(`${blocked.label}：${blocked.unavailable}。保留上次清單，待資料恢復後再比較。`);

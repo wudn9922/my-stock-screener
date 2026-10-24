@@ -80,6 +80,21 @@ export function fixedMaBarsFromCsv(csv: string) {
     .sort((a, b) => a.time - b.time);
 }
 
+/** Both sources use universe_cache.py's Date,Open,High,Low,Close,Volume CSV format. */
+export async function readCollectorFixedMaBars(symbol: string, root: string) {
+  if (!/^[A-Z0-9^][A-Z0-9.^=-]{0,31}$/.test(symbol))
+    throw new Error(`Invalid symbol: ${symbol}`);
+  let csv: string;
+  try {
+    csv = await readFile(resolve(root, "data", `${symbol}.csv`), "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    const cacheDir = resolve(root, process.env.UNIVERSE_CACHE_DIR || ".cache/universe-full");
+    csv = await readFile(resolve(cacheDir, "bars", `${symbol}.csv`), "utf8");
+  }
+  return fixedMaBarsFromCsv(csv);
+}
+
 /** The same evaluator as the browser, without moving lastViewed/lastOpenedAt. */
 export async function refreshSavedWatchlists() {
   if (process.env.ATLAS_WATCHLIST_SYNC_ENABLED !== "1") {
@@ -224,10 +239,7 @@ export async function refreshSavedWatchlists() {
               return body as ParameterStock[];
             });
           }
-          fixedMAs = await loadScreenerFixedMAs(items, await fixedStocks, async symbol => {
-            if (!/^[A-Z0-9^][A-Z0-9.^=-]{0,31}$/.test(symbol)) throw new Error("Invalid symbol");
-            return fixedMaBarsFromCsv(await readFile(resolve(root, `data/${symbol}.csv`), "utf8"));
-          });
+          fixedMAs = await loadScreenerFixedMAs(items, await fixedStocks, symbol => readCollectorFixedMaBars(symbol, root));
         }
         const members = evaluateWatchlist(
           list,
