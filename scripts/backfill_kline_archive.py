@@ -65,8 +65,7 @@ def backfill(archive_dir, cache_dir, payload_dir, years=2, budget=1800, markets=
             frame = frame[frame.index.date >= target]
             if frame.empty:
                 raise ValueError("Yahoo returned no completed sessions in the requested period")
-            rows = [archive.normalize((day.strftime("%Y-%m-%d"), *row))
-                    for day, row in zip(frame.index, frame.itertuples(index=False, name=None))]
+            rows = archive.frame_rows(frame)
             relative = f"{archive.market_of(symbol)}/{symbol}.csv"
             content = archive.csv_text(rows)
             archive.atomic(Path(payload_dir) / relative, content)

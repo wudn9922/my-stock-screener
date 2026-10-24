@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import { BarChart3, Check, ChevronDown, Layers3, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useDialogFocus } from './useDialogFocus';
-import { formatDateTime } from './format';
+import { formatDateTime, formatMarketVolume, marketVolumeUnit, marketVolumeValue } from './format';
 import type { GrowthFile } from '../fundamentals/GrowthProvider';
 import {
   EMPTY_FILTERS,
@@ -18,7 +18,6 @@ import {
   activeChips,
   enoughPeriods,
   formatRange,
-  formatShares,
   gateCountText,
   gateSentence,
   isCustomVolume,
@@ -26,6 +25,7 @@ import {
   removeFilter,
   serializeFilters,
   toggleVolume,
+  volumeThresholdOf,
   trendFlagUnavailable,
   type FilterAvailability,
   type FilterRange,
@@ -46,6 +46,8 @@ export interface FilterSheetProps {
   open: boolean;
   market: 'TW' | 'US';
   groupName: string;
+  /** At least one row uses its saved smallest fixed SMA instead of EMA20. */
+  hasFixedMAs?: boolean;
   value: FilterState;
   availability: FilterAvailability;
   /** Rows the draft would show (group rows, text search included). */
@@ -64,21 +66,16 @@ export interface FilterSheetProps {
 
 const DIALOG_ID = 'screener-filters';
 const MA_SLIDER_LIMIT = 20;
-const CHANGE_PRESETS: { label: string; range: FilterRange }[] = [
-  { label: '漲 ≥3%', range: { min: 3, max: null } },
-  { label: '漲 0～3%', range: { min: 0, max: 3 } },
-  { label: '跌 0～3%', range: { min: -3, max: 0 } },
-  { label: '跌 ≥3%', range: { min: null, max: -3 } },
-];
-const sameRange = (a: FilterRange | null | undefined, b: FilterRange | null | undefined) =>
-  (a?.min ?? null) === (b?.min ?? null) && (a?.max ?? null) === (b?.max ?? null) && !!a === !!b;
+function Hint({ children, title = '說明' }: { children: ReactNode; title?: string }) {
+  return <details className="fs-details fs-help"><summary>{title}</summary><div className="fs-hint">{children}</div></details>;
+}
 
 function Section({ title, hint, unavailable, children }: { title: string; hint?: ReactNode; unavailable?: string | null; children: ReactNode }) {
   return (
     <section className={`fs-section ${unavailable ? 'is-unavailable' : ''}`} aria-label={title}>
       <h3 className="fs-section-title">{title}</h3>
       {unavailable ? <p className="fs-unavailable">{unavailable}</p> : children}
-      {hint && !unavailable && <p className="fs-hint">{hint}</p>}
+      {hint && !unavailable && <Hint title={`${title}說明`}>{hint}</Hint>}
     </section>
   );
 }
@@ -122,36 +119,6 @@ function Choice<T extends number>({
         </button>
       ))}
     </div>
-  );
-}
-
-/** Text input for an optional number; keeps partial input such as `-` while typing. */
-function NumberField({ label, value, onChange }: { label: string; value: number | null; onChange: (value: number | null) => void }) {
-  const [text, setText] = useState(value === null ? '' : String(value));
-  useEffect(() => {
-    const parsed = text.trim() === '' ? null : Number(text);
-    if (parsed !== value) setText(value === null ? '' : String(value));
-    // Only an outside change (preset, reset) rewrites the text.
-  }, [value]);
-  return (
-    <label className="fs-number">
-      <span>{label}</span>
-      <input
-        type="text"
-        inputMode="decimal"
-        enterKeyHint="done"
-        placeholder="不限"
-        value={text}
-        aria-label={`今日漲跌${label}（%）`}
-        onChange={(event) => {
-          const next = event.target.value.replace(/[^\d.+-]/g, '').slice(0, 7);
-          setText(next);
-          if (next.trim() === '') onChange(null);
-          else if (Number.isFinite(Number(next))) onChange(Number(next));
-        }}
-      />
-      <span className="fs-unit">%</span>
-    </label>
   );
 }
 
@@ -432,10 +399,10 @@ function GrowthGateBlock({
           </p>{note && <p className="fs-hint fs-coverage">{note}</p>}</details>
         </>
       ) : (
-        <p className="fs-hint">選擇或輸入幅度 X 後才會套用（期數與成長佔比 P 會保留）。</p>
+        <Hint title="啟用條件說明">選擇或輸入幅度 X 後才會套用，期數與成長佔比 P 會保留。</Hint>
       )}
-      {!gate && note && <p className="fs-hint fs-coverage">{note}</p>}
-      {gate && coverageSummary && <p className="fs-hint fs-coverage">{coverageSummary}</p>}
+      {!gate && note && <Hint title="資料涵蓋">{note}</Hint>}
+      {gate && coverageSummary && <Hint title="資料涵蓋摘要">{coverageSummary}</Hint>}
     </div>
   );
 }
@@ -476,7 +443,7 @@ function Disclosure({
 export function FilterSheet(props: FilterSheetProps) {
   const { open, market, value, availability, growth, growthLoading, onNeedGrowth, onClose } = props;
   const [draft, setDraft] = useState<FilterState>(value);
-  const [volumeText, setVolumeText] = useState(value.vol === null ? '' : String(value.vol));
+  const [volumeText, setVolumeText] = useState(value.vol === null ? '' : String(marketVolumeValue(value.vol, market)));
   const [terms, setTerms] = useState<GateTermsMap>(() => termsOf(value));
   const [category, setCategory] = useState<'all' | 'technical' | 'fundamental'>('all');
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -486,7 +453,7 @@ export function FilterSheet(props: FilterSheetProps) {
   useEffect(() => {
     if (!open) return;
     setDraft(value);
-    setVolumeText(value.vol === null ? '' : String(value.vol));
+    setVolumeText(value.vol === null ? '' : String(marketVolumeValue(value.vol, market)));
     setTerms(termsOf(value));
   }, [open]);
   useDialogFocus(open, DIALOG_ID);
@@ -525,9 +492,10 @@ export function FilterSheet(props: FilterSheetProps) {
   if (!open) return null;
 
   const update = (patch: Partial<FilterState>) => setDraft((previous) => ({ ...previous, ...patch }));
-  const volumeInvalid = volumeText.trim() !== '' && (!/^\d+$/.test(volumeText.trim()) || !Number.isSafeInteger(Number(volumeText)));
+  const volumeUnit = marketVolumeUnit(market);
+  const volumeInvalid = volumeThresholdOf(volumeText, market) === undefined;
   const setShareVolume = (vol: number | null) => {
-    setVolumeText(vol === null ? '' : String(vol));
+    setVolumeText(vol === null ? '' : String(marketVolumeValue(vol, market)));
     update({ vol });
   };
   const setGateMin = (key: GateKey, min: number | null) => update({ [key]: min === null ? null : gateFor(key, terms[key], min) });
@@ -672,7 +640,7 @@ export function FilterSheet(props: FilterSheetProps) {
       </div>
     );
   };
-  const draftChips = activeChips(draft, availability);
+  const draftChips = activeChips(draft, availability, market, props.hasFixedMAs);
   const revenueChips = draftChips.filter((chip) => chip.key === 'rev' || chip.key === 'revY');
   const revenueCount = revenueChips.length;
   const revenueSummary = revenueChips.map((chip) => chip.label).join('；');
@@ -729,11 +697,11 @@ export function FilterSheet(props: FilterSheetProps) {
         </div>}
         <div className="fs-body">
           <div hidden={category === 'fundamental'}>
-          <Section title="每日成交股數" unavailable={availability.vol} hint="以最近一個交易日的成交股數篩選，台美股都以「股」計算（台股 1 張＝1,000 股）。預設不限；留白或輸入 0 可取消門檻。">
+          <Section title={`20 日平均成交量（${volumeUnit}）`} unavailable={availability.vol} hint="以含資料日在內、最近完整 20 個交易日的平均成交量篩選。台股以張顯示（1 張＝1,000 股），美股以股顯示；未滿 20 日不提供均量。留白或輸入 0 可取消門檻。">
             <Choice
-              label="成交股數門檻"
+              label="平均成交量門檻"
               value={draft.vol}
-              options={[{ value: null, label: '不限' }, ...SHARE_VOLUME_PRESETS.map((value) => ({ value, label: `≥${formatShares(value)}` }))]}
+              options={[{ value: null, label: '不限' }, ...SHARE_VOLUME_PRESETS.map((value) => ({ value, label: `≥${formatMarketVolume(value, market)}` }))]}
               onChange={(vol) => setShareVolume(toggleVolume(draft.vol, vol))}
             />
             <div className="fs-number-row">
@@ -741,55 +709,31 @@ export function FilterSheet(props: FilterSheetProps) {
                 <span>至少</span>
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   enterKeyHint="done"
                   placeholder="不限"
-                  aria-label="自訂成交股數下限（股）"
+                  aria-label={`自訂20日平均成交量下限（${volumeUnit}）`}
                   aria-invalid={volumeInvalid}
                   aria-describedby={volumeInvalid ? 'fs-volume-error' : undefined}
                   value={volumeText}
                   onChange={(event) => {
                     const text = event.target.value;
                     setVolumeText(text);
-                    if (text.trim() === '') update({ vol: null });
-                    else if (/^\d+$/.test(text.trim()) && Number.isSafeInteger(Number(text))) update({ vol: Number(text) || null });
+                    const shares = volumeThresholdOf(text, market);
+                    if (shares !== undefined) update({ vol: shares });
                   }}
                 />
-                <span>股</span>
+                <span>{volumeUnit}</span>
               </label>
             </div>
-            {volumeInvalid && <p id="fs-volume-error" className="fs-unavailable" role="alert">請輸入有效的非負整數股數。</p>}
+            {volumeInvalid && <p id="fs-volume-error" className="fs-unavailable" role="alert">請輸入有效的非負{volumeUnit}數{market === 'TW' ? '（最小 0.001 張）' : '（整數）'}。</p>}
           </Section>
-          <Section title="今日漲跌" unavailable={availability.chg}>
-            <div className="fs-chips" role="group" aria-label="今日漲跌快選">
-              {CHANGE_PRESETS.map((preset) => {
-                const active = sameRange(draft.chg, preset.range);
-                return (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    className={`fs-chip ${active ? 'active' : ''}`}
-                    aria-pressed={active}
-                    onClick={() => update({ chg: active ? null : preset.range })}
-                  >
-                    {preset.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="fs-number-row">
-              <NumberField label="最小" value={draft.chg?.min ?? null} onChange={(min) => update({ chg: min === null && (draft.chg?.max ?? null) === null ? null : { min, max: draft.chg?.max ?? null } })} />
-              <span className="fs-dash" aria-hidden="true">～</span>
-              <NumberField label="最大" value={draft.chg?.max ?? null} onChange={(max) => update({ chg: max === null && (draft.chg?.min ?? null) === null ? null : { min: draft.chg?.min ?? null, max } })} />
-            </div>
-          </Section>
-
           <Section
             title="均線乖離"
-            hint="收盤價高於（+）或低於（−）EMA20（20 日指數移動平均）的百分比；滑到兩端代表不限。"
+            hint="收盤價相對均線的百分比，高於為正、低於為負。預設 EMA20；有個股固定均線參數時，改用其中最小期數的 MA。各股票獨立判斷；滑到兩端代表不限。"
             unavailable={availability.ema20}
           >
-            <RangeSlider label="EMA20" value={draft.ema20 ?? undefined} onChange={(range) => update({ ema20: range ?? null })} />
+            <RangeSlider label={props.hasFixedMAs ? '固定最小均線／EMA20' : 'EMA20'} value={draft.ema20 ?? undefined} onChange={(range) => update({ ema20: range ?? null })} />
           </Section>
 
           <Section
@@ -898,7 +842,7 @@ export function FilterSheet(props: FilterSheetProps) {
           </div>
           <div hidden={category === 'technical'}>
           <Section title="基本面（EPS／營收成長）" unavailable={fundamentalsBlocked}>
-            <p className="fs-stack-note"><Layers3 size={17} /><span>同一指標可新增多個條件，全部同時滿足才入選。<small>例如：近 5 年 EPS 年增皆 ≥ 10%，且最近 1 年 ≥ 20%。</small></span></p>
+            <Hint title="多重條件說明">同一指標可新增多個條件，全部同時滿足才入選。例如：近 5 年 EPS 年增皆 ≥ 10%，且最近 1 年 ≥ 20%。</Hint>
             <details className="fs-details fs-method"><summary>年增率與資料來源說明</summary>
             <p className="fs-hint fs-lead">
               年增率（YoY）一律和「去年同期」比：季度比去年同一季，年度比前一個會計年度。每一期 YoY ≥ 幅度 X% 記為成長，低於則為衰退；
@@ -911,7 +855,7 @@ export function FilterSheet(props: FilterSheetProps) {
             {gateBlock('eps', '季度 EPS 成長', '季', 'EPS 年增')}
             {gateBlock('epsY', '年度 EPS 成長', '年', 'EPS 年增')}
             <Disclosure id="screener-streak" title="進階：嚴格連續成長" count={draft.epss === null ? 0 : 1} summary={draft.epss === null ? null : `EPS 連續成長 ≥${draft.epss} 年`}>
-            <p className="fs-hint">年度成長條件可設定幅度與成長佔比，並略過部分缺資料的年度；此條件要求每一年 EPS 年增率嚴格 ＞ 0，持平或資料缺口都會中斷。只需一般盈餘成長篩選時，使用上方「年度 EPS 成長」即可。</p>
+            <Hint title="嚴格連續成長說明">年度成長條件可設定幅度與成長佔比，並略過部分缺資料的年度；此條件要求每一年 EPS 年增率嚴格 ＞ 0，持平或資料缺口都會中斷。一般盈餘成長篩選可使用上方「年度 EPS 成長」。</Hint>
             <div className="fs-block" role="group" aria-label="EPS 連續成長年數">
               <div className="fs-sub">EPS 連續成長年數</div>
               {availability.epss && !growthPending ? (
@@ -967,15 +911,16 @@ export function FilterSheet(props: FilterSheetProps) {
                   <span className="fs-switch-track" aria-hidden="true" />
                   <span>
                     EPS 成長加速
-                    <small>{draft.accelY && !draft.accel ? '最新一年的 EPS 年增率 ＞ 前一年的年增率' : '最新一季的 EPS 年增率 ＞ 前一季的年增率'}（例：前期 +10%、最新一期 +25%）。{draft.accel && draft.accelY ? '年度與季度皆須加速。' : ''}</small>
+
                   </span>
                 </label>
                 {(draft.accel || draft.accelY) && <>
                   <Choice label="EPS 成長加速 · 週期" value={draft.accelY ? (draft.accel ? 3 : 2) : 1} onChange={(period) => update({ accel: period === 1 || period === 3, accelY: period === 2 || period === 3 })} options={[
-                    { value: 1, label: '季度', disabled: !!availability.accel && !growthPending && !draft.accel },
-                    { value: 2, label: '年度', disabled: !!availability.accelY && !growthPending && !draft.accelY },
-                    { value: 3, label: '年度＋季度', disabled: !!(availability.accel || availability.accelY) && !growthPending && !(draft.accel && draft.accelY) },
+                    { value: 1, label: '季度年增', disabled: !!availability.accel && !growthPending && !draft.accel },
+                    { value: 2, label: '年度年增', disabled: !!availability.accelY && !growthPending && !draft.accelY },
+                    { value: 3, label: '兩者皆符合', disabled: !!(availability.accel || availability.accelY) && !growthPending && !(draft.accel && draft.accelY) },
                   ]} />
+                  <Hint title="EPS 成長加速說明">季度年增：最新一季 EPS 相對去年同季的年增率，大於前一季的年增率。年度年增：最新完整會計年度 EPS 相對前一年的年增率，大於前一年度的年增率。例如前期 +10%、最新一期 +25%；選兩者時必須同時符合。</Hint>
                   <details className="fs-details"><summary>加速條件的資料涵蓋</summary>
                     {draft.accel && <p className="fs-hint fs-coverage">{availability.accel || coverageText('accel', 2, true)}</p>}
                     {draft.accelY && <p className="fs-hint fs-coverage">{availability.accelY || coverageText('accelY', 2, true)}</p>}
@@ -994,9 +939,10 @@ export function FilterSheet(props: FilterSheetProps) {
                 <span className="fs-switch-track" aria-hidden="true" />
                 <span>
                   含虧轉盈
-                  <small>去年同期 EPS ≤ 0、本期轉為獲利時 YoY 無法計算；開啟時計為成長，關閉時在成長期數中計為衰退（連續成長年數與加速則視為缺資料）。</small>
+
                 </span>
               </label>
+              <Hint title="虧轉盈說明">去年同期 EPS ≤ 0、本期轉為獲利時 YoY 無法計算；開啟時計為成長，關閉時在成長期數中計為衰退（連續成長年數與加速則視為缺資料）。</Hint>
             </div>
             <Disclosure id="screener-revenue-growth" title="營收" count={revenueCount} summary={revenueSummary}>
               {gateBlock('rev', '季度營收成長', '季', '營收 年增')}
@@ -1015,17 +961,17 @@ export function FilterSheet(props: FilterSheetProps) {
                 <span className="fs-switch-track" aria-hidden="true" />
                 <span>
                   資料不足時排除
-                  <small>有財報資料的期數少於 ⌈N÷2⌉ 期、財報歷史不夠長，或去年同期虧損（YoY 無法計算）時；關閉則保留這些股票。</small>
                 </span>
               </label>
             </div>
-            <p className="fs-hint">
+            <Hint title="缺資料的處理說明">有財報資料的期數少於 ⌈N÷2⌉ 期、財報歷史不夠長，或去年同期虧損而無法計算 YoY 時，依「資料不足時排除」處理；關閉則保留這些股票。</Hint>
+            <Hint title="基本面資料來源與更新">
               {growthLoading
                 ? '基本面資料載入中…'
                 : growth
                   ? `資料：${GROWTH_SOURCE_TEXT[market]}${growthDate ? ` · 更新 ${growthDate}` : ''} · 財報公布後數日更新`
                   : '開啟面板後載入基本面資料。'}
-            </p>
+            </Hint>
           </Section>
           </div>
         </div>

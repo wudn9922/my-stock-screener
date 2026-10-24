@@ -115,22 +115,28 @@ test('period, weighting and size controls change the map; the industry map offer
   await expect(agg.getByRole('button', { name: '等權（中位數）' })).toHaveAttribute('aria-pressed', 'true');
   const medianLabels = await cells(page).evaluateAll((nodes) => nodes.map((n) => n.getAttribute('aria-label')));
   expect(medianLabels).not.toEqual(weightedLabels);
-  await expect(page.locator('.map-foot')).toContainText('等權中位數');
+  const notes = page.locator('.themes-map > .help-disclosure');
+  await expect(notes.locator('.help-disclosure-body')).toBeHidden();
+  await notes.locator('summary').click();
+  await expect(notes.locator('.help-disclosure-body')).toBeVisible();
+  await expect(notes.locator('.help-disclosure-body')).toContainText('等權中位數');
 
   const sizes = page.getByRole('group', { name: '大小' });
   await expect(sizes.getByRole('button', { name: '均衡' })).toHaveAttribute('aria-pressed', 'true');
   await expect(sizes.getByRole('button')).toHaveText(['均衡', '等大小', '市值']);
-  await expect(page.locator('.map-foot')).toContainText('產業市值合計');
-  await expect(page.locator('.map-foot')).toContainText('資料日 2026/10/13');
-  await expect(page.locator('.map-foot')).toContainText('涵蓋 300 檔');
+  await expect(page.locator('.themes-map > .help-disclosure .help-disclosure-body')).toContainText('產業市值合計');
+  await expect(page.locator('.themes-map > .help-disclosure .help-disclosure-body')).toContainText('資料日 2026/10/13');
+  await expect(page.locator('.themes-map > .help-disclosure .help-disclosure-body')).toContainText('涵蓋 300 檔');
   await sizes.getByRole('button', { name: '等大小' }).click();
-  await expect(page.locator('.map-foot')).toContainText('每個方塊一樣大');
+  await expect(page.locator('.themes-map > .help-disclosure .help-disclosure-body')).toContainText('每個方塊一樣大');
   // Remembered across reloads (agg and size share one stored object).
   await page.reload();
   await expect(sizes.getByRole('button', { name: '等大小' })).toHaveAttribute('aria-pressed', 'true');
   await expect(agg.getByRole('button', { name: '等權（中位數）' })).toHaveAttribute('aria-pressed', 'true');
+  await notes.locator('summary').click();
+  await expect(notes.locator('.help-disclosure-body')).toBeVisible();
   await sizes.getByRole('button', { name: '市值' }).click();
-  await expect(page.locator('.map-foot')).toContainText('小產業會很小');
+  await expect(page.locator('.themes-map > .help-disclosure .help-disclosure-body')).toContainText('小產業會很小');
   expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
 });
 
@@ -249,12 +255,16 @@ test('Taiwan and US keep the heatmap view across the market tabs', async ({ page
   await mockMap(page);
   await page.goto('./?page=themes&market=tw&v=map');
   await expect(cells(page)).toHaveCount(12);
-  await expect(page.locator('.map-foot')).toContainText('新台幣');
+  await page.locator('.themes-map > .help-disclosure > summary').click();
+  await expect(page.locator('.themes-map > .help-disclosure .help-disclosure-body')).toBeVisible();
+  await expect(page.locator('.themes-map > .help-disclosure .help-disclosure-body')).toContainText('新台幣');
   const tabs = page.getByRole('tablist', { name: '市場' });
   await tabs.getByRole('tab', { name: /美股/ }).click();
   await expect(page).toHaveURL(/page=themes&v=map$/);
   await expect(cells(page)).toHaveCount(22);
-  await expect(page.locator('.map-foot')).toContainText('美元');
+  await page.locator('.themes-map > .help-disclosure > summary').click();
+  await expect(page.locator('.themes-map > .help-disclosure .help-disclosure-body')).toBeVisible();
+  await expect(page.locator('.themes-map > .help-disclosure .help-disclosure-body')).toContainText('美元');
   await tabs.getByRole('tab', { name: /台股/ }).click();
   await expect(page).toHaveURL(/page=themes&market=tw&v=map$/);
   await expect(cells(page)).toHaveCount(12);
@@ -273,7 +283,9 @@ test('without profile data the map falls back to theme cells, says so, and never
   // The universe list still sizes the cells by turnover.
   const sizes = page.getByRole('group', { name: '大小' });
   await expect(sizes.getByRole('button', { name: '成交值' })).toBeEnabled();
-  await expect(page.locator('.map-foot')).toContainText('不是市值');
+  await page.locator('.themes-map > .help-disclosure > summary').click();
+  await expect(page.locator('.themes-map > .help-disclosure .help-disclosure-body')).toBeVisible();
+  await expect(page.locator('.themes-map > .help-disclosure .help-disclosure-body')).toContainText('不是市值');
   // A click opens the existing theme detail, and closing returns to the heatmap.
   await cells(page).filter({ hasText: '光通訊' }).first().click();
   await expect(page).toHaveURL(/page=themes&v=map&theme=optical/);

@@ -22,7 +22,7 @@ import report_metrics  # noqa: E402
 UNIVERSE_FIELDS = [
     "symbol", "name", "close", "changePct", "volume", "r5", "r21", "r63",
     "ma20", "ma50", "ma200", "ema20", "ma20Slope5", "trend", "hi52", "fromHi52", "hiBars",
-    "rs21", "rs63", "rsRank", "volVsPrev", "turnover20", "asOf",
+    "rs21", "rs63", "rsRank", "volVsPrev", "turnover20", "asOf", "volumeAvg20",
 ]
 
 
@@ -171,6 +171,38 @@ class ComputeStockMetricsTest(unittest.TestCase):
         )
         self.assertEqual(metrics["volVsPrev"], 1.5)
 
+    def test_average_volume_uses_exactly_latest_twenty_sessions(self):
+        metrics = report_metrics.compute_stock_metrics(
+            make_prices([10] * 30, volumes=[50000.0] * 10 + [1000.0] * 19 + [3000.0]),
+            None, "SPY",
+        )
+        self.assertEqual(metrics["volumeAvg20"], 1100.0)
+        short = report_metrics.compute_stock_metrics(make_prices([10] * 19), None, "SPY")
+        self.assertIsNone(short["volumeAvg20"])
+        zero_day = report_metrics.compute_stock_metrics(
+            make_prices([10] * 20, volumes=[1000.0] * 19 + [0.0]), None, "SPY",
+        )
+        self.assertEqual(zero_day["volumeAvg20"], 950.0)
+
+    def test_average_volume_rejects_unknown_volume_without_confusing_real_zero(self):
+        for missing in (None, float("nan"), float("inf"), float("-inf"), -1):
+            with self.subTest(missing=missing):
+                frame = make_prices([10] * 20)
+                frame.iloc[-1, frame.columns.get_loc("Volume")] = missing
+                self.assertIsNone(report_metrics.compute_stock_metrics(frame)["volumeAvg20"])
+                # The report/universe pipeline may clean a frame before computing metrics.
+                cleaned = report_metrics.clean_prices(frame)
+                self.assertIsNone(report_metrics.compute_stock_metrics(cleaned)["volumeAvg20"])
+        old_gap = make_prices([10] * 21, volumes=[float("nan")] + [1000.0] * 20)
+        self.assertEqual(report_metrics.compute_stock_metrics(old_gap)["volumeAvg20"], 1000.0)
+
+    def test_average_volume_csv_roundtrip_preserves_unknown_volume(self):
+        frame = make_prices([10] * 20, volumes=[1000.0] * 19 + [float("nan")])
+        with tempfile.TemporaryDirectory() as directory:
+            write_csv(directory, "TEST", frame)
+            loaded = report_metrics.read_price_csv(os.path.join(directory, "TEST.csv"))
+            self.assertIsNone(report_metrics.compute_stock_metrics(loaded)["volumeAvg20"])
+
     def test_vol_vs_prev_spike_and_drop(self):
         spike = report_metrics.compute_stock_metrics(
             make_prices([10] * 41, volumes=[1000.0] * 40 + [3000.0]), None, "SPY"
@@ -231,7 +263,7 @@ class ComputeStockMetricsTest(unittest.TestCase):
         metrics = report_metrics.compute_stock_metrics(make_prices([10]), None, "SPY")
         self.assertEqual(metrics["bars"], 1)
         self.assertEqual(metrics["hiBars"], 1)
-        for key in ("r5", "r21", "r63", "ma20Slope5", "trend", "ema20", "volVsPrev", "turnover20"):
+        for key in ("r5", "r21", "r63", "ma20Slope5", "trend", "ema20", "volVsPrev", "turnover20", "volumeAvg20"):
             self.assertIsNone(metrics[key], key)
         self.assertEqual(metrics["ma"], {"20": None, "50": None, "200": None})
         strict_json(metrics)
@@ -426,6 +458,7 @@ class UniverseTest(unittest.TestCase):
         row = dict(zip(UNIVERSE_FIELDS, tw["rows"][0]))
         self.assertEqual(row["symbol"], "1101.TW")
         self.assertEqual(row["hiBars"], 252)
+        self.assertEqual(row["volumeAvg20"], 2000000)
         self.assertIn(row["trend"], ("up", "down", "mixed"))
         strict_json(payload)
 

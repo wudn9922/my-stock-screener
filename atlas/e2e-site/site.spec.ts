@@ -44,14 +44,14 @@ test('lands on 大盤 / 台灣 with report cards, LINE summary and mini charts',
   expect(errors).toEqual([]);
 });
 
-test('index card opens the chart workspace with the index MAs', async ({ page }) => {
+test('index card opens the chart workspace without preset MAs', async ({ page }) => {
   await mockSite(page);
   await page.goto('./?page=markets&market=tw');
   await page.locator('.index-card').first().click();
   await expect(page).toHaveURL(/page=chart&symbol=\^TWII&tf=1D/);
   await chartReady(page);
   await expect(page.getByTestId('active-symbol')).toHaveText('^TWII');
-  await expect(page.locator('.indicator-chip .indicator-name')).toHaveText(['SMA 23', 'SMA 29', 'SMA 61']);
+  await expect(page.locator('.indicator-chip .indicator-name')).toHaveCount(0);
   await page.goBack();
   await expect(page.locator('.index-card')).toHaveCount(2);
 });
@@ -99,7 +99,7 @@ test('global search finds Chinese names, bare digits and tickers, with keyboard 
   await expect(page.locator('.search-results [role="option"]').first()).toContainText('2330');
 });
 
-test('screener virtualizes a long list and opens rows with the group MA', async ({ page }) => {
+test('screener virtualizes a long list and opens rows without preset MAs', async ({ page }) => {
   await mockSite(page, { report: buildReport(600) });
   await page.goto('./?page=screener&group=tw_all');
   await expect(page.locator('.screener-row').first()).toBeVisible();
@@ -113,7 +113,7 @@ test('screener virtualizes a long list and opens rows with the group MA', async 
   await page.locator('.screener-row').click();
   await expect(page).toHaveURL(/page=chart&symbol=1101\.TW/);
   await chartReady(page);
-  await expect(page.locator('.indicator-chip .indicator-name')).toHaveText(['SMA 20']);
+  await expect(page.locator('.indicator-chip .indicator-name')).toHaveCount(0);
 });
 
 test('world page compares indices and isolates per-row failures', async ({ page }) => {

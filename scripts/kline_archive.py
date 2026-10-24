@@ -117,6 +117,13 @@ def csv_text(rows):
     return stream.getvalue()
 
 
+def frame_rows(frame):
+    """Serialize source observations, not the calculation frame's zero fallback."""
+    source = uc._volume_source_frame(frame)
+    return [normalize((day.strftime("%Y-%m-%d"), *row))
+            for day, row in zip(source.index, source.itertuples(index=False, name=None))]
+
+
 def read_rows(path, strict=False):
     with Path(path).open(newline="", encoding="utf-8") as stream:
         reader = csv.reader(stream)
@@ -457,7 +464,7 @@ def apply_operations(archive, payload, main_log=None, now=None):
 
 def stage_adjustment(cache, symbol, frame, comparison, now):
     market_of(symbol)
-    rows = [normalize((day.strftime("%Y-%m-%d"), *row)) for day, row in zip(frame.index, frame.itertuples(index=False, name=None))]
+    rows = frame_rows(frame)
     content = csv_text(rows)
     receipt = {"version": 1, "symbol": symbol, "comparison": comparison,
                "sha256": digest(content.encode()), "fetchedAt": now.isoformat(),

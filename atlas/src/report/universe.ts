@@ -36,6 +36,7 @@ export const UNIVERSE_FIELDS = [
   'volVsPrev',
   'turnover20',
   'asOf',
+  'volumeAvg20',
 ] as const;
 /**
  * Optional profile columns written by the full-market build (scripts/build_universe_full.py) after the
@@ -120,6 +121,7 @@ export function universeRowToItem(
     rsRank: get('rsRank'),
     volVsPrev: get('volVsPrev'),
     turnover20: get('turnover20'),
+    volumeAvg20: get('volumeAvg20'),
   })!;
   const numeric = (field: string) => toFinite(get(field));
   const close = numeric('close');

@@ -1,3 +1,4 @@
+import { HelpDisclosure } from './HelpDisclosure';
 import { useEffect, useState, useSyncExternalStore, type FormEvent } from 'react';
 import { FIXED_STOCK_GROUP, parameterMAs, parseMovingAverages, settingsApi, type ParameterStock } from '../cloud/settingsApi';
 import { ConsoleDialog } from './ConsoleDialog';
@@ -69,14 +70,14 @@ export function FixedStockParameters({
   };
   return (
     <ConsoleDialog title={`${ticker} 固定均線參數`} busy={busy} onClose={onClose}>
-      <p>
+      <HelpDisclosure label="固定參數保存與優先順序">
         {access.storageMode === 'cloud'
           ? '固定參數會保存到你的 Supabase 帳號，出榜或刪除清單後仍保留。'
           : access.storageMode === 'device'
             ? '固定參數只保存在這個帳號的裝置空間，不會上傳。'
             : '固定參數只在本次瀏覽套用，重新載入後清除，不會保存或上傳。'}
         均線優先於分組與清單的預設值。
-      </p>
+      </HelpDisclosure>
       {loading && <p role="status">正在載入已保存的參數…</p>}
       {prefill && ready && (
         <p role="status">{saved ? `目前已保存：${saved.join(' / ')}；儲存後會被取代。` : '目前沒有已保存的固定參數。'}</p>
@@ -98,7 +99,7 @@ export function FixedStockParameters({
             placeholder="20, 50, 200"
           />
         </label>
-        <p>填入 1～4 個不重複的整數（1～1000），用逗號分隔。</p>
+        <HelpDisclosure label="參數輸入格式">填入 1～4 個不重複的整數（1～1000），用逗號分隔。</HelpDisclosure>
         <div className="console-actions">
           <button type="submit" className="primary-button" disabled={loading || busy || !ready}>
             {access.storageMode === 'none'

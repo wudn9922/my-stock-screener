@@ -778,7 +778,9 @@ class Run:
 
         if bar.get("close") and bar["date"] in frame.index.strftime("%Y-%m-%d"):
             # 同一天 Yahoo 與官方／報價都有：記錄收盤與成交量的一致程度（日誌中的口徑檢查）
-            yahoo = frame.loc[bar["date"]]
+            # The compatible calculation frame uses zero for unknown shares;
+            # source comparisons must recover the attrs-based missing cells.
+            yahoo = uc._volume_source_frame(frame).loc[bar["date"]]
             self.agreement.append((
                 market,
                 abs(bar["close"] / float(yahoo["Close"]) - 1),

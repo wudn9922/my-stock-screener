@@ -7,9 +7,9 @@
   color: var(--text-3);
 }
 .themes-help {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: var(--text-2);
+  margin: 0 0 6px;
+  font-size: 11px;
+  color: var(--text-3);
 }
 .themes-help[open] {
   padding-bottom: 4px;
@@ -20,11 +20,11 @@
 .themes-help summary {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  min-height: 32px;
   padding: 0 4px 0 0;
   cursor: pointer;
-  color: var(--accent-text);
-  font-weight: 600;
+  color: var(--text-3);
+  font-weight: 400;
   list-style: none;
 }
 .themes-help summary::-webkit-details-marker {

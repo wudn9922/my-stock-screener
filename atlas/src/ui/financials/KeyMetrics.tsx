@@ -3,6 +3,7 @@ import type { FinancialHistory } from '../../fundamentals/FinancialHistory';
 import { formatDateTime } from '../format';
 import { barLayout, barPath } from './barGeometry';
 import { FoldCard } from './FoldCard';
+import { FinancialNote } from './FinancialNote';
 import {
   KEY_SPARK_PERIODS,
   formatValue,
@@ -41,11 +42,11 @@ export function KeyMetrics({ history, view }: { history: FinancialHistory; view:
           ))}
         </ul>
       )}
-      <p className="fin-key-note">
+      <FinancialNote className="fin-key-note" label="關鍵指標說明"><p>
         年增率：金額與 EPS 為同期成長率（季度對去年同季）；毛利率、營業利益率、淨利率為百分點差。迷你柱為近 {KEY_SPARK_PERIODS} 期，由舊到新。
         毛利財報未列示時，以營收減營業成本推算（標示「推算」）。資料更新日{' '}
         {history.checkedAt ? formatDateTime(history.checkedAt, false) : '—'}，僅供研究參考。
-      </p>
+      </p></FinancialNote>
     </FoldCard>
   );
 }

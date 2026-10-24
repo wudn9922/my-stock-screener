@@ -1,10 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { displayTicker, formatPercent, formatPrice, formatRatio, maDistance, maValue, toneClass } from '../src/ui/format';
+import { displayTicker, formatMarketVolume, formatPercent, formatPrice, formatRatio, maDistance, maValue, marketVolumeUnit, marketVolumeValue, toneClass } from '../src/ui/format';
 import { matchLocalSymbols } from '../src/ui/searchRanking';
 import { filterAndSortItems } from '../src/pages/screenerItems';
 import { groupItemSchema, type GroupItem } from '../src/report/schema';
 
 describe('formatting', () => {
+  it('converts Taiwan quantities to lots without changing US shares or losing odd lots', () => {
+    expect(marketVolumeUnit('2330.TW')).toBe('張');
+    expect(marketVolumeUnit('6488.TWO')).toBe('張');
+    expect(marketVolumeUnit('TW')).toBe('張');
+    expect(marketVolumeUnit('US')).toBe('股');
+    expect(marketVolumeUnit('AAPL')).toBe('股');
+    expect(marketVolumeValue(1_234_567, '2330.TW')).toBe(1234.567);
+    expect(marketVolumeValue(1_234_567, 'AAPL')).toBe(1_234_567);
+    expect(formatMarketVolume(1_234_567, '2330.TW')).toBe('1,234.567 張');
+    expect(formatMarketVolume(1, '6488.TWO')).toBe('0.001 張');
+    expect(formatMarketVolume(-1001, '2330.TW')).toBe('-1.001 張');
+    expect(formatMarketVolume(0, '2330.TW')).toBe('0 張');
+    expect(formatMarketVolume(1_234_567, 'AAPL')).toBe('1,234,567 股');
+    expect(formatMarketVolume(null, 'TW')).toBe('—');
+    expect(marketVolumeValue(Number.NaN, 'TW')).toBeNull();
+  });
+
   it('formats prices, signed percents and ratios', () => {
     expect(formatPrice(22812.456)).toBe('22,812.46');
     expect(formatPrice(0.12345)).toBe('0.1235');

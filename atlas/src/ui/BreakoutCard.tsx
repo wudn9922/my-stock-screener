@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, GitBranch, Layers, Rocket, ShieldCheck, Target, Timer } from 'lucide-react';
 import {
-  DEFAULT_BREAKOUT_PARAMS, OUTCOME_RULES, SUCCESS_MODEL, loadBreakouts,
+  DEFAULT_BREAKOUT_PARAMS, OUTCOME_RULES, SUCCESS_MODEL, loadBreakouts, loadBreakoutsHistory, fetchBreakoutSnapshot,
   type BreakoutMarket, type BreakoutMarketKey,
-  type BreakoutParams, type BreakoutStats, type BreakoutWindow, type BreakoutsLoadResult, type OutcomeKey,
+  type BreakoutParams, type BreakoutStats, type BreakoutWindow, type BreakoutsLoadResult, type BreakoutsHistoryResult, type OutcomeKey,
 } from '../report/breakouts';
 import { formatDateTime } from './format';
 import './breakouts.css';
@@ -43,7 +43,7 @@ function StrategyRow({ method, stats, rule, params, index }: {
   return <li className={`bo-row${low ? ' low' : ''}`} data-method={method.key}>
     <div className="bo-row-head">
       <div className="bo-method-name"><span className="bo-method-index">0{index + 1}</span><div>
-        <h3 className="bo-label">{method.label}</h3><p>{method.hint}</p>
+        <h3 className="bo-label">{method.label}</h3><details className="bo-inline-help"><summary>方法說明</summary><p>{method.hint}</p></details>
       </div></div>
       <b className="bo-win" aria-label={`進場成功率 ${note ? '尚無完整結果' : rate(outcome?.winRate ?? null)}`}>
         {note ? '—' : rate(outcome?.winRate ?? null)}<small>成功率</small>
@@ -122,8 +122,10 @@ function BreakoutBody({ data, params }: { data: BreakoutMarket; params: Breakout
         aria-pressed={entry.key === active.key} onClick={() => setWindow(entry.key)}>{entry.label}</button>)}
     </div></div>
     <OutcomeSelector selected={selectedRule} onSelect={setRule} />
-    <div className="bo-rule-description" aria-live="polite"><b>{rule.label}</b><p>{rule.description}</p></div>
-    <div className="bo-common"><ShieldCheck size={15} aria-hidden="true" /><p><b>突破日收盤門檻，四組共用</b><span>關鍵點 ＋ 0.1 ATR(14)；未達即失敗</span></p></div>
+    <details className="bo-details" key={selectedRule}><summary>{rule.label} · 判定說明</summary>
+      <div className="bo-rule-description"><p>{rule.description}</p></div>
+      <div className="bo-common"><ShieldCheck size={15} aria-hidden="true" /><p><b>突破日收盤門檻，四組共用</b><span>關鍵點 ＋ 0.1 ATR(14)；未達即失敗</span></p></div>
+    </details>
     {!complete ? <p className="bo-pending-note"><Timer size={14} aria-hidden="true" />這段訊號仍在觀察或缺少後續日線，尚無完整比較結果。</p> : null}
     <ul className="bo-list">{METHODS.map((method, index) => <StrategyRow key={method.key} method={method} index={index}
       stats={current.strategies[method.key]} rule={selectedRule} params={params} />)}</ul>
@@ -134,19 +136,44 @@ function BreakoutBody({ data, params }: { data: BreakoutMarket; params: Breakout
 }
 
 export function BreakoutCard({ market }: { market: BreakoutMarketKey }) {
-  const [result, setResult] = useState<BreakoutsLoadResult | null>(null);
+  const [latest, setLatest] = useState<BreakoutsLoadResult | null>(null);
+  const [history, setHistory] = useState<BreakoutsHistoryResult | null>(null);
+  const [selectedDate, setSelectedDate] = useState('latest');
+  const [archived, setArchived] = useState<{ asOf: string; result: BreakoutsLoadResult } | null>(null);
   useEffect(() => {
     let active = true;
-    void loadBreakouts().then(next => { if (active) setResult(next); });
+    void loadBreakouts().then(next => { if (active) setLatest(next); });
+    void loadBreakoutsHistory().then(next => { if (active) setHistory(next); });
     return () => { active = false; };
   }, []);
+  const snapshots = history?.status === 'ok' ? history.data.snapshots.filter(entry => entry.markets[market]) : [];
+  const activeDate = selectedDate === 'latest' || snapshots.some(entry => entry.asOf === selectedDate) ? selectedDate : 'latest';
+  useEffect(() => {
+    if (activeDate === 'latest') return;
+    const controller = new AbortController();
+    void fetchBreakoutSnapshot(activeDate, latest?.url, fetch, controller.signal).then(result => {
+      if (!controller.signal.aborted) setArchived({ asOf: activeDate, result });
+    });
+    return () => controller.abort();
+  }, [activeDate, latest?.url]);
+  const result = activeDate === 'latest' ? latest : archived?.asOf === activeDate ? archived.result : null;
   const data = result?.status === 'ok' ? result.data.markets[market] : undefined;
   const params = result?.status === 'ok' ? result.data.params : DEFAULT_BREAKOUT_PARAMS;
   return <section className="card breakout-card" aria-label={`${MARKET_NAMES[market]}全市場進場成功率`} aria-busy={result === null}>
     <header className="card-head"><h2><Rocket size={16} aria-hidden="true" />全市場進場成功率<small>{MARKET_NAMES[market]}</small></h2>
       {data?.scope === 'full' && data.asOf ? <span className="bo-asof">資料日 {formatDateTime(data.asOf, false)}</span> : null}
     </header>
-    <div className="bo-body">{result === null ? <p className="muted-text" role="status">載入中…</p> : data?.scope === 'full' ? <BreakoutBody data={data} params={params} /> :
+    <div className="bo-body">
+      <div className="bo-history">
+        <label>測試紀錄<select aria-label="進場成功率測試日期" value={activeDate} onChange={event => setSelectedDate(event.target.value)}>
+          <option value="latest">今天／最新一次</option>
+          {snapshots.map(entry => <option key={entry.asOf} value={entry.asOf}>{formatDateTime(entry.asOf, false)} 保存結果</option>)}
+        </select></label>
+        {result?.status === 'ok' && result.data.generatedAt ? <small>測試時間 {formatDateTime(result.data.generatedAt)}</small> : null}
+        <details className="bo-inline-help"><summary>保存說明</summary><p>保留每 {history?.status === 'ok' ? history.data.intervalDays : 20} 個日曆天的測試結果；選取日期查看當時原始結果。最新一次顯示目前報表，實際測試時間與行情資料日分開標示。</p></details>
+        {history && !snapshots.length ? <small>{history.status === 'ok' ? '尚無已保存的歷史結果。' : history.message}</small> : null}
+      </div>
+      {result === null ? <p className="muted-text" role="status">載入中…</p> : data?.scope === 'full' ? <BreakoutBody key={`${market}:${activeDate}`} data={data} params={params} /> :
       data ? <p className="muted-text" role="status">全市場進場成功率尚未產生；舊的部分市場樣本不列入。</p> :
         <p className="muted-text" role="status">{result.status === 'ok' ? `${MARKET_NAMES[market]}的突破勝率尚未產生。` : result.message}</p>}
     </div>

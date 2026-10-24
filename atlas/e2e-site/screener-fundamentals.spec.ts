@@ -7,7 +7,7 @@ import { buildReport, mockSite, screenerFixtures } from './mocks';
 const shotDir = process.env.SCREENSHOT_DIR;
 
 const fixtureGrowth = screenerFixtures.growth() as { rows: unknown[][] };
-const twUniverse = (screenerFixtures.universe() as { markets: { TW: { rows: unknown[][] } } }).markets.TW.rows.map((row) => String(row[0]));
+const twUniverse = screenerFixtures.universe().markets.TW!.rows.map((row) => String(row[0]));
 /**
  * Taiwan fixture stocks that pass an annual gate: of the latest `years` fiscal years, the ones with data (at least
  * ceil(years / 2) of them) must have growth ≥ `min` % in at least `share` % of the cases (a turnaround counts as growth).
@@ -446,8 +446,8 @@ test('EPS acceleration switches between annual and quarterly data and can requir
   const sheet = await openSheet(page);
   await sheet.getByRole('navigation', { name: '篩選分類' }).getByRole('button', { name: /^基本面/ }).click();
   const period = sheet.getByRole('group', { name: 'EPS 成長加速 · 週期', exact: true });
-  await period.getByRole('button', { name: '年度', exact: true }).click();
-  await expect(sheet.getByRole('group', { name: 'EPS 成長加速週期', exact: true })).toContainText('最新一年的 EPS 年增率 ＞ 前一年的年增率');
+  await period.getByRole('button', { name: '年度年增', exact: true }).click();
+  await expect(sheet.getByRole('group', { name: 'EPS 成長加速週期', exact: true })).toContainText('最新完整會計年度 EPS 相對前一年的年增率');
   const expected = fixtureGrowth.rows.filter((row) => {
     const values = row[7] as (number | null)[];
     const turns = row[10] as number;
@@ -461,9 +461,9 @@ test('EPS acceleration switches between annual and quarterly data and can requir
   await page.reload();
   const again = await openSheet(page);
   const control = again.getByRole('group', { name: 'EPS 成長加速 · 週期', exact: true });
-  await expect(control.getByRole('button', { name: '年度', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await control.getByRole('button', { name: '年度＋季度', exact: true }).click();
-  await expect(again.getByRole('group', { name: 'EPS 成長加速週期', exact: true })).toContainText('年度與季度皆須加速');
+  await expect(control.getByRole('button', { name: '年度年增', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await control.getByRole('button', { name: '兩者皆符合', exact: true }).click();
+  await expect(again.getByRole('group', { name: 'EPS 成長加速週期', exact: true })).toContainText('選兩者時必須同時符合');
   await again.getByRole('button', { name: /^套用/ }).click();
   expect(new URL(page.url()).searchParams.get('f')).toBe('acc:1;accy:1');
 });

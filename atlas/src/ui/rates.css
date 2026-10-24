@@ -692,21 +692,21 @@ a.rates-static {
 /* Rate notes are collapsed by default; native details/summary keeps keyboard and touch access. */
 .rates-disclosure {
   min-width: 0;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: transparent;
 }
 .rates-disclosure summary {
   list-style: none;
   cursor: pointer;
-  min-height: 36px;
+  min-height: 32px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent-text);
+  padding: 6px 2px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-3);
 }
 .rates-disclosure summary::-webkit-details-marker {
   display: none;

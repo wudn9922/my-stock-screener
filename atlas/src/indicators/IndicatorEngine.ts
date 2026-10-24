@@ -10,6 +10,7 @@ import { ema } from './ExponentialMovingAverage';
 import { sma } from './MovingAverage';
 import { coloredVolume, volume, volumeSma, VOLUME_SMA_PERIOD } from './Volume';
 import type { Bar, Timeframe } from '../market-data/MarketDataProvider';
+import { formatMarketVolume } from '../ui/format';
 import { nativeLineWidth, resolveStrokeWidth, type PriceToCoordinate } from '../chart/StrokeWidth';
 
 type LineEntry = {
@@ -155,8 +156,10 @@ export class IndicatorEngine {
           entry.signature = signature;
         }
       } else {
-        entry.api.applyOptions({ color: instance.color, visible: instance.visible, title: '' });
+        const priceFormat = { type: 'custom' as const, minMove: 1, formatter: (value: number) => formatMarketVolume(value, instance.symbol) };
+        entry.api.applyOptions({ color: instance.color, visible: instance.visible, title: '', priceFormat });
         entry.averageApi.applyOptions({
+          priceFormat,
           color: instance.color,
           lineWidth: instance.lineWidth,
           visible: instance.visible,

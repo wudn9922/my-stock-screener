@@ -29,6 +29,8 @@ export function buildReport(longList = 600): Json {
       changePct: (((index * 7) % 19) - 9) / 2,
       maValues: { 20: Number(ma.toFixed(2)) },
       note: `現價:${close}`,
+      volume: 9_999_999,
+      metrics: { ema20: (close / ma - 1) * 100, ma: { 20: (close / ma - 1) * 100 }, volumeAvg20: 100_000 * (index + 1) },
     };
   });
   return report;
@@ -161,7 +163,12 @@ export interface MockOptions {
 
 /** Screener fixtures (synthetic): full-market universe, report/growth.json and valuation/us-growth.json. */
 export const screenerFixtures = {
-  universe: () => readJson('tests/fixtures/screener/universe.json'),
+  universe: () => {
+    const fixture = readJson('tests/fixtures/screener/universe.json') as { fields: string[]; markets: Record<string, { rows: unknown[][] }> };
+    fixture.fields.push('volumeAvg20');
+    Object.values(fixture.markets).forEach(market => market.rows.forEach((row, index) => row.push((index + 1) * 750_000)));
+    return fixture;
+  },
   growth: () => readJson('tests/fixtures/screener/growth.json'),
   usGrowth: () => readJson('tests/fixtures/screener/us-growth.json'),
 };

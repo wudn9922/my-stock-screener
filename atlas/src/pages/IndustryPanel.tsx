@@ -1,3 +1,4 @@
+import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useDialogFocus } from '../ui/useDialogFocus';
@@ -124,10 +125,10 @@ export function IndustryPanel({
             </span>
           </div>
           {cell.merged && (
-            <p className="detail-muted">
+            <HelpDisclosure label="其他產業的合併說明">
               「其他」合併了成分股少於 3 檔的產業與未分類股票
               {cell.mergedFrom.length ? `：${cell.mergedFrom.slice(0, 12).join('、')}${cell.mergedFrom.length > 12 ? ` 等 ${cell.mergedFrom.length} 個產業` : ''}` : ''}。
-            </p>
+            </HelpDisclosure>
           )}
           <section className="detail-constituents" aria-label="成分股">
             <div className="constituents-head">
@@ -163,7 +164,7 @@ export function IndustryPanel({
               </button>
             )}
           </section>
-          <p className="detail-disclaimer">報酬為收盤資料；僅供研究參考，非投資建議。</p>
+          <HelpDisclosure label="資料備註">報酬為收盤資料；僅供研究參考，非投資建議。</HelpDisclosure>
         </div>
       </aside>
     </div>

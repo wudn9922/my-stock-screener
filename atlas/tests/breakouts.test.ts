@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_BREAKOUT_PARAMS, breakoutsUrl, edgeVsBase, fetchBreakouts, parseBreakouts, sampleLevel, type BreakoutStats } from '../src/report/breakouts';
+import { DEFAULT_BREAKOUT_PARAMS, breakoutArchiveUrl, breakoutsUrl, edgeVsBase, fetchBreakouts, fetchBreakoutsHistory, fetchBreakoutSnapshot, parseBreakouts, parseBreakoutsHistory, sampleLevel, type BreakoutStats } from '../src/report/breakouts';
 
 // Synthetic contract fixture (not market data); tests/test_breakouts.py checks it against the job output.
 const sample = JSON.parse(readFileSync(resolve(import.meta.dirname, 'fixtures/breakouts/breakouts.sample.json'), 'utf8')) as Record<string, unknown>;
@@ -242,6 +242,43 @@ describe('breakouts loading', () => {
     expect((await fetchBreakouts('u', respond('<!doctype html>') as unknown as typeof fetch)).status).toBe('invalid');
     const ok = await fetchBreakouts('u', respond(JSON.stringify(sample)) as unknown as typeof fetch);
     expect(ok.status).toBe('ok');
+  });
+});
+
+describe('saved breakout results', () => {
+  it('sorts and deduplicates actual dates, rejecting invalid calendar dates and unsafe paths', () => {
+    const result = parseBreakoutsHistory({ version: 1, intervalDays: 20, snapshots: [
+      { asOf: '2026-09-19', markets: { tw: '2026-09-18' } },
+      { asOf: '2026-10-09', markets: { tw: '2026-10-09', us: '2026-10-08' } },
+      { asOf: '2026-10-09', markets: { tw: '2026-10-09' } },
+      { asOf: '2026-02-30', markets: { tw: '2026-02-28' } },
+      { asOf: '../../secrets', markets: { tw: '2026-10-09' } },
+      { asOf: '2026-09-01', markets: {} },
+    ] });
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') expect(result.data.snapshots.map(entry => entry.asOf)).toEqual(['2026-10-09', '2026-09-19']);
+    expect(breakoutArchiveUrl('2026-10-09', 'https://cdn.test/report/breakouts.json')).toBe('https://cdn.test/report/breakouts-archive/2026-10-09.json');
+    expect(() => breakoutArchiveUrl('../bad')).toThrow();
+    expect(parseBreakoutsHistory({ snapshots: [] }).status).toBe('invalid');
+  });
+
+  it('loads the sibling catalog and keeps missing, invalid and offline history separate from the current report', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ version: 1, intervalDays: 20, snapshots: [] })));
+    expect((await fetchBreakoutsHistory('https://cdn.test/r/breakouts.json', fetcher as typeof fetch)).status).toBe('ok');
+    expect(fetcher).toHaveBeenCalledWith('https://cdn.test/r/breakouts-history.json', { cache: 'no-cache' });
+    expect((await fetchBreakoutsHistory(undefined, vi.fn(async () => new Response('', { status: 404 })) as typeof fetch)).status).toBe('missing');
+    expect((await fetchBreakoutsHistory(undefined, vi.fn(async () => new Response('<html>')) as typeof fetch)).status).toBe('invalid');
+    expect((await fetchBreakoutsHistory(undefined, vi.fn(async () => { throw new Error('offline'); }) as typeof fetch)).status).toBe('error');
+  });
+
+  it('checks an archived report date and never substitutes the latest result for a missing archive', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(sample)));
+    const result = await fetchBreakoutSnapshot('2026-10-09', 'https://cdn.test/r/breakouts.json', fetcher as typeof fetch);
+    expect(result.status).toBe('ok');
+    expect(fetcher.mock.calls).toHaveLength(1);
+    const wrong = await fetchBreakoutSnapshot('2026-09-19', 'https://cdn.test/r/breakouts.json', fetcher as typeof fetch);
+    expect(wrong).toMatchObject({ status: 'invalid', message: expect.stringContaining('日期不符') });
+    expect((await fetchBreakoutSnapshot('2026-10-09', 'https://cdn.test/r/breakouts.json', vi.fn(async () => new Response('', { status: 404 })) as typeof fetch)).status).toBe('missing');
   });
 });
 

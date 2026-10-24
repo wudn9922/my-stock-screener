@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { secSchema } from "../../report/research";
-import { Provenance, ResearchDisclosure, Status, useResearch } from "./Common";
+import {
+  Provenance,
+  ResearchDisclosure,
+  ResearchNote,
+  Status,
+  useResearch,
+} from "./Common";
 const labels: Record<string, string> = {
   agreement: "重大合約",
   merger: "收購／出售／併購",
@@ -61,15 +67,17 @@ function SecData({ symbol, symbols }: { symbol?: string; symbols?: string[] }) {
   return (
     <>
       <Provenance data={data} />
-      <p className="source-note">
-        全市場名單 {data.universe} 檔，CIK 對應 {data.mapped} 檔；已查詢{" "}
-        {Object.keys(data.checkedSymbols).length} 檔、累積{" "}
-        {data.indexedDates.length}{" "}
-        個每日索引。覆蓋正在累積，未查詢不代表無事件。
-        {coverage && ` 此股最近查詢 ${coverage.fetchedAt}。`}
-        {coverage?.applicability.includes("6-K") &&
-          " 外國發行人可能以 6-K 申報；此雷達只收錄 8-K，不將 6-K 混入。"}
-      </p>
+      <ResearchNote title="查詢覆蓋與申報類型">
+        <p>
+          全市場名單 {data.universe} 檔，CIK 對應 {data.mapped} 檔；已查詢{" "}
+          {Object.keys(data.checkedSymbols).length} 檔、累積{" "}
+          {data.indexedDates.length}{" "}
+          個每日索引。覆蓋正在累積，未查詢不代表無事件。
+          {coverage && ` 此股最近查詢 ${coverage.fetchedAt}。`}
+          {coverage?.applicability.includes("6-K") &&
+            " 外國發行人可能以 6-K 申報；此雷達只收錄 8-K，不將 6-K 混入。"}
+        </p>
+      </ResearchNote>
       <div className="research-controls">
         <label>
           最近

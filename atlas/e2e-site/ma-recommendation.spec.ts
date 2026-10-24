@@ -83,7 +83,11 @@ test('chart shows the weekly recommendation, applies it on the daily chart and s
   await expect(card.locator('dd')).toHaveText('短 24（69） · 中 38（60） · 長 89（99）');
   await expect(card.locator('.ws-ma-reco-status')).toHaveText('日線至 2026-10-17');
   await expect(card.locator('table')).toContainText('20（70）、★24（69）');
-  await expect(card).toContainText('★不一定是分數最高的那條');
+  const explanation = card.locator('.help-disclosure');
+  await expect(explanation.locator('.help-disclosure-body')).toBeHidden();
+  await explanation.locator('summary').click();
+  await expect(explanation.locator('.help-disclosure-body')).toBeVisible();
+  await expect(explanation).toContainText('★不一定是分數最高的那條');
   await expect(card.locator('table')).toContainText('+15.3%');
   await expect(card.getByRole('link', { name: /在 ma-selector 查看/ })).toHaveAttribute('href', /streamlit\.app\/\?ticker=2330\.TW$/);
   await page.screenshot({ path: testInfo.outputPath('ma-recommendation-panel.png') });

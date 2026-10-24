@@ -56,6 +56,21 @@ export function displayTicker(symbol: string): string {
   return symbol.replace(/\.(TW|TWO)$/i, '');
 }
 
+/** Quantity display only: report/provider values stay in shares for calculations. */
+export function marketVolumeUnit(symbolOrMarket: string): '張' | '股' {
+  return /^(?:TW|TWO|TWSE|TPEX|\^TWII|\^TWOII)$|\.(?:TW|TWO)$/i.test(symbolOrMarket) ? '張' : '股';
+}
+
+export function marketVolumeValue(shares: number | null | undefined, symbolOrMarket: string): number | null {
+  if (shares == null || !Number.isFinite(shares)) return null;
+  return shares / (marketVolumeUnit(symbolOrMarket) === '張' ? 1000 : 1);
+}
+
+export function formatMarketVolume(shares: number | null | undefined, symbolOrMarket: string, digits = 3): string {
+  const value = marketVolumeValue(shares, symbolOrMarket);
+  return value === null ? '—' : `${value.toLocaleString('zh-TW', { maximumFractionDigits: digits })} ${marketVolumeUnit(symbolOrMarket)}`;
+}
+
 /** Moving-average value from a report record keyed `20`, `MA20`, `ma20` or `sma20`. */
 export function maValue(values: Record<string, number>, period: number): number | null {
   for (const key of [String(period), `MA${period}`, `ma${period}`, `SMA${period}`, `sma${period}`]) {

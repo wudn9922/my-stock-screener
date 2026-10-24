@@ -44,6 +44,7 @@ UNIVERSE_FIELDS = [
     "volVsPrev",
     "turnover20",
     "asOf",
+    "volumeAvg20",
 ]
 
 MARKET_BENCHMARKS = {
@@ -69,6 +70,7 @@ EMA_SPAN = 20
 SLOPE_BARS = 5
 HI52_BARS = 252
 TURNOVER_BARS = 20
+VOLUME_AVERAGE_BARS = 20
 
 # 基準指數最後一根 K 比個股最後一根早超過此天數，相對強弱給 None
 BENCH_STALE_DAYS = 7
@@ -82,6 +84,9 @@ UNIVERSE_STALE_DAYS = 7
 RS_RANK_MIN_COUNT = 10
 
 PRICE_COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
+# Frame-only lineage: cleaning keeps its historical zero fallback for existing consumers,
+# while complete-window volume averages must distinguish missing values from genuine zeros.
+UNKNOWN_VOLUME_DATES = "atlas_unknown_volume_dates"
 
 
 # =========================================================================
@@ -143,6 +148,7 @@ def clean_prices(df):
 
     result = df[PRICE_COLUMNS].apply(pd.to_numeric, errors="coerce")
     result = result.replace([float("inf"), float("-inf")], float("nan"))
+    result["_volume_unknown"] = result["Volume"].isna() | (result["Volume"] < 0)
     result = result.dropna(subset=["Open", "High", "Low", "Close"])
     result = result[result["Close"] > 0]
     result["Volume"] = result["Volume"].fillna(0).clip(lower=0)
@@ -154,9 +160,16 @@ def clean_prices(df):
 
     result.index = index
     result = result[~result.index.isna()]
+    previously_unknown = set(df.attrs.get(UNKNOWN_VOLUME_DATES, ()))
+    if previously_unknown:
+        result["_volume_unknown"] |= result.index.map(lambda day: day.isoformat() in previously_unknown)
     result = result[~result.index.duplicated(keep="last")].sort_index()
-
-    return usable_frame(result)
+    result = usable_frame(result)
+    unknown_dates = tuple(day.isoformat() for day in result.index[result["_volume_unknown"]])
+    result = result.drop(columns=["_volume_unknown"])
+    result.attrs.update(df.attrs)
+    result.attrs[UNKNOWN_VOLUME_DATES] = unknown_dates
+    return result
 
 
 def read_price_csv(path):
@@ -334,6 +347,19 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
         if turnover is not None:
             turnover = int(round(turnover))
 
+    # 最近 20 個交易日（含資料日）的平均成交量，維持股為資料單位。
+    # 不足完整窗口或窗口中有未知量時，不以補零、單日量或成交金額推估。
+    unknown_volume_dates = set(df.attrs.get(UNKNOWN_VOLUME_DATES, ()))
+    complete_volume_window = bars >= VOLUME_AVERAGE_BARS and all(
+        day.isoformat() not in unknown_volume_dates
+        for day in dates[-VOLUME_AVERAGE_BARS:]
+    )
+    volume_average = (
+        round_or_none(volume[-VOLUME_AVERAGE_BARS:].mean())
+        if complete_volume_window
+        else None
+    )
+
     return {
         "bars": int(bars),
         "r5": round_or_none(returns[5]),
@@ -351,7 +377,8 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
         "rsBench": bench_symbol,
         "rsRank": None,
         "volVsPrev": round_or_none(vol_vs_prev),
-        "turnover20": turnover
+        "turnover20": turnover,
+        "volumeAvg20": volume_average,
     }
 
 

@@ -1,3 +1,4 @@
+import { HelpDisclosure } from './HelpDisclosure';
 import { useEffect, useState, useSyncExternalStore, type FormEvent } from 'react';
 import {
   FIXED_PARAMETER_GROUPS,
@@ -83,7 +84,7 @@ export function ParameterConsole() {
   return (
     <section className="parameter-console" aria-label="原有均線參數控制台">
       <h2>均線參數與個人分組</h2>
-      <p className="muted">各自設定股票、分組及均線。只有允許雲端保存的帳號，才會交由既有每日掃描與突破提醒服務使用。</p>
+      <HelpDisclosure label="參數使用說明">各自設定股票、分組及均線。只有允許雲端保存的帳號，才會交由既有每日掃描與突破提醒服務使用。</HelpDisclosure>
       {message && (
         <p role="status" className="console-message">
           {message}
@@ -163,9 +164,9 @@ export function ParameterConsole() {
         </label>
         <span className="muted">{filteredStocks.length} 筆</span>
       </div>
-      <p className="muted">
+      <HelpDisclosure label="固定參數與保存說明">
         無分組的固定參數優先於分組與清單的均線；依目前授權選擇暫存、裝置或雲端保存。只有允許雲端保存且啟用監控的帳號才會使用服務端提醒。
-      </p>
+      </HelpDisclosure>
       <div className="research-table-scroll parameter-stock-scroll" role="region" aria-label="已有參數股票清單" tabIndex={0}>
         <table className="research-table" aria-label="個人股票參數">
           <thead>

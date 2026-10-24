@@ -276,6 +276,83 @@ class CacheTest(unittest.TestCase):
             back = report_metrics.read_price_csv(path)  # 與 data/*.csv 同一個讀取器
             self.assertEqual(list(back["Close"]), [22.25, 22.7])
 
+    def test_unknown_source_volume_survives_chart_cache_and_metric_round_trip(self):
+        days = weekdays("2026-10-13", 20)
+        stamps = [int(datetime.fromisoformat(day + "T16:00:00+00:00").timestamp()) for day in days]
+        for missing in (None, float("nan"), float("inf")):
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as tmp:
+                payload = {"chart": {"result": [{
+                    "meta": {"exchangeTimezoneName": "America/New_York"},
+                    "timestamp": stamps,
+                    "indicators": {"quote": [{"open": [10] * 20, "high": [11] * 20,
+                        "low": [9] * 20, "close": [10] * 20, "volume": [1000] * 19 + [missing]}]},
+                }], "error": None}}
+                rows, _, _ = us.parse_yahoo_chart(payload, "TEST")
+                self.assertIsNone(rows[-1][-1])
+                source = uc.frame_from_rows(rows)
+                # Existing consumers still see the historical zero fallback.
+                self.assertEqual(source["Volume"].iloc[-1], 0)
+                path = os.path.join(tmp, "TEST.csv")
+                uc.write_bars(path, uc.clean(source))
+                with open(path, encoding="utf-8") as file:
+                    self.assertTrue(file.read().splitlines()[-1].endswith(","))
+                cached = uc.read_bars(path)
+                self.assertEqual(cached["Volume"].iloc[-1], 0)
+                for loaded in (cached, report_metrics.read_price_csv(path)):
+                    record = report_metrics.build_stock_record("TEST", loaded, {}, "US")
+                    self.assertIsNone(record["metrics"]["volumeAvg20"])
+                # A second write cannot convert the unknown cell into a real zero.
+                uc.write_bars(path, cached)
+                self.assertIsNone(report_metrics.build_stock_record(
+                    "TEST", report_metrics.read_price_csv(path), {}, "US")["metrics"]["volumeAvg20"])
+
+    def test_real_zero_source_volume_remains_known_after_cache_round_trip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "TEST.csv")
+            uc.write_bars(path, frame([10] * 20, volumes=[1000] * 19 + [0]))
+            with open(path, encoding="utf-8") as file:
+                self.assertTrue(file.read().splitlines()[-1].endswith(",0"))
+            record = report_metrics.build_stock_record("TEST", uc.read_bars(path), {}, "US")
+            self.assertEqual(record["metrics"]["volumeAvg20"], 950)
+
+    def test_volume_lineage_survives_incremental_full_merge_and_source_repair(self):
+        old = frame([10] * 20, end="2026-10-12", volumes=[1000] * 19 + [None])
+        next_day = frame([10], end="2026-10-13")
+        appended = uc.merge_incremental(old, next_day)
+        self.assertIsNone(report_metrics.compute_stock_metrics(appended)["volumeAvg20"])
+        # New source data can confirm that the former unknown observation was truly zero.
+        confirmed = frame([10], end="2026-10-12", volumes=[0])
+        repaired = uc.merge_incremental(old, confirmed)
+        self.assertEqual(report_metrics.compute_stock_metrics(repaired)["volumeAvg20"], 950)
+        # Full history replacement retains the newer cached unknown session, and its lineage.
+        recent = frame([10] * 21, end="2026-10-13", volumes=[1000] * 20 + [None])
+        complete = uc.merge_full(recent, frame([10] * 20, end="2026-10-12"))
+        self.assertIsNone(report_metrics.compute_stock_metrics(complete)["volumeAvg20"])
+        # A replacement containing unknowns cannot inherit the old frame's known-volume status.
+        replaced = uc.merge_full(frame([10] * 20), old)
+        self.assertIsNone(report_metrics.compute_stock_metrics(replaced)["volumeAvg20"])
+
+    def test_daily_quote_unknown_volume_is_not_a_known_zero_when_appended(self):
+        stamp = int(datetime(2026, 10, 13, 20, 0, tzinfo=timezone.utc).timestamp())
+        payload = {"quoteResponse": {"result": [{"symbol": "TEST", "regularMarketTime": stamp,
+            "regularMarketOpen": 10, "regularMarketDayHigh": 11, "regularMarketDayLow": 9,
+            "regularMarketPrice": 10, "regularMarketVolume": None}], "error": None}}
+        bar = us.parse_yahoo_quotes(payload, report_metrics.market_of)["TEST"]
+        self.assertIsNone(bar["volume"])
+        job = object.__new__(bu.Run)
+        job.pending = {"TEST": bar}
+        job.agreement = []
+        job.calendars = {"US": uc.TradingCalendar(["2026-10-12", "2026-10-13"])}
+        # Same-day source comparison must remain valid even without a quote volume.
+        job.apply_pending("TEST", frame([10] * 20))
+        self.assertIsNone(job.agreement[-1][2])
+        combined = uc.append_row(frame([10] * 19, end="2026-10-12"), uc.snapshot_bar(bar, 10))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "TEST.csv")
+            uc.write_bars(path, combined)
+            record = report_metrics.build_stock_record("TEST", report_metrics.read_price_csv(path), {}, "US")
+            self.assertIsNone(record["metrics"]["volumeAvg20"])
+
     def test_keep_bars(self):
         with tempfile.TemporaryDirectory() as tmp:
             written = uc.write_bars(os.path.join(tmp, "X.csv"), frame([10.0] * 400))
@@ -780,7 +857,7 @@ class EndToEndTest(unittest.TestCase):
 def full_market(as_of, rows=12):
     return {
         "benchmark": "SPY", "asOf": as_of, "universe": "美股…", "scope": "full",
-        "rows": [[f"S{i}", f"S{i}"] + [None] * 16 + [float(i), None, None, None, as_of, "Tech", "Software", 1000 * i]
+        "rows": [[f"S{i}", f"S{i}"] + [None] * 16 + [float(i), None, None, None, as_of, None, "Tech", "Software", 1000 * i]
                  for i in range(rows)],
     }
 

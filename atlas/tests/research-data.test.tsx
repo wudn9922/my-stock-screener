@@ -12,11 +12,15 @@ import {
   fetchResearch,
   type VolumeFeature,
 } from "../src/report/research";
-import { decodeResearchRecord, marketIndexSchema } from "../src/report/researchStore";
+import {
+  decodeResearchRecord,
+  marketIndexSchema,
+} from "../src/report/researchStore";
 import { holderBaseline, largeHolderSchema } from "../src/report/twChips";
 import { parseRoute, serializeRoute } from "../src/app/routes";
 import { HistoryPlot, num, pct, Provenance } from "../src/ui/research/Common";
 import { dispositionStatus } from "../src/ui/research/OfficialAlerts";
+import { VolumeAnalysis } from "../src/ui/research/VolumePanel";
 // Unit tests use a reviewed corpus; CI also runs against the restored live tree.
 const root = process.env.ATLAS_RESEARCH_DIR
   ? resolve(process.env.ATLAS_RESEARCH_DIR)
@@ -69,7 +73,9 @@ const feature = (up: boolean, rvol: number | null): VolumeFeature => ({
 afterEach(() => vi.unstubAllGlobals());
 describe("public research contracts", () => {
   it("validates every institutional shard and preserves negative values", () => {
-    expect(marketIndexSchema.safeParse(rawJson("institutions.json")).success).toBe(true);
+    expect(
+      marketIndexSchema.safeParse(rawJson("institutions.json")).success,
+    ).toBe(true);
     const stocks = allStocks("institutions");
     expect(stocks.length).toBeGreaterThan(2);
     if (process.env.ATLAS_RESEARCH_DIR)
@@ -84,7 +90,9 @@ describe("public research contracts", () => {
     ).toBe(true);
   }, 30000);
   it("validates every daily price-volume shard", () => {
-    expect(marketIndexSchema.safeParse(rawJson("volume.json")).success).toBe(true);
+    expect(marketIndexSchema.safeParse(rawJson("volume.json")).success).toBe(
+      true,
+    );
     for (const stock of allStocks("volume"))
       expect(volumeSchema.safeParse(stock).success).toBe(true);
   }, 30000);
@@ -178,6 +186,32 @@ describe("causal structure and dates", () => {
   });
 });
 describe("accessible summaries", () => {
+  it("keeps price-volume research to abnormal volume and four directional ratios", () => {
+    const data = volumeSchema.parse(json("volume/2330.TW.json"));
+    const html = renderToStaticMarkup(<VolumeAnalysis data={data} />);
+    expect((html.match(/<dt>/g) ?? []).length).toBe(5);
+    for (const label of [
+      "異常量 RVOL20",
+      "上漲縮量比例",
+      "下跌放量比例",
+      "上漲放量比例",
+      "下跌縮量比例",
+    ])
+      expect(html).toContain(label);
+    for (const label of [
+      "ADV",
+      "Amihud",
+      "近期最大量日期",
+      "價格變化",
+      "連續縮量上漲",
+      "成交量與收盤價",
+      "流動性與完整數據",
+    ])
+      expect(html).not.toContain(label);
+    expect(html).toContain("有效觀測");
+    expect(html).toContain('class="research-note source-note"');
+  });
+
   it("null stays N/A and actual zero remains zero", () => {
     expect(num(null)).toBe("N/A");
     expect(num(0)).toBe("0");

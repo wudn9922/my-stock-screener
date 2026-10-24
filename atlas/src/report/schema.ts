@@ -133,6 +133,8 @@ export interface StockMetrics {
   /** Today's volume ÷ the previous session's volume (null on older reports, whose `volRatio` meant something else). */
   volVsPrev: number | null;
   turnover20: number | null;
+  /** Mean traded shares over the latest 20 sessions, including asOf; null on older reports or short history. */
+  volumeAvg20: number | null;
 }
 
 const toCount = (value: unknown) => {
@@ -168,6 +170,7 @@ export function parseMetrics(value: unknown): StockMetrics | null {
     rsRank: rank === null ? null : Math.min(99, Math.max(1, Math.round(rank))),
     volVsPrev: toFinite(raw.volVsPrev),
     turnover20: toFinite(raw.turnover20),
+    volumeAvg20: toFinite(raw.volumeAvg20),
   };
   return metrics;
 }

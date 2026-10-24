@@ -731,7 +731,7 @@ def parse_yahoo_chart(payload, symbol=""):
     """
     v8 chart 日 K → (rows, splits, meta)。
     rows：[(YYYY-MM-DD, open, high, low, close, volume)] 依日期排序、同日取最後一筆；
-    缺值（null）或收盤 ≤ 0 的列略過。close 是 Yahoo 分割調整後、未含股利還原的收盤（同 data/*.csv）。
+    未知成交量保留 None，由快取區分缺值與真實 0 量。close 是 Yahoo 分割調整後、未含股利還原的收盤（同 data/*.csv）。
     splits：[(YYYY-MM-DD, numerator, denominator)]。無資料時 rows 為空串列。
     """
     chart = (payload or {}).get("chart") if isinstance(payload, dict) else None

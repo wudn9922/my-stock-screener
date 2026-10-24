@@ -135,6 +135,26 @@ class ArchiveTests(_ArchiveCase):
         result = ka.normalize(["2026-01-02", value, 2, 1, value, None])
         self.assertEqual(float(result[4]), float(uc._price(value)))
 
+    def test_attrs_volume_lineage_survives_merges_adjustment_staging_and_archive(self):
+        rows = [row("2026-10-21", volume=None), row("2026-10-22", volume=0)]
+        compatible = uc.clean(frame(rows))
+        self.assertEqual(compatible["Volume"].tolist(), [0, 0])
+        self.assertEqual(compatible.attrs[uc.UNKNOWN_VOLUME_DATES], ("2026-10-21T00:00:00",))
+        merged = uc.merge_incremental(compatible, uc.clean(frame([row("2026-10-23")])))
+        merged = uc.merge_full(merged, compatible)
+        expected = rows + [row("2026-10-23")]
+        self.assertEqual(ka.frame_rows(uc.clean(merged)), expected)
+        ka.stage_adjustment(self.cache, "AAPL", merged, {}, NOW)
+        staged = self.cache / "archive-adjustments/AAPL.csv"
+        self.assertEqual(ka.read_rows(staged, strict=True), expected)
+        # The cache and the archive serialize the same source cells, while all
+        # existing calculation consumers keep their attrs-based zero fallback.
+        path = uc.bars_path(str(self.cache), "AAPL")
+        uc.write_bars(path, merged, now=NOW)
+        self.assertEqual(ka.read_rows(path), expected)
+        ka.put_symbol(self.archive, "AAPL", ka.frame_rows(uc.read_bars(path)))
+        self.assertEqual(ka.symbol_rows(self.archive, "AAPL"), expected)
+
     def test_partial_or_unfinished_cache_entries_are_not_archived(self):
         self.cache_rows("AAPL", [row("2026-10-23")])
         state = uc.load_state(str(self.cache))
@@ -320,6 +340,14 @@ class ArchiveTests(_ArchiveCase):
 
 
 class BackfillTests(_ArchiveCase):
+    def test_backfill_stages_attrs_unknown_volume_as_empty_and_explicit_zero_as_zero(self):
+        compatible = uc.clean(frame([row("2026-10-22", volume=None), row("2026-10-23", volume=0)]))
+        with patch.object(bu.Run, "connect_yahoo", return_value=True), patch.object(bu.Run, "fetch_chart", return_value=compatible):
+            bf.backfill(self.archive, self.cache, self.payload, budget=60, markets="US", now=NOW,
+                        sleep=lambda _: None, listing={"US": {"AAPL": {}}})
+        ka.apply_operations(self.archive, self.payload)
+        self.assertEqual([r[-1] for r in ka.symbol_rows(self.archive, "AAPL")], ["", "0"])
+
     def test_resume_skips_completed_symbols_across_new_runs(self):
         ticks = [0]
 

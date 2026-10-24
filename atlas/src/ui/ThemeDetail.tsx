@@ -1,3 +1,4 @@
+import { HelpDisclosure } from './HelpDisclosure';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { ChartCandlestick, ChevronDown, X } from 'lucide-react';
 import { MiniChart } from './MiniChart';
@@ -172,11 +173,11 @@ function ConstituentRow({
             收盤 {formatPrice(item.close)} · 3月相對 {benchmark} <b className={`num ${toneClass(item.rs3m)}`}>{formatPercent(item.rs3m, 1)}</b> ·{' '}
             {item.aboveMa50 === null ? '50日線資料不足' : item.aboveMa50 ? '站上50日線' : '跌破50日線'}
           </p>
-          <MiniChart symbol={item.symbol} maList={[20, 50]} height={150} />
+          <MiniChart symbol={item.symbol} height={150} />
           <button
             type="button"
             className="ghost-button open-chart"
-            onClick={() => openChart({ symbol: item.symbol, name: item.name, maList: [20, 50] })}
+            onClick={() => openChart({ symbol: item.symbol, name: item.name })}
           >
             <ChartCandlestick size={16} aria-hidden="true" />
             開啟圖表
@@ -280,7 +281,7 @@ export function ThemeDetail({
         </header>
         <div className="sheet-body">
           <section className="detail-about" aria-label="這是什麼題材">
-            <p>{theme.description}</p>
+            <HelpDisclosure label="題材介紹">{theme.description}</HelpDisclosure>
             {theme.etf && (
               <p className="etf-line">
                 參考 ETF：
@@ -338,7 +339,7 @@ export function ThemeDetail({
               ))}
             </ul>
           </section>
-          <p className="detail-disclaimer">股價為收盤資料；說明為簡化介紹，僅供研究參考，非投資建議。</p>
+          <HelpDisclosure label="資料備註">股價為收盤資料；說明為簡化介紹，僅供研究參考，非投資建議。</HelpDisclosure>
         </div>
       </aside>
     </div>

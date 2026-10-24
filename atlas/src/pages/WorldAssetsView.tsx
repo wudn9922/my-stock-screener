@@ -1,3 +1,4 @@
+import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { useEffect, useState } from "react";
 import {
   worldAssetsSchema,
@@ -94,11 +95,11 @@ export default function WorldAssetsView({
   if (!data) return <Status error={error} />;
   return (
     <>
-      <p className="source-note">
+      <HelpDisclosure label="報價與商品說明">
         {view === "commodities"
           ? "原物料期貨日K；來源按近月合約銜接，展期日期與價差調整規則未完整揭露，非現貨價格。"
           : "匯率日K為延遲參考報價；非銀行牌告或 Fed 統計匯率，報價方向逐組標示。"}
-      </p>
+      </HelpDisclosure>
       <div>
         {keys[view].map((id) =>
           data.series[id] ? (

@@ -1,3 +1,4 @@
+import { HelpDisclosure } from './HelpDisclosure';
 import { useEffect, useState, type FormEvent } from 'react';
 import { closedBars, type BarResult, type Timeframe } from '../market-data/MarketDataProvider';
 import { getMarketProfile, type MarketProfile } from '../market-data/MarketProfile';
@@ -152,12 +153,12 @@ export function BacktestPanel({ symbol, timeframe, result, market, onResult }: B
           {symbol} · {timeframe} · {currency}
         </span>
       </div>
-      <p className="research-disclaimer">
-        研究用途：只使用已收盤 K 棒，以下一根 K 棒開盤價模擬成交；訊號不會下單。{' '}
-        {result
-          ? `${adjustedText} 資料來源：${result.source}${result.dataState === 'simulated' ? ' · 模擬資料' : ''}。`
-          : '等待圖表資料來源。'}
+      <p className="small muted">
+        {result ? `來源：${result.source}${result.dataState === 'simulated' ? ' · 模擬資料' : ''}` : '等待圖表資料來源。'}
       </p>
+      <HelpDisclosure label="回測執行與價格說明">
+        研究用途：只使用已收盤 K 棒，以下一根 K 棒開盤價模擬成交；訊號不會下單。{adjustedText}
+      </HelpDisclosure>
       <form className="research-form" onSubmit={run}>
         <label>
           策略

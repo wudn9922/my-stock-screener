@@ -41,6 +41,9 @@ SESSION_DONE = {"TW": dtime(14, 45), "US": dtime(16, 30)}
 MARKET_TIMEZONES = {"TW": "Asia/Taipei", "US": "America/New_York"}
 STATE_VERSION = 1
 PRICE_COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
+# Shared with report_metrics: calculations retain the legacy zero fallback, while
+# cache CSVs preserve unknown source volumes as empty cells for complete-window means.
+UNKNOWN_VOLUME_DATES = "atlas_unknown_volume_dates"
 
 
 # =========================================================================
@@ -96,18 +99,35 @@ def frame_from_rows(rows):
     return clean(frame)
 
 
+def _volume_source_frame(frame):
+    """Recover unknown source cells before acceptance, concatenation or serialization."""
+    if frame is None or frame.empty:
+        return frame
+    unknown = set(frame.attrs.get(UNKNOWN_VOLUME_DATES, ()))
+    if not unknown:
+        return frame
+    frame = frame.copy()
+    mask = [pd.Timestamp(day).tz_localize(None).isoformat() in unknown for day in frame.index]
+    frame.loc[mask, "Volume"] = math.nan
+    frame.attrs.pop(UNKNOWN_VOLUME_DATES, None)
+    return frame
+
+
 def clean(frame):
     if frame is None or frame.empty:
         return pd.DataFrame(columns=PRICE_COLUMNS)
 
-    frame = frame[PRICE_COLUMNS].apply(pd.to_numeric, errors="coerce")
+    frame = _volume_source_frame(frame)[PRICE_COLUMNS].apply(pd.to_numeric, errors="coerce")
     frame = frame.replace([math.inf, -math.inf], math.nan).dropna(subset=["Open", "High", "Low", "Close"])
     frame = frame[frame["Close"] > 0].copy()
-    # Unknown shares are not a no-trade observation. Aggregation still skips NaN.
-    frame["Volume"] = frame["Volume"].clip(lower=0)
+    frame["_volume_unknown"] = frame["Volume"].isna() | (frame["Volume"] < 0)
+    frame["Volume"] = frame["Volume"].fillna(0).clip(lower=0)
     frame.index = pd.to_datetime(frame.index).normalize()
     frame = frame[~frame.index.duplicated(keep="last")].sort_index()
     frame.index.name = "Date"
+    unknown = tuple(pd.Timestamp(day).tz_localize(None).isoformat() for day in frame.index[frame["_volume_unknown"]])
+    frame = frame.drop(columns=["_volume_unknown"])
+    frame.attrs[UNKNOWN_VOLUME_DATES] = unknown
 
     return frame
 
@@ -131,15 +151,16 @@ def _price(value):
 
 
 def write_bars(path, frame, keep=KEEP_BARS, refetch=None, now=None):
-    """CSV（同 data/*.csv 欄位；價格 4 位小數、成交量整數）原子寫入；回傳寫入的 frame。"""
+    """CSV 原子寫入：價格 4 位、已知成交量整數、未知成交量空欄；回傳相容的計算 frame。"""
     symbol = os.path.basename(path).removesuffix(".csv")
-    frame = accept_frame(frame, symbol, refetch=refetch, now=now,
+    frame = accept_frame(_volume_source_frame(frame), symbol, refetch=refetch, now=now,
                          source_url="https://query1.finance.yahoo.com/v8/finance/chart/" + symbol)
     frame = clean(frame).tail(keep)
     lines = ["Date,Open,High,Low,Close,Volume"]
+    unknown = set(frame.attrs.get(UNKNOWN_VOLUME_DATES, ()))
 
     for day, row in zip(frame.index, frame.itertuples(index=False)):
-        volume = "" if pd.isna(row.Volume) else str(int(round(row.Volume)))
+        volume = "" if pd.Timestamp(day).tz_localize(None).isoformat() in unknown else str(int(round(row.Volume)))
         lines.append(
             f"{day:%Y-%m-%d},{_price(row.Open)},{_price(row.High)},{_price(row.Low)},"
             f"{_price(row.Close)},{volume}"
@@ -298,7 +319,8 @@ def merge_incremental(old, new, keep=KEEP_BARS):
     if new is None or new.empty:
         return clean(old).tail(keep)
 
-    combined = pd.concat([old[~old.index.isin(new.index)], new])
+    combined = pd.concat([_volume_source_frame(old[~old.index.isin(new.index)]), _volume_source_frame(new)])
+    combined.attrs.pop(UNKNOWN_VOLUME_DATES, None)
     return clean(combined).tail(keep)
 
 
@@ -311,7 +333,9 @@ def merge_full(old, new, keep=KEEP_BARS):
         return clean(new).tail(keep)
 
     newer = old[old.index > new.index[-1]]
-    return clean(pd.concat([new, newer])).tail(keep)
+    combined = pd.concat([_volume_source_frame(new), _volume_source_frame(newer)])
+    combined.attrs.pop(UNKNOWN_VOLUME_DATES, None)
+    return clean(combined).tail(keep)
 
 
 def session_done(day, market, now):

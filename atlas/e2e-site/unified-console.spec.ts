@@ -9,14 +9,14 @@ test('filter application is reachable and changes the rows, URL, and reloaded vi
   await expect(page.locator('.screener-row').first()).toBeVisible();
   await page.getByRole('button', { name: '篩選條件', exact: true }).click();
   const sheet = page.getByRole('dialog', { name: '篩選條件' });
-  await sheet.getByRole('button', { name: '漲 ≥3%', exact: true }).click();
+  await sheet.getByRole('button', { name: '站上MA20', exact: true }).click();
   const apply = sheet.getByRole('button', { name: /^套用/ });
   await expect(apply).toBeInViewport();
   await apply.click();
   await expect(sheet).not.toBeVisible();
-  await expect(page).toHaveURL(/f=chg/);
+  await expect(page).toHaveURL(/f=tr/);
   const count = await page.locator('.result-count').innerText();
-  await expect(page.getByRole('group', { name: '已套用的篩選條件' })).toContainText('3');
+  await expect(page.getByRole('group', { name: '已套用的篩選條件' })).toContainText('站上MA20');
   expect(await page.locator('.screener-row').count()).toBeGreaterThan(0);
   await page.reload();
   await expect(page.locator('.result-count')).toHaveText(count);
@@ -28,7 +28,7 @@ test('apply remains clickable after scrolling a long sheet and shrinking the vis
   await page.goto('./?page=screener&group=tw_all');
   await page.getByRole('button', { name: '篩選條件', exact: true }).click();
   const sheet = page.getByRole('dialog', { name: '篩選條件' });
-  await sheet.getByRole('button', { name: '漲 ≥3%', exact: true }).click();
+  await sheet.getByRole('button', { name: '站上MA20', exact: true }).click();
   await sheet.locator('.fs-body').evaluate((node) => {
     node.scrollTop = node.scrollHeight;
   });
@@ -39,7 +39,7 @@ test('apply remains clickable after scrolling a long sheet and shrinking the vis
   expect(box!.height).toBeGreaterThanOrEqual(44);
   await apply.click();
   await expect(sheet).not.toBeVisible();
-  await expect(page).toHaveURL(/f=chg/);
+  await expect(page).toHaveURL(/f=tr/);
 });
 
 test('Apply stays inside the visual viewport when a keyboard leaves the layout viewport tall', async ({ page }) => {
@@ -70,19 +70,19 @@ test('multiple saved lists preserve independent rules, opening diffs, streaks, a
   const report = buildReport(20) as {
     reportDate: string;
     generatedAt: string;
-    groups: { key: string; items: { symbol: string; name: string; changePct: number; asOf?: string }[] }[];
+    groups: { key: string; items: { symbol: string; name: string; changePct: number; metrics: { ema20: number }; asOf?: string }[] }[];
   };
   report.reportDate = '2026-10-08';
   report.generatedAt = '2026-10-08T09:00:00Z';
   await mockSite(page, { report });
-  await page.goto('./?page=screener&group=tw_all&f=chg:3:');
+  await page.goto('./?page=screener&group=tw_all&f=ema20:3:');
   await page.getByRole('button', { name: '存成自選清單', exact: true }).click();
   await page.getByRole('textbox', { name: '自選清單名稱' }).fill('強勢追蹤');
   await page.getByRole('button', { name: '儲存並追蹤清單' }).click();
   await expect(page.getByRole('region', { name: '清單追蹤結果' })).toContainText('首次開啟');
   const firstUrl = page.url();
   await page.getByRole('switch', { name: '監控此清單的突破提醒' }).check();
-  await page.goto('./?page=screener&group=tw_all&f=chg::-3');
+  await page.goto('./?page=screener&group=tw_all&f=ema20::-3');
   await page.getByRole('button', { name: '存成自選清單', exact: true }).click();
   await page.getByRole('textbox', { name: '自選清單名稱' }).fill('回檔觀察');
   await page.getByRole('button', { name: '儲存並追蹤清單' }).click();
@@ -92,8 +92,8 @@ test('multiple saved lists preserve independent rules, opening diffs, streaks, a
   next.reportDate = '2026-10-09';
   next.generatedAt = '2026-10-09T09:00:00Z';
   const rows = next.groups.find((group) => group.key === 'tw_all')!.items;
-  rows.find((row) => row.changePct >= 3)!.changePct = -4;
-  rows.find((row) => row.changePct < 3 && row.changePct > -4)!.changePct = 4;
+  rows.find((row) => row.metrics.ema20 >= 3)!.metrics.ema20 = -4;
+  rows.find((row) => row.metrics.ema20 < 3 && row.metrics.ema20 > -4)!.metrics.ema20 = 4;
   rows.forEach((row) => {
     row.asOf = '2026-10-09';
   });
@@ -161,7 +161,7 @@ test('the original parameter API is available inside Atlas and an undeployed clo
   await page.getByRole('textbox', { name: '股票均線參數' }).fill('20, 50, 200');
   await page.getByRole('button', { name: '新增股票參數', exact: true }).click();
   await expect(page.getByRole('table', { name: '個人股票參數' })).toContainText('NVDA');
-  await page.goto('./?page=screener&group=tw_all&f=chg:3:');
+  await page.goto('./?page=screener&group=tw_all&f=ema20:3:');
   await page.getByRole('button', { name: '存成自選清單', exact: true }).click();
   await page.getByRole('button', { name: '儲存並追蹤清單' }).click();
   await page.getByText('清單設定與 Supabase 同步', { exact: true }).click();
@@ -189,7 +189,7 @@ test('theme rotation uses aligned history and filters the observed quadrants', a
   await page.route('**/my-stock-screener/report/themes.json', (route) => route.fulfill({ contentType: 'application/json', body }));
   await page.goto('./?page=themes');
   const rotation = page.locator('.theme-rotation');
-  await rotation.locator('summary').click();
+  await rotation.locator(':scope > summary').click();
   await expect(rotation.getByRole('table', { name: '題材輪動比較' })).toBeVisible();
   expect(await rotation.locator('tbody tr').count()).toBeGreaterThan(0);
   await rotation.getByRole('button', { name: /^領先/ }).click();
