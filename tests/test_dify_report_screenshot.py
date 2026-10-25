@@ -97,9 +97,9 @@ def fake_playwright(page):
     return PW()
 
 
-def snapshot_payload(hours_ago, status="200", available=True):
+def snapshot_payload(hours_ago, status="200", available=True, now=None):
     ts = (
-        datetime.now(timezone.utc) - timedelta(hours=hours_ago)
+        (now or datetime.now(timezone.utc)) - timedelta(hours=hours_ago)
     ).strftime("%Y%m%d%H%M%S")
     return {
         "archived_snapshots": {
@@ -111,6 +111,18 @@ def snapshot_payload(hours_ago, status="200", available=True):
             }
         }
     }
+
+
+def cdx_payload(captures, now=None):
+    now = now or datetime.now(timezone.utc)
+    return [["timestamp", "statuscode", "mimetype"]] + [
+        [
+            (now - timedelta(hours=hours)).strftime("%Y%m%d%H%M%S"),
+            status,
+            mimetype,
+        ]
+        for hours, status, mimetype in captures
+    ]
 
 
 class BlockedPageTest(unittest.TestCase):
@@ -153,26 +165,40 @@ class BlockedPageTest(unittest.TestCase):
 
 
 class WaybackSnapshotTest(unittest.TestCase):
-    def call(self, payload):
+    def setUp(self):
+        self.now = datetime(2026, 10, 25, 9, 30, tzinfo=timezone.utc)
+        clock = mock.patch.object(dify_report, "datetime", wraps=datetime)
+        self.addCleanup(clock.stop)
+        clock.start().now.return_value = self.now
+
+    def call(self, payload, captures=()):
+        def fake_get(url, **_kwargs):
+            if url == dify_report.WAYBACK_AVAILABLE_API:
+                return FakeResponse(payload)
+            self.assertEqual(url, dify_report.WAYBACK_CDX_API)
+            return FakeResponse(cdx_payload(captures, now=self.now))
+
         with mock.patch.object(
-            dify_report.requests, "get",
-            return_value=FakeResponse(payload),
+            dify_report.requests, "get", side_effect=fake_get,
         ):
             return dify_report.get_wayback_snapshot(
                 "wsj.com", "https://www.wsj.com/", max_age_hours=36
             )
 
     def test_builds_toolbar_free_url(self):
-        url, snapshot_time = self.call(snapshot_payload(5))
+        url, snapshot_time = self.call(snapshot_payload(5, now=self.now))
         self.assertTrue(url.startswith("https://web.archive.org/web/"))
         self.assertIn("if_/https://www.wsj.com/", url)
         self.assertLess(
-            datetime.now(timezone.utc) - snapshot_time, timedelta(hours=6)
+            self.now - snapshot_time, timedelta(hours=6)
         )
 
     def test_stale_snapshot_rejected(self):
-        with self.assertRaises(RuntimeError):
-            self.call(snapshot_payload(50))
+        with self.assertRaisesRegex(RuntimeError, "超過上限 36 小時"):
+            self.call(
+                snapshot_payload(50, now=self.now),
+                captures=[(50, "200", "text/html")],
+            )
 
     def test_missing_or_bad_snapshot_rejected(self):
         with self.assertRaises(RuntimeError):
@@ -181,6 +207,105 @@ class WaybackSnapshotTest(unittest.TestCase):
             self.call(snapshot_payload(1, status="404"))
         with self.assertRaises(RuntimeError):
             self.call(snapshot_payload(1, available=False))
+
+    def test_uses_newest_valid_html_skipping_newer_bad_captures(self):
+        # CDX 的列順序不保證是由新到舊；最近一筆是空的 204 存檔。
+        captures = [
+            (5, "200", "text/html"),
+            (1, "204", "text/html"),
+            (3, "200", "text/html"),
+            (2, "200", "application/pdf"),
+        ]
+        with mock.patch.object(
+            dify_report.requests, "get",
+            return_value=FakeResponse(cdx_payload(captures, now=self.now)),
+        ) as get, mock.patch("builtins.print") as log:
+            url, snapshot_time = dify_report.get_wayback_snapshot(
+                "wsj.com", "https://www.wsj.com/", max_age_hours=36
+            )
+
+        self.assertEqual(snapshot_time, self.now - timedelta(hours=3))
+        self.assertEqual(
+            url, "https://web.archive.org/web/20261025063000if_/https://www.wsj.com/"
+        )
+        get.assert_called_once_with(
+            dify_report.WAYBACK_CDX_API,
+            params={
+                "url": "wsj.com",
+                "from": "20261023213000",
+                "to": "20261025093000",
+                "output": "json",
+                "fl": "timestamp,statuscode,mimetype",
+            },
+            timeout=30,
+        )
+        logs = "\n".join(str(call.args[0]) for call in log.call_args_list)
+        self.assertIn("20261025063000", logs)
+        self.assertIn("略過 2 筆較新存檔", logs)
+        self.assertIn("HTTP 204", logs)
+        self.assertIn("mimetype application/pdf", logs)
+
+    def test_capture_at_max_age_is_accepted(self):
+        with mock.patch.object(dify_report, "WAYBACK_MAX_AGE_HOURS", 12):
+            with mock.patch.object(
+                dify_report.requests, "get",
+                return_value=FakeResponse(cdx_payload(
+                    [(12, "200", "text/html")], now=self.now
+                )),
+            ) as get:
+                _, snapshot_time = dify_report.get_wayback_snapshot(
+                    "wsj.com", "https://www.wsj.com/"
+                )
+        self.assertEqual(snapshot_time, self.now - timedelta(hours=12))
+        self.assertEqual(get.call_args.kwargs["params"]["from"], "20261024213000")
+
+    def test_cdx_error_retries_then_falls_back_to_available(self):
+        with mock.patch.object(
+            dify_report.requests, "get", side_effect=[
+                FakeResponse(status=503),
+                dify_report.requests.Timeout("CDX timeout"),
+                FakeResponse(status=503),
+                FakeResponse(snapshot_payload(5, now=self.now)),
+            ],
+        ) as get, mock.patch.object(dify_report.time, "sleep") as sleep:
+            url, snapshot_time = dify_report.get_wayback_snapshot(
+                "wsj.com", "https://www.wsj.com/", max_age_hours=36
+            )
+
+        self.assertEqual(snapshot_time, self.now - timedelta(hours=5))
+        self.assertIn("20261025043000if_/https://www.wsj.com/", url)
+        self.assertEqual(
+            [call.args[0] for call in get.call_args_list],
+            [dify_report.WAYBACK_CDX_API] * 3 + [dify_report.WAYBACK_AVAILABLE_API],
+        )
+        self.assertTrue(all(
+            call.kwargs["timeout"] == 30 for call in get.call_args_list
+        ))
+        self.assertEqual(sleep.call_args_list, [mock.call(5), mock.call(5)])
+
+    def test_cdx_retry_success_does_not_call_available(self):
+        with mock.patch.object(
+            dify_report.requests, "get", side_effect=[
+                FakeResponse(status=503),
+                FakeResponse(cdx_payload([(2, "200", "text/html")], now=self.now)),
+            ],
+        ) as get, mock.patch.object(dify_report.time, "sleep") as sleep:
+            _, snapshot_time = dify_report.get_wayback_snapshot(
+                "wsj.com", "https://www.wsj.com/", max_age_hours=36
+            )
+        self.assertEqual(snapshot_time, self.now - timedelta(hours=2))
+        self.assertEqual(get.call_count, 2)
+        self.assertTrue(all(
+            call.args[0] == dify_report.WAYBACK_CDX_API for call in get.call_args_list
+        ))
+        sleep.assert_called_once_with(5)
+
+    def test_unusable_cdx_captures_fall_back_to_available(self):
+        _, snapshot_time = self.call(
+            snapshot_payload(5, now=self.now),
+            captures=[(1, "204", "text/html"), (2, "200", "application/json")],
+        )
+        self.assertEqual(snapshot_time, self.now - timedelta(hours=5))
 
 
 class SequencedPage(FakePage):
@@ -209,7 +334,7 @@ class CaptureFlowTest(unittest.TestCase):
             dify_report, "sync_playwright", fake_playwright(page)
         ), mock.patch.object(
             dify_report.requests, "get",
-            return_value=FakeResponse(snapshot_payload(2)),
+            return_value=FakeResponse(cdx_payload([(2, "200", "text/html")])),
         ), mock.patch.object(
             dify_report, "publish_screenshots"
         ) as publish, mock.patch.object(dify_report.os, "makedirs"):

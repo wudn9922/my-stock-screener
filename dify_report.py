@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 from requests.adapters import HTTPAdapter
@@ -28,6 +28,7 @@ BARRONS_SCROLL_Y = int(os.environ.get("BARRONS_SCROLL_Y", "400"))
 # 改截 Internet Archive（Wayback Machine）最近一次的首頁存檔。
 # 存檔比現在舊，超過這個小時數就視為過期、不使用。
 WAYBACK_MAX_AGE_HOURS = int(os.environ.get("WAYBACK_MAX_AGE_HOURS", "36"))
+WAYBACK_CDX_API = "https://web.archive.org/cdx/search/cdx"
 WAYBACK_AVAILABLE_API = "https://archive.org/wayback/available"
 
 # JPEG 比 PNG 小很多，LINE 圖片大小有限制（約 1MB）
@@ -106,7 +107,7 @@ def detect_blocked_page(page, response):
 
 def get_wayback_snapshot(site, page_url, max_age_hours=None):
     """
-    查詢 Wayback Machine 離現在最近的存檔。
+    用 CDX 選取期限內最新的 200 HTML 存檔，失敗時退回 available API。
 
     回傳 (可直接開啟的存檔網址, 存檔時間)。
     網址使用 if_ 模式，不會顯示 Wayback 工具列。
@@ -116,6 +117,74 @@ def get_wayback_snapshot(site, page_url, max_age_hours=None):
         max_age_hours = WAYBACK_MAX_AGE_HOURS
 
     now = datetime.now(timezone.utc)
+    cdx_params = {
+        "url": site,
+        "from": (now - timedelta(hours=max_age_hours)).strftime("%Y%m%d%H%M%S"),
+        "to": now.strftime("%Y%m%d%H%M%S"),
+        "output": "json",
+        "fl": "timestamp,statuscode,mimetype",
+    }
+    # 不在伺服器端過濾狀態與 MIME，才能記錄跳過了幾筆較新的壞存檔及原因。
+    cdx_rows = None
+    for attempt in range(1, 4):
+        try:
+            response = requests.get(WAYBACK_CDX_API, params=cdx_params, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            if not isinstance(data, list) or (data and (
+                data[0] != ["timestamp", "statuscode", "mimetype"]
+                or any(not isinstance(row, list) or len(row) != 3 for row in data[1:])
+            )):
+                raise ValueError("CDX 回傳格式錯誤")
+            cdx_rows = data[1:]
+            break
+        except Exception as e:
+            print(f"Wayback CDX 查詢第 {attempt}/3 次失敗：{e}")
+            if attempt < 3:
+                time.sleep(5)
+
+    captures = []
+    for timestamp, status, mimetype in cdx_rows or []:
+        try:
+            snapshot_time = datetime.strptime(
+                str(timestamp), "%Y%m%d%H%M%S"
+            ).replace(tzinfo=timezone.utc)
+        except ValueError:
+            print(f"Wayback CDX 略過存檔：時間格式錯誤 {timestamp}")
+            continue
+        captures.append((snapshot_time, str(timestamp), str(status), mimetype))
+
+    skipped = []
+    for snapshot_time, timestamp, status, mimetype in sorted(
+        captures, key=lambda capture: capture[0], reverse=True
+    ):
+        age_hours = (now - snapshot_time).total_seconds() / 3600
+        reasons = []
+        if status != "200":
+            reasons.append(f"HTTP {status}")
+        if mimetype != "text/html":
+            reasons.append(f"mimetype {mimetype}")
+        if age_hours > max_age_hours:
+            reasons.append(f"超過上限 {max_age_hours} 小時")
+        if snapshot_time > now:
+            reasons.append("存檔時間晚於現在")
+        if reasons:
+            reason = "、".join(reasons)
+            skipped.append((snapshot_time, reason))
+            print(f"Wayback CDX 略過存檔 {timestamp}：{reason}")
+            continue
+
+        newer_skipped = sum(capture_time > snapshot_time for capture_time, _ in skipped)
+        print(
+            f"Wayback CDX 選用存檔 {timestamp}（{age_hours:.1f} 小時前）；"
+            f"略過 {newer_skipped} 筆較新存檔（原因見上方紀錄）"
+        )
+        return (
+            f"https://web.archive.org/web/{timestamp}if_/{page_url}",
+            snapshot_time,
+        )
+
+    print("Wayback CDX 查詢失敗或沒有期限內可用的 HTML 存檔，改用 available API")
     params = {
         "url": site,
         "timestamp": now.strftime("%Y%m%d%H%M%S"),
@@ -174,7 +243,15 @@ def get_wayback_snapshot(site, page_url, max_age_hours=None):
             f"超過上限 {max_age_hours} 小時"
         )
 
-    print(f"Wayback 存檔時間 {timestamp}（{age_hours:.1f} 小時前）")
+    if cdx_rows is None:
+        skipped_info = "CDX 查詢失敗，無法確認較新存檔略過數"
+    else:
+        newer_skipped = sum(capture_time > snapshot_time for capture_time, _ in skipped)
+        skipped_info = f"略過 {newer_skipped} 筆 CDX 回傳的較新存檔（原因見上方紀錄）"
+    print(
+        f"Wayback available 選用存檔 {timestamp}（{age_hours:.1f} 小時前）；"
+        f"{skipped_info}"
+    )
 
     return (
         f"https://web.archive.org/web/{timestamp}if_/{page_url}",
