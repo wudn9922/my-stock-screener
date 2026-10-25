@@ -240,7 +240,7 @@ jobs:
           KLINE_CORRECTIONS_LOG: /tmp/test-kline-corrections.json
         run: |
           cp docs/report/kline-corrections.json "$KLINE_CORRECTIONS_LOG"
-          pip install requests numpy pandas openpyxl xlrd lxml pyyaml
+          pip install requests numpy pandas yfinance openpyxl xlrd lxml pyyaml
           python -m unittest discover -s tests -p test_research.py -v
           python -m unittest discover -s tests -p test_research_candles.py -v
           python -m unittest discover -s tests -p test_research_operations.py -v
