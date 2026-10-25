@@ -84,6 +84,22 @@ class MarketSessionTest(unittest.TestCase):
         self.assertEqual(actual['asOf'], '2026-10-22')
         self.assertGreater(actual['segments']['all']['ma20']['total'], 0)
 
+    def test_real_csv_readers_do_not_turn_unknown_volume_into_closure_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            frames = {'2330.TW': closure(prices(), ['2026-10-23']),
+                      '6488.TWO': closure(prices(), ['2026-10-23'])}
+            frames['6488.TWO'].loc[pd.Timestamp('2026-10-23'), 'Volume'] = float('nan')
+            for symbol, frame in frames.items():
+                frame.to_csv(Path(directory) / f'{symbol}.csv', index_label='Date')
+            loaded = {s: bb.load_daily_bars(Path(directory) / f'{s}.csv') for s in frames}
+            self.assertNotIn('2026-10-23', non_trading_dates(loaded))
+            self.assertIn('2026-10-23T00:00:00', loaded['6488.TWO'].attrs[rm.UNKNOWN_VOLUME_DATES])
+            with patch.object(main, 'DATA_DIR', directory), patch.dict(main.REPORT_NON_TRADING_DATES, clear=True):
+                projected = main._scan_analysis_frames(list(frames))
+                self.assertNotIn('2026-10-23', main.REPORT_NON_TRADING_DATES['TW'])
+                self.assertEqual(projected['2330.TW'].index[-1], pd.Timestamp('2026-10-23'))
+                self.assertIsNone(rm.compute_stock_metrics(projected['6488.TWO'])['volumeAvg20'])
+
     def test_empty_volume_history_produces_no_new_market(self):
         frame = prices(0)
         self.assertIsNone(bb.build_market({'A': frame, 'B': frame.copy()}, 'empty'))

@@ -49,7 +49,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 from kline_integrity import usable_frame
-from scripts.market_sessions import market_prices
+from scripts.market_sessions import UNKNOWN_VOLUME_DATES, market_prices
 DEFAULT_DATA_DIR = os.path.join(REPO_ROOT, "data")
 DEFAULT_OUT = os.path.join(REPO_ROOT, "docs", "report", "breadth.json")
 
@@ -68,15 +68,18 @@ def load_daily_bars(csv_path, price_columns=("Close",)):
     if not {"Date", "Volume", *price_columns}.issubset(raw.columns):
         return None
 
+    volume = pd.to_numeric(raw["Volume"], errors="coerce")
     bars = pd.DataFrame(
         {
             "Date": pd.to_datetime(raw["Date"], errors="coerce"),
             **{column: pd.to_numeric(raw[column], errors="coerce") for column in price_columns},
-            "Volume": pd.to_numeric(raw["Volume"], errors="coerce").fillna(0),
+            "Volume": volume.fillna(0),
+            "_volume_unknown": volume.isna() | (volume < 0),
         }
     )
     bars = bars.dropna(subset=["Date", *price_columns])
     bars = bars.drop_duplicates("Date", keep="last").sort_values("Date").set_index("Date")
+    bars.attrs[UNKNOWN_VOLUME_DATES] = tuple(day.isoformat() for day in bars.index[bars.pop("_volume_unknown")])
     return bars if len(bars) else None
 
 

@@ -29,7 +29,10 @@ on a separate PR targeting `generated`, never in the source PR.
 
 Primary self-review checked sparse/unknown-volume data, long closures, individual
 halts, cross-market isolation, missing-source retention, mismatched saved rows,
-input immutability and the early public-owner privacy guard. New browser cases
+input immutability and the early public-owner privacy guard. The existing CSV
+cleaners converted missing volume to zero; their analysis views now retain the
+unknown-volume lineage before the closure inference, with an actual-CSV reader
+regression. New browser cases
 cover Sunday and long-closure clocks, breadth, candidates, average-volume and
 prior-session-volume filters on desktop, phone Chromium and iPhone WebKit.
 Actual verification totals and exact-head Actions results are recorded in the

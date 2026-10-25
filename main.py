@@ -2131,6 +2131,7 @@ def _report_analysis_prices(ticker, frame):
 
 def _scan_analysis_frames(tickers):
     """Read all freshly collected histories before identifying market-wide closures."""
+    from report_metrics import read_price_csv
     from scripts.market_sessions import market_prices
     frames_by_market = {"TW": {}, "US": {}}
     requested_markets = set()
@@ -2141,7 +2142,9 @@ def _scan_analysis_frames(tickers):
         if not os.path.exists(path):
             continue
         try:
-            frame = clean_ohlcv_dataframe(kline.read_csv(path, index_col=0, parse_dates=True))
+            # Retain missing-volume lineage: unknown source values must not
+            # become evidence that the whole market traded zero shares.
+            frame = read_price_csv(path)
             if not frame.empty:
                 frames_by_market[market][ticker] = frame
         except Exception as exc:
