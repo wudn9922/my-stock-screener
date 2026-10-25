@@ -10,7 +10,7 @@ F5 市場寬度：站上 MA20 / MA60 的股票比例 → docs/report/breadth.jso
 - 美股：S&P 500 與 CSV 交集；名單取得失敗時退回 data/ 內所有非台股、非指數的 CSV。
 - 某日「有效」：該日有 K 線且成交量 > 0；最後一根早於 asOf 的股票不列入當日 count。
 - 站上 = 收盤 > SMA_n（嚴格大於）；只有至少 n 根K 的股票才進入該均線的分母。
-- asOf = 各檔最後日期的眾數（同次數取較晚者）。
+- asOf = 排除市場共同零量占位日後，眾數日期以前最近有足夠有效資料的交易日。
 - 歷史：asOf 以前、有資料檔數不少於「近 20 個交易日有資料檔數的下四分位數」一半的日期，取最後 120 個，逐日重算。
   （不用 universe 總檔數當分母：部分 CSV 長期沒更新時，總檔數會讓覆蓋率門檻失真。）
 - 注意：universe 是「現在」的名單，回推的歷史含存活者偏差。
@@ -49,6 +49,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 from kline_integrity import usable_frame
+from scripts.market_sessions import market_prices
 DEFAULT_DATA_DIR = os.path.join(REPO_ROOT, "data")
 DEFAULT_OUT = os.path.join(REPO_ROOT, "docs", "report", "breadth.json")
 
@@ -165,18 +166,27 @@ def build_market(frames, universe_label, segment_of=None):
     frames: {symbol: DataFrame（index 為日期，欄位 Close、Volume）}
     segment_of: {symbol: "twse" | "tpex"}，台股才需要；沒有時只輸出 all。
     """
+    frames, _ = market_prices(frames)
+    if not frames:
+        return None
     as_of = as_of_date(frames)
     flags = _daily_flags(frames)
     symbols = list(frames)
     tally = _tally(flags, symbols)
 
+    dates = trading_days(flags["present"], as_of)
+    if dates.empty:
+        return None
+    # The modal last row can be an unpublished/zero-volume placeholder. Use the
+    # latest evaluable session rather than publishing an empty market snapshot.
+    as_of = dates[-1]
     segments = {"all": _segment(tally.loc[as_of])}
     if segment_of is not None:
         for name in SEGMENT_NAMES:
             members = [symbol for symbol in symbols if segment_of.get(symbol) == name]
             segments[name] = _segment(_tally(flags, members).loc[as_of])
 
-    dates = trading_days(flags["present"], as_of)[-HISTORY_DAYS:]
+    dates = dates[-HISTORY_DAYS:]
     history_tally = tally.loc[dates]
     history = {
         "dates": [day.strftime("%Y-%m-%d") for day in dates],
@@ -200,7 +210,9 @@ def build_breadth_payload(inputs, generated_at):
     for key, spec in inputs.items():
         if not spec["frames"]:
             continue
-        markets[key] = build_market(spec["frames"], spec["universe"], spec.get("segment_of"))
+        market = build_market(spec["frames"], spec["universe"], spec.get("segment_of"))
+        if market is not None:
+            markets[key] = market
     return {"version": BREADTH_JSON_VERSION, "generatedAt": generated_at, "markets": markets}
 
 
@@ -273,6 +285,21 @@ def main(argv=None, us_tickers_fn=None):
     if not payload["markets"]:
         print("⚠️ data/ 沒有可用的日 K，breadth.json 不更新")
         return 1
+
+    # One source can be unavailable while the other market refreshes. Do not
+    # erase its last evaluable snapshot as a side effect of that partial run.
+    try:
+        with open(args.out, encoding="utf-8") as file:
+            previous = json.load(file)
+    except (OSError, ValueError):
+        previous = {}
+    old_markets = previous.get("markets", {}) if isinstance(previous, dict) else {}
+    for key in ("tw", "us"):
+        old = old_markets.get(key) if isinstance(old_markets, dict) else None
+        count = ((old or {}).get("segments", {}).get("all", {}).get("count")) if isinstance(old, dict) else None
+        if key not in payload["markets"] and isinstance(count, (int, float)) and count > 0 and old.get("asOf"):
+            payload["markets"][key] = old
+            print(f"ℹ️ {key.upper()} 本次無有效資料，沿用資料日 {old['asOf']}")
 
     write_json_atomic(args.out, payload)
     for key, market in payload["markets"].items():

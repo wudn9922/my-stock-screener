@@ -15,6 +15,14 @@ on:
       - '.github/workflows/research-data.yml'
       - 'breakout_alert/**'
       - 'main.py'
+      - 'report_metrics.py'
+      - 'scripts/market_sessions.py'
+      - 'scripts/restore_closed_market_snapshot.py'
+      - 'scripts/build_breadth.py'
+      - 'tests/test_market_sessions.py'
+      - 'tests/test_breadth.py'
+      - 'tests/test_report_metrics.py'
+      - 'tests/test_market_volume_scope.py'
       - 'Dockerfile.discord-query'
       - '.github/workflows/cloud-run.yml'
       - 'supabase/functions/user-settings/**'
@@ -204,7 +212,7 @@ jobs:
           retention-days: 7
       - name: Desktop, phone and WebKit regressions
         working-directory: atlas
-        run: npm run test:site -- account-privacy.spec.ts legacy-import.spec.ts parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts data-integrity.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts themes-map.spec.ts breakouts.spec.ts index-volume.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts workspace-refinements.spec.ts
+        run: npm run test:site -- account-privacy.spec.ts legacy-import.spec.ts parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts data-integrity.spec.ts closed-market.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts themes-map.spec.ts breakouts.spec.ts index-volume.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts workspace-refinements.spec.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -239,6 +247,10 @@ jobs:
           python -m unittest discover -s tests -p test_tw_chips.py -v
           python -m unittest discover -s tests -p 'test_atlas_watchlists.py' -v
           python -m unittest discover -s tests -p 'test_account_permissions.py' -v
+          python -m unittest discover -s tests -p 'test_market_sessions.py' -v
+          python -m unittest discover -s tests -p 'test_breadth.py' -v
+          python -m unittest discover -s tests -p 'test_report_metrics.py' -v
+          python -m unittest discover -s tests -p 'test_market_volume_scope.py' -v
           python -m unittest discover -s tests -p 'test_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_full_market_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_swing_breakouts.py' -v
