@@ -9,7 +9,7 @@ import {
   parseMaRecommendation,
   recommendedPeriods,
 } from '../src/report/maRecommendation';
-import { appliedDailySmaPeriods, applyRecommended, missingRecommended, selectableCandidates } from '../src/ui/MaRecommendation';
+import { appliedDailySmaPeriods, applyRecommended, missingRecommended, selectableCandidates, toggleRecommended } from '../src/ui/MaRecommendation';
 
 // Shape written by ma-selector scripts/build_recommendations.py (core/recommend.py).
 const file = (ticker = '2330.TW') => ({
@@ -103,5 +103,46 @@ describe('ma-selector recommendations', () => {
     store.addIndicator({ ...applied, id: 'duplicate', period: 20 });
     expect(appliedDailySmaPeriods(store.symbol('2330.TW').indicators)).toEqual([20]);
     expect(missingRecommended(store.symbol('2330.TW').indicators, recommendedPeriods(result.data))).toEqual([24, 34, 89]);
+  });
+
+  it('toggles a candidate off and back on without changing other periods, types, symbols or timeframe scopes', async () => {
+    const database = 'ma-toggle-' + crypto.randomUUID();
+    const store = new AppStore(new IndexedDBStore(database));
+    await store.initialize();
+    expect(toggleRecommended(store, '2330.TW', 20)).toEqual({ added: true, removed: 0, locked: 0 });
+    const applied = store.symbol('2330.TW').indicators[0]!;
+    store.addIndicator({ ...applied, id: 'weekly', scope: { timeframe: '1W' } });
+    store.addIndicator({ ...applied, id: 'other-period', period: 34 });
+    store.addIndicator({ ...applied, id: 'ema', type: 'EMA' });
+    store.addIndicator({ ...applied, id: 'locked', period: 89, locked: true });
+    store.addIndicator({ ...applied, id: 'other-symbol', symbol: 'AAPL' });
+    const retained = store.symbol('2330.TW').indicators.slice(1);
+    const otherSymbol = store.symbol('AAPL');
+    store.updateSymbol('2330.TW', (state) => ({ ...state, preferences: { ...state.preferences, timeframe: '1W' } }));
+    expect(toggleRecommended(store, '2330.TW', 20)).toEqual({ added: false, removed: 1, locked: 0 });
+    expect(store.symbol('2330.TW').indicators).toEqual(retained);
+    expect(store.symbol('2330.TW').preferences.timeframe).toBe('1D');
+    expect(store.symbol('AAPL')).toEqual(otherSymbol);
+    await store.flush();
+    const restored = new AppStore(new IndexedDBStore(database));
+    await restored.initialize();
+    expect(restored.symbol('2330.TW').indicators).toEqual(retained);
+    expect(toggleRecommended(restored, '2330.TW', 20)).toEqual({ added: true, removed: 0, locked: 0 });
+    expect(appliedDailySmaPeriods(restored.symbol('2330.TW').indicators)).toEqual([20, 34, 89]);
+  });
+
+  it('removes only unlocked duplicate SMAs and leaves a locked candidate unchanged on further clicks', async () => {
+    const store = new AppStore(new IndexedDBStore('ma-toggle-lock-' + crypto.randomUUID()));
+    await store.initialize();
+    applyRecommended(store, '2330.TW', [24]);
+    const applied = store.symbol('2330.TW').indicators[0]!;
+    const locked = { ...applied, id: 'locked', locked: true };
+    store.addIndicator(locked);
+    expect(toggleRecommended(store, '2330.TW', 24)).toEqual({ added: false, removed: 1, locked: 1 });
+    expect(store.symbol('2330.TW').indicators).toEqual([locked]);
+    store.updateSymbol('2330.TW', (state) => ({ ...state, preferences: { ...state.preferences, timeframe: '1W' } }));
+    const before = store.symbol('2330.TW');
+    expect(toggleRecommended(store, '2330.TW', 24)).toEqual({ added: false, removed: 0, locked: 1 });
+    expect(store.symbol('2330.TW')).toEqual(before);
   });
 });

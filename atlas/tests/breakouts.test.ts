@@ -101,16 +101,22 @@ describe('breakouts schema', () => {
         },
       }),
     );
-    expect(tw.windows['1w']!.strategies.box20!.winRate).toBeNull();
-    expect(tw.windows['1w']!.market).toEqual({
-      entryDays: 2,
-      pairs: 1800,
-      upRate: 48,
-      avgReturn: -0.3,
-    });
+    expect(Object.keys(tw.windows)).toEqual(['1m']);
     expect(markets.us!.universe).toBe('全市場美股普通股與 ADR（NYSE／NASDAQ／NYSE American 等）');
     expect(markets.us!.scope).toBe('full');
     expect(tw.coverage).toEqual({ loaded: 980, missing: 20 });
+  });
+
+  it('drops retired weekly metadata and cohorts from old full-market reports', () => {
+    const raw = structuredClone(sample) as { params: { windows: { key: string; days: number; label: string }[] } };
+    raw.params.windows.unshift({ key: '1w', days: 5, label: '近一週' });
+    const result = parseBreakouts(raw);
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.data.params.windows).toEqual([{ key: '1m', days: 21, label: '近1月' }]);
+    for (const market of Object.values(result.data.markets)) {
+      expect(Object.keys(market.windows)).toEqual(['1m']);
+    }
   });
 
   it('tolerates unknown fields, numeric strings, bad strategies and missing params', () => {

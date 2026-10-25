@@ -117,6 +117,8 @@ export interface BreakoutMonthlyPoint {
 export interface BreakoutMonthlyHistory {
   intervalMonths: 1;
   referenceDate: string;
+  /** Actual recalculation time when supplied by the saved backfill. */
+  calculatedAt?: string | null;
   points: BreakoutMonthlyPoint[];
 }
 export interface BreakoutMarket {
@@ -323,7 +325,9 @@ const marketSchema = z
         stocks: countOf.parse(anomalies.stocks),
         days: countOf.parse(anomalies.days),
       },
-      windows,
+      // Older full-market files can still carry the retired weekly cohort.
+      // Keep generic legacy reports readable without exposing weekly full-market data.
+      windows: full ? Object.fromEntries(Object.entries(windows).filter(([key]) => key !== '1w')) : windows,
       monthly: full ? parseMonthly(market.monthly, market.asOf) : null,
     };
   });
@@ -333,7 +337,7 @@ function parseParams(value: unknown): BreakoutParams {
   const defaults = DEFAULT_BREAKOUT_PARAMS;
   const windows = (Array.isArray(raw.windows) ? raw.windows : [])
     .map(record)
-    .filter((entry) => typeof entry.key === 'string' && entry.key.trim())
+    .filter((entry) => typeof entry.key === 'string' && entry.key.trim() && entry.key.trim() !== '1w')
     .map((entry) => ({
       key: String(entry.key).trim(),
       days: positiveInt(entry.days) ?? 0,
@@ -398,6 +402,33 @@ export const breakoutsSchema = z.object({
 });
 
 export type BreakoutsLoadResult = { status: 'ok'; data: Breakouts; url: string } | { status: 'missing' | 'invalid' | 'error'; message: string; url: string };
+
+/** Fill an older generated report from a real, saved recalculation of the same data date.
+ * Latest statistics and explicitly supplied histories always belong to the live report.
+ * Archived reports use fetchBreakoutSnapshot directly and retain their original contents.
+ */
+export function withMonthlyBackfill(latest: BreakoutsLoadResult, saved: BreakoutsLoadResult): BreakoutsLoadResult {
+  if (latest.status !== 'ok' || saved.status !== 'ok' ||
+    latest.data.params.successModel !== SUCCESS_MODEL || saved.data.params.successModel !== SUCCESS_MODEL ||
+    JSON.stringify(latest.data.params) !== JSON.stringify(saved.data.params)) return latest;
+  const markets = { ...latest.data.markets };
+  let changed = false;
+  for (const key of BREAKOUT_MARKET_KEYS) {
+    const current = markets[key], backfill = saved.data.markets[key];
+    if (!current || current.scope !== 'full' || current.monthly || !current.asOf || !current.windows['1m'] ||
+      backfill?.scope !== 'full' || backfill.asOf !== current.asOf || !backfill.monthly ||
+      current.boxMaxWidthPct !== backfill.boxMaxWidthPct || !current.universeCount ||
+      current.evaluated / current.universeCount < 0.9) continue;
+    const historical = backfill.monthly.points.filter(point => point.targetDate < current.asOf!);
+    if (!historical.length) continue;
+    markets[key] = { ...current, monthly: { intervalMonths: 1, referenceDate: current.asOf, calculatedAt: saved.data.generatedAt,
+      points: [...historical, { targetDate: current.asOf, asOf: current.asOf, status: 'ok',
+        evaluated: current.evaluated, universeCount: current.universeCount,
+        strategies: current.windows['1m'].strategies }] } };
+    changed = true;
+  }
+  return changed ? { ...latest, data: { ...latest.data, markets } } : latest;
+}
 
 const archiveDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
   const parsed = new Date(`${value}T00:00:00Z`);
@@ -514,10 +545,24 @@ export async function fetchBreakouts(url = breakoutsUrl(), fetcher: typeof fetch
 
 let shared: Promise<BreakoutsLoadResult> | null = null;
 
+async function includeSavedMonthlyHistory(result: BreakoutsLoadResult): Promise<BreakoutsLoadResult> {
+  if (result.status !== 'ok' || result.data.params.successModel !== SUCCESS_MODEL ||
+    !Object.values(result.data.markets).some(market => market.scope === 'full' && !market.monthly)) return result;
+  try {
+    // A durable result from real archived K-lines ships with the UI. This also
+    // fills the existing generated report before the next universe job runs.
+    const saved = await import('../../../docs/report/breakouts-backfill.json');
+    return withMonthlyBackfill(result, parseBreakouts(saved.default));
+  } catch {
+    // A failed optional chunk must not hide the available current statistics.
+    return result;
+  }
+}
+
 /** One shared load per page session; `refresh` forces a new request. */
 export function loadBreakouts(refresh = false): Promise<BreakoutsLoadResult> {
   if (!shared || refresh) {
-    const request = fetchBreakouts().then((result) => {
+    const request = fetchBreakouts().then(includeSavedMonthlyHistory).then((result) => {
       // Do not pin a transient failure for the rest of the session; the next card mount retries.
       if (result.status === 'error' && shared === request) shared = null;
       return result;

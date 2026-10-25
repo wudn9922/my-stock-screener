@@ -19,6 +19,47 @@ const row = (page: Page, method = 'swingHigh') => card(page).locator(`.bo-row[da
 const picker = (page: Page) => card(page).getByRole('group', { name: '勝率計算方式' });
 const noOverflow = async (page: Page) => expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
 
+test('the shipped real recalculation fills both markets before the next report job', async ({ page }) => {
+  const saved = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../docs/report/breakouts-backfill.json'), 'utf8'));
+  const older = structuredClone(saved);
+  for (const market of Object.values(older.markets) as Record<string, unknown>[]) delete market.monthly;
+  await mockBreakouts(page, older);
+  for (const key of ['tw', 'us']) {
+    await page.goto(`./?page=markets&market=${key}`);
+    await expect(card(page).locator('.bo-history-chart')).toHaveCount(3);
+    for (const chart of await card(page).locator('.bo-history-chart').all())
+      await expect(chart).toHaveAttribute('data-point-count', '7');
+    await expect(card(page).getByRole('combobox', { name: '成功率顯示月數' })).toHaveValue('5');
+    await expect(row(page).locator('.bo-win')).toContainText(`${saved.markets[key].windows['1m'].strategies.swingHigh.comparison.rules.hold5.winRate.toFixed(1)}%`);
+    await card(page).getByText('每月測試數值與涵蓋', { exact: true }).click();
+    const table = card(page).locator('.bo-history-table');
+    await expect(table.locator('tbody tr')).toHaveCount(7);
+    for (const point of saved.markets[key].monthly.points)
+      await expect(table).toContainText(point.asOf);
+    const first = saved.markets[key].monthly.points[0];
+    await expect(table.locator('tbody tr').first()).toContainText(`${first.strategies.swingHigh.comparison.rules.hold5.winRate.toFixed(1)}%`);
+    await card(page).getByText('參考日與保存說明', { exact: true }).click();
+    await expect(card(page)).toContainText('歷史回算時間');
+    await expect(card(page)).not.toContainText(/近一週|近1週|每月重算結果尚未產生/);
+    await noOverflow(page);
+  }
+});
+
+test('old full-market files with weekly metadata still show monthly rates only', async ({ page }) => {
+  const payload = JSON.parse(body);
+  payload.params.windows.unshift({ key: '1w', days: 5, label: '近一週' });
+  // The saved fixture also carries the old 1w cohort; it must never render.
+  expect(payload.markets.tw.windows['1w']).toBeTruthy();
+  await mockBreakouts(page, payload);
+  await page.goto('./?page=markets&market=tw');
+  await expect(row(page).locator('.bo-win')).toContainText('50.0%');
+  await expect(card(page)).not.toContainText(/近一週|近1週|近週/);
+  await expect(card(page).getByRole('button', { name: /近.*週/ })).toHaveCount(0);
+  await card(page).getByText('計算與資料說明', { exact: true }).click();
+  await expect(card(page)).not.toContainText(/近一週|近1週|近週/);
+  await noOverflow(page);
+});
+
 test('three entry cards compare four outcomes with fixed cohorts on desktop and phone', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(String(error)));

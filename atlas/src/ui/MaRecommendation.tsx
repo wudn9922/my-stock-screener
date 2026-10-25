@@ -61,6 +61,23 @@ export function applyRecommended(store: AppStore, symbol: string, periods: reado
   return missing;
 }
 
+/** Toggle only this period's daily SMAs, preserving locked instances and all other scopes. */
+export function toggleRecommended(store: AppStore, symbol: string, period: number) {
+  const matches = store.symbol(symbol).indicators.filter((indicator) =>
+    indicator.type === 'SMA' && indicator.scope.timeframe === '1D' && indicator.period === period);
+  if (!matches.length) {
+    applyRecommended(store, symbol, [period]);
+    return { added: true, removed: 0, locked: 0 };
+  }
+  const removable = matches.filter((indicator) => !indicator.locked);
+  if (removable.length) {
+    // The selector owns daily SMAs; the store removes only the active timeframe.
+    applyRecommended(store, symbol, [period]);
+    removable.forEach((indicator) => store.removeIndicator(symbol, indicator.id));
+  }
+  return { added: false, removed: removable.length, locked: matches.length - removable.length };
+}
+
 const scoreText = (score: number | null) => (score === null ? '' : `（${Math.round(score)}）`);
 /** The pick's own structural score (candidates carry it; a pick outside the list has none). */
 const scoreOf = (range: MaRecommendationRange) => range.candidates.find((c) => c.period === range.final)?.score ?? null;
@@ -100,6 +117,12 @@ export function MaRecommendation({
     onNotice(added.length
       ? `已在日線圖加入 SMA ${added.join(' / ')}。`
       : `日線圖已有 SMA ${selected.join(' / ')}，已切換到日線。`);
+  };
+  const toggle = (period: number) => {
+    const changed = toggleRecommended(store, symbol, period);
+    onNotice(changed.added ? `已在日線圖加入 SMA ${period}。`
+      : changed.removed ? `已從日線圖移除 SMA ${period}${changed.locked ? ' 的未鎖定均線；同參數鎖定均線仍保留。' : '。'}`
+        : `SMA ${period} 已鎖定，請先解鎖後再取消套用。`);
   };
   const link = maSelectorLink(symbol);
   const ranges = data ? MA_RANGE_KEYS.map((key) => data.ranges.find((range) => range.key === key)!) : [];
@@ -143,7 +166,7 @@ export function MaRecommendation({
             <thead>
               <tr>
                 <th scope="col">區間</th>
-                <th scope="col">候選（點選套用，★＝建議）</th>
+                <th scope="col">候選（點選套用／取消，★＝建議）</th>
                 <th scope="col">反手報酬</th>
               </tr>
             </thead>
@@ -163,9 +186,9 @@ export function MaRecommendation({
                         {selectableCandidates(range).map((candidate) => {
                           const present = applied.includes(candidate.period);
                           return <button key={candidate.period} type="button" className="ghost-button ws-ma-candidate"
-                            aria-label={present ? `SMA ${candidate.period} 已套用` : `套用 SMA ${candidate.period}`}
-                            disabled={present && timeframe === '1D'}
-                            onClick={() => apply([candidate.period])}>
+                            aria-label={present ? `取消套用 SMA ${candidate.period}` : `套用 SMA ${candidate.period}`}
+                            aria-pressed={present}
+                            onClick={() => toggle(candidate.period)}>
                             {candidate.period === range.final ? '★' : ''}{candidate.period}{scoreText(candidate.score)}
                             {present ? ' ✓' : ''}
                           </button>;

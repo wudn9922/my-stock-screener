@@ -61,9 +61,17 @@ class FullMarketBreakoutsTest(unittest.TestCase):
         for key in ("tw", "us"):
             market = self.build()["markets"][key]
             for method in ("box20", "ema20"):
-                stats = market["windows"]["1w"]["strategies"][method]
+                stats = market["windows"]["1m"]["strategies"][method]
                 self.assertEqual((stats["n"], stats["maturedN"], stats["wins"], stats["winRate"]), (1, 1, 1, 100))
-            self.assertEqual(set(market["windows"]["1w"]["strategies"]), {"swingHigh", "box20", "ema20"})
+            self.assertEqual(set(market["windows"]), {"1m"})
+            self.assertEqual(set(market["windows"]["1m"]["strategies"]), {"swingHigh", "box20", "ema20"})
+
+    def test_full_market_output_and_metadata_omit_weekly_information(self):
+        payload = self.build()
+        self.assertEqual([window["key"] for window in payload["params"]["windows"]], ["1m"])
+        for market in payload["markets"].values():
+            self.assertEqual(list(market["windows"]), ["1m"])
+            self.assertEqual(market["windows"]["1m"]["days"], 21)
 
     def test_missing_or_incomplete_history_does_not_shrink_the_listing(self):
         os.remove(full.uc.bars_path(self.cache, "MICRO"))

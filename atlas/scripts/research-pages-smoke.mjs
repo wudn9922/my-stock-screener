@@ -23,6 +23,7 @@ for (const [name, type, settings] of [
   const page = await context.newPage();
   const errors = [];
   const research = [];
+  const monthly = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("response", (response) => {
     if (response.url().includes("/report/research/"))
@@ -55,6 +56,24 @@ for (const [name, type, settings] of [
         .querySelector('[data-chart-identity="world:FX-USDTWD"] .candle-ohlc')
         ?.textContent?.includes("O "),
     );
+    for (const market of ["tw", "us"]) {
+      await page.goto(base + "?page=markets&market=" + market);
+      // Exercise the real generated report and the bundled historical record,
+      // including the case where the producer has not yet published monthly data.
+      await page.waitForFunction(() => {
+        const plots = [...document.querySelectorAll(".breakout-card .bo-history-chart")];
+        return plots.length === 3 && plots.every(plot =>
+          Number(plot.getAttribute("data-point-count")) >= 4 &&
+          (plot.getAttribute("aria-label")?.match(/\d{4}-\d{2}-\d{2} \d+(?:\.\d+)?%/g)?.length ?? 0) >= 4,
+        );
+      });
+      const card = page.locator("section.breakout-card");
+      if (/近一週|近1週/.test(await card.innerText()))
+        throw new Error("Full-market success rates still expose the retired weekly view");
+      monthly.push({ market, pointCounts: await card.locator(".bo-history-chart").evaluateAll(plots =>
+        plots.map(plot => Number(plot.getAttribute("data-point-count"))),
+      ) });
+    }
     for (const symbol of ["2330.TW", "6488.TWO", "AAPL"]) {
       await page.goto(base + "?page=financials&symbol=" + symbol);
       const volume = page.locator("details.data-research").filter({
@@ -99,6 +118,7 @@ for (const [name, type, settings] of [
       project: name,
       source: "Unmocked Pages build with actual committed report JSON",
       research,
+      monthly,
       errors,
       horizontalOverflow: overflow,
       passed:

@@ -1915,7 +1915,7 @@
     top: 80px;
   }
 }
-/* Independent volatility tiles beside the recommendation menu; details float above the chart. */
+/* Independent volatility and volume controls beside recommendations; details float above the chart. */
 .ws-analysis-tools, .ws-volatility {
   display: flex;
   align-items: center;
@@ -2043,6 +2043,13 @@
   font-size: 10px;
 }
 @media (max-width: 1099px) {
+  .ws-header {
+    grid-template-areas:
+      'symbol quote'
+      'valuation actions'
+      'tabs tabs'
+      'stats stats';
+  }
   .ws-header > .ws-analysis-tools {
     grid-area: stats;
     justify-self: end;

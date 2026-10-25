@@ -990,9 +990,12 @@ export function App({
         {!isIndex && providerId !== 'demo' && (
           <div className="ws-analysis-tools">
             <StockVolatility symbol={symbol} provider={providers[providerId]} reloadToken={reloadToken} />
+            <StockStatsMenu label="價量分析" testId="volume-analysis-toggle">
+              <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
+            </StockStatsMenu>
             <StockStatsMenu label="建議均線">
               <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} onNotice={setNotice} />
-              <Suspense fallback={<p>載入價量與公告…</p>}><StockResearch key={symbol} symbol={symbol} /></Suspense>
+              <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>
             </StockStatsMenu>
           </div>
         )}

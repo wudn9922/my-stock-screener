@@ -180,7 +180,7 @@ export function BreakoutCard({ market }: { market: BreakoutMarketKey }) {
           {snapshots.map(entry => <option key={entry.asOf} value={entry.asOf}>{formatDateTime(entry.asOf, false)} 保存結果</option>)}
         </select></label>
         {result?.status === 'ok' && result.data.generatedAt ? <small>測試時間 {formatDateTime(result.data.generatedAt)}</small> : null}
-        <details className="bo-inline-help"><summary>參考日與保存說明</summary><p>以選取報表的最新有效資料日為基準，往前每個日曆月重算一次，共6個月；非交易日退到當時最近的有資料交易日。各次只使用該日以前的K線與完整5日觀察。另保留每 {history?.status === 'ok' ? history.data.intervalDays : 20} 個日曆天的原始報表；舊報表沒有每月重算值時不補造。最新一次的實際測試時間與行情資料日分開標示。</p></details>
+        <details className="bo-inline-help"><summary>參考日與保存說明</summary><p>以選取報表的最新有效資料日為基準，往前每個日曆月重算一次，共6個月；非交易日退到當時最近的有資料交易日。各次只使用該日以前的K線與完整5日觀察。月度歷史依真實日K事後回算，沿用計算時的上市名單。另保留每 {history?.status === 'ok' ? history.data.intervalDays : 20} 個日曆天的原始報表，各保存結果保留原內容。最新一次的實際測試時間與行情資料日分開標示。{data?.monthly?.calculatedAt ? ` 歷史回算時間 ${formatDateTime(data.monthly.calculatedAt)}。` : ''}</p></details>
         {history && !snapshots.length ? <small>{history.status === 'ok' ? '尚無已保存的歷史結果。' : history.message}</small> : null}
       </div>
       {result === null ? <p className="muted-text" role="status">載入中…</p> : data?.scope === 'full' ? <BreakoutBody key={`${market}:${activeDate}`} data={data} params={params} /> :

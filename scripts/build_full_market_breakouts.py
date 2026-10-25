@@ -140,6 +140,9 @@ def build_payload(inputs, generated_at):
             listingAsOf=spec["listingAsOf"], listingSource=spec["listingSource"],
         )
         market["monthly"] = monthly_history(spec, key, market) if spec["frames"] else None
+        # Full-market rates use one 21-session cohort per monthly reference date.
+        # Do not retain the generic engine's legacy five-session window.
+        market["windows"] = {key: window for key, window in market["windows"].items() if key == "1m"}
         for window in market["windows"].values():
             window["strategies"] = {name: window["strategies"][name] for name in ACTIVE_STRATEGIES}
     return payload
