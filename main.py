@@ -35,6 +35,7 @@ HTTP_HEADERS = {
 }
 
 DATA_DIR = "data"
+REPORT_NON_TRADING_DATES = {"TW": frozenset(), "US": frozenset()}
 DOCS_DIR = "docs"
 # 252 根可算 52 週高點；新 CSV 初始化下載 250d，既有 CSV 每天累積一根
 MAX_DAYS = 260
@@ -2122,6 +2123,40 @@ def download_market_data(
 
     return pd.DataFrame()
 
+def _report_analysis_prices(ticker, frame):
+    from scripts.market_sessions import analysis_prices
+    market = "TW" if ticker.endswith((".TW", ".TWO")) else "US"
+    return analysis_prices(frame, REPORT_NON_TRADING_DATES.get(market, ()))
+
+
+def _scan_analysis_frames(tickers):
+    """Read all freshly collected histories before identifying market-wide closures."""
+    from report_metrics import read_price_csv
+    from scripts.market_sessions import market_prices
+    frames_by_market = {"TW": {}, "US": {}}
+    requested_markets = set()
+    for ticker in tickers:
+        market = "TW" if ticker.endswith((".TW", ".TWO")) else "US"
+        requested_markets.add(market)
+        path = os.path.join(DATA_DIR, f"{ticker}.csv")
+        if not os.path.exists(path):
+            continue
+        try:
+            # Retain missing-volume lineage: unknown source values must not
+            # become evidence that the whole market traded zero shares.
+            frame = read_price_csv(path)
+            if not frame.empty:
+                frames_by_market[market][ticker] = frame
+        except Exception as exc:
+            print(f"⚠️ {ticker} 全市場篩選讀取失敗：{type(exc).__name__}: {exc}")
+    frames = {}
+    for market in requested_markets:
+        projected, excluded = market_prices(frames_by_market[market])
+        REPORT_NON_TRADING_DATES[market] = excluded
+        frames.update(projected)
+    return frames
+
+
 def scan_market(tickers, report_min_volume=0):
     # report_min_volume 只篩報告名單；所有 tickers 的 CSV 都會先下載更新。
     os.makedirs(
@@ -2448,27 +2483,17 @@ def scan_market(tickers, report_min_volume=0):
     # 全部 CSV 更新後才篩選報告清單：台股最新日 K 至少 100 萬股；美股不限。
     # 這裡的台股成交股數門檻只影響每日 LINE 報告 tw_all，不影響行情收集。
     # -----------------------------------------------------------------
+    analysis_frames = _scan_analysis_frames(tickers)
+    return _market_scan_report(tickers, analysis_frames, report_min_volume)
+
+
+def _market_scan_report(tickers, analysis_frames, report_min_volume=0):
+    """Evaluate already collected histories; no downloads, cache writes or messages."""
+    matched_list = []
     for ticker in tickers:
-        csv_path = os.path.join(
-            DATA_DIR,
-            f"{ticker}.csv"
-        )
-
-        if not os.path.exists(csv_path):
-            continue
-
         try:
-            df = kline.read_csv(
-                csv_path,
-                index_col=0,
-                parse_dates=True
-            )
-
-            df = clean_ohlcv_dataframe(
-                df
-            )
-
-            if len(df) < 20:
+            df = analysis_frames.get(ticker)
+            if df is None or len(df) < 20:
                 continue
 
             latest_volume = safe_float(
@@ -3140,6 +3165,11 @@ def process_custom_groups(
             ).copy()
 
             combined = write_kline_csv(combined[kline.FIELDS], csv_path)
+            combined = _report_analysis_prices(actual_ticker, combined)
+            if combined.empty:
+                _record_failed_stock(unmatched_out, actual_ticker, group_key,
+                                     "沒有有效交易日資料", raw_ma_list, group_market=group_market)
+                continue
 
             for ma_window in ma_list:
                 combined[
@@ -7817,6 +7847,8 @@ def main():
     if not is_public_report_owner(supabase_user_id):
         print("ℹ️ 公開日報僅接受管理員帳號；略過私人設定讀取及所有報告產物寫入。")
         return
+
+    REPORT_NON_TRADING_DATES.update(TW=frozenset(), US=frozenset())
 
     print(
         "👤 LINE 推播使用：LINE_USER_ID"

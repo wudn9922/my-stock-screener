@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 
 import pandas as pd
 from kline_integrity import usable_frame, read_csv as read_kline_csv
+from scripts.market_sessions import analysis_prices, market_prices
 
 UNIVERSE_VERSION = 1
 UNIVERSE_FILE = "universe.json"
@@ -538,6 +539,7 @@ def build_universe(tickers, market, data_dir, bench, name_fn=None):
     bench_symbol, _ = _bench_parts(bench, market)
     records = []
     seen = set()
+    frames = {}
 
     for ticker in tickers or []:
         symbol = str(ticker or "").strip().upper()
@@ -553,12 +555,18 @@ def build_universe(tickers, market, data_dir, bench, name_fn=None):
             if df.empty:
                 continue
 
+            frames[symbol] = df
+
+        except Exception as exc:
+            print(f"⚠️ {symbol} universe 指標失敗：{type(exc).__name__}: {exc}")
+
+    frames, excluded_dates = market_prices(frames)
+    for symbol, df in frames.items():
+        try:
             name = name_fn(symbol) if name_fn else ""
             record = build_stock_record(symbol, df, bench, market, name)
-
             if record is not None:
                 records.append(record)
-
         except Exception as exc:
             print(f"⚠️ {symbol} universe 指標失敗：{type(exc).__name__}: {exc}")
 
@@ -591,7 +599,8 @@ def build_universe(tickers, market, data_dir, bench, name_fn=None):
         "asOf": as_of,
         "universe": UNIVERSE_LABELS.get(market, market),
         "records": records,
-        "rsDistribution": distribution
+        "rsDistribution": distribution,
+        "nonTradingDates": sorted(excluded_dates),
     }
 
 
@@ -629,6 +638,7 @@ def make_lookup(universe, data_dir, bench_map):
 
         try:
             df = read_price_csv(os.path.join(data_dir, f"{symbol}.csv"))
+            df = analysis_prices(df, (universe.get(market) or {}).get("nonTradingDates", ()))
             metrics = compute_stock_metrics(df, bench_close, bench_symbol)
 
             if metrics is not None:

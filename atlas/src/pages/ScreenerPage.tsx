@@ -361,6 +361,9 @@ function ScreenerView({
   const filterButtonRef = useRef<HTMLButtonElement>(null);
 
   const groupItems = group?.items ?? EMPTY_GROUP_ITEMS;
+  const groupDates = useMemo(() => [...new Set(groupItems.flatMap(item =>
+    item.asOf && /^\d{4}-\d{2}-\d{2}$/.test(item.asOf) ? [item.asOf] : [],
+  ))].sort(), [groupItems]);
   // Fixed and custom groups also list their unmatched / failed stocks; full-market lists never do.
   const counts = useMemo(() => statusCounts(groupItems), [groupItems]);
   const hasUnmatched = !universeMarket && counts.unmatched > 0;
@@ -563,6 +566,12 @@ function ScreenerView({
           {universeMarketData.items.length.toLocaleString('en-US')} 檔
           {universeMarketData.asOf ? ` · 資料日 ${formatDateTime(universeMarketData.asOf, false)}` : ''} · 相對強弱基準{' '}
           {universeMarketData.benchmark === '^TWII' ? '加權指數' : universeMarketData.benchmark} · {universeMarketData.universe}
+        </p>
+      )}
+      {!universeMarketData && groupDates.length > 0 && (
+        <p className="screener-meta">
+          資料日 {formatDateTime(groupDates[0]!, false)}
+          {groupDates.length > 1 ? ` ～ ${formatDateTime(groupDates.at(-1)!, false)}` : ''}
         </p>
       )}
       {observationDate && groupItems.some(item => item.asOf !== observationDate) && (

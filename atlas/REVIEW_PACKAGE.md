@@ -1,3 +1,44 @@
+## Current follow-up: retain valid market data during closures (2026-10-25)
+
+The deployed Sunday report had an empty Taiwan full-market scan and zero-count
+breadth. The daily CSVs had acquired market-wide zero-volume placeholders dated
+2026-10-23, while real trading ended on 2026-10-22. Scanning applied its unchanged
+volume floor to those placeholders; breadth selected their modal date; filter
+metrics also consumed the extra bar. Full-universe data itself remained intact.
+
+A shared read-only session projection now excludes weekends and broad,
+known-zero market dates before scan, metrics, custom-group and breadth analysis.
+Weekday inference requires independent histories and adequate recent coverage;
+any positive or unknown volume prevents that inference. A halted individual
+stock on an active market date is not rewound. Taiwan and US cohorts remain
+separate. Raw caches, permanent archives, report volume thresholds, same-date
+filter guards and public-owner permission checks retain their existing behavior.
+Partial breadth refreshes preserve the other market's prior valid snapshot.
+Scan groups display their actual observation date alongside existing metadata.
+
+The recovery CLI prepares separate review files only. It validates retained scan
+prices/volumes against current raw histories, requires the latest genuine
+session, keeps original metrics, computes the newly added complete-window
+average volume, and rebuilds breadth. The actual replay restores all 92 saved
+Taiwan candidates without rejection and breadth of 1,949 stocks (MA20:
+494/1,947 = 25.4%; MA60: 720/1,945 = 37.0%), dated 2026-10-22. Other markets and
+groups remain byte-equivalent as JSON values. Source hashes and recovery
+provenance are in `docs/closed-market-recovery-proof.json`; the browser fixture
+contains a documented three-row real excerpt. Generated repair artifacts belong
+on a separate PR targeting `generated`, never in the source PR.
+
+Primary self-review checked sparse/unknown-volume data, long closures, individual
+halts, cross-market isolation, missing-source retention, mismatched saved rows,
+input immutability and the early public-owner privacy guard. The existing CSV
+cleaners converted missing volume to zero; their analysis views now retain the
+unknown-volume lineage before the closure inference, with an actual-CSV reader
+regression. New browser cases
+cover Sunday and long-closure clocks, breadth, candidates, average-volume and
+prior-session-volume filters on desktop, phone Chromium and iPhone WebKit.
+Actual verification totals and exact-head Actions results are recorded in the
+PR. No independent review, physical-device verification, merge or deployment is
+claimed.
+
 ## Current follow-up: index directional volume above market entry rates (2026-10-25)
 
 Taiwan and US market pages now show an index-volume card directly above full-market entry success rates. The card defaults to the market's first configured index, offers every configured index in that market, and exposes the existing 5/10/20-session directional ratios immediately. It contains no abnormal-volume calculation or RVOL thresholds. Stocks retain their abnormal-volume controls and share the unchanged directional-ratio calculation and presentation.
