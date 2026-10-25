@@ -4,9 +4,11 @@ import { SecRadar } from "./SecRadar";
 export default function StockResearch({
   symbol,
   simulated = false,
+  mode = "all",
 }: {
   symbol: string;
   simulated?: boolean;
+  mode?: "all" | "volume" | "official";
 }) {
   const tw = /\.TWO?$/.test(symbol);
   return (
@@ -16,10 +18,10 @@ export default function StockResearch({
           研究面板使用官方或日報真實資料；目前圖表是模擬資料，兩者不可直接比較。
         </p>
       )}
-      <VolumePanel key={`volume-${symbol}`} symbol={symbol} />
-      <div className="stock-official-notices">
+      {mode !== "official" && <VolumePanel key={`volume-${symbol}`} symbol={symbol} />}
+      {mode !== "volume" && <div className="stock-official-notices">
         {tw ? <OfficialAlerts symbol={symbol} /> : <SecRadar symbol={symbol} />}
-      </div>
+      </div>}
     </div>
   );
 }

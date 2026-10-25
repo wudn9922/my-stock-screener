@@ -59,23 +59,25 @@ test('chart shows the weekly recommendation, applies it on the daily chart and s
   await page.goto('./?page=chart&symbol=2330.TW&tf=1W');
   const card = page.getByTestId('ma-recommendation');
   const toggle = page.getByTestId('stock-stats-toggle');
-  // Closed: one button sharing an existing header row (P/E on desktop, K線／財務 on phones); no extra row above the chart.
+  // Closed: recommendations share the analysis row with both volatility values and volume analysis.
   // Hidden also matches an element not yet mounted; wait for the lazy chart header before measuring it.
   await expect(toggle).toBeVisible();
   await expect(page.getByTestId('valuation')).toBeVisible();
   await expect(card).toBeHidden();
   await expect(toggle).toBeVisible();
   const row = await page.evaluate(() => {
-    const toggle = document.querySelector('[data-testid="stock-stats-toggle"]')!.getBoundingClientRect();
-    const shares = (selector: string) => {
-      const element = document.querySelector(selector);
-      if (!element) return false;
-      const other = element.getBoundingClientRect();
-      return toggle.top < other.bottom && toggle.bottom > other.top;
+    const tools = document.querySelector('.ws-analysis-tools')!.getBoundingClientRect();
+    const tabs = document.querySelector('.ws-header > .stock-tabs')!.getBoundingClientRect();
+    return {
+      tops: ['volatility-atr-toggle', 'volatility-range-toggle', 'volume-analysis-toggle', 'stock-stats-toggle']
+        .map(id => document.querySelector(`[data-testid="${id}"]`)!.getBoundingClientRect().top),
+      tabsOverlap: Math.max(0, Math.min(tools.right, tabs.right) - Math.max(tools.left, tabs.left)) *
+        Math.max(0, Math.min(tools.bottom, tabs.bottom) - Math.max(tools.top, tabs.top)),
+      overflow: document.scrollingElement!.scrollWidth - innerWidth,
     };
-    return { shares: shares('[data-testid="valuation"]') || shares('.stock-tabs'), overflow: document.scrollingElement!.scrollWidth - innerWidth };
   });
-  expect(row.shares).toBe(true);
+  expect(Math.max(...row.tops) - Math.min(...row.tops)).toBeLessThanOrEqual(12);
+  expect(row.tabsOverlap).toBe(0);
   expect(row.overflow).toBeLessThanOrEqual(0);
 
   await toggle.click();
@@ -97,15 +99,27 @@ test('chart shows the weekly recommendation, applies it on the daily chart and s
   // A non-star candidate can be applied alone; fixing starts from applied MAs, not the three recommendations.
   await card.getByRole('button', { name: '套用 SMA 20', exact: true }).click();
   await expect(page.locator('.indicator-chip .indicator-name')).toHaveText(['SMA 20']);
-  await expect(card.getByRole('button', { name: 'SMA 20 已套用', exact: true })).toBeDisabled();
+  const applied20 = card.getByRole('button', { name: '取消套用 SMA 20', exact: true });
+  await expect(applied20).toBeEnabled();
+  await expect(applied20).toHaveAttribute('aria-pressed', 'true');
   await card.getByRole('button', { name: '固定為個股參數' }).click();
   const onlyApplied = page.getByRole('dialog', { name: '2330.TW 固定均線參數' });
   await expect(onlyApplied.getByRole('textbox', { name: '個股固定均線參數' })).toHaveValue('20');
   await onlyApplied.getByRole('button', { name: '取消編輯' }).click();
+  await applied20.click();
+  await expect(page.locator('.indicator-chip .indicator-name')).toHaveCount(0);
+  await expect(card.getByRole('button', { name: '套用 SMA 20', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect(card.getByRole('button', { name: '固定為個股參數' })).toBeDisabled();
+  await card.getByRole('button', { name: '套用 SMA 20', exact: true }).click();
   await card.getByRole('button', { name: '套用全部建議' }).click();
   await expect(page.getByRole('status').filter({ hasText: '已在日線圖加入 SMA 24 / 38 / 89' })).toBeVisible();
   await expect(page.getByRole('button', { name: '週期 1D', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(card.getByRole('button', { name: '建議已套用', exact: true })).toBeDisabled();
+  // Starred candidates also toggle independently of the other applied lines.
+  await card.getByRole('button', { name: '取消套用 SMA 24', exact: true }).click();
+  await expect(page.locator('.indicator-chip .indicator-name')).toHaveText(['SMA 20', 'SMA 38', 'SMA 89']);
+  await expect(card.getByRole('button', { name: '取消套用 SMA 20', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await card.getByRole('button', { name: '套用 SMA 24', exact: true }).click();
 
   await card.getByRole('button', { name: '固定為個股參數' }).click();
   const dialog = page.getByRole('dialog', { name: '2330.TW 固定均線參數' });

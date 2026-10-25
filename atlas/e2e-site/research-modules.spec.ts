@@ -196,13 +196,24 @@ test("chart research panel leaves candles mounted and settings intact", async ({
   await page.goto("./?page=chart&symbol=AAPL&tf=1D");
   await expect(page.getByTestId("active-symbol")).toHaveText("AAPL");
   await page
-    .getByRole("button", { name: "建議均線", exact: true })
+    .getByRole("button", { name: "價量分析", exact: true })
     .first()
     .click();
-  const summary = page.locator("summary").filter({ hasText: "價量分析" });
+  const volume = page.getByRole("region", { name: "價量分析", exact: true });
+  const summary = volume.locator("summary").filter({ hasText: "價量分析" });
   await summary.click();
-  await expect(page.getByText("上漲縮量比例", { exact: true })).toBeVisible();
+  await expect(volume.getByText("上漲縮量比例", { exact: true })).toBeVisible();
+  await expect(volume.locator(".stock-official-notices")).toHaveCount(0);
+  const volumeBounds = await volume.evaluate((element) => ({
+    bottom: element.getBoundingClientRect().bottom,
+    navigation: document.querySelector(".site-tabbar")?.getBoundingClientRect(),
+  }));
+  if (volumeBounds.navigation && volumeBounds.navigation.height > 0)
+    expect(volumeBounds.bottom).toBeLessThanOrEqual(volumeBounds.navigation.top);
+  await page.getByRole("button", { name: "建議均線", exact: true }).click();
+  await expect(volume).not.toBeVisible();
   const menu = page.getByRole("region", { name: "建議均線", exact: true });
+  await expect(menu.locator("summary").filter({ hasText: "價量分析" })).toHaveCount(0);
   const official = menu.locator(".stock-official-notices > details > summary");
   await official.scrollIntoViewIfNeeded();
   await expect(official).toBeVisible();

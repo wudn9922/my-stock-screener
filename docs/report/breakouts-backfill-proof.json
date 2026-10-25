@@ -1,0 +1,1638 @@
+{
+  "archiveGitCommit": "4c934296ac3bb1003d0d4a7f106d21a099cddb87",
+  "archiveManifestSha256": "d7286e3ec29dac16ba0d3e13fd1f75a48dc4243a81e289365254054cb036fb34",
+  "sourceBasis": "Yahoo split-adjusted; not dividend-adjusted",
+  "sourceMarkets": {
+    "tw": {
+      "symbolCount": 1981,
+      "firstDate": "2024-10-24",
+      "lastDate": "2026-10-23",
+      "rows": 952449,
+      "csvBytes": 48488668
+    },
+    "us": {
+      "symbolCount": 5347,
+      "firstDate": "2024-10-24",
+      "lastDate": "2026-10-23",
+      "rows": 2528381,
+      "csvBytes": 124616870
+    }
+  },
+  "replayStartedAt": "2026-10-25T06:16:04.604027+00:00",
+  "rollingBarsPerSymbol": 320,
+  "codeSha256": {
+    "scripts/build_full_market_breakouts.py": "76fbc8485bca1a64d69d7ea8f6666626918e895b447dce2db3860cd4f107db67",
+    "scripts/build_breakouts.py": "ff6d8bc90988a4def0c4b29749604179fcba4aa1106709e60398501a1a83d073",
+    "scripts/breakout_outcomes.py": "c723a6ccab295b6fa78043a411d71b7110ed7563fb9838d4431e2a843a248d7b",
+    "scripts/swing_breakouts.py": "409a907d8ea1647b6d8671e893adb857b3dc20004dacddbdcf99eba669028982",
+    "scripts/kline_archive.py": "5050273dd83d886159637fd258a30508158a3503c321ae3d80b66ec6b479649c",
+    "scripts/universe_cache.py": "8c629e3d7060d467fc60511649356662e2ecd7c2a063c427419e8b54a406ef5f"
+  },
+  "seededSymbolCount": 7328,
+  "listWarnings": [],
+  "listProblems": [],
+  "lists": {
+    "TWSE": {
+      "fetchedAt": "2026-10-25",
+      "source": "t187ap03_L",
+      "count": 1087
+    },
+    "TPEx": {
+      "fetchedAt": "2026-10-25",
+      "source": "mopsfin_t187ap03_O",
+      "count": 894
+    },
+    "US": {
+      "fetchedAt": "2026-10-25",
+      "source": "nasdaqtrader",
+      "count": 5348
+    }
+  },
+  "listsSha256": "819d7f0b2cb7851ecde72b6912aec9bebebce1c9ae091654d099f0a04ab33489",
+  "stateSha256": "9074b88d7ee9019cf6f25f669e7a655a61eb04fdeef4b87e30ad315b1c5fe32e",
+  "alignedGeneratedSnapshotGitCommit": "71f7e0b31bb5456724d6f0d9b38407a28af94447",
+  "referenceDatePolicy": "Align each market to the actual saved report date to backfill its missing historical months; never use prices after that reference date.",
+  "sourceLatestSession": {
+    "tw": "2026-10-23",
+    "us": "2026-10-23"
+  },
+  "marketReferenceCutoffs": {
+    "tw": "2026-10-22",
+    "us": "2026-10-23"
+  },
+  "calculationInputs": {
+    "tw": {
+      "listed": 1981,
+      "loadedFrames": 1981,
+      "listingAsOf": "2026-10-25",
+      "listingSource": "t187ap03_L、mopsfin_t187ap03_O"
+    },
+    "us": {
+      "listed": 5348,
+      "loadedFrames": 5347,
+      "listingAsOf": "2026-10-25",
+      "listingSource": "nasdaqtrader"
+    }
+  },
+  "inputChecksumsSha256": "fa90d643051a3e13480dda37efec57a944466d15db752279b95e56756227f3dc",
+  "reportSha256": "14a9d4ee198b88452e3867c20e4f07dbde77fa15f1eddd14f1427c4b30de0bf5",
+  "reportGeneratedAt": "2026-10-25T06:23:04+00:00",
+  "reportAsOf": "2026-10-23",
+  "monthlySummary": {
+    "tw": {
+      "referenceDate": "2026-10-22",
+      "points": [
+        {
+          "targetDate": "2026-04-22",
+          "asOf": "2026-04-22",
+          "status": "ok",
+          "evaluated": 1962,
+          "universeCount": 1981,
+          "coveragePct": 99.0409,
+          "strategies": {
+            "box20": {
+              "n": 432,
+              "completeN": 260,
+              "pendingN": 169,
+              "missingN": 3,
+              "rules": {
+                "hold5": {
+                  "wins": 217,
+                  "failures": 43,
+                  "evaluatedN": 260,
+                  "winRate": 83.5
+                },
+                "nextHigh": {
+                  "wins": 150,
+                  "failures": 110,
+                  "evaluatedN": 260,
+                  "winRate": 57.7
+                },
+                "firstHit": {
+                  "wins": 225,
+                  "failures": 35,
+                  "evaluatedN": 260,
+                  "winRate": 86.5
+                },
+                "targetAndNext": {
+                  "wins": 92,
+                  "failures": 168,
+                  "evaluatedN": 260,
+                  "winRate": 35.4
+                }
+              }
+            },
+            "ema20": {
+              "n": 1289,
+              "completeN": 1061,
+              "pendingN": 214,
+              "missingN": 14,
+              "rules": {
+                "hold5": {
+                  "wins": 760,
+                  "failures": 301,
+                  "evaluatedN": 1061,
+                  "winRate": 71.6
+                },
+                "nextHigh": {
+                  "wins": 549,
+                  "failures": 512,
+                  "evaluatedN": 1061,
+                  "winRate": 51.7
+                },
+                "firstHit": {
+                  "wins": 813,
+                  "failures": 248,
+                  "evaluatedN": 1061,
+                  "winRate": 76.6
+                },
+                "targetAndNext": {
+                  "wins": 404,
+                  "failures": 657,
+                  "evaluatedN": 1061,
+                  "winRate": 38.1
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 1571,
+              "completeN": 1028,
+              "pendingN": 532,
+              "missingN": 11,
+              "rules": {
+                "hold5": {
+                  "wins": 404,
+                  "failures": 624,
+                  "evaluatedN": 1028,
+                  "winRate": 39.3
+                },
+                "nextHigh": {
+                  "wins": 366,
+                  "failures": 662,
+                  "evaluatedN": 1028,
+                  "winRate": 35.6
+                },
+                "firstHit": {
+                  "wins": 455,
+                  "failures": 573,
+                  "evaluatedN": 1028,
+                  "winRate": 44.3
+                },
+                "targetAndNext": {
+                  "wins": 317,
+                  "failures": 711,
+                  "evaluatedN": 1028,
+                  "winRate": 30.8
+                }
+              }
+            }
+          }
+        },
+        {
+          "targetDate": "2026-05-22",
+          "asOf": "2026-05-22",
+          "status": "ok",
+          "evaluated": 1967,
+          "universeCount": 1981,
+          "coveragePct": 99.2933,
+          "strategies": {
+            "box20": {
+              "n": 256,
+              "completeN": 192,
+              "pendingN": 59,
+              "missingN": 5,
+              "rules": {
+                "hold5": {
+                  "wins": 156,
+                  "failures": 36,
+                  "evaluatedN": 192,
+                  "winRate": 81.2
+                },
+                "nextHigh": {
+                  "wins": 119,
+                  "failures": 73,
+                  "evaluatedN": 192,
+                  "winRate": 62.0
+                },
+                "firstHit": {
+                  "wins": 170,
+                  "failures": 22,
+                  "evaluatedN": 192,
+                  "winRate": 88.5
+                },
+                "targetAndNext": {
+                  "wins": 84,
+                  "failures": 108,
+                  "evaluatedN": 192,
+                  "winRate": 43.8
+                }
+              }
+            },
+            "ema20": {
+              "n": 1157,
+              "completeN": 829,
+              "pendingN": 309,
+              "missingN": 19,
+              "rules": {
+                "hold5": {
+                  "wins": 580,
+                  "failures": 249,
+                  "evaluatedN": 829,
+                  "winRate": 70.0
+                },
+                "nextHigh": {
+                  "wins": 401,
+                  "failures": 428,
+                  "evaluatedN": 829,
+                  "winRate": 48.4
+                },
+                "firstHit": {
+                  "wins": 630,
+                  "failures": 199,
+                  "evaluatedN": 829,
+                  "winRate": 76.0
+                },
+                "targetAndNext": {
+                  "wins": 289,
+                  "failures": 540,
+                  "evaluatedN": 829,
+                  "winRate": 34.9
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 1447,
+              "completeN": 1097,
+              "pendingN": 340,
+              "missingN": 10,
+              "rules": {
+                "hold5": {
+                  "wins": 381,
+                  "failures": 716,
+                  "evaluatedN": 1097,
+                  "winRate": 34.7
+                },
+                "nextHigh": {
+                  "wins": 389,
+                  "failures": 708,
+                  "evaluatedN": 1097,
+                  "winRate": 35.5
+                },
+                "firstHit": {
+                  "wins": 465,
+                  "failures": 632,
+                  "evaluatedN": 1097,
+                  "winRate": 42.4
+                },
+                "targetAndNext": {
+                  "wins": 353,
+                  "failures": 744,
+                  "evaluatedN": 1097,
+                  "winRate": 32.2
+                }
+              }
+            }
+          }
+        },
+        {
+          "targetDate": "2026-06-22",
+          "asOf": "2026-06-22",
+          "status": "ok",
+          "evaluated": 1964,
+          "universeCount": 1981,
+          "coveragePct": 99.1418,
+          "strategies": {
+            "box20": {
+              "n": 463,
+              "completeN": 407,
+              "pendingN": 53,
+              "missingN": 3,
+              "rules": {
+                "hold5": {
+                  "wins": 321,
+                  "failures": 86,
+                  "evaluatedN": 407,
+                  "winRate": 78.9
+                },
+                "nextHigh": {
+                  "wins": 254,
+                  "failures": 153,
+                  "evaluatedN": 407,
+                  "winRate": 62.4
+                },
+                "firstHit": {
+                  "wins": 361,
+                  "failures": 46,
+                  "evaluatedN": 407,
+                  "winRate": 88.7
+                },
+                "targetAndNext": {
+                  "wins": 160,
+                  "failures": 247,
+                  "evaluatedN": 407,
+                  "winRate": 39.3
+                }
+              }
+            },
+            "ema20": {
+              "n": 1352,
+              "completeN": 1073,
+              "pendingN": 263,
+              "missingN": 16,
+              "rules": {
+                "hold5": {
+                  "wins": 721,
+                  "failures": 352,
+                  "evaluatedN": 1073,
+                  "winRate": 67.2
+                },
+                "nextHigh": {
+                  "wins": 606,
+                  "failures": 467,
+                  "evaluatedN": 1073,
+                  "winRate": 56.5
+                },
+                "firstHit": {
+                  "wins": 817,
+                  "failures": 256,
+                  "evaluatedN": 1073,
+                  "winRate": 76.1
+                },
+                "targetAndNext": {
+                  "wins": 449,
+                  "failures": 624,
+                  "evaluatedN": 1073,
+                  "winRate": 41.8
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 1928,
+              "completeN": 1502,
+              "pendingN": 422,
+              "missingN": 4,
+              "rules": {
+                "hold5": {
+                  "wins": 502,
+                  "failures": 1000,
+                  "evaluatedN": 1502,
+                  "winRate": 33.4
+                },
+                "nextHigh": {
+                  "wins": 542,
+                  "failures": 960,
+                  "evaluatedN": 1502,
+                  "winRate": 36.1
+                },
+                "firstHit": {
+                  "wins": 664,
+                  "failures": 838,
+                  "evaluatedN": 1502,
+                  "winRate": 44.2
+                },
+                "targetAndNext": {
+                  "wins": 458,
+                  "failures": 1044,
+                  "evaluatedN": 1502,
+                  "winRate": 30.5
+                }
+              }
+            }
+          }
+        },
+        {
+          "targetDate": "2026-07-22",
+          "asOf": "2026-07-22",
+          "status": "ok",
+          "evaluated": 1958,
+          "universeCount": 1981,
+          "coveragePct": 98.839,
+          "strategies": {
+            "box20": {
+              "n": 268,
+              "completeN": 215,
+              "pendingN": 48,
+              "missingN": 5,
+              "rules": {
+                "hold5": {
+                  "wins": 161,
+                  "failures": 54,
+                  "evaluatedN": 215,
+                  "winRate": 74.9
+                },
+                "nextHigh": {
+                  "wins": 126,
+                  "failures": 89,
+                  "evaluatedN": 215,
+                  "winRate": 58.6
+                },
+                "firstHit": {
+                  "wins": 183,
+                  "failures": 32,
+                  "evaluatedN": 215,
+                  "winRate": 85.1
+                },
+                "targetAndNext": {
+                  "wins": 71,
+                  "failures": 144,
+                  "evaluatedN": 215,
+                  "winRate": 33.0
+                }
+              }
+            },
+            "ema20": {
+              "n": 1084,
+              "completeN": 919,
+              "pendingN": 146,
+              "missingN": 19,
+              "rules": {
+                "hold5": {
+                  "wins": 547,
+                  "failures": 372,
+                  "evaluatedN": 919,
+                  "winRate": 59.5
+                },
+                "nextHigh": {
+                  "wins": 496,
+                  "failures": 423,
+                  "evaluatedN": 919,
+                  "winRate": 54.0
+                },
+                "firstHit": {
+                  "wins": 668,
+                  "failures": 251,
+                  "evaluatedN": 919,
+                  "winRate": 72.7
+                },
+                "targetAndNext": {
+                  "wins": 324,
+                  "failures": 595,
+                  "evaluatedN": 919,
+                  "winRate": 35.3
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 1075,
+              "completeN": 918,
+              "pendingN": 146,
+              "missingN": 11,
+              "rules": {
+                "hold5": {
+                  "wins": 235,
+                  "failures": 683,
+                  "evaluatedN": 918,
+                  "winRate": 25.6
+                },
+                "nextHigh": {
+                  "wins": 314,
+                  "failures": 604,
+                  "evaluatedN": 918,
+                  "winRate": 34.2
+                },
+                "firstHit": {
+                  "wins": 362,
+                  "failures": 556,
+                  "evaluatedN": 918,
+                  "winRate": 39.4
+                },
+                "targetAndNext": {
+                  "wins": 252,
+                  "failures": 666,
+                  "evaluatedN": 918,
+                  "winRate": 27.5
+                }
+              }
+            }
+          }
+        },
+        {
+          "targetDate": "2026-08-22",
+          "asOf": "2026-08-21",
+          "status": "ok",
+          "evaluated": 1957,
+          "universeCount": 1981,
+          "coveragePct": 98.7885,
+          "strategies": {
+            "box20": {
+              "n": 270,
+              "completeN": 185,
+              "pendingN": 76,
+              "missingN": 9,
+              "rules": {
+                "hold5": {
+                  "wins": 161,
+                  "failures": 24,
+                  "evaluatedN": 185,
+                  "winRate": 87.0
+                },
+                "nextHigh": {
+                  "wins": 99,
+                  "failures": 86,
+                  "evaluatedN": 185,
+                  "winRate": 53.5
+                },
+                "firstHit": {
+                  "wins": 167,
+                  "failures": 18,
+                  "evaluatedN": 185,
+                  "winRate": 90.3
+                },
+                "targetAndNext": {
+                  "wins": 59,
+                  "failures": 126,
+                  "evaluatedN": 185,
+                  "winRate": 31.9
+                }
+              }
+            },
+            "ema20": {
+              "n": 1369,
+              "completeN": 1178,
+              "pendingN": 167,
+              "missingN": 24,
+              "rules": {
+                "hold5": {
+                  "wins": 768,
+                  "failures": 410,
+                  "evaluatedN": 1178,
+                  "winRate": 65.2
+                },
+                "nextHigh": {
+                  "wins": 551,
+                  "failures": 627,
+                  "evaluatedN": 1178,
+                  "winRate": 46.8
+                },
+                "firstHit": {
+                  "wins": 834,
+                  "failures": 344,
+                  "evaluatedN": 1178,
+                  "winRate": 70.8
+                },
+                "targetAndNext": {
+                  "wins": 387,
+                  "failures": 791,
+                  "evaluatedN": 1178,
+                  "winRate": 32.9
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 658,
+              "completeN": 479,
+              "pendingN": 166,
+              "missingN": 13,
+              "rules": {
+                "hold5": {
+                  "wins": 166,
+                  "failures": 313,
+                  "evaluatedN": 479,
+                  "winRate": 34.7
+                },
+                "nextHigh": {
+                  "wins": 148,
+                  "failures": 331,
+                  "evaluatedN": 479,
+                  "winRate": 30.9
+                },
+                "firstHit": {
+                  "wins": 196,
+                  "failures": 283,
+                  "evaluatedN": 479,
+                  "winRate": 40.9
+                },
+                "targetAndNext": {
+                  "wins": 120,
+                  "failures": 359,
+                  "evaluatedN": 479,
+                  "winRate": 25.1
+                }
+              }
+            }
+          }
+        },
+        {
+          "targetDate": "2026-09-22",
+          "asOf": "2026-09-22",
+          "status": "ok",
+          "evaluated": 1952,
+          "universeCount": 1981,
+          "coveragePct": 98.5361,
+          "strategies": {
+            "box20": {
+              "n": 330,
+              "completeN": 224,
+              "pendingN": 102,
+              "missingN": 4,
+              "rules": {
+                "hold5": {
+                  "wins": 187,
+                  "failures": 37,
+                  "evaluatedN": 224,
+                  "winRate": 83.5
+                },
+                "nextHigh": {
+                  "wins": 114,
+                  "failures": 110,
+                  "evaluatedN": 224,
+                  "winRate": 50.9
+                },
+                "firstHit": {
+                  "wins": 196,
+                  "failures": 28,
+                  "evaluatedN": 224,
+                  "winRate": 87.5
+                },
+                "targetAndNext": {
+                  "wins": 71,
+                  "failures": 153,
+                  "evaluatedN": 224,
+                  "winRate": 31.7
+                }
+              }
+            },
+            "ema20": {
+              "n": 1207,
+              "completeN": 776,
+              "pendingN": 404,
+              "missingN": 27,
+              "rules": {
+                "hold5": {
+                  "wins": 505,
+                  "failures": 271,
+                  "evaluatedN": 776,
+                  "winRate": 65.1
+                },
+                "nextHigh": {
+                  "wins": 331,
+                  "failures": 445,
+                  "evaluatedN": 776,
+                  "winRate": 42.7
+                },
+                "firstHit": {
+                  "wins": 539,
+                  "failures": 237,
+                  "evaluatedN": 776,
+                  "winRate": 69.5
+                },
+                "targetAndNext": {
+                  "wins": 202,
+                  "failures": 574,
+                  "evaluatedN": 776,
+                  "winRate": 26.0
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 824,
+              "completeN": 564,
+              "pendingN": 253,
+              "missingN": 7,
+              "rules": {
+                "hold5": {
+                  "wins": 179,
+                  "failures": 385,
+                  "evaluatedN": 564,
+                  "winRate": 31.7
+                },
+                "nextHigh": {
+                  "wins": 168,
+                  "failures": 396,
+                  "evaluatedN": 564,
+                  "winRate": 29.8
+                },
+                "firstHit": {
+                  "wins": 218,
+                  "failures": 346,
+                  "evaluatedN": 564,
+                  "winRate": 38.7
+                },
+                "targetAndNext": {
+                  "wins": 141,
+                  "failures": 423,
+                  "evaluatedN": 564,
+                  "winRate": 25.0
+                }
+              }
+            }
+          }
+        },
+        {
+          "targetDate": "2026-10-22",
+          "asOf": "2026-10-22",
+          "status": "ok",
+          "evaluated": 1944,
+          "universeCount": 1981,
+          "coveragePct": 98.1323,
+          "strategies": {
+            "box20": {
+              "n": 478,
+              "completeN": 408,
+              "pendingN": 59,
+              "missingN": 11,
+              "rules": {
+                "hold5": {
+                  "wins": 352,
+                  "failures": 56,
+                  "evaluatedN": 408,
+                  "winRate": 86.3
+                },
+                "nextHigh": {
+                  "wins": 225,
+                  "failures": 183,
+                  "evaluatedN": 408,
+                  "winRate": 55.1
+                },
+                "firstHit": {
+                  "wins": 363,
+                  "failures": 45,
+                  "evaluatedN": 408,
+                  "winRate": 89.0
+                },
+                "targetAndNext": {
+                  "wins": 162,
+                  "failures": 246,
+                  "evaluatedN": 408,
+                  "winRate": 39.7
+                }
+              }
+            },
+            "ema20": {
+              "n": 1078,
+              "completeN": 872,
+              "pendingN": 189,
+              "missingN": 17,
+              "rules": {
+                "hold5": {
+                  "wins": 656,
+                  "failures": 216,
+                  "evaluatedN": 872,
+                  "winRate": 75.2
+                },
+                "nextHigh": {
+                  "wins": 380,
+                  "failures": 492,
+                  "evaluatedN": 872,
+                  "winRate": 43.6
+                },
+                "firstHit": {
+                  "wins": 678,
+                  "failures": 194,
+                  "evaluatedN": 872,
+                  "winRate": 77.8
+                },
+                "targetAndNext": {
+                  "wins": 205,
+                  "failures": 667,
+                  "evaluatedN": 872,
+                  "winRate": 23.5
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 1098,
+              "completeN": 900,
+              "pendingN": 183,
+              "missingN": 15,
+              "rules": {
+                "hold5": {
+                  "wins": 335,
+                  "failures": 565,
+                  "evaluatedN": 900,
+                  "winRate": 37.2
+                },
+                "nextHigh": {
+                  "wins": 292,
+                  "failures": 608,
+                  "evaluatedN": 900,
+                  "winRate": 32.4
+                },
+                "firstHit": {
+                  "wins": 384,
+                  "failures": 516,
+                  "evaluatedN": 900,
+                  "winRate": 42.7
+                },
+                "targetAndNext": {
+                  "wins": 235,
+                  "failures": 665,
+                  "evaluatedN": 900,
+                  "winRate": 26.1
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "us": {
+      "referenceDate": "2026-10-23",
+      "points": [
+        {
+          "targetDate": "2026-04-23",
+          "asOf": "2026-04-23",
+          "status": "ok",
+          "evaluated": 5138,
+          "universeCount": 5348,
+          "coveragePct": 96.0733,
+          "strategies": {
+            "box20": {
+              "n": 660,
+              "completeN": 556,
+              "pendingN": 97,
+              "missingN": 7,
+              "rules": {
+                "hold5": {
+                  "wins": 439,
+                  "failures": 117,
+                  "evaluatedN": 556,
+                  "winRate": 79.0
+                },
+                "nextHigh": {
+                  "wins": 325,
+                  "failures": 231,
+                  "evaluatedN": 556,
+                  "winRate": 58.5
+                },
+                "firstHit": {
+                  "wins": 450,
+                  "failures": 106,
+                  "evaluatedN": 556,
+                  "winRate": 80.9
+                },
+                "targetAndNext": {
+                  "wins": 155,
+                  "failures": 401,
+                  "evaluatedN": 556,
+                  "winRate": 27.9
+                }
+              }
+            },
+            "ema20": {
+              "n": 3321,
+              "completeN": 2978,
+              "pendingN": 322,
+              "missingN": 21,
+              "rules": {
+                "hold5": {
+                  "wins": 1821,
+                  "failures": 1157,
+                  "evaluatedN": 2978,
+                  "winRate": 61.1
+                },
+                "nextHigh": {
+                  "wins": 1458,
+                  "failures": 1520,
+                  "evaluatedN": 2978,
+                  "winRate": 49.0
+                },
+                "firstHit": {
+                  "wins": 2052,
+                  "failures": 926,
+                  "evaluatedN": 2978,
+                  "winRate": 68.9
+                },
+                "targetAndNext": {
+                  "wins": 1135,
+                  "failures": 1843,
+                  "evaluatedN": 2978,
+                  "winRate": 38.1
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 3195,
+              "completeN": 2140,
+              "pendingN": 1032,
+              "missingN": 23,
+              "rules": {
+                "hold5": {
+                  "wins": 804,
+                  "failures": 1336,
+                  "evaluatedN": 2140,
+                  "winRate": 37.6
+                },
+                "nextHigh": {
+                  "wins": 683,
+                  "failures": 1457,
+                  "evaluatedN": 2140,
+                  "winRate": 31.9
+                },
+                "firstHit": {
+                  "wins": 906,
+                  "failures": 1234,
+                  "evaluatedN": 2140,
+                  "winRate": 42.3
+                },
+                "targetAndNext": {
+                  "wins": 500,
+                  "failures": 1640,
+                  "evaluatedN": 2140,
+                  "winRate": 23.4
+                }
+              }
+            }
+          }
+        },
+        {
+          "targetDate": "2026-05-23",
+          "asOf": "2026-05-22",
+          "status": "ok",
+          "evaluated": 5175,
+          "universeCount": 5348,
+          "coveragePct": 96.7651,
+          "strategies": {
+            "box20": {
+              "n": 288,
+              "completeN": 205,
+              "pendingN": 76,
+              "missingN": 7,
+              "rules": {
+                "hold5": {
+                  "wins": 141,
+                  "failures": 64,
+                  "evaluatedN": 205,
+                  "winRate": 68.8
+                },
+                "nextHigh": {
+                  "wins": 102,
+                  "failures": 103,
+                  "evaluatedN": 205,
+                  "winRate": 49.8
+                },
+                "firstHit": {
+                  "wins": 152,
+                  "failures": 53,
+                  "evaluatedN": 205,
+                  "winRate": 74.1
+                },
+                "targetAndNext": {
+                  "wins": 44,
+                  "failures": 161,
+                  "evaluatedN": 205,
+                  "winRate": 21.5
+                }
+              }
+            },
+            "ema20": {
+              "n": 2979,
+              "completeN": 2206,
+              "pendingN": 757,
+              "missingN": 16,
+              "rules": {
+                "hold5": {
+                  "wins": 1219,
+                  "failures": 987,
+                  "evaluatedN": 2206,
+                  "winRate": 55.3
+                },
+                "nextHigh": {
+                  "wins": 1144,
+                  "failures": 1062,
+                  "evaluatedN": 2206,
+                  "winRate": 51.9
+                },
+                "firstHit": {
+                  "wins": 1524,
+                  "failures": 682,
+                  "evaluatedN": 2206,
+                  "winRate": 69.1
+                },
+                "targetAndNext": {
+                  "wins": 789,
+                  "failures": 1417,
+                  "evaluatedN": 2206,
+                  "winRate": 35.8
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 3076,
+              "completeN": 2455,
+              "pendingN": 595,
+              "missingN": 26,
+              "rules": {
+                "hold5": {
+                  "wins": 659,
+                  "failures": 1796,
+                  "evaluatedN": 2455,
+                  "winRate": 26.8
+                },
+                "nextHigh": {
+                  "wins": 630,
+                  "failures": 1825,
+                  "evaluatedN": 2455,
+                  "winRate": 25.7
+                },
+                "firstHit": {
+                  "wins": 878,
+                  "failures": 1577,
+                  "evaluatedN": 2455,
+                  "winRate": 35.8
+                },
+                "targetAndNext": {
+                  "wins": 470,
+                  "failures": 1985,
+                  "evaluatedN": 2455,
+                  "winRate": 19.1
+                }
+              }
+            }
+          }
+        },
+        {
+          "targetDate": "2026-06-23",
+          "asOf": "2026-06-23",
+          "status": "ok",
+          "evaluated": 5208,
+          "universeCount": 5348,
+          "coveragePct": 97.3822,
+          "strategies": {
+            "box20": {
+              "n": 508,
+              "completeN": 425,
+              "pendingN": 73,
+              "missingN": 10,
+              "rules": {
+                "hold5": {
+                  "wins": 303,
+                  "failures": 122,
+                  "evaluatedN": 425,
+                  "winRate": 71.3
+                },
+                "nextHigh": {
+                  "wins": 253,
+                  "failures": 172,
+                  "evaluatedN": 425,
+                  "winRate": 59.5
+                },
+                "firstHit": {
+                  "wins": 314,
+                  "failures": 111,
+                  "evaluatedN": 425,
+                  "winRate": 73.9
+                },
+                "targetAndNext": {
+                  "wins": 89,
+                  "failures": 336,
+                  "evaluatedN": 425,
+                  "winRate": 20.9
+                }
+              }
+            },
+            "ema20": {
+              "n": 2825,
+              "completeN": 2379,
+              "pendingN": 427,
+              "missingN": 19,
+              "rules": {
+                "hold5": {
+                  "wins": 1361,
+                  "failures": 1018,
+                  "evaluatedN": 2379,
+                  "winRate": 57.2
+                },
+                "nextHigh": {
+                  "wins": 1260,
+                  "failures": 1119,
+                  "evaluatedN": 2379,
+                  "winRate": 53.0
+                },
+                "firstHit": {
+                  "wins": 1689,
+                  "failures": 690,
+                  "evaluatedN": 2379,
+                  "winRate": 71.0
+                },
+                "targetAndNext": {
+                  "wins": 913,
+                  "failures": 1466,
+                  "evaluatedN": 2379,
+                  "winRate": 38.4
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 4152,
+              "completeN": 3234,
+              "pendingN": 897,
+              "missingN": 21,
+              "rules": {
+                "hold5": {
+                  "wins": 932,
+                  "failures": 2302,
+                  "evaluatedN": 3234,
+                  "winRate": 28.8
+                },
+                "nextHigh": {
+                  "wins": 880,
+                  "failures": 2354,
+                  "evaluatedN": 3234,
+                  "winRate": 27.2
+                },
+                "firstHit": {
+                  "wins": 1126,
+                  "failures": 2108,
+                  "evaluatedN": 3234,
+                  "winRate": 34.8
+                },
+                "targetAndNext": {
+                  "wins": 579,
+                  "failures": 2655,
+                  "evaluatedN": 3234,
+                  "winRate": 17.9
+                }
+              }
+            }
+          }
+        },
+        {
+          "targetDate": "2026-07-23",
+          "asOf": "2026-07-23",
+          "status": "ok",
+          "evaluated": 5205,
+          "universeCount": 5348,
+          "coveragePct": 97.3261,
+          "strategies": {
+            "box20": {
+              "n": 412,
+              "completeN": 364,
+              "pendingN": 41,
+              "missingN": 7,
+              "rules": {
+                "hold5": {
+                  "wins": 281,
+                  "failures": 83,
+                  "evaluatedN": 364,
+                  "winRate": 77.2
+                },
+                "nextHigh": {
+                  "wins": 210,
+                  "failures": 154,
+                  "evaluatedN": 364,
+                  "winRate": 57.7
+                },
+                "firstHit": {
+                  "wins": 295,
+                  "failures": 69,
+                  "evaluatedN": 364,
+                  "winRate": 81.0
+                },
+                "targetAndNext": {
+                  "wins": 77,
+                  "failures": 287,
+                  "evaluatedN": 364,
+                  "winRate": 21.2
+                }
+              }
+            },
+            "ema20": {
+              "n": 2759,
+              "completeN": 2289,
+              "pendingN": 456,
+              "missingN": 14,
+              "rules": {
+                "hold5": {
+                  "wins": 1327,
+                  "failures": 962,
+                  "evaluatedN": 2289,
+                  "winRate": 58.0
+                },
+                "nextHigh": {
+                  "wins": 1217,
+                  "failures": 1072,
+                  "evaluatedN": 2289,
+                  "winRate": 53.2
+                },
+                "firstHit": {
+                  "wins": 1581,
+                  "failures": 708,
+                  "evaluatedN": 2289,
+                  "winRate": 69.1
+                },
+                "targetAndNext": {
+                  "wins": 838,
+                  "failures": 1451,
+                  "evaluatedN": 2289,
+                  "winRate": 36.6
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 3355,
+              "completeN": 2819,
+              "pendingN": 510,
+              "missingN": 26,
+              "rules": {
+                "hold5": {
+                  "wins": 969,
+                  "failures": 1850,
+                  "evaluatedN": 2819,
+                  "winRate": 34.4
+                },
+                "nextHigh": {
+                  "wins": 834,
+                  "failures": 1985,
+                  "evaluatedN": 2819,
+                  "winRate": 29.6
+                },
+                "firstHit": {
+                  "wins": 1147,
+                  "failures": 1672,
+                  "evaluatedN": 2819,
+                  "winRate": 40.7
+                },
+                "targetAndNext": {
+                  "wins": 528,
+                  "failures": 2291,
+                  "evaluatedN": 2819,
+                  "winRate": 18.7
+                }
+              }
+            }
+          }
+        },
+        {
+          "targetDate": "2026-08-23",
+          "asOf": "2026-08-21",
+          "status": "ok",
+          "evaluated": 5259,
+          "universeCount": 5348,
+          "coveragePct": 98.3358,
+          "strategies": {
+            "box20": {
+              "n": 367,
+              "completeN": 313,
+              "pendingN": 46,
+              "missingN": 8,
+              "rules": {
+                "hold5": {
+                  "wins": 218,
+                  "failures": 95,
+                  "evaluatedN": 313,
+                  "winRate": 69.6
+                },
+                "nextHigh": {
+                  "wins": 141,
+                  "failures": 172,
+                  "evaluatedN": 313,
+                  "winRate": 45.0
+                },
+                "firstHit": {
+                  "wins": 231,
+                  "failures": 82,
+                  "evaluatedN": 313,
+                  "winRate": 73.8
+                },
+                "targetAndNext": {
+                  "wins": 67,
+                  "failures": 246,
+                  "evaluatedN": 313,
+                  "winRate": 21.4
+                }
+              }
+            },
+            "ema20": {
+              "n": 2883,
+              "completeN": 2482,
+              "pendingN": 382,
+              "missingN": 19,
+              "rules": {
+                "hold5": {
+                  "wins": 1490,
+                  "failures": 992,
+                  "evaluatedN": 2482,
+                  "winRate": 60.0
+                },
+                "nextHigh": {
+                  "wins": 1320,
+                  "failures": 1162,
+                  "evaluatedN": 2482,
+                  "winRate": 53.2
+                },
+                "firstHit": {
+                  "wins": 1755,
+                  "failures": 727,
+                  "evaluatedN": 2482,
+                  "winRate": 70.7
+                },
+                "targetAndNext": {
+                  "wins": 999,
+                  "failures": 1483,
+                  "evaluatedN": 2482,
+                  "winRate": 40.2
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 3720,
+              "completeN": 3020,
+              "pendingN": 682,
+              "missingN": 18,
+              "rules": {
+                "hold5": {
+                  "wins": 1000,
+                  "failures": 2020,
+                  "evaluatedN": 3020,
+                  "winRate": 33.1
+                },
+                "nextHigh": {
+                  "wins": 809,
+                  "failures": 2211,
+                  "evaluatedN": 3020,
+                  "winRate": 26.8
+                },
+                "firstHit": {
+                  "wins": 1144,
+                  "failures": 1876,
+                  "evaluatedN": 3020,
+                  "winRate": 37.9
+                },
+                "targetAndNext": {
+                  "wins": 578,
+                  "failures": 2442,
+                  "evaluatedN": 3020,
+                  "winRate": 19.1
+                }
+              }
+            }
+          }
+        },
+        {
+          "targetDate": "2026-09-23",
+          "asOf": "2026-09-23",
+          "status": "ok",
+          "evaluated": 5259,
+          "universeCount": 5348,
+          "coveragePct": 98.3358,
+          "strategies": {
+            "box20": {
+              "n": 223,
+              "completeN": 161,
+              "pendingN": 57,
+              "missingN": 5,
+              "rules": {
+                "hold5": {
+                  "wins": 110,
+                  "failures": 51,
+                  "evaluatedN": 161,
+                  "winRate": 68.3
+                },
+                "nextHigh": {
+                  "wins": 76,
+                  "failures": 85,
+                  "evaluatedN": 161,
+                  "winRate": 47.2
+                },
+                "firstHit": {
+                  "wins": 119,
+                  "failures": 42,
+                  "evaluatedN": 161,
+                  "winRate": 73.9
+                },
+                "targetAndNext": {
+                  "wins": 21,
+                  "failures": 140,
+                  "evaluatedN": 161,
+                  "winRate": 13.0
+                }
+              }
+            },
+            "ema20": {
+              "n": 2610,
+              "completeN": 1976,
+              "pendingN": 617,
+              "missingN": 17,
+              "rules": {
+                "hold5": {
+                  "wins": 999,
+                  "failures": 977,
+                  "evaluatedN": 1976,
+                  "winRate": 50.6
+                },
+                "nextHigh": {
+                  "wins": 830,
+                  "failures": 1146,
+                  "evaluatedN": 1976,
+                  "winRate": 42.0
+                },
+                "firstHit": {
+                  "wins": 1230,
+                  "failures": 746,
+                  "evaluatedN": 1976,
+                  "winRate": 62.2
+                },
+                "targetAndNext": {
+                  "wins": 441,
+                  "failures": 1535,
+                  "evaluatedN": 1976,
+                  "winRate": 22.3
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 1692,
+              "completeN": 1290,
+              "pendingN": 390,
+              "missingN": 12,
+              "rules": {
+                "hold5": {
+                  "wins": 289,
+                  "failures": 1001,
+                  "evaluatedN": 1290,
+                  "winRate": 22.4
+                },
+                "nextHigh": {
+                  "wins": 253,
+                  "failures": 1037,
+                  "evaluatedN": 1290,
+                  "winRate": 19.6
+                },
+                "firstHit": {
+                  "wins": 374,
+                  "failures": 916,
+                  "evaluatedN": 1290,
+                  "winRate": 29.0
+                },
+                "targetAndNext": {
+                  "wins": 156,
+                  "failures": 1134,
+                  "evaluatedN": 1290,
+                  "winRate": 12.1
+                }
+              }
+            }
+          }
+        },
+        {
+          "targetDate": "2026-10-23",
+          "asOf": "2026-10-23",
+          "status": "ok",
+          "evaluated": 5273,
+          "universeCount": 5348,
+          "coveragePct": 98.5976,
+          "strategies": {
+            "box20": {
+              "n": 705,
+              "completeN": 393,
+              "pendingN": 310,
+              "missingN": 2,
+              "rules": {
+                "hold5": {
+                  "wins": 311,
+                  "failures": 82,
+                  "evaluatedN": 393,
+                  "winRate": 79.1
+                },
+                "nextHigh": {
+                  "wins": 226,
+                  "failures": 167,
+                  "evaluatedN": 393,
+                  "winRate": 57.5
+                },
+                "firstHit": {
+                  "wins": 318,
+                  "failures": 75,
+                  "evaluatedN": 393,
+                  "winRate": 80.9
+                },
+                "targetAndNext": {
+                  "wins": 119,
+                  "failures": 274,
+                  "evaluatedN": 393,
+                  "winRate": 30.3
+                }
+              }
+            },
+            "ema20": {
+              "n": 2776,
+              "completeN": 2097,
+              "pendingN": 660,
+              "missingN": 19,
+              "rules": {
+                "hold5": {
+                  "wins": 1209,
+                  "failures": 888,
+                  "evaluatedN": 2097,
+                  "winRate": 57.7
+                },
+                "nextHigh": {
+                  "wins": 978,
+                  "failures": 1119,
+                  "evaluatedN": 2097,
+                  "winRate": 46.6
+                },
+                "firstHit": {
+                  "wins": 1415,
+                  "failures": 682,
+                  "evaluatedN": 2097,
+                  "winRate": 67.5
+                },
+                "targetAndNext": {
+                  "wins": 596,
+                  "failures": 1501,
+                  "evaluatedN": 2097,
+                  "winRate": 28.4
+                }
+              }
+            },
+            "swingHigh": {
+              "n": 1805,
+              "completeN": 1177,
+              "pendingN": 617,
+              "missingN": 11,
+              "rules": {
+                "hold5": {
+                  "wins": 374,
+                  "failures": 803,
+                  "evaluatedN": 1177,
+                  "winRate": 31.8
+                },
+                "nextHigh": {
+                  "wins": 301,
+                  "failures": 876,
+                  "evaluatedN": 1177,
+                  "winRate": 25.6
+                },
+                "firstHit": {
+                  "wins": 420,
+                  "failures": 757,
+                  "evaluatedN": 1177,
+                  "winRate": 35.7
+                },
+                "targetAndNext": {
+                  "wins": 205,
+                  "failures": 972,
+                  "evaluatedN": 1177,
+                  "winRate": 17.4
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "replayCompletedAt": "2026-10-25T06:30:20.133338+00:00",
+  "baseSourceCommit": "284ad7622f625f6b2be58ddb5447470acc0c4b35",
+  "runtime": {
+    "python": "3.12.14",
+    "pandas": "3.0.6"
+  },
+  "additionalSourceSha256": {
+    "kline_integrity.py": "63493f46d5ccc03d81da454af52adf22888c89f480d2400fc93589f0c394228c",
+    "scripts/build_breadth.py": "3d11d6198d3f7c83d1bf513eb8c538607c97a684c2251563334d580db6de45cf",
+    "docs/report/kline-corrections.json": "3f51b656e03f8171fe454b7a7a28744a218c0bdbec0fa29fb321817b9f88e877"
+  },
+  "isolatedCorrectionJournal": {
+    "path": "/workspace/atlas173-computed/input-corrections.json",
+    "exists": false,
+    "scope": "Local replay only; repository journal is never written",
+    "sha256": null
+  },
+  "inputCacheFileCount": 7328,
+  "verification": {
+    "coverageThreshold": 0.9,
+    "historicalPointsPerMarket": 6,
+    "latestPointsPerMarket": 1,
+    "allPointsHaveCompleteSamples": true,
+    "weeklyWindowsAbsent": true,
+    "reportChecksumMatches": true
+  },
+  "quarantineEquivalence": {
+    "verifiedAt": "2026-10-25T06:35:00.939475+00:00",
+    "sourceJournalSha256": "3f51b656e03f8171fe454b7a7a28744a218c0bdbec0fa29fb321817b9f88e877",
+    "sourceQuarantinedCount": 1,
+    "originalIsolatedJournalExisted": false,
+    "originalIsolatedQuarantinedCount": 0,
+    "comparedFrameCounts": {
+      "tw": 1981,
+      "us": 5347
+    },
+    "marketReferenceCutoffs": {
+      "tw": "2026-10-22",
+      "us": "2026-10-23"
+    },
+    "quarantineChecks": [
+      {
+        "symbol": "7825.TWO",
+        "date": "2026-08-28",
+        "reason": "invalid-OHLC-bounds",
+        "cacheHasDate": false,
+        "originalInputHasDate": false,
+        "mainJournalInputHasDate": false
+      }
+    ],
+    "quarantinedInputIntersectionCount": 0,
+    "changedFrameCount": 0,
+    "differences": [],
+    "comparedFrameHashes": {
+      "tw": "57063393380273dd9d771cc6d14fe09935169ced6be85b9c7c4a80c932760b3b",
+      "us": "69dc5f00fd943aa7835b5eb48251a8d0e0367a700638f0908a1c232fcf5f7aaf"
+    },
+    "allOriginalCacheChecksumsMatch": true,
+    "exactlyEquivalent": true,
+    "reason": "All existing main-journal quarantined sessions are already absent from the immutable replay cache. Loading all 7,328 exact calculation frames with that journal changes no symbol, date, value, dtype, or frame metadata after the original market cutoffs. The original absent isolated journal therefore yields the same computation inputs; no recalculation or quarantine override is needed."
+  }
+}

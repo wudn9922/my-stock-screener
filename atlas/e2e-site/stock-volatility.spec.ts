@@ -24,7 +24,7 @@ function fixture(symbol: string, count = 22) {
   return payload;
 }
 
-test('independent daily volatility tiles stay beside recommendations and do not follow quote or chart timeframe', async ({ page }, testInfo) => {
+test('daily volatility and independent volume analysis stay beside recommendations without following quote or chart timeframe', async ({ page }, testInfo) => {
   await mockSite(page);
   const intervals: string[] = [];
   await page.route('https://edge.test/functions/v1/market-chart**', (route) => {
@@ -44,14 +44,28 @@ test('independent daily volatility tiles stay beside recommendations and do not 
   await expect(stats).toContainText('2026-10-08');
   expect(intervals).toContain('1d');
   expect(intervals).toContain('1wk');
-  const geometry = await page.evaluate(() => ({
-    recommendation: document.querySelector('[data-testid="stock-stats-toggle"]')!.getBoundingClientRect().top,
-    volatility: document.querySelector('[data-testid="stock-volatility"]')!.getBoundingClientRect().top,
-    overflow: document.scrollingElement!.scrollWidth - innerWidth,
-  }));
+  const geometry = await page.evaluate(() => {
+    const tools = document.querySelector('.ws-analysis-tools')!.getBoundingClientRect();
+    const tabs = document.querySelector('.ws-header > .stock-tabs')!.getBoundingClientRect();
+    return {
+      recommendation: document.querySelector('[data-testid="stock-stats-toggle"]')!.getBoundingClientRect().top,
+      volume: document.querySelector('[data-testid="volume-analysis-toggle"]')!.getBoundingClientRect().top,
+      volatility: document.querySelector('[data-testid="stock-volatility"]')!.getBoundingClientRect().top,
+      tabsOverlap: Math.max(0, Math.min(tools.right, tabs.right) - Math.max(tools.left, tabs.left)) *
+        Math.max(0, Math.min(tools.bottom, tabs.bottom) - Math.max(tools.top, tabs.top)),
+      overflow: document.scrollingElement!.scrollWidth - innerWidth,
+    };
+  });
   expect(Math.abs(geometry.volatility - geometry.recommendation)).toBeLessThanOrEqual(12);
+  expect(Math.abs(geometry.volatility - geometry.volume)).toBeLessThanOrEqual(12);
+  expect(geometry.tabsOverlap).toBe(0);
   expect(geometry.overflow).toBeLessThanOrEqual(0);
+  await expect(page.locator('.ws-analysis-tools').getByTestId('volume-analysis-toggle')).toBeVisible();
+  await page.getByTestId('volume-analysis-toggle').click();
+  await expect(page.getByRole('region', { name: '價量分析', exact: true })).toBeVisible();
+  await expect(page.getByTestId('stock-stats-toggle')).toHaveAttribute('aria-expanded', 'false');
   await page.getByTestId('stock-stats-toggle').click();
+  await expect(page.getByTestId('volume-analysis-toggle')).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByTestId('ma-recommendation')).toBeVisible();
   // The volatility controls remain separate and usable while the MA menu is closed.
   await page.keyboard.press('Escape');
