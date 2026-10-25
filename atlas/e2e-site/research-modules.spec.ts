@@ -196,12 +196,11 @@ test("chart research panel leaves candles mounted and settings intact", async ({
   await page.goto("./?page=chart&symbol=AAPL&tf=1D");
   await expect(page.getByTestId("active-symbol")).toHaveText("AAPL");
   await page
-    .getByRole("button", { name: "價量分析", exact: true })
+    .getByRole("button", { name: "價量", exact: true })
     .first()
     .click();
-  const volume = page.getByRole("region", { name: "價量分析", exact: true });
-  const summary = volume.locator("summary").filter({ hasText: "價量分析" });
-  await summary.click();
+  const volume = page.getByRole("region", { name: "價量", exact: true });
+  await expect(volume.locator(":scope summary").filter({ hasText: "價量分析" })).toHaveCount(0);
   await expect(volume.getByText("上漲縮量比例", { exact: true })).toBeVisible();
   await expect(volume.locator(".stock-official-notices")).toHaveCount(0);
   const volumeBounds = await volume.evaluate((element) => ({

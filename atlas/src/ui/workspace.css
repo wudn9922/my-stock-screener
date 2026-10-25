@@ -1083,6 +1083,9 @@
   color: var(--text-3);
 }
 .ws-stock-statistics {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   min-width: 0;
 }
 .ws-volatility-values {
@@ -1915,21 +1918,30 @@
     top: 80px;
   }
 }
-/* Independent volatility and volume controls beside recommendations; details float above the chart. */
-.ws-analysis-tools, .ws-volatility {
+/* Stock pages and analysis share one row; their details float above the plot. */
+.ws-stock-controls, .ws-analysis-tools, .ws-volatility {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
 }
-.ws-volatility .ws-stats-toggle {
-  padding: 3px 7px;
-  border-radius: 6px;
+.ws-stock-controls { flex: 0 0 auto; }
+.ws-stock-controls > .stock-tabs { padding: 2px; gap: 1px; }
+.ws-stock-controls > .stock-tabs button { min-width: 40px; min-height: 30px; padding: 0 6px; font-size: 12px; }
+.ws-stock-statistics > .ws-stats-menu > .ws-stats-toggle,
+.ws-header-actions > .ws-stats-menu > .ws-stats-toggle {
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  justify-content: center;
+  border: 0;
+  background: transparent;
 }
-.ws-volatility .ws-stats-toggle > svg { display: none; }
-.ws-volatility-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
-.ws-volatility-tile > span { font-size: 9px; color: var(--text-3); }
-.ws-volatility-tile > strong { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text); }
+.ws-stock-statistics > .ws-stats-menu > .ws-stats-toggle > svg:last-child,
+.ws-header-actions > .ws-stats-menu > .ws-stats-toggle > svg:last-child { display: none; }
+.source-details .data-source, .source-details .events-source { white-space: normal; overflow-wrap: anywhere; padding: 0; font-size: 12px; }
+.source-details p { margin: 8px 0; }
 .ws-header .ws-analysis-tools .ws-ma-reco { margin-top: 0; padding-top: 0; border-top: 0; }
 .ws-analysis-tools .data-research { margin-top: 12px; }
 .stock-official-notices .data-research {
@@ -1960,7 +1972,7 @@
   color: var(--accent-text);
   border-color: var(--accent-text);
 }
-.ws-stats-toggle[aria-expanded='true'] svg {
+.ws-stats-toggle[aria-expanded='true'] > svg:last-child {
   transform: rotate(180deg);
 }
 .ws-stats-panel {
@@ -2047,18 +2059,28 @@
     grid-template-areas:
       'symbol quote'
       'valuation actions'
-      'tabs tabs'
-      'stats stats';
+      'controls controls';
+    gap: 2px 6px;
+    padding: 4px 6px;
   }
-  .ws-header > .ws-analysis-tools {
-    grid-area: stats;
-    justify-self: end;
-    margin: 0 4px 4px 0;
+  .ws-stock-statistics { gap: 2px; }
+  .ws-valuation { padding-left: 2px; gap: 8px; }
+  .ws-valuation div { padding: 0; gap: 4px; }
+  .ws-header-actions .icon-button { width: 28px; height: 28px; }
+  .ws-header > .ws-stock-controls {
+    grid-area: controls;
+    justify-self: stretch;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+  }
+  .ws-stock-controls > .stock-tabs { margin: 0; padding: 0; }
+  .ws-stock-controls > .stock-tabs button { min-width: 40px; min-height: 36px; }
+  .ws-analysis-tools {
     gap: 4px;
   }
-  .ws-analysis-tools .ws-stats-toggle { font-size: 11px; padding: 3px 6px; }
-  .ws-volatility { gap: 4px; }
-  .ws-volatility-tile > span { font-size: 8px; }
+  .ws-analysis-tools .ws-stats-toggle { min-height: 34px; font-size: 12px; padding: 3px 6px; }
+  .ws-analysis-tools .ws-stats-toggle > svg { width: 12px; height: 12px; }
   .ws-stats-panel {
     left: auto;
     right: 0;

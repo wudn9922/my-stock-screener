@@ -67,9 +67,9 @@ test('chart shows the weekly recommendation, applies it on the daily chart and s
   await expect(toggle).toBeVisible();
   const row = await page.evaluate(() => {
     const tools = document.querySelector('.ws-analysis-tools')!.getBoundingClientRect();
-    const tabs = document.querySelector('.ws-header > .stock-tabs')!.getBoundingClientRect();
+    const tabs = document.querySelector('.ws-stock-controls > .stock-tabs')!.getBoundingClientRect();
     return {
-      tops: ['volatility-atr-toggle', 'volatility-range-toggle', 'volume-analysis-toggle', 'stock-stats-toggle']
+      tops: ['volatility-toggle', 'volume-analysis-toggle', 'stock-stats-toggle']
         .map(id => document.querySelector(`[data-testid="${id}"]`)!.getBoundingClientRect().top),
       tabsOverlap: Math.max(0, Math.min(tools.right, tabs.right) - Math.max(tools.left, tabs.left)) *
         Math.max(0, Math.min(tools.bottom, tabs.bottom) - Math.max(tools.top, tabs.top)),

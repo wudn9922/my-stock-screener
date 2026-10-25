@@ -3,6 +3,73 @@ import { mockDeviceAccount } from './account-fixture';
 import { mockSite } from './mocks';
 import { closePanel, openPanel, searchSymbol } from '../e2e/site-helpers';
 
+test('stock controls share one compact row and the normal chart fills the space above navigation', async ({ page }, testInfo) => {
+  test.setTimeout(120000);
+  await mockDeviceAccount(page);
+  await mockSite(page);
+  const sizes: { width: number; height: number; safeTop?: number; safeBottom?: number }[] = testInfo.project.name === 'desktop-chromium'
+    ? [{ width: 1440, height: 900 }]
+    : [{ width: 390, height: 710 }, { width: 320, height: 640 }, { width: 375, height: 667 }, { width: 390, height: 844, safeTop: 12, safeBottom: 20 }, { width: 844, height: 390 }];
+  const measurements = [];
+  for (const size of sizes) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
+    await page.evaluate(({ safeTop = 0, safeBottom = 0 }) => {
+      document.documentElement.style.setProperty('--safe-area-inset-top', `${safeTop}px`);
+      document.documentElement.style.setProperty('--safe-area-inset-bottom', `${safeBottom}px`);
+    }, size);
+    await expect(page.getByTestId('ohlc-header')).toContainText('O ');
+    await expect.poll(() => page.locator('.chart-host').evaluate(host =>
+      Math.abs(host.getBoundingClientRect().bottom - host.querySelector('.tv-lightweight-charts')!.getBoundingClientRect().bottom),
+    )).toBeLessThanOrEqual(1);
+    const controls = page.locator('.ws-stock-controls');
+    await expect(controls.getByRole('button')).toHaveText(['K線', '財務', '波動率', '價量', '建議均線']);
+    await expect(page.locator('.app-shell')).not.toHaveClass(/chart-focus/);
+    const bounds = await page.evaluate(() => {
+      const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
+      const buttons = [...document.querySelectorAll('.ws-stock-controls > .stock-tabs button, .ws-analysis-tools > .ws-stats-menu > button, .ws-volatility > .ws-stats-menu > button')].map(button => button.getBoundingClientRect());
+      const valuation = box('[data-testid="valuation"]'), help = box('[data-testid="valuation-help-toggle"]');
+      const main = document.getElementById('main')!;
+      return {
+        header: box('.ws-header').height,
+        availableHeight: box('.app-shell').height,
+        controlRowSpan: Math.max(...buttons.map(button => button.top)) - Math.min(...buttons.map(button => button.top)),
+        controlsInsideViewport: buttons.every(button => button.left >= 0 && button.right <= innerWidth),
+        helpRightOfValues: help.left >= valuation.right - 1,
+        helpAligned: Math.abs((help.top + help.bottom) / 2 - (valuation.top + valuation.bottom) / 2),
+        plot: box('.chart-host'), stage: box('.chart-stage'), navigation: box('.site-tabbar'),
+        mainOverflow: main.scrollHeight - main.clientHeight,
+        horizontalOverflow: document.scrollingElement!.scrollWidth - innerWidth,
+      };
+    });
+    expect(bounds.controlRowSpan).toBeLessThanOrEqual(4);
+    expect(bounds.controlsInsideViewport).toBe(true);
+    expect(bounds.helpRightOfValues).toBe(true);
+    expect(bounds.helpAligned).toBeLessThanOrEqual(4);
+    expect(bounds.horizontalOverflow).toBeLessThanOrEqual(0);
+    expect(bounds.mainOverflow).toBeLessThanOrEqual(1);
+    if (bounds.navigation.height > 0) {
+      expect(bounds.header).toBeLessThanOrEqual(124);
+      expect(Math.abs(bounds.plot.bottom - bounds.navigation.top)).toBeLessThanOrEqual(2);
+      expect(bounds.plot.height).toBeGreaterThan(size.height > size.width ? bounds.availableHeight * 0.5 : 40);
+    }
+    const plotHeight = bounds.plot.height;
+    await page.getByTestId('valuation-help-toggle').click();
+    await expect(page.getByRole('region', { name: '本益比說明', exact: true })).toBeVisible();
+    await expect.poll(async () => (await page.locator('.chart-host').boundingBox())!.height).toBe(plotHeight);
+    await page.keyboard.press('Escape');
+    await page.getByTestId('source-info-toggle').click();
+    const source = page.getByRole('region', { name: '行情資料說明', exact: true });
+    await expect(source).toBeVisible();
+    await expect(source.locator('.data-source')).not.toBeEmpty();
+    await page.keyboard.press('Escape');
+    measurements.push({ ...size, header: bounds.header, plot: plotHeight });
+    if (size.width === 390 && size.height === 710)
+      await page.screenshot({ path: testInfo.outputPath('compact-normal-chart.png') });
+  }
+  await testInfo.attach('chart-layout-measurements', { body: JSON.stringify(measurements), contentType: 'application/json' });
+});
+
 test('report navigation starts without MAs and preserves manually selected per-stock indicators', async ({ page }) => {
   await mockDeviceAccount(page);
   await mockSite(page);
