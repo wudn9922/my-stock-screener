@@ -1,3 +1,11 @@
+## Current follow-up: index directional volume above market entry rates (2026-10-25)
+
+Taiwan and US market pages now show an index-volume card directly above full-market entry success rates. The card defaults to the market's first configured index, offers every configured index in that market, and exposes the existing 5/10/20-session directional ratios immediately. It contains no abnormal-volume calculation or RVOL thresholds. Stocks retain their abnormal-volume controls and share the unchanged directional-ratio calculation and presentation.
+
+The analysis and overview candles share one daily request, including its source/as-of/cache metadata. Calculations use each selected index's own completed daily bars, capped at both the current time and the response's original observation time so an old pre-close response cannot acquire a completed session later. Zero volume, invalid OHLC and unverified jumps over 40% break adjacent comparisons; flat prices and equal volumes retain the existing denominator rules. Missing directions are N/A. Index changes clear prior values while loading, failed requests can be retried, and source descriptions remain folded.
+
+Regressions cover exact directional numerators/denominators, window boundaries, zero/invalid data, Taiwan and DST-sensitive US closes, stale pre-close responses, shared-request deduplication, retry recovery, correct card order, index/market isolation and three browser profiles. The primary engineer performs self-review; independent or physical-device sign-off is not claimed. Final validation belongs in the PR, which must remain unmerged and undeployed.
+
 ## Current follow-up: compact normal chart on phones (2026-10-25)
 
 The valuation explanation is now a floating info control immediately to the right of the P/E values. K線, 財務, 波動率, 價量 and 建議均線 share one compact row; the volatility menu retains both existing calculations and their explanations. The chart's volume menu mounts the analysis directly, while financial-page disclosures retain their existing expandable presentation.

@@ -5,7 +5,7 @@
 import { createScreenerMarketProvider } from '../market-data/createScreenerMarketProvider';
 import { loadSymbolDirectory, searchSymbols } from '../market-data/SymbolCatalog';
 import { describePe, getValuation, type Valuation } from '../fundamentals/ValuationProvider';
-import type { Bar, MarketDataProvider } from '../market-data/MarketDataProvider';
+import type { Bar, BarResult, MarketDataProvider } from '../market-data/MarketDataProvider';
 import { getMarketProfile } from '../market-data/MarketProfile';
 
 export interface StockSearchEntry {
@@ -22,18 +22,21 @@ export function marketProvider(): MarketDataProvider {
   return provider;
 }
 
-const dailyBars = new Map<string, Promise<Bar[]>>();
-/** Daily bars for overview pages, de-duplicated per page session. */
-export function getDailyBars(symbol: string): Promise<Bar[]> {
-  let request = dailyBars.get(symbol);
+const dailyResults = new Map<string, Promise<BarResult>>();
+/** Daily bars and their source metadata, shared by overview charts and analysis. */
+export function getDailyBarResult(symbol: string): Promise<BarResult> {
+  let request = dailyResults.get(symbol);
   if (!request) {
-    request = marketProvider()
-      .getBars(symbol, '1D')
-      .then((result) => result.bars);
-    dailyBars.set(symbol, request);
-    request.catch(() => dailyBars.delete(symbol));
+    request = marketProvider().getBars(symbol, '1D');
+    dailyResults.set(symbol, request);
+    request.catch(() => dailyResults.delete(symbol));
   }
   return request;
+}
+
+/** Daily bars for overview pages, de-duplicated per page session. */
+export function getDailyBars(symbol: string): Promise<Bar[]> {
+  return getDailyBarResult(symbol).then((result) => result.bars);
 }
 
 export async function searchStocks(query: string, limit = 20): Promise<StockSearchEntry[]> {

@@ -69,7 +69,7 @@ test('three entry cards compare four outcomes with fixed cohorts on desktop and 
   await expect(section.getByRole('heading', { name: /全市場進場成功率/ })).toContainText('台股');
   await expect(section.locator('.bo-asof')).toHaveText('資料日 2026/10/09');
   const order = await page.locator('.markets-side > section.card').evaluateAll(nodes => nodes.map(node => node.className));
-  expect(order.slice(0, 2)).toEqual(['card breakout-card', 'card breadth-card']);
+  expect(order.slice(0, 3)).toEqual(['card index-volume-card', 'card breakout-card', 'card breadth-card']);
   await expect(section.locator('.bo-row')).toHaveCount(3);
   await expect(picker(page).getByRole('button')).toHaveCount(4);
   await expect(row(page).locator('.bo-win')).toContainText('50.0%');
