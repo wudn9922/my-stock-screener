@@ -2074,8 +2074,8 @@
     gap: 6px;
     min-width: 0;
   }
-  .ws-stock-controls > .stock-tabs { margin: 0; }
-  .ws-stock-controls > .stock-tabs button { min-width: 40px; min-height: 32px; }
+  .ws-stock-controls > .stock-tabs { margin: 0; padding: 0; }
+  .ws-stock-controls > .stock-tabs button { min-width: 40px; min-height: 36px; }
   .ws-analysis-tools {
     gap: 4px;
   }
