@@ -151,8 +151,10 @@ test('project-path PWA preserves scope, drawings, isolated MAs and portable back
     expect(new URL(url).pathname.startsWith(base)).toBe(true);
     expect((await page.request.get(url)).ok()).toBe(true);
   }
-  await expect(page.locator('.static-hosting-note')).toHaveText('DEMO 價格為模擬資料，並非市場行情。');
-  await expect(page.locator('.static-hosting-note')).toBeVisible();
+  await page.getByTestId('source-info-toggle').click();
+  await expect(page.locator('.demo-data-note')).toHaveText('DEMO 價格為模擬資料，並非市場行情。');
+  await expect(page.locator('.demo-data-note')).toBeVisible();
+  await page.keyboard.press('Escape');
   await openWorkspacePanel(page, 'settings');
   const optionDisabled = (value: string) =>
     page.getByLabel('資料來源', { exact: true }).locator(`option[value="${value}"]`).evaluate((option) => (option as HTMLOptionElement).disabled);

@@ -39,14 +39,15 @@ test('daily volatility and independent volume analysis stay beside recommendatio
   await page.goto('./?page=chart&symbol=NVDA&tf=1W');
   const stats = page.getByTestId('stock-volatility');
   await expect(stats.locator('[data-volatility-value]')).toHaveText(['4.00%', '4.00%']);
-  await expect(stats.getByTestId('volatility-atr-toggle')).toHaveAccessibleName('ATR（20）% 4.00%，計算說明');
-  await expect(stats.getByTestId('volatility-range-toggle')).toHaveAccessibleName('20 日平均日內振幅 4.00%，計算說明');
+  await expect(stats.getByTestId('volatility-toggle')).toHaveAccessibleName('波動率');
+  await stats.getByTestId('volatility-toggle').click();
+  await expect(stats.getByRole('region', { name: '波動率', exact: true })).toBeVisible();
   await expect(stats).toContainText('2026-10-08');
   expect(intervals).toContain('1d');
   expect(intervals).toContain('1wk');
   const geometry = await page.evaluate(() => {
     const tools = document.querySelector('.ws-analysis-tools')!.getBoundingClientRect();
-    const tabs = document.querySelector('.ws-header > .stock-tabs')!.getBoundingClientRect();
+    const tabs = document.querySelector('.ws-stock-controls > .stock-tabs')!.getBoundingClientRect();
     return {
       recommendation: document.querySelector('[data-testid="stock-stats-toggle"]')!.getBoundingClientRect().top,
       volume: document.querySelector('[data-testid="volume-analysis-toggle"]')!.getBoundingClientRect().top,
@@ -62,7 +63,7 @@ test('daily volatility and independent volume analysis stay beside recommendatio
   expect(geometry.overflow).toBeLessThanOrEqual(0);
   await expect(page.locator('.ws-analysis-tools').getByTestId('volume-analysis-toggle')).toBeVisible();
   await page.getByTestId('volume-analysis-toggle').click();
-  await expect(page.getByRole('region', { name: '價量分析', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '價量', exact: true })).toBeVisible();
   await expect(page.getByTestId('stock-stats-toggle')).toHaveAttribute('aria-expanded', 'false');
   await page.getByTestId('stock-stats-toggle').click();
   await expect(page.getByTestId('volume-analysis-toggle')).toHaveAttribute('aria-expanded', 'false');
@@ -72,20 +73,21 @@ test('daily volatility and independent volume analysis stay beside recommendatio
   await expect(stats).toBeVisible();
   await page.getByRole('button', { name: '週期 1D', exact: true }).click();
   await expect(stats.locator('[data-volatility-value]')).toHaveText(['4.00%', '4.00%']);
-  await stats.getByTestId('volatility-atr-toggle').click();
-  await expect(stats.getByRole('region', { name: 'ATR（20）% 計算說明' })).toContainText('ATR 原值 4.40，基準收盤 110.00');
-  await stats.getByTestId('volatility-range-toggle').click();
-  await expect(stats.getByRole('region', { name: '20 日平均日內振幅 計算說明' })).toContainText('不含隔夜跳空');
+  await stats.getByTestId('volatility-toggle').click();
+  const popup = stats.getByRole('region', { name: '波動率', exact: true });
+  await popup.getByText('ATR（20）% 計算說明', { exact: true }).click();
+  await expect(popup).toContainText('ATR 原值 4.40，基準收盤 110.00');
+  await popup.getByText('20 日平均日內振幅 計算說明', { exact: true }).click();
+  await expect(popup).toContainText('不含隔夜跳空');
   await page.keyboard.press('Escape');
-  // Keyboard navigation dismisses the previous tile instead of stacking overlapping popups.
-  await stats.getByTestId('volatility-atr-toggle').focus();
+  // Keyboard focus moving to a sibling dismisses the previous popup.
+  await stats.getByTestId('volatility-toggle').focus();
   await page.keyboard.press('Enter');
-  await expect(stats.getByTestId('volatility-atr-toggle')).toHaveAttribute('aria-expanded', 'true');
-  await page.keyboard.press('Tab');
-  await expect(stats.getByTestId('volatility-range-toggle')).toBeFocused();
+  await expect(stats.getByTestId('volatility-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await page.getByTestId('volume-analysis-toggle').focus();
   await page.keyboard.press('Enter');
-  await expect(stats.getByTestId('volatility-range-toggle')).toHaveAttribute('aria-expanded', 'true');
-  await expect(stats.getByTestId('volatility-atr-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByTestId('volume-analysis-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await expect(stats.getByTestId('volatility-toggle')).toHaveAttribute('aria-expanded', 'false');
   await page.keyboard.press('Escape');
   await page.screenshot({ path: testInfo.outputPath('volatility-header.png') });
 });

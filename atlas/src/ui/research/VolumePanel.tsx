@@ -14,7 +14,8 @@ import {
   useResearch,
 } from "./Common";
 
-export function VolumePanel({ symbol }: { symbol: string }) {
+export function VolumePanel({ symbol, inline = false }: { symbol: string; inline?: boolean }) {
+  if (inline) return <section className="volume-analysis-results" aria-label="價量分析結果"><VolumeData symbol={symbol} /></section>;
   return (
     <ResearchDisclosure key={symbol} title="價量分析 · 異常量與放量／縮量比例">
       <VolumeData symbol={symbol} />

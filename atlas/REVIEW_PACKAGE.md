@@ -1,3 +1,11 @@
+## Current follow-up: compact normal chart on phones (2026-10-25)
+
+The valuation explanation is now a floating info control immediately to the right of the P/E values. K線, 財務, 波動率, 價量 and 建議均線 share one compact row; the volatility menu retains both existing calculations and their explanations. The chart's volume menu mounts the analysis directly, while financial-page disclosures retain their existing expandable presentation.
+
+Chart-route layout allocates the remaining height after the account notice and any legacy-import content. The normal chart extends to the top of site navigation; market-source details are available from an info control beside refresh instead of reserving footer rows. Actionable legacy import prompts retain their readable minimum chart area. The engine and calculation/storage boundaries are unchanged, with resizing handled by the existing observer and public Lightweight Charts APIs.
+
+Browser coverage measures button alignment and P/E help placement, verifies the real chart canvas resizes with its host, checks the normal chart's bottom edge against navigation, and exercises 320/375/390px portrait, landscape, resized viewports and safe insets. Opening either explanation must leave the plot height unchanged; opening 價量 must show results without another disclosure click. Existing stock switching, MA toggles, drawing and fullscreen regressions are included in validation. This follow-up uses primary-engineer self-review; no independent or physical-device sign-off is claimed. Final checks are recorded in the PR, which remains unmerged and undeployed.
+
 ## Current follow-up: visible monthly history and reversible MA choices (2026-10-25)
 
 The existing generated report still had weekly cohorts and no monthly points. Full-market output and old full-market parsing now omit the weekly cohort. A real historical replay is committed in `docs/report/breakouts-backfill.json`, with its source and calculation proof beside it. The latest-report loader lazily bundles that record and supplements a missing history only when the market date and all parsed calculation parameters match. Live latest statistics, explicit newer histories (including gaps), and original saved reports remain authoritative. The recalculation time is disclosed in the existing collapsed explanation.

@@ -383,9 +383,14 @@ h3 {
   overscroll-behavior: contain;
 }
 .site.on-chart .site-main {
+  display: flex;
+  flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
 }
+.site.on-chart .site-main > .storage-policy-note { flex: 0 0 auto; }
+.site.on-chart .chart-page-host { flex: 1; min-height: 0; height: auto; }
+.site.on-chart .site-main > .data-health { display: none; }
 .chart-page-host {
   height: 100%;
 }

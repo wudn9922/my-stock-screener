@@ -23,6 +23,7 @@ import {
   MoreHorizontal,
   X,
   HelpCircle,
+  Info,
   FlaskConical,
   RefreshCw,
   Search,
@@ -80,7 +81,6 @@ import { sitePreferences, upDownColors } from './sitePreferences';
 import { displayTicker, formatPercent, formatPe, formatPrice, toneClass } from '../ui/format';
 import type { ChartRequest } from './chartRequest';
 import { marketVolumeUnit } from '../ui/format';
-import { HelpDisclosure } from '../ui/HelpDisclosure';
 import type { LocalSymbol } from '../ui/SymbolSearch';
 import '../ui/workspace.css';
 
@@ -981,26 +981,26 @@ export function App({
                 <dd className={peFigures?.peTtmLoss ? 'pe-loss' : undefined}>{formatPe(peFigures?.peTtm, !!peFigures?.peTtmLoss)}</dd>
               </div>
             </dl>
-            <HelpDisclosure label="本益比說明">
+            <StockStatsMenu label="本益比說明" testId="valuation-help-toggle" trigger={<Info size={13} />}>
               <p>{peTitle(`本益比（${peFigures?.fiscalYear ?? '年度'} EPS）`, peFigures?.pe ?? null)}</p>
               <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}</p>
-            </HelpDisclosure>
+            </StockStatsMenu>
           </div>
         )}
         {!isIndex && providerId !== 'demo' && (
-          <div className="ws-analysis-tools">
-            <StockVolatility symbol={symbol} provider={providers[providerId]} reloadToken={reloadToken} />
-            <StockStatsMenu label="價量分析" testId="volume-analysis-toggle">
-              <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
-            </StockStatsMenu>
-            <StockStatsMenu label="建議均線">
-              <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} onNotice={setNotice} />
-              <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>
-            </StockStatsMenu>
+          <div className="ws-stock-controls">
+            {onOpenFinancials && <StockTabs active="chart" onSelect={(tab) => tab === 'financials' && onOpenFinancials(symbol, tf)} />}
+            <div className="ws-analysis-tools">
+              <StockVolatility symbol={symbol} provider={providers[providerId]} reloadToken={reloadToken} />
+              <StockStatsMenu label="價量" testId="volume-analysis-toggle">
+                <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
+              </StockStatsMenu>
+              <StockStatsMenu label="建議均線">
+                <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} onNotice={setNotice} />
+                <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>
+              </StockStatsMenu>
+            </div>
           </div>
-        )}
-        {onOpenFinancials && !isIndex && providerId !== 'demo' && (
-          <StockTabs active="chart" onSelect={(tab) => tab === 'financials' && onOpenFinancials(symbol, tf)} />
         )}
         <div className="ws-header-actions">
           {providerId === 'demo' && (
@@ -1024,6 +1024,14 @@ export function App({
           <IconButton label="重新整理行情" onClick={() => setReloadToken((n) => n + 1)}>
             <RefreshCw size={17} />
           </IconButton>
+          <StockStatsMenu label="行情資料說明" testId="source-info-toggle" trigger={<Info size={16} />}>
+            <div className="source-details">
+              <div ref={sourceRef} className="data-source" />
+              {STATIC_HOSTING && <p className="static-hosting-note">{staticHostingText}</p>}
+              {providerId === 'demo' && <p className="demo-data-note">{demoDataText}</p>}
+              <div className="events-source">{eventsStatus}</div>
+            </div>
+          </StockStatsMenu>
         </div>
       </header>
       <div className="chart-toolbar" inert={modal} aria-hidden={modal}>
@@ -1227,15 +1235,6 @@ export function App({
                 {drawingControls}
               </div>
             )}
-          </div>
-          <div className="source-strip">
-            <div ref={sourceRef} className="data-source" />
-            {(STATIC_HOSTING || providerId === 'demo') && (
-              <HelpDisclosure label="行情資料說明" className="static-hosting-note">
-                <p>{STATIC_HOSTING ? staticHostingText : ''} {providerId === 'demo' ? demoDataText : ''}</p>
-              </HelpDisclosure>
-            )}
-            <div className="events-source">{eventsStatus}</div>
           </div>
         </main>
         {right && !mobile && (
