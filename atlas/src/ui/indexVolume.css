@@ -1,4 +1,4 @@
-.index-volume-card { padding: 16px; min-width: 0; }
+.index-volume-card { padding: 16px; margin-bottom: 12px; min-width: 0; }
 .index-volume-card > h3 { margin: 0 0 12px; font-size: 15px; }
 .index-volume-picker { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 12px; }
 .index-volume-picker select { flex: 1; min-width: 0; width: 0; min-height: 36px; }
