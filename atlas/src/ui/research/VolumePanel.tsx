@@ -1,18 +1,17 @@
 import { useState } from "react";
 import {
   volumeSchema,
-  volumeStructure,
   type VolumeResearch,
 } from "../../report/research";
 import {
   num,
   Provenance,
   ResearchDisclosure,
-  ResearchNote,
   Stat,
   Status,
   useResearch,
 } from "./Common";
+import { VolumeRatios } from "./VolumeRatios";
 
 export function VolumePanel({ symbol, inline = false }: { symbol: string; inline?: boolean }) {
   if (inline) return <section className="volume-analysis-results" aria-label="價量分析結果"><VolumeData symbol={symbol} /></section>;
@@ -34,12 +33,8 @@ function VolumeData({ symbol }: { symbol: string }) {
 }
 
 export function VolumeAnalysis({ data }: { data: VolumeResearch }) {
-  const [window, setWindow] = useState(20),
-    [abnormal, setAbnormal] = useState(2),
+  const [abnormal, setAbnormal] = useState(2),
     [quiet, setQuiet] = useState(0.5);
-  const structure = volumeStructure(data.features, window);
-  const ratio = (value: typeof structure.upShrink) =>
-    `${value.numerator}/${value.denominator} = ${value.pct === null ? "N/A" : num(value.pct, 1) + "%"}`;
   const abnormalState =
     data.latest.rvol === null
       ? "有效歷史不足"
@@ -83,32 +78,7 @@ export function VolumeAnalysis({ data }: { data: VolumeResearch }) {
           />
         </label>
       </div>
-      <h3>上漲／下跌放量與縮量比例</h3>
-      <div className="research-controls">
-        <label>
-          觀測窗口
-          <select
-            aria-label="價量觀測窗口"
-            value={window}
-            onChange={(e) => setWindow(Number(e.target.value))}
-          >
-            {[5, 10, 20].map((w) => (
-              <option key={w} value={w}>
-                {w} 個交易日
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <dl className="research-stats">
-        <Stat label="上漲縮量比例" value={ratio(structure.upShrink)} />
-        <Stat label="下跌放量比例" value={ratio(structure.downExpand)} />
-        <Stat label="上漲放量比例" value={ratio(structure.upExpand)} />
-        <Stat label="下跌縮量比例" value={ratio(structure.downShrink)} />
-      </dl>
-      <ResearchNote
-        title={`計算說明 · 有效觀測 ${structure.observations}/${window} 日${structure.observations < Math.max(5, window * 0.8) ? " · 樣本不足" : ""}`}
-      >
+      <VolumeRatios features={data.features}>
         <p>
           分母為有效上漲／下跌日；無有效上漲或下跌日為
           N/A。放量／縮量只比較當日與前一個交易日的成交量；相同成交量不歸入任一類。
@@ -121,7 +91,7 @@ export function VolumeAnalysis({ data }: { data: VolumeResearch }) {
         {data.risks.map((risk) => (
           <p key={risk}>{risk}</p>
         ))}
-      </ResearchNote>
+      </VolumeRatios>
       <Provenance data={data} />
     </>
   );

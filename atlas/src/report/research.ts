@@ -259,7 +259,9 @@ export async function fetchResearch<T>(
     throw new Error("股票代號不符，已拒絕顯示其他股票資料。");
   return result.data;
 }
-export function volumeStructure(features: VolumeFeature[], window: number) {
+export type DirectionalVolumeFeature = Pick<VolumeFeature, "valid" | "returnPct" | "volume">;
+
+export function volumeStructure(features: readonly DirectionalVolumeFeature[], window: number) {
   // Pair before slicing: the first day in a window still needs the immediately
   // preceding session. Never skip a missing/invalid day to find an older volume.
   const sample = features

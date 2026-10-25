@@ -24,6 +24,7 @@ for (const [name, type, settings] of [
   const errors = [];
   const research = [];
   const monthly = [];
+  const indexVolume = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("response", (response) => {
     if (response.url().includes("/report/research/"))
@@ -73,6 +74,25 @@ for (const [name, type, settings] of [
       monthly.push({ market, pointCounts: await card.locator(".bo-history-chart").evaluateAll(plots =>
         plots.map(plot => Number(plot.getAttribute("data-point-count"))),
       ) });
+      if (market === "tw") {
+        // The official TPEx daily series is available locally in the real Pages
+        // tree; no live proxy or synthetic volume is needed for this assertion.
+        const volume = page.getByRole("region", { name: "指數價量分析", exact: true });
+        await volume.getByLabel("價量分析指數").selectOption("^TWOII");
+        await page.waitForFunction(() => {
+          const values = [...document.querySelectorAll(".index-volume-card .research-stats dd")];
+          return values.length === 4 && values.some(value => /\d+\/\d+ = \d+(?:\.\d+)?%/.test(value.textContent));
+        });
+        if (/異常量|RVOL/.test(await volume.innerText()))
+          throw new Error("Index volume analysis must contain directional ratios only");
+        const rawResponse = await page.request.get(new URL("../report/series/%5ETWOII.json", base).href);
+        if (!rawResponse.ok()) throw new Error("Official index daily series unavailable");
+        const raw = await rawResponse.json();
+        const latestDay = new Date(raw.bars.at(-1).time * 1000).toISOString().slice(0, 10);
+        if (!(await volume.locator(".index-volume-date").innerText()).includes(latestDay))
+          throw new Error("Index volume analysis did not retain the latest completed source date");
+        indexVolume.push({ symbol: "^TWOII", asOf: latestDay, ratios: await volume.locator(".research-stats dd").allTextContents() });
+      }
     }
     for (const symbol of ["2330.TW", "6488.TWO", "AAPL"]) {
       await page.goto(base + "?page=financials&symbol=" + symbol);
@@ -119,6 +139,7 @@ for (const [name, type, settings] of [
       source: "Unmocked Pages build with actual committed report JSON",
       research,
       monthly,
+      indexVolume,
       errors,
       horizontalOverflow: overflow,
       passed:
