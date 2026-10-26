@@ -1,5 +1,5 @@
 import type { Bar, BarResult, Timeframe } from './MarketDataProvider';
-import { intervalSeconds } from './MarketDataProvider';
+import { intervalSeconds } from './Timeframes';
 import {
   calendarPeriodStart,
   getMarketProfile,

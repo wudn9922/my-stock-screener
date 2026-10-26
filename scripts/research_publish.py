@@ -25,17 +25,24 @@ FILES = {
 def world_files(root):
     from research_candles import ASSETS
 
+    symbols = {key: value[2] for key, value in ASSETS.items()}
+    symbols["btcusdt"] = "CRYPTO-BTCUSDT"
     index = json.loads((root / "world-assets.json").read_text())
     out = {}
     for key, asset in index.get("series", {}).items():
         if not asset.get("candlePath"):
             continue
         if (
-            key not in ASSETS
+            key not in symbols
             or asset["candlePath"] != f"candles/{key}.json"
-            or asset.get("symbol") != ASSETS[key][2]
+            or asset.get("symbol") != symbols[key]
         ):
             raise ValueError("Unapproved world candle path/symbol")
+        if key == "btcusdt" and any(asset.get(field) != expected for field, expected in {
+            "providerSymbol": "BTCUSDT", "baseCurrency": "BTC", "quoteCurrency": "USDT",
+            "instrumentType": "crypto-spot", "timezone": "UTC", "unit": "USDT/BTC", "volumeUnit": "BTC",
+        }.items()):
+            raise ValueError("BTC/USDT published pair metadata does not match the source")
         out[key] = asset
     return out
 

@@ -215,6 +215,7 @@ const asset = meta.extend({
   changes: z.record(z.string(), nullable).optional(),
   baseCurrency: z.string().nullish(),
   quoteCurrency: z.string().nullish(),
+  volumeUnit: z.string().optional(),
   quoteDirection: z.string().nullish(),
 });
 export const worldAssetsSchema = z.object({

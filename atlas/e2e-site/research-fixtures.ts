@@ -6,6 +6,7 @@ const symbols: Record<string, string> = {
   wti: 'CMD-WTI', brent: 'CMD-BRENT', gas: 'CMD-GAS', gold: 'CMD-GOLD',
   silver: 'CMD-SILVER', copper: 'CMD-COPPER', usdtwd: 'FX-USDTWD',
   usdjpy: 'FX-USDJPY', eurusd: 'FX-EURUSD', usdcny: 'FX-USDCNY', usdkrw: 'FX-USDKRW',
+  btcusdt: 'CRYPTO-BTCUSDT',
 };
 
 /** Browser mocks use frozen source excerpts and main's retained OHLC evidence.

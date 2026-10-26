@@ -140,16 +140,16 @@ test("Taiwan real chips, institutional units, volume structure and symbol separa
     .filter({ has: page.locator(":scope > summary", { hasText: "價量分析" }) });
   await volume.locator(":scope > summary").click();
   await expect(volume.locator(".research-stats dt")).toHaveText([
-    "異常量 RVOL20", "上漲縮量比例", "下跌放量比例", "上漲放量比例", "下跌縮量比例",
+    "上漲縮量比例", "下跌放量比例", "上漲放量比例", "下跌縮量比例", "異常量 RVOL20",
   ]);
-  await expect(volume.locator(".research-stats dd").first()).toContainText("1.2");
+  await expect(volume.locator(".volume-analysis-anomaly dd")).toContainText("1.2");
   await expect(volume.locator("table, svg")).toHaveCount(0);
   for (const removed of ["ADV", "Amihud", "流動性與完整數據", "近期最大量日期", "價格變化", "連續縮量上漲"])
     await expect(volume).not.toContainText(removed);
   await volume.getByLabel("異常放量門檻").fill("1");
-  await expect(volume.locator(".research-stats dd").first()).toContainText("異常放量");
+  await expect(volume.locator(".volume-analysis-anomaly dd")).toContainText("異常放量");
   await volume.getByLabel("價量觀測窗口").selectOption("5");
-  const volumeNote = volume.locator(".research-note").filter({
+  const volumeNote = volume.locator(".volume-analysis-ratios .research-note").filter({
     has: page.locator(":scope > summary", { hasText: "計算說明" }),
   });
   await expect(volumeNote.locator(":scope > summary")).toContainText("/5 日");

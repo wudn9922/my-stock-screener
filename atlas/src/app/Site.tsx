@@ -15,6 +15,7 @@ import type { Timeframe } from '../market-data/MarketDataProvider';
 import './siteNav.css';
 import { DataHealthPanel } from '../ui/DataHealthPanel';
 import { StorageNotice } from '../auth/StorageNotice';
+import { RouteBoundary } from './RouteBoundary';
 
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
@@ -233,17 +234,20 @@ export function Site() {
       </nav>
       <main className="site-main" id="main">
         {SCREENER_HOSTING && <StorageNotice />}
-        <Suspense fallback={pageFallback}>
-          {route.page === 'markets' && <MarketsPage {...pageProps} market={route.market} />}
-          {route.page === 'world' && <WorldPage {...pageProps} view={route.view} />}
-          {route.page === 'themes' && <ThemesPage {...pageProps} theme={route.theme} market={route.market} view={route.v} />}
-          {route.page === 'screener' && <ScreenerPage {...pageProps} group={route.group} f={route.f} />}
-          {route.page === 'console' && <ConsolePage {...pageProps} list={route.list} />}
-          {route.page === 'financials' && <FinancialsPage {...pageProps} symbol={route.symbol} p={route.p} tf={route.tf} />}
-        </Suspense>
+        <RouteBoundary key={route.page}>
+          <Suspense fallback={pageFallback}>
+            {route.page === 'markets' && <MarketsPage {...pageProps} market={route.market} />}
+            {route.page === 'world' && <WorldPage {...pageProps} view={route.view} />}
+            {route.page === 'themes' && <ThemesPage {...pageProps} theme={route.theme} market={route.market} view={route.v} />}
+            {route.page === 'screener' && <ScreenerPage {...pageProps} group={route.group} f={route.f} />}
+            {route.page === 'console' && <ConsolePage {...pageProps} list={route.list} />}
+            {route.page === 'financials' && <FinancialsPage {...pageProps} symbol={route.symbol} p={route.p} tf={route.tf} />}
+          </Suspense>
+        </RouteBoundary>
         {chartVisited.current && (
-          <Suspense fallback={route.page === 'chart' ? <PageState kind="loading" title="載入圖表工作台…" /> : null}>
-            <div className="chart-page-host" hidden={route.page !== 'chart'}>
+          <div className="chart-page-host" hidden={route.page !== 'chart'}>
+            <RouteBoundary>
+              <Suspense fallback={route.page === 'chart' ? <PageState kind="loading" title="載入圖表工作台…" /> : null}>
               <ChartPage
                 active={route.page === 'chart'}
                 request={chartRequest}
@@ -252,8 +256,9 @@ export function Site() {
                 onOpenFinancials={openFinancials}
                 reportSymbols={localSymbols}
               />
-            </div>
-          </Suspense>
+              </Suspense>
+            </RouteBoundary>
+          </div>
         )}
         <DataHealthPanel report={reportState} />
       </main>

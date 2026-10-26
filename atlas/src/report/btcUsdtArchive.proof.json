@@ -1,0 +1,57 @@
+{
+  "csvSha256": "085f746673ccc031d93023d676c34f9e29d5fc7b29dfd75bfa01017e85a50c2d",
+  "asset": {
+    "methodVersion": "research-v1",
+    "source": "Binance BTC/USDT spot daily OHLC",
+    "sourceUrl": "https://www.binance.com/en/trade/BTC_USDT?type=spot",
+    "asOf": "2026-10-24",
+    "publishedAt": null,
+    "fetchedAt": "2026-10-25T19:05:19+00:00",
+    "generatedAt": "2026-10-25T19:05:19+00:00",
+    "status": "ok",
+    "missingReason": null,
+    "name": "BTC/USDT",
+    "symbol": "CRYPTO-BTCUSDT",
+    "providerSymbol": "BTCUSDT",
+    "frequency": "daily",
+    "unit": "USDT/BTC",
+    "instrumentType": "crypto-spot",
+    "pricePrecision": 2,
+    "timezone": "UTC",
+    "latest": 80888.16,
+    "candlePath": "candles/btcusdt.json",
+    "candleSha256": "93b2c95ba354f5fc30dc451565039de7e3c25ce93662b6892665a83e2167b961",
+    "csvSha256": "085f746673ccc031d93023d676c34f9e29d5fc7b29dfd75bfa01017e85a50c2d",
+    "baseCurrency": "BTC",
+    "quoteCurrency": "USDT",
+    "volumeUnit": "BTC",
+    "quoteDirection": "每 1 BTC 兌 USDT",
+    "priceBasis": "Binance BTC/USDT spot OHLC; 24/7 UTC daily sessions; volume in BTC. USDT is the quote asset, not USD.",
+    "coverageFrom": "2021-10-21",
+    "observations": 1830,
+    "excludedInvalidOHLC": 0
+  },
+  "sourceReceipts": [
+    {
+      "url": "https://data-api.binance.vision/api/v3/exchangeInfo?symbol=BTCUSDT",
+      "fetchedAt": "2026-10-25T19:05:16+00:00",
+      "lastModified": null,
+      "sha256": "97fe995c004a65976289180c771faed0faf6496b33ddfe8ed794d632be9582c5",
+      "bytes": 5349
+    },
+    {
+      "url": "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000&startTime=1634774400000",
+      "fetchedAt": "2026-10-25T19:05:18+00:00",
+      "lastModified": null,
+      "sha256": "a2d6c4f63d2bbbe03ae12ecaf86c70638c20c74bca20f372c75e705e40683581",
+      "bytes": 187447
+    },
+    {
+      "url": "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000&startTime=1721174400000",
+      "fetchedAt": "2026-10-25T19:05:19+00:00",
+      "lastModified": null,
+      "sha256": "549528294174f89f314031400741f6c01ccd243d358c6aa733cda72dbc5f7c14",
+      "bytes": 155726
+    }
+  ]
+}

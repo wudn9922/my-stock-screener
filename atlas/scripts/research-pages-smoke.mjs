@@ -25,6 +25,7 @@ for (const [name, type, settings] of [
   const research = [];
   const monthly = [];
   const indexVolume = [];
+  const cryptoAssets = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("response", (response) => {
     if (response.url().includes("/report/research/"))
@@ -50,6 +51,12 @@ for (const [name, type, settings] of [
         (name === "iphone-webkit" ? "iphone-world.png" : "desktop-world.png"),
       fullPage: false,
     });
+    const btc = page.locator('.world-candle-card').filter({ has: page.getByRole('heading', { name: 'BTC/USDT', exact: true }) });
+    await btc.scrollIntoViewIfNeeded();
+    await page.waitForFunction(() => document.querySelector('[data-chart-identity="world:CRYPTO-BTCUSDT"] .candle-ohlc')?.textContent?.includes('O '));
+    if (!(await btc.innerText()).includes('USDT/BTC')) throw new Error('BTC/USDT must retain the actual quote currency');
+    cryptoAssets.push({ pair: 'BTC/USDT', source: await btc.locator('.source-note').first().innerText() });
+    await btc.screenshot({ path: resolve(out, name + '-btcusdt.png') });
     await page.getByRole("button", { name: "匯率", exact: true }).click();
     await page.getByRole("heading", { name: "USD/TWD", exact: true }).waitFor();
     await page.waitForFunction(() =>
@@ -140,6 +147,7 @@ for (const [name, type, settings] of [
       research,
       monthly,
       indexVolume,
+      cryptoAssets,
       errors,
       horizontalOverflow: overflow,
       passed:

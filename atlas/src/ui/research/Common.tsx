@@ -88,14 +88,18 @@ export function Provenance({
 export function ResearchNote({
   children,
   title = "說明",
+  compact = false,
 }: {
   children: ReactNode;
   title?: string;
+  compact?: boolean;
 }) {
   return (
-    <details className="research-note source-note">
-      <summary>{title}</summary>
-      {children}
+    <details className={`research-note source-note${compact ? " research-note-compact" : ""}`}>
+      <summary aria-label={compact ? title : undefined} title={compact ? title : undefined}>
+        {compact ? <span aria-hidden="true">?</span> : title}
+      </summary>
+      <div className="research-note-body">{children}</div>
     </details>
   );
 }
@@ -127,11 +131,11 @@ export function Stat({
   note?: string;
 }) {
   return (
-    <div>
+    <div className="research-stat">
       <dt>{label}</dt>
       <dd>{value}</dd>
       {note && (
-        <ResearchNote>
+        <ResearchNote title={`${label}說明`} compact>
           <small>{note}</small>
         </ResearchNote>
       )}

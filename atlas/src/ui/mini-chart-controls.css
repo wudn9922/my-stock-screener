@@ -1,0 +1,51 @@
+.mini-chart-interactive .mini-chart-canvas {
+  top: 36px;
+}
+.mini-chart-controls {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-3);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.mini-chart-controls > span:first-child {
+  margin-right: auto;
+}
+.mini-chart-controls button {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.mini-chart-controls button:disabled {
+  opacity: .45;
+  cursor: default;
+}
+.mini-chart-controls output {
+  min-width: 22px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.index-card-link {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+.index-card-link > .trend-badge {
+  align-self: flex-start;
+}
+.index-card > .index-card-foot {
+  display: flex;
+  flex-direction: row;
+}
+.index-card:active {
+  transform: none;
+}

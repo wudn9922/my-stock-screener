@@ -49,6 +49,16 @@ def payload(symbol="GC=F"):
     }
 
 
+def crypto_response(url):
+    if "/exchangeInfo?" in url:
+        return {"timezone": "UTC", "symbols": [{"symbol": "BTCUSDT", "baseAsset": "BTC",
+                "quoteAsset": "USDT", "isSpotTradingAllowed": True, "status": "TRADING"}]}
+    if "/klines?" in url:
+        return [[1792454400000, "10", "12", "9", "11", "1.25", 1792540799999],
+                [1792540800000, "11", "13", "10", "12", "2.5", 1792627199999]]
+    return None
+
+
 class CandleSources(unittest.TestCase):
     def test_latest_completed_invalid_bar_refetches_once_before_the_forming_row(self):
         from unittest.mock import Mock
@@ -124,10 +134,13 @@ class CandleSources(unittest.TestCase):
                 from urllib.parse import unquote
 
                 self.calls += 1
-                symbol = unquote(url.split("/chart/")[1].split("?")[0])
-                p = payload(symbol)
                 if self.fail:
                     raise SourceError("429", status=429)
+                crypto = crypto_response(url)
+                if crypto is not None:
+                    return crypto
+                symbol = unquote(url.split("/chart/")[1].split("?")[0])
+                p = payload(symbol)
                 if symbol.endswith("=X"):
                     p["chart"]["result"][0]["meta"].update(
                         instrumentType="CURRENCY",
@@ -152,7 +165,7 @@ class CandleSources(unittest.TestCase):
                 p.name: (p.read_bytes(), p.stat().st_mtime_ns)
                 for p in data.glob("*.csv")
             }
-            self.assertEqual(len(before), 11)
+            self.assertEqual(len(before), 12)
             build_world_candles(out, data, transport)
             self.assertEqual(
                 before,
@@ -171,7 +184,8 @@ class CandleSources(unittest.TestCase):
             transport.fail = True
             before_limit = transport.calls
             build_world_candles(out, data, transport)
-            self.assertEqual(transport.calls, before_limit + 1)
+            # Rate limits are isolated per source; Yahoo cannot suppress BTC.
+            self.assertEqual(transport.calls, before_limit + 2)
             self.assertEqual(
                 before,
                 {
@@ -182,7 +196,7 @@ class CandleSources(unittest.TestCase):
             self.assertEqual(read(out)["series"]["gold"]["status"], "stale")
             stage(out.parent, root / "artifacts", "world", data)
             overlay(root / "artifacts", root / "published", root / "retained")
-            self.assertEqual(len(list((root / "retained").glob("*.csv"))), 11)
+            self.assertEqual(len(list((root / "retained").glob("*.csv"))), 12)
             kept = root / "retained/CMD-WTI.csv"
             rows = read_csv(kept)
             later = date.fromisoformat(rows[-1][0]) + timedelta(days=1)
@@ -200,6 +214,9 @@ class CandleSources(unittest.TestCase):
             def json(self, url):
                 from urllib.parse import unquote
 
+                crypto = crypto_response(url)
+                if crypto is not None:
+                    return crypto
                 symbol = unquote(url.split("/chart/")[1].split("?")[0])
                 p = payload(symbol)
                 meta = p["chart"]["result"][0]["meta"]
@@ -236,6 +253,12 @@ class CandleSources(unittest.TestCase):
         class RetainedSource:
             def json(self, url):
                 from urllib.parse import unquote
+                if "/exchangeInfo?" in url:
+                    return crypto_response(url)
+                if "/klines?" in url:
+                    row = read_csv(data / "CRYPTO-BTCUSDT.csv")[-1]
+                    opened = int(datetime.fromisoformat(row[0]).replace(tzinfo=timezone.utc).timestamp() * 1000)
+                    return [[opened, *[str(v) for v in row[1:]], opened + 86_400_000 - 1]]
                 ticker = unquote(url.split("/chart/")[1].split("?")[0])
                 name, _, symbol, unit = next(a for a in ASSETS.values() if a[1] == ticker)
                 row = read_csv(data / (symbol + ".csv"))[-1]

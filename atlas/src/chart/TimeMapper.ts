@@ -63,8 +63,10 @@ function marketEpoch(
 }
 
 /** Regular-session schedule, weekends excluded. Holidays require a production exchange calendar. */
-export function nextSessionTime(time: number, timeframe: Timeframe, market?: MarketProfile): number {
+export type SessionCalendar = 'regular' | 'continuous-utc';
+export function nextSessionTime(time: number, timeframe: Timeframe, market?: MarketProfile, calendar: SessionCalendar = 'regular'): number {
   const profile = market ?? getMarketProfile();
+  if (calendar === 'continuous-utc' && timeframe !== '1M') return time + intervalSeconds[timeframe];
   if (timeframe === '1M') {
     if (profile.market === 'TW') {
       const { year, month } = dateParts(time, profile);
@@ -192,11 +194,12 @@ export class TimeMapper {
     readonly timeframe: Timeframe,
     futureCount = 500,
     readonly market: MarketProfile = getMarketProfile(),
+    readonly calendar: SessionCalendar = 'regular',
   ) {
     this.times = bars.map((b) => b.time);
     this.lastRealLogical = bars.length - 1;
     for (let i = 0; i < futureCount && this.times.length; i++)
-      this.times.push(nextSessionTime(this.times.at(-1)!, timeframe, market));
+      this.times.push(nextSessionTime(this.times.at(-1)!, timeframe, market, calendar));
   }
   toTime(logical: number): number {
     if (!this.times.length) return 0;

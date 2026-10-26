@@ -1,7 +1,7 @@
 import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { OfficialAlerts } from '../ui/research/OfficialAlerts';
 import { SecRadar } from '../ui/research/SecRadar';
-import { useMemo } from 'react';
+import { useMemo, type MouseEvent } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { PageProps } from './pageProps';
 import { ChartAttribution, ReportGate, TrendBadge } from './ReportGate';
@@ -25,17 +25,15 @@ export const MARKET_META: Record<MarketKey, { name: string; flag: string }> = {
 
 function IndexCard({ index, onOpen }: { index: IndexStatus; onOpen: () => void }) {
   const tone = toneClass(index.changePct);
+  const open = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+    event.preventDefault();
+    onOpen();
+  };
+  const href = serializeRoute({ page: 'chart', symbol: index.symbol, tf: '1D' });
   return (
-    <a
-      className="card index-card"
-      href={serializeRoute({ page: 'chart', symbol: index.symbol, tf: '1D' })}
-      onClick={(event) => {
-        if (event.metaKey || event.ctrlKey || event.shiftKey) return;
-        event.preventDefault();
-        onOpen();
-      }}
-      aria-label={`${index.name} ${formatPrice(index.close)}，開啟完整圖表`}
-    >
+    <article className="card index-card" aria-label={index.name}>
+      <a className="index-card-link" href={href} onClick={open} aria-label={`${index.name} ${formatPrice(index.close)}，開啟完整圖表`}>
       <div className="index-card-head">
         <div className="index-card-name">
           <b>{index.name}</b>
@@ -47,8 +45,9 @@ function IndexCard({ index, onOpen }: { index: IndexStatus; onOpen: () => void }
         </div>
       </div>
       <TrendBadge trend={index.trend} label={index.trendLabel} />
-      <MiniChart symbol={index.symbol} height={164} />
-      <div className="index-card-foot">
+      </a>
+      <MiniChart symbol={index.symbol} height={244} maPeriods={index.maList} interactive showVolume />
+      <a className="index-card-foot index-card-link" href={href} onClick={open} aria-label={`${index.name}，開啟完整圖表`}>
         <span className="ma-legend">
           {index.maList.length ? (
             index.maList.map((period, i) => {
@@ -70,8 +69,8 @@ function IndexCard({ index, onOpen }: { index: IndexStatus; onOpen: () => void }
           {index.score !== null && index.scoreMax ? ` ${index.score > 0 ? '+' : ''}${index.score}/${index.scoreMax}` : ''}
           <ChevronRight size={16} aria-hidden="true" className="card-chevron" />
         </span>
-      </div>
-    </a>
+      </a>
+    </article>
   );
 }
 

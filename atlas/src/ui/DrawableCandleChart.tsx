@@ -25,6 +25,7 @@ export function DrawableCandleChart({
   source,
   unit,
   precision = 2,
+  calendar = 'regular',
   marketSymbol,
   loading,
   error,
@@ -34,6 +35,7 @@ export function DrawableCandleChart({
   source: string;
   unit: string;
   precision?: number;
+  calendar?: 'regular' | 'continuous-utc';
   marketSymbol?: string;
   loading?: boolean;
   error?: string;
@@ -131,9 +133,10 @@ export function DrawableCandleChart({
       [],
       s.preferences.views[timeframe],
       false,
+      calendar,
     );
     chart.setPricePrecision(precision);
-  }, [state.ready, symbol, timeframe, shown, source, market, precision]);
+  }, [state.ready, symbol, timeframe, shown, source, market, precision, calendar]);
   useEffect(() => {
     engine.current?.setUpDownColors(upDownColors(prefs.colors));
     engine.current?.sync(
@@ -182,6 +185,7 @@ export function DrawableCandleChart({
     <section
       className="drawable-candles"
       data-chart-identity={identity}
+      data-session-calendar={calendar}
       data-drawing-symbol={symbol}
       aria-label={`${source}可畫線K線圖`}
     >

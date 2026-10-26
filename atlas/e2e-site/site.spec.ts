@@ -47,7 +47,7 @@ test('lands on 大盤 / 台灣 with report cards, LINE summary and mini charts',
 test('index card opens the chart workspace without preset MAs', async ({ page }) => {
   await mockSite(page);
   await page.goto('./?page=markets&market=tw');
-  await page.locator('.index-card').first().click();
+  await page.locator('.index-card').first().getByRole('link', { name: '台灣加權指數，開啟完整圖表', exact: true }).click();
   await expect(page).toHaveURL(/page=chart&symbol=\^TWII&tf=1D/);
   await chartReady(page);
   await expect(page.getByTestId('active-symbol')).toHaveText('^TWII');

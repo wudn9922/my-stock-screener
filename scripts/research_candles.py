@@ -118,14 +118,14 @@ def read_csv(path):
         ]
 
 
-def save_csv(path, rows, now=None):
+def save_csv(path, rows, now=None, zone="America/New_York", source_url=None):
     if path.exists() and not {r[0] for r in read_csv(path)} <= {r[0] for r in rows}:
         raise ValueError("Refusing to delete retained K-line dates")
     old = {r[0]: r for r in read_csv(path)}
     accepted = []
     for row in rows:
         values = dict(zip(FIELDS[1:], row[1:]))
-        if not kline.session_complete(row[0], path.stem, now=now, zone='America/New_York') and row != old.get(row[0]):
+        if not kline.session_complete(row[0], path.stem, now=now, zone=zone) and row != old.get(row[0]):
             kline.log_event(path.stem, row[0], 'deferred', old=values,
                             reason='unfinished-world-session', fetched_at=stamp())
             if row[0] in old:
@@ -137,7 +137,7 @@ def save_csv(path, rows, now=None):
         if row[0] in old and row != old[row[0]]:
             kline.log_event(path.stem, row[0], "corrected",
                             old=dict(zip(FIELDS[1:], old[row[0]][1:])), new=values,
-                            source_url="https://query1.finance.yahoo.com/v8/finance/chart/" + next((a[1] for a in ASSETS.values() if a[2] == path.stem), path.stem),
+                            source_url=source_url or "https://query1.finance.yahoo.com/v8/finance/chart/" + next((a[1] for a in ASSETS.values() if a[2] == path.stem), path.stem),
                             fetched_at=stamp(), reason="world-source-refresh")
         accepted.append(row)
     rows = accepted
@@ -236,6 +236,8 @@ def build_world_candles(out, data_dir=None, http=None):
             print(key, str(exc), flush=True)
             # Preserve previously validated candle snapshots and their real dates.
             assets[key] = retain(old, "Yahoo Finance daily OHLC", url, exc)
+    from research_crypto import build_btc_usdt
+    assets["btcusdt"] = build_btc_usdt(out, data_dir, http, previous.get("series", {}).get("btcusdt"))
     write(
         out,
         dict(
@@ -243,6 +245,6 @@ def build_world_candles(out, data_dir=None, http=None):
             methodVersion="research-candles-v1",
             generatedAt=stamp(),
             series=assets,
-            limitations="Futures OHLC are provider front-contract histories, not EIA spot or monthly benchmarks; provider roll schedule/adjustment is unspecified. FX are indicative daily OHLC, not Fed H10 statistics, bank retail rates or live quotes. Only completed source sessions are included.",
+            limitations="Futures OHLC are provider front-contract histories, not EIA spot or monthly benchmarks; provider roll schedule/adjustment is unspecified. FX are indicative daily OHLC, not Fed H10 statistics, bank retail rates or live quotes. BTC/USDT is Binance spot, quoted in USDT with BTC volume, using 24/7 UTC sessions. Only completed source sessions are included.",
         ),
     )
