@@ -11,6 +11,7 @@ on:
       - 'kline_integrity.py'
       - '.github/generated-paths.json'
       - 'tests/test_kline_archive*.py'
+      - 'tests/fixtures/kline-daily-*'
       - '.github/workflows/kline-archive*.yml'
       - '.github/workflows/universe-full.yml'
       - 'docs/KLINE_ARCHIVE.md'
@@ -63,7 +64,7 @@ jobs:
         with:
           python-version: '3.10'
       - run: pip install --quiet pandas
-      - name: Verify a 7000-symbol daily append in under five minutes
+      - name: Apply 2.24 million overlapping-source conflicts and verify the daily append
         env:
           KLINE_ARCHIVE_PERFORMANCE: '1'
         run: python -u -m unittest discover -s tests -p test_kline_archive_performance.py -v

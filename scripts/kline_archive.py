@@ -247,15 +247,75 @@ def merge_main_log(root, destination=None):
     return True
 
 
+class _ConflictBatch:
+    """One summary per symbol/reason; exact date dedup costs at most 366 bits/year.
+
+    Counts mean distinct conflicting dates, not provider revisions or retries.
+    Three deterministic samples retain examples, never every rejected row. Git
+    retains previous versions, including the original v1 per-row observations.
+    """
+    SAMPLE_LIMIT = 3
+
+    def __init__(self, root):
+        self.path = Path(root) / CONFLICTS
+        self.entries, self.dirty = {}, False
+        state = json_read(self.path, {"version": 2, "conflicts": {}})
+        if state["version"] == 1:
+            print(f"K-line apply: compact legacy conflicts start entries={len(state['conflicts'])}", flush=True)
+            for index, entry in enumerate(state["conflicts"].values(), 1):
+                self.add(entry["symbol"], entry["incoming"], entry["old"], entry["reason"], entry["firstObservedAt"])
+                if index % 10000 == 0:
+                    print(f"K-line apply: compact legacy conflicts {index}/{len(state['conflicts'])}", flush=True)
+            self.dirty = True
+        elif state["version"] == 2:
+            self.entries = state["conflicts"]
+        else:
+            raise ValueError("Unknown archive conflict schema")
+
+    def add(self, symbol, row, old, reason, observed_at=None):
+        key = digest(json.dumps([symbol, reason]).encode())
+        entry = self.entries.get(key)
+        if entry is None:
+            entry = self.entries[key] = dict(symbol=symbol, reason=reason, count=0,
+                firstDate=row[0], lastDate=row[0], dateBits={}, samples=[],
+                firstObservedAt=observed_at or ki.utcnow())
+            self.dirty = True
+        day = date.fromisoformat(row[0])
+        year = str(day.year)
+        mask = 1 << (day - date(day.year, 1, 1)).days
+        bits = int(entry["dateBits"].get(year, "0"), 16)
+        if not bits & mask:
+            entry["dateBits"][year] = format(bits | mask, "x")
+            entry["count"] += 1
+            entry["firstDate"] = min(entry["firstDate"], row[0])
+            entry["lastDate"] = max(entry["lastDate"], row[0])
+            self.dirty = True
+        # Lexical order makes migration and baseline/final replay independent of
+        # traversal order, with bounded memory and byte-identical no-op retries.
+        # "date" is the first sorted key. Once the three earliest samples are
+        # selected, later dates cannot replace them; avoid serializing all four
+        # candidates for every bar in a 320-session rolling window.
+        if len(entry["samples"]) < self.SAMPLE_LIMIT or row[0] <= entry["samples"][-1]["date"]:
+            sample = dict(date=row[0], old=list(old) if old else None, incoming=list(row))
+            samples = sorted({json.dumps(s, sort_keys=True) for s in entry["samples"]} |
+                             {json.dumps(sample, sort_keys=True)})[:self.SAMPLE_LIMIT]
+            selected = [json.loads(s) for s in samples]
+            if selected != entry["samples"]:
+                entry["samples"] = selected
+                self.dirty = True
+        if observed_at and observed_at < entry["firstObservedAt"]:
+            entry["firstObservedAt"] = observed_at
+            self.dirty = True
+
+    def commit(self):
+        if self.dirty:
+            json_write(self.path, {"version": 2, "conflicts": self.entries})
+
+
 def conflict(root, symbol, row, old, reason):
-    path = Path(root) / CONFLICTS
-    state = json_read(path, {"version": 1, "conflicts": {}})
-    value = dict(symbol=symbol, date=row[0], old=list(old) if old else None,
-                 incoming=list(row), reason=reason)
-    key = digest(json.dumps(value, sort_keys=True).encode())
-    if key not in state["conflicts"]:
-        state["conflicts"][key] = {**value, "firstObservedAt": ki.utcnow()}
-        json_write(path, state)
+    batch = _ConflictBatch(root)
+    batch.add(symbol, row, old, reason)
+    batch.commit()
 
 
 def adjustment_comparison(witness):
@@ -306,6 +366,8 @@ class _AdjustmentBatch:
         self.root, self.scratch = Path(root), Path(scratch)
         self.watched, self.snapshots, self.pending, self.events = set(), {}, {}, []
         self.applied_daily = {}
+        self.conflicts = _ConflictBatch(root)
+        self.validated = set()
 
     def record(self, path, symbol, adjustment):
         if symbol not in self.watched:
@@ -345,8 +407,16 @@ class _AdjustmentBatch:
         add_events(self.root, self.events)
 
 
-def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at=None, _audit=None):
+def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at=None, _audit=None, _conflicts=None):
     """Plan first; all writes retain the union of existing dates. No deletion API exists."""
+    # Standalone imports also batch all disagreements, rather than doing JSON IO
+    # for every row. Transport imports share one batch across the whole payload.
+    if _conflicts is None:
+        batch = _ConflictBatch(root)
+        try:
+            return put_symbol(root, symbol, incoming, mode, correction, fetched_at, _audit, batch)
+        finally:
+            batch.commit()
     if mode not in ("daily", "backfill"):
         raise ValueError("Invalid import mode")
     incoming = [normalize(row) for row in incoming]
@@ -370,7 +440,7 @@ def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at
         # A fresh max download must cover every archived earlier session. A short or
         # truncated provider response never mixes old/new split bases in one symbol.
         if current and any(row[0] not in source for row in current if row[0] <= incoming[-1][0]):
-            conflict(root, symbol, incoming[0], None, "adjustment-source-does-not-cover-retained-history")
+            _conflicts.add(symbol, incoming[0], None, "adjustment-source-does-not-cover-retained-history")
             return {"added": 0, "corrected": 0, "conflicts": 1, "blocked": True}
     counts = {"added": 0, "corrected": 0, "conflicts": 0, "blocked": False}
     changes = set()
@@ -388,7 +458,7 @@ def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at
                 counts["corrected"] += 1
                 corrected_dates.setdefault(row[0][:4], []).append(row[0])
             else:
-                conflict(root, symbol, row, old, "existing-row-disagrees")
+                _conflicts.add(symbol, row, old, "existing-row-disagrees")
                 counts["conflicts"] += 1
         elif not last or row[0] > last or mode == "backfill":
             by_date[row[0]] = row
@@ -542,12 +612,23 @@ def stage_cache(cache, archive, output, now=None, previous=None):
 
 
 def apply_operations(archive, payload, main_log=None, now=None, rebuild_manifest=True):
+    print(f"K-line apply: start payload={payload}", flush=True)
     with tempfile.TemporaryDirectory(prefix="kline-audit-") as scratch:
-        audit = _AdjustmentBatch(archive, scratch)
-        totals = _apply_operations(archive, payload, now, audit)
-        audit.commit()
+        with timed("apply.initialize_batches"):
+            audit = _AdjustmentBatch(archive, scratch)
+        try:
+            totals = _apply_operations(archive, payload, now, audit)
+            with timed("apply.adjustment_audits"):
+                audit.commit()
+        finally:
+            # Preserve observed disagreements on a later failure, as v1 did,
+            # without making each observation a full-file read/write.
+            with timed("apply.conflicts_flush"):
+                audit.conflicts.commit()
+            print(f"K-line apply: conflictSummaries={len(audit.conflicts.entries)}", flush=True)
     if rebuild_manifest:
-        update_manifest(archive)
+        with timed("apply.manifest"):
+            update_manifest(archive)
     if main_log:
         merge_main_log(archive, main_log)
     return totals
@@ -560,18 +641,29 @@ def _apply_operations(archive, payload, now, audit):
         raise ValueError("Invalid archive transport")
     prepared = []
     now = now or datetime.now(timezone.utc)
-    for item in plan["symbols"]:
+    started = time.perf_counter()
+    label = payload.name
+    print(f"K-line apply: {label} validate start symbols={len(plan['symbols'])}", flush=True)
+    for index, item in enumerate(plan["symbols"], 1):
         expected = f"{market_of(item['symbol'])}/{item['symbol']}.csv"
         if item["file"] != expected:
             raise ValueError("Unsafe payload path")
         path = payload / expected
         if path.is_symlink() or digest(path.read_bytes()) != item["sha256"]:
             raise ValueError("Transport CSV digest mismatch")
-        rows = read_rows(path, strict=True)
-        market = "TW" if market_of(item["symbol"]) == "tw" else "US"
-        if any(not uc.session_done(row[0], market, now) for row in rows):
-            raise ValueError("Archive transport includes an unfinished session")
-        prepared.append((item, rows))
+        identity = (item["symbol"], item["sha256"])
+        if identity not in audit.validated:
+            rows = read_rows(path, strict=True)
+            market = "TW" if market_of(item["symbol"]) == "tw" else "US"
+            if any(not uc.session_done(row[0], market, now) for row in rows):
+                raise ValueError("Archive transport includes an unfinished session")
+            audit.validated.add(identity)
+        # Prevalidate before changing the archive, but do not retain all rolling
+        # windows in RAM. Identical transports still have their bytes hashed.
+        prepared.append((item, path))
+        if index % 250 == 0 or index == len(plan["symbols"]):
+            print(f"K-line apply: {label} validate {index}/{len(plan['symbols'])} elapsed={time.perf_counter() - started:.3f}s", flush=True)
+    print(f"K-line timing: apply.{label}.validate: {time.perf_counter() - started:.3f}s", flush=True)
     audit.watched.update(item["symbol"] for item, _ in prepared if item.get("correction"))
     totals = {"added": 0, "corrected": 0, "conflicts": 0, "blocked": 0}
     if plan.get("baseline"):
@@ -580,19 +672,33 @@ def _apply_operations(archive, payload, now, audit):
         baseline = _apply_operations(archive, payload / "baseline", now, audit)
         for key in totals:
             totals[key] += baseline[key]
-    for item, rows in prepared:
+    started = time.perf_counter()
+    skipped = 0
+    print(f"K-line apply: {label} merge start symbols={len(prepared)}", flush=True)
+    for index, (item, path) in enumerate(prepared, 1):
         # The final snapshot often repeats the retained pre-rollover baseline.
-        # Skip only an identical, successfully accepted daily operation. Any
-        # intervening correction/conflict invalidates this symbol's checkpoint.
+        # Identical daily conflicts are already recorded and existing rows win.
+        # A completed daily operation can be skipped even with disagreements;
+        # any intervening correction invalidates this symbol's checkpoint.
         daily = plan["mode"] == "daily" and not item.get("correction")
+        body = path.read_bytes()
+        if path.is_symlink() or digest(body) != item["sha256"]:
+            raise ValueError("Transport CSV changed during apply")
         if daily and audit.applied_daily.get(item["symbol"]) == item["sha256"]:
-            continue
-        result = put_symbol(archive, item["symbol"], rows, plan["mode"], item.get("correction"), item.get("fetchedAt"), _audit=audit)
-        audit.applied_daily.pop(item["symbol"], None)
-        if daily and not result["conflicts"] and not result["blocked"]:
-            audit.applied_daily[item["symbol"]] = item["sha256"]
-        for key in totals:
-            totals[key] += result[key]
+            skipped += 1
+        else:
+            # Recheck bytes after baseline application, before trusting the
+            # prevalidated transport. Never apply a mutated payload file.
+            rows = _read_rows(io.StringIO(body.decode()), path, strict=True)
+            result = put_symbol(archive, item["symbol"], rows, plan["mode"], item.get("correction"), item.get("fetchedAt"), _audit=audit, _conflicts=audit.conflicts)
+            audit.applied_daily.pop(item["symbol"], None)
+            if daily and not result["blocked"]:
+                audit.applied_daily[item["symbol"]] = item["sha256"]
+            for key in totals:
+                totals[key] += result[key]
+        if index % 250 == 0 or index == len(prepared):
+            print(f"K-line apply: {label} merge {index}/{len(prepared)} duplicateOperations={skipped} counts={totals} elapsed={time.perf_counter() - started:.3f}s", flush=True)
+    print(f"K-line timing: apply.{label}.merge: {time.perf_counter() - started:.3f}s", flush=True)
     if "progress" in plan:
         # The serialized publisher is the sole progress writer. Never remove old entries.
         progress = json_read(archive / PROGRESS, {"version": 1, "symbols": {}})
