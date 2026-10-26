@@ -26,7 +26,7 @@ function sdkFixture(loggedIn = false) {
   return { sdk, state };
 }
 beforeEach(() => { vi.resetModules(); });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('explicit external-browser / installed-PWA LINE login', () => {
   it('keeps the recovery guest choice inside LINE until an explicit login, even after route cleanup', async () => {
@@ -72,7 +72,7 @@ describe('explicit external-browser / installed-PWA LINE login', () => {
   });
 
   it('uses SDK login only after the button and keeps a same-origin return route', async () => {
-    environment('?page=chart&symbol=NVDA&tf=1D&code=stale&state=stale&liff.state=old#secret');
+    environment('?page=chart&symbol=NVDA&tf=1D&code=stale&state=stale&liff.unrelated=old#secret');
     const { sdk } = sdkFixture();
     const auth = await import('../src/cloud/lineIdentity');
     expect(await auth.startLineIdentity()).toBeNull();
@@ -97,6 +97,57 @@ describe('explicit external-browser / installed-PWA LINE login', () => {
     expect(hasLineLoginCallback('?liffClientId=x&code=x&state=y')).toBe(true);
   });
 
+  it.each([
+    '?atlasLineLogin=1&code=fixture-code&liffClientId=2010330411',
+    '?code=fixture-code&liffClientId=2010330411&liffRedirectUri=fixture',
+    '?liffOAuth2Error=true&error=access_denied',
+    '?liff.state=%2Fatlas%2F%3Fpage%3Dconsole',
+    '?liff.referrer=https%3A%2F%2Fliff.line.me%2Ffixture',
+    '?page=console#access_token=fixture-access&context_token=fixture-context',
+  ])('initializes a supported LINE handoff before routing: %s', async (query) => {
+    environment(query);
+    const { sdk } = sdkFixture();
+    const auth = await import('../src/cloud/lineIdentity');
+    expect(auth.needsLineIdentityBeforeRouting()).toBe(true);
+    expect(await auth.startLineIdentity()).toBeNull();
+    expect(sdk.init).toHaveBeenCalledOnce();
+    expect(sdk.login).not.toHaveBeenCalled();
+  });
+
+  it('keeps credential fragments for init and removes them only after completion', async () => {
+    environment('?page=console#access_token=fixture-access&context_token=fixture-context&view=chart');
+    const replaceState = vi.fn();
+    vi.stubGlobal('history', { state: { preserved: true }, replaceState });
+    const { sdk } = sdkFixture();
+    let finish!: () => void;
+    sdk.init.mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
+    const auth = await import('../src/cloud/lineIdentity');
+    const start = auth.startLineIdentity();
+    await vi.waitFor(() => expect(sdk.init).toHaveBeenCalledOnce());
+    expect(replaceState).not.toHaveBeenCalled();
+    finish(); await start;
+    expect(replaceState).toHaveBeenCalledExactlyOnceWith({ preserved: true }, '', `${URL_BASE}?page=console#view=chart`);
+    expect(sdk.login).not.toHaveBeenCalled();
+  });
+
+  it('bounds an explicit init wait and never redirects after that attempt times out', async () => {
+    vi.useFakeTimers();
+    environment();
+    const { sdk } = sdkFixture();
+    let finish!: () => void;
+    sdk.init.mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
+    const auth = await import('../src/cloud/lineIdentity');
+    const attempt = auth.loginLineIdentity().then(() => 'unexpected success', error => String(error));
+    await vi.advanceTimersByTimeAsync(16000);
+    expect(await Promise.race([attempt, Promise.resolve('still pending')])).toContain('逾時');
+    expect(sdk.init).toHaveBeenCalledOnce();
+    finish();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(sdk.login).not.toHaveBeenCalled();
+    expect(await auth.loginLineIdentity()).toBe('redirecting');
+    expect(sdk.login).toHaveBeenCalledOnce();
+  });
+
   it('shares callback initialization until the SDK finishes, without another login redirect', async () => {
     environment('?page=chart&symbol=NVDA&atlasLineLogin=1&code=provider-code&state=provider-state');
     const { sdk } = sdkFixture(true);
@@ -113,6 +164,15 @@ describe('explicit external-browser / installed-PWA LINE login', () => {
     finish();
     expect((await first)?.userId).toBe(A);
     expect((await second)?.userId).toBe(A);
+    expect(sdk.login).not.toHaveBeenCalled();
+  });
+
+  it('explains an OAuth return without a verified SDK session instead of claiming login', async () => {
+    environment('?code=fixture-code&liffClientId=2010330411');
+    const { sdk } = sdkFixture();
+    const auth = await import('../src/cloud/lineIdentity');
+    expect(await auth.startLineIdentity()).toBeNull();
+    expect(auth.lineLoginError()).toContain('回傳未完成驗證');
     expect(sdk.login).not.toHaveBeenCalled();
   });
 
