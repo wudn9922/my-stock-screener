@@ -199,6 +199,69 @@ test('the OAuth callback keeps its code until SDK init finishes, then verifies t
   expect((await lineState(page)).loginCalls).toEqual([]);
 });
 
+for (const [kind, suffix, marker] of [
+  ['code without state', '?page=console&code=fixture-code&liffClientId=2010330411&liffRedirectUri=fixture', 'code=fixture-code'],
+  ['LIFF primary state', '?liff.state=%2Fatlas%2F%3Fpage%3Dconsole', 'liff.state='],
+  ['LIFF primary fragment', '?page=console#access_token=fixture-access&context_token=fixture-context', 'context_token='],
+] as const) test(`${kind} reaches SDK init before the router can remove it`, async ({ page }) => {
+  await installedPwa(page);
+  await externalSdk(page, DEVICE_USER_ID, true);
+  const actions: string[] = [];
+  await page.route('**/functions/v1/user-settings', route => {
+    actions.push(route.request().postDataJSON().action);
+    return route.fulfill({ json: accessEnvelope() });
+  });
+  await mockSite(page);
+  await page.goto('./' + suffix, { waitUntil: 'domcontentloaded' });
+  await expect.poll(async () => (await lineState(page)).initCalls.length).toBe(1);
+  expect((await lineState(page)).initCalls[0].url).toContain(marker);
+  expect(page.url()).toContain(marker);
+  expect(actions).toEqual([]);
+  await page.evaluate(() => (globalThis as unknown as { __lineMock: LineMock }).__lineMock.finishInit!());
+  await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'device');
+  expect(new URL(page.url()).searchParams.get('page')).toBe('console');
+  expect(page.url()).not.toContain(marker);
+  expect(actions).toEqual(['access.get']);
+  expect((await lineState(page)).loginCalls).toEqual([]);
+});
+
+test('a return without an SDK session explains retry and sends no access request', async ({ page }) => {
+  await externalSdk(page);
+  const actions: string[] = [];
+  await page.route('**/functions/v1/user-settings', route => {
+    actions.push(route.request().postDataJSON().action);
+    return route.fulfill({ status: 401, json: { ok: false } });
+  });
+  await mockSite(page);
+  await page.goto('./?page=console&code=fixture-code&liffClientId=2010330411');
+  await expect(page.locator('[data-storage-mode]')).toContainText('回傳未完成驗證');
+  await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'none');
+  expect(actions).toEqual([]);
+  expect((await lineState(page)).loginCalls).toEqual([]);
+  await page.getByRole('button', { name: '使用 LINE 登入', exact: true }).click();
+  await expect.poll(async () => (await lineState(page)).loginCalls.length).toBe(1);
+});
+
+test('an explicit login timeout releases the button and a late SDK init never navigates', async ({ page }) => {
+  await installedPwa(page);
+  await page.clock.install();
+  await externalSdk(page, null, true);
+  await mockSite(page);
+  await page.goto('./?page=console');
+  const login = page.getByRole('button', { name: '使用 LINE 登入', exact: true });
+  await login.click();
+  await expect.poll(async () => (await lineState(page)).initCalls.length).toBe(1);
+  await expect(page.getByRole('button', { name: '正在開啟 LINE 登入…', exact: true })).toBeDisabled();
+  await page.clock.fastForward(16000);
+  await expect(page.locator('[data-storage-mode]')).toContainText('逾時');
+  await expect(login).toBeEnabled();
+  await page.evaluate(() => (globalThis as unknown as { __lineMock: LineMock }).__lineMock.finishInit!());
+  await expect.poll(async () => (await lineState(page)).loginCalls.length).toBe(0);
+  await login.click();
+  await expect.poll(async () => (await lineState(page)).loginCalls.length).toBe(1);
+  expect((await lineState(page)).initCalls).toHaveLength(1);
+});
+
 test('a cancelled OAuth callback stays a guest and never retries or redirects automatically', async ({ page }) => {
   await externalSdk(page, null, false, true);
   const actions: string[] = [];

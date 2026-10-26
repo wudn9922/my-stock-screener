@@ -15,7 +15,8 @@ ADR-016's account authorization overrides the historical offline-shell baseline
 below for this deployment. The screener continues to retire its old worker and
 never adds background CacheStorage or guest persistence. Modern installability
 does not require a service worker. LINE login outside LINE is explicit and uses
-the same server-verified grant; callback initialization precedes URL routing.
+the same server-verified grant; LIFF primary handoffs and OAuth returns initialize
+before URL routing.
 Fresh external launches require an explicit login tap to restore the SDK
 session and reverify access. See [self-use runbook](../PWA_SELF_USE.md).
 

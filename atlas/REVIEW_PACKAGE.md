@@ -1,3 +1,35 @@
+## Current follow-up: LINE login handoffs and bounded explicit startup (2026-10-26)
+
+The pre-router gate recognized only OAuth code/error returns with a state query
+parameter. It missed LIFF primary liff.state/referrer and credential-fragment
+handoffs, which the query router could normalize away before SDK initialization.
+It also imposed a state requirement that the SDK's code/PKCE processing does not
+require. Supported LIFF markers now reach SDK init before routing; consumed credential
+fragments are then removed without retaining them in a canonical route; arbitrary
+unmarked code parameters still do not initialize login or grant any access.
+
+An explicit login click previously waited without a bound if SDK init stalled.
+Its 15-second wait now ends with a retryable message while sharing the unresolved
+SDK init. The timed-out click cannot later call provider login; only a fresh
+click can continue once the SDK becomes ready. Callback startup still preserves
+the URL and uses the existing recovery screen instead of rendering over init.
+
+Public LIFF configuration was checked without cookies/tokens: the existing
+endpoint covers Atlas and includes openid/profile. A downloaded official SDK
+2.31.2 completed init and generated the expected PKCE authorization request in
+an isolated browser using static public fixtures; all provider navigation was
+blocked before leaving the fixture. An anonymous read-only authorization request
+accepted the Atlas return path. Supabase aggregate logs showed normal user-settings
+responses, with no account/token contents queried. No provider configuration,
+production account, grant, database, function or deployment was changed.
+
+Seven unit regressions failed on the prior implementation (six handoff shapes
+and the stalled click). Browser coverage checks URL ordering, explicit retry,
+late completion, server-grant validation and existing guest/account isolation
+on desktop, mobile Chromium and iPhone WebKit. Actual results are in the PR.
+Primary review is recorded here; independent signoff and successful real-account
+consent / physical iPhone return-to-PWA verification are not claimed.
+
 ## Current follow-up: free self-use PWA (2026-10-26)
 
 The existing manifest already supported standalone display; installation was
