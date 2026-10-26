@@ -1,3 +1,46 @@
+## Current follow-up: free self-use PWA (2026-10-26)
+
+The existing manifest already supported standalone display; installation was
+undiscoverable, ordinary browser sessions could never authenticate, and an open
+installed app had no deployment-version check. Settings now provide iPhone/iPad
+Safari instructions, LINE-browser escape/copy guidance, explicit Android native
+prompts with honest cancellation/completion state, and public build-version
+checks. Safe-area-aware dialog bounds support portrait and landscape. Existing
+manifest identity, scope, icons and the normal GitHub Pages deployment remain.
+
+Browser/PWA LINE authentication is explicit. Guests neither load LIFF nor
+persist application actions. Recognized callbacks await SDK initialization
+before routing; a bounded recovery screen preserves the callback if it stalls.
+Only the existing server-verified access policy enables device/cloud stores.
+Signout invalidates retained token callbacks and isolates the workspace without
+deleting saved account drawings; inside LINE it does not call unsupported SDK
+logout. Fresh external launches require tapping login to recover the SDK
+session and reverify permissions. The existing public access endpoint rejected
+an invalid test token with HTTP 401; no production account or grant was changed.
+
+Version metadata and HTML carry the same deterministic build fingerprint.
+Checks use no credentials or app storage, reject other scopes/invalid responses,
+and never automatically reload over drawing work. Explicit reload retains the
+route and discloses that guest work is temporary. The screener keeps its worker
+retirement and no-background-cache policy; current installability does not
+require a worker. No offline-launch/new-market-data or background-alert promise
+is made. There are no new paid services, packages or native toolchains.
+
+Primary review accepted fixes for safe-area scrolling, non-blocking LINE timeout
+recovery, unsupported inside-LINE logout and compact login explanation layout.
+Read-only review found that LINE's user agent would restart a stalled login
+after the guest-recovery link. An explicit RAM-only guest URL now suppresses
+identity initialization and refresh until a new login click; it cannot grant
+storage, and is removed from subsequent OAuth redirects.
+Tests cover platform instructions, native prompt outcomes, standalone detection,
+icons, update/reload errors, guest zero-persistence, denial/mismatched grants,
+callback ordering/cancellation/timeouts, token expiry/signout and restoring
+saved drawings after a fresh launch and explicit reauthorization. Actual totals
+and exact-head CI results are recorded in the PR. The runbook documents real
+device installation and LINE-provider prerequisites; mocked WebKit is not a
+physical iPhone installation or successful real provider login. No external
+independent signoff, merge or deployment is claimed.
+
 ## Current follow-up: market charts, navigation recovery and concise analysis (2026-10-25)
 
 Market index previews now use the report's configured SMAs at 2px, retaining

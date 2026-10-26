@@ -1,0 +1,5 @@
+.storage-policy-note { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.storage-policy-note > p { margin: 0; flex: 1 1 220px; }
+.pwa-login-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+.pwa-login-actions > button { min-height: 44px; }
+.pwa-login-actions .help-disclosure { flex: 1; min-width: 100px; }

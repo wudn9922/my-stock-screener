@@ -16,6 +16,8 @@ import './siteNav.css';
 import { DataHealthPanel } from '../ui/DataHealthPanel';
 import { StorageNotice } from '../auth/StorageNotice';
 import { RouteBoundary } from './RouteBoundary';
+import { InstallPanel } from '../pwa/InstallPanel';
+import { AppUpdate } from '../pwa/AppUpdate';
 
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
@@ -299,8 +301,8 @@ export function Site() {
         </div>
       )}
       {settingsOpen && (
-        <div className="dialog-backdrop" onClick={() => setSettingsOpen(false)}>
-          <div className="site-dialog" role="dialog" aria-modal="true" aria-label="顯示設定" onClick={(event) => event.stopPropagation()}>
+        <div className="dialog-backdrop site-pwa-backdrop" onClick={() => setSettingsOpen(false)}>
+          <div className="site-dialog site-pwa-dialog" role="dialog" aria-modal="true" aria-label="顯示設定" onClick={(event) => event.stopPropagation()}>
             <div className="dialog-head">
               <b>顯示設定</b>
               <button type="button" className="icon-button" aria-label="關閉" onClick={() => setSettingsOpen(false)}>
@@ -330,6 +332,8 @@ export function Site() {
                 ))}
               </div>
             </fieldset>
+            <InstallPanel />
+            <AppUpdate />
             <dl className="dialog-facts">
               <div>
                 <dt>報告日期</dt>

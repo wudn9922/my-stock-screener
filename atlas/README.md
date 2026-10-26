@@ -1,5 +1,12 @@
 # Atlas Research Terminal — V1
 
+Atlas screener can be installed for free from Safari/Chrome as a home-screen
+Web App: open https://wudn9922.github.io/my-stock-screener/atlas/ and use
+**顯示設定 → 安裝 Atlas**, or Safari **分享 → 加入主畫面**. No store,
+paid wrapper, Apple membership or weekly re-signing is required. The online-first
+PWA follows the existing GitHub Pages deployment and account storage grants.
+See the [installation, login and updates guide](docs/PWA_SELF_USE.md).
+
 A Web-first stock research terminal with an original interface, one Lightweight Charts 5.2.1 implementation, and a separate drawing engine. V1 extends the accepted Phase 1/2 workspace; it does not replace it. Core development, offline Demo mode and tests require no paid subscription, API key, credit card or commercial chart license. This project does not use TradingView proprietary source or Advanced Charts.
 
 For the `/my-stock-screener/atlas/` deployment, personal storage now requires an owner-issued LINE account grant: none (RAM only), device (account-scoped browser storage), or cloud (existing Supabase synchronization). Guests do not persist application actions. Verified device/cloud users can explicitly import legacy browser settings from the console or chart page, without a manual export backup. The merge preserves account versions on conflicts and leaves legacy data untouched. This supersedes older screener local-storage descriptions below; the separate drawing-lab build retains its existing behavior. See [account storage and rollout](../docs/ACCOUNT_STORAGE_PERMISSIONS.md) and [ADR-016](docs/architecture/ADR-016-account-storage-authorization.md). Production SQL/function deployment remains a separate prerequisite; this PR does not deploy or merge.

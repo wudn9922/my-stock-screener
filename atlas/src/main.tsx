@@ -4,6 +4,8 @@ import { applyColorConvention } from './app/sitePreferences';
 import { SCREENER_HOSTING } from './app/HostingMode';
 import { accessState, initializeAccess } from './auth/access';
 import { retireScreenerWorker } from './auth/retireWorker';
+import { DEFAULT_LIFF_ID, needsLineIdentityBeforeRouting, startLineIdentity } from './cloud/lineIdentity';
+import { PUBLIC_BASE } from './app/HostingMode';
 import './styles.css';
 // Packaged native builds use their bundled assets, independent of PWA shell updates.
 if (
@@ -25,7 +27,28 @@ const LIFF_START_TIMEOUT_MS = 4000;
 
 async function render() {
   if (SCREENER_HOSTING) {
-    // No guest storage, SDK outside LINE, cached grant, or automatic legacy-data adoption.
+    // An explicit external LINE callback must finish before the router can
+    // normalize its URL. A slow SDK gets a recovery screen with the URL intact.
+    if (needsLineIdentityBeforeRouting()) {
+      const root = document.getElementById('root')!;
+      root.textContent = '正在完成 LINE 登入…';
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const finished = await Promise.race([
+        startLineIdentity(import.meta.env.VITE_LIFF_ID || DEFAULT_LIFF_ID).then(() => true),
+        new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), 15000); }),
+      ]);
+      clearTimeout(timer);
+      if (!finished) {
+        createRoot(root).render(<main className="page-state" role="alert">
+          <b>LINE 登入尚未完成</b>
+          <p>連線恢復後可重新嘗試，或先以訪客開啟 Atlas。</p>
+          <button type="button" className="primary-button" onClick={() => location.reload()}>重新嘗試登入</button>
+          <a href={`${PUBLIC_BASE}?atlasGuest=1`}>先開啟 Atlas</a>
+        </main>);
+        return;
+      }
+    }
+    // No guest app persistence, cached grants, or automatic legacy-data adoption.
     // Delayed login may resolve later; the boundary then replaces the entire temporary workspace.
     await Promise.race([
       initializeAccess(),
