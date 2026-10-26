@@ -72,18 +72,22 @@ def publish(path, payload=None, summary=None, sleep=time.sleep, create_only=Fals
     head = git(path, "rev-parse", "--verify", "HEAD", check=False)
     base = head.stdout.strip() if head.returncode == 0 else None
     if payload:
-        archive.apply_operations(path, payload)
-    archive.verify(path, base, summary)
-    git(path, "add", "-A", "--", ".")
+        with archive.timed("publish.apply_operations"):
+            archive.apply_operations(path, payload, rebuild_manifest=False)
+    archive.verify(path, base, summary, refresh_manifest=bool(payload))
+    with archive.timed("publish.stage"):
+        git(path, "add", "-A", "--", ".")
     changed = git(path, "diff", "--cached", "--quiet", check=False)
     if changed.returncode == 0:
         print("Archive unchanged; no commit or push")
         return False
     if changed.returncode != 1:
         raise RuntimeError("Unable to inspect archive index")
-    git(path, "commit", "-m", "Retain full-market daily K-lines")
+    with archive.timed("publish.commit"):
+        git(path, "commit", "-m", "Retain full-market daily K-lines")
     for attempt in range(3):
-        result = git(path, "push", "origin", f"HEAD:refs/heads/{archive.BRANCH}", check=False)
+        with archive.timed(f"publish.push (attempt {attempt + 1})"):
+            result = git(path, "push", "origin", f"HEAD:refs/heads/{archive.BRANCH}", check=False)
         if result.returncode == 0:
             print("Published permanent archive:", git(path, "rev-parse", "HEAD").stdout.strip())
             return True
@@ -97,8 +101,7 @@ def publish(path, payload=None, summary=None, sleep=time.sleep, create_only=Fals
             git(path, "rebase", "--abort", check=False)
             raise RuntimeError("Archive rebase conflict; remote unchanged, retry the producer against the new tip")
         remote_base = git(path, "rev-parse", "FETCH_HEAD").stdout.strip()
-        archive.update_manifest(path)
-        archive.verify(path, remote_base, summary)
+        archive.verify(path, remote_base, summary, refresh_manifest=True)
         git(path, "add", "--", "manifest.json")
         if git(path, "diff", "--cached", "--quiet", check=False).returncode == 1:
             git(path, "commit", "-m", "Update archive size after concurrent append")

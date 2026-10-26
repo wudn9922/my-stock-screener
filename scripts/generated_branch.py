@@ -3,7 +3,8 @@
 
 The caller's checkout/index is never committed or reset. Publishing replays only
 the owner's changed blobs onto each freshly fetched tip (an index-only rebase).
-Same-path concurrent edits fail instead of silently overwriting newer output.
+Same-path concurrent edits fail, except the append-only correction journal, whose
+events are union-merged before each bounded, non-force retry.
 """
 import argparse
 from contextlib import contextmanager
@@ -15,9 +16,14 @@ from pathlib import Path
 import subprocess
 import tempfile
 import time
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from kline_journal import merge_logs
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / ".github/generated-paths.json"
+UNION_JOURNALS = {"docs/report/kline-corrections.json"}
 RELAY = ".github/workflows/generated-pages-relay.yml"
 RELAY_BODY = b"""# Storage-branch relay; implementation always comes from main.
 name: Generated Pages relay
@@ -202,7 +208,26 @@ class Storage:
             conflicts = [p for p, e in delta.items()
                          if current.get(p) != original.get(p) and current.get(p) != e]
             if conflicts:
-                raise ValueError("Concurrent same-path change; rerun producer: " + repr(conflicts))
+                # Only this append-only journal has union semantics. Deletion,
+                # mode changes and all other record conflicts remain fail-closed.
+                if branch != "main" or any(
+                    p not in UNION_JOURNALS or not current.get(p) or not delta[p]
+                    or current[p][0] != "100644" or delta[p][0] != "100644"
+                    for p in conflicts
+                ):
+                    raise ValueError("Concurrent same-path change; rerun producer: " + repr(conflicts))
+                for path in conflicts:
+                    remote = json.loads(git("cat-file", "blob", current[path][1]))
+                    local = json.loads(git("cat-file", "blob", delta[path][1]))
+                    for journal in (remote, local):
+                        if (journal.get("version") != 1 or not isinstance(journal.get("events"), list)
+                                or not isinstance(journal.get("quarantined"), list)):
+                            raise ValueError("Invalid K-line correction log; refusing concurrent union")
+                    merged = merge_logs(remote, local)
+                    body = (json.dumps(merged, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode()
+                    delta[path] = ("100644", git("hash-object", "-w", "--stdin", data=body).decode().strip())
+                    original[path] = current[path]
+                    print(f"Union-merged concurrent correction journal on attempt {attempt + 1}: {path}")
             with self.index(head) as env:
                 self.update_index(delta, env)
                 tree = git("write-tree", env=env).decode().strip()

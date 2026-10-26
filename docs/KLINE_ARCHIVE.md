@@ -35,6 +35,41 @@ kline-archive (orphan; no main parent)
 
 初始化尚未完成、分支無法讀取或封存驗證失敗時，新的全市場採集暫停，避免在沒有永久保存前先裁切舊快取；原 cache／報告的 always 保存與發佈仍繼續。已退出名單的 cache 也須先確認日期已進入永久封存才可清理。不要把「封存來源不可用」當成空白封存重新建立。
 
+## 發布競爭、每日效能與停更復原
+
+`generated_branch.py` 發布 main records 時，只有 `docs/report/kline-corrections.json`
+可在同路徑競爭後使用既有 `kline_integrity.merge_logs` 的 union 規則；collector 與
+publisher 共用同一個純標準庫函式，事件按 id 去重、保留雙方事件與既有隔離狀態。
+每次普通 push 失敗都重新 fetch main，最多五次；不強推、不修改呼叫者的 checkout
+或 index。任一其他 record 同路徑衝突仍立即失敗，且不發布 generated outputs。
+Q4 工作使用 main 的 helper 副本時，也複製同版 union 模組。
+
+每日 archive publisher 使用單一 `git cat-file --batch` 讀取必要的基準 blob；以
+Git blob hash 略過未變年度的歷史差異比較。所有現存 CSV 仍逐列嚴格驗證一次，
+包含沒有改變的年度；其統計直接用於 manifest，不再次解析全市場。新舊資料只常駐
+單一股票／年度，批次 Git 回應暫存在磁碟；不一次載入全市場新舊列。
+
+artifact 中完全相同且已成功接收的 daily baseline／final 操作只套用一次；任何
+中間修正或衝突都會清除該股票的去重 checkpoint。publisher 在資料／歷史稽核通過後
+用已驗證的統計建立精確 manifest；一般 `verify` 仍唯讀且拒絕不符的 manifest。
+檔案／日期刪除、未登記的歷史變更、舊 audit 被改寫仍會阻擋發布。
+
+每日 archive job 的上限由 20 分鐘增至 40 分鐘，提供 checkout／Git push 的餘裕；
+`python -u` 會即時列出 apply、批次 Git、列與歷史驗證、stage、commit、push 的秒數。
+CI 另建 7,000 檔 × 3 年、21,000 個 packed 年度檔／3,654,000 列的合成封存，對每檔
+追加一天後驗證 3,661,000 列，要求驗證少於 300 秒，也完成對本機 bare origin 的普通
+commit／push；不讀寫正式資料或 ref。
+
+封存停在 2026-10-23 時，後續正常 producer 會從還原的 320 根 rolling cache 暫存
+所有未封存且已完成的交易日，並依原順序追加；沒有只保留今日／最後一根的篩選。
+TW／US 的多日復原與重跑去重有離線測試。合併後下一次成功的正常工作會執行這條
+復原路徑；這個修正 PR 本身不觸發正式採集、封存 push 或網站部署。
+
+```sh
+KLINE_ARCHIVE_PERFORMANCE=1 python -u -m unittest discover -s tests \
+  -p test_kline_archive_performance.py -v
+```
+
 ## 拆股／價格基準修正
 
 沿用 `universe_cache.compare_overlap`／`merge_full` 的偵測：舊／新重疊收盤差超過既有 0.5% 容忍度，且本次完整 Yahoo 重抓成功時，保存包含比對日、前後收盤、來源時間與 payload hash 的 cache receipt。
@@ -102,6 +137,6 @@ python scripts/kline_archive.py verify --archive-dir /tmp/kline-check --base HEA
 
 驗證只常駐全市場的檔案 metadata；K 線逐檔驗證，歷史差異只讀取有變動股票／年度的 baseline，不把全市場新舊 OHLC 同時載入記憶體。日常追加只讀取涉及年度及最後年度；冷啟動回種從最新年度向前取滿 320 根即停止。
 
-另在 `/tmp` 做合成規模驗證：7,000 檔、3,654,000 根、21,000 個年度 CSV，內容總大小 187,090,432 bytes。完整逐檔驗證加上全市場當日追加比對耗時 112.53 秒；Python 程序峰值 RSS 122,072 KiB，Git 子程序個別峰值 97,672 KiB（非整體 runner 同時用量）。此為合成價格的效能測試，沒有推送或冒充真實全市場資料。
+2026-10-26 修正後的可重現合成測試使用 7,000 檔、21,000 個 packed 年度 CSV；逐檔追加一天後共 3,661,000 列、205,500,841 bytes。本機驗證為 48.755 秒，包含 apply、驗證、stage、commit 與本機 bare-origin push 的每日發布為 72.397 秒；基準 7,000 個 blob 僅啟動一次 Git batch。此為合成價格，不是正式行情；GitHub runner 另受 CI 的 300 秒驗證門檻約束。唯讀檢查正式 `4c934296a` 封存的 21,133 檔、3,480,830 列為 36.722 秒；沒有改動正式 main、generated 或 archive ref，也沒有宣稱已補齊正式資料。
 
 大小隨實際股票與歷史變動：例如 7,000 檔 × 252 日 × 每列約 70 bytes，新增 CSV 原始內容約 124 MB／年（約 0.5 MB／交易日）；Git 的 tree/blob/pack 與真實修正另計，不能把 CSV byte 增長冒充 repository 實際儲存量。每次驗證 job 都回報當時真正的檔案總大小。

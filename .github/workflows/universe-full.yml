@@ -164,7 +164,7 @@ jobs:
     needs: build
     if: always() && !cancelled() && needs.build.outputs.archive_payload == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     permissions:
       contents: write
     concurrency:
@@ -190,6 +190,6 @@ jobs:
       - name: Verify, append and push only kline-archive
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python scripts/kline_archive_git.py publish --archive-dir .cache/kline-archive --payload-dir .cache/kline-payload
+        run: python -u scripts/kline_archive_git.py publish --archive-dir .cache/kline-archive --payload-dir .cache/kline-payload
       - name: Merge archive correction events into the existing main journal
         run: python scripts/kline_archive_git.py journal --archive-dir .cache/kline-archive

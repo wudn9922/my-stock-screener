@@ -117,6 +117,6 @@ jobs:
       - name: Merge missing history, preserve conflicts, publish validated archive
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python scripts/kline_archive_git.py publish --archive-dir .cache/kline-archive --payload-dir .cache/kline-backfill-payload
+        run: python -u scripts/kline_archive_git.py publish --archive-dir .cache/kline-archive --payload-dir .cache/kline-backfill-payload
       - name: Reconcile any retained adjustment events with the main journal
         run: python scripts/kline_archive_git.py journal --archive-dir .cache/kline-archive

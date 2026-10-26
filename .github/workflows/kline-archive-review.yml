@@ -7,6 +7,7 @@ on:
       - 'scripts/build_universe_full.py'
       - 'scripts/universe_cache.py'
       - 'scripts/universe_sources.py'
+      - 'scripts/kline_journal.py'
       - 'kline_integrity.py'
       - '.github/generated-paths.json'
       - 'tests/test_kline_archive*.py'
@@ -53,3 +54,16 @@ jobs:
             base=(--base HEAD^)
           fi
           python scripts/kline_archive.py verify --archive-dir .cache/kline-archive "${base[@]}"
+  daily-performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install --quiet pandas
+      - name: Verify a 7000-symbol daily append in under five minutes
+        env:
+          KLINE_ARCHIVE_PERFORMANCE: '1'
+        run: python -u -m unittest discover -s tests -p test_kline_archive_performance.py -v

@@ -6,6 +6,7 @@ All existing dates and unlisted symbols survive every operation.
 """
 import argparse
 import csv
+from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_EVEN
 import hashlib
@@ -19,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -128,20 +130,24 @@ def frame_rows(frame):
 
 def read_rows(path, strict=False):
     with Path(path).open(newline="", encoding="utf-8") as stream:
-        reader = csv.reader(stream)
-        if next(reader, None) != FIELDS:
-            raise ValueError(f"Invalid CSV header: {path}")
-        result = []
-        for raw in reader:
-            try:
-                row = normalize(raw)
-                if strict and tuple(raw) != row:
-                    raise ValueError("Noncanonical price/volume formatting")
-                if result and row[0] <= result[-1][0]:
-                    raise ValueError("Dates are not strictly increasing")
-                result.append(row)
-            except (ValueError, InvalidOperation) as exc:
-                raise ValueError(f"{path}: {raw[:1]}: {exc}") from exc
+        return _read_rows(stream, path, strict)
+
+
+def _read_rows(stream, path, strict=False):
+    reader = csv.reader(stream)
+    if next(reader, None) != FIELDS:
+        raise ValueError(f"Invalid CSV header: {path}")
+    result = []
+    for raw in reader:
+        try:
+            row = normalize(raw)
+            if strict and tuple(raw) != row:
+                raise ValueError("Noncanonical price/volume formatting")
+            if result and row[0] <= result[-1][0]:
+                raise ValueError("Dates are not strictly increasing")
+            result.append(row)
+        except (ValueError, InvalidOperation) as exc:
+            raise ValueError(f"{path}: {raw[:1]}: {exc}") from exc
     if strict and not result:
         raise ValueError(f"Empty archive CSV: {path}")
     return result
@@ -299,6 +305,7 @@ class _AdjustmentBatch:
     def __init__(self, root, scratch):
         self.root, self.scratch = Path(root), Path(scratch)
         self.watched, self.snapshots, self.pending, self.events = set(), {}, {}, []
+        self.applied_daily = {}
 
     def record(self, path, symbol, adjustment):
         if symbol not in self.watched:
@@ -427,33 +434,46 @@ def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at
 
 def update_manifest(root, write=True):
     root = Path(root)
-    markets = {key: {"symbols": [], "firstDate": None, "lastDate": None, "rows": 0, "csvBytes": 0} for key in ("tw", "us")}
+    stats = {}
     for path in archive_files(root):
         rows = read_rows(path, strict=True)
         if any(row[0][:4] != path.stem for row in rows):
             raise ValueError(f"CSV year mismatch: {path}")
-        market, symbol, _ = path.relative_to(root).parts
+        stats[path.relative_to(root).as_posix()] = _row_stats(rows, path.stat().st_size)
+    other = sum(p.stat().st_size for p in root.rglob("*") if p.is_file()
+                and ".git" not in p.relative_to(root).parts and p.name != "manifest.json")
+    manifest = _manifest(stats, other)
+    if write:
+        json_write(root / "manifest.json", manifest)
+    return manifest
+
+
+def _row_stats(rows, size):
+    return {"firstDate": rows[0][0], "lastDate": rows[-1][0], "rows": len(rows), "csvBytes": size}
+
+
+def _manifest(stats, other):
+    """Build the exact manifest from already validated rows, without another CSV pass."""
+    markets = {key: {"symbols": [], "firstDate": None, "lastDate": None, "rows": 0, "csvBytes": 0} for key in ("tw", "us")}
+    for name, stat in stats.items():
+        market, symbol, _ = name.split("/")
         part = markets[market]
         part["symbols"].append(symbol)
-        part["firstDate"] = min(part["firstDate"] or rows[0][0], rows[0][0])
-        part["lastDate"] = max(part["lastDate"] or rows[-1][0], rows[-1][0])
-        part["rows"] += len(rows)
-        part["csvBytes"] += path.stat().st_size
+        part["firstDate"] = min(part["firstDate"] or stat["firstDate"], stat["firstDate"])
+        part["lastDate"] = max(part["lastDate"] or stat["lastDate"], stat["lastDate"])
+        part["rows"] += stat["rows"]
+        part["csvBytes"] += stat["csvBytes"]
     for part in markets.values():
         part["symbols"] = sorted(set(part["symbols"]))
         part["symbolCount"] = len(part["symbols"])
     manifest = {"version": 1, "priceBasis": "Yahoo split-adjusted; not dividend-adjusted",
                 "markets": markets, "csvBytes": sum(p["csvBytes"] for p in markets.values()), "totalBytes": 0}
     # Fixed point includes the manifest's own byte count, plus README/audit/progress.
-    other = sum(p.stat().st_size for p in root.rglob("*") if p.is_file()
-                and ".git" not in p.relative_to(root).parts and p.name != "manifest.json")
     for _ in range(10):
         size = other + len((json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode())
         if manifest["totalBytes"] == size:
             break
         manifest["totalBytes"] = size
-    if write:
-        json_write(root / "manifest.json", manifest)
     return manifest
 
 
@@ -521,12 +541,13 @@ def stage_cache(cache, archive, output, now=None, previous=None):
     return plan
 
 
-def apply_operations(archive, payload, main_log=None, now=None):
+def apply_operations(archive, payload, main_log=None, now=None, rebuild_manifest=True):
     with tempfile.TemporaryDirectory(prefix="kline-audit-") as scratch:
         audit = _AdjustmentBatch(archive, scratch)
         totals = _apply_operations(archive, payload, now, audit)
         audit.commit()
-    update_manifest(archive)
+    if rebuild_manifest:
+        update_manifest(archive)
     if main_log:
         merge_main_log(archive, main_log)
     return totals
@@ -560,7 +581,16 @@ def _apply_operations(archive, payload, now, audit):
         for key in totals:
             totals[key] += baseline[key]
     for item, rows in prepared:
+        # The final snapshot often repeats the retained pre-rollover baseline.
+        # Skip only an identical, successfully accepted daily operation. Any
+        # intervening correction/conflict invalidates this symbol's checkpoint.
+        daily = plan["mode"] == "daily" and not item.get("correction")
+        if daily and audit.applied_daily.get(item["symbol"]) == item["sha256"]:
+            continue
         result = put_symbol(archive, item["symbol"], rows, plan["mode"], item.get("correction"), item.get("fetchedAt"), _audit=audit)
+        audit.applied_daily.pop(item["symbol"], None)
+        if daily and not result["conflicts"] and not result["blocked"]:
+            audit.applied_daily[item["symbol"]] = item["sha256"]
         for key in totals:
             totals[key] += result[key]
     if "progress" in plan:
@@ -631,7 +661,67 @@ def _git(root, *args):
     return subprocess.check_output(["git", "-C", str(root), *args], text=True).strip()
 
 
-def verify(root, base=None, summary=None):
+@contextmanager
+def timed(label):
+    started = time.perf_counter()
+    try:
+        yield
+    finally:
+        print(f"K-line timing: {label}: {time.perf_counter() - started:.3f}s", flush=True)
+
+
+def _blob_hash(body, object_format):
+    return hashlib.new(object_format, b"blob " + str(len(body)).encode() + b"\0" + body).hexdigest()
+
+
+@contextmanager
+def _baseline_blobs(root, entries):
+    """One Git batch, disk-backed framing; only one symbol/year lives in RAM.
+
+    Temporary files avoid pipe deadlock on large responses. Identical object IDs
+    are requested once, and offsets allow the latest year to be reused by a
+    symbol's older changed years without another Git invocation or full scan.
+    """
+    objects = sorted(set(entries.values()))
+    with tempfile.TemporaryFile() as requests, tempfile.TemporaryFile() as responses:
+        offsets = {}
+        if objects:
+            requests.write(b"".join(sha.encode() + b"\n" for sha in objects))
+            requests.seek(0)
+            with timed(f"verify.baseline_git_batch ({len(objects)} blobs)"):
+                subprocess.run(["git", "-C", str(root), "cat-file", "--batch"],
+                               stdin=requests, stdout=responses, check=True)
+            responses.seek(0)
+            for expected in objects:
+                header = responses.readline().decode().split()
+                if len(header) != 3 or header[:2] != [expected, "blob"]:
+                    raise ValueError("Invalid baseline blob response: " + repr(header))
+                size = int(header[2])
+                if size < 0:
+                    raise ValueError("Invalid baseline blob size")
+                offsets[expected] = (responses.tell(), size)
+                responses.seek(size, 1)
+                if responses.read(1) != b"\n":
+                    raise ValueError("Truncated baseline blob")
+
+        def read(name):
+            offset, size = offsets[entries[name]]
+            responses.seek(offset)
+            body = responses.read(size)
+            if len(body) != size:
+                raise ValueError("Truncated baseline blob: " + name)
+            return _read_rows(io.StringIO(body.decode()), name, strict=True), digest(body)
+
+        yield read
+
+
+def verify(root, base=None, summary=None, refresh_manifest=False):
+    """Validate all CSVs once; baseline diffs use one batch, never per-file Git.
+
+    Default verification remains read-only. The publisher alone requests a fresh
+    manifest, computed from these validated rows after all history checks pass.
+    """
+    started = time.perf_counter()
     root = Path(root)
     allowed = {"README.md", "manifest.json", LOG, CONFLICTS, PROGRESS}
     for path in root.rglob("*"):
@@ -645,31 +735,26 @@ def verify(root, base=None, summary=None):
     if not (root / "README.md").is_file() or not (root / LOG).is_file():
         raise ValueError("Archive not initialized")
     files = archive_files(root)
-    current = {}
-    row_count = 0
     object_format = _git(root, "rev-parse", "--show-object-format") if base else "sha1"
-    for path in files:
-        rows = read_rows(path, strict=True)
-        if any(r[0][:4] != path.stem for r in rows):
-            raise ValueError(f"Year/date mismatch: {path}")
-        row_count += len(rows)
-        body = path.read_bytes()
-        header = b"blob " + str(len(body)).encode() + b"\0"
-        current[path.relative_to(root).as_posix()] = {
-            "blob": hashlib.new(object_format, header + body).hexdigest(), "sha256": digest(body)}
+    current = {}
+    with timed("verify.current_blob_hashes"):
+        for path in files:
+            body = path.read_bytes()
+            current[path.relative_to(root).as_posix()] = {
+                "blob": _blob_hash(body, object_format), "sha256": digest(body)}
     log = ki.read_log(root / LOG)
     if len({e["id"] for e in log["events"]}) != len(log["events"]):
         raise ValueError("Duplicate correction event identifiers")
     for record in log["events"]:
         if str(record.get("reason", "")).startswith("kline-archive/adjustment-year:"):
             validate_adjustment_audit(record)
+    old_tree, old_last, changed, file_audit = {}, {}, {}, {}
     if base:
-        old_tree = {}
         for item in _git(root, "ls-tree", "-rz", base, "--", "tw", "us").split("\0"):
             if not item:
                 continue
             metadata, name = item.split("\t", 1)
-            if not re.fullmatch(r"(?:tw|us)/[^/]+/\d{4}\.csv", name):
+            if not re.fullmatch(r"(?:tw|us)/[^/]+/\d{4}\.csv", name) or metadata.split()[1] != "blob":
                 raise ValueError(f"Invalid baseline archive path: {name}")
             old_tree[name] = metadata.split()[2]
         if any(name not in current for name in old_tree):
@@ -680,9 +765,6 @@ def verify(root, base=None, summary=None):
         if any(new_ids.get(key) != value for key, value in old_ids.items()):
             raise ValueError("Correction history was removed or rewritten")
         audit = [e for e in log["events"] if e["id"] not in old_ids]
-        old_last = {}
-        changed = {}
-        file_audit = {}
         for name in old_tree:
             symbol = name.split("/")[1]
             old_last[symbol] = max(old_last.get(symbol, name), name)
@@ -693,59 +775,78 @@ def verify(root, base=None, summary=None):
             if ((e["status"] == "backfilled" and e.get("reason") == "kline-archive/backfill-year")
                     or (e["status"] == "corrected" and str(e.get("reason", "")).startswith("kline-archive/adjustment-year:"))):
                 file_audit.setdefault(e["new"]["path"], []).append(e)
-
-        def baseline(name):
-            blob = subprocess.check_output(["git", "-C", str(root), "show", f"{base}:{name}"])
-            data = [normalize(r) for r in list(csv.reader(io.StringIO(blob.decode())))[1:]]
-            return data, digest(blob)
-
-        # Only metadata is kept for the whole market. OHLC rows are compared one
-        # symbol/year at a time, so permanent history cannot exhaust runner RAM.
-        for symbol, names in changed.items():
-            last_name = old_last.get(symbol)
-            last_rows, last_hash = baseline(last_name) if last_name else ([], None)
-            last = last_rows[-1][0] if last_rows else ""
-            for name in names:
-                old_rows, old_hash = (last_rows, last_hash) if name == last_name else baseline(name) if name in old_tree else ([], None)
-                rows = read_rows(root / name, strict=True)
-                old = {r[0]: r for r in old_rows}
-                if not old.keys() <= {r[0] for r in rows}:
-                    raise ValueError(f"Archive dates deleted: {symbol}")
-                # Journal union ordering can differ for events with the same
-                # clock timestamp. Follow exact hash edges, never log order.
-                reachable = {(old_hash, False, False)}
-                pending = list(reachable)
-                while pending:
-                    state, adjusted, backfilled = pending.pop()
-                    for e in file_audit.get(name, []):
-                        before = e.get("old")
-                        if (before.get("sha256") if before else None) != state or e["symbol"] != symbol:
-                            continue
-                        is_adjustment = e["status"] == "corrected"
-                        target = (e["new"]["sha256"], adjusted or is_adjustment, backfilled or not is_adjustment)
-                        if target not in reachable:
-                            reachable.add(target)
-                            pending.append(target)
-                covered = [r for r in reachable if r[0] == current[name]["sha256"] and r[0] != old_hash]
-                adjusted = any(r[1] for r in covered)
-                backfilled = any(r[2] for r in covered)
-                for row in rows:
-                    day = row[0]
-                    before = old.get(day)
-                    if before == row or (before is None and (day > last or backfilled)) or (before is not None and adjusted):
+    needed = {name: old_tree[name] for names in changed.values() for name in names if name in old_tree}
+    needed.update({old_last[symbol]: old_tree[old_last[symbol]] for symbol in changed if symbol in old_last})
+    stats = {}
+    active_symbol, last_name, last_rows, last_hash, last = None, None, [], None, ""
+    with timed("verify.csv_rows_and_history"), _baseline_blobs(root, needed) as baseline:
+        for path in files:
+            name = path.relative_to(root).as_posix()
+            body = path.read_bytes()
+            if _blob_hash(body, object_format) != current[name]["blob"]:
+                raise ValueError("Archive changed during verification: " + name)
+            rows = _read_rows(io.StringIO(body.decode()), name, strict=True)
+            if any(r[0][:4] != path.stem for r in rows):
+                raise ValueError(f"Year/date mismatch: {path}")
+            stats[name] = _row_stats(rows, len(body))
+            symbol = name.split("/")[1]
+            if symbol != active_symbol:
+                active_symbol = symbol
+                last_name = old_last.get(symbol) if symbol in changed else None
+                last_rows, last_hash = baseline(last_name) if last_name else ([], None)
+                last = last_rows[-1][0] if last_rows else ""
+            # Byte-identical files need no baseline history diff; their schema,
+            # dates, OHLC and manifest contribution are still checked above.
+            if not base or name not in changed.get(symbol, []):
+                continue
+            old_rows, old_hash = (last_rows, last_hash) if name == last_name else baseline(name) if name in old_tree else ([], None)
+            old = {r[0]: r for r in old_rows}
+            if not old.keys() <= {r[0] for r in rows}:
+                raise ValueError(f"Archive dates deleted: {symbol}")
+            # Journal union ordering can differ for events with the same
+            # clock timestamp. Follow exact hash edges, never log order.
+            reachable = {(old_hash, False, False)}
+            pending = list(reachable)
+            while pending:
+                state, adjusted, backfilled = pending.pop()
+                for e in file_audit.get(name, []):
+                    before = e.get("old")
+                    if (before.get("sha256") if before else None) != state or e["symbol"] != symbol:
                         continue
-                    raise ValueError(f"Unlogged historical modification: {symbol} {day}")
+                    is_adjustment = e["status"] == "corrected"
+                    target = (e["new"]["sha256"], adjusted or is_adjustment, backfilled or not is_adjustment)
+                    if target not in reachable:
+                        reachable.add(target)
+                        pending.append(target)
+            covered = [r for r in reachable if r[0] == current[name]["sha256"] and r[0] != old_hash]
+            adjusted = any(r[1] for r in covered)
+            backfilled = any(r[2] for r in covered)
+            for row in rows:
+                day = row[0]
+                before = old.get(day)
+                if before == row or (before is None and (day > last or backfilled)) or (before is not None and adjusted):
+                    continue
+                raise ValueError(f"Unlogged historical modification: {symbol} {day}")
     stored = json_read(root / "manifest.json", None)
-    # Verification is read-only: compute expected manifest in memory, restoring no files.
-    actual_bytes = sum(p.stat().st_size for p in root.rglob("*") if p.is_file() and ".git" not in p.relative_to(root).parts)
-    csv_bytes = sum(p.stat().st_size for p in files)
-    if not stored or stored != update_manifest(root, write=False) or stored["totalBytes"] != actual_bytes or stored["csvBytes"] != csv_bytes:
+    sizes = {p.relative_to(root).as_posix(): p.stat().st_size for p in root.rglob("*")
+             if p.is_file() and ".git" not in p.relative_to(root).parts}
+    other = sum(size for name, size in sizes.items() if name != "manifest.json")
+    expected = _manifest(stats, other)
+    if refresh_manifest:
+        json_write(root / "manifest.json", expected)
+        stored = json_read(root / "manifest.json", None)
+        sizes["manifest.json"] = (root / "manifest.json").stat().st_size
+    actual_bytes = sum(sizes.values())
+    csv_bytes = sum(stat["csvBytes"] for stat in stats.values())
+    if not stored or stored != expected or stored["totalBytes"] != actual_bytes or stored["csvBytes"] != csv_bytes:
         raise ValueError("Archive manifest size does not match files")
-    result = {"files": len(files), "rows": row_count, "totalBytes": actual_bytes, "csvBytes": csv_bytes}
+    result = {"files": len(files), "rows": sum(stat["rows"] for stat in stats.values()),
+              "totalBytes": actual_bytes, "csvBytes": csv_bytes}
     text = "### Permanent K-line archive\n\n" + "\n".join(f"- {k}: {v:,}" for k, v in result.items()) + "\n"
     if summary:
         with open(summary, "a", encoding="utf-8") as stream:
             stream.write(text)
+    print(f"K-line timing: verify.total: {time.perf_counter() - started:.3f}s", flush=True)
     print(json.dumps(result))
     return result
 
