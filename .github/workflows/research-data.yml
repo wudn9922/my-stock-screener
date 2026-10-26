@@ -197,7 +197,7 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin main
-          if ! git diff --quiet "$SOURCE_SHA" origin/main -- 'scripts/*research*.py' kline_integrity.py scripts/build_sec_radar.py scripts/build_world_assets.py 'atlas/src/report/research*.ts' .github/workflows/research-data.yml .github/generated-paths.json scripts/generated_branch.py; then
+          if ! git diff --quiet "$SOURCE_SHA" origin/main -- 'scripts/*research*.py' kline_integrity.py scripts/kline_journal.py scripts/build_sec_radar.py scripts/build_world_assets.py 'atlas/src/report/research*.ts' .github/workflows/research-data.yml .github/generated-paths.json scripts/generated_branch.py; then
             echo '::error::Research implementation changed during collection; rerun on current main.'
             exit 1
           fi
@@ -216,7 +216,7 @@ jobs:
           for attempt in 1 2 3; do
             git fetch origin main
             git reset --hard origin/main
-            if ! git diff --quiet "$SOURCE_SHA" HEAD -- 'scripts/*research*.py' kline_integrity.py scripts/build_sec_radar.py scripts/build_world_assets.py 'atlas/src/report/research*.ts' .github/workflows/research-data.yml .github/generated-paths.json scripts/generated_branch.py; then
+            if ! git diff --quiet "$SOURCE_SHA" HEAD -- 'scripts/*research*.py' kline_integrity.py scripts/kline_journal.py scripts/build_sec_radar.py scripts/build_world_assets.py 'atlas/src/report/research*.ts' .github/workflows/research-data.yml .github/generated-paths.json scripts/generated_branch.py; then
               echo '::error::Research implementation changed during collection; rerun on current main.'
               exit 1
             fi

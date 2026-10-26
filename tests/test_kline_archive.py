@@ -57,10 +57,10 @@ class _ArchiveCase(unittest.TestCase):
         ka.put_symbol(self.archive, symbol, rows or [row("2025-12-31"), row("2026-01-02")])
         ka.update_manifest(self.archive)
 
-    def cache_rows(self, symbol, rows):
-        uc.write_bars(uc.bars_path(str(self.cache), symbol), frame(rows), now=NOW)
+    def cache_rows(self, symbol, rows, now=NOW):
+        uc.write_bars(uc.bars_path(str(self.cache), symbol), frame(rows), now=now)
         state = uc.load_state(str(self.cache))
-        uc.record_frame(state, symbol, frame(rows), NOW.date().isoformat(), full=True)
+        uc.record_frame(state, symbol, frame(rows), now.date().isoformat(), full=True)
         uc.save_state(str(self.cache), state)
 
     def checkpoint(self):
@@ -419,17 +419,16 @@ class ArchiveTests(_ArchiveCase):
         base = self.checkpoint()
         ka.put_symbol(self.archive, "AAPL", [row("2026-01-05")])
         ka.update_manifest(self.archive)
-        original = subprocess.check_output
-        old_reads = []
+        original = ka._baseline_blobs
+        requests = []
 
-        def inspect(args, **kwargs):
-            if "show" in args and str(args[-1]).endswith(".csv"):
-                old_reads.append(args[-1])
-            return original(args, **kwargs)
+        def inspect(root, entries):
+            requests.append(set(entries))
+            return original(root, entries)
 
-        with patch.object(ka.subprocess, "check_output", side_effect=inspect):
+        with patch.object(ka, "_baseline_blobs", side_effect=inspect):
             ka.verify(self.archive, base)
-        self.assertEqual(old_reads, [f"{base}:us/AAPL/2026.csv"])
+        self.assertEqual(requests, [{"us/AAPL/2026.csv"}])
 
     def test_daily_append_does_not_read_unaffected_old_years(self):
         self.seed(rows=[row("2024-01-02"), row("2025-12-31"), row("2026-01-02")])
@@ -443,6 +442,61 @@ class ArchiveTests(_ArchiveCase):
         with patch.object(ka, "read_rows", side_effect=inspect):
             ka.put_symbol(self.archive, "AAPL", [row("2026-01-05")])
         self.assertEqual(reads, ["2026.csv"])
+
+    def test_recovery_appends_every_missing_session_from_the_rolling_cache(self):
+        self.seed("AAPL", [row("2026-10-23")])
+        self.seed("2330.TW", [row("2026-10-23")])
+        base = self.checkpoint()
+        days = ["2026-10-23", "2026-10-26", "2026-10-27", "2026-10-28"]
+        now = datetime(2026, 10, 29, 2, tzinfo=timezone.utc)
+        for symbol in ("AAPL", "2330.TW"):
+            self.cache_rows(symbol, [row(d) for d in days], now=now)
+        baseline = self.root / "baseline"
+        ka.stage_cache(self.cache, self.archive, baseline, now)
+        ka.stage_cache(self.cache, self.archive, self.payload, now, previous=baseline)
+        with patch.object(ka, "put_symbol", wraps=ka.put_symbol) as put:
+            totals = ka.apply_operations(self.archive, self.payload, now=now, rebuild_manifest=False)
+        self.assertEqual(totals["added"], 6)
+        self.assertEqual(put.call_count, 2)  # Identical baseline/latest daily payload only once per symbol.
+        ka.verify(self.archive, base, refresh_manifest=True)
+        for symbol in ("AAPL", "2330.TW"):
+            self.assertEqual([r[0] for r in ka.symbol_rows(self.archive, symbol)], days)
+        ka.apply_operations(self.archive, self.payload, now=now)
+        ka.verify(self.archive, base)
+        self.assertEqual(ka.json_read(self.archive / "manifest.json", {})["markets"]["us"]["rows"], 4)
+
+    def test_unchanged_baseline_csv_still_gets_strict_schema_validation(self):
+        self.seed(rows=[row("2026-01-02")])
+        path = self.archive / "us/AAPL/2026.csv"
+        # Commit a malformed baseline: equality to its blob must not bypass validation.
+        path.write_text(path.read_text().replace("100.0000", "100"))
+        base = self.checkpoint()
+        with self.assertRaisesRegex(ValueError, "Noncanonical"):
+            ka.verify(self.archive, base)
+
+    def test_manifest_refresh_cannot_mask_an_unlogged_historical_change(self):
+        self.seed(rows=[row("2026-01-02")])
+        base = self.checkpoint()
+        manifest = (self.archive / "manifest.json").read_bytes()
+        path = self.archive / "us/AAPL/2026.csv"
+        path.write_text(ka.csv_text([row("2026-01-02", close=90)]))
+        with self.assertRaisesRegex(ValueError, "Unlogged historical"):
+            ka.verify(self.archive, base, refresh_manifest=True)
+        self.assertEqual((self.archive / "manifest.json").read_bytes(), manifest)
+
+    def test_manifest_rows_dates_symbols_and_bytes_must_all_match(self):
+        self.seed()
+        original = ka.json_read(self.archive / "manifest.json", {})
+        for field, value in (("rows", 99), ("firstDate", "2000-01-01"),
+                             ("symbols", ["OTHER"]), ("csvBytes", 1)):
+            with self.subTest(field=field):
+                changed = json.loads(json.dumps(original))
+                changed["markets"]["us"][field] = value
+                ka.json_write(self.archive / "manifest.json", changed)
+                with self.assertRaisesRegex(ValueError, "manifest"):
+                    ka.verify(self.archive)
+        ka.json_write(self.archive / "manifest.json", original)
+        ka.verify(self.archive)
 
     def test_an_unlogged_new_old_year_is_rejected(self):
         self.seed()

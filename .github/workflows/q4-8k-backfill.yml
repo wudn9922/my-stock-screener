@@ -76,6 +76,7 @@ jobs:
           GENERATED_BRANCH_MODE: '1'
         run: |
           git show origin/main:scripts/generated_branch.py > "$RUNNER_TEMP/generated_branch.py"
+          git show origin/main:scripts/kline_journal.py > "$RUNNER_TEMP/kline_journal.py"
           git show origin/main:.github/generated-paths.json > "$RUNNER_TEMP/generated-paths.json"
           python "$RUNNER_TEMP/generated_branch.py" --config "$RUNNER_TEMP/generated-paths.json" restore
 

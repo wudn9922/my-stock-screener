@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -35,6 +36,7 @@ class GeneratedStorageTests(unittest.TestCase):
         self.config.write_bytes((REPO / ".github/generated-paths.json").read_bytes())
         self.files = {
             "code.py": b"keep code\n",
+            "docs/report/kline-corrections.json": b'{"version":1,"quarantined":[],"events":[]}',
             "docs/index.html": b"daily\x00html\n",
             "docs/wsj.png": b"image\x00\x01",
             "docs/atlas/index.html": b"atlas\n",
@@ -268,6 +270,118 @@ class GeneratedStorageTests(unittest.TestCase):
         tip = self.remote("generated")
         self.assertEqual(self.body(tip, "docs/report/latest.json"), b"daily update")
         self.assertEqual(self.body(tip, "docs/report/research/volume.json"), b"concurrent research")
+
+    @staticmethod
+    def journal_event(identity):
+        return dict(id=identity, loggedAt="2026-10-26T09:00:00Z", symbol=identity,
+                    date="2026-10-23", status="corrected", reason="test correction")
+
+    def journal(self, *identities):
+        return dict(version=1, quarantined=[], events=[self.journal_event(i) for i in identities])
+
+    def concurrent_main(self, changes):
+        head = self.remote("main")
+        entries = self.store.entries(head)
+        for path, body in changes.items():
+            sha = gb.git("hash-object", "-w", "--stdin", data=body).decode().strip()
+            entries[path] = ("100644", sha)
+        commit = self.store.commit(self.store.tree(entries), "concurrent records", head)
+        self.git("push", "origin", commit + ":refs/heads/main")
+        return commit
+
+    def test_concurrent_journal_unions_events_and_publishes_daily_csv_and_outputs(self):
+        journal = "docs/report/kline-corrections.json"
+        self.write(journal, json.dumps(self.journal("SHARED", "DAILY")).encode())
+        self.write("data/AAPL.csv", b"daily retained K-lines")
+        self.write("docs/report/latest.json", b"daily generated output")
+        self.concurrent_main({journal: json.dumps(self.journal("SHARED", "UNIVERSE")).encode()})
+        before_head = self.git("rev-parse", "HEAD")
+        before_index = gb.git("write-tree")
+        self.store.publish("daily")
+        merged = json.loads(self.body(self.remote("main"), journal))
+        self.assertEqual(sorted(e["id"] for e in merged["events"]), ["DAILY", "SHARED", "UNIVERSE"])
+        self.assertEqual(self.body(self.remote("main"), "data/AAPL.csv"), b"daily retained K-lines")
+        self.assertEqual(self.body(self.remote("generated"), "docs/report/latest.json"), b"daily generated output")
+        self.assertEqual(self.git("rev-parse", "HEAD"), before_head)
+        self.assertEqual(gb.git("write-tree"), before_index)
+        self.store.publish("daily")  # A rerun must neither lose nor duplicate events.
+        self.assertEqual(json.loads(self.body(self.remote("main"), journal)), merged)
+
+    def test_journal_unions_repeated_push_races_with_bounded_retries(self):
+        journal = "docs/report/kline-corrections.json"
+        self.write(journal, json.dumps(self.journal("LOCAL")).encode())
+        original_run = subprocess.run
+        pushes = []
+
+        def racing(command, **kwargs):
+            if command[:3] == ["git", "push", "origin"] and command[-1].endswith(":refs/heads/main"):
+                pushes.append(command)
+                if len(pushes) <= 2:
+                    # Use the original runner for this independent writer to avoid
+                    # intercepting its push recursively.
+                    with patch.object(gb.subprocess, "run", original_run):
+                        self.concurrent_main({journal: json.dumps(self.journal("REMOTE1", *(["REMOTE2"] if len(pushes) == 2 else []))).encode()})
+            return original_run(command, **kwargs)
+
+        with patch.object(gb.subprocess, "run", side_effect=racing), patch.object(gb.time, "sleep"):
+            self.assertTrue(self.store.publish_one("main", self.base, [journal], "daily journal"))
+        self.assertEqual(len(pushes), 3)
+        self.assertEqual(sorted(e["id"] for e in json.loads(self.body(self.remote("main"), journal))["events"]),
+                         ["LOCAL", "REMOTE1", "REMOTE2"])
+        self.assertFalse(any("force" in arg for command in pushes for arg in command))
+
+    def test_journal_retry_exhaustion_is_bounded_and_never_force_pushes(self):
+        journal = "docs/report/kline-corrections.json"
+        self.write(journal, json.dumps(self.journal("LOCAL")).encode())
+        original_run = subprocess.run
+        attempts = []
+
+        def racing(command, **kwargs):
+            if command[:3] == ["git", "push", "origin"] and command[-1].endswith(":refs/heads/main"):
+                attempts.append(command)
+                with patch.object(gb.subprocess, "run", original_run):
+                    self.concurrent_main({journal: json.dumps(self.journal(*(f"REMOTE{i}" for i in range(len(attempts))))).encode()})
+            return original_run(command, **kwargs)
+
+        with patch.object(gb.subprocess, "run", side_effect=racing), patch.object(gb.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "five fetch/rebase retries"):
+                self.store.publish_one("main", self.base, [journal], "daily journal")
+        self.assertEqual(len(attempts), 5)
+        self.assertFalse(any("force" in arg for command in attempts for arg in command))
+        self.assertEqual(len(json.loads(self.body(self.remote("main"), journal))["events"]), 5)
+
+    def test_invalid_remote_journal_does_not_publish_local_records(self):
+        journal = "docs/report/kline-corrections.json"
+        self.write(journal, json.dumps(self.journal("LOCAL")).encode())
+        self.write("data/AAPL.csv", b"unpublished local record")
+        head = self.concurrent_main({journal: b'{"version":2,"events":[],"quarantined":[]}'})
+        with self.assertRaisesRegex(ValueError, "Invalid K-line correction log"):
+            self.store.publish("daily")
+        self.assertEqual(self.remote("main"), head)
+        self.assertEqual(self.body(head, "data/AAPL.csv"), self.files["data/AAPL.csv"])
+
+    def test_concurrent_nonjournal_record_still_fails_without_publishing_any_outputs(self):
+        journal = "docs/report/kline-corrections.json"
+        self.write(journal, json.dumps(self.journal("LOCAL")).encode())
+        self.write("data/AAPL.csv", b"stale local CSV")
+        self.write("docs/report/latest.json", b"unpublished daily")
+        head = self.concurrent_main({journal: json.dumps(self.journal("REMOTE")).encode(),
+                                     "data/AAPL.csv": b"concurrent CSV"})
+        generated = self.remote("generated")
+        with self.assertRaisesRegex(ValueError, "Concurrent same-path.*data/AAPL.csv"):
+            self.store.publish("daily")
+        self.assertEqual(self.remote("main"), head)
+        self.assertEqual(self.remote("generated"), generated)
+        self.assertEqual(json.loads(self.body(head, journal)), self.journal("REMOTE"))
+
+    def test_storage_helper_and_journal_union_need_only_the_standard_library(self):
+        # q4-8k runs a copy of main's helper beside its copied dependency.
+        folder = Path(self.temp.name) / "standalone"
+        folder.mkdir()
+        for name in ("generated_branch.py", "kline_journal.py"):
+            (folder / name).write_bytes((REPO / "scripts" / name).read_bytes())
+        subprocess.run([sys.executable, "-I", "-S", str(folder / "generated_branch.py"), "--help"],
+                       check=True, stdout=subprocess.DEVNULL)
 
     def test_same_path_conflict_refuses_to_overwrite(self):
         self.write("docs/report/latest.json", b"first run")

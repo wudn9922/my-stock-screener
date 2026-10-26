@@ -19,6 +19,8 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from scripts.kline_journal import merge_logs
+
 ROOT = Path(__file__).resolve().parent
 LOG_PATH = Path(os.environ.get("KLINE_CORRECTIONS_LOG", ROOT / "docs/report/kline-corrections.json"))
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
@@ -100,23 +102,6 @@ def log_event(symbol, day, status, old=None, new=None, source_url=None,
     path.parent.mkdir(parents=True, exist_ok=True)
     _atomic(path, json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + "\n")
     _load_log.cache_clear()
-
-
-def merge_logs(current, incoming):
-    """Concurrent collector artifacts retain the union of append-only events."""
-    if incoming.get('version') != 1 or not isinstance(incoming.get('events'), list):
-        raise ValueError('Invalid correction artifact')
-    events = {e['id']: e for e in current.get('events', [])}
-    events.update({e['id']: e for e in incoming['events']})
-    ordered = sorted(events.values(), key=lambda e: (e['loggedAt'], e['id']))
-    blocked = {(q['symbol'],q['date']):q for q in current.get('quarantined', [])}
-    for event in ordered:
-        key = event['symbol'], event['date']
-        if event['status'] == 'quarantined':
-            blocked[key] = dict(symbol=key[0], date=key[1], reason=event.get('reason'))
-        elif event['status'] == 'corrected':
-            blocked.pop(key, None)
-    return dict(version=1, quarantined=[blocked[k] for k in sorted(blocked)], events=ordered)
 
 
 def _atomic(path, text):
