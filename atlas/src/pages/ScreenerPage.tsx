@@ -4,6 +4,7 @@ import type { PageProps } from './pageProps';
 import { ReportGate } from './ReportGate';
 import { itemStatusOf, type GroupItem, type Report, type ReportGroup } from '../report/schema';
 import { getPeFigures, type PeFigures } from '../app/dataSources';
+import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { mapWithConcurrency } from './worldPerformance';
 import {
   METRIC_SORTS,
@@ -668,7 +669,7 @@ export default function ScreenerPage({ report, reload, navigate, openChart, grou
         <div>
           <h2 className="page-title">選股</h2>
           {report.status === 'ok' && (
-            <p className="page-sub">每日報告的群組與全市場條件篩選 · 點選股票開啟圖表</p>
+            <HelpDisclosure label="選股說明">每日報告的群組與全市場條件篩選；點選股票可開啟圖表。</HelpDisclosure>
           )}
         </div>
       </div>

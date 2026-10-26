@@ -1,3 +1,46 @@
+## Current follow-up: market charts, navigation recovery and concise analysis (2026-10-25)
+
+Market index previews now use the report's configured SMAs at 2px, retaining
+full-history warmup, and display an independent volume scale. Native pan/pinch
+and explicit zoom/reset controls operate inside the card; dedicated links open
+the full workspace. Passive stock previews and individual-stock indicator
+defaults remain unchanged. Interactive market charts retain attribution.
+
+The reported navigation blackout was not reproduced in a fresh desktop load of
+the exact published assets fetched with TLS verification. A reproducible missing
+lazy-bundle case is now handled by route boundaries: navigation stays mounted,
+an actionable fallback replaces the failed page, and explicit reload retries
+the current deployment. Hidden workspace failures remain inside the hidden host.
+A real MarketDataProvider/MarketTiming import cycle was removed using leaf
+timeframe metadata, preserving public exports. Production builds now reject
+cyclic cross-chunk reexports; an in-memory restoration of the old cycle fails
+that gate. This is an eliminated risk, not proof of the user's precise cause.
+
+Commodities include genuine Binance spot BTC/USDT, with USDT quote currency,
+BTC base volume and completed UTC daily sessions, including weekends. Its
+permanent record and hash/pair-validated dated supplement are reviewed source
+records; existing published pair snapshots remain authoritative. No BTC/USD
+substitution, browser exchange dependency or source-archive rewrite is used.
+
+Volume analysis presents directional ratios first, then centered anomaly
+controls. The two volatility values are larger independent cards. Shared
+explanations use compact collapsed controls; per-stat help sits beside the
+metric title, and accounting notes follow the financial charts. Observation
+dates, stale/unavailable states, errors and meaningful empty states remain
+visible. Root accepted and corrected attribution, hidden-boundary containment
+and explicit BTC unavailability handling during implementation review. Read-only
+agent review also identified a malformed Binance row escaping the retention
+path; row schema validation now converts it into a source failure, preserving
+the existing CSV and candle snapshot. A regression replays the malformed row.
+
+Focused browser regressions cover configured MA/volume painting, native chart
+interaction, repeated navigation, missing chunks/reload, BTC source boundaries,
+analysis order/centering, large volatility cards and note expansion by keyboard.
+Actual test totals and exact-head Actions results are recorded in the PR.
+This package records primary review and implementation-agent contributions;
+it does not claim independent sign-off or physical-device verification. No
+merge or deployment was performed.
+
 ## Current follow-up: retain valid market data during closures (2026-10-25)
 
 The deployed Sunday report had an empty Taiwan full-market scan and zero-count

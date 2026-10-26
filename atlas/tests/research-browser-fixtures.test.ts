@@ -11,8 +11,8 @@ describe('frozen research browser candle fixtures', () => {
   const snapshot = series.wti!;
   const candles = Object.entries(series).filter(([, asset]) => asset.candlePath);
 
-  it('covers all eleven commodity and FX candle snapshots', () => {
-    expect(candles).toHaveLength(11);
+  it('covers all twelve commodity, FX and BTC/USDT candle snapshots', () => {
+    expect(candles).toHaveLength(12);
   });
 
   it.each(candles)('matches the frozen date and close for %s', (_id, asset) => {

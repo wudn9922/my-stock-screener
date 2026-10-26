@@ -101,7 +101,6 @@ export function MetricCard({ group, history, view, metric, onMetric, note, defau
 
   return (
     <FoldCard className="fin-card" title={group.title} summary={summary} defaultOpen={defaultOpen} dataAttributes={{ 'data-group': group.id }}>
-      {note && <FinancialNote className="fin-card-note" label="財報口徑說明"><p>{note}</p></FinancialNote>}
       <div className="fin-tabs" role="group" aria-label={`${group.title}指標`}>
         {group.metrics.map((id) => (
           <button key={id} type="button" className={id === metric ? 'active' : ''} aria-pressed={id === metric} onClick={() => onMetric(id)}>
@@ -173,6 +172,7 @@ export function MetricCard({ group, history, view, metric, onMetric, note, defau
           />
         )}
       </div>
+      {note && <FinancialNote className="fin-card-note" label="財報口徑說明"><p>{note}</p></FinancialNote>}
     </FoldCard>
   );
 }

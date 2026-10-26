@@ -55,9 +55,9 @@ export function StockVolatility({ symbol, provider, reloadToken }: { symbol: str
           {stats && <p>ATR 原值 {stats.atr.toFixed(2)}，基準收盤 {stats.close.toFixed(2)}。</p>}
         </HelpDisclosure>
         <HelpDisclosure label="20 日平均日內振幅 計算說明"><p>{rangeFormula}</p></HelpDisclosure>
-        <p className="muted small">固定使用已收盤日線，與圖表週期無關；日線缺日不補值。
+        <HelpDisclosure label="日線資料與來源"><p>固定使用已收盤日線，與圖表週期無關；日線缺日不補值。
           {result ? ` 來源：${result.source}；${result.priceBasis === 'split-adjusted' ? '拆股調整價格' : result.priceBasis === 'unadjusted' ? '未還原價格，除權息／分割可能放大波動' : '價格還原基準未確認'}。` : ''}
-        </p>
+        </p></HelpDisclosure>
       </StockStatsMenu>
     </div>
   );

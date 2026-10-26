@@ -212,12 +212,24 @@ jobs:
           retention-days: 7
       - name: Desktop, phone and WebKit regressions
         working-directory: atlas
-        run: npm run test:site -- account-privacy.spec.ts legacy-import.spec.ts parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts data-integrity.spec.ts closed-market.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts themes-map.spec.ts breakouts.spec.ts index-volume.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts workspace-refinements.spec.ts
+        run: npm run test:site -- account-privacy.spec.ts legacy-import.spec.ts parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts data-integrity.spec.ts closed-market.spec.ts navigation-recovery.spec.ts market-chart-controls.spec.ts world-btc.spec.ts analysis-panel-layout.spec.ts notes-density.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts themes-map.spec.ts breakouts.spec.ts index-volume.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts workspace-refinements.spec.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: atlas-breakout-previews
           path: atlas/test-results/site/**/four-outcome-card.png
+          if-no-files-found: ignore
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atlas-market-analysis-previews
+          path: |
+            atlas/test-results/site/**/market-configured-ma-volume.png
+            atlas/test-results/site/**/volume-ratios-first.png
+            atlas/test-results/site/**/volatility-large-values.png
+            atlas/test-results/site/**/btc-usdt-*.png
+            atlas/test-results/site/**/compact-explanations.png
           if-no-files-found: ignore
           retention-days: 7
       - uses: actions/setup-python@v5
@@ -243,6 +255,7 @@ jobs:
           pip install requests numpy pandas yfinance openpyxl xlrd lxml pyyaml
           python -m unittest discover -s tests -p test_research.py -v
           python -m unittest discover -s tests -p test_research_candles.py -v
+          python -m unittest discover -s tests -p test_research_crypto.py -v
           python -m unittest discover -s tests -p test_research_operations.py -v
           python -m unittest discover -s tests -p test_tw_chips.py -v
           python -m unittest discover -s tests -p 'test_atlas_watchlists.py' -v

@@ -15,7 +15,7 @@ import {
   type MouseEventParams,
 } from 'lightweight-charts';
 import { restoreViewRange, type ViewRange } from './ChartPreferences';
-import { TimeMapper } from './TimeMapper';
+import { TimeMapper, type SessionCalendar } from './TimeMapper';
 import { ChartTransform } from './ChartTransform';
 import { DrawingStateMachine } from '../drawing/DrawingStateMachine';
 import { DrawingPrimitive } from '../drawing/DrawingPrimitive';
@@ -222,6 +222,7 @@ export class ChartEngine {
     indicators: IndicatorInstance[],
     range?: ViewRange,
     legacyVolume = true,
+    calendar: SessionCalendar = 'regular',
   ) {
     this.cancelOhlcFrame();
     this.activePointers.clear();
@@ -254,7 +255,7 @@ export class ChartEngine {
     this.allDrawings = drawings;
     this.revision++;
     const market = result.market ?? getMarketProfile(symbol);
-    this.mapper = new TimeMapper(result.bars, timeframe, 500, market);
+    this.mapper = new TimeMapper(result.bars, timeframe, 500, market, calendar);
     const transform = new ChartTransform(this.chart, this.candles, this.mapper, this.atr);
     this.candles.setData([
       ...result.bars.map((b) => ({ ...b, time: b.time as UTCTimestamp })),

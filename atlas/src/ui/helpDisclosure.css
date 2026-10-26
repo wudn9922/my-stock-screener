@@ -1,5 +1,5 @@
 .help-disclosure {
-  margin: 6px 0;
+  margin: 2px 0;
   min-width: 0;
   color: var(--text-3);
   font-size: 11px;
@@ -8,10 +8,24 @@
 .help-disclosure > summary {
   width: fit-content;
   max-width: 100%;
-  min-height: 32px;
-  padding: 6px 2px;
+  min-height: 28px;
+  padding: 3px 2px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  list-style: none;
   cursor: pointer;
   font-weight: 400;
+}
+.help-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.help-disclosure > summary::before {
+  content: '›';
+  display: inline-block;
+}
+.help-disclosure[open] > summary::before {
+  transform: rotate(90deg);
 }
 .help-disclosure > summary:focus-visible {
   outline: 2px solid var(--accent);
@@ -35,8 +49,8 @@
 }
 @media (pointer: coarse) {
   .help-disclosure > summary {
-    min-height: 44px;
-    padding-top: 12px;
-    padding-bottom: 12px;
+    min-height: 32px;
+    padding-top: 5px;
+    padding-bottom: 5px;
   }
 }

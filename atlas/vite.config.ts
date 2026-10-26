@@ -16,6 +16,11 @@ export default defineConfig({
   preview: { port: 4173 },
   build: {
     rollupOptions: {
+      onwarn(warning, warn) {
+        // Lazy routes must not ship execution-order-dependent module cycles.
+        if (warning.code === 'CYCLIC_CROSS_CHUNK_REEXPORT') throw new Error(warning.message);
+        warn(warning);
+      },
       output: {
         manualChunks: {
           chart: [

@@ -10,8 +10,8 @@ import {
   type MarketProfile,
 } from './MarketProfile';
 
-export const timeframes = ['5m', '15m', '30m', '1H', '4H', '1D', '1W', '1M'] as const;
-export type Timeframe = (typeof timeframes)[number];
+import type { Timeframe } from './Timeframes';
+export { timeframes, intervalSeconds, type Timeframe } from './Timeframes';
 export type { MarketProfile } from './MarketProfile';
 export { CANONICAL_SYMBOL_REGEX, getMarketProfile, isCanonicalSymbol, calendarPeriodStart, marketProfileSchema, sessionDate, isSessionCloseObservation, SESSION_CLOSE_SOURCE_QUALIFIER };
 /** Kept as a source-compatible alias for callers that used the former roadmap type. */
@@ -132,17 +132,7 @@ export type CorporateEventsResult =
       asOf?: number;
       cacheStatus?: CacheStatus;
     };
-export const intervalSeconds: Record<Timeframe, number> = {
-  '5m': 300,
-  '15m': 900,
-  '30m': 1800,
-  '1H': 3600,
-  '4H': 14400,
-  '1D': 86400,
-  '1W': 604800,
-  // Volatility sizing only. Monthly traversal and bar closes use calendar boundaries.
-  '1M': 30 * 86400,
-};
+
 export function normalizeSymbol(value: string): string {
   const symbol = value.trim().toUpperCase();
   if (!CANONICAL_SYMBOL_REGEX.test(symbol)) throw new Error('請輸入有效的股票或指數代號（例如 NVDA、BRK-B、2330.TW、6488.TWO、^TWII）');
