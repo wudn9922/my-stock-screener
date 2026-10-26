@@ -8,6 +8,7 @@ on:
     paths:
       - 'supabase/functions/market-chart/**'
       - 'supabase/functions/user-settings/**'
+      - 'supabase/functions/_shared/**'
       - 'supabase/functions/chart-drawings/**'
       - '.github/workflows/supabase-functions.yml'
   workflow_dispatch:

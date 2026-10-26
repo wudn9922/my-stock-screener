@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { LineHandoffError, lineLoginHandoff } from "../_shared/lineLoginHandoff.ts";
 import { validateWatchlist, watchlistId, watchlistVersion } from "./watchlists.ts";
 import { StorageAccessError, adminLineId, getStorageAccess, listStorageGrants, parseStorageUserId, requireCloudStorage, saveStorageGrant } from "../_shared/storageAccess.ts";
 
@@ -231,6 +232,17 @@ Deno.serve(async (request: Request) => {
     const action = String(
       body.action ?? "",
     ).trim();
+
+    // Anonymous begin/poll/cancel require random one-use proofs; completion also
+    // independently verifies LINE. They never read/write personal settings or grants.
+    if (action.startsWith('line.login.')) {
+      const url = Deno.env.get('SUPABASE_URL'), secret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      if (!url || !secret) throw new LineHandoffError(503, '登入交接服務尚未就緒。');
+      const database = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
+      const caller = request.headers.get('cf-connecting-ip') || request.headers.get('x-real-ip') || 'unknown';
+      const data = await lineLoginHandoff(database, body, secret, caller, verifyLineIdToken);
+      return new Response(JSON.stringify({ ok: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+    }
 
     const idToken = String(
       body.idToken ?? "",
@@ -616,6 +628,7 @@ Deno.serve(async (request: Request) => {
 
     throw new HttpError(400, "Invalid action");
   } catch (error) {
+    if (error instanceof LineHandoffError) return new Response(JSON.stringify({ ok: false, error: error.message }), { status: error.status, headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
     if (error instanceof StorageAccessError) {
       return jsonResponse({ ok: false, error: error.message, code: error.code }, error.status);
     }

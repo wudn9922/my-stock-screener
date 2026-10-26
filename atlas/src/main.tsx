@@ -7,6 +7,7 @@ import { retireScreenerWorker } from './auth/retireWorker';
 import { DEFAULT_LIFF_ID, needsLineIdentityBeforeRouting, startLineIdentity } from './cloud/lineIdentity';
 import { PUBLIC_BASE } from './app/HostingMode';
 import './styles.css';
+import { completeIncomingLineHandoff } from './cloud/lineLoginHandoff';
 // Packaged native builds use their bundled assets, independent of PWA shell updates.
 if (
   'serviceWorker' in navigator &&
@@ -34,7 +35,7 @@ async function render() {
       root.textContent = '正在完成 LINE 登入…';
       let timer: ReturnType<typeof setTimeout> | undefined;
       const finished = await Promise.race([
-        startLineIdentity(import.meta.env.VITE_LIFF_ID || DEFAULT_LIFF_ID).then(() => true),
+        startLineIdentity(import.meta.env.VITE_LIFF_ID || DEFAULT_LIFF_ID).then(async identity => { await completeIncomingLineHandoff(identity); return true; }),
         new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), 15000); }),
       ]);
       clearTimeout(timer);
@@ -48,6 +49,10 @@ async function render() {
         return;
       }
     }
+    // The configured LIFF endpoint is the parent root. Render this same entry
+    // there; canonicalize only AFTER primary SDK handling and any handoff.
+    if (location.pathname === new URL('../', new URL(PUBLIC_BASE, location.origin)).pathname)
+      history.replaceState(history.state, '', `${PUBLIC_BASE}${location.search}${location.hash}`);
     // No guest app persistence, cached grants, or automatic legacy-data adoption.
     // Delayed login may resolve later; the boundary then replaces the entire temporary workspace.
     await Promise.race([

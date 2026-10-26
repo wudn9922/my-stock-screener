@@ -2,7 +2,7 @@ name: Atlas Research Terminal
 
 # 建置 Atlas（行情改由 Supabase Edge Function 即時代理，不再產生個股快照檔），
 # 並在建置時產生全市場股票目錄與本益比資料（美股 Yahoo、台股證交所／櫃買中心），部署到 docs/atlas/
-# （GitHub Pages：/my-stock-screener/atlas/）。只會替換 docs/atlas/。
+# （GitHub Pages：/my-stock-screener/atlas/），並共用根目錄 LIFF 入口。
 on:
   workflow_run:
     workflows: ["Daily Stock Screener"]
@@ -176,7 +176,7 @@ jobs:
           UNIVERSE_CACHE_DIR: ${{ github.workspace }}/.cache/universe-full
         run: npm run refresh:watchlists
 
-      - name: Replace docs/atlas with build output
+      - name: Replace Atlas and the primary LIFF endpoint with the same build
         run: |
           set -euo pipefail
           if [ ! -f atlas/dist-pages/index.html ]; then
@@ -188,10 +188,11 @@ jobs:
               echo "::warning::建置結果缺少 ${file}（搜尋或本益比會降級顯示）"
             fi
           done
-          # 只動 docs/atlas；docs/report/、docs/index.html、docs/*.png 一律不碰
+          # 根目錄是 LINE 設定的 primary endpoint；不可在 LIFF init 前 redirect。
           rm -rf docs/atlas
           mkdir -p docs/atlas
           cp -a atlas/dist-pages/. docs/atlas/
+          cp atlas/dist-pages/index.html docs/index.html
           # GitHub Pages 的 Jekyll 會略過底線開頭的檔案；若有這類檔案，補上 docs/.nojekyll
           if find docs/atlas -name '_*' -print -quit | grep -q .; then
             echo "偵測到底線開頭的檔案，建立 docs/.nojekyll"
@@ -217,6 +218,7 @@ jobs:
             git checkout -- atlas
           fi
           git add -A docs/atlas
+          git add -f docs/index.html
           if [ -f docs/.nojekyll ]; then
             git add docs/.nojekyll
           fi

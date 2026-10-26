@@ -6,6 +6,7 @@ are accepted: this suite creates its own trust-authenticated cluster under a tem
 """
 
 import getpass
+import json
 import os
 from pathlib import Path
 import shutil
@@ -29,7 +30,7 @@ MIGRATION = (
 )
 
 
-class AccountStorageSqlTests(unittest.TestCase):
+class _PostgresFixture(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         configured = os.environ.get("ATLAS_PG_BIN")
@@ -113,6 +114,7 @@ class AccountStorageSqlTests(unittest.TestCase):
         """
         cls.run_sql(fixture)
         cls.run_sql(MIGRATION.read_text())
+        cls.run_sql((MIGRATION.parent / 'line_login_handoff.sql').read_text())
 
     @classmethod
     def tearDownClass(cls):
@@ -134,6 +136,7 @@ class AccountStorageSqlTests(unittest.TestCase):
         return result.stdout.strip() if success else result.stderr
 
     def setUp(self):
+        self.run_sql('truncate atlas_private.line_login_handoffs;')
         self.run_sql(
             "truncate public.atlas_storage_access, public.index_configs, "
             + ", ".join("public." + table for table in TABLES)
@@ -145,6 +148,7 @@ class AccountStorageSqlTests(unittest.TestCase):
             f"insert into public.atlas_storage_access(line_user_id,storage_mode,updated_by) values ('{user}','{mode}','{OWNER}') on conflict(line_user_id) do update set storage_mode=excluded.storage_mode,updated_by=excluded.updated_by;"
         )
 
+class AccountStorageSqlTests(_PostgresFixture):
     def test_owner_default_and_explicit_modes(self):
         for table in TABLES:
             self.run_sql(
@@ -360,6 +364,62 @@ class AccountStorageSqlTests(unittest.TestCase):
                 if process and process.poll() is None:
                     process.kill()
                     process.communicate()
+
+
+class LineLoginSqlTests(_PostgresFixture):
+    def handoff(self, operation, intent='12345678-1234-4234-8234-123456789abc', read='a' * 64,
+                write='b' * 64, bucket='c' * 64, ciphertext=None):
+        quoted = lambda value: 'null' if value is None else "'" + value.replace("'", "''") + "'"
+        sql = "set role service_role; select public.atlas_line_login_handoff(" + ','.join(
+            quoted(v) for v in (operation, intent, read, write, bucket, ciphertext)) + ');'
+        return json.loads(self.run_sql(sql).splitlines()[-1])
+
+    def test_login_one_use_proofs_and_no_personal_rows(self):
+        self.assertEqual(self.handoff('begin')['status'], 'pending')
+        self.assertEqual(self.handoff('poll', read='d' * 64)['status'], 'missing')
+        self.assertEqual(self.handoff('complete', write='d' * 64, ciphertext='encrypted')['status'], 'missing')
+        self.assertEqual(self.handoff('complete', ciphertext='encrypted')['status'], 'complete')
+        self.assertEqual(self.handoff('complete', ciphertext='replacement')['status'], 'used')
+        self.assertEqual(self.handoff('poll'), dict(status='consumed', ciphertext='encrypted'))
+        self.assertEqual(self.handoff('poll')['status'], 'missing')
+        self.assertEqual(self.run_sql('select count(*) from atlas_private.line_login_handoffs;'), '0')
+        self.assertEqual(self.run_sql('select count(*) from public.atlas_storage_access;'), '0')
+        for table in TABLES:
+            self.assertEqual(self.run_sql(f'select count(*) from public.{table};'), '0')
+
+    def test_login_expiry_cancel_and_cleanup(self):
+        self.handoff('begin')
+        self.run_sql("update atlas_private.line_login_handoffs set expires_at=clock_timestamp()-interval '1 second';")
+        self.assertEqual(self.handoff('complete', ciphertext='encrypted')['status'], 'missing')
+        self.handoff('begin')
+        self.assertEqual(self.handoff('cancel')['status'], 'consumed')
+        self.assertEqual(self.handoff('complete', ciphertext='encrypted')['status'], 'missing')
+
+    def test_login_capacity_and_caller_limit(self):
+        for number in range(6):
+            result = self.handoff('begin', intent=f'12345678-1234-4234-8234-{number:012d}')
+            self.assertEqual(result['status'], 'pending' if number < 5 else 'busy')
+        self.run_sql('truncate atlas_private.line_login_handoffs;')
+        self.run_sql("""insert into atlas_private.line_login_handoffs(id,read_hash,write_hash,bucket)
+          select md5(n::text)::uuid, repeat('a',64), repeat('b',64), md5(n::text)||md5(n::text)
+          from generate_series(1,512) n;""")
+        self.assertEqual(self.handoff('begin')['status'], 'busy')
+        self.assertEqual(self.run_sql('select count(*) from atlas_private.line_login_handoffs;'), '512')
+
+    def test_login_anon_authenticated_cannot_call_or_read_and_rpc_is_invoker(self):
+        for role in ('anon', 'authenticated'):
+            self.assertIn('permission denied', self.run_sql(f"set role {role}; select public.atlas_line_login_handoff('poll','12345678-1234-4234-8234-123456789abc');", success=False))
+            self.assertIn('permission denied', self.run_sql(f'set role {role}; select * from atlas_private.line_login_handoffs;', success=False))
+        self.assertEqual(self.run_sql("select prosecdef from pg_proc where oid='public.atlas_line_login_handoff(text,uuid,text,text,text,text)'::regprocedure;"), 'f')
+        self.assertEqual(self.run_sql("select relrowsecurity from pg_class where oid='atlas_private.line_login_handoffs'::regclass;"), 't')
+
+    def test_login_concurrent_consumers_get_exactly_one_identity(self):
+        from concurrent.futures import ThreadPoolExecutor
+        self.handoff('begin')
+        self.handoff('complete', ciphertext='encrypted')
+        with ThreadPoolExecutor(2) as pool:
+            statuses = list(pool.map(lambda _: self.handoff('poll')['status'], range(2)))
+        self.assertEqual(sorted(statuses), ['consumed', 'missing'])
 
 
 if __name__ == "__main__":

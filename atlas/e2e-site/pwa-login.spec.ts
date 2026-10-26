@@ -18,6 +18,9 @@ interface LineMock {
 async function externalSdk(page: Page, account: string | null = null, deferInit = false, failInit = false) {
   const sdkRequests: string[] = [];
   await page.addInitScript(({ initialAccount, delayed, failed }) => {
+    // Exercise the SDK's same-partition desktop fallback on every viewport.
+    // Installed/mobile cross-partition login uses the real-SDK handoff suite.
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 Atlas Desktop Safari' });
     (globalThis as unknown as { __lineMock: LineMock }).__lineMock = {
       account: initialAccount, expires: Date.now() / 1000 + 3600, deferInit: delayed, failInit: failed,
       initCalls: [], loginCalls: [], logoutCalls: 0,
@@ -122,8 +125,7 @@ test('an ordinary external visitor never loads LIFF or stores guest actions', as
   expect(privateActions).toEqual([]);
 });
 
-test('only the explicit login button initializes LIFF and starts login in an installed PWA', async ({ page }) => {
-  await installedPwa(page);
+test('only the explicit desktop-browser login button initializes LIFF and starts same-partition login', async ({ page }) => {
   const sdk = await externalSdk(page);
   const privateActions: string[] = [];
   await page.route('**/functions/v1/user-settings', route => {
@@ -243,7 +245,6 @@ test('a return without an SDK session explains retry and sends no access request
 });
 
 test('an explicit login timeout releases the button and a late SDK init never navigates', async ({ page }) => {
-  await installedPwa(page);
   await page.clock.install();
   await externalSdk(page, null, true);
   await mockSite(page);
@@ -304,8 +305,7 @@ for (const inLine of [false, true]) test(`a stalled ${inLine ? 'LINE' : 'externa
   expect(actions).toEqual([]);
 });
 
-test('installed PWA signout isolates the workspace without deleting drawings, and expiry never redirects to login', async ({ page }) => {
-  await installedPwa(page);
+test('SDK browser signout isolates the workspace without deleting drawings, and expiry never redirects to login', async ({ page }) => {
   const sdk = await externalSdk(page, DEVICE_USER_ID);
   const actions: string[] = [];
   await page.route('**/functions/v1/user-settings', route => {

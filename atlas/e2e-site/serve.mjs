@@ -23,7 +23,9 @@ const port = Number(process.env.SITE_PORT || 4177);
 createServer(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname);
   let file = null;
-  if (path.startsWith(base)) {
+  if (path === '/my-stock-screener/' || path === '/my-stock-screener/index.html') {
+    file = join(out, 'index.html'); // The real primary LIFF endpoint runs the same bootstrap.
+  } else if (path.startsWith(base)) {
     file = normalize(join(out, path.slice(base.length) || 'index.html'));
     if (!file.startsWith(out)) file = null;
     else

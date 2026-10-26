@@ -15,3 +15,15 @@ An account/policy epoch replaces the rendered workspace, chart store, list store
 Both private-data Edge Functions verify LINE independently, derive ownership from its verified subject, and require a cloud grant before touching personal tables. SQL revokes direct anon/authenticated table privileges, enables RLS, and checks cloud permission again at mutation time. Grant changes and personal writes serialize on a per-account advisory lock. The policy table is bounded and changes only through explicit owner operations. Scheduled consumers also check policy and scope user queries; public GitHub reports accept only the configured owner.
 
 This changes storage routing, not the drawing engine, canonical models, market feeds, authentication provider or trading strategies. Existing production rows remain intact. Rollout, account management, data recovery, verification and the limits of device revocation are documented in [ACCOUNT_STORAGE_PERMISSIONS.md](../../../docs/ACCOUNT_STORAGE_PERMISSIONS.md).
+
+## Cross-browser LINE handoff (2026-10-26)
+
+Mobile browsers / installed PWAs now keep the receiving page alive while a separate
+LIFF window authenticates. A two-minute, proof-bound, encrypted server handoff
+delivers a candidate identity once, followed by explicit account confirmation and
+the unchanged server storage-grant check. Receiving proofs and recovered identity
+stay in RAM; functional authentication metadata is the sole addition to a private
+server schema. No personal settings or grants are created by this transport.
+The parent LIFF endpoint renders the same Atlas bootstrap before URL changes.
+This supersedes the former same-browser SDK assumption for mobile login; the
+desktop fallback remains. See [handoff design, SQL and rollout](../../../docs/LINE_LOGIN_HANDOFF.md).

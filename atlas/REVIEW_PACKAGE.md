@@ -1,4 +1,33 @@
-## Current follow-up: LINE login handoffs and bounded explicit startup (2026-10-26)
+## Current follow-up: real SDK storage partitions and one-time LINE handoff (2026-10-26)
+
+The official SDK 2.31.2 reproduced the reported loop: its own partition exchanges
+the callback code, while a new browser context with the same callback has no PKCE
+verifier and remains logged out. Earlier account-return doubles did not model
+that behavior. The deployed root also redirected before primary SDK init.
+
+Mobile / standalone login now uses a separate LIFF window and a two-minute
+one-use handoff. Receiver and sender proofs are separate; only hashes are stored.
+The verified ID token is AES-GCM encrypted with a server-only key and bound to
+its intent. The receiver confirms the account and still needs the normal fresh
+access.get grant. No URL or candidate identity can grant persistence. Private
+RLS storage, service-only invoker RPC, bounded capacity, expiry and atomic
+consumption are tested against native disposable PostgreSQL. The root now uses
+the same Atlas bootstrap; desktop SDK fallback and guest RAM-only behavior stay.
+
+Real SDK browser tests use test ECDSA keys and provider HTTP fixtures, including
+two completely independent browser contexts. Existing SDK fallback tests now
+explicitly model a desktop user agent; mobile/PWA behavior is exercised in the
+new real-SDK handoff suite. No authentication assertion was relaxed. Official
+provider consent / physical iPhone return is not claimed.
+
+Read-only public deployment/configuration and aggregate server logs were checked.
+Production advisories showed only the existing no-policy RLS informational
+notices ([reference](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)), matching the service-only policy. No production schema, grant, function
+or data was changed. SQL -> function -> Atlas entry publication is an explicit
+rollout prerequisite in [the handoff runbook](../docs/LINE_LOGIN_HANDOFF.md).
+Primary review only; no independent external signoff. Actual checks are in the PR.
+
+## Previous follow-up: LINE login handoffs and bounded explicit startup (2026-10-26)
 
 The pre-router gate recognized only OAuth code/error returns with a state query
 parameter. It missed LIFF primary liff.state/referrer and credential-fragment
