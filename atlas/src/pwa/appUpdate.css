@@ -1,0 +1,7 @@
+.pwa-update { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.pwa-update h3 { font-size: 14px; margin: 0 0 8px; }
+.pwa-update p { font-size: 12px; color: var(--text-2); margin: 6px 0; line-height: 1.6; }
+.pwa-update .pwa-update-detail { color: var(--text-3); }
+.pwa-update button { min-height: 44px; margin-top: 6px; }
+.site-pwa-dialog { max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 32px); overflow-y: auto; overscroll-behavior: contain; }
+.site-pwa-backdrop { padding: calc(16px + var(--safe-top)) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left)); }
