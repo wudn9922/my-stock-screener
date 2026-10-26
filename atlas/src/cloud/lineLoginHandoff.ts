@@ -39,7 +39,32 @@ export function incomingLineHandoff(
 // Import cycle is deliberately avoided: lineIdentity only checks the public marker shape itself.
 const incoming = incomingLineHandoff();
 let completionMessage: string | null = null;
+let incomingIdentity: LineIdentity | null = null;
+let sending = false;
 export const lineHandoffMessage = () => completionMessage;
+export const linePairingCode = (intentId: string) =>
+  intentId.replace(/-/g, '').slice(-6).toUpperCase();
+export function incomingLineApproval() {
+  if (
+    !incoming ||
+    !incomingIdentity?.idToken() ||
+    (typeof window !== 'undefined' && window.top !== window.self)
+  )
+    return null;
+  return { code: linePairingCode(incoming.intentId) };
+}
+/** Loading a link must never transfer a logged-in visitor's identity to its receiver. */
+export function prepareIncomingLineHandoff(identity: LineIdentity | null) {
+  if (!incoming) return;
+  incomingIdentity = identity;
+  completionMessage = incomingLineApproval()
+    ? '請核對原來 Atlas 的配對碼；只有這次登入由你本人發起時才確認。'
+    : '這次登入未完成，請返回原來的 Atlas 重新登入。';
+}
+export function cancelIncomingLineHandoff() {
+  incomingIdentity = null;
+  completionMessage = '已取消傳送 LINE 登入，請返回原來的 Atlas。';
+}
 class HandoffRequestError extends Error {
   constructor(
     readonly status: number,
@@ -88,21 +113,25 @@ async function request(body: Record<string, unknown>, signal?: AbortSignal) {
     signal?.removeEventListener('abort', abort);
   }
 }
-export async function completeIncomingLineHandoff(
-  identity: LineIdentity | null,
-) {
-  if (!incoming) return;
-  const idToken = identity?.idToken();
+export async function completeIncomingLineHandoff() {
+  if (!incoming || sending || !incomingLineApproval()) return;
+  const idToken = incomingIdentity?.idToken();
   if (!idToken) {
     completionMessage = '這次登入未完成，請返回原來的 Atlas 重新登入。';
     return;
   }
+  sending = true;
   try {
     // LINE may open before the original page's begin POST has committed.
     // Retry this same intent briefly, never OAuth or an already used intent.
     for (let attempt = 0; ; attempt++) {
       try {
-        await request({ action: 'line.login.complete', ...incoming, idToken });
+        await request({
+          action: 'line.login.complete',
+          ...incoming,
+          idToken,
+          confirmed: true,
+        });
         break;
       } catch (error) {
         if (
@@ -116,9 +145,12 @@ export async function completeIncomingLineHandoff(
     }
     completionMessage =
       'LINE 驗證完成，請返回原來的 Atlas 視窗或主畫面 App，確認帳號後完成登入。';
+    incomingIdentity = null;
   } catch (error) {
     completionMessage =
       error instanceof Error ? error.message : '登入交接未完成。';
+  } finally {
+    sending = false;
   }
 }
 export function needsSeparateLineLogin() {

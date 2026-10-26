@@ -7,7 +7,10 @@ that behavior. The deployed root also redirected before primary SDK init.
 
 Mobile / standalone login now uses a separate LIFF window and a two-minute
 one-use handoff. Receiver and sender proofs are separate; only hashes are stored.
-The verified ID token is AES-GCM encrypted with a server-only key and bound to
+The sending page requires an explicit top-level approval and matching visual
+pairing code before transferring anything; merely visiting a link does not
+complete a handoff, and framed approval is rejected. The visual code is not an
+authorization key. The verified ID token is AES-GCM encrypted with a server-only key and bound to
 its intent. The receiver confirms the account and still needs the normal fresh
 access.get grant. No URL or candidate identity can grant persistence. Private
 RLS storage, service-only invoker RPC, bounded capacity, expiry and atomic

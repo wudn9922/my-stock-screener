@@ -96,7 +96,7 @@ describe('storage authorization is enforced by deployed private-data handlers', 
   });
   it('verifies the completing LINE account and rejects invalid proofs before creating private login data', async () => {
     const fixture = handler('user-settings', A, {}, null, false);
-    const invalidToken = await fixture.request({ action: 'line.login.complete', intentId: '12345678-1234-4234-8234-123456789abc', writeSecret: 'w'.repeat(43) });
+    const invalidToken = await fixture.request({ action: 'line.login.complete', confirmed: true, intentId: '12345678-1234-4234-8234-123456789abc', writeSecret: 'w'.repeat(43) });
     expect(invalidToken.status).toBe(401);
     const invalidProof = await fixture.request({ action: 'line.login.begin', idToken: undefined, intentId: '12345678-1234-4234-8234-123456789abc', readSecret: 'bad', writeSecret: 'w'.repeat(43) });
     expect(invalidProof.status).toBe(400);

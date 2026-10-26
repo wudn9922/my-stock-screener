@@ -71,6 +71,11 @@ test('primary root handles the real SDK callback before SDK secondary navigation
   );
   await page.goto(await sdkLogin(page, root));
   await expect(
+    page.getByRole('group', { name: '確認 LINE 登入交接' }),
+  ).toContainText('789ABC');
+  expect(actions).not.toContain('line.login.complete');
+  await page.getByRole('button', { name: '確認登入原來的 Atlas' }).click();
+  await expect(
     page.getByText(
       'LINE 驗證完成，請返回原來的 Atlas 視窗或主畫面 App，確認帳號後完成登入。',
     ),

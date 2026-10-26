@@ -7,7 +7,7 @@ import { retireScreenerWorker } from './auth/retireWorker';
 import { DEFAULT_LIFF_ID, needsLineIdentityBeforeRouting, startLineIdentity } from './cloud/lineIdentity';
 import { PUBLIC_BASE } from './app/HostingMode';
 import './styles.css';
-import { completeIncomingLineHandoff } from './cloud/lineLoginHandoff';
+import { prepareIncomingLineHandoff } from './cloud/lineLoginHandoff';
 // Packaged native builds use their bundled assets, independent of PWA shell updates.
 if (
   'serviceWorker' in navigator &&
@@ -35,7 +35,7 @@ async function render() {
       root.textContent = '正在完成 LINE 登入…';
       let timer: ReturnType<typeof setTimeout> | undefined;
       const finished = await Promise.race([
-        startLineIdentity(import.meta.env.VITE_LIFF_ID || DEFAULT_LIFF_ID).then(async identity => { await completeIncomingLineHandoff(identity); return true; }),
+        startLineIdentity(import.meta.env.VITE_LIFF_ID || DEFAULT_LIFF_ID).then(identity => { prepareIncomingLineHandoff(identity); return true; }),
         new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), 15000); }),
       ]);
       clearTimeout(timer);

@@ -19,8 +19,9 @@ SDK 初始化，再進行 SDK secondary navigation／應用程式網址整理。
 ## 使用方式
 
 1. 手機網頁或主畫面 App 點「使用 LINE 登入」。原來的 Atlas 視窗保留，另一個
-   視窗開啟 LINE 的 LIFF 入口。不需要 App 與 Safari 共用 Cookie 或 localStorage。
-2. 在 LINE 完成驗證；返回的網頁會顯示驗證完成與返回原視窗的提示。
+   視窗開啟 LINE 的 LIFF 入口，原視窗顯示配對碼。不需要 App 與 Safari 共用 Cookie 或 localStorage。
+2. 在 LINE 完成驗證，核對與原視窗相同的配對碼，再點「確認登入原來的 Atlas」。
+   只有本人剛剛發起登入時才確認；單純開啟別人轉傳的網址不會送出身分。
 3. 從主畫面／App 切換器回到 Atlas，或切回原來的 Safari 分頁，確認顯示的 LINE
    帳號後點「確認登入此帳號」。iOS 不允許網站強制切回指定的已安裝 Web App。
 4. 原有伺服器重新驗證 ID token 與儲存授權，才允許裝置／雲端保存。未授權帳號
@@ -38,7 +39,9 @@ SDK 初始化，再進行 SDK secondary navigation／應用程式網址整理。
 * 接收端產生 UUID 及各 256 bits 的 read/write secret。read secret 只在原視窗 RAM
   與 HTTPS POST 存在，從不放入 LINE URL、localStorage、sessionStorage 或 IndexedDB。
 * LINE 視窗只帶 write secret；完成端必須獨立通過既有 LINE ID-token 驗證。
-  接收端須持另一份 read secret 才能原子領取一次，並由使用者確認帳號。
+  完成端須在最上層頁面明確核對配對碼、點確認後才傳送；iframe 不允許批准。
+  配對碼只是視覺核對，不代替 proof 或 LINE 驗證。接收端須持另一份 read secret
+  才能原子領取一次，再由使用者確認帳號；兩端都不會只因收到網址便傳遞或接受身分。
 * 交接保存於未暴露到 Data API 的 `atlas_private` schema。表啟用 RLS，表／RPC
   對 PUBLIC、anon、authenticated 均無權限；RPC 為 SECURITY INVOKER，只有現有
   service_role 可呼叫。一般使用者不能直接存取交接表。

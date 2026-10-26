@@ -46,6 +46,7 @@ test('installed PWA receives a one-use LINE identity from a different browser pa
         });
       }
       if (body.action === 'line.login.complete') {
+        expect(body.confirmed).toBe(true);
         expect(body.intentId).toBe(intentId);
         expect(body.writeSecret).toBe(writeSecret);
         expect(body.idToken).toBe(candidate.idToken);
@@ -112,6 +113,19 @@ test('installed PWA receives a one-use LINE identity from a different browser pa
       ).href,
     );
     await callback.goto(await sdkLogin(callback, target));
+    const approval = callback.getByRole('group', {
+      name: '確認 LINE 登入交接',
+    });
+    await expect(approval).toContainText(
+      intentId.replace(/-/g, '').slice(-6).toUpperCase(),
+    );
+    expect(completed).toBe(false);
+    await expect(
+      page.getByRole('group', { name: '確認 LINE 登入帳號' }),
+    ).toHaveCount(0);
+    await approval
+      .getByRole('button', { name: '確認登入原來的 Atlas' })
+      .click();
     await expect(
       callback.getByText(
         'LINE 驗證完成，請返回原來的 Atlas 視窗或主畫面 App，確認帳號後完成登入。',

@@ -152,10 +152,12 @@ describe('partition-independent explicit LINE login', () => {
           );
         }),
       );
-      const completed = module.completeIncomingLineHandoff({
+      module.prepareIncomingLineHandoff({
         userId: USER,
         idToken: () => 'verified-test-token',
       });
+      expect(fetch).not.toHaveBeenCalled();
+      const completed = module.completeIncomingLineHandoff();
       await vi.advanceTimersByTimeAsync(8000);
       await completed;
       expect(attempts).toBe(alwaysMissing ? 11 : 3);
@@ -164,6 +166,25 @@ describe('partition-independent explicit LINE login', () => {
       );
     },
   );
+  it('never transfers identity from a framed approval page', async () => {
+    vi.resetModules();
+    vi.stubGlobal(
+      'location',
+      new URL(
+        `https://atlas.test/?atlasLineHandoff=${ID}&atlasLineWrite=${'w'.repeat(43)}`,
+      ),
+    );
+    vi.stubGlobal('window', { top: {}, self: {} });
+    vi.stubGlobal('fetch', vi.fn());
+    const module = await import('../src/cloud/lineLoginHandoff');
+    module.prepareIncomingLineHandoff({
+      userId: USER,
+      idToken: () => 'verified-test-token',
+    });
+    expect(module.incomingLineApproval()).toBeNull();
+    await module.completeIncomingLineHandoff();
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('captures the same transaction from primary and secondary LIFF URLs', () => {
     const query = `?atlasLineHandoff=${ID}&atlasLineWrite=${'w'.repeat(43)}`;
     expect(incomingLineHandoff(query)).toEqual(

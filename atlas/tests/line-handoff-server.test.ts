@@ -36,6 +36,26 @@ function database(status = 'pending', ciphertext?: string) {
   };
 }
 describe('server-only LINE login handoff', () => {
+  it('rejects unconfirmed handoffs before provider verification or database access', async () => {
+    const db = database(),
+      verify = vi.fn();
+    await expect(
+      lineLoginHandoff(
+        db,
+        {
+          action: 'line.login.complete',
+          intentId: ID,
+          writeSecret: WRITE,
+          idToken: token(),
+        },
+        SERVER,
+        '',
+        verify,
+      ),
+    ).rejects.toThrow('配對碼');
+    expect(verify).not.toHaveBeenCalled();
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
   it('stores only hashed proofs and a server-salted caller bucket on explicit begin', async () => {
     const db = database(),
       verify = vi.fn();
@@ -67,6 +87,7 @@ describe('server-only LINE login handoff', () => {
       db,
       {
         action: 'line.login.complete',
+        confirmed: true,
         intentId: ID,
         writeSecret: WRITE,
         idToken,
@@ -105,6 +126,7 @@ describe('server-only LINE login handoff', () => {
         db,
         {
           action: 'line.login.complete',
+          confirmed: true,
           intentId: ID,
           writeSecret: WRITE,
           idToken: token(),
@@ -125,6 +147,7 @@ describe('server-only LINE login handoff', () => {
           db,
           {
             action: 'line.login.complete',
+            confirmed: true,
             intentId: ID,
             writeSecret: WRITE,
             idToken: token(extra),

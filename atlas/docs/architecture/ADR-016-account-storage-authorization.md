@@ -19,7 +19,8 @@ This changes storage routing, not the drawing engine, canonical models, market f
 ## Cross-browser LINE handoff (2026-10-26)
 
 Mobile browsers / installed PWAs now keep the receiving page alive while a separate
-LIFF window authenticates. A two-minute, proof-bound, encrypted server handoff
+LIFF window authenticates and explicitly approves a matching pairing code in a
+top-level page. Merely visiting a handoff link never transfers an identity. A two-minute, proof-bound, encrypted server handoff
 delivers a candidate identity once, followed by explicit account confirmation and
 the unchanged server storage-grant check. Receiving proofs and recovered identity
 stay in RAM; functional authentication metadata is the sole addition to a private

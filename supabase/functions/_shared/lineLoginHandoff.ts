@@ -108,6 +108,8 @@ export async function lineLoginHandoff(
     parameters.caller_bucket = await handoffHash(`${serverSecret}:${caller}`);
   }
   if (operation === 'complete') {
+    if (body.confirmed !== true)
+      throw new LineHandoffError(400, '請先核對配對碼並確認登入交接。');
     if (typeof body.idToken !== 'string' || body.idToken.length > 8192)
       throw new LineHandoffError(401, 'LINE 登入驗證失敗。');
     const userId = await verify(body.idToken);
