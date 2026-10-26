@@ -49,15 +49,20 @@ Git blob hash 略過未變年度的歷史差異比較。所有現存 CSV 仍逐�
 包含沒有改變的年度；其統計直接用於 manifest，不再次解析全市場。新舊資料只常駐
 單一股票／年度，批次 Git 回應暫存在磁碟；不一次載入全市場新舊列。
 
-artifact 中完全相同且已成功接收的 daily baseline／final 操作只套用一次；任何
-中間修正或衝突都會清除該股票的去重 checkpoint。publisher 在資料／歷史稽核通過後
+artifact 中完全相同且已處理的 daily baseline／final 操作只套用一次，包含已記錄且
+保留舊列的衝突；任何中間修正都會清除該股票的去重 checkpoint。兩份 transport
+仍各自驗證 digest，不能因略過重複操作而接收損壞資料。publisher 在資料／歷史稽核通過後
 用已驗證的統計建立精確 manifest；一般 `verify` 仍唯讀且拒絕不符的 manifest。
 檔案／日期刪除、未登記的歷史變更、舊 audit 被改寫仍會阻擋發布。
 
 每日 archive job 的上限由 20 分鐘增至 40 分鐘，提供 checkout／Git push 的餘裕；
 `python -u` 會即時列出 apply、批次 Git、列與歷史驗證、stage、commit、push 的秒數。
+apply 開始時立即輸出訊息，分開列出狀態載入、每份 snapshot 的驗證／合併、稽核、
+衝突寫入與選用的 manifest 重建耗時；每 250 檔與最後一檔輸出進度、筆數及略過數。
+逐檔預先驗證 transport，不同時在記憶體保留全市場的 rolling rows。
 CI 另建 7,000 檔 × 3 年、21,000 個 packed 年度檔／3,654,000 列的合成封存，對每檔
-追加一天後驗證 3,661,000 列，要求驗證少於 300 秒，也完成對本機 bare origin 的普通
+保留的 320 根製造微小來源差異（共 2,240,000 筆）再追加一天，要求 apply 與
+3,661,000 列驗證各少於 300 秒、衝突摘要小於 12 MB，也完成對本機 bare origin 的普通
 commit／push；不讀寫正式資料或 ref。
 
 封存停在 2026-10-23 時，後續正常 producer 會從還原的 320 根 rolling cache 暫存
@@ -93,6 +98,23 @@ publish 必須確認修正資料涵蓋原有較早交易日。只修正該股票
 每檔完成後更新 artifact checkpoint；發佈後進度永久保存在 `state/backfill.json`，不靠 Actions cache 存活。同一組 years 的首次起點會固定，跨日續跑不向後滑動；下次略過已完成且涵蓋所選起點的股票，不為已完成股票重建 Yahoo session。增加 years 會補更早期間。新上市、來源起點較晚、休市及來源缺漏都如實保留第一／最後來源日期，不補值、不把部分資料稱為完整兩年。失敗股票保留錯誤與重試日期；日後移出名單也不刪除其進度或 CSV。
 
 回補只加入不存在的日期。既有日期有任何價格／成交量差異就保留舊列並寫入 `state/conflicts.json`，同一組差異去重。補入舊日期以每年度檔案的 before/after SHA-256 與新增筆數作稽核，不為每個補入日期膨脹一份逐列修正日誌；既有歷史列仍不得改動。股價基準真的改變時只能走上面的 cache 調整路徑。
+
+### 精簡衝突狀態（version 2）
+
+每次 apply 只讀取衝突檔一次，在記憶體彙整所有股票後原子寫入一次；中途其他操作
+失敗時也保存已觀察到的差異。單檔 `put_symbol` 呼叫同樣批次寫入，不逐列重寫 JSON。
+每組 `symbol + reason` 只保留一份摘要：`count` 是累計不同衝突日期數，
+`firstDate/lastDate` 是日期範圍，`firstObservedAt` 是首次觀察時間，`samples` 最多三份
+依內容固定排序的舊／新值範例。`dateBits` 以每年度至多 366 bits 的十六進位日期集合
+精確去重，因此重跑或同日來源改版不會累加 count，也不會隨拒收的列／版本數增加
+逐列 JSON 紀錄。空白量、零量與價格仍依原規則比較，沒有新增容忍度。
+
+既有 version 1 狀態會在載入時彙整為相同摘要，保留日期集合、最早觀察時間及至多
+三份範例；舊逐列觀察仍可在 Git 歷史查到。這是衝突診斷資訊的精簡，不是修改既有
+K 線或稽核日誌。重播相同資料不改寫狀態時間戳或新增摘要。
+
+實際 artifact 的量測表、可重現步驟與**尚未實作的來源優先序建議**見
+[2026-10-26 archive conflict investigation](report/kline-daily-40317163328.md)。
 
 Actions artifacts 只負責短期交接（7 天），不是真正的永久副本。一次 fetch 在發佈前失敗最多重抓該批資料；遠端已保存的日期與完成進度都不會消失。
 

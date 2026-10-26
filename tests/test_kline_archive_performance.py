@@ -58,6 +58,7 @@ class ArchivePerformanceTests(unittest.TestCase):
                     symbol += ".TW"
                 folder = archive / market / symbol
                 folder.mkdir(parents=True)
+                rolling = []
                 for year, days in dates.items():
                     rows = []
                     for index, day in enumerate(days):
@@ -66,11 +67,17 @@ class ArchivePerformanceTests(unittest.TestCase):
                         price = 100 + ((number * 17 + index * 13 + year) % 100000) / 1000
                         volume = 1000 + (number * 7919 + index * 104729) % 100000000
                         rows.append(f"{day},{price:.4f},{price + 1:.4f},{price - 1:.4f},{price:.4f},{volume}\n")
+                        # Real daily artifacts contain overlaps from a different
+                        # source. Exercise 320 slightly disagreeing retained bars,
+                        # rather than the conflict-free append used previously.
+                        rolling.append([day, price + .0001, price + 1.0001,
+                                        price - .9999, price + .0001, volume + 1])
                     (folder / f"{year}.csv").write_text(",".join(ka.FIELDS) + "\n" + "".join(rows))
                 relative = f"{market}/{symbol}.csv"
                 target = payload / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
-                content = ka.csv_text([ka.normalize(["2026-10-26", 100, 101, 99, 100, 1000 + number])])
+                content = ka.csv_text([ka.normalize(r) for r in rolling[-320:]] +
+                                      [ka.normalize(["2026-10-26", 100, 101, 99, 100, 1000 + number])])
                 target.write_text(content)
                 operations.append(dict(symbol=symbol, file=relative, sha256=ka.digest(content.encode()), correction=None))
             ka.update_manifest(archive)
@@ -87,8 +94,14 @@ class ArchivePerformanceTests(unittest.TestCase):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((payload / item["file"]).read_bytes())
             ka.json_write(payload / "operations.json", dict(plan, baseline=True))
-            original_verify, original_run = ka.verify, subprocess.run
-            verifications, batches = [], []
+            original_verify, original_run, original_apply = ka.verify, subprocess.run, ka.apply_operations
+            verifications, batches, applications = [], [], []
+
+            def measured_apply(*args, **kwargs):
+                started = time.perf_counter()
+                result = original_apply(*args, **kwargs)
+                applications.append((time.perf_counter() - started, result))
+                return result
 
             def measured(*args, **kwargs):
                 started = time.perf_counter()
@@ -104,11 +117,19 @@ class ArchivePerformanceTests(unittest.TestCase):
                 return original_run(command, **kwargs)
 
             started = time.perf_counter()
-            with patch.object(ka, "verify", side_effect=measured), patch.object(ka.subprocess, "run", side_effect=inspect), patch.object(ka, "datetime", wraps=datetime) as clock:
+            with patch.object(ka, "verify", side_effect=measured), patch.object(ka, "apply_operations", side_effect=measured_apply), patch.object(ka.subprocess, "run", side_effect=inspect), patch.object(ka, "datetime", wraps=datetime) as clock:
                 clock.now.return_value = datetime(2026, 10, 27, 2, tzinfo=timezone.utc)
                 self.assertTrue(kg.publish(archive, payload, sleep=lambda _: None))
             publish_seconds = time.perf_counter() - started
             self.assertEqual(len(verifications), 1)
+            self.assertEqual(len(applications), 1)
+            apply_seconds, counts = applications[0]
+            self.assertEqual(counts, dict(added=7000, corrected=0, conflicts=2240000, blocked=0))
+            conflicts = ka.json_read(archive / ka.CONFLICTS, {})
+            self.assertEqual(len(conflicts["conflicts"]), 7000)
+            self.assertTrue(all(e["count"] == 320 and len(e["samples"]) <= 3 for e in conflicts["conflicts"].values()))
+            conflict_bytes = (archive / ka.CONFLICTS).stat().st_size
+            self.assertLess(conflict_bytes, 12_000_000)
             verification_seconds, result = verifications[0]
             self.assertEqual(result["files"], 21000)
             self.assertEqual(result["rows"], 3661000)
@@ -120,12 +141,14 @@ class ArchivePerformanceTests(unittest.TestCase):
             self.assertEqual(git(remote, "rev-parse", "refs/heads/kline-archive"), git(archive, "rev-parse", "HEAD"))
             report = dict(symbols=7000, files=21000, rows=result["rows"],
                           verificationSeconds=round(verification_seconds, 3),
+                          applySeconds=round(apply_seconds, 3), conflicts=counts["conflicts"], conflictBytes=conflict_bytes,
                           dailyPublishSeconds=round(publish_seconds, 3), baselineBatchProcesses=len(batches))
             print("Synthetic archive performance: " + json.dumps(report), flush=True)
             if os.environ.get("GITHUB_STEP_SUMMARY"):
                 with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as stream:
                     stream.write("### Synthetic daily archive benchmark\n\n```json\n" + json.dumps(report, indent=2) + "\n```\n")
             self.assertLess(verification_seconds, 300, "Daily verification must take under five minutes")
+            self.assertLess(apply_seconds, 300, "320-bar conflict replay must take under five minutes")
 
 
 if __name__ == "__main__":
