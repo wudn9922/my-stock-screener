@@ -32,6 +32,10 @@ Read-only review found that LINE's user agent would restart a stalled login
 after the guest-recovery link. An explicit RAM-only guest URL now suppresses
 identity initialization and refresh until a new login click; it cannot grant
 storage, and is removed from subsequent OAuth redirects.
+The first full PR run found that the new 44px account actions reduced the
+landscape chart below its existing minimum. Short landscape chart headers now
+use smaller outer spacing, preserving the account touch targets and the
+unchanged chart geometry assertions.
 Tests cover platform instructions, native prompt outcomes, standalone detection,
 icons, update/reload errors, guest zero-persistence, denial/mismatched grants,
 callback ordering/cancellation/timeouts, token expiry/signout and restoring
