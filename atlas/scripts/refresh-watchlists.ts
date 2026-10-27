@@ -17,6 +17,8 @@ import {
 import { parseFilters } from "../src/pages/screenerFilters";
 import { loadScreenerFixedMAs } from "../src/pages/screenerFixedMAs";
 import type { ParameterStock } from "../src/cloud/settingsApi";
+import { ValuationProvider } from "../src/fundamentals/ValuationProvider";
+import { getScreenerPeFigures } from "../src/app/dataSources";
 
 const DEFAULT_ADMIN_LINE_ID = "Ua0037dbd5037b64fc76804c60520ad76";
 const LINE_ID = /^U[0-9a-f]{32}$/;
@@ -93,6 +95,18 @@ export async function readCollectorFixedMaBars(symbol: string, root: string) {
     csv = await readFile(resolve(cacheDir, "bars", `${symbol}.csv`), "utf8");
   }
   return fixedMaBarsFromCsv(csv);
+}
+
+/** Existing generated valuation inputs, using the same priority as the growth supplement. */
+export function collectorValuationProvider(root: string): ValuationProvider {
+  return new ValuationProvider("/valuation/", { fetcher: async input => {
+    const file = String(input).endsWith("/tw.json") ? "tw.json" : "us.json";
+    try {
+      return new Response(await readFile(resolve(root, "atlas/public/valuation", file), "utf8"));
+    } catch {
+      return new Response(await readFile(resolve(root, "docs/atlas/valuation", file), "utf8"));
+    }
+  } });
 }
 
 /** The same evaluator as the browser, without moving lastViewed/lastOpenedAt. */
@@ -193,6 +207,8 @@ export async function refreshSavedWatchlists() {
   };
   let updated = 0,
     skipped = 0;
+  // Read the existing published valuation files; no additional service or generated data is needed.
+  const valuations = collectorValuationProvider(root);
   try {
     const url = new URL(`${base}/rest/v1/atlas_watchlists`);
     url.search = new URLSearchParams({
@@ -246,6 +262,7 @@ export async function refreshSavedWatchlists() {
           items,
           list.market === "US" ? mergeGrowth(yahooGrowth, growth) : growth,
           fixedMAs,
+          parseFilters(list.filters).pe ? await getScreenerPeFigures(items, list.market, valuations) : undefined,
         );
         let previousSession: string | null = null;
         try {

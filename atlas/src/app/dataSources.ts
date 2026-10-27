@@ -4,7 +4,7 @@
  */
 import { createScreenerMarketProvider } from '../market-data/createScreenerMarketProvider';
 import { loadSymbolDirectory, searchSymbols } from '../market-data/SymbolCatalog';
-import { describePe, getValuation, type Valuation } from '../fundamentals/ValuationProvider';
+import { describePe, getValuation, valuationProvider, type Valuation, type ValuationProvider } from '../fundamentals/ValuationProvider';
 import type { Bar, BarResult, MarketDataProvider } from '../market-data/MarketDataProvider';
 import { getMarketProfile } from '../market-data/MarketProfile';
 
@@ -72,7 +72,7 @@ export interface PeFigures {
   asOf: string | null;
 }
 
-export async function getPeFigures(symbol: string, price: number | null | undefined): Promise<PeFigures> {
+export async function getPeFigures(symbol: string, price: number | null | undefined, source = getValuation): Promise<PeFigures> {
   const empty = (reason: string): PeFigures => ({
     pe: null,
     peTtm: null,
@@ -85,7 +85,7 @@ export async function getPeFigures(symbol: string, price: number | null | undefi
   });
   if (symbol.startsWith('^')) return empty('指數不適用本益比');
   // Not memoized here: the provider caches (and periodically reloads) its market files itself.
-  const valuation: Valuation | null = await getValuation(symbol).catch(() => null);
+  const valuation: Valuation | null = await source(symbol).catch(() => null);
   if (!valuation) return empty('暫無 EPS 資料');
   const annual = describePe(price, valuation.epsAnnual);
   const exchangeTtm =
@@ -113,4 +113,24 @@ export async function getPeFigures(symbol: string, price: number | null | undefi
     source: valuation.source,
     asOf: valuation.asOf,
   };
+}
+
+export type ScreenerPeFigures = Readonly<Record<string, PeFigures>>;
+
+/** Same TTM-first, annual-fallback figure shown in the screener; losses never pass a numeric range. */
+export function screenerPeValue(figures: PeFigures | undefined): number | null {
+  if (!figures || figures.peTtmLoss) return null;
+  const value = figures.peTtm ?? figures.pe;
+  return value !== null && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/** One cached market file, evaluated for every source row (including rows outside the viewport). */
+export async function getScreenerPeFigures(
+  items: readonly { symbol: string; close: number | null }[],
+  market: 'TW' | 'US',
+  provider: ValuationProvider = valuationProvider(),
+): Promise<ScreenerPeFigures | null> {
+  if (!await provider.loadFile(market)) return null;
+  const source = provider.getValuation.bind(provider);
+  return Object.fromEntries(await Promise.all(items.map(async item => [item.symbol, await getPeFigures(item.symbol, item.close, source)])));
 }

@@ -27,7 +27,7 @@ import { accessState, requireCloudAccess } from '../auth/access';
 import { canPersist } from '../auth/storage';
 import { StorageAdminPanel, StorageModeNotice } from '../ui/StorageAdminPanel';
 import { LegacyImportCard } from '../ui/LegacyImportCard';
-import { getDailyBars } from '../app/dataSources';
+import { getDailyBars, getScreenerPeFigures } from '../app/dataSources';
 import { loadScreenerFixedMAs } from './screenerFixedMAs';
 
 type CloudList = { id: string; definition: unknown; updated_at: string };
@@ -157,7 +157,8 @@ export default function ConsolePage({ report, navigate, openChart, list: request
       const fixedMAs = parseFilters(selected.filters).ema20
         ? await loadScreenerFixedMAs(items, await settingsApi<ParameterStock[]>('stocks.list'), getDailyBars)
         : undefined;
-      const members = evaluateWatchlist(selected, items, growth, fixedMAs);
+      const pe = parseFilters(selected.filters).pe ? await getScreenerPeFigures(items, selected.market) : undefined;
+      const members = evaluateWatchlist(selected, items, growth, fixedMAs, pe);
       if (!active) return;
       const latest = store.getSnapshot().document.lists.find((entry) => entry.id === selected.id);
       if (!latest || latest.filters !== selected.filters || latest.group !== selected.group) return;
