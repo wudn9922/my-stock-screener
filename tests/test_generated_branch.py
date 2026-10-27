@@ -108,6 +108,7 @@ class GeneratedStorageTests(unittest.TestCase):
 
     def test_publish_only_owned_changes_preserves_main_index_and_records(self):
         self.write("docs/report/latest.json", b"new latest")
+        self.write("docs/report/trending-stocks.json", b'{"symbols":["NVDA","AAPL"]}')
         self.write("docs/report/financials/AAPL.json", b"must not leak")
         self.write("docs/report/research/sec/US.json", b"other owner's edit")
         self.git("add", "code.py")
@@ -115,10 +116,14 @@ class GeneratedStorageTests(unittest.TestCase):
         self.store.publish("daily")
         tip = self.remote("generated")
         self.assertEqual(self.body(tip, "docs/report/latest.json"), b"new latest")
+        self.assertEqual(self.body(tip, "docs/report/trending-stocks.json"), b'{"symbols":["NVDA","AAPL"]}')
         self.assertEqual(self.body(tip, "docs/report/research/sec/US.json"), self.files["docs/report/research/sec/US.json"])
         self.assertEqual(self.remote("main"), self.base)
         self.assertEqual(self.git("rev-parse", "HEAD"), self.base)
         self.assertEqual(self.git("write-tree"), index_before)
+        with tempfile.TemporaryDirectory() as directory:
+            self.store.assemble(self.base, tip, Path(directory) / "site")
+            self.assertEqual((Path(directory) / "site/report/trending-stocks.json").read_bytes(), b'{"symbols":["NVDA","AAPL"]}')
 
     def test_pr2_removes_only_outputs_and_new_csv_stays_on_main(self):
         # Simulate PR2: remove only moved paths from main, keep all old history.

@@ -5,6 +5,7 @@ import { ReportGate } from './ReportGate';
 import { itemStatusOf, type GroupItem, type Report, type ReportGroup } from '../report/schema';
 import { getPeFigures, type PeFigures } from '../app/dataSources';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
+import { TrendingStocksCard } from '../ui/TrendingStocksCard';
 import { mapWithConcurrency } from './worldPerformance';
 import {
   METRIC_SORTS,
@@ -673,6 +674,7 @@ export default function ScreenerPage({ report, reload, navigate, openChart, grou
           )}
         </div>
       </div>
+      <TrendingStocksCard openChart={openChart} />
       <ReportGate report={report} reload={reload}>
         {(data) => <ScreenerView report={data} group={group} f={f} navigate={navigate} openChart={openChart} />}
       </ReportGate>

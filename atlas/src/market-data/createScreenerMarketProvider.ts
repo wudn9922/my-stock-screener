@@ -55,6 +55,11 @@ export class ScreenerMarketRouter implements MarketDataProvider {
     return (await this.route(symbol, signal)).getQuote(symbol, signal);
   }
 
+  async refreshBars(symbol: string, timeframe: Timeframe, signal?: AbortSignal): Promise<BarResult> {
+    const provider = await this.route(symbol, signal) as EdgeYahooProvider | StaticSeriesProvider;
+    return usableBarResult(await provider.refreshBars(symbol, timeframe, signal), symbol, timeframe);
+  }
+
   async getCorporateEvents(symbol: string, range?: MarketRange, signal?: AbortSignal): Promise<CorporateEventsResult> {
     const provider = await this.route(symbol, signal);
     return provider.getCorporateEvents

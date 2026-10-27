@@ -1177,6 +1177,10 @@
   background: transparent;
   opacity: 1;
 }
+.ws-header-actions .ws-refresh-button { min-height: 36px; white-space: nowrap; }
+@media (max-width: 1099px) {
+  .ws-header-actions .ws-refresh-button { min-height: 28px; padding: 0 7px; font-size: 12px; }
+}
 .demo-switch {
   min-height: 36px;
   padding: 0 10px;

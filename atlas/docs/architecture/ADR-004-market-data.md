@@ -16,3 +16,14 @@ Demo supports 5m/15m/30m/1H/4H/1D/1W scheduled simulated data. Yahoo exposes onl
 ## Authorized UAT extension (2026-10-07)
 
 [ADR-011](ADR-011-timeframe-ownership-and-snapshot-prices.md) supersedes historical cross-timeframe defaults and Demo-only static prices. 1M is calendar-aware. Drawings/indicators/history/volume now belong to symbol+timeframe with validated atomic v3 migration. Yahoo quote OHLC is source-split-adjusted, never divided again; real static delayed snapshots and as-of metadata are published by the existing hourly weekday Actions workflow. SEC still needs a backend. Previous unadjusted wording is historical and must not guide new price normalization.
+
+## Single-symbol manual refresh (2026-10-27)
+
+The optional `MarketDataProvider.refreshBars(symbol, timeframe, signal)` stays behind the provider boundary.
+The screener router refreshes the selected source only: Yahoo requests use an isolated raw-response cache,
+a unique query value and `cache: no-store`; calendar periods also refetch that symbol's daily bars.
+The outer cache validates and replaces the selected bars/quote only after success, with revision guards
+preventing older downloads from replacing refreshed data. Manual refresh never falls back to stale success.
+The workspace retains its current chart on error and cancels the update on navigation/timeframe changes;
+canonical drawings, indicators and view preferences remain owned by the existing store and chart engine.
+Source timestamps and delayed/static provenance remain authoritative; this does not add a real-time feed.

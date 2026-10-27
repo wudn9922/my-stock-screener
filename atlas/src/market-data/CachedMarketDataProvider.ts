@@ -319,6 +319,7 @@ export class CachedMarketDataProvider implements MarketDataProvider {
   private readonly now: () => number;
   private readonly cacheIdentity: string;
   private readonly inFlight = new Map<string, Promise<CacheValue>>();
+  private readonly revisions = new Map<string, number>();
   private dbPromise?: Promise<IDBPDatabase<MarketCacheSchema>>;
   private context = getStorageContextKey();
   private memory = new Map<string, MarketCacheEntry>();
@@ -364,6 +365,34 @@ export class CachedMarketDataProvider implements MarketDataProvider {
     const identity = makeIdentity(this.cacheIdentity, symbol, 'quote', '1D', { from: null, to: null });
     const result = await this.request(identity, () => this.provider.getQuote(identity.symbol), signal);
     return result as Quote;
+  }
+
+  async refreshBars(symbol: string, timeframe: Timeframe, signal?: AbortSignal): Promise<BarResult> {
+    signal?.throwIfAborted();
+    const context = this.ensureContext();
+    const identity = makeIdentity(this.cacheIdentity, symbol, 'bars', timeframe, { from: null, to: null });
+    const revision = (this.revisions.get(identity.symbol) ?? 0) + 1;
+    this.revisions.set(identity.symbol, revision);
+    for (const [key] of this.inFlight) {
+      if (JSON.parse(key)[1] === identity.symbol) this.inFlight.delete(key);
+    }
+    const raw = this.provider.refreshBars
+      ? await this.provider.refreshBars(identity.symbol, timeframe, signal)
+      : await this.provider.getBars(identity.symbol, timeframe, undefined, signal);
+    signal?.throwIfAborted();
+    this.assertContext(context);
+    if (this.revisions.get(identity.symbol) !== revision) throw new DOMException('Superseded refresh', 'AbortError');
+    validateValue('bars', raw, identity.symbol, timeframe);
+    const fresh = labelValue(usableBarResult(raw, identity.symbol, timeframe), 'fresh');
+    try {
+      await this.write(identity, fresh, context);
+      if (fresh.quote) {
+        await this.write(makeIdentity(this.cacheIdentity, identity.symbol, 'quote', '1D', { from: null, to: null }), fresh.quote, context);
+      }
+    } catch {
+      // Disposable cache failure must not hide a successfully refreshed chart.
+    }
+    return fresh;
   }
 
   async getSymbolTimeframes(symbol: string, signal?: AbortSignal): Promise<readonly Timeframe[]> {
@@ -425,13 +454,14 @@ export class CachedMarketDataProvider implements MarketDataProvider {
 
     let pending = this.inFlight.get(identity.key);
     if (!pending) {
+      const revision = this.revisions.get(identity.symbol) ?? 0;
       pending = (async () => {
         const raw = await load();
         this.assertContext(context);
         validateValue(identity.kind, raw, identity.symbol, identity.timeframe);
         const fresh = labelValue(raw, 'fresh');
         try {
-          await this.write(identity, fresh, context);
+          if ((this.revisions.get(identity.symbol) ?? 0) === revision) await this.write(identity, fresh, context);
         } catch {
           // The market cache is disposable; a cache quota/private-mode failure
           // must not hide a successful provider response.
@@ -508,6 +538,7 @@ export class CachedMarketDataProvider implements MarketDataProvider {
       void old?.then((db) => db.close()).catch(() => undefined);
       this.memory.clear();
       this.inFlight.clear();
+      this.revisions.clear();
       this.context = context;
     }
     return context;

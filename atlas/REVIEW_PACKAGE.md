@@ -678,3 +678,16 @@ Shared provenance notes distinguish annual and quarterly field fills. The existi
 regression assumed both desktop valuation and mobile tab elements existed while accepting either as
 the shared row; it now waits for the toggle and measures each available sibling. The same-row and
 zero-overflow assertions remain mandatory; no MA product behavior changed.
+
+## Monthly MA, LINE trending stocks and single-symbol refresh (2026-10-27)
+
+Primary-engineer self-review; no independent sign-off. User requested a PR without merging;
+the follow-up changes MA cadence from the original two-month request to monthly.
+
+- MA job runs on the first of each month at 02:17 UTC (10:17 Taipei), with manual dispatch and existing partial-failure retention intact. UI cadence text matches.
+- The LINE report saves its ordered, at-most-five US trending symbols atomically after a successful push. Empty fetches preserve the last good report and its timestamps. The daily generated owner, ignored-output inventory, Pages assembly and legacy publication include this file. No recipient identifiers or message text are published.
+- Screener and US markets read the same schema-validated JSON; loading/error/retry and aged-data states are explicit. Symbol buttons open the existing daily chart.
+- Manual K-line refresh bypasses the selected symbol's normalized/raw/HTTP caches, validates results, keeps other symbols' caches, and protects refreshed entries against earlier in-flight writes. Weekly/monthly normalization still uses that symbol's daily rows. Failed refresh keeps the current chart; navigation cancels old refreshes. Existing drawing/indicator/view state is reused. The source remains Yahoo delayed or official static data.
+- Verified clean `npm ci`, 1,315 Atlas tests (113 files, final full run with `--maxWorkers=1`), lint/typecheck, normal and screener Pages builds. Python: 2 trending-report tests, 24 LINE/screenshot regressions and 28 generated-storage tests. Generated-storage coverage proves the new report survives publication and Pages assembly. Initial concurrent full testing hit a five-second SEC fixture timeout; the isolated complete rerun passed without changing the test.
+- Browser regression: 29 passed / 1 existing desktop-inapplicable skip across the new feature, MA recommendations, market-chart controls and workspace layout/symbol preferences on desktop Chromium, mobile Chromium and iPhone WebKit. The compact refresh button fixes the discovered phone-header height regression. WebKit's missing libraries were extracted into `/tmp`, checked with `ldd`/`ctypes`, then exercised with host validation disabled because `ldconfig` cannot discover the local libraries. This is headless evidence, not physical-device UAT.
+- Read-only live smoke: the existing Supabase `market-chart` endpoint returned AAPL and 21 daily bars for `range=1mo`; no production function deployment, real LINE push or MA/data job was triggered. First production trending report appears after the next successful daily LINE report following merge.

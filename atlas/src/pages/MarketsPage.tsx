@@ -7,6 +7,7 @@ import type { PageProps } from './pageProps';
 import { ChartAttribution, ReportGate, TrendBadge } from './ReportGate';
 import { MARKET_KEYS, type IndexStatus, type MarketKey, type Report } from '../report/schema';
 import { LineTextCard } from '../ui/LineTextCard';
+import { TrendingStocksCard } from '../ui/TrendingStocksCard';
 import { BreadthCard } from '../ui/BreadthCard';
 import { BreakoutCard } from '../ui/BreakoutCard';
 import { IndexVolumeCard } from '../ui/IndexVolumeCard';
@@ -138,6 +139,7 @@ function MarketView({ report, market, openChart }: { report: Report; market: Mar
         )}
       </section>
       <aside className="markets-side">
+        {market === 'us' && <TrendingStocksCard openChart={openChart} />}
         {(market === 'tw' || market === 'us') && (
           <>
             <IndexVolumeCard key={market} indices={data.indices} />

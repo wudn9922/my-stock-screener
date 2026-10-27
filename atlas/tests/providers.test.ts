@@ -266,3 +266,35 @@ it('rejects provider responses whose quote or event identity does not match the 
   await expect(eventCache.getCorporateEvents('AAPL')).rejects.toBeInstanceOf(MarketCacheCorruptionError);
   expect(barCalls).toBe(0);
 });
+
+it('refresh bypasses a fresh cache for only the requested symbol and preserves other symbols', async () => {
+  const calls: string[] = [];
+  let close = 10;
+  const base = testProvider('refresh-test', async symbol => { calls.push(symbol); return sampleResult(close); });
+  base.refreshBars = async (symbol) => { calls.push(`refresh:${symbol}`); return sampleResult(close); };
+  const cache = new CachedMarketDataProvider(base, { dbName: uniqueDbName() });
+  await cache.getBars('AAPL', '5m');
+  await cache.getBars('NVDA', '5m');
+  close = 20;
+  expect((await cache.refreshBars('aapl', '5m')).bars[0].close).toBe(20);
+  expect((await cache.getBars('AAPL', '5m')).bars[0].close).toBe(20);
+  expect((await cache.getBars('NVDA', '5m')).bars[0].close).toBe(10);
+  expect(calls).toEqual(['AAPL', 'NVDA', 'refresh:AAPL']);
+  base.refreshBars = async () => { throw new MarketDataUnavailableError('offline'); };
+  await expect(cache.refreshBars('AAPL', '5m')).rejects.toThrow('offline');
+  expect((await cache.getBars('AAPL', '5m')).bars[0].close).toBe(20);
+});
+
+it('an older in-flight download cannot overwrite manually refreshed bars', async () => {
+  let finish!: (result: BarResult) => void;
+  const base = testProvider('refresh-race', () => new Promise(resolve => { finish = resolve; }));
+  base.refreshBars = async () => sampleResult(30);
+  const cache = new CachedMarketDataProvider(base, { dbName: uniqueDbName() });
+  const older = cache.getBars('AAPL', '5m');
+  // Wait until the first request has passed the asynchronous cache lookup.
+  while (!finish) await new Promise(resolve => setTimeout(resolve, 0));
+  await cache.refreshBars('AAPL', '5m');
+  finish(sampleResult(10));
+  await older;
+  expect((await cache.getBars('AAPL', '5m')).bars[0].close).toBe(30);
+});

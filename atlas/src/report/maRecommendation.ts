@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { reportUrl } from './loadReport';
 
 /**
- * Recommended moving averages (`report/ma-selector/<symbol>.json`), written weekly by the my-stock-screener
+ * Recommended moving averages (`report/ma-selector/<symbol>.json`), written monthly by the my-stock-screener
  * workflow `ma-recommendations.yml`, which runs ma-selector's `scripts/build_recommendations.py`. The selection rules
  * live in the ma-selector repository (production SMA selector); Atlas only reads and displays the result.
  */
@@ -72,7 +72,7 @@ export function maRecommendationUrl(
   return new URL(`ma-selector/${encodeURIComponent(symbol)}.json`, reportUrl(base, override, origin)).href;
 }
 
-const MISSING = '這檔股票還沒有建議均線（每週更新；只涵蓋報告的台股與 S&P 500）。';
+const MISSING = '這檔股票還沒有建議均線（每月更新；只涵蓋報告的台股與 S&P 500）。';
 
 /** Parses an already-fetched body. Never throws. */
 export function parseMaRecommendation(data: unknown, symbol: string, url = ''): MaRecommendationLoadResult {

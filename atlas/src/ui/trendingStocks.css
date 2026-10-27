@@ -1,0 +1,10 @@
+.trending-stocks { padding: 16px; }
+.trending-stocks .card-head { padding: 0 0 8px; }
+.trending-stocks ol { margin: 12px 0; padding-left: 24px; }
+.trending-stocks li { padding: 3px 0; }
+.trending-stocks li button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 44px; padding: 8px 12px; text-align: left; }
+.trending-stocks li span { font-size: 12px; opacity: .75; }
+.screener-page > .trending-stocks { flex: 0 0 auto; margin-bottom: 14px; }
+.screener-page > .trending-stocks ol { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.screener-page > .trending-stocks li { flex: 1 0 110px; margin-left: 12px; }
+.screener-page > .trending-stocks li button { gap: 8px; padding: 8px; }
