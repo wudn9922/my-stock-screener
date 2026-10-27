@@ -17,7 +17,29 @@ export function StorageNotice() {
   const [checkingCode, setCheckingCode] = useState(false);
   const approval = incomingLineApproval();
   const pending = useRef<AbortController | null>(null);
+  const codeInput = useRef<HTMLInputElement | null>(null);
   useEffect(() => () => pending.current?.abort(), []);
+  useEffect(() => {
+    let frame: number | undefined;
+    const revealCode = () => {
+      if (!pending.current || document.visibilityState === 'hidden') return;
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const input = codeInput.current;
+        if (!pending.current || document.visibilityState === 'hidden' || !input || input.disabled) return;
+        input.scrollIntoView({ block: 'center', inline: 'nearest' });
+        input.focus({ preventScroll: true });
+      });
+    };
+    window.addEventListener('focus', revealCode);
+    document.addEventListener('visibilitychange', revealCode);
+    revealCode(); // A readiness poll can finish just after the PWA becomes visible.
+    return () => {
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      window.removeEventListener('focus', revealCode);
+      document.removeEventListener('visibilitychange', revealCode);
+    };
+  }, [codeChallenge, checkingCode]);
   const label = access.storageMode === 'cloud'
     ? '此帳號已獲雲端儲存授權。'
     : access.storageMode === 'device'
@@ -85,7 +107,7 @@ export function StorageNotice() {
       event.preventDefault(); if (checkingCode || !/^\d{6}$/.test(code)) return;
       setCheckingCode(true); codeChallenge.submit(code); setCode('');
     }}>
-      <label>LINE 頁面的六位確認碼 <input aria-label="LINE 六位確認碼" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="off" value={code} disabled={checkingCode} onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></label>
+      <label>LINE 頁面的六位確認碼 <input ref={codeInput} aria-label="LINE 六位確認碼" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="off" value={code} disabled={checkingCode} onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></label>
       <button className="ghost-button" type="submit" disabled={checkingCode || !/^\d{6}$/.test(code)}>{checkingCode ? '正在驗證確認碼…' : '驗證確認碼'}</button>
       {codeChallenge.error && <span role="alert">{codeChallenge.error}</span>}
     </form>}

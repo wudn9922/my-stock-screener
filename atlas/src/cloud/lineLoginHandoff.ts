@@ -1,4 +1,9 @@
 import { DEFAULT_LIFF_ID, type LineIdentity } from './lineIdentity';
+import {
+  canLaunchLineAppDirectly,
+  launchLineHandoff,
+  lineLaunchFallbackUrl,
+} from './lineLoginLaunch';
 const API =
   'https://bxhqpfeberqbtxymghyt.supabase.co/functions/v1/user-settings';
 const UUID =
@@ -170,7 +175,7 @@ export async function completeIncomingLineHandoff() {
 }
 export function needsSeparateLineLogin() {
   return (
-    /iPhone|iPad|iPod|Android/i.test(globalThis.navigator?.userAgent ?? '') ||
+    canLaunchLineAppDirectly() ||
     (globalThis.navigator as Navigator & { standalone?: boolean })
       ?.standalone === true ||
     globalThis.matchMedia?.('(display-mode: standalone)').matches === true
@@ -196,20 +201,15 @@ export async function beginSeparateLineLogin(
   );
   target.searchParams.set('atlasLineHandoff', intentId);
   target.searchParams.set('atlasLineWrite', writeSecret);
-  onOpenUrl(target.href);
+  onOpenUrl(lineLaunchFallbackUrl(target));
   let created = false;
+  let releaseLaunch = () => {};
   try {
     const creation = request(
       { action: 'line.login.begin', intentId, readSecret, writeSecret },
       signal,
     );
-    // Open within the gesture; iOS/noopener can return null even when it opens.
-    // The original App never needs control of the separate browser window.
-    try {
-      window.open(target.href, '_blank', 'noopener,noreferrer');
-    } catch {
-      /* The explicit link remains available. */
-    }
+    releaseLaunch = launchLineHandoff(target);
     const result = await creation;
     created = true;
     const expiresAt = Date.parse(String(result.expiresAt));
@@ -282,6 +282,7 @@ export async function beginSeparateLineLogin(
       signal.aborted ? '已取消 LINE 登入。' : '這次登入已逾時，請重新登入。',
     );
   } finally {
+    releaseLaunch();
     if (created)
       void request({ action: 'line.login.cancel', intentId, readSecret }).catch(
         () => {},

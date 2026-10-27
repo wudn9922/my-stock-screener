@@ -16,6 +16,11 @@ LINE SDK 的 PKCE 驗證資料存在發起登入的瀏覽器儲存空間。iOS �
 SDK 初始化，再進行 SDK secondary navigation／應用程式網址整理。primary／secondary
 的交接識別都會先於 router 處理。LINE 後台、channel、openid scope 不變。
 
+## iPhone sheet 後續修正
+
+目前前端的直接啟動、可讀備援頁、官方 scheme 棄用資訊與返回聚焦，見
+[LINE_LOGIN_LAUNCH.md](LINE_LOGIN_LAUNCH.md)。以下的反向碼與伺服器保護維持不變。
+
 ## 使用方式
 
 1. 手機網頁或主畫面 App 點「使用 LINE 登入」。原來的 Atlas 視窗保留，另一個

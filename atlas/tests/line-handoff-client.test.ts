@@ -7,6 +7,7 @@ import {
 import {
   beginSeparateLineLogin,
   incomingLineHandoff,
+  needsSeparateLineLogin,
 } from '../src/cloud/lineLoginHandoff';
 const ID = '12345678-1234-4234-8234-123456789abc',
   USER = `U${'a'.repeat(32)}`;
@@ -59,6 +60,88 @@ afterEach(() => {
   logoutLineIdentity();
 });
 describe('partition-independent explicit LINE login', () => {
+  it.each([
+    {
+      userAgent: 'Mozilla/5.0 (iPhone)',
+      platform: 'iPhone',
+      maxTouchPoints: 5,
+    },
+    {
+      userAgent: 'Mozilla/5.0 (Android)',
+      platform: 'Linux',
+      maxTouchPoints: 5,
+    },
+    {
+      userAgent: 'Mozilla/5.0 (Macintosh)',
+      platform: 'MacIntel',
+      maxTouchPoints: 5,
+    },
+  ])(
+    'dispatches directly during the gesture and retains the receiver on $platform',
+    async (nav) => {
+      vi.useFakeTimers();
+      const { calls, candidate, storage } = environment();
+      const frame = {
+        hidden: false,
+        title: '',
+        referrerPolicy: '',
+        src: '',
+        remove: vi.fn(),
+      };
+      const append = vi.fn();
+      vi.stubGlobal('navigator', nav);
+      expect(needsSeparateLineLogin()).toBe(true);
+      vi.stubGlobal('document', {
+        visibilityState: 'visible',
+        createElement: vi.fn(() => frame),
+        body: { append },
+      });
+      const offered = vi.fn();
+      const result = beginSeparateLineLogin(
+        new AbortController().signal,
+        offered,
+        (challenge) => challenge.submit('012345'),
+      );
+      // No awaited network response or browser window is needed to dispatch the app.
+      expect(append).toHaveBeenCalledExactlyOnceWith(frame);
+      expect(window.open).not.toHaveBeenCalled();
+      const url = new URL(frame.src),
+        begin = calls[0]!;
+      expect(url.protocol).toBe('line:');
+      expect(url.hostname).toBe('app');
+      expect(url.pathname).toBe('/2010330411-6JhrotT9');
+      expect(url.searchParams.get('atlasLineHandoff')).toBe(begin.intentId);
+      expect(url.searchParams.get('atlasLineWrite')).toBe(begin.writeSecret);
+      expect(url.href).not.toContain(begin.readSecret);
+      expect(url.searchParams.has('code')).toBe(false);
+      expect(new URL(offered.mock.calls[0]![0]).pathname).toBe(
+        '/line-login-launch.html',
+      );
+      await vi.advanceTimersByTimeAsync(1600);
+      expect(await result).toEqual(candidate);
+      expect(frame.remove).toHaveBeenCalledOnce();
+      expect(storage.setItem).not.toHaveBeenCalled();
+    },
+  );
+  it('removes the dispatch frame when a mobile handoff is cancelled', async () => {
+    vi.useFakeTimers();
+    environment('pending');
+    const remove = vi.fn();
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone)' });
+    vi.stubGlobal('document', {
+      visibilityState: 'visible',
+      createElement: () => ({ remove }),
+      body: { append: vi.fn() },
+    });
+    const controller = new AbortController();
+    const result = beginSeparateLineLogin(controller.signal);
+    const rejected = expect(result).rejects.toThrow('取消');
+    await vi.advanceTimersByTimeAsync(1);
+    controller.abort();
+    await rejected;
+    expect(remove).toHaveBeenCalledOnce();
+    expect(window.open).not.toHaveBeenCalled();
+  });
   it('waits for typed reverse confirmation, sends a wrong guess only once, then accepts the corrected code', async () => {
     vi.useFakeTimers();
     const { candidate, storage } = environment();
@@ -131,7 +214,7 @@ describe('partition-independent explicit LINE login', () => {
       beginSeparateLineLogin(new AbortController().signal),
     ).rejects.toThrow('確認碼保護');
   });
-  it('keeps the receiver secret in RAM, opens LIFF in another window and returns only a candidate', async () => {
+  it('keeps the receiver secret in RAM, opens an explanatory fallback and returns only a candidate', async () => {
     const { calls, candidate, storage } = environment();
     expect(
       await beginSeparateLineLogin(
@@ -142,8 +225,7 @@ describe('partition-independent explicit LINE login', () => {
     ).toEqual(candidate);
     const begin = calls[0]!;
     const url = new URL(vi.mocked(window.open).mock.calls[0]![0] as string);
-    expect(url.origin).toBe('https://liff.line.me');
-    expect(url.pathname).toBe('/2010330411-6JhrotT9/atlas/');
+    expect(url.pathname).toBe('/line-login-launch.html');
     expect(url.searchParams.get('atlasLineWrite')).toBe(begin.writeSecret);
     expect(url.href).not.toContain(begin.readSecret);
     expect(window.open).toHaveBeenCalledWith(
@@ -185,7 +267,7 @@ describe('partition-independent explicit LINE login', () => {
         (challenge) => challenge.submit('012345'),
       ),
     ).toEqual(candidate);
-    expect(offered.mock.calls[0]![0]).toContain('https://liff.line.me/');
+    expect(offered.mock.calls[0]![0]).toContain('/line-login-launch.html?');
   });
   it('cancels pending login and releases the original window without redirecting it', async () => {
     vi.useFakeTimers();
