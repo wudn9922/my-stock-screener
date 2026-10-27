@@ -1,12 +1,18 @@
-/* Phone navigation includes the unified console and search, with 44px-plus targets at 320px. */
+/* Phase 1 navigation: five stable destinations; search stays in the top bar. */
 @media (max-width: 1099px) {
   .site .site-tabbar {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
   .site .site-tabbar button {
     gap: 2px;
     padding: 0;
-    font-size: 11px;
+    min-height: 44px;
+    font-size: 12px;
     letter-spacing: 0;
   }
+  .site .site-mobile-search { width: 44px; height: 44px; min-width: 44px; flex: none; }
 }
+.market-section-nav { display: flex; width: fit-content; max-width: calc(100% - 32px); margin: 14px 16px 0; flex-shrink: 0; }
+.market-section-nav > a { display: flex; align-items: center; justify-content: center; min-width: 64px; min-height: 44px; padding: 6px 12px; border-radius: 6px; color: var(--text-3); font-size: 13px; }
+.market-section-nav > a.active { background: var(--surface-3); color: var(--text); }
+.console-watchlist-link { display: block; margin-bottom: 12px; color: var(--accent-text); }

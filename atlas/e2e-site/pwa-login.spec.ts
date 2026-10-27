@@ -315,7 +315,7 @@ test('SDK browser signout isolates the workspace without deleting drawings, and 
   await mockSite(page, { report: buildReport(20) });
   await page.goto('./?page=console&atlasLineLogin=1&code=provider-code&state=provider-state&liffClientId=2010330411');
   await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'device');
-  await page.getByRole('button', { name: '圖表', exact: true }).click();
+  await page.getByRole('button', { name: '個股', exact: true }).click();
   await expect(page.getByTestId('chart').locator('canvas').first()).toBeVisible();
   await expect(page.getByTestId('ohlc-header')).toContainText('O');
   await chooseDrawingTool(page, '水平線');

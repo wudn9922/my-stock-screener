@@ -11,6 +11,13 @@ async function fixtures(page: Page) {
   }
 }
 
+async function openDestination(page: Page, nav: ReturnType<Page['getByRole']>, label: string) {
+  if (label === '世界' || label === '題材' || label === '大盤') {
+    await nav.getByRole('button', { name: '市場', exact: true }).click();
+    await page.getByRole('navigation', { name: '市場分頁' }).getByRole('link', { name: label, exact: true }).click();
+  } else await nav.getByRole('button', { name: label, exact: true }).click();
+}
+
 test('cold lazy pages and repeated bottom navigation retain a usable shell', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -23,7 +30,7 @@ test('cold lazy pages and repeated bottom navigation retain a usable shell', asy
     ['選股', 'screener', '.screener-row'], ['題材', 'themes', '.theme-tile'],
     ['世界', 'world', '.research-world-tabs'],
   ]) {
-    await nav.getByRole('button', { name: label, exact: true }).click();
+    await openDestination(page, nav, label!);
     await expect(page.locator('.site')).toHaveAttribute('data-page', route!);
     await expect(page.locator(content!).first()).toBeVisible();
     await expect(page.getByRole('alert').filter({ hasText: '此頁暫時無法開啟' })).toHaveCount(0);
@@ -51,12 +58,12 @@ test('a missing old deployment bundle offers reload into the new deployment and 
     ? route.fulfill({ status: 404, headers: { 'cache-control': 'no-store' }, body: 'temporary bundle unavailable' }) : route.continue());
   await page.goto('./?page=markets&market=tw');
   const nav = page.getByRole('navigation', { name: '主要頁面' }).filter({ visible: true });
-  await nav.getByRole('button', { name: '世界', exact: true }).click();
+  await openDestination(page, nav, '世界');
   const fallback = page.getByRole('alert').filter({ hasText: '此頁暫時無法開啟' });
   await expect(fallback).toBeVisible();
   await nav.getByRole('button', { name: '選股', exact: true }).click();
   await expect(page.locator('.screener-row').first()).toBeVisible();
-  await nav.getByRole('button', { name: '世界', exact: true }).click();
+  await openDestination(page, nav, '世界');
   await expect(fallback).toBeVisible();
   fail = false;
   await fallback.getByRole('button', { name: '重新載入', exact: true }).click();

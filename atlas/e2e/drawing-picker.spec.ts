@@ -347,7 +347,7 @@ test('Escape closes an owned input dialog and passes through ordinary focused in
   await loaded(page);
   // Escape in the global search box clears the query and keeps focus; the chart is untouched.
   const phone = await page.locator('.site-tabbar').isVisible();
-  if (phone) await page.locator('.site-tabbar').getByRole('button', { name: '搜尋', exact: true }).click();
+  if (phone) await page.getByRole('button', { name: /^切換股票（目前/ }).click();
   const search = page.locator(phone ? '.search-sheet' : '.site-topbar').getByRole('combobox', { name: '搜尋股票' });
   await search.fill('AAPL');
   await search.focus();

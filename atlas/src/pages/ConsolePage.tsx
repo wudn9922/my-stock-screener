@@ -1,3 +1,4 @@
+import { DisplaySettings } from '../ui/DisplaySettings';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
 import type { PageProps } from './pageProps';
@@ -31,14 +32,15 @@ import { loadScreenerFixedMAs } from './screenerFixedMAs';
 
 type CloudList = { id: string; definition: unknown; updated_at: string };
 
-export default function ConsolePage({ report, navigate, openChart, list: requested }: PageProps & { list?: string }) {
+export default function ConsolePage({ report, navigate, openChart, list: requested, section = 'settings' }: PageProps & { list?: string; section?: 'lists' | 'settings' }) {
   const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
   const cloudAllowed = access.storageMode === 'cloud';
   const store = watchlistStore();
   const sync = watchlistCloudSync(store);
   const { document, error: storageError } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const selected = document.lists.find((entry) => entry.id === requested) ?? document.lists[0];
-  const [tab, setTab] = useState<'lists' | 'parameters' | 'admin'>('lists');
+  const [settingsTab, setTab] = useState<'parameters' | 'admin' | 'display'>('parameters');
+  const tab = section === 'lists' ? 'lists' : settingsTab === 'admin' && !access.isAdmin ? 'parameters' : settingsTab;
   const [visit, setVisit] = useState<WatchlistVisit | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -235,7 +237,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         ...definition,
         cloud: { userId: identity.userId, version: row.updated_at },
       });
-      navigate({ page: 'console', list: row.id });
+      navigate({ page: 'watchlist', list: row.id });
       setAttempt((value) => value + 1);
       setCloudMessage('雲端清單已匯入；之後開啟會先讀取每日紀錄，再比較上次開啟時的名單。');
     });
@@ -274,7 +276,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         symbols,
       });
       store.save(next);
-      navigate({ page: 'console', list: next.id });
+      navigate({ page: 'watchlist', list: next.id });
       setCreating(false);
       setName('');
       setManual('');
@@ -293,16 +295,17 @@ export default function ConsolePage({ report, navigate, openChart, list: request
     <div className="page console-page">
       <div className="page-head">
         <div>
-          <h2 className="page-title">參數控制台與自選清單</h2>
+          <h2 className="page-title">{section === 'lists' ? '自選清單' : '我的'}</h2>
           <p className="page-sub">設定選股條件、追蹤名單變化；保存方式由帳號授權決定。</p>
         </div>
       </div>
       <StorageModeNotice />
       <LegacyImportCard />
-      <div className="segmented console-tabs" role="group" aria-label="控制台分頁">
-        <button type="button" aria-pressed={tab === 'lists'} className={tab === 'lists' ? 'active' : ''} onClick={() => setTab('lists')}>
-          自選清單
-        </button>
+      {section === 'settings' && <a className="console-card console-watchlist-link" href="?page=watchlist" onClick={event => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault(); navigate({ page: 'watchlist' });
+      }}>自選清單 →</a>}
+      {section === 'settings' && <div className="segmented console-tabs" role="group" aria-label="控制台分頁">
         <button
           type="button"
           aria-pressed={tab === 'parameters'}
@@ -316,8 +319,15 @@ export default function ConsolePage({ report, navigate, openChart, list: request
             管理員
           </button>
         )}
-      </div>
-      {tab === 'admin' && access.isAdmin ? (
+        <button type="button" aria-pressed={tab === 'display'} className={tab === 'display' ? 'active' : ''} onClick={() => setTab('display')}>
+          顯示與App
+        </button>
+      </div>}
+      {tab === 'display' ? (
+        <section className="console-card" aria-label="顯示與App"><DisplaySettings
+          reportDate={report.status === 'ok' ? report.report.reportDate : null}
+          generatedAt={report.status === 'ok' ? report.report.generatedAt : null} /></section>
+      ) : tab === 'admin'  && access.isAdmin ? (
         <StorageAdminPanel />
       ) : tab === 'parameters' ? (
         <ParameterConsole />
@@ -407,7 +417,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                 aria-pressed={selected?.id === entry.id}
                 onClick={() => {
                   if (selected?.id === entry.id) setAttempt((value) => value + 1);
-                  else navigate({ page: 'console', list: entry.id });
+                  else navigate({ page: 'watchlist', list: entry.id });
                 }}
               >
                 {entry.name}
@@ -435,7 +445,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                     if (confirm(`確定刪除清單「${selected.name}」？已連結的 Supabase 清單也會一起刪除；個股固定參數會保留。`))
                       void cloud(async () => {
                         await sync.remove(selected.id);
-                        navigate({ page: 'console' });
+                        navigate({ page: 'watchlist' });
                         setCloudMessage('清單已刪除；個股固定參數仍保留。');
                       });
                   }}

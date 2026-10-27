@@ -119,5 +119,5 @@ test('the bottom of the more-panels sheet stays reachable above the site navigat
   await expect(debug).toBeChecked();
   await page.screenshot({ path: testInfo.outputPath('sheet-bottom.png') });
   await closePanel(page);
-  await expect(page.locator('.site-tabbar').getByRole('button', { name: '大盤', exact: true })).toBeVisible();
+  await expect(page.locator('.site-tabbar').getByRole('button', { name: '市場', exact: true })).toBeVisible();
 });

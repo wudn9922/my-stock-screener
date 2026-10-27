@@ -79,13 +79,13 @@ test('missing themes.json shows the not-generated state', async ({ page }) => {
   await expect(page.getByText('題材資料尚未產生')).toBeVisible();
 });
 
-test('phone tab bar keeps seven buttons including the console on one row', async ({ page }) => {
+test('phone tab bar keeps five primary destinations on one row', async ({ page }) => {
   await mockThemes(page);
   await page.goto('./?page=themes');
   const bar = page.locator('.site-tabbar');
   if (!(await bar.isVisible())) test.skip(true, 'desktop layout has the side rail instead');
   const boxes = await bar.locator('button').evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().toJSON()));
-  expect(boxes).toHaveLength(7);
+  expect(boxes).toHaveLength(5);
   expect(new Set(boxes.map((b) => Math.round(b.top))).size).toBe(1);
   for (const box of boxes) expect(box.width).toBeGreaterThanOrEqual(44);
 });
