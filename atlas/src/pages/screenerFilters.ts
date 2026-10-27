@@ -2,6 +2,7 @@ import { userStorage } from '../auth/storage';
 import type { GroupItem, MetricMa } from '../report/schema';
 import { formatMarketVolume, maDistance, maValue } from '../ui/format';
 import { growthKey, type GrowthFile, type GrowthRecord } from '../fundamentals/GrowthProvider';
+import { screenerPeValue, type ScreenerPeFigures } from '../app/dataSources';
 
 /**
  * Screener filter conditions: state, the compact `f` URL encoding and the pure filter itself.
@@ -14,6 +15,8 @@ import { growthKey, type GrowthFile, type GrowthRecord } from '../fundamentals/G
  *   rs3 / rs1: 3-month / 1-month relative return vs the market's benchmark index > N%
  * - vr: volume vs the previous session ≥ N (today ÷ yesterday)
  * - vol: 20-session average volume ≥ N (canonical integer shares; Taiwan input/display uses lots)
+ * - pe: inclusive nonnegative P/E bounds, `pe:10:20`, `pe::20` or `pe:10:`. TTM first, annual fallback,
+ *   matching the displayed figure; losses and missing figures are always excluded.
  * - eps / rev: `N:X[:P]` quarterly YoY gate, epsy / revy: `N:X[:P]` annual one. Over the latest N periods (quarters
  *   1–12, years 1–10) a period is growth when its YoY ≥ X% (a turnaround counts, see tn), otherwise a decline; the
  *   stock passes when growth ÷ periods with data ≥ P% (the share, 1–100, default 100 = every period). Missing
@@ -101,6 +104,8 @@ export interface FilterState {
   vr: number | null;
   /** Minimum 20-session average volume in shares; null means no volume threshold. */
   vol: number | null;
+  /** Optional for compatibility with existing saved conditions; null/absent means unrestricted. */
+  pe?: FilterRange | null;
   eps: GrowthGate | null;
   rev: GrowthGate | null;
   /** Annual EPS / revenue YoY. */
@@ -173,6 +178,18 @@ const rangeOf = (min: number | null, max: number | null): FilterRange | null => 
   if (min === null && max === null) return null;
   return min !== null && max !== null && min > max ? { min: max, max: min } : { min, max };
 };
+/** Blank bounds are unrestricted; invalid, negative or reversed bounds cannot be applied. */
+export function peRangeOf(lower: string, upper: string): FilterRange | null | undefined {
+  const parse = (text: string): number | null | undefined => {
+    if (!text.trim()) return null;
+    if (!/^\d+(?:\.\d{1,2})?$/.test(text.trim())) return undefined;
+    const value = Number(text);
+    return Number.isFinite(value) && Number.isSafeInteger(Math.round(value * 100)) ? value : undefined;
+  };
+  const min = parse(lower), max = parse(upper);
+  if (min === undefined || max === undefined || (min !== null && max !== null && min > max)) return undefined;
+  return min === null && max === null ? null : { min, max };
+}
 /**
  * `N:X:P`, `N:X` (P = 100) or just `X` (1 period, P = 100) → periods within 1..maxPeriods, threshold X and share P
  * (1–100). Anything else (a wrong count of numbers, a share outside 1–100) is dropped.
@@ -228,6 +245,9 @@ export function parseFilters(value: string | null | undefined): FilterState {
     } else if (key === 'vol') {
       const vol = parts.length === 1 ? number(parts[0]) : null;
       state.vol = vol !== null && Number.isSafeInteger(vol) && vol > 0 ? vol : null;
+    } else if (key === 'pe' && parts.length === 2) {
+      const range = peRangeOf(parts[0]!, parts[1]!);
+      if (range) state.pe = range;
     } else if (key === 'eps' || key === 'rev' || key === 'epsy' || key === 'revy') {
       const kind = key === 'epsy' ? 'epsY' : key === 'revy' ? 'revY' : key;
       const gate = kind === 'epsY' || kind === 'revY' ? yearGate(parts) : quarterGate(parts);
@@ -263,6 +283,7 @@ export function serializeFilters(state: FilterState): string {
   if (state.rs1 !== null) tokens.push(`rs1:${formatNumber(state.rs1)}`);
   if (state.vr !== null) tokens.push(`vr:${formatNumber(state.vr)}`);
   if (state.vol !== null) tokens.push(`vol:${state.vol}`);
+  if (state.pe) tokens.push(`pe:${formatRangeParam(state.pe)}`);
   if (state.eps) tokens.push(gateParam('eps', state.eps.quarters, state.eps.min, state.eps.share));
   if (state.epsY) tokens.push(gateParam('epsy', state.epsY.years, state.epsY.min, state.epsY.share));
   if (state.epss !== null) tokens.push(`epss:${state.epss}`);
@@ -453,8 +474,8 @@ export function accelCoverage(items: readonly GroupItem[], growth: GrowthFile | 
 
 // ---------------------------------------------------------- availability
 
-export type FilterKey = 'chg' | 'ema20' | 'tr' | 'hi' | 'rs' | 'rs3' | 'rs1' | 'vr' | 'vol' | 'eps' | 'rev' | 'epsY' | 'revY' | 'epss' | 'accel' | 'accelY';
-export const FILTER_KEYS: readonly FilterKey[] = ['chg', 'ema20', 'tr', 'hi', 'rs', 'rs3', 'rs1', 'vr', 'vol', 'eps', 'rev', 'epsY', 'revY', 'epss', 'accel', 'accelY'];
+export type FilterKey = 'chg' | 'ema20' | 'tr' | 'hi' | 'rs' | 'rs3' | 'rs1' | 'vr' | 'vol' | 'pe' | 'eps' | 'rev' | 'epsY' | 'revY' | 'epss' | 'accel' | 'accelY';
+export const FILTER_KEYS: readonly FilterKey[] = ['chg', 'ema20', 'tr', 'hi', 'rs', 'rs3', 'rs1', 'vr', 'vol', 'pe', 'eps', 'rev', 'epsY', 'revY', 'epss', 'accel', 'accelY'];
 /** SMA distances are no longer a filter, but the trend flags still need them; their availability is tracked too. */
 export type TrendMaKey = 'ma20' | 'ma50' | 'ma200';
 
@@ -466,6 +487,8 @@ export interface FilterContext {
   growth?: GrowthFile | null;
   /** True while the growth data is being fetched. */
   growthLoading?: boolean;
+  /** Undefined while loading; null when the valuation market file could not be read. */
+  pe?: ScreenerPeFigures | null;
   fixedMAs?: FixedScreenerMas;
   /** A loading/error state must not silently replace a saved fixed MA with EMA20. */
   maReferenceReason?: string | null;
@@ -510,6 +533,7 @@ export function filterAvailability(items: readonly GroupItem[], context: FilterC
     rs1: reason(any((item) => item.metrics?.rs21)),
     vr: reason(any((item) => item.metrics?.volVsPrev)),
     vol: any((item) => item.metrics?.volumeAvg20) ? null : '此群組沒有近 20 日平均成交量資料（需完整 20 個交易日）',
+    pe: context.pe === undefined ? '本益比資料載入中…' : context.pe === null ? '本益比資料尚未產生或暫時無法取得' : null,
     eps: fundamentals((record) => someNumber(record.epsYoY, record.epsTurnQ)),
     rev: fundamentals((record) => someNumber(record.revYoY)),
     epsY: fundamentals((record) => someNumber(record.epsYoYAnnual, record.epsTurnAnnual)),
@@ -569,6 +593,8 @@ export function applyFilters(items: readonly GroupItem[], state: FilterState, co
   if (rs1 !== null && !available.rs1) tests.push((item) => (item.metrics?.rs21 ?? -Infinity) > rs1);
   if (vr !== null && !available.vr) tests.push((item) => (item.metrics?.volVsPrev ?? -Infinity) >= vr);
   if (vol !== null && !available.vol) tests.push((item) => (item.metrics?.volumeAvg20 ?? -Infinity) >= vol);
+  // An unavailable P/E source must never turn an applied numeric condition into an unfiltered list.
+  if (state.pe) tests.push(item => item.status !== 'failed' && inRange(screenerPeValue(context.pe?.[item.symbol]), state.pe!));
   const record = (item: GroupItem) => growthRecordFor(item, context.growth);
   if (eps && !available.eps)
     tests.push((item) => {
@@ -622,6 +648,10 @@ export function formatRange(range: FilterRange, unit = '%'): string {
   if (range.min !== null) return `≥${signed(range.min)}${unit}`;
   return `≤${signed(range.max ?? 0)}${unit}`;
 }
+export function formatPeRange(range: FilterRange): string {
+  if (range.min !== null && range.max !== null) return `${formatNumber(range.min)}～${formatNumber(range.max)} 倍`;
+  return range.min !== null ? `≥${formatNumber(range.min)} 倍` : `≤${formatNumber(range.max ?? 0)} 倍`;
+}
 /** Chip text of a growth gate: `EPS YoY 近8季皆≥15%`, or with a share `EPS YoY 近8季成長≥75%（≥15%）`. */
 const gateChipText = (head: string, unit: '季' | '年', periods: number, min: number, share: number): string => {
   const threshold = formatNumber(min);
@@ -670,6 +700,7 @@ export function activeChips(state: FilterState, availability?: FilterAvailabilit
     chips.push({ id: 'rs1', key: 'rs1', label: state.rs1 === 0 ? '1月強於大盤' : `1月相對強弱 >${signed(state.rs1)}%` });
   if (state.vr !== null) chips.push({ id: 'vr', key: 'vr', label: `量比 ≥${formatNumber(state.vr)}` });
   if (state.vol !== null) chips.push({ id: 'vol', key: 'vol', label: `20 日均量 ≥${formatMarketVolume(state.vol, market)}` });
+  if (state.pe) chips.push({ id: 'pe', key: 'pe', label: `本益比 ${formatPeRange(state.pe)}` });
   if (state.eps) chips.push({ id: 'eps', key: 'eps', label: gateLabel('EPS', state.eps) });
   if (state.epsY) chips.push({ id: 'epsY', key: 'epsY', label: yearGateLabel('EPS', state.epsY) });
   if (state.epss !== null) chips.push({ id: 'epss', key: 'epss', label: streakLabel(state.epss) });
@@ -707,7 +738,7 @@ export function removeFilter(state: FilterState, id: ChipId): FilterState {
       Object.assign(next, { [id]: next.extraGates![index].gate });
       next.extraGates = next.extraGates!.filter((_, i) => i !== index);
     } else next[id] = null;
-  } else if (id === 'chg' || id === 'ema20' || id === 'epss') next[id] = null;
+  } else if (id === 'chg' || id === 'ema20' || id === 'epss' || id === 'pe') next[id] = null;
   else if (id === 'hi' || id === 'rs' || id === 'rs3' || id === 'rs1' || id === 'vr' || id === 'vol') next[id] = null;
   else if (id === 'accel') next.accel = false;
   else if (id === 'accelY') next.accelY = false;

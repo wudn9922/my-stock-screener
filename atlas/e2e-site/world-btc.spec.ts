@@ -19,15 +19,15 @@ for (const savedOnly of [false, true]) {
     });
     await page.goto('./?page=world&view=commodities');
     const card = page.locator('.world-candle-card').filter({ has: page.getByRole('heading', { name: 'BTC/USDT', exact: true }) });
-    await card.scrollIntoViewIfNeeded();
     await expect(card).toContainText('USDT/BTC');
     await expect(card).toContainText('成交量 BTC');
     await expect(card).toContainText('2026-10-24');
+    if (savedOnly) await expect(card).toContainText('保存資料');
+    await expect(async () => { await card.scrollIntoViewIfNeeded(); }).toPass({ timeout: 10000 });
     await expect(card.locator('.candle-ohlc')).toContainText('O ');
     const chart = card.locator('[data-chart-identity="world:CRYPTO-BTCUSDT"]');
     await expect(chart).toHaveAttribute('data-session-calendar', 'continuous-utc');
     await expect(chart.locator('canvas').first()).toBeVisible();
-    if (savedOnly) await expect(card).toContainText('保存資料');
     await chart.getByRole('button', { name: '週K', exact: true }).click();
     await expect(chart.locator('.candle-ohlc')).toContainText('O ');
     await card.screenshot({ path: info.outputPath(`btc-usdt-${savedOnly ? 'retained' : 'published'}.png`) });
