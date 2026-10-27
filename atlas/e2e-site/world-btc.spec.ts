@@ -22,9 +22,9 @@ for (const savedOnly of [false, true]) {
     await expect(card).toContainText('USDT/BTC');
     await expect(card).toContainText('成交量 BTC');
     await expect(card).toContainText('2026-10-24');
-    await expect(card.locator('.candle-ohlc')).toContainText('O ');
     if (savedOnly) await expect(card).toContainText('保存資料');
-    await card.scrollIntoViewIfNeeded();
+    await expect(async () => { await card.scrollIntoViewIfNeeded(); }).toPass({ timeout: 10000 });
+    await expect(card.locator('.candle-ohlc')).toContainText('O ');
     const chart = card.locator('[data-chart-identity="world:CRYPTO-BTCUSDT"]');
     await expect(chart).toHaveAttribute('data-session-calendar', 'continuous-utc');
     await expect(chart.locator('canvas').first()).toBeVisible();
