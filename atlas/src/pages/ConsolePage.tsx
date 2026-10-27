@@ -1,4 +1,5 @@
 import { DisplaySettings } from '../ui/DisplaySettings';
+import { WatchlistBoard } from '../ui/WatchlistBoard';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
 import type { PageProps } from './pageProps';
@@ -299,6 +300,9 @@ export default function ConsolePage({ report, navigate, openChart, list: request
           <p className="page-sub">設定選股條件、追蹤名單變化；保存方式由帳號授權決定。</p>
         </div>
       </div>
+      {section === 'lists' && (
+        <WatchlistBoard report={report} list={selected} hasLists={document.lists.length > 0} openChart={openChart} navigate={navigate} />
+      )}
       <StorageModeNotice />
       <LegacyImportCard />
       {section === 'settings' && <a className="console-card console-watchlist-link" href="?page=watchlist" onClick={event => {

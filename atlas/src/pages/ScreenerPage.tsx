@@ -543,7 +543,7 @@ function ScreenerView({
       </div>
       <div className="save-watchlist">
         <button type="button" className="ghost-button" disabled={groupPending} onClick={() => { setSavingList((previous) => !previous); setListName(group.name); }}>存成自選清單</button>
-        <button type="button" className="text-button" onClick={() => navigate({ page: 'watchlist' })}>開啟我的清單／控制台</button>
+        <button type="button" className="text-button" onClick={() => navigate({ page: 'watchlist' })}>開啟自選清單</button>
         {savingList && <form className="save-watchlist" onSubmit={(event) => {
           event.preventDefault();
           try {
