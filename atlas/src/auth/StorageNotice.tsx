@@ -11,6 +11,7 @@ export function StorageNotice() {
   const [error, setError] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<LoginCandidate | null>(null);
   const [loginUrl, setLoginUrl] = useState<string | null>(null);
+  const [launchMissed, setLaunchMissed] = useState(false);
   const [senderState, setSenderState] = useState({ busy: false });
   const [codeChallenge, setCodeChallenge] = useState<LineCodeChallenge | null>(null);
   const [code, setCode] = useState('');
@@ -53,10 +54,11 @@ export function StorageNotice() {
       if (needsSeparateLineLogin()) {
         const controller = new AbortController();
         pending.current = controller;
+        setLaunchMissed(false);
         try { setCandidate(await beginSeparateLineLogin(controller.signal, setLoginUrl, challenge => {
           setCodeChallenge(challenge); setCheckingCode(false); setCode('');
-        })); }
-        finally { pending.current = null; setBusy(false); setLoginUrl(null); setCodeChallenge(null); setCode(''); setCheckingCode(false); }
+        }, () => setLaunchMissed(true))); }
+        finally { pending.current = null; setBusy(false); setLoginUrl(null); setLaunchMissed(false); setCodeChallenge(null); setCode(''); setCheckingCode(false); }
         return;
       }
       const result = await loginLineIdentity();
@@ -111,7 +113,7 @@ export function StorageNotice() {
       <button className="ghost-button" type="submit" disabled={checkingCode || !/^\d{6}$/.test(code)}>{checkingCode ? '正在驗證確認碼…' : '驗證確認碼'}</button>
       {codeChallenge.error && <span role="alert">{codeChallenge.error}</span>}
     </form>}
-    {busy && pending.current && <p role="status">請在 LINE 完成驗證後，返回這個 Atlas 視窗。{loginUrl && <>配對碼 {linePairingCode(new URL(loginUrl).searchParams.get('atlasLineHandoff')!)} <a href={loginUrl} target="_blank" rel="noopener noreferrer">開啟 LINE 登入視窗</a></>}<button type="button" className="ghost-button" onClick={() => pending.current?.abort()}>取消登入</button></p>}
+    {busy && pending.current && <p role="status">請在 LINE 完成驗證後，返回這個 Atlas 視窗。{loginUrl && <>配對碼 {linePairingCode(new URL(loginUrl).searchParams.get('atlasLineHandoff')!)} {launchMissed && <strong id="line-launch-missed" className="line-launch-missed">LINE 沒有自動開啟？請點這裡</strong>} <a href={loginUrl} target="_blank" rel="noopener noreferrer" className={launchMissed ? 'primary-button line-launch-link' : undefined} aria-describedby={launchMissed ? 'line-launch-missed' : undefined}>開啟 LINE 登入視窗</a></>}<button type="button" className="ghost-button" onClick={() => pending.current?.abort()}>取消登入</button></p>}
     <div className="pwa-login-actions">{access.userId
       ? <button type="button" className="ghost-button" disabled={busy} onClick={() => void logout()}>{isLineInAppBrowser() ? '登出 Atlas' : '登出 LINE'}</button>
       : <>

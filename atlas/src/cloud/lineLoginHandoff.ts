@@ -191,6 +191,7 @@ export async function beginSeparateLineLogin(
   signal: AbortSignal,
   onOpenUrl: (url: string) => void = () => {},
   onCodePrompt: (challenge: LineCodeChallenge) => void = () => {},
+  onLaunchMissed: () => void = () => {},
 ): Promise<LoginCandidate> {
   if (signal.aborted) throw new Error('已取消 LINE 登入。');
   const intentId = crypto.randomUUID(),
@@ -209,7 +210,9 @@ export async function beginSeparateLineLogin(
       { action: 'line.login.begin', intentId, readSecret, writeSecret },
       signal,
     );
-    releaseLaunch = launchLineHandoff(target);
+    releaseLaunch = launchLineHandoff(target, () => {
+      if (!signal.aborted) onLaunchMissed();
+    });
     const result = await creation;
     created = true;
     const expiresAt = Date.parse(String(result.expiresAt));

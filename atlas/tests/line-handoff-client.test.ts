@@ -53,6 +53,41 @@ function environment(status = 'complete') {
   vi.stubGlobal('sessionStorage', storage);
   return { popup, calls, candidate, storage };
 }
+/** Event-capable mobile window/document doubles; nothing here can navigate. */
+function mobileDom() {
+  const state = { visibilityState: 'visible', focused: true };
+  const link = {
+    href: '',
+    rel: '',
+    referrerPolicy: '',
+    hidden: false,
+    dataset: {} as Record<string, string>,
+    click: vi.fn(),
+    remove: vi.fn(),
+  };
+  const frame = {
+    hidden: false,
+    title: '',
+    referrerPolicy: '',
+    src: '',
+    remove: vi.fn(),
+  };
+  const append = vi.fn();
+  const createElement = vi.fn((tag: string) => (tag === 'a' ? link : frame));
+  const windowEvents = new EventTarget(),
+    documentEvents = new EventTarget();
+  vi.stubGlobal('window', Object.assign(windowEvents, { open: window.open }));
+  vi.stubGlobal(
+    'document',
+    Object.defineProperties(documentEvents, {
+      visibilityState: { get: () => state.visibilityState },
+      hasFocus: { value: () => state.focused },
+      createElement: { value: createElement },
+      body: { value: { append } },
+    }),
+  );
+  return { state, link, frame, append, createElement };
+}
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -67,49 +102,46 @@ describe('partition-independent explicit LINE login', () => {
       maxTouchPoints: 5,
     },
     {
-      userAgent: 'Mozilla/5.0 (Android)',
-      platform: 'Linux',
-      maxTouchPoints: 5,
-    },
-    {
       userAgent: 'Mozilla/5.0 (Macintosh)',
       platform: 'MacIntel',
       maxTouchPoints: 5,
     },
   ])(
-    'dispatches directly during the gesture and retains the receiver on $platform',
+    'navigates the top-level page to the LINE scheme inside the gesture on $platform',
     async (nav) => {
       vi.useFakeTimers();
       const { calls, candidate, storage } = environment();
-      const frame = {
-        hidden: false,
-        title: '',
-        referrerPolicy: '',
-        src: '',
-        remove: vi.fn(),
-      };
-      const append = vi.fn();
+      const { link, frame, append, createElement } = mobileDom();
       vi.stubGlobal('navigator', nav);
       expect(needsSeparateLineLogin()).toBe(true);
-      vi.stubGlobal('document', {
-        visibilityState: 'visible',
-        createElement: vi.fn(() => frame),
-        body: { append },
-      });
-      const offered = vi.fn();
+      const offered = vi.fn(),
+        missed = vi.fn();
       const result = beginSeparateLineLogin(
         new AbortController().signal,
         offered,
         (challenge) => challenge.submit('012345'),
+        missed,
       );
-      // No awaited network response or browser window is needed to dispatch the app.
-      expect(append).toHaveBeenCalledExactlyOnceWith(frame);
+      // Dispatched synchronously: no awaited begin response, frame or window is needed.
+      expect(link.click).toHaveBeenCalledOnce();
+      expect(createElement).toHaveBeenCalledExactlyOnceWith('a');
+      expect(append).toHaveBeenCalledExactlyOnceWith(link);
+      expect(link.remove).toHaveBeenCalledOnce();
+      expect(frame.src).toBe('');
       expect(window.open).not.toHaveBeenCalled();
-      const url = new URL(frame.src),
+      expect(link.rel).toBe('noreferrer');
+      expect(link.referrerPolicy).toBe('no-referrer');
+      const url = new URL(link.href),
         begin = calls[0]!;
+      expect(calls).toHaveLength(1);
+      expect(begin.action).toBe('line.login.begin');
       expect(url.protocol).toBe('line:');
       expect(url.hostname).toBe('app');
       expect(url.pathname).toBe('/2010330411-6JhrotT9');
+      expect([...url.searchParams.keys()].sort()).toEqual([
+        'atlasLineHandoff',
+        'atlasLineWrite',
+      ]);
       expect(url.searchParams.get('atlasLineHandoff')).toBe(begin.intentId);
       expect(url.searchParams.get('atlasLineWrite')).toBe(begin.writeSecret);
       expect(url.href).not.toContain(begin.readSecret);
@@ -117,29 +149,122 @@ describe('partition-independent explicit LINE login', () => {
       expect(new URL(offered.mock.calls[0]![0]).pathname).toBe(
         '/line-login-launch.html',
       );
-      await vi.advanceTimersByTimeAsync(1600);
+      await vi.advanceTimersByTimeAsync(1400);
+      expect(missed).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(200);
+      // Still visible and focused: show the manual control, never auto-open a window.
+      expect(missed).toHaveBeenCalledOnce();
+      expect(window.open).not.toHaveBeenCalled();
       expect(await result).toEqual(candidate);
-      expect(frame.remove).toHaveBeenCalledOnce();
+      expect(link.click).toHaveBeenCalledOnce();
       expect(storage.setItem).not.toHaveBeenCalled();
+    },
+  );
+  it('keeps the hidden dispatch frame on Android and retains the receiver', async () => {
+    vi.useFakeTimers();
+    const { calls, candidate, storage } = environment();
+    const { link, frame, append } = mobileDom();
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (Android)',
+      platform: 'Linux',
+      maxTouchPoints: 5,
+    });
+    expect(needsSeparateLineLogin()).toBe(true);
+    const offered = vi.fn(),
+      missed = vi.fn();
+    const result = beginSeparateLineLogin(
+      new AbortController().signal,
+      offered,
+      (challenge) => challenge.submit('012345'),
+      missed,
+    );
+    // No awaited network response or browser window is needed to dispatch the app.
+    expect(append).toHaveBeenCalledExactlyOnceWith(frame);
+    expect(link.click).not.toHaveBeenCalled();
+    expect(window.open).not.toHaveBeenCalled();
+    const url = new URL(frame.src),
+      begin = calls[0]!;
+    expect(url.protocol).toBe('line:');
+    expect(url.hostname).toBe('app');
+    expect(url.pathname).toBe('/2010330411-6JhrotT9');
+    expect(url.searchParams.get('atlasLineHandoff')).toBe(begin.intentId);
+    expect(url.searchParams.get('atlasLineWrite')).toBe(begin.writeSecret);
+    expect(url.href).not.toContain(begin.readSecret);
+    expect(url.searchParams.has('code')).toBe(false);
+    expect(new URL(offered.mock.calls[0]![0]).pathname).toBe(
+      '/line-login-launch.html',
+    );
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(missed).toHaveBeenCalledOnce();
+    expect(await result).toEqual(candidate);
+    expect(frame.remove).toHaveBeenCalledOnce();
+    expect(storage.setItem).not.toHaveBeenCalled();
+  });
+  it.each(['blur', 'pagehide', 'hidden', 'unfocused'] as const)(
+    'assumes LINE opened and shows no hint after %s',
+    async (signal) => {
+      vi.useFakeTimers();
+      environment('pending');
+      const dom = mobileDom();
+      vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone)' });
+      const missed = vi.fn();
+      const controller = new AbortController();
+      const result = beginSeparateLineLogin(
+        controller.signal,
+        undefined,
+        undefined,
+        missed,
+      );
+      const rejected = expect(result).rejects.toThrow('取消');
+      expect(dom.link.click).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(300);
+      if (signal === 'blur' || signal === 'pagehide')
+        window.dispatchEvent(new Event(signal));
+      else if (signal === 'hidden') {
+        dom.state.visibilityState = 'hidden';
+        document.dispatchEvent(new Event('visibilitychange'));
+        dom.state.visibilityState = 'visible';
+      } else dom.state.focused = false;
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(missed).not.toHaveBeenCalled();
+      expect(window.open).not.toHaveBeenCalled();
+      controller.abort();
+      await rejected;
     },
   );
   it('removes the dispatch frame when a mobile handoff is cancelled', async () => {
     vi.useFakeTimers();
     environment('pending');
-    const remove = vi.fn();
-    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone)' });
-    vi.stubGlobal('document', {
-      visibilityState: 'visible',
-      createElement: () => ({ remove }),
-      body: { append: vi.fn() },
-    });
+    const { frame } = mobileDom();
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Android)' });
     const controller = new AbortController();
     const result = beginSeparateLineLogin(controller.signal);
     const rejected = expect(result).rejects.toThrow('取消');
     await vi.advanceTimersByTimeAsync(1);
     controller.abort();
     await rejected;
-    expect(remove).toHaveBeenCalledOnce();
+    expect(frame.remove).toHaveBeenCalledOnce();
+    expect(window.open).not.toHaveBeenCalled();
+  });
+  it('shows no launch hint after an iPhone handoff is cancelled', async () => {
+    vi.useFakeTimers();
+    environment('pending');
+    mobileDom();
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone)' });
+    const missed = vi.fn();
+    const controller = new AbortController();
+    const result = beginSeparateLineLogin(
+      controller.signal,
+      undefined,
+      undefined,
+      missed,
+    );
+    const rejected = expect(result).rejects.toThrow('取消');
+    await vi.advanceTimersByTimeAsync(1);
+    controller.abort();
+    await rejected;
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(missed).not.toHaveBeenCalled();
     expect(window.open).not.toHaveBeenCalled();
   });
   it('waits for typed reverse confirmation, sends a wrong guess only once, then accepts the corrected code', async () => {
@@ -216,13 +341,17 @@ describe('partition-independent explicit LINE login', () => {
   });
   it('keeps the receiver secret in RAM, opens an explanatory fallback and returns only a candidate', async () => {
     const { calls, candidate, storage } = environment();
+    const missed = vi.fn();
     expect(
       await beginSeparateLineLogin(
         new AbortController().signal,
         undefined,
         (challenge) => challenge.submit('012345'),
+        missed,
       ),
     ).toEqual(candidate);
+    // Desktop path unchanged: one explanatory window, no scheme dispatch or launch hint.
+    expect(missed).not.toHaveBeenCalled();
     const begin = calls[0]!;
     const url = new URL(vi.mocked(window.open).mock.calls[0]![0] as string);
     expect(url.pathname).toBe('/line-login-launch.html');

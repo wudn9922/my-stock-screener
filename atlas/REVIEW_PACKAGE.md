@@ -1,4 +1,17 @@
-## Current follow-up: iOS launch sheet and receiver focus (2026-10-27)
+## Current follow-up: iOS top-level LINE app launch (2026-10-27)
+
+Real-iPhone report on #185: the hidden `line://app` iframe never opened LINE from the
+home-screen PWA (iOS WebKit ignores custom schemes in subframes). iOS/iPadOS now
+activate a disposable `line://app/{LIFF_ID}?intent&write` link (top-level) inside the
+same synchronous gesture; only `line://app/` may be navigated, never http(s), no
+reload or window.open. Android keeps the subframe: LINE documents no `intent://` form
+and a top-level failure could replace the receiver. If the page is still visible and
+focused ~1.5 s later (no hidden/blur/pagehide), the existing manual link becomes a
+prominent button with a hint; nothing is auto-opened. Proof scope, reverse code,
+network binding, TTL, one-use claim and server grants are unchanged. Browser tests
+stub the scheme click and assert no main-frame navigation/pagehide. No server change.
+
+## Previous follow-up: iOS launch sheet and receiver focus (2026-10-27)
 
 Primary self-review; no independent sign-off. #184 was already merged, so this is
 a separate PR from current main. Mobile user gestures dispatch a legacy line://app
