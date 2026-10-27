@@ -767,4 +767,6 @@ revision; the same matrix and the full PR workflow are rerun on this layout foll
 
 本益比獨立 PR 以 main `087f4f113` 為基準；既有導覽改版及後續報價板、個股分頁、市場分類已在主線，不包含在本次差異中。
 
+完整回歸發現 world-btc.spec.ts 在 BTC 保存資料尚未載入完成時捲動卡片，會遇到 DOM 替換而偶發 element detached。原文字、OHLC、日曆、畫布、週K與零錯誤斷言全部保留，僅先等待原有資料／OHLC／保存資料斷言完成，再捲動；WorldPage 與行情程式未改。修正後三平台 BTC 回歸另行重跑，精確結果記在 PR。
+
 使用者要求繼續增加本益比選項。本次沿用原估值與篩選架構，新增可留白的上下限及快捷倍數；舊條件、導覽與網址全部保留。具體規則、資料缺漏處理及測試見 docs/SCREENER_PE_FILTER.md。市場檔只載入一次且涵蓋畫面外股票，來源失敗不會回傳未篩選結果；自選策略保留失敗前的比較基準。離線收集器只適配既有估值 JSON，未變更任何後端 API、SQL、權限、workflow 或市場資料檔。採主要工程師自我審查，沒有獨立簽核；實際測試數字記錄在 PR body。
