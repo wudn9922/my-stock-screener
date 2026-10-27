@@ -35,3 +35,14 @@ class TrendingStocksTest(unittest.TestCase):
             path = Path(directory) / 'trending.json'
             dify_report.save_trending_stocks('nvda, NVDA, AAPL, AMD, TSLA, MSFT, META', '2026-10-27T09:00:00Z', path)
             self.assertEqual(json.loads(path.read_text())['symbols'], ['NVDA', 'AAPL', 'AMD', 'TSLA', 'MSFT'])
+
+    def test_skips_symbols_outside_the_frontend_pattern_before_limiting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'trending.json'
+            bad = ['^GSPC', '2330.TW', '<script>', 'BRK/B', 'AAPL$', 'A B', 'A' * 16, '']
+            good = ['NVDA', 'BRK-B', 'BRK.B', 'A' * 15, 'MSFT']
+            dify_report.save_trending_stocks(','.join(bad + good + ['TSLA']), '2026-10-27T09:00:00Z', path)
+            before = path.read_bytes()
+            self.assertEqual(json.loads(before)['symbols'], good)
+            self.assertFalse(dify_report.save_trending_stocks(','.join(bad), '2026-10-28T09:00:00Z', path))
+            self.assertEqual(path.read_bytes(), before)

@@ -1,6 +1,7 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -1528,7 +1529,10 @@ def push_line_messages(messages):
 
 def save_trending_stocks(stocks, fetched_at, path="docs/report/trending-stocks.json"):
     """Save the same ordered symbols sent to LINE; an empty fetch retains the last good report."""
-    symbols = list(dict.fromkeys(s.strip().upper() for s in stocks.split(",") if s.strip()))[:5]
+    symbols = list(dict.fromkeys(
+        symbol for s in stocks.split(",")
+        if re.fullmatch(r"[A-Z][A-Z0-9.-]{0,14}", symbol := s.strip().upper())
+    ))[:5]
     if not symbols:
         return False
     target = Path(path)
