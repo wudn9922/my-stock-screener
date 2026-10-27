@@ -1113,13 +1113,13 @@ export function App({
       {stockViews && visitedViews.has('volume') && (
         <section className="stock-view" aria-label="價量" hidden={stockView !== 'volume'} inert={modal} aria-hidden={modal}>
           <div className="stock-view-card">
-            <h2>價量分析</h2>
-            <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
-          </div>
-          <div className="stock-view-card">
             <h2>建議均線</h2>
             <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} onNotice={setNotice} />
             <p className="stock-view-hint">套用後切回「K線」即可在圖上看到均線。</p>
+          </div>
+          <div className="stock-view-card">
+            <h2>價量分析</h2>
+            <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
           </div>
         </section>
       )}
