@@ -1,4 +1,73 @@
-## Current follow-up: LINE login handoffs and bounded explicit startup (2026-10-26)
+## Current follow-up: reverse confirmation and same-network binding (2026-10-27)
+
+Accepted the reported approval-phishing gap: a visual pairing warning alone cannot
+stop a receiver who convinces a visitor to approve its link. The original receiver
+must now manually enter a separate six-digit code shown only after verified LINE
+completion. Server randomness uses unbiased rejection sampling; the row stores only
+a secret-salted, domain/intent-bound hash. Empty readiness polls neither reveal the
+code/identity nor consume attempts. SQL row locking counts wrong codes and deletes
+on the fifth; cancellation returns no ciphertext. Existing read/write proofs, visual
+pairing code, TTL, encryption and final account/grant confirmation remain required.
+
+Begin and complete bind an independently domain-salted IPv4 /24 or IPv6 /64 hash.
+Only CF-Connecting-IP from the current hosted Supabase ingress is accepted. No
+X-Forwarded-For / X-Real-IP fallback; malformed/missing values and Cloudflare's shared
+cross-zone Worker sentinel fail closed. Read-only GET probes confirmed this actual
+endpoint rejects a forged CF header while a forged XFF survives; function ingress
+logs were queried only for booleans, never client IPs/tokens. Primary official-source
+references, evidence table, scope and network routing limitations are in
+[the handoff runbook](../docs/LINE_LOGIN_HANDOFF.md). Shared NAT/VPN membership does
+not prove identity; neither control is claimed to stop disclosure of the reverse
+code to a phisher. LINE approval explicitly says only to approve a login just
+initiated on one's own device.
+
+The manual SQL supports old schema upgrades and repeated application. New columns
+are nullable for legacy rows, which fail closed and must restart; the six-argument
+RPC overload is removed. Permissions stay RLS/private/service-only SECURITY INVOKER.
+No production schema/function/frontend deployment, merge, grant or personal data
+change was performed. SQL -> function -> frontend remains a required rollout order.
+
+Native disposable PostgreSQL covers concurrent wrong guesses, limit/deletion,
+legacy rows/overload removal, missing/different networks and one-use consumption.
+Browser regressions execute the real shared handler and cryptography with simulated
+trusted ingress, plus the pinned real SDK in separate storage partitions. They cover
+same-device flow, correction of a wrong code, five guesses and network rejection.
+Actual test counts and exact-head CI are recorded in the PR. Primary review only;
+no external independent sign-off or physical iPhone/real LINE consent claim.
+
+## Previous follow-up: real SDK storage partitions and one-time LINE handoff (2026-10-26)
+
+The official SDK 2.31.2 reproduced the reported loop: its own partition exchanges
+the callback code, while a new browser context with the same callback has no PKCE
+verifier and remains logged out. Earlier account-return doubles did not model
+that behavior. The deployed root also redirected before primary SDK init.
+
+Mobile / standalone login now uses a separate LIFF window and a two-minute
+one-use handoff. Receiver and sender proofs are separate; only hashes are stored.
+The sending page requires an explicit top-level approval and matching visual
+pairing code before transferring anything; merely visiting a link does not
+complete a handoff, and framed approval is rejected. The visual code is not an
+authorization key. The verified ID token is AES-GCM encrypted with a server-only key and bound to
+its intent. The receiver confirms the account and still needs the normal fresh
+access.get grant. No URL or candidate identity can grant persistence. Private
+RLS storage, service-only invoker RPC, bounded capacity, expiry and atomic
+consumption are tested against native disposable PostgreSQL. The root now uses
+the same Atlas bootstrap; desktop SDK fallback and guest RAM-only behavior stay.
+
+Real SDK browser tests use test ECDSA keys and provider HTTP fixtures, including
+two completely independent browser contexts. Existing SDK fallback tests now
+explicitly model a desktop user agent; mobile/PWA behavior is exercised in the
+new real-SDK handoff suite. No authentication assertion was relaxed. Official
+provider consent / physical iPhone return is not claimed.
+
+Read-only public deployment/configuration and aggregate server logs were checked.
+Production advisories showed only the existing no-policy RLS informational
+notices ([reference](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)), matching the service-only policy. No production schema, grant, function
+or data was changed. SQL -> function -> Atlas entry publication is an explicit
+rollout prerequisite in [the handoff runbook](../docs/LINE_LOGIN_HANDOFF.md).
+Primary review only; no independent external signoff. Actual checks are in the PR.
+
+## Previous follow-up: LINE login handoffs and bounded explicit startup (2026-10-26)
 
 The pre-router gate recognized only OAuth code/error returns with a state query
 parameter. It missed LIFF primary liff.state/referrer and credential-fragment

@@ -30,6 +30,7 @@ let signedOut = false;
 let guestOnly = new URLSearchParams(globalThis.location?.search ?? '').get('atlasGuest') === '1';
 let identityGeneration = 0;
 let loginError: string | null = null;
+let handedOff: { userId: string; token: string; expiresAt: number; generation: number } | null = null;
 
 interface LiffSdk {
   init(config: { liffId: string; withLoginOnExternalBrowser: false }): Promise<void>;
@@ -74,7 +75,23 @@ function hasLiffLaunchParameters(): boolean {
 
 /** main.tsx must await startLineIdentity fully for these launches before rendering the router. */
 export function needsLineIdentityBeforeRouting(): boolean {
-  return !guestOnly && (isLineInAppBrowser() || hasLineLoginCallback() || hasLiffLaunchParameters());
+  const params = new URLSearchParams(globalThis.location?.search ?? '');
+  const handoff = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(params.get('atlasLineHandoff') ?? '') && /^[A-Za-z0-9_-]{43}$/.test(params.get('atlasLineWrite') ?? '');
+  return !guestOnly && (isLineInAppBrowser() || hasLineLoginCallback() || hasLiffLaunchParameters() || handoff);
+}
+
+/** A handoff carries an identity only; AccessController still verifies its server grant. */
+export function acceptLineHandoff(candidate: { userId: string; idToken: string; expiresAt: number }) {
+  if (!/^U[0-9a-f]{32}$/.test(candidate.userId) || !candidate.idToken || !Number.isFinite(candidate.expiresAt) || candidate.expiresAt <= Date.now() + EXPIRY_MARGIN_MS)
+    throw new Error('LINE 登入已過期，請重新登入。');
+  signedOut = guestOnly = false;
+  identityGeneration++;
+  handedOff = { userId: candidate.userId, token: candidate.idToken, expiresAt: candidate.expiresAt, generation: identityGeneration };
+}
+function handoffIdentity(): LineIdentity | null {
+  const value = handedOff;
+  if (!value || signedOut || guestOnly || value.generation !== identityGeneration || value.expiresAt <= Date.now() + EXPIRY_MARGIN_MS) return null;
+  return { userId: value.userId, idToken: () => handedOff === value && !signedOut && value.generation === identityGeneration && value.expiresAt > Date.now() + EXPIRY_MARGIN_MS ? value.token : null };
 }
 
 export function lineLoginError(): string | null { return loginError; }
@@ -236,6 +253,7 @@ export async function loginLineIdentity(liffId = import.meta.env?.VITE_LIFF_ID |
 export function logoutLineIdentity(): void {
   signedOut = true;
   identityGeneration++;
+  handedOff = null;
   loginError = null;
   clearLoginAttempts();
   if (initializedSdk?.isLoggedIn() && !isLiffClient(initializedSdk)) initializedSdk.logout();
@@ -244,6 +262,7 @@ export function logoutLineIdentity(): void {
 /** Re-read account switches and expiry without replaying OAuth init or automatic login. */
 export async function refreshLineIdentity(): Promise<LineIdentity | null> {
   if (signedOut || guestOnly) return null;
+  if (handedOff) return handoffIdentity();
   if (initializedSdk) return identityFromSdk(initializedSdk, Date.now);
   return startLineIdentity(import.meta.env?.VITE_LIFF_ID || DEFAULT_LIFF_ID);
 }

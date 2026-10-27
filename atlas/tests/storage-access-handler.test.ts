@@ -4,6 +4,7 @@ import { transformSync } from 'esbuild';
 import { describe, expect, it } from 'vitest';
 import * as policy from '../../supabase/functions/_shared/storageAccess';
 import * as watchlists from '../../supabase/functions/user-settings/watchlists';
+import * as lineHandoff from '../../supabase/functions/_shared/lineLoginHandoff';
 
 const OWNER = policy.DEFAULT_ADMIN_LINE_ID;
 const A = 'U11111111111111111111111111111111';
@@ -18,7 +19,12 @@ const grant = (user: string, mode: policy.StorageMode) => ({ line_user_id: user,
 function database(seed: Record<string, Row[]> = {}, policyError: DbError | null = null) {
   const rows: Record<string, Row[]> = structuredClone({ atlas_storage_access: [], groups: [], stocks: [], atlas_watchlists: [], chart_drawings: [], index_configs: [], ...seed });
   const calls: { table: string; operation: string; filters: [string, unknown][] }[] = [];
+  const rpcCalls: { name: string; parameters: Row }[] = [];
   const db = {
+    rpc: async (name: string, parameters: Row) => {
+      rpcCalls.push({ name, parameters });
+      return { data: { status: 'pending', expiresAt: new Date(Date.now() + 120000).toISOString() }, error: null };
+    },
     from(table: string) {
       const entry = { table, operation: 'read', filters: [] as [string, unknown][] };
       calls.push(entry);
@@ -56,7 +62,7 @@ function database(seed: Record<string, Row[]> = {}, policyError: DbError | null 
       return query;
     },
   };
-  return { db, rows, calls };
+  return { db, rows, calls, rpcCalls };
 }
 
 function handler(kind: 'user-settings' | 'chart-drawings', user = A, seed: Record<string, Row[]> = {}, policyError: DbError | null = null, verified = true) {
@@ -64,7 +70,7 @@ function handler(kind: 'user-settings' | 'chart-drawings', user = A, seed: Recor
   let serve!: (request: Request) => Promise<Response>;
   const source = readFileSync(new URL(`../../supabase/functions/${kind}/index.ts`, import.meta.url), 'utf8').replace(/^import .*;\r?\n/gm, '');
   runInNewContext(transformSync(source, { loader: 'ts', target: 'es2022', format: 'cjs' }).code, {
-    ...policy, ...watchlists,
+    ...policy, ...watchlists, ...lineHandoff,
     Deno: { env: { get: (key: string) => key === 'ADMIN_LINE_USER_ID' ? OWNER : key === 'ATLAS_FIXED_PARAMETERS_ENABLED' ? '1' : 'offline-test-only' }, serve: (callback: typeof serve) => { serve = callback; } },
     createClient: () => fixture.db,
     fetch: async () => new Response(JSON.stringify(verified ? { sub: user } : { error: 'invalid_token' }), { status: verified ? 200 : 401 }),
@@ -72,14 +78,38 @@ function handler(kind: 'user-settings' | 'chart-drawings', user = A, seed: Recor
   });
   return {
     ...fixture,
-    async request(body: Row) {
-      const response = await serve(new Request('https://offline.invalid/', { method: 'POST', body: JSON.stringify({ idToken: 'verified-by-fixture', ...body }) }));
+    async request(body: Row, headers: HeadersInit = { 'cf-connecting-ip': '203.0.113.21' }) {
+      const response = await serve(new Request('https://offline.invalid/', { method: 'POST', headers, body: JSON.stringify({ idToken: 'verified-by-fixture', ...body }) }));
       return { status: response.status, body: await response.json() };
     },
   };
 }
 
 describe('storage authorization is enforced by deployed private-data handlers', () => {
+  it('does not accept caller-supplied forwarding headers as a network binding', async () => {
+    const fixture = handler('user-settings');
+    const result = await fixture.request({ action: 'line.login.begin', intentId: '12345678-1234-4234-8234-123456789abc',
+      readSecret: 'r'.repeat(43), writeSecret: 'w'.repeat(43) }, { 'x-forwarded-for': '203.0.113.21', 'x-real-ip': '203.0.113.21' });
+    expect(result.status).toBe(403); expect(result.body.error).toContain('同一個網路');
+    expect(fixture.rpcCalls).toEqual([]); expect(fixture.calls).toEqual([]);
+  });
+  it.each(['begin', 'poll', 'cancel'])('allows only proof-bound login %s without a LINE identity or personal-table access', async operation => {
+    const fixture = handler('user-settings', A, {}, null, false);
+    const result = await fixture.request({ action: `line.login.${operation}`, idToken: undefined,
+      intentId: '12345678-1234-4234-8234-123456789abc', readSecret: 'r'.repeat(43), writeSecret: 'w'.repeat(43) });
+    expect(result.status).toBe(200);
+    expect(fixture.rpcCalls).toHaveLength(1);
+    expect(fixture.calls).toEqual([]);
+  });
+  it('verifies the completing LINE account and rejects invalid proofs before creating private login data', async () => {
+    const fixture = handler('user-settings', A, {}, null, false);
+    const invalidToken = await fixture.request({ action: 'line.login.complete', confirmed: true, intentId: '12345678-1234-4234-8234-123456789abc', writeSecret: 'w'.repeat(43) });
+    expect(invalidToken.status).toBe(401);
+    const invalidProof = await fixture.request({ action: 'line.login.begin', idToken: undefined, intentId: '12345678-1234-4234-8234-123456789abc', readSecret: 'bad', writeSecret: 'w'.repeat(43) });
+    expect(invalidProof.status).toBe(400);
+    expect(fixture.rpcCalls).toEqual([]);
+    expect(fixture.calls).toEqual([]);
+  });
   const actions = [
     ['user-settings', 'groups.list'], ['user-settings', 'groups.create'], ['user-settings', 'groups.rename'], ['user-settings', 'groups.delete'],
     ['user-settings', 'stocks.list'], ['user-settings', 'stocks.save'], ['user-settings', 'stocks.delete'],
