@@ -381,6 +381,7 @@ class Run:
         bars = {}
         dates = []
         sources = []
+        loaded = []
 
         for url, parse, label in (
             (TWSE_DAY_ALL_URL, src.parse_twse_day_all, "證交所 STOCK_DAY_ALL"),
@@ -403,10 +404,22 @@ class Run:
                 self.log(f"⏳ {label} {snapshot['date']} 尚未收盤，略過")
                 continue
 
+            loaded.append((label, snapshot))
+            self.log(f"📥 {label}：{len(snapshot['bars'])} 檔，資料日 {snapshot['date']}")
+
+        # Both exchanges trade the same sessions: a feed older than the other one is stale (e.g. TWSE
+        # STOCK_DAY_ALL still serving 10/22 on 10/27). Its stocks count as missing, so the Yahoo quote
+        # fallback or per-stock recent history fills the session instead of silently keeping old bars.
+        latest = max((snapshot["date"] for _, snapshot in loaded), default=None)
+        for label, snapshot in loaded:
+            if snapshot["date"] != latest:
+                message = f"{label} 資料日 {snapshot['date']} 落後 {latest}，視為未更新，改由備援來源補齊"
+                self.warnings.append(message)
+                self.log(f"⚠️ {message}")
+                continue
             bars.update(snapshot["bars"])
             dates.append(snapshot["date"])
             sources.append(label)
-            self.log(f"📥 {label}：{len(snapshot['bars'])} 檔，資料日 {snapshot['date']}")
 
         self.snapshots["TW"] = {"bars": bars, "date": max(dates) if dates else None, "sources": sources}
 
