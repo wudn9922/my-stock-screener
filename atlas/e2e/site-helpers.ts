@@ -48,7 +48,11 @@ export async function searchSymbol(page: Page, text: string): Promise<void> {
   await closePanel(page);
   if (await isMobileShell(page)) {
     const input = page.getByRole('dialog', { name: '搜尋股票' }).getByRole('combobox', { name: '搜尋股票' });
-    if (!(await input.isVisible())) await page.locator('.site-tabbar').getByRole('button', { name: '搜尋', exact: true }).click();
+    if (!(await input.isVisible())) {
+      const topSearch = page.locator('.site-topbar').getByRole('button', { name: '搜尋股票', exact: true });
+      if (await topSearch.isVisible()) await topSearch.click();
+      else await page.getByRole('button', { name: /^切換股票（目前/ }).click();
+    }
     await input.fill(text);
     await expect(page.locator('.search-results [role="option"]').first()).toBeVisible();
     await input.press('Enter');

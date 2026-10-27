@@ -750,3 +750,13 @@ Phone visual follow-up: prevent the fixed-group status tabs from shrinking under
 and stale notices, and tighten the timestamp paragraph spacing. The group browser test checks that the
 status-control container cannot clip its buttons. All 24 targeted browser cases passed on the preceding
 revision; the same matrix and the full PR workflow are rerun on this layout follow-up.
+
+## 導覽改版第一階段（main d59b07be4）
+
+主要工程師自我審查，沒有宣稱獨立審核。使用者範圍為導覽與內容搬移，所有功能／控制／網址／資料都必須保留；沒有無法保留而被刪除的項目。
+
+功能與舊網址對照、修改過的每個既有 spec、文件標題差異、390px／桌面截圖及 trace 說明見 docs/NAVIGATION_PHASE_ONE.md。MarketsPage、WorldPage、ThemesPage、ChartEngine、StorageNotice、ParameterConsole、main.py、SQL、Supabase、workflow 與市場資料沒有修改。清單與原有雲端／歷史邏輯共用原 ConsolePage，只調整 section 與導航目的地。
+
+原 DEFAULT_PAGE、品牌連結、日期 chip、DataHealthPanel、RouteBoundary、lazy loading、chartVisited 及捲動邏輯保留。入口測試證明圖表／財務往返仍是同一 chart DOM；帳號／舊資料／LINE／PWA／清單整合斷言完整保留。先前桌面新測試使用 radio 的隱藏 input 點擊，已改用原可點擊 label，保留 checked 與重載後持久化斷言。
+
+已執行 clean npm ci、npm test（1,505 通過）、lint、一般與 Pages build；完整 npm run test:site 的三瀏覽器結果、其失敗與修正記錄以 PR body 為準。不合併、不部署。

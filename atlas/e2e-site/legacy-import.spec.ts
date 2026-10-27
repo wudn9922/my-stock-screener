@@ -188,7 +188,7 @@ for (const kind of ['guest', 'none', 'denied'] as const) {
     await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'none');
     await expect(page.getByTestId('legacy-import-card')).toHaveCount(0);
     await expect(page.getByTestId('legacy-import-reopen')).toHaveCount(0);
-    await page.getByRole('button', { name: '圖表', exact: true }).click();
+    await page.getByRole('button', { name: '個股', exact: true }).click();
     await expect(page.getByTestId('ohlc-header')).toBeVisible();
     await expect(page.getByTestId('legacy-import-confirm')).toHaveCount(0);
     expect(await page.evaluate(() => (globalThis as unknown as { __legacyReads: string[] }).__legacyReads)).toEqual([]);
@@ -236,7 +236,7 @@ for (const mode of ['device', 'cloud'] as const) {
     await page.reload();
     await expect(page.getByTestId('ohlc-header')).toBeVisible();
     await expect(page.getByTestId('legacy-import-card')).toHaveCount(0);
-    await page.getByRole('button', { name: '控制台', exact: true }).click();
+    await page.getByRole('button', { name: '我的', exact: true }).click();
     await page.getByTestId('legacy-import-reopen').click();
     await expect(page.getByTestId('legacy-import-card')).toBeVisible();
     await page.getByTestId('legacy-import-confirm').click();

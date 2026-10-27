@@ -7,7 +7,11 @@ async function isPhone(page: Page) {
 }
 async function openSearch(page: Page) {
   if (await isPhone(page)) {
-    await page.locator('.site-tabbar').getByRole('button', { name: '搜尋', exact: true }).click();
+    {
+      const topSearch = page.locator('.site-topbar').getByRole('button', { name: '搜尋股票', exact: true });
+      if (await topSearch.isVisible()) await topSearch.click();
+      else await page.getByRole('button', { name: /^切換股票（目前/ }).click();
+    }
     return page.getByRole('dialog', { name: '搜尋股票' }).getByRole('combobox', { name: '搜尋股票' });
   }
   const input = page.locator('.site-topbar').getByRole('combobox', { name: '搜尋股票' });

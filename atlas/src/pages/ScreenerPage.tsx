@@ -543,13 +543,13 @@ function ScreenerView({
       </div>
       <div className="save-watchlist">
         <button type="button" className="ghost-button" disabled={groupPending} onClick={() => { setSavingList((previous) => !previous); setListName(group.name); }}>存成自選清單</button>
-        <button type="button" className="text-button" onClick={() => navigate({ page: 'console' })}>開啟我的清單／控制台</button>
+        <button type="button" className="text-button" onClick={() => navigate({ page: 'watchlist' })}>開啟我的清單／控制台</button>
         {savingList && <form className="save-watchlist" onSubmit={(event) => {
           event.preventDefault();
           try {
             const list = createWatchlist({ name: listName, market, group: group.key, filters: serializeFilters(filters), maList: group.maList.length ? group.maList.slice(0, 4) : [20, 50, 200],
               ...(isTrending ? { kind: 'manual', symbols: groupItems.map(item => item.symbol) } : {}) });
-            watchlistStore().save(list); navigate({ page: 'console', list: list.id });
+            watchlistStore().save(list); navigate({ page: 'watchlist', list: list.id });
           } catch (error) { setSaveError(error instanceof Error ? error.message : '清單儲存失敗'); }
         }}><input aria-label="自選清單名稱" value={listName} onChange={(event) => setListName(event.target.value)} maxLength={40} required /><button type="submit" className="primary-button">儲存並追蹤清單</button></form>}
         {saveError && <span role="alert">{saveError}</span>}

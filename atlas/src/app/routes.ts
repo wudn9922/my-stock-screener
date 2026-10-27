@@ -10,7 +10,7 @@ import type { Timeframe } from '../market-data/MarketDataProvider';
  * `?page=financials&symbol=AAPL&p=q` (not in the bottom bar; opened from the chart header). Legacy report links (`?symbol=…&tf=…`) open the chart.
  * LINE LIFF wraps the original path and query in `liff.state`, which is unwrapped first.
  */
-export const PAGES = ['markets', 'world', 'themes', 'screener', 'chart', 'financials', 'console'] as const;
+export const PAGES = ['markets', 'world', 'themes', 'screener', 'chart', 'financials', 'watchlist', 'console'] as const;
 export type Page = (typeof PAGES)[number];
 
 export type Route =
@@ -20,7 +20,8 @@ export type Route =
   /** `market` is only present for Taiwan (`'tw'`); omitted means the US themes. `v: 'map'` shows the heatmap; omitted means the list. */
   | { page: 'themes'; theme?: string; market?: 'tw'; v?: 'map' }
   | { page: 'screener'; group?: string; f?: string }
-  | { page: 'console'; list?: string }
+  | { page: 'console' }
+  | { page: 'watchlist'; list?: string }
   | { page: 'chart'; symbol?: string; tf?: Timeframe }
   /** q/a stores the period choice; US defaults to quarters, Taiwan to annual. tf returns to the chart. */
   | { page: 'financials'; symbol?: string; p?: 'q' | 'a'; tf?: Timeframe };
@@ -42,7 +43,8 @@ const pageAliases: Record<string, Page> = {
   groups: 'screener',
   console: 'console',
   settings: 'console',
-  watchlists: 'console',
+  watchlists: 'watchlist',
+  watchlist: 'watchlist',
   chart: 'chart',
   financials: 'financials',
   financial: 'financials',
@@ -74,6 +76,8 @@ export function defaultRoute(page: Page): Route {
     case 'chart':
       return { page };
     case 'console':
+      return { page };
+    case 'watchlist':
       return { page };
     case 'financials':
       return { page };
@@ -156,9 +160,12 @@ export function parseRoute(search: string, fallback: Page = 'markets'): ParsedRo
     const group = params.get('group')?.trim();
     const f = params.get('f')?.trim();
     route = { page, ...(group && GROUP_KEY.test(group) ? { group } : {}), ...(f && FILTER_PARAM.test(f) ? { f } : {}) };
-  } else if (page === 'console') {
+  } else if (page === 'console' || page === 'watchlist') {
     const list = params.get('list');
-    route = { page, ...(list && /^[0-9a-f-]{36}$/i.test(list) ? { list } : {}) };
+    const validList = list && /^[0-9a-f-]{36}$/i.test(list) ? list : undefined;
+    route = page === 'watchlist' || (page === 'console' && validList)
+      ? { page: 'watchlist', ...(validList ? { list: validList } : {}) }
+      : { page: 'console' };
   } else if (page === 'chart') {
     const tf = parseLaunchTimeframe(params.get('tf') ?? params.get('timeframe'));
     route = { page, ...(symbol ? { symbol } : {}), ...(tf ? { tf } : {}) };
@@ -190,7 +197,7 @@ export function serializeRoute(route: Route): string {
   if (route.page === 'themes' && route.theme) params.set('theme', route.theme);
   if (route.page === 'screener' && route.group) params.set('group', route.group);
   if (route.page === 'screener' && route.f) params.set('f', route.f);
-  if (route.page === 'console' && route.list) params.set('list', route.list);
+  if (route.page === 'watchlist' && route.list) params.set('list', route.list);
   if (route.page === 'chart') {
     if (route.symbol) params.set('symbol', route.symbol);
     if (route.tf) params.set('tf', route.tf);

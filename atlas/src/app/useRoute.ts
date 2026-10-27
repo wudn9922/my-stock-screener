@@ -21,8 +21,11 @@ export function useRoute(fallback: Page) {
     return { route: parsed.route, id: 1, source: 'url' };
   });
   useEffect(() => {
-    const pop = () =>
-      setState((previous) => ({ route: parseRoute(window.location.search, fallback).route, id: previous.id + 1, source: 'url' }));
+    const pop = () => {
+      const parsed = parseRoute(window.location.search, fallback);
+      if (parsed.rewrite) window.history.replaceState(window.history.state, '', currentUrl(parsed.route));
+      setState((previous) => ({ route: parsed.route, id: previous.id + 1, source: 'url' }));
+    };
     window.addEventListener('popstate', pop);
     return () => window.removeEventListener('popstate', pop);
   }, [fallback]);

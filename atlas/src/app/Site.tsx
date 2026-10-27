@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ChartCandlestick, Flame, Globe, LayoutDashboard, ListFilter, Search, Settings, SlidersHorizontal, X } from 'lucide-react';
+import { ChartCandlestick, LayoutDashboard, ListFilter, Search, Settings, Star, UserRound, X } from 'lucide-react';
 import { useRoute } from './useRoute';
 import type { Page, Route } from './routes';
 import { SCREENER_HOSTING } from './HostingMode';
@@ -10,14 +10,13 @@ import { applyColorConvention, sitePreferences } from './sitePreferences';
 import { formatDateTime } from '../ui/format';
 import { PageState } from '../ui/PageState';
 import type { ChartRequest } from './chartRequest';
-import { HelpDisclosure } from '../ui/HelpDisclosure';
 import type { Timeframe } from '../market-data/MarketDataProvider';
 import './siteNav.css';
 import { DataHealthPanel } from '../ui/DataHealthPanel';
 import { StorageNotice } from '../auth/StorageNotice';
 import { RouteBoundary } from './RouteBoundary';
-import { InstallPanel } from '../pwa/InstallPanel';
-import { AppUpdate } from '../pwa/AppUpdate';
+import { DisplaySettings } from '../ui/DisplaySettings';
+import { MarketSectionNav, type MarketSectionRoutes } from '../ui/MarketSectionNav';
 
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
@@ -35,13 +34,12 @@ const DEFAULT_PAGE: Page =
     ? 'chart'
     : 'markets';
 
-const NAV: { page: Page; label: string; icon: typeof Globe }[] = [
-  { page: 'markets', label: '大盤', icon: LayoutDashboard },
-  { page: 'world', label: '世界', icon: Globe },
-  { page: 'themes', label: '題材', icon: Flame },
+const NAV: { page: Page; label: string; icon: typeof Star }[] = [
+  { page: 'watchlist', label: '自選', icon: Star },
+  { page: 'markets', label: '市場', icon: LayoutDashboard },
   { page: 'screener', label: '選股', icon: ListFilter },
-  { page: 'chart', label: '圖表', icon: ChartCandlestick },
-  { page: 'console', label: '控制台', icon: SlidersHorizontal },
+  { page: 'chart', label: '個股', icon: ChartCandlestick },
+  { page: 'console', label: '我的', icon: UserRound },
 ];
 const PAGE_TITLES: Record<Page, string> = {
   markets: '大盤',
@@ -50,12 +48,13 @@ const PAGE_TITLES: Record<Page, string> = {
   screener: '選股',
   chart: '圖表',
   financials: '財報分析',
-  console: '參數控制台',
+  watchlist: '自選清單',
+  console: '我的',
 };
 const RATES_TITLE = '美債與利率';
 
-/** The bottom bar has no financials item: that page belongs to the chart and lights 「圖表」. */
-const navPageOf = (page: Page): Page => (page === 'financials' ? 'chart' : page);
+/** Existing detail pages light their parent primary section. */
+const navPageOf = (page: Page): Page => page === 'financials' ? 'chart' : page === 'world' || page === 'themes' ? 'markets' : page;
 const pageTitleOf = (route: Route) => route.page === 'world'
   ? route.view === 'commodities' ? '原物料' : route.view === 'fx' ? '匯率' : route.view === 'indices' ? PAGE_TITLES.world : RATES_TITLE
   : PAGE_TITLES[route.page];
@@ -87,6 +86,11 @@ function reportSymbols(report: Report | null): LocalSymbol[] {
 export function Site() {
   const mobile = useSyncExternalStore(subscribeMobile, () => mobileQuery.matches);
   const { route, id: navId, source: navSource, navigate, syncRoute } = useRoute(DEFAULT_PAGE);
+  const marketMemory = useRef<MarketSectionRoutes>({ markets: { page: 'markets', market: 'tw' }, world: { page: 'world' }, themes: { page: 'themes' } });
+  if (route.page === 'markets') marketMemory.current.markets = route;
+  if (route.page === 'world') marketMemory.current.world = route;
+  if (route.page === 'themes') marketMemory.current.themes = { page: 'themes', ...(route.market ? { market: route.market } : {}), ...(route.v ? { v: route.v } : {}) };
+
   // Builds without a published report (upstream Atlas) only fetch it when a report page opens.
   const { state: reportState, reload } = useReport(SCREENER_HOSTING || route.page !== 'chart');
   const report = reportState.status === 'ok' ? reportState.report : null;
@@ -176,7 +180,7 @@ export function Site() {
     // Back from financials to the chart of the same symbol, with the timeframe it was opened with.
     if (page === 'chart')
       navigate(route.page === 'financials' && route.symbol ? { page: 'chart', symbol: route.symbol, ...(route.tf ? { tf: route.tf } : {}) } : { page: 'chart' });
-    else if (page === 'markets') navigate({ page, market: route.page === 'markets' ? route.market : 'tw' });
+    else if (page === 'markets') navigate(marketMemory.current.markets);
     else navigate({ page } as Route);
   };
   const reportDate = report?.reportDate ?? null;
@@ -210,6 +214,9 @@ export function Site() {
           </div>
         )}
         <div className="site-topbar-end">
+          {mobile && <button type="button" className="icon-button site-mobile-search" aria-label="搜尋股票" title="搜尋股票" onClick={() => setSearchOpen(true)}>
+            <Search size={21} aria-hidden="true" />
+          </button>}
           {reportDate && (
             <span className="report-date" title={report?.generatedAt ? `產生時間 ${formatDateTime(report.generatedAt)}` : undefined}>
               報告日 {formatDateTime(reportDate, false)}
@@ -236,13 +243,15 @@ export function Site() {
       </nav>
       <main className="site-main" id="main">
         {SCREENER_HOSTING && <StorageNotice />}
+        {(route.page === 'markets' || route.page === 'world' || route.page === 'themes') &&
+          <MarketSectionNav active={route.page} routes={marketMemory.current} navigate={navigate} />}
         <RouteBoundary key={route.page}>
           <Suspense fallback={pageFallback}>
             {route.page === 'markets' && <MarketsPage {...pageProps} market={route.market} />}
             {route.page === 'world' && <WorldPage {...pageProps} view={route.view} />}
             {route.page === 'themes' && <ThemesPage {...pageProps} theme={route.theme} market={route.market} view={route.v} />}
             {route.page === 'screener' && <ScreenerPage {...pageProps} group={route.group} f={route.f} />}
-            {route.page === 'console' && <ConsolePage {...pageProps} list={route.list} />}
+            {(route.page === 'console' || route.page === 'watchlist') && <ConsolePage {...pageProps} section={route.page === 'watchlist' ? 'lists' : 'settings'} list={route.page === 'watchlist' ? route.list : undefined} />}
             {route.page === 'financials' && <FinancialsPage {...pageProps} symbol={route.symbol} p={route.p} tf={route.tf} />}
           </Suspense>
         </RouteBoundary>
@@ -277,10 +286,6 @@ export function Site() {
             <span>{label}</span>
           </button>
         ))}
-        <button type="button" className={searchOpen ? 'active' : ''} onClick={() => setSearchOpen(true)}>
-          <Search size={21} aria-hidden="true" />
-          <span>搜尋</span>
-        </button>
       </nav>
       {searchOpen && (
         <div className="search-sheet-backdrop" onClick={() => setSearchOpen(false)}>
@@ -309,42 +314,7 @@ export function Site() {
                 <X size={18} />
               </button>
             </div>
-            <fieldset className="segmented-field">
-              <legend>漲跌顏色</legend>
-              <div className="segmented">
-                {(
-                  [
-                    ['tw', '紅漲綠跌'],
-                    ['us', '綠漲紅跌'],
-                  ] as const
-                ).map(([value, label]) => (
-                  <label key={value} className={preferences.colors === value ? 'active' : ''}>
-                    <input
-                      type="radio"
-                      name="color-convention"
-                      value={value}
-                      checked={preferences.colors === value}
-                      onChange={() => sitePreferences.setColors(value)}
-                    />
-                    <span className={`swatch ${value}`} aria-hidden="true" />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <InstallPanel />
-            <AppUpdate />
-            <dl className="dialog-facts">
-              <div>
-                <dt>報告日期</dt>
-                <dd>{reportDate ? formatDateTime(reportDate, false) : '—'}</dd>
-              </div>
-              <div>
-                <dt>產生時間</dt>
-                <dd>{report?.generatedAt ? formatDateTime(report.generatedAt) : '—'}</dd>
-              </div>
-            </dl>
-            <HelpDisclosure label="行情與儲存說明">行情為延遲資料，僅供研究參考，非投資建議。圖表設定與畫線依帳號儲存權限保留。</HelpDisclosure>
+            <DisplaySettings reportDate={reportDate} generatedAt={report?.generatedAt ?? null} />
           </div>
         </div>
       )}
