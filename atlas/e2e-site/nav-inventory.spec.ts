@@ -122,14 +122,18 @@ test('market section inventory and remembered selectors, screener filters, chart
   await fixtures(page);
   await page.goto('./');
   await primary(page).getByRole('button', { name: '市場', exact: true }).click();
-  await expect(sections(page).getByRole('link', { name: '大盤', exact: true })).toHaveAttribute('aria-current', 'page');
-  for (const [key, label] of [['tw', '台灣'], ['jp', '日本'], ['kr', '韓國'], ['eu', '歐洲'], ['us', '美國']]) {
+  await expect(sections(page).getByRole('link')).toHaveText(['台股', '美股', '日韓歐', '全球', '題材']);
+  await expect(sections(page).getByRole('link', { name: '台股', exact: true })).toHaveAttribute('aria-current', 'page');
+  for (const [key, label, section] of [['tw', '台灣', '台股'], ['jp', '日本', '日韓歐'], ['kr', '韓國', '日韓歐'], ['eu', '歐洲', '日韓歐'], ['us', '美國', '美股']]) {
     const tab = page.getByRole('tab', { name: new RegExp(label!) });
     await tab.click(); await expect(tab).toHaveAttribute('aria-selected', 'true');
     await expect(page).toHaveURL(new RegExp(`page=markets&market=${key}`));
     await expect(page.locator('.markets-layout')).toBeVisible();
+    await expect(sections(page).getByRole('link', { name: section, exact: true })).toHaveAttribute('aria-current', 'page');
   }
-  await sections(page).getByRole('link', { name: '世界', exact: true }).click();
+  await sections(page).getByRole('link', { name: '台股', exact: true }).click();
+  await expect(page.getByRole('tab', { name: /台灣/ })).toHaveAttribute('aria-selected', 'true');
+  await sections(page).getByRole('link', { name: '全球', exact: true }).click();
   await expect(primary(page).getByRole('button', { name: '市場', exact: true })).toHaveAttribute('aria-current', 'page');
   for (const [view, label, content] of [['', '美債利率', '.rates-view'], ['indices', '指數', '.world-table-card'], ['commodities', '原物料', '.world-candle-card'], ['fx', '匯率', '.world-candle-card']]) {
     const button = page.getByRole('group', { name: '世界頁面' }).getByRole('button', { name: label, exact: true });
@@ -147,9 +151,11 @@ test('market section inventory and remembered selectors, screener filters, chart
   await expect(page.locator('.theme-tile')).toHaveCount(8);
   await page.getByRole('group', { name: '檢視' }).getByRole('button', { name: '熱力圖', exact: true }).click();
   await expect(page.locator('.themes-map')).toBeVisible();
-  await sections(page).getByRole('link', { name: '大盤', exact: true }).click();
+  await sections(page).getByRole('link', { name: '美股', exact: true }).click();
   await expect(page.getByRole('tab', { name: /美國/ })).toHaveAttribute('aria-selected', 'true');
-  await sections(page).getByRole('link', { name: '世界', exact: true }).click();
+  await sections(page).getByRole('link', { name: '日韓歐', exact: true }).click();
+  await expect(page.getByRole('tab', { name: /歐洲/ })).toHaveAttribute('aria-selected', 'true');
+  await sections(page).getByRole('link', { name: '全球', exact: true }).click();
   await expect(page).toHaveURL(/view=fx/);
   await sections(page).getByRole('link', { name: '題材', exact: true }).click();
   await expect(page).toHaveURL(/page=themes&market=tw&v=map/);

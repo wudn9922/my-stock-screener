@@ -17,7 +17,7 @@ import { DataHealthPanel } from '../ui/DataHealthPanel';
 import { StorageNotice } from '../auth/StorageNotice';
 import { RouteBoundary } from './RouteBoundary';
 import { DisplaySettings } from '../ui/DisplaySettings';
-import { MarketSectionNav, type MarketSectionRoutes } from '../ui/MarketSectionNav';
+import { INITIAL_MARKET_SECTIONS, MarketSectionNav, marketSectionOf, rememberMarketSection, type MarketSectionRoutes } from '../ui/MarketSectionNav';
 
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
@@ -87,10 +87,14 @@ function reportSymbols(report: Report | null): LocalSymbol[] {
 export function Site() {
   const mobile = useSyncExternalStore(subscribeMobile, () => mobileQuery.matches);
   const { route, id: navId, source: navSource, navigate, syncRoute } = useRoute(DEFAULT_PAGE);
-  const marketMemory = useRef<MarketSectionRoutes>({ markets: { page: 'markets', market: 'tw' }, world: { page: 'world' }, themes: { page: 'themes' } });
-  if (route.page === 'markets') marketMemory.current.markets = route;
-  if (route.page === 'world') marketMemory.current.world = route;
-  if (route.page === 'themes') marketMemory.current.themes = { page: 'themes', ...(route.market ? { market: route.market } : {}), ...(route.v ? { v: route.v } : {}) };
+  // 市場 remembers each section as it was left, and the bottom 「市場」 reopens the last section visited.
+  const marketMemory = useRef<MarketSectionRoutes>(INITIAL_MARKET_SECTIONS);
+  const lastMarketSection = useRef<Route>(INITIAL_MARKET_SECTIONS.tw);
+  const marketSection = marketSectionOf(route);
+  if (marketSection) {
+    marketMemory.current = rememberMarketSection(marketMemory.current, route);
+    lastMarketSection.current = marketSection === 'themes' ? marketMemory.current.themes : route;
+  }
 
   // Builds without a published report (upstream Atlas) only fetch it when a report page opens.
   const { state: reportState, reload } = useReport(SCREENER_HOSTING || route.page !== 'chart');
@@ -182,11 +186,12 @@ export function Site() {
   );
   const go = (page: Page) => {
     setSearchOpen(false);
-    if (page === route.page) return;
+    // Already in that destination (市場 covers its sections).
+    if (page === route.page || (page === 'markets' && marketSection)) return;
     // Back from financials to the chart of the same symbol, with the timeframe it was opened with.
     if (page === 'chart')
       navigate(route.page === 'financials' && route.symbol ? { page: 'chart', symbol: route.symbol, ...(route.tf ? { tf: route.tf } : {}) } : { page: 'chart' });
-    else if (page === 'markets') navigate(marketMemory.current.markets);
+    else if (page === 'markets') navigate(lastMarketSection.current);
     else navigate({ page } as Route);
   };
   const reportDate = report?.reportDate ?? null;
@@ -250,7 +255,7 @@ export function Site() {
       <main className="site-main" id="main">
         {SCREENER_HOSTING && <StorageNotice />}
         {(route.page === 'markets' || route.page === 'world' || route.page === 'themes') &&
-          <MarketSectionNav active={route.page} routes={marketMemory.current} navigate={navigate} />}
+          <MarketSectionNav active={marketSection!} routes={marketMemory.current} navigate={navigate} />}
         <RouteBoundary key={route.page}>
           <Suspense fallback={pageFallback}>
             {route.page === 'markets' && <MarketsPage {...pageProps} market={route.market} />}
