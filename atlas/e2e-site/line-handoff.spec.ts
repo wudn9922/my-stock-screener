@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { buildReport, mockSite } from './mocks';
 import { accessEnvelope, DEVICE_USER_ID } from './account-fixture';
 import {
@@ -11,6 +11,61 @@ import {
   sdkLogin,
   sdkTestUrl,
 } from './line-sdk-fixture';
+
+interface LaunchRecord {
+  urls: string[];
+  inGesture: boolean[];
+  pagehide: number;
+  beforeunload: number;
+  opened: string[];
+}
+/**
+ * Playwright cannot open the real LINE app. Record (and cancel) any top-level
+ * line: link activation, whether it ran inside the trusted click gesture, and
+ * any pagehide/beforeunload of the original receiver document.
+ */
+async function recordLineLaunch(page: Page) {
+  await page.addInitScript(() => {
+    const state = {
+      urls: [] as string[],
+      inGesture: [] as boolean[],
+      pagehide: 0,
+      beforeunload: 0,
+      opened: [] as string[],
+    };
+    (window as unknown as { __lineLaunch: typeof state }).__lineLaunch = state;
+    let gesture = false;
+    window.addEventListener(
+      'click',
+      (e) => e.isTrusted && (gesture = true),
+      true,
+    );
+    window.addEventListener('click', (e) => e.isTrusted && (gesture = false));
+    document.addEventListener(
+      'click',
+      (event) => {
+        const link =
+          event.target instanceof Element ? event.target.closest('a') : null;
+        if (link?.protocol !== 'line:') return;
+        state.urls.push(link.href);
+        state.inGesture.push(gesture);
+        event.preventDefault(); // Stub the OS app hand-off; never leave the page.
+      },
+      true,
+    );
+    window.addEventListener('pagehide', () => state.pagehide++);
+    window.addEventListener('beforeunload', () => state.beforeunload++);
+    const open = window.open.bind(window);
+    window.open = (...args) => {
+      state.opened.push(String(args[0]));
+      return open(...args);
+    };
+  });
+}
+const launchRecord = (page: Page) =>
+  page.evaluate(
+    () => (window as unknown as { __lineLaunch: LaunchRecord }).__lineLaunch,
+  );
 
 /** Two independent contexts deliberately share no cookies, localStorage or IndexedDB. */
 for (const scenario of [
@@ -140,6 +195,7 @@ for (const scenario of [
         value: 'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15',
       });
     });
+    await recordLineLaunch(page);
     await mockSite(page, { report: buildReport(20) });
     await route(page.context());
     await page.context().route('https://liff.line.me/**', (r) =>
@@ -150,16 +206,32 @@ for (const scenario of [
     );
     await page.goto('./?page=console');
     const originalBeforeLogin = page.url();
+    let mainNavigations = 0;
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame()) mainNavigations++;
+    });
     await page
       .getByRole('button', { name: '使用 LINE 登入', exact: true })
       .click();
+    // iOS WebKit ignores custom schemes in subframes: no hidden launch frame.
     const launchFrame = page.locator('iframe[title="開啟 LINE"]');
-    await expect(launchFrame).toHaveAttribute('src', /^line:\/\/app\//);
-    const appUrl = new URL((await launchFrame.getAttribute('src'))!);
+    await expect(launchFrame).toHaveCount(0);
+    const launch = await launchRecord(page);
+    expect(launch.urls).toHaveLength(1);
+    expect(launch.inGesture).toEqual([true]);
+    expect(launch.urls[0]).toMatch(/^line:\/\/app\//);
+    const appUrl = new URL(launch.urls[0]!);
+    expect(appUrl.pathname).toBe('/2010330411-6JhrotT9');
+    expect(appUrl.searchParams.get('atlasLineHandoff')).toBe(intentId);
     expect(appUrl.searchParams.get('atlasLineWrite')).toBe(writeSecret);
     expect(appUrl.href).not.toContain(readSecret);
+    expect(launch.opened).toEqual([]);
+    expect(launch.pagehide).toBe(0);
+    expect(launch.beforeunload).toBe(0);
+    await expect(page.locator('a[data-atlas-line-launch]')).toHaveCount(0);
     expect(page.context().pages()).toHaveLength(1);
     expect(page.url()).toBe(originalBeforeLogin);
+    expect(mainNavigations).toBe(0);
     await expect(
       page.getByText('請在 LINE 完成驗證後，返回這個 Atlas 視窗。', {
         exact: false,
@@ -306,6 +378,14 @@ for (const scenario of [
       );
       expect(consumed).toBe(true);
       await expect(launchFrame).toHaveCount(0);
+      // The receiver document (and its RAM read secret) was never unloaded.
+      expect(mainNavigations).toBe(0);
+      expect(await launchRecord(page)).toMatchObject({
+        pagehide: 0,
+        beforeunload: 0,
+        opened: [],
+      });
+      expect((await launchRecord(page)).urls).toHaveLength(1);
     } finally {
       await sender.close();
     }
@@ -315,6 +395,7 @@ for (const insideLine of [false, true])
   test(`an unavailable WindowProxy offers a login link without OAuth loops (LINE browser=${insideLine})`, async ({
     page,
   }) => {
+    await recordLineLaunch(page);
     await page.addInitScript((inLine) => {
       Object.defineProperty(navigator, 'standalone', { value: true });
       window.open = () => null;
@@ -378,6 +459,7 @@ test('manual launch sheet keeps its explanation when native dispatch and closing
       true,
     );
   });
+  await recordLineLaunch(page);
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'standalone', { value: true });
     Object.defineProperty(navigator, 'userAgent', {
@@ -456,6 +538,137 @@ test('manual launch sheet keeps its explanation when native dispatch and closing
   } finally {
     await sheet.close();
   }
+});
+
+for (const device of ['iphone', 'desktop'] as const)
+  test(`launch hint when LINE does not open: ${device}`, async ({ page }) => {
+    await recordLineLaunch(page);
+    await page.addInitScript(
+      (ua) => {
+        Object.defineProperty(navigator, 'standalone', { value: true });
+        Object.defineProperty(navigator, 'userAgent', {
+          value: ua,
+          configurable: true,
+        });
+        Object.defineProperty(navigator, 'platform', {
+          value: ua.includes('iPhone') ? 'iPhone' : 'Win32',
+          configurable: true,
+        });
+        Object.defineProperty(navigator, 'maxTouchPoints', {
+          value: ua.includes('iPhone') ? 5 : 0,
+          configurable: true,
+        });
+      },
+      device === 'iphone'
+        ? 'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15'
+        : 'Mozilla/5.0 (Windows NT 10.0) Chrome/130',
+    );
+    let begin: Record<string, unknown> = {};
+    await mockSite(page);
+    await page.route('**/functions/v1/user-settings', (r) => {
+      const body = r.request().postDataJSON();
+      if (body.action === 'line.login.begin') begin = body;
+      return r.fulfill({
+        json: {
+          ok: true,
+          data: {
+            status: 'pending',
+            expiresAt: new Date(Date.now() + 120000).toISOString(),
+          },
+        },
+      });
+    });
+    await page.goto('./?page=console');
+    const original = page.url();
+    await page
+      .getByRole('button', { name: '使用 LINE 登入', exact: true })
+      .click();
+    const link = page.getByRole('link', { name: '開啟 LINE 登入視窗' });
+    await expect(link).toBeVisible();
+    const hint = page.getByText('LINE 沒有自動開啟？請點這裡', { exact: true });
+    const launch = await launchRecord(page);
+    expect(launch.pagehide).toBe(0);
+    if (device === 'desktop') {
+      // Desktop path unchanged: one explanatory window, no scheme or hint.
+      expect(launch.urls).toEqual([]);
+      expect(launch.opened).toHaveLength(1);
+      expect(new URL(launch.opened[0]!).pathname).toMatch(
+        /\/line-login-launch\.html$/,
+      );
+      await page.waitForTimeout(2500);
+      await expect(hint).toHaveCount(0);
+    } else {
+      expect(launch.inGesture).toEqual([true]);
+      expect(new URL(launch.urls[0]!).searchParams.get('atlasLineWrite')).toBe(
+        begin.writeSecret,
+      );
+      expect(launch.opened).toEqual([]);
+      // Still visible and focused after ~1.5 s: assume LINE did not open.
+      await expect(hint).toBeVisible({ timeout: 5000 });
+      await expect(link).toHaveClass(/primary-button/);
+      await expect(link).toHaveAttribute(
+        'aria-describedby',
+        'line-launch-missed',
+      );
+      // Never auto-open a window after the delay (popup blockers).
+      await page.waitForTimeout(500);
+      expect((await launchRecord(page)).opened).toEqual([]);
+      expect((await launchRecord(page)).urls).toHaveLength(1);
+      expect(page.context().pages()).toHaveLength(1);
+    }
+    expect(page.url()).toBe(original);
+    await page.getByRole('button', { name: '取消登入', exact: true }).click();
+    await expect(hint).toHaveCount(0);
+  });
+
+test('no launch hint when the page is hidden right after the LINE scheme dispatch', async ({
+  page,
+}) => {
+  await recordLineLaunch(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'standalone', { value: true });
+    Object.defineProperty(navigator, 'userAgent', {
+      value: 'Mozilla/5.0 (iPhone)',
+      configurable: true,
+    });
+  });
+  await mockSite(page);
+  await page.route('**/functions/v1/user-settings', (r) =>
+    r.fulfill({
+      json: {
+        ok: true,
+        data: {
+          status: 'pending',
+          expiresAt: new Date(Date.now() + 120000).toISOString(),
+        },
+      },
+    }),
+  );
+  await page.goto('./?page=console');
+  await page
+    .getByRole('button', { name: '使用 LINE 登入', exact: true })
+    .click();
+  // Model iOS backgrounding the PWA while LINE takes over.
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    });
+  });
+  await page.waitForTimeout(2500);
+  await expect(
+    page.getByRole('link', { name: '開啟 LINE 登入視窗' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('LINE 沒有自動開啟？請點這裡', { exact: true }),
+  ).toHaveCount(0);
+  expect((await launchRecord(page)).urls).toHaveLength(1);
+  await page.getByRole('button', { name: '取消登入', exact: true }).click();
 });
 
 test('the launch sheet is readable before JavaScript or SDK initialization', async ({

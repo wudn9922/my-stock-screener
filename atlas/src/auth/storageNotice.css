@@ -14,3 +14,7 @@
   .site.on-chart .storage-policy-note { margin-top: 0; }
   .site.on-chart .ws-header { padding-top: 2px; padding-bottom: 2px; row-gap: 0; }
 }
+
+/* Shown only when LINE did not take over the page ~1.5 s after the login gesture. */
+.line-launch-missed { display: block; margin-top: 6px; color: var(--accent-text); }
+a.line-launch-link { margin: 6px 0; text-decoration: none; }
