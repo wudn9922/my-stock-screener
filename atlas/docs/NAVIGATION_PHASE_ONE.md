@@ -67,6 +67,7 @@
 | `site.spec.ts` | 手機搜尋改點頂部按鈕；精簡圖表頁走原股票切換入口，仍驗證相同搜尋結果 |
 | `themes.spec.ts` | 主導覽數量由需求指定的 7 改成 5；仍檢查同列與每項至少 44px 寬 |
 | `workspace-refinements.spec.ts` | 底列大盤入口改名市場；原圖表高度、面板可達性斷言不變 |
+| `screener-universe-full.spec.ts` | 全量執行發現 main 既有測試在範圍說明收合時檢查其內文；先點原展開按鈕，保留全部原文字、狀態、數量及效能斷言，並增加美股展開狀態檢查；不改產品行為 |
 | `e2e/drawing-picker.spec.ts` | 手機圖表的搜尋改從原股票切換按鈕開啟同一 sheet，原 Escape／焦點斷言保留 |
 | `e2e/site-helpers.ts` | 搜尋 helper 跟隨搬移後的入口；工作台操作、資料源與匯出 helper 行為不變 |
 

@@ -19,6 +19,10 @@ test('US full-market list: scope, count and exclusions are shown; 6,000 rows sta
   const meta = page.locator('.screener-meta');
   await expect(meta).toContainText('6,000 檔');
   await expect(meta).toContainText('美股 NYSE／NASDAQ／NYSE American 等交易所普通股與 ADR（6,120 檔）');
+  const note = page.locator('.screener-note');
+  await expect(note).toHaveAttribute('aria-expanded', 'false');
+  await note.click();
+  await expect(note).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('.screener-note')).toContainText('排除近 5 個交易日無 K 線');
   await expect(page.locator('.screener-note')).toContainText('Nasdaq 股票篩選器');
   await expect(page.locator('.result-count')).toHaveText('6000 檔');
@@ -69,10 +73,10 @@ test('Taiwan full-market list shows the official scope and the note without over
   await expect(page.locator('.screener-meta')).toContainText('1,850 檔');
   await expect(page.locator('.screener-meta')).toContainText('台股上市＋上櫃普通股（上市 1,060、上櫃 830 檔）');
   const note = page.locator('.screener-note');
-  await expect(note).toContainText('不含 ETF、TDR、特別股、權證與興櫃');
   await expect(note).toHaveAttribute('aria-expanded', 'false');
   await note.click();
   await expect(note).toHaveAttribute('aria-expanded', 'true');
+  await expect(note).toContainText('不含 ETF、TDR、特別股、權證與興櫃');
   const chip = page.getByRole('button', { name: /台股全市場篩選/ });
   await expect(chip).toContainText('1850');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

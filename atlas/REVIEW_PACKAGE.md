@@ -760,3 +760,5 @@ revision; the same matrix and the full PR workflow are rerun on this layout foll
 原 DEFAULT_PAGE、品牌連結、日期 chip、DataHealthPanel、RouteBoundary、lazy loading、chartVisited 及捲動邏輯保留。入口測試證明圖表／財務往返仍是同一 chart DOM；帳號／舊資料／LINE／PWA／清單整合斷言完整保留。先前桌面新測試使用 radio 的隱藏 input 點擊，已改用原可點擊 label，保留 checked 與重載後持久化斷言。
 
 已執行 clean npm ci、npm test（1,505 通過）、lint、一般與 Pages build；完整 npm run test:site 的三瀏覽器結果、其失敗與修正記錄以 PR body 為準。不合併、不部署。
+
+全量回歸發現 main 的 screener-universe-full.spec.ts 在原本收合的名單範圍說明中直接檢查內文。測試補上點擊既有按鈕的操作，原有內文、收合／展開、數量、篩選與虛擬列表斷言全部保留；產品的說明按鈕和展開行為未改。
