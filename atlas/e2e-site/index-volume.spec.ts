@@ -102,3 +102,21 @@ test('unavailable daily source leaves success rates usable and an explicit retry
   await card.getByRole('button', { name: '重試價量分析', exact: true }).click();
   await expect(card.locator('.research-stats dd').first()).toHaveText('1/10 = 10%');
 });
+
+test('SOX has no index volume: the card uses labelled SOXX volume with the index prices', async ({ page }) => {
+  await fixtures(page);
+  await page.route('**/my-stock-screener/report/series/%5ESOX.json', route =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify(packet('^SOX', true)) }));
+  await page.goto('./?page=markets&market=us');
+  const card = panel(page);
+  await card.getByLabel('價量分析指數').selectOption('^SOX');
+  await expect(card.getByRole('note')).toHaveText(/此指數的資料來源沒有成交量；成交量改用 SOXX（iShares 半導體 ETF）同日成交量/);
+  await expect(card.locator('.research-stats dd')).toHaveCount(4);
+  for (const text of await card.locator('.research-stats dd').allTextContents()) expect(text).not.toBe('0/0 = N/A');
+  await expect(card.getByRole('status')).toHaveCount(0);
+  await expect(card).toContainText('成交量為 SOXX（iShares 半導體 ETF）');
+  // An index with its own volume never shows the proxy note.
+  await card.getByLabel('價量分析指數').selectOption('^GSPC');
+  await expect(card.locator('.research-stats dd').first()).toHaveText('1/10 = 10%');
+  await expect(card.getByRole('note')).toHaveCount(0);
+});

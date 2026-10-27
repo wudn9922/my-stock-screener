@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Bar, BarResult } from '../src/market-data/MarketDataProvider';
 import { getMarketProfile } from '../src/market-data/MarketProfile';
-import { indexVolumeFeatures } from '../src/report/indexVolume';
+import { hasIndexVolume, INDEX_VOLUME_PROXIES, indexVolumeFeatures, withProxyVolume } from '../src/report/indexVolume';
 import { volumeStructure } from '../src/report/research';
 
 const epoch = (value: string) => Date.parse(value) / 1000;
@@ -84,5 +84,27 @@ describe('index directional volume', () => {
     const close = epoch(closeTime), data = result(rows, '^GSPC', close);
     expect(indexVolumeFeatures(data, '^GSPC', close - 1)).toHaveLength(1);
     expect(indexVolumeFeatures(data, '^GSPC', close)).toHaveLength(2);
+  });
+});
+
+describe('labelled volume proxy for indices without volume', () => {
+  it('only SOX has a proxy, and only an index with no recent volume uses it', () => {
+    expect(INDEX_VOLUME_PROXIES['^SOX']).toEqual({ symbol: 'SOXX', label: 'SOXX（iShares 半導體 ETF）' });
+    expect(INDEX_VOLUME_PROXIES['^GSPC']).toBeUndefined();
+    expect(hasIndexVolume(result(bars([[100, 0], [101, 0]]), '^SOX'))).toBe(false);
+    expect(hasIndexVolume(result(bars([[100, 0], [101, 5]]), '^SOX'))).toBe(true);
+  });
+
+  it('keeps the index prices and dates, takes same-day proxy volume and never fills a missing proxy day', () => {
+    const index = result(bars([[100, 0], [110, 0], [99, 0], [100, 0]]), '^SOX', epoch('2026-10-25T12:00:00Z'));
+    const proxyBars = bars([[50, 100], [55, 200], [49, 300]]);
+    const proxy = result(proxyBars, 'SOXX', epoch('2026-10-24T12:00:00Z'));
+    const merged = withProxyVolume(index, proxy, '^SOX');
+    expect(merged.bars.map((bar) => bar.close)).toEqual([100, 110, 99, 100]);
+    expect(merged.bars.map((bar) => bar.volume)).toEqual([100, 200, 300, 0]);
+    expect(merged.asOf).toBe(epoch('2026-10-24T12:00:00Z'));
+    const features = indexVolumeFeatures(merged, '^SOX', epoch('2026-10-25T12:00:00Z'));
+    expect(features.map((feature) => feature.valid)).toEqual([true, true, true, false]);
+    expect(volumeStructure(features, 20)).toMatchObject({ observations: 2, upExpand: { numerator: 1 }, downExpand: { numerator: 1 } });
   });
 });

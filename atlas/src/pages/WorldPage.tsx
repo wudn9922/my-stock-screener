@@ -30,6 +30,7 @@ import {
 import type { Bar } from '../market-data/MarketDataProvider';
 import { formatDateTime, formatPercent, formatPrice, toneClass } from '../ui/format';
 import { PageState } from '../ui/PageState';
+import './worldPage.css';
 
 // The rates research view loads only when opened; it has its own data and does not use the daily report.
 const RatesView = lazy(() => import('./RatesView'));
@@ -392,7 +393,7 @@ export default function WorldPage({ report, reload, navigate, openChart, view }:
   const assets = view === 'commodities' || view === 'fx';
   return (
     <div className="page world-page">
-      <div className="page-head">
+      <div className="page-head world-page-head">
         <div>
           <h2 className="page-title">{rates ? '美債與利率' : view === 'commodities' ? '原物料' : view === 'fx' ? '匯率' : '世界指數'}</h2>
           {view === 'indices' && report.status === 'ok' && (

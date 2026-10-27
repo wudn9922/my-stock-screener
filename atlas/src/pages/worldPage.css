@@ -1,0 +1,26 @@
+/* 世界 page view switch: loaded with the page itself so every view (rates, indices, commodities, FX) shares it. */
+.research-world-tabs {
+  flex-wrap: wrap;
+}
+.research-world-tabs button {
+  min-height: 44px;
+}
+/* Phones: the four views take their own full-width row above the date line, never wrapping one onto a second line. */
+@media (max-width: 767px) {
+  .world-page-head {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .research-world-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+  }
+  .research-world-tabs.segmented.compact > button {
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 4px;
+    font-size: 13px;
+  }
+}

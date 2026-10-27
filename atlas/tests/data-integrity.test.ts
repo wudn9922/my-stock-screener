@@ -9,6 +9,25 @@ import type { BarResult } from '../src/market-data/MarketDataProvider';
 const t = (day: string) => Date.parse(day + 'T01:00:00Z') / 1000;
 const bar = (day: string) => ({ time: t(day), open: 87, high: 105, low: 85, close: 95, volume: 100 });
 
+describe('closed-session placeholders in charts', () => {
+  const day = (date: string, close: number, volume: number, flat = false) =>
+    ({ time: t(date), open: flat ? close : close - 5, high: flat ? close : close + 5, low: flat ? close : close - 10, close, volume });
+  it('drops a flat zero-volume copy of the previous close, as on the 10/23 Taiwan closure', () => {
+    const bars = [day('2026-10-22', 2385, 22930116), day('2026-10-23', 2385, 0, true), day('2026-10-27', 2400, 35766965)];
+    expect(usableBars(bars, '2330.TW').map(b => b.time)).toEqual([t('2026-10-22'), t('2026-10-27')]);
+    // Consecutive closure days are all dropped (each compares with the last kept session).
+    const twoDays = [bars[0]!, day('2026-10-23', 2385, 0, true), day('2026-10-26', 2385, 0, true), bars[2]!];
+    expect(usableBars(twoDays, '2330.TW')).toHaveLength(2);
+  });
+  it('keeps every real session: traded volume, a moved price, a first bar, and weekly or monthly bars', () => {
+    expect(usableBars([day('2026-10-22', 100, 10), day('2026-10-23', 100, 5, true)], '2330.TW')).toHaveLength(2);
+    expect(usableBars([day('2026-10-22', 100, 10), day('2026-10-23', 101, 0, true)], '2330.TW')).toHaveLength(2);
+    expect(usableBars([day('2026-10-22', 100, 10), { ...day('2026-10-23', 100, 0), open: 99, high: 101, low: 99 }], '2330.TW')).toHaveLength(2);
+    expect(usableBars([day('2026-10-23', 100, 0, true)], '2330.TW')).toHaveLength(1);
+    expect(usableBars([day('2026-10-19', 100, 10), day('2026-10-26', 100, 0, true)], '2330.TW', '1W')).toHaveLength(2);
+  });
+});
+
 describe('K-line quarantine boundary', () => {
   it('skips explicitly quarantined bars even if their OHLC looks valid', () => {
     expect(usableBars([bar('2026-08-27'), bar('2026-08-28'), bar('2026-08-31')], '7825.TWO')).toHaveLength(2);

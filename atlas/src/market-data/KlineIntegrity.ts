@@ -21,8 +21,24 @@ export function validKline(bar: Bar): boolean {
     && bar.low <= Math.min(bar.open, bar.close) && Math.max(bar.open, bar.close) <= bar.high;
 }
 
+/**
+ * A source's stand-in for a session that never traded (market closure, typhoon day, holiday): no volume and
+ * one price equal to the previous close for open, high, low and close. A real session always differs in
+ * volume or price, so only these flat copies are dropped (daily bars; never the first bar).
+ */
+export function isClosedSessionPlaceholder(bar: Bar, previous: Bar | undefined): boolean {
+  return !!previous && bar.volume === 0 && bar.open === bar.close && bar.high === bar.close && bar.low === bar.close
+    && bar.close === previous.close;
+}
+
 export function usableBars(bars: readonly Bar[], symbol: string, timeframe: Timeframe = '1D'): Bar[] {
-  return bars.filter(bar => validKline(bar) && !isQuarantinedBar(symbol, bar.time, timeframe));
+  const usable: Bar[] = [];
+  for (const bar of bars) {
+    if (!validKline(bar) || isQuarantinedBar(symbol, bar.time, timeframe)) continue;
+    if (timeframe === '1D' && isClosedSessionPlaceholder(bar, usable.at(-1))) continue;
+    usable.push(bar);
+  }
+  return usable;
 }
 
 export function usableBarResult(result: BarResult, symbol: string, timeframe: Timeframe): BarResult {
