@@ -10,6 +10,7 @@ import { applyColorConvention, sitePreferences } from './sitePreferences';
 import { formatDateTime } from '../ui/format';
 import { PageState } from '../ui/PageState';
 import type { ChartRequest } from './chartRequest';
+import type { StockView } from '../ui/StockTabs';
 import type { Timeframe } from '../market-data/MarketDataProvider';
 import './siteNav.css';
 import { DataHealthPanel } from '../ui/DataHealthPanel';
@@ -98,6 +99,9 @@ export function Site() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const preferences = useSyncExternalStore(sitePreferences.subscribe, sitePreferences.get);
   const [chartRequest, setChartRequest] = useState<ChartRequest | null>(null);
+  // 「K線｜價量｜研究」 view of the chart page. Opening a stock shows K線 unless the financials tabs asked for a view.
+  const [stockView, setStockView] = useState<StockView>('chart');
+  const pendingView = useRef<StockView | null>(null);
   const chartVisited = useRef(route.page === 'chart');
   if (route.page === 'chart') chartVisited.current = true;
   const localSymbols = useMemo(() => reportSymbols(report), [report]);
@@ -107,6 +111,8 @@ export function Site() {
   useEffect(() => {
     if (route.page !== 'chart' || !route.symbol) return;
     setChartRequest({ id: navId, symbol: route.symbol, timeframe: route.tf, source: navSource });
+    setStockView(pendingView.current ?? 'chart');
+    pendingView.current = null;
     // Only a new navigation id issues a request; the route is read at that moment.
   }, [navId]);
   // Each page starts at the top (the shell scrolls inside <main>).
@@ -252,7 +258,10 @@ export function Site() {
             {route.page === 'themes' && <ThemesPage {...pageProps} theme={route.theme} market={route.market} view={route.v} />}
             {route.page === 'screener' && <ScreenerPage {...pageProps} group={route.group} f={route.f} />}
             {(route.page === 'console' || route.page === 'watchlist') && <ConsolePage {...pageProps} section={route.page === 'watchlist' ? 'lists' : 'settings'} list={route.page === 'watchlist' ? route.list : undefined} />}
-            {route.page === 'financials' && <FinancialsPage {...pageProps} symbol={route.symbol} p={route.p} tf={route.tf} />}
+            {route.page === 'financials' && (
+              <FinancialsPage {...pageProps} symbol={route.symbol} p={route.p} tf={route.tf}
+                onStockView={(view) => { pendingView.current = view; setStockView(view); }} />
+            )}
           </Suspense>
         </RouteBoundary>
         {chartVisited.current && (
@@ -265,6 +274,8 @@ export function Site() {
                 onStateChange={onChartState}
                 onOpenSearch={() => setSearchOpen(true)}
                 onOpenFinancials={openFinancials}
+                view={stockView}
+                onViewChange={setStockView}
                 reportSymbols={localSymbols}
               />
               </Suspense>
