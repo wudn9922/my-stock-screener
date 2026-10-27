@@ -379,6 +379,79 @@ class GeneratedStorageTests(unittest.TestCase):
         self.assertEqual(self.remote("generated"), generated)
         self.assertEqual(json.loads(self.body(head, journal)), self.journal("REMOTE"))
 
+    @staticmethod
+    def universe(fields, **markets):
+        return dict(version=1, generatedAt="2026-10-27T09:00:00+00:00", reportDate="2026-10-26",
+                    fields=fields, markets=markets)
+
+    def concurrent_generated(self, changes):
+        head = self.remote("generated")
+        entries = self.store.entries(head)
+        for path, body in changes.items():
+            entries[path] = ("100644", gb.git("hash-object", "-w", "--stdin", data=body).decode().strip())
+        commit = self.store.commit(self.store.tree(entries), "concurrent universe", head)
+        self.git("push", "origin", commit + ":refs/heads/generated")
+        return commit
+
+    def test_concurrent_universe_merges_per_market_and_publishes_daily_outputs(self):
+        path = "docs/report/universe.json"
+        # Daily: its own TW scan (newer, not full) and the restored, older full US market.
+        daily = self.universe(["symbol", "close"],
+                              TW=dict(asOf="2026-10-27", scope="daily", rows=[["2330.TW", 1]]),
+                              US=dict(asOf="2026-10-23", scope="full", rows=[["OLD", 2]]))
+        # The full-market job published meanwhile: full TW and newer full US with profile columns.
+        full = self.universe(["symbol", "close", "sector"],
+                             TW=dict(asOf="2026-10-26", scope="full", rows=[["2330.TW", 3, "半導體"]]),
+                             US=dict(asOf="2026-10-26", scope="full", rows=[["NVDA", 4, "Tech"]]))
+        full["generatedAt"] = "2026-10-27T09:28:00+00:00"
+        self.write(path, json.dumps(daily).encode())
+        self.write("docs/report/latest.json", b"daily generated output")
+        self.concurrent_generated({path: json.dumps(full).encode()})
+        self.store.publish("daily")
+        tip = self.remote("generated")
+        merged = json.loads(self.body(tip, path))
+        self.assertEqual(merged["fields"], ["symbol", "close", "sector"])
+        self.assertEqual(merged["markets"]["TW"], dict(asOf="2026-10-26", scope="full", rows=[["2330.TW", 3, "半導體"]]))
+        self.assertEqual(merged["markets"]["US"], dict(asOf="2026-10-26", scope="full", rows=[["NVDA", 4, "Tech"]]))
+        self.assertEqual(merged["generatedAt"], "2026-10-27T09:28:00+00:00")
+        self.assertEqual(self.body(tip, "docs/report/latest.json"), b"daily generated output")
+        self.store.publish("daily")  # A rerun converges without another conflict.
+        self.assertEqual(json.loads(self.body(self.remote("generated"), path)), merged)
+
+    def test_universe_merge_keeps_newer_market_and_remaps_rows_by_field_name(self):
+        remote = self.universe(["symbol", "close", "sector"],
+                               TW=dict(asOf="2026-10-22", scope="full", rows=[["2330.TW", 1, "半導體"]]))
+        local = self.universe(["close", "symbol"],
+                              TW=dict(asOf="2026-10-26", scope="full", rows=[[5, "2317.TW"]]),
+                              US=dict(asOf="2026-10-26", scope="daily", rows=[[6, "AAPL"]]))
+        local["reportDate"] = "2026-10-27"
+        merged = gb.merge_universe(remote, local)
+        self.assertEqual(merged["fields"], ["symbol", "close", "sector"])
+        self.assertEqual(merged["markets"]["TW"]["rows"], [["2317.TW", 5, None]])
+        self.assertEqual(merged["markets"]["US"]["rows"], [["AAPL", 6, None]])
+        self.assertEqual(merged["reportDate"], "2026-10-27")
+        same_day = self.universe(["symbol"], TW=dict(asOf="2026-10-22", scope="full", rows=[["LOCAL"]]))
+        self.assertEqual(gb.merge_universe(remote, same_day)["markets"]["TW"]["rows"], [["2330.TW", 1, "半導體"]])
+        for invalid in ({"universe": 1}, dict(version=1, fields=["symbol"], markets={"TW": {"rows": None}})):
+            with self.assertRaisesRegex(ValueError, "Invalid universe.json"):
+                gb.merge_universe(invalid, local)
+
+    def test_invalid_concurrent_universe_publishes_no_generated_outputs(self):
+        path = "docs/report/universe.json"
+        self.write(path, json.dumps(self.universe(["symbol"], TW=dict(asOf="2026-10-27", rows=[["A"]]))).encode())
+        self.write("docs/report/latest.json", b"unpublished daily")
+        head = self.concurrent_generated({path: b'{"universe":2}'})
+        with self.assertRaisesRegex(ValueError, "Invalid universe.json"):
+            self.store.publish("daily")
+        self.assertEqual(self.remote("generated"), head)
+
+    def test_other_generated_conflicts_still_fail_closed(self):
+        self.write("docs/report/latest.json", b"local daily")
+        head = self.concurrent_generated({"docs/report/latest.json": b"concurrent daily"})
+        with self.assertRaisesRegex(ValueError, "Concurrent same-path.*latest.json"):
+            self.store.publish("daily")
+        self.assertEqual(self.remote("generated"), head)
+
     def test_storage_helper_and_journal_union_need_only_the_standard_library(self):
         # q4-8k runs a copy of main's helper beside its copied dependency.
         folder = Path(self.temp.name) / "standalone"
