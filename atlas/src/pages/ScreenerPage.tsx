@@ -554,7 +554,7 @@ function ScreenerView({
         }}><input aria-label="自選清單名稱" value={listName} onChange={(event) => setListName(event.target.value)} maxLength={40} required /><button type="submit" className="primary-button">儲存並追蹤清單</button></form>}
         {saveError && <span role="alert">{saveError}</span>}
       </div>
-      {isTrending && trendingData && <div className="screener-meta" aria-label="LINE 熱門資料時間">
+      {isTrending && trendingData && <div className="screener-meta line-trending-meta" aria-label="LINE 熱門資料時間">
         <p>抓取時間 {formatDateTime(trendingData.fetchedAt)} · LINE 推播時間 {formatDateTime(trendingData.sentAt)}</p>
         {trendingStocksStale(trendingData, latestReportDay) && <p className="screener-date-notice" role="status">
           LINE 熱門清單早於最新報告日 {latestReportDay}，目前顯示上次成功推播的名單。

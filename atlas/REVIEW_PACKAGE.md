@@ -732,3 +732,8 @@ remain unchanged. Local verification: clean npm ci; 1,322 Atlas unit tests; thre
 24 existing LINE/screenshot tests and 28 generated-storage tests; the eight targeted desktop browser cases
 passed. Phone/WebKit and the complete Atlas PR workflow are rerun for this revision; final CI results are
 reported with the PR, without claiming independent review, deploying or merging.
+
+Phone visual follow-up: prevent the fixed-group status tabs from shrinking under the LINE timestamp
+and stale notices, and tighten the timestamp paragraph spacing. The group browser test checks that the
+status-control container cannot clip its buttons. All 24 targeted browser cases passed on the preceding
+revision; the same matrix and the full PR workflow are rerun on this layout follow-up.

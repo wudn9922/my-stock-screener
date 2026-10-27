@@ -86,6 +86,8 @@ test('LINE group is US-only, next to full market, and retains LINE order, univer
   await expect(list.locator('.row-id b')).toHaveText([...data.symbols].sort());
   await page.getByRole('combobox', { name: '排序', exact: true }).selectOption('default');
   await expect(list.locator('.row-id b')).toHaveText(data.symbols);
+  const statusTabs = page.getByRole('group', { name: '成功與未成功股票' });
+  expect(await statusTabs.evaluate(node => node.getBoundingClientRect().height >= node.querySelector('button')!.getBoundingClientRect().height)).toBe(true);
   await page.getByRole('button', { name: /^未成功/ }).click();
   await expect(list.locator('.row-id b')).toHaveText(['NOTFOUND']);
   await page.getByRole('button', { name: /^全部/ }).click();
