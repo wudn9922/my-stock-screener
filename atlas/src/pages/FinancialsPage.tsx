@@ -1,4 +1,5 @@
 import { userStorage } from '../auth/storage';
+import type { StockView } from '../ui/StockTabs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { PageProps } from './pageProps';
 import { PageState, Skeleton } from '../ui/PageState';
@@ -37,6 +38,8 @@ export interface FinancialsPageProps extends PageProps {
   p?: 'q' | 'a';
   /** Chart timeframe the 「K線」 tab returns to (`?tf=`). */
   tf?: Timeframe;
+  /** Chooses the chart page view (K線／價量／研究) the next chart navigation opens. */
+  onStockView?: (view: StockView) => void;
 }
 
 const VIEW_KEY = 'atlas-financials-view-v1';
@@ -86,7 +89,7 @@ function cardNote(group: MetricGroupId, issues: readonly string[], foreignReport
   return null;
 }
 
-export default function FinancialsPage({ report, navigate, symbol, p, tf }: FinancialsPageProps) {
+export default function FinancialsPage({ report, navigate, symbol, p, tf, onStockView }: FinancialsPageProps) {
   const isTaiwanSymbol = !!symbol && (TAIWAN_SYMBOL_REGEX.test(symbol) || /^\d{4,6}[A-Z]?$/.test(symbol));
   const key = financialsKey(symbol);
   const showQuarterly = key !== null || isTaiwanSymbol;
@@ -204,7 +207,10 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
   });
   const homeListing = twListingForAdr(symbol);
   const onHomeListing = (listing: { tw: string }) => navigate({ page: 'financials', symbol: listing.tw, ...(p ? { p } : {}) });
-  const onBack = () => navigate(symbol ? { page: 'chart', symbol, ...(tf ? { tf } : {}) } : { page: 'chart' });
+  const onBack = (view: StockView = 'chart') => {
+    onStockView?.(view);
+    navigate(symbol ? { page: 'chart', symbol, ...(tf ? { tf } : {}) } : { page: 'chart' });
+  };
 
   let body;
   if (!symbol) body = <PageState kind="empty" title="選擇一檔股票" message="用上方搜尋輸入代號或名稱，或從圖表頁按「財務」開啟。" />;
@@ -300,6 +306,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf }: Fina
         localSymbols={localSymbols}
         homeListing={homeListing}
         onBack={onBack}
+        stockViews={!!onStockView}
         onKind={onKind}
         onMode={onMode}
         onSymbol={onSymbol}

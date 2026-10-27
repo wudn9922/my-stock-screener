@@ -40,3 +40,42 @@
     font-size: 14px;
   }
 }
+
+/* 價量／研究 views replace the chart area; the chart stays mounted (hidden) and returns unchanged. */
+.app-shell.stock-view-open > .chart-toolbar,
+.app-shell.stock-view-open > .workspace {
+  display: none;
+}
+.stock-view {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px calc(24px + var(--safe-bottom));
+  background: var(--bg);
+}
+.stock-view[hidden] {
+  display: none;
+}
+.stock-view-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.stock-view-card > h2 {
+  margin-bottom: 10px;
+  font-size: 17px;
+}
+.stock-view-hint {
+  margin: 8px 0 0;
+  color: var(--text-3);
+  font-size: 13px;
+}
+.stock-view-hint .text-button {
+  min-height: 44px;
+  padding: 0 4px;
+}

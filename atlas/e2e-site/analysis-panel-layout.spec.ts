@@ -15,7 +15,7 @@ test('volume ratios lead the centered anomaly controls and volatility values rem
     } catch { return route.fulfill({ status: 404 }); }
   });
   await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
-  await page.getByTestId('volume-analysis-toggle').click();
+  await page.getByTestId('stock-tab-volume').click();
   const panel = page.getByRole('region', { name: '價量', exact: true });
   const ratios = panel.getByRole('region', { name: '上漲／下跌放量與縮量比例', exact: true });
   const anomaly = panel.getByRole('region', { name: '異常量', exact: true });

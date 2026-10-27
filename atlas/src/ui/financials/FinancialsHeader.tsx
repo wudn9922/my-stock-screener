@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft, Info, Search, X } from 'lucide-react';
 import type { FinancialHistory, PeriodKind } from '../../fundamentals/FinancialHistory';
 import { SymbolSearch, type LocalSymbol, type SearchResult } from '../SymbolSearch';
-import { StockTabs } from '../StockTabs';
+import { StockTabs, type StockView } from '../StockTabs';
 import { displayTicker } from '../format';
 import { adrRatioText, type TwAdrListing } from '../../fundamentals/adrListings';
 import { LEVEL_TEXT, issueText, revisionText } from './financialsView';
@@ -21,7 +21,10 @@ export interface FinancialsHeaderProps {
   localSymbols: readonly LocalSymbol[];
   /** Taiwan listing of the ADR being viewed: the header links to its financials. */
   homeListing?: TwAdrListing | null;
-  onBack: () => void;
+  /** Returns to the chart page, optionally in its 價量／研究 view. */
+  onBack: (view?: StockView) => void;
+  /** The chart page offers 價量／研究 views (site build); otherwise only 「K線｜財務」. */
+  stockViews?: boolean;
   onKind: (kind: PeriodKind) => void;
   onMode: (mode: DisplayMode) => void;
   onSymbol: (result: SearchResult) => void;
@@ -33,7 +36,7 @@ export interface FinancialsHeaderProps {
  * share the second row; secondary queries are folded. The whole head scrolls with the figures.
  */
 export function FinancialsHeader({
-  symbol, name, history, kind, showQuarterly, futuHref, mode, localSymbols, homeListing, onBack, onKind, onMode, onSymbol, onHomeListing,
+  symbol, name, history, kind, showQuarterly, futuHref, mode, localSymbols, homeListing, onBack, stockViews = false, onKind, onMode, onSymbol, onHomeListing,
 }: FinancialsHeaderProps) {
   const [searching, setSearching] = useState(!symbol);
   const [qualityOpen, setQualityOpen] = useState(false);
@@ -45,9 +48,10 @@ export function FinancialsHeader({
     <header className="fin-head">
       <div className="fin-head-row fin-head-main">
         {symbol ? (
-          <StockTabs active="financials" onSelect={(tab) => tab === 'chart' && onBack()} />
+          <StockTabs active="financials" tabs={stockViews ? undefined : ['chart', 'financials']}
+            onSelect={(tab) => tab !== 'financials' && onBack(tab)} />
         ) : (
-          <button type="button" className="fin-back" onClick={onBack} aria-label="回到圖表">
+          <button type="button" className="fin-back" onClick={() => onBack()} aria-label="回到圖表">
             <ArrowLeft size={18} aria-hidden="true" />
             <span>圖表</span>
           </button>

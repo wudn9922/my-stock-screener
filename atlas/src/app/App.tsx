@@ -47,7 +47,7 @@ import { toolNames, type ActiveTool } from '../drawing/DrawingModel';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { useChartFocus } from '../ui/useChartFocus';
 import { IconButton } from '../ui/IconButton';
-import { StockTabs } from '../ui/StockTabs';
+import { StockTabs, type StockView } from '../ui/StockTabs';
 import { StockVolatility } from '../ui/StockVolatility';
 import { MaRecommendation } from '../ui/MaRecommendation';
 import { StockStatsMenu } from '../ui/StockStatsMenu';
@@ -162,6 +162,9 @@ export interface ChartWorkspaceProps {
   /** Opens the financials page for a symbol with the chart timeframe; the header shows 「K線｜財務」 only when provided. */
   onOpenFinancials?: (symbol: string, timeframe: Timeframe) => void;
   reportSymbols?: readonly LocalSymbol[];
+  /** 「K線｜價量｜研究」 view of the chart page; the tabs show these views only when onViewChange is provided. */
+  view?: StockView;
+  onViewChange?: (view: StockView) => void;
 }
 
 export function App({
@@ -171,6 +174,8 @@ export function App({
   onOpenSearch,
   onOpenFinancials,
   reportSymbols = [],
+  view = 'chart',
+  onViewChange,
 }: ChartWorkspaceProps = {}) {
   const store = getChartStore();
   const mobile = useSyncExternalStore(subscribeMobile, () => mobileMedia.matches);
@@ -254,6 +259,12 @@ export function App({
   const [symbolTimeframes, setSymbolTimeframes] = useState<{ key: string; values: readonly Timeframe[] } | null>(null);
   const market = getMarketProfile(symbol);
   const isIndex = symbol.startsWith('^');
+  // Indices and simulated data have no 價量／研究 views; the chart stays the only view there.
+  const stockViews = !!onViewChange && !isIndex && providerId !== 'demo';
+  const stockView: StockView = stockViews ? view : 'chart';
+  // Views mount on first visit and then stay mounted (hidden), so their data loads once per symbol.
+  const [visitedViews, setVisitedViews] = useState<ReadonlySet<StockView>>(() => new Set(['chart']));
+  if (!visitedViews.has(stockView)) setVisitedViews(new Set([...visitedViews, stockView]));
   const marketLabel = isIndex
     ? market.market === 'TW' ? '台股指數' : '指數'
     : market.market === 'TW' ? (market.exchange === 'TWSE' ? '上市' : '上櫃') : '美股';
@@ -988,7 +999,7 @@ export function App({
   return (
     <div
       ref={chartFocus.containerRef}
-      className={`app-shell ${tablet && sheet ? 'tablet-context-open' : ''} ${chartFocus.isFocused ? 'chart-focus' : ''}`}
+      className={`app-shell ${tablet && sheet ? 'tablet-context-open' : ''} ${chartFocus.isFocused ? 'chart-focus' : ''} ${stockView !== 'chart' ? 'stock-view-open' : ''}`}
     >
       <header className="ws-header" inert={modal} aria-hidden={modal}>
         <button
@@ -1035,16 +1046,26 @@ export function App({
         )}
         {!isIndex && providerId !== 'demo' && (
           <div className="ws-stock-controls">
-            {onOpenFinancials && <StockTabs active="chart" onSelect={(tab) => tab === 'financials' && onOpenFinancials(symbol, tf)} />}
+            {onOpenFinancials && (
+              <StockTabs
+                active={stockView}
+                tabs={stockViews ? undefined : ['chart', 'financials']}
+                onSelect={(tab) => (tab === 'financials' ? onOpenFinancials(symbol, tf) : onViewChange?.(tab))}
+              />
+            )}
             <div className="ws-analysis-tools">
               <StockVolatility symbol={symbol} provider={providers[providerId]} reloadToken={reloadToken} />
-              <StockStatsMenu label="價量" testId="volume-analysis-toggle">
-                <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
-              </StockStatsMenu>
-              <StockStatsMenu label="建議均線">
-                <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} onNotice={setNotice} />
-                <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>
-              </StockStatsMenu>
+              {!stockViews && (
+                <>
+                  <StockStatsMenu label="價量" testId="volume-analysis-toggle">
+                    <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
+                  </StockStatsMenu>
+                  <StockStatsMenu label="建議均線">
+                    <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} onNotice={setNotice} />
+                    <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>
+                  </StockStatsMenu>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -1089,6 +1110,34 @@ export function App({
           </StockStatsMenu>
         </div>
       </header>
+      {stockViews && visitedViews.has('volume') && (
+        <section className="stock-view" aria-label="價量" hidden={stockView !== 'volume'} inert={modal} aria-hidden={modal}>
+          <div className="stock-view-card">
+            <h2>價量分析</h2>
+            <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
+          </div>
+          <div className="stock-view-card">
+            <h2>建議均線</h2>
+            <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} onNotice={setNotice} />
+            <p className="stock-view-hint">套用後切回「K線」即可在圖上看到均線。</p>
+          </div>
+        </section>
+      )}
+      {stockViews && visitedViews.has('research') && (
+        <section className="stock-view" aria-label="研究" hidden={stockView !== 'research'} inert={modal} aria-hidden={modal}>
+          <div className="stock-view-card">
+            <h2>{market.market === 'TW' ? '官方公告與處置' : 'SEC 重大事件'}</h2>
+            <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>
+          </div>
+          {onOpenFinancials && (
+            <p className="stock-view-hint">
+              財報、籌碼與法人資料在
+              <button type="button" className="text-button" onClick={() => onOpenFinancials(symbol, tf)}>財務</button>
+              分頁。
+            </p>
+          )}
+        </section>
+      )}
       <div className="chart-toolbar" inert={modal} aria-hidden={modal}>
         <div className="timeframe-buttons" ref={timeframesRef} role="group" aria-label="K 線週期">
           {timeframes

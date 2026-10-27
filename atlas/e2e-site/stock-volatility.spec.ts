@@ -49,28 +49,26 @@ test('daily volatility and independent volume analysis stay beside recommendatio
     const tools = document.querySelector('.ws-analysis-tools')!.getBoundingClientRect();
     const tabs = document.querySelector('.ws-stock-controls > .stock-tabs')!.getBoundingClientRect();
     return {
-      recommendation: document.querySelector('[data-testid="stock-stats-toggle"]')!.getBoundingClientRect().top,
-      volume: document.querySelector('[data-testid="volume-analysis-toggle"]')!.getBoundingClientRect().top,
+      volume: document.querySelector('[data-testid="stock-tab-volume"]')!.getBoundingClientRect().top,
       volatility: document.querySelector('[data-testid="stock-volatility"]')!.getBoundingClientRect().top,
       tabsOverlap: Math.max(0, Math.min(tools.right, tabs.right) - Math.max(tools.left, tabs.left)) *
         Math.max(0, Math.min(tools.bottom, tabs.bottom) - Math.max(tools.top, tabs.top)),
       overflow: document.scrollingElement!.scrollWidth - innerWidth,
     };
   });
-  expect(Math.abs(geometry.volatility - geometry.recommendation)).toBeLessThanOrEqual(12);
   expect(Math.abs(geometry.volatility - geometry.volume)).toBeLessThanOrEqual(12);
   expect(geometry.tabsOverlap).toBe(0);
   expect(geometry.overflow).toBeLessThanOrEqual(0);
-  await expect(page.locator('.ws-analysis-tools').getByTestId('volume-analysis-toggle')).toBeVisible();
-  await page.getByTestId('volume-analysis-toggle').click();
+  // 價量 (volume analysis and the MA recommendation) is a view of the stock page, not a menu.
+  await page.getByTestId('stock-tab-volume').click();
   await expect(page.getByRole('region', { name: '價量', exact: true })).toBeVisible();
-  await expect(page.getByTestId('stock-stats-toggle')).toHaveAttribute('aria-expanded', 'false');
-  await page.getByTestId('stock-stats-toggle').click();
-  await expect(page.getByTestId('volume-analysis-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByTestId('stock-tab-volume')).toHaveAttribute('aria-current', 'page');
   await expect(page.getByTestId('ma-recommendation')).toBeVisible();
-  // The volatility controls remain separate and usable while the MA menu is closed.
-  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('chart')).toBeHidden();
+  // The volatility controls stay in the header and usable from every view.
   await expect(stats).toBeVisible();
+  await page.getByTestId('stock-tab-chart').click();
+  await expect(page.getByRole('region', { name: '價量', exact: true })).toBeHidden();
   await page.getByRole('button', { name: '週期 1D', exact: true }).click();
   await expect(stats.locator('[data-volatility-value]')).toHaveText(['4.00%', '4.00%']);
   await stats.getByTestId('volatility-toggle').click();
@@ -84,9 +82,9 @@ test('daily volatility and independent volume analysis stay beside recommendatio
   await stats.getByTestId('volatility-toggle').focus();
   await page.keyboard.press('Enter');
   await expect(stats.getByTestId('volatility-toggle')).toHaveAttribute('aria-expanded', 'true');
-  await page.getByTestId('volume-analysis-toggle').focus();
+  await page.getByTestId('source-info-toggle').focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByTestId('volume-analysis-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByTestId('source-info-toggle')).toHaveAttribute('aria-expanded', 'true');
   await expect(stats.getByTestId('volatility-toggle')).toHaveAttribute('aria-expanded', 'false');
   await page.keyboard.press('Escape');
   await page.screenshot({ path: testInfo.outputPath('volatility-header.png') });

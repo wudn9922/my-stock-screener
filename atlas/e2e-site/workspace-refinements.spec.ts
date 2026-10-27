@@ -23,7 +23,7 @@ test('stock controls share one compact row and the normal chart fills the space 
       Math.abs(host.getBoundingClientRect().bottom - host.querySelector('.tv-lightweight-charts')!.getBoundingClientRect().bottom),
     )).toBeLessThanOrEqual(1);
     const controls = page.locator('.ws-stock-controls');
-    await expect(controls.getByRole('button')).toHaveText(['K線', '財務', '波動率', '價量', '建議均線']);
+    await expect(controls.getByRole('button')).toHaveText(['K線', '財務', '價量', '研究', '波動率']);
     await expect(page.locator('.app-shell')).not.toHaveClass(/chart-focus/);
     const bounds = await page.evaluate(() => {
       const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
