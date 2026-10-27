@@ -2,6 +2,10 @@ import { expect, test, type BrowserContext } from '@playwright/test';
 import { buildReport, mockSite } from './mocks';
 import { accessEnvelope, DEVICE_USER_ID } from './account-fixture';
 import {
+  lineLoginHandoff,
+  LineHandoffError,
+} from '../../supabase/functions/_shared/lineLoginHandoff';
+import {
   installRealSdk,
   sdkIdentityFixture,
   sdkLogin,
@@ -9,162 +13,284 @@ import {
 } from './line-sdk-fixture';
 
 /** Two independent contexts deliberately share no cookies, localStorage or IndexedDB. */
-test('installed PWA receives a one-use LINE identity from a different browser partition', async ({
-  page,
-  browser,
-}) => {
-  const actions: Record<string, unknown>[] = [];
-  let completed = false,
-    consumed = false;
-  let intentId = '',
-    readSecret = '',
-    writeSecret = '';
-  let receiverAccess = 0;
-  const identity = sdkIdentityFixture();
-  const candidate = {
-    userId: DEVICE_USER_ID,
-    idToken: identity.idToken,
-    expiresAt: Date.now() + 3600000,
-    displayName: '本人測試帳號',
-  };
-  const route = async (context: BrowserContext) =>
-    context.route('**/functions/v1/user-settings', async (r) => {
-      const body = r.request().postDataJSON() as Record<string, unknown>;
-      actions.push(body);
-      if (body.action === 'line.login.begin') {
-        intentId = body.intentId as string;
-        readSecret = body.readSecret as string;
-        writeSecret = body.writeSecret as string;
-        return r.fulfill({
-          json: {
-            ok: true,
-            data: {
-              status: 'pending',
-              expiresAt: new Date(Date.now() + 120000).toISOString(),
+for (const scenario of [
+  'legitimate',
+  'attempt-limit',
+  'different-network',
+] as const)
+  test(`installed PWA reverse-code handoff: ${scenario}`, async ({
+    page,
+    browser,
+  }) => {
+    const actions: Record<string, unknown>[] = [];
+    let completed = false,
+      consumed = false;
+    let intentId = '',
+      readSecret = '',
+      writeSecret = '';
+    let receiverAccess = 0;
+    const identity = sdkIdentityFixture();
+    const candidate = {
+      userId: DEVICE_USER_ID,
+      idToken: identity.idToken,
+      expiresAt: Date.now() + 3600000,
+      displayName: '本人測試帳號',
+    };
+    let row: Record<string, unknown> | null = null,
+      attempts = 0;
+    const database = {
+      rpc: async (_name: string, p: Record<string, unknown>) => {
+        let data: Record<string, unknown> = { status: 'missing' };
+        if (p.operation === 'begin') {
+          row = { ...p };
+          data = {
+            status: 'pending',
+            expiresAt: new Date(Date.now() + 120000).toISOString(),
+          };
+        } else if (row && p.intent_id === row.intent_id) {
+          if (p.operation === 'complete' && p.write_hash === row.write_hash) {
+            if (p.network_hash !== row.network_hash)
+              data = { status: 'network_mismatch' };
+            else if (completed) data = { status: 'used' };
+            else {
+              row = { ...row, ...p };
+              completed = true;
+              data = { status: 'complete' };
+            }
+          } else if (p.read_hash === row.read_hash) {
+            if (p.operation === 'cancel') {
+              row = null;
+              data = { status: 'consumed' };
+            } else if (!completed) data = { status: 'pending' };
+            else if (!p.confirmation_hash) data = { status: 'code_required' };
+            else if (p.confirmation_hash !== row.confirmation_hash) {
+              attempts++;
+              if (attempts >= 5) {
+                row = null;
+                data = { status: 'locked' };
+              } else
+                data = {
+                  status: 'wrong_code',
+                  attemptsRemaining: 5 - attempts,
+                };
+            } else {
+              consumed = true;
+              data = { status: 'consumed', ciphertext: row.encrypted_token };
+              row = null;
+            }
+          }
+        }
+        return { data, error: null };
+      },
+    };
+    const route = async (context: BrowserContext) =>
+      context.route('**/functions/v1/user-settings', async (r) => {
+        const body = r.request().postDataJSON() as Record<string, unknown>;
+        actions.push(body);
+        if (body.action === 'access.get') {
+          if (context === page.context()) receiverAccess++;
+          return r.fulfill({ json: accessEnvelope(DEVICE_USER_ID) });
+        }
+        if (body.action === 'line.login.begin') {
+          intentId = body.intentId as string;
+          readSecret = body.readSecret as string;
+          writeSecret = body.writeSecret as string;
+        }
+        if (body.action === 'line.login.complete') {
+          expect(body.confirmed).toBe(true);
+          expect(body.intentId).toBe(intentId);
+          expect(body.writeSecret).toBe(writeSecret);
+          expect(body.idToken).toBe(candidate.idToken);
+        }
+        // Simulate managed ingress IPs; execute the actual crypto / code / network handler.
+        // Row locking, attempts, upgrade and permissions are separately tested on real PostgreSQL.
+        const ip =
+          context === page.context()
+            ? '203.0.113.21'
+            : scenario === 'different-network'
+              ? '198.51.100.7'
+              : '203.0.113.99';
+        try {
+          const data = await lineLoginHandoff(
+            database,
+            body,
+            'offline-server-secret',
+            new Headers({ 'cf-connecting-ip': ip }),
+            async (idToken) => {
+              expect(idToken).toBe(candidate.idToken);
+              return DEVICE_USER_ID;
             },
-          },
-        });
-      }
-      if (body.action === 'line.login.complete') {
-        expect(body.confirmed).toBe(true);
-        expect(body.intentId).toBe(intentId);
-        expect(body.writeSecret).toBe(writeSecret);
-        expect(body.idToken).toBe(candidate.idToken);
-        completed = true;
-        return r.fulfill({ json: { ok: true, data: { status: 'complete' } } });
-      }
-      if (body.action === 'line.login.poll') {
-        expect(body.readSecret).toBe(readSecret);
-        if (completed && !consumed) {
-          consumed = true;
+          );
+          return r.fulfill({ json: { ok: true, data } });
+        } catch (error) {
+          if (!(error instanceof LineHandoffError)) throw error;
           return r.fulfill({
-            json: {
-              ok: true,
-              data: { status: 'complete', identity: candidate },
-            },
+            status: error.status,
+            json: { ok: false, error: error.message },
           });
         }
-        return r.fulfill({ json: { ok: true, data: { status: 'pending' } } });
-      }
-      if (body.action === 'access.get') {
-        if (context === page.context()) receiverAccess++;
-        return r.fulfill({ json: accessEnvelope(DEVICE_USER_ID) });
-      }
-      return r.fulfill({ json: { ok: true, data: { status: 'consumed' } } });
-    });
-  await page.addInitScript(() =>
-    Object.defineProperty(navigator, 'standalone', {
-      configurable: true,
-      value: true,
-    }),
-  );
-  await mockSite(page, { report: buildReport(20) });
-  await route(page.context());
-  await page.context().route('https://liff.line.me/**', (r) =>
-    r.fulfill({
-      contentType: 'text/html',
-      body: '<p>LINE provider fixture</p>',
-    }),
-  );
-  await page.goto('./?page=console');
-  const popupPromise = page.context().waitForEvent('page');
-  await page
-    .getByRole('button', { name: '使用 LINE 登入', exact: true })
-    .click();
-  const popup = await popupPromise;
-  await expect.poll(() => popup.url()).toContain('atlasLineHandoff=');
-  expect(popup.url()).not.toContain(readSecret);
-  await expect(
-    page.getByText('請在 LINE 完成驗證後，返回這個 Atlas 視窗。', {
-      exact: false,
-    }),
-  ).toBeVisible();
-  const originalUrl = page.url();
-  const sender = await browser.newContext({ serviceWorkers: 'block' });
-  try {
-    await route(sender);
-    const sdk = await installRealSdk(sender, identity);
-    const callback = await sender.newPage();
-    await mockSite(callback, { report: buildReport(20) });
-    const target = sdkTestUrl(
-      new URL(
-        `?atlasLineHandoff=${intentId}&atlasLineWrite=${writeSecret}`,
-        originalUrl,
-      ).href,
+      });
+    await page.addInitScript(() =>
+      Object.defineProperty(navigator, 'standalone', {
+        configurable: true,
+        value: true,
+      }),
     );
-    await callback.goto(await sdkLogin(callback, target));
-    const approval = callback.getByRole('group', {
-      name: '確認 LINE 登入交接',
-    });
-    await expect(approval).toContainText(
-      intentId.replace(/-/g, '').slice(-6).toUpperCase(),
+    await mockSite(page, { report: buildReport(20) });
+    await route(page.context());
+    await page.context().route('https://liff.line.me/**', (r) =>
+      r.fulfill({
+        contentType: 'text/html',
+        body: '<p>LINE provider fixture</p>',
+      }),
     );
-    expect(completed).toBe(false);
-    await expect(
-      page.getByRole('group', { name: '確認 LINE 登入帳號' }),
-    ).toHaveCount(0);
-    await approval
-      .getByRole('button', { name: '確認登入原來的 Atlas' })
+    await page.goto('./?page=console');
+    const popupPromise = page.context().waitForEvent('page');
+    await page
+      .getByRole('button', { name: '使用 LINE 登入', exact: true })
       .click();
+    const popup = await popupPromise;
+    await expect.poll(() => popup.url()).toContain('atlasLineHandoff=');
+    expect(popup.url()).not.toContain(readSecret);
     await expect(
-      callback.getByText(
-        'LINE 驗證完成，請返回原來的 Atlas 視窗或主畫面 App，確認帳號後完成登入。',
-      ),
+      page.getByText('請在 LINE 完成驗證後，返回這個 Atlas 視窗。', {
+        exact: false,
+      }),
     ).toBeVisible();
-    await page.bringToFront();
-    const confirm = page.getByRole('group', { name: '確認 LINE 登入帳號' });
-    await expect(confirm).toContainText('本人測試帳號');
-    await expect(page.locator('[data-storage-mode]')).toHaveAttribute(
-      'data-storage-mode',
-      'none',
-    );
-    expect(receiverAccess).toBe(0);
-    expect(sdk.exchanges).toHaveLength(1);
-    expect(sdk.exchanges[0].hasVerifier).toBe(true);
-    await confirm.getByRole('button', { name: '確認登入此帳號' }).click();
-    await expect(page.locator('[data-storage-mode]')).toHaveAttribute(
-      'data-storage-mode',
-      'device',
-    );
-    expect(page.url()).toBe(originalUrl);
-    expect(
-      await page.evaluate(() =>
-        Object.keys(localStorage).filter(
-          (k) => k.includes('Handoff') || k.includes('readSecret'),
+    const originalUrl = page.url();
+    const sender = await browser.newContext({ serviceWorkers: 'block' });
+    try {
+      await route(sender);
+      const sdk = await installRealSdk(sender, identity);
+      const callback = await sender.newPage();
+      await mockSite(callback, { report: buildReport(20) });
+      const target = sdkTestUrl(
+        new URL(
+          `?atlasLineHandoff=${intentId}&atlasLineWrite=${writeSecret}`,
+          originalUrl,
+        ).href,
+      );
+      await callback.goto(await sdkLogin(callback, target));
+      const approval = callback.getByRole('group', {
+        name: '確認 LINE 登入交接',
+      });
+      await expect(approval).toContainText(
+        intentId.replace(/-/g, '').slice(-6).toUpperCase(),
+      );
+      expect(completed).toBe(false);
+      await expect(
+        page.getByRole('group', { name: '確認 LINE 登入帳號' }),
+      ).toHaveCount(0);
+      await expect(approval).toContainText(
+        '只有你剛剛在自己的裝置按了登入，才按確認',
+      );
+      await approval
+        .getByRole('button', { name: '確認登入原來的 Atlas' })
+        .click();
+      if (scenario === 'different-network') {
+        await expect(
+          callback.getByText('請在同一個網路下完成登入', { exact: true }),
+        ).toBeVisible();
+        expect(completed).toBe(false);
+        expect(consumed).toBe(false);
+        expect(receiverAccess).toBe(0);
+        expect(row).not.toHaveProperty('encrypted_token');
+        await page.bringToFront();
+        await expect(
+          page.getByRole('group', { name: '確認 LINE 登入帳號' }),
+        ).toHaveCount(0);
+        await page
+          .getByRole('button', { name: '取消登入', exact: true })
+          .click();
+        return;
+      }
+      const codeGroup = callback.getByRole('group', {
+        name: 'LINE 登入確認碼',
+      });
+      await expect(codeGroup).toBeVisible();
+      const code = (await codeGroup.locator('strong').innerText()).trim();
+      expect(code).toMatch(/^\d{6}$/);
+      expect(callback.url()).not.toContain(code);
+      expect(page.url()).not.toContain(code);
+      await page.bringToFront();
+      const form = page.getByRole('form', { name: '輸入 LINE 確認碼' });
+      await expect(form).toBeVisible();
+      await expect(
+        page.getByRole('group', { name: '確認 LINE 登入帳號' }),
+      ).toHaveCount(0);
+      expect(consumed).toBe(false);
+      expect(receiverAccess).toBe(0);
+      expect(
+        actions
+          .filter((a) => a.action === 'line.login.poll')
+          .every((a) => a.code === undefined),
+      ).toBe(true);
+      const wrong = code === '000000' ? '111111' : '000000';
+      const wrongCount = scenario === 'attempt-limit' ? 5 : 1;
+      for (let n = 0; n < wrongCount; n++) {
+        await form
+          .getByRole('textbox', { name: 'LINE 六位確認碼' })
+          .fill(wrong);
+        await form
+          .getByRole('button', { name: '驗證確認碼', exact: true })
+          .click();
+        if (n < 4)
+          await expect(form.getByRole('alert')).toHaveText(
+            `確認碼不正確，還可嘗試 ${4 - n} 次。`,
+          );
+      }
+      if (scenario === 'attempt-limit') {
+        await expect(page.locator('[data-storage-mode]')).toContainText(
+          '確認碼錯誤已達五次',
+        );
+        await expect(form).toHaveCount(0);
+        expect(row).toBeNull();
+        expect(consumed).toBe(false);
+        expect(receiverAccess).toBe(0);
+        await expect(
+          page.getByRole('button', { name: '使用 LINE 登入', exact: true }),
+        ).toBeEnabled();
+        return;
+      }
+      await form.getByRole('textbox', { name: 'LINE 六位確認碼' }).fill(code);
+      await form
+        .getByRole('button', { name: '驗證確認碼', exact: true })
+        .click();
+      const confirm = page.getByRole('group', { name: '確認 LINE 登入帳號' });
+      await expect(confirm).toContainText('本人測試帳號');
+      await expect(page.locator('[data-storage-mode]')).toHaveAttribute(
+        'data-storage-mode',
+        'none',
+      );
+      expect(receiverAccess).toBe(0);
+      expect(sdk.exchanges).toHaveLength(1);
+      expect(sdk.exchanges[0].hasVerifier).toBe(true);
+      await confirm.getByRole('button', { name: '確認登入此帳號' }).click();
+      await expect(page.locator('[data-storage-mode]')).toHaveAttribute(
+        'data-storage-mode',
+        'device',
+      );
+      expect(page.url()).toBe(originalUrl);
+      expect(
+        await page.evaluate(() =>
+          Object.keys(localStorage).filter(
+            (k) => k.includes('Handoff') || k.includes('readSecret'),
+          ),
         ),
-      ),
-    ).toEqual([]);
-    await page.getByRole('button', { name: '登出 LINE', exact: true }).click();
-    await expect(page.locator('[data-storage-mode]')).toHaveAttribute(
-      'data-storage-mode',
-      'none',
-    );
-    expect(consumed).toBe(true);
-  } finally {
-    await sender.close();
-    await popup.close();
-  }
-});
+      ).toEqual([]);
+      await page
+        .getByRole('button', { name: '登出 LINE', exact: true })
+        .click();
+      await expect(page.locator('[data-storage-mode]')).toHaveAttribute(
+        'data-storage-mode',
+        'none',
+      );
+      expect(consumed).toBe(true);
+    } finally {
+      await sender.close();
+      await popup.close();
+    }
+  });
 
 for (const insideLine of [false, true])
   test(`an unavailable WindowProxy offers a login link without OAuth loops (LINE browser=${insideLine})`, async ({

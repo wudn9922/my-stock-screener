@@ -41,7 +41,13 @@ const incoming = incomingLineHandoff();
 let completionMessage: string | null = null;
 let incomingIdentity: LineIdentity | null = null;
 let sending = false;
+let completedCode: string | null = null;
 export const lineHandoffMessage = () => completionMessage;
+export const incomingLineConfirmationCode = () => completedCode;
+export interface LineCodeChallenge {
+  submit: (code: string) => void;
+  error: string | null;
+}
 export const linePairingCode = (intentId: string) =>
   intentId.replace(/-/g, '').slice(-6).toUpperCase();
 export function incomingLineApproval() {
@@ -56,13 +62,15 @@ export function incomingLineApproval() {
 /** Loading a link must never transfer a logged-in visitor's identity to its receiver. */
 export function prepareIncomingLineHandoff(identity: LineIdentity | null) {
   if (!incoming) return;
+  completedCode = null;
   incomingIdentity = identity;
   completionMessage = incomingLineApproval()
-    ? '請核對原來 Atlas 的配對碼；只有這次登入由你本人發起時才確認。'
+    ? '請核對原來 Atlas 的配對碼。只有你剛剛在自己的裝置按了登入，才按確認'
     : '這次登入未完成，請返回原來的 Atlas 重新登入。';
 }
 export function cancelIncomingLineHandoff() {
   incomingIdentity = null;
+  completedCode = null;
   completionMessage = '已取消傳送 LINE 登入，請返回原來的 Atlas。';
 }
 class HandoffRequestError extends Error {
@@ -126,12 +134,19 @@ export async function completeIncomingLineHandoff() {
     // Retry this same intent briefly, never OAuth or an already used intent.
     for (let attempt = 0; ; attempt++) {
       try {
-        await request({
+        const result = await request({
           action: 'line.login.complete',
           ...incoming,
           idToken,
           confirmed: true,
         });
+        if (
+          result.status !== 'complete' ||
+          typeof result.code !== 'string' ||
+          !/^\d{6}$/.test(result.code)
+        )
+          throw new Error('登入確認碼未取得，請從原來的 Atlas 重新登入。');
+        completedCode = result.code;
         break;
       } catch (error) {
         if (
@@ -144,7 +159,7 @@ export async function completeIncomingLineHandoff() {
       }
     }
     completionMessage =
-      'LINE 驗證完成，請返回原來的 Atlas 視窗或主畫面 App，確認帳號後完成登入。';
+      'LINE 驗證完成，請回到剛剛發起登入的 Atlas 輸入下方確認碼。請勿把確認碼告訴任何人。';
     incomingIdentity = null;
   } catch (error) {
     completionMessage =
@@ -170,6 +185,7 @@ const secret = () =>
 export async function beginSeparateLineLogin(
   signal: AbortSignal,
   onOpenUrl: (url: string) => void = () => {},
+  onCodePrompt: (challenge: LineCodeChallenge) => void = () => {},
 ): Promise<LoginCandidate> {
   if (signal.aborted) throw new Error('已取消 LINE 登入。');
   const intentId = crypto.randomUUID(),
@@ -203,13 +219,38 @@ export async function beginSeparateLineLogin(
       expiresAt > Date.now() + 150000
     )
       throw new Error('登入交接期限不正確。');
+    let queuedCode: string | null = null,
+      prompted = false;
+    const submit = (code: string) => {
+      if (!signal.aborted && /^\d{6}$/.test(code)) queuedCode = code;
+    };
     while (!signal.aborted && Date.now() < expiresAt) {
       if (document.visibilityState !== 'hidden') {
+        const code = queuedCode;
+        queuedCode = null;
         const poll = await request(
-          { action: 'line.login.poll', intentId, readSecret },
+          {
+            action: 'line.login.poll',
+            intentId,
+            readSecret,
+            ...(code ? { code } : {}),
+          },
           signal,
         );
+        if (poll.status === 'code_required' && !prompted) {
+          prompted = true;
+          onCodePrompt({ submit, error: null });
+        }
+        if (poll.status === 'wrong_code') {
+          prompted = true;
+          onCodePrompt({
+            submit,
+            error: `確認碼不正確，還可嘗試 ${Number(poll.attemptsRemaining)} 次。`,
+          });
+        }
         if (poll.status === 'complete') {
+          if (!code)
+            throw new Error('登入交接服務需更新確認碼保護，請重新登入。');
           const candidate = poll.identity as LoginCandidate;
           if (
             !candidate ||

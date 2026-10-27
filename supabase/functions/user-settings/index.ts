@@ -239,8 +239,7 @@ Deno.serve(async (request: Request) => {
       const url = Deno.env.get('SUPABASE_URL'), secret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
       if (!url || !secret) throw new LineHandoffError(503, '登入交接服務尚未就緒。');
       const database = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
-      const caller = request.headers.get('cf-connecting-ip') || request.headers.get('x-real-ip') || 'unknown';
-      const data = await lineLoginHandoff(database, body, secret, caller, verifyLineIdToken);
+      const data = await lineLoginHandoff(database, body, secret, request.headers, verifyLineIdToken);
       return new Response(JSON.stringify({ ok: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
     }
 

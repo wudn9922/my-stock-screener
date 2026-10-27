@@ -55,7 +55,7 @@ test('primary root handles the real SDK callback before SDK secondary navigation
         ok: true,
         data:
           r.request().postDataJSON().action === 'line.login.complete'
-            ? { status: 'complete' }
+            ? { status: 'complete', code: '012345' }
             : accessEnvelope(DEVICE_USER_ID).data,
       },
     });
@@ -77,7 +77,7 @@ test('primary root handles the real SDK callback before SDK secondary navigation
   await page.getByRole('button', { name: '確認登入原來的 Atlas' }).click();
   await expect(
     page.getByText(
-      'LINE 驗證完成，請返回原來的 Atlas 視窗或主畫面 App，確認帳號後完成登入。',
+      'LINE 驗證完成，請回到剛剛發起登入的 Atlas 輸入下方確認碼。請勿把確認碼告訴任何人。',
     ),
   ).toBeVisible();
   await expect(page.locator('[data-storage-mode]')).toHaveAttribute(

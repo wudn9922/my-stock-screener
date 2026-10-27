@@ -40,7 +40,9 @@ function environment(status = 'complete') {
                   status: 'pending',
                   expiresAt: new Date(Date.now() + 120000).toISOString(),
                 }
-              : { status, identity: candidate },
+              : status === 'complete' && !body.code
+                ? { status: 'code_required' }
+                : { status, identity: candidate },
         }),
       );
     }),
@@ -57,11 +59,87 @@ afterEach(() => {
   logoutLineIdentity();
 });
 describe('partition-independent explicit LINE login', () => {
+  it('waits for typed reverse confirmation, sends a wrong guess only once, then accepts the corrected code', async () => {
+    vi.useFakeTimers();
+    const { candidate, storage } = environment();
+    const codes: unknown[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url, init: RequestInit) => {
+        const body = JSON.parse(init.body as string);
+        let data: Record<string, unknown> = {
+          status: 'pending',
+          expiresAt: new Date(Date.now() + 120000).toISOString(),
+        };
+        if (body.action === 'line.login.poll') {
+          codes.push(body.code);
+          data = !body.code
+            ? { status: 'code_required' }
+            : body.code === '012345'
+              ? { status: 'complete', identity: candidate }
+              : { status: 'wrong_code', attemptsRemaining: 4 };
+        }
+        return new Response(JSON.stringify({ ok: true, data }));
+      }),
+    );
+    const prompts: { submit: (code: string) => void; error: string | null }[] =
+      [];
+    let received = false;
+    const result = beginSeparateLineLogin(
+      new AbortController().signal,
+      undefined,
+      (challenge) => prompts.push(challenge),
+    ).then((value) => {
+      received = true;
+      return value;
+    });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(received).toBe(false);
+    expect(prompts).toHaveLength(1);
+    prompts[0]!.submit('000000');
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]!.error).toContain('4');
+    expect(codes.filter((code) => code === '000000')).toHaveLength(1);
+    expect(received).toBe(false);
+    expect(storage.setItem).not.toHaveBeenCalled();
+    prompts[1]!.submit('012345');
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(await result).toEqual(candidate);
+  });
+  it('rejects an old server returning identity before reverse confirmation', async () => {
+    environment();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url, init: RequestInit) => {
+        const body = JSON.parse(init.body as string);
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            data:
+              body.action === 'line.login.begin'
+                ? {
+                    status: 'pending',
+                    expiresAt: new Date(Date.now() + 120000).toISOString(),
+                  }
+                : { status: 'complete', identity: {} },
+          }),
+        );
+      }),
+    );
+    await expect(
+      beginSeparateLineLogin(new AbortController().signal),
+    ).rejects.toThrow('確認碼保護');
+  });
   it('keeps the receiver secret in RAM, opens LIFF in another window and returns only a candidate', async () => {
     const { calls, candidate, storage } = environment();
-    expect(await beginSeparateLineLogin(new AbortController().signal)).toEqual(
-      candidate,
-    );
+    expect(
+      await beginSeparateLineLogin(
+        new AbortController().signal,
+        undefined,
+        (challenge) => challenge.submit('012345'),
+      ),
+    ).toEqual(candidate);
     const begin = calls[0]!;
     const url = new URL(vi.mocked(window.open).mock.calls[0]![0] as string);
     expect(url.origin).toBe('https://liff.line.me');
@@ -73,7 +151,13 @@ describe('partition-independent explicit LINE login', () => {
       '_blank',
       'noopener,noreferrer',
     );
-    expect(calls.find((c) => c.action === 'line.login.poll')).toMatchObject({
+    expect(
+      calls.filter((c) => c.action === 'line.login.poll')[0],
+    ).not.toHaveProperty('code');
+    expect(
+      calls.find((c) => c.action === 'line.login.poll' && c.code),
+    ).toMatchObject({
+      code: '012345',
       intentId: begin.intentId,
       readSecret: begin.readSecret,
     });
@@ -95,7 +179,11 @@ describe('partition-independent explicit LINE login', () => {
     vi.mocked(window.open).mockReturnValue(null);
     const offered = vi.fn();
     expect(
-      await beginSeparateLineLogin(new AbortController().signal, offered),
+      await beginSeparateLineLogin(
+        new AbortController().signal,
+        offered,
+        (challenge) => challenge.submit('012345'),
+      ),
     ).toEqual(candidate);
     expect(offered.mock.calls[0]![0]).toContain('https://liff.line.me/');
   });
@@ -114,7 +202,11 @@ describe('partition-independent explicit LINE login', () => {
     vi.useFakeTimers();
     const { calls } = environment('pending');
     const expired = expect(
-      beginSeparateLineLogin(new AbortController().signal),
+      beginSeparateLineLogin(
+        new AbortController().signal,
+        undefined,
+        (challenge) => challenge.submit('012345'),
+      ),
     ).rejects.toThrow('逾時');
     await vi.advanceTimersByTimeAsync(120001);
     await expired;
@@ -146,7 +238,7 @@ describe('partition-independent explicit LINE login', () => {
             JSON.stringify(
               missing
                 ? { ok: false, error: 'not ready' }
-                : { ok: true, data: { status: 'complete' } },
+                : { ok: true, data: { status: 'complete', code: '012345' } },
             ),
             { status: missing ? 404 : 200 },
           );
@@ -161,6 +253,9 @@ describe('partition-independent explicit LINE login', () => {
       await vi.advanceTimersByTimeAsync(8000);
       await completed;
       expect(attempts).toBe(alwaysMissing ? 11 : 3);
+      expect(module.incomingLineConfirmationCode()).toBe(
+        alwaysMissing ? null : '012345',
+      );
       expect(module.lineHandoffMessage()).toContain(
         alwaysMissing ? 'not ready' : 'LINE 驗證完成',
       );

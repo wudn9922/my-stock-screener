@@ -5,6 +5,9 @@
 .pwa-login-actions .help-disclosure { flex: 1; min-width: 100px; }
 .line-login-candidate { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; max-width: 100%; }
 .line-login-candidate > span { overflow-wrap: anywhere; }
+.line-reverse-code { font-size: 1.5rem; letter-spacing: .18em; font-variant-numeric: tabular-nums; }
+.line-login-candidate label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.line-login-candidate input { width: 8em; min-height: 44px; font-size: 1rem; letter-spacing: .12em; }
 
 /* Keep the 44px account actions without taking the short landscape chart's space. */
 @media (max-width: 1099px) and (max-height: 450px) and (orientation: landscape) {

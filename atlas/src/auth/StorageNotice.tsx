@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { acceptLineHandoff, isLineInAppBrowser, lineLoginError, loginLineIdentity, logoutLineIdentity } from '../cloud/lineIdentity';
-import { beginSeparateLineLogin, cancelIncomingLineHandoff, completeIncomingLineHandoff, incomingLineApproval, lineHandoffMessage, linePairingCode, needsSeparateLineLogin, type LoginCandidate } from '../cloud/lineLoginHandoff';
+import { beginSeparateLineLogin, cancelIncomingLineHandoff, completeIncomingLineHandoff, incomingLineApproval, incomingLineConfirmationCode, lineHandoffMessage, linePairingCode, needsSeparateLineLogin, type LineCodeChallenge, type LoginCandidate } from '../cloud/lineLoginHandoff';
 import { accessState, refreshAccess } from './access';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
 import './storageNotice.css';
@@ -12,6 +12,9 @@ export function StorageNotice() {
   const [candidate, setCandidate] = useState<LoginCandidate | null>(null);
   const [loginUrl, setLoginUrl] = useState<string | null>(null);
   const [senderState, setSenderState] = useState({ busy: false });
+  const [codeChallenge, setCodeChallenge] = useState<LineCodeChallenge | null>(null);
+  const [code, setCode] = useState('');
+  const [checkingCode, setCheckingCode] = useState(false);
   const approval = incomingLineApproval();
   const pending = useRef<AbortController | null>(null);
   useEffect(() => () => pending.current?.abort(), []);
@@ -28,8 +31,10 @@ export function StorageNotice() {
       if (needsSeparateLineLogin()) {
         const controller = new AbortController();
         pending.current = controller;
-        try { setCandidate(await beginSeparateLineLogin(controller.signal, setLoginUrl)); }
-        finally { pending.current = null; setBusy(false); setLoginUrl(null); }
+        try { setCandidate(await beginSeparateLineLogin(controller.signal, setLoginUrl, challenge => {
+          setCodeChallenge(challenge); setCheckingCode(false); setCode('');
+        })); }
+        finally { pending.current = null; setBusy(false); setLoginUrl(null); setCodeChallenge(null); setCode(''); setCheckingCode(false); }
         return;
       }
       const result = await loginLineIdentity();
@@ -62,7 +67,11 @@ export function StorageNotice() {
       {access.userId ? '已登入 · ' : '訪客模式 · '}{label}{(error || access.error || lineLoginError()) && ` ${error || access.error || lineLoginError()}`}
     </p>
     {lineHandoffMessage() && <p role="status">{lineHandoffMessage()}</p>}
+    {incomingLineConfirmationCode() && <div className="line-login-candidate" role="group" aria-label="LINE 登入確認碼">
+      <span>確認碼 <strong className="line-reverse-code">{incomingLineConfirmationCode()}</strong> · 只輸入在你剛剛發起登入的 Atlas，請勿轉傳。</span>
+    </div>}
     {approval && <div className="line-login-candidate" role="group" aria-label="確認 LINE 登入交接">
+      <span>只有你剛剛在自己的裝置按了登入，才按確認</span>
       <span>配對碼 {approval.code}</span>
       <button type="button" className="ghost-button" disabled={senderState.busy} onClick={() => void approveSender()}>確認登入原來的 Atlas</button>
       <button type="button" className="ghost-button" disabled={senderState.busy} onClick={() => { cancelIncomingLineHandoff(); setSenderState({ busy: false }); }}>取消交接</button>
@@ -72,6 +81,14 @@ export function StorageNotice() {
       <button type="button" className="ghost-button" disabled={busy} onClick={() => void confirm()}>確認登入此帳號</button>
       <button type="button" className="ghost-button" disabled={busy} onClick={() => setCandidate(null)}>取消</button>
     </div>}
+    {codeChallenge && <form className="line-login-candidate" aria-label="輸入 LINE 確認碼" onSubmit={event => {
+      event.preventDefault(); if (checkingCode || !/^\d{6}$/.test(code)) return;
+      setCheckingCode(true); codeChallenge.submit(code); setCode('');
+    }}>
+      <label>LINE 頁面的六位確認碼 <input aria-label="LINE 六位確認碼" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="off" value={code} disabled={checkingCode} onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></label>
+      <button className="ghost-button" type="submit" disabled={checkingCode || !/^\d{6}$/.test(code)}>{checkingCode ? '正在驗證確認碼…' : '驗證確認碼'}</button>
+      {codeChallenge.error && <span role="alert">{codeChallenge.error}</span>}
+    </form>}
     {busy && pending.current && <p role="status">請在 LINE 完成驗證後，返回這個 Atlas 視窗。{loginUrl && <>配對碼 {linePairingCode(new URL(loginUrl).searchParams.get('atlasLineHandoff')!)} <a href={loginUrl} target="_blank" rel="noopener noreferrer">開啟 LINE 登入視窗</a></>}<button type="button" className="ghost-button" onClick={() => pending.current?.abort()}>取消登入</button></p>}
     <div className="pwa-login-actions">{access.userId
       ? <button type="button" className="ghost-button" disabled={busy} onClick={() => void logout()}>{isLineInAppBrowser() ? '登出 Atlas' : '登出 LINE'}</button>

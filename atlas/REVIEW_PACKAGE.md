@@ -1,4 +1,41 @@
-## Current follow-up: real SDK storage partitions and one-time LINE handoff (2026-10-26)
+## Current follow-up: reverse confirmation and same-network binding (2026-10-27)
+
+Accepted the reported approval-phishing gap: a visual pairing warning alone cannot
+stop a receiver who convinces a visitor to approve its link. The original receiver
+must now manually enter a separate six-digit code shown only after verified LINE
+completion. Server randomness uses unbiased rejection sampling; the row stores only
+a secret-salted, domain/intent-bound hash. Empty readiness polls neither reveal the
+code/identity nor consume attempts. SQL row locking counts wrong codes and deletes
+on the fifth; cancellation returns no ciphertext. Existing read/write proofs, visual
+pairing code, TTL, encryption and final account/grant confirmation remain required.
+
+Begin and complete bind an independently domain-salted IPv4 /24 or IPv6 /64 hash.
+Only CF-Connecting-IP from the current hosted Supabase ingress is accepted. No
+X-Forwarded-For / X-Real-IP fallback; malformed/missing values and Cloudflare's shared
+cross-zone Worker sentinel fail closed. Read-only GET probes confirmed this actual
+endpoint rejects a forged CF header while a forged XFF survives; function ingress
+logs were queried only for booleans, never client IPs/tokens. Primary official-source
+references, evidence table, scope and network routing limitations are in
+[the handoff runbook](../docs/LINE_LOGIN_HANDOFF.md). Shared NAT/VPN membership does
+not prove identity; neither control is claimed to stop disclosure of the reverse
+code to a phisher. LINE approval explicitly says only to approve a login just
+initiated on one's own device.
+
+The manual SQL supports old schema upgrades and repeated application. New columns
+are nullable for legacy rows, which fail closed and must restart; the six-argument
+RPC overload is removed. Permissions stay RLS/private/service-only SECURITY INVOKER.
+No production schema/function/frontend deployment, merge, grant or personal data
+change was performed. SQL -> function -> frontend remains a required rollout order.
+
+Native disposable PostgreSQL covers concurrent wrong guesses, limit/deletion,
+legacy rows/overload removal, missing/different networks and one-use consumption.
+Browser regressions execute the real shared handler and cryptography with simulated
+trusted ingress, plus the pinned real SDK in separate storage partitions. They cover
+same-device flow, correction of a wrong code, five guesses and network rejection.
+Actual test counts and exact-head CI are recorded in the PR. Primary review only;
+no external independent sign-off or physical iPhone/real LINE consent claim.
+
+## Previous follow-up: real SDK storage partitions and one-time LINE handoff (2026-10-26)
 
 The official SDK 2.31.2 reproduced the reported loop: its own partition exchanges
 the callback code, while a new browser context with the same callback has no PKCE

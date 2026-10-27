@@ -78,14 +78,21 @@ function handler(kind: 'user-settings' | 'chart-drawings', user = A, seed: Recor
   });
   return {
     ...fixture,
-    async request(body: Row) {
-      const response = await serve(new Request('https://offline.invalid/', { method: 'POST', body: JSON.stringify({ idToken: 'verified-by-fixture', ...body }) }));
+    async request(body: Row, headers: HeadersInit = { 'cf-connecting-ip': '203.0.113.21' }) {
+      const response = await serve(new Request('https://offline.invalid/', { method: 'POST', headers, body: JSON.stringify({ idToken: 'verified-by-fixture', ...body }) }));
       return { status: response.status, body: await response.json() };
     },
   };
 }
 
 describe('storage authorization is enforced by deployed private-data handlers', () => {
+  it('does not accept caller-supplied forwarding headers as a network binding', async () => {
+    const fixture = handler('user-settings');
+    const result = await fixture.request({ action: 'line.login.begin', intentId: '12345678-1234-4234-8234-123456789abc',
+      readSecret: 'r'.repeat(43), writeSecret: 'w'.repeat(43) }, { 'x-forwarded-for': '203.0.113.21', 'x-real-ip': '203.0.113.21' });
+    expect(result.status).toBe(403); expect(result.body.error).toContain('同一個網路');
+    expect(fixture.rpcCalls).toEqual([]); expect(fixture.calls).toEqual([]);
+  });
   it.each(['begin', 'poll', 'cancel'])('allows only proof-bound login %s without a LINE identity or personal-table access', async operation => {
     const fixture = handler('user-settings', A, {}, null, false);
     const result = await fixture.request({ action: `line.login.${operation}`, idToken: undefined,

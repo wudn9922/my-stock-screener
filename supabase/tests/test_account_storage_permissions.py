@@ -368,10 +368,10 @@ class AccountStorageSqlTests(_PostgresFixture):
 
 class LineLoginSqlTests(_PostgresFixture):
     def handoff(self, operation, intent='12345678-1234-4234-8234-123456789abc', read='a' * 64,
-                write='b' * 64, bucket='c' * 64, ciphertext=None):
+                write='b' * 64, bucket='c' * 64, ciphertext=None, network='d' * 64, code='e' * 64):
         quoted = lambda value: 'null' if value is None else "'" + value.replace("'", "''") + "'"
         sql = "set role service_role; select public.atlas_line_login_handoff(" + ','.join(
-            quoted(v) for v in (operation, intent, read, write, bucket, ciphertext)) + ');'
+            quoted(v) for v in (operation, intent, read, write, bucket, ciphertext, network, code)) + ');'
         return json.loads(self.run_sql(sql).splitlines()[-1])
 
     def test_login_one_use_proofs_and_no_personal_rows(self):
@@ -410,8 +410,72 @@ class LineLoginSqlTests(_PostgresFixture):
         for role in ('anon', 'authenticated'):
             self.assertIn('permission denied', self.run_sql(f"set role {role}; select public.atlas_line_login_handoff('poll','12345678-1234-4234-8234-123456789abc');", success=False))
             self.assertIn('permission denied', self.run_sql(f'set role {role}; select * from atlas_private.line_login_handoffs;', success=False))
-        self.assertEqual(self.run_sql("select prosecdef from pg_proc where oid='public.atlas_line_login_handoff(text,uuid,text,text,text,text)'::regprocedure;"), 'f')
+        self.assertEqual(self.run_sql("select prosecdef from pg_proc where oid='public.atlas_line_login_handoff(text,uuid,text,text,text,text,text,text)'::regprocedure;"), 'f')
         self.assertEqual(self.run_sql("select relrowsecurity from pg_class where oid='atlas_private.line_login_handoffs'::regclass;"), 't')
+
+    def test_reverse_code_is_required_wrong_guesses_are_counted_and_fifth_deletes(self):
+        self.handoff('begin')
+        self.handoff('complete', ciphertext='encrypted')
+        for _ in range(8):
+            self.assertEqual(self.handoff('poll', code=None), dict(status='code_required'))
+        self.assertEqual(self.run_sql('select failed_attempts from atlas_private.line_login_handoffs;'), '0')
+        # The read proof remains necessary; its failure cannot consume another user's attempts.
+        self.assertEqual(self.handoff('poll', read='f' * 64, code='f' * 64)['status'], 'missing')
+        for remaining in (4, 3, 2, 1):
+            self.assertEqual(self.handoff('poll', code='f' * 64), dict(status='wrong_code', attemptsRemaining=remaining))
+        self.assertEqual(self.handoff('poll', code='f' * 64), dict(status='locked'))
+        self.assertEqual(self.run_sql('select count(*) from atlas_private.line_login_handoffs;'), '0')
+        self.assertEqual(self.handoff('poll')['status'], 'missing')
+
+    def test_correct_code_after_wrong_code_is_one_use_and_cancel_never_returns_payload(self):
+        self.handoff('begin')
+        self.handoff('complete', ciphertext='encrypted')
+        self.assertEqual(self.handoff('poll', code='f' * 64)['status'], 'wrong_code')
+        self.assertEqual(self.handoff('poll'), dict(status='consumed', ciphertext='encrypted'))
+        self.assertEqual(self.handoff('poll')['status'], 'missing')
+        self.handoff('begin')
+        self.handoff('complete', ciphertext='encrypted')
+        self.assertEqual(self.handoff('cancel'), dict(status='consumed'))
+
+    def test_different_or_missing_network_cannot_complete_and_never_changes_payload(self):
+        self.handoff('begin')
+        for network in ('f' * 64, None):
+            self.assertEqual(self.handoff('complete', network=network, ciphertext='encrypted'), dict(status='network_mismatch'))
+            self.assertEqual(self.handoff('poll', code=None), dict(status='pending'))
+            self.assertEqual(self.run_sql('select ciphertext is null and code_hash is null from atlas_private.line_login_handoffs;'), 't')
+        self.assertEqual(self.handoff('complete', ciphertext='encrypted')['status'], 'complete')
+        self.assertEqual(self.handoff('poll')['ciphertext'], 'encrypted')
+
+    def test_concurrent_wrong_guesses_cannot_exceed_five_or_release_identity(self):
+        from concurrent.futures import ThreadPoolExecutor
+        self.handoff('begin')
+        self.handoff('complete', ciphertext='encrypted')
+        with ThreadPoolExecutor(8) as pool:
+            results = list(pool.map(lambda _: self.handoff('poll', code='f' * 64), range(8)))
+        self.assertEqual(sorted(r['status'] for r in results), ['locked'] + ['missing'] * 3 + ['wrong_code'] * 4)
+        self.assertTrue(all('ciphertext' not in r for r in results))
+        self.assertEqual(self.handoff('poll')['status'], 'missing')
+
+    def test_manual_upgrade_is_idempotent_and_legacy_inflight_rows_fail_closed(self):
+        migration = (MIGRATION.parent / 'line_login_handoff.sql').read_text()
+        # Recreate the actual prior shape, including its RPC overload and an in-flight row.
+        self.run_sql("""alter table atlas_private.line_login_handoffs
+          drop column network_hash, drop column code_hash, drop column failed_attempts;
+          create function public.atlas_line_login_handoff(text,uuid,text,text,text,text)
+          returns jsonb language sql as 'select ''{}''::jsonb';
+          insert into atlas_private.line_login_handoffs(id,read_hash,write_hash,bucket,ciphertext)
+          values ('12345678-1234-4234-8234-123456789abc',repeat('a',64),repeat('b',64),repeat('c',64),'old-encrypted');""")
+        try:
+            self.run_sql(migration)
+            self.run_sql(migration)
+            self.assertEqual(self.run_sql("select to_regprocedure('public.atlas_line_login_handoff(text,uuid,text,text,text,text)') is null;"), 't')
+            self.assertEqual(self.handoff('poll')['status'], 'restart_required')
+            self.assertEqual(self.run_sql('select count(*) from atlas_private.line_login_handoffs;'), '0')
+            self.handoff('begin')
+            self.run_sql('update atlas_private.line_login_handoffs set network_hash=null;')
+            self.assertEqual(self.handoff('complete', ciphertext='encrypted')['status'], 'restart_required')
+        finally:
+            self.run_sql(migration)
 
     def test_login_concurrent_consumers_get_exactly_one_identity(self):
         from concurrent.futures import ThreadPoolExecutor
