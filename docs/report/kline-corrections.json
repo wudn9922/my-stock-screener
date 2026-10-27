@@ -195088,6 +195088,5994 @@
       "reason": "invalid-world-OHLC",
       "id": "fa382485e29e79b51370d51d48884498e7ba93ea4c76f501d13bb0e11eade582",
       "loggedAt": "2026-10-27T10:43:37.842276+00:00"
+    },
+    {
+      "symbol": "1341.TW",
+      "date": "2026-10-22",
+      "status": "corrected",
+      "old": {
+        "Open": null,
+        "High": null,
+        "Low": null,
+        "Close": null,
+        "Volume": 60.0
+      },
+      "new": {
+        "Open": 58.400001525878906,
+        "High": 58.400001525878906,
+        "Low": 58.400001525878906,
+        "Close": 58.400001525878906,
+        "Volume": 0.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/1341.TW",
+      "fetchedAt": "2026-10-27T13:20:47.306309+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "7891cf9f5b15acc8ae58a8f414c5874f876de274758a7298d8f6b949dbd667c8",
+      "loggedAt": "2026-10-27T13:20:47.393567+00:00"
+    },
+    {
+      "symbol": "1441.TW",
+      "date": "2026-10-22",
+      "status": "corrected",
+      "old": {
+        "Open": null,
+        "High": null,
+        "Low": null,
+        "Close": null,
+        "Volume": 2536.0
+      },
+      "new": {
+        "Open": 9.710000038146973,
+        "High": 9.710000038146973,
+        "Low": 9.710000038146973,
+        "Close": 9.710000038146973,
+        "Volume": 0.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/1441.TW",
+      "fetchedAt": "2026-10-27T13:20:47.738779+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "043a0e8870c257b9a85f83d998ccc902656dba85faae1d6da91333442bdf5c3b",
+      "loggedAt": "2026-10-27T13:20:47.819608+00:00"
+    },
+    {
+      "symbol": "1538.TW",
+      "date": "2026-10-22",
+      "status": "corrected",
+      "old": {
+        "Open": null,
+        "High": null,
+        "Low": null,
+        "Close": null,
+        "Volume": 612.0
+      },
+      "new": {
+        "Open": 9.25,
+        "High": 9.25,
+        "Low": 9.25,
+        "Close": 9.25,
+        "Volume": 0.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/1538.TW",
+      "fetchedAt": "2026-10-27T13:20:48.208928+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "32900717dc9d55cc1e988aec26b0134aec502fe154ca182553c4a5f305d9d3bf",
+      "loggedAt": "2026-10-27T13:20:48.289327+00:00"
+    },
+    {
+      "symbol": "1583.TW",
+      "date": "2026-10-22",
+      "status": "corrected",
+      "old": {
+        "Open": null,
+        "High": null,
+        "Low": null,
+        "Close": null,
+        "Volume": 1.0
+      },
+      "new": {
+        "Open": 47.0,
+        "High": 47.0,
+        "Low": 47.0,
+        "Close": 47.0,
+        "Volume": 0.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/1583.TW",
+      "fetchedAt": "2026-10-27T13:20:48.695408+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "618a40fb481c44154c8d8423fd5eb2a24036f69a01fdf3465c2ece52eb2a0e1a",
+      "loggedAt": "2026-10-27T13:20:48.775984+00:00"
+    },
+    {
+      "symbol": "2035.TWO",
+      "date": "2026-10-27",
+      "status": "rejected",
+      "old": {
+        "Open": null,
+        "High": null,
+        "Low": null,
+        "Close": null,
+        "Volume": 2.0
+      },
+      "new": null,
+      "sourceUrl": "https://query1.finance.yahoo.com/v7/finance/quote",
+      "fetchedAt": null,
+      "reason": "missing-or-nonnumeric-OHLC; official:ValueError",
+      "id": "6e8d861481abb6dc6238a3450928dcc255138151e220e4b3b808fb648be9bac1",
+      "loggedAt": "2026-10-27T13:20:53.859316+00:00"
+    },
+    {
+      "symbol": "2321.TW",
+      "date": "2026-10-22",
+      "status": "corrected",
+      "old": {
+        "Open": null,
+        "High": null,
+        "Low": null,
+        "Close": null,
+        "Volume": 374.0
+      },
+      "new": {
+        "Open": 26.0,
+        "High": 26.0,
+        "Low": 26.0,
+        "Close": 26.0,
+        "Volume": 0.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/2321.TW",
+      "fetchedAt": "2026-10-27T13:20:54.341909+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "3482bc732a1ce89d2fde94e790b7ff0632f74333f75ffe264b5ccdebbbc349a2",
+      "loggedAt": "2026-10-27T13:20:54.420439+00:00"
+    },
+    {
+      "symbol": "4581.TW",
+      "date": "2026-10-22",
+      "status": "corrected",
+      "old": {
+        "Open": null,
+        "High": null,
+        "Low": null,
+        "Close": null,
+        "Volume": null
+      },
+      "new": {
+        "Open": 48.20000076293945,
+        "High": 48.20000076293945,
+        "Low": 48.20000076293945,
+        "Close": 48.20000076293945,
+        "Volume": 0.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/4581.TW",
+      "fetchedAt": "2026-10-27T13:20:56.461262+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "c9ed90f0d6ff3360711937f1f6f623857429e24453c2b83259783f4305cf2c8b",
+      "loggedAt": "2026-10-27T13:20:56.538670+00:00"
+    },
+    {
+      "symbol": "6921.TW",
+      "date": "2026-10-22",
+      "status": "corrected",
+      "old": {
+        "Open": null,
+        "High": null,
+        "Low": null,
+        "Close": null,
+        "Volume": null
+      },
+      "new": {
+        "Open": 64.5,
+        "High": 64.5,
+        "Low": 64.5,
+        "Close": 64.5,
+        "Volume": 0.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/6921.TW",
+      "fetchedAt": "2026-10-27T13:20:58.047725+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "0e954dd7aa70b42f5307abf0b71cda79a99fb2c06a48fa5c08607d96286a65a6",
+      "loggedAt": "2026-10-27T13:20:58.124746+00:00"
+    },
+    {
+      "symbol": "BRK-A",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 810951.0,
+        "High": 821588.2,
+        "Low": 813234.56,
+        "Close": 821931.0,
+        "Volume": 278.0
+      },
+      "new": {
+        "Open": 810951.0,
+        "High": 822768.0,
+        "Low": 810951.0,
+        "Close": 821931.0,
+        "Volume": 300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BRK-A",
+      "fetchedAt": "2026-10-27T13:20:59.614265+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "d605a86475bc8ffe85371b4f0d7c569eae04812859cc09c952deb4038645da60",
+      "loggedAt": "2026-10-27T13:20:59.690976+00:00"
+    },
+    {
+      "symbol": "COP",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 149.24,
+        "High": 152.0,
+        "Low": 149.3,
+        "Close": 151.37,
+        "Volume": 5216424.0
+      },
+      "new": {
+        "Open": 149.24000549316406,
+        "High": 152.0,
+        "Low": 149.24000549316406,
+        "Close": 151.3699951171875,
+        "Volume": 5278300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/COP",
+      "fetchedAt": "2026-10-27T13:21:00.029043+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "b3429e7cd4b6e6e9f1e947a87e1c4336e8fa00f3e78cbbb1648af02d709d6104",
+      "loggedAt": "2026-10-27T13:21:00.136012+00:00"
+    },
+    {
+      "symbol": "BMO",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 171.35,
+        "High": 171.34,
+        "Low": 169.65,
+        "Close": 170.48,
+        "Volume": 305812.0
+      },
+      "new": {
+        "Open": 171.35000610351562,
+        "High": 171.35000610351562,
+        "Low": 169.64999389648438,
+        "Close": 170.47999572753906,
+        "Volume": 988600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BMO",
+      "fetchedAt": "2026-10-27T13:21:00.464226+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "ca4e08f4a3cfee2573efdc07e650c3d0beacffbf35e668f304963148e8e717a2",
+      "loggedAt": "2026-10-27T13:21:00.542460+00:00"
+    },
+    {
+      "symbol": "ENB",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 47.865,
+        "High": 48.3299,
+        "Low": 47.88,
+        "Close": 48.26,
+        "Volume": 5297227.0
+      },
+      "new": {
+        "Open": 47.869998931884766,
+        "High": 48.33000183105469,
+        "Low": 47.86000061035156,
+        "Close": 48.2599983215332,
+        "Volume": 5462700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/ENB",
+      "fetchedAt": "2026-10-27T13:21:00.875613+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "20163cd9764a7c2adabf8a6664924a08658ed78ac61725c70a2fdcd28b2fb1c9",
+      "loggedAt": "2026-10-27T13:21:00.981772+00:00"
+    },
+    {
+      "symbol": "TRV",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 402.78,
+        "High": 402.77,
+        "Low": 398.62,
+        "Close": 400.17,
+        "Volume": 1150774.0
+      },
+      "new": {
+        "Open": 402.7799987792969,
+        "High": 402.7799987792969,
+        "Low": 398.6199951171875,
+        "Close": 400.1700134277344,
+        "Volume": 1151100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TRV",
+      "fetchedAt": "2026-10-27T13:21:01.316216+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "d372b2e0de65fc2482f1c23de6f31af6ffb10317dbe7295a77abad4bfe65aae4",
+      "loggedAt": "2026-10-27T13:21:01.395394+00:00"
+    },
+    {
+      "symbol": "NOC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 553.86,
+        "High": 566.44,
+        "Low": 554.655,
+        "Close": 565.41,
+        "Volume": 790539.0
+      },
+      "new": {
+        "Open": 553.8599853515625,
+        "High": 566.47998046875,
+        "Low": 553.8599853515625,
+        "Close": 565.4099731445312,
+        "Volume": 791100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/NOC",
+      "fetchedAt": "2026-10-27T13:21:01.741740+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "f22cc49c2e05accfd2a97af0e03d891dea154e0becb277e45a35f82e04bd0560",
+      "loggedAt": "2026-10-27T13:21:01.851145+00:00"
+    },
+    {
+      "symbol": "HLT",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 349.21,
+        "High": 355.8,
+        "Low": 349.32,
+        "Close": 351.89,
+        "Volume": 2610959.0
+      },
+      "new": {
+        "Open": 349.2099914550781,
+        "High": 355.79998779296875,
+        "Low": 349.2099914550781,
+        "Close": 351.8900146484375,
+        "Volume": 2611100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/HLT",
+      "fetchedAt": "2026-10-27T13:21:02.171032+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "0093f1207352a6380d29173a323596b66d0d4fd6874ac1c47c76d33958f61c3b",
+      "loggedAt": "2026-10-27T13:21:02.250151+00:00"
+    },
+    {
+      "symbol": "APO",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 114.02,
+        "High": 117.16,
+        "Low": 114.2,
+        "Close": 114.37,
+        "Volume": 2853612.0
+      },
+      "new": {
+        "Open": 114.0199966430664,
+        "High": 117.16000366210938,
+        "Low": 114.0,
+        "Close": 114.37000274658203,
+        "Volume": 2853600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/APO",
+      "fetchedAt": "2026-10-27T13:21:02.576160+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "5b70cb523b1769a05e10f89b98f58088f9f383057a645c7ff94ab49e419f5f96",
+      "loggedAt": "2026-10-27T13:21:02.684006+00:00"
+    },
+    {
+      "symbol": "AZO",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 3142.32,
+        "High": 3264.365,
+        "Low": 3143.89,
+        "Close": 3190.07,
+        "Volume": 182259.0
+      },
+      "new": {
+        "Open": 3142.320068359375,
+        "High": 3264.3701171875,
+        "Low": 3142.320068359375,
+        "Close": 3190.070068359375,
+        "Volume": 182300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AZO",
+      "fetchedAt": "2026-10-27T13:21:02.989592+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "3696e3a7ffa7155a5e7e95029e241de8de1383f58676841ccb2c182e55013387",
+      "loggedAt": "2026-10-27T13:21:03.070135+00:00"
+    },
+    {
+      "symbol": "VTR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 86.8,
+        "High": 88.1,
+        "Low": 86.91,
+        "Close": 87.42,
+        "Volume": 1946212.0
+      },
+      "new": {
+        "Open": 86.80000305175781,
+        "High": 88.0999984741211,
+        "Low": 86.80000305175781,
+        "Close": 87.41999816894531,
+        "Volume": 1946200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/VTR",
+      "fetchedAt": "2026-10-27T13:21:03.395505+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "ca7c92fb9b29f7ab6bbe8386acbf7cc3d17a9fb78d711eff4f4bb0a2883bd20f",
+      "loggedAt": "2026-10-27T13:21:03.501040+00:00"
+    },
+    {
+      "symbol": "FMX",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 126.49,
+        "High": 126.06,
+        "Low": 122.71,
+        "Close": 124.98,
+        "Volume": 1093339.0
+      },
+      "new": {
+        "Open": 126.48999786376953,
+        "High": 126.5,
+        "Low": 122.70999908447266,
+        "Close": 124.9800033569336,
+        "Volume": 1093300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/FMX",
+      "fetchedAt": "2026-10-27T13:21:03.831243+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "afb6820db7bff64929450317ba977f9011517b705419d7a629a15391f8ad7962",
+      "loggedAt": "2026-10-27T13:21:03.910128+00:00"
+    },
+    {
+      "symbol": "BBDO",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 3.425,
+        "High": 3.325,
+        "Low": 2.655,
+        "Close": 2.76,
+        "Volume": 769827.0
+      },
+      "new": {
+        "Open": 3.430000066757202,
+        "High": 3.430000066757202,
+        "Low": 2.6600000858306885,
+        "Close": 2.759999990463257,
+        "Volume": 769800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BBDO",
+      "fetchedAt": "2026-10-27T13:21:04.243074+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "4e34c56a62cdc62b5e11277379bf7d8ba233089e1b1e453a39f9cd3c892936d4",
+      "loggedAt": "2026-10-27T13:21:04.348759+00:00"
+    },
+    {
+      "symbol": "WSM",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 254.37,
+        "High": 253.5,
+        "Low": 248.19,
+        "Close": 249.96,
+        "Volume": 869872.0
+      },
+      "new": {
+        "Open": 254.3699951171875,
+        "High": 254.3699951171875,
+        "Low": 248.19000244140625,
+        "Close": 249.9600067138672,
+        "Volume": 869900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/WSM",
+      "fetchedAt": "2026-10-27T13:21:04.684522+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "a11946362634e709fac018a9696d5745fd8f3d932e627555e3d625f6bb265ab7",
+      "loggedAt": "2026-10-27T13:21:04.761629+00:00"
+    },
+    {
+      "symbol": "DOW",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 32.43,
+        "High": 34.365,
+        "Low": 32.5109,
+        "Close": 33.99,
+        "Volume": 14061595.0
+      },
+      "new": {
+        "Open": 32.43000030517578,
+        "High": 34.369998931884766,
+        "Low": 32.279998779296875,
+        "Close": 33.9900016784668,
+        "Volume": 14062000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/DOW",
+      "fetchedAt": "2026-10-27T13:21:05.080674+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "689bd00cd27fe43617839ae4cf560b43399bf976e625299bf715b2f0a52cdc67",
+      "loggedAt": "2026-10-27T13:21:05.186545+00:00"
+    },
+    {
+      "symbol": "SYF",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 74.03,
+        "High": 75.375,
+        "Low": 74.22,
+        "Close": 74.83,
+        "Volume": 3056187.0
+      },
+      "new": {
+        "Open": 74.02999877929688,
+        "High": 75.37999725341797,
+        "Low": 74.02999877929688,
+        "Close": 74.83000183105469,
+        "Volume": 3056200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SYF",
+      "fetchedAt": "2026-10-27T13:21:05.501567+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "a9aa1139eb33d2258e4c5cba7765835d5693d07ce5d970892b3ebfebd79e5172",
+      "loggedAt": "2026-10-27T13:21:05.578795+00:00"
+    },
+    {
+      "symbol": "RL",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 377.4,
+        "High": 389.74,
+        "Low": 379.36,
+        "Close": 386.95,
+        "Volume": 598480.0
+      },
+      "new": {
+        "Open": 377.3999938964844,
+        "High": 389.739990234375,
+        "Low": 377.3999938964844,
+        "Close": 386.95001220703125,
+        "Volume": 598700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/RL",
+      "fetchedAt": "2026-10-27T13:21:05.901735+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "ab372abb03994f37c5d995cabb94b2dab94e279f18f768e5402879a355b3e04c",
+      "loggedAt": "2026-10-27T13:21:06.007622+00:00"
+    },
+    {
+      "symbol": "BBY",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 100.16,
+        "High": 100.0,
+        "Low": 96.81,
+        "Close": 97.95,
+        "Volume": 2185233.0
+      },
+      "new": {
+        "Open": 100.16000366210938,
+        "High": 100.31999969482422,
+        "Low": 96.80000305175781,
+        "Close": 97.94999694824219,
+        "Volume": 2185200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BBY",
+      "fetchedAt": "2026-10-27T13:21:06.333140+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "356504c5eda7f51636e208537cfe9992208fbc75e269c2ed412ec4413d54989c",
+      "loggedAt": "2026-10-27T13:21:06.411465+00:00"
+    },
+    {
+      "symbol": "TOST",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 32.71,
+        "High": 32.66,
+        "Low": 31.74,
+        "Close": 32.13,
+        "Volume": 5171991.0
+      },
+      "new": {
+        "Open": 32.709999084472656,
+        "High": 32.709999084472656,
+        "Low": 31.739999771118164,
+        "Close": 32.130001068115234,
+        "Volume": 5172000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TOST",
+      "fetchedAt": "2026-10-27T13:21:06.719539+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "ede5fb2e911a1e68c40c564d70aa394ec10822b09c558d6a208871a0c12d47fd",
+      "loggedAt": "2026-10-27T13:21:06.826766+00:00"
+    },
+    {
+      "symbol": "CF",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 119.835,
+        "High": 123.06,
+        "Low": 119.88,
+        "Close": 120.84,
+        "Volume": 1671303.0
+      },
+      "new": {
+        "Open": 119.83999633789062,
+        "High": 123.05999755859375,
+        "Low": 119.41999816894531,
+        "Close": 120.83999633789062,
+        "Volume": 1671300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CF",
+      "fetchedAt": "2026-10-27T13:21:07.154491+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "5f924815f7f7da9b34b2aa2767bf885790f9067e4b9ea2b6278ba53808450ee4",
+      "loggedAt": "2026-10-27T13:21:07.233076+00:00"
+    },
+    {
+      "symbol": "LDOS",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 137.02,
+        "High": 141.37,
+        "Low": 138.47,
+        "Close": 139.86,
+        "Volume": 806910.0
+      },
+      "new": {
+        "Open": 137.02000427246094,
+        "High": 141.3699951171875,
+        "Low": 137.02000427246094,
+        "Close": 139.86000061035156,
+        "Volume": 807300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LDOS",
+      "fetchedAt": "2026-10-27T13:21:07.553745+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "63976beeccb3f72833d7c0ef4a06085af0ddf81041b67e05d708ab25ce07e2fd",
+      "loggedAt": "2026-10-27T13:21:07.663099+00:00"
+    },
+    {
+      "symbol": "MGA",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 64.89,
+        "High": 64.625,
+        "Low": 63.7,
+        "Close": 63.96,
+        "Volume": 907445.0
+      },
+      "new": {
+        "Open": 64.88999938964844,
+        "High": 64.88999938964844,
+        "Low": 63.70000076293945,
+        "Close": 63.959999084472656,
+        "Volume": 912100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MGA",
+      "fetchedAt": "2026-10-27T13:21:08.073001+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "fd6326ffeb5eb106acccb7b2dbad41a2e94944fe4666fcbdf8bac3b1da5abb8b",
+      "loggedAt": "2026-10-27T13:21:08.151660+00:00"
+    },
+    {
+      "symbol": "CRBG",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 34.39,
+        "High": 35.31,
+        "Low": 34.41,
+        "Close": 34.66,
+        "Volume": 3520372.0
+      },
+      "new": {
+        "Open": 34.38999938964844,
+        "High": 35.310001373291016,
+        "Low": 34.380001068115234,
+        "Close": 34.65999984741211,
+        "Volume": 3524800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CRBG",
+      "fetchedAt": "2026-10-27T13:21:08.462476+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "b93fbc67ebb3245b34daddced2c49fcf55de2df24c6042abc292248d4136d33e",
+      "loggedAt": "2026-10-27T13:21:08.569447+00:00"
+    },
+    {
+      "symbol": "CACI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 650.0,
+        "High": 674.44,
+        "Low": 653.53,
+        "Close": 665.0,
+        "Volume": 370509.0
+      },
+      "new": {
+        "Open": 650.0,
+        "High": 674.4400024414062,
+        "Low": 650.0,
+        "Close": 665.0,
+        "Volume": 370500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CACI",
+      "fetchedAt": "2026-10-27T13:21:08.881756+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "f7aa278270e32d7266683c1ac803d3afaa626085f7208eae35a9749c5f03b305",
+      "loggedAt": "2026-10-27T13:21:08.959341+00:00"
+    },
+    {
+      "symbol": "EQH",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 52.75,
+        "High": 54.6,
+        "Low": 53.155,
+        "Close": 53.58,
+        "Volume": 1767024.0
+      },
+      "new": {
+        "Open": 52.75,
+        "High": 54.60499954223633,
+        "Low": 52.75,
+        "Close": 53.58000183105469,
+        "Volume": 1789600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/EQH",
+      "fetchedAt": "2026-10-27T13:21:09.341535+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "8b9bcddad5e7ac2295de6f2ab3c296bdec6c7dbbe9d964e9e9cc1097b2871bfd",
+      "loggedAt": "2026-10-27T13:21:09.447372+00:00"
+    },
+    {
+      "symbol": "SOLV",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 85.68,
+        "High": 87.56,
+        "Low": 85.795,
+        "Close": 85.81,
+        "Volume": 975572.0
+      },
+      "new": {
+        "Open": 85.68000030517578,
+        "High": 87.55999755859375,
+        "Low": 85.68000030517578,
+        "Close": 85.80999755859375,
+        "Volume": 975600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SOLV",
+      "fetchedAt": "2026-10-27T13:21:09.754180+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "907a6bdd2743b37db69e579b94bdce673eb61b2171cfd1809804c1178987f67c",
+      "loggedAt": "2026-10-27T13:21:09.831406+00:00"
+    },
+    {
+      "symbol": "CET",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 55.6,
+        "High": 56.3662,
+        "Low": 55.602,
+        "Close": 55.81,
+        "Volume": 20473.0
+      },
+      "new": {
+        "Open": 55.599998474121094,
+        "High": 56.369998931884766,
+        "Low": 55.599998474121094,
+        "Close": 55.810001373291016,
+        "Volume": 20500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CET",
+      "fetchedAt": "2026-10-27T13:21:10.173445+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "f9ecfcc2a5503ef8ff7c3d1629b6643d0ca1f4df89fed970b0690719db331b49",
+      "loggedAt": "2026-10-27T13:21:10.280839+00:00"
+    },
+    {
+      "symbol": "KEP",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 10.55,
+        "High": 10.53,
+        "Low": 10.4001,
+        "Close": 10.49,
+        "Volume": 855518.0
+      },
+      "new": {
+        "Open": 10.550000190734863,
+        "High": 10.550000190734863,
+        "Low": 10.399999618530273,
+        "Close": 10.489999771118164,
+        "Volume": 855800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/KEP",
+      "fetchedAt": "2026-10-27T13:21:10.670235+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "9689b70502ddf77a45cbfa17503cbb20be5cfd8d85b4666a40fbaf8528188495",
+      "loggedAt": "2026-10-27T13:21:10.748577+00:00"
+    },
+    {
+      "symbol": "BAX",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 25.62,
+        "High": 25.485,
+        "Low": 25.065,
+        "Close": 25.29,
+        "Volume": 4043450.0
+      },
+      "new": {
+        "Open": 25.6200008392334,
+        "High": 25.6200008392334,
+        "Low": 25.059999465942383,
+        "Close": 25.290000915527344,
+        "Volume": 4043500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BAX",
+      "fetchedAt": "2026-10-27T13:21:11.153661+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "887ee8ae921f9056f5c3d2c84ec866745d7250b764cca0c36bb8cfda6d2452b0",
+      "loggedAt": "2026-10-27T13:21:11.257484+00:00"
+    },
+    {
+      "symbol": "PEN",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 323.88,
+        "High": 325.58,
+        "Low": 324.42,
+        "Close": 325.22,
+        "Volume": 434163.0
+      },
+      "new": {
+        "Open": 323.8800048828125,
+        "High": 325.5799865722656,
+        "Low": 323.8800048828125,
+        "Close": 325.2200012207031,
+        "Volume": 434200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/PEN",
+      "fetchedAt": "2026-10-27T13:21:11.566661+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "edf7596ca59b0fd1f0e094c9a4c25607220e37677d38d20abb91b465172651d0",
+      "loggedAt": "2026-10-27T13:21:11.645296+00:00"
+    },
+    {
+      "symbol": "FIG",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 24.56,
+        "High": 24.44,
+        "Low": 23.065,
+        "Close": 23.52,
+        "Volume": 8483110.0
+      },
+      "new": {
+        "Open": 24.559999465942383,
+        "High": 24.559999465942383,
+        "Low": 23.065000534057617,
+        "Close": 23.520000457763672,
+        "Volume": 8506700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/FIG",
+      "fetchedAt": "2026-10-27T13:21:12.034840+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "09c3a8c7fff42994d03364636832c58a5eff2a4d27aa0e23c2babd940b5a01df",
+      "loggedAt": "2026-10-27T13:21:12.144200+00:00"
+    },
+    {
+      "symbol": "GL",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 155.62,
+        "High": 159.455,
+        "Low": 155.815,
+        "Close": 156.82,
+        "Volume": 949402.0
+      },
+      "new": {
+        "Open": 155.6199951171875,
+        "High": 159.4600067138672,
+        "Low": 155.6199951171875,
+        "Close": 156.82000732421875,
+        "Volume": 1024800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/GL",
+      "fetchedAt": "2026-10-27T13:21:12.538418+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "5893c1444ecd760088308c11e20c1251884041610a4b2b2dc2f10ce07f9e70cb",
+      "loggedAt": "2026-10-27T13:21:12.618726+00:00"
+    },
+    {
+      "symbol": "MICC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 19.09,
+        "High": 19.715,
+        "Low": 19.1,
+        "Close": 19.42,
+        "Volume": 1711374.0
+      },
+      "new": {
+        "Open": 19.09000015258789,
+        "High": 19.71500015258789,
+        "Low": 19.09000015258789,
+        "Close": 19.420000076293945,
+        "Volume": 1711500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MICC",
+      "fetchedAt": "2026-10-27T13:21:12.928802+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "72c4794dfc11f24fbd7c08a23a17c37e394f38748816e5ffadcb4e2ad81eab74",
+      "loggedAt": "2026-10-27T13:21:13.040847+00:00"
+    },
+    {
+      "symbol": "R",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 273.48,
+        "High": 285.4425,
+        "Low": 273.615,
+        "Close": 282.11,
+        "Volume": 523014.0
+      },
+      "new": {
+        "Open": 273.4800109863281,
+        "High": 285.57000732421875,
+        "Low": 273.4800109863281,
+        "Close": 282.1099853515625,
+        "Volume": 523000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/R",
+      "fetchedAt": "2026-10-27T13:21:13.390453+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "a075330910b4513a59e0d9a16c92dedf56849db331addf9899bd85251ea46345",
+      "loggedAt": "2026-10-27T13:21:13.469915+00:00"
+    },
+    {
+      "symbol": "JEF",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 44.91,
+        "High": 45.89,
+        "Low": 44.9101,
+        "Close": 45.43,
+        "Volume": 1693922.0
+      },
+      "new": {
+        "Open": 44.90999984741211,
+        "High": 45.900001525878906,
+        "Low": 44.90999984741211,
+        "Close": 45.43000030517578,
+        "Volume": 1694000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/JEF",
+      "fetchedAt": "2026-10-27T13:21:13.878446+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "77636c680edb133dc4a1f5c62c581137039e9a3c243fa7fa2f104f492c77f1f5",
+      "loggedAt": "2026-10-27T13:21:13.984969+00:00"
+    },
+    {
+      "symbol": "HMY",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 16.0,
+        "High": 15.99,
+        "Low": 15.58,
+        "Close": 15.9,
+        "Volume": 2084629.0
+      },
+      "new": {
+        "Open": 16.0,
+        "High": 16.0,
+        "Low": 15.579999923706055,
+        "Close": 15.899999618530273,
+        "Volume": 2084600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/HMY",
+      "fetchedAt": "2026-10-27T13:21:14.310426+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "559bfec9441a616e14e0d7e8969c041cd1931419c5c8ba45fd96cbf27ab49b14",
+      "loggedAt": "2026-10-27T13:21:14.388744+00:00"
+    },
+    {
+      "symbol": "BAH",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 78.71,
+        "High": 84.8899,
+        "Low": 79.09,
+        "Close": 83.36,
+        "Volume": 2493903.0
+      },
+      "new": {
+        "Open": 78.70999908447266,
+        "High": 84.88999938964844,
+        "Low": 78.70999908447266,
+        "Close": 83.36000061035156,
+        "Volume": 2493900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BAH",
+      "fetchedAt": "2026-10-27T13:21:14.707526+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "35285fd01085d14fd35e76efc3a6921dd345c8a3c28b1293e70677454e5a9202",
+      "loggedAt": "2026-10-27T13:21:14.815036+00:00"
+    },
+    {
+      "symbol": "CFR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 157.71,
+        "High": 159.56,
+        "Low": 157.76,
+        "Close": 158.58,
+        "Volume": 582728.0
+      },
+      "new": {
+        "Open": 157.7100067138672,
+        "High": 159.55999755859375,
+        "Low": 157.7100067138672,
+        "Close": 158.5800018310547,
+        "Volume": 582700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CFR",
+      "fetchedAt": "2026-10-27T13:21:15.154226+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "65fe1a035b8e041513c3591312922d3075b612dfe7f46832fbb1b626368962f9",
+      "loggedAt": "2026-10-27T13:21:15.232089+00:00"
+    },
+    {
+      "symbol": "SM",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 39.51,
+        "High": 40.5602,
+        "Low": 39.55,
+        "Close": 40.15,
+        "Volume": 1992091.0
+      },
+      "new": {
+        "Open": 39.5099983215332,
+        "High": 40.560001373291016,
+        "Low": 39.5099983215332,
+        "Close": 40.150001525878906,
+        "Volume": 1992100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SM",
+      "fetchedAt": "2026-10-27T13:21:15.573912+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "bcb0df505d3f295c1c87066614bcac354f47a7ab1350e69ce601703bd27a208e",
+      "loggedAt": "2026-10-27T13:21:15.678189+00:00"
+    },
+    {
+      "symbol": "PBF",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 75.86,
+        "High": 82.73,
+        "Low": 75.93,
+        "Close": 80.55,
+        "Volume": 2195398.0
+      },
+      "new": {
+        "Open": 75.86000061035156,
+        "High": 82.7300033569336,
+        "Low": 75.86000061035156,
+        "Close": 80.55000305175781,
+        "Volume": 2283100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/PBF",
+      "fetchedAt": "2026-10-27T13:21:16.000609+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "760bb2ec61e5fe8e2f0989d05a6e9b7856582f293d020c8b5f4087b8320317d1",
+      "loggedAt": "2026-10-27T13:21:16.077477+00:00"
+    },
+    {
+      "symbol": "FRT",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 108.79,
+        "High": 109.9704,
+        "Low": 108.91,
+        "Close": 109.23,
+        "Volume": 971124.0
+      },
+      "new": {
+        "Open": 108.79000091552734,
+        "High": 109.97000122070312,
+        "Low": 108.79000091552734,
+        "Close": 109.2300033569336,
+        "Volume": 971100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/FRT",
+      "fetchedAt": "2026-10-27T13:21:16.420349+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "37b8250a039b85117ca05c29ad1f45007bb020f8141ccb3be8746f098155d370",
+      "loggedAt": "2026-10-27T13:21:16.529092+00:00"
+    },
+    {
+      "symbol": "IAG",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 16.5,
+        "High": 16.41,
+        "Low": 15.865,
+        "Close": 16.34,
+        "Volume": 4307174.0
+      },
+      "new": {
+        "Open": 16.5,
+        "High": 16.5,
+        "Low": 15.869999885559082,
+        "Close": 16.34000015258789,
+        "Volume": 4333000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/IAG",
+      "fetchedAt": "2026-10-27T13:21:16.859493+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "7e6543533e4d3bfafa3eeba7a5f72d8846dcbdd700621d77ddebb2b8048a31fd",
+      "loggedAt": "2026-10-27T13:21:16.939669+00:00"
+    },
+    {
+      "symbol": "KNTK",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 55.51,
+        "High": 56.325,
+        "Low": 55.58,
+        "Close": 55.97,
+        "Volume": 597874.0
+      },
+      "new": {
+        "Open": 55.5099983215332,
+        "High": 56.33000183105469,
+        "Low": 55.5099983215332,
+        "Close": 55.970001220703125,
+        "Volume": 597900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/KNTK",
+      "fetchedAt": "2026-10-27T13:21:17.255556+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "db8cb421eb1c2423c5aadb79165a8a453e7d63abc0d05c9ebd6d9548ef6e4133",
+      "loggedAt": "2026-10-27T13:21:17.362520+00:00"
+    },
+    {
+      "symbol": "DAR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 56.58,
+        "High": 58.27,
+        "Low": 56.61,
+        "Close": 57.16,
+        "Volume": 1816864.0
+      },
+      "new": {
+        "Open": 56.58000183105469,
+        "High": 58.27000045776367,
+        "Low": 56.58000183105469,
+        "Close": 57.15999984741211,
+        "Volume": 1816900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/DAR",
+      "fetchedAt": "2026-10-27T13:21:17.672520+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "1e43612cd28acc5887a61561e779c0b3ac3c38d822e56f76e4471afe7c3a2f0f",
+      "loggedAt": "2026-10-27T13:21:17.751571+00:00"
+    },
+    {
+      "symbol": "KLAR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 12.86,
+        "High": 12.725,
+        "Low": 12.46,
+        "Close": 12.62,
+        "Volume": 5388568.0
+      },
+      "new": {
+        "Open": 12.859999656677246,
+        "High": 12.859999656677246,
+        "Low": 12.460000038146973,
+        "Close": 12.619999885559082,
+        "Volume": 5390500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/KLAR",
+      "fetchedAt": "2026-10-27T13:21:18.059792+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "6355c1843854c7f10ebff314d33ee8f595bb8b22427f1e79c011b26de3c82c64",
+      "loggedAt": "2026-10-27T13:21:18.165517+00:00"
+    },
+    {
+      "symbol": "VOYA",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 95.81,
+        "High": 97.84,
+        "Low": 96.14,
+        "Close": 96.56,
+        "Volume": 949573.0
+      },
+      "new": {
+        "Open": 95.80999755859375,
+        "High": 97.87999725341797,
+        "Low": 95.80999755859375,
+        "Close": 96.55999755859375,
+        "Volume": 949600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/VOYA",
+      "fetchedAt": "2026-10-27T13:21:18.486807+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "73efcfe2070b2be36a4d98c4aabd0fffca06409ff0ebff71a41483dd1747bbd4",
+      "loggedAt": "2026-10-27T13:21:18.565173+00:00"
+    },
+    {
+      "symbol": "CTRE",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 36.69,
+        "High": 37.2946,
+        "Low": 36.715,
+        "Close": 36.98,
+        "Volume": 1464583.0
+      },
+      "new": {
+        "Open": 36.689998626708984,
+        "High": 37.29999923706055,
+        "Low": 36.689998626708984,
+        "Close": 36.97999954223633,
+        "Volume": 1464600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CTRE",
+      "fetchedAt": "2026-10-27T13:21:18.902912+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "95fa73e2eae520866b219ed633a25ffdb2532a8462f7ac63bef2cfcef3bfd57a",
+      "loggedAt": "2026-10-27T13:21:19.012070+00:00"
+    },
+    {
+      "symbol": "UGI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 38.49,
+        "High": 39.14,
+        "Low": 38.52,
+        "Close": 39.11,
+        "Volume": 1494958.0
+      },
+      "new": {
+        "Open": 38.4900016784668,
+        "High": 39.13999938964844,
+        "Low": 38.4900016784668,
+        "Close": 39.11000061035156,
+        "Volume": 1495000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/UGI",
+      "fetchedAt": "2026-10-27T13:21:19.355181+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "9ddb6211c6192f41b70320b8f7eb1149d4a583c533ea4d49b345427ce43c6dbd",
+      "loggedAt": "2026-10-27T13:21:19.434781+00:00"
+    },
+    {
+      "symbol": "WLK",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 64.56,
+        "High": 66.895,
+        "Low": 65.065,
+        "Close": 65.31,
+        "Volume": 952415.0
+      },
+      "new": {
+        "Open": 64.55999755859375,
+        "High": 66.91000366210938,
+        "Low": 64.55999755859375,
+        "Close": 65.30999755859375,
+        "Volume": 960900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/WLK",
+      "fetchedAt": "2026-10-27T13:21:19.766136+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "4a4756e80f617fe5d5aa48477e11bdd68915e1168d059d4136b3b20d0c71b9a7",
+      "loggedAt": "2026-10-27T13:21:19.873142+00:00"
+    },
+    {
+      "symbol": "STN",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 70.76,
+        "High": 71.705,
+        "Low": 70.845,
+        "Close": 71.01,
+        "Volume": 299197.0
+      },
+      "new": {
+        "Open": 70.76000213623047,
+        "High": 71.7300033569336,
+        "Low": 70.76000213623047,
+        "Close": 71.01000213623047,
+        "Volume": 365600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/STN",
+      "fetchedAt": "2026-10-27T13:21:20.204376+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "8e08da61e7a8549d610b0e77d94535f6cec06b15c87359f277cb4f626ac08c72",
+      "loggedAt": "2026-10-27T13:21:20.284786+00:00"
+    },
+    {
+      "symbol": "AXS",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 102.39,
+        "High": 103.765,
+        "Low": 102.46,
+        "Close": 102.46,
+        "Volume": 446846.0
+      },
+      "new": {
+        "Open": 102.38999938964844,
+        "High": 103.81999969482422,
+        "Low": 102.38999938964844,
+        "Close": 102.45999908447266,
+        "Volume": 446800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AXS",
+      "fetchedAt": "2026-10-27T13:21:20.642153+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "3631508b68ec570d857f4ebef26324f3c68e47effdf6ed088370ee8f47ad1fb5",
+      "loggedAt": "2026-10-27T13:21:20.721999+00:00"
+    },
+    {
+      "symbol": "TAP",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 40.9,
+        "High": 40.785,
+        "Low": 39.6,
+        "Close": 40.0,
+        "Volume": 3229785.0
+      },
+      "new": {
+        "Open": 40.900001525878906,
+        "High": 40.900001525878906,
+        "Low": 39.599998474121094,
+        "Close": 40.0,
+        "Volume": 3229800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TAP",
+      "fetchedAt": "2026-10-27T13:21:21.059783+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "a898a5a1575d5cebb10cd435f386d02fdcf99c5f05630afba4c53cc1e9beaebf",
+      "loggedAt": "2026-10-27T13:21:21.140465+00:00"
+    },
+    {
+      "symbol": "SOBO",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 35.06,
+        "High": 35.76,
+        "Low": 35.19,
+        "Close": 35.69,
+        "Volume": 1074678.0
+      },
+      "new": {
+        "Open": 35.060001373291016,
+        "High": 35.7599983215332,
+        "Low": 35.060001373291016,
+        "Close": 35.689998626708984,
+        "Volume": 1111000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SOBO",
+      "fetchedAt": "2026-10-27T13:21:21.482510+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "ffbaf5d1c7fcb449f4960de5707c7881750693dba8ea601341c485e0e58df458",
+      "loggedAt": "2026-10-27T13:21:21.561227+00:00"
+    },
+    {
+      "symbol": "MTDR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 58.54,
+        "High": 60.95,
+        "Low": 59.02,
+        "Close": 60.09,
+        "Volume": 2024273.0
+      },
+      "new": {
+        "Open": 58.540000915527344,
+        "High": 60.95000076293945,
+        "Low": 58.540000915527344,
+        "Close": 60.09000015258789,
+        "Volume": 2024300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MTDR",
+      "fetchedAt": "2026-10-27T13:21:21.879031+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "457a7dde530eff1fb5807a7d0c65c46948f2958c27e766e52d45922ae8eb5727",
+      "loggedAt": "2026-10-27T13:21:21.957429+00:00"
+    },
+    {
+      "symbol": "CAVA",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 53.86,
+        "High": 53.85,
+        "Low": 50.33,
+        "Close": 51.53,
+        "Volume": 3108003.0
+      },
+      "new": {
+        "Open": 53.86000061035156,
+        "High": 53.86000061035156,
+        "Low": 50.33000183105469,
+        "Close": 51.529998779296875,
+        "Volume": 3109700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CAVA",
+      "fetchedAt": "2026-10-27T13:21:22.296970+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "bf6e0c917c672339fd66b177943367a1dedb09324f6bb0fb1aa00fa2fefd8ac1",
+      "loggedAt": "2026-10-27T13:21:22.376071+00:00"
+    },
+    {
+      "symbol": "AMTM",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 21.8,
+        "High": 22.5,
+        "Low": 21.83,
+        "Close": 22.07,
+        "Volume": 1854396.0
+      },
+      "new": {
+        "Open": 21.799999237060547,
+        "High": 22.5,
+        "Low": 21.799999237060547,
+        "Close": 22.06999969482422,
+        "Volume": 1854400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AMTM",
+      "fetchedAt": "2026-10-27T13:21:22.685512+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "ca2682989ae7b9153e25e574d1475f272452204822b87981d65a0b91a24bc1fd",
+      "loggedAt": "2026-10-27T13:21:22.763764+00:00"
+    },
+    {
+      "symbol": "CPA",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 131.0,
+        "High": 130.94,
+        "Low": 127.03,
+        "Close": 130.01,
+        "Volume": 516901.0
+      },
+      "new": {
+        "Open": 131.0,
+        "High": 131.11000061035156,
+        "Low": 127.02999877929688,
+        "Close": 130.00999450683594,
+        "Volume": 516900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CPA",
+      "fetchedAt": "2026-10-27T13:21:23.115985+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "5b604af7a485a0213745b01f70e87187650a85759fd8b87fc6e2d8551a049636",
+      "loggedAt": "2026-10-27T13:21:23.193629+00:00"
+    },
+    {
+      "symbol": "CE",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 47.34,
+        "High": 49.41,
+        "Low": 47.73,
+        "Close": 48.08,
+        "Volume": 1530494.0
+      },
+      "new": {
+        "Open": 47.34000015258789,
+        "High": 49.40999984741211,
+        "Low": 47.34000015258789,
+        "Close": 48.08000183105469,
+        "Volume": 1530500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CE",
+      "fetchedAt": "2026-10-27T13:21:23.523921+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "bb6b72fc186384b12d6371ca6d683b878c681c5355aa83ed4aad195f2bfc04b5",
+      "loggedAt": "2026-10-27T13:21:23.603855+00:00"
+    },
+    {
+      "symbol": "TEO",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 12.66,
+        "High": 12.6133,
+        "Low": 11.63,
+        "Close": 11.94,
+        "Volume": 350349.0
+      },
+      "new": {
+        "Open": 12.65999984741211,
+        "High": 12.65999984741211,
+        "Low": 11.630000114440918,
+        "Close": 11.9399995803833,
+        "Volume": 350300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TEO",
+      "fetchedAt": "2026-10-27T13:21:23.959858+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "178edc01f818f7b2ff7a91635091b4f8eb4b8fc2202240e26a446d5daa9c9eb4",
+      "loggedAt": "2026-10-27T13:21:24.038709+00:00"
+    },
+    {
+      "symbol": "CON",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 39.32,
+        "High": 40.34,
+        "Low": 39.545,
+        "Close": 40.2,
+        "Volume": 1759446.0
+      },
+      "new": {
+        "Open": 39.31999969482422,
+        "High": 40.34000015258789,
+        "Low": 39.31999969482422,
+        "Close": 40.20000076293945,
+        "Volume": 1759400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CON",
+      "fetchedAt": "2026-10-27T13:21:24.352908+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "c1ac38a79424080e8119969824cfc965f2b63497032dc3d433a2cc472b9f56ab",
+      "loggedAt": "2026-10-27T13:21:24.434198+00:00"
+    },
+    {
+      "symbol": "TREX",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 50.38,
+        "High": 50.365,
+        "Low": 49.5,
+        "Close": 49.57,
+        "Volume": 1383013.0
+      },
+      "new": {
+        "Open": 50.380001068115234,
+        "High": 50.38999938964844,
+        "Low": 49.5,
+        "Close": 49.56999969482422,
+        "Volume": 1383000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TREX",
+      "fetchedAt": "2026-10-27T13:21:24.835164+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "6a18fdc85efd1784e5bfe057c2f71cd7eb5e6fd872594c988f6ee36e75badda4",
+      "loggedAt": "2026-10-27T13:21:24.915509+00:00"
+    },
+    {
+      "symbol": "KBR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 39.3,
+        "High": 40.2,
+        "Low": 39.385,
+        "Close": 40.02,
+        "Volume": 1960529.0
+      },
+      "new": {
+        "Open": 39.29999923706055,
+        "High": 40.209999084472656,
+        "Low": 39.29999923706055,
+        "Close": 40.02000045776367,
+        "Volume": 1973600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/KBR",
+      "fetchedAt": "2026-10-27T13:21:25.244017+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "8082035f162ec3fc64354a06255ec5529310fcfc15479023d152ea9a1f6a0c53",
+      "loggedAt": "2026-10-27T13:21:25.323985+00:00"
+    },
+    {
+      "symbol": "PIPR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 64.53,
+        "High": 65.56,
+        "Low": 64.59,
+        "Close": 64.97,
+        "Volume": 582479.0
+      },
+      "new": {
+        "Open": 64.52999877929688,
+        "High": 65.56999969482422,
+        "Low": 64.27999877929688,
+        "Close": 64.97000122070312,
+        "Volume": 582500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/PIPR",
+      "fetchedAt": "2026-10-27T13:21:25.663339+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "4c2842a5f3a3fcb14ef91238e91bd4e39963693ea3a1f07b8b4f406996b030a2",
+      "loggedAt": "2026-10-27T13:21:25.741704+00:00"
+    },
+    {
+      "symbol": "FCN",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 156.69,
+        "High": 164.085,
+        "Low": 157.14,
+        "Close": 161.4,
+        "Volume": 422786.0
+      },
+      "new": {
+        "Open": 156.69000244140625,
+        "High": 164.3800048828125,
+        "Low": 156.69000244140625,
+        "Close": 161.39999389648438,
+        "Volume": 422800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/FCN",
+      "fetchedAt": "2026-10-27T13:21:26.060635+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "0abaa52304208618de28521d68d0699d7159e567fd8936f4a7128d15a2de21c2",
+      "loggedAt": "2026-10-27T13:21:26.138196+00:00"
+    },
+    {
+      "symbol": "BLSH",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 28.27,
+        "High": 28.115,
+        "Low": 26.88,
+        "Close": 27.6,
+        "Volume": 925756.0
+      },
+      "new": {
+        "Open": 28.270000457763672,
+        "High": 28.270000457763672,
+        "Low": 26.8799991607666,
+        "Close": 27.600000381469727,
+        "Volume": 925800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BLSH",
+      "fetchedAt": "2026-10-27T13:21:26.478687+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "db1444e49a18e9b0d501f76b9a1142fa47b672758b64b557375afc4436332b80",
+      "loggedAt": "2026-10-27T13:21:26.557717+00:00"
+    },
+    {
+      "symbol": "SIM",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 25.74,
+        "High": 25.86,
+        "Low": 25.86,
+        "Close": 25.86,
+        "Volume": 1500.0
+      },
+      "new": {
+        "Open": 25.739999771118164,
+        "High": 25.959999084472656,
+        "Low": 25.739999771118164,
+        "Close": 25.860000610351562,
+        "Volume": 1500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SIM",
+      "fetchedAt": "2026-10-27T13:21:26.867664+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "35ca29534786451d23de25cce02f622ecb092436cf53d133158bbf1ff9364b30",
+      "loggedAt": "2026-10-27T13:21:26.946549+00:00"
+    },
+    {
+      "symbol": "SKT",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 36.45,
+        "High": 36.805,
+        "Low": 36.48,
+        "Close": 36.59,
+        "Volume": 608308.0
+      },
+      "new": {
+        "Open": 36.45000076293945,
+        "High": 36.810001373291016,
+        "Low": 36.45000076293945,
+        "Close": 36.59000015258789,
+        "Volume": 608300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SKT",
+      "fetchedAt": "2026-10-27T13:21:27.305528+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "51e3fbdd9635b782cf995c74602b63a6680b6814696000e75f0edcaf0a0dfcfc",
+      "loggedAt": "2026-10-27T13:21:27.384819+00:00"
+    },
+    {
+      "symbol": "ENVA",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 166.29,
+        "High": 173.83,
+        "Low": 167.23,
+        "Close": 170.03,
+        "Volume": 300300.0
+      },
+      "new": {
+        "Open": 166.2899932861328,
+        "High": 173.8300018310547,
+        "Low": 166.2899932861328,
+        "Close": 170.02999877929688,
+        "Volume": 300500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/ENVA",
+      "fetchedAt": "2026-10-27T13:21:27.696437+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "f6ea9ec6bd79d645ca5ba75f000f88078287878fc1cbc9e3fea4a92f879be5ed",
+      "loggedAt": "2026-10-27T13:21:27.777427+00:00"
+    },
+    {
+      "symbol": "OII",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 38.62,
+        "High": 40.79,
+        "Low": 38.84,
+        "Close": 40.24,
+        "Volume": 1433818.0
+      },
+      "new": {
+        "Open": 38.619998931884766,
+        "High": 40.79999923706055,
+        "Low": 38.619998931884766,
+        "Close": 40.2400016784668,
+        "Volume": 1433800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/OII",
+      "fetchedAt": "2026-10-27T13:21:28.116023+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "8915ace3b38f38c50b36fdc07fa2b7fc7acaa50cc9879ac6d8ee22cd7df8b264",
+      "loggedAt": "2026-10-27T13:21:28.196286+00:00"
+    },
+    {
+      "symbol": "NP",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 27.96,
+        "High": 28.66,
+        "Low": 28.0,
+        "Close": 28.37,
+        "Volume": 485069.0
+      },
+      "new": {
+        "Open": 27.959999084472656,
+        "High": 28.65999984741211,
+        "Low": 27.959999084472656,
+        "Close": 28.3700008392334,
+        "Volume": 485100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/NP",
+      "fetchedAt": "2026-10-27T13:21:28.508328+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "bf6d4a74d0e60865aab2e73e5ec05023f27e6fc2075fee3c73877f7bba48afa7",
+      "loggedAt": "2026-10-27T13:21:28.587136+00:00"
+    },
+    {
+      "symbol": "AVNT",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 41.11,
+        "High": 41.91,
+        "Low": 41.1688,
+        "Close": 41.28,
+        "Volume": 441163.0
+      },
+      "new": {
+        "Open": 41.11000061035156,
+        "High": 41.90999984741211,
+        "Low": 41.11000061035156,
+        "Close": 41.279998779296875,
+        "Volume": 441200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AVNT",
+      "fetchedAt": "2026-10-27T13:21:28.940620+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "5c23f00291a5fe5e2ffade038537d53de6ab192c9cac8b0f4506eda2e73f658f",
+      "loggedAt": "2026-10-27T13:21:29.020517+00:00"
+    },
+    {
+      "symbol": "ZGN",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 13.21,
+        "High": 13.7,
+        "Low": 13.39,
+        "Close": 13.41,
+        "Volume": 764344.0
+      },
+      "new": {
+        "Open": 13.210000038146973,
+        "High": 13.704999923706055,
+        "Low": 13.210000038146973,
+        "Close": 13.40999984741211,
+        "Volume": 764300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/ZGN",
+      "fetchedAt": "2026-10-27T13:21:29.338905+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "2bc5f421b4ac5807d572a7d996592c196c089850d7af5bf28e07221351a83931",
+      "loggedAt": "2026-10-27T13:21:29.419746+00:00"
+    },
+    {
+      "symbol": "SLG",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 49.9,
+        "High": 50.93,
+        "Low": 49.94,
+        "Close": 50.41,
+        "Volume": 853257.0
+      },
+      "new": {
+        "Open": 49.900001525878906,
+        "High": 50.93000030517578,
+        "Low": 49.709999084472656,
+        "Close": 50.40999984741211,
+        "Volume": 853300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SLG",
+      "fetchedAt": "2026-10-27T13:21:29.779925+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "c2f6205f1906101406c0bfd07b0ea3eef4ffc2186373519517a9c478e10a3570",
+      "loggedAt": "2026-10-27T13:21:29.858968+00:00"
+    },
+    {
+      "symbol": "KEN",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 65.01,
+        "High": 67.08,
+        "Low": 65.56,
+        "Close": 66.29,
+        "Volume": 29384.0
+      },
+      "new": {
+        "Open": 65.01000213623047,
+        "High": 67.08000183105469,
+        "Low": 65.01000213623047,
+        "Close": 66.29000091552734,
+        "Volume": 29400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/KEN",
+      "fetchedAt": "2026-10-27T13:21:30.199280+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "a25b7a3b712061f1f8ef59a6fd46c80cb1e580fe769f9340b2c990560d1398bb",
+      "loggedAt": "2026-10-27T13:21:30.280164+00:00"
+    },
+    {
+      "symbol": "HNI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 47.65,
+        "High": 48.16,
+        "Low": 47.66,
+        "Close": 47.7,
+        "Volume": 323896.0
+      },
+      "new": {
+        "Open": 47.650001525878906,
+        "High": 48.15999984741211,
+        "Low": 47.650001525878906,
+        "Close": 47.70000076293945,
+        "Volume": 323900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/HNI",
+      "fetchedAt": "2026-10-27T13:21:30.642469+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "e10ed9cb25a42382406b1422ed3d48616c6fad1544ef5fbfd640eb89a2e63305",
+      "loggedAt": "2026-10-27T13:21:30.721288+00:00"
+    },
+    {
+      "symbol": "PFSI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 62.6,
+        "High": 64.0,
+        "Low": 62.835,
+        "Close": 63.14,
+        "Volume": 448519.0
+      },
+      "new": {
+        "Open": 62.599998474121094,
+        "High": 64.0,
+        "Low": 62.599998474121094,
+        "Close": 63.13999938964844,
+        "Volume": 448500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/PFSI",
+      "fetchedAt": "2026-10-27T13:21:31.037113+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "375f067b862270234328cedad5cd0e4f23fea4606f844d8598bda8c30aa609d9",
+      "loggedAt": "2026-10-27T13:21:31.117549+00:00"
+    },
+    {
+      "symbol": "MNSO",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 9.91,
+        "High": 10.14,
+        "Low": 9.92,
+        "Close": 9.98,
+        "Volume": 1107804.0
+      },
+      "new": {
+        "Open": 9.90999984741211,
+        "High": 10.140000343322754,
+        "Low": 9.899999618530273,
+        "Close": 9.979999542236328,
+        "Volume": 1107800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MNSO",
+      "fetchedAt": "2026-10-27T13:21:31.464741+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "6bb13bdc26a45da92e6684445558ee5e6a7f936d7605ffc27be2a25bec006503",
+      "loggedAt": "2026-10-27T13:21:31.545262+00:00"
+    },
+    {
+      "symbol": "CBZ",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 54.95,
+        "High": 54.94,
+        "Low": 54.835,
+        "Close": 54.85,
+        "Volume": 2141382.0
+      },
+      "new": {
+        "Open": 54.95000076293945,
+        "High": 54.95000076293945,
+        "Low": 54.84000015258789,
+        "Close": 54.849998474121094,
+        "Volume": 2194800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CBZ",
+      "fetchedAt": "2026-10-27T13:21:31.926990+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "3af14010a59d1b5199a6955045940ac882fac5850169a9067cf96ec142c01db9",
+      "loggedAt": "2026-10-27T13:21:32.007720+00:00"
+    },
+    {
+      "symbol": "VIA",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 36.67,
+        "High": 36.58,
+        "Low": 35.49,
+        "Close": 35.56,
+        "Volume": 502901.0
+      },
+      "new": {
+        "Open": 36.66999816894531,
+        "High": 36.66999816894531,
+        "Low": 35.4900016784668,
+        "Close": 35.560001373291016,
+        "Volume": 503000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/VIA",
+      "fetchedAt": "2026-10-27T13:21:32.352135+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "7285c2e77d59a2a72a59659a1fe60d4193dee5c49b1e78c2a1b54de98666b0f3",
+      "loggedAt": "2026-10-27T13:21:32.432003+00:00"
+    },
+    {
+      "symbol": "BOH",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 69.19,
+        "High": 71.07,
+        "Low": 69.25,
+        "Close": 70.53,
+        "Volume": 568487.0
+      },
+      "new": {
+        "Open": 69.19000244140625,
+        "High": 71.06999969482422,
+        "Low": 69.19000244140625,
+        "Close": 70.52999877929688,
+        "Volume": 568500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BOH",
+      "fetchedAt": "2026-10-27T13:21:32.833918+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "800829e59fd15ee9dd81432ec510466502374a2a80b1d5bbc508be427cf78b03",
+      "loggedAt": "2026-10-27T13:21:32.914369+00:00"
+    },
+    {
+      "symbol": "AMBP",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 4.56,
+        "High": 4.545,
+        "Low": 4.465,
+        "Close": 4.49,
+        "Volume": 2532152.0
+      },
+      "new": {
+        "Open": 4.559999942779541,
+        "High": 4.559999942779541,
+        "Low": 4.460000038146973,
+        "Close": 4.489999771118164,
+        "Volume": 2532200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AMBP",
+      "fetchedAt": "2026-10-27T13:21:33.254441+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "9636dc8757314813a83715970a8babe1f691fd7c5c0ddce2db29e7746e527e58",
+      "loggedAt": "2026-10-27T13:21:33.333284+00:00"
+    },
+    {
+      "symbol": "AKR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 18.73,
+        "High": 18.95,
+        "Low": 18.8,
+        "Close": 18.83,
+        "Volume": 929620.0
+      },
+      "new": {
+        "Open": 18.729999542236328,
+        "High": 18.950000762939453,
+        "Low": 18.729999542236328,
+        "Close": 18.829999923706055,
+        "Volume": 929600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AKR",
+      "fetchedAt": "2026-10-27T13:21:33.663647+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "70854471d7ca8a973328e180c262f556661cad7d768f928cfd40c9de55c6c80a",
+      "loggedAt": "2026-10-27T13:21:33.742495+00:00"
+    },
+    {
+      "symbol": "RH",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 137.4,
+        "High": 137.33,
+        "Low": 131.5101,
+        "Close": 135.72,
+        "Volume": 543858.0
+      },
+      "new": {
+        "Open": 137.39999389648438,
+        "High": 137.39999389648438,
+        "Low": 131.50999450683594,
+        "Close": 135.72000122070312,
+        "Volume": 544000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/RH",
+      "fetchedAt": "2026-10-27T13:21:34.140715+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "9c5ff2a354e619c41ac1f3e6610a99c1c3fdee05864883d7de686eadf59b8d5a",
+      "loggedAt": "2026-10-27T13:21:34.219995+00:00"
+    },
+    {
+      "symbol": "BBAR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 12.56,
+        "High": 12.505,
+        "Low": 11.64,
+        "Close": 12.12,
+        "Volume": 941717.0
+      },
+      "new": {
+        "Open": 12.5600004196167,
+        "High": 12.5600004196167,
+        "Low": 11.640000343322754,
+        "Close": 12.119999885559082,
+        "Volume": 941700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BBAR",
+      "fetchedAt": "2026-10-27T13:21:34.550297+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "bbb064ee2e9989bc15a2f387eddb49045ef93c9fdeaff6561e2c09c920937bc6",
+      "loggedAt": "2026-10-27T13:21:34.630011+00:00"
+    },
+    {
+      "symbol": "BHC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 6.53,
+        "High": 6.455,
+        "Low": 6.27,
+        "Close": 6.35,
+        "Volume": 2365425.0
+      },
+      "new": {
+        "Open": 6.53000020980835,
+        "High": 6.550000190734863,
+        "Low": 6.269999980926514,
+        "Close": 6.349999904632568,
+        "Volume": 2401500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BHC",
+      "fetchedAt": "2026-10-27T13:21:34.967081+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "695e613957d4179c21fd471941cd8a8d5bac83f75f664c00357a8c0e6eb54a29",
+      "loggedAt": "2026-10-27T13:21:35.046587+00:00"
+    },
+    {
+      "symbol": "LTC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 43.76,
+        "High": 44.63,
+        "Low": 43.79,
+        "Close": 43.96,
+        "Volume": 366399.0
+      },
+      "new": {
+        "Open": 43.7599983215332,
+        "High": 44.630001068115234,
+        "Low": 43.75,
+        "Close": 43.959999084472656,
+        "Volume": 366400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LTC",
+      "fetchedAt": "2026-10-27T13:21:35.388310+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "076ceefce1c1f4505bc594dedcf97c0193b2fca9a031e15eb5053639122932a8",
+      "loggedAt": "2026-10-27T13:21:35.467559+00:00"
+    },
+    {
+      "symbol": "WS",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 41.19,
+        "High": 43.4699,
+        "Low": 41.235,
+        "Close": 42.23,
+        "Volume": 457888.0
+      },
+      "new": {
+        "Open": 41.189998626708984,
+        "High": 43.470001220703125,
+        "Low": 41.189998626708984,
+        "Close": 42.22999954223633,
+        "Volume": 457900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/WS",
+      "fetchedAt": "2026-10-27T13:21:35.814993+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "e1fb4124f8e89c41a147d59e0c92ad4b00b51eef8f235c2cb6647a7d246be540",
+      "loggedAt": "2026-10-27T13:21:35.894705+00:00"
+    },
+    {
+      "symbol": "STUB",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 5.85,
+        "High": 5.81,
+        "Low": 5.55,
+        "Close": 5.64,
+        "Volume": 3034362.0
+      },
+      "new": {
+        "Open": 5.849999904632568,
+        "High": 5.849999904632568,
+        "Low": 5.550000190734863,
+        "Close": 5.639999866485596,
+        "Volume": 3034400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/STUB",
+      "fetchedAt": "2026-10-27T13:21:36.206997+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "3e49902aa1d05d6596cd183f0d454e6c6dc80354cf2b7f2c13d073ab3eeea1e7",
+      "loggedAt": "2026-10-27T13:21:36.285210+00:00"
+    },
+    {
+      "symbol": "INVX",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 29.6,
+        "High": 30.83,
+        "Low": 29.94,
+        "Close": 30.66,
+        "Volume": 523788.0
+      },
+      "new": {
+        "Open": 29.600000381469727,
+        "High": 30.829999923706055,
+        "Low": 29.600000381469727,
+        "Close": 30.65999984741211,
+        "Volume": 523800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/INVX",
+      "fetchedAt": "2026-10-27T13:21:36.688207+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "25daad4f2b04c071551f861ccade1b6d37d5ebf32c1b2b2e461f0de01cb416e2",
+      "loggedAt": "2026-10-27T13:21:36.768450+00:00"
+    },
+    {
+      "symbol": "LCII",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 84.69,
+        "High": 88.91,
+        "Low": 84.75,
+        "Close": 87.9,
+        "Volume": 888348.0
+      },
+      "new": {
+        "Open": 84.69000244140625,
+        "High": 88.91000366210938,
+        "Low": 84.47000122070312,
+        "Close": 87.9000015258789,
+        "Volume": 962200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LCII",
+      "fetchedAt": "2026-10-27T13:21:37.086935+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "a2b54206a10a3540d942da7a06b1b232ac4f049d5625728e08842e30c1e07bcb",
+      "loggedAt": "2026-10-27T13:21:37.166513+00:00"
+    },
+    {
+      "symbol": "AERO",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 15.32,
+        "High": 15.04,
+        "Low": 13.98,
+        "Close": 14.03,
+        "Volume": 352235.0
+      },
+      "new": {
+        "Open": 15.319999694824219,
+        "High": 15.319999694824219,
+        "Low": 13.970000267028809,
+        "Close": 14.029999732971191,
+        "Volume": 352200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AERO",
+      "fetchedAt": "2026-10-27T13:21:37.500719+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "483bcad287cf7e2ad58df5eda0f68934587a6297b126fccdaf7de7019e911047",
+      "loggedAt": "2026-10-27T13:21:37.580132+00:00"
+    },
+    {
+      "symbol": "SAM",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 202.79,
+        "High": 202.43,
+        "Low": 195.205,
+        "Close": 201.48,
+        "Volume": 296597.0
+      },
+      "new": {
+        "Open": 202.7899932861328,
+        "High": 202.92999267578125,
+        "Low": 195.2100067138672,
+        "Close": 201.47999572753906,
+        "Volume": 296600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SAM",
+      "fetchedAt": "2026-10-27T13:21:37.892071+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "f84e13fe40c493fa947c2be6fe0a39df52a5a1af9d657db3be9981003625a054",
+      "loggedAt": "2026-10-27T13:21:37.971118+00:00"
+    },
+    {
+      "symbol": "NGL",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 15.34,
+        "High": 16.005,
+        "Low": 15.445,
+        "Close": 15.9,
+        "Volume": 181332.0
+      },
+      "new": {
+        "Open": 15.34000015258789,
+        "High": 16.010000228881836,
+        "Low": 15.34000015258789,
+        "Close": 15.899999618530273,
+        "Volume": 181300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/NGL",
+      "fetchedAt": "2026-10-27T13:21:38.309454+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "7783040990c5bf026f0da9f6eea81248a47d0be703ef3672038f325c3669d1c3",
+      "loggedAt": "2026-10-27T13:21:38.388638+00:00"
+    },
+    {
+      "symbol": "CC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 12.8,
+        "High": 13.37,
+        "Low": 12.81,
+        "Close": 12.87,
+        "Volume": 1904295.0
+      },
+      "new": {
+        "Open": 12.800000190734863,
+        "High": 13.369999885559082,
+        "Low": 12.710000038146973,
+        "Close": 12.869999885559082,
+        "Volume": 1904900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CC",
+      "fetchedAt": "2026-10-27T13:21:38.708154+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "4ce26b84add22d897a69590ede7c961bc73884c7b85e8e0694412ff72bbe1db9",
+      "loggedAt": "2026-10-27T13:21:38.788423+00:00"
+    },
+    {
+      "symbol": "CCU",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 10.38,
+        "High": 10.33,
+        "Low": 10.14,
+        "Close": 10.29,
+        "Volume": 220304.0
+      },
+      "new": {
+        "Open": 10.380000114440918,
+        "High": 10.40999984741211,
+        "Low": 10.140000343322754,
+        "Close": 10.289999961853027,
+        "Volume": 220300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CCU",
+      "fetchedAt": "2026-10-27T13:21:39.139984+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "d509bff8781ece634f82b04e5650cc6c76780b1e149fb737f130ca4360a64c5f",
+      "loggedAt": "2026-10-27T13:21:39.219074+00:00"
+    },
+    {
+      "symbol": "RLJ",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 12.15,
+        "High": 12.36,
+        "Low": 12.165,
+        "Close": 12.23,
+        "Volume": 1424023.0
+      },
+      "new": {
+        "Open": 12.149999618530273,
+        "High": 12.359999656677246,
+        "Low": 12.149999618530273,
+        "Close": 12.229999542236328,
+        "Volume": 1424000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/RLJ",
+      "fetchedAt": "2026-10-27T13:21:39.542079+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "88df27e289c36d37ccbb7591bf9a5a669e6f651c9d7055ca3c250424df6a9e4d",
+      "loggedAt": "2026-10-27T13:21:39.621000+00:00"
+    },
+    {
+      "symbol": "ATS",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 18.89,
+        "High": 19.24,
+        "Low": 18.945,
+        "Close": 18.95,
+        "Volume": 182338.0
+      },
+      "new": {
+        "Open": 18.889999389648438,
+        "High": 19.25,
+        "Low": 18.889999389648438,
+        "Close": 18.950000762939453,
+        "Volume": 237100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/ATS",
+      "fetchedAt": "2026-10-27T13:21:40.022514+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "6d5deaa5776643b82e629b44ccb258b3a0a5fead9fb74bee03239a927dffbd0e",
+      "loggedAt": "2026-10-27T13:21:40.101149+00:00"
+    },
+    {
+      "symbol": "XHR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 19.63,
+        "High": 19.9191,
+        "Low": 19.6659,
+        "Close": 19.84,
+        "Volume": 589675.0
+      },
+      "new": {
+        "Open": 19.6299991607666,
+        "High": 19.91900062561035,
+        "Low": 19.6299991607666,
+        "Close": 19.84000015258789,
+        "Volume": 606400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/XHR",
+      "fetchedAt": "2026-10-27T13:21:40.416350+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "05cb1930adef5231f9aec681bef08ee780b28b054a741ef6f17c2fd1f00c9b99",
+      "loggedAt": "2026-10-27T13:21:40.496522+00:00"
+    },
+    {
+      "symbol": "OLN",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 15.545,
+        "High": 16.43,
+        "Low": 15.61,
+        "Close": 15.94,
+        "Volume": 5001520.0
+      },
+      "new": {
+        "Open": 15.550000190734863,
+        "High": 16.43000030517578,
+        "Low": 15.529999732971191,
+        "Close": 15.9399995803833,
+        "Volume": 5001600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/OLN",
+      "fetchedAt": "2026-10-27T13:21:40.851910+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "22e9c61a0c45392b21730554e412ee12044cd2303bbd8f74590d9884ecccadc4",
+      "loggedAt": "2026-10-27T13:21:40.930911+00:00"
+    },
+    {
+      "symbol": "FLOC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 19.4,
+        "High": 19.99,
+        "Low": 19.42,
+        "Close": 19.69,
+        "Volume": 242248.0
+      },
+      "new": {
+        "Open": 19.399999618530273,
+        "High": 19.989999771118164,
+        "Low": 19.399999618530273,
+        "Close": 19.690000534057617,
+        "Volume": 242200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/FLOC",
+      "fetchedAt": "2026-10-27T13:21:41.245132+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "e7d6a98527ff237c5a9341da3925b850254f9ce3c736bc4707a6082e366dab8d",
+      "loggedAt": "2026-10-27T13:21:41.323806+00:00"
+    },
+    {
+      "symbol": "ALG",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 147.06,
+        "High": 146.66,
+        "Low": 144.18,
+        "Close": 144.53,
+        "Volume": 153235.0
+      },
+      "new": {
+        "Open": 147.05999755859375,
+        "High": 147.05999755859375,
+        "Low": 144.17999267578125,
+        "Close": 144.52999877929688,
+        "Volume": 153200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/ALG",
+      "fetchedAt": "2026-10-27T13:21:41.743405+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "93278b17aa84bc247dee8e50ded2b87db8338290e11e4a0f87a00b4ac5c32600",
+      "loggedAt": "2026-10-27T13:21:41.822868+00:00"
+    },
+    {
+      "symbol": "GEL",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 14.02,
+        "High": 14.5,
+        "Low": 14.07,
+        "Close": 14.37,
+        "Volume": 171619.0
+      },
+      "new": {
+        "Open": 14.020000457763672,
+        "High": 14.5,
+        "Low": 14.020000457763672,
+        "Close": 14.369999885559082,
+        "Volume": 171600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/GEL",
+      "fetchedAt": "2026-10-27T13:21:42.149265+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "86f054bf50357f73b45ab6198e790e1585b16e9cb1e24dea985822768b439acd",
+      "loggedAt": "2026-10-27T13:21:42.229776+00:00"
+    },
+    {
+      "symbol": "KMPR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 28.67,
+        "High": 29.25,
+        "Low": 28.76,
+        "Close": 29.23,
+        "Volume": 797836.0
+      },
+      "new": {
+        "Open": 28.670000076293945,
+        "High": 29.260000228881836,
+        "Low": 28.670000076293945,
+        "Close": 29.229999542236328,
+        "Volume": 799800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/KMPR",
+      "fetchedAt": "2026-10-27T13:21:42.586025+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "6bee7fa5ad337f8381fc373cbf4f9241ac0cb009d0d5d36ac75ed3e135981784",
+      "loggedAt": "2026-10-27T13:21:42.664767+00:00"
+    },
+    {
+      "symbol": "KOS",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 2.82,
+        "High": 2.95,
+        "Low": 2.825,
+        "Close": 2.85,
+        "Volume": 19546862.0
+      },
+      "new": {
+        "Open": 2.819999933242798,
+        "High": 2.950000047683716,
+        "Low": 2.819999933242798,
+        "Close": 2.8499999046325684,
+        "Volume": 19995000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/KOS",
+      "fetchedAt": "2026-10-27T13:21:42.978245+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "026fc9fc1f5df1f96dd1cca34a8d23520f967f73b3db17ff4d4a575c04f7ed7c",
+      "loggedAt": "2026-10-27T13:21:43.056992+00:00"
+    },
+    {
+      "symbol": "TEN",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 55.98,
+        "High": 55.79,
+        "Low": 54.74,
+        "Close": 55.19,
+        "Volume": 523061.0
+      },
+      "new": {
+        "Open": 55.97999954223633,
+        "High": 55.97999954223633,
+        "Low": 54.7400016784668,
+        "Close": 55.189998626708984,
+        "Volume": 523100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TEN",
+      "fetchedAt": "2026-10-27T13:21:43.402586+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "557bc54a2297985ee416b93592bc42cec4832ce3a2e637fd7519a070e452aae0",
+      "loggedAt": "2026-10-27T13:21:43.481262+00:00"
+    },
+    {
+      "symbol": "TMP",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 101.87,
+        "High": 104.175,
+        "Low": 101.99,
+        "Close": 102.47,
+        "Volume": 165592.0
+      },
+      "new": {
+        "Open": 101.87000274658203,
+        "High": 104.18000030517578,
+        "Low": 101.16999816894531,
+        "Close": 102.47000122070312,
+        "Volume": 165600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TMP",
+      "fetchedAt": "2026-10-27T13:21:43.825291+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "4e91f1a2c30f6417712d08d7dec609648dd1ba825452dfe7e5ab612ef9bec211",
+      "loggedAt": "2026-10-27T13:21:43.935990+00:00"
+    },
+    {
+      "symbol": "NBR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 79.6,
+        "High": 83.895,
+        "Low": 80.98,
+        "Close": 82.29,
+        "Volume": 237252.0
+      },
+      "new": {
+        "Open": 79.5999984741211,
+        "High": 83.9000015258789,
+        "Low": 79.5999984741211,
+        "Close": 82.29000091552734,
+        "Volume": 237300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/NBR",
+      "fetchedAt": "2026-10-27T13:21:44.250664+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "69e22b9db04133eb821dfc765945ca5b40e884c7c2fa13f32383a352b306240d",
+      "loggedAt": "2026-10-27T13:21:44.329532+00:00"
+    },
+    {
+      "symbol": "LYNX",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 10.33,
+        "High": 11.0,
+        "Low": 10.3625,
+        "Close": 10.71,
+        "Volume": 246269.0
+      },
+      "new": {
+        "Open": 10.329999923706055,
+        "High": 11.0,
+        "Low": 10.329999923706055,
+        "Close": 10.710000038146973,
+        "Volume": 246300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LYNX",
+      "fetchedAt": "2026-10-27T13:21:44.647722+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "f490261fdc07cba913a3172b7705bf12510396d145c8c8ce2a622a65391c0adf",
+      "loggedAt": "2026-10-27T13:21:44.755696+00:00"
+    },
+    {
+      "symbol": "SPH",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 17.72,
+        "High": 18.07,
+        "Low": 17.825,
+        "Close": 17.97,
+        "Volume": 176857.0
+      },
+      "new": {
+        "Open": 17.719999313354492,
+        "High": 18.06999969482422,
+        "Low": 17.719999313354492,
+        "Close": 17.969999313354492,
+        "Volume": 176900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SPH",
+      "fetchedAt": "2026-10-27T13:21:45.085451+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "86d4e71cf30c593c775c4ec48be328b37ce7c50d14975a14d46d5d27008aaec1",
+      "loggedAt": "2026-10-27T13:21:45.163401+00:00"
+    },
+    {
+      "symbol": "BOW",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 34.07,
+        "High": 34.19,
+        "Low": 34.1,
+        "Close": 34.14,
+        "Volume": 140127.0
+      },
+      "new": {
+        "Open": 34.06999969482422,
+        "High": 34.189998626708984,
+        "Low": 34.06999969482422,
+        "Close": 34.13999938964844,
+        "Volume": 141100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BOW",
+      "fetchedAt": "2026-10-27T13:21:45.478106+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "79780a01a2f2a9e7eb2f4abebcf01fe67fdb53d0e99c627573d1bdfea3ab5bd6",
+      "loggedAt": "2026-10-27T13:21:45.590489+00:00"
+    },
+    {
+      "symbol": "LOMA",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 9.56,
+        "High": 9.48,
+        "Low": 9.082,
+        "Close": 9.43,
+        "Volume": 486603.0
+      },
+      "new": {
+        "Open": 9.5600004196167,
+        "High": 9.5600004196167,
+        "Low": 9.081999778747559,
+        "Close": 9.430000305175781,
+        "Volume": 486600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LOMA",
+      "fetchedAt": "2026-10-27T13:21:45.908368+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "c6924780d983ec7d3ae1f441fa058cc8403044050dd7626f7d4b40f829b0fce6",
+      "loggedAt": "2026-10-27T13:21:45.987349+00:00"
+    },
+    {
+      "symbol": "DEA",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 22.82,
+        "High": 23.6,
+        "Low": 22.86,
+        "Close": 23.16,
+        "Volume": 665146.0
+      },
+      "new": {
+        "Open": 22.81999969482422,
+        "High": 23.600000381469727,
+        "Low": 22.81999969482422,
+        "Close": 23.15999984741211,
+        "Volume": 665200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/DEA",
+      "fetchedAt": "2026-10-27T13:21:46.310177+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "00853add7c66b6be4150d21b5d4a4c2796dc4e1ea46babbf652542520a3334a7",
+      "loggedAt": "2026-10-27T13:21:46.419570+00:00"
+    },
+    {
+      "symbol": "TBN",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 30.23,
+        "High": 31.305,
+        "Low": 30.275,
+        "Close": 30.58,
+        "Volume": 202265.0
+      },
+      "new": {
+        "Open": 30.229999542236328,
+        "High": 31.30500030517578,
+        "Low": 30.229999542236328,
+        "Close": 30.579999923706055,
+        "Volume": 202300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TBN",
+      "fetchedAt": "2026-10-27T13:21:46.730535+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "763d93583c9bd59cae15e823f2280d57eb72bcfafe8ed955b12e672ff93740f4",
+      "loggedAt": "2026-10-27T13:21:46.809167+00:00"
+    },
+    {
+      "symbol": "IMC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 7.83,
+        "High": 10.88,
+        "Low": 8.25,
+        "Close": 10.15,
+        "Volume": 106589.0
+      },
+      "new": {
+        "Open": 7.829999923706055,
+        "High": 10.880000114440918,
+        "Low": 7.829999923706055,
+        "Close": 10.149999618530273,
+        "Volume": 106700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/IMC",
+      "fetchedAt": "2026-10-27T13:21:47.117541+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "cdd8cd0f8aeb9c1f7d8ce6f81320c94b5c4d9c9e6daaf22b402e6e9ecb6bebb1",
+      "loggedAt": "2026-10-27T13:21:47.226254+00:00"
+    },
+    {
+      "symbol": "FET",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 85.96,
+        "High": 90.5099,
+        "Low": 86.85,
+        "Close": 88.87,
+        "Volume": 120564.0
+      },
+      "new": {
+        "Open": 85.95999908447266,
+        "High": 90.51000213623047,
+        "Low": 85.95999908447266,
+        "Close": 88.87000274658203,
+        "Volume": 124900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/FET",
+      "fetchedAt": "2026-10-27T13:21:47.534746+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "2d223085e430cc2dc75f7c432ecfb6c440c9b6dbdd766422df8ae3a8c5c0fe44",
+      "loggedAt": "2026-10-27T13:21:47.614065+00:00"
+    },
+    {
+      "symbol": "BV",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 10.54,
+        "High": 10.8,
+        "Low": 10.555,
+        "Close": 10.72,
+        "Volume": 662259.0
+      },
+      "new": {
+        "Open": 10.539999961853027,
+        "High": 10.800000190734863,
+        "Low": 10.520000457763672,
+        "Close": 10.720000267028809,
+        "Volume": 692800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BV",
+      "fetchedAt": "2026-10-27T13:21:47.923451+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "b0ee89bd407b7530fd7ee724f93e9b2c5d6fc28c2e6e2c31f694ccd14f8785fd",
+      "loggedAt": "2026-10-27T13:21:48.029894+00:00"
+    },
+    {
+      "symbol": "TDAY",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 6.85,
+        "High": 6.79,
+        "Low": 6.635,
+        "Close": 6.72,
+        "Volume": 2296765.0
+      },
+      "new": {
+        "Open": 6.849999904632568,
+        "High": 6.849999904632568,
+        "Low": 6.639999866485596,
+        "Close": 6.71999979019165,
+        "Volume": 2296800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TDAY",
+      "fetchedAt": "2026-10-27T13:21:48.409107+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "3a178d0c9bdd8f97893b04a705484b5c234b54655ea3bd68f05dabf80a3dfa50",
+      "loggedAt": "2026-10-27T13:21:48.488682+00:00"
+    },
+    {
+      "symbol": "SBSI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 31.74,
+        "High": 32.235,
+        "Low": 31.75,
+        "Close": 31.82,
+        "Volume": 101036.0
+      },
+      "new": {
+        "Open": 31.739999771118164,
+        "High": 32.2400016784668,
+        "Low": 31.739999771118164,
+        "Close": 31.81999969482422,
+        "Volume": 101000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SBSI",
+      "fetchedAt": "2026-10-27T13:21:48.822120+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "626859e45774b27a32ef171114facdd2bf8d1b7360971c3f2c4c093555ec1011",
+      "loggedAt": "2026-10-27T13:21:48.931557+00:00"
+    },
+    {
+      "symbol": "HSLV",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 4.9,
+        "High": 4.875,
+        "Low": 4.5,
+        "Close": 4.53,
+        "Volume": 500576.0
+      },
+      "new": {
+        "Open": 4.900000095367432,
+        "High": 4.900000095367432,
+        "Low": 4.489999771118164,
+        "Close": 4.53000020980835,
+        "Volume": 576400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/HSLV",
+      "fetchedAt": "2026-10-27T13:21:49.242694+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "986fa8ec5cd3099cfa6055cc8b8622a92b787403fae674eba101969c25431161",
+      "loggedAt": "2026-10-27T13:21:49.324349+00:00"
+    },
+    {
+      "symbol": "PUMP",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 7.2,
+        "High": 7.4475,
+        "Low": 7.25,
+        "Close": 7.33,
+        "Volume": 3069060.0
+      },
+      "new": {
+        "Open": 7.199999809265137,
+        "High": 7.447999954223633,
+        "Low": 7.199999809265137,
+        "Close": 7.329999923706055,
+        "Volume": 3094900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/PUMP",
+      "fetchedAt": "2026-10-27T13:21:49.645818+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "af4930bef3e14aa6e9c9d170620a611e1313c0d3803351cb7301bd2bcbc56d65",
+      "loggedAt": "2026-10-27T13:21:49.756451+00:00"
+    },
+    {
+      "symbol": "FUBO",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 7.9,
+        "High": 7.85,
+        "Low": 7.55,
+        "Close": 7.79,
+        "Volume": 1146522.0
+      },
+      "new": {
+        "Open": 7.900000095367432,
+        "High": 7.900000095367432,
+        "Low": 7.550000190734863,
+        "Close": 7.789999961853027,
+        "Volume": 1147700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/FUBO",
+      "fetchedAt": "2026-10-27T13:21:50.070518+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "33b85e61047202a22725e501f8e3c9e7dba80b03c914eb7262f92c2403edb54a",
+      "loggedAt": "2026-10-27T13:21:50.148875+00:00"
+    },
+    {
+      "symbol": "AZUL",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 5.75,
+        "High": 5.72,
+        "Low": 4.0,
+        "Close": 4.05,
+        "Volume": 988586.0
+      },
+      "new": {
+        "Open": 5.75,
+        "High": 5.75,
+        "Low": 4.0,
+        "Close": 4.050000190734863,
+        "Volume": 988600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AZUL",
+      "fetchedAt": "2026-10-27T13:21:50.470401+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "30b8b03a66481f81bd49a5bf08b440b2d9fa23ed82793d4ad4eba30ea81a0c6b",
+      "loggedAt": "2026-10-27T13:21:50.577673+00:00"
+    },
+    {
+      "symbol": "EDN",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 18.56,
+        "High": 18.545,
+        "Low": 16.8903,
+        "Close": 17.86,
+        "Volume": 172211.0
+      },
+      "new": {
+        "Open": 18.559999465942383,
+        "High": 18.559999465942383,
+        "Low": 16.889999389648438,
+        "Close": 17.860000610351562,
+        "Volume": 172200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/EDN",
+      "fetchedAt": "2026-10-27T13:21:50.892651+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "0da513ea7201bec9ed4b85e3d5abbf66a19cbf715d1dad58c30abef4f100cb95",
+      "loggedAt": "2026-10-27T13:21:50.971824+00:00"
+    },
+    {
+      "symbol": "WHK",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 25.54,
+        "High": 26.05,
+        "Low": 25.545,
+        "Close": 26.05,
+        "Volume": 92085.0
+      },
+      "new": {
+        "Open": 25.540000915527344,
+        "High": 26.049999237060547,
+        "Low": 25.5,
+        "Close": 26.049999237060547,
+        "Volume": 92100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/WHK",
+      "fetchedAt": "2026-10-27T13:21:51.285416+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "4bde4180669b60b5129a813115e5ce0921868cb175dd76032f46bd8a0942af9e",
+      "loggedAt": "2026-10-27T13:21:51.394082+00:00"
+    },
+    {
+      "symbol": "GOOS",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 8.13,
+        "High": 8.12,
+        "Low": 7.94,
+        "Close": 8.09,
+        "Volume": 928909.0
+      },
+      "new": {
+        "Open": 8.130000114440918,
+        "High": 8.130000114440918,
+        "Low": 7.940000057220459,
+        "Close": 8.09000015258789,
+        "Volume": 935200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/GOOS",
+      "fetchedAt": "2026-10-27T13:21:51.707322+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "e0d801914aadd4602035ad2521c52e1ef6968dbdd47397c658cb90fa789e7b6c",
+      "loggedAt": "2026-10-27T13:21:51.787474+00:00"
+    },
+    {
+      "symbol": "HSHP",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 17.04,
+        "High": 17.0,
+        "Low": 16.7376,
+        "Close": 16.76,
+        "Volume": 231121.0
+      },
+      "new": {
+        "Open": 17.040000915527344,
+        "High": 17.040000915527344,
+        "Low": 16.729999542236328,
+        "Close": 16.760000228881836,
+        "Volume": 231100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/HSHP",
+      "fetchedAt": "2026-10-27T13:21:52.169163+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "16c2809dbecaa431839a722cf6e84748b442e303e7c4f4079e008abecef43ee6",
+      "loggedAt": "2026-10-27T13:21:52.275002+00:00"
+    },
+    {
+      "symbol": "LU",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 9.01,
+        "High": 9.0,
+        "Low": 8.3,
+        "Close": 8.48,
+        "Volume": 455115.0
+      },
+      "new": {
+        "Open": 9.010000228881836,
+        "High": 9.010000228881836,
+        "Low": 8.289999961853027,
+        "Close": 8.479999542236328,
+        "Volume": 455300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LU",
+      "fetchedAt": "2026-10-27T13:21:52.594802+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "ac86dcdcad8fd5314d740f8d6671e681ce9749714c9f1dcc893a97d07091e163",
+      "loggedAt": "2026-10-27T13:21:52.674462+00:00"
+    },
+    {
+      "symbol": "LXU",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 9.86,
+        "High": 10.56,
+        "Low": 9.875,
+        "Close": 10.15,
+        "Volume": 889120.0
+      },
+      "new": {
+        "Open": 9.859999656677246,
+        "High": 10.569999694824219,
+        "Low": 9.850000381469727,
+        "Close": 10.149999618530273,
+        "Volume": 889400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LXU",
+      "fetchedAt": "2026-10-27T13:21:52.984152+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "06e16767982adfa87d672580c0020f5593e899fe03fa92c7a4058f2d9f036766",
+      "loggedAt": "2026-10-27T13:21:53.090874+00:00"
+    },
+    {
+      "symbol": "DC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 5.33,
+        "High": 5.32,
+        "Low": 5.13,
+        "Close": 5.19,
+        "Volume": 1003753.0
+      },
+      "new": {
+        "Open": 5.329999923706055,
+        "High": 5.34499979019165,
+        "Low": 5.130000114440918,
+        "Close": 5.190000057220459,
+        "Volume": 1003800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/DC",
+      "fetchedAt": "2026-10-27T13:21:53.403141+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "d95f9b7a1ad609fe54bc42ee931619bf275d4d28aead8b0c43b1b22e6dad4c9e",
+      "loggedAt": "2026-10-27T13:21:53.481387+00:00"
+    },
+    {
+      "symbol": "BTGO",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 5.45,
+        "High": 5.44,
+        "Low": 5.17,
+        "Close": 5.4,
+        "Volume": 806245.0
+      },
+      "new": {
+        "Open": 5.449999809265137,
+        "High": 5.449999809265137,
+        "Low": 5.170000076293945,
+        "Close": 5.400000095367432,
+        "Volume": 806300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BTGO",
+      "fetchedAt": "2026-10-27T13:21:53.794139+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "955482a324c64f89f8dd414bac32ad075bc719985b893b6f40719f01e37e613f",
+      "loggedAt": "2026-10-27T13:21:53.907839+00:00"
+    },
+    {
+      "symbol": "MLR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 52.23,
+        "High": 51.99,
+        "Low": 51.4,
+        "Close": 51.46,
+        "Volume": 37047.0
+      },
+      "new": {
+        "Open": 52.22999954223633,
+        "High": 52.22999954223633,
+        "Low": 51.400001525878906,
+        "Close": 51.459999084472656,
+        "Volume": 37000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MLR",
+      "fetchedAt": "2026-10-27T13:21:54.241154+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "752bd5074cd812443782e6a943297ff6a9cf72dfb80e78ec80e17e91b5155765",
+      "loggedAt": "2026-10-27T13:21:54.320806+00:00"
+    },
+    {
+      "symbol": "JBI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 4.49,
+        "High": 4.46,
+        "Low": 4.27,
+        "Close": 4.28,
+        "Volume": 1272549.0
+      },
+      "new": {
+        "Open": 4.489999771118164,
+        "High": 4.489999771118164,
+        "Low": 4.269999980926514,
+        "Close": 4.28000020980835,
+        "Volume": 1272700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/JBI",
+      "fetchedAt": "2026-10-27T13:21:54.634083+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "049c88bc36a97d9fbc3fec36c3fc1a893df906b6739b2954516e03fcda7ca3fe",
+      "loggedAt": "2026-10-27T13:21:54.742168+00:00"
+    },
+    {
+      "symbol": "WNC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 12.93,
+        "High": 13.29,
+        "Low": 12.94,
+        "Close": 12.97,
+        "Volume": 452429.0
+      },
+      "new": {
+        "Open": 12.930000305175781,
+        "High": 13.300000190734863,
+        "Low": 12.930000305175781,
+        "Close": 12.970000267028809,
+        "Volume": 452400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/WNC",
+      "fetchedAt": "2026-10-27T13:21:55.072208+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "50e783f1d7023346f1392289eb0cf888a55f38c31223b15c32485af27b4f3bb0",
+      "loggedAt": "2026-10-27T13:21:55.151708+00:00"
+    },
+    {
+      "symbol": "GORO",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 3.31,
+        "High": 3.3,
+        "Low": 3.05,
+        "Close": 3.12,
+        "Volume": 1353145.0
+      },
+      "new": {
+        "Open": 3.309999942779541,
+        "High": 3.309999942779541,
+        "Low": 3.049999952316284,
+        "Close": 3.119999885559082,
+        "Volume": 1355900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/GORO",
+      "fetchedAt": "2026-10-27T13:21:55.493378+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "ff16764ea3ad685ecf6b37ad0769ca225880638674aeecc6ffbff848ba1bce85",
+      "loggedAt": "2026-10-27T13:21:55.571624+00:00"
+    },
+    {
+      "symbol": "OIS",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 8.37,
+        "High": 8.77,
+        "Low": 8.51,
+        "Close": 8.74,
+        "Volume": 753195.0
+      },
+      "new": {
+        "Open": 8.369999885559082,
+        "High": 8.770000457763672,
+        "Low": 8.369999885559082,
+        "Close": 8.739999771118164,
+        "Volume": 755500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/OIS",
+      "fetchedAt": "2026-10-27T13:21:55.883512+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "2cf4310c7e64f5c8755afba956b5895a5af88e7e7c76a90e7fcb282f2e7022b6",
+      "loggedAt": "2026-10-27T13:21:55.964175+00:00"
+    },
+    {
+      "symbol": "GAU",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 2.03,
+        "High": 2.025,
+        "Low": 1.93,
+        "Close": 1.99,
+        "Volume": 2368715.0
+      },
+      "new": {
+        "Open": 2.0299999713897705,
+        "High": 2.0299999713897705,
+        "Low": 1.9299999475479126,
+        "Close": 1.9900000095367432,
+        "Volume": 2441100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/GAU",
+      "fetchedAt": "2026-10-27T13:21:56.303548+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "653b202ddd626fdb7e4256fd37d0f83227287fc3060095e24297ca5d7e9b6ebb",
+      "loggedAt": "2026-10-27T13:21:56.382291+00:00"
+    },
+    {
+      "symbol": "THM",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 2.0,
+        "High": 1.985,
+        "Low": 1.885,
+        "Close": 1.95,
+        "Volume": 513463.0
+      },
+      "new": {
+        "Open": 2.0,
+        "High": 2.0,
+        "Low": 1.8799999952316284,
+        "Close": 1.9500000476837158,
+        "Volume": 516000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/THM",
+      "fetchedAt": "2026-10-27T13:21:56.694459+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "cc7bbd78cacb01aabeb744b5dceffe0bf9ef53e042de208968f99e9552b7d0b4",
+      "loggedAt": "2026-10-27T13:21:56.773139+00:00"
+    },
+    {
+      "symbol": "CMDB",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 20.08,
+        "High": 20.667,
+        "Low": 20.13,
+        "Close": 20.16,
+        "Volume": 49944.0
+      },
+      "new": {
+        "Open": 20.079999923706055,
+        "High": 20.66699981689453,
+        "Low": 20.0,
+        "Close": 20.15999984741211,
+        "Volume": 49900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CMDB",
+      "fetchedAt": "2026-10-27T13:21:57.117284+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "8e14da16aac6db04816b4e81a7a480e45af1642ef7ad90a613667129d3a7b792",
+      "loggedAt": "2026-10-27T13:21:57.196558+00:00"
+    },
+    {
+      "symbol": "CLB",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 9.8,
+        "High": 10.35,
+        "Low": 9.81,
+        "Close": 10.22,
+        "Volume": 526973.0
+      },
+      "new": {
+        "Open": 9.800000190734863,
+        "High": 10.350000381469727,
+        "Low": 9.800000190734863,
+        "Close": 10.220000267028809,
+        "Volume": 527000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CLB",
+      "fetchedAt": "2026-10-27T13:21:57.531871+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "128eca2151de5265877d9dfb233a23013dd614622e07995c021147162e9c7d53",
+      "loggedAt": "2026-10-27T13:21:57.611384+00:00"
+    },
+    {
+      "symbol": "LXFR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 17.29,
+        "High": 17.28,
+        "Low": 17.25,
+        "Close": 17.25,
+        "Volume": 120615.0
+      },
+      "new": {
+        "Open": 17.290000915527344,
+        "High": 17.290000915527344,
+        "Low": 17.25,
+        "Close": 17.25,
+        "Volume": 120600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LXFR",
+      "fetchedAt": "2026-10-27T13:21:57.958795+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "785eac14d66e27f3cf807420c72c42b43f3920c12d71d2f3ca0b3183b98d5ab4",
+      "loggedAt": "2026-10-27T13:21:58.038032+00:00"
+    },
+    {
+      "symbol": "AVBC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 22.6,
+        "High": 23.1,
+        "Low": 22.7964,
+        "Close": 23.03,
+        "Volume": 145256.0
+      },
+      "new": {
+        "Open": 22.600000381469727,
+        "High": 23.100000381469727,
+        "Low": 22.600000381469727,
+        "Close": 23.030000686645508,
+        "Volume": 145300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AVBC",
+      "fetchedAt": "2026-10-27T13:21:58.347287+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "6ecd165357b0c8a628b6fe3d72c05fbef89209ff296ad49a909cc0d060e5a4f0",
+      "loggedAt": "2026-10-27T13:21:58.425960+00:00"
+    },
+    {
+      "symbol": "HVT",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 29.74,
+        "High": 29.605,
+        "Low": 29.09,
+        "Close": 29.23,
+        "Volume": 68096.0
+      },
+      "new": {
+        "Open": 29.739999771118164,
+        "High": 29.739999771118164,
+        "Low": 29.09000015258789,
+        "Close": 29.229999542236328,
+        "Volume": 68100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/HVT",
+      "fetchedAt": "2026-10-27T13:21:58.793490+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "b9d9f461738330aab191d300a7295744dc5841a9dc24cc974720156945c75bcf",
+      "loggedAt": "2026-10-27T13:21:58.871833+00:00"
+    },
+    {
+      "symbol": "CIX",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 35.49,
+        "High": 36.95,
+        "Low": 35.98,
+        "Close": 36.28,
+        "Volume": 19961.0
+      },
+      "new": {
+        "Open": 35.4900016784668,
+        "High": 36.95000076293945,
+        "Low": 35.4900016784668,
+        "Close": 36.279998779296875,
+        "Volume": 20000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CIX",
+      "fetchedAt": "2026-10-27T13:21:59.200790+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "2c60040390ef91d273885edfded469f76a92d825a825539928c66dd89baba4ca",
+      "loggedAt": "2026-10-27T13:21:59.280541+00:00"
+    },
+    {
+      "symbol": "CBAN",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 20.34,
+        "High": 20.59,
+        "Low": 20.41,
+        "Close": 20.42,
+        "Volume": 98628.0
+      },
+      "new": {
+        "Open": 20.34000015258789,
+        "High": 20.59000015258789,
+        "Low": 20.34000015258789,
+        "Close": 20.420000076293945,
+        "Volume": 98600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CBAN",
+      "fetchedAt": "2026-10-27T13:21:59.635800+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "2f694ebc5542e4ac62f966f2a6dbb87c620aebdf3de67e498c5f118198b6a69d",
+      "loggedAt": "2026-10-27T13:21:59.716763+00:00"
+    },
+    {
+      "symbol": "AUXX",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 4.0,
+        "High": 4.1625,
+        "Low": 4.13,
+        "Close": 4.13,
+        "Volume": 16238.0
+      },
+      "new": {
+        "Open": 4.0,
+        "High": 4.159999847412109,
+        "Low": 4.0,
+        "Close": 4.130000114440918,
+        "Volume": 22600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AUXX",
+      "fetchedAt": "2026-10-27T13:22:00.027556+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "6aad4690ba243fb89f1b0618764bbf4a8a9cd3c645f03b8a81f6b54933894609",
+      "loggedAt": "2026-10-27T13:22:00.106318+00:00"
+    },
+    {
+      "symbol": "SI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 19.6,
+        "High": 19.53,
+        "Low": 19.12,
+        "Close": 19.38,
+        "Volume": 71594.0
+      },
+      "new": {
+        "Open": 19.600000381469727,
+        "High": 19.600000381469727,
+        "Low": 19.0,
+        "Close": 19.3799991607666,
+        "Volume": 71600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SI",
+      "fetchedAt": "2026-10-27T13:22:00.443336+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "f494352d841821ed36f0dfb0bff89bd1328aa5bad77fcbd1832d322600c6c010",
+      "loggedAt": "2026-10-27T13:22:00.522544+00:00"
+    },
+    {
+      "symbol": "CINT",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 3.21,
+        "High": 3.18,
+        "Low": 2.93,
+        "Close": 2.96,
+        "Volume": 70113.0
+      },
+      "new": {
+        "Open": 3.2100000381469727,
+        "High": 3.2100000381469727,
+        "Low": 2.930000066757202,
+        "Close": 2.9600000381469727,
+        "Volume": 70100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CINT",
+      "fetchedAt": "2026-10-27T13:22:00.837167+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "50166ac6aa9a72a9f2c2e9525607c19720a0daa8505fc264dab915b7f4edfe6f",
+      "loggedAt": "2026-10-27T13:22:00.916349+00:00"
+    },
+    {
+      "symbol": "BOC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 12.47,
+        "High": 12.72,
+        "Low": 12.52,
+        "Close": 12.61,
+        "Volume": 123678.0
+      },
+      "new": {
+        "Open": 12.470000267028809,
+        "High": 12.720000267028809,
+        "Low": 12.470000267028809,
+        "Close": 12.609999656677246,
+        "Volume": 123700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BOC",
+      "fetchedAt": "2026-10-27T13:22:01.247721+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "1eaccc0b967ebf46bafee10d67fb4f9266a8f68e48d8cbdab5aa8c741f9f3e15",
+      "loggedAt": "2026-10-27T13:22:01.326951+00:00"
+    },
+    {
+      "symbol": "AUNA",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 5.13,
+        "High": 5.125,
+        "Low": 4.93,
+        "Close": 4.99,
+        "Volume": 271845.0
+      },
+      "new": {
+        "Open": 5.130000114440918,
+        "High": 5.159999847412109,
+        "Low": 4.929999828338623,
+        "Close": 4.989999771118164,
+        "Volume": 271900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AUNA",
+      "fetchedAt": "2026-10-27T13:22:01.638304+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "76eb557c61ea50af9fc8aab010653bc0fabebdaecdd46c677101b22d4f2ad3a8",
+      "loggedAt": "2026-10-27T13:22:01.717003+00:00"
+    },
+    {
+      "symbol": "LEO",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 5.7,
+        "High": 5.84,
+        "Low": 5.715,
+        "Close": 5.84,
+        "Volume": 293530.0
+      },
+      "new": {
+        "Open": 5.699999809265137,
+        "High": 5.840000152587891,
+        "Low": 5.690000057220459,
+        "Close": 5.840000152587891,
+        "Volume": 297600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LEO",
+      "fetchedAt": "2026-10-27T13:22:02.076194+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "561e976e00a91250020b38154c12ccbb22b2fb9da3b96e6572178d73ebbcdcbd",
+      "loggedAt": "2026-10-27T13:22:02.155009+00:00"
+    },
+    {
+      "symbol": "MCI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 17.3,
+        "High": 17.6415,
+        "Low": 17.4,
+        "Close": 17.57,
+        "Volume": 23709.0
+      },
+      "new": {
+        "Open": 17.299999237060547,
+        "High": 17.639999389648438,
+        "Low": 17.299999237060547,
+        "Close": 17.56999969482422,
+        "Volume": 23700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MCI",
+      "fetchedAt": "2026-10-27T13:22:02.492636+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "71e91bb858c91360adf307276622d1653d6f19c29832ebcc36432e290c01a943",
+      "loggedAt": "2026-10-27T13:22:02.572690+00:00"
+    },
+    {
+      "symbol": "WSBF",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 19.85,
+        "High": 20.03,
+        "Low": 19.79,
+        "Close": 19.78,
+        "Volume": 50119.0
+      },
+      "new": {
+        "Open": 19.989999771118164,
+        "High": 20.059999465942383,
+        "Low": 19.780000686645508,
+        "Close": 19.780000686645508,
+        "Volume": 50200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/WSBF",
+      "fetchedAt": "2026-10-27T13:22:02.918826+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "4ad63c170b919edb314e70bc8b179bd405d591c48ee7312ffbad3496971eb07f",
+      "loggedAt": "2026-10-27T13:22:02.998981+00:00"
+    },
+    {
+      "symbol": "LND",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 3.4,
+        "High": 3.38,
+        "Low": 3.14,
+        "Close": 3.32,
+        "Volume": 247854.0
+      },
+      "new": {
+        "Open": 3.4000000953674316,
+        "High": 3.4000000953674316,
+        "Low": 3.140000104904175,
+        "Close": 3.319999933242798,
+        "Volume": 247900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LND",
+      "fetchedAt": "2026-10-27T13:22:03.323640+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "9d00b7d05c05334e29ea71f33374e5fd50d9e0efab1e0ed4a3400906cf686bed",
+      "loggedAt": "2026-10-27T13:22:03.401866+00:00"
+    },
+    {
+      "symbol": "NOA",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 11.57,
+        "High": 11.91,
+        "Low": 11.68,
+        "Close": 11.88,
+        "Volume": 72564.0
+      },
+      "new": {
+        "Open": 11.569999694824219,
+        "High": 12.0,
+        "Low": 11.569999694824219,
+        "Close": 11.880000114440918,
+        "Volume": 77200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/NOA",
+      "fetchedAt": "2026-10-27T13:22:03.745559+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "780151e7bb0f1fd80e2b49d90eef1f54b66e30a69018cc2139eb4ab6d33f7d4b",
+      "loggedAt": "2026-10-27T13:22:03.824592+00:00"
+    },
+    {
+      "symbol": "LAW",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 5.09,
+        "High": 5.08,
+        "Low": 4.885,
+        "Close": 5.0,
+        "Volume": 220230.0
+      },
+      "new": {
+        "Open": 5.090000152587891,
+        "High": 5.09499979019165,
+        "Low": 4.880000114440918,
+        "Close": 5.0,
+        "Volume": 220300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LAW",
+      "fetchedAt": "2026-10-27T13:22:04.139929+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "65fef2dd5b378b705766c906c7eb76f6b5ff82c3917ee528e1af02f49139a29e",
+      "loggedAt": "2026-10-27T13:22:04.252391+00:00"
+    },
+    {
+      "symbol": "MPTI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 65.63,
+        "High": 68.46,
+        "Low": 66.35,
+        "Close": 67.66,
+        "Volume": 71049.0
+      },
+      "new": {
+        "Open": 65.62999725341797,
+        "High": 68.45999908447266,
+        "Low": 65.62999725341797,
+        "Close": 67.66000366210938,
+        "Volume": 71000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MPTI",
+      "fetchedAt": "2026-10-27T13:22:04.565642+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "e1fd96c45be75e99e8e96d9269bf95c3cac5d85b4793b3229440301aa5498324",
+      "loggedAt": "2026-10-27T13:22:04.643700+00:00"
+    },
+    {
+      "symbol": "PSFE",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 5.71,
+        "High": 5.69,
+        "Low": 5.47,
+        "Close": 5.56,
+        "Volume": 254773.0
+      },
+      "new": {
+        "Open": 5.710000038146973,
+        "High": 5.710000038146973,
+        "Low": 5.46999979019165,
+        "Close": 5.559999942779541,
+        "Volume": 254800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/PSFE",
+      "fetchedAt": "2026-10-27T13:22:04.954574+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "b54278456bbb713ffa26366cdc507deedf19a9581ee52c0c493569cf0a73a267",
+      "loggedAt": "2026-10-27T13:22:05.064539+00:00"
+    },
+    {
+      "symbol": "SEG",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 22.8,
+        "High": 22.705,
+        "Low": 22.45,
+        "Close": 22.6,
+        "Volume": 33291.0
+      },
+      "new": {
+        "Open": 22.799999237060547,
+        "High": 22.799999237060547,
+        "Low": 22.450000762939453,
+        "Close": 22.600000381469727,
+        "Volume": 33300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SEG",
+      "fetchedAt": "2026-10-27T13:22:05.376196+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "f0c6a7bd1e40a8b375e4363a39ffc4c5197f1672e285ebc3402deba09d8faef6",
+      "loggedAt": "2026-10-27T13:22:05.455021+00:00"
+    },
+    {
+      "symbol": "ZKH",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 1.68,
+        "High": 1.795,
+        "Low": 1.6824,
+        "Close": 1.78,
+        "Volume": 54534.0
+      },
+      "new": {
+        "Open": 1.6799999475479126,
+        "High": 1.7949999570846558,
+        "Low": 1.6699999570846558,
+        "Close": 1.7799999713897705,
+        "Volume": 54500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/ZKH",
+      "fetchedAt": "2026-10-27T13:22:05.766806+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "f283aa1c2ef9ae1efb7cb5f9c37891a1e5bfac0ffbd9f4bc155fc7c2777ae73e",
+      "loggedAt": "2026-10-27T13:22:05.876088+00:00"
+    },
+    {
+      "symbol": "XYF",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 4.75,
+        "High": 4.86,
+        "Low": 4.76,
+        "Close": 4.82,
+        "Volume": 33518.0
+      },
+      "new": {
+        "Open": 4.75,
+        "High": 4.860000133514404,
+        "Low": 4.75,
+        "Close": 4.820000171661377,
+        "Volume": 33500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/XYF",
+      "fetchedAt": "2026-10-27T13:22:06.207685+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "11292e7af1a4e00b852cac389e1efc8cca3864400211b1369aa06817cd9c8cb4",
+      "loggedAt": "2026-10-27T13:22:06.287838+00:00"
+    },
+    {
+      "symbol": "BKTI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 66.79,
+        "High": 69.78,
+        "Low": 66.86,
+        "Close": 68.65,
+        "Volume": 52073.0
+      },
+      "new": {
+        "Open": 66.79000091552734,
+        "High": 69.77999877929688,
+        "Low": 66.79000091552734,
+        "Close": 68.6500015258789,
+        "Volume": 52100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BKTI",
+      "fetchedAt": "2026-10-27T13:22:06.610572+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "2c6083e692feacebaba64fcfc56c4076ab10e90faf8df95eba2f4b04f649e2ad",
+      "loggedAt": "2026-10-27T13:22:06.718242+00:00"
+    },
+    {
+      "symbol": "SMHI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 8.48,
+        "High": 8.8,
+        "Low": 8.5,
+        "Close": 8.65,
+        "Volume": 93212.0
+      },
+      "new": {
+        "Open": 8.479999542236328,
+        "High": 8.800000190734863,
+        "Low": 8.479999542236328,
+        "Close": 8.649999618530273,
+        "Volume": 93200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SMHI",
+      "fetchedAt": "2026-10-27T13:22:07.029532+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "e7e55e3fd507d22c18ce04901da62371df2419bd094f02f5eba484f9c1a843f5",
+      "loggedAt": "2026-10-27T13:22:07.109509+00:00"
+    },
+    {
+      "symbol": "ELMD",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 26.24,
+        "High": 27.1,
+        "Low": 26.4,
+        "Close": 26.62,
+        "Volume": 42479.0
+      },
+      "new": {
+        "Open": 26.239999771118164,
+        "High": 27.100000381469727,
+        "Low": 26.239999771118164,
+        "Close": 26.6200008392334,
+        "Volume": 42500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/ELMD",
+      "fetchedAt": "2026-10-27T13:22:07.422852+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "cbcec0442338cb9030f778bdaada8aed658b6afd31733947a9edcc9b62f3269e",
+      "loggedAt": "2026-10-27T13:22:07.530645+00:00"
+    },
+    {
+      "symbol": "NSTR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 3.1,
+        "High": 4.04,
+        "Low": 3.25,
+        "Close": 3.35,
+        "Volume": 81661.0
+      },
+      "new": {
+        "Open": 3.0999999046325684,
+        "High": 4.079999923706055,
+        "Low": 3.0999999046325684,
+        "Close": 3.3499999046325684,
+        "Volume": 81700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/NSTR",
+      "fetchedAt": "2026-10-27T13:22:07.840092+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "fe49625191efd4b410617b004538410e0b28923ce67b1fef12ffa6f29bc7fdd4",
+      "loggedAt": "2026-10-27T13:22:07.919734+00:00"
+    },
+    {
+      "symbol": "FC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 18.32,
+        "High": 19.135,
+        "Low": 18.56,
+        "Close": 18.59,
+        "Volume": 35998.0
+      },
+      "new": {
+        "Open": 18.31999969482422,
+        "High": 19.139999389648438,
+        "Low": 18.31999969482422,
+        "Close": 18.59000015258789,
+        "Volume": 36000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/FC",
+      "fetchedAt": "2026-10-27T13:22:08.234451+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "7d76a502fa72b34cc640fa156d191cbbf40e11b09b32971d04a2c6ec70f4ef2b",
+      "loggedAt": "2026-10-27T13:22:08.339202+00:00"
+    },
+    {
+      "symbol": "PED",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 14.31,
+        "High": 15.6,
+        "Low": 14.8125,
+        "Close": 15.53,
+        "Volume": 18384.0
+      },
+      "new": {
+        "Open": 14.3100004196167,
+        "High": 15.600000381469727,
+        "Low": 14.3100004196167,
+        "Close": 15.529999732971191,
+        "Volume": 18400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/PED",
+      "fetchedAt": "2026-10-27T13:22:08.646896+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "c831072ead65e04bf2cda53f03502c94d076e4de26d40160d46d7bf1572da450",
+      "loggedAt": "2026-10-27T13:22:08.725433+00:00"
+    },
+    {
+      "symbol": "PLX",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 2.55,
+        "High": 2.52,
+        "Low": 2.46,
+        "Close": 2.48,
+        "Volume": 416213.0
+      },
+      "new": {
+        "Open": 2.549999952316284,
+        "High": 2.549999952316284,
+        "Low": 2.4600000381469727,
+        "Close": 2.4800000190734863,
+        "Volume": 416200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/PLX",
+      "fetchedAt": "2026-10-27T13:22:09.038798+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "925f7052140e79f9f18ebb5349f064a87c903aeaf7fcf7033a68f863ebe5d48f",
+      "loggedAt": "2026-10-27T13:22:09.144125+00:00"
+    },
+    {
+      "symbol": "VTN",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 9.85,
+        "High": 9.84,
+        "Low": 9.66,
+        "Close": 9.83,
+        "Volume": 42959.0
+      },
+      "new": {
+        "Open": 9.850000381469727,
+        "High": 9.850000381469727,
+        "Low": 9.65999984741211,
+        "Close": 9.829999923706055,
+        "Volume": 43000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/VTN",
+      "fetchedAt": "2026-10-27T13:22:09.482315+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "594c2732210035cf99a2b9d82b9573bb3c06568d787101e95a3087eb532f0726",
+      "loggedAt": "2026-10-27T13:22:09.562394+00:00"
+    },
+    {
+      "symbol": "WHG",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 18.94,
+        "High": 18.81,
+        "Low": 18.73,
+        "Close": 18.81,
+        "Volume": 4812.0
+      },
+      "new": {
+        "Open": 18.940000534057617,
+        "High": 18.959999084472656,
+        "Low": 18.729999542236328,
+        "Close": 18.809999465942383,
+        "Volume": 4800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/WHG",
+      "fetchedAt": "2026-10-27T13:22:09.931191+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "551d79932baff9073ee4ee63d0a52949968b7fcfdb9f7b2f451455fbd36fcdd7",
+      "loggedAt": "2026-10-27T13:22:10.036021+00:00"
+    },
+    {
+      "symbol": "SSTK",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 4.67,
+        "High": 4.6,
+        "Low": 4.24,
+        "Close": 4.39,
+        "Volume": 584764.0
+      },
+      "new": {
+        "Open": 4.670000076293945,
+        "High": 4.670000076293945,
+        "Low": 4.239999771118164,
+        "Close": 4.389999866485596,
+        "Volume": 584800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SSTK",
+      "fetchedAt": "2026-10-27T13:22:10.353840+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "ffa991fcdc9f66238f06c57b77380c7a3b4921066bbf834075788e83c5f05bac",
+      "loggedAt": "2026-10-27T13:22:10.433135+00:00"
+    },
+    {
+      "symbol": "ESP",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 51.65,
+        "High": 53.7015,
+        "Low": 52.155,
+        "Close": 53.04,
+        "Volume": 18093.0
+      },
+      "new": {
+        "Open": 51.650001525878906,
+        "High": 53.70000076293945,
+        "Low": 51.650001525878906,
+        "Close": 53.040000915527344,
+        "Volume": 18100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/ESP",
+      "fetchedAt": "2026-10-27T13:22:10.767235+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "77c32321a875dede6507946ccbfbd74a07ff114c7d489d064461ba405d376ce4",
+      "loggedAt": "2026-10-27T13:22:10.872260+00:00"
+    },
+    {
+      "symbol": "GUNN",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 8.3,
+        "High": 11.05,
+        "Low": 8.325,
+        "Close": 9.37,
+        "Volume": 762445.0
+      },
+      "new": {
+        "Open": 8.300000190734863,
+        "High": 11.420000076293945,
+        "Low": 8.300000190734863,
+        "Close": 9.369999885559082,
+        "Volume": 856200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/GUNN",
+      "fetchedAt": "2026-10-27T13:22:11.183043+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "fee3167651a2cb955df96855dd3a15ebd23fd71154520c1443044ff9ec9908b2",
+      "loggedAt": "2026-10-27T13:22:11.261279+00:00"
+    },
+    {
+      "symbol": "ASBH",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 19.61,
+        "High": 19.53,
+        "Low": 19.03,
+        "Close": 19.17,
+        "Volume": 109477.0
+      },
+      "new": {
+        "Open": 19.610000610351562,
+        "High": 19.610000610351562,
+        "Low": 19.030000686645508,
+        "Close": 19.170000076293945,
+        "Volume": 109500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/ASBH",
+      "fetchedAt": "2026-10-27T13:22:11.575605+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "40e967f09e8c919e4c3bdd80f288bd67a79c1cc25f87337d0072dadc2ccac5a6",
+      "loggedAt": "2026-10-27T13:22:11.681214+00:00"
+    },
+    {
+      "symbol": "SJT",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 3.37,
+        "High": 3.35,
+        "Low": 3.14,
+        "Close": 3.3,
+        "Volume": 248115.0
+      },
+      "new": {
+        "Open": 3.369999885559082,
+        "High": 3.369999885559082,
+        "Low": 3.140000104904175,
+        "Close": 3.299999952316284,
+        "Volume": 248100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SJT",
+      "fetchedAt": "2026-10-27T13:22:12.018343+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "16ce512630187f57581c723d61aca34d431592e0ddf91fdc5f09ea6643826f3c",
+      "loggedAt": "2026-10-27T13:22:12.097292+00:00"
+    },
+    {
+      "symbol": "NLOP",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 9.5,
+        "High": 9.65,
+        "Low": 9.51,
+        "Close": 9.53,
+        "Volume": 165626.0
+      },
+      "new": {
+        "Open": 9.5,
+        "High": 9.649999618530273,
+        "Low": 9.5,
+        "Close": 9.529999732971191,
+        "Volume": 165600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/NLOP",
+      "fetchedAt": "2026-10-27T13:22:12.474117+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "7f927cc335814477682c92bb4e56ee96f58796590a33971d9f46c2d79310eb14",
+      "loggedAt": "2026-10-27T13:22:12.580574+00:00"
+    },
+    {
+      "symbol": "TRAK",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 7.38,
+        "High": 7.3599,
+        "Low": 7.21,
+        "Close": 7.21,
+        "Volume": 63874.0
+      },
+      "new": {
+        "Open": 7.380000114440918,
+        "High": 7.380000114440918,
+        "Low": 7.210000038146973,
+        "Close": 7.210000038146973,
+        "Volume": 63900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TRAK",
+      "fetchedAt": "2026-10-27T13:22:12.899888+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "69cb94ff49b50a3cee9efa0e3a0ed68d7aa7f468912f22b2f4a923e8df89c0d3",
+      "loggedAt": "2026-10-27T13:22:12.979203+00:00"
+    },
+    {
+      "symbol": "LGCY",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 10.13,
+        "High": 10.44,
+        "Low": 10.15,
+        "Close": 10.45,
+        "Volume": 82785.0
+      },
+      "new": {
+        "Open": 10.130000114440918,
+        "High": 10.520000457763672,
+        "Low": 10.130000114440918,
+        "Close": 10.449999809265137,
+        "Volume": 82800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LGCY",
+      "fetchedAt": "2026-10-27T13:22:13.294375+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "e314b791a84af4b748a9383396cb675c6f4ab6345b708467e16552f9e0ccebfe",
+      "loggedAt": "2026-10-27T13:22:13.398968+00:00"
+    },
+    {
+      "symbol": "COOK",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 47.35,
+        "High": 46.91,
+        "Low": 45.58,
+        "Close": 46.48,
+        "Volume": 67419.0
+      },
+      "new": {
+        "Open": 47.349998474121094,
+        "High": 47.349998474121094,
+        "Low": 45.38999938964844,
+        "Close": 46.47999954223633,
+        "Volume": 67400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/COOK",
+      "fetchedAt": "2026-10-27T13:22:13.712827+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "0b34b0ce1192e8c22988bb3e0da6efcb1fe344d12a167f6246e35d0b64fa306a",
+      "loggedAt": "2026-10-27T13:22:13.793200+00:00"
+    },
+    {
+      "symbol": "ONL",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 2.17,
+        "High": 2.26,
+        "Low": 2.175,
+        "Close": 2.25,
+        "Volume": 612450.0
+      },
+      "new": {
+        "Open": 2.1700000762939453,
+        "High": 2.259999990463257,
+        "Low": 2.1700000762939453,
+        "Close": 2.25,
+        "Volume": 612500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/ONL",
+      "fetchedAt": "2026-10-27T13:22:14.135261+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "0cb1c7955559847985d328870ed88862230f75a06e8030177c63ec835ca508a6",
+      "loggedAt": "2026-10-27T13:22:14.214512+00:00"
+    },
+    {
+      "symbol": "EP",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 2.9,
+        "High": 3.155,
+        "Low": 2.9425,
+        "Close": 3.07,
+        "Volume": 57687.0
+      },
+      "new": {
+        "Open": 2.9000000953674316,
+        "High": 3.1549999713897705,
+        "Low": 2.9000000953674316,
+        "Close": 3.069999933242798,
+        "Volume": 57700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/EP",
+      "fetchedAt": "2026-10-27T13:22:14.598760+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "4cdb47b07e2a042b4db42ab433143a58fdd9e9f1be5e401460169ef21e7bada2",
+      "loggedAt": "2026-10-27T13:22:14.678169+00:00"
+    },
+    {
+      "symbol": "AXR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 20.445,
+        "High": 20.59,
+        "Low": 20.59,
+        "Close": 20.59,
+        "Volume": 2385.0
+      },
+      "new": {
+        "Open": 20.450000762939453,
+        "High": 20.75,
+        "Low": 20.450000762939453,
+        "Close": 20.59000015258789,
+        "Volume": 2400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AXR",
+      "fetchedAt": "2026-10-27T13:22:15.017529+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "36884acb078963a5a5e1bc1dd167443c5feeeeaf091d8557f5ee8d4435121133",
+      "loggedAt": "2026-10-27T13:22:15.096510+00:00"
+    },
+    {
+      "symbol": "TISI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 24.29,
+        "High": 24.07,
+        "Low": 23.65,
+        "Close": 23.81,
+        "Volume": 19954.0
+      },
+      "new": {
+        "Open": 24.290000915527344,
+        "High": 24.290000915527344,
+        "Low": 23.649999618530273,
+        "Close": 23.809999465942383,
+        "Volume": 20000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TISI",
+      "fetchedAt": "2026-10-27T13:22:15.408365+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "0d7947fe3714c11b51edd6f9e5ee200c420e45a839405164c5eb71e86109a925",
+      "loggedAt": "2026-10-27T13:22:15.487440+00:00"
+    },
+    {
+      "symbol": "GLU",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 17.48,
+        "High": 17.7,
+        "Low": 17.5328,
+        "Close": 17.67,
+        "Volume": 10238.0
+      },
+      "new": {
+        "Open": 17.479999542236328,
+        "High": 17.700000762939453,
+        "Low": 17.479999542236328,
+        "Close": 17.670000076293945,
+        "Volume": 10200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/GLU",
+      "fetchedAt": "2026-10-27T13:22:15.847096+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "bbd21516ff45e9dd0aa639fa8f8ee606ad00e9d38d9275282e583cad2f70e9eb",
+      "loggedAt": "2026-10-27T13:22:15.927819+00:00"
+    },
+    {
+      "symbol": "LANV",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.829,
+        "High": 0.8344,
+        "Low": 0.7822,
+        "Close": 0.83445,
+        "Volume": 14492.0
+      },
+      "new": {
+        "Open": 0.8289999961853027,
+        "High": 0.8339999914169312,
+        "Low": 0.7820000052452087,
+        "Close": 0.8339999914169312,
+        "Volume": 14500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LANV",
+      "fetchedAt": "2026-10-27T13:22:16.238324+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "c6e8e86871b9d0b9f2dec8d56b1b218c1233577676994394bb3b4c006740fa8e",
+      "loggedAt": "2026-10-27T13:22:16.317375+00:00"
+    },
+    {
+      "symbol": "JHI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 11.75,
+        "High": 11.81,
+        "Low": 11.76,
+        "Close": 11.76,
+        "Volume": 14278.0
+      },
+      "new": {
+        "Open": 11.75,
+        "High": 11.8100004196167,
+        "Low": 11.75,
+        "Close": 11.760000228881836,
+        "Volume": 14300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/JHI",
+      "fetchedAt": "2026-10-27T13:22:16.681763+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "c40ecc34a633047e1bcc888bd515ac4b0e3febd5ecf1f3d213f2f7ed1ebb2d2e",
+      "loggedAt": "2026-10-27T13:22:16.762838+00:00"
+    },
+    {
+      "symbol": "BHR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 1.42,
+        "High": 1.41,
+        "Low": 1.365,
+        "Close": 1.39,
+        "Volume": 1030734.0
+      },
+      "new": {
+        "Open": 1.4199999570846558,
+        "High": 1.4199999570846558,
+        "Low": 1.3700000047683716,
+        "Close": 1.3899999856948853,
+        "Volume": 1030700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BHR",
+      "fetchedAt": "2026-10-27T13:22:17.089888+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "fa15c6197fefc15ad479c86ea9d456195ae5373d793a66014476656a5c00495f",
+      "loggedAt": "2026-10-27T13:22:17.169083+00:00"
+    },
+    {
+      "symbol": "RGT",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 14.42,
+        "High": 14.385,
+        "Low": 14.3001,
+        "Close": 14.38,
+        "Volume": 18950.0
+      },
+      "new": {
+        "Open": 14.420000076293945,
+        "High": 14.420000076293945,
+        "Low": 14.199999809265137,
+        "Close": 14.380000114440918,
+        "Volume": 19000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/RGT",
+      "fetchedAt": "2026-10-27T13:22:17.517546+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "0b3adae5bb7e03a03008f93ce74198e526fc6a9eefcc167ce56ecc1402aaea4b",
+      "loggedAt": "2026-10-27T13:22:17.596498+00:00"
+    },
+    {
+      "symbol": "MAYS",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 43.0,
+        "High": 42.93,
+        "Low": 42.93,
+        "Close": 42.93,
+        "Volume": 1158.0
+      },
+      "new": {
+        "Open": 43.0,
+        "High": 43.099998474121094,
+        "Low": 42.83000183105469,
+        "Close": 42.93000030517578,
+        "Volume": 1200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MAYS",
+      "fetchedAt": "2026-10-27T13:22:17.917944+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "369dc852dc65c52520809dbdb1ec6b0931f1c21e38b3860e022da70b14bae615",
+      "loggedAt": "2026-10-27T13:22:17.997627+00:00"
+    },
+    {
+      "symbol": "MGLD",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 1.96,
+        "High": 1.97,
+        "Low": 1.97,
+        "Close": 1.97,
+        "Volume": 23075.0
+      },
+      "new": {
+        "Open": 1.9600000381469727,
+        "High": 1.9800000190734863,
+        "Low": 1.9600000381469727,
+        "Close": 1.9700000286102295,
+        "Volume": 23100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MGLD",
+      "fetchedAt": "2026-10-27T13:22:18.331651+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "424d6923ff0ade317e8ee91b651f46bcef0fe8a8f04abde2f794d24480889361",
+      "loggedAt": "2026-10-27T13:22:18.410859+00:00"
+    },
+    {
+      "symbol": "LPA",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 2.6,
+        "High": 2.74,
+        "Low": 2.61,
+        "Close": 2.64,
+        "Volume": 27422.0
+      },
+      "new": {
+        "Open": 2.5999999046325684,
+        "High": 2.740000009536743,
+        "Low": 2.5999999046325684,
+        "Close": 2.640000104904175,
+        "Volume": 27400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LPA",
+      "fetchedAt": "2026-10-27T13:22:18.718778+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "b2a55d254f2f2b4e9cf9194a61bbac33e7e4458a8aab19f883fe4e752578850d",
+      "loggedAt": "2026-10-27T13:22:18.797914+00:00"
+    },
+    {
+      "symbol": "COE",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 11.76,
+        "High": 11.7,
+        "Low": 11.46,
+        "Close": 11.53,
+        "Volume": 9792.0
+      },
+      "new": {
+        "Open": 11.760000228881836,
+        "High": 11.869999885559082,
+        "Low": 11.460000038146973,
+        "Close": 11.529999732971191,
+        "Volume": 9800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/COE",
+      "fetchedAt": "2026-10-27T13:22:19.135582+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "e72c18c6c6d522d8bcc698702419a3eb688ea3fdf1d004d7164556f1895464f9",
+      "loggedAt": "2026-10-27T13:22:19.215346+00:00"
+    },
+    {
+      "symbol": "MAIA",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 1.15,
+        "High": 1.145,
+        "Low": 1.1,
+        "Close": 1.11,
+        "Volume": 269978.0
+      },
+      "new": {
+        "Open": 1.149999976158142,
+        "High": 1.149999976158142,
+        "Low": 1.100000023841858,
+        "Close": 1.1100000143051147,
+        "Volume": 280000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MAIA",
+      "fetchedAt": "2026-10-27T13:22:19.537424+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "130901aee63913d00bca77ec9f57fe4ae3632131cc95684bd7dcc83387aa7abb",
+      "loggedAt": "2026-10-27T13:22:19.616335+00:00"
+    },
+    {
+      "symbol": "AIB",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.98,
+        "High": 0.9706,
+        "Low": 0.8122,
+        "Close": 0.83,
+        "Volume": 2269174.0
+      },
+      "new": {
+        "Open": 0.9800000190734863,
+        "High": 0.9800000190734863,
+        "Low": 0.8100000023841858,
+        "Close": 0.8299999833106995,
+        "Volume": 2269700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AIB",
+      "fetchedAt": "2026-10-27T13:22:19.956314+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "b8dbffcebb691dc105072e768a6720d7a80dc48311cff80a494a4d939ce7e63a",
+      "loggedAt": "2026-10-27T13:22:20.041201+00:00"
+    },
+    {
+      "symbol": "DIT",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 61.4,
+        "High": 64.55,
+        "Low": 64.55,
+        "Close": 64.55,
+        "Volume": 1157.0
+      },
+      "new": {
+        "Open": 61.400001525878906,
+        "High": 65.04000091552734,
+        "Low": 61.400001525878906,
+        "Close": 64.55000305175781,
+        "Volume": 1200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/DIT",
+      "fetchedAt": "2026-10-27T13:22:20.440523+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "90eaa47af5cc52bd4e10c78d2b08e771d953eeb0f51750316380be2bf3e68415",
+      "loggedAt": "2026-10-27T13:22:20.520259+00:00"
+    },
+    {
+      "symbol": "PTHS",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 17.34,
+        "High": 17.06,
+        "Low": 15.2,
+        "Close": 15.2,
+        "Volume": 22810.0
+      },
+      "new": {
+        "Open": 17.34000015258789,
+        "High": 17.34000015258789,
+        "Low": 15.199999809265137,
+        "Close": 15.199999809265137,
+        "Volume": 22800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/PTHS",
+      "fetchedAt": "2026-10-27T13:22:20.855543+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "79d6c2bc134253e7d9787fb37d0917159409cb39829fb31ec10d4e46dc34d097",
+      "loggedAt": "2026-10-27T13:22:20.934345+00:00"
+    },
+    {
+      "symbol": "CLPR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 3.05,
+        "High": 3.17,
+        "Low": 3.1,
+        "Close": 3.13,
+        "Volume": 34310.0
+      },
+      "new": {
+        "Open": 3.049999952316284,
+        "High": 3.1700000762939453,
+        "Low": 3.049999952316284,
+        "Close": 3.130000114440918,
+        "Volume": 34300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CLPR",
+      "fetchedAt": "2026-10-27T13:22:21.257937+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "1811210d2c84377dc1bc26e7c9e4c22e72543e6c8d1e394dccd44005274028bb",
+      "loggedAt": "2026-10-27T13:22:21.337761+00:00"
+    },
+    {
+      "symbol": "DSWL",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 3.085,
+        "High": 3.085,
+        "Low": 3.085,
+        "Close": 2.99,
+        "Volume": 1572.0
+      },
+      "new": {
+        "Open": 3.0899999141693115,
+        "High": 3.0899999141693115,
+        "Low": 2.9800000190734863,
+        "Close": 2.990000009536743,
+        "Volume": 1600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/DSWL",
+      "fetchedAt": "2026-10-27T13:22:21.689343+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "5d0720783f49f3d212eb3bec444785fc9e52deb7ca05d6e53b2723e6d1b26c49",
+      "loggedAt": "2026-10-27T13:22:21.769882+00:00"
+    },
+    {
+      "symbol": "SLND",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.731,
+        "High": 0.7772,
+        "Low": 0.7377,
+        "Close": 0.7555,
+        "Volume": 99661.0
+      },
+      "new": {
+        "Open": 0.7310000061988831,
+        "High": 0.7770000100135803,
+        "Low": 0.7310000061988831,
+        "Close": 0.7559999823570251,
+        "Volume": 100100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SLND",
+      "fetchedAt": "2026-10-27T13:22:22.087366+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "a7ca857ee851901191a50ac5a422cd8c2b79ff50ad37482a88a23b7cefa96ee7",
+      "loggedAt": "2026-10-27T13:22:22.167606+00:00"
+    },
+    {
+      "symbol": "NSRX",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 3.41,
+        "High": 3.6067,
+        "Low": 3.4142,
+        "Close": 3.49,
+        "Volume": 15034.0
+      },
+      "new": {
+        "Open": 3.4100000858306885,
+        "High": 3.6070001125335693,
+        "Low": 3.4100000858306885,
+        "Close": 3.490000009536743,
+        "Volume": 15100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/NSRX",
+      "fetchedAt": "2026-10-27T13:22:22.501768+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "4f08de0f6e5c7fe868018ae2f981776ad863f097f878cee95ccb1ed0fe1f1e88",
+      "loggedAt": "2026-10-27T13:22:22.581762+00:00"
+    },
+    {
+      "symbol": "ANVS",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 1.0,
+        "High": 0.9993,
+        "Low": 0.9295,
+        "Close": 0.957,
+        "Volume": 593042.0
+      },
+      "new": {
+        "Open": 1.0,
+        "High": 1.0,
+        "Low": 0.9300000071525574,
+        "Close": 0.9599999785423279,
+        "Volume": 593000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/ANVS",
+      "fetchedAt": "2026-10-27T13:22:22.894350+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "ac18d978b8b5fd35169c5410c1e62f64cdc2b53b18cfc99a67660b8f9a41342d",
+      "loggedAt": "2026-10-27T13:22:23.003503+00:00"
+    },
+    {
+      "symbol": "SACH",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.81,
+        "High": 0.828,
+        "Low": 0.8101,
+        "Close": 0.82,
+        "Volume": 68169.0
+      },
+      "new": {
+        "Open": 0.8100000023841858,
+        "High": 0.828000009059906,
+        "Low": 0.8100000023841858,
+        "Close": 0.8199999928474426,
+        "Volume": 68200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SACH",
+      "fetchedAt": "2026-10-27T13:22:23.324611+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "569bd2d75869c1dff5e3993355ae2343817e08ec72c6f4ca0e61c632dfade6aa",
+      "loggedAt": "2026-10-27T13:22:23.403637+00:00"
+    },
+    {
+      "symbol": "AXIL",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 6.14,
+        "High": 5.775,
+        "Low": 5.5,
+        "Close": 5.54,
+        "Volume": 49949.0
+      },
+      "new": {
+        "Open": 6.139999866485596,
+        "High": 6.139999866485596,
+        "Low": 5.449999809265137,
+        "Close": 5.539999961853027,
+        "Volume": 49900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AXIL",
+      "fetchedAt": "2026-10-27T13:22:23.718114+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "32a18ecdf44808ecae1280ddd5e2e20edd02f761e66ba18b76abd86dd491b008",
+      "loggedAt": "2026-10-27T13:22:23.823844+00:00"
+    },
+    {
+      "symbol": "BCHT",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 1.1,
+        "High": 1.255,
+        "Low": 1.1886,
+        "Close": 1.24,
+        "Volume": 12116.0
+      },
+      "new": {
+        "Open": 1.100000023841858,
+        "High": 1.2599999904632568,
+        "Low": 1.100000023841858,
+        "Close": 1.2400000095367432,
+        "Volume": 12100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BCHT",
+      "fetchedAt": "2026-10-27T13:22:24.133126+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "e087ee0bf2db464da01b040e962ba922eae41ebaa129af8c0928e5da566de3a7",
+      "loggedAt": "2026-10-27T13:22:24.212487+00:00"
+    },
+    {
+      "symbol": "LSF",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 2.81,
+        "High": 2.8049,
+        "Low": 2.6001,
+        "Close": 2.66,
+        "Volume": 19498.0
+      },
+      "new": {
+        "Open": 2.809999942779541,
+        "High": 2.809999942779541,
+        "Low": 2.5999999046325684,
+        "Close": 2.6600000858306885,
+        "Volume": 19500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LSF",
+      "fetchedAt": "2026-10-27T13:22:24.520626+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "a8c8c0f43262f873551e1c63747aec5ad05ccb61c004cb7c90b6d6c26bdb37ba",
+      "loggedAt": "2026-10-27T13:22:24.630406+00:00"
+    },
+    {
+      "symbol": "TGE",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.8071,
+        "High": 0.7979,
+        "Low": 0.5505,
+        "Close": 0.5924,
+        "Volume": 505003.0
+      },
+      "new": {
+        "Open": 0.8069999814033508,
+        "High": 0.8069999814033508,
+        "Low": 0.5509999990463257,
+        "Close": 0.5920000076293945,
+        "Volume": 505000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TGE",
+      "fetchedAt": "2026-10-27T13:22:24.943446+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "5eca125f0b192fe23715d9c913da0fa9ff33def9e987d05996c30dd334bd440d",
+      "loggedAt": "2026-10-27T13:22:25.023398+00:00"
+    },
+    {
+      "symbol": "SNSC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.92,
+        "High": 0.9199,
+        "Low": 0.7512,
+        "Close": 0.7528,
+        "Volume": 42157.0
+      },
+      "new": {
+        "Open": 0.9200000166893005,
+        "High": 0.9200000166893005,
+        "Low": 0.75,
+        "Close": 0.75,
+        "Volume": 42300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SNSC",
+      "fetchedAt": "2026-10-27T13:22:25.339639+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "c69ac0700fa73871653d519e9d1d76efe68f8632fa431f22d74c9c719eed3cfe",
+      "loggedAt": "2026-10-27T13:22:25.447951+00:00"
+    },
+    {
+      "symbol": "SPRU",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 1.34,
+        "High": 1.3398,
+        "Low": 1.32,
+        "Close": 1.32,
+        "Volume": 25556.0
+      },
+      "new": {
+        "Open": 1.340000033378601,
+        "High": 1.340000033378601,
+        "Low": 1.3200000524520874,
+        "Close": 1.3200000524520874,
+        "Volume": 25600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SPRU",
+      "fetchedAt": "2026-10-27T13:22:25.763205+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "bacb35a6af939c8ecbf4de47db93854c65128e85add67fd6796632304d55349f",
+      "loggedAt": "2026-10-27T13:22:25.843482+00:00"
+    },
+    {
+      "symbol": "LFT",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 4.17,
+        "High": 4.29,
+        "Low": 4.18,
+        "Close": 4.22,
+        "Volume": 18631.0
+      },
+      "new": {
+        "Open": 4.170000076293945,
+        "High": 4.289999961853027,
+        "Low": 4.170000076293945,
+        "Close": 4.21999979019165,
+        "Volume": 18600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/LFT",
+      "fetchedAt": "2026-10-27T13:22:26.169879+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "8149c436cbe4a0a1df1ff3fb1f7d632d552f6ae0145251af9e4bb392a8870c66",
+      "loggedAt": "2026-10-27T13:22:26.280007+00:00"
+    },
+    {
+      "symbol": "SRXH",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 1.0,
+        "High": 1.0999,
+        "Low": 1.04,
+        "Close": 1.04,
+        "Volume": 690459.0
+      },
+      "new": {
+        "Open": 1.0,
+        "High": 1.100000023841858,
+        "Low": 0.9950000047683716,
+        "Close": 1.0399999618530273,
+        "Volume": 692000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SRXH",
+      "fetchedAt": "2026-10-27T13:22:26.673018+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "fb223bc42f11725345f24b6829bc6e1998a04e1b151d2a128a4a491c880a273a",
+      "loggedAt": "2026-10-27T13:22:26.753300+00:00"
+    },
+    {
+      "symbol": "MXC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 9.88,
+        "High": 10.25,
+        "Low": 9.97,
+        "Close": 9.97,
+        "Volume": 31223.0
+      },
+      "new": {
+        "Open": 9.880000114440918,
+        "High": 10.529999732971191,
+        "Low": 9.880000114440918,
+        "Close": 9.970000267028809,
+        "Volume": 31200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MXC",
+      "fetchedAt": "2026-10-27T13:22:27.075679+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "2310d3ecffff3858eca7e83159fd7a8287b63bf57f347676277d72abae14b2ad",
+      "loggedAt": "2026-10-27T13:22:27.183443+00:00"
+    },
+    {
+      "symbol": "PBM",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 4.06,
+        "High": 4.18,
+        "Low": 3.75,
+        "Close": 3.66,
+        "Volume": 45711.0
+      },
+      "new": {
+        "Open": 4.110000133514404,
+        "High": 4.179999828338623,
+        "Low": 3.630000114440918,
+        "Close": 3.6600000858306885,
+        "Volume": 45700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/PBM",
+      "fetchedAt": "2026-10-27T13:22:27.503974+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "86db13e407676a198a674cc6cd67e3bce18a832a22a73ad2ff7ed1aab42aa6f4",
+      "loggedAt": "2026-10-27T13:22:27.583602+00:00"
+    },
+    {
+      "symbol": "CCM",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 4.15,
+        "High": 3.94,
+        "Low": 3.73,
+        "Close": 3.895,
+        "Volume": 13905.0
+      },
+      "new": {
+        "Open": 4.150000095367432,
+        "High": 4.150000095367432,
+        "Low": 3.700000047683716,
+        "Close": 3.9000000953674316,
+        "Volume": 13900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CCM",
+      "fetchedAt": "2026-10-27T13:22:27.900423+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "fe348a022dedd5b0079afdec265d7ca2bc4c4af250ec476d1774bfef93577699",
+      "loggedAt": "2026-10-27T13:22:28.007063+00:00"
+    },
+    {
+      "symbol": "MOGU",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 1.6,
+        "High": 1.97,
+        "Low": 1.66,
+        "Close": 1.89,
+        "Volume": 11400.0
+      },
+      "new": {
+        "Open": 1.600000023841858,
+        "High": 1.9700000286102295,
+        "Low": 1.600000023841858,
+        "Close": 1.8899999856948853,
+        "Volume": 11400.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MOGU",
+      "fetchedAt": "2026-10-27T13:22:28.320241+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "35b27abe8dccbf0bc0872740c29457c86758465edc0f803c894f6045d418d998",
+      "loggedAt": "2026-10-27T13:22:28.399512+00:00"
+    },
+    {
+      "symbol": "IPM",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 1.71,
+        "High": 1.7,
+        "Low": 1.7,
+        "Close": 1.7,
+        "Volume": 860.0
+      },
+      "new": {
+        "Open": 1.7100000381469727,
+        "High": 1.7100000381469727,
+        "Low": 1.7000000476837158,
+        "Close": 1.7000000476837158,
+        "Volume": 1100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/IPM",
+      "fetchedAt": "2026-10-27T13:22:28.776841+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "47eb638d78dca51085ded98843175001d30f9e22b11261230e618c41275e1a86",
+      "loggedAt": "2026-10-27T13:22:28.884182+00:00"
+    },
+    {
+      "symbol": "MCRP",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.428,
+        "High": 0.4229,
+        "Low": 0.3957,
+        "Close": 0.409,
+        "Volume": 48915.0
+      },
+      "new": {
+        "Open": 0.42800000309944153,
+        "High": 0.42800000309944153,
+        "Low": 0.3959999978542328,
+        "Close": 0.4090000092983246,
+        "Volume": 48900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MCRP",
+      "fetchedAt": "2026-10-27T13:22:29.203741+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "7aa221ef1acf8ef375ed05be5e2ce134e0ae6a16140e0d388a94fa2edadb25e8",
+      "loggedAt": "2026-10-27T13:22:29.283921+00:00"
+    },
+    {
+      "symbol": "AEON",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.235,
+        "High": 0.2498,
+        "Low": 0.2354,
+        "Close": 0.24,
+        "Volume": 106769.0
+      },
+      "new": {
+        "Open": 0.23499999940395355,
+        "High": 0.25,
+        "Low": 0.23499999940395355,
+        "Close": 0.23999999463558197,
+        "Volume": 108000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AEON",
+      "fetchedAt": "2026-10-27T13:22:29.630686+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "602fbbc2bd98e1207edfcd26cbeeebc96aa3f957316571f28fd3a9e926bc6d5e",
+      "loggedAt": "2026-10-27T13:22:29.737896+00:00"
+    },
+    {
+      "symbol": "TMDE",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.6147,
+        "High": 0.6008,
+        "Low": 0.58,
+        "Close": 0.58,
+        "Volume": 25118.0
+      },
+      "new": {
+        "Open": 0.6150000095367432,
+        "High": 0.6150000095367432,
+        "Low": 0.5799999833106995,
+        "Close": 0.5799999833106995,
+        "Volume": 25100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TMDE",
+      "fetchedAt": "2026-10-27T13:22:30.055950+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "0ce6058fecc27a5a05d1d78a12cf36ddb07f4cfb19062caea2ee7fc35bc77b63",
+      "loggedAt": "2026-10-27T13:22:30.136940+00:00"
+    },
+    {
+      "symbol": "AUST",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.7756,
+        "High": 0.7724,
+        "Low": 0.73,
+        "Close": 0.751,
+        "Volume": 20121.0
+      },
+      "new": {
+        "Open": 0.7760000228881836,
+        "High": 0.7760000228881836,
+        "Low": 0.7250000238418579,
+        "Close": 0.7509999871253967,
+        "Volume": 20100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AUST",
+      "fetchedAt": "2026-10-27T13:22:30.462947+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "dd89eb64668f00a841af64a057150b4150e7766ec3e326ce06a61b6baa454040",
+      "loggedAt": "2026-10-27T13:22:30.567292+00:00"
+    },
+    {
+      "symbol": "EQS",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.77,
+        "High": 0.7524,
+        "Low": 0.7,
+        "Close": 0.7,
+        "Volume": 11918.0
+      },
+      "new": {
+        "Open": 0.7699999809265137,
+        "High": 0.7699999809265137,
+        "Low": 0.699999988079071,
+        "Close": 0.699999988079071,
+        "Volume": 11900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/EQS",
+      "fetchedAt": "2026-10-27T13:22:30.889440+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "2af47b56a26be0a292cbbd4899803313d274ea163b0436a3823aae5699d5526f",
+      "loggedAt": "2026-10-27T13:22:30.968899+00:00"
+    },
+    {
+      "symbol": "AWX",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 2.59,
+        "High": 2.555,
+        "Low": 2.5,
+        "Close": 2.5,
+        "Volume": 1709.0
+      },
+      "new": {
+        "Open": 2.5899999141693115,
+        "High": 2.5899999141693115,
+        "Low": 2.5,
+        "Close": 2.5,
+        "Volume": 1700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/AWX",
+      "fetchedAt": "2026-10-27T13:22:31.283547+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "004d419809b012d8ab340f322539d4c26162971afa27f391db86c1a93043eedb",
+      "loggedAt": "2026-10-27T13:22:31.388278+00:00"
+    },
+    {
+      "symbol": "MWG",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 1.47,
+        "High": 1.455,
+        "Low": 1.455,
+        "Close": 1.455,
+        "Volume": 3807.0
+      },
+      "new": {
+        "Open": 1.4700000286102295,
+        "High": 1.4700000286102295,
+        "Low": 1.437000036239624,
+        "Close": 1.4550000429153442,
+        "Volume": 3800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MWG",
+      "fetchedAt": "2026-10-27T13:22:31.703123+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "1e8616bdf2c9d3fc44b607c8785eb10091f2118606e7c5c62b56426a47e60453",
+      "loggedAt": "2026-10-27T13:22:31.782681+00:00"
+    },
+    {
+      "symbol": "BQ",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.522,
+        "High": 0.4892,
+        "Low": 0.4525,
+        "Close": 0.48,
+        "Volume": 22817.0
+      },
+      "new": {
+        "Open": 0.5220000147819519,
+        "High": 0.5220000147819519,
+        "Low": 0.453000009059906,
+        "Close": 0.47999998927116394,
+        "Volume": 22800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BQ",
+      "fetchedAt": "2026-10-27T13:22:32.128371+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "19a9aa753d32c14ca704372bfe51c6d34b8d637dc7f8684b4ee24fbbad7e08d9",
+      "loggedAt": "2026-10-27T13:22:32.206786+00:00"
+    },
+    {
+      "symbol": "MTR",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 1.9,
+        "High": 2.0587,
+        "Low": 1.935,
+        "Close": 1.9526,
+        "Volume": 4320.0
+      },
+      "new": {
+        "Open": 1.899999976158142,
+        "High": 2.059999942779541,
+        "Low": 1.899999976158142,
+        "Close": 1.9500000476837158,
+        "Volume": 4300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MTR",
+      "fetchedAt": "2026-10-27T13:22:32.560557+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "06cde4293d90de903ae919a094c9c41d5f40c4881bfd9fd9545ef9a7370cd683",
+      "loggedAt": "2026-10-27T13:22:32.640738+00:00"
+    },
+    {
+      "symbol": "GVH",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.8307,
+        "High": 0.8307,
+        "Low": 0.7812,
+        "Close": 0.78,
+        "Volume": 25267.0
+      },
+      "new": {
+        "Open": 0.8309999704360962,
+        "High": 0.8309999704360962,
+        "Low": 0.7699999809265137,
+        "Close": 0.7799999713897705,
+        "Volume": 25800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/GVH",
+      "fetchedAt": "2026-10-27T13:22:32.991539+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "fd816fbfeb1236441a1e04f1a1dc570acc25664689647549ba694bdcac7a1242",
+      "loggedAt": "2026-10-27T13:22:33.071333+00:00"
+    },
+    {
+      "symbol": "DAIC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 1.16,
+        "High": 1.2,
+        "Low": 1.045,
+        "Close": 1.04,
+        "Volume": 215142.0
+      },
+      "new": {
+        "Open": 1.159999966621399,
+        "High": 1.2000000476837158,
+        "Low": 1.0299999713897705,
+        "Close": 1.0399999618530273,
+        "Volume": 215200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/DAIC",
+      "fetchedAt": "2026-10-27T13:22:33.383425+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "fe25f4e07975e64d51b0a1b8abff2013c8cb818f7d2aa7437c705b664b7c2d53",
+      "loggedAt": "2026-10-27T13:22:33.472324+00:00"
+    },
+    {
+      "symbol": "CLDI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.65,
+        "High": 0.6498,
+        "Low": 0.63,
+        "Close": 0.64,
+        "Volume": 41419.0
+      },
+      "new": {
+        "Open": 0.6499999761581421,
+        "High": 0.6499999761581421,
+        "Low": 0.6299999952316284,
+        "Close": 0.6399999856948853,
+        "Volume": 41800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CLDI",
+      "fetchedAt": "2026-10-27T13:22:33.813793+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "02f3b9428021275bebfe876d4ff06da147667f79877d352709d9e7feb1c75f1e",
+      "loggedAt": "2026-10-27T13:22:33.893503+00:00"
+    },
+    {
+      "symbol": "BURU",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.2321,
+        "High": 0.2298,
+        "Low": 0.2001,
+        "Close": 0.226,
+        "Volume": 2377901.0
+      },
+      "new": {
+        "Open": 0.23199999332427979,
+        "High": 0.23199999332427979,
+        "Low": 0.20000000298023224,
+        "Close": 0.22599999606609344,
+        "Volume": 2387900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BURU",
+      "fetchedAt": "2026-10-27T13:22:34.240986+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "47a36da6bbe2e61dd640feef52c46a1c45c7cafcdf36cf89064a080586f0ee15",
+      "loggedAt": "2026-10-27T13:22:34.321512+00:00"
+    },
+    {
+      "symbol": "OGEN",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.419,
+        "High": 0.4101,
+        "Low": 0.3985,
+        "Close": 0.3985,
+        "Volume": 16220.0
+      },
+      "new": {
+        "Open": 0.41999998688697815,
+        "High": 0.41999998688697815,
+        "Low": 0.4000000059604645,
+        "Close": 0.4000000059604645,
+        "Volume": 17300.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/OGEN",
+      "fetchedAt": "2026-10-27T13:22:34.659446+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "2070b44338e0056dd7b4c47a2703ec09cce47753b335ff2ec30abcfd81f440c0",
+      "loggedAt": "2026-10-27T13:22:34.738162+00:00"
+    },
+    {
+      "symbol": "VJET",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 0.7052,
+        "High": 0.6969,
+        "Low": 0.6063,
+        "Close": 0.6455,
+        "Volume": 284594.0
+      },
+      "new": {
+        "Open": 0.7099999785423279,
+        "High": 0.7099999785423279,
+        "Low": 0.6100000143051147,
+        "Close": 0.6499999761581421,
+        "Volume": 296700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/VJET",
+      "fetchedAt": "2026-10-27T13:22:35.055427+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "65d01a9ad1dd790a1aaf7a4ee3a306c5607682069885a3ddb9655cb3c267f153",
+      "loggedAt": "2026-10-27T13:22:35.135551+00:00"
+    },
+    {
+      "symbol": "BCSS",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 10.2,
+        "High": 10.21,
+        "Low": 10.205,
+        "Close": 10.21,
+        "Volume": 47948.0
+      },
+      "new": {
+        "Open": 10.199999809265137,
+        "High": 10.210000038146973,
+        "Low": 10.199999809265137,
+        "Close": 10.210000038146973,
+        "Volume": 47900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BCSS",
+      "fetchedAt": "2026-10-27T13:22:35.473676+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "42b938a39d91a66c6a13c87eafb2c9ed35c4161f36e12fd411ab7fd7a0178c18",
+      "loggedAt": "2026-10-27T13:22:35.553313+00:00"
+    },
+    {
+      "symbol": "BDCI",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 10.155,
+        "High": 10.16,
+        "Low": 10.16,
+        "Close": 10.16,
+        "Volume": 5646.0
+      },
+      "new": {
+        "Open": 10.154999732971191,
+        "High": 10.15999984741211,
+        "Low": 10.149999618530273,
+        "Close": 10.15999984741211,
+        "Volume": 5700.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BDCI",
+      "fetchedAt": "2026-10-27T13:22:35.871226+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "1c3ee94672d12bc76dec8259f6f60da09d202236258cd6f603a22553c12faa89",
+      "loggedAt": "2026-10-27T13:22:35.952233+00:00"
+    },
+    {
+      "symbol": "BF-A",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 30.15,
+        "High": 30.0,
+        "Low": 29.66,
+        "Close": 29.81,
+        "Volume": 111960.0
+      },
+      "new": {
+        "Open": 30.149999618530273,
+        "High": 30.149999618530273,
+        "Low": 29.649999618530273,
+        "Close": 29.809999465942383,
+        "Volume": 112000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/BF-A",
+      "fetchedAt": "2026-10-27T13:22:36.314537+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "45f58103bb8ce5c082954a59fccf9214d2fcb565b14e4b9b9873972abb85c6ee",
+      "loggedAt": "2026-10-27T13:22:36.394734+00:00"
+    },
+    {
+      "symbol": "CAES",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 10.02,
+        "High": 10.015,
+        "Low": 10.015,
+        "Close": 10.015,
+        "Volume": 2841.0
+      },
+      "new": {
+        "Open": 10.020000457763672,
+        "High": 10.020000457763672,
+        "Low": 10.020000457763672,
+        "Close": 10.020000457763672,
+        "Volume": 2800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CAES",
+      "fetchedAt": "2026-10-27T13:22:36.710325+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "23c8fe06db5599a8cb299b2e3a06851131e61da24e89246ac0154c93ace95440",
+      "loggedAt": "2026-10-27T13:22:36.790042+00:00"
+    },
+    {
+      "symbol": "CIG-C",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 3.39,
+        "High": 3.1333,
+        "Low": 2.9797,
+        "Close": 3.1333,
+        "Volume": 11454.0
+      },
+      "new": {
+        "Open": 3.390000104904175,
+        "High": 3.390000104904175,
+        "Low": 2.9600000381469727,
+        "Close": 3.1333000659942627,
+        "Volume": 11454.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CIG-C",
+      "fetchedAt": "2026-10-27T13:22:37.143751+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "5594c21a5a2b52c50ccf2b5a26ab117ea2a5d7d763c5e83d80f75d17161d07ce",
+      "loggedAt": "2026-10-27T13:22:37.223253+00:00"
+    },
+    {
+      "symbol": "DXYZ",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 29.59,
+        "High": 29.55,
+        "Low": 27.89,
+        "Close": 28.11,
+        "Volume": 1056264.0
+      },
+      "new": {
+        "Open": 29.59000015258789,
+        "High": 29.59000015258789,
+        "Low": 27.889999389648438,
+        "Close": 28.110000610351562,
+        "Volume": 1058600.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/DXYZ",
+      "fetchedAt": "2026-10-27T13:22:37.541236+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "a4f567817502416242e7c0aeb8bca5c97a93fe00d1a373fa3956335f3c4b8eb7",
+      "loggedAt": "2026-10-27T13:22:37.622543+00:00"
+    },
+    {
+      "symbol": "MOG-B",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 327.76,
+        "High": 354.57,
+        "Low": 354.57,
+        "Close": 354.57,
+        "Volume": 240.0
+      },
+      "new": {
+        "Open": 327.760009765625,
+        "High": 354.57000732421875,
+        "Low": 327.760009765625,
+        "Close": 354.57000732421875,
+        "Volume": 200.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/MOG-B",
+      "fetchedAt": "2026-10-27T13:22:37.992812+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "0003f30670d885fa13380b66cc26767885728f654a59bb83c8900a5dcfb4cf8b",
+      "loggedAt": "2026-10-27T13:22:38.074720+00:00"
+    },
+    {
+      "symbol": "OGCP",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 4.8,
+        "High": 4.92,
+        "Low": 4.855,
+        "Close": 4.92,
+        "Volume": 2885.0
+      },
+      "new": {
+        "Open": 4.800000190734863,
+        "High": 4.949999809265137,
+        "Low": 4.800000190734863,
+        "Close": 4.920000076293945,
+        "Volume": 2900.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/OGCP",
+      "fetchedAt": "2026-10-27T13:22:38.420580+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "83fc0c7a2d5cbe91fd3b1b1a16763fa07167da38889703e5759fc4198a251dcb",
+      "loggedAt": "2026-10-27T13:22:38.500832+00:00"
+    },
+    {
+      "symbol": "PDCC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 7.13,
+        "High": 7.1601,
+        "Low": 7.1396,
+        "Close": 7.1601,
+        "Volume": 3003.0
+      },
+      "new": {
+        "Open": 7.130000114440918,
+        "High": 7.159999847412109,
+        "Low": 7.130000114440918,
+        "Close": 7.159999847412109,
+        "Volume": 3000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/PDCC",
+      "fetchedAt": "2026-10-27T13:22:38.835905+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "37f5d07ad4ac4dda6eab52c50346bf154eeebf356499874b88e7f2c98ad5c315",
+      "loggedAt": "2026-10-27T13:22:38.916067+00:00"
+    },
+    {
+      "symbol": "SPMC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 5.75,
+        "High": 5.7384,
+        "Low": 5.5,
+        "Close": 5.58,
+        "Volume": 71043.0
+      },
+      "new": {
+        "Open": 5.75,
+        "High": 5.75,
+        "Low": 5.5,
+        "Close": 5.579999923706055,
+        "Volume": 71000.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SPMC",
+      "fetchedAt": "2026-10-27T13:22:39.230969+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "eba4a388f429712a94b8f2595b3b40150cec41328ac43c7e428c1e24003001bd",
+      "loggedAt": "2026-10-27T13:22:39.368860+00:00"
+    },
+    {
+      "symbol": "TAP-A",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 41.6,
+        "High": 42.4,
+        "Low": 42.4,
+        "Close": 42.4,
+        "Volume": 835.0
+      },
+      "new": {
+        "Open": 41.599998474121094,
+        "High": 42.400001525878906,
+        "Low": 41.599998474121094,
+        "Close": 42.400001525878906,
+        "Volume": 800.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TAP-A",
+      "fetchedAt": "2026-10-27T13:22:39.694102+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "b5116fbf5c535c8e8fbff387c068cee57696ee0914f85547e5a5be981b1ae2ae",
+      "loggedAt": "2026-10-27T13:22:39.772696+00:00"
+    },
+    {
+      "symbol": "TONT",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 10.945,
+        "High": 10.95,
+        "Low": 10.95,
+        "Close": 10.95,
+        "Volume": 538.0
+      },
+      "new": {
+        "Open": 10.944999694824219,
+        "High": 10.949999809265137,
+        "Low": 10.944999694824219,
+        "Close": 10.949999809265137,
+        "Volume": 500.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/TONT",
+      "fetchedAt": "2026-10-27T13:22:40.108925+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "d47be864a51379a4001179ce85b4b3e3602f82953a65064075ff851391d04d2b",
+      "loggedAt": "2026-10-27T13:22:40.218392+00:00"
+    },
+    {
+      "symbol": "WENC",
+      "date": "2026-10-26",
+      "status": "corrected",
+      "old": {
+        "Open": 9.99,
+        "High": 10.03,
+        "Low": 10.025,
+        "Close": 10.025,
+        "Volume": 200106.0
+      },
+      "new": {
+        "Open": 9.989999771118164,
+        "High": 10.029999732971191,
+        "Low": 9.989999771118164,
+        "Close": 10.029999732971191,
+        "Volume": 200100.0
+      },
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/WENC",
+      "fetchedAt": "2026-10-27T13:22:40.533751+00:00",
+      "reason": "invalid-source-bar-replaced",
+      "id": "becad7d486e7936605e4f3769d64eeba515bed817f08ec4821f414ce774bd96e",
+      "loggedAt": "2026-10-27T13:22:40.614030+00:00"
+    },
+    {
+      "symbol": "6898.TWO",
+      "date": "2025-08-01",
+      "status": "rejected",
+      "old": {
+        "Open": null,
+        "High": null,
+        "Low": null,
+        "Close": null,
+        "Volume": null
+      },
+      "new": null,
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/6898.TWO",
+      "fetchedAt": null,
+      "reason": "nonpositive-or-nonfinite-price",
+      "id": "9267460fa8bd1628d2b06669b988278be574f378bded30beec373336feb11a75",
+      "loggedAt": "2026-10-27T13:26:37.551460+00:00"
     }
   ]
 }
