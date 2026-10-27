@@ -4,7 +4,8 @@
 The caller's checkout/index is never committed or reset. Publishing replays only
 the owner's changed blobs onto each freshly fetched tip (an index-only rebase).
 Same-path concurrent edits fail, except the append-only correction journal, whose
-events are union-merged before each bounded, non-force retry.
+events are union-merged before each bounded, non-force retry, and the shared
+full-market universe, merged per market (full scope, then newest data, wins).
 """
 import argparse
 from contextlib import contextmanager
@@ -24,6 +25,9 @@ from kline_journal import merge_logs
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / ".github/generated-paths.json"
 UNION_JOURNALS = {"docs/report/kline-corrections.json"}
+# Written by both the daily report (main.py) and the full-market job; each keeps
+# the other's markets, so a concurrent write merges per market instead of failing.
+UNIVERSE = "docs/report/universe.json"
 RELAY = ".github/workflows/generated-pages-relay.yml"
 RELAY_BODY = b"""# Storage-branch relay; implementation always comes from main.
 name: Generated Pages relay
@@ -42,6 +46,36 @@ jobs:
 
 def git(*args, data=None, env=None):
     return subprocess.check_output(["git", *args], input=data, env=env)
+
+
+def merge_universe(remote, local):
+    """Per market keep the better entry: scope "full" (the full-market job) first, then
+    the later asOf, then the already-published remote, matching main.py, which keeps a
+    fresh full market over its own scan. Rows are remapped by field name onto one list."""
+    for document in (remote, local):
+        if (not isinstance(document, dict) or document.get("version") != 1
+                or not isinstance(document.get("markets"), dict)
+                or not isinstance(document.get("fields"), list)
+                or not all(isinstance(field, str) for field in document["fields"])
+                or not all(isinstance(entry, dict) and isinstance(entry.get("rows"), list)
+                           for entry in document["markets"].values())):
+            raise ValueError("Invalid universe.json; refusing concurrent merge")
+
+    def rank(entry):
+        return entry.get("scope") == "full", str(entry.get("asOf") or "")
+
+    fields = list(remote["fields"]) + [field for field in local["fields"] if field not in remote["fields"]]
+    markets = {}
+    for market in list(remote["markets"]) + [m for m in local["markets"] if m not in remote["markets"]]:
+        theirs, ours = remote["markets"].get(market), local["markets"].get(market)
+        source, entry = (local, ours) if theirs is None or (ours is not None and rank(ours) > rank(theirs)) else (remote, theirs)
+        position = {field: i for i, field in enumerate(source["fields"])}
+        rows = [[row[position[field]] if field in position and position[field] < len(row) else None for field in fields]
+                for row in entry["rows"]]
+        markets[market] = {**entry, "rows": rows}
+    latest = lambda key: max((str(d.get(key)) for d in (remote, local) if d.get(key)), default=None)
+    return {**remote, "generatedAt": latest("generatedAt"), "reportDate": latest("reportDate"),
+            "fields": fields, "markets": markets}
 
 
 def matches(path, patterns):
@@ -208,10 +242,12 @@ class Storage:
             conflicts = [p for p, e in delta.items()
                          if current.get(p) != original.get(p) and current.get(p) != e]
             if conflicts:
-                # Only this append-only journal has union semantics. Deletion,
-                # mode changes and all other record conflicts remain fail-closed.
-                if branch != "main" or any(
-                    p not in UNION_JOURNALS or not current.get(p) or not delta[p]
+                # Only the append-only journal (main) and the per-market universe
+                # (generated) merge. Deletion, mode changes and all other conflicts
+                # remain fail-closed.
+                mergeable = UNION_JOURNALS if branch == "main" else {UNIVERSE} if branch == "generated" else set()
+                if any(
+                    p not in mergeable or not current.get(p) or not delta[p]
                     or current[p][0] != "100644" or delta[p][0] != "100644"
                     for p in conflicts
                 ):
@@ -219,15 +255,21 @@ class Storage:
                 for path in conflicts:
                     remote = json.loads(git("cat-file", "blob", current[path][1]))
                     local = json.loads(git("cat-file", "blob", delta[path][1]))
-                    for journal in (remote, local):
-                        if (journal.get("version") != 1 or not isinstance(journal.get("events"), list)
-                                or not isinstance(journal.get("quarantined"), list)):
-                            raise ValueError("Invalid K-line correction log; refusing concurrent union")
-                    merged = merge_logs(remote, local)
-                    body = (json.dumps(merged, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode()
+                    if path == UNIVERSE:
+                        merged = merge_universe(remote, local)
+                        body = json.dumps(merged, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode()
+                        label = "full-market universe per market"
+                    else:
+                        for journal in (remote, local):
+                            if (journal.get("version") != 1 or not isinstance(journal.get("events"), list)
+                                    or not isinstance(journal.get("quarantined"), list)):
+                                raise ValueError("Invalid K-line correction log; refusing concurrent union")
+                        merged = merge_logs(remote, local)
+                        body = (json.dumps(merged, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode()
+                        label = "correction journal"
                     delta[path] = ("100644", git("hash-object", "-w", "--stdin", data=body).decode().strip())
                     original[path] = current[path]
-                    print(f"Union-merged concurrent correction journal on attempt {attempt + 1}: {path}")
+                    print(f"Merged concurrent {label} on attempt {attempt + 1}: {path}")
             with self.index(head) as env:
                 self.update_index(delta, env)
                 tree = git("write-tree", env=env).decode().strip()
