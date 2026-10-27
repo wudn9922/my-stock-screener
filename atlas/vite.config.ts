@@ -1,5 +1,6 @@
 import { secProxy } from './src/fundamentals/secProxy';
 import { defineConfig } from 'vitest/config';
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { versionedServiceWorker } from './src/app/buildPlugins';
 import { yahooProxy } from './src/market-data/yahooProxy';
@@ -16,6 +17,10 @@ export default defineConfig({
   preview: { port: 4173 },
   build: {
     rollupOptions: {
+      input: {
+        index: fileURLToPath(new URL('./index.html', import.meta.url)),
+        lineLogin: fileURLToPath(new URL('./line-login-launch.html', import.meta.url)),
+      },
       onwarn(warning, warn) {
         // Lazy routes must not ship execution-order-dependent module cycles.
         if (warning.code === 'CYCLIC_CROSS_CHUNK_REEXPORT') throw new Error(warning.message);

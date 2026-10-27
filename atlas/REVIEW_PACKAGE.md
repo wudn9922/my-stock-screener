@@ -1,4 +1,24 @@
-## Current follow-up: reverse confirmation and same-network binding (2026-10-27)
+## Current follow-up: iOS launch sheet and receiver focus (2026-10-27)
+
+Primary self-review; no independent sign-off. #184 was already merged, so this is
+a separate PR from current main. Mobile user gestures dispatch a legacy line://app
+URI in a disposable child frame, never navigating the RAM-only receiver or opening
+a window first. LINE's official deprecation and takeover warning are explicit in
+[the runbook](../docs/LINE_LOGIN_LAUNCH.md); this is not described as a newly supported
+secure app-link scheme or as headless proof of iPhone native dispatch. Existing
+reverse code, network binding, read/write proofs and server grants remain mandatory.
+
+Fallbacks load a real static-first HTML entry before offering the official HTTPS
+LIFF link; close failures leave readable X instructions. The helper gets its LIFF
+ID from the build, ignores query-selected IDs/redirects, strips its own query, uses
+no-referrer and never polls, initializes SDK or writes storage. Original pending
+receivers scroll/focus the code field on foreground and on late readiness.
+Tests model OS dispatch without claiming a real app launch; they cover no primary
+popup/navigation, frame cleanup, wrong code/network regressions, focus, blocked
+close, no-JS explanation and malicious target rejection. No SQL, Edge Function,
+production settings, merge or deployment. Actual test counts are in the PR.
+
+## Previous follow-up: reverse confirmation and same-network binding (2026-10-27)
 
 Accepted the reported approval-phishing gap: a visual pairing warning alone cannot
 stop a receiver who convinces a visitor to approve its link. The original receiver

@@ -33,3 +33,17 @@ server schema. No personal settings or grants are created by this transport.
 The parent LIFF endpoint renders the same Atlas bootstrap before URL changes.
 This supersedes the former same-browser SDK assumption for mobile login; the
 desktop fallback remains. See [handoff design, SQL and rollout](../../../docs/LINE_LOGIN_HANDOFF.md).
+
+## Mobile dispatch and sheet return (2026-10-27)
+
+Mobile login first attempts the documented legacy line://app scheme from the active
+gesture in a disposable child frame, preserving the receiver document and RAM proof.
+LINE deprecates this scheme due to interception risks; it is a compatibility attempt,
+not a trusted app-identity signal. Only the existing intent/write proof is dispatched.
+The supported HTTPS path remains available through an isolated, static-first launch
+entry with visible close/X instructions and a best-effort close on return. Its LIFF
+ID is compiled configuration, never a query-selected target. Pending receivers reveal
+and focus the reverse-code field when foregrounded or when readiness arrives later.
+No server transport, authorization or storage policy changes. Native app dispatch
+and the physical iOS keyboard remain owner device acceptance items.
+See [details and limitations](../../../docs/LINE_LOGIN_LAUNCH.md).

@@ -16,10 +16,15 @@ LINE SDK 的 PKCE 驗證資料存在發起登入的瀏覽器儲存空間。iOS �
 SDK 初始化，再進行 SDK secondary navigation／應用程式網址整理。primary／secondary
 的交接識別都會先於 router 處理。LINE 後台、channel、openid scope 不變。
 
+## iPhone sheet 後續修正
+
+目前前端的直接啟動、可讀備援頁、官方 scheme 棄用資訊與返回聚焦，見
+[LINE_LOGIN_LAUNCH.md](LINE_LOGIN_LAUNCH.md)。以下的反向碼與伺服器保護維持不變。
+
 ## 使用方式
 
-1. 手機網頁或主畫面 App 點「使用 LINE 登入」。原來的 Atlas 視窗保留，另一個
-   視窗開啟 LINE 的 LIFF 入口，原視窗顯示配對碼。不需要 App 與 Safari 共用 Cookie 或 localStorage。
+1. 手機網頁或主畫面 App 點「使用 LINE 登入」。原來的 Atlas 視窗保留，先嘗試直接
+   開啟 LINE；受阻時可用有提示文字的備援頁繼續。原視窗顯示配對碼。不需要 App 與 Safari 共用 Cookie 或 localStorage。
 2. 在 LINE 完成驗證，核對與原視窗相同的配對碼，再點「確認登入原來的 Atlas」。
    只有本人剛剛發起登入時才確認；單純開啟別人轉傳的網址不會送出身分。
 3. LINE 頁面顯示伺服器產生的六位確認碼。從主畫面／App 切換器回到**剛剛發起登入的原 Atlas**，
@@ -31,7 +36,7 @@ SDK 初始化，再進行 SDK secondary navigation／應用程式網址整理。
    仍可登入但只暫存；不會自行新增使用者儲存權限。
 
 取消、超過兩分鐘、驗證失敗或原 App 被系統完整關閉時，重新開始一次登入。
-若沒有開啟新視窗，可點「開啟 LINE 登入視窗」。不依賴 iOS 提供新視窗控制物件。
+若 LINE 未開啟，可點「開啟 LINE 登入視窗」，在提示頁點「在 LINE 中繼續」。不依賴 iOS 提供新視窗控制物件。
 完成端只在原 App 的 begin 尚未提交（404）時重試同一交接，最多 10 次／7.5 秒；
 不重啟 OAuth，不改寫已使用的交接。沒有失敗後自動重導或無限重試。
 桌面瀏覽器仍保留同一儲存空間的 SDK 登入；LINE 內開啟仍先直接使用 LIFF 身分，
