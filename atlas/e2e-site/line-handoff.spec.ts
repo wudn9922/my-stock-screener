@@ -130,12 +130,16 @@ for (const scenario of [
           });
         }
       });
-    await page.addInitScript(() =>
+    await page.addInitScript(() => {
       Object.defineProperty(navigator, 'standalone', {
         configurable: true,
         value: true,
-      }),
-    );
+      });
+      Object.defineProperty(navigator, 'userAgent', {
+        configurable: true,
+        value: 'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15',
+      });
+    });
     await mockSite(page, { report: buildReport(20) });
     await route(page.context());
     await page.context().route('https://liff.line.me/**', (r) =>
@@ -145,13 +149,17 @@ for (const scenario of [
       }),
     );
     await page.goto('./?page=console');
-    const popupPromise = page.context().waitForEvent('page');
+    const originalBeforeLogin = page.url();
     await page
       .getByRole('button', { name: '使用 LINE 登入', exact: true })
       .click();
-    const popup = await popupPromise;
-    await expect.poll(() => popup.url()).toContain('atlasLineHandoff=');
-    expect(popup.url()).not.toContain(readSecret);
+    const launchFrame = page.locator('iframe[title="開啟 LINE"]');
+    await expect(launchFrame).toHaveAttribute('src', /^line:\/\/app\//);
+    const appUrl = new URL((await launchFrame.getAttribute('src'))!);
+    expect(appUrl.searchParams.get('atlasLineWrite')).toBe(writeSecret);
+    expect(appUrl.href).not.toContain(readSecret);
+    expect(page.context().pages()).toHaveLength(1);
+    expect(page.url()).toBe(originalBeforeLogin);
     await expect(
       page.getByText('請在 LINE 完成驗證後，返回這個 Atlas 視窗。', {
         exact: false,
@@ -215,6 +223,17 @@ for (const scenario of [
       await page.bringToFront();
       const form = page.getByRole('form', { name: '輸入 LINE 確認碼' });
       await expect(form).toBeVisible();
+      const input = form.getByRole('textbox', { name: 'LINE 六位確認碼' });
+      await expect(input).toBeFocused();
+      await page.getByRole('button', { name: '取消登入', exact: true }).focus();
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await expect(input).toBeFocused();
+      await expect(input).toBeInViewport();
+      await page.getByRole('button', { name: '取消登入', exact: true }).focus();
+      await page.evaluate(() =>
+        document.dispatchEvent(new Event('visibilitychange')),
+      );
+      await expect(input).toBeFocused();
       await expect(
         page.getByRole('group', { name: '確認 LINE 登入帳號' }),
       ).toHaveCount(0);
@@ -286,9 +305,9 @@ for (const scenario of [
         'none',
       );
       expect(consumed).toBe(true);
+      await expect(launchFrame).toHaveCount(0);
     } finally {
       await sender.close();
-      await popup.close();
     }
   });
 
@@ -338,3 +357,154 @@ for (const insideLine of [false, true])
       page.getByRole('button', { name: '使用 LINE 登入', exact: true }),
     ).toBeEnabled();
   });
+
+test('manual launch sheet keeps its explanation when native dispatch and closing are blocked', async ({
+  page,
+}) => {
+  await page.context().addInitScript(() => {
+    if (!location.pathname.endsWith('/line-login-launch.html')) return;
+    const state = window as unknown as Window & { closeCalls: number };
+    state.closeCalls = 0;
+    window.close = () => {
+      state.closeCalls++;
+    };
+    // Model OS app dispatch without unloading the explanatory document.
+    document.addEventListener(
+      'click',
+      (event) => {
+        if ((event.target as HTMLElement).id === 'continue-line')
+          event.preventDefault();
+      },
+      true,
+    );
+  });
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'standalone', { value: true });
+    Object.defineProperty(navigator, 'userAgent', {
+      value: 'Mozilla/5.0 (iPhone)',
+      configurable: true,
+    });
+  });
+  let begin: Record<string, unknown> = {};
+  await mockSite(page);
+  await page.route('**/functions/v1/user-settings', (r) => {
+    const body = r.request().postDataJSON();
+    if (body.action === 'line.login.begin') begin = body;
+    return r.fulfill({
+      json: {
+        ok: true,
+        data: {
+          status: 'pending',
+          expiresAt: new Date(Date.now() + 120000).toISOString(),
+        },
+      },
+    });
+  });
+  await page.goto('./?page=console');
+  const original = page.url();
+  await page
+    .getByRole('button', { name: '使用 LINE 登入', exact: true })
+    .click();
+  const opened = page.context().waitForEvent('page');
+  await page.getByRole('link', { name: '開啟 LINE 登入視窗' }).click();
+  const sheet = await opened;
+  try {
+    const explanation = sheet.getByText(
+      '已在 LINE 繼續登入，完成後請按左上角「完成／X」回到原本的 Atlas 輸入確認碼',
+      { exact: true },
+    );
+    await expect(explanation).toBeVisible();
+    await expect.poll(() => sheet.url()).not.toContain('atlasLineWrite');
+    const link = new URL(
+      (await sheet
+        .getByRole('link', { name: '在 LINE 中繼續' })
+        .getAttribute('href'))!,
+    );
+    expect(link.origin).toBe('https://liff.line.me');
+    expect(link.searchParams.get('atlasLineWrite')).toBe(begin.writeSecret);
+    expect(link.href).not.toContain(begin.readSecret);
+    expect(sheet.url()).not.toContain(begin.readSecret);
+    await sheet.getByRole('link', { name: '在 LINE 中繼續' }).click();
+    await sheet.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'hidden',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'visible',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.dispatchEvent(new Event('focus'));
+    });
+    expect(
+      await sheet.evaluate(
+        () => (window as unknown as Window & { closeCalls: number }).closeCalls,
+      ),
+    ).toBeGreaterThan(0);
+    await expect(explanation).toBeVisible();
+    expect(
+      await sheet.evaluate(() => ({
+        local: Object.keys(localStorage),
+        session: Object.keys(sessionStorage),
+      })),
+    ).toEqual({ local: [], session: [] });
+    expect(page.url()).toBe(original);
+    await page.bringToFront();
+    await page.getByRole('button', { name: '取消登入', exact: true }).click();
+  } finally {
+    await sheet.close();
+  }
+});
+
+test('the launch sheet is readable before JavaScript or SDK initialization', async ({
+  browser,
+}, info) => {
+  const context = await browser.newContext({
+    javaScriptEnabled: false,
+    serviceWorkers: 'block',
+  });
+  try {
+    const sheet = await context.newPage();
+    await sheet.goto(
+      new URL('line-login-launch.html', info.project.use.baseURL).href,
+    );
+    await expect(
+      sheet.getByRole('heading', { name: '返回原本的 Atlas 完成登入' }),
+    ).toBeVisible();
+    await expect(sheet.getByRole('status')).toContainText('完成／X');
+  } finally {
+    await context.close();
+  }
+});
+
+test('the launch sheet rejects malformed or arbitrary redirect targets', async ({
+  page,
+}) => {
+  await page.goto(
+    './line-login-launch.html?atlasLineHandoff=bad&atlasLineWrite=bad&atlasLiffId=https://attacker.invalid',
+  );
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('link', { name: '在 LINE 中繼續' })).toHaveCount(
+    0,
+  );
+  await expect(page.getByRole('status')).toContainText('完成／X');
+  expect(new URL(page.url()).search).toBe('');
+  await page.goto(
+    './line-login-launch.html?atlasLineHandoff=12345678-1234-4234-8234-123456789abc&atlasLineWrite=' +
+      'w'.repeat(43) +
+      '&atlasLiffId=999999-ATTACKER&redirect=https://attacker.invalid',
+  );
+  const link = new URL(
+    (await page
+      .getByRole('link', { name: '在 LINE 中繼續' })
+      .getAttribute('href'))!,
+  );
+  expect(link.origin).toBe('https://liff.line.me');
+  expect(link.pathname).toBe('/2010330411-6JhrotT9/atlas/');
+  expect([...link.searchParams.keys()].sort()).toEqual([
+    'atlasLineHandoff',
+    'atlasLineWrite',
+  ]);
+});

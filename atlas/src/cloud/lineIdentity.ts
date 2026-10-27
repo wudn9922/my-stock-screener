@@ -4,7 +4,8 @@
  * before the router changes its URL. Neither route parameters nor decoded claims grant storage:
  * access.get must independently verify the SDK's ID token on the server.
  */
-export const DEFAULT_LIFF_ID = '2010330411-6JhrotT9';
+import { DEFAULT_LIFF_ID } from './lineLoginConfig';
+export { DEFAULT_LIFF_ID } from './lineLoginConfig';
 const LIFF_SDK_URL = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
 const LOGIN_RETURN_PARAM = 'atlasLineLogin';
 /** Treat a token that expires within this window as already expired. */
