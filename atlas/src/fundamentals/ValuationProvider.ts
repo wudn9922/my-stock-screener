@@ -178,8 +178,12 @@ export class ValuationProvider {
 
 let defaultProvider: ValuationProvider | null = null;
 
+/** Shared market-file cache for individual figures and whole-universe screening. */
+export function valuationProvider(): ValuationProvider {
+  return defaultProvider ??= new ValuationProvider();
+}
+
 /** Shared default instance reading `${BASE_URL}valuation/`. */
 export function getValuation(symbol: string, signal?: AbortSignal): Promise<Valuation | null> {
-  defaultProvider ??= new ValuationProvider();
-  return defaultProvider.getValuation(symbol, signal);
+  return valuationProvider().getValuation(symbol, signal);
 }

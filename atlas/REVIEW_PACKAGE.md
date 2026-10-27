@@ -762,3 +762,7 @@ revision; the same matrix and the full PR workflow are rerun on this layout foll
 已執行 clean npm ci、npm test（1,505 通過）、lint、一般與 Pages build；完整 npm run test:site 的三瀏覽器結果、其失敗與修正記錄以 PR body 為準。不合併、不部署。
 
 全量回歸發現 main 的 screener-universe-full.spec.ts 在原本收合的名單範圍說明中直接檢查內文。測試補上點擊既有按鈕的操作，原有內文、收合／展開、數量、篩選與虛擬列表斷言全部保留；產品的說明按鈕和展開行為未改。
+
+## 後續授權：本益比篩選
+
+使用者要求繼續增加本益比選項。本次沿用原估值與篩選架構，新增可留白的上下限及快捷倍數；舊條件、導覽與網址全部保留。具體規則、資料缺漏處理及測試見 docs/SCREENER_PE_FILTER.md。市場檔只載入一次且涵蓋畫面外股票，來源失敗不會回傳未篩選結果；自選策略保留失敗前的比較基準。離線收集器只適配既有估值 JSON，未變更任何後端 API、SQL、權限、workflow 或市場資料檔。採主要工程師自我審查，沒有獨立簽核；實際測試數字記錄在 PR body。

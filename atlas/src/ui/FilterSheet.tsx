@@ -18,6 +18,7 @@ import {
   activeChips,
   enoughPeriods,
   formatRange,
+  peRangeOf,
   gateCountText,
   gateSentence,
   isCustomVolume,
@@ -444,6 +445,8 @@ export function FilterSheet(props: FilterSheetProps) {
   const { open, market, value, availability, growth, growthLoading, onNeedGrowth, onClose } = props;
   const [draft, setDraft] = useState<FilterState>(value);
   const [volumeText, setVolumeText] = useState(value.vol === null ? '' : String(marketVolumeValue(value.vol, market)));
+  const [peLower, setPeLower] = useState(String(value.pe?.min ?? ''));
+  const [peUpper, setPeUpper] = useState(String(value.pe?.max ?? ''));
   const [terms, setTerms] = useState<GateTermsMap>(() => termsOf(value));
   const [category, setCategory] = useState<'all' | 'technical' | 'fundamental'>('all');
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -454,6 +457,8 @@ export function FilterSheet(props: FilterSheetProps) {
     if (!open) return;
     setDraft(value);
     setVolumeText(value.vol === null ? '' : String(marketVolumeValue(value.vol, market)));
+    setPeLower(String(value.pe?.min ?? ''));
+    setPeUpper(String(value.pe?.max ?? ''));
     setTerms(termsOf(value));
   }, [open]);
   useDialogFocus(open, DIALOG_ID);
@@ -494,6 +499,17 @@ export function FilterSheet(props: FilterSheetProps) {
   const update = (patch: Partial<FilterState>) => setDraft((previous) => ({ ...previous, ...patch }));
   const volumeUnit = marketVolumeUnit(market);
   const volumeInvalid = volumeThresholdOf(volumeText, market) === undefined;
+  const peInvalid = peRangeOf(peLower, peUpper) === undefined;
+  const setPeRange = (range: FilterRange | null) => {
+    setPeLower(String(range?.min ?? ''));
+    setPeUpper(String(range?.max ?? ''));
+    update({ pe: range });
+  };
+  const editPeRange = (lower: string, upper: string) => {
+    setPeLower(lower); setPeUpper(upper);
+    const range = peRangeOf(lower, upper);
+    if (range !== undefined) update({ pe: range });
+  };
   const setShareVolume = (vol: number | null) => {
     setVolumeText(vol === null ? '' : String(marketVolumeValue(vol, market)));
     update({ vol });
@@ -644,7 +660,7 @@ export function FilterSheet(props: FilterSheetProps) {
   const revenueChips = draftChips.filter((chip) => chip.key === 'rev' || chip.key === 'revY');
   const revenueCount = revenueChips.length;
   const revenueSummary = revenueChips.map((chip) => chip.label).join('；');
-  const fundamentalCount = draftChips.filter((chip) => ['eps', 'epsY', 'rev', 'revY', 'epss', 'accel', 'accelY'].includes(chip.key)).length;
+  const fundamentalCount = draftChips.filter((chip) => ['pe', 'eps', 'epsY', 'rev', 'revY', 'epss', 'accel', 'accelY'].includes(chip.key)).length;
 
   return createPortal(
     <div className="fs-backdrop" ref={backdropRef} onClick={onClose}>
@@ -692,6 +708,7 @@ export function FilterSheet(props: FilterSheetProps) {
             const next = removeFilter(draft, chip.id);
             setDraft(next);
             if (chip.id === 'vol') setVolumeText('');
+            if (chip.id === 'pe') { setPeLower(''); setPeUpper(''); }
             setTerms(termsOf(next));
           }}>{chip.label}{chip.unavailable && '（暫不套用）'}<X size={12} /></button>)}</div>
         </div>}
@@ -841,6 +858,25 @@ export function FilterSheet(props: FilterSheetProps) {
 
           </div>
           <div hidden={category === 'technical'}>
+          <Section title="本益比" unavailable={availability.pe} hint="與清單本益比欄位相同，優先採用近四季 TTM；TTM 缺值且非虧損時，使用最近完整年度。虧損與缺少本益比的股票固定排除，不受成長條件的「資料不足時排除」開關影響。">
+            <div className="fs-chips" role="group" aria-label="本益比上限">
+              {[null, 10, 15, 20, 30].map(max => {
+                const active = max === null ? !draft.pe : draft.pe?.min === null && draft.pe.max === max;
+                return <button key={String(max)} type="button" className={`fs-chip ${active ? 'active' : ''}`} aria-pressed={active}
+                  onClick={() => setPeRange(max === null || active ? null : { min: null, max })}>{max === null ? '不限' : `≤${max} 倍`}</button>;
+              })}
+            </div>
+            <div className="fs-number-row">
+              <label className="fs-number"><span>至少</span><input type="text" inputMode="decimal" enterKeyHint="done" placeholder="不限"
+                aria-label="本益比下限（倍）" aria-invalid={peInvalid} aria-describedby={peInvalid ? 'fs-pe-error' : undefined}
+                value={peLower} onChange={event => editPeRange(event.target.value, peUpper)} /><span>倍</span></label>
+              <label className="fs-number"><span>至多</span><input type="text" inputMode="decimal" enterKeyHint="done" placeholder="不限"
+                aria-label="本益比上限（倍）" aria-invalid={peInvalid} aria-describedby={peInvalid ? 'fs-pe-error' : undefined}
+                value={peUpper} onChange={event => editPeRange(peLower, event.target.value)} /><span>倍</span></label>
+            </div>
+            {peInvalid && <p id="fs-pe-error" className="fs-unavailable" role="alert">請輸入非負數（最多兩位小數），下限不可大於上限。</p>}
+            <p className="fs-hint">上下限皆包含；留白表示不限。虧損或缺少本益比資料的股票不會入選。</p>
+          </Section>
           <Section title="基本面（EPS／營收成長）" unavailable={fundamentalsBlocked}>
             <Hint title="多重條件說明">同一指標可新增多個條件，全部同時滿足才入選。例如：近 5 年 EPS 年增皆 ≥ 10%，且最近 1 年 ≥ 20%。</Hint>
             <details className="fs-details fs-method"><summary>年增率與資料來源說明</summary>
@@ -977,11 +1013,11 @@ export function FilterSheet(props: FilterSheetProps) {
         </div>
         </div>
         <footer className="fs-foot">
-          <button type="button" className="ghost-button" onClick={() => { setDraft({ ...EMPTY_FILTERS, tr: [] }); setTerms(termsOf(EMPTY_FILTERS)); setVolumeText(''); }}>
+          <button type="button" className="ghost-button" onClick={() => { setDraft({ ...EMPTY_FILTERS, tr: [] }); setTerms(termsOf(EMPTY_FILTERS)); setVolumeText(''); setPeLower(''); setPeUpper(''); }}>
             重設
           </button>
-          <button type="button" className="primary-button fs-apply" disabled={volumeInvalid} onClick={() => props.onApply(draft)}>
-            {wantsGrowth && (growth === undefined || growthLoading) ? '套用' : `套用（${count.toLocaleString('en-US')} 檔）`}
+          <button type="button" className="primary-button fs-apply" disabled={volumeInvalid || peInvalid || (!!draft.pe && !!availability.pe)} onClick={() => props.onApply(draft)}>
+            {(wantsGrowth && (growth === undefined || growthLoading)) || (draft.pe && availability.pe) ? '套用' : `套用（${count.toLocaleString('en-US')} 檔）`}
           </button>
         </footer>
       </div>

@@ -3,7 +3,7 @@ import { ChevronRight, Globe2, Search, SlidersHorizontal, X } from 'lucide-react
 import type { PageProps } from './pageProps';
 import { ReportGate } from './ReportGate';
 import { itemStatusOf, type GroupItem, type Report, type ReportGroup } from '../report/schema';
-import { getPeFigures, type PeFigures } from '../app/dataSources';
+import { getPeFigures, getScreenerPeFigures, type PeFigures, type ScreenerPeFigures } from '../app/dataSources';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
 import {
   fetchTrendingStocks, LINE_TRENDING_GROUP_KEY, trendingStocksGroup, trendingStocksStale, type TrendingStocksResult,
@@ -336,6 +336,20 @@ function useGrowth(wanted: boolean, market: 'TW' | 'US') {
   return { growth, loading };
 }
 
+/** Load the entire source group, never just the virtualized rows or another market's figures. */
+function useScreenerPe(wanted: boolean, market: 'TW' | 'US', items: readonly GroupItem[]) {
+  const [loaded, setLoaded] = useState<{ market: 'TW' | 'US'; items: readonly GroupItem[]; data: ScreenerPeFigures | null }>();
+  useEffect(() => {
+    if (!wanted) return;
+    let live = true;
+    void getScreenerPeFigures(items, market).then(data => {
+      if (live) setLoaded({ market, items, data });
+    }).catch(() => { if (live) setLoaded({ market, items, data: null }); });
+    return () => { live = false; };
+  }, [wanted, market, items]);
+  return loaded?.market === market && loaded.items === items ? loaded.data : undefined;
+}
+
 function ScreenerView({
   report,
   group: requested,
@@ -412,8 +426,9 @@ function ScreenerView({
   const hasFixedMAs = !!fixedMAs && Object.keys(fixedMAs).length > 0;
   const wantGrowth = needsGrowth(filters) || activeSort === 'eps' || (sheetOpen && draftNeedsGrowth);
   const { growth, loading: growthLoading } = useGrowth(wantGrowth, market);
+  const peFigures = useScreenerPe(!!filters.pe || sheetOpen, market, groupItems);
   const observationDate = sourceMarketData?.asOf;
-  const context = useMemo<FilterContext>(() => ({ market, growth, growthLoading, asOf: observationDate, fixedMAs, maReferenceReason }), [market, growth, growthLoading, observationDate, fixedMAs, maReferenceReason]);
+  const context = useMemo<FilterContext>(() => ({ market, growth, growthLoading, pe: peFigures, asOf: observationDate, fixedMAs, maReferenceReason }), [market, growth, growthLoading, peFigures, observationDate, fixedMAs, maReferenceReason]);
   const availability = useMemo(() => filterAvailability(groupItems, context), [groupItems, context]);
   const chips = useMemo(() => activeChips(filters, availability, market, hasFixedMAs), [filters, availability, market, hasFixedMAs]);
   const filtered = useMemo(() => applyFilters(viewItems, filters, context), [viewItems, filters, context]);
@@ -539,7 +554,7 @@ function ScreenerView({
             ))}
           </select>
         </label>
-        <span className="result-count">{resultCountText(items, viewItems.length, activeView, hasUnmatched)}</span>
+        <span className="result-count">{filters.pe && peFigures === undefined ? '本益比載入中…' : filters.pe && peFigures === null ? '本益比資料無法取得' : resultCountText(items, viewItems.length, activeView, hasUnmatched)}</span>
       </div>
       <div className="save-watchlist">
         <button type="button" className="ghost-button" disabled={groupPending} onClick={() => { setSavingList((previous) => !previous); setListName(group.name); }}>存成自選清單</button>
@@ -645,6 +660,10 @@ function ScreenerView({
           onRetry={trending ? retryTrending : undefined} />
       ) : universePending ? (
         <UniverseStatus state={universe} market={sourceMarket!} onRetry={retryUniverse} />
+      ) : filters.pe && peFigures === undefined ? (
+        <PageState kind="loading" title="載入本益比資料…" />
+      ) : filters.pe && peFigures === null ? (
+        <PageState kind="error" title="本益比資料尚未產生或暫時無法取得" message="請稍後重試，或移除本益比條件；不會顯示未經篩選的結果。" />
       ) : (
         <div className="screener-list card" ref={listRef} onScroll={onScroll} role="list" aria-label={`${group.name}股票清單`}>
           {items.length ? (
@@ -654,7 +673,7 @@ function ScreenerView({
                   <Row
                     item={item}
                     marketDate={observationDate}
-                    pe={pe[item.symbol]}
+                    pe={peFigures?.[item.symbol] ?? pe[item.symbol]}
                     pills={pills}
                     growth={growth}
                     filters={filters}
