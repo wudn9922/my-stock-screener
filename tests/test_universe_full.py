@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from datetime import date, datetime, timedelta, timezone
 
+import pandas as pd
+
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 for path in (ROOT, os.path.join(ROOT, "scripts"), os.path.join(ROOT, "tests")):
@@ -740,6 +742,44 @@ class EndToEndTest(unittest.TestCase):
         self.assertIn("chart:1101.TW:3mo", net.calls)
         cached = uc.read_bars(uc.bars_path(self.cache, "1101.TW"))
         self.assertEqual([day.strftime("%Y-%m-%d") for day in cached.index[-3:]], ["2026-10-12", "2026-10-13", "2026-10-14"])
+
+    def test_stale_twse_feed_is_replaced_by_recent_history(self):
+        # TWSE STOCK_DAY_ALL still serves the previous session while TPEx has today's: listed stocks must
+        # still reach today through the fallback instead of keeping yesterday's bar.
+        data = world()
+        net = self.complete_cache(data)
+        net.today_bars = {}
+        for symbol in TW_SYMBOLS:
+            frame_ = data[symbol]
+            if symbol.endswith(".TWO"):
+                net.today_bars[symbol] = next_bar(frame_, "2026-10-14")
+                continue
+            last = frame_.iloc[-1]
+            net.today_bars[symbol] = {"date": "2026-10-13", "open": float(last["Open"]), "high": float(last["High"]),
+                                      "low": float(last["Low"]), "close": float(last["Close"]), "volume": float(last["Volume"]),
+                                      "reference": float(frame_["Close"].iloc[-2])}
+            today = next_bar(frame_, "2026-10-14")
+            row = pd.DataFrame([{"Open": today["open"], "High": today["high"], "Low": today["low"],
+                                 "Close": today["close"], "Volume": today["volume"]}], index=pd.to_datetime(["2026-10-14"]))
+            net.world[symbol] = pd.concat([frame_, row])
+        code, job, logs = self.run_job(net, now=datetime(2026, 10, 15, 1, 0, tzinfo=timezone.utc), markets="TW")
+        self.assertEqual(code, 0, job.problems)
+        self.assertTrue(any("STOCK_DAY_ALL 資料日 2026-10-13 落後 2026-10-14" in warning for warning in job.warnings))
+        listed = [symbol for symbol in TW_SYMBOLS if symbol.endswith(".TW")]
+        for symbol in listed:
+            self.assertIn(f"chart:{symbol}:3mo", net.calls)
+            cached = uc.read_bars(uc.bars_path(self.cache, symbol))
+            self.assertEqual(cached.index[-1].strftime("%Y-%m-%d"), "2026-10-14", symbol)
+        self.assertEqual(self.universe()["markets"]["TW"]["asOf"], "2026-10-14")
+
+    def test_equal_feed_dates_are_both_used(self):
+        data = world()
+        net = self.complete_cache(data)
+        net.today_bars = {symbol: next_bar(data[symbol], "2026-10-14") for symbol in TW_SYMBOLS}
+        code, job, _ = self.run_job(net, now=datetime(2026, 10, 15, 1, 0, tzinfo=timezone.utc), markets="TW")
+        self.assertEqual(code, 0, job.problems)
+        self.assertFalse(any("落後" in warning for warning in job.warnings))
+        self.assertEqual(job.stats["TW.appended"], len(TW_SYMBOLS))
 
     def test_zero_volume_stock_is_excluded(self):
         data = world()
