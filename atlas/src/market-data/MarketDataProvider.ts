@@ -93,6 +93,8 @@ export interface MarketDataProvider {
     signal?: AbortSignal,
   ): Promise<BarResult>;
   getQuote(symbol: string, signal?: AbortSignal): Promise<Quote>;
+  /** Explicit single-symbol refresh; bypass caches and report failure instead of returning stale data. */
+  refreshBars?(symbol: string, timeframe: Timeframe, signal?: AbortSignal): Promise<BarResult>;
   getCorporateEvents?(
     symbol: string,
     range?: MarketRange,

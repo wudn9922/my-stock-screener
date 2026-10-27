@@ -2,7 +2,7 @@
   "branch": "generated",
   "owners": {
     "screenshots": ["docs/wsj.png", "docs/barrons.png", "docs/wsj.jpg", "docs/barrons.jpg"],
-    "daily": ["docs/index.html", "docs/wsj.png", "docs/barrons.png", "docs/wsj.jpg", "docs/barrons.jpg", "docs/report/latest.json", "docs/report/universe.json", "docs/report/breadth.json", "docs/report/series/**", "docs/report/themes.json", "docs/report/rates.json", "docs/report/rates-history.json"],
+    "daily": ["docs/index.html", "docs/wsj.png", "docs/barrons.png", "docs/wsj.jpg", "docs/barrons.jpg", "docs/report/latest.json", "docs/report/trending-stocks.json", "docs/report/universe.json", "docs/report/breadth.json", "docs/report/series/**", "docs/report/themes.json", "docs/report/rates.json", "docs/report/rates-history.json"],
     "atlas": ["docs/atlas/**", "docs/index.html"],
     "financials": ["docs/report/growth.json"],
     "fundamentals": ["docs/report/fundamentals/tw.json", "docs/report/fundamentals/us-sec.json", "docs/report/fundamentals/tw-finmind.json", "docs/report/growth.json"],

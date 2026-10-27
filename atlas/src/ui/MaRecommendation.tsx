@@ -129,7 +129,7 @@ export function MaRecommendation({
   return (
     <div className="ws-ma-reco" data-testid="ma-recommendation" aria-busy={!result}>
       <dl className="ws-volatility-values">
-        <div title="ma-selector 依日線選出「最能分出多空」的 SMA：短期 15–33、中期 34–45、長期 46–110（每週更新）。括號內為結構分數。">
+        <div title="ma-selector 依日線選出「最能分出多空」的 SMA：短期 15–33、中期 34–45、長期 46–110（每月更新）。括號內為結構分數。">
           <dt>建議均線</dt>
           <dd>
             {data
@@ -205,7 +205,7 @@ export function MaRecommendation({
             </tbody>
           </table>
           <HelpDisclosure label="建議均線與分數說明">
-            {ranges.map((range) => `${MA_RANGE_LABELS[range.key]} ${range.min}–${range.max}`).join('、')}（每週更新），括號內為結構分數。分數＝結構分數（0–100）：突破、二日、回測、雜訊、糾結等指標相對 83 檔基準的百分位加權，越高越能分出多空。候選＝與最高分相差 ≤15 分；建議＝多空反手報酬距最佳
+            {ranges.map((range) => `${MA_RANGE_LABELS[range.key]} ${range.min}–${range.max}`).join('、')}（每月更新），括號內為結構分數。分數＝結構分數（0–100）：突破、二日、回測、雜訊、糾結等指標相對 83 檔基準的百分位加權，越高越能分出多空。候選＝與最高分相差 ≤15 分；建議＝多空反手報酬距最佳
             ≤5 個百分點者中分數最高，所以★不一定是分數最高的那條。反手報酬為歷史模擬，不代表未來績效。股票適合度{' '}
             {data.suitability.short === null ? '—' : `${Math.round(data.suitability.short)} / 100`}。
           </HelpDisclosure>

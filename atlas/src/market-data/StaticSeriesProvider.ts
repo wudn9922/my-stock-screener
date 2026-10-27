@@ -212,6 +212,14 @@ export class StaticSeriesProvider implements MarketDataProvider {
     return quote;
   }
 
+  async refreshBars(symbol: string, timeframe: Timeframe, signal?: AbortSignal): Promise<BarResult> {
+    const fresh = new StaticSeriesProvider(this.reportBase, {
+      now: this.now,
+      fetcher: (input, init) => this.fetcher(input, { ...init, cache: 'no-store' }),
+    });
+    return fresh.getBars(symbol, timeframe, undefined, signal);
+  }
+
   async getCorporateEvents(symbol: string): Promise<CorporateEventsResult> {
     const normalized = normalizeSymbol(symbol);
     return { status: 'unavailable', events: [], source: `${normalized} 官方指數資料不含除權息事件` };

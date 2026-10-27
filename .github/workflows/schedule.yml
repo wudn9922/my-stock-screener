@@ -161,6 +161,7 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           # data/*.csv 是永久 K 線紀錄，不再清除過期檔；開關關閉時仍與報告一起留 main。
           git add -A docs/report data
+          if [ -f docs/report/trending-stocks.json ]; then git add -f docs/report/trending-stocks.json; fi
           git commit -m "Auto-update daily data and report JSON" || echo "No changes to commit"
           # Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試
           for attempt in 1 2 3; do

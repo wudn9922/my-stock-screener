@@ -1,10 +1,12 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import quote
 
 from requests.adapters import HTTPAdapter
@@ -1525,6 +1527,29 @@ def push_line_messages(messages):
     )
 
 
+def save_trending_stocks(stocks, fetched_at, path="docs/report/trending-stocks.json"):
+    """Save the same ordered symbols sent to LINE; an empty fetch retains the last good report."""
+    symbols = list(dict.fromkeys(
+        symbol for s in stocks.split(",")
+        if re.fullmatch(r"[A-Z][A-Z0-9.-]{0,14}", symbol := s.strip().upper())
+    ))[:5]
+    if not symbols:
+        return False
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": 1,
+        "source": "Yahoo Finance US trending · LINE 財經報告",
+        "fetchedAt": fetched_at,
+        "sentAt": datetime.now(timezone.utc).isoformat(),
+        "symbols": symbols,
+    }
+    temporary = target.with_suffix(".tmp")
+    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(target)
+    return True
+
+
 def send_line_report(message, image_urls):
     """將 Dify 文字報告及新聞截圖推送至 LINE（合併為一到兩則訊息）。"""
     print("正在準備 LINE 推播...")
@@ -1586,6 +1611,7 @@ if __name__ == "__main__":
         stocks_live = fetch_yahoo_realtime_trending(
             limit=5
         )
+        stocks_fetched_at = datetime.now(timezone.utc).isoformat()
 
         # 3. 取得聯邦基金目標區間及 US10Y
         rates_report = fetch_us_rates_report()
@@ -1665,6 +1691,7 @@ if __name__ == "__main__":
                 report_text,
                 image_urls,
             )
+            save_trending_stocks(stocks_live, stocks_fetched_at)
         else:
             print("沒有報告或圖片可以發送。")
 

@@ -205,6 +205,52 @@ export function App({
     [drawingPickerOpen, setDrawingPickerOpen] = useState(false),
     [reloadToken, setReloadToken] = useState(0);
   const [catalogEntries, setCatalogEntries] = useState<SymbolCatalogEntry[]>([]);
+  const refreshController = useRef<AbortController | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  useEffect(() => {
+    setRefreshing(false);
+    return () => {
+      refreshController.current?.abort();
+      refreshController.current = null;
+    };
+  }, [symbol, tf, providerId, active, reloadToken]);
+
+  const refreshCurrentStock = async () => {
+    const provider: MarketDataProvider = providers[providerId];
+    if (!provider.refreshBars || refreshController.current) return;
+    const abort = new AbortController();
+    refreshController.current = abort;
+    setRefreshing(true);
+    setNotice('');
+    engine.current?.controller?.cancel();
+    engine.current?.flushView();
+    try {
+      const refreshed = await provider.refreshBars(symbol, tf, abort.signal);
+      if (abort.signal.aborted || !engine.current) return;
+      const settings = store.symbol(symbol);
+      engine.current.load(symbol, tf, refreshed, settings.drawings, settings.indicators,
+        settings.preferences.views[tf], legacyVolumeEnabled(settings.preferences, tf));
+      engine.current.sync(settings.drawings, settings.indicators, settings.preferences.magnet, 'select',
+        legacyVolumeEnabled(settings.preferences, tf));
+      setTool('select');
+      setSelected(null);
+      setResult(refreshed);
+      setDataError('');
+      if (refreshed.quote) setQuote({ symbol, provider: providerId, quote: refreshed.quote });
+      setNotice(`已更新 ${symbol} 的 ${tf} K 線；${refreshed.source}。`);
+      if (provider.getCorporateEvents) {
+        const events = await provider.getCorporateEvents(symbol, undefined, abort.signal).catch(() => null);
+        if (!abort.signal.aborted && events?.status === 'available') engine.current?.setCorporateEvents(events.events);
+      }
+    } catch (error) {
+      if (!abort.signal.aborted) setNotice(`${symbol} 更新失敗，保留原有 K 線。${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      if (refreshController.current === abort) {
+        refreshController.current = null;
+        setRefreshing(false);
+      }
+    }
+  };
   const [symbolTimeframes, setSymbolTimeframes] = useState<{ key: string; values: readonly Timeframe[] } | null>(null);
   const market = getMarketProfile(symbol);
   const isIndex = symbol.startsWith('^');
@@ -1021,9 +1067,18 @@ export function App({
           >
             <span className="star-glyph" aria-hidden="true">{inWatchlist ? '★' : '☆'}</span>
           </IconButton>
-          <IconButton label="重新整理行情" onClick={() => setReloadToken((n) => n + 1)}>
-            <RefreshCw size={17} />
-          </IconButton>
+          {SCREENER_HOSTING ? (
+            <button className="ghost-button ws-refresh-button" type="button" aria-label={`更新 ${symbol} K 線`}
+              title="只重新抓取目前股票的最新可用 K 線；Yahoo 仍為延遲行情。"
+              disabled={loading || refreshing || !state.ready}
+              onClick={() => void refreshCurrentStock()}>
+              <RefreshCw size={17} aria-hidden="true" />{refreshing ? '更新中…' : '更新 K 線'}
+            </button>
+          ) : (
+            <IconButton label="重新整理行情" onClick={() => setReloadToken((n) => n + 1)}>
+              <RefreshCw size={17} />
+            </IconButton>
+          )}
           <StockStatsMenu label="行情資料說明" testId="source-info-toggle" trigger={<Info size={16} />}>
             <div className="source-details">
               <div ref={sourceRef} className="data-source" />

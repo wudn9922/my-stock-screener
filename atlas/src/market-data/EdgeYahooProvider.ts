@@ -121,6 +121,7 @@ export class EdgeYahooProvider implements MarketDataProvider {
   private readonly maxEntries: number;
   private readonly recent = new Map<string, RawEntry>();
   private readonly inFlight = new Map<string, InFlight>();
+  private readonly revisions = new Map<string, number>();
   readonly proxyUrl: string;
 
   constructor(proxyUrl: string = defaultMarketProxyUrl(), options: EdgeYahooProviderOptions = {}) {
@@ -136,6 +137,30 @@ export class EdgeYahooProvider implements MarketDataProvider {
   /** False when no proxy URL was configured at build time. */
   get configured(): boolean {
     return this.proxyUrl.length > 0;
+  }
+
+  /** Isolated request cache so an older in-flight download cannot satisfy a manual refresh. */
+  async refreshBars(symbol: string, timeframe: Timeframe, signal?: AbortSignal): Promise<BarResult> {
+    const normalized = normalizeSymbol(symbol);
+    const revision = (this.revisions.get(normalized) ?? 0) + 1;
+    this.revisions.set(normalized, revision);
+    for (const key of this.inFlight.keys()) if (key.startsWith(`${normalized}|`)) this.inFlight.delete(key);
+    const fresh = new EdgeYahooProvider(this.proxyUrl, {
+      now: this.now,
+      timeoutMs: this.timeoutMs,
+      fetcher: (input, init) => {
+        const url = new URL(String(input));
+        url.searchParams.set('_refresh', crypto.randomUUID());
+        return this.fetcher(url.href, { ...init, cache: 'no-store' });
+      },
+    });
+    const result = await fresh.getBars(normalized, timeframe, undefined, signal);
+    signal?.throwIfAborted();
+    if (this.revisions.get(normalized) === revision) {
+      for (const [key, entry] of fresh.recent) this.recent.set(key, entry);
+      while (this.recent.size > this.maxEntries) this.recent.delete(this.recent.keys().next().value!);
+    }
+    return result;
   }
 
   /** The exact function URL requested for a symbol/timeframe (exported for diagnostics and tests). */
@@ -280,10 +305,12 @@ export class EdgeYahooProvider implements MarketDataProvider {
     let flight = this.inFlight.get(key);
     if (!flight || fresh) {
       const controller = new AbortController();
+      const revision = this.revisions.get(symbol) ?? 0;
       const created: InFlight = {
         controller,
         waiters: 0,
         promise: this.download(symbol, timeframe, controller.signal).then((entry) => {
+          if ((this.revisions.get(symbol) ?? 0) !== revision) return entry;
           this.recent.delete(key);
           this.recent.set(key, entry);
           while (this.recent.size > this.maxEntries) this.recent.delete(this.recent.keys().next().value!);

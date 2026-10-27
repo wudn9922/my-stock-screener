@@ -5,6 +5,9 @@ import { ReportGate } from './ReportGate';
 import { itemStatusOf, type GroupItem, type Report, type ReportGroup } from '../report/schema';
 import { getPeFigures, type PeFigures } from '../app/dataSources';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
+import {
+  fetchTrendingStocks, LINE_TRENDING_GROUP_KEY, trendingStocksGroup, trendingStocksStale, type TrendingStocksResult,
+} from '../report/trendingStocks';
 import { mapWithConcurrency } from './worldPerformance';
 import {
   METRIC_SORTS,
@@ -86,11 +89,13 @@ function GroupChips({
   groups,
   active,
   universeCounts,
+  trendingGroup,
   onChange,
 }: {
   groups: readonly ReportGroup[];
   active: string;
   universeCounts: Partial<Record<UniverseMarketKey, number>>;
+  trendingGroup: ReportGroup;
   onChange: (key: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -117,6 +122,13 @@ function GroupChips({
               全市場
               {universeCounts[market] !== undefined && <span className="chip-count">{universeCounts[market]}</span>}
             </button>
+            {market === 'US' && (
+              <button type="button" className={`chip ${active === LINE_TRENDING_GROUP_KEY ? 'active' : ''}`}
+                aria-pressed={active === LINE_TRENDING_GROUP_KEY} onClick={() => onChange(LINE_TRENDING_GROUP_KEY)}>
+                LINE 熱門
+                {trendingGroup.items.length > 0 && <span className="chip-count">{trendingGroup.items.length}</span>}
+              </button>
+            )}
             {list.map((group) => {
               // The chip counts the matched ("成功") rows; the rest is shown as a faint "+N".
               const { matched, unmatched } = statusCounts(group.items);
@@ -286,6 +298,21 @@ function useUniverse(market: UniverseMarketKey | null) {
   return { state, retry };
 }
 
+function useTrendingStocks(wanted: boolean) {
+  const [state, setState] = useState<TrendingStocksResult>();
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!wanted) return;
+    const abort = new AbortController();
+    setState(undefined);
+    void fetchTrendingStocks(abort.signal).then(result => {
+      if (!abort.signal.aborted) setState(result);
+    });
+    return () => abort.abort();
+  }, [wanted, attempt]);
+  return { state, retry: () => setAttempt(n => n + 1) };
+}
+
 /** Growth data (EPS / revenue YoY) of one market, loaded once a fundamental condition or sort needs it. */
 function useGrowth(wanted: boolean, market: 'TW' | 'US') {
   const [loaded, setLoaded] = useState<{ market: 'TW' | 'US'; file: GrowthFile | null } | null>(null);
@@ -317,11 +344,17 @@ function ScreenerView({
   openChart,
 }: { report: Report; group?: string; f?: string } & Pick<PageProps, 'navigate' | 'openChart'>) {
   const groups = report.groups;
+  const isTrending = requested === LINE_TRENDING_GROUP_KEY;
   const universeMarket = universeMarketOf(requested);
-  const { state: universe, retry: retryUniverse } = useUniverse(universeMarket);
+  const sourceMarket = isTrending ? 'US' : universeMarket;
+  const { state: universe, retry: retryUniverse } = useUniverse(sourceMarket);
   const universeData = universe.status === 'ok' ? universe.universe : null;
+  const sourceMarketData = sourceMarket ? universeData?.markets[sourceMarket] : undefined;
   const universeMarketData = universeMarket ? (universeData?.markets[universeMarket] ?? null) : null;
-  const group: ReportGroup | undefined = universeMarket
+  const { state: trending, retry: retryTrending } = useTrendingStocks(isTrending);
+  const trendingData = trending?.status === 'ok' ? trending.data : undefined;
+  const trendingGroup = useMemo(() => trendingStocksGroup(trendingData, universeData?.markets.US), [trendingData, universeData]);
+  const group: ReportGroup | undefined = isTrending ? trendingGroup : universeMarket
     ? universeMarketData
       ? universeGroup(universeMarketData)
       : { key: UNIVERSE_GROUP_KEYS[universeMarket], name: UNIVERSE_LABELS[universeMarket], market: universeMarket, kind: 'scan', maList: [20, 50, 200], items: EMPTY_GROUP_ITEMS }
@@ -379,7 +412,7 @@ function ScreenerView({
   const hasFixedMAs = !!fixedMAs && Object.keys(fixedMAs).length > 0;
   const wantGrowth = needsGrowth(filters) || activeSort === 'eps' || (sheetOpen && draftNeedsGrowth);
   const { growth, loading: growthLoading } = useGrowth(wantGrowth, market);
-  const observationDate = universeMarketData?.asOf;
+  const observationDate = sourceMarketData?.asOf;
   const context = useMemo<FilterContext>(() => ({ market, growth, growthLoading, asOf: observationDate, fixedMAs, maReferenceReason }), [market, growth, growthLoading, observationDate, fixedMAs, maReferenceReason]);
   const availability = useMemo(() => filterAvailability(groupItems, context), [groupItems, context]);
   const chips = useMemo(() => activeChips(filters, availability, market, hasFixedMAs), [filters, availability, market, hasFixedMAs]);
@@ -456,19 +489,21 @@ function ScreenerView({
     setScroll((previous) => (Math.abs(previous.top - top) < ROW_HEIGHT / 2 ? previous : { ...previous, top }));
   };
   const changeGroup = (key: string) => {
-    const nextMarket = universeMarketOf(key) ?? groups.find((g) => g.key === key)?.market ?? market;
+    const nextMarket = key === LINE_TRENDING_GROUP_KEY ? 'US' : universeMarketOf(key) ?? groups.find((g) => g.key === key)?.market ?? market;
     const text = nextMarket === market ? serializeFilters(filters) : (readStoredFilters(nextMarket) ?? '');
     setView('all');
     routeTo(key, text, false);
   };
   const universeCounts: Partial<Record<UniverseMarketKey, number>> = {};
   for (const key of MARKETS) if (universeData?.markets[key]) universeCounts[key] = universeData.markets[key]!.items.length;
-  const universePending = !!universeMarket && !universeMarketData;
+  const universePending = !!sourceMarket && !sourceMarketData;
+  const groupPending = universePending || (isTrending && !trendingData);
   const appliedCount = chips.filter((chip) => !chip.unavailable).length;
+  const latestReportDay = [report.reportDate, universeData?.reportDate, sourceMarketData?.asOf].filter((date): date is string => !!date).sort().at(-1);
 
   return (
     <div className="screener-body">
-      <GroupChips groups={groups} active={group.key} universeCounts={universeCounts} onChange={changeGroup} />
+      <GroupChips groups={groups} active={group.key} universeCounts={universeCounts} trendingGroup={trendingGroup} onChange={changeGroup} />
       <div className="screener-tools">
         <label className="filter-field">
           <Search size={15} aria-hidden="true" />
@@ -487,7 +522,7 @@ function ScreenerView({
           aria-haspopup="dialog"
           aria-expanded={sheetOpen}
           aria-label={chips.length ? `篩選條件（已設定 ${chips.length} 項）` : '篩選條件'}
-          disabled={universePending}
+          disabled={groupPending}
           onClick={() => setSheetOpen(true)}
         >
           <SlidersHorizontal size={15} aria-hidden="true" />
@@ -507,17 +542,24 @@ function ScreenerView({
         <span className="result-count">{resultCountText(items, viewItems.length, activeView, hasUnmatched)}</span>
       </div>
       <div className="save-watchlist">
-        <button type="button" className="ghost-button" disabled={universePending} onClick={() => { setSavingList((previous) => !previous); setListName(group.name); }}>存成自選清單</button>
+        <button type="button" className="ghost-button" disabled={groupPending} onClick={() => { setSavingList((previous) => !previous); setListName(group.name); }}>存成自選清單</button>
         <button type="button" className="text-button" onClick={() => navigate({ page: 'console' })}>開啟我的清單／控制台</button>
         {savingList && <form className="save-watchlist" onSubmit={(event) => {
           event.preventDefault();
           try {
-            const list = createWatchlist({ name: listName, market, group: group.key, filters: serializeFilters(filters), maList: group.maList.length ? group.maList.slice(0, 4) : [20, 50, 200] });
+            const list = createWatchlist({ name: listName, market, group: group.key, filters: serializeFilters(filters), maList: group.maList.length ? group.maList.slice(0, 4) : [20, 50, 200],
+              ...(isTrending ? { kind: 'manual', symbols: groupItems.map(item => item.symbol) } : {}) });
             watchlistStore().save(list); navigate({ page: 'console', list: list.id });
           } catch (error) { setSaveError(error instanceof Error ? error.message : '清單儲存失敗'); }
         }}><input aria-label="自選清單名稱" value={listName} onChange={(event) => setListName(event.target.value)} maxLength={40} required /><button type="submit" className="primary-button">儲存並追蹤清單</button></form>}
         {saveError && <span role="alert">{saveError}</span>}
       </div>
+      {isTrending && trendingData && <div className="screener-meta line-trending-meta" aria-label="LINE 熱門資料時間">
+        <p>抓取時間 {formatDateTime(trendingData.fetchedAt)} · LINE 推播時間 {formatDateTime(trendingData.sentAt)}</p>
+        {trendingStocksStale(trendingData, latestReportDay) && <p className="screener-date-notice" role="status">
+          LINE 熱門清單早於最新報告日 {latestReportDay}，目前顯示上次成功推播的名單。
+        </p>}
+      </div>}
       {hasUnmatched && (
         <div className="segmented compact status-seg" role="group" aria-label="成功與未成功股票">
           {STATUS_VIEWS.map((mode) => (
@@ -598,8 +640,11 @@ function ScreenerView({
         <span className="num">收盤／漲跌</span>
         <span />
       </div>
-      {universePending ? (
-        <UniverseStatus state={universe} market={universeMarket!} onRetry={retryUniverse} />
+      {isTrending && !trendingData ? (
+        <PageState kind={trending ? 'empty' : 'loading'} title={trending?.status === 'error' ? trending.message : '載入 LINE 熱門美股…'}
+          onRetry={trending ? retryTrending : undefined} />
+      ) : universePending ? (
+        <UniverseStatus state={universe} market={sourceMarket!} onRetry={retryUniverse} />
       ) : (
         <div className="screener-list card" ref={listRef} onScroll={onScroll} role="list" aria-label={`${group.name}股票清單`}>
           {items.length ? (

@@ -213,3 +213,27 @@ describe('EdgeYahooProvider', () => {
     expect(alignIndexCurrency(twIndex, '^TWII')).toBe(twIndex);
   });
 });
+
+it('manual refresh bypasses raw/HTTP caches and primes the next daily read', async () => {
+  const { fetcher, mock, calls } = edgeFetch();
+  const provider = new EdgeYahooProvider(PROXY, { fetcher, now: () => asOfMs });
+  await provider.getBars('SMCI', '1D');
+  await provider.getBars('SMCI', '1D');
+  expect(mock).toHaveBeenCalledTimes(1);
+  await provider.refreshBars('SMCI', '1D');
+  expect(mock).toHaveBeenCalledTimes(2);
+  expect(calls[1].url.searchParams.get('_refresh')).toBeTruthy();
+  expect(mock.mock.calls[1][1]).toMatchObject({ cache: 'no-store' });
+  await provider.getQuote('SMCI');
+  expect(mock).toHaveBeenCalledTimes(2);
+});
+
+it('manual calendar refresh downloads native and daily bars for the same symbol', async () => {
+  const { fetcher, calls } = edgeFetch();
+  const provider = new EdgeYahooProvider(PROXY, { fetcher, now: () => asOfMs });
+  await provider.getBars('SMCI', '1W');
+  calls.length = 0;
+  await provider.refreshBars('SMCI', '1W');
+  expect(calls.map(call => call.url.searchParams.get('interval')).sort()).toEqual(['1d', '1wk']);
+  expect(calls.every(call => call.url.searchParams.get('symbol') === 'SMCI' && call.url.searchParams.has('_refresh'))).toBe(true);
+});

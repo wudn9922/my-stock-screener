@@ -50,7 +50,7 @@ async function mockLine(page: Page) {
   return saves;
 }
 
-test('chart shows the weekly recommendation, applies it on the daily chart and saves it as a fixed parameter', async ({ page }, testInfo) => {
+test('chart shows the monthly recommendation, applies it on the daily chart and saves it as a fixed parameter', async ({ page }, testInfo) => {
   await mockSite(page);
   const saves = await mockLine(page);
   await page.route('**/my-stock-screener/report/ma-selector/2330.TW.json', (route) =>
