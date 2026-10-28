@@ -5,11 +5,11 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from build_screener_history import capture
+from build_screener_history import KEEP_DATES, capture
 
 
 class ScreenerHistoryTests(unittest.TestCase):
-    def test_append_only_market_dates_growth_and_source_bytes(self):
+    def test_first_snapshot_wins_market_dates_growth_and_source_bytes(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             report = root / "docs/report"
@@ -31,6 +31,25 @@ class ScreenerHistoryTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), first)
             index = json.loads((report / "screener-history/index.json").read_text())
             self.assertEqual(index["markets"]["TW"], ["2026-10-27", "2026-10-28"])
+
+    def test_keeps_only_the_latest_market_days(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            report = root / "docs/report"
+            history = report / "screener-history"
+            history.mkdir(parents=True)
+            days = [f"2026-10-{d:02d}" for d in range(1, KEEP_DATES + 3)]
+            for day in days[:-1]:
+                (history / f"TW-{day}.json").write_text("{}")
+            (history / "US-2026-09-30.json").write_text("{}")
+            source = {"version": 1, "fields": ["symbol"], "markets": {"TW": {"asOf": days[-1], "rows": [["2330.TW"]]}}}
+            (report / "universe.json").write_text(json.dumps(source))
+            self.assertEqual(capture(root, "2026-10-28T01:00:00Z"), 1)
+            kept = sorted(p.stem for p in history.glob("TW-*.json"))
+            self.assertEqual(kept, [f"TW-{day}" for day in days[-KEEP_DATES:]])
+            index = json.loads((history / "index.json").read_text())
+            self.assertEqual(index["markets"]["TW"], days[-KEEP_DATES:])
+            self.assertEqual(index["markets"]["US"], ["2026-09-30"])
 
     def test_missing_or_malformed_input_does_not_create_fabricated_history(self):
         with tempfile.TemporaryDirectory() as folder:

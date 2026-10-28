@@ -4,7 +4,7 @@
 
 - 新增「我的 → 資料狀態」，18 個來源與八個 workflow，前端僅讀約 10 KB 的 `data-status.json`；來源政策集中在 Python `SOURCES`。交易所日曆包含 TW／US 休市、早收盤、夏令時間與收盤後發布寬限。
 - 圖表研究新增個股與大盤價格報酬比較；選股新增兩日同條件名單進出；題材頁新增產業同期間報酬、上漲比例與完整共同樣本量比。
-- 新增 generated-only producer、owner 與忽略路徑。沿用既有 owner delta／非 force 重試；讀取 archive manifest 與還原的 rolling cache，無永久來源寫入。新歷史快照只新增且受 append_only 保護，索引可更新。
+- 新增 generated-only producer、owner 與忽略路徑。沿用既有 owner delta／非 force 重試；讀取 archive manifest 與還原的 rolling cache，無永久來源寫入。選股歷史快照首次寫入後不覆寫，每個市場只保留最近 10 個資料日（衍生輸出，不列入 append_only），索引可更新。
 - 原始功能只加入四個入口。登入／帳號指定路徑、Supabase functions、網站外框、永久價格／財務檔、archive 分支均沒有修改；無通知、合併或部署。
 
 驗證：`npm ci`；1,550 項 Vitest／119 檔；lint、typecheck、正常 build、Pages build；Python 16 項新分析測試與 33 項 generated storage 測試。以實際 generated 文件與 archive manifest 唯讀解析，18 來源皆有有效日期，八個 workflow API 皆取得紀錄。新增 status owner 的真實 disposable Git 測試證明 concurrent daily 更新保留、main 永久記錄不動、舊快照不可覆寫。完整瀏覽器回歸 179 通過／4 項既有平台略過；追加歷史價格口徑保護後，受影響的資料狀態、比較、選股條件與本益比 57 項全部通過。

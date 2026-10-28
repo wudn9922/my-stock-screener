@@ -144,10 +144,11 @@ class GeneratedStorageTests(unittest.TestCase):
         self.assertNotIn("data/AAPL.csv", self.store.entries(generated))
         self.assertEqual(self.body(self.base, "data/AAPL.csv"), self.files["data/AAPL.csv"])
         self.assertEqual(self.body(self.base, "docs/report/financials/AAPL.json"), self.files["docs/report/financials/AAPL.json"])
+        # Snapshots are derived outputs: pruning an old date publishes a deletion.
         self.store.restore()
-        self.write(history, b"cannot rewrite a previous snapshot")
-        with self.assertRaisesRegex(ValueError, "append-only"):
-            self.store.publish("status")
+        Path(history).unlink()
+        self.store.publish("status")
+        self.assertNotIn(history, self.store.entries(self.remote("generated")))
 
     def test_pr2_removes_only_outputs_and_new_csv_stays_on_main(self):
         # Simulate PR2: remove only moved paths from main, keep all old history.

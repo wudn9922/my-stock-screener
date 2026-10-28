@@ -14,7 +14,7 @@
     "rates": ["docs/report/rates.json", "docs/report/rates-history.json"],
     "ma": ["docs/report/ma-selector/**"]
   },
-  "append_only": ["docs/report/breakouts-archive/*.json", "docs/report/screener-history/TW-*.json", "docs/report/screener-history/US-*.json"],
+  "append_only": ["docs/report/breakouts-archive/*.json"],
   "records": {
     "daily": ["data/*.csv", "docs/report/kline-corrections.json"],
     "research": ["data/world/*.csv", "docs/report/kline-corrections.json"],

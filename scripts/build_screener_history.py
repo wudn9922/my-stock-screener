@@ -11,6 +11,9 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
+# Derived snapshots, not permanent records: keep the latest market days per market so the
+# Pages site stays small (each day is ~1.5 MB per market). Comparisons need at least two.
+KEEP_DATES = 10
 
 
 def read(path, fallback=None):
@@ -60,8 +63,14 @@ def capture(root=ROOT, now=None):
                      "usGrowth": read(root / "docs/atlas/valuation/us-growth.json") if market == "US" else None,
                      "valuation": read(root / f"docs/atlas/valuation/{market.lower()}.json")})
         count += 1
-    # Rebuild from the owned files, retaining every previous date; no deletions.
-    dates = {market: sorted(p.stem.removeprefix(market + "-") for p in folder.glob(f"{market}-*.json") if re.fullmatch(market + r"-\d{4}-\d{2}-\d{2}", p.stem)) for market in ("TW", "US")}
+    # Rebuild from the owned files. A kept snapshot is never rewritten; only dates older than
+    # the latest KEEP_DATES per market are removed.
+    dates = {}
+    for market in ("TW", "US"):
+        kept = sorted(p.stem.removeprefix(market + "-") for p in folder.glob(f"{market}-*.json") if re.fullmatch(market + r"-\d{4}-\d{2}-\d{2}", p.stem))
+        for old in kept[:-KEEP_DATES]:
+            (folder / f"{market}-{old}.json").unlink()
+        dates[market] = kept[-KEEP_DATES:]
     if any(dates.values()):
         write(folder / "index.json", {"version": 1, "generatedAt": now, "markets": dates})
     return count
