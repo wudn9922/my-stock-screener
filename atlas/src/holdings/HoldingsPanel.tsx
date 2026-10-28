@@ -18,6 +18,8 @@ import {
 import type { ImportSymbol } from './import';
 import { formatDateTime, toneClass } from '../ui/format';
 import './holdings.css';
+import { MexcPanel } from './MexcPanel';
+import { mexcStore } from './mexc';
 
 const BROKERS: { id: Broker; name: string; kind: HoldingAccount['kind']; currency: HoldingAccount['currency'] }[] = [
   { id: 'cathay', name: '國泰證券', kind: 'tw-broker', currency: 'TWD' },
@@ -45,6 +47,8 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
   const store = holdingsStore();
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const mexc = mexcStore();
+  const mexcSnapshot = useSyncExternalStore(mexc.subscribe, mexc.getSnapshot);
   const [directory, setDirectory] = useState<ImportSymbol[] | null>(null),
     [directoryError, setDirectoryError] = useState(false),
     [directoryAttempt, setDirectoryAttempt] = useState(0);
@@ -54,7 +58,8 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   const [broker, setBroker] = useState<Broker>('cathay'),
     [name, setName] = useState(''),
     [editing, setEditing] = useState(false),
-    [initial, setInitial] = useState<Holding[] | undefined>();
+    [initial, setInitial] = useState<Holding[] | undefined>(),
+    [connecting, setConnecting] = useState(false);
   const [message, setMessage] = useState(''),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
@@ -67,6 +72,9 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   useEffect(() => {
     void store.reload();
   }, [store]);
+  useEffect(() => {
+    void mexc.load();
+  }, [mexc]);
   useEffect(() => {
     let active = true;
     void loadHoldingsDirectory()
@@ -85,6 +93,9 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   }, [directoryAttempt]);
   const { document } = snapshot;
   const selected = document.accounts.find((entry) => entry.account.id === accountId) ?? document.accounts[0];
+  useEffect(() => {
+    if (selected && accountId !== selected.account.id) setAccountId(selected.account.id);
+  }, [selected?.account.id, accountId]);
   const symbols = [...new Set(document.accounts.flatMap((entry) => entry.holdings.map((h) => h.symbol)))]
     .sort()
     .join(',');
@@ -118,10 +129,27 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
     discount: validDiscount ? discount : '1',
     etfs: new Set(directory?.filter((entry) => entry.etf).map((entry) => entry.symbol)),
   };
-  const all = document.accounts.flatMap((entry) =>
-    entry.holdings.map((holding) => ({ holding, result: valueHolding(holding, quotes[holding.symbol], costs) })),
+  const pendingAccounts = new Set(
+    mexcSnapshot.state.connections
+      .filter((connection) => {
+        const current = document.accounts.find((entry) => entry.account.id === connection.accountId);
+        return current && (connection.needsReview || connection.holdingRevision !== current.revision);
+      })
+      .map((connection) => connection.accountId),
   );
-  const summary = summarizeHoldings(all, rates);
+  const holdingQuote = (holding: Holding) => {
+    const connection = mexcSnapshot.state.connections.find((entry) => entry.accountId === holding.accountId);
+    return connection
+      ? pendingAccounts.has(holding.accountId)
+        ? undefined
+        : connection.quotes[holding.symbol]
+      : quotes[holding.symbol];
+  };
+  const all = document.accounts.flatMap((entry) =>
+    entry.holdings.map((holding) => ({ holding, result: valueHolding(holding, holdingQuote(holding), costs) })),
+  );
+  const evaluatedSummary = summarizeHoldings(all, rates);
+  const summary = { ...evaluatedSummary, partial: evaluatedSummary.partial || pendingAccounts.size > 0 };
   const rows = all
     .filter((row) => row.holding.accountId === selected?.account.id)
     .sort((a, b) => {
@@ -135,7 +163,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           ? -1
           : new Money(bv).cmp(av);
     });
-  const blocked = snapshot.loading || !!snapshot.error || busy;
+  const blocked = snapshot.loading || !!snapshot.error || busy || mexcSnapshot.busy;
   const importAccount = draft ?? selected?.account;
   const subtotal = (items: typeof all) => (
     <>
@@ -150,7 +178,13 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           <span>
             今日損益 <Signed value={value.missingToday ? null : decimalText(value.today)} />
           </span>
-          {value.missing > 0 && <span>部分持股無報價，損益僅含有報價項目</span>}
+          {value.missing > 0 && (
+            <span>
+              {items.some((item) => pendingAccounts.has(item.holding.accountId))
+                ? '等候確認 MEXC 餘額與成本，暫不估值'
+                : '部分持股無報價，損益僅含有報價項目'}
+            </span>
+          )}
         </div>
       ))}
     </>
@@ -171,7 +205,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
         <button
           className="primary-button"
           type="button"
-          disabled={blocked || editing || creating}
+          disabled={blocked || editing || creating || connecting}
           onClick={() => {
             setCreating(true);
             setEditing(false);
@@ -185,7 +219,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           <button
             type="button"
             className="ghost-button"
-            disabled={snapshot.loading || busy || editing || creating}
+            disabled={snapshot.loading || busy || editing || creating || connecting || mexcSnapshot.busy}
             onClick={() => void store.reload()}
           >
             重新載入持股
@@ -244,10 +278,37 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             <button type="submit" className="primary-button" disabled={!directory?.length || blocked}>
               繼續匯入
             </button>
+            {broker === 'mexc' && access.storageMode === 'cloud' && (
+              <button
+                type="button"
+                className="primary-button"
+                disabled={blocked || mexcSnapshot.loading || !mexcSnapshot.state.configured}
+                onClick={() => {
+                  setDraft({
+                    id: crypto.randomUUID(),
+                    name: name.trim() || 'MEXC',
+                    broker: 'mexc',
+                    kind: 'crypto-exchange',
+                    currency: 'USDT',
+                  });
+                  setCreating(false);
+                  setConnecting(true);
+                  setEditing(false);
+                }}
+              >
+                使用 MEXC API 連線
+              </button>
+            )}
             <button type="button" className="ghost-button" onClick={() => setCreating(false)}>
               取消
             </button>
           </div>
+          {broker === 'mexc' && access.storageMode !== 'cloud' && (
+            <p className="holdings-muted">自動讀取 MEXC 需要雲端儲存授權；目前仍可上傳或貼上持股。</p>
+          )}
+          {broker === 'mexc' && access.storageMode === 'cloud' && !mexcSnapshot.state.configured && (
+            <p role="note">MEXC API 服務尚未啟用，維護者完成設定後即可連線；目前可先匯入持股。</p>
+          )}
         </form>
       )}
       {directoryError && (
@@ -282,7 +343,13 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 </strong>
               </div>
             </div>
-            {summary.partial && <p role="note">總計尚未完整：缺少報價或換算匯率的持股未納入。</p>}
+            {summary.partial && (
+              <p role="note">
+                {pendingAccounts.size > 0
+                  ? '總計尚未完整：部分 MEXC 餘額與成本尚未確認，暫不納入總計。'
+                  : '總計尚未完整：缺少報價或換算匯率的持股未納入。'}
+              </p>
+            )}
             {all.some((row) => row.holding.costCurrency === 'USD') &&
               !rates.some((rate) => rate.currency === 'USD') &&
               !quotesBusy && <p className="holdings-muted">目前無 USD/TWD 匯率，USD 部位另列，尚未納入台幣總計。</p>}
@@ -333,7 +400,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
               <select
                 aria-label="持股帳戶"
                 value={selected?.account.id ?? ''}
-                disabled={editing || creating}
+                disabled={editing || creating || connecting || mexcSnapshot.busy}
                 onChange={(event) => {
                   setAccountId(event.target.value);
                   setDraft(null);
@@ -363,7 +430,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             <button
               type="button"
               className="primary-button"
-              disabled={blocked || !directory?.length || editing || creating}
+              disabled={blocked || !directory?.length || editing || creating || connecting}
               onClick={() => {
                 setDraft(null);
                 setEditing(true);
@@ -375,7 +442,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             <button
               type="button"
               className="ghost-button"
-              disabled={blocked || !directory?.length || editing || creating}
+              disabled={blocked || !directory?.length || editing || creating || connecting}
               onClick={() => {
                 setDraft(null);
                 setEditing(true);
@@ -387,7 +454,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             <button
               type="button"
               className="text-button"
-              disabled={blocked || editing || creating}
+              disabled={blocked || editing || creating || connecting}
               onClick={() => {
                 if (!selected || !confirm('刪除此帳戶與全部持股？此操作無法復原。')) return;
                 setBusy(true);
@@ -405,6 +472,30 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             </button>
           </div>
         </>
+      )}
+      {connecting && draft && (
+        <MexcPanel
+          key={draft.id}
+          account={draft}
+          disabled={snapshot.loading || !!snapshot.error || busy}
+          onCancel={() => {
+            setConnecting(false);
+            setDraft(null);
+          }}
+          onConnected={() => {
+            setAccountId(draft.id);
+            setConnecting(false);
+            setDraft(null);
+          }}
+        />
+      )}
+      {!connecting && selected?.account.broker === 'mexc' && access.storageMode === 'cloud' && (
+        <MexcPanel
+          key={selected.account.id}
+          account={selected.account}
+          confirmed={selected}
+          disabled={snapshot.loading || !!snapshot.error || busy || editing || creating}
+        />
       )}
       {editing && importAccount && directory && (
         <ImportHoldings
@@ -435,7 +526,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           {quotesBusy && <p role="status">讀取報價中…</p>}
           <div className="holdings-cards">
             {rows.map(({ holding, result }) => {
-              const quote = quotes[holding.symbol],
+              const quote = holdingQuote(holding),
                 entry = directory?.find((entry) => entry.symbol === holding.symbol);
               return (
                 <article className="holdings-position" key={holding.id} aria-label={`${holding.symbol} 持股`}>
@@ -453,10 +544,24 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                   <dl>
                     <div>
                       <dt>現價</dt>
-                      <dd>{quote ? amount(quote.price, holding.market === 'CRYPTO' ? 4 : 2) : '無報價'}</dd>
+                      <dd>
+                        {quote
+                          ? amount(quote.price, holding.market === 'CRYPTO' ? 4 : 2)
+                          : pendingAccounts.has(holding.accountId)
+                            ? '等候確認同步成本'
+                            : '無報價'}
+                      </dd>
                     </div>
                     <div>
-                      <dt>{holding.market === 'TW' ? '持有張數' : holding.market === 'US' ? '股數' : '幣數'}</dt>
+                      <dt>
+                        {holding.market === 'TW'
+                          ? '持有張數'
+                          : holding.market === 'US'
+                            ? '股數'
+                            : pendingAccounts.has(holding.accountId)
+                              ? '上次確認幣數'
+                              : '幣數'}
+                      </dt>
                       <dd>
                         {holding.market === 'TW'
                           ? decimalText(new Money(holding.quantity).div(1000)) + ' 張'
@@ -498,17 +603,27 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                   </dl>
                   <p className="holdings-muted">
                     {holding.costCurrency} ·{' '}
-                    {quote ? `${quote.asOf} · ${quote.source}（非即時）` : '目前來源無可用報價'} · 持股更新{' '}
-                    {formatDateTime(holding.updatedAt)}
+                    {quote
+                      ? `${quote.asOf} · ${quote.source}（非即時）`
+                      : pendingAccounts.has(holding.accountId)
+                        ? '同步餘額與成本尚未確認'
+                        : '目前來源無可用報價'}{' '}
+                    · 持股更新 {formatDateTime(holding.updatedAt)}
                   </p>
                 </article>
               );
             })}
           </div>
-          {!rows.length && <p>此帳戶目前沒有持股，可匯入庫存表格。</p>}
+          {!rows.length && (
+            <p>
+              {pendingAccounts.has(selected.account.id)
+                ? '請先確認 MEXC 餘額與平均成本，再計算持股損益。'
+                : '此帳戶目前沒有持股，可匯入庫存表格。'}
+            </p>
+          )}
         </section>
       )}
-      {!document.accounts.length && !editing && !creating && !snapshot.loading && (
+      {!document.accounts.length && !editing && !creating && !connecting && !snapshot.loading && (
         <p>尚未匯入持股。先新增帳戶，再上傳檔案或貼上庫存表格。</p>
       )}
     </section>

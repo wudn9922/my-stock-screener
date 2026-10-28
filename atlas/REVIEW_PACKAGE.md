@@ -1,4 +1,32 @@
-## Current feature: holdings import and P&L, PR A (2026-10-28)
+## Current feature: MEXC read-only synchronization, PR B (2026-10-28)
+
+Primary self-review only; no independent sign-off. Started from main 61eb973 after
+#199 merged. Cloud users can enter a MEXC key pair on the website. The server checks
+the official key permission endpoint, accepts only known read scopes, and performs
+three fixed-origin GET requests. It never trades, transfers or withdraws. All tests
+use fictitious keys and a fake MEXC transport; no real MEXC API call was made.
+
+AES-GCM encrypts BOTH credentials with a server-only 32-byte environment key and
+owner/account/version AAD. Only last-four metadata and sanitized balances/quotes
+return to the browser. Payloads are bound to their storage context BEFORE awaiting
+identity initialization, preventing a key or holding write from moving to a newly
+selected account. No auth files are changed. Private tables/RPC remain service-only.
+
+Server rate limits, post-I/O grant checks, shared owner locks and one-use claims
+prevent rapid retries, revoked writes, stale-cost replacement and resurrection
+after disconnect. Unknown/new/increased costs remain staged, not zero-cost profit.
+Confirmed averages survive decreases; quotes stay per account. No daily P&L is
+invented from rolling 24h values. Visible-page five-minute polling pauses during
+review, editing and hidden pages. Existing manual imports and navigation remain.
+
+Validation before PR: clean npm ci; lint and typecheck; 1,656 Vitest tests / 124 files; both builds; 150 affected browser regressions, followed by 63 storage/holdings/MEXC checks and 24 final MEXC checks across desktop Chromium, mobile Chromium and iPhone WebKit. Static SQL parsing passes. Frontend bundles contain no server master-key lookup or MEXC upstream client header.
+
+New SQL was statically parsed with pglast, not executed. Relational-fake tests execute
+the actual handler/crypto, not actual PostgreSQL RLS/locking. Maintainers must verify
+and manually apply SQL, configure HOLDINGS_ENCRYPTION_KEY, deploy user-settings, then
+publish the frontend. See [the runbook](../docs/ATLAS_MEXC_SYNC.md). No deploy or merge.
+
+## Previous feature: holdings import and P&L, PR A (2026-10-28)
 
 Primary self-review only; no independent sign-off. The 自選 console retains its
 default list view and gains 清單 / 持股. Browser-only CSV/XLSX/paste parsing feeds an
