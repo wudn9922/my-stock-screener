@@ -63,7 +63,8 @@ begin
         or jsonb_typeof(definition_value->'broker') is distinct from 'string'
         or length(btrim(definition_value->>'name')) not between 1 and 40
         or definition_value->>'kind' not in ('tw-broker','us-broker','crypto-exchange')
-        or definition_value->>'currency' <> case definition_value->>'kind' when 'tw-broker' then 'TWD' when 'us-broker' then 'USD' else 'USDT' end then
+        -- CASE is parenthesized: inside IF, PL/pgSQL would otherwise end the condition at the CASE's first THEN.
+        or definition_value->>'currency' <> (case definition_value->>'kind' when 'tw-broker' then 'TWD' when 'us-broker' then 'USD' else 'USDT' end) then
         return jsonb_build_object('status','invalid');
       end if;
     else
@@ -105,7 +106,7 @@ begin
           or exists(select 1 from unnest(array['id','accountId','symbol','market','quantity','averageCost','costCurrency','source']) as fields(field)
             where jsonb_typeof(item->field) is distinct from 'string')
           or item->>'accountId' is distinct from account_uuid::text
-          or item->>'market' <> case definition_value->>'kind' when 'tw-broker' then 'TW' when 'us-broker' then 'US' else 'CRYPTO' end
+          or item->>'market' <> (case definition_value->>'kind' when 'tw-broker' then 'TW' when 'us-broker' then 'US' else 'CRYPTO' end)
           or item->>'costCurrency' <> definition_value->>'currency'
           or item->>'quantity' !~ '^(0|[1-9][0-9]{0,14})(\.[0-9]{1,18})?$'
           or item->>'averageCost' !~ '^(0|[1-9][0-9]{0,14})(\.[0-9]{1,18})?$'
