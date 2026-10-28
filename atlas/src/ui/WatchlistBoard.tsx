@@ -9,8 +9,9 @@ import { fetchTrendingStocks, type TrendingStocksResult } from '../report/trendi
 import type { SavedWatchlist } from '../watchlists/model';
 import { displayTicker, formatDateTime, formatPercent, formatPrice, toneClass } from './format';
 import './watchlistBoard.css';
+import { MonitorSignals } from './MonitorSignals';
 
-type BoardTab = 'list' | 'trending' | 'recent';
+type BoardTab = 'list' | 'trending' | 'signals' | 'recent';
 interface BoardRow {
   symbol: string;
   name: string;
@@ -182,11 +183,11 @@ export function WatchlistBoard({ report, list, hasLists, openChart, navigate }: 
         </div>
       )}
       <div className="wb-tabs" role="group" aria-label="行情來源">
-        {([['list', '我的清單'], ['trending', 'LINE 熱門'], ['recent', '最近搜尋']] as const).map(([key, label]) => (
+        {([['list', '我的清單'], ['trending', 'LINE 熱門'], ['signals', '突破／跌破'], ['recent', '最近搜尋']] as const).map(([key, label]) => (
           <button key={key} type="button" aria-pressed={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>
         ))}
       </div>
-      <p className="wb-caption">
+      {tab === 'signals' ? <MonitorSignals openChart={openChart} /> : <><p className="wb-caption">
         <span>{tab === 'list' ? list ? `清單：${list.name}（在下方切換）` : '我的清單' : tab === 'trending' ? 'LINE 熱門美股' : '最近搜尋的股票'}</span>
         <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}延遲報價</span>
       </p>
@@ -198,6 +199,7 @@ export function WatchlistBoard({ report, list, hasLists, openChart, navigate }: 
       {rows.length > shown.length && (
         <button type="button" className="text-button wb-more" onClick={() => setExpanded(true)}>顯示全部 {rows.length} 檔</button>
       )}
+      </>}
     </section>
   );
 }

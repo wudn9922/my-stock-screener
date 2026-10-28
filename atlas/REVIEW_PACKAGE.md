@@ -1,4 +1,43 @@
-## Current feature: MEXC read-only synchronization, PR B (2026-10-28)
+## Current extension: Discord monitor signal groups and screener health layout (2026-10-28)
+
+Primary self-review only; no independent sign-off. Based on main `7dfa54650dee5b476f1d54da8ec337cf49b5271c`.
+The watchlist board keeps its current default and adds 突破／跌破 beside LINE 熱門.
+Group details coalesce triggered MAs per stock, show daily candles/volume with existing
+MiniChart, preserve vertical/wheel page scrolling and button/pinch zoom, automatically
+load further cards and release offscreen canvases. Existing chart wheel behavior stays
+the default elsewhere. Back navigation restores the group heading's focus and position.
+
+The independent `monitor-signals` function reads only the verified cloud owner's
+existing last-successful Discord state. None/device are denied server-side before
+private reads. Shared identity/grant helpers are reused, not changed; user-settings,
+chart-drawings, login/account files, app shell and monitor producers are untouched.
+Pagination has an explicit cap, output uses a field allowlist/no-store, account changes
+cancel old requests, and personal results stay in RAM. Body size and upstream lifetime
+are bounded. The page shows only each market's latest signal session (exchange-local
+date) from a 30-day last-state read, not full notification history.
+
+The screener container now grows with its content while the virtual list remains a
+bounded scroll region. Synthetic 390×520 comparison reproduced 214px of overlap in
+the old CSS; the fixed layout has a 34px gap. Browser assertions check geometry,
+virtual scrolling, disclosure access and the final health row within main.
+
+Actual local gates: clean npm ci, lint, typecheck, 1,636 unit tests across 125 files,
+normal/Pages builds, and 156 broad desktop/mobile Chromium/iPhone WebKit regressions
+passed. Twenty new unit cases include actual Edge entrypoint execution with fake
+LINE/database responses, ownership/grants, malformed inputs, paging/truncation,
+revocation and context races. The final shared-chart/scroll/focus run passed 53 cases;
+its WebKit long-list case passed after correcting the test to address the price-pane
+canvas and using supported DOM touch events (54 cases covered). The negative control
+requires horizontal drag to be handled while vertical touch remains uncancelled.
+Preview bundles do not contain the server-role environment key name.
+
+No production data was queried, no SQL executed, no notification sent, no deployment
+or merge performed. New function enablement is a maintainer action; missing service
+shows an error/retry without changing saved lists. Headless WebKit is not a physical
+iPhone sign-off. See [the runbook](../docs/ATLAS_MONITOR_SIGNALS.md) and
+[ADR-021](docs/architecture/ADR-021-monitor-signals-read-only.md).
+
+## Previous feature: MEXC read-only synchronization, PR B (2026-10-28)
 
 Primary self-review only; no independent sign-off. Started from main 61eb973 after
 #199 merged. Cloud users can enter a MEXC key pair on the website. The server checks

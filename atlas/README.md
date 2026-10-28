@@ -1,5 +1,9 @@
 # Atlas Research Terminal — V1
 
+自選的「LINE 熱門」旁可切換「突破／跌破」，以組別詳細連續捲動查看已成功推送到
+Discord 的股票日 K、成交量與觸發均線；獨立唯讀服務需維護者手動啟用。
+資料範圍、授權與操作見 [監控訊號說明](../docs/ATLAS_MONITOR_SIGNALS.md)。
+
 Atlas screener can be installed for free from Safari/Chrome as a home-screen
 Web App: open https://wudn9922.github.io/my-stock-screener/atlas/ and use
 **顯示設定 → 安裝 Atlas**, or Safari **分享 → 加入主畫面**. No store,
