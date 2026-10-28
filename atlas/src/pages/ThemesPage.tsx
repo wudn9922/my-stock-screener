@@ -3,6 +3,7 @@ import { userStorage } from '../auth/storage';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
 import { ThemeRotationCard } from '../ui/ThemeRotationCard';
+import { IndustryRotationPanel } from '../ui/IndustryRotationPanel';
 import type { PageProps } from './pageProps';
 import { PageState } from '../ui/PageState';
 import ThemesMap from './ThemesMap';
@@ -422,6 +423,7 @@ function ThemesView({
       )}
 
       <ThemeRotationCard data={data} onOpen={open} />
+      <IndustryRotationPanel market={market === 'tw' ? 'TW' : 'US'} />
       <footer className="page-foot">
         <span>資料日 {formatDateTime(data.asOf, false)}{age !== null && age > 6 ? `（已 ${age} 天未更新）` : ''}</span>
         <HelpDisclosure label="資料與報酬備註">

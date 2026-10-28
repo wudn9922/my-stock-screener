@@ -125,6 +125,30 @@ class GeneratedStorageTests(unittest.TestCase):
             self.store.assemble(self.base, tip, Path(directory) / "site")
             self.assertEqual((Path(directory) / "site/report/trending-stocks.json").read_bytes(), b'{"symbols":["NVDA","AAPL"]}')
 
+    def test_status_owner_preserves_concurrent_daily_and_all_permanent_records(self):
+        # Status began at the seed; daily publishes after its read snapshot.
+        self.write("docs/report/latest.json", b'{"reportDate":"2026-10-28"}')
+        self.store.publish("daily")
+        self.write("data/AAPL.csv", b"unrelated local edit must not be published")
+        self.write("docs/report/financials/AAPL.json", b"unrelated financial edit")
+        self.write("docs/report/data-status.json", b'{"version":1,"sources":[]}')
+        self.write("docs/report/industry-rotation.json", b'{"version":1,"markets":{}}')
+        history = "docs/report/screener-history/TW-2026-10-28.json"
+        self.write(history, b'{"version":1,"dataDate":"2026-10-28"}')
+        self.write("docs/report/screener-history/index.json", b'{"version":1}')
+        self.store.publish("status")
+        generated = self.remote("generated")
+        self.assertEqual(self.remote("main"), self.base)
+        self.assertEqual(self.body(generated, "docs/report/latest.json"), b'{"reportDate":"2026-10-28"}')
+        self.assertEqual(self.body(generated, history), b'{"version":1,"dataDate":"2026-10-28"}')
+        self.assertNotIn("data/AAPL.csv", self.store.entries(generated))
+        self.assertEqual(self.body(self.base, "data/AAPL.csv"), self.files["data/AAPL.csv"])
+        self.assertEqual(self.body(self.base, "docs/report/financials/AAPL.json"), self.files["docs/report/financials/AAPL.json"])
+        self.store.restore()
+        self.write(history, b"cannot rewrite a previous snapshot")
+        with self.assertRaisesRegex(ValueError, "append-only"):
+            self.store.publish("status")
+
     def test_pr2_removes_only_outputs_and_new_csv_stays_on_main(self):
         # Simulate PR2: remove only moved paths from main, keep all old history.
         for path in self.store.entries(self.base):

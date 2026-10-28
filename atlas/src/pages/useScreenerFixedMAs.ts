@@ -8,7 +8,7 @@ import type { FixedScreenerMas } from './screenerFilters';
 import { loadScreenerFixedMAs } from './screenerFixedMAs';
 
 /** Loads only configured stocks, and only while MA filtering or inspection needs their references. */
-export function useScreenerFixedMAs(wanted: boolean, items: readonly GroupItem[]) {
+export function useScreenerFixedMAs(wanted: boolean, items: readonly GroupItem[], loadBars = getDailyBars, requireComplete = false) {
   const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
   const context = getStorageContextKey();
   const [state, setState] = useState<{ context: string; items: readonly GroupItem[]; mas: FixedScreenerMas; reason: string | null } | null>(null);
@@ -18,11 +18,11 @@ export function useScreenerFixedMAs(wanted: boolean, items: readonly GroupItem[]
     const controller = new AbortController();
     setState({ context, items, mas: {}, reason: '固定均線參數載入中…' });
     void settingsApi<ParameterStock[]>('stocks.list', {}, controller.signal)
-      .then(stocks => loadScreenerFixedMAs(items, stocks, getDailyBars))
-      .then(mas => { if (active) setState({ context, items, mas, reason: null }); })
+      .then(stocks => loadScreenerFixedMAs(items, stocks, loadBars))
+      .then(mas => { if (active) setState({ context, items, mas, reason: requireComplete && Object.values(mas).some(reference => reference.distance === null) ? '固定均線缺少與快照同價格口徑的歷史資料，暫無法完整比較。' : null }); })
       .catch(() => { if (active) setState({ context, items, mas: {}, reason: '固定均線參數無法載入，請重新整理頁面重試。' }); });
     return () => { active = false; controller.abort(); };
-  }, [wanted, items, context, access.userId, access.storageMode]);
+  }, [wanted, items, context, access.userId, access.storageMode, loadBars, requireComplete]);
   const current = state?.context === context && state.items === items ? state : null;
   return { fixedMAs: current?.mas, maReferenceReason: wanted && items.length > 0 ? (current ? current.reason : '固定均線參數載入中…') : null };
 }

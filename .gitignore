@@ -54,3 +54,7 @@ docs/report/**/*.tmp
 /docs/report/tw-chips.json
 /docs/report/themes-tw.json
 /docs/report/ma-selector/
+# Status-owned generated derivatives; main stores code/tests only.
+/docs/report/data-status.json
+/docs/report/industry-rotation.json
+/docs/report/screener-history/*.json

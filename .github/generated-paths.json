@@ -1,6 +1,7 @@
 {
   "branch": "generated",
   "owners": {
+    "status": ["docs/report/data-status.json", "docs/report/industry-rotation.json", "docs/report/screener-history/*.json"],
     "screenshots": ["docs/wsj.png", "docs/barrons.png", "docs/wsj.jpg", "docs/barrons.jpg"],
     "daily": ["docs/index.html", "docs/wsj.png", "docs/barrons.png", "docs/wsj.jpg", "docs/barrons.jpg", "docs/report/latest.json", "docs/report/trending-stocks.json", "docs/report/universe.json", "docs/report/breadth.json", "docs/report/series/**", "docs/report/themes.json", "docs/report/rates.json", "docs/report/rates-history.json"],
     "atlas": ["docs/atlas/**", "docs/index.html"],
@@ -13,7 +14,7 @@
     "rates": ["docs/report/rates.json", "docs/report/rates-history.json"],
     "ma": ["docs/report/ma-selector/**"]
   },
-  "append_only": ["docs/report/breakouts-archive/*.json"],
+  "append_only": ["docs/report/breakouts-archive/*.json", "docs/report/screener-history/TW-*.json", "docs/report/screener-history/US-*.json"],
   "records": {
     "daily": ["data/*.csv", "docs/report/kline-corrections.json"],
     "research": ["data/world/*.csv", "docs/report/kline-corrections.json"],

@@ -1,0 +1,122 @@
+.data-status-panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.data-status-panel *,
+.data-status-panel *::before {
+  box-sizing: border-box;
+}
+.data-status-panel h2 {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+.data-status-panel h3 {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+.data-status-panel p,
+.data-status-panel small {
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.data-status-panel button,
+.data-status-panel a {
+  min-height: 44px;
+}
+.data-status-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.data-status-list > li + li {
+  border-top: 1px solid var(--border);
+}
+.data-status-source > summary {
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-height: 72px;
+  padding: 12px 0;
+  list-style: none;
+  align-items: center;
+}
+.data-status-source > summary::-webkit-details-marker {
+  display: none;
+}
+.data-status-name {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.data-status-name::before {
+  content: "▸ ";
+  color: var(--text-3);
+}
+.data-status-source[open] .data-status-name::before {
+  content: "▾ ";
+}
+.data-status-dates {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.data-status-dates b {
+  color: var(--text-2);
+  font-weight: 500;
+}
+.data-status-badge {
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.data-status-badge.is-ok {
+  color: var(--positive, #4bbb8b);
+}
+.data-status-badge.is-late {
+  color: var(--warning, #e8b768);
+}
+.data-status-badge.is-stale {
+  color: var(--negative, #ee6c76);
+}
+.data-status-badge.is-missing {
+  color: var(--text-3);
+}
+.data-status-reason {
+  padding: 0 8px 10px;
+}
+.data-status-run {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+}
+.data-status-run a {
+  display: flex;
+  align-items: center;
+  color: var(--accent-text);
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.data-status-run small,
+.data-status-run p {
+  grid-column: 1 / -1;
+}
+.console-tabs {
+  flex-wrap: wrap;
+}
+.console-tabs > button {
+  min-height: 44px;
+}
+.data-status-panel .help-disclosure > summary {
+  min-height: 44px;
+}
