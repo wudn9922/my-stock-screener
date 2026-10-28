@@ -1,4 +1,38 @@
-## Current extension: 資料狀態與三項公開資料比較（2026-10-28）
+## Current feature: holdings import and P&L, PR A (2026-10-28)
+
+Primary self-review only; no independent sign-off. The 自選 console retains its
+default list view and gains 清單 / 持股. Browser-only CSV/XLSX/paste parsing feeds an
+editable preview and account snapshot replacement, with saved column-index mappings
+and explicit missing-cost / non-trade / incomplete-history review. All fixture values
+are fictional. The legacy official KGI inventory image has no cost column; tests
+therefore require correction instead of inventing an export cost. Firstrade transaction
+files reconstruct average cost, including partial/full sales and net purchase fees.
+
+Quantities and costs are decimal strings, prices use existing providers, and missing
+quotes/FX remain explicit partial totals. USDT is never silently treated as USD.
+Known ETF flags come from the official catalog. Mobile controls retain 44 px targets.
+
+Storage follows the existing verified context: guest RAM, device account-qualified
+userStorage, cloud Supabase plus RAM only. Account changes invalidate old operations
+and unmount raw imports. Normalized positions alone use fixed-URL POST, no-store
+responses and sanitized errors; raw files, extra columns, positions in URLs/logs or
+analytics, fallback local cloud saves, notifications and broker connections are absent.
+
+Every holdings server action follows requireCloudStorage; verified owner is bound
+inside a service-role-only RPC. SQL declares RLS, explicit privilege revocation,
+owner predicates, transactional account replacement, per-owner serialization, row
+caps and revision checks. Per the user's instruction NO SQL was executed; handler
+tests use the existing relational-fake style and do not certify PostgreSQL locking
+or RLS. Maintainers must review/apply SQL and verify permissions, then deploy the
+function, then release the frontend. See [the runbook](../docs/ATLAS_HOLDINGS.md).
+
+The branch was rebased onto main `13c1ab5d58db209f1506fdd75cede34ac62e3e67` after #197 merged; both data status and its comparison features remain intact. Clean npm ci, lint, typecheck, 1,616 unit tests / 123 files, both builds and 147 targeted desktop/mobile/WebKit integration tests passed before opening the PR. An additional 27 holdings browser checks passed after adding preview action guards (finish or cancel before switching/reloading account actions).
+
+No merge, deployment, permanent-price/history modification or MEXC call. PR B starts
+only after A is merged. Actual clean-install/build/unit/browser checks are recorded
+in the PR; headless WebKit is not a physical iPhone or real-broker-file certification.
+
+## Previous extension: 資料狀態與三項公開資料比較（2026-10-28）
 
 由最新 main `fe7b39f50348b55241056ccd373b4feab2530a04` 開分支。
 

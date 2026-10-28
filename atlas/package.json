@@ -21,12 +21,14 @@
   },
   "dependencies": {
     "@tradingview/lwc-toolkit": "1.0.0",
+    "decimal.js": "10.6.0",
     "fancy-canvas": "^2.1.0",
     "idb": "^8.0.3",
     "lightweight-charts": "5.2.1",
     "lucide-react": "^0.468.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "read-excel-file": "9.3.13",
     "undici": "^7.30.0",
     "zod": "^4.1.0"
   },

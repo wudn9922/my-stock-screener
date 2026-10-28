@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { HoldingsError, handleHoldings } from "./holdings.ts";
 import { LineHandoffError, lineLoginHandoff } from "../_shared/lineLoginHandoff.ts";
 import { validateWatchlist, watchlistId, watchlistVersion } from "./watchlists.ts";
 import { DeviceSessionError, createDeviceSession, resolveLineUser, revokeDeviceSession } from "../_shared/deviceSession.ts";
@@ -311,6 +312,20 @@ Deno.serve(async (request: Request) => {
     // This gate also covers legacy clients and reads of former cloud data after revocation.
     // It is intentionally checked on every request, not cached at login.
     await requireCloudStorage(supabase, lineUserId, adminId);
+
+    if (action.startsWith('holdings.')) {
+      // Personal positions never enter generic database-error logging. POST-only,
+      // no-store, normalized payloads; the RPC transaction owns limits and CAS.
+      try {
+        const data = await handleHoldings(supabase, lineUserId, body);
+        return new Response(JSON.stringify({ ok: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+      } catch (error) {
+        const known = error instanceof HoldingsError;
+        return new Response(JSON.stringify({ ok: false, error: known ? error.message : '持股服務暫時無法使用，請稍後重試。' }), {
+          status: known ? error.status : 503, headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+        });
+      }
+    }
 
     // 固定分組，或使用者自己的自訂分組（stocks.group_id 存成 custom_<groups.id>）
     const ownsGroup = async (groupId: string) => {

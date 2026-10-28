@@ -6,6 +6,8 @@ This product uses [TradingView Lightweight Charts™](https://www.tradingview.co
 - @tradingview/lwc-toolkit 1.0.0 — TradingView, Apache-2.0.
 - fancy-canvas — TradingView, Apache-2.0.
 - React / React DOM / Vite / idb / Zod / lucide-react — open-source dependencies; their respective licenses ship in npm packages.
+- read-excel-file 9.3.13 — Nikolay Kuchumov, MIT; browser-only XLSX import. Its bundled/transitive fflate, saxen, unzipper-esm and worker-f licenses ship in their npm packages.
+- decimal.js 10.6.0 — Michael Mclaughlin, MIT; decimal holdings quantities, average costs and P&L calculations.
 - Optional native wrapper: @capacitor/core / cli / ios / android 8.5.2 — Ionic, MIT; licenses ship in the isolated apps/native npm packages. No paid service is required.
 - Official chart agent skills — source: https://github.com/tradingview/lightweight-charts/tree/master/.github/skills. Vendored solely as authoring instructions, not proprietary assets.
 

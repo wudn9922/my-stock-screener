@@ -115,6 +115,9 @@ class _PostgresFixture(unittest.TestCase):
         cls.run_sql(fixture)
         cls.run_sql(MIGRATION.read_text())
         cls.run_sql((MIGRATION.parent / 'line_login_handoff.sql').read_text())
+        # Real-PostgreSQL parse/apply guard (PL/pgSQL bodies are only compiled on a real server).
+        cls.run_sql((MIGRATION.parent / 'atlas_holdings.sql').read_text())
+        cls.run_sql((MIGRATION.parent / 'device_sessions.sql').read_text())
 
     @classmethod
     def tearDownClass(cls):
@@ -137,6 +140,7 @@ class _PostgresFixture(unittest.TestCase):
 
     def setUp(self):
         self.run_sql('truncate atlas_private.line_login_handoffs;')
+        self.run_sql('truncate public.atlas_holdings, public.atlas_holding_accounts, atlas_private.device_sessions;')
         self.run_sql(
             "truncate public.atlas_storage_access, public.index_configs, "
             + ", ".join("public." + table for table in TABLES)
@@ -484,6 +488,64 @@ class LineLoginSqlTests(_PostgresFixture):
         with ThreadPoolExecutor(2) as pool:
             statuses = list(pool.map(lambda _: self.handoff('poll')['status'], range(2)))
         self.assertEqual(sorted(statuses), ['consumed', 'missing'])
+
+ACCOUNT = "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b"
+
+
+def holding(identifier, symbol, quantity="1000", market="TW", currency="TWD"):
+    return {"id": identifier, "accountId": ACCOUNT, "symbol": symbol, "market": market, "quantity": quantity,
+            "averageCost": "612.5", "costCurrency": currency, "source": "import", "updatedAt": "2026-10-28T00:00:00Z"}
+
+
+class HoldingsSqlTests(_PostgresFixture):
+    def action(self, operation, owner=USER, payload=None, revision=None):
+        body = json.dumps(payload or {}).replace("'", "''")
+        expected = "null" if revision is None else str(revision)
+        return json.loads(self.run_sql(
+            f"set role service_role; select public.atlas_holdings_action('{operation}', '{owner}', '{body}'::jsonb, {expected});"
+        ).splitlines()[-1])
+
+    def replace(self, holdings, owner=USER, revision=None):
+        account = {"id": ACCOUNT, "name": "凱基", "kind": "tw-broker", "currency": "TWD", "broker": "kgi"}
+        return self.action("replaceAccount", owner, {"account": account, "holdings": holdings}, revision)
+
+    def test_replace_list_revision_and_owner_isolation(self):
+        created = self.replace([holding("0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d", "2330.TW"),
+                                holding("1a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d", "0050.TW", "0.5")])
+        self.assertEqual(created["status"], "ok")
+        account = created["document"]["accounts"][0]
+        self.assertEqual((account["revision"], len(account["holdings"])), (1, 2))
+        self.assertEqual(self.action("list", OTHER)["document"]["accounts"], [])
+        # A stale revision never overwrites; another owner cannot touch the account.
+        self.assertEqual(self.replace([], revision=0)["status"], "conflict")
+        self.assertEqual(self.action("deleteAccount", OTHER, {"accountId": ACCOUNT}, 1)["status"], "conflict")
+        self.assertEqual(self.run_sql("select count(*) from public.atlas_holdings;"), "2")
+        replaced = self.replace([holding("2a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d", "2317.TW")], revision=1)
+        self.assertEqual([h["symbol"] for h in replaced["document"]["accounts"][0]["holdings"]], ["2317.TW"])
+
+    def test_invalid_market_and_duplicates_change_nothing(self):
+        self.replace([holding("0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d", "2330.TW")])
+        wrong = holding("1a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d", "AAPL", market="US", currency="USD")
+        self.assertEqual(self.action("upsert", USER, {"accountId": ACCOUNT, "holding": wrong}, 1)["status"], "invalid")
+        twice = [holding("1a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d", "2317.TW"), holding("2a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d", "2317.TW")]
+        self.assertEqual(self.replace(twice, revision=1)["status"], "invalid")
+        self.assertEqual(self.run_sql("select string_agg(symbol, ',') from public.atlas_holdings;"), "2330.TW")
+
+    def test_browsers_cannot_read_or_call(self):
+        for role in ("anon", "authenticated"):
+            self.assertEqual(self.run_sql(
+                f"select has_table_privilege('{role}','public.atlas_holdings','select')::text"
+                f" || has_function_privilege('{role}','public.atlas_holdings_action(text,text,jsonb,bigint)','execute')::text;"), "falsefalse")
+
+
+class DeviceSessionSqlTests(_PostgresFixture):
+    def test_create_use_revoke(self):
+        call = lambda op, user="null": json.loads(self.run_sql(
+            f"set role service_role; select public.atlas_device_session('{op}', repeat('a',64), {user});").splitlines()[-1])
+        self.assertEqual(call("create", f"'{USER}'")["status"], "created")
+        self.assertEqual(call("use"), {"status": "active", "userId": USER})
+        self.assertEqual(call("revoke")["status"], "revoked")
+        self.assertEqual(call("use")["status"], "missing")
 
 
 if __name__ == "__main__":

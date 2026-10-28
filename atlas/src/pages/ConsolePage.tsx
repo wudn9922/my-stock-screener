@@ -31,6 +31,8 @@ import { StorageAdminPanel, StorageModeNotice } from '../ui/StorageAdminPanel';
 import { LegacyImportCard } from '../ui/LegacyImportCard';
 import { getDailyBars, getScreenerPeFigures } from '../app/dataSources';
 import { loadScreenerFixedMAs } from './screenerFixedMAs';
+import { HoldingsPanel } from '../holdings/HoldingsPanel';
+import { getStorageContextKey } from '../auth/storage';
 
 type CloudList = { id: string; definition: unknown; updated_at: string };
 
@@ -42,7 +44,8 @@ export default function ConsolePage({ report, navigate, openChart, list: request
   const { document, error: storageError } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const selected = document.lists.find((entry) => entry.id === requested) ?? document.lists[0];
   const [settingsTab, setTab] = useState<'parameters' | 'admin' | 'display' | 'status'>('parameters');
-  const tab = section === 'lists' ? 'lists' : settingsTab === 'admin' && !access.isAdmin ? 'parameters' : settingsTab;
+  const [listsView, setListsView] = useState<'lists' | 'holdings'>('lists');
+  const tab = section === 'lists' ? listsView : settingsTab === 'admin' && !access.isAdmin ? 'parameters' : settingsTab;
   const [visit, setVisit] = useState<WatchlistVisit | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -302,7 +305,11 @@ export default function ConsolePage({ report, navigate, openChart, list: request
           <p className="page-sub">設定選股條件、追蹤名單變化；保存方式由帳號授權決定。</p>
         </div>
       </div>
-      {section === 'lists' && (
+      {section === 'lists' && <div className="segmented console-tabs" role="group" aria-label="自選檢視">
+        <button type="button" className={listsView === 'lists' ? 'active' : ''} aria-pressed={listsView === 'lists'} onClick={() => setListsView('lists')}>清單</button>
+        <button type="button" className={listsView === 'holdings' ? 'active' : ''} aria-pressed={listsView === 'holdings'} onClick={() => setListsView('holdings')}>持股</button>
+      </div>}
+      {section === 'lists' && listsView === 'lists' && (
         <WatchlistBoard report={report} list={selected} hasLists={document.lists.length > 0} openChart={openChart} navigate={navigate} />
       )}
       <StorageModeNotice />
@@ -332,7 +339,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
           資料狀態
         </button>
       </div>}
-      {tab === 'status' ? <DataStatusPanel /> : tab === 'display' ? (
+      {tab === 'holdings' ? <HoldingsPanel key={getStorageContextKey()} openChart={openChart} navigate={navigate} /> : tab === 'status' ? <DataStatusPanel /> : tab === 'display' ? (
         <section className="console-card" aria-label="顯示與App"><DisplaySettings
           reportDate={report.status === 'ok' ? report.report.reportDate : null}
           generatedAt={report.status === 'ok' ? report.report.generatedAt : null} /></section>

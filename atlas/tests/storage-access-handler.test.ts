@@ -6,6 +6,7 @@ import * as policy from '../../supabase/functions/_shared/storageAccess';
 import * as watchlists from '../../supabase/functions/user-settings/watchlists';
 import * as lineHandoff from '../../supabase/functions/_shared/lineLoginHandoff';
 import * as deviceSession from '../../supabase/functions/_shared/deviceSession';
+import * as holdings from '../../supabase/functions/user-settings/holdings';
 
 const OWNER = policy.DEFAULT_ADMIN_LINE_ID;
 const A = 'U11111111111111111111111111111111';
@@ -15,6 +16,8 @@ type Row = Record<string, unknown>;
 type DbError = { code?: string; message?: string };
 type Result = { data: Row | Row[] | null; error: DbError | null; count?: number };
 const grant = (user: string, mode: policy.StorageMode) => ({ line_user_id: user, storage_mode: mode, label: '', updated_at: REVISION });
+const holdingAccount: holdings.HoldingAccount = { id: '11111111-1111-4111-8111-111111111111', name: 'Private test', kind: 'tw-broker', currency: 'TWD', broker: 'kgi' };
+const holdingRow: holdings.Holding = { id: '22222222-2222-4222-8222-222222222222', accountId: holdingAccount.id, symbol: '2330.TW', market: 'TW', quantity: '1357.25', averageCost: '812.5', costCurrency: 'TWD', source: 'import', updatedAt: REVISION };
 
 /** A small relational fake: execute the actual deployed handler, including the shared policy helper. */
 function database(seed: Record<string, Row[]> = {}, policyError: DbError | null = null) {
@@ -23,9 +26,37 @@ function database(seed: Record<string, Row[]> = {}, policyError: DbError | null 
   const rpcCalls: { name: string; parameters: Row }[] = [];
   // Hash → owner, as public.atlas_device_session keeps it (no raw tokens).
   const deviceSessions = new Map<string, string>();
+  const portfolios = new Map<string, holdings.HoldingsDocument>();
   const db = {
-    rpc: async (name: string, parameters: Row) => {
+    rpc: async (name: string, parameters: Row): Promise<{ data: unknown; error: DbError | null }> => {
       rpcCalls.push({ name, parameters });
+      if (name === 'atlas_holdings_action') {
+        const owner = String(parameters.owner_id), operation = parameters.operation;
+        const document: holdings.HoldingsDocument = structuredClone(portfolios.get(owner) ?? { version: 1, accounts: [] });
+        const payload = parameters.payload as Row;
+        const account = operation === 'replaceAccount' ? holdings.validateHoldingAccount(payload.account) : null;
+        const accountId = account?.id ?? payload.accountId;
+        const current = document.accounts.find(entry => entry.account.id === accountId);
+        const result = (status: string) => ({ data: { status, document }, error: null });
+        if (operation !== 'list') {
+          if ((current?.revision ?? null) !== parameters.expected_revision || (!current && operation !== 'replaceAccount')) return result('conflict');
+          if (account) {
+            if (!current && document.accounts.length >= holdings.HOLDINGS_LIMITS.accounts) return result('limit');
+            const next = holdings.validateAccountState({ account, holdings: payload.holdings, revision: (current?.revision ?? 0) + 1 });
+            document.accounts = [...document.accounts.filter(entry => entry.account.id !== accountId), next];
+          } else if (current) {
+            if (operation === 'upsert') {
+              const next = holdings.validateHolding(payload.holding, current.account);
+              current.holdings = [...current.holdings.filter(item => item.id !== next.id), next];
+            } else if (operation === 'delete') current.holdings = current.holdings.filter(item => item.id !== payload.holdingId);
+            else if (operation === 'deleteAccount') document.accounts = document.accounts.filter(entry => entry.account.id !== accountId);
+            current.revision++;
+          }
+          if (document.accounts.some(entry => entry.holdings.length > holdings.HOLDINGS_LIMITS.perAccount) || document.accounts.reduce((sum, entry) => sum + entry.holdings.length, 0) > holdings.HOLDINGS_LIMITS.total) return result('limit');
+          portfolios.set(owner, document);
+        }
+        return result('ok');
+      }
       if (name === 'atlas_device_session') {
         const hash = String(parameters.session_hash);
         if (parameters.operation === 'create') { deviceSessions.set(hash, String(parameters.line_user_id)); return { data: { status: 'created', expiresAt: '2027-01-25T00:00:00Z' }, error: null }; }
@@ -72,33 +103,101 @@ function database(seed: Record<string, Row[]> = {}, policyError: DbError | null 
       return query;
     },
   };
-  return { db, rows, calls, rpcCalls, deviceSessions };
+  return { db, rows, calls, rpcCalls, deviceSessions, portfolios };
 }
 
 function handler(kind: 'user-settings' | 'chart-drawings', user = A, seed: Record<string, Row[]> = {}, policyError: DbError | null = null, verified = true) {
   const fixture = database(seed, policyError);
   const lineVerifications: string[] = [];
+  const errorLogs: unknown[][] = [];
   let serve!: (request: Request) => Promise<Response>;
   const source = readFileSync(new URL(`../../supabase/functions/${kind}/index.ts`, import.meta.url), 'utf8').replace(/^import .*;\r?\n/gm, '');
   runInNewContext(transformSync(source, { loader: 'ts', target: 'es2022', format: 'cjs' }).code, {
-    ...policy, ...watchlists, ...lineHandoff, ...deviceSession,
+    ...policy, ...watchlists, ...lineHandoff, ...deviceSession, ...holdings,
     Deno: { env: { get: (key: string) => key === 'ADMIN_LINE_USER_ID' ? OWNER : key === 'ATLAS_FIXED_PARAMETERS_ENABLED' ? '1' : 'offline-test-only' }, serve: (callback: typeof serve) => { serve = callback; } },
     createClient: () => fixture.db,
     fetch: async (_url: string, init: RequestInit) => {
       lineVerifications.push(new URLSearchParams(String(init.body)).get('id_token') ?? '');
       return new Response(JSON.stringify(verified ? { sub: user } : { error: 'invalid_token' }), { status: verified ? 200 : 401 });
     },
-    Request, Response, URLSearchParams, TextEncoder, crypto, btoa, console: { error: () => {} },
+    Request, Response, URLSearchParams, TextEncoder, crypto, btoa, console: { error: (...args: unknown[]) => { errorLogs.push(args); } },
   });
   return {
     ...fixture,
     lineVerifications,
+    errorLogs,
     async request(body: Row, headers: HeadersInit = { 'cf-connecting-ip': '203.0.113.21' }) {
       const response = await serve(new Request('https://offline.invalid/', { method: 'POST', headers, body: JSON.stringify({ idToken: 'verified-by-fixture', ...body }) }));
       return { status: response.status, body: await response.json() };
     },
   };
 }
+
+describe('holdings actual request handler', () => {
+  const create = { action: 'holdings.replaceAccount', account: holdingAccount, holdings: [holdingRow], expectedRevision: null };
+  it('scopes every action to the verified owner, ignoring forged ownership, and replaces rather than appends', async () => {
+    const fixture = handler('user-settings', A, { atlas_storage_access: [grant(A, 'cloud')] });
+    fixture.portfolios.set(B, { version: 1, accounts: [{ account: { ...holdingAccount, name: 'B only' }, holdings: [holdingRow], revision: 1 }] });
+    expect((await fixture.request({ ...create, owner_id: B, userId: B, line_user_id: B })).status).toBe(200);
+    expect(fixture.rpcCalls.at(-1)!.parameters.owner_id).toBe(A);
+    expect(fixture.portfolios.get(B)!.accounts[0]!.account.name).toBe('B only');
+    const result = await fixture.request({ ...create, expectedRevision: 1, holdings: [{ ...holdingRow, quantity: '2000' }] });
+    expect(result.body.data.accounts[0].holdings).toHaveLength(1);
+    expect(result.body.data.accounts[0].holdings[0].quantity).toBe('2000');
+    expect((await fixture.request({ ...create, expectedRevision: 1 })).status).toBe(409);
+    const listing = await fixture.request({ action: 'holdings.list', userId: B });
+    expect(listing.body.data.accounts[0].account.name).toBe('Private test');
+    expect(fixture.errorLogs).toEqual([]);
+  });
+  it('does not use another owner account, and covers authorized upsert/delete/clear', async () => {
+    const fixture = handler('user-settings', A, { atlas_storage_access: [grant(A, 'cloud')] });
+    fixture.portfolios.set(B, { version: 1, accounts: [{ account: holdingAccount, holdings: [holdingRow], revision: 1 }] });
+    expect((await fixture.request({ action: 'holdings.deleteAccount', accountId: holdingAccount.id, expectedRevision: 1 })).status).toBe(409);
+    await fixture.request(create);
+    expect((await fixture.request({ action: 'holdings.upsert', holding: { ...holdingRow, quantity: '2' }, expectedRevision: 1 })).status).toBe(200);
+    expect((await fixture.request({ action: 'holdings.delete', accountId: holdingAccount.id, holdingId: holdingRow.id, expectedRevision: 2 })).body.data.accounts[0].holdings).toEqual([]);
+    expect((await fixture.request({ ...create, holdings: [], expectedRevision: 3 })).status).toBe(200);
+    expect((await fixture.request({ action: 'holdings.deleteAccount', accountId: holdingAccount.id, expectedRevision: 4 })).body.data.accounts).toEqual([]);
+    expect(fixture.portfolios.get(B)!.accounts[0]!.holdings).toHaveLength(1);
+  });
+  it('validates row limits before the RPC, and handles the per-owner transactional limit', async () => {
+    const fixture = handler('user-settings', A, { atlas_storage_access: [grant(A, 'cloud')] });
+    expect((await fixture.request({ ...create, holdings: Array.from({ length: 1001 }, () => holdingRow) })).status).toBe(400);
+    expect(fixture.rpcCalls).toHaveLength(0);
+    const accounts = Array.from({ length: 30 }, (_, index) => ({ account: { ...holdingAccount, id: `33333333-3333-4333-8333-${String(index).padStart(12, '0')}` }, holdings: [], revision: 1 }));
+    fixture.portfolios.set(A, { version: 1, accounts });
+    expect((await fixture.request(create)).status).toBe(400);
+    expect(fixture.portfolios.get(A)!.accounts).toHaveLength(30);
+  });
+  it('suppresses private database error details and never logs request contents', async () => {
+    const fixture = handler('user-settings', A, { atlas_storage_access: [grant(A, 'cloud')] });
+    fixture.db.rpc = async () => ({ data: null, error: { code: '23505', message: 'private quantity 1357.25 / cost 812.5' } });
+    const response = await fixture.request(create);
+    expect(response.status).toBe(503);
+    expect(JSON.stringify(response.body)).not.toMatch(/1357|812|Private/);
+    expect(fixture.errorLogs).toEqual([]);
+  });
+  it('keeps the total owner limit across accounts and re-checks cloud permission after a successful request', async () => {
+    const fixture = handler('user-settings', A, { atlas_storage_access: [grant(A, 'cloud')] });
+    const existing = [0, 1].map(index => {
+      const account = { ...holdingAccount, id: `33333333-3333-4333-8333-${String(index).padStart(12, '0')}` };
+      return { account, revision: 1, holdings: Array.from({ length: 1000 }, (_, i) => ({ ...holdingRow, accountId: account.id, id: `44444444-4444-4444-8444-${String(i).padStart(12, '0')}`, symbol: `${7000 + i}.TW` })) };
+    });
+    fixture.portfolios.set(A, { version: 1, accounts: existing });
+    expect((await fixture.request(create)).status).toBe(400);
+    expect(fixture.portfolios.get(A)!.accounts).toHaveLength(2);
+    expect((await fixture.request({ action: 'holdings.list' })).status).toBe(200);
+    const count = fixture.rpcCalls.length;
+    fixture.rows.atlas_storage_access[0].storage_mode = 'device';
+    expect((await fixture.request({ action: 'holdings.list' })).status).toBe(403);
+    expect(fixture.rpcCalls).toHaveLength(count);
+  });
+  it('fails safely when schema/RPC is not deployed', async () => {
+    const fixture = handler('user-settings', A, { atlas_storage_access: [grant(A, 'cloud')] });
+    fixture.db.rpc = async () => ({ data: null, error: { code: 'PGRST202' } });
+    expect((await fixture.request({ action: 'holdings.list' })).body.error).toContain('尚未啟用');
+  });
+});
 
 describe('storage authorization is enforced by deployed private-data handlers', () => {
   it('does not accept caller-supplied forwarding headers as a network binding', async () => {
@@ -129,6 +228,7 @@ describe('storage authorization is enforced by deployed private-data handlers', 
     ['user-settings', 'groups.list'], ['user-settings', 'groups.create'], ['user-settings', 'groups.rename'], ['user-settings', 'groups.delete'],
     ['user-settings', 'stocks.list'], ['user-settings', 'stocks.save'], ['user-settings', 'stocks.delete'],
     ['user-settings', 'watchlists.list'], ['user-settings', 'watchlists.save'], ['user-settings', 'watchlists.delete'],
+    ['user-settings', 'holdings.list'], ['user-settings', 'holdings.replaceAccount'], ['user-settings', 'holdings.upsert'], ['user-settings', 'holdings.delete'], ['user-settings', 'holdings.deleteAccount'],
     ['user-settings', 'admin.index.list'], ['user-settings', 'admin.index.save'],
     ['chart-drawings', 'atlas.list'], ['chart-drawings', 'atlas.save'], ['chart-drawings', 'load'], ['chart-drawings', 'save'],
   ] as const;
