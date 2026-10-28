@@ -10,15 +10,15 @@
 
 | 來源 | 日期欄位（相對 docs/report/） | 類型 | 正常／過期（交易日） | 日曆／收盤後寬限 |
 | --- | --- | --- | --- | --- |
-| 每日報告 | latest.json → reportDate；generatedAt 另列 | daily | 0／3 | XTAI／120 分鐘 |
-| 全市場台股 | universe.json → markets.TW.asOf；含 counts.stale/missing | daily | 0／3 | XTAI／120 分鐘 |
-| 全市場美股 | universe.json → markets.US.asOf；含 counts.stale/missing | daily | 0／3 | XNYS／360 分鐘 |
-| 台股突破 | breakouts.json → markets.tw.asOf；舊格式才用 asOf | daily | 0／3 | XTAI／120 分鐘 |
-| 美股突破 | breakouts.json → markets.us.asOf；舊格式才用 asOf | daily | 0／3 | XNYS／360 分鐘 |
-| 台股市場寬度 | breadth.json → markets.tw.asOf；舊格式才用 generatedAt | daily | 0／3 | XTAI／120 分鐘 |
-| 美股市場寬度 | breadth.json → markets.us.asOf；舊格式才用 generatedAt | daily | 0／3 | XNYS／360 分鐘 |
-| 美股題材 | themes.json → asOf | daily | 0／3 | XNYS／360 分鐘 |
-| 台股題材 | themes-tw.json → asOf | daily | 0／3 | XTAI／120 分鐘 |
+| 每日報告 | latest.json → reportDate；generatedAt 另列 | daily | 0／3 | XTAI／720 分鐘 |
+| 全市場台股 | universe.json → markets.TW.asOf；含 counts.stale/missing | daily | 0／3 | XTAI／720 分鐘 |
+| 全市場美股 | universe.json → markets.US.asOf；含 counts.stale/missing | daily | 0／3 | XNYS／1320 分鐘 |
+| 台股突破 | breakouts.json → markets.tw.asOf；舊格式才用 asOf | daily | 0／3 | XTAI／720 分鐘 |
+| 美股突破 | breakouts.json → markets.us.asOf；舊格式才用 asOf | daily | 0／3 | XNYS／1320 分鐘 |
+| 台股市場寬度 | breadth.json → markets.tw.asOf；舊格式才用 generatedAt | daily | 0／3 | XTAI／720 分鐘 |
+| 美股市場寬度 | breadth.json → markets.us.asOf；舊格式才用 generatedAt | daily | 0／3 | XNYS／1320 分鐘 |
+| 美股題材 | themes.json → asOf | daily | 0／3 | XNYS／1320 分鐘 |
+| 台股題材 | themes-tw.json → asOf | daily | 0／3 | XTAI／720 分鐘 |
 | 利率（FRED） | rates.json → asOf | daily | 3／6 | XNYS／360 分鐘 |
 | 台股籌碼 | tw-chips.json → generatedAt | weekly | 5／10 | XTAI／120 分鐘 |
 | 成長財務彙整 | growth.json → generatedAt | daily | 1／3 | XTAI／120 分鐘 |
@@ -26,10 +26,10 @@
 | 台股財報（MOPS） | fundamentals/tw.json → 最新季別的 fetch.*.at，以該季最早擷取日判定 | quarterly | 65／85 | XTAI／120 分鐘 |
 | 台股財報（FinMind） | fundamentals/tw-finmind.json → fetch.*[0]，以涵蓋個股最早擷取日判定 | quarterly | 65／85 | XTAI／120 分鐘 |
 | 熱門股 | trending-stocks.json → fetchedAt | daily | 0／3 | XNYS／360 分鐘 |
-| 台股 K 線封存 | kline-archive:manifest.json → markets.tw.lastDate | daily | 0／3 | XTAI／120 分鐘 |
-| 美股 K 線封存 | kline-archive:manifest.json → markets.us.lastDate | daily | 0／3 | XNYS／360 分鐘 |
+| 台股 K 線封存 | kline-archive:manifest.json → markets.tw.lastDate | daily | 0／3 | XTAI／720 分鐘 |
+| 美股 K 線封存 | kline-archive:manifest.json → markets.us.lastDate | daily | 0／3 | XNYS／1320 分鐘 |
 
-使用與 `breakout_alert/market_clock.py` 相同的 `exchange_calendars` 交易所日曆，指定 XTAI／XNYS，不用週一至週五近似；早收盤、休市、夏令時間均依日曆。應更新日＝已收盤且已過發布寬限的最近交易日；落後數＝資料日之後至應更新日之間的交易日數。美股 360 分鐘寬限會跨至台灣次日 10:00（冬令 11:00）；台股為 15:30。這是保守的資料發布政策，不宣稱來源有即時服務保證。
+使用與 `breakout_alert/market_clock.py` 相同的 `exchange_calendars` 交易所日曆，指定 XTAI／XNYS，不用週一至週五近似；早收盤、休市、夏令時間均依日曆。應更新日＝已收盤且已過發布寬限的最近交易日；落後數＝資料日之後至應更新日之間的交易日數。寬限依實際產出排程訂定：每日報告與全市場流程約在台灣時間 23:20～23:40 發布，因此每日流程的台股來源用 720 分鐘（台灣時間次日 01:30 前），美股用 1320 分鐘（夏令台灣時間隔天 02:00、冬令 03:00 前，即前一個美股交易日的資料要在台灣隔天晚上報告後才到）；其他美股來源維持 360 分鐘、台股 120 分鐘。正常的產出時間不會被標為延遲；這不宣稱來源有即時服務保證。
 
 注意監控口徑：這是**已發布衍生檔**的新鮮度；不重新向 TWSE STOCK_DAY_ALL、Yahoo 或財報 API 抓資料，也不保證備援成功後能得知原始端點本身是否卡住。時間戳來源只能檢查擷取／彙整是否新鮮，不能驗證其中每項內容；季度來源不推論財報是否已到申報期限。封存檢查市場最大日期，不代表每檔均已補齊。利率以 XNYS 作美國工作日近似基準，配合三交易日寬限，不宣稱涵蓋每個全球市場或 FRED 系列發布日曆。
 

@@ -37,18 +37,24 @@ class Source:
     counts_field: str = ""
 
 
+# The daily report and full-market universe publish around 23:20-23:40 Taipei (15:20-15:40Z):
+# Taiwan data for that day ~10h after the 13:30 close, and US data for the previous session
+# ~20h after its close. Grace covers that schedule with slack, so normal timing is not "late".
+TW_PIPELINE_MINUTES = 12 * 60
+US_PIPELINE_MINUTES = 22 * 60
+
 # All cadence, date selectors, publication grace and thresholds live in this table.
 # Quarterly entries monitor refresh coverage, NOT whether a new fiscal quarter is due.
 SOURCES = (
-    Source("report", "每日報告", "無", "latest.json", "reportDate"),
-    Source("universe-tw", "全市場台股", "TW", "universe.json", "markets.TW.asOf", counts_field="markets.TW.counts"),
-    Source("universe-us", "全市場美股", "US", "universe.json", "markets.US.asOf", calendar="XNYS", publish_minutes=360, counts_field="markets.US.counts"),
-    Source("breakouts-tw", "台股突破", "TW", "breakouts.json", "markets.tw.asOf|asOf"),
-    Source("breakouts-us", "美股突破", "US", "breakouts.json", "markets.us.asOf|asOf", calendar="XNYS", publish_minutes=360),
-    Source("breadth-tw", "台股市場寬度", "TW", "breadth.json", "markets.tw.asOf|generatedAt"),
-    Source("breadth-us", "美股市場寬度", "US", "breadth.json", "markets.us.asOf|generatedAt", calendar="XNYS", publish_minutes=360),
-    Source("themes-us", "美股題材", "US", "themes.json", "asOf", calendar="XNYS", publish_minutes=360),
-    Source("themes-tw", "台股題材", "TW", "themes-tw.json", "asOf"),
+    Source("report", "每日報告", "無", "latest.json", "reportDate", publish_minutes=TW_PIPELINE_MINUTES),
+    Source("universe-tw", "全市場台股", "TW", "universe.json", "markets.TW.asOf", publish_minutes=TW_PIPELINE_MINUTES, counts_field="markets.TW.counts"),
+    Source("universe-us", "全市場美股", "US", "universe.json", "markets.US.asOf", calendar="XNYS", publish_minutes=US_PIPELINE_MINUTES, counts_field="markets.US.counts"),
+    Source("breakouts-tw", "台股突破", "TW", "breakouts.json", "markets.tw.asOf|asOf", publish_minutes=TW_PIPELINE_MINUTES),
+    Source("breakouts-us", "美股突破", "US", "breakouts.json", "markets.us.asOf|asOf", calendar="XNYS", publish_minutes=US_PIPELINE_MINUTES),
+    Source("breadth-tw", "台股市場寬度", "TW", "breadth.json", "markets.tw.asOf|generatedAt", publish_minutes=TW_PIPELINE_MINUTES),
+    Source("breadth-us", "美股市場寬度", "US", "breadth.json", "markets.us.asOf|generatedAt", calendar="XNYS", publish_minutes=US_PIPELINE_MINUTES),
+    Source("themes-us", "美股題材", "US", "themes.json", "asOf", calendar="XNYS", publish_minutes=US_PIPELINE_MINUTES),
+    Source("themes-tw", "台股題材", "TW", "themes-tw.json", "asOf", publish_minutes=TW_PIPELINE_MINUTES),
     Source("rates", "利率（FRED）", "全球", "rates.json", "asOf", 3, 6, calendar="XNYS", publish_minutes=360),
     Source("chips", "台股籌碼", "TW", "tw-chips.json", "generatedAt", 5, 10, "weekly"),
     Source("growth", "成長財務彙整", "無", "growth.json", "generatedAt", 1, 3),
@@ -56,8 +62,8 @@ SOURCES = (
     Source("tw-financials", "台股財報（MOPS）", "TW", "fundamentals/tw.json", "fetch.latest-season.at", 65, 85, "quarterly", generated_field="fetch.latest-season.at"),
     Source("tw-finmind", "台股財報（FinMind）", "TW", "fundamentals/tw-finmind.json", "fetch.*.0", 65, 85, "quarterly", generated_field="fetch.*.0"),
     Source("trending", "熱門股", "US", "trending-stocks.json", "fetchedAt", calendar="XNYS", publish_minutes=360, generated_field="fetchedAt"),
-    Source("archive-tw", "台股 K 線封存（市場最新）", "TW", "@archive", "markets.tw.lastDate"),
-    Source("archive-us", "美股 K 線封存（市場最新）", "US", "@archive", "markets.us.lastDate", calendar="XNYS", publish_minutes=360),
+    Source("archive-tw", "台股 K 線封存（市場最新）", "TW", "@archive", "markets.tw.lastDate", publish_minutes=TW_PIPELINE_MINUTES),
+    Source("archive-us", "美股 K 線封存（市場最新）", "US", "@archive", "markets.us.lastDate", calendar="XNYS", publish_minutes=US_PIPELINE_MINUTES),
 )
 WORKFLOWS = {
     "schedule.yml": "每日報告", "universe-full.yml": "全市場資料／K 線封存",
