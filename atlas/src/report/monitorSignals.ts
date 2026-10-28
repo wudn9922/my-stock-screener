@@ -19,7 +19,9 @@ export type MonitorStock = {
   ticker: string; symbol: string | null; name: string; market: 'TW' | 'US'; signals: MonitorSignal[]; latest: string; maPeriods: number[];
 };
 export type MonitorGroup = { key: string; name: string; market: 'TW' | 'US'; stocks: MonitorStock[]; up: number; down: number; latest: string };
-export type MonitorResult = { status: 'ok'; data: MonitorSnapshot; groups: MonitorGroup[] } | { status: 'error'; message: string };
+/** The exchange-local session date shown for each market (YYYY-MM-DD). */
+export type MonitorSessions = Partial<Record<'TW' | 'US', string>>;
+export type MonitorResult = { status: 'ok'; data: MonitorSnapshot; groups: MonitorGroup[]; sessions: MonitorSessions } | { status: 'error'; message: string };
 export const MONITOR_API_URL = 'https://bxhqpfeberqbtxymghyt.supabase.co/functions/v1/monitor-signals';
 
 /** A Taiwan bare code must resolve in the real directory; never guess .TW vs .TWO. */
@@ -31,6 +33,23 @@ export async function monitorSymbol(ticker: string, market: 'TW' | 'US', search 
   }
   const symbol = market === 'US' ? ticker.replace(/\./g, '-') : ticker;
   return /^(?:\^[A-Z0-9]+|[A-Z][A-Z0-9-]{0,14}|\d{4,6}\.(?:TW|TWO))$/.test(symbol) ? symbol : null;
+}
+
+const SESSION_ZONES = { TW: 'Asia/Taipei', US: 'America/New_York' } as const;
+const sessionDate = (sentAt: string, market: 'TW' | 'US') =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: SESSION_ZONES[market], year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(sentAt));
+
+/**
+ * Only each market's latest session with a sent signal; the next session's signals replace it.
+ * Dates are exchange-local, so US signals sent after midnight in Taipei stay on their own session.
+ */
+export function latestSessionSignals(signals: readonly MonitorSignal[]): { signals: MonitorSignal[]; sessions: MonitorSessions } {
+  const sessions: MonitorSessions = {};
+  for (const signal of signals) {
+    const day = sessionDate(signal.sentAt, signal.market);
+    if (!sessions[signal.market] || day > sessions[signal.market]!) sessions[signal.market] = day;
+  }
+  return { signals: signals.filter(signal => sessionDate(signal.sentAt, signal.market) === sessions[signal.market]), sessions };
 }
 
 /** Group by market + monitor group, merge multiple triggered MAs into one stock card. */
@@ -84,10 +103,11 @@ export async function fetchMonitorSignals(signal?: AbortSignal, fetcher: typeof 
     const result = await response.json();
     const parsed = monitorSnapshotSchema.safeParse(result?.data);
     if (!response.ok || !result?.ok || !parsed.success) throw new Error('unavailable');
-    const unique = new Map(parsed.data.signals.map(row => [`${row.market}:${row.ticker}`, row]));
+    const latest = latestSessionSignals(parsed.data.signals);
+    const unique = new Map(latest.signals.map(row => [`${row.market}:${row.ticker}`, row]));
     const symbols = new Map(await Promise.all([...unique].map(async ([key, row]) => [key, await monitorSymbol(row.ticker, row.market)] as const)));
     if (abort.signal.aborted || context !== getStorageContextKey()) throw new Error('cancelled');
-    return { status: 'ok', data: parsed.data, groups: groupMonitorSignals(parsed.data.signals, symbols) };
+    return { status: 'ok', data: parsed.data, groups: groupMonitorSignals(latest.signals, symbols), sessions: latest.sessions };
   } catch {
     return { status: 'error', message: '暫時無法取得突破／跌破訊號，請稍後重試。' };
   } finally {

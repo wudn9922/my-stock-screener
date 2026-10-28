@@ -7,7 +7,7 @@ vi.mock('../src/auth/access', () => ({
 }));
 vi.mock('../src/auth/storage', () => ({ getStorageContextKey: () => state.context }));
 vi.mock('../src/app/dataSources', () => ({ searchStocks: vi.fn(async () => []) }));
-import { fetchMonitorSignals, groupMonitorSignals, monitorSnapshotSchema, monitorSymbol } from '../src/report/monitorSignals';
+import { fetchMonitorSignals, groupMonitorSignals, latestSessionSignals, monitorSnapshotSchema, monitorSymbol } from '../src/report/monitorSignals';
 import type { MonitorSignal } from '../../supabase/functions/monitor-signals/contract';
 const signal = (extra: Partial<MonitorSignal> = {}): MonitorSignal => ({ groupId: 'us_g1', groupName: '美股權值', ticker: 'NVDA', name: 'NVIDIA',
   market: 'US', direction: 'breakout_up', maPeriod: 20, sentAt: '2026-10-27T15:00:00.000Z', price: 150, maValue: 148, volumeRatio: 1.2, ...extra });
@@ -26,6 +26,20 @@ describe('monitor signal list', () => {
     expect(groups[0]).toMatchObject({ up: 1, down: 1 }); expect(groups[0]!.stocks[0]!.maPeriods).toEqual([20, 50]);
     expect(groups[0]!.stocks[0]!.symbol).toBe('NVDA');
   });
+  it('keeps only each market\'s latest exchange-local session', () => {
+    const { signals, sessions } = latestSessionSignals([
+      // US 10/27 session: 15:00Z and 23:30Z are both 10/27 in New York (the latter is past midnight in Taipei).
+      signal({ ticker: 'NVDA', sentAt: '2026-10-27T15:00:00.000Z' }), signal({ ticker: 'AAPL', sentAt: '2026-10-27T23:30:00.000Z' }),
+      signal({ ticker: 'MSFT', sentAt: '2026-10-26T15:00:00.000Z' }),
+      // TW 10/28 session: 01:30Z is 09:30 in Taipei; 10/27 is the previous session.
+      signal({ market: 'TW', ticker: '2330.TW', sentAt: '2026-10-28T01:30:00.000Z' }), signal({ market: 'TW', ticker: '2317.TW', sentAt: '2026-10-27T05:00:00.000Z' }),
+    ]);
+    expect(sessions).toEqual({ US: '2026-10-27', TW: '2026-10-28' });
+    expect(signals.map(row => row.ticker)).toEqual(['NVDA', 'AAPL', '2330.TW']);
+    // A closed market keeps its last session instead of emptying.
+    expect(latestSessionSignals([signal({ sentAt: '2026-10-23T15:00:00.000Z' })]).signals).toHaveLength(1);
+    expect(latestSessionSignals([])).toEqual({ signals: [], sessions: {} });
+  });
   it('resolves bare Taiwan tickers against the directory, never guesses listing', async () => {
     const search = vi.fn(async () => [{ symbol: '6488.TWO', market: 'TW' as const, name: '環球晶', exchange: 'TPEx' }]);
     expect(await monitorSymbol('6488', 'TW', search)).toBe('6488.TWO');
@@ -37,6 +51,7 @@ describe('monitor signal list', () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ ok: true, data: snapshot() })));
     const result = await fetchMonitorSignals(undefined, fetcher);
     expect(result.status).toBe('ok');
+    expect(result.status === 'ok' && result.sessions).toEqual({ US: '2026-10-27' });
     const [url, init] = fetcher.mock.calls[0]!; expect(String(url)).not.toContain('?'); expect(String(url)).not.toContain('secret');
     expect(init).toMatchObject({ method: 'POST', cache: 'no-store' });
     expect(JSON.parse(String(init?.body))).toEqual({ action: 'list', idToken: 'secret-in-body-only' });

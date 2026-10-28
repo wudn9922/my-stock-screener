@@ -7,7 +7,8 @@ account-owned monitor state through a new, isolated `monitor-signals` function.
 Existing login, user-settings, chart-drawings and monitor producers remain unchanged.
 Shared server identity/grant helpers authenticate each read; the verified owner is
 the only query scope. Only last successful Discord `last_alert_*` fields are projected.
-This is a rolling 30-day last-state view, not a new append-only notification history.
+This is a 30-day last-state read; the page shows only each market's latest signal session
+(exchange-local date), replaced by the next session. It is not an append-only notification history.
 
 The client binds its original storage context before asynchronous initialization,
 aborts on context changes, and never persists the returned personal groups/signals.

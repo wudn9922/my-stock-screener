@@ -13,7 +13,8 @@ private reads. Shared identity/grant helpers are reused, not changed; user-setti
 chart-drawings, login/account files, app shell and monitor producers are untouched.
 Pagination has an explicit cap, output uses a field allowlist/no-store, account changes
 cancel old requests, and personal results stay in RAM. Body size and upstream lifetime
-are bounded. The source is a 30-day last-state view, not full notification history.
+are bounded. The page shows only each market's latest signal session (exchange-local
+date) from a 30-day last-state read, not full notification history.
 
 The screener container now grows with its content while the virtual list remains a
 bounded scroll region. Synthetic 390×520 comparison reproduced 214px of overlap in

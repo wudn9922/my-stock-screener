@@ -114,7 +114,7 @@ test('a missing reader is explained and retry recovers without breaking saved li
   await page.goto('./?page=watchlist'); await source(page).click();
   await expect(panel(page).getByRole('alert')).toContainText('監控訊號讀取服務尚未啟用');
   await panel(page).getByRole('button', { name: '重試', exact: true }).click();
-  await expect(panel(page).getByRole('status')).toContainText('最近 30 天沒有成功發送');
+  await expect(panel(page).getByRole('status')).toContainText('最近沒有成功發送');
   await expect(page.getByRole('button', { name: '建立手動清單', exact: true })).toBeVisible();
 });
 
@@ -124,6 +124,19 @@ for (const mode of ['none', 'device'] as const) test(`${mode} never requests clo
   await page.goto('./?page=watchlist'); await source(page).click();
   await expect(page.getByRole('status').filter({ hasText: '突破／跌破是個人雲端監控資料' })).toBeVisible();
   expect(calls).toBe(0);
+});
+
+test('only the latest session per market is shown; an older day is replaced', async ({ page }) => {
+  await setup(page);
+  await mockSignals(page, [signal(), signal({ ticker: 'MSFT', name: 'Microsoft', sentAt: '2026-10-26T15:00:00.000Z' }),
+    signal({ groupId: 'us_g3', groupName: '美股超級績效', ticker: 'TSLA', name: 'Tesla', sentAt: '2026-10-24T15:00:00.000Z' })]);
+  await page.goto('./?page=watchlist'); await source(page).click();
+  await expect(panel(page)).toContainText('最新一天 · 美股 2026/10/27');
+  await expect(panel(page).locator('.monitor-group')).toHaveCount(1);
+  await expect(panel(page).getByRole('button', { name: '美股超級績效 詳細', exact: true })).toHaveCount(0);
+  await panel(page).getByRole('button', { name: '美股權值精選 詳細', exact: true }).click();
+  await expect(panel(page).locator('.monitor-stock')).toHaveCount(1);
+  await expect(panel(page)).toContainText('NVIDIA'); await expect(panel(page)).not.toContainText('Microsoft');
 });
 
 test('previous successful sends remain visible after market closure; unavailable charts retain signals', async ({ page }) => {

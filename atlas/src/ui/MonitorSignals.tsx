@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { accessState } from '../auth/access';
 import { getStorageContextKey } from '../auth/storage';
-import { fetchMonitorSignals, type MonitorGroup, type MonitorResult, type MonitorStock } from '../report/monitorSignals';
+import { fetchMonitorSignals, type MonitorGroup, type MonitorResult, type MonitorSessions, type MonitorStock } from '../report/monitorSignals';
 import { MiniChart } from './MiniChart';
 import type { OpenChartOptions } from '../app/Site';
 import { displayTicker, formatDateTime, formatPrice, formatRatio } from './format';
 import './monitorSignals.css';
+
+const sessionLabel = (sessions: MonitorSessions) => (['TW', 'US'] as const)
+  .filter(market => sessions[market]).map(market => ` · ${market === 'TW' ? '台股' : '美股'} ${formatDateTime(sessions[market]!, false)}`).join('');
 
 function SignalStock({ stock, openChart }: { stock: MonitorStock; openChart: (options: OpenChartOptions) => void }) {
   const ref = useRef<HTMLElement>(null);
@@ -88,12 +91,12 @@ function CloudSignals({ openChart }: { openChart: (options: OpenChartOptions) =>
     {!result ? <p role="status">讀取已成功發送到 Discord 的訊號…</p> : result.status === 'error'
       ? <div role="alert"><p>{result.message}</p><button type="button" className="ghost-button" onClick={() => setAttempt(value => value + 1)}>重試</button></div>
       : <>
-        <div className="monitor-caption">最近 30 天 · 更新 {formatDateTime(result.data.generatedAt)}
-          <details><summary>訊號範圍</summary><p>與 Discord 共用成功發送紀錄。每組、每檔、每條均線只保留最後一次訊號；這不是完整訊息歷史。圖表為延遲日 K，觸發價是發送當時的價格。</p></details>
+        <div className="monitor-caption">最新一天{sessionLabel(result.sessions)} · 更新 {formatDateTime(result.data.generatedAt)}
+          <details><summary>訊號範圍</summary><p>與 Discord 共用成功發送紀錄。台股、美股各自只顯示最近一個有訊號的交易日（依當地日期），下一個交易日有新訊號就換成新的一天；休市時保留最後一天。每組、每檔、每條均線只保留最後一次訊號；這不是完整訊息歷史。圖表為延遲日 K，觸發價是發送當時的價格。</p></details>
         </div>
         {result.data.truncated && <p role="status">訊號較多，目前顯示最新 5,000 筆。</p>}
         {group ? <GroupDetail key={group.key} group={group} onBack={() => { setSelected(null); heading.current?.focus({ preventScroll: true }); heading.current?.scrollIntoView({ block: 'start' }); }} openChart={openChart} />
-          : !result.groups.length ? <p role="status">最近 30 天沒有成功發送的突破／跌破訊號，休市期間仍會保留已有紀錄。</p>
+          : !result.groups.length ? <p role="status">最近沒有成功發送的突破／跌破訊號，休市期間仍會保留最後一天的紀錄。</p>
             : <div className="monitor-groups">{result.groups.map(group => <article key={group.key} className="console-card monitor-group">
               <span>{group.market === 'TW' ? '台股' : '美股'}</span><h4>{group.name}</h4>
               <p><b className="up">突破 {group.up}</b><b className="down">跌破 {group.down}</b><span>共 {group.stocks.length} 檔</span></p>
