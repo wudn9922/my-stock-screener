@@ -41,7 +41,7 @@
   flex-wrap: wrap;
 }
 .wb-tabs button {
-  min-height: 44px;
+  min-height: 46px;
   padding: 0 16px;
   border-radius: 22px;
   border: 1px solid var(--border-strong);

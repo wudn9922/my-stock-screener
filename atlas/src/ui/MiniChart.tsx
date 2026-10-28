@@ -56,6 +56,7 @@ export function MiniChart({
   maPeriods = NO_MAS,
   interactive = false,
   showVolume = false,
+  wheelZoom = true,
 }: {
   symbol: string;
   height?: number;
@@ -63,6 +64,8 @@ export function MiniChart({
   maPeriods?: readonly number[];
   interactive?: boolean;
   showVolume?: boolean;
+  /** Long review lists let the mouse wheel scroll the page; buttons/pinch still zoom. */
+  wheelZoom?: boolean;
 }) {
   const { ref, near } = useNearViewport<HTMLDivElement>();
   const hostRef = useRef<HTMLDivElement>(null);
@@ -114,7 +117,7 @@ export function MiniChart({
       rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.1, bottom: showVolume ? 0.25 : 0.08 } },
       timeScale: { borderVisible: false, rightOffset: 2, fixLeftEdge: true, fixRightEdge: true },
       handleScroll: interactive ? { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false } : false,
-      handleScale: interactive ? { mouseWheel: true, pinch: true, axisPressedMouseMove: { time: true, price: false } } : false,
+      handleScale: interactive ? { mouseWheel: wheelZoom, pinch: true, axisPressedMouseMove: { time: true, price: false } } : false,
       localization: { locale: 'zh-TW' },
     });
     chartRef.current = chart;
@@ -177,7 +180,7 @@ export function MiniChart({
       chartRef.current = null;
       chart.remove();
     };
-  }, [bars, colors, maKey, interactive, showVolume]);
+  }, [bars, colors, maKey, interactive, showVolume, wheelZoom]);
   const zoom = (factor: number) => {
     const scale = chartRef.current?.timeScale();
     const range = scale?.getVisibleLogicalRange();

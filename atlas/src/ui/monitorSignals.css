@@ -1,0 +1,33 @@
+.monitor-signals, .monitor-detail, .monitor-stock-list { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.monitor-summary, .monitor-detail-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.monitor-summary h3, .monitor-detail h3 { margin: 0; font-size: 18px; scroll-margin-block-start: 16px; }
+.monitor-signals button { min-height: 44px; }
+.monitor-caption { margin: 0; color: var(--text-3); font-size: 12px; line-height: 1.6; }
+.monitor-caption details { margin-top: 4px; }
+.monitor-caption summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.monitor-caption details p { margin: 0 0 8px; }
+.monitor-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 12px; }
+.monitor-group { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.monitor-group h4 { margin: 0; font-size: 17px; overflow-wrap: anywhere; }
+.monitor-group > span, .monitor-group small { font-size: 12px; color: var(--text-3); }
+.monitor-group p { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; font-size: 14px; }
+.monitor-group > button { align-self: flex-start; margin-top: auto; }
+.monitor-signals .up { color: var(--up-text); }
+.monitor-signals .down { color: var(--down-text); }
+.monitor-stock { min-width: 0; }
+.monitor-stock > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.monitor-stock h4 { margin: 0; font-size: 18px; overflow-wrap: anywhere; }
+.monitor-stock > header span { font-size: 13px; color: var(--text-3); }
+.monitor-stock > header button { flex: none; }
+.monitor-triggers { display: flex; flex-wrap: wrap; gap: 8px 14px; list-style: none; margin: 12px 0; padding: 0; }
+.monitor-triggers li { display: flex; flex-direction: column; gap: 3px; font-size: 13px; min-width: 0; }
+.monitor-triggers span, .monitor-triggers small { color: var(--text-3); font-size: 12px; overflow-wrap: anywhere; }
+.monitor-chart { height: 280px; min-width: 0; position: relative; }
+.monitor-chart .mini-chart-controls { height: 44px; }
+.monitor-chart .mini-chart-controls button { min-width: 44px; }
+.monitor-chart .mini-chart-interactive .mini-chart-canvas { top: 44px; }
+.monitor-chart > p { padding: 24px 12px; color: var(--text-3); font-size: 13px; }
+@media (max-width: 480px) {
+  .monitor-stock { padding: 12px 4px; }
+  .monitor-stock > header, .monitor-triggers { margin-inline: 8px; }
+}

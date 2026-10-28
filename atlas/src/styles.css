@@ -1359,7 +1359,7 @@ h3 {
 
 /* -- Screener */
 .screener-page {
-  height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   padding-bottom: 16px;
@@ -1491,7 +1491,8 @@ h3 {
   text-align: right;
 }
 .screener-list {
-  flex: 1;
+  flex: none;
+  height: clamp(300px, 55dvh, 680px);
   min-height: 300px;
   overflow-y: auto;
   overscroll-behavior: contain;

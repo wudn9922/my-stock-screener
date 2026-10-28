@@ -430,3 +430,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/user-settings/deno.json"
 entrypoint = "./functions/user-settings/index.ts"
+
+[functions.monitor-signals]
+enabled = true
+verify_jwt = false
+import_map = "./functions/monitor-signals/deno.json"
+entrypoint = "./functions/monitor-signals/index.ts"
