@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { LineHandoffError, lineLoginHandoff } from "../_shared/lineLoginHandoff.ts";
 import { validateWatchlist, watchlistId, watchlistVersion } from "./watchlists.ts";
+import { DeviceSessionError, createDeviceSession, resolveLineUser, revokeDeviceSession } from "../_shared/deviceSession.ts";
 import { StorageAccessError, adminLineId, getStorageAccess, listStorageGrants, parseStorageUserId, requireCloudStorage, saveStorageGrant } from "../_shared/storageAccess.ts";
 
 /**
@@ -21,6 +22,10 @@ import { StorageAccessError, adminLineId, getStorageAccess, listStorageGrants, p
  *   stocks.delete { id }
  *   admin.index.list                                      僅管理員（回傳目前已設定的大盤均線）
  *   admin.index.save { ticker, name, mas: number[] }      僅管理員
+ *   device.session.create                                 以 LINE ID Token 記住這台裝置（回傳 deviceToken）
+ *   device.session.revoke                                 以 deviceToken 登出這台裝置
+ *
+ * idToken 也可以是 deviceToken（atlasdev. 開頭）；儲存授權仍在每次請求重新檢查。
  */
 
 const corsHeaders = {
@@ -251,10 +256,6 @@ Deno.serve(async (request: Request) => {
       throw new HttpError(401, "Missing LIFF ID Token");
     }
 
-    const lineUserId = await verifyLineIdToken(
-      idToken,
-    );
-
     const supabaseUrl = Deno.env.get(
       "SUPABASE_URL",
     );
@@ -279,6 +280,18 @@ Deno.serve(async (request: Request) => {
         },
       },
     );
+
+    // Remembering a device proves the LINE account only; it never reads or changes a grant.
+    if (action === "device.session.create") {
+      const data = await createDeviceSession(supabase, idToken, verifyLineIdToken, request.headers.get("user-agent"));
+      return new Response(JSON.stringify({ ok: true, data }), { headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
+    }
+    if (action === "device.session.revoke") {
+      const data = await revokeDeviceSession(supabase, idToken);
+      return jsonResponse({ ok: true, data });
+    }
+
+    const lineUserId = await resolveLineUser(supabase, idToken, verifyLineIdToken);
 
     const adminId = adminLineId(Deno.env.get("ADMIN_LINE_USER_ID"));
     // Login/access discovery is read-only. An ungranted user is never enrolled automatically.
@@ -630,6 +643,9 @@ Deno.serve(async (request: Request) => {
     if (error instanceof LineHandoffError) return new Response(JSON.stringify({ ok: false, error: error.message }), { status: error.status, headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
     if (error instanceof StorageAccessError) {
       return jsonResponse({ ok: false, error: error.message, code: error.code }, error.status);
+    }
+    if (error instanceof DeviceSessionError) {
+      return jsonResponse({ ok: false, error: error.message, code: "device_session" }, error.status);
     }
     if (error instanceof HttpError) {
       return jsonResponse(

@@ -4,7 +4,8 @@ import { applyColorConvention } from './app/sitePreferences';
 import { SCREENER_HOSTING } from './app/HostingMode';
 import { accessState, initializeAccess } from './auth/access';
 import { retireScreenerWorker } from './auth/retireWorker';
-import { DEFAULT_LIFF_ID, needsLineIdentityBeforeRouting, startLineIdentity } from './cloud/lineIdentity';
+import { DEFAULT_LIFF_ID, hasLineLoginCallback, needsLineIdentityBeforeRouting, startLineIdentity } from './cloud/lineIdentity';
+import { completeRememberAfterRedirect } from './cloud/deviceSession';
 import { PUBLIC_BASE } from './app/HostingMode';
 import './styles.css';
 import { prepareIncomingLineHandoff } from './cloud/lineLoginHandoff';
@@ -31,11 +32,17 @@ async function render() {
     // An explicit external LINE callback must finish before the router can
     // normalize its URL. A slow SDK gets a recovery screen with the URL intact.
     if (needsLineIdentityBeforeRouting()) {
+      const oauthReturn = hasLineLoginCallback();
       const root = document.getElementById('root')!;
       root.textContent = '正在完成 LINE 登入…';
       let timer: ReturnType<typeof setTimeout> | undefined;
       const finished = await Promise.race([
-        startLineIdentity(import.meta.env.VITE_LIFF_ID || DEFAULT_LIFF_ID).then(identity => { prepareIncomingLineHandoff(identity); return true; }),
+        startLineIdentity(import.meta.env.VITE_LIFF_ID || DEFAULT_LIFF_ID).then(async identity => {
+          prepareIncomingLineHandoff(identity);
+          // A same-window OAuth return that started with 「記住這台裝置」 checked.
+          if (oauthReturn) await completeRememberAfterRedirect(identity);
+          return true;
+        }),
         new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), 15000); }),
       ]);
       clearTimeout(timer);

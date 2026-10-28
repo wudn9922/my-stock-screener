@@ -167,7 +167,9 @@ for (const rejected of ['denied', 'mismatched'] as const) {
     await page.getByRole('button', { name: '使用 LINE 登入', exact: true }).click();
     await expect.poll(() => actions.length).toBeGreaterThan(0);
     await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'none');
-    expect(actions.every(action => action.action === 'access.get' && action.idToken === `token-${DEVICE_USER_ID}`)).toBe(true);
+    // Only the grant check and the remember-device exchange see the LINE token; neither is stored.
+    expect(actions.every(action => ['access.get', 'device.session.create'].includes(action.action as string) && action.idToken === `token-${DEVICE_USER_ID}`)).toBe(true);
+    expect(await page.evaluate(() => localStorage.getItem('atlas-device-session-v1'))).toBeNull();
     await displayColors(page, '綠漲紅跌');
     await expect(page.locator('html')).toHaveAttribute('data-colors', 'us');
     expect(await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('atlas-account-')))).toEqual([]);
@@ -326,25 +328,34 @@ test('SDK browser signout isolates the workspace without deleting drawings, and 
   await page.mouse.up();
   await expect(page.locator('.chart-status')).toContainText('畫線 1 條');
   await expect.poll(() => accountDrawingCount(page)).toBe(1);
+  // Account controls live on 我的; the chart page no longer carries the login bar.
+  await expect(page.getByRole('button', { name: '登出 LINE', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '我的', exact: true }).click();
   await page.getByRole('button', { name: '登出 LINE', exact: true }).click();
   await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'none');
   expect((await lineState(page)).logoutCalls).toBe(1);
   expect(await accountDrawingCount(page)).toBe(1);
+  await page.getByRole('button', { name: '個股', exact: true }).click();
   await expect(page.locator('.chart-status')).toContainText('畫線 0 條');
+  await page.getByRole('button', { name: '我的', exact: true }).click();
   await page.evaluate(account => { (globalThis as unknown as { __lineMock: LineMock }).__lineMock.account = account; }, DEVICE_USER_ID);
   await page.getByRole('button', { name: '使用 LINE 登入', exact: true }).click();
   await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'device');
+  await page.getByRole('button', { name: '個股', exact: true }).click();
   await expect(page.locator('.chart-status')).toContainText('畫線 1 條');
   const requestsBeforeReload = sdk.length, grantsBeforeReload = actions.length;
   await page.reload();
-  await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'none');
   await expect(page.locator('.chart-status')).toContainText('畫線 0 條');
+  await page.getByRole('button', { name: '我的', exact: true }).click();
+  await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'none');
   expect(sdk).toHaveLength(requestsBeforeReload);
   expect((await lineState(page)).initCalls).toEqual([]);
   expect(actions).toHaveLength(grantsBeforeReload);
   await page.getByRole('button', { name: '使用 LINE 登入', exact: true }).click();
   await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'device');
+  await page.getByRole('button', { name: '個股', exact: true }).click();
   await expect(page.locator('.chart-status')).toContainText('畫線 1 條');
+  await page.getByRole('button', { name: '我的', exact: true }).click();
   expect(sdk).toHaveLength(requestsBeforeReload + 1);
   expect((await lineState(page)).initCalls).toHaveLength(1);
   expect(actions.length).toBeGreaterThan(grantsBeforeReload);
@@ -353,8 +364,10 @@ test('SDK browser signout isolates the workspace without deleting drawings, and 
     window.dispatchEvent(new Event('focus'));
   });
   await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'none');
+  await page.getByRole('button', { name: '個股', exact: true }).click();
   await expect(page.locator('.chart-status')).toContainText('畫線 0 條');
   expect(await accountDrawingCount(page)).toBe(1);
   expect((await lineState(page)).loginCalls).toEqual([]);
-  expect(actions.every(action => action === 'access.get')).toBe(true);
+  // The server declined to issue a device token here, so expiry falls back to guest.
+  expect(actions.every(action => action === 'access.get' || action === 'device.session.create')).toBe(true);
 });

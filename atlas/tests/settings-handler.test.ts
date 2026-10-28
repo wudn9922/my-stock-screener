@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { watchlistId, watchlistVersion } from '../../supabase/functions/user-settings/watchlists';
 import * as storageAccess from '../../supabase/functions/_shared/storageAccess';
 import * as lineHandoff from '../../supabase/functions/_shared/lineLoginHandoff';
+import * as deviceSession from '../../supabase/functions/_shared/deviceSession';
 
 type Row = Record<string, unknown>;
 /** Exercise the deployed handler's validation and ownership predicates with an offline database. */
@@ -98,6 +99,7 @@ function handlerFixture(seed: Row[] = [], count = seed.length, enabled = true, t
     watchlistVersion,
     ...storageAccess,
     ...lineHandoff,
+    ...deviceSession,
     Request,
     Response,
     URLSearchParams,

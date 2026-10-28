@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { DeviceSessionError, resolveLineUser } from "../_shared/deviceSession.ts";
 import { StorageAccessError, adminLineId, parseStorageUserId, requireCloudStorage } from "../_shared/storageAccess.ts";
 
 /**
@@ -172,10 +173,6 @@ Deno.serve(async (request: Request) => {
       );
     }
 
-    const lineUserId = await verifyLineIdToken(
-      idToken,
-    );
-
     const supabaseUrl = Deno.env.get(
       "SUPABASE_URL",
     );
@@ -200,6 +197,9 @@ Deno.serve(async (request: Request) => {
         },
       },
     );
+
+    // A remembered-device token resolves to its LINE account; the grant check below still applies.
+    const lineUserId = await resolveLineUser(supabase, idToken, verifyLineIdToken);
 
     // Shared with user-settings: legacy and Atlas routes cannot bypass an owner's grant.
     await requireCloudStorage(supabase, lineUserId, adminLineId(Deno.env.get("ADMIN_LINE_USER_ID")));
@@ -402,6 +402,9 @@ Deno.serve(async (request: Request) => {
   } catch (error) {
     if (error instanceof StorageAccessError) {
       return jsonResponse({ ok: false, error: error.message, code: error.code }, error.status);
+    }
+    if (error instanceof DeviceSessionError) {
+      return jsonResponse({ ok: false, error: error.message, code: "device_session" }, error.status);
     }
     console.error(error);
 

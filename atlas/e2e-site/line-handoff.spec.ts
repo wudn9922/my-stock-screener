@@ -68,6 +68,7 @@ const launchRecord = (page: Page) =>
   );
 
 /** Two independent contexts deliberately share no cookies, localStorage or IndexedDB. */
+const REMEMBERED_TOKEN = `atlasdev.${'r'.repeat(43)}`;
 for (const scenario of [
   'legitimate',
   'attempt-limit',
@@ -146,6 +147,12 @@ for (const scenario of [
           if (context === page.context()) receiverAccess++;
           return r.fulfill({ json: accessEnvelope(DEVICE_USER_ID) });
         }
+        // 「記住這台裝置」 exchanges the handed-off LINE token once; logout revokes it.
+        if (body.action === 'device.session.create') {
+          expect(body.idToken).toBe(candidate.idToken);
+          return r.fulfill({ json: { ok: true, data: { userId: DEVICE_USER_ID, deviceToken: REMEMBERED_TOKEN, expiresAt: null } } });
+        }
+        if (body.action === 'device.session.revoke') return r.fulfill({ json: { ok: true, data: { revoked: true } } });
         if (body.action === 'line.login.begin') {
           intentId = body.intentId as string;
           readSecret = body.readSecret as string;
@@ -331,7 +338,7 @@ for (const scenario of [
           );
       }
       if (scenario === 'attempt-limit') {
-        await expect(page.locator('[data-storage-mode]')).toContainText(
+        await expect(page.locator('.storage-policy-note')).toContainText(
           '確認碼錯誤已達五次',
         );
         await expect(form).toHaveCount(0);
@@ -349,10 +356,8 @@ for (const scenario of [
         .click();
       const confirm = page.getByRole('group', { name: '確認 LINE 登入帳號' });
       await expect(confirm).toContainText('本人測試帳號');
-      await expect(page.locator('[data-storage-mode]')).toHaveAttribute(
-        'data-storage-mode',
-        'none',
-      );
+      // The installed app stays on its login page until the account is confirmed.
+      await expect(page.locator('.login-gate')).toBeVisible();
       expect(receiverAccess).toBe(0);
       expect(sdk.exchanges).toHaveLength(1);
       expect(sdk.exchanges[0].hasVerifier).toBe(true);
@@ -362,6 +367,9 @@ for (const scenario of [
         'device',
       );
       expect(page.url()).toBe(originalUrl);
+      await expect.poll(() => page.evaluate(() => localStorage.getItem('atlas-device-session-v1')))
+        .toBe(JSON.stringify({ token: REMEMBERED_TOKEN, userId: DEVICE_USER_ID }));
+      await expect(page.locator('[data-storage-mode]')).toContainText('此裝置已記住登入');
       expect(
         await page.evaluate(() =>
           Object.keys(localStorage).filter(
@@ -372,10 +380,10 @@ for (const scenario of [
       await page
         .getByRole('button', { name: '登出 LINE', exact: true })
         .click();
-      await expect(page.locator('[data-storage-mode]')).toHaveAttribute(
-        'data-storage-mode',
-        'none',
-      );
+      // Logging out forgets the device here and on the server, and returns to the login page.
+      await expect(page.locator('.login-gate')).toBeVisible();
+      await expect.poll(() => actions.some(action => action.action === 'device.session.revoke' && action.idToken === REMEMBERED_TOKEN)).toBe(true);
+      expect(await page.evaluate(() => localStorage.getItem('atlas-device-session-v1'))).toBeNull();
       expect(consumed).toBe(true);
       await expect(launchFrame).toHaveCount(0);
       // The receiver document (and its RAM read secret) was never unloaded.
@@ -431,7 +439,7 @@ for (const insideLine of [false, true])
       page.getByRole('link', { name: '開啟 LINE 登入視窗' }),
     ).toBeVisible();
     await page.getByRole('button', { name: '取消登入', exact: true }).click();
-    await expect(page.locator('[data-storage-mode]')).toContainText(
+    await expect(page.locator('.storage-policy-note')).toContainText(
       '已取消 LINE 登入',
     );
     await expect(
