@@ -1,6 +1,6 @@
 import { accessState } from '../auth/access';
 import { canPersist, getStorageContextKey, userStorage } from '../auth/storage';
-import { settingsApi } from '../cloud/settingsApi';
+import { holdingsContextApi } from './contextApi';
 import {
   emptyHoldings,
   replaceAccount,
@@ -53,7 +53,7 @@ export class HoldingsStore {
     if (this.mode !== 'cloud') return;
     this.set({ loading: true, error: '' });
     try {
-      const document = validateHoldingsDocument(await settingsApi('holdings.list'));
+      const document = validateHoldingsDocument(await holdingsContextApi(this.context, 'holdings.list'));
       this.set({ document });
     } catch {
       if (this.context === getStorageContextKey()) this.set({ error: '無法載入雲端持股，請確認服務已啟用後重試。' });
@@ -81,12 +81,19 @@ export class HoldingsStore {
       { accountId: id, expectedRevision: previous.revision },
     );
   }
+  /** MEXC replies are verified, same-owner cloud documents; never persisted locally. */
+  acceptCloudDocument(document: unknown) {
+    this.active();
+    if (this.mode !== 'cloud') throw new Error('MEXC 同步需要雲端儲存授權。');
+    this.set({ document: validateHoldingsDocument(document), error: '' });
+  }
   private async write(next: HoldingsDocument, action: string, payload: Record<string, unknown>) {
     this.active();
     if (this.blocked || this.snapshot.loading || this.snapshot.error) throw new Error('請先成功載入持股，再進行修改。');
     let document: HoldingsDocument;
     try {
-      if (this.mode === 'cloud') document = validateHoldingsDocument(await settingsApi(action, payload));
+      if (this.mode === 'cloud')
+        document = validateHoldingsDocument(await holdingsContextApi(this.context, action, payload));
       else {
         document = validateHoldingsDocument(next);
         userStorage.setItem(KEY, JSON.stringify(document));
