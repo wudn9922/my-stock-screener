@@ -293788,6 +293788,32 @@
       "reason": "invalid-source-bar-replaced",
       "id": "9f8c973c850e219be9593cd6e7734c7a42678a028749ecce828cb1a85a70523f",
       "loggedAt": "2026-10-28T09:56:38.093711+00:00"
+    },
+    {
+      "adjustmentId": "c3e084ce5bf014b280ad72d3aff5913cb2e367f598e66d918d66e03a2a1d6abd",
+      "comparison": {
+        "date": "2026-10-14",
+        "newClose": 0.15000000596046448,
+        "oldClose": 0.1462,
+        "worst": 0.025992
+      },
+      "date": "2026-10-23",
+      "fetchedAt": "2026-10-28T09:44:02.511051+00:00",
+      "id": "46e84f1bce03b31d6fdc3e901fadea74838a07a272cef7bc08831cb76febbc0c",
+      "loggedAt": "2026-10-28T10:12:33.334131+00:00",
+      "new": {
+        "path": "us/CYAB/2026.csv",
+        "rowsChanged": 2,
+        "sha256": "f3e0748ed9d249d1fc9ba1f52a5ddffcec50cb78a19215954ee6ff568111c5fe"
+      },
+      "old": {
+        "sha256": "f5d15dff94790bbdfae78979aa7ccf6dafd239cbbf8ddbc37c6e76263ae6a7d5"
+      },
+      "reason": "kline-archive/adjustment-year:c3e084ce5bf014b280ad72d3aff5913cb2e367f598e66d918d66e03a2a1d6abd",
+      "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/CYAB",
+      "status": "corrected",
+      "symbol": "CYAB",
+      "year": 2026
     }
   ]
 }
