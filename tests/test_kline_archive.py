@@ -507,6 +507,83 @@ class ArchiveTests(_ArchiveCase):
             ka.verify(self.archive, base)
 
 
+def flat(day, close=100):
+    return ka.normalize([day, close, close, close, close, 0])
+
+
+TW_SYMBOLS = [f"{1101 + i}.TW" for i in range(ka.CLOSED_SESSION_MIN_SYMBOLS + 10)]
+
+
+class ClosedSessionTests(_ArchiveCase):
+    """Unscheduled market-wide closures (e.g. 2026-10-23 typhoon) are not trading sessions."""
+
+    def seed_market(self, closed_day="2026-10-21", traded=()):
+        for symbol in TW_SYMBOLS:
+            bar = row(closed_day, close=101) if symbol in traded else flat(closed_day)
+            ka.put_symbol(self.archive, symbol, [row("2026-10-20"), bar, row("2026-10-22", close=102)])
+        ka.update_manifest(self.archive)
+
+    def test_stage_never_archives_a_market_wide_closed_session(self):
+        for symbol in TW_SYMBOLS:
+            ka.put_symbol(self.archive, symbol, [row("2026-10-20")])
+            self.cache_rows(symbol, [row("2026-10-20"), flat("2026-10-21"), row("2026-10-22", close=102)])
+        ka.update_manifest(self.archive)
+        plan = ka.stage_cache(self.cache, self.archive, self.payload, now=NOW)
+        self.assertEqual(plan["closedSessions"], [{"market": "tw", "date": "2026-10-21", "symbols": len(TW_SYMBOLS)}])
+        ka.apply_operations(self.archive, self.payload, now=NOW)
+        self.assertEqual([r[0] for r in ka.symbol_rows(self.archive, TW_SYMBOLS[0])], ["2026-10-20", "2026-10-22"])
+
+    def test_isolated_flat_bars_on_a_trading_day_are_still_archived(self):
+        for index, symbol in enumerate(TW_SYMBOLS):
+            ka.put_symbol(self.archive, symbol, [row("2026-10-20")])
+            bar = flat("2026-10-21") if index < 5 else row("2026-10-21", close=101)
+            self.cache_rows(symbol, [row("2026-10-20"), bar])
+        ka.update_manifest(self.archive)
+        plan = ka.stage_cache(self.cache, self.archive, self.payload, now=NOW)
+        self.assertEqual(plan["closedSessions"], [])
+        ka.apply_operations(self.archive, self.payload, now=NOW)
+        self.assertEqual(ka.symbol_rows(self.archive, TW_SYMBOLS[0])[-1], flat("2026-10-21"))
+
+    def test_audited_removal_passes_verification_and_is_logged_per_file(self):
+        self.seed_market()
+        base = self.checkpoint()
+        result = ka.remove_closed_session(self.archive, "tw", "2026-10-21")
+        self.assertEqual(result["removed"], len(TW_SYMBOLS))
+        self.assertEqual([r[0] for r in ka.symbol_rows(self.archive, TW_SYMBOLS[0])], ["2026-10-20", "2026-10-22"])
+        events = [e for e in ki.read_log(self.archive / ka.LOG)["events"] if e["status"] == "removed"]
+        self.assertEqual(len(events), len(TW_SYMBOLS))
+        self.assertTrue(all(e["reason"] == ka.CLOSED_SESSION_REASON and e["date"] == "2026-10-21" for e in events))
+        ka.verify(self.archive, base)
+        # The main journal only carries price adjustments.
+        self.assertFalse(ka.merge_main_log(self.archive, self.log))
+
+    def test_removal_refuses_a_day_when_any_stock_traded(self):
+        self.seed_market(traded={TW_SYMBOLS[0]})
+        before = {p: p.read_bytes() for p in (self.archive / "tw").rglob("*.csv")}
+        with self.assertRaisesRegex(ValueError, "traded"):
+            ka.remove_closed_session(self.archive, "tw", "2026-10-21")
+        self.assertEqual({p: p.read_bytes() for p in (self.archive / "tw").rglob("*.csv")}, before)
+
+    def test_audit_cannot_cover_another_deleted_date(self):
+        self.seed_market()
+        base = self.checkpoint()
+        ka.remove_closed_session(self.archive, "tw", "2026-10-21")
+        path = self.archive / "tw" / TW_SYMBOLS[0] / "2026.csv"
+        path.write_text(ka.csv_text([row("2026-10-20")]))
+        ka.update_manifest(self.archive)
+        with self.assertRaisesRegex(ValueError, "deleted"):
+            ka.verify(self.archive, base)
+
+    def test_unaudited_removal_of_a_placeholder_is_still_rejected(self):
+        self.seed_market()
+        base = self.checkpoint()
+        path = self.archive / "tw" / TW_SYMBOLS[0] / "2026.csv"
+        path.write_text(ka.csv_text([row("2026-10-20"), row("2026-10-22", close=102)]))
+        ka.update_manifest(self.archive)
+        with self.assertRaisesRegex(ValueError, "deleted"):
+            ka.verify(self.archive, base)
+
+
 class BackfillTests(_ArchiveCase):
     def test_empty_or_invalid_chart_payload_records_no_source_data_without_rows(self):
         self.seed("SVA")

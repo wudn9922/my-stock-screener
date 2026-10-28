@@ -46,7 +46,9 @@ Ordinary daily updates only append completed sessions accepted by universe-full.
 Backfill inserts missing dates with audit records, never replaces disagreements.
 Only a cache-proven history adjustment may correct existing dates; every change
 has per-year old/new SHA-256 audits in docs/report/kline-corrections.json.
-Dates are never removed.
+Dates are never removed, except an audited market-wide closed-session placeholder
+(an unscheduled closure such as a typhoon day, where every stock has a flat zero-volume
+bar at the previous close): status "removed", reason kline-archive/closed-session.
 state/ retains resumable backfill progress and deduplicated conflicts.
 manifest.json reports the actual symbols, market date bounds, rows and byte size.
 
@@ -198,6 +200,24 @@ def latest_rows(root, symbol, count):
 def first_date(root, symbol):
     paths = sorted((Path(root) / market_of(symbol) / symbol).glob("*.csv"))
     return read_rows(paths[0], strict=True)[0][0] if paths else None
+
+
+# A market-wide closed session (e.g. an unscheduled typhoon closure that exchange calendars
+# do not know) shows up as a flat, zero-volume bar at the previous close for nearly every stock.
+CLOSED_SESSION_REASON = "kline-archive/closed-session"
+CLOSED_SESSION_MIN_SYMBOLS = 50
+CLOSED_SESSION_SHARE = 0.95
+
+
+def is_placeholder(row, previous_close):
+    """Flat zero-volume bar repeating the previous close; unknown volume is never a placeholder."""
+    return previous_close is not None and row[1] == row[2] == row[3] == row[4] == previous_close and row[5] == "0"
+
+
+def closed_sessions(observations):
+    """observations: {(market, date): [is_placeholder, ...]} -> market-wide closed (market, date) keys."""
+    return {key for key, flags in observations.items()
+            if len(flags) >= CLOSED_SESSION_MIN_SYMBOLS and sum(flags) >= CLOSED_SESSION_SHARE * len(flags)}
 
 
 def values(row):
@@ -502,6 +522,50 @@ def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at
     return counts
 
 
+def remove_closed_session(root, market, day):
+    """Remove one market-wide closed-session placeholder date, with a per-file audit.
+
+    Refuses unless every archived stock of the market has a flat zero-volume bar at
+    the previous close on that date (at least CLOSED_SESSION_MIN_SYMBOLS of them).
+    """
+    root = Path(root)
+    if market not in ("tw", "us") or date.fromisoformat(day).isoformat() != day:
+        raise ValueError("Invalid market/date")
+    planned, events, total = {}, [], 0
+    for path in sorted((root / market).glob(f"*/{day[:4]}.csv")):
+        rows = read_rows(path, strict=True)
+        index = next((i for i, r in enumerate(rows) if r[0] == day), None)
+        if index is None:
+            continue
+        total += 1
+        symbol = path.parent.name
+        if index:
+            previous = rows[index - 1][4]
+        else:
+            earlier = sorted(p for p in path.parent.glob("*.csv") if p.stem < path.stem)
+            previous = read_rows(earlier[-1], strict=True)[-1][4] if earlier else None
+        if not is_placeholder(rows[index], previous):
+            raise ValueError(f"Not a market-wide closed session: {symbol} {day} traded")
+        kept = rows[:index] + rows[index + 1:]
+        if not kept:
+            raise ValueError(f"Removing {day} would empty {path.relative_to(root)}")
+        content = csv_text(kept)
+        planned[path] = content
+        record = dict(symbol=symbol, date=day, status="removed",
+                      old={"sha256": digest(path.read_bytes())},
+                      new={"path": path.relative_to(root).as_posix(), "sha256": digest(content.encode()), "rowsRemoved": 1},
+                      reason=CLOSED_SESSION_REASON)
+        record.update(id=digest(json.dumps(record, sort_keys=True).encode()), loggedAt=ki.utcnow())
+        events.append(record)
+    if total < CLOSED_SESSION_MIN_SYMBOLS:
+        raise ValueError(f"Not a market-wide session: only {total} {market} stocks have {day}")
+    add_events(root, events)
+    for path, content in planned.items():
+        atomic(path, content)
+    update_manifest(root)
+    return {"market": market, "date": day, "removed": len(events)}
+
+
 def update_manifest(root, write=True):
     root = Path(root)
     stats = {}
@@ -561,6 +625,7 @@ def stage_cache(cache, archive, output, now=None, previous=None):
     now = now or datetime.now(timezone.utc)
     cache, output = Path(cache), Path(output)
     plan = {"version": 1, "mode": "daily", "symbols": [], "skipped": []}
+    staged, observations = [], {}
     for symbol, entry in sorted(uc.load_state(str(cache))["symbols"].items()):
         try:
             market_of(symbol)
@@ -592,16 +657,31 @@ def stage_cache(cache, archive, output, now=None, previous=None):
                 raise ValueError("Cache includes an unfinished session")
             existing = symbol_rows(archive, symbol, {r[0][:4] for r in rows})
             known = {r[0]: r for r in existing}
+            market = market_of(symbol)
+            for before, bar in zip(rows, rows[1:]):
+                if known.get(bar[0]) != bar:
+                    observations.setdefault((market, bar[0]), []).append(is_placeholder(bar, before[4]))
             # Changed overlaps are retained so the publisher can report conflicts.
             rows = rows if receipt else [r for r in rows if known.get(r[0]) != r]
-            if not rows:
-                continue
-            relative = f"{market_of(symbol)}/{symbol}.csv"
-            content = csv_text(rows)
-            atomic(output / relative, content)
-            plan["symbols"].append({"symbol": symbol, "file": relative, "sha256": digest(content.encode()), "correction": receipt})
+            if rows:
+                staged.append((symbol, rows, receipt))
         except (ValueError, InvalidOperation, KeyError, OSError) as exc:
             plan["skipped"].append({"symbol": symbol, "reason": str(exc)})
+    # A market-wide closed session is never archived; isolated flat bars (a real day
+    # without trades) still are. Corrections carry their own proven full history.
+    closed = closed_sessions(observations)
+    plan["closedSessions"] = [{"market": market, "date": day, "symbols": len(observations[(market, day)])}
+                              for market, day in sorted(closed)]
+    for symbol, rows, receipt in staged:
+        market = market_of(symbol)
+        if not receipt:
+            rows = [r for r in rows if (market, r[0]) not in closed]
+        if not rows:
+            continue
+        relative = f"{market}/{symbol}.csv"
+        content = csv_text(rows)
+        atomic(output / relative, content)
+        plan["symbols"].append({"symbol": symbol, "file": relative, "sha256": digest(content.encode()), "correction": receipt})
     if previous and (Path(previous) / "operations.json").exists():
         if (output / "baseline").exists():
             raise ValueError("Baseline transport destination must be fresh")
@@ -854,7 +934,7 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
     for record in log["events"]:
         if str(record.get("reason", "")).startswith("kline-archive/adjustment-year:"):
             validate_adjustment_audit(record)
-    old_tree, old_last, changed, file_audit = {}, {}, {}, {}
+    old_tree, old_last, changed, file_audit, removals = {}, {}, {}, {}, {}
     if base:
         for item in _git(root, "ls-tree", "-rz", base, "--", "tw", "us").split("\0"):
             if not item:
@@ -881,6 +961,8 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
             if ((e["status"] == "backfilled" and e.get("reason") == "kline-archive/backfill-year")
                     or (e["status"] == "corrected" and str(e.get("reason", "")).startswith("kline-archive/adjustment-year:"))):
                 file_audit.setdefault(e["new"]["path"], []).append(e)
+            elif e["status"] == "removed" and e.get("reason") == CLOSED_SESSION_REASON:
+                removals.setdefault(e["new"]["path"], []).append(e)
     needed = {name: old_tree[name] for names in changed.values() for name in names if name in old_tree}
     needed.update({old_last[symbol]: old_tree[old_last[symbol]] for symbol in changed if symbol in old_last})
     stats = {}
@@ -907,8 +989,18 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
                 continue
             old_rows, old_hash = (last_rows, last_hash) if name == last_name else baseline(name) if name in old_tree else ([], None)
             old = {r[0]: r for r in old_rows}
-            if not old.keys() <= {r[0] for r in rows}:
-                raise ValueError(f"Archive dates deleted: {symbol}")
+            missing = old.keys() - {r[0] for r in rows}
+            # Only an audited closed-session removal of exactly this file transition may drop
+            # a date, and only a flat zero-volume bar repeating the previous close.
+            removed = {e["date"] for e in removals.get(name, [])
+                       if e["old"]["sha256"] == old_hash and e["new"]["sha256"] == current[name]["sha256"]}
+            ordered = sorted(old)
+            for day in missing:
+                index = ordered.index(day)
+                previous = old[ordered[index - 1]][4] if index else None
+                if day not in removed or not (old[day][1] == old[day][2] == old[day][3] == old[day][4] == (previous or old[day][4])
+                                              and old[day][5] == "0"):
+                    raise ValueError(f"Archive dates deleted: {symbol}")
             # Journal union ordering can differ for events with the same
             # clock timestamp. Follow exact hash edges, never log order.
             reachable = {(old_hash, False, False)}
@@ -959,7 +1051,7 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=["init", "stage", "apply", "bootstrap", "verify"])
+    parser.add_argument("operation", choices=["init", "stage", "apply", "bootstrap", "verify", "remove-closed-session"])
     parser.add_argument("--archive-dir", required=True)
     parser.add_argument("--cache-dir", default=".cache/universe-full")
     parser.add_argument("--payload-dir", default=".cache/kline-payload")
@@ -967,6 +1059,8 @@ def main():
     parser.add_argument("--base")
     parser.add_argument("--main-log")
     parser.add_argument("--summary", default=os.environ.get("GITHUB_STEP_SUMMARY"))
+    parser.add_argument("--market", choices=["tw", "us"])
+    parser.add_argument("--date")
     args = parser.parse_args()
     if args.operation == "init":
         initialize(args.archive_dir)
@@ -977,6 +1071,10 @@ def main():
         print(json.dumps(apply_operations(args.archive_dir, args.payload_dir, args.main_log)))
     elif args.operation == "bootstrap":
         print(json.dumps({"seeded": bootstrap(args.archive_dir, args.cache_dir)}))
+    elif args.operation == "remove-closed-session":
+        if not args.market or not args.date:
+            parser.error("remove-closed-session needs --market and --date")
+        print(json.dumps(remove_closed_session(args.archive_dir, args.market, args.date)))
     else:
         verify(args.archive_dir, args.base, args.summary)
 

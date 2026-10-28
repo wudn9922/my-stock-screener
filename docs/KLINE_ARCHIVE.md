@@ -89,6 +89,14 @@ publish 必須確認修正資料涵蓋原有較早交易日。只修正該股票
 
 只有精簡的 `adjustment-year` 事件會再合併回 main 同名永久日誌；舊的逐列封存事件及回補事件不複製到 main。一次調整新增到 main 的事件數不超過有變動的年度檔數；既有 2.8 MB 主日誌不改寫或刪除。這一步只發佈該 journal，不操作 `data/*.csv`、其他 records 或 generated outputs。main 發生並行 journal 更新時，重新讀取最新 main 並 union，不覆蓋別人的事件。若 journal 發佈失敗，封存分支仍保有所有事件，下次可重播；main checkout 不做 pull/rebase。
 
+## 全市場臨時休市（颱風假等）
+
+交易所日曆只知道預定假日，不知道臨時休市（例如 2026-10-23 颱風休市）。那天整個市場每檔都會是「開高低收相同、成交量 0、等於前一日收盤」的空白 K 棒。
+
+- **每日流程**：`stage` 若發現某市場某日至少 50 檔、且 95% 以上都是這種空白 K 棒，就判定為全市場休市，不寫入封存（`operations.json` 的 `closedSessions` 會列出）。個別股票在交易日沒有成交的平盤 K 棒仍照常保存。
+- **已寫入的清除**：`python scripts/kline_archive.py remove-closed-session --archive-dir <封存> --market tw --date YYYY-MM-DD`。只有當天該市場每一檔都是空白 K 棒時才會執行，否則整批拒絕、不改任何檔案。每個檔案記一筆 `status: removed`、`reason: kline-archive/closed-session` 的稽核（新舊 SHA-256）。
+- **驗證**：`verify` 仍拒絕任何刪除日期，唯一例外是有對應稽核、且被刪的那列確實是空白 K 棒。
+
 ## 一次性歷史回補與續跑
 
 `Permanent K-line Backfill` 使用同一份上市／上櫃／美股普通股與 ADR universe 來源，與既有下載工作共用 `universe-full` 鎖，避免同時增加 Yahoo 請求。fetch job 只有 `contents: read`；只把資料 artifact 交給唯一序列化的 publish job，後者才有 write。
