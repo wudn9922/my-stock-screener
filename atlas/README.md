@@ -194,7 +194,9 @@ or pasted-table import, editable previews, account snapshot replacement and date
 market prices for P&L. Guest data is RAM-only; device and cloud follow existing
 account authorization. See [the holdings runbook](../docs/ATLAS_HOLDINGS.md) for
 format limits and the maintainer-only SQL → user-settings → frontend rollout.
-MEXC automatic synchronization is deferred to a separate PR after this feature merges.
+MEXC read-only API synchronization follows in PR B after #199, with server-encrypted
+credentials, cost review and visible-page polling. See [its manual setup runbook](../docs/ATLAS_MEXC_SYNC.md)
+before enabling the website key-entry form; no deployment or SQL application is automatic.
 
 Desktop supports chart with contextual panels; iPhone uses bottom sheets/tabs without permanently shrinking the chart. iPad uses a wider contextual panel while retaining chart pan/drawing access. Forms/actions have accessible labels, keyboard focus and 44px targets; controls are not hover-only. Safe-area CSS handles notches/home indicators. Debug is OFF by default and exposes source, symbol/timeframe, counts, storage and errors when enabled.
 

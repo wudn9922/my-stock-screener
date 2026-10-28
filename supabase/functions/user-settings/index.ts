@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { HoldingsError, handleHoldings } from "./holdings.ts";
+import { MexcError, handleMexc } from "./mexc.ts";
 import { LineHandoffError, lineLoginHandoff } from "../_shared/lineLoginHandoff.ts";
 import { validateWatchlist, watchlistId, watchlistVersion } from "./watchlists.ts";
 import { DeviceSessionError, createDeviceSession, resolveLineUser, revokeDeviceSession } from "../_shared/deviceSession.ts";
@@ -312,6 +313,21 @@ Deno.serve(async (request: Request) => {
     // This gate also covers legacy clients and reads of former cloud data after revocation.
     // It is intentionally checked on every request, not cached at login.
     await requireCloudStorage(supabase, lineUserId, adminId);
+
+    if (action.startsWith('holdings.mexc.')) {
+      try {
+        const data = await handleMexc(supabase, lineUserId, body, Deno.env.get('HOLDINGS_ENCRYPTION_KEY'),
+          () => requireCloudStorage(supabase, lineUserId, adminId));
+        return new Response(JSON.stringify({ ok: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+      } catch (error) {
+        // Never pass credentials, upstream signed URLs or balances to the generic logger.
+        const known = error instanceof MexcError;
+        return new Response(JSON.stringify({ ok: false, error: known ? error.message : 'MEXC 操作無法完成，請重新載入確認。',
+          code: known ? error.code : 'service' }), { status: known ? error.status : 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store',
+            ...(known && error.retryAfter ? { 'Retry-After': String(error.retryAfter) } : {}) } });
+      }
+    }
 
     if (action.startsWith('holdings.')) {
       // Personal positions never enter generic database-error logging. POST-only,

@@ -44,6 +44,10 @@
 .holdings-panel textarea {
   resize: vertical;
 }
+.mexc-panel { display: grid; gap: 12px; }
+.mexc-panel form { display: grid; gap: 12px; }
+.mexc-panel fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 0; }
+.mexc-panel input[type=password] { font-size: 16px; }
 .holdings-toolbar {
   display: flex;
   gap: 8px;

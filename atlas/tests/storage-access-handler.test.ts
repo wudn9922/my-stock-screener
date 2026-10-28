@@ -229,6 +229,7 @@ describe('storage authorization is enforced by deployed private-data handlers', 
     ['user-settings', 'stocks.list'], ['user-settings', 'stocks.save'], ['user-settings', 'stocks.delete'],
     ['user-settings', 'watchlists.list'], ['user-settings', 'watchlists.save'], ['user-settings', 'watchlists.delete'],
     ['user-settings', 'holdings.list'], ['user-settings', 'holdings.replaceAccount'], ['user-settings', 'holdings.upsert'], ['user-settings', 'holdings.delete'], ['user-settings', 'holdings.deleteAccount'],
+    ['user-settings', 'holdings.mexc.status'], ['user-settings', 'holdings.mexc.connect'], ['user-settings', 'holdings.mexc.sync'], ['user-settings', 'holdings.mexc.apply'], ['user-settings', 'holdings.mexc.disconnect'],
     ['user-settings', 'admin.index.list'], ['user-settings', 'admin.index.save'],
     ['chart-drawings', 'atlas.list'], ['chart-drawings', 'atlas.save'], ['chart-drawings', 'load'], ['chart-drawings', 'save'],
   ] as const;

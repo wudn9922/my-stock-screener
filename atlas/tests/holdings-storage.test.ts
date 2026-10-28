@@ -77,6 +77,34 @@ afterEach(() => {
 });
 
 describe('holdings use the existing verified storage context', () => {
+  it.each(['holdings.replaceAccount', 'holdings.mexc.connect'])(
+    'never sends %s payloads under a new identity while access initialization awaits',
+    async (action) => {
+      const { accessState } = await import('../src/auth/access');
+      h.userId = `U${'1'.repeat(32)}`;
+      h.mode = 'cloud';
+      await accessState.initialize();
+      const { getStorageContextKey } = await import('../src/auth/storage');
+      const { holdingsContextApi } = await import('../src/holdings/contextApi');
+      type Access = Awaited<ReturnType<typeof accessState.initialize>>;
+      let release!: (state: Access) => void;
+      const gate = new Promise<Access>((resolve) => {
+        release = resolve;
+      });
+      vi.spyOn(accessState, 'initialize').mockReturnValueOnce(gate);
+      const pending = holdingsContextApi(getStorageContextKey(), action, {
+        account,
+        holdings: [holding],
+        apiKey: 'FAKE-KEY-SHOULD-NOT-SEND',
+        apiSecret: 'FAKE-SECRET-SHOULD-NOT-SEND',
+      });
+      h.userId = `U${'2'.repeat(32)}`;
+      await accessState.refresh();
+      release(accessState.getSnapshot());
+      await expect(pending).rejects.toThrow();
+      expect(h.calls).not.toContain(action);
+    },
+  );
   it('keeps guests in RAM across views, writes no local storage and never calls the cloud', async () => {
     const { accessState } = await import('../src/auth/access');
     await accessState.initialize();
