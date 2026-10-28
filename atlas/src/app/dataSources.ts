@@ -3,7 +3,7 @@
  * valuation). Pages and the chart workspace import from here only.
  */
 import { createScreenerMarketProvider } from '../market-data/createScreenerMarketProvider';
-import { loadSymbolDirectory, searchSymbols } from '../market-data/SymbolCatalog';
+import { loadSymbolDirectory, loadSymbolCatalog, searchSymbols } from '../market-data/SymbolCatalog';
 import { describePe, getValuation, valuationProvider, type Valuation, type ValuationProvider } from '../fundamentals/ValuationProvider';
 import type { Bar, BarResult, MarketDataProvider } from '../market-data/MarketDataProvider';
 import { getMarketProfile } from '../market-data/MarketProfile';
@@ -54,6 +54,14 @@ export function preloadSymbolDirectory(): void {
   void Promise.resolve()
     .then(() => loadSymbolDirectory())
     .catch(() => undefined);
+}
+
+/** Public symbol metadata only; portfolio quantities/costs never enter the provider layer. */
+export async function getHoldingsSymbolDirectory() {
+  const [directory, catalog] = await Promise.all([loadSymbolDirectory().catch(() => null), loadSymbolCatalog().catch(() => [])]);
+  const entries = new Map((directory?.entries ?? []).map(entry => [entry.symbol, { symbol: entry.symbol, name: entry.name, market: entry.market, etf: false }]));
+  for (const entry of catalog) entries.set(entry.symbol, { symbol: entry.symbol, name: entry.name, market: 'TW', etf: entry.kind === 'etf' });
+  return [...entries.values()];
 }
 
 export interface PeFigures {

@@ -1,0 +1,164 @@
+.holdings-panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.holdings-panel * {
+  box-sizing: border-box;
+  min-width: 0;
+}
+.holdings-panel h3,
+.holdings-panel h4,
+.holdings-panel p {
+  overflow-wrap: anywhere;
+}
+.holdings-panel h3 {
+  margin: 0 0 12px;
+}
+.holdings-panel button,
+.holdings-panel select,
+.holdings-panel input:not([type='checkbox']),
+.holdings-panel summary {
+  min-height: 44px;
+}
+.holdings-panel summary {
+  align-content: center;
+  cursor: pointer;
+}
+.holdings-panel label {
+  display: grid;
+  gap: 6px;
+}
+.holdings-panel input:not([type='checkbox']),
+.holdings-panel select,
+.holdings-panel textarea {
+  width: 100%;
+  max-width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface-2);
+  font: inherit;
+}
+.holdings-panel textarea {
+  resize: vertical;
+}
+.holdings-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.holdings-toolbar h3,
+.holdings-toolbar h4 {
+  flex: 1;
+  margin: 0;
+}
+.holdings-fields,
+.holdings-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+.holdings-metrics > div {
+  display: grid;
+  gap: 8px;
+}
+.holdings-metrics strong {
+  font-size: clamp(17px, 3vw, 24px);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.holdings-muted,
+.holdings-storage {
+  color: var(--text-3);
+  font-size: 12px;
+}
+.holdings-panel .holdings-check {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+}
+.holdings-check input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.holdings-import {
+  display: grid;
+  gap: 12px;
+}
+.holdings-import fieldset {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 0;
+  padding: 12px;
+}
+.holdings-import .holdings-invalid {
+  border-color: var(--up-text);
+}
+.holdings-error {
+  color: var(--up-text);
+}
+.holdings-preview {
+  display: grid;
+  gap: 12px;
+  max-height: 65vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.holdings-sample {
+  max-height: 200px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  color: var(--text-3);
+}
+.holdings-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 12px;
+}
+.holdings-position {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+.holdings-symbol {
+  text-align: left;
+  font-weight: 700;
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+.holdings-position dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.holdings-position dt {
+  color: var(--text-3);
+  font-size: 12px;
+}
+.holdings-position dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.holdings-subtotal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 12px 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .holdings-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .holdings-panel .console-card {
+    padding: 12px;
+  }
+}
