@@ -5,6 +5,7 @@ import { ReportGate } from './ReportGate';
 import { itemStatusOf, type GroupItem, type Report, type ReportGroup } from '../report/schema';
 import { getPeFigures, getScreenerPeFigures, type PeFigures, type ScreenerPeFigures } from '../app/dataSources';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
+import { ScreenerChanges } from '../ui/ScreenerChanges';
 import {
   fetchTrendingStocks, LINE_TRENDING_GROUP_KEY, trendingStocksGroup, trendingStocksStale, type TrendingStocksResult,
 } from '../report/trendingStocks';
@@ -519,6 +520,7 @@ function ScreenerView({
   return (
     <div className="screener-body">
       <GroupChips groups={groups} active={group.key} universeCounts={universeCounts} trendingGroup={trendingGroup} onChange={changeGroup} />
+      {!isTrending && <ScreenerChanges market={market} group={group.key} filters={filters} query={query} view={activeView} openChart={openChart} />}
       <div className="screener-tools">
         <label className="filter-field">
           <Search size={15} aria-hidden="true" />

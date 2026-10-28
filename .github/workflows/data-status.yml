@@ -1,0 +1,59 @@
+name: Data status
+on:
+  schedule:
+    # Asia/Taipei 08:35 / 18:35 / 23:35 (UTC+8, no DST).
+    - cron: '35 0,10,15 * * *'
+  workflow_run:
+    workflows: ["Daily Stock Screener", "Full-Market Universe"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  # This new producer is generated-only even if the legacy cutover switch is unset.
+  GENERATED_BRANCH_MODE: '1'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: data-status-generated
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install 'exchange-calendars>=4.5,<5.0' pandas
+      - name: Restore generated read-only inputs
+        id: inputs
+        run: python scripts/generated_branch.py restore
+      - name: Build read-only data inventory
+        id: status
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python -u scripts/build_data_status.py
+      - name: Restore rolling daily bars read-only
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/universe-full
+          key: universe-full-v1-status-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: universe-full-v1-
+      - name: Build industry comparison without changing daily bars
+        run: python scripts/build_industry_rotation.py
+      - name: Capture public screener inputs for date comparisons
+        run: python scripts/build_screener_history.py
+      - name: Publish only status-owned outputs
+        # The existing publisher rebases ONLY this owner's delta onto each fresh
+        # generated tip and retries non-force pushes; other owners are preserved.
+        if: always() && !cancelled() && steps.inputs.outcome == 'success' && steps.status.outcome == 'success'
+        run: python scripts/generated_branch.py publish status

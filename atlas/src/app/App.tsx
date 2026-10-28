@@ -86,6 +86,7 @@ import '../ui/workspace.css';
 
 type Panel = 'indicators' | 'drawings' | 'backtest' | 'alerts' | 'settings';
 const StockResearch = lazy(() => import('../ui/research/StockResearch'));
+const RelativeStrengthPanel = lazy(() => import('../ui/RelativeStrengthPanel').then(module => ({ default: module.RelativeStrengthPanel })));
 type DockTab = 'watchlist' | Panel;
 const panelNames: Record<DockTab, string> = {
   watchlist: '圖表收藏',
@@ -1125,6 +1126,9 @@ export function App({
       )}
       {stockViews && visitedViews.has('research') && (
         <section className="stock-view" aria-label="研究" hidden={stockView !== 'research'} inert={modal} aria-hidden={modal}>
+          <div className="stock-view-card">
+            <Suspense fallback={<p>載入相對大盤比較…</p>}><RelativeStrengthPanel key={symbol} symbol={symbol} /></Suspense>
+          </div>
           <div className="stock-view-card">
             <h2>{market.market === 'TW' ? '官方公告與處置' : 'SEC 重大事件'}</h2>
             <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>

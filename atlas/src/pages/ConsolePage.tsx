@@ -1,4 +1,5 @@
 import { DisplaySettings } from '../ui/DisplaySettings';
+import { DataStatusPanel } from '../ui/DataStatusPanel';
 import { WatchlistBoard } from '../ui/WatchlistBoard';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
@@ -40,7 +41,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
   const sync = watchlistCloudSync(store);
   const { document, error: storageError } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const selected = document.lists.find((entry) => entry.id === requested) ?? document.lists[0];
-  const [settingsTab, setTab] = useState<'parameters' | 'admin' | 'display'>('parameters');
+  const [settingsTab, setTab] = useState<'parameters' | 'admin' | 'display' | 'status'>('parameters');
   const tab = section === 'lists' ? 'lists' : settingsTab === 'admin' && !access.isAdmin ? 'parameters' : settingsTab;
   const [visit, setVisit] = useState<WatchlistVisit | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -327,8 +328,11 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         <button type="button" aria-pressed={tab === 'display'} className={tab === 'display' ? 'active' : ''} onClick={() => setTab('display')}>
           顯示與App
         </button>
+        <button type="button" aria-pressed={tab === 'status'} className={tab === 'status' ? 'active' : ''} onClick={() => setTab('status')}>
+          資料狀態
+        </button>
       </div>}
-      {tab === 'display' ? (
+      {tab === 'status' ? <DataStatusPanel /> : tab === 'display' ? (
         <section className="console-card" aria-label="顯示與App"><DisplaySettings
           reportDate={report.status === 'ok' ? report.report.reportDate : null}
           generatedAt={report.status === 'ok' ? report.report.generatedAt : null} /></section>

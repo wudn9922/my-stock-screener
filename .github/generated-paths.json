@@ -1,6 +1,7 @@
 {
   "branch": "generated",
   "owners": {
+    "status": ["docs/report/data-status.json", "docs/report/industry-rotation.json", "docs/report/screener-history/*.json"],
     "screenshots": ["docs/wsj.png", "docs/barrons.png", "docs/wsj.jpg", "docs/barrons.jpg"],
     "daily": ["docs/index.html", "docs/wsj.png", "docs/barrons.png", "docs/wsj.jpg", "docs/barrons.jpg", "docs/report/latest.json", "docs/report/trending-stocks.json", "docs/report/universe.json", "docs/report/breadth.json", "docs/report/series/**", "docs/report/themes.json", "docs/report/rates.json", "docs/report/rates-history.json"],
     "atlas": ["docs/atlas/**", "docs/index.html"],

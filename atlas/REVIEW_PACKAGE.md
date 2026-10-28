@@ -1,4 +1,19 @@
-## Current follow-up: iOS top-level LINE app launch (2026-10-27)
+## Current extension: 資料狀態與三項公開資料比較（2026-10-28）
+
+由最新 main `fe7b39f50348b55241056ccd373b4feab2530a04` 開分支。
+
+- 新增「我的 → 資料狀態」，18 個來源與八個 workflow，前端僅讀約 10 KB 的 `data-status.json`；來源政策集中在 Python `SOURCES`。交易所日曆包含 TW／US 休市、早收盤、夏令時間與收盤後發布寬限。
+- 圖表研究新增個股與大盤價格報酬比較；選股新增兩日同條件名單進出；題材頁新增產業同期間報酬、上漲比例與完整共同樣本量比。
+- 新增 generated-only producer、owner 與忽略路徑。沿用既有 owner delta／非 force 重試；讀取 archive manifest 與還原的 rolling cache，無永久來源寫入。選股歷史快照首次寫入後不覆寫，每個市場只保留最近 10 個資料日（衍生輸出，不列入 append_only），索引可更新。
+- 原始功能只加入四個入口。登入／帳號指定路徑、Supabase functions、網站外框、永久價格／財務檔、archive 分支均沒有修改；無通知、合併或部署。
+
+驗證：`npm ci`；1,550 項 Vitest／119 檔；lint、typecheck、正常 build、Pages build；Python 16 項新分析測試與 33 項 generated storage 測試。以實際 generated 文件與 archive manifest 唯讀解析，18 來源皆有有效日期，八個 workflow API 皆取得紀錄。新增 status owner 的真實 disposable Git 測試證明 concurrent daily 更新保留、main 永久記錄不動、舊快照不可覆寫。完整瀏覽器回歸 179 通過／4 項既有平台略過；追加歷史價格口徑保護後，受影響的資料狀態、比較、選股條件與本益比 57 項全部通過。
+
+已接受限制：歷史名單從功能上線後開始保存，需兩個資料日，不倒填財務；固定均線採目前設定對齊歷史行情，要求收盤與快照同價格口徑，不一致或參考缺少時停止比較。狀態監控已發布衍生檔，不直接輪詢原始 TWSE 等端點；季度擷取時間不是財報期別，date-only 不捏造時分。archive 日期為市場最大值。產業成員採目前分類、具有存續偏差；缺快取的量能顯示未知，不等於零。實體 iPhone 操作未驗證；沒有獨立外部審查簽核。
+
+詳細門檻與口徑：[資料狀態與比較功能](docs/DATA_STATUS_AND_COMPARISONS.md)、[ADR-018](docs/architecture/ADR-018-data-status-and-public-comparisons.md)。
+
+## Previous follow-up: iOS top-level LINE app launch (2026-10-27)
 
 Real-iPhone report on #185: the hidden `line://app` iframe never opened LINE from the
 home-screen PWA (iOS WebKit ignores custom schemes in subframes). iOS/iPadOS now
