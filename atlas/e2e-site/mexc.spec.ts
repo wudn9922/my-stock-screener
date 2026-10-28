@@ -221,4 +221,11 @@ test('automatic synchronization keeps the selected account when server order cha
   await expect(panel(page).getByRole('combobox', { name: '持股帳戶' })).toHaveValue(mexcId);
   await expect(mexc(page)).toBeVisible();
   expect(f.bodies.filter((body) => body.apiSecret)).toHaveLength(1);
+  page.once('dialog', (dialog) => dialog.accept());
+  await panel(page).getByRole('button', { name: '刪除帳戶', exact: true }).click();
+  await expect(panel(page).getByRole('combobox', { name: '持股帳戶' })).toHaveValue(
+    '22222222-2222-4222-8222-222222222222',
+  );
+  await expect(panel(page).getByRole('region', { name: '持股總計' })).not.toContainText('總計尚未完整');
+  expect(f.connections.size).toBe(0);
 });

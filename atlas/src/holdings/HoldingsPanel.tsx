@@ -131,12 +131,10 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   };
   const pendingAccounts = new Set(
     mexcSnapshot.state.connections
-      .filter(
-        (connection) =>
-          connection.needsReview ||
-          connection.holdingRevision !==
-            document.accounts.find((entry) => entry.account.id === connection.accountId)?.revision,
-      )
+      .filter((connection) => {
+        const current = document.accounts.find((entry) => entry.account.id === connection.accountId);
+        return current && (connection.needsReview || connection.holdingRevision !== current.revision);
+      })
       .map((connection) => connection.accountId),
   );
   const holdingQuote = (holding: Holding) => {
