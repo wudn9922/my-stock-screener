@@ -2,9 +2,11 @@
  * LINE identity for account-scoped storage. Ordinary external-browser visitors never load LIFF.
  * External browsers / installed PWAs opt in with the login button; an OAuth return is initialized
  * before the router changes its URL. Neither route parameters nor decoded claims grant storage:
- * access.get must independently verify the SDK's ID token on the server.
+ * access.get must independently verify the SDK's ID token on the server. After an explicit login
+ * with 「記住這台裝置」, a remembered-device token (deviceSession.ts) stands in once the LINE token expires.
  */
 import { DEFAULT_LIFF_ID } from './lineLoginConfig';
+import { deviceIdentity, forgetDevice } from './deviceSession';
 export { DEFAULT_LIFF_ID } from './lineLoginConfig';
 const LIFF_SDK_URL = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
 const LOGIN_RETURN_PARAM = 'atlasLineLogin';
@@ -16,7 +18,7 @@ const EXPLICIT_INIT_TIMEOUT_MS = 15_000;
 const MAX_ATTEMPTS = 2;
 const GUARD_WINDOW_MS = 120_000;
 const GUARD_KEY = 'atlas-liff-attempts';
-// No application login state or guest actions are written to browser storage.
+// Guest actions and login attempts stay in RAM; only an opted-in remembered device is stored.
 const attemptMemory = new Map<string, string>();
 const attemptStore = {
   getItem: (key: string) => attemptMemory.get(key) ?? null,
@@ -46,8 +48,10 @@ interface LiffSdk {
 export interface LineIdentity {
   /** LINE user ID (`U…`), used only to key local sync metadata. */
   userId: string;
-  /** Current SDK ID token, or null after logout, account change or expiry. */
+  /** Current SDK ID token (or remembered-device token), or null after logout, account change or expiry. */
   idToken(): string | null;
+  /** `device` when backed by a remembered-device token rather than a LINE ID token. */
+  kind?: 'line' | 'device';
 }
 
 export function isLineInAppBrowser(userAgent = globalThis.navigator?.userAgent ?? ''): boolean {
@@ -96,6 +100,8 @@ function handoffIdentity(): LineIdentity | null {
 }
 
 export function lineLoginError(): string | null { return loginError; }
+/** `?atlasGuest=1` recovery launches opt out of every login, including a remembered device. */
+export const lineGuestOnly = () => guestOnly;
 
 function loadSdk(): Promise<LiffSdk> {
   const existing = (globalThis as { liff?: LiffSdk }).liff;
@@ -184,8 +190,8 @@ function initializeIdentity(liffId: string, now: () => number): Promise<LineIden
 
 /**
  * Start before routing inside LINE, on a LIFF primary handoff or a recognized OAuth return. There is no automatic
- * external-browser login or remembered application opt-in; a later fresh PWA launch shows the
- * login button again. Tapping it can restore the SDK session, followed by a fresh server grant.
+ * external-browser LINE login; a later fresh PWA launch uses its remembered device, if one was opted
+ * in, or shows the login page again. Tapping login can restore the SDK session, then a fresh server grant.
  */
 export async function startLineIdentity(liffId = DEFAULT_LIFF_ID, now: () => number = Date.now): Promise<LineIdentity | null> {
   if (signedOut || guestOnly) return null;
@@ -250,9 +256,10 @@ export async function loginLineIdentity(liffId = import.meta.env?.VITE_LIFF_ID |
   return 'redirecting';
 }
 
-/** Sign out of Atlas, and clear SDK authentication where supported. Saved workspaces stay intact. */
+/** Sign out of Atlas, forget a remembered device, and clear SDK authentication where supported. Saved workspaces stay intact. */
 export function logoutLineIdentity(): void {
   signedOut = true;
+  forgetDevice();
   identityGeneration++;
   handedOff = null;
   loginError = null;
@@ -263,7 +270,10 @@ export function logoutLineIdentity(): void {
 /** Re-read account switches and expiry without replaying OAuth init or automatic login. */
 export async function refreshLineIdentity(): Promise<LineIdentity | null> {
   if (signedOut || guestOnly) return null;
-  if (handedOff) return handoffIdentity();
-  if (initializedSdk) return identityFromSdk(initializedSdk, Date.now);
-  return startLineIdentity(import.meta.env?.VITE_LIFF_ID || DEFAULT_LIFF_ID);
+  const live = handedOff ? handoffIdentity()
+    : initializedSdk ? identityFromSdk(initializedSdk, Date.now)
+      : await startLineIdentity(import.meta.env?.VITE_LIFF_ID || DEFAULT_LIFF_ID);
+  // A live LINE token wins; once it expires (about an hour) a remembered device keeps the login.
+  if (live?.idToken()) return live;
+  return deviceIdentity() ?? live;
 }

@@ -148,6 +148,8 @@ for (const source of ['navigator.standalone', 'display-mode'] as const) {
     await deviceBrowser(page, IPHONE_SAFARI, { standalone: source === 'navigator.standalone', displayMode: source === 'display-mode' });
     await mockSite(page);
     await page.goto('./');
+    // The installed app opens on its login page first.
+    await page.getByRole('button', { name: '先以訪客瀏覽', exact: true }).click();
     const panel = await openInstallSettings(page);
     await expect(panel).toContainText('已從主畫面開啟 Atlas');
     await expect(panel.getByRole('button', { name: '安裝 Atlas', exact: true })).toHaveCount(0);

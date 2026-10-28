@@ -67,7 +67,8 @@ describe('explicit external-browser / installed-PWA LINE login', () => {
     expect(sdk.init).toHaveBeenCalledExactlyOnceWith({ liffId: auth.DEFAULT_LIFF_ID, withLoginOnExternalBrowser: false });
     expect(sdk.login).not.toHaveBeenCalled();
     expect((await auth.refreshLineIdentity())?.idToken()).toBe(`token-${A}`);
-    expect(storage.getItem).not.toHaveBeenCalled();
+    // Only an opted-in remembered device is ever looked up; nothing is written.
+    expect(storage.getItem.mock.calls.every(([key]) => key === 'atlas-device-session-v1')).toBe(true);
     expect(storage.setItem).not.toHaveBeenCalled();
   });
 

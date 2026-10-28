@@ -253,7 +253,8 @@ export function Site() {
         ))}
       </nav>
       <main className="site-main" id="main">
-        {SCREENER_HOSTING && <StorageNotice />}
+        {/* Full account controls on 我的; elsewhere only an in-progress login or handoff shows. */}
+        {SCREENER_HOSTING && <StorageNotice variant={route.page === 'console' ? 'full' : 'alerts'} />}
         {(route.page === 'markets' || route.page === 'world' || route.page === 'themes') &&
           <MarketSectionNav active={marketSection!} routes={marketMemory.current} navigate={navigate} />}
         <RouteBoundary key={route.page}>

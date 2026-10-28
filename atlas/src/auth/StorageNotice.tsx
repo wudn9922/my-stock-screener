@@ -1,12 +1,27 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { acceptLineHandoff, isLineInAppBrowser, lineLoginError, loginLineIdentity, logoutLineIdentity } from '../cloud/lineIdentity';
+import { acceptLineHandoff, isLineInAppBrowser, lineLoginError, loginLineIdentity, logoutLineIdentity, refreshLineIdentity, type LineIdentity } from '../cloud/lineIdentity';
+import { DEVICE_SESSION_DAYS, deviceSessionVersion, forgetDevice, rememberAfterRedirect, rememberDevice, rememberedDevice, subscribeDeviceSession } from '../cloud/deviceSession';
 import { beginSeparateLineLogin, cancelIncomingLineHandoff, completeIncomingLineHandoff, incomingLineApproval, incomingLineConfirmationCode, lineHandoffMessage, linePairingCode, needsSeparateLineLogin, type LineCodeChallenge, type LoginCandidate } from '../cloud/lineLoginHandoff';
-import { accessState, refreshAccess } from './access';
+import { accessState, currentIdentity, refreshAccess } from './access';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
 import './storageNotice.css';
 
-export function StorageNotice() {
+/** After an explicit login: keep the device remembered, or forget an earlier one, as the checkbox says. */
+function applyRemember(identity: LineIdentity | null, remember: boolean) {
+  if (!identity?.idToken()) return;
+  if (remember) void rememberDevice(identity);
+  else forgetDevice();
+}
+
+/**
+ * `full` (我的 page): status, login/logout and the remember-device choice. `gate`: the installed app's
+ * login page. `alerts` (every other page): only an in-progress login, handoff approval or error.
+ */
+export function StorageNotice({ variant = 'full' }: { variant?: 'full' | 'gate' | 'alerts' }) {
   const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
+  useSyncExternalStore(subscribeDeviceSession, deviceSessionVersion);
+  const [remember, setRemember] = useState(true);
+  const [rememberBusy, setRememberBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<LoginCandidate | null>(null);
@@ -61,9 +76,15 @@ export function StorageNotice() {
         finally { pending.current = null; setBusy(false); setLoginUrl(null); setLaunchMissed(false); setCodeChallenge(null); setCode(''); setCheckingCode(false); }
         return;
       }
+      rememberAfterRedirect(remember);
       const result = await loginLineIdentity();
-      if (result === 'authenticated') { await refreshAccess(); setBusy(false); }
+      if (result === 'authenticated') {
+        rememberAfterRedirect(false);
+        applyRemember(await refreshLineIdentity(), remember);
+        await refreshAccess(); setBusy(false);
+      }
     } catch (cause) {
+      rememberAfterRedirect(false);
       setError(cause instanceof Error ? cause.message : 'LINE 登入未完成，請稍後重試。');
       setBusy(false);
     }
@@ -71,7 +92,11 @@ export function StorageNotice() {
   const confirm = async () => {
     if (!candidate) return;
     setBusy(true); setError(null);
-    try { acceptLineHandoff(candidate); setCandidate(null); await refreshAccess(); }
+    try {
+      acceptLineHandoff(candidate); setCandidate(null);
+      applyRemember(await refreshLineIdentity(), remember);
+      await refreshAccess();
+    }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'LINE 登入未完成。'); }
     finally { setBusy(false); }
   };
@@ -81,15 +106,21 @@ export function StorageNotice() {
     catch { setError('LINE 登出未能完成，請關閉此頁後再試。'); }
     finally { await refreshAccess(); setBusy(false); }
   };
+  const rememberNow = async () => {
+    const identity = currentIdentity();
+    if (!identity) return;
+    setRememberBusy(true); setError(null);
+    if (!await rememberDevice(identity)) setError('無法記住這台裝置，請稍後重試。');
+    setRememberBusy(false);
+  };
   const approveSender = async () => {
     setSenderState({ busy: true });
     try { await completeIncomingLineHandoff(); }
     finally { setSenderState({ busy: false }); }
   };
-  return <div className="source-note storage-policy-note">
-    <p role="status" data-storage-mode={access.storageMode}>
-      {access.userId ? '已登入 · ' : '訪客模式 · '}{label}{(error || access.error || lineLoginError()) && ` ${error || access.error || lineLoginError()}`}
-    </p>
+  const message = error || access.error || lineLoginError();
+  const remembered = !!access.userId && rememberedDevice()?.userId === access.userId;
+  const flows = <>
     {lineHandoffMessage() && <p role="status">{lineHandoffMessage()}</p>}
     {incomingLineConfirmationCode() && <div className="line-login-candidate" role="group" aria-label="LINE 登入確認碼">
       <span>確認碼 <strong className="line-reverse-code">{incomingLineConfirmationCode()}</strong> · 只輸入在你剛剛發起登入的 Atlas，請勿轉傳。</span>
@@ -114,11 +145,37 @@ export function StorageNotice() {
       {codeChallenge.error && <span role="alert">{codeChallenge.error}</span>}
     </form>}
     {busy && pending.current && <p role="status">請在 LINE 完成驗證後，返回這個 Atlas 視窗。{loginUrl && <>配對碼 {linePairingCode(new URL(loginUrl).searchParams.get('atlasLineHandoff')!)} {launchMissed && <strong id="line-launch-missed" className="line-launch-missed">LINE 沒有自動開啟？請點這裡</strong>} <a href={loginUrl} target="_blank" rel="noopener noreferrer" className={launchMissed ? 'primary-button line-launch-link' : undefined} aria-describedby={launchMissed ? 'line-launch-missed' : undefined}>開啟 LINE 登入視窗</a></>}<button type="button" className="ghost-button" onClick={() => pending.current?.abort()}>取消登入</button></p>}
+  </>;
+  if (variant === 'alerts') {
+    // Other pages stay clear unless a login or handoff needs attention right now.
+    const active = message || lineHandoffMessage() || incomingLineConfirmationCode() || approval || candidate || codeChallenge || (busy && pending.current);
+    if (!active) return null;
+    return <div className="source-note storage-policy-note">
+      {message && <p role="status">{message}</p>}
+      {flows}
+    </div>;
+  }
+  const rememberChoice = <label className="remember-device">
+    <input type="checkbox" checked={remember} disabled={busy} onChange={event => setRemember(event.target.checked)} />
+    記住這台裝置（{DEVICE_SESSION_DAYS} 天內免登入）
+  </label>;
+  return <div className={`source-note storage-policy-note${variant === 'gate' ? ' storage-policy-gate' : ''}`}>
+    {variant === 'gate'
+      ? message && <p role="alert">{message}</p>
+      : <p role="status" data-storage-mode={access.storageMode}>
+        {access.userId ? '已登入 · ' : '訪客模式 · '}{label}{remembered && ' 此裝置已記住登入。'}{message && ` ${message}`}
+      </p>}
+    {flows}
     <div className="pwa-login-actions">{access.userId
-      ? <button type="button" className="ghost-button" disabled={busy} onClick={() => void logout()}>{isLineInAppBrowser() ? '登出 Atlas' : '登出 LINE'}</button>
+      ? <>
+        <button type="button" className="ghost-button" disabled={busy} onClick={() => void logout()}>{isLineInAppBrowser() ? '登出 Atlas' : '登出 LINE'}</button>
+        {!remembered && currentIdentity()?.kind !== 'device' && !isLineInAppBrowser() &&
+          <button type="button" className="ghost-button" disabled={busy || rememberBusy} onClick={() => void rememberNow()}>記住這台裝置</button>}
+      </>
       : <>
-        <button type="button" className="ghost-button" disabled={busy} onClick={() => void login()}>{busy ? '正在開啟 LINE 登入…' : '使用 LINE 登入'}</button>
-        <HelpDisclosure label="登入說明">點選登入後會啟用 LINE 登入所需的瀏覽器儲存；個人操作的保存仍需帳號授權。重新開啟 App 後可再點登入，以同一帳號取回已保存的畫線。</HelpDisclosure>
+        <button type="button" className={variant === 'gate' ? 'primary-button' : 'ghost-button'} disabled={busy} onClick={() => void login()}>{busy ? '正在開啟 LINE 登入…' : '使用 LINE 登入'}</button>
+        {!isLineInAppBrowser() && rememberChoice}
+        <HelpDisclosure label="登入說明">點選登入後會啟用 LINE 登入所需的瀏覽器儲存；個人操作的保存仍需帳號授權。勾選「記住這台裝置」時，這台裝置會保存一組登入憑證，{DEVICE_SESSION_DAYS} 天內未使用才需重新登入；按「登出」即刪除。</HelpDisclosure>
       </>}
     </div>
   </div>;

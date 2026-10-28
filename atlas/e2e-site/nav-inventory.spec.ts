@@ -69,7 +69,8 @@ test('five destinations, 320/390px targets, top search, slash shortcut, gear and
   await fixtures(page);
   await page.goto('./');
   await expect(primary(page).getByRole('button')).toHaveText(destinations);
-  await expect(page.getByRole('button', { name: '使用 LINE 登入', exact: true })).toBeVisible();
+  // The login bar no longer takes space on every page; it lives on 我的.
+  await expect(page.getByRole('button', { name: '使用 LINE 登入', exact: true })).toHaveCount(0);
   const original = page.viewportSize()!;
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 });
@@ -115,6 +116,8 @@ test('five destinations, 320/390px targets, top search, slash shortcut, gear and
   await expect(dialog.locator('summary')).toContainText('行情與儲存說明');
   await dialog.getByRole('button', { name: '關閉', exact: true }).click();
   await search(page, 'NVDA');
+  await primary(page).getByRole('button', { name: '我的', exact: true }).click();
+  await expect(page.getByRole('button', { name: '使用 LINE 登入', exact: true })).toBeVisible();
 });
 
 test('market section inventory and remembered selectors, screener filters, chart/financial round trip', async ({ page }) => {

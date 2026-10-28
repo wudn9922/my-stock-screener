@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import * as policy from '../../supabase/functions/_shared/storageAccess';
 import * as watchlists from '../../supabase/functions/user-settings/watchlists';
 import * as lineHandoff from '../../supabase/functions/_shared/lineLoginHandoff';
+import * as deviceSession from '../../supabase/functions/_shared/deviceSession';
 
 const OWNER = policy.DEFAULT_ADMIN_LINE_ID;
 const A = 'U11111111111111111111111111111111';
@@ -20,9 +21,18 @@ function database(seed: Record<string, Row[]> = {}, policyError: DbError | null 
   const rows: Record<string, Row[]> = structuredClone({ atlas_storage_access: [], groups: [], stocks: [], atlas_watchlists: [], chart_drawings: [], index_configs: [], ...seed });
   const calls: { table: string; operation: string; filters: [string, unknown][] }[] = [];
   const rpcCalls: { name: string; parameters: Row }[] = [];
+  // Hash → owner, as public.atlas_device_session keeps it (no raw tokens).
+  const deviceSessions = new Map<string, string>();
   const db = {
     rpc: async (name: string, parameters: Row) => {
       rpcCalls.push({ name, parameters });
+      if (name === 'atlas_device_session') {
+        const hash = String(parameters.session_hash);
+        if (parameters.operation === 'create') { deviceSessions.set(hash, String(parameters.line_user_id)); return { data: { status: 'created', expiresAt: '2027-01-25T00:00:00Z' }, error: null }; }
+        if (parameters.operation === 'revoke') { deviceSessions.delete(hash); return { data: { status: 'revoked' }, error: null }; }
+        const owner = deviceSessions.get(hash);
+        return { data: owner ? { status: 'active', userId: owner } : { status: 'missing' }, error: null };
+      }
       return { data: { status: 'pending', expiresAt: new Date(Date.now() + 120000).toISOString() }, error: null };
     },
     from(table: string) {
@@ -62,22 +72,27 @@ function database(seed: Record<string, Row[]> = {}, policyError: DbError | null 
       return query;
     },
   };
-  return { db, rows, calls, rpcCalls };
+  return { db, rows, calls, rpcCalls, deviceSessions };
 }
 
 function handler(kind: 'user-settings' | 'chart-drawings', user = A, seed: Record<string, Row[]> = {}, policyError: DbError | null = null, verified = true) {
   const fixture = database(seed, policyError);
+  const lineVerifications: string[] = [];
   let serve!: (request: Request) => Promise<Response>;
   const source = readFileSync(new URL(`../../supabase/functions/${kind}/index.ts`, import.meta.url), 'utf8').replace(/^import .*;\r?\n/gm, '');
   runInNewContext(transformSync(source, { loader: 'ts', target: 'es2022', format: 'cjs' }).code, {
-    ...policy, ...watchlists, ...lineHandoff,
+    ...policy, ...watchlists, ...lineHandoff, ...deviceSession,
     Deno: { env: { get: (key: string) => key === 'ADMIN_LINE_USER_ID' ? OWNER : key === 'ATLAS_FIXED_PARAMETERS_ENABLED' ? '1' : 'offline-test-only' }, serve: (callback: typeof serve) => { serve = callback; } },
     createClient: () => fixture.db,
-    fetch: async () => new Response(JSON.stringify(verified ? { sub: user } : { error: 'invalid_token' }), { status: verified ? 200 : 401 }),
-    Request, Response, URLSearchParams, console: { error: () => {} },
+    fetch: async (_url: string, init: RequestInit) => {
+      lineVerifications.push(new URLSearchParams(String(init.body)).get('id_token') ?? '');
+      return new Response(JSON.stringify(verified ? { sub: user } : { error: 'invalid_token' }), { status: verified ? 200 : 401 });
+    },
+    Request, Response, URLSearchParams, TextEncoder, crypto, btoa, console: { error: () => {} },
   });
   return {
     ...fixture,
+    lineVerifications,
     async request(body: Row, headers: HeadersInit = { 'cf-connecting-ip': '203.0.113.21' }) {
       const response = await serve(new Request('https://offline.invalid/', { method: 'POST', headers, body: JSON.stringify({ idToken: 'verified-by-fixture', ...body }) }));
       return { status: response.status, body: await response.json() };
@@ -269,6 +284,67 @@ describe('storage authorization is enforced by deployed private-data handlers', 
       const fixture = handler('user-settings', subject);
       expect((await fixture.request({ action: 'access.get' })).status).toBe(401);
       expect(fixture.calls).toHaveLength(0);
+    }
+  });
+});
+
+describe('remembered-device sessions', () => {
+  const DEVICE = /^atlasdev\.[A-Za-z0-9_-]{43}$/;
+  it('issues a device token only for a verified LINE login and stores only its hash', async () => {
+    const fixture = handler('user-settings', A);
+    const created = await fixture.request({ action: 'device.session.create', idToken: 'line-id-token' });
+    expect(created.status).toBe(200);
+    expect(created.body.data.userId).toBe(A);
+    const token = created.body.data.deviceToken as string;
+    expect(token).toMatch(DEVICE);
+    expect(fixture.lineVerifications).toEqual(['line-id-token']);
+    const [hash] = [...fixture.deviceSessions.keys()];
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(fixture.rpcCalls)).not.toContain(token.slice(9));
+    // A device token can never mint another one.
+    const chained = await fixture.request({ action: 'device.session.create', idToken: token });
+    expect(chained.status).toBe(400);
+    expect(fixture.deviceSessions.size).toBe(1);
+    // An invalid LINE token creates nothing.
+    const invalid = handler('user-settings', A, {}, null, false);
+    expect((await invalid.request({ action: 'device.session.create', idToken: 'expired' })).status).toBe(401);
+    expect(invalid.deviceSessions.size).toBe(0);
+  });
+
+  it('resolves a device token to its account without LINE, while every request still checks the grant', async () => {
+    const fixture = handler('user-settings', A, { atlas_storage_access: [grant(A, 'cloud')], stocks: [{ id: 1, line_user_id: A, ticker: 'NVDA', group_id: 'us_g1' }] });
+    const token = (await fixture.request({ action: 'device.session.create', idToken: 'line-id-token' })).body.data.deviceToken as string;
+    const access = await fixture.request({ action: 'access.get', idToken: token });
+    expect(access.status).toBe(200);
+    expect(access.body.data).toMatchObject({ userId: A, storageMode: 'cloud' });
+    expect((await fixture.request({ action: 'stocks.list', idToken: token })).status).toBe(200);
+    expect(fixture.lineVerifications).toEqual(['line-id-token']);
+    fixture.rows.atlas_storage_access[0].storage_mode = 'none';
+    expect((await fixture.request({ action: 'stocks.list', idToken: token })).status).toBe(403);
+  });
+
+  it('signs a device out on revoke, and rejects unknown or malformed device tokens without LINE', async () => {
+    const fixture = handler('user-settings', A);
+    const token = (await fixture.request({ action: 'device.session.create', idToken: 'line-id-token' })).body.data.deviceToken as string;
+    expect((await fixture.request({ action: 'device.session.revoke', idToken: token })).status).toBe(200);
+    expect(fixture.deviceSessions.size).toBe(0);
+    const revoked = await fixture.request({ action: 'access.get', idToken: token });
+    expect(revoked.status).toBe(401);
+    expect(revoked.body.code).toBe('device_session');
+    const calls = fixture.rpcCalls.length;
+    expect((await fixture.request({ action: 'access.get', idToken: 'atlasdev.short' })).status).toBe(401);
+    expect(fixture.rpcCalls).toHaveLength(calls);
+    expect(fixture.lineVerifications).toEqual(['line-id-token']);
+  });
+
+  it('lets chart drawings use a device token under the same grant check', async () => {
+    const settings = handler('user-settings', A);
+    const token = (await settings.request({ action: 'device.session.create', idToken: 'line-id-token' })).body.data.deviceToken as string;
+    for (const [mode, status] of [['cloud', 200], ['device', 403]] as const) {
+      const drawings = handler('chart-drawings', A, { atlas_storage_access: [grant(A, mode)] });
+      for (const [hash, owner] of settings.deviceSessions) drawings.deviceSessions.set(hash, owner);
+      expect((await drawings.request({ action: 'atlas.list', idToken: token })).status).toBe(status);
+      expect(drawings.lineVerifications).toEqual([]);
     }
   });
 });

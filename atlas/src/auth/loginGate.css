@@ -1,0 +1,30 @@
+.login-gate {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(24px + var(--safe-top)) calc(16px + var(--safe-right)) calc(24px + var(--safe-bottom)) calc(16px + var(--safe-left));
+  background: var(--bg);
+  color: var(--text);
+}
+.login-gate-card {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.login-gate-card > img { border-radius: 16px; }
+.login-gate-card h1 { margin: 0; font-size: 24px; letter-spacing: .02em; }
+.login-gate-sub { margin: 0 0 8px; color: var(--text-2); font-size: 14px; line-height: 1.6; }
+.login-gate-note { margin: 0; color: var(--text-3); font-size: 12px; line-height: 1.6; }
+.login-gate .storage-policy-gate { width: 100%; flex-direction: column; align-items: stretch; margin: 0; text-align: left; }
+.login-gate .storage-policy-gate .pwa-login-actions { flex-direction: column; align-items: stretch; gap: 10px; }
+.login-gate .storage-policy-gate .pwa-login-actions > button { width: 100%; font-size: 16px; }
+.login-gate .storage-policy-gate .help-disclosure { flex: none; }
+.login-gate-guest { width: 100%; min-height: 44px; }
+.remember-device { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+.remember-device input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
