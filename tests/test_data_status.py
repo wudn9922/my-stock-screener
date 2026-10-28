@@ -32,6 +32,17 @@ class DataStatusTests(unittest.TestCase):
             row = evaluate(self.tw, {"asOf": day, "generatedAt": "2026-10-28T09:00:00Z"}, now("2026-10-28T10:00:00Z"))
             self.assertEqual((row["status"], row["lagTradingDays"]), (status, lag))
 
+    def test_daily_pipeline_timing_is_not_late(self):
+        sources = {source.id: source for source in SOURCES}
+        tw, us = sources["universe-tw"], sources["universe-us"]
+        # Taipei 18:35 on Oct 27: today's TW report has not run yet (it lands ~23:30).
+        self.assertEqual(evaluate(tw, {"markets": {"TW": {"asOf": "2026-10-26", "counts": {"stale": 0, "missing": 0}}}, "generatedAt": "2026-10-26T15:30:00Z"}, now("2026-10-27T10:35:00Z"))["status"], "ok")
+        # After that night's run window, a missing Oct 27 TW update is late.
+        self.assertEqual(evaluate(tw, {"markets": {"TW": {"asOf": "2026-10-26", "counts": {"stale": 0, "missing": 0}}}, "generatedAt": "2026-10-26T15:30:00Z"}, now("2026-10-27T18:00:00Z"))["status"], "late")
+        # Taipei morning/afternoon of Oct 28: the US Oct 27 session arrives with that night's run.
+        self.assertEqual(evaluate(us, {"markets": {"US": {"asOf": "2026-10-26", "counts": {"stale": 0, "missing": 0}}}, "generatedAt": "2026-10-27T15:30:00Z"}, now("2026-10-28T10:35:00Z"))["status"], "ok")
+        self.assertEqual(evaluate(us, {"markets": {"US": {"asOf": "2026-10-26", "counts": {"stale": 0, "missing": 0}}}, "generatedAt": "2026-10-27T15:30:00Z"}, now("2026-10-28T19:00:00Z"))["status"], "late")
+
     def test_publication_grace_and_dst(self):
         # US Oct 27 close at 20Z, +6h availability at Taiwan Oct 28 10:00.
         self.assertEqual(expected_date(self.us, now("2026-10-28T01:59:00Z")), "2026-10-26")
