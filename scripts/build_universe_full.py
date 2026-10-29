@@ -1241,7 +1241,8 @@ def run(args, net=None, now=None, clock=time.monotonic, sleep=time.sleep, log=pr
 
 
 def main(argv=None):
-    code, _ = run(parse_args(argv))
+    with kline.batched_journal():
+        code, _ = run(parse_args(argv))
     return code
 
 

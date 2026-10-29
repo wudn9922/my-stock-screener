@@ -3,6 +3,7 @@
 Permanent CSVs retain every existing date, including quarantined evidence. Readers
 use usable_frame(); writers validate fresh inputs before merging with retained rows.
 """
+from contextlib import contextmanager
 from datetime import datetime, time, timedelta, timezone
 from functools import lru_cache
 import csv
@@ -19,7 +20,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from scripts.kline_journal import merge_logs
+from scripts.kline_journal import dump_journal, fact, merge_logs, prune_main_journal
 
 ROOT = Path(__file__).resolve().parent
 LOG_PATH = Path(os.environ.get("KLINE_CORRECTIONS_LOG", ROOT / "docs/report/kline-corrections.json"))
@@ -72,9 +73,57 @@ def _load_log(path, mtime):
     return data
 
 
+# While batched_journal() is active: path -> _Journal held in memory, written once.
+_batch = None
+
+
+class _Journal:
+    """A loaded journal plus the indexes log_event needs per call."""
+    def __init__(self, data):
+        self.data, self.dirty = data, False
+        self.ids = {e["id"] for e in data["events"]}
+        self.last = {(e["symbol"], e["date"]): e for e in data["events"]}
+
+
 def read_log(path=None):
     path = Path(path or LOG_PATH)
+    if _batch is not None and str(path) in _batch:
+        return _batch[str(path)].data
     return _load_log(str(path), path.stat().st_mtime_ns if path.exists() else None)
+
+
+def write_log(path, data):
+    """Every main-journal writer: retention/dedup (kline_journal) and the line-per-event format."""
+    _atomic(path, dump_journal(prune_main_journal(data)))
+    _load_log.cache_clear()
+
+
+@contextmanager
+def batched_journal():
+    """Hold correction-journal writes in memory for one run and write each file once.
+
+    Without it, every event rewrote the whole journal. Call flush_journal() before
+    anything outside this process (git add, a subprocess) reads the file.
+    """
+    global _batch
+    if _batch is not None:
+        yield
+        return
+    _batch = {}
+    try:
+        yield
+    finally:
+        try:
+            flush_journal()
+        finally:
+            _batch = None
+
+
+def flush_journal():
+    for path, journal in list((_batch or {}).items()):
+        if journal.dirty:
+            write_log(Path(path), journal.data)
+        del _batch[path]
 
 
 def quarantined_dates(symbol, log_path=None):
@@ -83,25 +132,38 @@ def quarantined_dates(symbol, log_path=None):
 
 def log_event(symbol, day, status, old=None, new=None, source_url=None,
               fetched_at=None, reason=None, log_path=None):
+    if status == "deferred":
+        # An unfinished session is simply not written yet; recording each sighting
+        # was a quarter of the journal and is never read.
+        return
     path = Path(log_path or LOG_PATH)
-    data = json.loads(json.dumps(read_log(path)))
+    if _batch is not None and str(path) in _batch:
+        journal = _batch[str(path)]
+    else:
+        journal = _Journal(json.loads(json.dumps(read_log(path))))
+    data = journal.data
     event = dict(symbol=symbol, date=str(day)[:10], status=status, old=old, new=new,
                  sourceUrl=source_url, fetchedAt=fetched_at, reason=reason)
     identity = hashlib.sha256(json.dumps(event, sort_keys=True).encode()).hexdigest()
-    # Retries/no-op replays must not manufacture correction events.
-    if any(e["id"] == identity for e in data["events"]):
+    key = (symbol, event["date"])
+    # Retries/no-op replays must not manufacture correction events; neither may a
+    # later fetch reporting the same bad or revised bar as the previous event.
+    if identity in journal.ids or (key in journal.last and fact(journal.last[key]) == fact(event)):
         return
     event.update(id=identity, loggedAt=utcnow())
     data["events"].append(event)
-    key = (symbol, event["date"])
+    journal.ids.add(identity)
+    journal.last[key] = event
     if status == "quarantined" and not any((q["symbol"], q["date"]) == key for q in data["quarantined"]):
         data["quarantined"].append(dict(symbol=symbol, date=event["date"], reason=reason))
         data["quarantined"].sort(key=lambda q: (q["symbol"], q["date"]))
     elif status == "corrected":
         data["quarantined"] = [q for q in data["quarantined"] if (q["symbol"], q["date"]) != key]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    _atomic(path, json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + "\n")
-    _load_log.cache_clear()
+    if _batch is not None:
+        journal.dirty = True
+        _batch[str(path)] = journal
+        return
+    write_log(path, data)
 
 
 def _atomic(path, text):

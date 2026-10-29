@@ -8367,11 +8367,14 @@ def main():
     # 推送最新報告 JSON 與 CSV 到 GitHub Pages
     # -----------------------------------------------------------------
     prune_stale_csv()
+    # The correction journal is batched for the run; git must see it.
+    kline.flush_journal()
     push_report_to_github()
 
 
 if __name__ == "__main__":
-    main()
+    with kline.batched_journal():
+        main()
 
 
 # =========================================================================

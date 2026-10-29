@@ -20,7 +20,7 @@ import time
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from kline_journal import merge_logs
+from kline_journal import dump_journal, merge_logs, prune_main_journal
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / ".github/generated-paths.json"
@@ -264,8 +264,8 @@ class Storage:
                             if (journal.get("version") != 1 or not isinstance(journal.get("events"), list)
                                     or not isinstance(journal.get("quarantined"), list)):
                                 raise ValueError("Invalid K-line correction log; refusing concurrent union")
-                        merged = merge_logs(remote, local)
-                        body = (json.dumps(merged, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode()
+                        merged = prune_main_journal(merge_logs(remote, local))
+                        body = dump_journal(merged).encode()
                         label = "correction journal"
                     delta[path] = ("100644", git("hash-object", "-w", "--stdin", data=body).decode().strip())
                     original[path] = current[path]
