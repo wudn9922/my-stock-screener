@@ -39,7 +39,8 @@ def permanent(event):
 
 
 def logged_at(event):
-    moment = datetime.fromisoformat(event['loggedAt'])
+    # Python 3.10 (the scheduled jobs) does not parse a trailing "Z".
+    moment = datetime.fromisoformat(event['loggedAt'].replace('Z', '+00:00'))
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 

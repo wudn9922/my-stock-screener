@@ -1,6 +1,7 @@
 """Real git integration tests: isolated bare origin, no network or production writes."""
 import importlib.util
 import ast
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
@@ -16,6 +17,9 @@ spec = importlib.util.spec_from_file_location("generated_branch", REPO / "script
 gb = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gb)
 
+
+# Recent (inside the main journal's retention), in the "Z" form Python 3.10 must parse.
+JOURNAL_LOGGED_AT = (datetime.now(timezone.utc) - timedelta(days=3)).strftime("%Y-%m-%dT09:00:00Z")
 
 class GeneratedStorageTests(unittest.TestCase):
     def setUp(self):
@@ -303,7 +307,7 @@ class GeneratedStorageTests(unittest.TestCase):
 
     @staticmethod
     def journal_event(identity):
-        return dict(id=identity, loggedAt="2026-10-26T09:00:00Z", symbol=identity,
+        return dict(id=identity, loggedAt=JOURNAL_LOGGED_AT, symbol=identity,
                     date="2026-10-23", status="corrected", reason="test correction")
 
     def journal(self, *identities):

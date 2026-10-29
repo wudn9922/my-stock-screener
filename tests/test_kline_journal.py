@@ -46,6 +46,14 @@ class PruneTests(unittest.TestCase):
                          [("E", "f"), ("F", "f"), ("G", "new"), ("B", "1"), ("C", "f"), ("C", "f"), ("C", "f")])
         self.assertEqual(kept["quarantined"], data["quarantined"])
 
+    def test_z_suffixed_timestamps_parse_on_python_310(self):
+        recent = event("Z", "2026-10-28", "rejected", 1)
+        recent["loggedAt"] = (NOW - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        aged = event("Y", "2026-06-01", "rejected", 120)
+        aged["loggedAt"] = (NOW - timedelta(days=120)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        kept = journal.prune_main_journal(dict(version=1, quarantined=[], events=[recent, aged]), now=NOW)
+        self.assertEqual([e["symbol"] for e in kept["events"]], ["Z"])
+
     def test_cap_keeps_permanent_and_newest(self):
         events = [event("Q", "2026-01-01", "quarantined", 200)] + [event(f"S{i}", "2026-10-01", "rejected", 1 - i / 1e6) for i in range(5)]
         with patch.object(journal, "MAX_EVENTS", 3):
