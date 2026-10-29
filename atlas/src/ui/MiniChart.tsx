@@ -16,6 +16,7 @@ import type { Bar } from '../market-data/MarketDataProvider';
 import { sma } from '../indicators/MovingAverage';
 import { indicatorColors } from '../indicators/IndicatorRegistry';
 import './mini-chart-controls.css';
+import { miniChartStart } from './miniChartRange';
 
 const VISIBLE_BARS = 130;
 const NO_MAS: readonly number[] = [];
@@ -57,6 +58,7 @@ export function MiniChart({
   interactive = false,
   showVolume = false,
   wheelZoom = true,
+  initialMonths,
 }: {
   symbol: string;
   height?: number;
@@ -66,6 +68,7 @@ export function MiniChart({
   showVolume?: boolean;
   /** Long review lists let the mouse wheel scroll the page; buttons/pinch still zoom. */
   wheelZoom?: boolean;
+  initialMonths?: number;
 }) {
   const { ref, near } = useNearViewport<HTMLDivElement>();
   const hostRef = useRef<HTMLDivElement>(null);
@@ -172,7 +175,7 @@ export function MiniChart({
     };
     if (interactive) {
       scale.subscribeVisibleLogicalRangeChange(showRange);
-      scale.setVisibleLogicalRange({ from: Math.max(0, bars.length - VISIBLE_BARS), to: bars.length - 1 });
+      scale.setVisibleLogicalRange({ from: miniChartStart(bars, initialMonths), to: bars.length - 1 });
     } else scale.fitContent();
     return () => {
       cancelAnimationFrame(rangeFrame);
@@ -180,7 +183,7 @@ export function MiniChart({
       chartRef.current = null;
       chart.remove();
     };
-  }, [bars, colors, maKey, interactive, showVolume, wheelZoom]);
+  }, [bars, colors, maKey, interactive, showVolume, wheelZoom, initialMonths]);
   const zoom = (factor: number) => {
     const scale = chartRef.current?.timeScale();
     const range = scale?.getVisibleLogicalRange();
@@ -196,7 +199,7 @@ export function MiniChart({
         <button type="button" aria-label="縮小圖表" title="縮小（顯示更多 K 線）" disabled={status !== 'ready'} onClick={() => zoom(1.5)}>−</button>
         <button type="button" aria-label="放大圖表" title="放大（顯示較少 K 線）" disabled={status !== 'ready'} onClick={() => zoom(2 / 3)}>＋</button>
         <button type="button" disabled={status !== 'ready'} onClick={() => {
-          if (bars?.length) chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0, bars.length - VISIBLE_BARS), to: bars.length - 1 });
+          if (bars?.length) chartRef.current?.timeScale().setVisibleLogicalRange({ from: miniChartStart(bars, initialMonths), to: bars.length - 1 });
         }}>重設</button>
         <output ref={countRef} aria-label="顯示 K 線根數">—</output><span>根</span>
       </div>}

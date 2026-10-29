@@ -28,11 +28,7 @@ export interface IndexParameter {
   ma3: number;
   ma4: number;
 }
-/** A dormant per-ticker preference, never a report or monitoring group. */
-export const FIXED_STOCK_GROUP = 'ungrouped';
-export function parameterMAs(stock: Pick<ParameterStock, 'ma1' | 'ma2' | 'ma3' | 'ma4'>): number[] {
-  return [stock.ma1, stock.ma2, stock.ma3, stock.ma4].filter((n) => n > 0);
-}
+export { FIXED_STOCK_GROUP, parameterMAs } from './stockParameters';
 export const FIXED_PARAMETER_GROUPS = {
   tw_g1: '台股權值',
   tw_g2: '台股熱門',

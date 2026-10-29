@@ -14,8 +14,6 @@ import { activeChips, needsGrowth, parseFilters } from './screenerFilters';
 import { loadUniverse, UNIVERSE_GROUP_KEYS, universeMarketOf } from '../report/universe';
 import { loadMarketGrowth } from '../fundamentals/GrowthProvider';
 import {
-  FIXED_STOCK_GROUP,
-  parameterMAs,
   parameterStorageMessage,
   parseMovingAverages,
   settingsApi,
@@ -33,6 +31,8 @@ import { getDailyBars, getScreenerPeFigures } from '../app/dataSources';
 import { loadScreenerFixedMAs } from './screenerFixedMAs';
 import { HoldingsPanel } from '../holdings/HoldingsPanel';
 import { getStorageContextKey } from '../auth/storage';
+import { useStockParameters } from '../cloud/useStockParameters';
+import { stockParameterMap } from '../cloud/stockParameters';
 
 type CloudList = { id: string; definition: unknown; updated_at: string };
 
@@ -61,7 +61,8 @@ export default function ConsolePage({ report, navigate, openChart, list: request
   const [renaming, setRenaming] = useState('');
   const imported = useRef<HTMLInputElement>(null);
   const [editingStock, setEditingStock] = useState<string | null>(null);
-  const [fixedParameters, setFixedParameters] = useState<Record<string, number[]>>({});
+  const stockParameters = useStockParameters();
+  const fixedParameters = stockParameterMap(stockParameters.stocks);
   const [syncCount, setSyncCount] = useState(0);
   const seenSettings = useRef(new Map<string, string>());
   const settingsKey = selected
@@ -106,24 +107,6 @@ export default function ConsolePage({ report, navigate, openChart, list: request
       active = false;
     };
   }, [settingsKey, sync, cloudAllowed]);
-  useEffect(() => {
-    let active = true;
-    void settingsApi<ParameterStock[]>('stocks.list')
-      .then((stocks) => {
-        if (active)
-          setFixedParameters(
-            Object.fromEntries(
-              stocks.filter((stock) => stock.group_id === FIXED_STOCK_GROUP).map((stock) => [stock.ticker, parameterMAs(stock)]),
-            ),
-          );
-      })
-      .catch(() => {
-        /* Individual editing reports authenticated load failures in its dialog. */
-      });
-    return () => {
-      active = false;
-    };
-  }, [tab]);
   useEffect(() => {
     setRenaming(selected?.name ?? '');
   }, [selected?.id, selected?.name]);
@@ -310,7 +293,8 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         <button type="button" className={listsView === 'holdings' ? 'active' : ''} aria-pressed={listsView === 'holdings'} onClick={() => setListsView('holdings')}>持股</button>
       </div>}
       {section === 'lists' && listsView === 'lists' && (
-        <WatchlistBoard report={report} list={selected} lists={document.lists} onSelectList={id => navigate({ page: 'watchlist', list: id })} openChart={openChart} navigate={navigate} />
+        <WatchlistBoard list={selected} lists={document.lists} parameters={stockParameters.stocks} parameterError={stockParameters.error}
+          onSelectList={id => navigate({ page: 'watchlist', list: id })} openChart={openChart} navigate={navigate} />
       )}
       <StorageModeNotice />
       <LegacyImportCard />
@@ -717,11 +701,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
               ticker={editingStock}
               defaults={fixedParameters[editingStock] ?? selected.maList}
               onClose={() => setEditingStock(null)}
-              onSaved={(values) => {
-                setFixedParameters((previous) => ({
-                  ...previous,
-                  [editingStock]: values,
-                }));
+              onSaved={() => {
                 setEditingStock(null);
                 setCloudMessage(parameterStorageMessage(`${editingStock} 固定均線`));
               }}

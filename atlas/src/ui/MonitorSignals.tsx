@@ -35,7 +35,7 @@ function SignalStock({ stock, openChart }: { stock: MonitorStock; openChart: (op
     </ul>
     <div className="monitor-chart" aria-label={`${stock.ticker} 日 K 與成交量`}>
       {!stock.symbol ? <p>代號尚未對應行情來源，仍保留原始訊號。</p> : visible
-        ? <MiniChart symbol={stock.symbol} height={280} maPeriods={stock.maPeriods} interactive showVolume wheelZoom={false} />
+        ? <MiniChart symbol={stock.symbol} height={280} maPeriods={stock.maPeriods} initialMonths={6} interactive showVolume wheelZoom={false} />
         : <span className="mini-chart-empty">圖表將在捲動到此處時載入</span>}
     </div>
   </article>;

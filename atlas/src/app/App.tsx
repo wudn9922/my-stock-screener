@@ -50,6 +50,9 @@ import { IconButton } from '../ui/IconButton';
 import { StockTabs, type StockView } from '../ui/StockTabs';
 import { StockVolatility } from '../ui/StockVolatility';
 import { MaRecommendation } from '../ui/MaRecommendation';
+import { useStockParameters } from '../cloud/useStockParameters';
+import { parameterMAs, stockParameterRows } from '../cloud/stockParameters';
+import { reconcileParameterIndicators } from './stockParameterIndicators';
 import { StockStatsMenu } from '../ui/StockStatsMenu';
 import { DrawingToolGlyph, DrawingToolPicker } from '../ui/DrawingToolPicker';
 import { Watchlist, companies } from '../ui/Watchlist';
@@ -187,6 +190,17 @@ export function App({
     s = store.symbol(symbol),
     tf = s.preferences.timeframe;
   const providerId = state.app.provider as ProviderId;
+  const parameters = useStockParameters(state.ready && providerId !== 'demo' && !symbol.startsWith('^'));
+  const parameter = stockParameterRows(parameters.stocks, symbol)[0];
+  const parameterKey = parameter ? `${parameter.id}:${parameterMAs(parameter).join(',')}` : '';
+  useEffect(() => {
+    if (!state.ready || providerId === 'demo' || !parameters.ready) return;
+    const current = store.symbol(symbol);
+    const periods = parameterKey ? parameterKey.split(':')[1]!.split(',').filter(Boolean).map(Number) : [];
+    const next = reconcileParameterIndicators(symbol, current.indicators, periods);
+    if (JSON.stringify(next) !== JSON.stringify(current.indicators)) store.updateSymbol(symbol, value => ({ ...value, indicators: next }));
+    // Run on a new symbol/source revision, not every indicator edit: toggling a line off remains possible.
+  }, [state.ready, providerId, symbol, parameterKey, parameters.ready, store]);
   const activeIndicators = useMemo(
     () => s.indicators.filter((indicator) => indicator.scope.timeframe === tf),
     [s.indicators, tf],
@@ -1062,7 +1076,7 @@ export function App({
                     <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
                   </StockStatsMenu>
                   <StockStatsMenu label="建議均線">
-                    <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} onNotice={setNotice} />
+                    <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} savedStock={parameter} parameterError={parameters.error} onNotice={setNotice} />
                     <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>
                   </StockStatsMenu>
                 </>
@@ -1115,7 +1129,7 @@ export function App({
         <section className="stock-view" aria-label="價量" hidden={stockView !== 'volume'} inert={modal} aria-hidden={modal}>
           <div className="stock-view-card">
             <h2>建議均線</h2>
-            <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} onNotice={setNotice} />
+            <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} savedStock={parameter} parameterError={parameters.error} onNotice={setNotice} />
             <p className="stock-view-hint">套用後切回「K線」即可在圖上看到均線。</p>
           </div>
           <div className="stock-view-card">

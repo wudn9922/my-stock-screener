@@ -14,6 +14,9 @@ import {
 import { DEFAULT_LIFF_ID } from '../cloud/lineIdentity';
 import { ConsoleDialog } from './ConsoleDialog';
 import { accessState } from '../auth/access';
+import { stockParameterRows } from '../cloud/stockParameters';
+import { saveStockParameters } from '../cloud/saveStockParameters';
+import { stockParametersChanged } from '../cloud/useStockParameters';
 
 /** The original control panel's authenticated API, rendered inside the Atlas shell. */
 export function ParameterConsole() {
@@ -60,11 +63,13 @@ export function ParameterConsole() {
   const save = (event: FormEvent) => {
     event.preventDefault();
     void run(async () => {
-      await settingsApi('stocks.save', {
-        ticker: ticker.trim().toUpperCase(),
-        groupId,
-        mas: fixedForTicker && groupId !== FIXED_STOCK_GROUP ? parameterMAs(fixedForTicker) : parseMovingAverages(mas),
-      });
+      if (existingForTicker) {
+        setEditGroup(existingForTicker.group_id);
+        setEditMas(parameterMAs(existingForTicker).join(', '));
+        setDialog({ stock: existingForTicker, mode: 'edit' });
+        return;
+      }
+      await saveStockParameters(ticker.trim().toUpperCase(), parseMovingAverages(mas), existingForTicker, groupId);
       await reload();
       setTicker('');
       setMessage(parameterStorageMessage('股票與均線參數'));
@@ -75,7 +80,7 @@ export function ParameterConsole() {
     [FIXED_STOCK_GROUP]: '無分組（固定參數）',
     ...Object.fromEntries(groups.map((group) => [`custom_${group.id}`, group.name])),
   };
-  const fixedForTicker = stocks.find((stock) => stock.ticker === ticker.trim().toUpperCase() && stock.group_id === FIXED_STOCK_GROUP);
+  const existingForTicker = stockParameterRows(stocks, ticker)[0];
   const filteredStocks = stocks.filter(
     (stock) =>
       (filterGroup === 'all' || stock.group_id === filterGroup) &&
@@ -131,13 +136,12 @@ export function ParameterConsole() {
           />
         </label>
         <button type="submit" className="primary-button" disabled={busy}>
-          新增股票參數
+          {existingForTicker ? '編輯已有參數' : '新增股票參數'}
         </button>
       </form>
-      {fixedForTicker && (
+      {existingForTicker && (
         <p className="muted">
-          此股票已有固定均線 {parameterMAs(fixedForTicker).join(' / ')}
-          ，加入分組時沿用此參數。
+          此股票已有均線 {parameterMAs(existingForTicker).join(' / ')}，請確認原有參數後再編輯，不會另外新增無分組參數。
         </p>
       )}
       <div className="console-actions parameter-filters">
@@ -165,7 +169,7 @@ export function ParameterConsole() {
         <span className="muted">{filteredStocks.length} 筆</span>
       </div>
       <HelpDisclosure label="固定參數與保存說明">
-        無分組的固定參數優先於分組與清單的均線；依目前授權選擇暫存、裝置或雲端保存。只有允許雲端保存且啟用監控的帳號才會使用服務端提醒。
+        優先使用原有分組的股票參數；沒有分組才使用無分組固定參數。依目前授權選擇暫存、裝置或雲端保存。只有允許雲端保存且啟用監控的帳號才會使用服務端提醒。
       </HelpDisclosure>
       <div className="research-table-scroll parameter-stock-scroll" role="region" aria-label="已有參數股票清單" tabIndex={0}>
         <table className="research-table" aria-label="個人股票參數">
@@ -189,10 +193,11 @@ export function ParameterConsole() {
                     className="text-button"
                     disabled={busy}
                     onClick={() => {
+                      const editable = stock.group_id === FIXED_STOCK_GROUP ? stockParameterRows(stocks, stock.ticker)[0]! : stock;
                       setMessage('');
-                      setEditGroup(stock.group_id);
-                      setEditMas(parameterMAs(stock).join(', '));
-                      setDialog({ stock, mode: 'edit' });
+                      setEditGroup(editable.group_id);
+                      setEditMas(parameterMAs(editable).join(', '));
+                      setDialog({ stock: editable, mode: 'edit' });
                     }}
                   >
                     編輯
@@ -231,12 +236,7 @@ export function ParameterConsole() {
               onSubmit={(event) => {
                 event.preventDefault();
                 void run(async () => {
-                  await settingsApi('stocks.save', {
-                    id: dialog.stock.id,
-                    ticker: dialog.stock.ticker,
-                    groupId: editGroup,
-                    mas: parseMovingAverages(editMas),
-                  });
+                  await saveStockParameters(dialog.stock.ticker, parseMovingAverages(editMas), dialog.stock, editGroup);
                   await reload();
                   setDialog(null);
                   setMessage(parameterStorageMessage('股票均線參數'));
@@ -248,7 +248,7 @@ export function ParameterConsole() {
                 <select
                   aria-label="編輯股票組別"
                   value={editGroup}
-                  disabled={busy || dialog.stock.group_id === FIXED_STOCK_GROUP}
+                  disabled={busy}
                   onChange={(event) => setEditGroup(event.target.value)}
                 >
                   {Object.entries(names).map(([key, name]) => (
@@ -271,8 +271,8 @@ export function ParameterConsole() {
               <p>
                 填入 1～4 個不重複的整數（1～1000），用逗號分隔。
                 {dialog.stock.group_id !== FIXED_STOCK_GROUP &&
-                  stocks.some((stock) => stock.ticker === dialog.stock.ticker && stock.group_id === FIXED_STOCK_GROUP) &&
-                  '此股票另有固定參數；實際監控優先使用固定參數，請從「無分組」編輯該筆設定。'}
+                  stockParameterRows(stocks, dialog.stock.ticker).some(stock => stock.group_id === FIXED_STOCK_GROUP) &&
+                  '此股票另有無分組重複參數；確認儲存會保留此分組，並清除無分組重複筆。'}
               </p>
               <div className="console-actions">
                 <button type="submit" className="primary-button" disabled={busy}>
@@ -303,6 +303,7 @@ export function ParameterConsole() {
                       await settingsApi('stocks.delete', {
                         id: dialog.stock.id,
                       });
+                      stockParametersChanged();
                       await reload();
                       setDialog(null);
                       setMessage('這筆股票參數已刪除。');

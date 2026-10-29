@@ -35,8 +35,7 @@ test('without lists the board opens on LINE 熱門 with quotes, and explains the
   await expect(rows(page).first().locator('.wb-change')).toHaveText(/^[▲▼]? ?[+-]?\d+\.\d{2}%$/);
   await expect(rows(page).first().locator('polyline')).toHaveAttribute('points', /^0\.0,/);
   expect(requested).toEqual(expect.arrayContaining(['NVDA', 'AAPL']));
-  // The index strip opens the chart of its index.
-  await expect(board(page).getByRole('group', { name: '主要指數' }).getByRole('button').first()).toBeVisible();
+  await expect(board(page).getByRole('group', { name: '主要指數' })).toHaveCount(0);
 
   await source(page, '我的清單').click();
   await expect(board(page).getByRole('status')).toContainText('還沒有自選清單');

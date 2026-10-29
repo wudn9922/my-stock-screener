@@ -3,13 +3,13 @@ import type { OpenChartOptions } from '../app/Site';
 import type { Route } from '../app/routes';
 import { getDailyBars } from '../app/dataSources';
 import type { Bar } from '../market-data/MarketDataProvider';
-import type { ReportState } from '../report/useReport';
 import { fetchTrendingStocks, type TrendingStocksResult } from '../report/trendingStocks';
 import type { SavedWatchlist } from '../watchlists/model';
 import { displayTicker, formatDateTime, formatPercent, formatPrice, toneClass } from './format';
 import './watchlistBoard.css';
 import { MonitorSignals } from './MonitorSignals';
 import { StockChartList } from './StockChartList';
+import type { ParameterStock } from '../cloud/settingsApi';
 
 type BoardTab = 'list' | 'trending' | 'signals';
 interface BoardRow {
@@ -122,11 +122,12 @@ function useTrending(wanted: boolean) {
 }
 
 /**
- * 自選 home: a quote board (index strip, saved list / LINE 熱門 / monitor signals with daily change and a
+ * 自選 home: a quote board (saved list / LINE 熱門 / monitor signals with daily change and a
  * 30-day path) above the unchanged list management. Display only: it writes nothing to storage.
  */
-export function WatchlistBoard({ report, list, lists, onSelectList, openChart, navigate }: {
-  report: ReportState;
+export function WatchlistBoard({ list, lists, parameters, parameterError, onSelectList, openChart, navigate }: {
+  parameters: readonly ParameterStock[];
+  parameterError?: string | null;
   list: SavedWatchlist | undefined;
   lists: readonly SavedWatchlist[];
   onSelectList: (id: string) => void;
@@ -144,9 +145,6 @@ export function WatchlistBoard({ report, list, lists, onSelectList, openChart, n
     if (hasLists) setTab('list');
   }, [hasLists]);
 
-  const indices = report.status === 'ok'
-    ? (['tw', 'us'] as const).flatMap((key) => report.report.markets.find((market) => market.key === key)?.indices.slice(0, 2) ?? [])
-    : [];
   const rows: BoardRow[] = tab === 'list'
     ? savedListRows(list)
     : trending?.status === 'ok'
@@ -169,17 +167,6 @@ export function WatchlistBoard({ report, list, lists, onSelectList, openChart, n
 
   return (
     <section className="watchlist-board" aria-label="自選行情">
-      {indices.length > 0 && (
-        <div className="wb-indices" role="group" aria-label="主要指數">
-          {indices.map((index) => (
-            <button key={index.symbol} type="button" className="wb-index" onClick={() => openChart({ symbol: index.symbol, name: index.name })}>
-              <small>{index.name}</small>
-              <b>{formatPrice(index.close)}</b>
-              <small className={toneClass(index.changePct)}>{formatPercent(index.changePct)}</small>
-            </button>
-          ))}
-        </div>
-      )}
       <div className="wb-tabs" role="group" aria-label="行情來源">
         {([['list', '我的清單'], ['trending', 'LINE 熱門'], ['signals', '突破／跌破']] as const).map(([key, label]) => (
           <button key={key} type="button" aria-pressed={tab === key} className={tab === key ? 'active' : ''} onClick={() => {
@@ -201,7 +188,9 @@ export function WatchlistBoard({ report, list, lists, onSelectList, openChart, n
         <span>{tab === 'list' ? list ? `清單：${list.name}` : '我的清單' : 'LINE 熱門美股'}</span>
         <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}延遲報價</span>
       </p>
-      {empty ? <div className="wb-empty" role="status">{empty}</div> : charts ? <StockChartList key={`${tab}:${list?.id ?? ''}`} rows={rows} openChart={openChart} /> : (
+      {charts && parameterError && <p role="status">{parameterError}</p>}
+      {empty ? <div className="wb-empty" role="status">{empty}</div> : charts ? <StockChartList key={`${tab}:${list?.id ?? ''}`} rows={rows}
+        parameters={parameters} groupPeriods={tab === 'list' ? list?.maList : undefined} openChart={openChart} /> : (
         <ul className="wb-rows" aria-label="自選行情列表">
           {shown.map((row) => <QuoteRow key={row.symbol} row={row} onOpen={open} />)}
         </ul>

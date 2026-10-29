@@ -34,25 +34,31 @@ async function mockLine(page: Page) {
     };
   });
   const saves: Record<string, unknown>[] = [];
+  const stocks: { id: number; ticker: string; group_id: string; ma1: number; ma2: number; ma3: number; ma4: number }[] = [];
   await page.route('**/functions/v1/user-settings', async (route) => {
     const body = route.request().postDataJSON() as Record<string, unknown>;
     expect(body.idToken).toBe('test-token');
     if (body.action === 'access.get') return route.fulfill({ json: accessEnvelope(undefined, 'cloud') });
-    if (body.action === 'stocks.save') saves.push(body);
+    if (body.action === 'stocks.save') {
+      saves.push(body);
+      const mas = body.mas as number[];
+      const stock = { id: 7, ticker: String(body.ticker), group_id: String(body.groupId), ma1: mas[0] ?? 0, ma2: mas[1] ?? 0, ma3: mas[2] ?? 0, ma4: mas[3] ?? 0 };
+      stocks.splice(0, stocks.length, stock);
+    }
     const data =
       body.action === 'stocks.list'
-        ? [{ id: 7, ticker: '2330.TW', group_id: 'ungrouped', ma1: 20, ma2: 60, ma3: 0, ma4: 0 }]
+        ? stocks
         : body.action === 'stocks.save'
           ? [{ id: 7 }]
           : [];
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, data }) });
   });
-  return saves;
+  return { saves, stocks };
 }
 
 test('chart shows the monthly recommendation, applies it on the daily chart and saves it as a fixed parameter', async ({ page }, testInfo) => {
   await mockSite(page);
-  const saves = await mockLine(page);
+  const { saves, stocks } = await mockLine(page);
   await page.route('**/my-stock-screener/report/ma-selector/2330.TW.json', (route) =>
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(recommendation) }),
   );
@@ -122,9 +128,12 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
   await expect(card.getByRole('button', { name: '取消套用 SMA 20', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await card.getByRole('button', { name: '套用 SMA 24', exact: true }).click();
 
+  stocks.push({ id: 7, ticker: '2330.TW', group_id: 'ungrouped', ma1: 20, ma2: 60, ma3: 0, ma4: 0 });
   await card.getByRole('button', { name: '固定為個股參數' }).click();
   const dialog = page.getByRole('dialog', { name: '2330.TW 固定均線參數' });
-  await expect(dialog.getByText('目前已保存：20 / 60；儲存後會被取代。')).toBeVisible();
+  await expect(dialog.getByRole('status')).toContainText('目前已保存：20 / 60；保留無分組');
+  await expect(dialog.getByRole('textbox', { name: '個股固定均線參數' })).toHaveValue('20, 60');
+  await dialog.getByRole('button', { name: /改用目前圖表的均線/ }).click();
   await expect(dialog.getByRole('textbox', { name: '個股固定均線參數' })).toHaveValue('20, 24, 38, 89');
   await page.screenshot({ path: testInfo.outputPath('ma-recommendation-fix.png') });
   await dialog.getByRole('button', { name: '確認並儲存到雲端' }).click();
@@ -149,6 +158,6 @@ test('a symbol without a recommendation links to the live ma-selector instead', 
   await page.getByTestId('stock-tab-volume').click();
   await expect(card.locator('dd')).toHaveText('—');
   await expect(card.locator('.ws-ma-reco-status')).toContainText('還沒有建議均線');
-  await expect(card.getByRole('button')).toHaveCount(0);
+  await expect(card.getByRole('button', { name: '固定為個股參數' })).toBeDisabled();
   await expect(card.getByRole('link', { name: /即時計算這檔股票/ })).toHaveAttribute('href', /\?ticker=NVDA$/);
 });

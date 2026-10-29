@@ -194,6 +194,24 @@ describe('explicit legacy browser settings copy', () => {
     expect(await mergeLegacyBrowserSettings(snapshot, () => {})).toMatchObject({ added: 0, conflicts: 1 });
   });
 
+  it.each(['device', 'cloud'] as const)('does not recreate a grouped/dormant duplicate or shadow current-account values during legacy import (%s)', async mode => {
+    h.access.storageMode = mode;
+    const original = { id: 1, ticker: '2330.TW', group_id: 'ungrouped', ma1: 50, ma2: 200, ma3: 0, ma4: 0 };
+    h.disk.set(PARAMETER_STORAGE_KEY, JSON.stringify({ version: 1, nextId: 4, groups: [], stocks: [
+      { ...original, id: 2, ticker: '2330', ma1: 13 },
+      { ...original, id: 3, ticker: '2330', group_id: 'tw_g1', ma1: 29 },
+    ] }));
+    const target = mode === 'cloud' ? `server/account-a/${PARAMETER_STORAGE_KEY}` : accountKey(PARAMETER_STORAGE_KEY);
+    h.disk.set(target, JSON.stringify({ version: 1, nextId: 2, groups: [], stocks: [original] }));
+    const snapshot = readLegacyBrowserSettings()!;
+    expect(await mergeLegacyBrowserSettings(snapshot, () => {})).toMatchObject({ added: 0, conflicts: 2 });
+    expect(JSON.parse(h.disk.get(target)!).stocks).toEqual([original]);
+    expect(h.cloudCalls).not.toContain('stocks.save');
+    h.disk.delete(target);
+    await mergeLegacyBrowserSettings(snapshot, () => {});
+    expect(JSON.parse(h.disk.get(target)!).stocks).toEqual([expect.objectContaining({ group_id: 'tw_g1', ma1: 29 })]);
+  });
+
   it.each(['device', 'cloud'] as const)('preserves nondefault group MAs in device mode or prevents partial cloud import (%s)', async mode => {
     h.access.storageMode = mode;
     h.disk.set('atlas-financials-view-v1', 'table');
