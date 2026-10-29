@@ -41,6 +41,11 @@ pixel position/44px targets, unchanged plot height before/during/after placement
 and lock/edit/delete. No gesture assertions or test timeouts were weakened.
 The cold lazy-navigation/old-deployment recovery helper now selects 大盤, with
 both original recovery scenarios passing on all three profiles (six tests).
+Full Python CI exposed an existing synthetic full-market size fixture that
+explicitly omitted 2026Q3, while the real 2330 file now contains that quarter.
+Newer Yahoo data correctly beat that older official fixture. Only the synthetic
+coverage is completed; source precedence and all source/size assertions remain.
+All 40 growth tests pass; no production financial implementation or record changes.
 
 No dependency/lockfile, account/auth, protected server-function, permanent price,
 financial or K-line archive changes. No SQL, notifications, deployment or merge.
