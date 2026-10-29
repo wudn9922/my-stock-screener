@@ -1,4 +1,41 @@
-## Current extension: Discord monitor signal groups and screener health layout (2026-10-28)
+## Current follow-up: price-axis isolation and watchlist chart review (2026-10-29)
+
+Primary self-review only; no independent sign-off. Based on main `3cece7a70`.
+Native price-axis dragging disables autoscale on the reused candle series. A
+real-canvas browser reproduction switched synthetic 20-price AAPL to 2,000-price
+NVDA: the old engine showed correct OHLC but zero candle-colored pixels. Public
+price-scale applyOptions re-enables autoscale on symbol/timeframe changes and
+explicit Reset View. Same-context refresh, saved logical ranges, canonical
+drawings and per-timeframe indicators are retained.
+
+My Lists selects the default existing list and exposes a controlled selector
+immediately below the source tabs. ConsolePage continues to own definitions,
+evaluation, history and synchronization. The old lower selector is moved; recent
+search is removed only from this board, with global search/history preserved.
+The chart-review button uses every current row, automatic 20-row batches,
+offscreen chart disposal and native vertical/wheel scrolling. MiniChart/provider
+are reused without preset stock MAs or new persistence.
+
+The four stock tabs now share compact styling between the workspace and financials.
+Financial identity comes first, period/display controls remain, and folded secondary
+queries sit in the tools row. The original 112px mobile header budget and scrolling
+header tests remain unchanged and pass. No account/auth, Supabase, navigation-shell
+or permanent market-data files are changed; existing MEXC and monitor behavior remains.
+
+Actual local validation: clean npm ci; lint/typecheck; 1,677 unit tests in 126 files;
+normal and Pages builds; 209 affected desktop/mobile Chromium/iPhone WebKit site
+tests passed with one original desktop skip for a phone-only sheet; three normal
+browser timeframe/drawing reload/export tests and three global-search/history
+checks passed. New tests compare rendered candles, top selector order/defaults,
+60-row chart review and the shared stock-tab measurements. Older list tests now
+assert option counts and dropdown selection while retaining their functional gates.
+
+No new dependencies, SQL, server deployment, notifications or merge. Synthetic
+prices and fake services only; headless WebKit is not physical-iPhone certification.
+See [the implementation notes](docs/CHART_WATCHLIST_FOLLOWUPS.md) and
+[ADR-022](docs/architecture/ADR-022-price-scale-and-watchlist-review.md).
+
+## Previous extension: Discord monitor signal groups and screener health layout (2026-10-28)
 
 Primary self-review only; no independent sign-off. Based on main `7dfa54650dee5b476f1d54da8ec337cf49b5271c`.
 The watchlist board keeps its current default and adds 突破／跌破 beside LINE 熱門.

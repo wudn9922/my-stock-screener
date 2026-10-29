@@ -47,10 +47,7 @@ export function FinancialsHeader({
   return (
     <header className="fin-head">
       <div className="fin-head-row fin-head-main">
-        {symbol ? (
-          <StockTabs active="financials" tabs={stockViews ? undefined : ['chart', 'financials']}
-            onSelect={(tab) => tab !== 'financials' && onBack(tab)} />
-        ) : (
+        {!symbol && (
           <button type="button" className="fin-back" onClick={() => onBack()} aria-label="回到圖表">
             <ArrowLeft size={18} aria-hidden="true" />
             <span>圖表</span>
@@ -58,10 +55,29 @@ export function FinancialsHeader({
         )}
         <div className="fin-title">
           <b>{symbol ? displayTicker(symbol) : '財報分析'}</b>
-          {name && symbol && name.toUpperCase() !== symbol && name !== displayTicker(symbol) && <span className="fin-name">{name}</span>}
           {history && <span className="fin-currency">{history.currency}</span>}
+          {name && symbol && name.toUpperCase() !== symbol && name !== displayTicker(symbol) && <span className="fin-name">{name}</span>}
         </div>
         <div className="fin-head-tools">
+          {(futuHref && symbol || homeListing && onHomeListing) && (
+            <FinancialNote label="其他查詢" className="fin-other-queries">
+              {futuHref && symbol && (
+                <div className="fin-outbound-row">
+                  <a className="fin-futu-link" href={futuHref} target="_blank" rel="noopener noreferrer">在富途網頁查看財報</a>
+                  <a className="fin-futu-link" href={`ftnn://quote/2/${encodeURIComponent(symbol)}/`}>在富途 App 開啟</a>
+                </div>
+              )}
+              {homeListing && onHomeListing && (
+                <p className="fin-home-listing">
+                  也可查看{' '}
+                  <button type="button" className="fin-home-link" title={`${homeListing.twName}（台股）`} onClick={() => onHomeListing(homeListing)}>
+                    {homeListing.tw}（台股）財報
+                  </button>
+                  <span className="fin-home-ratio">{adrRatioText(homeListing)}</span>
+                </p>
+              )}
+            </FinancialNote>
+          )}
           {history && level && (
             <button
               type="button"
@@ -88,6 +104,10 @@ export function FinancialsHeader({
         </div>
       </div>
       <div className="fin-head-row controls">
+        {symbol && <div className="stock-page-controls fin-stock-controls">
+          <StockTabs active="financials" tabs={stockViews ? undefined : ['chart', 'financials']}
+            onSelect={tab => tab !== 'financials' && onBack(tab)} />
+        </div>}
         {showQuarterly && (
           <div className="segmented compact" role="group" aria-label="期間">
             {(
@@ -114,25 +134,6 @@ export function FinancialsHeader({
             </button>
           ))}
         </div>
-        {(futuHref && symbol || homeListing && onHomeListing) && (
-          <FinancialNote label="其他查詢" className="fin-other-queries">
-            {futuHref && symbol && (
-              <div className="fin-outbound-row">
-                <a className="fin-futu-link" href={futuHref} target="_blank" rel="noopener noreferrer">在富途網頁查看財報</a>
-                <a className="fin-futu-link" href={`ftnn://quote/2/${encodeURIComponent(symbol)}/`}>在富途 App 開啟</a>
-              </div>
-            )}
-            {homeListing && onHomeListing && (
-              <p className="fin-home-listing">
-                也可查看{' '}
-                <button type="button" className="fin-home-link" title={`${homeListing.twName}（台股）`} onClick={() => onHomeListing(homeListing)}>
-                  {homeListing.tw}（台股）財報
-                </button>
-                <span className="fin-home-ratio">{adrRatioText(homeListing)}</span>
-              </p>
-            )}
-          </FinancialNote>
-        )}
       </div>
       {searching && (
         <div className="fin-search" id="fin-symbol-search">

@@ -26,6 +26,7 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+.fin-head-row.controls > .segmented.compact > button { min-width: 36px; min-height: 36px; padding: 0 6px; font-size: 12px; }
 .fin-outbound-row {
   display: flex;
   flex-wrap: wrap;
@@ -77,7 +78,7 @@
   white-space: nowrap;
 }
 .fin-title b {
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -745,10 +746,12 @@
     flex-wrap: wrap;
   }
   .fin-title b {
-    font-size: 14px;
+    font-size: 22px;
   }
   .fin-name {
-    display: none;
+    display: block;
+    flex-basis: 100%;
+    font-size: 12px;
   }
   .fin-head-row.controls {
     gap: 6px;

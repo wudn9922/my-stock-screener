@@ -166,7 +166,7 @@ for (const mode of ['none', 'device'] as const) {
     await page.reload();
     const tabs = page.getByRole('group', { name: '我的自選清單' });
     if (mode === 'device') await expect(tabs).toContainText('重新命名研究');
-    else await expect(tabs).not.toContainText('重新命名研究');
+    else await expect(tabs).toHaveCount(0);
     expect(policy?.privateRequests ?? []).toEqual([]);
   });
 }

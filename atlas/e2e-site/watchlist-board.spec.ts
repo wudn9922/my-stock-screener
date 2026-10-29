@@ -43,8 +43,7 @@ test('without lists the board opens on LINE 熱門 with quotes, and explains the
   await board(page).getByRole('button', { name: '到選股建立清單', exact: true }).click();
   await expect(page.locator('.site')).toHaveAttribute('data-page', 'screener');
   await page.goBack();
-  await source(page, '最近搜尋').click();
-  await expect(board(page).getByRole('status')).toContainText('還沒有搜尋紀錄');
+  await expect(source(page, '最近搜尋')).toHaveCount(0);
   // List management below the board is unchanged.
   await expect(page.getByRole('button', { name: '以篩選條件建立清單', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '建立手動清單', exact: true })).toBeVisible();
@@ -92,7 +91,7 @@ test('board rows keep 44px targets and no horizontal overflow at 320px', async (
   await expect(rows(page)).toHaveCount(3);
   for (const box of await rows(page).evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height)))
     expect(box).toBeGreaterThanOrEqual(44);
-  for (const name of ['我的清單', 'LINE 熱門', '最近搜尋'])
+  for (const name of ['我的清單', 'LINE 熱門', '突破／跌破'])
     expect((await source(page, name).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.querySelector('#main')!.scrollWidth - document.querySelector('#main')!.clientWidth)).toBeLessThanOrEqual(0);
 });

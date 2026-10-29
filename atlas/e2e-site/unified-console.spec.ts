@@ -86,7 +86,7 @@ test('multiple saved lists preserve independent rules, opening diffs, streaks, a
   await page.getByRole('button', { name: '存成自選清單', exact: true }).click();
   await page.getByRole('textbox', { name: '自選清單名稱' }).fill('回檔觀察');
   await page.getByRole('button', { name: '儲存並追蹤清單' }).click();
-  await expect(page.getByRole('group', { name: '我的自選清單' }).getByRole('button')).toHaveCount(2);
+  await expect(page.getByRole('group', { name: '我的自選清單' }).getByRole('option')).toHaveCount(2);
   await expect(page.getByRole('switch', { name: '監控此清單的突破提醒' })).not.toBeChecked();
   const next = structuredClone(report);
   next.reportDate = '2026-10-09';
@@ -168,7 +168,7 @@ test('the original parameter API is available inside Atlas and an undeployed clo
   await page.getByRole('button', { name: '重試同步', exact: true }).click();
   await expect(page.locator('.console-message').last()).toContainText('尚未部署');
   await expect(page.locator('.console-message').last()).toContainText('本機清單仍保留');
-  await expect(page.getByRole('group', { name: '我的自選清單' }).getByRole('button')).toHaveCount(1);
+  await expect(page.getByRole('group', { name: '我的自選清單' }).getByRole('option')).toHaveCount(1);
 });
 
 test('data health is folded at the page bottom and reports source failures explicitly', async ({ page }) => {

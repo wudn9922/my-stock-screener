@@ -139,7 +139,7 @@ test('list creation, monitoring changes and renaming sync automatically; deletio
   await page.getByRole('button', { name: '刪除清單', exact: true }).click();
   await expect(page.locator('.console-message').last()).toContainText('雲端刪除暫時失敗');
   expect(cloud.lists.size).toBe(1);
-  await expect(page.getByRole('group', { name: '我的自選清單' }).getByRole('button')).toHaveCount(1);
+  await expect(page.getByRole('group', { name: '我的自選清單' }).getByRole('option')).toHaveCount(1);
   cloud.state.failDelete = false;
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '刪除清單', exact: true }).click();

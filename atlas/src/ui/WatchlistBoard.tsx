@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { OpenChartOptions } from '../app/Site';
 import type { Route } from '../app/routes';
 import { getDailyBars } from '../app/dataSources';
-import { sitePreferences } from '../app/sitePreferences';
 import type { Bar } from '../market-data/MarketDataProvider';
 import type { ReportState } from '../report/useReport';
 import { fetchTrendingStocks, type TrendingStocksResult } from '../report/trendingStocks';
@@ -10,8 +9,9 @@ import type { SavedWatchlist } from '../watchlists/model';
 import { displayTicker, formatDateTime, formatPercent, formatPrice, toneClass } from './format';
 import './watchlistBoard.css';
 import { MonitorSignals } from './MonitorSignals';
+import { StockChartList } from './StockChartList';
 
-type BoardTab = 'list' | 'trending' | 'signals' | 'recent';
+type BoardTab = 'list' | 'trending' | 'signals';
 interface BoardRow {
   symbol: string;
   name: string;
@@ -122,21 +122,23 @@ function useTrending(wanted: boolean) {
 }
 
 /**
- * 自選 home: a quote board (index strip, saved list / LINE 熱門 / recent searches with daily change and a
+ * 自選 home: a quote board (index strip, saved list / LINE 熱門 / monitor signals with daily change and a
  * 30-day path) above the unchanged list management. Display only: it writes nothing to storage.
  */
-export function WatchlistBoard({ report, list, hasLists, openChart, navigate }: {
+export function WatchlistBoard({ report, list, lists, onSelectList, openChart, navigate }: {
   report: ReportState;
   list: SavedWatchlist | undefined;
-  hasLists: boolean;
+  lists: readonly SavedWatchlist[];
+  onSelectList: (id: string) => void;
   openChart: (options: OpenChartOptions) => void;
   navigate: (route: Route) => void;
 }) {
+  const hasLists = lists.length > 0;
   const [tab, setTab] = useState<BoardTab>(hasLists ? 'list' : 'trending');
   const [expanded, setExpanded] = useState(false);
-  const recent = useSyncExternalStore(sitePreferences.subscribe, () => sitePreferences.get().recent);
+  const [charts, setCharts] = useState(false);
   const { state: trending, retry } = useTrending(tab === 'trending');
-  useEffect(() => setExpanded(false), [tab, list?.id]);
+  useEffect(() => { setExpanded(false); setCharts(false); }, [tab, list?.id]);
   // The first saved list becomes the default source.
   useEffect(() => {
     if (hasLists) setTab('list');
@@ -147,9 +149,7 @@ export function WatchlistBoard({ report, list, hasLists, openChart, navigate }: 
     : [];
   const rows: BoardRow[] = tab === 'list'
     ? savedListRows(list)
-    : tab === 'recent'
-      ? recent
-      : trending?.status === 'ok'
+    : trending?.status === 'ok'
         ? trending.data.symbols.map((symbol) => ({ symbol, name: symbol }))
         : [];
   const shown = expanded ? rows : rows.slice(0, FIRST_ROWS);
@@ -163,9 +163,7 @@ export function WatchlistBoard({ report, list, hasLists, openChart, navigate }: 
         ? <p>這份清單還沒有入選股票；下方「清單追蹤結果」載入後會自動更新。</p>
         : <><p>還沒有自選清單。可以在選股頁用篩選條件建立，或在下方建立手動清單。</p>
           <button type="button" className="ghost-button" onClick={() => navigate({ page: 'screener' })}>到選股建立清單</button></>
-      : tab === 'recent'
-        ? <p>還沒有搜尋紀錄；用上方搜尋找股票後會列在這裡。</p>
-        : trending?.status === 'error'
+      : trending?.status === 'error'
           ? <><p>{trending.message}</p><button type="button" className="ghost-button" onClick={retry}>重試</button></>
           : <p>載入 LINE 熱門美股…</p>;
 
@@ -183,20 +181,32 @@ export function WatchlistBoard({ report, list, hasLists, openChart, navigate }: 
         </div>
       )}
       <div className="wb-tabs" role="group" aria-label="行情來源">
-        {([['list', '我的清單'], ['trending', 'LINE 熱門'], ['signals', '突破／跌破'], ['recent', '最近搜尋']] as const).map(([key, label]) => (
-          <button key={key} type="button" aria-pressed={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>
+        {([['list', '我的清單'], ['trending', 'LINE 熱門'], ['signals', '突破／跌破']] as const).map(([key, label]) => (
+          <button key={key} type="button" aria-pressed={tab === key} className={tab === key ? 'active' : ''} onClick={() => {
+            setTab(key);
+            if (key === 'list' && lists[0] && list?.id !== lists[0].id) onSelectList(lists[0].id);
+          }}>{label}</button>
         ))}
       </div>
-      {tab === 'signals' ? <MonitorSignals openChart={openChart} /> : <><p className="wb-caption">
-        <span>{tab === 'list' ? list ? `清單：${list.name}（在下方切換）` : '我的清單' : tab === 'trending' ? 'LINE 熱門美股' : '最近搜尋的股票'}</span>
+      {tab === 'signals' ? <MonitorSignals openChart={openChart} /> : <>
+      {tab === 'list' && hasLists && <div className="wb-list-picker" role="group" aria-label="我的自選清單">
+        <label>自選清單<select aria-label="選擇自選清單" value={list?.id ?? lists[0]!.id} onChange={event => onSelectList(event.target.value)}>
+          {lists.map(entry => <option key={entry.id} value={entry.id}>{entry.name}（{entry.market === 'TW' ? '台股' : '美股'}）</option>)}
+        </select></label>
+      </div>}
+      {rows.length > 0 && <button type="button" className="ghost-button wb-chart-toggle" aria-pressed={charts} onClick={() => setCharts(value => !value)}>
+        {charts ? '返回行情清單' : `連續看全部股票圖表（${rows.length} 檔）`}
+      </button>}
+      <p className="wb-caption">
+        <span>{tab === 'list' ? list ? `清單：${list.name}` : '我的清單' : 'LINE 熱門美股'}</span>
         <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}延遲報價</span>
       </p>
-      {empty ? <div className="wb-empty" role="status">{empty}</div> : (
+      {empty ? <div className="wb-empty" role="status">{empty}</div> : charts ? <StockChartList key={`${tab}:${list?.id ?? ''}`} rows={rows} openChart={openChart} /> : (
         <ul className="wb-rows" aria-label="自選行情列表">
           {shown.map((row) => <QuoteRow key={row.symbol} row={row} onOpen={open} />)}
         </ul>
       )}
-      {rows.length > shown.length && (
+      {!charts && rows.length > shown.length && (
         <button type="button" className="text-button wb-more" onClick={() => setExpanded(true)}>顯示全部 {rows.length} 檔</button>
       )}
       </>}
