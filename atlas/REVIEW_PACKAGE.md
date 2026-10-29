@@ -39,6 +39,8 @@ These retain corner/body edits, locked native pan, undo/redo, symbol/timeframe
 ownership, V3 import/V4 export and ATR coverage. New tests assert 2px, the menu's
 pixel position/44px targets, unchanged plot height before/during/after placement,
 and lock/edit/delete. No gesture assertions or test timeouts were weakened.
+The cold lazy-navigation/old-deployment recovery helper now selects 大盤, with
+both original recovery scenarios passing on all three profiles (six tests).
 
 No dependency/lockfile, account/auth, protected server-function, permanent price,
 financial or K-line archive changes. No SQL, notifications, deployment or merge.
