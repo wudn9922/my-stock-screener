@@ -144,10 +144,9 @@ def overlay(artifacts, dest, records_root=None):
     for module in modules:
         correction_artifact = artifacts / module / '_kline-corrections.json'
         if module == 'world' and correction_artifact.exists():
-            from kline_integrity import read_log, merge_logs, _atomic
+            from kline_integrity import read_log, merge_logs, write_log
             target = dest.parent / 'kline-corrections.json'
-            merged = merge_logs(read_log(target), read_log(correction_artifact))
-            _atomic(target, json.dumps(merged, ensure_ascii=False, indent=2)+'\n')
+            write_log(target, merge_logs(read_log(target), read_log(correction_artifact)))
         for relative in files_for(artifacts / module, module):
             path = dest / relative
             source = artifacts / module / relative

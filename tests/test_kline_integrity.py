@@ -73,7 +73,8 @@ class KlineIntegrityTest(unittest.TestCase):
         result = k.accept_frame(raw, "AAPL", now=now, refetch=retry, official=None)
         self.assertEqual(list(result.index.strftime('%Y-%m-%d')), ['2026-10-21'])
         retry.assert_called_once()
-        self.assertIn('deferred', [e['status'] for e in k.read_log()['events']])
+        # The forming row is not stored, and no longer logged on every sighting.
+        self.assertNotIn('deferred', [e['status'] for e in k.read_log()['events']])
 
     def test_permanent_rows_and_source_precision_survive_filtered_writes(self):
         path = Path(self.tmp.name) / '7825.TWO.csv'

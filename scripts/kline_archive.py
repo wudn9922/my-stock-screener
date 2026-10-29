@@ -261,9 +261,8 @@ def merge_main_log(root, destination=None):
     merged = ki.merge_logs(current, incoming)
     if merged == current:
         return False
-    # Preserve the existing main journal's human-readable format; no formatting-only pushes.
-    atomic(destination, json.dumps(merged, ensure_ascii=False, indent=2, allow_nan=False) + "\n")
-    ki._load_log.cache_clear()
+    # The main journal's retention and format; the archive's own journal is untouched.
+    ki.write_log(destination, merged)
     return True
 
 

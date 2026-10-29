@@ -35,6 +35,24 @@ kline-archive (orphan; no main parent)
 
 初始化尚未完成、分支無法讀取或封存驗證失敗時，新的全市場採集暫停，避免在沒有永久保存前先裁切舊快取；原 cache／報告的 always 保存與發佈仍繼續。已退出名單的 cache 也須先確認日期已進入永久封存才可清理。不要把「封存來源不可用」當成空白封存重新建立。
 
+## main 修正日誌的保存期限
+
+`main` 的 `docs/report/kline-corrections.json` 每天約新增數千筆，原本約 2 MB／日，
+約一個半月就會超過 GitHub 單檔 100 MB 上限。所有寫入 main 日誌的程式
+（`kline_integrity.log_event`、`generated_branch.py` 並行 union、`kline_archive.merge_main_log`、
+`research_publish.py`）都經 `kline_journal.prune_main_journal` 與 `dump_journal`：
+
+- **隔離名單（`quarantined`）永久保留**，網站與所有計算照常排除隔離日期。
+- 不再記錄「盤中未收盤、先不寫入」（`deferred`）：該 K 棒本來就沒寫進資料。
+- 同一檔、同一天，與上一筆保留事件內容相同（狀態、原因、舊值、新值）的重複觀察不再記；
+  來源來回變動的每一次改變仍保留。
+- 修正／拒收事件保留 **92 天**；`quarantined` 事件與 `kline-archive/` 開頭的封存調整事件永久保留。
+  安全上限 120,000 筆（約 63 MB），超過時先留最新的。更早的版本仍在 git 歷史可查。
+- 格式改成一行一筆的緊湊 JSON。每日報告（`main.py`）與全市場更新（`build_universe_full.py`）
+  以 `kline_integrity.batched_journal()` 在記憶體累積，跑完（或 git add 前）只寫一次。
+
+`kline-archive` 分支自己的日誌**不套用**以上規則，封存的每筆調整與移除紀錄永久保存。
+
 ## 發布競爭、每日效能與停更復原
 
 `generated_branch.py` 發布 main records 時，只有 `docs/report/kline-corrections.json`
