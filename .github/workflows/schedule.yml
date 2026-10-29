@@ -147,6 +147,14 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python -u scripts/build_rates.py
 
+      - name: Build Japanese spreads and monthly yield bands
+        if: steps.guard.outputs.skip != 'true'
+        continue-on-error: true
+        timeout-minutes: 6
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python -u scripts/build_bond_research.py
+
       # 財報分析中心改由 financials.yml 在本流程成功後另開 runner 執行：
       # 上千次 Yahoo 請求放在這裡會被前面的題材／利率步驟拖累而遭限流（HTTP 429）。
 
@@ -162,6 +170,9 @@ jobs:
           # data/*.csv 是永久 K 線紀錄，不再清除過期檔；開關關閉時仍與報告一起留 main。
           git add -A docs/report data
           if [ -f docs/report/trending-stocks.json ]; then git add -f docs/report/trending-stocks.json; fi
+          for report in docs/report/jp-rates.json docs/report/yield-band-params.json; do
+            if [ -f "$report" ]; then git add -f -- "$report"; fi
+          done
           git commit -m "Auto-update daily data and report JSON" || echo "No changes to commit"
           # Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試
           for attempt in 1 2 3; do

@@ -23,10 +23,12 @@ import { DrawingController } from '../drawing/DrawingController';
 import { IndicatorEngine } from '../indicators/IndicatorEngine';
 import {
   drawingVisible,
+  controlAnchors,
   type ToolKind,
   type DrawingStyle,
   type ActiveTool,
   type Drawing,
+  type Point,
 } from '../drawing/DrawingModel';
 import type { IndicatorInstance } from '../indicators/IndicatorRegistry';
 import type { Bar, BarResult, Timeframe } from '../market-data/MarketDataProvider';
@@ -41,7 +43,7 @@ import { formatMarketVolume } from '../ui/format';
 export interface ChartCallbacks {
   defaults?: (type: ToolKind) => Partial<DrawingStyle>;
   commit: (symbol: string, drawings: Drawing[], label: string, timeframe: Timeframe) => void;
-  selection: (id: string | null) => void;
+  selection: (id: string | null, point?: Point) => void;
   tool: (t: ActiveTool) => void;
   view: (symbol: string, timeframe: Timeframe, range: ViewRange) => void;
 }
@@ -442,6 +444,14 @@ export class ChartEngine {
   setSelection(id: string | null) {
     this.controller?.machine.select(id);
     this.controller?.refresh();
+  }
+  drawingVerticalBounds(id: string) {
+    const machine = this.controller?.machine;
+    const drawing = machine?.drawings.find(d => d.id === id);
+    if (!machine || !drawing) return null;
+    const ys = controlAnchors(drawing).map(anchor => machine.projection.toPoint(anchor)?.y)
+      .filter((y): y is number => typeof y === 'number' && Number.isFinite(y));
+    return ys.length ? { top: Math.min(...ys), bottom: Math.max(...ys) } : null;
   }
   resetView() {
     const n = this.bars.length - 1;

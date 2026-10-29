@@ -173,7 +173,7 @@ export function DrawingSettings({
           <button type="button" onClick={() => { onCancelGesture(); store.mutateDrawing(drawing.id, 'lock'); }} style={{ minHeight: 44 }} className="ghost-button">解鎖畫線</button>
         )}
       </form>
-      <HelpDisclosure label="畫線樣式與線寬說明">ATR 線寬＝0.02 × 14 根 K 棒 ATR 換算成 0.5–4 像素（至少 1 個實體像素）。新畫線預設使用 ATR 線寬，已儲存的畫線保留原設定。預設樣式只套用於之後的新畫線；費波那契預設維持標準七個層級。</HelpDisclosure>
+      <HelpDisclosure label="畫線樣式與線寬說明">ATR 線寬＝0.02 × 14 根 K 棒 ATR 換算成 0.5–4 像素（至少 1 個實體像素）。新畫線預設使用 2px 線寬，已儲存的畫線保留原設定。預設樣式只套用於之後的新畫線；費波那契預設維持標準七個層級。</HelpDisclosure>
     </section>
   );
 }

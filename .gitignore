@@ -43,6 +43,8 @@ docs/report/**/*.tmp
 /docs/report/themes.json
 /docs/report/rates.json
 /docs/report/rates-history.json
+/docs/report/jp-rates.json
+/docs/report/yield-band-params.json
 /docs/report/growth.json
 /docs/report/fundamentals/tw.json
 /docs/report/fundamentals/us-sec.json

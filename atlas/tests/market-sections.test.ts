@@ -3,9 +3,9 @@ import { INITIAL_MARKET_SECTIONS, marketSectionOf, rememberMarketSection } from 
 
 describe('市場 sections', () => {
   it('maps every market-area route to one section and other pages to none', () => {
-    expect(marketSectionOf({ page: 'markets', market: 'tw' })).toBe('tw');
-    expect(marketSectionOf({ page: 'markets', market: 'us' })).toBe('us');
-    for (const market of ['jp', 'kr', 'eu'] as const) expect(marketSectionOf({ page: 'markets', market })).toBe('intl');
+    expect(marketSectionOf({ page: 'markets', market: 'tw' })).toBe('markets');
+    expect(marketSectionOf({ page: 'markets', market: 'us' })).toBe('markets');
+    for (const market of ['jp', 'kr', 'eu'] as const) expect(marketSectionOf({ page: 'markets', market })).toBe('markets');
     expect(marketSectionOf({ page: 'world', view: 'fx' })).toBe('world');
     expect(marketSectionOf({ page: 'themes', market: 'tw', v: 'map' })).toBe('themes');
     expect(marketSectionOf({ page: 'screener' })).toBeNull();
@@ -18,12 +18,10 @@ describe('市場 sections', () => {
     memory = rememberMarketSection(memory, { page: 'themes', market: 'tw', v: 'map', theme: 'ai-chips' });
     memory = rememberMarketSection(memory, { page: 'screener', group: 'tw_g1' });
     expect(memory).toEqual({
-      tw: { page: 'markets', market: 'tw' },
-      us: { page: 'markets', market: 'us' },
-      intl: { page: 'markets', market: 'eu' },
+      markets: { page: 'markets', market: 'eu' },
       world: { page: 'world', view: 'commodities' },
       themes: { page: 'themes', market: 'tw', v: 'map' },
     });
-    expect(INITIAL_MARKET_SECTIONS.intl).toEqual({ page: 'markets', market: 'jp' });
+    expect(INITIAL_MARKET_SECTIONS.markets).toEqual({ page: 'markets', market: 'tw' });
   });
 });

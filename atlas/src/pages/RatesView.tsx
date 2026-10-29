@@ -5,6 +5,7 @@ import { loadRates, loadRatesHistory, type CachedResult, type Rates } from '../r
 import { PageState } from '../ui/PageState';
 import { formatDateTime } from '../ui/format';
 import { KeyNumbers } from '../ui/rates/KeyNumbers';
+import { YieldBandCard } from '../ui/rates/YieldBandCard';
 import { SpreadCard } from '../ui/rates/SpreadCard';
 import { ScenarioCard } from '../ui/rates/ScenarioCard';
 import { EtfCompareCard } from '../ui/rates/EtfCompareCard';
@@ -84,6 +85,8 @@ export default function RatesView({ openChart }: RatesViewProps) {
       )}
       <KeyNumbers rates={data} history={history} fedBound={fedBound} />
       <div className="rates-grid">
+        <YieldBandCard country="US" policy={data.policy?.upper ?? null} date={data.asOf}
+          value={data.curves.nominal.find(curve => curve.key === 'now')?.values[data.tenors.indexOf('10Y')] ?? null} />
         <SpreadCard rates={data} history={history} fedBound={fedBound} onFedBoundChange={setFedBound} />
         {data.etfs.length > 0 && <ScenarioCard etfs={data.etfs} />}
         {data.etfs.length > 0 && <EtfCompareCard etfs={data.etfs} openChart={openChart} />}

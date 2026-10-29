@@ -59,6 +59,23 @@ describe('Trend Line interaction regression', () => {
     expect(m.drawings[0].points).toEqual([mapper.anchor(11, 12), mapper.anchor(23, 25)]);
     expect(m.tool).toBe('select');
   });
+  it('defaults new drawings to 2px while preserving explicit custom ATR widths', () => {
+    const { m } = machine(); m.setTool('horizontal');
+    m.begin({ x: 100, y: 120 }, 1, false); m.end({ x: 100, y: 120 }, 1);
+    expect(m.drawings[0].style).toMatchObject({ lineWidth: 2, widthMode: 'pixels' });
+    const custom = new DrawingStateMachine('AAPL', mapper, projection, [], () => {}, () => {}, () => ({ lineWidth: 3, widthMode: 'atr' }));
+    custom.setTool('horizontal'); custom.begin({ x: 100, y: 120 }, 1, false); custom.end({ x: 100, y: 120 }, 1);
+    expect(custom.drawings[0].style).toMatchObject({ lineWidth: 3, widthMode: 'atr' });
+  });
+  it('publishes menu positions on selection/release, never on pointer movement', () => {
+    const { m, select } = machine([drawing]);
+    m.begin({ x: 150, y: 150 }, 1, false);
+    expect(select).toHaveBeenLastCalledWith('line', { x: 150, y: 150 });
+    for (let i = 1; i <= 15; i++) m.move({ x: 150 + i, y: 150 + i }, 1);
+    expect(select).toHaveBeenCalledTimes(1);
+    m.end({ x: 170, y: 170 }, 1);
+    expect(select).toHaveBeenLastCalledWith('line', { x: 170, y: 170 });
+  });
   it('edits selected endpoints and uses a snapshot for whole-line move', () => {
     const { m, commit } = machine([drawing]);
     m.select('line');
@@ -92,7 +109,7 @@ describe('Trend Line interaction regression', () => {
     const { m, commit, select } = machine([locked]);
     m.select('line');
     expect(m.begin({ x: 100, y: 100 }, 1, true)).toBe(false);
-    expect(select).toHaveBeenLastCalledWith('line');
+    expect(select).toHaveBeenLastCalledWith('line', { x: 100, y: 100 });
     expect(commit).not.toHaveBeenCalled();
     expect(hitTest([locked], { x: 100, y: 100 }, projection, true, 'line')!.part).toBe('body');
     expect(moveDrawing(locked, mapper.anchor(0, 0), mapper.anchor(2, 2), mapper)).toBe(locked);

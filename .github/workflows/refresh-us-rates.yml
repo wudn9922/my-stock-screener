@@ -12,6 +12,9 @@ on:
       - 'scripts/rates_analytics.py'
       - 'scripts/rates_config.py'
       - 'tests/test_rates.py'
+      - 'scripts/build_bond_research.py'
+      - 'tests/test_bond_research.py'
+      - 'atlas/data/yield-band-params.json'
 
 env:
   GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
@@ -54,12 +57,20 @@ jobs:
           cp tests/fixtures/rates/sample-rates-history.json atlas/tests/fixtures/rates/backend-sample-rates-history.json
 
       - name: Test US rates builder
-        run: python -m unittest discover -s tests -p test_rates.py
+        run: |
+          python -m unittest discover -s tests -p test_rates.py
+          python -m unittest discover -s tests -p test_bond_research.py
 
       - name: Rebuild US Treasury reports
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python -u scripts/build_rates.py
+
+      - name: Rebuild Japan spreads and monthly reasonable bands
+        continue-on-error: true
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python -u scripts/build_bond_research.py
 
       - name: Verify the published rates contract
         run: |
@@ -115,6 +126,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -- docs/report/rates.json docs/report/rates-history.json tests/fixtures/rates/sample-rates.json tests/fixtures/rates/sample-rates-history.json atlas/tests/fixtures/rates/backend-sample-rates.json atlas/tests/fixtures/rates/backend-sample-rates-history.json
+          for report in docs/report/jp-rates.json docs/report/yield-band-params.json; do
+            if [ -f "$report" ]; then git add -f -- "$report"; fi
+          done
           if git diff --cached --quiet; then
             echo "Rates reports unchanged; nothing to commit."
             exit 0

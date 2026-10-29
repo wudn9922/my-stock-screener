@@ -57,16 +57,16 @@ export class DrawingStateMachine {
     public projection: DrawingProjection,
     public drawings: Drawing[],
     private commit: (drawings: Drawing[], label: string) => void,
-    private selection: (id: string | null) => void,
+    private selection: (id: string | null, point?: Point) => void,
     private defaults: (type: ToolKind) => Partial<DrawingStyle> = () => ({}),
   ) {}
   setTool(tool: ActiveTool) {
     this.cancel();
     this.tool = tool;
   }
-  select(id: string | null) {
+  select(id: string | null, point?: Point) {
     this.selectedId = id;
-    this.selection(id);
+    if (point) this.selection(id, point); else this.selection(id);
   }
   private candidate(point: Point, snap: boolean) {
     const a = this.projection.toAnchor(point);
@@ -91,7 +91,7 @@ export class DrawingStateMachine {
       this.select(null);
       return false;
     }
-    this.select(hit.id);
+    this.select(hit.id, point);
     const d = this.drawings.find((d) => d.id === hit.id)!;
     if (d.locked) return false; // The chart owns a locked-line drag.
     const start = this.projection.toAnchor(point)!;
@@ -154,7 +154,7 @@ export class DrawingStateMachine {
         this.first = null;
         this.placed = [];
         this.preview = null;
-        this.select(d.id);
+        this.select(d.id, point);
         this.tool = 'select';
       }
     } else if (this.preview) {
@@ -174,6 +174,7 @@ export class DrawingStateMachine {
       }
       this.preview = null;
     }
+    if (g.kind === 'edit') this.select(this.selectedId, point);
     this.gesture = null;
     this.pointer = null;
   }
@@ -197,11 +198,11 @@ export class DrawingStateMachine {
       style: {
         ...otherStyle,
         color: style.color ?? '#5ca9ff',
-        lineWidth: style.lineWidth ?? 1,
+        lineWidth: style.lineWidth ?? 2,
         ...(style.widthMode !== undefined
           ? { widthMode: style.widthMode }
           : style.lineWidth === undefined
-            ? { widthMode: 'atr' as const }
+            ? { widthMode: 'pixels' as const }
             : {}),
         ...(type === 'fibonacci' && hiddenLevels
           ? { hiddenLevels: hiddenLevels.filter((level) => fibDefaultLevels.has(level)) }

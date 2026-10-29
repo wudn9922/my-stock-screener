@@ -1,24 +1,22 @@
 import type { PageProps } from '../pages/pageProps';
 import { serializeRoute, type Route } from '../app/routes';
 
-export type MarketSection = 'tw' | 'us' | 'intl' | 'world' | 'themes';
+export type MarketSection = 'markets' | 'world' | 'themes';
 type MarketRoute = Extract<Route, { page: 'markets' }>;
 export interface MarketSectionRoutes {
-  tw: MarketRoute;
-  us: MarketRoute;
-  /** Last of 日本／韓國／歐洲 (the markets page's own tabs switch between them). */
-  intl: MarketRoute;
+  /** Last selected country within 大盤. */
+  markets: MarketRoute;
   world: Extract<Route, { page: 'world' }>;
   themes: Extract<Route, { page: 'themes' }>;
 }
 
 const SECTIONS: readonly (readonly [MarketSection, string])[] = [
-  ['tw', '台股'], ['us', '美股'], ['intl', '日韓歐'], ['world', '全球'], ['themes', '題材'],
+  ['markets', '大盤'], ['world', '全球'], ['themes', '題材'],
 ];
 
 /** The 市場 section a market-area route belongs to. */
 export function marketSectionOf(route: Route): MarketSection | null {
-  if (route.page === 'markets') return route.market === 'tw' ? 'tw' : route.market === 'us' ? 'us' : 'intl';
+  if (route.page === 'markets') return 'markets';
   return route.page === 'world' || route.page === 'themes' ? route.page : null;
 }
 
@@ -32,9 +30,7 @@ export function rememberMarketSection(memory: MarketSectionRoutes, route: Route)
 }
 
 export const INITIAL_MARKET_SECTIONS: MarketSectionRoutes = {
-  tw: { page: 'markets', market: 'tw' },
-  us: { page: 'markets', market: 'us' },
-  intl: { page: 'markets', market: 'jp' },
+  markets: { page: 'markets', market: 'tw' },
   world: { page: 'world' },
   themes: { page: 'themes' },
 };

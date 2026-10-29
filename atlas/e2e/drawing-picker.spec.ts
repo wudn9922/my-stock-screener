@@ -241,6 +241,12 @@ test('new SMA defaults to 2px and explicitly selected ATR width preserves locked
     chart.y + chart.height * 0.5,
   );
   await expect.poll(async () => (await readSymbol(page))?.drawings.length).toBe(1);
+  expect((await readSymbol(page))!.drawings[0].style).toMatchObject({ lineWidth: 2, widthMode: 'pixels' });
+  await page.getByRole('button', { name: '畫線設定', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '修改畫線', exact: true });
+  await editor.getByRole('combobox', { name: '線寬', exact: true }).selectOption('atr');
+  await editor.getByRole('button', { name: '儲存畫線', exact: true }).click();
+  await editor.getByRole('button', { name: '完成', exact: true }).click();
   await page.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
   await expect.poll(async () => (await readSymbol(page))?.drawings[0]?.locked).toBe(true);
 
@@ -385,6 +391,7 @@ test('legacy locked pixel widths survive V3 import and V4 export without being r
     chart.y + chart.height * 0.47,
   );
   await expect.poll(async () => (await readSymbol(page))?.drawings.length).toBe(1);
+  expect((await readSymbol(page))!.drawings[0].style).toMatchObject({ lineWidth: 2, widthMode: 'pixels' });
   await page.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
 
   const baseline = await exportSettings(page);
