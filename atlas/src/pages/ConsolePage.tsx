@@ -310,7 +310,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         <button type="button" className={listsView === 'holdings' ? 'active' : ''} aria-pressed={listsView === 'holdings'} onClick={() => setListsView('holdings')}>持股</button>
       </div>}
       {section === 'lists' && listsView === 'lists' && (
-        <WatchlistBoard report={report} list={selected} hasLists={document.lists.length > 0} openChart={openChart} navigate={navigate} />
+        <WatchlistBoard report={report} list={selected} lists={document.lists} onSelectList={id => navigate({ page: 'watchlist', list: id })} openChart={openChart} navigate={navigate} />
       )}
       <StorageModeNotice />
       <LegacyImportCard />
@@ -424,23 +424,6 @@ export default function ConsolePage({ report, navigate, openChart, list: request
               </button>
             </form>
           )}
-          <div className="watchlist-tabs" role="group" aria-label="我的自選清單">
-            {document.lists.map((entry) => (
-              <button
-                type="button"
-                key={entry.id}
-                className={`chip ${selected?.id === entry.id ? 'active' : ''}`}
-                aria-pressed={selected?.id === entry.id}
-                onClick={() => {
-                  if (selected?.id === entry.id) setAttempt((value) => value + 1);
-                  else navigate({ page: 'watchlist', list: entry.id });
-                }}
-              >
-                {entry.name}
-                <small>{entry.market === 'TW' ? '台股' : '美股'}</small>
-              </button>
-            ))}
-          </div>
           {!selected ? (
             <div className="page-state empty">
               <b>還沒有條件清單</b>

@@ -54,6 +54,9 @@
   color: var(--bg);
   font-weight: 650;
 }
+.wb-list-picker label { display: flex; flex-direction: column; gap: 6px; color: var(--text-2); font-size: 13px; }
+.wb-list-picker select { width: 100%; min-width: 0; min-height: 46px; padding: 8px 12px; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; font: inherit; }
+.wb-chart-toggle { align-self: flex-start; min-height: 46px; max-width: 100%; }
 .wb-caption {
   display: flex;
   justify-content: space-between;

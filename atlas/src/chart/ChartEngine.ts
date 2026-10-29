@@ -224,6 +224,7 @@ export class ChartEngine {
     legacyVolume = true,
     calendar: SessionCalendar = 'regular',
   ) {
+    const contextChanged = this.symbol !== symbol || this.timeframe !== timeframe;
     this.cancelOhlcFrame();
     this.activePointers.clear();
     this.ohlcBar = null;
@@ -302,6 +303,9 @@ export class ChartEngine {
     this.indicators.sync(indicators, result.bars, timeframe, this.revision);
     this.syncLegacyVolumeVisibility(indicators, legacyVolume);
     this.chart.timeScale().setVisibleLogicalRange(restoreViewRange(range, result.bars.length));
+    // Native price-axis dragging disables autoscale on the reused series. That
+    // manual scale belongs to the old symbol/timeframe, not the next instrument.
+    if (contextChanged) this.candles.priceScale().applyOptions({ autoScale: true });
     this.ohlcBar = result.bars.at(-1) ?? null;
     this.renderHeader();
     this.scheduleVisualFrame();
@@ -442,6 +446,7 @@ export class ChartEngine {
   resetView() {
     const n = this.bars.length - 1;
     this.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 150), to: n + 40 });
+    this.candles.priceScale().applyOptions({ autoScale: true });
     this.scheduleView();
   }
   futureArea() {

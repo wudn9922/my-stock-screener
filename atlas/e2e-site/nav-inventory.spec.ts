@@ -203,7 +203,8 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
     await expect(page.getByRole('region', { name: '清單追蹤結果' })).toContainText(symbol!);
     await expect.poll(() => cloud.size).toBe(symbol === 'NVDA' ? 1 : 2);
   }
-  await page.getByRole('group', { name: '我的自選清單' }).getByRole('button', { name: /導覽 NVDA/ }).click();
+  const listPicker = page.getByRole('combobox', { name: '選擇自選清單' });
+  await listPicker.selectOption((await listPicker.getByRole('option', { name: /導覽 NVDA/ }).getAttribute('value'))!);
   const result = page.getByRole('region', { name: '清單追蹤結果' });
   await expect(result).toContainText('NVDA');
   await expect(result).toContainText('目前入選');
@@ -219,7 +220,7 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
   const payload = readFileSync((await download.path())!);
   page.once('dialog', dialog => dialog.accept());
   await page.locator('.console-page input[type="file"]').setInputFiles({ name: 'atlas-watchlists.json', mimeType: 'application/json', buffer: payload });
-  await expect(page.getByRole('group', { name: '我的自選清單' }).getByRole('button')).toHaveCount(2);
+  await expect(page.getByRole('group', { name: '我的自選清單' }).getByRole('option')).toHaveCount(2);
   await page.getByText('載入與管理雲端清單', { exact: true }).click();
   await page.getByRole('button', { name: '載入雲端清單', exact: true }).click();
   await expect(page.getByRole('button', { name: '匯入本機', exact: true })).toHaveCount(2);
@@ -253,5 +254,5 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
   await page.screenshot({ path: info.outputPath(info.project.name === 'desktop-chromium' ? 'my-display-desktop.png' : 'my-display-mobile-390.png') });
   await page.getByRole('link', { name: '自選清單 →', exact: true }).click();
   await expect(page.locator('.page-title')).toHaveText('自選清單');
-  await expect(page.getByRole('group', { name: '我的自選清單' }).getByRole('button')).toHaveCount(2);
+  await expect(page.getByRole('group', { name: '我的自選清單' }).getByRole('option')).toHaveCount(2);
 });

@@ -1,4 +1,4 @@
-/* K線｜財務 switch (chart header and financials header). Desktop pointers get a compact 30px target; touch
+/* K線｜財務｜價量｜研究 (chart header and financials header). Desktop pointers get a compact 30px target; touch
    and narrow screens keep at least 36px. */
 .stock-tabs {
   display: inline-flex;
@@ -33,12 +33,19 @@
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+.stock-page-controls { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 0 0 auto; }
+.stock-page-controls > .stock-tabs { padding: 2px; gap: 1px; }
+.stock-page-controls > .stock-tabs button { min-width: 40px; min-height: 30px; padding: 0 6px; font-size: 12px; }
 @media (max-width: 1099px), (pointer: coarse) {
   .stock-tabs button {
     min-height: 36px;
     min-width: 60px;
     font-size: 14px;
   }
+}
+@media (max-width: 1099px) {
+  .stock-page-controls > .stock-tabs { margin: 0; padding: 0; }
+  .stock-page-controls > .stock-tabs button { min-width: 40px; min-height: 36px; font-size: 12px; }
 }
 
 /* 價量／研究 views replace the chart area; the chart stays mounted (hidden) and returns unchanged. */

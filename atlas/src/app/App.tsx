@@ -1046,7 +1046,7 @@ export function App({
           </div>
         )}
         {!isIndex && providerId !== 'demo' && (
-          <div className="ws-stock-controls">
+          <div className="ws-stock-controls stock-page-controls">
             {onOpenFinancials && (
               <StockTabs
                 active={stockView}

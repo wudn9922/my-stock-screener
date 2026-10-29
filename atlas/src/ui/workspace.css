@@ -1930,8 +1930,6 @@
   min-width: 0;
 }
 .ws-stock-controls { flex: 0 0 auto; }
-.ws-stock-controls > .stock-tabs { padding: 2px; gap: 1px; }
-.ws-stock-controls > .stock-tabs button { min-width: 40px; min-height: 30px; padding: 0 6px; font-size: 12px; }
 .ws-stock-statistics > .ws-stats-menu > .ws-stats-toggle,
 .ws-header-actions > .ws-stats-menu > .ws-stats-toggle {
   padding: 0;
@@ -2107,8 +2105,6 @@
     gap: 6px;
     min-width: 0;
   }
-  .ws-stock-controls > .stock-tabs { margin: 0; padding: 0; }
-  .ws-stock-controls > .stock-tabs button { min-width: 40px; min-height: 36px; }
   .ws-analysis-tools {
     gap: 4px;
   }
