@@ -242,12 +242,22 @@ def parameter_ticker_key(ticker):
 
 
 def fixed_parameter_map(stocks, user_id):
-    """Dormant preferences do not confer membership or notification consent."""
+    """Original grouped stock rows win over legacy dormant duplicates.
+
+    This only resolves parameters, never membership or notification consent.
+    Keep the ordering and ticker keys aligned with Atlas stockParameters.ts.
+    """
     result = {}
-    for stock in stocks:
-        if stock.get("line_user_id") != user_id or stock.get("group_id") != FIXED_STOCK_GROUP_ID:
-            continue
+    seen = set()
+    owned = [stock for stock in stocks if stock.get("line_user_id") == user_id
+             and str(stock.get("group_id") or "").strip() not in {"", "admin_index"}]
+    owned.sort(key=lambda stock: (stock.get("group_id") == FIXED_STOCK_GROUP_ID,
+                                 safe_int(stock.get("id")) or 0))
+    for stock in owned:
         ticker = parameter_ticker_key(stock.get("ticker"))
+        if ticker in seen:
+            continue
+        seen.add(ticker)
         periods = get_ma_list(stock)
         if ticker and periods and len(periods) <= 4 and all(1 <= period <= 1000 for period in periods):
             result[ticker] = periods

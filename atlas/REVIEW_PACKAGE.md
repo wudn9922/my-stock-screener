@@ -1,3 +1,49 @@
+## Current follow-up: preserve the original stock MA source (2026-10-29)
+
+Primary self-review only; no independent sign-off. Based on main `b77a4a141`.
+The previous dialog only read/wrote the dormant ungrouped row while the chart
+never hydrated stocks settings; the monitor gave that new row priority over
+original grouped values. All consumers now resolve original grouped stock rows
+before dormant duplicates, with the lowest grouped ID as a deterministic
+fallback for legacy aliases. No membership or notification consent is added.
+
+Fixed editing opens the original saved values first and explicitly offers the
+currently applied chart values as a replacement. The original ID/ticker/group
+are retained on confirmation. Disclosed dormant duplicates are deleted only
+after the primary save succeeds; partial cleanup reports an error and retries
+start with a fresh read. Changed/missing originals and account-context switches
+stop follow-up writes. This uses the existing owner-scoped API; no SQL, protected
+server functions or account/auth implementation is changed or deployed.
+
+Chart hydration adds daily SMA instances with stable source IDs and 2px width;
+manual/locked indicators, other timeframes, drawings and view state are preserved.
+An unchanged source fingerprint does not override interactive toggles. Previews
+are read-only and prefer saved stock values to selected-list MAs; their initial
+and reset range is six calendar months from the last actual bar, with full
+history retained for warmup/zoom. The watchlist-only index strip is removed.
+
+Validation evidence and operational limits are recorded in
+[STOCK_PARAMETER_CONSISTENCY](docs/STOCK_PARAMETER_CONSISTENCY.md). Browser tests
+exercise the real chart canvas, grouped/dormant persistence, cancellation,
+failed writes/loads, independent stock MAs and six-month zoom/reset. Existing
+account privacy, console, navigation, signal, market, drawing/timeframe and
+indicator behaviors remain regression gates. Headless WebKit is not a physical
+iPhone verification. Production records are unchanged until a user confirms an
+edit in a maintainer-published build.
+
+Actual local results: clean npm ci, lint/typecheck, normal/Pages builds;
+1,686 Vitest tests in 127 files; 61 relevant Python tests; 180 site-browser
+regressions, followed by final 39-case canvas/import and 21-case import reruns,
+all passing across desktop/mobile Chromium and iPhone WebKit. The normal
+1D/1W/1M scope test passed all three platforms: one initial WebKit global
+45-second timeout under concurrent browser work was rerun alone unchanged and
+passed in 19.2 seconds. No assertions or timeouts were weakened. Original
+account/auth and protected Edge Function paths, lockfile and permanent market
+records are untouched. Legacy import retains the account's values and now
+avoids reintroducing grouped/dormant duplicates for normalized ticker aliases.
+
+---
+
 ## Current follow-up: price-axis isolation and watchlist chart review (2026-10-29)
 
 Primary self-review only; no independent sign-off. Based on main `3cece7a70`.

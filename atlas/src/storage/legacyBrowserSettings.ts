@@ -7,6 +7,8 @@ import { parseAggMode, parseWeightMode } from '../pages/themesMapModel';
 import { PERIODS } from '../report/themes';
 import { parameterDocumentSchema, PARAMETER_STORAGE_KEY } from '../cloud/localParameters';
 import { parameterMAs, settingsApi, type ParameterGroup, type ParameterStock } from '../cloud/settingsApi';
+import { parameterTickerKey, FIXED_STOCK_GROUP } from '../cloud/stockParameters';
+import { stockParametersChanged } from '../cloud/useStockParameters';
 import { watchlistDocumentSchema, watchlistSchema, type SavedWatchlist } from '../watchlists/model';
 import { watchlistStore, WATCHLIST_STORAGE_KEY } from '../watchlists/store';
 import { watchlistCloudSync } from '../watchlists/sync';
@@ -160,6 +162,9 @@ function sameMAs(a: ParameterGroup | ParameterStock, b: ParameterGroup | Paramet
 function defaultGroupMAs(group: ParameterGroup) {
   return group.ma1 === 5 && group.ma2 === 10 && group.ma3 === 20 && group.ma4 === 60;
 }
+function originalStockRows(stocks: readonly ParameterStock[]) {
+  return [...stocks].sort((a, b) => Number(a.group_id === FIXED_STOCK_GROUP) - Number(b.group_id === FIXED_STOCK_GROUP) || a.id - b.id);
+}
 function mergeDeviceParameters(value: unknown, result: MergeResult) {
   const legacy = parameterDocumentSchema.parse(value);
   const raw = userStorage.getItem(PARAMETER_STORAGE_KEY);
@@ -172,10 +177,10 @@ function mergeDeviceParameters(value: unknown, result: MergeResult) {
     else { group = { ...source, id: merged.nextId++ }; merged.groups.push(group); result.added++; }
     mapping.set(source.id, group.id);
   }
-  for (const source of legacy.stocks) {
+  for (const source of originalStockRows(legacy.stocks)) {
     const custom = /^custom_(\d+)$/.exec(source.group_id);
     const groupId = custom ? `custom_${mapping.get(Number(custom[1]))}` : source.group_id;
-    const existing = merged.stocks.find(stock => stock.ticker === source.ticker && (stock.group_id === groupId || (stock.group_id !== 'ungrouped' && groupId !== 'ungrouped')));
+    const existing = merged.stocks.find(stock => parameterTickerKey(stock.ticker) === parameterTickerKey(source.ticker));
     if (existing) { if (existing.group_id !== groupId || !sameMAs(existing, source)) result.conflicts++; }
     else { merged.stocks.push({ ...source, id: merged.nextId++, group_id: groupId }); result.added++; }
   }
@@ -198,13 +203,13 @@ async function mergeParameters(value: unknown, check: () => void, result: MergeR
     }
     groupIds.set(source.id, target.id);
   }
-  for (const source of legacy.stocks) {
+  for (const source of originalStockRows(legacy.stocks)) {
     check();
     const custom = /^custom_(\d+)$/.exec(source.group_id);
     const mapped = custom ? groupIds.get(Number(custom[1])) : undefined;
     if (custom && !mapped) throw new Error('舊版股票參數參照不存在的分組；原始資料未變動。');
     const groupId = custom ? `custom_${mapped}` : source.group_id;
-    const target = stocks.find(stock => stock.ticker === source.ticker && (stock.group_id === groupId || (stock.group_id !== 'ungrouped' && groupId !== 'ungrouped')));
+    const target = stocks.find(stock => parameterTickerKey(stock.ticker) === parameterTickerKey(source.ticker));
     if (target) {
       if (target.group_id !== groupId || !sameMAs(target, source)) result.conflicts++;
       continue;
@@ -232,7 +237,7 @@ export async function mergeLegacyBrowserSettings(snapshot: BrowserLegacySnapshot
   for (const { key, value } of entries) {
     check();
     if (key === WATCHLIST_STORAGE_KEY) { await mergeLists(value, check, result); check(); continue; }
-    if (key === PARAMETER_STORAGE_KEY) { await mergeParameters(value, check, result); check(); continue; }
+    if (key === PARAMETER_STORAGE_KEY) { await mergeParameters(value, check, result); check(); stockParametersChanged(); continue; }
     const raw = userStorage.getItem(key);
     if (raw === null) { userStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); result.added++; continue; }
     const current = validate(key, raw);

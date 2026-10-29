@@ -1,5 +1,5 @@
 import type { ParameterStock } from '../cloud/settingsApi';
-import { FIXED_STOCK_GROUP, parameterMAs } from '../cloud/settingsApi';
+import { parameterTickerKey, stockParameterMap } from '../cloud/stockParameters';
 import type { Bar } from '../market-data/MarketDataProvider';
 import { getMarketProfile, sessionDate } from '../market-data/MarketProfile';
 import type { GroupItem, MetricMa } from '../report/schema';
@@ -7,16 +7,16 @@ import { maDistance, maValue } from '../ui/format';
 import { maDeviation, type FixedScreenerMas } from './screenerFilters';
 import { mapWithConcurrency } from './worldPerformance';
 
-/** Only explicit per-stock fixed parameters override EMA20; group/default MAs never do. */
+/** Explicit stock rows (original grouped row first) override EMA20; generic group defaults never do. */
 export async function loadScreenerFixedMAs(
   items: readonly GroupItem[],
   stocks: readonly ParameterStock[],
   loadBars: (symbol: string) => Promise<Pick<Bar, 'time' | 'close'>[]>,
 ): Promise<FixedScreenerMas> {
-  const fixed = new Map(stocks.filter(stock => stock.group_id === FIXED_STOCK_GROUP).map(stock => [stock.ticker, parameterMAs(stock)]));
+  const fixed = stockParameterMap(stocks);
   const result: Record<string, { period: number; distance: number | null }> = {};
-  await mapWithConcurrency(items.filter(item => fixed.has(item.symbol)), 4, async item => {
-    const periods = fixed.get(item.symbol)!.filter(period => Number.isInteger(period) && period > 0 && period <= 1000);
+  await mapWithConcurrency(items.filter(item => fixed[parameterTickerKey(item.symbol)]), 4, async item => {
+    const periods = fixed[parameterTickerKey(item.symbol)].filter(period => Number.isInteger(period) && period > 0 && period <= 1000);
     if (!periods.length) return;
     const period = Math.min(...periods);
     let distance = maDistance(item.close, maValue(item.maValues, period));

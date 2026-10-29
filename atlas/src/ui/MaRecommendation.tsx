@@ -13,7 +13,7 @@ import {
   type MaRecommendationRange,
 } from '../report/maRecommendation';
 import { FixedStockParameters } from './FixedStockParameters';
-import { parameterStorageMessage } from '../cloud/settingsApi';
+import { parameterMAs, parameterStorageMessage, type ParameterStock } from '../cloud/settingsApi';
 import './research.css';
 import './maRecommendation.css';
 
@@ -88,6 +88,8 @@ export function MaRecommendation({
   symbol,
   timeframe,
   indicators,
+  savedStock,
+  parameterError,
   onNotice,
 }: {
   store: AppStore;
@@ -95,6 +97,8 @@ export function MaRecommendation({
   timeframe: Timeframe;
   /** All of the symbol's indicators (every timeframe). */
   indicators: readonly IndicatorInstance[];
+  savedStock?: ParameterStock;
+  parameterError?: string | null;
   onNotice: (message: string) => void;
 }) {
   const [loaded, setLoaded] = useState<{ symbol: string; result: MaRecommendationLoadResult }>();
@@ -145,6 +149,10 @@ export function MaRecommendation({
             ? `日線至 ${result.data.asof}${result.data.limited ? ' · 資料不足 3.5 年，中長期僅供參考' : ''}`
             : result.message}
       </p>
+      {savedStock && <p className="ws-ma-reco-status">已保存均線：{parameterMAs(savedStock).join(' / ')}（{savedStock.group_id === 'ungrouped' ? '固定參數' : '原有分組'}）</p>}
+      {parameterError && <p role="status">{parameterError}</p>}
+      <button type="button" className="ghost-button" disabled={!applied.length && !savedStock}
+        title="先查看已保存的參數，再決定是否使用目前圖表的均線" onClick={() => setFixing(true)}>固定為個股參數</button>
       {data && (
         <>
           <div className="ws-ma-reco-actions">
@@ -155,11 +163,6 @@ export function MaRecommendation({
               onClick={() => apply(periods)}
             >
               {missing.length ? '套用全部建議' : timeframe === '1D' ? '建議已套用' : '切到日線查看'}
-            </button>
-            <button type="button" className="ghost-button" disabled={!applied.length}
-              title={applied.length ? '以已套用的日線 SMA 編輯固定參數' : '請先套用日線 SMA'}
-              onClick={() => setFixing(true)}>
-              固定為個股參數
             </button>
           </div>
           <table className="ws-ma-reco-table">
@@ -214,7 +217,7 @@ export function MaRecommendation({
       <a href={link} target="_blank" rel="noopener noreferrer">
         {data ? '在 ma-selector 查看完整候選、判定圖與回測 ↗' : '在 ma-selector 即時計算這檔股票 ↗'}
       </a>
-      {fixing && data && (
+      {fixing && (
         <FixedStockParameters
           ticker={symbol}
           defaults={applied}

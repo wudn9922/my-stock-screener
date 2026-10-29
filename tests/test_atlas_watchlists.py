@@ -103,7 +103,15 @@ class WatchlistMonitorTests(unittest.TestCase):
         grouped = dict(fixed, id=3, group_id='us_g1', ma1=20, ma2=50)
         self.store.get_user_stocks.return_value = [fixed, grouped]
         configs = self.store.get_monitor_configs()
-        self.assertEqual([(row['group_id'], row['ma_list']) for row in configs], [('us_g1', [13, 34])])
+        self.assertEqual([(row['group_id'], row['ma_list']) for row in configs], [('us_g1', [20, 50])])
+
+    def test_original_grouped_parameters_win_in_both_input_orders_and_are_owner_scoped(self):
+        original = {'id': 2, 'ticker': '2330', 'line_user_id': 'U-test', 'group_id': 'tw_g1', 'ma1': 29, 'ma2': 34, 'ma3': 73}
+        duplicate = dict(original, id=1, ticker='2330.TW', group_id='ungrouped', ma1=20, ma2=50, ma3=200)
+        foreign = dict(original, id=0, line_user_id='U-other', ma1=1)
+        for rows in ([original, duplicate, foreign], [foreign, duplicate, original]):
+            self.assertEqual(fixed_parameter_map(rows, 'U-test'), {'2330.TW': [29, 34, 73]})
+        self.assertEqual(fixed_parameter_map([duplicate], 'U-test'), {'2330.TW': [20, 50, 200]})
 
     def test_daily_report_applies_fixed_parameters_without_adding_dormant_stocks(self):
         # Execute the actual loader without importing data downloaders or sending requests.
@@ -125,7 +133,7 @@ class WatchlistMonitorTests(unittest.TestCase):
         }
         exec(compile(ast.Module(body=[loader], type_ignores=[]), 'main.py', 'exec'), namespace)
         configs, _, _ = namespace['load_configs_from_supabase']('U-test')
-        self.assertEqual(configs['us_g1'], {'NVDA': [13, 34]})
+        self.assertEqual(configs['us_g1'], {'NVDA': [20, 50]})
         self.assertNotIn('ungrouped', configs)
         self.assertFalse(any('MSFT' in group for group in configs.values()))
 

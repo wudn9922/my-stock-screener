@@ -15,7 +15,7 @@ beforeEach(() => vi.stubEnv('UNIVERSE_CACHE_DIR', ''));
 afterEach(() => vi.unstubAllEnvs());
 
 describe('screener fixed moving-average references', () => {
-  it('uses the smallest saved per-stock parameter, leaves group MAs on EMA20 and needs no unrelated histories', async () => {
+  it('uses the smallest saved stock parameter from fixed or grouped rows and needs no unrelated histories', async () => {
     const fixed = row('FIXED', { maValues: { 3: 100, 50: 90 } });
     const grouped = row('GROUPED', { maList: [3, 20], maValues: { 3: 100 } });
     const plain = row('PLAIN');
@@ -24,11 +24,13 @@ describe('screener fixed moving-average references', () => {
     expect(loadBars).not.toHaveBeenCalled();
     expect(screenerMa(fixed, references).label).toBe('MA3');
     expect(screenerMa(fixed, references).distance).toBeCloseTo(10);
-    expect(screenerMa(grouped, references)).toEqual({ label: 'EMA20', distance: -15 });
-    expect(applyFilters([fixed, grouped, plain], parseFilters('ema20:0:20'), { market: 'US', fixedMAs: references })).toEqual([fixed]);
+    expect(screenerMa(grouped, references).label).toBe('MA3');
+    expect(screenerMa(grouped, references).distance).toBeCloseTo(10);
+    expect(screenerMa(plain, references)).toEqual({ label: 'EMA20', distance: -15 });
+    expect(applyFilters([fixed, grouped, plain], parseFilters('ema20:0:20'), { market: 'US', fixedMAs: references })).toEqual([fixed, grouped]);
     const list = createWatchlist({ name: '固定參數', market: 'US', group: 'universe-us', filters: 'ema20:0:20' });
     expect(() => evaluateWatchlist(list, [fixed, grouped], undefined)).toThrow('固定均線參數尚未取得');
-    expect(evaluateWatchlist(list, [fixed, grouped], undefined, references).map(item => item.symbol)).toEqual(['FIXED']);
+    expect(evaluateWatchlist(list, [fixed, grouped], undefined, references).map(item => item.symbol)).toEqual(['FIXED', 'GROUPED']);
   });
 
   it('aligns history to the report date, excludes newer prices and never substitutes EMA20 for a missing fixed MA', async () => {

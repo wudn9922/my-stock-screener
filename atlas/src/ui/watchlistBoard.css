@@ -6,35 +6,6 @@
   margin-bottom: 20px;
   min-width: 0;
 }
-.wb-indices {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.wb-index {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  flex: 0 0 auto;
-  min-width: 112px;
-  min-height: 44px;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  text-align: left;
-}
-.wb-index b {
-  font-size: 16px;
-  font-variant-numeric: tabular-nums;
-}
-.wb-index small {
-  font-size: 12px;
-  color: var(--text-3);
-}
-.wb-index small.up { color: var(--up-text); }
-.wb-index small.down { color: var(--down-text); }
 .wb-tabs {
   display: flex;
   gap: 8px;
