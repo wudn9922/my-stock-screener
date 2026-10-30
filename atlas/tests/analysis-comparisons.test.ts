@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { relativeStrength } from "../src/pages/relativeStrength";
+import { relativeStrength, stockRs } from "../src/pages/relativeStrength";
 import {
   compareScreenerResults,
   snapshotReferenceBars,
@@ -13,7 +13,7 @@ import {
   parseIndustryRotation,
   sortIndustryRotation,
 } from "../src/report/industryRotation";
-import { universeRowToItem } from "../src/report/universe";
+import { parseUniverse, universeRowToItem } from "../src/report/universe";
 import type { Bar } from "../src/market-data/MarketDataProvider";
 
 const bar = (date: string, close: number) =>
@@ -32,6 +32,18 @@ const item = (symbol: string, date: string, ratio: number) =>
     { benchmark: "^TWII", asOf: date },
   )!;
 describe("relative performance", () => {
+  it('uses the published full-market RS, preserves its date and never infers a missing rank', () => {
+    const parsed = parseUniverse({ fields: ['symbol', 'rsRank', 'asOf'], markets: {
+      TW: { scope: 'full', benchmark: '^TWII', asOf: '2026-10-29', rows: [['2330.TW', 87, '2026-10-28']] },
+      US: { scope: 'liquid', rows: [['AAPL', 99, '2026-10-29']] },
+    } });
+    if (parsed.status !== 'ok') throw new Error('Invalid test universe');
+    expect(stockRs(parsed.universe, '2330.TW')).toEqual({ rank: 87, date: '2026-10-28', benchmark: '^TWII', stale: true });
+    expect(stockRs(parsed.universe, 'AAPL')).toBeNull();
+    expect(stockRs(parsed.universe, '2317.TW')).toBeNull();
+    parsed.universe.markets.TW!.items[0]!.metrics!.rsRank = null;
+    expect(stockRs(parsed.universe, '2330.TW')).toBeNull();
+  });
   it("aligns by actual dates rather than array position, rebases and measures excess in points", () => {
     const result = relativeStrength(
       [bar("2026-10-20", 100), bar("2026-10-21", 150), bar("2026-10-22", 120)],

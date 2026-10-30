@@ -5,7 +5,7 @@ import { stockVolatility } from '../market-data/StockVolatility';
 import { StockStatsMenu } from './StockStatsMenu';
 import { HelpDisclosure } from './HelpDisclosure';
 
-export function StockVolatility({ symbol, provider, reloadToken }: { symbol: string; provider: MarketDataProvider; reloadToken: number }) {
+export function StockVolatility({ symbol, provider, reloadToken, tabStyle = false }: { symbol: string; provider: MarketDataProvider; reloadToken: number; tabStyle?: boolean }) {
   const [loaded, setLoaded] = useState<{
     symbol: string;
     provider: MarketDataProvider;
@@ -41,7 +41,7 @@ export function StockVolatility({ symbol, provider, reloadToken }: { symbol: str
   const rangeFormula = '20 日平均日內振幅＝最近 20 根完整日線的 (最高−最低) ÷ 前一交易日收盤價 × 100，再取平均；不含隔夜跳空。';
   return (
     <div className="ws-volatility" data-testid="stock-volatility" aria-label={`${symbol} 日線波動`} aria-busy={!current}>
-      <StockStatsMenu label="波動率" testId="volatility-toggle">
+      <StockStatsMenu label="波動率" testId="volatility-toggle" tabStyle={tabStyle}>
         <p className="muted small">{status}</p>
         <dl className="ws-volatility-values">
           {[

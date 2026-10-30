@@ -1074,22 +1074,28 @@ export function App({
                 active={stockView}
                 tabs={stockViews ? undefined : ['chart', 'financials']}
                 onSelect={(tab) => (tab === 'financials' ? onOpenFinancials(symbol, tf) : onViewChange?.(tab))}
-              />
-            )}
-            <div className="ws-analysis-tools">
-              <StockVolatility symbol={symbol} provider={providers[providerId]} reloadToken={reloadToken} />
-              {!stockViews && (
-                <>
-                  <StockStatsMenu label="價量" testId="volume-analysis-toggle">
+              >
+                {!stockViews && <StockStatsMenu label="價量" testId="volume-analysis-toggle" tabStyle>
                     <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
-                  </StockStatsMenu>
-                  <StockStatsMenu label="建議均線">
-                    <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} savedStock={parameter} parameterError={parameters.error} onNotice={setNotice} />
-                    <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>
-                  </StockStatsMenu>
-                </>
-              )}
-            </div>
+                  </StockStatsMenu>}
+                <StockStatsMenu label="建議均線" testId="ma-recommendation-toggle" tabStyle>
+                  <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} savedStock={parameter} parameterError={parameters.error} onNotice={setNotice} />
+                  <p className="stock-view-hint">套用後切回「K線」即可在圖上看到均線。</p>
+                  {!stockViews && <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>}
+                </StockStatsMenu>
+                <StockVolatility symbol={symbol} provider={providers[providerId]} reloadToken={reloadToken} tabStyle />
+              </StockTabs>
+            )}
+            {!onOpenFinancials && <div className="ws-analysis-tools">
+              <StockVolatility symbol={symbol} provider={providers[providerId]} reloadToken={reloadToken} />
+              {!stockViews && <><StockStatsMenu label="價量" testId="volume-analysis-toggle">
+                <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
+              </StockStatsMenu>
+              <StockStatsMenu label="建議均線" testId="ma-recommendation-toggle">
+                <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} savedStock={parameter} parameterError={parameters.error} onNotice={setNotice} />
+                <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>
+              </StockStatsMenu></>}
+            </div>}
           </div>
         )}
         <div className="ws-header-actions">
@@ -1135,11 +1141,6 @@ export function App({
       </header>
       {stockViews && visitedViews.has('volume') && (
         <section className="stock-view" aria-label="價量" hidden={stockView !== 'volume'} inert={modal} aria-hidden={modal}>
-          <div className="stock-view-card">
-            <h2>建議均線</h2>
-            <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} savedStock={parameter} parameterError={parameters.error} onNotice={setNotice} />
-            <p className="stock-view-hint">套用後切回「K線」即可在圖上看到均線。</p>
-          </div>
           <div className="stock-view-card">
             <h2>價量分析</h2>
             <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>

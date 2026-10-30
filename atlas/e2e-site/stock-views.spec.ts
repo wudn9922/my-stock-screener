@@ -23,9 +23,9 @@ test('K線｜財務｜價量｜研究 switch views of one stock and keep the sam
   await fixtures(page);
   await page.goto('./?page=chart&symbol=AAPL&tf=1D');
   await expect(page.getByTestId('ohlc-header')).toContainText('O ');
-  await expect(tabs(page).getByRole('button')).toHaveText(['K線', '財務', '價量', '研究']);
+  await expect(tabs(page).getByRole('button')).toHaveText(['K線', '財務', '價量', '研究', '建議均線', '波動率']);
   await expect(tabs(page).getByRole('button', { name: 'K線', exact: true })).toHaveAttribute('aria-current', 'page');
-  // The old header menus moved into the views; the volatility menu stays in the header.
+  // Volume analysis is a view; recommendations and volatility open from the shared header.
   await expect(page.getByTestId('volume-analysis-toggle')).toHaveCount(0);
   await expect(page.getByTestId('volatility-toggle')).toBeVisible();
   await page.getByTestId('chart').evaluate((node) => { (window as unknown as { viewsChart: Element }).viewsChart = node; });
@@ -33,7 +33,11 @@ test('K線｜財務｜價量｜研究 switch views of one stock and keep the sam
   await page.getByTestId('stock-tab-volume').click();
   const volume = page.getByRole('region', { name: '價量', exact: true });
   await expect(volume.getByText('上漲縮量比例', { exact: true })).toBeVisible();
-  await expect(volume.getByTestId('ma-recommendation')).toBeVisible();
+  await expect(volume.getByTestId('ma-recommendation')).toHaveCount(0);
+  await page.getByTestId('ma-recommendation-toggle').click();
+  await expect(page.getByRole('region', { name: '建議均線', exact: true })).toBeVisible();
+  await expect(page.getByTestId('ma-recommendation')).toBeVisible();
+  await page.getByTestId('ma-recommendation-toggle').click();
   await expect(page.locator('.chart-toolbar')).toBeHidden();
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
 

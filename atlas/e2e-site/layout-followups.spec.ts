@@ -16,7 +16,7 @@ test('世界 views stay on one row on narrow phones in every view', async ({ pag
     for (const view of ['', '&view=indices', '&view=jp-bonds', '&view=commodities', '&view=fx']) {
       await page.goto(`./?page=world${view}`);
       const tabs = page.getByRole('group', { name: '世界頁面' }).getByRole('button');
-      await expect(tabs).toHaveText(['美債', '指數', '利差', '原物料', '匯率']);
+      await expect(tabs).toHaveText(['美債', '指數', '日債', '原物料', '匯率']);
       const boxes = await tabs.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect()));
       expect(new Set(boxes.map((box) => Math.round(box.top))).size, `${width}px ${view || 'rates'}`).toBe(1);
       for (const box of boxes) expect(box.height).toBeGreaterThanOrEqual(43.5);
@@ -25,11 +25,13 @@ test('世界 views stay on one row on narrow phones in every view', async ({ pag
   }
 });
 
-test('the 價量 view opens with the MA recommendation first', async ({ page }) => {
+test('the 價量 view opens directly with analysis and recommendations open from the shared header', async ({ page }) => {
   await mockSite(page);
   await page.goto('./?page=chart&symbol=AAPL&tf=1D');
   await page.getByTestId('stock-tab-volume').click();
   const view = page.getByRole('region', { name: '價量', exact: true });
-  await expect(view.locator('.stock-view-card > h2')).toHaveText(['建議均線', '價量分析']);
-  await expect(view.getByTestId('ma-recommendation')).toBeInViewport();
+  await expect(view.locator('.stock-view-card > h2')).toHaveText(['價量分析']);
+  await expect(view.getByTestId('ma-recommendation')).toHaveCount(0);
+  await page.getByTestId('ma-recommendation-toggle').click();
+  await expect(page.getByRole('region', { name: '建議均線', exact: true }).getByTestId('ma-recommendation')).toBeInViewport();
 });

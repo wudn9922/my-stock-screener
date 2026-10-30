@@ -92,3 +92,8 @@
   overflow: auto;
   overscroll-behavior: contain;
 }
+.analysis-rs { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 4px 12px; padding: 12px; margin: 12px 0; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
+.analysis-rs > span { font-weight: 600; }
+.analysis-rs b { font-size: 30px; font-variant-numeric: tabular-nums; }
+.analysis-rs small { color: var(--text-3); font-size: 12px; }
+.analysis-rs > small { grid-column: 1 / -1; overflow-wrap: anywhere; }

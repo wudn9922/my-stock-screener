@@ -10,7 +10,7 @@
   border-radius: 10px;
   background: var(--surface-2);
 }
-.stock-tabs button {
+:is(.stock-tabs > button, .stock-tabs .stock-tab-trigger) {
   min-height: 30px;
   min-width: 52px;
   padding: 0 12px;
@@ -19,25 +19,28 @@
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
+  border: 0;
+  background: transparent;
+  justify-content: center;
 }
-.stock-tabs button:hover {
+:is(.stock-tabs > button, .stock-tabs .stock-tab-trigger):hover {
   color: var(--text);
   background: var(--surface-3);
 }
-.stock-tabs button.active {
+:is(.stock-tabs > button, .stock-tabs .stock-tab-trigger).active {
   color: var(--text);
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px var(--accent);
 }
-.stock-tabs button:focus-visible {
+:is(.stock-tabs > button, .stock-tabs .stock-tab-trigger):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 .stock-page-controls { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 0 0 auto; }
 .stock-page-controls > .stock-tabs { padding: 2px; gap: 1px; }
-.stock-page-controls > .stock-tabs button { min-width: 40px; min-height: 30px; padding: 0 6px; font-size: 12px; }
+.stock-page-controls :is(.stock-tabs > button, .stock-tabs .stock-tab-trigger) { min-width: 40px; min-height: 30px; padding: 0 6px; font-size: 12px; }
 @media (max-width: 1099px), (pointer: coarse) {
-  .stock-tabs button {
+  :is(.stock-tabs > button, .stock-tabs .stock-tab-trigger) {
     min-height: 36px;
     min-width: 60px;
     font-size: 14px;
@@ -45,7 +48,7 @@
 }
 @media (max-width: 1099px) {
   .stock-page-controls > .stock-tabs { margin: 0; padding: 0; }
-  .stock-page-controls > .stock-tabs button { min-width: 40px; min-height: 36px; font-size: 12px; }
+  .stock-page-controls :is(.stock-tabs > button, .stock-tabs .stock-tab-trigger) { min-width: 40px; min-height: 36px; font-size: 12px; }
 }
 
 /* 價量／研究 views replace the chart area; the chart stays mounted (hidden) and returns unchanged. */
@@ -85,4 +88,22 @@
 .stock-view-hint .text-button {
   min-height: 44px;
   padding: 0 4px;
+}
+
+/* All six chart controls belong to the same group; popup contents keep their own styles. */
+.stock-tabs > .ws-stats-menu,
+.stock-tabs > .ws-volatility { align-self: stretch; display: flex; }
+.stock-tabs > .ws-volatility > .ws-stats-menu { align-self: stretch; display: flex; }
+.stock-tabs .stock-tab-trigger { height: 100%; }
+.stock-page-controls .stock-tab-trigger[aria-expanded='true'] {
+  color: var(--text);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.ws-header > .ws-stock-controls { justify-content: flex-start; }
+@media (max-width: 350px) {
+  .stock-page-controls :is(.stock-tabs > button, .stock-tabs .stock-tab-trigger) {
+    min-width: 36px; padding: 0 4px; font-size: 11px;
+  }
+  .stock-tabs .stock-tab-trigger > svg { width: 12px; }
 }

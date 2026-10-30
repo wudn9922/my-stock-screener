@@ -35,14 +35,14 @@
   margin: 0;
   padding: 0 0 2px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.2fr) minmax(0, 1.2fr);
   gap: 8px;
 }
 .rates-key {
   min-width: 0;
   display: grid;
   gap: 2px;
-  padding: 9px 12px;
+  padding: 9px clamp(6px, 1.6vw, 12px);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -60,6 +60,10 @@
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.rates-key-title {
+  white-space: nowrap;
+  font-size: clamp(10px, 2.8vw, 12px);
 }
 .rates-chg {
   font-size: 12px;
@@ -107,6 +111,8 @@
 }
 .rates-card-body {
   display: grid;
+  /* The old canvas width must not become the implicit grid track's minimum on resize. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   padding: 10px 12px 12px;
   min-width: 0;

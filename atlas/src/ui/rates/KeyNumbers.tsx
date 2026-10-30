@@ -37,7 +37,7 @@ export function RatesKeyNumbers({ items }: { items: readonly RateKeyNumber[] }) 
       {items.map((item) => (
         <li key={item.key} className="rates-key" title={item.title}>
           <span className="rates-key-label">
-            {item.label}
+            <span className="rates-key-title">{item.label}</span>
             {item.badge && <span className="rates-badge warn"><AlertTriangle size={11} aria-hidden="true" />{item.badge}</span>}
           </span>
           <b className="rates-key-value">{item.value}</b>

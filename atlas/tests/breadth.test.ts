@@ -31,6 +31,16 @@ const sample = {
 };
 
 describe('breadth schema', () => {
+  it('retains full-market coverage without labelling an older partial report as full', () => {
+    const result = parseBreadth({ ...sample, markets: { us: { ...sample.markets.us,
+      scope: 'full', universeCount: 5100, coverage: { loaded: 5080, missing: 20, notTraded: 12 } } } });
+    if (result.status !== 'ok') throw new Error('Invalid test breadth');
+    expect(result.data.markets.us).toMatchObject({ scope: 'full', universeCount: 5100,
+      coverage: { loaded: 5080, missing: 20, notTraded: 12 } });
+    const old = parseBreadth(sample);
+    if (old.status !== 'ok') throw new Error('Invalid legacy breadth');
+    expect(old.data.markets.us!.scope).toBeUndefined();
+  });
   it('parses the job output with both markets and the TW listing segments', () => {
     const result = parseBreadth(sample);
     expect(result.status).toBe('ok');

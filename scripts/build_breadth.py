@@ -2,6 +2,9 @@
 """
 F5 市場寬度：站上 MA20 / MA60 的股票比例 → docs/report/breadth.json。
 
+正式全市場輸出由 build_full_market_breadth.py 讀 universe-full 快取，重用本檔的純計算引擎。
+本檔 CLI 保留舊 data/ 分析用途；排程不再以部分名單覆蓋正式報表。
+
 只讀 data/ 內的日 K CSV（Date,Open,High,Low,Close,Volume），不需要行情網路。
 美股 universe 的 S&P 500 名單會呼叫 main.get_us_tickers（只在直接執行時延遲匯入）。
 

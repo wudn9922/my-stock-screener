@@ -23,11 +23,11 @@ test('stock controls share one compact row and the normal chart fills the space 
       Math.abs(host.getBoundingClientRect().bottom - host.querySelector('.tv-lightweight-charts')!.getBoundingClientRect().bottom),
     )).toBeLessThanOrEqual(1);
     const controls = page.locator('.ws-stock-controls');
-    await expect(controls.getByRole('button')).toHaveText(['K線', '財務', '價量', '研究', '波動率']);
+    await expect(controls.getByRole('button')).toHaveText(['K線', '財務', '價量', '研究', '建議均線', '波動率']);
     await expect(page.locator('.app-shell')).not.toHaveClass(/chart-focus/);
     const bounds = await page.evaluate(() => {
       const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
-      const buttons = [...document.querySelectorAll('.ws-stock-controls > .stock-tabs button, .ws-analysis-tools > .ws-stats-menu > button, .ws-volatility > .ws-stats-menu > button')].map(button => button.getBoundingClientRect());
+      const buttons = [...document.querySelectorAll('.ws-stock-controls > .stock-tabs > button, .stock-tabs .stock-tab-trigger')].map(button => button.getBoundingClientRect());
       const valuation = box('[data-testid="valuation"]'), help = box('[data-testid="valuation-help-toggle"]');
       const main = document.getElementById('main')!;
       return {

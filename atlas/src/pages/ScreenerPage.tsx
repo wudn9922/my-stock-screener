@@ -75,6 +75,8 @@ import { EarningsBadge } from '../ui/EarningsBadge';
 import { createWatchlist } from '../watchlists/model';
 import { watchlistStore } from '../watchlists/store';
 import '../ui/research.css';
+import { StockChartList } from '../ui/StockChartList';
+import { useStockParameters } from '../cloud/useStockParameters';
 
 const ROW_HEIGHT = 64;
 const OVERSCAN = 8;
@@ -391,6 +393,8 @@ function ScreenerView({
   const [view, setView] = useState<StatusView>('all');
   const [sort, setSort] = useState<SortMode>('default');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [charts, setCharts] = useState(false);
+  const chartParameters = useStockParameters(charts);
   const [savingList, setSavingList] = useState(false);
   const [listName, setListName] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -460,7 +464,7 @@ function ScreenerView({
     const observer = new ResizeObserver(measure);
     observer.observe(list);
     return () => observer.disconnect();
-  }, [group?.key]);
+  }, [group?.key, charts]);
   const start = Math.max(0, Math.floor(scroll.top / ROW_HEIGHT) - OVERSCAN);
   const end = Math.min(items.length, Math.ceil((scroll.top + scroll.height) / ROW_HEIGHT) + OVERSCAN);
   const slice = items.slice(start, end);
@@ -498,6 +502,7 @@ function ScreenerView({
   };
   const changeGroup = (key: string) => {
     setView('all');
+    setCharts(false);
     closeSheet();
     routeTo(key, '', false);
   };
@@ -641,13 +646,17 @@ function ScreenerView({
           名單範圍說明{noteOpen && <span>{universeMarketData.note}</span>}
         </button>
       )}
-      <div className="screener-head" aria-hidden="true">
+      {!groupPending && (items.length > 0 || charts) && <button type="button" className="ghost-button screener-chart-toggle"
+        aria-pressed={charts} onClick={() => setCharts(value => !value)}>
+        {charts ? '返回股票清單' : `連續看全部股票圖表（${items.length} 檔）`}
+      </button>}
+      {!charts && <div className="screener-head" aria-hidden="true">
         <span>代號／名稱</span>
         <span>{pills.length ? '指標・均線乖離' : '均線乖離・備註'}</span>
         <span className="num">本益比 TTM</span>
         <span className="num">收盤／漲跌</span>
         <span />
-      </div>
+      </div>}
       {isTrending && !trendingData ? (
         <PageState kind={trending ? 'empty' : 'loading'} title={trending?.status === 'error' ? trending.message : '載入 LINE 熱門美股…'}
           onRetry={trending ? retryTrending : undefined} />
@@ -657,6 +666,12 @@ function ScreenerView({
         <PageState kind="loading" title="載入本益比資料…" />
       ) : filters.pe && peFigures === null ? (
         <PageState kind="error" title="本益比資料尚未產生或暫時無法取得" message="請稍後重試，或移除本益比條件；不會顯示未經篩選的結果。" />
+      ) : charts && items.length > 0 ? (
+        <div className="screener-charts">
+          {chartParameters.error && <p role="status">{chartParameters.error}</p>}
+          <StockChartList key={group.key} rows={items} parameters={chartParameters.stocks} groupPeriods={group.maList}
+            openChart={options => openChart({ ...options, tf: '1D', maList: items.find(item => item.symbol === options.symbol)?.maList })} />
+        </div>
       ) : (
         <div className="screener-list card" ref={listRef} onScroll={onScroll} role="list" aria-label={`${group.name}股票清單`}>
           {items.length ? (

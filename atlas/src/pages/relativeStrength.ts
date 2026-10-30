@@ -3,6 +3,17 @@ import {
   getMarketProfile,
   type Bar,
 } from "../market-data/MarketDataProvider";
+import type { Universe } from '../report/universe';
+
+/** The published whole-market 3-month rank, never a rank inferred from two price series. */
+export function stockRs(universe: Universe, symbol: string) {
+  const market = universe.markets[getMarketProfile(symbol).market === 'TW' ? 'TW' : 'US'];
+  if (!market || market.scope !== 'full') return null;
+  const item = market.items.find(row => row.symbol === symbol.toUpperCase());
+  const rank = item?.metrics?.rsRank;
+  if (!item || rank == null || !Number.isFinite(rank) || rank < 1 || rank > 99 || !item.asOf) return null;
+  return { rank, date: item.asOf, benchmark: market.benchmark, stale: item.asOf !== market.asOf };
+}
 
 /** Align actual session dates; never forward-fill a suspended stock or pair by array position. */
 export function relativeStrength(
