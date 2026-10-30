@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 import { accessEnvelope } from './account-fixture';
+import { readFileSync } from 'node:fs';
 
 // Shape written by ma-selector scripts/build_recommendations.py (synthetic values).
 const recommendation = {
@@ -160,4 +161,57 @@ test('a symbol without a recommendation links to the live ma-selector instead', 
   await expect(card.locator('.ws-ma-reco-status')).toContainText('還沒有建議均線');
   await expect(card.getByRole('button', { name: '固定為個股參數' })).toBeDisabled();
   await expect(card.getByRole('link', { name: /即時計算這檔股票/ })).toHaveAttribute('href', /\?ticker=NVDA$/);
+});
+
+// Real ma-selector VERSION 2 output (synthetic prices): ranking, 2-year scores and the experimental selector v2.
+const v2Fixture = (name: string) => readFileSync(new URL(`../tests/fixtures/ma-selector/2330.TW.${name}.json`, import.meta.url), 'utf8');
+
+test('the panel shows ranking, 2-year scores and the experimental v2 picks, which apply alongside the current ones', async ({ page }, testInfo) => {
+  await mockSite(page);
+  await page.route('**/my-stock-screener/report/ma-selector/2330.TW.json', (route) =>
+    route.fulfill({ contentType: 'application/json', body: v2Fixture('with-second') }),
+  );
+  await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
+  await page.getByTestId('stock-tab-volume').click();
+  const card = page.getByTestId('ma-recommendation');
+  await expect(card.locator('dd')).toContainText('短 33');
+  const rows = card.locator('.ws-ma-reco-table').first().locator('tbody tr');
+  await expect(rows.nth(0).locator('th')).toContainText(/贏過 \d+%/);
+  await expect(rows.nth(0).getByRole('button').first()).toContainText(/2年 \d+/);
+  await expect(rows.nth(2).getByRole('button').first()).not.toContainText('2年');
+
+  const v2 = card.getByTestId('ma-recommendation-v2');
+  await expect(v2.locator('summary')).toHaveText(/^實驗選線 v2（尚未驗證）：短 34／15 · 中 \d+ · 長 66$/);
+  await v2.locator('summary').click();
+  await expect(v2).toContainText('只供比較，不取代上面的建議');
+  await expect(v2.getByRole('button', { name: '套用 SMA 34', exact: true })).toContainText('★34');
+  await expect(v2.getByRole('button', { name: '套用 SMA 15', exact: true })).toContainText('★15');
+  await expect(v2.locator('.ws-ma-v2-suitability li')).toHaveCount(3);
+  await expect(v2.locator('.ws-ma-v2-suitability')).toContainText(/短期 2 年最高分 \d+（贏過 \d+%）/);
+  await page.screenshot({ path: testInfo.outputPath('ma-recommendation-v2.png') });
+
+  await v2.getByRole('button', { name: '套用 v2 全部' }).click();
+  const medium = Number((await v2.locator('summary').textContent())!.match(/中 (\d+)/)![1]);
+  await expect(page.locator('.indicator-chip .indicator-name')).toHaveText(['SMA 34', 'SMA 15', `SMA ${medium}`, 'SMA 66']);
+  await expect(v2.getByRole('button', { name: 'v2 已全部套用' })).toBeDisabled();
+  // The current long pick is the same SMA 66, so it shows as applied in the current table too.
+  await expect(rows.nth(2).getByRole('button', { name: '取消套用 SMA 66', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  // Toggling a v2 candidate off removes only that period.
+  await v2.getByRole('button', { name: '取消套用 SMA 15', exact: true }).click();
+  await expect(page.locator('.indicator-chip .indicator-name')).toHaveText(['SMA 34', `SMA ${medium}`, 'SMA 66']);
+});
+
+test('v2 without a second short line says so and applies three lines', async ({ page }) => {
+  await mockSite(page);
+  await page.route('**/my-stock-screener/report/ma-selector/2330.TW.json', (route) =>
+    route.fulfill({ contentType: 'application/json', body: v2Fixture('no-second') }),
+  );
+  await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
+  await page.getByTestId('stock-tab-volume').click();
+  const v2 = page.getByTestId('ma-recommendation').getByTestId('ma-recommendation-v2');
+  await expect(v2.locator('summary')).toHaveText(/^實驗選線 v2（尚未驗證）：短 35 · 中 \d+ · 長 96$/);
+  await v2.locator('summary').click();
+  await expect(v2.locator('tbody tr').first().locator('th')).toContainText('無第二條');
+  await v2.getByRole('button', { name: '套用 v2 全部' }).click();
+  await expect(page.locator('.indicator-chip .indicator-name')).toHaveCount(3);
 });
