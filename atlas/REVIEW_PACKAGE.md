@@ -42,6 +42,13 @@ Protected auth/account/server files, outer site navigation, permanent price,
 financial and K-line records, archive branch, SQL and notifications are untouched.
 No merge or deployment.
 
+CI navigation follow-up: the WebKit trace showed a metadata heading followed
+by reload before the lazy FX candle effect started; fetch then ran on an
+unloading document. The research reload/back regression now requires validated
+OHLC before each navigation (and checks commodity OHLC too). Its strict empty
+page-error assertion is unchanged; no error filtering, timeout increase, retry
+configuration or production fetch behavior was changed.
+
 ## Current follow-up: bond layout, temporary screener conditions and drawing editor (2026-10-30)
 
 Primary self-review only; no independent sign-off. Based on main `3334513d5`.
