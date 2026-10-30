@@ -153,6 +153,15 @@ ma-selector's production SMA selector, unchanged (scores vs. its 83-stock refere
 backtest, rule B + short-range rescue); Atlas only displays it. Shape:
 `{"version":1,"ticker","kind":"SMA","asof","bars","limited","referenceAsof","suitability":{"short","long"},"ranges":[{"key":"short|medium|long","min","max","windowYears","final","candidates":[{"period","score","sarReturn","sarDrawdown","sarWinRate","sarTrades"}]}]}`.
 Symbols that fail or have < 376 bars keep their previous file; nothing is written below a 50 % success rate.
+VERSION 2 adds display-only fields from ma-selector's web page, all optional (a missing or malformed one is dropped by
+the client, never rejecting the file): `ranges[].rank` `{"best","pct","n"}` (stock-level ranking: this stock's smoothed range
+best beats `pct`% of the 83 reference stocks' range bests), `ranges[short|medium].candidates[].score2y` (the short-term
+formula over two years, so short and medium candidates share one scale), and `v2` — the experimental selector v2 (short
+SMA15–45 on two years with a second line ≥ 1.5× apart, medium SMA46–70 on three years, long unchanged;
+`{"short":{"min","max","final1","final2"|null,"secondSource","candidates","relaxed"},"medium":{"min","max","final","candidates"},"long":{"final"},"suitability":{"short2y","short1y","mid3y"},"rank"}`).
+It needs ma-selector's `data/reference_v2.parquet`; without it `score2y` and `v2` are omitted. In the panel, v2 is a collapsed
+「實驗選線 v2（尚未驗證）」 section whose candidates toggle like the current ones plus 「套用 v2 全部」; it never replaces the
+current picks.
 
 Client: `fetchMaRecommendation(symbol)` (`src/report/maRecommendation.ts`; 404 or an SPA-fallback body → `missing`).
 `ui/MaRecommendation.tsx` sits with the volatility figures in the chart header's "波動・均線" dropdown (`ui/StockStatsMenu.tsx`:
