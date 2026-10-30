@@ -36,10 +36,8 @@ import {
   streakCoverage,
   needsGrowth,
   parseFilters,
-  readStoredFilters,
   removeFilter,
   serializeFilters,
-  writeStoredFilters,
   type ChipId,
   type FilterContext,
   type FilterState,
@@ -376,22 +374,16 @@ function ScreenerView({
     : (groups.find((g) => g.key === requested) ?? groups[0]);
   const market = group?.market ?? 'TW';
 
-  // Conditions: the URL's `f` first, otherwise the last ones applied for this market.
-  const urlF = appliedFilter;
-  const filterText = urlF ?? readStoredFilters(market) ?? '';
+  // Temporary conditions belong to this URL. A fresh visit never restores old market preferences.
+  const filterText = appliedFilter ?? '';
   const filters = useMemo(() => parseFilters(filterText), [filterText]);
   const routeTo = useCallback(
     (key: string | undefined, text: string, replace: boolean) =>
       navigate({ page: 'screener', ...(key ? { group: key } : {}), ...(text ? { f: text } : {}) }, { replace }),
     [navigate],
   );
-  // Restored conditions go into the address bar so the view can be shared as-is.
-  useEffect(() => {
-    if (urlF === undefined && filterText) routeTo(group?.key ?? requested, filterText, true);
-  }, [group?.key, urlF, filterText]);
   const setFilters = (next: FilterState) => {
     const text = serializeFilters(next);
-    writeStoredFilters(market, text);
     routeTo(group?.key ?? requested, text, true);
   };
 
@@ -505,10 +497,9 @@ function ScreenerView({
     setScroll((previous) => (Math.abs(previous.top - top) < ROW_HEIGHT / 2 ? previous : { ...previous, top }));
   };
   const changeGroup = (key: string) => {
-    const nextMarket = key === LINE_TRENDING_GROUP_KEY ? 'US' : universeMarketOf(key) ?? groups.find((g) => g.key === key)?.market ?? market;
-    const text = nextMarket === market ? serializeFilters(filters) : (readStoredFilters(nextMarket) ?? '');
     setView('all');
-    routeTo(key, text, false);
+    closeSheet();
+    routeTo(key, '', false);
   };
   const universeCounts: Partial<Record<UniverseMarketKey, number>> = {};
   for (const key of MARKETS) if (universeData?.markets[key]) universeCounts[key] = universeData.markets[key]!.items.length;

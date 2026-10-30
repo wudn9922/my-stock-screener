@@ -246,7 +246,7 @@ test('new SMA defaults to 2px and explicitly selected ATR width preserves locked
   const editor = page.getByRole('dialog', { name: '修改畫線', exact: true });
   await editor.getByRole('combobox', { name: '線寬', exact: true }).selectOption('atr');
   await editor.getByRole('button', { name: '儲存畫線', exact: true }).click();
-  await editor.getByRole('button', { name: '完成', exact: true }).click();
+  await expect(editor).toBeHidden();
   await page.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
   await expect.poll(async () => (await readSymbol(page))?.drawings[0]?.locked).toBe(true);
 

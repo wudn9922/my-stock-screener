@@ -14,11 +14,38 @@ function curveValue(rates: Rates, kind: 'nominal' | 'real', key: string, tenor: 
 const changeBp = (now: number | null, then: number | null) => (finite(now) && finite(then) ? (now - then) * 100 : null);
 
 /** One month back from YYYY-MM-DD (day clamped to 28 so it always exists). */
-function monthBefore(date: string): string {
+export function monthBefore(date: string): string {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
   const month = m === 1 ? 12 : m - 1;
   const year = m === 1 ? y - 1 : y;
   return `${year}-${String(month).padStart(2, '0')}-${String(Math.min(d, 28)).padStart(2, '0')}`;
+}
+
+export interface RateKeyNumber {
+  key: string;
+  label: string;
+  value: string;
+  change: number | null;
+  badge?: string | null;
+  title?: string;
+}
+
+/** Shared headline layout for US and Japanese sovereign rates. */
+export function RatesKeyNumbers({ items }: { items: readonly RateKeyNumber[] }) {
+  return (
+    <ul className="rates-keys" aria-label="重點數字">
+      {items.map((item) => (
+        <li key={item.key} className="rates-key" title={item.title}>
+          <span className="rates-key-label">
+            {item.label}
+            {item.badge && <span className="rates-badge warn"><AlertTriangle size={11} aria-hidden="true" />{item.badge}</span>}
+          </span>
+          <b className="rates-key-value">{item.value}</b>
+          <ChangeBp bp={item.change} />
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /** Three headline chips: 10Y yield, 10Y−Fed at the selected bound, Fed target range. */
@@ -63,23 +90,5 @@ export function KeyNumbers({ rates, history, fedBound }: { rates: Rates; history
       change: policyChange,
     },
   ];
-  return (
-    <ul className="rates-keys" aria-label="重點數字">
-      {items.map((item) => (
-        <li key={item.key} className="rates-key">
-          <span className="rates-key-label">
-            {item.label}
-            {item.badge && (
-              <span className="rates-badge warn">
-                <AlertTriangle size={11} aria-hidden="true" />
-                {item.badge}
-              </span>
-            )}
-          </span>
-          <b className="rates-key-value">{item.value}</b>
-          <ChangeBp bp={item.change} />
-        </li>
-      ))}
-    </ul>
-  );
+  return <RatesKeyNumbers items={items} />;
 }

@@ -37,3 +37,13 @@ gesture ownership, native locked pan, history and persistence are unchanged;
 pointer movement does not update React state or write storage.
 
 See [sources, rollout and verification](../MARKET_BONDS_DRAWING_CONTROLS.md).
+
+## UI follow-up, 2026-10-30
+
+US and JP share the three-number summary and summary/band/spread ordering; JP's
+published point target is never expanded into an invented range. Compact world
+labels fit a five-column phone row. Temporary screener conditions now belong to
+the explicit URL, with group/fresh-visit resets; saved strategies and legacy
+preferences/imports remain intact. The stock drawing dialog focuses Cancel and
+closes after a successful settings commit, without changing the shared dialog,
+gesture model or persistence schema. See [behavior and verification](../BOND_FILTER_EDITOR_FOLLOWUPS.md).

@@ -13,10 +13,10 @@ test('世界 views stay on one row on narrow phones in every view', async ({ pag
     await page.route(`**/report/${file}.json`, (route) => route.fulfill({ json: JSON.parse(readFileSync(new URL(`../tests/fixtures/rates/${fixture}.json`, import.meta.url), 'utf8')) }));
   for (const width of [320, 375, 390]) {
     await page.setViewportSize({ width, height: 760 });
-    for (const view of ['', '&view=indices', '&view=commodities', '&view=fx']) {
+    for (const view of ['', '&view=indices', '&view=jp-bonds', '&view=commodities', '&view=fx']) {
       await page.goto(`./?page=world${view}`);
       const tabs = page.getByRole('group', { name: '世界頁面' }).getByRole('button');
-      await expect(tabs).toHaveText(['美債利率', '指數', '原物料', '匯率']);
+      await expect(tabs).toHaveText(['美債', '指數', '利差', '原物料', '匯率']);
       const boxes = await tabs.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect()));
       expect(new Set(boxes.map((box) => Math.round(box.top))).size, `${width}px ${view || 'rates'}`).toBe(1);
       for (const box of boxes) expect(box.height).toBeGreaterThanOrEqual(43.5);

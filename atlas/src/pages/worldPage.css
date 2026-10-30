@@ -2,10 +2,11 @@
 .research-world-tabs {
   flex-wrap: wrap;
 }
-.research-world-tabs button {
+.world-page .research-world-tabs.segmented.compact > button {
   min-height: 44px;
+  min-width: 44px;
 }
-/* Phones: the four views take their own full-width row above the date line, never wrapping one onto a second line. */
+/* Five compact views share one touch-friendly row above the date line. */
 @media (max-width: 767px) {
   .world-page-head {
     flex-direction: column-reverse;
@@ -14,10 +15,10 @@
   }
   .research-world-tabs {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     width: 100%;
   }
-  .research-world-tabs.segmented.compact > button {
+  .world-page .research-world-tabs.segmented.compact > button {
     min-width: 0;
     min-height: 44px;
     padding: 0 4px;

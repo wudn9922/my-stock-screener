@@ -69,6 +69,7 @@ for (const market of ['TW', 'US'] as const) {
     await sheet.getByRole('region', { name: /20 日平均成交量/ }).getByRole('button', { name: market === 'TW' ? '≥100 張' : '≥100,000 股', exact: true }).click();
     await sheet.getByRole('button', { name: '套用（2 檔）' }).click();
     expect(new URL(page.url()).searchParams.get('f')).toBe('vol:100000;pe:10:20');
+    const filteredUrl = page.url();
     await page.getByRole('button', { name: '存成自選清單', exact: true }).click();
     await page.getByRole('textbox', { name: '自選清單名稱' }).fill(`本益比 ${market}`);
     await page.getByRole('button', { name: '儲存並追蹤清單' }).click();
@@ -78,6 +79,9 @@ for (const market of ['TW', 'US'] as const) {
     await page.reload();
     await expect(page.getByRole('region', { name: '清單追蹤結果' })).toContainText(data.symbols[5]!.replace(/\.TW$/, ''));
     await page.goto(`./?page=screener&group=${data.group.key}`);
+    await expect(page.locator('.screener-row')).toHaveCount(6);
+    expect(new URL(page.url()).searchParams.get('f')).toBeNull();
+    await page.goto(filteredUrl);
     await expect(page.locator('.screener-row')).toHaveCount(2);
     await page.getByRole('button', { name: /移除條件：本益比/ }).click();
     expect(new URL(page.url()).searchParams.get('f')).toBe('vol:100000');

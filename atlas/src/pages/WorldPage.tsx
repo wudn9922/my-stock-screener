@@ -405,7 +405,7 @@ export default function WorldPage({ report, reload, navigate, openChart, view }:
         </div>
         <div className="segmented compact research-world-tabs" role="group" aria-label="世界頁面">
           <button type="button" className={rates ? 'active' : ''} aria-pressed={rates} onClick={() => navigate({ page: 'world' })}>
-            美債利率
+            美債
           </button>
           <button
             type="button"
@@ -415,7 +415,7 @@ export default function WorldPage({ report, reload, navigate, openChart, view }:
           >
             指數
           </button>
-          <button type="button" className={view === 'jp-bonds' ? 'active' : ''} aria-pressed={view === 'jp-bonds'} onClick={() => navigate({ page: 'world', view: 'jp-bonds' })}>日債利差</button>
+          <button type="button" title="日本國債利差" className={view === 'jp-bonds' ? 'active' : ''} aria-pressed={view === 'jp-bonds'} onClick={() => navigate({ page: 'world', view: 'jp-bonds' })}>利差</button>
           {(['commodities','fx'] as const).map(option => <button key={option} type="button" aria-pressed={view === option} className={view === option ? 'active' : ''} onClick={() => navigate({page:'world',view:option})}>{option === 'commodities' ? '原物料' : '匯率'}</button>)}
         </div>
       </div>
