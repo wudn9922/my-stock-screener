@@ -5,7 +5,40 @@ import { buildReport, mockSite, screenerFixtures } from './mocks';
 // Set SCREENSHOT_DIR to keep a picture of the sheet (used for manual visual checks, not by CI).
 const shotDir = process.env.SCREENSHOT_DIR;
 
-test('average volume AND stacked annual gates survive sharing, market memory and saved strategies', async ({ page, browser }) => {
+test('temporary filters reset across groups, markets and fresh visits without restoring legacy preferences', async ({ page }) => {
+  await mockDeviceAccount(page);
+  const key = accountPreference('atlas-screener-filters-v1');
+  const legacy = JSON.stringify({ TW: 'vol:999999999', US: 'vol:888888888' });
+  await page.addInitScript(({ key, legacy }) => localStorage.setItem(key, legacy), { key, legacy });
+  await mockSite(page, { report: buildReport(20), fundamentals: true });
+  await page.goto('./?page=screener&group=tw_g1&f=vol:1000000');
+  const chips = page.getByRole('group', { name: '已套用的篩選條件' });
+  await expect(chips).toBeVisible();
+  await page.getByRole('button', { name: '台股全市場篩選', exact: true }).click();
+  await expect(chips).toHaveCount(0);
+  expect(new URL(page.url()).searchParams.get('f')).toBeNull();
+  await page.getByRole('button', { name: /篩選條件/ }).click();
+  const sheet = page.getByRole('dialog', { name: '篩選條件' });
+  await sheet.getByRole('textbox', { name: '自訂20日平均成交量下限（張）' }).fill('1000');
+  await sheet.getByRole('button', { name: /^套用/ }).click();
+  await expect(chips).toBeVisible();
+  await page.getByRole('button', { name: '美股全市場篩選', exact: true }).click();
+  await expect(chips).toHaveCount(0);
+  expect(new URL(page.url()).searchParams.get('f')).toBeNull();
+  await page.getByRole('button', { name: /篩選條件/ }).click();
+  await sheet.getByRole('textbox', { name: '自訂20日平均成交量下限（股）' }).fill('100000');
+  await sheet.getByRole('button', { name: /^套用/ }).click();
+  await expect(chips).toBeVisible();
+  const nav = page.getByRole('navigation', { name: '主要頁面' }).filter({ visible: true });
+  await nav.getByRole('button', { name: '市場', exact: true }).click();
+  await nav.getByRole('button', { name: '選股', exact: true }).click();
+  await expect(page.locator('.screener-row').first()).toBeVisible();
+  await expect(chips).toHaveCount(0);
+  expect(new URL(page.url()).searchParams.get('f')).toBeNull();
+  expect(await page.evaluate(key => localStorage.getItem(key), key)).toBe(legacy);
+});
+
+test('average volume AND stacked annual gates survive sharing and saved strategies while fresh visits reset', async ({ page, browser }) => {
   const universe = screenerFixtures.universe() as { fields: string[]; markets: { TW: { rows: unknown[][] } } };
   const growth = screenerFixtures.growth() as { rows: unknown[][] };
   universe.markets.TW.rows = universe.markets.TW.rows.slice(0, 5);
@@ -60,11 +93,11 @@ test('average volume AND stacked annual gates survive sharing, market memory and
   await page.getByRole('button', { name: /篩選條件/ }).click();
   await sheet.getByRole('button', { name: /^套用/ }).click();
   await page.goto('./?page=screener&group=universe-tw');
-  await expect(page.locator('.result-count')).toHaveText('1 / 5 檔');
-  expect(new URL(page.url()).searchParams.get('f')).toBe(filters);
+  await expect(page.locator('.result-count')).toHaveText('5 檔');
+  expect(new URL(page.url()).searchParams.get('f')).toBeNull();
   await page.goto('./?page=screener&group=universe-us');
-  await expect(page).toHaveURL(/vol(?::|%3A)100000/);
-  expect(new URL(page.url()).searchParams.get('f')).toBe('vol:100000;rev:4:10;rev:1:20');
+  await expect(page.getByRole('group', { name: '已套用的篩選條件' })).toHaveCount(0);
+  expect(new URL(page.url()).searchParams.get('f')).toBeNull();
   await page.goto(strategyUrl);
   await page.reload();
   await expect(page.getByRole('region', { name: '清單追蹤結果' })).toContainText('成交量與疊加成長');
@@ -113,12 +146,15 @@ test('average volume threshold is optional, customizable, persisted and removabl
   await expect(sheet.getByRole('button', { name: '套用（2 檔）' })).toBeEnabled();
   if (shotDir) await page.screenshot({ path: `${shotDir}/filters-shares-${info.project.name}.png` });
   await sheet.getByRole('button', { name: '套用（2 檔）' }).click();
+  const filteredUrl = page.url();
   await page.reload();
   await expect(page.locator('.result-count')).toHaveText('2 / 6 檔');
   await expect(page.getByRole('group', { name: '已套用的篩選條件' })).toContainText('20 日均量 ≥250 張');
   await page.goto('./?page=screener&group=tw_g1');
+  await expect(page.locator('.result-count')).toHaveText('6 檔');
+  expect(new URL(page.url()).searchParams.get('f')).toBeNull();
+  await page.goto(filteredUrl);
   await expect(page.locator('.result-count')).toHaveText('2 / 6 檔');
-  await expect(page).toHaveURL(/vol(?::|%3A)250000/);
   await page.getByRole('button', { name: /移除.*20 日均量/ }).click();
   await expect(page.locator('.result-count')).toHaveText('6 檔');
   await page.getByRole('button', { name: '篩選條件' }).click();

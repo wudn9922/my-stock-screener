@@ -25,10 +25,12 @@ export function DrawingSettings({
   store,
   drawing,
   onCancelGesture,
+  onSaved,
 }: {
   store: AppStore;
   drawing: Drawing;
   onCancelGesture: () => void;
+  onSaved?: () => void;
 }) {
   const [draft, setDraft] = useState(() => styleDraft(drawing.style));
   const [levels, setLevels] = useState(() => levelsText(drawing.levels));
@@ -67,6 +69,7 @@ export function DrawingSettings({
       const style = structuredClone(draft);
       if (fib) style.hiddenLevels = parsedLevels.filter((level) => draft.hiddenLevels?.includes(level));
       store.updateDrawing(drawing.id, { style, ...(fib ? { levels: parsedLevels } : {}), visible });
+      onSaved?.();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     }

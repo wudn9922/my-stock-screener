@@ -30,7 +30,19 @@ test('global includes Japanese spreads and both countries use the attached reaso
   page.on('request', request => { if (/fred\.stlouisfed|mof\.go\.jp|boj\.or\.jp/.test(request.url())) sourceRequests.push(request.url()); });
   await page.goto('./?page=world&view=jp-bonds');
   await expect(page.getByRole('navigation', { name: '市場分頁' }).getByRole('link')).toHaveText(['大盤', '全球', '題材']);
-  await expect(page.getByRole('group', { name: '世界頁面' }).getByRole('button', { name: '日債利差', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const tabs = page.getByRole('group', { name: '世界頁面' });
+  await expect(tabs.getByRole('button')).toHaveText(['美債', '指數', '利差', '原物料', '匯率']);
+  await expect(tabs.getByRole('button', { name: '利差', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const tabBoxes = await tabs.getByRole('button').evaluateAll(buttons => buttons.map(button => {
+    const box = button.getBoundingClientRect(); return { top: box.top, width: box.width, height: box.height };
+  }));
+  expect(Math.max(...tabBoxes.map(box => box.top)) - Math.min(...tabBoxes.map(box => box.top))).toBeLessThanOrEqual(1);
+  for (const box of tabBoxes) { expect(box.width).toBeGreaterThanOrEqual(44); expect(box.height).toBeGreaterThanOrEqual(44); }
+  await expect(page.getByLabel('重點數字').locator('.rates-key-value')).toHaveText(['2.83%', '1.58%', '1.25%']);
+  await expect(page.getByLabel('重點數字')).toContainText('日銀目標區間');
+  const order = () => page.locator('.rates-grid > section > .card-head > h2').evaluateAll(headings => headings.slice(0, 2).map(h => h.firstChild?.textContent));
+  expect(await order()).toEqual(['10 年債殖利率合理區間', '利差']);
+  await page.screenshot({ path: testInfo.outputPath('japan-bond-summary.png') });
   const spread = page.getByRole('region', { name: '日本國債利差', exact: true });
   await expect(spread.locator('.rates-headline')).toContainText('+1.58%');
   await expect(spread.locator('canvas').first()).toBeVisible();
@@ -43,7 +55,8 @@ test('global includes Japanese spreads and both countries use the attached reaso
   await jpBand.getByRole('combobox', { name: '合理區間算法' }).selectOption('spread');
   await expect(jpBand.locator('.yield-band-values b')).toHaveText(['1.10%', '2.15%', '3.19%']);
   await page.screenshot({ path: testInfo.outputPath('japan-bond-spread-band.png') });
-  await page.getByRole('group', { name: '世界頁面' }).getByRole('button', { name: '美債利率', exact: true }).click();
+  await tabs.getByRole('button', { name: '美債', exact: true }).click();
+  expect(await order()).toEqual(['10 年債殖利率合理區間', '利差']);
   const usBand = page.getByRole('region', { name: '美國10年債合理區間' });
   await expect(usBand.locator('.yield-band-values b')).toHaveText(['3.52%', '5.11%', '6.71%']);
   await expect(usBand).toContainText('區間中段');
@@ -59,7 +72,7 @@ test('missing Japan reports show the dated attachment baseline and missing model
   await expect(page.getByRole('status').filter({ hasText: '基準快照' })).toContainText('並非即時行情');
   await expect(page.getByRole('region', { name: '日本10年債合理區間' })).toContainText('附檔基準參數');
   await expect(page.getByText('歷史利差尚未產生', { exact: false })).toBeVisible();
-  await page.getByRole('group', { name: '世界頁面' }).getByRole('button', { name: '美債利率', exact: true }).click();
+  await page.getByRole('group', { name: '世界頁面' }).getByRole('button', { name: '美債', exact: true }).click();
   await expect(page.getByRole('region', { name: '美國10年債合理區間' }).locator('.yield-band-values b')).toHaveCount(3);
   await expect(page.getByRole('heading', { name: '存續期間情境分析' })).toBeVisible();
 });
@@ -143,11 +156,13 @@ test('tapping a 2px drawing opens a compact chart-local menu for lock, edit and 
   await menu.getByRole('button', { name: '鎖定所選畫線', exact: true }).click();
   await menu.getByRole('button', { name: '畫線設定', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '修改畫線', exact: true });
+  await expect(editor.getByRole('button', { name: '取消', exact: true })).toBeFocused();
+  await expect(editor.getByLabel('線條顏色', { exact: true })).not.toBeFocused();
   await expect(editor.getByRole('combobox', { name: '線寬', exact: true })).toHaveValue('2');
   await editor.getByRole('combobox', { name: '線寬', exact: true }).selectOption('3');
   await editor.getByRole('button', { name: '儲存畫線', exact: true }).click();
+  await expect(editor).toBeHidden();
   await expect.poll(async () => (await drawings(page))[0].style.lineWidth).toBe(3);
-  await editor.getByRole('button', { name: '完成', exact: true }).click();
   await menu.getByRole('button', { name: '刪除所選畫線', exact: true }).click();
   await expect(menu).toBeHidden();
   await expect.poll(async () => (await drawings(page)).length).toBe(0);

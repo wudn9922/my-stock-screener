@@ -1,4 +1,40 @@
-## Current follow-up: market sections, US/JP yield bands and drawing menu (2026-10-29)
+## Current follow-up: bond layout, temporary screener conditions and drawing editor (2026-10-30)
+
+Primary self-review only; no independent sign-off. Based on main `3334513d5`.
+JP and US share the three-number headline component and summary/band/spread
+ordering. The BOJ point target is displayed as a point, with its nature disclosed;
+no bounds or missing history changes are fabricated. The five global views use
+short labels and a five-column phone row with 44px targets. US scenarios and ETFs,
+all routes, data loaders, models and sources remain unchanged.
+
+Temporary screener filters now come only from the explicit URL. Group/market
+switches clear conditions and close the old draft. Fresh visits no longer restore
+old per-market values. Explicit shared/back/reload URLs and saved watchlist rules
+still work; existing preference data and import/export helpers are retained.
+There is no timer clearing a user's ongoing work.
+
+The stock drawing dialog focuses Cancel before the native color field. A
+successful settings commit closes the quick editor through an optional callback;
+validation errors remain visible. Non-quick panels and the shared/account dialog
+are unchanged. Canonical anchors, gestures, lock guards and storage schema/queues
+are unchanged. No auth/account, protected server, shell-navigation, permanent
+price/financial/K-line, SQL, notification or deployment changes.
+
+Actual local validation: clean npm ci, lint/typecheck, 1,694 Vitest tests in 128
+files, normal and Pages builds; final 60 site-browser and 21 normal drawing/
+timeframe tests passed across desktop/mobile Chromium and iPhone WebKit. A wider
+site run passed 158 cases with one existing desktop skip, and exposed six copies
+of the former P/E auto-restore expectation. These now require a fresh visit to
+clear filters and an explicit URL to restore them; the final run includes all 15
+P/E tests passing. Original validation, sharing and saved-strategy gates remain.
+The updated 320/375/390px five-view layout regression is included in CI.
+
+See [behavior and verification](docs/BOND_FILTER_EDITOR_FOLLOWUPS.md).
+Headless WebKit is not physical-iPhone certification. No merge or deployment.
+
+---
+
+## Previous follow-up: market sections, US/JP yield bands and drawing menu (2026-10-29)
 
 Primary self-review only; no independent sign-off. Based on main `8d360e149`.
 Market content navigation combines TW/US/JP/KR/EU under 大盤 while retaining each

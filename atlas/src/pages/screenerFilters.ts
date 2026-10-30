@@ -757,7 +757,7 @@ function hasEpsCondition(state: FilterState): boolean {
 
 // --------------------------------------------------------------- storage
 
-/** Last applied conditions per market (`f` text), used when the URL carries none. */
+/** Legacy per-market conditions, retained for settings import/export compatibility. */
 export const FILTER_STORAGE_KEY = 'atlas-screener-filters-v1';
 
 type FilterStorage = Pick<Storage, 'getItem' | 'setItem'>;

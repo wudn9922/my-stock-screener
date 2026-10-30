@@ -138,7 +138,7 @@ test('market section inventory and remembered selectors, screener filters, chart
   await expect(page.getByRole('tab', { name: /台灣/ })).toHaveAttribute('aria-selected', 'true');
   await sections(page).getByRole('link', { name: '全球', exact: true }).click();
   await expect(primary(page).getByRole('button', { name: '市場', exact: true })).toHaveAttribute('aria-current', 'page');
-  for (const [view, label, content] of [['', '美債利率', '.rates-view'], ['indices', '指數', '.world-table-card'], ['commodities', '原物料', '.world-candle-card'], ['fx', '匯率', '.world-candle-card']]) {
+  for (const [view, label, content] of [['', '美債', '.rates-view'], ['indices', '指數', '.world-table-card'], ['commodities', '原物料', '.world-candle-card'], ['fx', '匯率', '.world-candle-card']]) {
     const button = page.getByRole('group', { name: '世界頁面' }).getByRole('button', { name: label, exact: true });
     await button.click(); await expect(button).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator(content!).first()).toBeVisible();

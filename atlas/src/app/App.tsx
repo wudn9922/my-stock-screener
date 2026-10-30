@@ -1504,8 +1504,8 @@ export function App({
         </div>
       )}
       {active && quickEditing && selectedDrawing && <ConsoleDialog title="修改畫線" onClose={() => setQuickEditing(false)}>
-        <DrawingSettings store={store} drawing={selectedDrawing} onCancelGesture={() => engine.current?.controller?.cancel()} />
-        <button type="button" className="ghost-button" onClick={() => setQuickEditing(false)}>完成</button>
+        <button type="button" autoFocus className="ghost-button" style={{ minHeight: 44 }} onClick={() => setQuickEditing(false)}>取消</button>
+        <DrawingSettings store={store} drawing={selectedDrawing} onCancelGesture={() => engine.current?.controller?.cancel()} onSaved={() => setQuickEditing(false)} />
       </ConsoleDialog>}
       {active && (notice || state.storageError) && (
         <div className="notice" role="status">
