@@ -737,3 +737,15 @@ a.rates-static {
 .rates-sources .rates-disclosure-body {
   font-size: 12px;
 }
+
+.yield-band-method { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.yield-band-method select { min-height: 44px; max-width: 130px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px; }
+.yield-band-values { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; color: var(--text-3); font-size: 12px; }
+.yield-band-values b { display: block; color: var(--text); font-size: 22px; font-variant-numeric: tabular-nums; margin-top: 5px; }
+.yield-band-track { height: 34px; position: relative; margin: 12px 0; }
+.yield-band-track i { position: absolute; }
+.yield-band-interval { top: 10px; height: 14px; border: 1px solid var(--accent, #3d8bfd); border-radius: 10px; background: #3d8bfd30; }
+.yield-band-center { top: 4px; height: 26px; border-left: 2px dashed var(--text-3); }
+.yield-band-current { top: 0; height: 34px; border-left: 3px solid #f0b35b; }
+.yield-band-current-value { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; font-size: 16px; }
+.yield-band-current-value small { color: var(--text-3); font-size: 12px; }

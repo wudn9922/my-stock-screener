@@ -482,10 +482,10 @@ class RepoDataTest(unittest.TestCase):
         for symbol in tw_symbols:
             code = symbol.split(".")[0]
             row = store["data"][code] = {}
+            # Populate every target season. A newer real Yahoo quarter correctly
+            # beats an older official fixture, which is not what this size test measures.
             for key in tw.target_seasons(TODAY):
                 year, quarter = tw.parse_season(key)
-                if key == "2026Q3":
-                    continue
                 revenue = rng.randint(100_000, 50_000_000) * quarter
                 eps = round(rng.uniform(-1, 8) * quarter, 2)
                 row[key] = [revenue, eps, round(eps * rng.randint(10_000, 2_000_000)), 0]

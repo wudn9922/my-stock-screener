@@ -1,4 +1,61 @@
-## Current follow-up: preserve the original stock MA source (2026-10-29)
+## Current follow-up: market sections, US/JP yield bands and drawing menu (2026-10-29)
+
+Primary self-review only; no independent sign-off. Based on main `8d360e149`.
+Market content navigation combines TW/US/JP/KR/EU under 大盤 while retaining each
+country selector, route compatibility and last-country memory. 全球 and 題材 stay
+separate. No application-shell or bottom-navigation changes.
+
+Japan's new global view shows 10Y−BOJ spread/history and the requested reference
+band, without ETFs or scenarios. US adds the same band while keeping its previous
+content. The supplied coefficient snapshot and JS formula are versioned; Python
+OLS uses residual n−2 and spread sample n−1, completed months only, full history,
+and per-country failure isolation. Recent BOJ effective dates were checked against
+official statements, with the older attachment dates disclosed. Original models
+and dates survive unavailable, truncated or unreleased monthly source data.
+
+The existing daily/rates workflows produce only two new generated reports, with
+their existing owner/concurrency protections. No new writer or external API in
+the browser. Read failures show a dated attachment baseline, never a fresh quote
+or fabricated history. A live read-only collector check returned official JP
+2026-10-28 10Y=2.867%, BOJ=1.25%, spread=1.617pp, with no missing MOF source.
+It wrote review output outside the repo, not permanent records or hosted reports.
+
+New drawings use 2px unless a custom default exists. Existing styles/ATR, canonical
+anchors, commit-on-release, lock/pan ownership, history and storage remain. Only
+selection/release emits a transient host-local point for a clamped DOM menu;
+pointer movement does not update React or persist pixels. Menu coordinates include
+the legend's offset and prefer outside the projected shape to leave its other
+handles/body reachable. Lock/delete/settings/deselect have 44px targets, settings
+reuse the editor, and mobile no longer consumes a bottom row. Gesture instructions
+also float inside the plot, keeping its height stable before/during/after drawing.
+
+Actual local checks: clean npm ci; lint/typecheck; full Vitest 1,694 tests
+in 128 files; 12 new Python tests plus 49 existing rates and 33 generated-storage
+tests; normal/Pages builds; 122 site-browser checks passed with one existing
+desktop skip for a phone-only sheet. Final code passed 56 normal drawing/gesture/
+storage/timeframe tests (one original desktop skip for mobile touch), and 44 site
+tests (one original desktop skip for a phone-only sheet), across all three profiles.
+These retain corner/body edits, locked native pan, undo/redo, symbol/timeframe
+ownership, V3 import/V4 export and ATR coverage. New tests assert 2px, the menu's
+pixel position/44px targets, unchanged plot height before/during/after placement,
+and lock/edit/delete. No gesture assertions or test timeouts were weakened.
+The cold lazy-navigation/old-deployment recovery helper now selects 大盤, with
+both original recovery scenarios passing on all three profiles (six tests).
+Full Python CI exposed an existing synthetic full-market size fixture that
+explicitly omitted 2026Q3, while the real 2330 file now contains that quarter.
+Newer Yahoo data correctly beat that older official fixture. Only the synthetic
+coverage is completed; source precedence and all source/size assertions remain.
+All 40 growth tests pass; no production financial implementation or record changes.
+
+No dependency/lockfile, account/auth, protected server-function, permanent price,
+financial or K-line archive changes. No SQL, notifications, deployment or merge.
+Headless Chromium/WebKit is not physical-iPhone verification. Details and sources:
+[MARKET_BONDS_DRAWING_CONTROLS](docs/MARKET_BONDS_DRAWING_CONTROLS.md),
+[ADR-023](docs/architecture/ADR-023-market-bonds-and-drawing-menu.md).
+
+---
+
+## Previous follow-up: preserve the original stock MA source (2026-10-29)
 
 Primary self-review only; no independent sign-off. Based on main `b77a4a141`.
 The previous dialog only read/wrote the dormant ungrouped row while the chart

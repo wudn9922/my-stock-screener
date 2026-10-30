@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - 'atlas/**'
+      - 'scripts/build_bond_research.py'
+      - 'tests/test_bond_research.py'
       - 'scripts/build_data_status.py'
       - 'scripts/build_screener_history.py'
       - 'scripts/build_industry_rotation.py'
@@ -221,7 +223,7 @@ jobs:
           retention-days: 7
       - name: Desktop, phone and WebKit regressions
         working-directory: atlas
-        run: npm run test:site -- stock-parameter-consistency.spec.ts chart-watchlist-followups.spec.ts monitor-signals.spec.ts screener-health-layout.spec.ts watchlist-board.spec.ts mexc.spec.ts holdings.spec.ts data-status.spec.ts analysis-comparisons.spec.ts nav-inventory.spec.ts stock-views.spec.ts account-privacy.spec.ts legacy-import.spec.ts parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts data-integrity.spec.ts closed-market.spec.ts pwa-install.spec.ts pwa-login.spec.ts pwa-update.spec.ts line-handoff.spec.ts line-sdk-contract.spec.ts navigation-recovery.spec.ts market-chart-controls.spec.ts world-btc.spec.ts analysis-panel-layout.spec.ts notes-density.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts themes-map.spec.ts breakouts.spec.ts index-volume.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts trending-refresh.spec.ts workspace-refinements.spec.ts
+        run: npm run test:site -- market-bond-drawing.spec.ts rates.spec.ts stock-parameter-consistency.spec.ts chart-watchlist-followups.spec.ts monitor-signals.spec.ts screener-health-layout.spec.ts watchlist-board.spec.ts mexc.spec.ts holdings.spec.ts data-status.spec.ts analysis-comparisons.spec.ts nav-inventory.spec.ts stock-views.spec.ts account-privacy.spec.ts legacy-import.spec.ts parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts data-integrity.spec.ts closed-market.spec.ts pwa-install.spec.ts pwa-login.spec.ts pwa-update.spec.ts line-handoff.spec.ts line-sdk-contract.spec.ts navigation-recovery.spec.ts market-chart-controls.spec.ts world-btc.spec.ts analysis-panel-layout.spec.ts notes-density.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts themes-map.spec.ts breakouts.spec.ts index-volume.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts trending-refresh.spec.ts workspace-refinements.spec.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -265,6 +267,8 @@ jobs:
         run: |
           cp docs/report/kline-corrections.json "$KLINE_CORRECTIONS_LOG"
           pip install requests numpy pandas yfinance openpyxl xlrd lxml pyyaml 'exchange-calendars>=4.5,<5.0'
+          python -m unittest discover -s tests -p test_bond_research.py -v
+          python -m unittest discover -s tests -p test_rates.py -v
           python -m unittest discover -s tests -p test_data_status.py -v
           python -m unittest discover -s tests -p test_screener_history.py -v
           python -m unittest discover -s tests -p test_industry_rotation.py -v

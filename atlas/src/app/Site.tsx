@@ -57,7 +57,7 @@ const RATES_TITLE = '美債與利率';
 /** Existing detail pages light their parent primary section. */
 const navPageOf = (page: Page): Page => page === 'financials' ? 'chart' : page === 'world' || page === 'themes' ? 'markets' : page;
 const pageTitleOf = (route: Route) => route.page === 'world'
-  ? route.view === 'commodities' ? '原物料' : route.view === 'fx' ? '匯率' : route.view === 'indices' ? PAGE_TITLES.world : RATES_TITLE
+  ? route.view === 'jp-bonds' ? '日本國債利差' : route.view === 'commodities' ? '原物料' : route.view === 'fx' ? '匯率' : route.view === 'indices' ? PAGE_TITLES.world : RATES_TITLE
   : PAGE_TITLES[route.page];
 
 const mobileQuery = window.matchMedia('(max-width: 1099px)');
@@ -89,7 +89,7 @@ export function Site() {
   const { route, id: navId, source: navSource, navigate, syncRoute } = useRoute(DEFAULT_PAGE);
   // 市場 remembers each section as it was left, and the bottom 「市場」 reopens the last section visited.
   const marketMemory = useRef<MarketSectionRoutes>(INITIAL_MARKET_SECTIONS);
-  const lastMarketSection = useRef<Route>(INITIAL_MARKET_SECTIONS.tw);
+  const lastMarketSection = useRef<Route>(INITIAL_MARKET_SECTIONS.markets);
   const marketSection = marketSectionOf(route);
   if (marketSection) {
     marketMemory.current = rememberMarketSection(marketMemory.current, route);

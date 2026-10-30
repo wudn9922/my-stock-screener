@@ -2154,3 +2154,33 @@
     padding-bottom: 8px;
   }
 }
+
+/* Selection actions stay beside the tapped line, inside the chart on every screen size. */
+.drawing-quick-menu {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  max-width: calc(100% - 8px);
+  background: var(--surface, #22262f);
+  border: 1px solid var(--border-strong, #475061);
+  border-radius: 9px;
+  box-shadow: 0 5px 18px #0005;
+}
+.drawing-quick-menu .icon-button { width: 44px; height: 44px; min-width: 44px; }
+.drawing-gesture-hint {
+  position: absolute;
+  z-index: 5;
+  left: 8px;
+  bottom: 36px;
+  max-width: calc(100% - 16px);
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-3);
+  background: var(--surface);
+  pointer-events: none;
+}

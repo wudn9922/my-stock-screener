@@ -12,7 +12,7 @@ async function fixtures(page: Page) {
 }
 
 async function openDestination(page: Page, nav: ReturnType<Page['getByRole']>, label: string) {
-  if (label === '全球' || label === '題材' || label === '台股') {
+  if (label === '全球' || label === '題材' || label === '大盤') {
     await nav.getByRole('button', { name: '市場', exact: true }).click();
     await page.getByRole('navigation', { name: '市場分頁' }).getByRole('link', { name: label, exact: true }).click();
   } else await nav.getByRole('button', { name: label, exact: true }).click();
@@ -26,7 +26,7 @@ test('cold lazy pages and repeated bottom navigation retain a usable shell', asy
   const nav = page.getByRole('navigation', { name: '主要頁面' }).filter({ visible: true });
   for (const [label, route, content] of [
     ['全球', 'world', '.research-world-tabs'], ['題材', 'themes', '.theme-tile'],
-    ['選股', 'screener', '.screener-row'], ['台股', 'markets', '.index-card'],
+    ['選股', 'screener', '.screener-row'], ['大盤', 'markets', '.index-card'],
     ['選股', 'screener', '.screener-row'], ['題材', 'themes', '.theme-tile'],
     ['全球', 'world', '.research-world-tabs'],
   ]) {

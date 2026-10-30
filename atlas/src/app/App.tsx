@@ -43,7 +43,7 @@ import {
   type Timeframe,
 } from '../market-data/MarketDataProvider';
 import { measurementValues } from '../tools/Measurement';
-import { toolNames, type ActiveTool } from '../drawing/DrawingModel';
+import { toolNames, type ActiveTool, type Point } from '../drawing/DrawingModel';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { useChartFocus } from '../ui/useChartFocus';
 import { IconButton } from '../ui/IconButton';
@@ -59,6 +59,8 @@ import { Watchlist, companies } from '../ui/Watchlist';
 import { IndicatorPanel } from '../ui/IndicatorPanel';
 import { DrawingPanel } from '../ui/DrawingPanel';
 import { DrawingSettings } from '../ui/DrawingSettings';
+import { DrawingQuickMenu } from '../ui/DrawingQuickMenu';
+import { ConsoleDialog } from '../ui/ConsoleDialog';
 import { WorkspaceSettings } from '../ui/WorkspaceSettings';
 import { BacktestPanel } from '../ui/BacktestPanel';
 import { AlertPanel } from '../ui/AlertPanel';
@@ -224,6 +226,10 @@ export function App({
     [help, setHelp] = useState(false),
     [drawingPickerOpen, setDrawingPickerOpen] = useState(false),
     [reloadToken, setReloadToken] = useState(0);
+  const [drawingMenuPoint, setDrawingMenuPoint] = useState<Point | null>(null);
+  const [drawingMenuBounds, setDrawingMenuBounds] = useState<{ top: number; bottom: number } | null>(null);
+  const [quickEditing, setQuickEditing] = useState(false);
+  useEffect(() => setQuickEditing(false), [symbol, tf, selected]);
   const [catalogEntries, setCatalogEntries] = useState<SymbolCatalogEntry[]>([]);
   const refreshController = useRef<AbortController | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -328,7 +334,7 @@ export function App({
     if (tab !== 'watchlist') store.updateApp({ workspace: { ...store.getSnapshot().app.workspace, rightTab: tab } });
   };
   const tablet = mobile && window.innerWidth >= 768;
-  const modal = active && ((!!sheet && !tablet) || help || drawingPickerOpen);
+  const modal = active && ((!!sheet && !tablet) || help || drawingPickerOpen || quickEditing);
   const errors = useSyncExternalStore(errorLog.subscribe, errorLog.getSnapshot);
   const alertSession = useRef('');
   useDialogFocus(modal, drawingPickerOpen ? 'drawing-tool-picker' : undefined);
@@ -398,7 +404,10 @@ export function App({
       {
         defaults: (type) => store.getSnapshot().app.drawingDefaults[type] ?? {},
         commit: (symbol, drawings, label, timeframe) => store.commitDrawings(symbol, drawings, label, timeframe),
-        selection: setSelected,
+        selection: (id, point) => {
+          setSelected(id); setDrawingMenuPoint(point ?? null);
+          setDrawingMenuBounds(id ? engine.current?.drawingVerticalBounds(id) ?? null : null);
+        },
         tool: setTool,
         view: (symbol, timeframe, range) =>
           store.updateSymbol(symbol, (s) => ({
@@ -888,7 +897,6 @@ export function App({
   const drawingControls =
     selectedDrawing && tool === 'select' ? (
       <>
-        <span>{toolNames[selectedDrawing.type]}</span>
         <IconButton
           label="鎖定所選畫線"
           active={selectedDrawing.locked}
@@ -903,7 +911,7 @@ export function App({
         >
           <Trash2 size={16} />
         </IconButton>
-        <IconButton label="畫線設定" onClick={() => openPanel('drawings')}>
+        <IconButton label="畫線設定" onClick={() => setQuickEditing(true)}>
           <Settings2 size={16} />
         </IconButton>
         <IconButton
@@ -1326,21 +1334,12 @@ export function App({
                 {displayTicker(symbol)}
                 <span>{companyName ?? 'ATLAS'}</span>
               </div>
-              {!mobile && drawingControls && (
-                <div className="floating-drawing-toolbar">{drawingControls}</div>
-              )}
+              {tool !== 'select' && <p className="drawing-gesture-hint">{`${toolNames[tool]} · 每個端點：按住 → 拖曳 → 放開`}</p>}
+              {drawingControls && !modal && <DrawingQuickMenu point={drawingMenuPoint} bounds={drawingMenuBounds} host={hostRef}>{drawingControls}</DrawingQuickMenu>}
             </div>
           </div>
-          <div
-            className={`chart-status ${mobile && drawingControls ? 'has-drawing-controls' : ''} ${
-              tool === 'select' && !(mobile && drawingControls) ? 'chart-status-idle' : ''
-            }`}
-          >
-            {tool === 'select' ? (
-              <span aria-hidden="true" />
-            ) : (
-              <span>{`${toolNames[tool]} · 每個端點：按住 → 拖曳 → 放開`}</span>
-            )}
+          <div className="chart-status chart-status-idle">
+            <span aria-hidden="true" />
             <span className="status-counts">
               畫線 {activeDrawings.length} 條 <span className="status-divider">/</span> 指標 {activeIndicators.length} 個
               <span className="status-divider">/</span>
@@ -1352,11 +1351,6 @@ export function App({
                 {!canPersist() ? '僅本次瀏覽暫存' : state.storageError ? '儲存失敗' : state.saving ? '儲存中…' : cloudLabels[cloud]}
               </span>
             </span>
-            {mobile && drawingControls && (
-              <div className="mobile-drawing-controls" aria-label="所選畫線操作">
-                {drawingControls}
-              </div>
-            )}
           </div>
         </main>
         {right && !mobile && (
@@ -1509,6 +1503,10 @@ export function App({
           </div>
         </div>
       )}
+      {active && quickEditing && selectedDrawing && <ConsoleDialog title="修改畫線" onClose={() => setQuickEditing(false)}>
+        <DrawingSettings store={store} drawing={selectedDrawing} onCancelGesture={() => engine.current?.controller?.cancel()} />
+        <button type="button" className="ghost-button" onClick={() => setQuickEditing(false)}>完成</button>
+      </ConsoleDialog>}
       {active && (notice || state.storageError) && (
         <div className="notice" role="status">
           {state.storageError ?? notice}

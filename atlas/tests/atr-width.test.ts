@@ -51,7 +51,7 @@ describe('Wilder ATR sizing', () => {
   });
 });
 
-it('defaults new drawings to ATR while preserving explicit legacy pixel defaults', () => {
+it('defaults new drawings to 2px while preserving explicit legacy pixel defaults', () => {
   const mapper = new TimeMapper([bar(1)], '1D');
   const projection: DrawingProjection = {
     toPoint: (anchor) => ({ x: anchor.logical, y: anchor.price }),
@@ -67,7 +67,7 @@ it('defaults new drawings to ATR while preserving explicit legacy pixel defaults
     return machine.drawings[0];
   };
 
-  expect(createDrawing().style).toMatchObject({ lineWidth: 1, widthMode: 'atr' });
+  expect(createDrawing().style).toMatchObject({ lineWidth: 2, widthMode: 'pixels' });
   const legacy = createDrawing(() => ({ color: '#ffffff', lineWidth: 3 }));
   expect(legacy.style).toMatchObject({ color: '#ffffff', lineWidth: 3 });
   expect(legacy.style.widthMode).toBeUndefined();
