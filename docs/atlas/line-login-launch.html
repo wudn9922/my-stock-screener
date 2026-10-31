@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow">
+  <title>返回 Atlas 完成 LINE 登入</title>
+  <style>
+    :root { color-scheme: dark; font: 17px/1.65 system-ui, sans-serif; background: #11151b; color: #e9edf3; }
+    body { margin: 0; padding: max(24px, env(safe-area-inset-top)) 24px 24px; }
+    main { max-width: 34rem; margin: 8vh auto; }
+    h1 { font-size: 1.35rem; }
+    a, button { display: inline-block; box-sizing: border-box; min-height: 44px; padding: 10px 16px; margin: 6px 8px 6px 0; border: 1px solid #547dba; border-radius: 8px; background: #1b2a40; color: inherit; font: inherit; }
+    a:not([href]) { display: none; }
+  </style>
+  <script type="module" crossorigin src="/my-stock-screener/atlas/assets/lineLogin-BVkBchhr.js"></script>
+  <link rel="modulepreload" crossorigin href="/my-stock-screener/atlas/assets/lineLoginConfig-CDuRX9og.js">
+</head>
+<body>
+  <main>
+    <h1>返回原本的 Atlas 完成登入</h1>
+    <p role="status">已在 LINE 繼續登入，完成後請按左上角「完成／X」回到原本的 Atlas 輸入確認碼</p>
+    <p>如果 LINE 還沒有開啟，請點下方按鈕。請保留原來的 Atlas 分頁或主畫面 App，確認碼只輸入在那個視窗。</p>
+    <a id="continue-line" rel="noreferrer">在 LINE 中繼續</a>
+    <button id="close-window" type="button">關閉此視窗</button>
+    <p id="launch-error" role="alert" hidden>這個登入連結已失效，請關閉此視窗，從原來的 Atlas 重新登入。</p>
+  </main>
+</body>
+</html>
