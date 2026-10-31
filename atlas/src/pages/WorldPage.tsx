@@ -420,7 +420,7 @@ export default function WorldPage({ report, reload, navigate, openChart, view }:
         </div>
       </div>
       {view === 'jp-bonds' ? <Suspense fallback={<PageState kind="loading" title="載入日本國債…" />}><JapanRatesView /></Suspense> : assets ? (
-        <Suspense fallback={<PageState kind="loading" title="載入研究資料…" />}><WorldAssetsView key={view} view={view} /></Suspense>
+        <Suspense fallback={<PageState kind="loading" title="載入研究資料…" />}><WorldAssetsView key={view} view={view} openChart={openChart} /></Suspense>
       ) : rates ? (
         // Outside ReportGate: the rates data is separate from the daily report.
         <Suspense fallback={<PageState kind="loading" title="載入中…" />}>

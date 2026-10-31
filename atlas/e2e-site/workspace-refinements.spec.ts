@@ -47,7 +47,8 @@ test('stock controls share one compact row and the normal chart fills the space 
     expect(bounds.helpRightOfValues).toBe(true);
     expect(bounds.helpAligned).toBeLessThanOrEqual(4);
     expect(bounds.horizontalOverflow).toBeLessThanOrEqual(0);
-    expect(bounds.mainOverflow).toBeLessThanOrEqual(1);
+    // The plot still fills the initial viewport; P/E and the common data footer follow below.
+    expect(bounds.mainOverflow).toBeGreaterThan(0);
     if (bounds.navigation.height > 0) {
       expect(bounds.header).toBeLessThanOrEqual(124);
       expect(Math.abs(bounds.plot.bottom - bounds.navigation.top)).toBeLessThanOrEqual(2);

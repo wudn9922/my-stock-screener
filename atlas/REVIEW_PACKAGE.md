@@ -1,4 +1,45 @@
-## Current follow-up: full-market breadth and chart review (2026-10-30)
+## Current follow-up: Chinese heatmap, asset lists and P/E (2026-10-31)
+
+Primary self-review only; no independent sign-off. Based on main `e60f63d8a`.
+
+The US heatmap translates display labels only (152 current Nasdaq names plus common aliases),
+leaving source IDs, grouping, weights and returns intact. Compact labels retain full tooltip/aria
+names. The shared permission display now precedes data health at the foot of every page, while
+login/auth code and storage policy remain unchanged. Screener virtualization keeps its existing
+behavior within a near-viewport-height list.
+
+World assets default to quote rows, with an explicit continuous-gallery toggle and the existing
+complete chart workbench. The read-only provider validates source identity and quote/candle
+alignment and never substitutes stocks on failure. Existing research drawing identities are
+reused for account/symbol/timeframe ownership and saved MAs. BTC source/calendar guards remain.
+
+The stock P/E time series below the full-height K-line uses the existing historical EPS rules,
+publication dates, split basis and weekly prices. Unsupported or missing data fails locally;
+no current-EPS retroactive history is fabricated. The footer and P/E are accessible by scrolling,
+without reducing the plot's initial height. Changing stock returns the main scroller to the top.
+
+Clean npm ci, lint, typecheck, normal build and Pages build completed. All 1,708 unit tests passed.
+Desktop/mobile Chromium and iPhone WebKit new-feature checks passed (15/15). A broad existing-site
+sweep ran 411 cases; it exposed duplicated Taiwan aria names, shortened stock header symbols and a
+12px safe-area sizing error, all now fixed in production code. The final seven-file rerun passed
+98 cases with 4 device-specific skips, including every previously failing case, legacy research
+drawings, BTC source rejection, chart ownership, navigation and portrait/landscape safe areas.
+Other existing financials, watchlist, screener and account-isolation cases passed in the broad sweep.
+The PR checks run the full site suite, real Pages source checks and existing offline storage gates.
+
+CI also exposed the collector's old import of the browser data facade: the added provider made
+esbuild reach Vite's raw BTC CSV import. Valuation helpers are moved byte-for-byte into a shared
+fundamentals module, with the public facade re-exported. The collector and pure filters now import
+that module directly. The actual collector bundles/runs with synchronization disabled, and a new
+esbuild regression test proves browser providers/raw assets stay outside its dependency graph.
+After that extraction, the complete 130-file unit suite, both builds, lint/typecheck, the real
+disabled-sync collector command and 36 additional desktop/mobile/WebKit P/E and screener cases passed.
+
+No permanent market files, authentication implementation, Supabase functions, SQL or deployment
+configuration changed. No merge or deployment is performed. Physical iPhone testing remains a
+maintainer check; automated WebKit is not claimed as physical-device verification.
+
+## Previous follow-up: full-market breadth and chart review (2026-10-30)
 
 Primary self-review only; no independent sign-off. Based on main `5910a85e0`.
 Production breadth now reads the existing full-market listing/cache reader and

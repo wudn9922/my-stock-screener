@@ -1,3 +1,4 @@
+import { worldAssetFor } from '../market-data/worldAssets';
 /** Display formatting shared by the site pages (zh-TW conventions, tabular numbers). */
 const priceFormats = new Map<number, Intl.NumberFormat>();
 function priceFormat(digits: number) {
@@ -9,8 +10,9 @@ function priceFormat(digits: number) {
   return format;
 }
 
-export function formatPrice(value: number | null | undefined): string {
+export function formatPrice(value: number | null | undefined, precision?: number): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  if (precision !== undefined) return priceFormat(precision).format(value);
   const abs = Math.abs(value);
   return priceFormat(abs >= 1000 ? 2 : abs >= 1 ? 2 : 4).format(value);
 }
@@ -53,11 +55,15 @@ export function formatDateTime(value: string | number | null | undefined, withTi
 
 /** Strips the exchange suffix for compact display: `2330.TW` → `2330`. */
 export function displayTicker(symbol: string): string {
+  const asset = worldAssetFor(symbol);
+  if (asset) return asset.ticker;
   return symbol.replace(/\.(TW|TWO)$/i, '');
 }
 
 /** Quantity display only: report/provider values stay in shares for calculations. */
-export function marketVolumeUnit(symbolOrMarket: string): '張' | '股' {
+export function marketVolumeUnit(symbolOrMarket: string): '張' | '股' | '口' | 'BTC' | '單位' {
+  const asset = worldAssetFor(symbolOrMarket);
+  if (asset) return asset.id === 'btcusdt' ? 'BTC' : asset.kind === 'commodities' ? '口' : '單位';
   return /^(?:TW|TWO|TWSE|TPEX|\^TWII|\^TWOII)$|\.(?:TW|TWO)$/i.test(symbolOrMarket) ? '張' : '股';
 }
 

@@ -11,6 +11,8 @@ import {
 } from './MarketDataProvider';
 import { StaticSeriesProvider, defaultReportBase } from './StaticSeriesProvider';
 import { usableBarResult } from './KlineIntegrity';
+import { WorldAssetProvider } from './WorldAssetProvider';
+import { worldAssetFor } from './worldAssets';
 
 export interface ScreenerMarketProviderOptions {
   /** Supabase `market-chart` function URL; default `import.meta.env.VITE_MARKET_PROXY_URL`. */
@@ -39,11 +41,13 @@ export class ScreenerMarketRouter implements MarketDataProvider {
   constructor(
     readonly live: EdgeYahooProvider,
     readonly series: StaticSeriesProvider,
+    readonly assets = new WorldAssetProvider(),
   ) {}
 
   /** The provider that serves this symbol. */
   async route(symbol: string, signal?: AbortSignal): Promise<MarketDataProvider> {
     const normalized = normalizeSymbol(symbol);
+    if (worldAssetFor(normalized)) return this.assets;
     return (await this.series.hasSymbol(normalized, signal)) ? this.series : this.live;
   }
 
@@ -56,7 +60,7 @@ export class ScreenerMarketRouter implements MarketDataProvider {
   }
 
   async refreshBars(symbol: string, timeframe: Timeframe, signal?: AbortSignal): Promise<BarResult> {
-    const provider = await this.route(symbol, signal) as EdgeYahooProvider | StaticSeriesProvider;
+    const provider = await this.route(symbol, signal) as EdgeYahooProvider | StaticSeriesProvider | WorldAssetProvider;
     return usableBarResult(await provider.refreshBars(symbol, timeframe, signal), symbol, timeframe);
   }
 
@@ -70,7 +74,7 @@ export class ScreenerMarketRouter implements MarketDataProvider {
   /** Static official series offer 1D/1W/1M only, so the UI disables intraday buttons for them. */
   async getSymbolTimeframes(symbol: string, signal?: AbortSignal): Promise<readonly Timeframe[]> {
     const provider = await this.route(symbol, signal);
-    return provider === this.series ? this.series.getSymbolTimeframes() : this.supportedTimeframes;
+    return provider === this.series ? this.series.getSymbolTimeframes() : provider === this.assets ? this.assets.getSymbolTimeframes() : this.supportedTimeframes;
   }
 }
 
@@ -80,6 +84,7 @@ export function createScreenerMarketProvider(options: ScreenerMarketProviderOpti
   const router = new ScreenerMarketRouter(
     new EdgeYahooProvider(options.proxyUrl ?? defaultMarketProxyUrl(), shared),
     new StaticSeriesProvider(options.reportBase ?? defaultReportBase(), shared),
+    new WorldAssetProvider(options.reportBase, options.fetcher),
   );
   if (options.cache === false) return router;
   return new CachedMarketDataProvider(router, options.cache === true || options.cache === undefined ? {} : options.cache);

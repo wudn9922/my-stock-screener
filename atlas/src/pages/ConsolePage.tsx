@@ -25,7 +25,7 @@ import type { GroupItem } from '../report/schema';
 import '../ui/research.css';
 import { accessState, requireCloudAccess } from '../auth/access';
 import { canPersist } from '../auth/storage';
-import { StorageAdminPanel, StorageModeNotice } from '../ui/StorageAdminPanel';
+import { StorageAdminPanel } from '../ui/StorageAdminPanel';
 import { LegacyImportCard } from '../ui/LegacyImportCard';
 import { getDailyBars, getScreenerPeFigures } from '../app/dataSources';
 import { loadScreenerFixedMAs } from './screenerFixedMAs';
@@ -296,7 +296,6 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         <WatchlistBoard list={selected} lists={document.lists} parameters={stockParameters.stocks} parameterError={stockParameters.error}
           onSelectList={id => navigate({ page: 'watchlist', list: id })} openChart={openChart} navigate={navigate} />
       )}
-      <StorageModeNotice />
       <LegacyImportCard />
       {section === 'settings' && <a className="console-card console-watchlist-link" href="?page=watchlist" onClick={event => {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

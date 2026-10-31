@@ -15,9 +15,11 @@ import type { Timeframe } from '../market-data/MarketDataProvider';
 import './siteNav.css';
 import { DataHealthPanel } from '../ui/DataHealthPanel';
 import { StorageNotice } from '../auth/StorageNotice';
+import { StorageModeNotice } from '../ui/StorageAdminPanel';
 import { RouteBoundary } from './RouteBoundary';
 import { DisplaySettings } from '../ui/DisplaySettings';
 import { INITIAL_MARKET_SECTIONS, MarketSectionNav, marketSectionOf, rememberMarketSection, type MarketSectionRoutes } from '../ui/MarketSectionNav';
+import { WORLD_ASSETS, worldAssetFor } from '../market-data/worldAssets';
 
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
@@ -108,7 +110,7 @@ export function Site() {
   const pendingView = useRef<StockView | null>(null);
   const chartVisited = useRef(route.page === 'chart');
   if (route.page === 'chart') chartVisited.current = true;
-  const localSymbols = useMemo(() => reportSymbols(report), [report]);
+  const localSymbols = useMemo(() => [...reportSymbols(report), ...WORLD_ASSETS.map(asset => ({ symbol: asset.symbol, name: `${asset.ticker} ${asset.name}` }))], [report]);
 
   useEffect(() => applyColorConvention(preferences.colors), [preferences.colors]);
   // A navigation that names a symbol becomes one chart request (URL syncs never repeat it).
@@ -132,12 +134,12 @@ export function Site() {
           ? route.view
           : route.page === 'themes'
             ? route.market
-            : '',
+            : route.page === 'chart' ? route.symbol : '',
   ]);
   useEffect(() => {
     const titles =
       route.page === 'chart' && route.symbol
-        ? `${route.symbol} · 圖表`
+        ? `${worldAssetFor(route.symbol)?.ticker ?? route.symbol} · 圖表`
         : route.page === 'financials' && route.symbol
           ? `${route.symbol} · 財報`
           : pageTitleOf(route);
@@ -254,7 +256,7 @@ export function Site() {
       </nav>
       <main className="site-main" id="main">
         {/* Full account controls on 我的; elsewhere only an in-progress login or handoff shows. */}
-        {SCREENER_HOSTING && <StorageNotice variant={route.page === 'console' ? 'full' : 'alerts'} />}
+        <div className="site-account-flow">{SCREENER_HOSTING && <StorageNotice variant={route.page === 'console' ? 'full' : 'alerts'} />}</div>
         {(route.page === 'markets' || route.page === 'world' || route.page === 'themes') &&
           <MarketSectionNav active={marketSection!} routes={marketMemory.current} navigate={navigate} />}
         <RouteBoundary key={route.page}>
@@ -288,7 +290,10 @@ export function Site() {
             </RouteBoundary>
           </div>
         )}
-        <DataHealthPanel report={reportState} />
+        <div className="site-data-footer">
+          <StorageModeNotice />
+          <DataHealthPanel report={reportState} />
+        </div>
       </main>
       <nav className="site-tabbar" aria-label="主要頁面">
         {NAV.map(({ page, label, icon: Icon }) => (

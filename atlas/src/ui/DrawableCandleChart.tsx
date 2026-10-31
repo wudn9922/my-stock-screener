@@ -29,6 +29,7 @@ export function DrawableCandleChart({
   calendar = 'regular',
   marketSymbol,
   showVolume = false,
+  showIndicators = false,
   loading,
   error,
 }: {
@@ -40,6 +41,7 @@ export function DrawableCandleChart({
   calendar?: 'regular' | 'continuous-utc';
   marketSymbol?: string;
   showVolume?: boolean;
+  showIndicators?: boolean;
   loading?: boolean;
   error?: string;
 }) {
@@ -133,7 +135,7 @@ export function DrawableCandleChart({
         market,
       },
       s.drawings,
-      [],
+      showIndicators ? s.indicators : [],
       s.preferences.views[timeframe],
       showVolume,
       calendar,
@@ -146,18 +148,20 @@ export function DrawableCandleChart({
       chart.volume.applyOptions({ priceFormat });
       chart.volumeAverage.applyOptions({ priceFormat });
     }
-  }, [state.ready, symbol, timeframe, shown, source, market, marketSymbol, precision, calendar, showVolume]);
+  }, [state.ready, symbol, timeframe, shown, source, market, marketSymbol, precision, calendar, showVolume, showIndicators]);
   useEffect(() => {
     engine.current?.setUpDownColors(upDownColors(prefs.colors));
     engine.current?.sync(
       saved.drawings,
-      [],
+      showIndicators ? saved.indicators : [],
       saved.preferences.magnet,
       tool,
       showVolume,
     );
   }, [
     saved.drawings,
+    saved.indicators,
+    showIndicators,
     saved.preferences.magnet,
     tool,
     prefs.colors,

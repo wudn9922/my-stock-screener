@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { formatPercent, toneClass } from '../ui/format';
 import { heatWithCap } from './themesView';
 import { toGroupInputs, type MapModel } from './themesMapModel';
-import { fitLayout, labelFit, textWidth, tipPosition, type LayoutOptions, type Rect } from './treemap';
+import { fitLayout, cellLabelFit, textWidth, tipPosition, type LayoutOptions, type Rect } from './treemap';
 
 /**
  * The treemap canvas shared by the industry map and its theme fallback: lays the cells out for the
@@ -100,7 +100,7 @@ export default function HeatCanvas({
         ? fitLayout(toGroupInputs(model), width, {
             baseHeight: baseHeightFor(width, model.cellCount),
             maxHeight: model.mode === 'size' ? (width < 600 ? MAX_HEIGHT_RAW.phone : MAX_HEIGHT_RAW.wide) : MAX_HEIGHT,
-            minSide: MIN_CELL_SIDE,
+            minSide: model.mode === 'size' ? MIN_CELL_SIDE : 44,
             layout: layoutOptions,
           })
         : null,
@@ -208,7 +208,7 @@ export default function HeatCanvas({
                     const { w, h } = placedLeaf.rect;
                     const tone = heatWithCap(cell.value, cap);
                     const preferred = Math.min(15, Math.max(11, Math.sqrt(w * h) / 7));
-                    const { fit, fontSize } = labelFit(cell.label, w - 1, h - 1, preferred);
+                    const { fit, fontSize, text } = cellLabelFit(cell.label, w - 1, h - 1, preferred);
                     return (
                       <button
                         key={cell.id}
@@ -216,6 +216,7 @@ export default function HeatCanvas({
                         className={`map-cell ${cell.value === null ? 'heat-na' : `heat-${tone.side}`} fit-${fit}`}
                         style={{ ...box(placedLeaf.rect, 0.5), fontSize, ['--mix' as string]: `${tone.mix}%` }}
                         aria-label={cell.aria}
+                        title={cell.label}
                         onClick={() => onCellClick(cell)}
                         onPointerEnter={(event) => event.pointerType === 'mouse' && show(cell.id)}
                         onPointerLeave={(event) => event.pointerType === 'mouse' && hide()}
@@ -227,7 +228,7 @@ export default function HeatCanvas({
                         onPointerCancel={onPointerEnd}
                         onContextMenu={(event) => event.preventDefault()}
                       >
-                        {fit !== 'none' && <b className="map-code">{cell.label}</b>}
+                        {fit !== 'none' && <b className="map-code">{text}</b>}
                         {fit === 'full' && <span className="map-pct num">{formatPercent(cell.value, 1)}</span>}
                       </button>
                     );

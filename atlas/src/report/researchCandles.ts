@@ -55,12 +55,4 @@ export function researchBars(raw: unknown, symbol: string): Bar[] {
 }
 
 /** Deterministic canonical identity, separate from stock/ETF drawings in the main workspace. */
-export function researchDrawingSymbol(identity: string) {
-  let hash = 14695981039346656037n;
-  for (const c of identity)
-    hash = BigInt.asUintN(
-      64,
-      (hash ^ BigInt(c.charCodeAt(0))) * 1099511628211n,
-    );
-  return `^R${hash.toString(36).toUpperCase()}`;
-}
+export { researchDrawingSymbol } from '../market-data/researchIdentity';

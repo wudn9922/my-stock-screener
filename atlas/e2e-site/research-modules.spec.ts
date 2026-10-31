@@ -62,6 +62,7 @@ test("world views, historical source frequency, reload and browser back", async 
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("./?page=world&view=commodities");
+  await page.getByRole('button', { name: /連續看全部圖表/ }).click();
   await expect(
     page.getByRole("heading", { name: "原物料", exact: true }),
   ).toBeVisible();
@@ -85,6 +86,7 @@ test("world views, historical source frequency, reload and browser back", async 
   await expect(goldSource.locator("a")).toBeVisible();
   await expect(gold.locator('.candle-ohlc')).toContainText('O ');
   await page.getByRole("button", { name: "匯率", exact: true }).click();
+  await page.getByRole('button', { name: /連續看全部圖表/ }).click();
   await expect(page).toHaveURL(/view=fx/);
   await expect(
     page.getByRole("heading", { name: "USD/TWD", exact: true }),
@@ -96,11 +98,13 @@ test("world views, historical source frequency, reload and browser back", async 
   const fx = page.locator('[data-chart-identity="world:FX-USDTWD"]');
   await expect(fx.locator('.candle-ohlc')).toContainText('O ');
   await page.reload();
+  await page.getByRole('button', { name: /連續看全部圖表/ }).click();
   await expect(
     page.getByRole("heading", { name: "USD/TWD", exact: true }),
   ).toBeVisible();
   await expect(fx.locator('.candle-ohlc')).toContainText('O ');
   await page.goBack();
+  await page.getByRole('button', { name: /連續看全部圖表/ }).click();
   await expect(page.getByRole("heading", { name: "WTI 原油" })).toBeVisible();
   expect(await noOverflow(page)).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
