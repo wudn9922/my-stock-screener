@@ -71,6 +71,9 @@ const marketSchema = z
   .object({
     asOf: optionalText,
     universe: text,
+    scope: z.unknown().optional(),
+    universeCount: countOf,
+    coverage: z.object({ loaded: countOf, missing: countOf, notTraded: countOf }).optional(),
     segments: z.object({
       all: segmentSchema,
       twse: segmentSchema.optional(),
@@ -81,6 +84,7 @@ const marketSchema = z
   .transform((market) => ({
     asOf: market.asOf,
     universe: market.universe,
+    ...(market.scope === 'full' ? { scope: 'full' as const, universeCount: market.universeCount, coverage: market.coverage } : {}),
     segments: {
       all: market.segments.all,
       twse: market.segments.twse ?? null,
@@ -125,6 +129,9 @@ export interface BreadthHistory {
 export interface BreadthMarket {
   asOf: string | null;
   universe: string;
+  scope?: 'full';
+  universeCount?: number;
+  coverage?: { loaded: number; missing: number; notTraded: number };
   segments: { all: BreadthSegment; twse: BreadthSegment | null; tpex: BreadthSegment | null };
   history: BreadthHistory;
 }

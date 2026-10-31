@@ -1,3 +1,54 @@
+## Current follow-up: full-market breadth and chart review (2026-10-30)
+
+Primary self-review only; no independent sign-off. Based on main `5910a85e0`.
+Production breadth now reads the existing full-market listing/cache reader and
+uses the same listing age/size and 90% coverage gates as entry-success rates.
+MA20/60 math and legacy analysis CLI remain. Entry-success calculations are
+unchanged. Coverage failures retain the prior output, and daily no longer owns
+or overwrites the breadth output; only universe publishes it to generated.
+No price/cache/archive inputs are written by the new collector.
+
+Global labels and rate headline widths are adjusted without changing yield,
+policy-bound or reasonable-band calculations. An explicit single minmax(0,1fr)
+rate-card grid track prevents old canvas dimensions from becoming a minimum
+width after a desktop-to-phone resize. This keeps the no-overflow assertion.
+
+StockTabs can host the existing recommendation and volatility floating menus.
+Scoped selectors exclude all popup form buttons; the compact original header
+height, chart lifecycle, candidate apply/cancel and original grouped-parameter
+editing stay intact. Screener review reuses StockChartList after the existing
+filter/search/sort pipeline, including saved-MA precedence, six-month range,
+lazy paging and offscreen chart disposal. It never evaluates/saves a watchlist.
+
+The research headline uses only the published full-market rsRank, displaying
+its original date/benchmark independently of the comparison controls; absent
+rankings are not estimated. Existing cumulative-return comparison remains.
+Theme charts opt into the existing ChartEngine histogram and real symbol volume
+formatting. Daily/weekly/monthly bars still come from the existing provider and
+aggregator; other DrawableCandleChart callers retain their original default.
+
+Local checks include clean npm ci; 1,696 tests in 128 Vitest files; 97 Python
+breadth/full-market/closed-session/generated-publication tests. Lint/typecheck
+and normal/Pages builds pass. Final related site subset: 71 passed / 1 existing
+skip; normal drawing/timeframe regressions: 21 passed. The broader site checks
+also cover all new chart/RS/volume flows; initial layout failures were fixed
+without loosening their bounds and verified by the final subset. Browser
+coverage includes desktop, mobile Chromium and iPhone WebKit with mocks, not a
+physical-device or live-price claim. Python outputs/journal tests use temporary
+files. The Actions real-cache breadth check writes only to /tmp and never saves
+cache or publishes outputs.
+
+Protected auth/account/server files, outer site navigation, permanent price,
+financial and K-line records, archive branch, SQL and notifications are untouched.
+No merge or deployment.
+
+CI navigation follow-up: the WebKit trace showed a metadata heading followed
+by reload before the lazy FX candle effect started; fetch then ran on an
+unloading document. The research reload/back regression now requires validated
+OHLC before each navigation (and checks commodity OHLC too). Its strict empty
+page-error assertion is unchanged; no error filtering, timeout increase, retry
+configuration or production fetch behavior was changed.
+
 ## Current follow-up: bond layout, temporary screener conditions and drawing editor (2026-10-30)
 
 Primary self-review only; no independent sign-off. Based on main `3334513d5`.

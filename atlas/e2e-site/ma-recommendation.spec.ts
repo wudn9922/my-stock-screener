@@ -64,18 +64,18 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
   );
   await page.goto('./?page=chart&symbol=2330.TW&tf=1W');
   const card = page.getByTestId('ma-recommendation');
-  const toggle = page.getByTestId('stock-tab-volume');
-  // Before the 價量 view opens: its tab shares the header row with the volatility values.
+  const toggle = page.getByTestId('ma-recommendation-toggle');
+  // Recommendations and volatility share the stock view control group.
   // Hidden also matches an element not yet mounted; wait for the lazy chart header before measuring it.
   await expect(toggle).toBeVisible();
   await expect(page.getByTestId('valuation')).toBeVisible();
   await expect(card).toBeHidden();
   await expect(toggle).toBeVisible();
   const row = await page.evaluate(() => {
-    const tools = document.querySelector('.ws-analysis-tools')!.getBoundingClientRect();
-    const tabs = document.querySelector('.ws-stock-controls > .stock-tabs')!.getBoundingClientRect();
+    const tools = document.querySelector('[data-testid="ma-recommendation-toggle"]')!.getBoundingClientRect();
+    const tabs = document.querySelector('[data-testid="stock-tab-research"]')!.getBoundingClientRect();
     return {
-      tops: ['volatility-toggle', 'stock-tab-volume']
+      tops: ['volatility-toggle', 'ma-recommendation-toggle', 'stock-tab-volume']
         .map(id => document.querySelector(`[data-testid="${id}"]`)!.getBoundingClientRect().top),
       tabsOverlap: Math.max(0, Math.min(tools.right, tabs.right) - Math.max(tools.left, tabs.left)) *
         Math.max(0, Math.min(tools.bottom, tabs.bottom) - Math.max(tools.top, tabs.top)),
@@ -87,7 +87,7 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
   expect(row.overflow).toBeLessThanOrEqual(0);
 
   await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-current', 'page');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await expect(card.locator('dd')).toHaveText('短 24（69） · 中 38（60） · 長 89（99）');
   await expect(card.locator('.ws-ma-reco-status')).toHaveText('日線至 2026-10-17');
   await expect(card.getByRole('button', { name: '套用 SMA 20', exact: true })).toHaveText('20（70）');
@@ -119,7 +119,7 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
   await card.getByRole('button', { name: '套用 SMA 20', exact: true }).click();
   await card.getByRole('button', { name: '套用全部建議' }).click();
   await expect(page.getByRole('status').filter({ hasText: '已在日線圖加入 SMA 24 / 38 / 89' })).toBeVisible();
-  // The chart toolbar is hidden while the 價量 view is open; its timeframe still switched to 1D.
+  // Applying a candidate switches the actual chart to 1D.
   await expect(page.locator('.timeframe-buttons button[aria-label="週期 1D"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(card.getByRole('button', { name: '建議已套用', exact: true })).toBeDisabled();
   // Starred candidates also toggle independently of the other applied lines.
@@ -140,7 +140,7 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
   await expect(dialog).toBeHidden();
   expect(saves).toEqual([expect.objectContaining({ action: 'stocks.save', ticker: '2330.TW', groupId: 'ungrouped', mas: [20, 24, 38, 89] })]);
   await expect(page.getByText('2330.TW 固定均線 20 / 24 / 38 / 89已儲存到你的 Supabase 帳號。')).toBeVisible();
-  // The 價量 view stays open across the dialog; K線 returns to the chart with the applied lines.
+  // The recommendation menu stays open across the dialog; a sibling control dismisses it.
   await expect(card).toBeVisible();
   await page.getByTestId('stock-tab-chart').click();
   await expect(card).toBeHidden();
@@ -155,7 +155,7 @@ test('a symbol without a recommendation links to the live ma-selector instead', 
   await page.route('**/my-stock-screener/report/ma-selector/**', (route) => route.fulfill({ status: 404, body: 'not found' }));
   await page.goto('./?page=chart&symbol=NVDA&tf=1D');
   const card = page.getByTestId('ma-recommendation');
-  await page.getByTestId('stock-tab-volume').click();
+  await page.getByTestId('ma-recommendation-toggle').click();
   await expect(card.locator('dd')).toHaveText('—');
   await expect(card.locator('.ws-ma-reco-status')).toContainText('還沒有建議均線');
   await expect(card.getByRole('button', { name: '固定為個股參數' })).toBeDisabled();

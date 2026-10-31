@@ -105,14 +105,7 @@ jobs:
           CUSTOM_GROUP_TEST_MODE: "false"
         run: python main.py
 
-      # 市場寬度（F5）：只讀 data/ 的日 K，失敗不影響報告與其他步驟
-      - name: Build market breadth
-        if: steps.guard.outputs.skip != 'true'
-        continue-on-error: true
-        timeout-minutes: 15
-        run: python scripts/build_breadth.py
-
-      # 進場成功率由 universe-full.yml 使用完整市場名單與日線快取產生，避免本流程的部分名單覆蓋全市場報表。
+      # 市場寬度與進場成功率由 universe-full.yml 使用完整市場名單與日線快取產生，避免部分名單覆蓋全市場報表。
 
       # ✨ 已修改：注入 Imgur 金鑰，讓自動截圖流能順利上傳並傳入 LINE
       - name: Run Dify Wall Street Report

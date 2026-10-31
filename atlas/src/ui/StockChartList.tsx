@@ -6,7 +6,7 @@ import './stockChartList.css';
 import type { ParameterStock } from '../cloud/settingsApi';
 import { parameterTickerKey, stockParameterMap } from '../cloud/stockParameters';
 
-export interface StockChartRow { symbol: string; name: string }
+export interface StockChartRow { symbol: string; name: string; maList?: readonly number[] }
 
 function StockChartCard({ row, periods, openChart }: { row: StockChartRow; periods: readonly number[]; openChart: (options: OpenChartOptions) => void }) {
   const host = useRef<HTMLElement>(null);
@@ -55,7 +55,7 @@ export function StockChartList({ rows, parameters, groupPeriods = [], openChart 
   }, [limit, rows.length]);
   return <section className="stock-chart-list" aria-label="連續股票圖表">
     {rows.slice(0, limit).map(row => <StockChartCard key={row.symbol} row={row}
-      periods={configured[parameterTickerKey(row.symbol)] ?? groupPeriods} openChart={openChart} />)}
+      periods={configured[parameterTickerKey(row.symbol)] ?? row.maList ?? groupPeriods} openChart={openChart} />)}
     {rows.length > limit && <button ref={more} type="button" className="ghost-button" onClick={() => setLimit(value => value + 20)}>繼續載入圖表（{limit}／{rows.length}）</button>}
   </section>;
 }
