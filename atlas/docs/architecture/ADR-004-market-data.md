@@ -45,3 +45,8 @@ they are not stock currency/volume assumptions. Indices and assets do not acquir
 The optional below-chart P/E plot reuses the existing financial-history loader, weekly provider prices
 and audited historical EPS calculation. It does not change the provider contracts or calculate old P/E
 from current EPS. Data is requested near the viewport and missing/invalid histories fail locally.
+
+Header/screener valuation helpers live in `fundamentals/peFigures.ts` and are re-exported by the site's
+data facade. Shared screener conditions and the Node collector import the pure module directly, so
+the collector does not bundle browser market providers or Vite-only raw BTC assets. The valuation
+formulas and collector decisions are unchanged; a real esbuild entry-point test enforces this boundary.

@@ -18,7 +18,7 @@ publication dates, split basis and weekly prices. Unsupported or missing data fa
 no current-EPS retroactive history is fabricated. The footer and P/E are accessible by scrolling,
 without reducing the plot's initial height. Changing stock returns the main scroller to the top.
 
-Clean npm ci, lint, typecheck, normal build and Pages build completed. All 1,707 unit tests passed.
+Clean npm ci, lint, typecheck, normal build and Pages build completed. All 1,708 unit tests passed.
 Desktop/mobile Chromium and iPhone WebKit new-feature checks passed (15/15). A broad existing-site
 sweep ran 411 cases; it exposed duplicated Taiwan aria names, shortened stock header symbols and a
 12px safe-area sizing error, all now fixed in production code. The final seven-file rerun passed
@@ -26,6 +26,14 @@ sweep ran 411 cases; it exposed duplicated Taiwan aria names, shortened stock he
 drawings, BTC source rejection, chart ownership, navigation and portrait/landscape safe areas.
 Other existing financials, watchlist, screener and account-isolation cases passed in the broad sweep.
 The PR checks run the full site suite, real Pages source checks and existing offline storage gates.
+
+CI also exposed the collector's old import of the browser data facade: the added provider made
+esbuild reach Vite's raw BTC CSV import. Valuation helpers are moved byte-for-byte into a shared
+fundamentals module, with the public facade re-exported. The collector and pure filters now import
+that module directly. The actual collector bundles/runs with synchronization disabled, and a new
+esbuild regression test proves browser providers/raw assets stay outside its dependency graph.
+After that extraction, the complete 130-file unit suite, both builds, lint/typecheck, the real
+disabled-sync collector command and 36 additional desktop/mobile/WebKit P/E and screener cases passed.
 
 No permanent market files, authentication implementation, Supabase functions, SQL or deployment
 configuration changed. No merge or deployment is performed. Physical iPhone testing remains a
