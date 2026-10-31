@@ -18,6 +18,7 @@ for (const savedOnly of [false, true]) {
       return route.fulfill({ contentType: 'application/json', body });
     });
     await page.goto('./?page=world&view=commodities');
+    await page.getByRole('button', { name: /連續看全部圖表/ }).click();
     const card = page.locator('.world-candle-card').filter({ has: page.getByRole('heading', { name: 'BTC/USDT', exact: true }) });
     await expect(card).toContainText('USDT/BTC');
     await expect(card).toContainText('成交量 BTC');
@@ -51,6 +52,7 @@ for (const mode of ['unavailable', 'invalid-candles', 'wrong-pair']) {
       return route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
     });
     await page.goto('./?page=world&view=commodities');
+    await page.getByRole('button', { name: /連續看全部圖表/ }).click();
     const card = page.locator('.world-candle-card').filter({ has: page.getByRole('heading', { name: 'BTC/USDT', exact: true }) });
     await card.scrollIntoViewIfNeeded();
     if (mode === 'unavailable') await expect(card).toContainText('尚未取得真正的開高低收資料');

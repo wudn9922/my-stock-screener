@@ -86,6 +86,7 @@ import { sitePreferences, upDownColors } from './sitePreferences';
 import { displayTicker, formatPercent, formatPe, formatPrice, toneClass } from '../ui/format';
 import type { ChartRequest } from './chartRequest';
 import { marketVolumeUnit } from '../ui/format';
+import { worldAssetFor } from '../market-data/worldAssets';
 import type { LocalSymbol } from '../ui/SymbolSearch';
 import '../ui/workspace.css';
 
@@ -154,6 +155,9 @@ const staticHostingText = SCREENER_HOSTING
   ? '行情為延遲資料（非即時），僅供研究參考，非投資建議。'
   : 'GitHub Pages：延遲行情快照，非即時；即時 Yahoo 需要後端。';
 const demoDataText = 'DEMO 價格為模擬資料，並非市場行情。';
+/** Forex snapshots have no traded volume; keep their existing volume-free default. */
+const legacyVolumeFor = (symbol: string, ...args: Parameters<typeof legacyVolumeEnabled>) =>
+  worldAssetFor(symbol)?.kind !== 'fx' && legacyVolumeEnabled(...args);
 const supportsTimeframe = (
   provider: { supportedTimeframes: readonly Timeframe[] },
   timeframe: Timeframe,
@@ -171,6 +175,7 @@ export interface ChartWorkspaceProps {
   /** 「K線｜價量｜研究」 view of the chart page; the tabs show these views only when onViewChange is provided. */
   view?: StockView;
   onViewChange?: (view: StockView) => void;
+  onShowPeChart?: () => void;
 }
 
 export function App({
@@ -182,6 +187,7 @@ export function App({
   reportSymbols = [],
   view = 'chart',
   onViewChange,
+  onShowPeChart,
 }: ChartWorkspaceProps = {}) {
   const store = getChartStore();
   const mobile = useSyncExternalStore(subscribeMobile, () => mobileMedia.matches);
@@ -255,9 +261,10 @@ export function App({
       if (abort.signal.aborted || !engine.current) return;
       const settings = store.symbol(symbol);
       engine.current.load(symbol, tf, refreshed, settings.drawings, settings.indicators,
-        settings.preferences.views[tf], legacyVolumeEnabled(settings.preferences, tf));
+        settings.preferences.views[tf], legacyVolumeFor(symbol, settings.preferences, tf), worldAssetFor(symbol)?.calendar);
+      engine.current.setPricePrecision(worldAssetFor(symbol)?.precision ?? 2);
       engine.current.sync(settings.drawings, settings.indicators, settings.preferences.magnet, 'select',
-        legacyVolumeEnabled(settings.preferences, tf));
+        legacyVolumeFor(symbol, settings.preferences, tf));
       setTool('select');
       setSelected(null);
       setResult(refreshed);
@@ -279,6 +286,7 @@ export function App({
   };
   const [symbolTimeframes, setSymbolTimeframes] = useState<{ key: string; values: readonly Timeframe[] } | null>(null);
   const market = getMarketProfile(symbol);
+  const asset = worldAssetFor(symbol);
   const isIndex = symbol.startsWith('^');
   // Indices and simulated data have no 價量／研究 views; the chart stays the only view there.
   const stockViews = !!onViewChange && !isIndex && providerId !== 'demo';
@@ -286,10 +294,11 @@ export function App({
   // Views mount on first visit and then stay mounted (hidden), so their data loads once per symbol.
   const [visitedViews, setVisitedViews] = useState<ReadonlySet<StockView>>(() => new Set(['chart']));
   if (!visitedViews.has(stockView)) setVisitedViews(new Set([...visitedViews, stockView]));
-  const marketLabel = isIndex
+  const marketLabel = asset ? asset.kind === 'fx' ? '匯率' : asset.id === 'btcusdt' ? '加密現貨' : '原物料期貨' : isIndex
     ? market.market === 'TW' ? '台股指數' : '指數'
     : market.market === 'TW' ? (market.exchange === 'TWSE' ? '上市' : '上櫃') : '美股';
   const companyName = [
+    asset?.name,
     catalogEntries.find((entry) => entry.symbol === symbol)?.name,
     getLoadedSymbolDirectory()?.entries.find((entry) => entry.symbol === symbol)?.name,
     reportSymbols.find((entry) => entry.symbol === symbol)?.name,
@@ -473,14 +482,16 @@ export function App({
           settings.drawings,
           settings.indicators,
           settings.preferences.views[tf],
-          legacyVolumeEnabled(settings.preferences, tf),
+          legacyVolumeFor(symbol, settings.preferences, tf),
+          worldAssetFor(symbol)?.calendar,
         );
+        chart.setPricePrecision(worldAssetFor(symbol)?.precision ?? 2);
         chart.sync(
           settings.drawings,
           settings.indicators,
           settings.preferences.magnet,
           'select',
-          legacyVolumeEnabled(settings.preferences, tf),
+          legacyVolumeFor(symbol, settings.preferences, tf),
         );
         setResult(result);
         setLoading(false);
@@ -551,7 +562,7 @@ export function App({
       s.indicators,
       s.preferences.magnet,
       tool,
-      legacyVolumeEnabled(s.preferences, tf),
+      legacyVolumeFor(symbol, s.preferences, tf),
     );
   }, [s.drawings, s.indicators, s.preferences.magnet, s.preferences.legacyVolume, s.preferences.volumeOverrides, tf, tool]);
   useEffect(() => {
@@ -952,7 +963,7 @@ export function App({
           {drawingPanel}
           {measurement && (
             <p className="small" aria-label="測量資訊">
-              價差 {market.currency} {measurement.priceDelta.toFixed(2)} ·{' '}
+              價差 {asset?.unit ?? market.currency} {measurement.priceDelta.toFixed(asset?.precision ?? 2)} ·{' '}
               {measurement.pricePercent === null
                 ? '不適用'
                 : measurement.pricePercent.toFixed(2) + '%'}
@@ -1012,7 +1023,7 @@ export function App({
     (a, b) => Number(a.type === 'Volume') - Number(b.type === 'Volume'),
   );
   const showLegacyVolume =
-    legacyVolumeEnabled(s.preferences, tf) && !activeIndicators.some((i) => i.type === 'Volume');
+    legacyVolumeFor(symbol, s.preferences, tf) && !activeIndicators.some((i) => i.type === 'Volume');
   const changeTone = toneClass(headerQuote?.change);
   const inWatchlist = state.app.watchlist.includes(symbol);
   const peTitle = (label: string, value: number | null) =>
@@ -1028,12 +1039,12 @@ export function App({
         <button
           type="button"
           className="ws-symbol"
-          aria-label={`切換股票（目前 ${symbol}）`}
+          aria-label={`切換股票（目前 ${asset?.ticker ?? symbol}）`}
           title="搜尋並切換股票"
           onClick={() => onOpenSearch?.()}
         >
           <span className="ws-symbol-text">
-            <b data-testid="active-symbol">{symbol}</b>
+            <b data-testid="active-symbol">{asset?.ticker ?? symbol}</b>
             <small>
               {companyName ?? marketLabel}
               <span className="ws-market-tag">{marketLabel}</span>
@@ -1042,12 +1053,12 @@ export function App({
           {onOpenSearch ? <Search size={16} className="ws-symbol-icon" /> : <ChevronDown size={16} className="ws-symbol-icon" />}
         </button>
         <div className={`ws-quote ${changeTone}`} aria-live="polite" data-testid="header-quote">
-          <b>{headerQuote ? formatPrice(headerQuote.price) : '—'}</b>
+          <b>{headerQuote ? formatPrice(headerQuote.price, asset?.precision) : '—'}</b>
           <span>
             {headerQuote ? `${headerQuote.change > 0 ? '+' : ''}${formatPrice(headerQuote.change)}` : ''}
             {headerQuote ? ` (${formatPercent(headerQuote.changePercent)})` : ''}
           </span>
-          <small>{market.currency}</small>
+          <small>{asset?.unit ?? market.currency}</small>
         </div>
         {!isIndex && providerId !== 'demo' && (
           <div className="ws-stock-statistics">
@@ -1064,6 +1075,7 @@ export function App({
             <StockStatsMenu label="本益比說明" testId="valuation-help-toggle" trigger={<Info size={13} />}>
               <p>{peTitle(`本益比（${peFigures?.fiscalYear ?? '年度'} EPS）`, peFigures?.pe ?? null)}</p>
               <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}</p>
+              {onShowPeChart && <button type="button" className="ghost-button" onClick={onShowPeChart}>查看下方本益比圖表</button>}
             </StockStatsMenu>
           </div>
         )}

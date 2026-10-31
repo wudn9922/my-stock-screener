@@ -105,6 +105,7 @@ test("commodity drawings persist across reload and stay isolated from FX and per
 }) => {
   await setup(page);
   await page.goto("./?page=world&view=commodities");
+  await page.getByRole('button', { name: /連續看全部圖表/ }).click();
   const chart = page.locator('[data-chart-identity="world:CMD-WTI"]');
   await horizontal(page, chart);
   const symbol = await chart.getAttribute("data-drawing-symbol");
@@ -112,6 +113,7 @@ test("commodity drawings persist across reload and stay isolated from FX and per
   await chart.getByRole("button", { name: "週K", exact: true }).click();
   await expect(chart.locator(".candle-ohlc")).toContainText("O ");
   await page.reload();
+  await page.getByRole('button', { name: /連續看全部圖表/ }).click();
   await expect(
     page
       .locator('[data-chart-identity="world:CMD-WTI"]')
@@ -119,6 +121,7 @@ test("commodity drawings persist across reload and stay isolated from FX and per
   ).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => savedCount(page, symbol!)).toBe(1);
   await page.goto("./?page=world&view=fx");
+  await page.getByRole('button', { name: /連續看全部圖表/ }).click();
   const fx = page.locator('[data-chart-identity="world:FX-USDTWD"]');
   await horizontal(page, fx);
   const fxSymbol = await fx.getAttribute("data-drawing-symbol");

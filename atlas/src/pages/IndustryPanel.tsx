@@ -7,6 +7,7 @@ import { PERIOD_LABELS } from '../report/themes';
 import type { OpenChartOptions } from '../app/Site';
 import { INDUSTRY_PERIODS, summarize, type IndustryCell, type IndustryModel, type IndustryPeriod } from './industryModel';
 import { formatMoney } from './themesMapModel';
+import { industryName } from './industryNames';
 
 const PAGE = 100;
 type SortKey = 'cap' | 'ret';
@@ -58,13 +59,14 @@ export function IndustryPanel({
     });
   }, [cell, sort, period]);
   const weightLabel = model.basis === 'turnover' ? '成交值加權' : '市值加權';
+  const displayName = industryName(cell.label, model.market);
   return (
     <div className="theme-sheet-backdrop" onClick={onClose}>
       <aside
         className="theme-sheet"
         role="dialog"
         aria-modal="true"
-        aria-label={`${cell.label} 產業成分股`}
+        aria-label={`${displayName} 產業成分股`}
         data-dialog-focus="industry-detail"
         onClick={(event) => event.stopPropagation()}
       >
@@ -72,7 +74,8 @@ export function IndustryPanel({
           <span className="sheet-grab" aria-hidden="true" />
           <div className="sheet-title">
             <div>
-              <h2>{cell.label}</h2>
+              <h2>{displayName}</h2>
+              {displayName !== cell.label && <small className="muted">{cell.label}</small>}
               <p>
                 {groupLabel && <span className="sheet-tag">{groupLabel}</span>}
                 <span>

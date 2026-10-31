@@ -197,8 +197,9 @@ describe('buildIndustryModel', () => {
     expect(model.cellCount).toBe(7);
   });
 
-  it('labels US sectors in Chinese and keeps the source name; unknown sectors stay as they are', () => {
+  it('allows compact Chinese heatmap labels and preserves other research source labels', () => {
     expect(sectorLabel('Health Care')).toBe('醫療保健 Health Care');
+    expect(sectorLabel('Health Care', true)).toBe('醫療保健');
     expect(sectorLabel('Something New')).toBe('Something New');
   });
 

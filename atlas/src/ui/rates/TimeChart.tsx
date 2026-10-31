@@ -49,6 +49,7 @@ export function TimeChart({
   zeroLine = false,
   onHover,
   className = 'rates-time-chart',
+  zoom = false,
 }: {
   lines: readonly ChartLine[];
   format: (value: number) => string;
@@ -56,6 +57,7 @@ export function TimeChart({
   zeroLine?: boolean;
   onHover?: (values: Record<string, number> | null, time: string | null) => void;
   className?: string;
+  zoom?: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -86,7 +88,7 @@ export function TimeChart({
       // A low minimum spacing lets fitContent show 20+ years of weekly points on a phone.
       timeScale: { borderVisible: false, rightOffset: 2, minBarSpacing: 0.05 },
       handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
-      handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: false },
+      handleScale: { mouseWheel: zoom, pinch: true, axisPressedMouseMove: zoom },
       localization: { locale: 'zh-TW', priceFormatter: (value: number) => formatRef.current(value) },
     });
     chartRef.current = chart;
@@ -110,7 +112,7 @@ export function TimeChart({
       chartRef.current = null;
       series.clear();
     };
-  }, []);
+  }, [zoom]);
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
