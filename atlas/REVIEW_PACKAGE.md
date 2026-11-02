@@ -51,6 +51,12 @@ The original chart gesture/timeframe suite additionally passed 23 cases, with it
 desktop-only touch skip, across desktop/mobile Chromium and iPhone WebKit. The Python CI matrix
 now explicitly installs pytest and runs the attachment tests in both records-only and generated
 modes; unittest discovery alone does not execute pytest-style function tests.
+The full CI site sweep passed 754 cases and exposed three profile variants of an old volatility
+test expecting daily recommendations immediately on a weekly chart. Its interaction now expands
+the explicit daily disclosure before retaining the original visibility/value assertions, matching
+the weekly recommendation test. No assertion was loosened or production code changed for that fix.
+The four-file follow-up (volatility, recommendation, stock views and layout) passed all 30 cases
+across desktop/mobile Chromium and iPhone WebKit; targeted lint also passed.
 
 Protected auth/account/backend files, outer navigation, permanent K-line/price/financial records,
 archive branch, SQL, notifications and deployments are untouched. No merge or deployment.

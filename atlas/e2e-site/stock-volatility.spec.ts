@@ -65,6 +65,7 @@ test('daily volatility and independent volume analysis stay beside recommendatio
   await expect(page.getByTestId('stock-tab-volume')).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('region', { name: '價量', exact: true }).getByTestId('ma-recommendation')).toHaveCount(0);
   await page.getByTestId('ma-recommendation-toggle').click();
+  await page.getByRole('region', { name: '建議均線', exact: true }).getByText('日 K 建議與監控參數', { exact: true }).click();
   await expect(page.getByTestId('ma-recommendation')).toBeVisible();
   await page.getByTestId('ma-recommendation-toggle').click();
   await expect(page.getByTestId('chart')).toBeHidden();
