@@ -41,7 +41,9 @@ are unchanged. Source removal, manual removal and unavailable inputs have distin
 
 Clean npm ci, lint, typecheck, normal/Pages builds and the disabled-sync collector command passed.
 All 1,743 unit tests in 134 files passed; the final changed-component subset passed 20 tests.
-Python: 23 attachment/fail-soft tests and 63 breadth/generated-publication regressions passed.
+Python: 24 attachment/fail-soft tests and 63 breadth/generated-publication regressions passed.
+Failure fixtures use complete calibration and assert the specific rejection reason; a successful
+daily run also appends the new site session, emits all five indices and leaves source breadth intact.
 Related desktop/mobile Chromium and iPhone WebKit site regressions passed all 114 cases in 8.1
 minutes. Screenshots were visually inspected for chart-local controls, current evidence
 and calibrated breadth; browser automation is not physical iPhone verification.

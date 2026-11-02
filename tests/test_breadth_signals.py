@@ -108,18 +108,22 @@ def test_merge_prefers_site_and_reports_overlap():
     assert check["overlapDays"] == 2 and check["maxAbsDiffMa20"] == 2.0
 
 
-@pytest.mark.parametrize("failure,expected_download_calls", [
-    ("overlap", 0), ("download", 1), ("missing-bars", 1), ("empty-bars", 1),
-    ("short-bars", 1), ("stale-bars", 1),
+@pytest.mark.parametrize("failure,expected_download_calls,reason", [
+    ("overlap", 0, "長歷史與網站寬度差"),
+    ("download", 1, "index download failed"),
+    ("missing-bars", 1, "指數日 K 缺少"),
+    ("empty-bars", 1, "下載不完整"),
+    ("short-bars", 1, "下載不完整"),
+    ("stale-bars", 1, "與寬度日期"),
 ])
-def test_daily_failures_leave_history_and_signals_untouched(tmp_path, failure, expected_download_calls):
+def test_daily_failures_leave_history_and_signals_untouched(tmp_path, capsys, failure, expected_download_calls, reason):
     idx = bdays(5)
     hist = pd.DataFrame({"pct20": [50.0] * 5, "pct60": [60.0] * 5}, index=idx)
     hist.index.name = "date"
     history_path = tmp_path / "history.csv"
     hist.to_csv(history_path)
     calibration_path = tmp_path / "calibration.json"
-    calibration_path.write_text(json.dumps({"indices": {ticker: {} for ticker in R.INDICES}}), encoding="utf-8")
+    calibration_path.write_text(json.dumps(calibration()), encoding="utf-8")
     breadth_path = tmp_path / "breadth.json"
     values20 = [80.0] * 5 if failure == "overlap" else [50.0] * 5
     values60 = [60.0] * 5
@@ -152,6 +156,7 @@ def test_daily_failures_leave_history_and_signals_untouched(tmp_path, failure, e
     ], bars_loader=load_failed_or_partial_bars)
 
     assert result == 1
+    assert reason in capsys.readouterr().out
     assert len(download_calls) == expected_download_calls
     assert history_path.read_bytes() == before_history
     assert out_path.read_bytes() == before_signals
@@ -164,6 +169,33 @@ def calibration():
     return {"generatedAt": "2026-11-01T00:00:00+00:00", "rulesVersion": 1, "sample": {}, "thresholds": th,
             "indices": {t: {"name": m["name"], "swing": m["swing"], **stats} for t, m in R.INDICES.items()},
             "overbought": {"dropFirstRate": 0.33, "baseRate": 0.33, "events": 40}}
+
+
+def test_daily_accepts_complete_aligned_indices_and_appends_the_site_session(tmp_path):
+    idx = bdays(6)
+    hist = pd.DataFrame({"pct20": [50.0] * 5, "pct60": [60.0] * 5}, index=idx[:5])
+    hist.index.name = "date"
+    history_path = tmp_path / "history.csv"
+    hist.to_csv(history_path)
+    calibration_path = tmp_path / "calibration.json"
+    calibration_path.write_text(json.dumps(calibration()), encoding="utf-8")
+    breadth_path = tmp_path / "breadth.json"
+    breadth_path.write_text(json.dumps(site_json([str(d.date()) for d in idx], [50.0] * 5 + [51.0], [60.0] * 6)), encoding="utf-8")
+    source_bytes = breadth_path.read_bytes()
+    out_path = tmp_path / "breadth-signals.json"
+    bar_days = pd.bdate_range(end=idx[-1], periods=400)
+    bars = {ticker: bars_from(np.full(400, 100.0), bar_days) for ticker in R.INDICES}
+    result = daily.main([
+        "--calibration", str(calibration_path), "--history", str(history_path),
+        "--breadth", str(breadth_path), "--out", str(out_path),
+    ], bars_loader=lambda _tickers: bars)
+    assert result == 0
+    payload = json.loads(out_path.read_text(encoding="utf-8"))["markets"]["us"]
+    assert payload["asOf"] == str(idx[-1].date())
+    assert payload["readings"]["ma20"]["pct"] == 51.0
+    assert {index["symbol"] for index in payload["lowSignal"]["indices"]} == set(R.INDICES)
+    assert len(daily.load_history(history_path)) == 6
+    assert breadth_path.read_bytes() == source_bytes
 
 
 def scenario(last_pct, drop):
