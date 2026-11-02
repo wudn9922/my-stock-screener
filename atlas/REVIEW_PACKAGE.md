@@ -45,6 +45,10 @@ Python: 23 attachment/fail-soft tests and 63 breadth/generated-publication regre
 Related desktop/mobile Chromium and iPhone WebKit site regressions passed all 114 cases in 8.1
 minutes. Screenshots were visually inspected for chart-local controls, current evidence
 and calibrated breadth; browser automation is not physical iPhone verification.
+The original chart gesture/timeframe suite additionally passed 23 cases, with its existing
+desktop-only touch skip, across desktop/mobile Chromium and iPhone WebKit. The Python CI matrix
+now explicitly installs pytest and runs the attachment tests in both records-only and generated
+modes; unittest discovery alone does not execute pytest-style function tests.
 
 Protected auth/account/backend files, outer navigation, permanent K-line/price/financial records,
 archive branch, SQL, notifications and deployments are untouched. No merge or deployment.
