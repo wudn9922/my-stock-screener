@@ -127,6 +127,9 @@ function BreadthBody({ data }: { data: BreadthMarket }) {
       <BreadthChart history={data.history} />
       <HelpDisclosure label="樣本與歷史說明">
         {data.universe}，當日有成交 {all.count.toLocaleString('zh-TW')} 檔。歷史走勢以目前名單回推，含存活者偏差。
+        {data.scope === 'full' && data.coverage && <>完整名單 {data.universeCount?.toLocaleString('zh-TW')} 檔；
+          快取缺漏 {data.coverage.missing} 檔，當日未成交／停更 {data.coverage.notTraded} 檔。
+          每條均線只以有足夠歷史且當日成交的股票為分母，缺資料不當成跌破。</>}
       </HelpDisclosure>
     </>
   );
@@ -153,7 +156,7 @@ export function BreadthCard({ market }: { market: BreadthMarketKey }) {
         <h2>
           <Gauge size={16} aria-hidden="true" />
           市場寬度
-          <small>{name}</small>
+          <small>{name}{data?.scope === 'full' ? '全市場' : ''}</small>
         </h2>
         {data?.asOf ? <span className="breadth-asof">資料日 {formatDateTime(data.asOf, false)}</span> : null}
       </header>

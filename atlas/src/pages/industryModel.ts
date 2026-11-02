@@ -96,10 +96,10 @@ export const US_SECTOR_ZH: Readonly<Record<string, string>> = {
   Utilities: '公用事業',
 };
 
-/** Display name of a sector group: Chinese with the source name kept, e.g. 「科技 Technology」. */
-export function sectorLabel(sector: string): string {
+/** Heatmap can omit the English suffix; other research views retain their existing source labels. */
+export function sectorLabel(sector: string, chineseOnly = false): string {
   const zh = US_SECTOR_ZH[sector];
-  return zh ? `${zh} ${sector}` : sector;
+  return zh ? chineseOnly ? zh : `${zh} ${sector}` : sector;
 }
 
 /** TW: the industry (官方產業別), else the sector. US: the sector and the industry stay separate. */

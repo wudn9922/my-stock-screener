@@ -18,7 +18,7 @@ import { parseFilters } from "../src/pages/screenerFilters";
 import { loadScreenerFixedMAs } from "../src/pages/screenerFixedMAs";
 import type { ParameterStock } from "../src/cloud/settingsApi";
 import { ValuationProvider } from "../src/fundamentals/ValuationProvider";
-import { getScreenerPeFigures } from "../src/app/dataSources";
+import { getScreenerPeFigures } from "../src/fundamentals/peFigures";
 
 const DEFAULT_ADMIN_LINE_ID = "Ua0037dbd5037b64fc76804c60520ad76";
 const LINE_ID = /^U[0-9a-f]{32}$/;

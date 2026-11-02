@@ -27,3 +27,26 @@ preventing older downloads from replacing refreshed data. Manual refresh never f
 The workspace retains its current chart on error and cancels the update on navigation/timeframe changes;
 canonical drawings, indicators and view preferences remain owned by the existing store and chart engine.
 Source timestamps and delayed/static provenance remain authoritative; this does not add a real-time feed.
+
+## Read-only world assets in the chart workspace (2026-10-31)
+
+The screener router resolves the 12 registered world research identities before checking stock/index
+providers. `WorldAssetProvider` validates the published world-assets index and daily candles together,
+offers daily/weekly/monthly bars and quotes, and explicitly has no corporate events. A missing or invalid
+registered asset never falls back to a similarly named stock. BTC retains the existing absent-index-only
+archive fallback and the explicit BTC/USDT identity check. No producer or durable input is changed.
+
+The registry reuses the inline charts' deterministic `^R…` storage symbols, so drawings and indicator
+ownership remain in the existing account-scoped AppStore; there is no migration or second chart engine.
+Source dates remain date labels, with the existing continuous-UTC mapper for BTC and the existing daily
+aggregator for weeks/months. Asset display units and price precision come from the registered instrument;
+they are not stock currency/volume assumptions. Indices and assets do not acquire stock financials.
+
+The optional below-chart P/E plot reuses the existing financial-history loader, weekly provider prices
+and audited historical EPS calculation. It does not change the provider contracts or calculate old P/E
+from current EPS. Data is requested near the viewport and missing/invalid histories fail locally.
+
+Header/screener valuation helpers live in `fundamentals/peFigures.ts` and are re-exported by the site's
+data facade. Shared screener conditions and the Node collector import the pure module directly, so
+the collector does not bundle browser market providers or Vite-only raw BTC assets. The valuation
+formulas and collector decisions are unchanged; a real esbuild entry-point test enforces this boundary.

@@ -53,7 +53,7 @@ async function movingAveragePixels(host: ReturnType<Page['locator']>) {
 }
 
 async function openFixed(page: Page, symbol = '2330.TW') {
-  await page.getByTestId('stock-tab-volume').click();
+  await page.getByTestId('ma-recommendation-toggle').click();
   await page.getByTestId('ma-recommendation').getByRole('button', { name: '固定為個股參數' }).click();
   return page.getByRole('dialog', { name: `${symbol} 固定均線參數` });
 }

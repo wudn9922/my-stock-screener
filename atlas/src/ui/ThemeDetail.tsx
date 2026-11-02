@@ -84,6 +84,7 @@ function ThemeCandleChart({ theme, data }: { theme: Theme; data: ThemesData }) {
         unit={data.market === "tw" ? "TWD" : "USD"}
         loading={!current && !!symbol}
         error={current?.error}
+        showVolume
       />
     </section>
   );
@@ -173,7 +174,7 @@ function ConstituentRow({
             收盤 {formatPrice(item.close)} · 3月相對 {benchmark} <b className={`num ${toneClass(item.rs3m)}`}>{formatPercent(item.rs3m, 1)}</b> ·{' '}
             {item.aboveMa50 === null ? '50日線資料不足' : item.aboveMa50 ? '站上50日線' : '跌破50日線'}
           </p>
-          <MiniChart symbol={item.symbol} height={150} />
+          <MiniChart symbol={item.symbol} height={180} showVolume />
           <button
             type="button"
             className="ghost-button open-chart"

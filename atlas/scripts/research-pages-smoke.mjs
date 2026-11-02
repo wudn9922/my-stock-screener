@@ -38,6 +38,7 @@ for (const [name, type, settings] of [
   });
   try {
     await page.goto(base + "?page=world&view=commodities");
+    await page.getByRole('button', { name: /連續看全部圖表/ }).click();
     await page.getByRole("heading", { name: "WTI 原油" }).waitFor();
     await page.waitForFunction(() =>
       document
@@ -58,6 +59,7 @@ for (const [name, type, settings] of [
     cryptoAssets.push({ pair: 'BTC/USDT', source: await btc.locator('.source-note').first().innerText() });
     await btc.screenshot({ path: resolve(out, name + '-btcusdt.png') });
     await page.getByRole("button", { name: "匯率", exact: true }).click();
+    await page.getByRole('button', { name: /連續看全部圖表/ }).click();
     await page.getByRole("heading", { name: "USD/TWD", exact: true }).waitFor();
     await page.waitForFunction(() =>
       document

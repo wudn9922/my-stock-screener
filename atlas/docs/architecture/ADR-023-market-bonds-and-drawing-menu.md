@@ -2,6 +2,25 @@
 
 Status: implemented for review; primary self-review only, no independent sign-off.
 
+## Full-market breadth and chart controls follow-up (2026-10-30)
+
+The Japan view's short label is 日債. US and Japan headline titles stay on one
+line without removing the selected Fed bound. Stock view and analysis triggers
+share the existing StockTabs group. Recommendation and volatility details remain
+floating menus; volume analysis contains only its results. The chart engine,
+canonical drawing models and account storage boundaries are unchanged.
+
+Production breadth now belongs to the universe generated owner and consumes the
+same complete listing/cache reader and coverage gates as full-market entry
+success rates. Daily publication no longer produces partial-list breadth. The
+legacy breadth CLI and full-market entry engine remain available unchanged.
+Screener chart review reuses StockChartList and saved-parameter precedence.
+Research displays the published full-market RS percentile before its existing
+price-return comparison. Theme charts enable the existing ChartEngine volume
+series only for observed ETF/constituent OHLCV, with real ticker volume units;
+all other research chart callers retain their original default. See
+[coverage, safety and tests](../MARKET_COVERAGE_CHARTS.md).
+
 The market content navigator has three sections: 大盤, 全球 and 題材. 大盤
 retains every existing country tab and remembers the last country while visiting
 another section. Route aliases remain compatible. The application shell and

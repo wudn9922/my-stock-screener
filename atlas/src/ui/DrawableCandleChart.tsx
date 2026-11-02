@@ -18,6 +18,7 @@ import {
 import { toolNames, type ActiveTool } from "../drawing/DrawingModel";
 import "./drawableCandles.css";
 import { researchDrawingSymbol } from "../report/researchCandles";
+import { formatMarketVolume } from './format';
 
 export function DrawableCandleChart({
   identity,
@@ -27,6 +28,8 @@ export function DrawableCandleChart({
   precision = 2,
   calendar = 'regular',
   marketSymbol,
+  showVolume = false,
+  showIndicators = false,
   loading,
   error,
 }: {
@@ -37,6 +40,8 @@ export function DrawableCandleChart({
   precision?: number;
   calendar?: 'regular' | 'continuous-utc';
   marketSymbol?: string;
+  showVolume?: boolean;
+  showIndicators?: boolean;
   loading?: boolean;
   error?: string;
 }) {
@@ -130,30 +135,40 @@ export function DrawableCandleChart({
         market,
       },
       s.drawings,
-      [],
+      showIndicators ? s.indicators : [],
       s.preferences.views[timeframe],
-      false,
+      showVolume,
       calendar,
     );
     chart.setPricePrecision(precision);
-  }, [state.ready, symbol, timeframe, shown, source, market, precision, calendar]);
+    if (showVolume) {
+      // Drawing identity is synthetic; volume units belong to the real ticker.
+      const priceFormat = { type: 'custom' as const, minMove: 1,
+        formatter: (value: number) => formatMarketVolume(value, marketSymbol ?? symbol) };
+      chart.volume.applyOptions({ priceFormat });
+      chart.volumeAverage.applyOptions({ priceFormat });
+    }
+  }, [state.ready, symbol, timeframe, shown, source, market, marketSymbol, precision, calendar, showVolume, showIndicators]);
   useEffect(() => {
     engine.current?.setUpDownColors(upDownColors(prefs.colors));
     engine.current?.sync(
       saved.drawings,
-      [],
+      showIndicators ? saved.indicators : [],
       saved.preferences.magnet,
       tool,
-      false,
+      showVolume,
     );
   }, [
     saved.drawings,
+    saved.indicators,
+    showIndicators,
     saved.preferences.magnet,
     tool,
     prefs.colors,
     state.ready,
     shown,
     timeframe,
+    showVolume,
   ]);
   const changeTimeframe = (tf: Timeframe) => {
     engine.current?.flushView();
@@ -187,6 +202,7 @@ export function DrawableCandleChart({
       data-chart-identity={identity}
       data-session-calendar={calendar}
       data-drawing-symbol={symbol}
+      data-show-volume={showVolume}
       aria-label={`${source}可畫線K線圖`}
     >
       <div className="candle-toolbar">
@@ -287,6 +303,9 @@ export function DrawableCandleChart({
             : "已儲存"}
         {tool !== "select" && ` · ${toolNames[tool]}：依原圖表操作方式畫線`}
       </p>
+      {showVolume && <p className="source-note" data-testid="research-volume-value">
+        {shown.some(bar => bar.volume > 0) ? `成交量 ${formatMarketVolume(shown.at(-1)!.volume, marketSymbol ?? symbol)} · 隨 K 線週期加總` : '無成交量資料'}
+      </p>}
     </section>
   );
 }

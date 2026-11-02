@@ -284,6 +284,19 @@ export function labelFit(name: string, width: number, height: number, preferred:
   return { fit: 'none', fontSize: 10 };
 }
 
+/** Prefer the complete name; a visibly abbreviated name is still useful in a narrow cell. */
+export function cellLabelFit(name: string, width: number, height: number, preferred: number) {
+  const full = labelFit(name, width, height, preferred);
+  if (full.fit !== 'none') return { ...full, text: name };
+  const letters = [...name];
+  for (let length = letters.length - 1; length >= 1; length--) {
+    const text = `${letters.slice(0, length).join('')}…`;
+    const fit = labelFit(text, width, height, Math.min(preferred, 11));
+    if (fit.fit !== 'none') return { ...fit, text };
+  }
+  return { ...full, text: name };
+}
+
 /** Where the tooltip for a cell goes: above it, else below it, else inside the cell, always inside the canvas horizontally. */
 export function tipPosition(
   rect: Rect,

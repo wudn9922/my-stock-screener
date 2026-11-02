@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { getDailyBarResult } from "../app/dataSources";
 import type { BarResult } from "../market-data/MarketDataProvider";
 import { getMarketProfile } from "../market-data/MarketProfile";
-import { relativeStrength } from "../pages/relativeStrength";
+import { relativeStrength, stockRs } from "../pages/relativeStrength";
+import { loadUniverse, type UniverseLoadResult } from '../report/universe';
 import { TimeChart } from "./rates/TimeChart";
 import { HelpDisclosure } from "./HelpDisclosure";
 import { formatPercent } from "./format";
@@ -19,6 +20,13 @@ export function RelativeStrengthPanel({ symbol }: { symbol: string }) {
   }>();
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [universe, setUniverse] = useState<UniverseLoadResult>();
+  useEffect(() => {
+    let active = true;
+    void loadUniverse().then(result => { if (active) setUniverse(result); });
+    return () => { active = false; };
+  }, [symbol]);
+  const rs = universe?.status === 'ok' ? stockRs(universe.universe, symbol) : null;
   useEffect(() => {
     let active = true;
     setLoaded(undefined);
@@ -74,6 +82,13 @@ export function RelativeStrengthPanel({ symbol }: { symbol: string }) {
   return (
     <section className="analysis-comparison" aria-label="個股與大盤強弱比較">
       <h3>相對大盤</h3>
+      <div className="analysis-rs" data-testid="stock-rs">
+        <span>RS 百分位 <small>1–99</small></span>
+        <b>{rs ? rs.rank : '—'}</b>
+        <small>{!universe ? '載入全市場 RS…' : rs
+          ? `${tw ? '台股' : '美股'}全市場 · 基準 ${rs.benchmark === '^TWII' ? '加權指數' : rs.benchmark} · 資料日 ${rs.date}${rs.stale ? '（舊資料）' : ''}`
+          : universe.status === 'error' ? '全市場 RS 暫時無法取得' : '全市場 RS 尚無可用資料'}</small>
+      </div>
       <div className="analysis-controls">
         <label>
           比較基準
@@ -157,6 +172,7 @@ export function RelativeStrengthPanel({ symbol }: { symbol: string }) {
             個共同交易日 · 藍：{symbol}／金：{benchmark}
           </p>
           <HelpDisclosure label="相對強弱計算與來源">
+            RS 百分位沿用全市場選股報表的 3 個月相對強弱排名（1–99），越高越強；固定使用報表的市場基準與資料日，不隨下方比較期間或基準切換。未有全市場排名時不推估。
             共同起點歸零，比較價格累積報酬；超額報酬＝個股報酬減大盤報酬，不含股息。僅使用雙方皆有資料的交易日，不補值。
             {comparison.sessions < sessions
               ? "歷史不足所選期間，顯示實際可比範圍。"

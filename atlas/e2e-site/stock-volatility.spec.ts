@@ -46,8 +46,8 @@ test('daily volatility and independent volume analysis stay beside recommendatio
   expect(intervals).toContain('1d');
   expect(intervals).toContain('1wk');
   const geometry = await page.evaluate(() => {
-    const tools = document.querySelector('.ws-analysis-tools')!.getBoundingClientRect();
-    const tabs = document.querySelector('.ws-stock-controls > .stock-tabs')!.getBoundingClientRect();
+    const tools = document.querySelector('[data-testid="volatility-toggle"]')!.getBoundingClientRect();
+    const tabs = document.querySelector('[data-testid="ma-recommendation-toggle"]')!.getBoundingClientRect();
     return {
       volume: document.querySelector('[data-testid="stock-tab-volume"]')!.getBoundingClientRect().top,
       volatility: document.querySelector('[data-testid="stock-volatility"]')!.getBoundingClientRect().top,
@@ -59,11 +59,14 @@ test('daily volatility and independent volume analysis stay beside recommendatio
   expect(Math.abs(geometry.volatility - geometry.volume)).toBeLessThanOrEqual(12);
   expect(geometry.tabsOverlap).toBe(0);
   expect(geometry.overflow).toBeLessThanOrEqual(0);
-  // 價量 (volume analysis and the MA recommendation) is a view of the stock page, not a menu.
+  // 價量 opens analysis directly; recommendations remain a separate header menu.
   await page.getByTestId('stock-tab-volume').click();
   await expect(page.getByRole('region', { name: '價量', exact: true })).toBeVisible();
   await expect(page.getByTestId('stock-tab-volume')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('region', { name: '價量', exact: true }).getByTestId('ma-recommendation')).toHaveCount(0);
+  await page.getByTestId('ma-recommendation-toggle').click();
   await expect(page.getByTestId('ma-recommendation')).toBeVisible();
+  await page.getByTestId('ma-recommendation-toggle').click();
   await expect(page.getByTestId('chart')).toBeHidden();
   // The volatility controls stay in the header and usable from every view.
   await expect(stats).toBeVisible();

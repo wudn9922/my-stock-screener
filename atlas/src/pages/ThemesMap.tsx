@@ -7,6 +7,7 @@ import type { OpenChartOptions } from '../app/Site';
 import { formatDateTime, formatPercent, toneClass } from '../ui/format';
 import HeatCanvas, { type HeatGroupView } from './HeatCanvas';
 import { IndustryPanel } from './IndustryPanel';
+import { industryName } from './industryNames';
 import {
   FALLBACK_NOTICE,
   MIN_INDUSTRY_STOCKS,
@@ -14,6 +15,7 @@ import {
   colorValue,
   industryGroups,
   summarize,
+  sectorLabel,
   type IndustryModel,
   type IndustrySummary,
   type MapSource,
@@ -223,23 +225,25 @@ function IndustryMap({
   const views = useMemo(
     (): HeatGroupView[] =>
       mapModel.groups.map((group) => {
-        const sector = model.twoLevel ? group.label : '';
+        const sector = model.twoLevel ? sectorLabel(group.id.slice(2), true) : '';
         return {
           id: group.id,
-          label: group.label,
+          label: sector || group.label,
           value: model.twoLevel ? colorValue(summaries.groups.get(group.id)!, agg).value : undefined,
           cells: group.cells.map((mapCell) => {
             const entry = cellById.get(mapCell.id)!;
             const summary = summaries.cells.get(mapCell.id)!;
             const color = colorValue(summary, agg);
+            const label = industryName(mapCell.label, model.market);
+            const original = label !== mapCell.label ? `（${mapCell.label}）` : '';
             return {
               id: mapCell.id,
-              label: mapCell.label,
+              label,
               value: color.value,
-              aria: `${sector ? `${sector} ` : ''}${mapCell.label}，${summary.count} 檔，${PERIOD_LABELS[period]}報酬 ${formatPercent(color.value, 1)}，開啟成分股`,
+              aria: `${sector ? `${sector} ` : ''}${label}${original}，${summary.count} 檔，${PERIOD_LABELS[period]}報酬 ${formatPercent(color.value, 1)}，開啟成分股`,
               tip: (
                 <IndustryTip
-                  label={mapCell.label}
+                  label={original ? `${label} · ${mapCell.label}` : label}
                   groupLabel={sector}
                   summary={summary}
                   model={model}

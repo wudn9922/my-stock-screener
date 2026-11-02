@@ -20,7 +20,7 @@ export type PriceLoad =
   | { status: 'ok'; bars: PriceBar[]; priceBasis: string | undefined; asOfSec: number; stale: boolean };
 
 /** Weekly bars come with their own price basis; 10 years is what the provider offers for 1W. */
-async function loadWeeklyPrices(symbol: string, signal: AbortSignal): Promise<PriceLoad> {
+export async function loadWeeklyPrices(symbol: string, signal: AbortSignal): Promise<PriceLoad> {
   try {
     const { marketProvider } = await import('../../app/dataSources');
     const result = await marketProvider().getBars(symbol, '1W', undefined, signal);

@@ -55,13 +55,14 @@ const noOverflow = (page: Page) =>
         document.getElementById("main")!.clientWidth,
     ),
   );
-test("world four options, historical source frequency, reload and browser back", async ({
+test("world views, historical source frequency, reload and browser back", async ({
   page,
 }, info) => {
   await setup(page);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("./?page=world&view=commodities");
+  await page.getByRole('button', { name: /連續看全部圖表/ }).click();
   await expect(
     page.getByRole("heading", { name: "原物料", exact: true }),
   ).toBeVisible();
@@ -83,17 +84,27 @@ test("world four options, historical source frequency, reload and browser back",
   await goldSource.locator(":scope > summary").click();
   await expect(goldSource.locator("a")).toHaveText("Yahoo Finance daily OHLC");
   await expect(goldSource.locator("a")).toBeVisible();
+  await expect(gold.locator('.candle-ohlc')).toContainText('O ');
   await page.getByRole("button", { name: "匯率", exact: true }).click();
+  await page.getByRole('button', { name: /連續看全部圖表/ }).click();
   await expect(page).toHaveURL(/view=fx/);
   await expect(
     page.getByRole("heading", { name: "USD/TWD", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("每 1 USD 兌 TWD").first()).toBeVisible();
+  // A title comes from metadata before the lazy candle effect runs. Verify real
+  // bars before replacing the document; reloading between those two phases can
+  // make WebKit start fetch on an already-unloading document.
+  const fx = page.locator('[data-chart-identity="world:FX-USDTWD"]');
+  await expect(fx.locator('.candle-ohlc')).toContainText('O ');
   await page.reload();
+  await page.getByRole('button', { name: /連續看全部圖表/ }).click();
   await expect(
     page.getByRole("heading", { name: "USD/TWD", exact: true }),
   ).toBeVisible();
+  await expect(fx.locator('.candle-ohlc')).toContainText('O ');
   await page.goBack();
+  await page.getByRole('button', { name: /連續看全部圖表/ }).click();
   await expect(page.getByRole("heading", { name: "WTI 原油" })).toBeVisible();
   expect(await noOverflow(page)).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);

@@ -128,6 +128,11 @@ jobs:
           exit 1
 
       # 與全市場選股共用完整名單、歷史快取；不足時保留舊報表，不退回流動性名單或 S&P 500。
+      - name: Build full-market breadth
+        if: always() && !cancelled()
+        timeout-minutes: 15
+        run: python -u scripts/build_full_market_breadth.py --cache-dir .cache/universe-full
+
       - name: Build full-market entry success rates
         if: always() && !cancelled()
         run: python -u scripts/build_full_market_breakouts.py --cache-dir .cache/universe-full
@@ -142,6 +147,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/report/universe.json docs/report/breakouts.json
+          if [ -f docs/report/breadth.json ]; then git add -f -- docs/report/breadth.json; fi
           if [ -f docs/report/breakouts-history.json ]; then git add -f -- docs/report/breakouts-history.json; fi
           if [ -f docs/report/kline-corrections.json ]; then git add -- docs/report/kline-corrections.json; fi
           # The same immutable 20-calendar-day snapshots are committed before cutover too.

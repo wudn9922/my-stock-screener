@@ -389,8 +389,25 @@ h3 {
   overflow-y: auto;
 }
 .site.on-chart .site-main > .storage-policy-note { flex: 0 0 auto; }
-.site.on-chart .chart-page-host { flex: 1; min-height: 0; height: auto; }
-.site.on-chart .site-main > .data-health { display: none; }
+.site.on-chart .chart-page-host { flex: none; min-height: 0; height: auto; }
+.site-account-flow { flex: none; display: flow-root; }
+.site.on-chart .chart-page-layout { height: var(--chart-viewport-height, 100dvh); }
+.chart-pe-history { margin: 16px; padding: 14px; min-width: 0; }
+.chart-pe-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.chart-pe-heading h2 { font-size: 16px; margin: 0; }
+.chart-pe-heading span { color: var(--text-2); font-size: 13px; }
+.chart-pe-canvas { width: 100%; height: 260px; }
+.asset-view-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.asset-view-controls button, .world-candle-card > button { min-height: 44px; }
+.asset-view-controls [aria-pressed="true"] { border-color: var(--accent); color: var(--text); }
+.asset-list { overflow: hidden; }
+.asset-list-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; width: 100%; min-height: 78px; padding: 12px; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.asset-list-row:hover { background: var(--surface-2); }
+.asset-list-row > span { display: grid; gap: 3px; min-width: 0; }
+.asset-list-row > span:nth-child(2) { text-align: right; }
+.asset-list-row small { font-size: 11px; color: var(--text-3); overflow-wrap: anywhere; }
+.asset-list-row > .up small, .asset-list-row > .down small { color: inherit; }
+.asset-list-row > small { grid-column: 1 / -1; }
 .chart-page-host {
   height: 100%;
 }
@@ -1492,12 +1509,14 @@ h3 {
 }
 .screener-list {
   flex: none;
-  height: clamp(300px, 55dvh, 680px);
+  height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 100px);
   min-height: 300px;
   overflow-y: auto;
   overscroll-behavior: contain;
   position: relative;
 }
+.site-data-footer { flex: none; margin: 16px; min-width: 0; }
+.site-data-footer > .console-card { margin-bottom: 12px; }
 .screener-rows {
   position: relative;
 }

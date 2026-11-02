@@ -1,3 +1,4 @@
+import { worldAssetFor } from '../market-data/worldAssets';
 import {
   createChart,
   createSeriesMarkers,
@@ -316,7 +317,9 @@ export class ChartEngine {
     const cacheText = { fresh: '最新', cached: '快取', stale: '舊資料' }[result.cacheStatus ?? 'fresh'];
     const basisText = { 'split-adjusted': '分割已調整', unadjusted: '未調整', unknown: '調整方式未知' }[result.priceBasis ?? 'unknown'];
     const time = (seconds: number) => new Date(seconds * 1000).toLocaleString('zh-TW', { hour12: false });
-    this.sourceLabel.textContent = `${result.source} · ${market.currency} · ${result.session === 'regular' ? '一般交易時段' : '含盤前盤後'} · ${stateText} · ${cacheText} · ${basisText} · 取得 ${result.asOf ? time(result.asOf) : '—'} · 最後 K 棒 ${time(result.bars.at(-1)!.time)}`;
+    const asset = worldAssetFor(symbol);
+    const sessionText = asset ? asset.calendar === 'continuous-utc' ? '全天交易 UTC 日線' : '來源日 K（日曆標籤）' : result.session === 'regular' ? '一般交易時段' : '含盤前盤後';
+    this.sourceLabel.textContent = `${result.source} · ${asset?.unit ?? market.currency} · ${sessionText} · ${stateText} · ${cacheText} · ${basisText} · 取得 ${result.asOf ? time(result.asOf) : '—'} · 最後 K 棒 ${time(result.bars.at(-1)!.time)}`;
     if (result.sessionCloseObservations?.length) this.sourceLabel.textContent += ` · ${result.sessionCloseObservations.length} 筆收盤競價觀測點（瞬時樣本）`;
     this.sourceLabel.title = this.sourceLabel.textContent;
   }

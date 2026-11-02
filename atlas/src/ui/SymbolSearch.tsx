@@ -3,6 +3,7 @@ import { ArrowUpRight, Clock, Search, X } from 'lucide-react';
 import { sitePreferences, type RecentSearch } from '../app/sitePreferences';
 import { isCanonicalSymbol } from '../market-data/MarketProfile';
 import { displayTicker } from './format';
+import { worldAssetFor } from '../market-data/worldAssets';
 import { matchLocalSymbols, type LocalSymbol } from './searchRanking';
 
 export type { LocalSymbol } from './searchRanking';
@@ -22,6 +23,11 @@ function exchangeBadge(exchange: string, market: 'TW' | 'US') {
   const value = exchange.toUpperCase();
   if (market === 'TW') return value === 'TPEX' || value === 'OTC' ? '上櫃' : value === 'TWSE' ? '上市' : '台股';
   return value || '美股';
+}
+function localBadge(symbol: string) {
+  const asset = worldAssetFor(symbol);
+  if (asset) return asset.kind === 'fx' ? '匯率' : asset.id === 'btcusdt' ? '加密現貨' : '原物料';
+  return symbol.startsWith('^') ? '指數' : symbol.match(/\.TWO?$/) ? '台股' : '美股';
 }
 
 /**
@@ -91,7 +97,7 @@ export function SymbolSearch({
     const local = matchLocalSymbols(trimmed, localSymbols).map((item) => ({
       symbol: item.symbol,
       name: item.name,
-      badge: item.symbol.startsWith('^') ? '指數' : item.symbol.match(/\.TWO?$/) ? '台股' : '美股',
+      badge: localBadge(item.symbol),
       kind: item.symbol.startsWith('^') ? ('index' as const) : ('stock' as const),
     }));
     const seen = new Set<string>();

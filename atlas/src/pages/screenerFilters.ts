@@ -2,7 +2,7 @@ import { userStorage } from '../auth/storage';
 import type { GroupItem, MetricMa } from '../report/schema';
 import { formatMarketVolume, maDistance, maValue } from '../ui/format';
 import { growthKey, type GrowthFile, type GrowthRecord } from '../fundamentals/GrowthProvider';
-import { screenerPeValue, type ScreenerPeFigures } from '../app/dataSources';
+import { screenerPeValue, type ScreenerPeFigures } from '../fundamentals/peFigures';
 
 /**
  * Screener filter conditions: state, the compact `f` URL encoding and the pure filter itself.

@@ -31,8 +31,8 @@ test('global includes Japanese spreads and both countries use the attached reaso
   await page.goto('./?page=world&view=jp-bonds');
   await expect(page.getByRole('navigation', { name: '市場分頁' }).getByRole('link')).toHaveText(['大盤', '全球', '題材']);
   const tabs = page.getByRole('group', { name: '世界頁面' });
-  await expect(tabs.getByRole('button')).toHaveText(['美債', '指數', '利差', '原物料', '匯率']);
-  await expect(tabs.getByRole('button', { name: '利差', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(tabs.getByRole('button')).toHaveText(['美債', '指數', '日債', '原物料', '匯率']);
+  await expect(tabs.getByRole('button', { name: '日債', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const tabBoxes = await tabs.getByRole('button').evaluateAll(buttons => buttons.map(button => {
     const box = button.getBoundingClientRect(); return { top: box.top, width: box.width, height: box.height };
   }));
@@ -61,6 +61,16 @@ test('global includes Japanese spreads and both countries use the attached reaso
   await expect(usBand.locator('.yield-band-values b')).toHaveText(['3.52%', '5.11%', '6.71%']);
   await expect(usBand).toContainText('區間中段');
   await expect(page.getByRole('heading', { name: '長天期美債 ETF 比較' })).toBeVisible();
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const sizes = await page.locator('.rates-key-title').evaluateAll(nodes => nodes.map(node => {
+      const box = node.getBoundingClientRect();
+      return { height: box.height, width: box.width, available: node.closest('.rates-key')!.clientWidth };
+    }));
+    for (const size of sizes) { expect(size.height).toBeLessThan(20); expect(size.width).toBeLessThanOrEqual(size.available); }
+    await expect.poll(() => page.locator('#main').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+  }
+  await page.screenshot({ path: testInfo.outputPath('us-bond-summary-one-line.png') });
   expect(sourceRequests).toEqual([]);
   expect(await page.locator('#main').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
 });
