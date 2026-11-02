@@ -28,6 +28,14 @@ const candidateSchema = z.object({
   sarDrawdown: z.unknown().optional().transform(finiteOrNull),
   sarWinRate: z.unknown().optional().transform(finiteOrNull),
   sarTrades: z.unknown().optional().transform(finiteOrNull),
+  /** 近2年分數(參考): the short-term formula over two years (short/medium candidates only). */
+  score2y: z.unknown().optional().transform(finiteOrNull),
+});
+const rankSchema = z.object({ pct: z.number().min(0).max(100), n: z.number().int().positive() });
+/** Optional display-only extras: a broken one is dropped instead of invalidating the recommendation. */
+const optional = <T extends z.ZodType>(schema: T) => z.unknown().optional().transform((value) => {
+  const parsed = schema.safeParse(value);
+  return parsed.success ? (parsed.data as z.output<T>) : null;
 });
 const rangeSchema = z.object({
   key: z.enum(MA_RANGE_KEYS),
@@ -36,6 +44,36 @@ const rangeSchema = z.object({
   windowYears: z.unknown().optional().transform(finiteOrNull),
   final: period,
   candidates: z.array(candidateSchema).catch([]),
+  /** Stock-level ranking: this stock's range best beats `pct`% of the reference stocks' range bests. */
+  rank: optional(rankSchema.extend({ best: z.number() })),
+});
+const v2CandidateSchema = z.object({
+  period,
+  score2y: z.unknown().optional().transform(finiteOrNull),
+  score1y: z.unknown().optional().transform(finiteOrNull),
+  score3y: z.unknown().optional().transform(finiteOrNull),
+  sarReturn: z.unknown().optional().transform(finiteOrNull),
+  sarReturn1y: z.unknown().optional().transform(finiteOrNull),
+});
+/** Experimental selector v2 (ma-selector core/select_v2.py; not validated, display only). */
+const v2Schema = z.object({
+  short: z.object({
+    min: period,
+    max: period,
+    final1: period,
+    final2: period.nullable(),
+    secondSource: z.enum(['cands', 'relaxed']).nullable().catch(null),
+    candidates: z.array(v2CandidateSchema).catch([]),
+    relaxed: z.array(v2CandidateSchema).catch([]),
+  }),
+  medium: z.object({ min: period, max: period, final: period, candidates: z.array(v2CandidateSchema).catch([]) }),
+  long: z.object({ final: period }),
+  suitability: z.object({
+    short2y: z.unknown().transform(finiteOrNull),
+    short1y: z.unknown().transform(finiteOrNull),
+    mid3y: z.unknown().transform(finiteOrNull),
+  }),
+  rank: z.object({ short2y: rankSchema, short1y: rankSchema, mid3y: rankSchema }).nullable().catch(null).optional(),
 });
 export const maRecommendationSchema = z.object({
   ticker: z.string(),
@@ -54,9 +92,11 @@ export const maRecommendationSchema = z.object({
   ranges: z
     .array(rangeSchema)
     .refine((ranges) => MA_RANGE_KEYS.every((key) => ranges.some((range) => range.key === key)), '短中長期都要有'),
+  v2: optional(v2Schema),
 });
 export type MaRecommendation = z.infer<typeof maRecommendationSchema>;
 export type MaRecommendationRange = MaRecommendation['ranges'][number];
+export type MaRecommendationV2 = NonNullable<MaRecommendation['v2']>;
 
 export type MaRecommendationLoadResult =
   | { status: 'ok'; data: MaRecommendation; url: string }
@@ -110,3 +150,7 @@ export async function fetchMaRecommendation(
 /** Final pick of each range, short → long (always three entries for a valid file). */
 export const recommendedPeriods = (data: MaRecommendation): number[] =>
   MA_RANGE_KEYS.map((key) => data.ranges.find((range) => range.key === key)!.final);
+
+/** Selector v2 picks: short first/second line, medium, long (duplicates and a missing second line removed). */
+export const v2Periods = (v2: MaRecommendationV2): number[] =>
+  [...new Set([v2.short.final1, v2.short.final2, v2.medium.final, v2.long.final].filter((p): p is number => p !== null))];

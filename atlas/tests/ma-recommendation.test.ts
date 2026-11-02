@@ -8,7 +8,10 @@ import {
   maSelectorLink,
   parseMaRecommendation,
   recommendedPeriods,
+  v2Periods,
 } from '../src/report/maRecommendation';
+import withSecond from './fixtures/ma-selector/2330.TW.with-second.json';
+import noSecond from './fixtures/ma-selector/2330.TW.no-second.json';
 import { appliedDailySmaPeriods, applyRecommended, missingRecommended, selectableCandidates, toggleRecommended } from '../src/ui/MaRecommendation';
 
 // Shape written by ma-selector scripts/build_recommendations.py (core/recommend.py).
@@ -144,5 +147,46 @@ describe('ma-selector recommendations', () => {
     const before = store.symbol('2330.TW');
     expect(toggleRecommended(store, '2330.TW', 24)).toEqual({ added: false, removed: 0, locked: 1 });
     expect(store.symbol('2330.TW')).toEqual(before);
+  });
+});
+
+// Fixtures are real ma-selector output (VERSION 2, synthetic prices): recommend() with ranking, 2-year scores and selector v2.
+describe('ma-selector VERSION 2 extras (ranking, 2-year score, selector v2)', () => {
+  it('parses ranking, 2-year scores and v2 from real batch output', () => {
+    const result = parseMaRecommendation(withSecond, '2330.TW');
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    const [short, medium, long] = result.data.ranges;
+    expect(short!.rank).toMatchObject({ n: 83, pct: expect.any(Number), best: expect.any(Number) });
+    expect(short!.candidates.every((c) => c.score2y !== null)).toBe(true);
+    expect(medium!.candidates.every((c) => c.score2y !== null)).toBe(true);
+    expect(long!.candidates.every((c) => c.score2y === null)).toBe(true);
+    const v2 = result.data.v2!;
+    expect(v2.short).toMatchObject({ min: 15, max: 45, final1: 34, final2: 15, secondSource: 'cands' });
+    expect(v2.medium).toMatchObject({ min: 46, max: 70 });
+    expect(v2.long.final).toBe(long!.final);
+    expect(v2.rank).toMatchObject({ short2y: { n: 83 }, short1y: { n: 83 }, mid3y: { n: 83 } });
+    expect(v2Periods(v2)).toEqual([34, 15, v2.medium.final, long!.final]);
+    // The current picks are unchanged by the extras.
+    expect(recommendedPeriods(result.data)).toEqual([33, 36, 66]);
+  });
+
+  it('keeps a missing second line as null and drops it from the v2 periods', () => {
+    const result = parseMaRecommendation(noSecond, '2330.TW');
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.data.v2!.short.final2).toBeNull();
+    expect(v2Periods(result.data.v2!)).not.toContain(null);
+  });
+
+  it('ignores a broken extra instead of rejecting the recommendation, and reads VERSION 1 files unchanged', () => {
+    const broken = { ...withSecond, v2: { short: { final1: 'x' } }, ranges: withSecond.ranges.map((r) => ({ ...r, rank: { pct: 'high' } })) };
+    const result = parseMaRecommendation(broken, '2330.TW');
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.data.v2).toBeNull();
+    expect(result.data.ranges.every((r) => r.rank === null)).toBe(true);
+    const v1 = parseMaRecommendation(file(), '2330.TW');
+    expect(v1.status === 'ok' && v1.data.v2 === null && v1.data.ranges.every((r) => r.rank === null)).toBe(true);
   });
 });
