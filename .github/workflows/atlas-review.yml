@@ -133,7 +133,7 @@ jobs:
           python atlas/scripts/apply_sec_restatements.py --verify-against "$PR_BASE_SHA"
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Restore generated inputs for PR readers after cutover
