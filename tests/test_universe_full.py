@@ -585,8 +585,9 @@ class EndToEndTest(unittest.TestCase):
         self.cache = os.path.join(self.tmp.name, "cache")
         self.report = os.path.join(self.tmp.name, "report")
         os.makedirs(self.report)
-        self.saved = (dict(bu.MIN_LIST), bu.REQUEST_DELAY, bu.QUOTE_DELAY, bu.RATE_LIMIT_WAITS)
+        self.saved = (dict(bu.MIN_LIST), bu.REQUEST_DELAY, bu.QUOTE_DELAY, bu.RATE_LIMIT_WAITS, dict(bu.MIN_US_PARTS))
         bu.MIN_LIST.update({"TWSE": 2, "TPEx": 1, "US": 3})
+        bu.MIN_US_PARTS.update({"NASDAQ": 1, "OTHER": 1})
         bu.REQUEST_DELAY = 0.0
         bu.QUOTE_DELAY = 0.0
         bu.RATE_LIMIT_WAITS = (1, 1, 1)
@@ -599,7 +600,9 @@ class EndToEndTest(unittest.TestCase):
     def tearDown(self):
         bu.MIN_LIST.clear()
         bu.MIN_LIST.update(self.saved[0])
-        bu.REQUEST_DELAY, bu.QUOTE_DELAY, bu.RATE_LIMIT_WAITS = self.saved[1:]
+        bu.MIN_US_PARTS.clear()
+        bu.MIN_US_PARTS.update(self.saved[4])
+        bu.REQUEST_DELAY, bu.QUOTE_DELAY, bu.RATE_LIMIT_WAITS = self.saved[1:4]
         self.tmp.cleanup()
 
     def run_job(self, net, budget=10_000, now=NOW, markets="TW,US"):
@@ -822,6 +825,38 @@ class EndToEndTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertTrue(any("只有 5 檔" in warning for warning in job.warnings))
         self.assertEqual(self.universe()["markets"]["US"]["rows"][0][:2], ["AAPL", "Apple"])
+
+    def test_empty_otherlisted_never_publishes_a_nasdaq_only_us_market(self):
+        # 2026-11-02: otherlisted.txt came back empty, Nasdaq alone passed the US total.
+        data = world()
+        net = self.complete_cache(data)
+        lists = uc.read_json(os.path.join(self.cache, "lists.json"))
+        self.assertIn("NYSE", {item["exchange"] for item in lists["US"]["items"].values()})
+
+        class EmptyOther(FakeNet):
+            def get_text(self, url, params=None, headers=None, timeout=30):
+                if url == bu.OTHER_LISTED_URL:
+                    self._check("otherlisted")
+                    return "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue|NASDAQ Symbol\n"
+                return super().get_text(url, params, headers, timeout)
+
+        net = EmptyOther(data, fail={"screener"})
+        code, job, logs = self.run_job(net, markets="US")
+        self.assertEqual(code, 0, job.problems)
+        self.assertTrue(any("名單不完整" in warning for warning in job.warnings))
+        self.assertTrue(job.list_info["US"]["source"].startswith("cache"))
+        self.assertIn("BRK-B", job.listing["US"])
+        # The incomplete list never replaces the cached complete one.
+        lists = uc.read_json(os.path.join(self.cache, "lists.json"))
+        self.assertIn("NYSE", {item["exchange"] for item in lists["US"]["items"].values()})
+
+    def test_incomplete_cached_us_list_is_not_reused(self):
+        items = {"AAPL": {"name": "Apple", "exchange": "NASDAQ"}}
+        problems = []
+        result = bu.load_us_list(lambda url: (None, "down"), lambda url: None,
+                                 {"US": {"fetchedAt": "2026-11-02", "items": items}}, "2026-11-02", lambda line: None, problems)
+        self.assertEqual(result[0], {})
+        self.assertTrue(any("上次美股名單也不完整" in problem for problem in problems))
 
     def test_one_market_failing_keeps_the_other(self):
         data = world()

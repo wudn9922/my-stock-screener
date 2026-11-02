@@ -54,6 +54,9 @@ YAHOO_QUOTE_URL = "https://query1.finance.yahoo.com/v7/finance/quote"
 
 BENCHMARKS = report_metrics.MARKET_BENCHMARKS
 MIN_LIST = {"TWSE": 800, "TPEx": 500, "US": 3000}
+# Each NasdaqTrader file is checked on its own: nasdaqlisted.txt alone exceeds the US total, so an
+# empty otherlisted.txt (2026-11-02) once dropped every NYSE / NYSE American / Arca stock.
+MIN_US_PARTS = {"NASDAQ": 2000, "OTHER": 1500}
 PUBLISH_COVERAGE = 0.9
 LIST_MAX_AGE_DAYS = 14
 PROFILE_MAX_AGE_DAYS = 45
@@ -279,6 +282,25 @@ def load_tw_exchange(exchange, fetch, lists_cache, snapshot, today, log, problem
     return {}, None
 
 
+def us_parts(items):
+    """(Nasdaq, NYSE/other) counts; None when the list carries no exchange (Nasdaq screener)."""
+    exchanges = Counter(item.get("exchange") for item in items.values())
+    if not any(exchanges.get(key) for key in exchanges if key):
+        return None
+    return exchanges.get("NASDAQ", 0), sum(count for key, count in exchanges.items() if key and key != "NASDAQ")
+
+
+def us_parts_missing(items):
+    """Why an exchange-labelled US list is incomplete, or None."""
+    parts = us_parts(items)
+    if parts is None:
+        return None
+    nasdaq, other = parts
+    if nasdaq < MIN_US_PARTS["NASDAQ"] or other < MIN_US_PARTS["OTHER"]:
+        return f"Nasdaq {nasdaq} 檔、NYSE 等 {other} 檔（門檻 {MIN_US_PARTS['NASDAQ']}／{MIN_US_PARTS['OTHER']}）"
+    return None
+
+
 def load_us_list(fetch_text, fetch_json, lists_cache, today, log, problems):
     """NasdaqTrader → Nasdaq screener → 上次名單。回傳 (items, source, excluded counts)。"""
     excluded = {}
@@ -291,10 +313,12 @@ def load_us_list(fetch_text, fetch_json, lists_cache, today, log, problems):
         except src.SourceFormatError as exc:
             items, error_a = {}, str(exc)
 
-        if len(items) >= MIN_LIST["US"]:
+        missing = us_parts_missing(items) if items else None
+
+        if len(items) >= MIN_LIST["US"] and not missing:
             return items, "nasdaqtrader", excluded
 
-        error_a = error_a or f"只有 {len(items)} 檔（門檻 {MIN_LIST['US']}）"
+        error_a = error_a or (f"名單不完整：{missing}" if missing else f"只有 {len(items)} 檔（門檻 {MIN_LIST['US']}）")
 
     problems.append(f"NasdaqTrader 名單不可用：{error_a or error_b}")
     screener = fetch_json(NASDAQ_SCREENER_URL)
@@ -317,8 +341,11 @@ def load_us_list(fetch_text, fetch_json, lists_cache, today, log, problems):
             return items, "nasdaq screener", excluded
 
     cached = cached_part(lists_cache, "US", today, LIST_MAX_AGE_DAYS)
+    stale = us_parts_missing(cached["items"]) if cached is not None else None
 
-    if cached is not None:
+    if stale:
+        problems.append(f"上次美股名單也不完整，不採用：{stale}")
+    elif cached is not None:
         log(f"↩️ 美股改用 {cached.get('fetchedAt')} 的名單（{len(cached['items'])} 檔）")
         return cached["items"], f"cache {cached.get('fetchedAt')}", {}
 
