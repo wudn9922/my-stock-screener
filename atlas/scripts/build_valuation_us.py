@@ -42,6 +42,8 @@ ANNUAL_STALE_DAYS = 400
 ANNUAL_RETRY_DAYS = 7
 MAX_CONSECUTIVE_FAILURES = 8
 MIN_US_RECORDS = 1000
+# The new file may not shrink below this share of the previous one.
+MAX_SHRINK_RATIO = 0.85
 SOURCE = "Yahoo Finance"
 # ADR EPS TTM from the quote must agree with net income / ADR count within this ratio
 ADR_TTM_TOLERANCE = 0.35
@@ -228,6 +230,13 @@ def build_record(eps_ttm, annual, previous, today_iso, annual_checked, adr=False
     return record
 
 
+def check_shrink(items, previous_items):
+    """A partial symbol directory or failed quote batches must not silently drop thousands of
+    stocks; failing keeps the previously deployed file."""
+    if previous_items and len(items) < len(previous_items) * MAX_SHRINK_RATIO:
+        raise RuntimeError(f"only {len(items)} records vs {len(previous_items)} previously")
+
+
 def read_json(path):
     try:
         with open(path, encoding="utf-8") as file:
@@ -401,6 +410,8 @@ def main():
     for symbol, (eps, adr_annual) in adr.items():
         items[symbol] = build_record(eps, adr_annual, None, today_iso, True, adr=True)
     items = dict(sorted(items.items()))
+
+    check_shrink(items, previous_items)
 
     document = {
         "version": 1,
