@@ -39,6 +39,9 @@ docs/report/**/*.tmp
 /docs/report/trending-stocks.json
 /docs/report/universe.json
 /docs/report/breadth.json
+/docs/report/breadth-signals.json
+/docs/report/breadth-us-calibration.json
+/docs/report/breadth-us-history.csv
 /docs/report/series/
 /docs/report/themes.json
 /docs/report/rates.json

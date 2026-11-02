@@ -204,16 +204,6 @@ export function loadBreadth(refresh = false): Promise<BreadthLoadResult> {
   return shared;
 }
 
-export type BreadthTone = 'weak' | 'hot' | 'neutral' | 'none';
-
-/** Below 20% is oversold-weak, above 80% is overheated; the boundaries themselves are neutral. */
-export function breadthTone(pct: number | null): BreadthTone {
-  if (pct === null || !Number.isFinite(pct)) return 'none';
-  if (pct < 20) return 'weak';
-  if (pct > 80) return 'hot';
-  return 'neutral';
-}
-
 const round1 = (value: number) => Math.round(value * 10) / 10;
 
 /**

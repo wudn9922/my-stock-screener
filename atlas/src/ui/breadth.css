@@ -13,6 +13,8 @@
   display: grid;
   gap: 14px;
   padding: 12px 14px 14px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .breadth-body .muted-text {
   margin: 0;
@@ -27,6 +29,7 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  flex-wrap: wrap;
 }
 .breadth-row-label {
   font-size: 13px;
@@ -44,15 +47,7 @@
   line-height: 1.5;
   padding: 0 7px;
   border-radius: 999px;
-  white-space: nowrap;
-}
-.breadth-tag.weak {
-  color: var(--down-text);
-  background: var(--down-soft);
-}
-.breadth-tag.hot {
-  color: var(--up-text);
-  background: var(--up-soft);
+  white-space: normal;
 }
 .breadth-bar {
   height: 8px;
@@ -190,4 +185,107 @@
   font-size: 12px;
   line-height: 1.6;
   color: var(--text-3);
+}
+
+.breadth-tag.oversold,
+.breadth-tag.extreme_oversold,
+.breadth-tag.signal-stop {
+  color: var(--down-text);
+  background: var(--down-soft);
+}
+.breadth-tag.overbought,
+.breadth-tag.extreme_overbought,
+.breadth-tag.signal-new,
+.breadth-tag.signal-target {
+  color: var(--up-text);
+  background: var(--up-soft);
+}
+.breadth-tag.neutral,
+.breadth-tag.signal-none,
+.breadth-tag.signal-timeout,
+.breadth-tag.signal-watch,
+.breadth-tag.signal-active {
+  color: var(--text-2);
+  background: var(--surface-3);
+}
+.breadth-marker-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.breadth-marker-select select {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+}
+.breadth-threshold {
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+  opacity: 0.65;
+}
+.breadth-threshold.ma20 {
+  stroke: var(--accent);
+}
+.breadth-threshold.ma60 {
+  stroke: var(--warn);
+}
+.breadth-signal-marker {
+  fill: var(--text);
+  stroke: var(--surface);
+  stroke-width: 1;
+}
+.breadth-low-signals,
+.breadth-index-signal {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.breadth-low-signals h3 {
+  font-size: 14px;
+  margin: 0;
+}
+.breadth-index-signal {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.breadth-signal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.breadth-trade-plan {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  gap: 6px;
+  font-size: 12px;
+}
+.breadth-trade-plan dt {
+  color: var(--text-3);
+}
+.breadth-trade-plan dd {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.breadth-signal-stats {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
+}
+.breadth-low-confidence {
+  display: inline-block;
+  color: var(--text-3);
+  margin-left: 6px;
+}
+.breadth-overbought > p {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.breadth-card .help-disclosure > summary {
+  min-height: 44px;
 }

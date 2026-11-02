@@ -16,6 +16,7 @@ import { FixedStockParameters } from './FixedStockParameters';
 import { parameterMAs, parameterStorageMessage, type ParameterStock } from '../cloud/settingsApi';
 import './research.css';
 import './maRecommendation.css';
+import { IndicatorPanel } from './IndicatorPanel';
 
 /** Recommended periods that are not yet a daily SMA on this symbol. */
 export function missingRecommended(indicators: readonly IndicatorInstance[], periods: readonly number[]): number[] {
@@ -83,7 +84,31 @@ const scoreText = (score: number | null) => (score === null ? '' : `（${Math.ro
 const scoreOf = (range: MaRecommendationRange) => range.candidates.find((c) => c.period === range.final)?.score ?? null;
 const percent = (value: number | null) => (value === null ? '—' : `${value > 0 ? '+' : ''}${(value * 100).toFixed(1)}%`);
 
-export function MaRecommendation({
+type RecommendationProps = {
+  active?: boolean;
+  store: AppStore;
+  symbol: string;
+  timeframe: Timeframe;
+  indicators: readonly IndicatorInstance[];
+  savedStock?: ParameterStock;
+  parameterError?: string | null;
+  onNotice: (message: string) => void;
+};
+
+export function MaRecommendation(props: RecommendationProps) {
+  const { store, symbol, timeframe, indicators } = props;
+  const [editor, setEditor] = useState(timeframe !== '1D');
+  useEffect(() => setEditor(timeframe !== '1D'), [symbol, timeframe]);
+  return <div className="ws-ma-timeframes">
+    <details key={`${symbol}:${timeframe}`} className="timeframe-ma-editor" open={editor} onToggle={event => setEditor(event.currentTarget.open)}>
+      <summary>自訂 {timeframe} 均線／畫線</summary>
+      {props.active !== false && editor && <IndicatorPanel key={`${symbol}:${timeframe}`} store={store} symbol={symbol} timeframe={timeframe} indicators={indicators.filter(indicator => indicator.scope.timeframe === timeframe)} />}
+    </details>
+    {timeframe === '1D' ? <DailyMaRecommendation {...props} /> : <HelpDisclosure label="日 K 建議與監控參數"><DailyMaRecommendation {...props} /></HelpDisclosure>}
+  </div>;
+}
+
+function DailyMaRecommendation({
   store,
   symbol,
   timeframe,
@@ -91,16 +116,7 @@ export function MaRecommendation({
   savedStock,
   parameterError,
   onNotice,
-}: {
-  store: AppStore;
-  symbol: string;
-  timeframe: Timeframe;
-  /** All of the symbol's indicators (every timeframe). */
-  indicators: readonly IndicatorInstance[];
-  savedStock?: ParameterStock;
-  parameterError?: string | null;
-  onNotice: (message: string) => void;
-}) {
+}: RecommendationProps) {
   const [loaded, setLoaded] = useState<{ symbol: string; result: MaRecommendationLoadResult }>();
   const [fixing, setFixing] = useState(false);
   useEffect(() => {

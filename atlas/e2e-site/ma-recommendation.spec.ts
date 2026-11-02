@@ -88,6 +88,7 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
 
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await page.locator('.ws-ma-timeframes > .help-disclosure > summary').click();
   await expect(card.locator('dd')).toHaveText('短 24（69） · 中 38（60） · 長 89（99）');
   await expect(card.locator('.ws-ma-reco-status')).toHaveText('日線至 2026-10-17');
   await expect(card.getByRole('button', { name: '套用 SMA 20', exact: true })).toHaveText('20（70）');
