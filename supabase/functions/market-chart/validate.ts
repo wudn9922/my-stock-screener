@@ -134,3 +134,41 @@ export function isChartPayload(value: unknown): boolean {
   const result = (chart as { result?: unknown }).result;
   return Array.isArray(result) && result.length > 0;
 }
+
+/**
+ * Batch live-quote mode: `?quotes=AAPL,2330.TW` returns the last month of daily rows for each symbol
+ * (one Yahoo chart request per symbol, `interval=1d&range=1mo`, no events). Atlas polls it once a minute
+ * for the stocks on screen and patches the forming bar; see atlas/src/market-data/LiveQuotes.ts.
+ */
+export const MAX_QUOTE_SYMBOLS = 40;
+export const QUOTE_INTERVAL = '1d';
+export const QUOTE_RANGE = '1mo';
+/** Browser and per-instance cache lifetime for a quote batch (the site polls every 60 s). */
+export const QUOTE_CACHE_SECONDS = 20;
+
+export type QuotesValidation =
+  | { ok: true; symbols: string[] }
+  | { ok: false; status: 400; code: 'invalid_symbol' | 'too_many_symbols'; message: string };
+
+export function validateQuotesRequest(value: string): QuotesValidation {
+  const symbols = [...new Set(value.split(',').map((part) => part.trim().toUpperCase()).filter(Boolean))];
+  if (!symbols.length || symbols.some((symbol) => symbol.length > 16 || !isValidChartSymbol(symbol))) {
+    return { ok: false, status: 400, code: 'invalid_symbol', message: 'Invalid or unsupported symbol' };
+  }
+  if (symbols.length > MAX_QUOTE_SYMBOLS) {
+    return { ok: false, status: 400, code: 'too_many_symbols', message: `At most ${MAX_QUOTE_SYMBOLS} symbols per request` };
+  }
+  return { ok: true, symbols };
+}
+
+export function quoteChartRequest(symbol: string): ChartRequest {
+  return { symbol, interval: QUOTE_INTERVAL, range: QUOTE_RANGE, events: false };
+}
+
+/** Keeps only what the client normalizer reads (meta minus its range lists, timestamps, OHLCV). */
+export function slimChartPayload(value: unknown): unknown {
+  const result = (value as { chart: { result: Record<string, unknown>[] } }).chart.result[0]!;
+  const { validRanges: _validRanges, tradingPeriods: _tradingPeriods, ...meta } = (result.meta ?? {}) as Record<string, unknown>;
+  const quote = ((result.indicators as { quote?: unknown[] } | undefined)?.quote ?? []).slice(0, 1);
+  return { chart: { result: [{ meta, timestamp: result.timestamp ?? [], indicators: { quote } }], error: null } };
+}

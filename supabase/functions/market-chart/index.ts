@@ -1,15 +1,22 @@
 // market-chart: a read-only Yahoo Finance chart proxy for Atlas (GitHub Pages cannot call Yahoo
 // directly because of CORS). GET ?symbol=&interval=&range=&events=1 → Yahoo's raw chart JSON.
+// GET ?quotes=AAPL,2330.TW → { results: { SYMBOL: slim chart JSON }, errors: { SYMBOL: code } }
+// with the last month of daily rows per symbol (the site's once-a-minute live refresh).
 // No secrets, no database access. Atlas normalizes and validates the payload client-side.
 import {
   buildYahooChartUrl,
+  type ChartRequest,
   cacheControlFor,
   classifyUpstreamStatus,
   corsHeaders,
   isAllowedOrigin,
   isChartPayload,
   parseAllowedOrigins,
+  QUOTE_CACHE_SECONDS,
+  quoteChartRequest,
+  slimChartPayload,
   validateChartRequest,
+  validateQuotesRequest,
   YAHOO_HOSTS,
 } from "./validate.ts";
 
@@ -34,25 +41,11 @@ function errorResponse(
   });
 }
 
-Deno.serve(async (req: Request): Promise<Response> => {
-  const origin = req.headers.get("Origin");
-  // Browsers on other sites get a plain 403; server-to-server callers (no Origin) are allowed.
-  if (origin && !isAllowedOrigin(origin, allowedOrigins)) {
-    return errorResponse(null, 403, "origin_not_allowed", "Origin not allowed");
-  }
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders(origin, allowedOrigins) });
-  }
-  if (req.method !== "GET") {
-    return errorResponse(origin, 405, "method_not_allowed", "Use GET");
-  }
+type Failure = ReturnType<typeof classifyUpstreamStatus>;
+type ChartOutcome = { ok: true; text: string; payload: unknown } | { ok: false; failure: Failure };
 
-  const validation = validateChartRequest(new URL(req.url).searchParams);
-  if (!validation.ok) {
-    return errorResponse(origin, validation.status, validation.code, validation.message);
-  }
-  const request = validation.value;
-
+/** One Yahoo chart request, query2 first; timeouts, 5xx and 429 retry query1. */
+async function fetchChart(request: ChartRequest): Promise<ChartOutcome> {
   let failure = classifyUpstreamStatus(502);
   for (const host of YAHOO_HOSTS) {
     try {
@@ -82,19 +75,104 @@ Deno.serve(async (req: Request): Promise<Response> => {
         failure = classifyUpstreamStatus(404);
         break;
       }
-      return new Response(text, {
-        status: 200,
-        headers: {
-          ...corsHeaders(origin, allowedOrigins),
-          "Content-Type": "application/json; charset=utf-8",
-          "Cache-Control": cacheControlFor(request.interval),
-        },
-      });
+      return { ok: true, text, payload };
     } catch {
       // Timeout or network failure: try the next Yahoo host. Details are never echoed to clients.
       failure = classifyUpstreamStatus(502);
     }
   }
+  return { ok: false, failure };
+}
+
+// Recent quote rows per symbol, shared by every viewer reaching this instance.
+const quoteCache = new Map<string, { at: number; payload: unknown }>();
+const QUOTE_CONCURRENCY = 6;
+
+async function quoteBatch(origin: string | null, value: string): Promise<Response> {
+  const validation = validateQuotesRequest(value);
+  if (!validation.ok) {
+    return errorResponse(origin, validation.status, validation.code, validation.message);
+  }
+  const results: Record<string, unknown> = {};
+  const errors: Record<string, string> = {};
+  const now = Date.now();
+  const pending = validation.symbols.filter((symbol) => {
+    const cached = quoteCache.get(symbol);
+    if (cached && now - cached.at < QUOTE_CACHE_SECONDS * 1000) results[symbol] = cached.payload;
+    return !(symbol in results);
+  });
+  let rateLimited = false;
+  const worker = async () => {
+    for (let symbol = pending.shift(); symbol; symbol = pending.shift()) {
+      // After Yahoo rate-limits once, stop asking it for the rest of this batch.
+      if (rateLimited) {
+        errors[symbol] = "rate_limited";
+        continue;
+      }
+      const outcome = await fetchChart(quoteChartRequest(symbol));
+      if (!outcome.ok) {
+        errors[symbol] = outcome.failure.code;
+        if (outcome.failure.code === "rate_limited") rateLimited = true;
+        continue;
+      }
+      try {
+        const payload = slimChartPayload(outcome.payload);
+        quoteCache.set(symbol, { at: Date.now(), payload });
+        results[symbol] = payload;
+      } catch {
+        errors[symbol] = "upstream_error";
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: QUOTE_CONCURRENCY }, worker));
+  if (quoteCache.size > 2000) quoteCache.clear();
+  if (Object.keys(errors).length) {
+    console.warn(`market-chart quotes: ${Object.entries(errors).map(([s, c]) => `${s}=${c}`).join(" ")}`);
+  }
+  return new Response(JSON.stringify({ asOf: Math.floor(Date.now() / 1000), results, errors }), {
+    status: 200,
+    headers: {
+      ...corsHeaders(origin, allowedOrigins),
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": `public, max-age=${QUOTE_CACHE_SECONDS}`,
+    },
+  });
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  const origin = req.headers.get("Origin");
+  // Browsers on other sites get a plain 403; server-to-server callers (no Origin) are allowed.
+  if (origin && !isAllowedOrigin(origin, allowedOrigins)) {
+    return errorResponse(null, 403, "origin_not_allowed", "Origin not allowed");
+  }
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders(origin, allowedOrigins) });
+  }
+  if (req.method !== "GET") {
+    return errorResponse(origin, 405, "method_not_allowed", "Use GET");
+  }
+
+  const params = new URL(req.url).searchParams;
+  const quotes = params.get("quotes");
+  if (quotes !== null) return quoteBatch(origin, quotes);
+
+  const validation = validateChartRequest(params);
+  if (!validation.ok) {
+    return errorResponse(origin, validation.status, validation.code, validation.message);
+  }
+  const request = validation.value;
+  const outcome = await fetchChart(request);
+  if (outcome.ok) {
+    return new Response(outcome.text, {
+      status: 200,
+      headers: {
+        ...corsHeaders(origin, allowedOrigins),
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": cacheControlFor(request.interval),
+      },
+    });
+  }
+  const failure = outcome.failure;
   console.warn(
     `market-chart ${request.symbol} ${request.interval}/${request.range}: ${failure.code}`,
   );

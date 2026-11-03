@@ -3,6 +3,7 @@ import type { OpenChartOptions } from '../app/Site';
 import type { Route } from '../app/routes';
 import { getDailyBars } from '../app/dataSources';
 import type { Bar } from '../market-data/MarketDataProvider';
+import { liveQuotes, mergeDailyBars } from '../market-data/LiveQuotes';
 import { fetchTrendingStocks, type TrendingStocksResult } from '../report/trendingStocks';
 import type { SavedWatchlist } from '../watchlists/model';
 import { displayTicker, formatDateTime, formatPercent, formatPrice, toneClass } from './format';
@@ -46,35 +47,53 @@ export function rowQuote(bars: readonly Bar[]) {
   return { close: last?.close ?? null, changePct, time: last?.time ?? null, points, trend: closes.length > 1 ? closes.at(-1)! - closes[0]! : null };
 }
 
-/** Starts the bar request only once the row is near the viewport (long lists stay cheap). */
+/**
+ * `near`: the row has come near the viewport once (starts the bar request; long lists stay cheap).
+ * `visible`: it is near the viewport now (only those rows take part in the live refresh).
+ */
 function useNear<T extends Element>() {
   const ref = useRef<T>(null);
   const [near, setNear] = useState(false);
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
     const element = ref.current;
-    if (!element || near) return;
-    if (typeof IntersectionObserver === 'undefined') return setNear(true);
-    const observer = new IntersectionObserver((entries) => entries.some((entry) => entry.isIntersecting) && setNear(true), { rootMargin: '200px' });
+    if (!element) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setNear(true);
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      const shown = entries.some((entry) => entry.isIntersecting);
+      setVisible(shown);
+      if (shown) setNear(true);
+    }, { rootMargin: '200px' });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [near]);
-  return { ref, near };
+  }, []);
+  return { ref, near, visible };
 }
 
 function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => void }) {
-  const { ref, near } = useNear<HTMLLIElement>();
+  const { ref, near, visible } = useNear<HTMLLIElement>();
   const [bars, setBars] = useState<readonly Bar[] | 'error' | null>(null);
   useEffect(() => {
     if (!near) return;
     let live = true;
     getDailyBars(row.symbol).then(
-      (result) => live && setBars(result),
-      () => live && setBars('error'),
+      (result) => live && setBars((current) => (Array.isArray(current) ? mergeDailyBars(result, current.slice(-30)) : result)),
+      () => live && setBars((current) => current ?? 'error'),
     );
     return () => {
       live = false;
     };
   }, [near, row.symbol]);
+  // While on screen: a fresh price right away, then once a minute during the session.
+  useEffect(() => {
+    if (!visible) return;
+    return liveQuotes().subscribe(row.symbol, (value) =>
+      setBars((current) => (Array.isArray(current) ? mergeDailyBars(current, value.bars) : value.bars)));
+  }, [visible, row.symbol]);
   const quote = Array.isArray(bars) ? rowQuote(bars) : null;
   const ticker = displayTicker(row.symbol);
   const tone = toneClass(quote?.changePct);
@@ -186,7 +205,7 @@ export function WatchlistBoard({ list, lists, parameters, parameterError, onSele
       </button>}
       <p className="wb-caption">
         <span>{tab === 'list' ? list ? `清單：${list.name}` : '我的清單' : 'LINE 熱門美股'}</span>
-        <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}延遲報價</span>
+        <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}盤中每分鐘更新（Yahoo 延遲報價）</span>
       </p>
       {charts && parameterError && <p role="status">{parameterError}</p>}
       {empty ? <div className="wb-empty" role="status">{empty}</div> : charts ? <StockChartList key={`${tab}:${list?.id ?? ''}`} rows={rows}
