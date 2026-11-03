@@ -49,6 +49,12 @@ export interface BarNormalization {
     time: number;
     quoteAsOf: number;
   };
+  /** The live session's forming daily row had high/low behind its own open/close; widened to them. */
+  liveBarBounds?: {
+    method: 'live-session-open-close';
+    time: number;
+    quoteAsOf: number;
+  };
   currentPeriod?: {
     method: 'daily-ohlcv';
     timeframe: '1W' | '1M';

@@ -122,6 +122,7 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
     }
   }
   let healedDailyClose: BarNormalization['healedDailyClose'];
+  let liveBarBounds: BarNormalization['liveBarBounds'];
   for (let i = 0; i < result.timestamp.length; i++) {
     if (canonicalSymbol && isQuarantinedBar(canonicalSymbol, result.timestamp[i]!, timeframe)) continue;
     const open = q.open[i],
@@ -171,14 +172,39 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
     // Keep the normalized Bar shape stable: Yahoo omits volume in some intervals,
     // and this prototype retains its established zero fallback for that field.
     const volume = q.volume?.[i] ?? 0;
+    let rowHigh = high,
+      rowLow = low;
+    // Right after the open Yahoo's still-forming daily row already carries the live price while its
+    // high/low lag behind (e.g. close 100.7 above high 100.5). Only that row of the live session is
+    // widened to its own open/close; any other inconsistent row still fails the response.
+    if (
+      timeframe === '1D' &&
+      i === latestDailyIndex &&
+      open > 0 &&
+      close > 0 &&
+      (rowHigh < Math.max(open, close) || rowLow > Math.min(open, close))
+    ) {
+      const metaTime = result.meta?.regularMarketTime,
+        rowTime = result.timestamp[i]!;
+      if (
+        metaTime !== undefined &&
+        metaTime >= rowTime &&
+        metaTime <= asOf + 300 &&
+        calendarDate(metaTime, market) === calendarDate(rowTime, market)
+      ) {
+        rowHigh = Math.max(rowHigh, open, close);
+        rowLow = Math.min(rowLow, open, close);
+        liveBarBounds = { method: 'live-session-open-close', time: rowTime, quoteAsOf: metaTime };
+      }
+    }
     if (
       open <= 0 ||
       high <= 0 ||
       low <= 0 ||
       close <= 0 ||
       volume < 0 ||
-      high < Math.max(open, close) ||
-      low > Math.min(open, close)
+      rowHigh < Math.max(open, close) ||
+      rowLow > Math.min(open, close)
     ) {
       throw new Error(`Invalid Yahoo OHLCV values at ${result.timestamp[i]}`);
     }
@@ -194,8 +220,8 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
     byTime.set(time, {
       time,
       open,
-      high,
-      low,
+      high: rowHigh,
+      low: rowLow,
       close,
       volume,
     });
@@ -237,7 +263,9 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
     adjusted: verifiedBasis,
     priceBasis: verifiedBasis ? 'split-adjusted' : 'unknown',
     ...(quote ? { quote } : {}),
-    ...(healedDailyClose ? { normalization: { healedDailyClose } } : {}),
+    ...(healedDailyClose || liveBarBounds
+      ? { normalization: { ...(healedDailyClose ? { healedDailyClose } : {}), ...(liveBarBounds ? { liveBarBounds } : {}) } }
+      : {}),
     asOf,
     latestBarAt: bars.at(-1)!.time,
     dataState: 'delayed',
@@ -350,11 +378,14 @@ export function normalizeYahooCalendarResponse(
     seenSessionDates.add(marketDate);
 
     const open = dailyQuote.open[index],
-      high = dailyQuote.high[index],
-      low = dailyQuote.low[index],
       sourceClose = dailyQuote.close[index],
       volume = dailyQuote.volume?.[index];
     const normalized = dailyByTime.get(time);
+    // The live row's high/low may have been widened to its open/close by the daily normalizer.
+    const widened = daily.normalization?.liveBarBounds;
+    const live = !!normalized && time === dailyMeta.latestRowTime && widened?.time === time && widened.quoteAsOf === dailyMeta.time;
+    const high = live ? normalized!.high : dailyQuote.high[index],
+      low = live ? normalized!.low : dailyQuote.low[index];
     let close = sourceClose;
     if (sourceClose === null) {
       const healing = daily.normalization?.healedDailyClose;
