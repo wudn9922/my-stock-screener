@@ -37,7 +37,7 @@ import type { StrategyResult } from '../strategy';
 import type { FilingEvent } from '../events/FilingEvents';
 import { coloredVolume, setVolumeColors, volumeSma } from '../indicators/Volume';
 import { averageTrueRange } from '../indicators/AverageTrueRange';
-import { getMarketProfile } from '../market-data/MarketProfile';
+import { getMarketProfile, type MarketProfile } from '../market-data/MarketProfile';
 import { marketTimeOptions } from './MarketTimeLabels';
 import { AXIS_FONT_FAMILY, AXIS_TEXT_COLOR, axisFontSize, compactAxisPrice } from './AxisAppearance';
 import { formatMarketVolume } from '../ui/format';
@@ -312,12 +312,71 @@ export class ChartEngine {
     this.ohlcBar = result.bars.at(-1) ?? null;
     this.renderHeader();
     this.scheduleVisualFrame();
+    this.renderSource(result, market);
+  }
+  /** A pointer is down on the chart or a drawing gesture is in progress. */
+  get interacting(): boolean {
+    return this.activePointers.size > 0 || !!this.controller?.machine.gesture;
+  }
+  /**
+   * Live refresh: when the bar times are unchanged (only the forming bar moved), redraws the data in
+   * place and keeps drawings, tool, selection and the visible range. Returns false when a full
+   * `load` is needed (a new bar appeared or history changed).
+   */
+  patchBars(result: BarResult): boolean {
+    const bars = result.bars;
+    if (!this.mapper || !this.controller || bars.length !== this.bars.length || bars.some((bar, i) => bar.time !== this.bars[i]!.time)) return false;
+    const following = this.ohlcBar !== null && this.ohlcBar.time === this.bars.at(-1)?.time;
+    const view = this.chart.timeScale().getVisibleLogicalRange();
+    this.bars = bars;
+    this.atr = averageTrueRange(bars);
+    this.revision++;
+    this.candles.setData([
+      ...bars.map((b) => ({ ...b, time: b.time as UTCTimestamp })),
+      ...this.mapper.futureWhitespace().map((b) => ({ time: b.time as UTCTimestamp })),
+    ]);
+    const volumeData = coloredVolume(bars),
+      volumeAverageData = volumeSma(bars);
+    this.volume.setData(volumeData.map((point) => ({ ...point, time: point.time as UTCTimestamp })));
+    this.volumeAverage.setData(volumeAverageData.map((point) => ({ ...point, time: point.time as UTCTimestamp })));
+    this.legacyVolumeValues = new Map(volumeData.map((point) => [point.time, point.value]));
+    this.legacyVolumeAverageValues = new Map(volumeAverageData.map((point) => [point.time, point.value]));
+    this.indicators.sync(this.indicatorInstances, bars, this.timeframe, this.revision);
+    if (view) this.chart.timeScale().setVisibleLogicalRange(view);
+    if (following) this.ohlcBar = bars.at(-1)!;
+    this.controller.refresh();
+    this.renderHeader();
+    this.scheduleVisualFrame();
+    this.renderSource(result, result.market ?? getMarketProfile(this.symbol));
+    return true;
+  }
+  /**
+   * Live refresh that added a bar: a full load that keeps the research, filing and corporate-event
+   * markers (they all sit on earlier bars, which a live refresh never changes).
+   */
+  reloadLive(
+    result: BarResult,
+    drawings: Drawing[],
+    indicators: IndicatorInstance[],
+    range?: ViewRange,
+    legacyVolume = true,
+    calendar: SessionCalendar = 'regular',
+  ) {
+    const kept = [this.researchMarkers, this.eventMarkers, this.corporateMarkers];
+    this.load(this.symbol, this.timeframe, result, drawings, indicators, range, legacyVolume, calendar);
+    const valid = <T extends { time: unknown }>(markers: T[]) => markers.filter((marker) => this.barIndices.has(marker.time as number));
+    this.researchMarkers = valid(kept[0]!);
+    this.eventMarkers = valid(kept[1]!);
+    this.corporateMarkers = valid(kept[2]!);
+    this.refreshMarkers();
+  }
+  private renderSource(result: BarResult, market: MarketProfile) {
     const state = result.dataState ?? (result.delayed ? 'delayed' : 'simulated');
     const stateText = state === 'simulated' ? '模擬' : state === 'live' ? '即時' : '延遲';
     const cacheText = { fresh: '最新', cached: '快取', stale: '舊資料' }[result.cacheStatus ?? 'fresh'];
     const basisText = { 'split-adjusted': '分割已調整', unadjusted: '未調整', unknown: '調整方式未知' }[result.priceBasis ?? 'unknown'];
     const time = (seconds: number) => new Date(seconds * 1000).toLocaleString('zh-TW', { hour12: false });
-    const asset = worldAssetFor(symbol);
+    const asset = worldAssetFor(this.symbol);
     const sessionText = asset ? asset.calendar === 'continuous-utc' ? '全天交易 UTC 日線' : '來源日 K（日曆標籤）' : result.session === 'regular' ? '一般交易時段' : '含盤前盤後';
     this.sourceLabel.textContent = `${result.source} · ${asset?.unit ?? market.currency} · ${sessionText} · ${stateText} · ${cacheText} · ${basisText} · 取得 ${result.asOf ? time(result.asOf) : '—'} · 最後 K 棒 ${time(result.bars.at(-1)!.time)}`;
     if (result.sessionCloseObservations?.length) this.sourceLabel.textContent += ` · ${result.sessionCloseObservations.length} 筆收盤競價觀測點（瞬時樣本）`;

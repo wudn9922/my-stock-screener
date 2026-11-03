@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { buildReport, mockSite, screenerFixtures, yahooChart } from './mocks';
+import { buildReport, mockSite, screenerFixtures, yahooChart, NO_LIVE_QUOTES } from './mocks';
 import { mockDeviceAccount } from './account-fixture';
 
 const trending = {
@@ -24,6 +24,7 @@ test('LINE stocks open a chart and repeated updates request only that stock; fai
   let fail = false;
   await page.route('https://edge.test/functions/v1/market-chart**', async route => {
     const url = new URL(route.request().url());
+    if (url.searchParams.has('quotes')) return route.fulfill({ json: NO_LIVE_QUOTES });
     if (url.searchParams.has('_refresh')) refreshed.push(url);
     if (fail) return route.fulfill({ status: 502, json: { error: 'upstream error' } });
     const body = yahooChart('NVDA', url.searchParams.get('interval')!);
@@ -149,6 +150,7 @@ test('switching symbols while refreshing cancels the result for the old chart', 
   let started = false;
   await page.route('https://edge.test/functions/v1/market-chart**', async route => {
     const url = new URL(route.request().url());
+    if (url.searchParams.has('quotes')) return route.fulfill({ json: NO_LIVE_QUOTES });
     if (url.searchParams.has('_refresh')) {
       started = true;
       await new Promise<void>(resolve => { release = resolve; });
