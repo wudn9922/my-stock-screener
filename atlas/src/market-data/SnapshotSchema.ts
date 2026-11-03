@@ -18,6 +18,7 @@ const bar = z.object({ time: timestamp, open: number.nonnegative(), high: number
 const quote = z.object({ symbol: z.string().regex(CANONICAL_SYMBOL_REGEX), price: number.positive(), change: number, changePercent: number, asOf: timestamp, source: z.string(), dataState: z.literal('delayed'), retrievedAt: number.positive(), cacheStatus: z.enum(['fresh', 'cached', 'stale']).optional(), market: marketProfileSchema.optional() });
 const normalization = z.object({
   healedDailyClose: z.object({ method: z.literal('validated-regular-market-price'), time: timestamp, quoteAsOf: timestamp }).optional(),
+  liveBarBounds: z.object({ method: z.literal('live-session-open-close'), time: timestamp, quoteAsOf: timestamp }).optional(),
   currentPeriod: z.object({
     method: z.literal('daily-ohlcv'), timeframe: z.enum(['1W', '1M']), periodStart: timestamp,
     firstDailyTime: timestamp, lastDailyTime: timestamp, dailyCount: z.number().int().positive(),

@@ -76,6 +76,45 @@ it('heals only a valid latest daily null close from same-session Yahoo market me
   expect(withoutRealVolume.normalization?.healedDailyClose).toBeUndefined();
 });
 
+/** Right after the open: the forming row's close is the live price, above its lagging high. */
+function liveCloseAboveHigh() {
+  const raw = fixture('SMCI-current-1d.json');
+  const result = raw.chart.result[0], q = result.indicators.quote[0], last = result.timestamp.length - 1;
+  q.close[last] = 46.1;
+  result.meta.regularMarketPrice = 46.1;
+  return { raw, last };
+}
+
+it('widens only the live session row whose high/low lag behind its own open/close', () => {
+  const { raw } = liveCloseAboveHigh();
+  const normalized = normalizeYahooResponse(raw, asOf, '1D', 'SMCI');
+  expect(normalized.bars.at(-1)).toMatchObject({ time: dailyCloseTime, open: 42.52000045776367, high: 46.1, low: 42.459999084472656, close: 46.1 });
+  expect(normalized.normalization?.liveBarBounds).toEqual({ method: 'live-session-open-close', time: dailyCloseTime, quoteAsOf: quoteTime });
+  expect(normalized.bars.slice(0, -1)).toEqual(normalizeYahooResponse(fixture('SMCI-current-1d.json'), asOf, '1D', 'SMCI').bars.slice(0, -1));
+
+  // A row from an earlier session stays a hard failure.
+  const historical = fixture('SMCI-current-1d.json');
+  const previous = historical.chart.result[0].timestamp.length - 2;
+  historical.chart.result[0].indicators.quote[0].close[previous] = 50;
+  expect(() => normalizeYahooResponse(historical, asOf, '1D', 'SMCI')).toThrow(/Invalid Yahoo OHLCV/);
+
+  // Without same-session market metadata the latest row is not treated as live.
+  const stale = liveCloseAboveHigh().raw;
+  stale.chart.result[0].meta.regularMarketTime = Date.parse('2026-10-06T20:00:00Z') / 1000;
+  expect(() => normalizeYahooResponse(stale, asOf, '1D', 'SMCI')).toThrow(/Invalid Yahoo OHLCV/);
+});
+
+it('keeps the current week buildable when the live daily row was widened', () => {
+  const { native } = currentRows('1W');
+  const { raw: daily } = liveCloseAboveHigh();
+  const nativeResult = native.chart.result[0], nq = nativeResult.indicators.quote[0], tail = nativeResult.timestamp.length - 1;
+  nativeResult.meta.regularMarketPrice = 46.1;
+  nq.close[tail] = 46.1;
+  nq.high[tail] = Math.max(nq.high[tail], 46.1);
+  const result = normalizeYahooCalendarResponse(native, daily, asOf, '1W', 'SMCI');
+  expect(result.bars.at(-1)).toMatchObject({ time: expected['1W'].time, high: 46.1, close: 46.1 });
+});
+
 it.each(['1W', '1M'] as const)(
   'reconstructs only the current %s bucket from daily OHLCV and retains native history',
   (timeframe) => {
