@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { dailyBars, mockSite, yahooChart } from './mocks';
+import { dailyBars, mockSite, yahooChart, NO_LIVE_QUOTES } from './mocks';
 
 // Deliberately simple synthetic prices: 20 TRs of 4, then one overnight gap with TR=12.
 function fixture(symbol: string, count = 22) {
@@ -29,6 +29,7 @@ test('daily volatility and independent volume analysis stay beside recommendatio
   const intervals: string[] = [];
   await page.route('https://edge.test/functions/v1/market-chart**', (route) => {
     const url = new URL(route.request().url());
+    if (url.searchParams.has('quotes')) return route.fulfill({ json: NO_LIVE_QUOTES });
     const symbol = url.searchParams.get('symbol')!;
     const interval = url.searchParams.get('interval')!;
     intervals.push(interval);
@@ -101,6 +102,7 @@ test('switching symbols clears old values; short history shows no invented volat
   });
   await page.route('https://edge.test/functions/v1/market-chart**', async (route) => {
     const url = new URL(route.request().url());
+    if (url.searchParams.has('quotes')) return route.fulfill({ json: NO_LIVE_QUOTES });
     const symbol = url.searchParams.get('symbol')!;
     if (symbol === 'NVDA') await gate;
     await route.fulfill({
@@ -127,6 +129,7 @@ test('daily request failure leaves the weekly chart usable and shows unavailable
   await mockSite(page);
   await page.route('https://edge.test/functions/v1/market-chart**', (route) => {
     const url = new URL(route.request().url());
+    if (url.searchParams.has('quotes')) return route.fulfill({ json: NO_LIVE_QUOTES });
     return url.searchParams.get('interval') === '1d'
       ? route.fulfill({ status: 502, json: { error: 'offline' } })
       : route.fulfill({

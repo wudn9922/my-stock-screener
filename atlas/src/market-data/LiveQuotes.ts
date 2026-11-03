@@ -1,8 +1,8 @@
 import type { Bar, BarResult, Quote } from './MarketDataProvider';
 import { normalizeSymbol } from './MarketDataProvider';
 import { calendarPeriodStart, getMarketProfile, type MarketProfile } from './MarketProfile';
-import { normalizeYahooResponse } from './YahooNormalizer';
-import { defaultMarketProxyUrl } from './EdgeYahooProvider';
+import { normalizeYahooResponse, YAHOO_SOURCE } from './YahooNormalizer';
+import { defaultMarketProxyUrl, EDGE_YAHOO_SOURCE } from './EdgeYahooProvider';
 import { worldAssetFor } from './worldAssets';
 
 /**
@@ -103,7 +103,8 @@ export function quotesUrl(proxyUrl: string, symbols: readonly string[]): string 
 export function normalizeLive(raw: unknown, symbol: string, retrievedAt: number): LiveDaily | null {
   try {
     const result: BarResult = normalizeYahooResponse(raw, retrievedAt, '1D', symbol);
-    return { symbol, bars: result.bars, ...(result.quote ? { quote: { ...result.quote, market: result.market } } : {}), retrievedAt };
+    const quote = result.quote && { ...result.quote, market: result.market, source: (result.quote.source ?? YAHOO_SOURCE).replace(YAHOO_SOURCE, EDGE_YAHOO_SOURCE) };
+    return { symbol, bars: result.bars, ...(quote ? { quote } : {}), retrievedAt };
   } catch {
     return null;
   }

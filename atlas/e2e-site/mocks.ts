@@ -108,6 +108,9 @@ export function weeklyBars(symbol: string, count = 522) {
     return { time, open, high: Math.max(open, close) * 1.01, low: Math.min(open, close) * 0.99, close, volume: Math.round(1e6 + rand() * 1e7) };
   });
 }
+/** A `market-chart?quotes=` answer with no rows: the live refresh leaves the page as loaded. */
+export const NO_LIVE_QUOTES = { asOf: 0, results: {}, errors: {} };
+
 export function yahooChart(symbol: string, interval: string) {
   const taiwan = TAIWAN(symbol);
   const bars = dailyBars(symbol);
@@ -204,6 +207,8 @@ export async function mockSite(page: Page, options: MockOptions = {}) {
   }
   await page.route('https://edge.test/functions/v1/market-chart**', (route) => {
     const url = new URL(route.request().url());
+    // The once-a-minute live refresh (?quotes=) changes nothing unless a test asks for it.
+    if (url.searchParams.has('quotes')) return json(route, NO_LIVE_QUOTES);
     const symbol = url.searchParams.get('symbol') ?? '';
     requested.push(symbol);
     if (options.failingSymbols?.includes(symbol)) return json(route, { error: 'upstream' }, 502);

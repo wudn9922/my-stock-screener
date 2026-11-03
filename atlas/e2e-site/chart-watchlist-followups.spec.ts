@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { mockSite, buildReport, yahooChart } from './mocks';
+import { mockSite, buildReport, yahooChart, NO_LIVE_QUOTES } from './mocks';
 import { searchSymbol } from '../e2e/site-helpers';
 import { mockDeviceAccount } from './account-fixture';
 
@@ -24,6 +24,7 @@ test('switching from a manually scaled low-price stock to a high-price stock sho
   await mockSite(page);
   await page.route('https://edge.test/functions/v1/market-chart**', route => {
     const url = new URL(route.request().url()), symbol = url.searchParams.get('symbol')!;
+    if (url.searchParams.has('quotes')) return route.fulfill({ json: NO_LIVE_QUOTES });
     const payload = yahooChart(symbol, url.searchParams.get('interval') ?? '1d');
     const data = payload.chart.result[0]!, quote = data.indicators.quote[0]!;
     const factor = (symbol === 'AAPL' ? 20 : 2000) / data.meta.regularMarketPrice;
