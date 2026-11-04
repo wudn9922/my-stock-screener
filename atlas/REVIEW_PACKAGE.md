@@ -16,6 +16,12 @@ Real-source smoke in an external temporary directory obtained AAPL's after-hours
 and an honestly unavailable premarket observation; no permanent records were written.
 Final semantic review also separated Nasdaq expectedPriceDate/pricedDate from listing dates; the five Python cases, 14 focused unit cases and 12 stock/IPO browser cases passed again.
 Final boundary fixes keep hyphenated share classes (BRK-B) eligible for same-time volume, and preserve a known startup failure after the 15-second waiting timer. Their unit/browser assertions are included without relaxing the gates.
+The first complete CI browser gate (804 cases) reported 786 passes, five existing skips and
+13 findings: old caption/footer/theme/error assertions plus one premature WebKit quote-menu
+interaction. Tests now assert the new exact footer locations, storage-to-health adjacency,
+compact picker/chart alignment, distinct missing/invalid reasons and a settled NVDA chart.
+The affected 78-case suite passed 77 with its existing desktop-only skip. No assertion was
+removed or broadly relaxed; no new skip was introduced.
 CI will verify the exact pushed head. No merge or deployment is authorized.
 
 ## Current follow-up: timeframe fixation, calibrated breadth and list evidence (2026-11-02)

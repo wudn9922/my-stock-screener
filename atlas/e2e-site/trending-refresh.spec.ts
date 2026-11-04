@@ -111,7 +111,8 @@ test('LINE tab remains visible for missing or invalid files and retry recovers i
     response = value;
     if (value !== 'missing') await page.reload();
     await expect(page.getByRole('button', { name: /^LINE 熱門/ })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('.screener-body .page-state')).toContainText('LINE 熱門美股清單尚未產生');
+    await expect(page.locator('.screener-body .page-state')).toContainText(value === 'missing'
+      ? 'LINE 熱門美股清單尚未產生' : 'LINE 熱門清單資料格式無效，請稍後重試。');
     await expect(page.getByRole('button', { name: '存成自選清單', exact: true })).toBeDisabled();
   }
   response = 'ok';

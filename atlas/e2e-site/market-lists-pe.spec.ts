@@ -90,7 +90,7 @@ test('permission display is immediately before data health at the foot of every 
     await page.goto(`./?page=${route}`);
     const footer = page.locator('.site-data-footer');
     await expect(footer.getByRole('complementary', { name: '目前儲存權限' })).toHaveCount(1);
-    expect(await footer.evaluate(element => element.firstElementChild?.getAttribute('aria-label'))).toBe('目前儲存權限');
+    expect(await footer.getByRole('complementary', { name: '目前儲存權限' }).evaluate(element => element.nextElementSibling?.classList.contains('data-health'))).toBe(true);
     expect(await footer.evaluate(element => element.lastElementChild?.classList.contains('data-health'))).toBe(true);
     expect(await footer.evaluate(element => element === document.getElementById('main')!.lastElementChild)).toBe(true);
     expect(await noOverflow(page)).toBeLessThanOrEqual(1);

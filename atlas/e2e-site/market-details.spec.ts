@@ -125,6 +125,9 @@ test("missing extended coverage and missing intraday history explain the cause",
     route.fulfill({ status: 404, body: "missing" }),
   );
   await page.goto("./?page=chart&symbol=NVDA");
+  await expect(page.getByTestId("active-symbol")).toHaveText("NVDA");
+  await expect(page.getByTestId("ohlc-header")).toContainText("O ");
+  await expect(page.locator(".chart-loading")).toHaveCount(0);
   await page.getByTestId("extended-quotes-toggle").click();
   await expect(
     page.getByRole("region", { name: "盤前盤後報價" }),

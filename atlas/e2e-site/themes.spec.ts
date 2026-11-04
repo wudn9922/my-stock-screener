@@ -103,7 +103,7 @@ test('market tabs switch between the US and Taiwan themes and reset the view', a
   await tabs.getByRole('tab', { name: /台股/ }).click();
   await expect(page).toHaveURL(/page=themes&market=tw$/);
   await expect(page.locator('.theme-tile')).toHaveCount(8);
-  await expect(page.locator('.themes-page .page-sub')).toContainText('基準 加權指數');
+  await expect(page.locator('.site-data-footer .page-sub')).toContainText('基準 加權指數');
   await expect(page.locator('.themes-legend')).toContainText('大盤 加權指數');
   await expect(page.getByRole('group', { name: '產業大類' }).getByRole('button', { name: /全部/ })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('group', { name: '指標' }).getByRole('button', { name: '相對 加權指數' }).click();
