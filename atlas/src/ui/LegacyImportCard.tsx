@@ -18,10 +18,7 @@ export function LegacyImportCard() {
     if (allowed) void ensureLegacyImport();
   }, [allowed, access.epoch]);
   // Check the live permission independently of the controller's last result.
-  if (!allowed || ['idle', 'checking', 'dismissed'].includes(state.status)) return null;
-  if (state.status === 'empty') {
-    return <p className="legacy-import-empty" role="status">這台裝置沒有可匯入的舊版資料。</p>;
-  }
+  if (!allowed || ['idle', 'checking', 'dismissed', 'empty'].includes(state.status)) return null;
   const busy = state.status === 'importing';
   return (
     <aside className="legacy-import-card" aria-label="舊版資料匯入" data-testid="legacy-import-card" aria-busy={busy}>

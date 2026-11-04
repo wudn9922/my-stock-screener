@@ -38,3 +38,9 @@
 7 項 Python、17 項相關前端單元測試、typecheck 通過。50 項相關瀏覽器回歸通過，另以 77.6／41.4 的實際顯示長度重跑 20 項：桌機、390px／375px Chromium、390px／375px iPhone WebKit 均通過。逐一檢查本益比、TTM、說明、收藏、更新及資訊按鈕邊界互不相交；驗證來源展開不覆蓋圖表／分頁，無資料不留高度。
 
 畫面：[桌機](screenshots/pr-a/a3-desktop.png)、[390px](screenshots/pr-a/a3-iphone390.png)、[375px](screenshots/pr-a/a3-iphone375.png)、[展開來源](screenshots/pr-a/a3-expanded-desktop.png)、[自選桌機](screenshots/pr-a/a3-board-desktop.png)、[自選 375px](screenshots/pr-a/a3-board-iphone375.png)。
+
+## A4 舊資料匯入僅在「我的」頁尾
+
+空裝置不渲染卡片或「沒有可匯入」提示。有舊資料時只在「我的」頁尾提供原有匯入選項；個股、自選等頁面均不掛載卡片。原有明確同意、衝突保留、帳號隔離與雲端同步流程不修改。
+
+23 項相關單元測試、45 項桌機／390px／375px Chromium 與 WebKit 回歸通過，保留原有重複匯入、雲端專有畫線、訪客／未授權不讀取舊資料的斷言。畫面：[桌機](screenshots/pr-a/a4-desktop.png)、[390px](screenshots/pr-a/a4-iphone390.png)、[375px](screenshots/pr-a/a4-iphone375.png)。
