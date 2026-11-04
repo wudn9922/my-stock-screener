@@ -1,3 +1,4 @@
+import { PageFooterNote } from '../ui/PageFooterNote';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { OfficialAlerts } from '../ui/research/OfficialAlerts';
 import { SecRadar } from '../ui/research/SecRadar';
@@ -162,10 +163,10 @@ export default function MarketsPage({ report, reload, navigate, openChart, marke
         <div>
           <h2 className="page-title">大盤</h2>
           {report.status === 'ok' && (
-            <p className="page-sub">
+            <PageFooterNote><p className="page-sub">
               報告日 {formatDateTime(report.report.reportDate, false)}
               {report.report.generatedAt ? ` · 產生於 ${formatDateTime(report.report.generatedAt)}` : ''}
-            </p>
+            </p></PageFooterNote>
           )}
         </div>
       </div>

@@ -1,3 +1,30 @@
+## Current follow-up: startup, compact watchlists and public market details (2026-11-04)
+
+Primary self-review only; no independent sign-off. Based on latest main `df29c9351`.
+The explicit ten-item request is documented in `docs/STARTUP_WATCHLIST_MARKET_DETAILS.md`.
+No protected auth/account/Edge Function source, SQL, existing permanent market records or archive branch is edited.
+New display snapshots are bounded, read-only consumers of public sources; source dates are never invented.
+Verified locally: clean npm ci; lint; typecheck; 137 Vitest files / 1,774 tests;
+normal + Pages builds; 5 public market-extras Python tests; 33 generated-branch tests;
+36 final browser cases across desktop Chromium, mobile Chromium and iPhone WebKit.
+The wider 237-case regression run had 233 passes and four findings (including a fractional
+43.999996px touch-target measurement). The accessibility label, WebKit padding and 45px
+compact-control fixes are verified without weakening
+assertions (80% main viewport, 44px controls, <=52px rows). Existing auth, holdings, import,
+navigation, live quotes, PWA and stock-view cases in that wider run passed.
+Real-source smoke in an external temporary directory obtained AAPL's after-hours trade timestamp
+and an honestly unavailable premarket observation; no permanent records were written.
+Final semantic review also separated Nasdaq expectedPriceDate/pricedDate from listing dates; the five Python cases, 14 focused unit cases and 12 stock/IPO browser cases passed again.
+Final boundary fixes keep hyphenated share classes (BRK-B) eligible for same-time volume, and preserve a known startup failure after the 15-second waiting timer. Their unit/browser assertions are included without relaxing the gates.
+The first complete CI browser gate (804 cases) reported 786 passes, five existing skips and
+13 findings: old caption/footer/theme/error assertions plus one premature WebKit quote-menu
+interaction. Tests now assert the new exact footer locations, storage-to-health adjacency,
+compact picker/chart alignment, distinct missing/invalid reasons and a settled NVDA chart.
+The affected 78-case suite passed 77 with its existing desktop-only skip. No assertion was
+removed or broadly relaxed; no new skip was introduced.
+Optional extended quote fields also tolerate null/zero/malformed metadata without rejecting otherwise valid regular bars; the complete 1,774-unit suite, lint and both builds passed after this compatibility fix.
+CI will verify the exact pushed head. No merge or deployment is authorized.
+
 ## Current follow-up: timeframe fixation, calibrated breadth and list evidence (2026-11-02)
 
 Primary self-review only; no independent sign-off. Based on main `133220a01`.

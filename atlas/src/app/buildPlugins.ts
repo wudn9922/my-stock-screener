@@ -19,7 +19,7 @@ export function versionedServiceWorker(): Plugin {
       const path = resolve(outDir, 'sw.js');
       const source = await readFile(path, 'utf8');
       const revision = createHash('sha256')
-        .update(index + source)
+        .update(index + source + await readFile(resolve(outDir, 'startup.js'), 'utf8'))
         .digest('hex')
         .slice(0, 12);
       await writeFile(path, source.replace('atlas-shell-v1', `atlas-shell-v1-${revision}`));

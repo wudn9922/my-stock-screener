@@ -1,3 +1,4 @@
+import { PageFooterNote } from '../ui/PageFooterNote';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
@@ -398,9 +399,9 @@ export default function WorldPage({ report, reload, navigate, openChart, view }:
         <div>
           <h2 className="page-title">{rates ? '美債與利率' : view === 'jp-bonds' ? '日本國債利差' : view === 'commodities' ? '原物料' : view === 'fx' ? '匯率' : '世界指數'}</h2>
           {view === 'indices' && report.status === 'ok' && (
-            <p className="page-sub">
+            <PageFooterNote><p className="page-sub">
               報告日 {formatDateTime(report.report.reportDate, false)} · 延遲行情
-            </p>
+            </p></PageFooterNote>
           )}
         </div>
         <div className="segmented compact research-world-tabs" role="group" aria-label="世界頁面">

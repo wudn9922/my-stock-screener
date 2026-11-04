@@ -284,3 +284,9 @@
     width: 100%;
   }
 }
+
+.same-time-volume { padding: 8px 0 16px; border-bottom: 1px solid var(--border); }
+.same-time-value { display: block; font-size: 28px; font-variant-numeric: tabular-nums; }
+.extended-quotes section { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.extended-quotes section b { font-size: 22px; }
+.extended-quotes a { min-height: 44px; display: inline-flex; align-items: center; }

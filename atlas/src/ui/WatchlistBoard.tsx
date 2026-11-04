@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { OpenChartOptions } from '../app/Site';
 import type { Route } from '../app/routes';
-import { getDailyBars } from '../app/dataSources';
+import { getDailyBars, searchStocks } from '../app/dataSources';
 import type { Bar } from '../market-data/MarketDataProvider';
 import { formatLiveTime, liveQuotes, mergeDailyBars } from '../market-data/LiveQuotes';
 import { fetchTrendingStocks, type TrendingStocksResult } from '../report/trendingStocks';
@@ -9,6 +9,8 @@ import type { SavedWatchlist } from '../watchlists/model';
 import { displayTicker, formatDateTime, formatPercent, formatPrice, toneClass } from './format';
 import './watchlistBoard.css';
 import { MonitorSignals } from './MonitorSignals';
+import { PageFooterNote } from './PageFooterNote';
+import { loadFailureReason } from '../market-data/loadFailureReason';
 import { StockChartList } from './StockChartList';
 import type { ParameterStock } from '../cloud/settingsApi';
 
@@ -76,13 +78,24 @@ function useNear<T extends Element>() {
 
 function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => void }) {
   const { ref, near, visible } = useNear<HTMLLIElement>();
-  const [bars, setBars] = useState<readonly Bar[] | 'error' | null>(null);
+  const [bars, setBars] = useState<readonly Bar[] | null>(null);
+  const [resolvedName, setResolvedName] = useState<{ symbol: string; name: string }>();
+  useEffect(() => {
+    if (!near || row.name !== row.symbol) return;
+    let live = true;
+    void searchStocks(row.symbol, 20).then(entries => {
+      const entry = entries.find(item => item.symbol === row.symbol);
+      if (live && entry) setResolvedName({ symbol: row.symbol, name: entry.name });
+    }).catch(() => undefined);
+    return () => { live = false; };
+  }, [near, row.symbol, row.name]);
+  const [failure, setFailure] = useState<string | null>(null);
   useEffect(() => {
     if (!near) return;
     let live = true;
     getDailyBars(row.symbol).then(
-      (result) => live && setBars((current) => (Array.isArray(current) ? mergeDailyBars(result, current.slice(-30)) : result)),
-      () => live && setBars((current) => current ?? 'error'),
+      (result) => { if (live) { setBars((current) => (current ? mergeDailyBars(result, current.slice(-30)) : result)); setFailure(result.length ? null : '來源沒有有效的日 K 資料'); } },
+      (error: unknown) => { if (live) setFailure(loadFailureReason(error)); },
     );
     return () => {
       live = false;
@@ -92,10 +105,11 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
   useEffect(() => {
     if (!visible) return;
     return liveQuotes().subscribe(row.symbol, (value) =>
-      setBars((current) => (Array.isArray(current) ? mergeDailyBars(current, value.bars) : value.bars)));
+      { setFailure(null); setBars((current) => (current ? mergeDailyBars(current, value.bars) : value.bars)); });
   }, [visible, row.symbol]);
   const quote = Array.isArray(bars) ? rowQuote(bars) : null;
   const ticker = displayTicker(row.symbol);
+  const fullName = row.name !== row.symbol ? row.name : resolvedName?.symbol === row.symbol ? resolvedName.name : null;
   const tone = toneClass(quote?.changePct);
   return (
     <li ref={ref}>
@@ -110,17 +124,18 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
         }}
       >
         <span className="wb-name">
-          <b>{row.name === row.symbol ? ticker : row.name}</b>
-          {row.name !== row.symbol && <small>{ticker}</small>}
+          <b>{ticker}</b>
+          {fullName && <small title={fullName}>{fullName}</small>}
         </span>
         <svg className={`wb-spark ${toneClass(quote?.trend)}`} viewBox="0 0 72 24" aria-hidden="true">
           {quote?.points && <polyline points={quote.points} />}
         </svg>
         <span className="wb-quote">
-          <b>{bars === 'error' ? '—' : formatPrice(quote?.close)}</b>
+          <b>{formatPrice(quote?.close)}</b>
           <small className={`wb-change ${tone}`}>
-            {bars === 'error' ? '暫無行情' : quote?.changePct == null ? '…' : `${tone === 'up' ? '▲ ' : tone === 'down' ? '▼ ' : ''}${formatPercent(quote.changePct)}`}
+            {failure && !bars ? '載入失敗' : quote?.changePct == null ? '…' : `${tone === 'up' ? '▲ ' : tone === 'down' ? '▼ ' : ''}${formatPercent(quote.changePct)}`}
           </small>
+          {failure && <small className="wb-error" role="status">{failure}</small>}
         </span>
       </a>
     </li>
@@ -151,7 +166,8 @@ function useTrending(wanted: boolean) {
  * 自選 home: a quote board (saved list / LINE 熱門 / monitor signals with daily change and a
  * 30-day path) above the unchanged list management. Display only: it writes nothing to storage.
  */
-export function WatchlistBoard({ list, lists, parameters, parameterError, onSelectList, openChart, navigate }: {
+export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterError, onSelectList, openChart, navigate }: {
+  viewSwitch?: ReactNode;
   parameters: readonly ParameterStock[];
   parameterError?: string | null;
   list: SavedWatchlist | undefined;
@@ -194,7 +210,7 @@ export function WatchlistBoard({ list, lists, parameters, parameterError, onSele
 
   return (
     <section className="watchlist-board" aria-label="自選行情">
-      <div className="wb-tabs" role="group" aria-label="行情來源">
+      <div className="wb-toolbar">{viewSwitch}<div className="wb-tabs" role="group" aria-label="行情來源">
         {([['list', '我的清單'], ['trending', 'LINE 熱門'], ['signals', '突破／跌破']] as const).map(([key, label]) => (
           <button key={key} type="button" aria-pressed={tab === key} className={tab === key ? 'active' : ''} onClick={() => {
             setTab(key);
@@ -202,19 +218,22 @@ export function WatchlistBoard({ list, lists, parameters, parameterError, onSele
           }}>{label}</button>
         ))}
       </div>
+      </div>
       {tab === 'signals' ? <MonitorSignals openChart={openChart} /> : <>
+      <div className="wb-list-toolbar">
       {tab === 'list' && hasLists && <div className="wb-list-picker" role="group" aria-label="我的自選清單">
-        <label>自選清單<select aria-label="選擇自選清單" value={list?.id ?? lists[0]!.id} onChange={event => onSelectList(event.target.value)}>
+        <label><span className="sr-only">自選清單</span><select aria-label="選擇自選清單" value={list?.id ?? lists[0]!.id} onChange={event => onSelectList(event.target.value)}>
           {lists.map(entry => <option key={entry.id} value={entry.id}>{entry.name}（{entry.market === 'TW' ? '台股' : '美股'}）</option>)}
         </select></label>
       </div>}
-      {rows.length > 0 && <button type="button" className="ghost-button wb-chart-toggle" aria-pressed={charts} onClick={() => setCharts(value => !value)}>
-        {charts ? '返回行情清單' : `連續看全部股票圖表（${rows.length} 檔）`}
+      {rows.length > 0 && <button type="button" className="ghost-button wb-chart-toggle" aria-label={charts ? '返回行情清單' : `連續看全部股票圖表（${rows.length} 檔）`} title={charts ? '返回行情清單' : `連續看全部股票圖表（${rows.length} 檔）`} aria-pressed={charts} onClick={() => setCharts(value => !value)}>
+        {charts ? '清單' : '圖表'}
       </button>}
-      <p className="wb-caption">
+      </div>
+      <PageFooterNote><p className="wb-caption">
         <span>{tab === 'list' ? list ? `清單：${list.name}` : '我的清單' : 'LINE 熱門美股'}</span>
         <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}盤中每分鐘更新（Yahoo 延遲報價）{liveAt ? <> · <time data-testid="board-live-time">更新於 {formatLiveTime(liveAt)}</time></> : null}</span>
-      </p>
+      </p></PageFooterNote>
       {charts && parameterError && <p role="status">{parameterError}</p>}
       {empty ? <div className="wb-empty" role="status">{empty}</div> : charts ? <StockChartList key={`${tab}:${list?.id ?? ''}`} rows={rows}
         parameters={parameters} groupPeriods={tab === 'list' ? list?.maList : undefined} openChart={openChart} /> : (

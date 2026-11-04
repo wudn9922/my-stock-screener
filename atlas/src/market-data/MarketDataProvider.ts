@@ -42,6 +42,7 @@ export interface Quote {
   retrievedAt?: number;
   cacheStatus?: CacheStatus;
   market?: MarketProfile;
+  extended?: Partial<Record<'pre' | 'post', { price: number; asOf: number }>>;
 }
 export interface BarNormalization {
   healedDailyClose?: {
@@ -67,6 +68,8 @@ export interface BarNormalization {
   };
 }
 export interface BarResult {
+  /** Unknown volume is distinct from an observed zero for intraday comparisons. */
+  missingVolumeAt?: number[];
   bars: Bar[];
   source: string;
   session: 'regular' | 'extended';

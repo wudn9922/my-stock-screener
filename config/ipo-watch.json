@@ -1,0 +1,19 @@
+[
+  {
+    "id": "anthropic",
+    "name": "Anthropic",
+    "symbol": "ANT",
+    "aliases": [
+      "Claude",
+      "Anthropic PBC"
+    ],
+    "status": "申請上市，掛牌日待確認",
+    "exchange": "Nasdaq（申請）",
+    "filedDate": "2026-11-02",
+    "listingDate": null,
+    "price": null,
+    "checkedAt": "2026-11-04T08:42:51+00:00",
+    "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2130357/000162828026068676/anthropicpbc-sx1ax1.htm",
+    "issuerUrl": "https://www.anthropic.com/news/s1-sec"
+  }
+]

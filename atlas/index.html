@@ -12,9 +12,20 @@
     <link rel="icon" href="%BASE_URL%icon.svg" />
     <link rel="apple-touch-icon" href="%BASE_URL%icon-192.png" />
     <title>Atlas 股市報告</title>
+    <style>
+      body{margin:0;background:#0b0e13}
+      .atlas-welcome{box-sizing:border-box;min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px;background:#0b0e13;color:#edf0f7;font:16px system-ui,sans-serif;text-align:center}.atlas-welcome svg{width:64px;height:64px;color:#8bb8ff}.atlas-welcome h1{font-size:32px;letter-spacing:3px;margin:0}.atlas-welcome p{color:#a3adbd;max-width:30em;margin:0;line-height:1.7}.atlas-welcome button{min-height:44px;padding:8px 24px;border:1px solid #5b7393;border-radius:10px;background:#172334;color:#edf0f7;font:inherit}.atlas-welcome progress{width:120px;height:3px;accent-color:#8bb8ff}
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><main id="atlas-welcome" class="atlas-welcome" aria-label="Atlas 歡迎頁面">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M8 46l15-21 11 12 10-23 12 32" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h1>Atlas</h1><p>歡迎回來，準備查看你的自選清單。</p>
+      <p id="atlas-boot-status" role="status">正在開啟 Atlas…</p><progress aria-label="正在載入"></progress>
+      <button id="atlas-boot-retry" type="button" hidden>重新載入</button>
+      <noscript><p>瀏覽器已停用 JavaScript，請啟用後重新開啟 Atlas。</p></noscript>
+    </main></div>
+    <script src="%BASE_URL%startup.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

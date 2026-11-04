@@ -52,9 +52,11 @@ it('compares the fetch date to the newest report day in Taipei, including midnig
   expect(trendingStocksStale({ ...data, sentAt: '2026-10-28T09:05:00Z' }, '2026-10-28')).toBe(true);
 });
 
-it('returns the group missing message for 404 and every invalid payload', async () => {
+it('distinguishes a missing file from invalid payloads and an upstream HTTP failure', async () => {
   const { LINE_TRENDING_MISSING } = await import('../src/report/trendingStocks');
-  for (const response of [new Response('', { status: 404 }), new Response('<html>fallback</html>'), Response.json({ version: 99 })]) {
-    expect(await fetchTrendingStocks(undefined, async () => response)).toEqual({ status: 'error', message: LINE_TRENDING_MISSING });
+  expect(await fetchTrendingStocks(undefined, async () => new Response('', { status: 404 }))).toEqual({ status: 'error', message: LINE_TRENDING_MISSING });
+  for (const response of [new Response('<html>fallback</html>'), Response.json({ version: 99 })]) {
+    expect(await fetchTrendingStocks(undefined, async () => response)).toEqual({ status: 'error', message: 'LINE 熱門清單資料格式無效，請稍後重試。' });
   }
+  expect(await fetchTrendingStocks(undefined, async () => new Response('', { status: 503 }))).toEqual({ status: 'error', message: 'LINE 熱門清單來源回應 HTTP 503，請稍後重試。' });
 });

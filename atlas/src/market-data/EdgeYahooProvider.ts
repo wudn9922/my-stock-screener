@@ -381,20 +381,20 @@ export class EdgeYahooProvider implements MarketDataProvider {
         });
       } catch (error) {
         if (signal.aborted && !timedOut) throw abortError(signal);
-        throw new MarketDataUnavailableError(edgeUnavailableMessage(symbol), { cause: error });
+        throw new MarketDataUnavailableError(timedOut ? `${symbol} 行情來源回應逾時` : `${symbol} 無法連線至行情來源`, { cause: error });
       }
       if (!response.ok) {
         if (response.status === 404) throw new Error(`找不到 ${symbol} 的行情資料，代號可能有誤或已下市`);
         if (response.status === 400) throw new Error(`${symbol} 不是行情代理接受的代號或週期`);
         if (response.status === 403) throw new Error('行情代理拒絕此網站來源，請檢查 Edge Function 的允許來源設定');
-        throw new MarketDataUnavailableError(edgeUnavailableMessage(symbol));
+        throw new MarketDataUnavailableError(`${symbol} 行情服務暫時無法使用（HTTP ${response.status}）`);
       }
       let raw: unknown;
       try {
         raw = await response.json();
       } catch (error) {
         if (signal.aborted && !timedOut) throw abortError(signal);
-        throw new MarketDataUnavailableError(edgeUnavailableMessage(symbol), { cause: error });
+        throw new MarketDataUnavailableError(`${symbol} 行情來源回傳無效 JSON`, { cause: error });
       }
       const fetchedAtMs = this.now();
       return { raw: alignIndexCurrency(raw, symbol), retrievedAt: fetchedAtMs / 1000, fetchedAtMs };

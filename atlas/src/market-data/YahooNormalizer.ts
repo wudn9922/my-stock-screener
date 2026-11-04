@@ -37,6 +37,11 @@ const responseSchema = z.object({
             exchangeTimezoneName: z.string().optional(),
             regularMarketPrice: z.number().finite().positive().optional(),
             regularMarketTime: z.number().int().positive().optional(),
+            // Optional extended metadata must never invalidate regular-session bars.
+            preMarketPrice: z.number().finite().positive().optional().catch(undefined),
+            preMarketTime: z.number().int().positive().optional().catch(undefined),
+            postMarketPrice: z.number().finite().positive().optional().catch(undefined),
+            postMarketTime: z.number().int().positive().optional().catch(undefined),
           }).optional(),
           timestamp: z.array(z.number().int().positive()),
           indicators: z.object({
@@ -110,6 +115,7 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
     throw new Error('Only USD market data is supported');
   }
   const byTime = new Map<number, Bar>();
+  const missingVolumeAt = new Set<number>();
   const originalTimes = new Map<number, number>();
   const sessionCloseEligibility = new Map<number, boolean>();
   const canMarkSessionClose = market.market === 'TW' &&
@@ -217,6 +223,7 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
     // replacing it would double count or lose the aggregate's OHLC/volume.
     if ((timeframe === '1M' || timeframe === '1W') && (originalTimes.get(time) ?? Infinity) < originalTime) continue;
     originalTimes.set(time, originalTime);
+    if (q.volume?.[i] == null) missingVolumeAt.add(time); else missingVolumeAt.delete(time);
     byTime.set(time, {
       time,
       open,
@@ -252,11 +259,17 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
     changePercent: (quotePrice / previous - 1) * 100, asOf: quoteTime,
     source: YAHOO_SOURCE, dataState: 'delayed' as const, retrievedAt: asOf, cacheStatus: 'fresh' as const,
     market,
+    ...(market.market === 'US' ? { extended: Object.fromEntries((['pre', 'post'] as const).flatMap(mode => {
+      const price = mode === 'pre' ? meta.preMarketPrice : meta.postMarketPrice;
+      const time = mode === 'pre' ? meta.preMarketTime : meta.postMarketTime;
+      return price && time && time <= asOf + 300 ? [[mode, { price, asOf: time }]] : [];
+    })) } : {}),
   } : undefined;
   sessionCloseObservations.sort((a, b) => a - b);
   const hasSessionCloseObservations = sessionCloseObservations.length > 0;
   return {
     bars,
+    ...(missingVolumeAt.size ? { missingVolumeAt: [...missingVolumeAt] } : {}),
     source: hasSessionCloseObservations ? `${YAHOO_SOURCE} · ${SESSION_CLOSE_SOURCE_QUALIFIER}` : YAHOO_SOURCE,
     session: 'regular',
     delayed: true,

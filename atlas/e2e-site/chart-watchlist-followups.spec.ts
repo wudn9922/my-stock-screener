@@ -53,7 +53,7 @@ async function createManual(page: Page, name: string, symbol: string) {
   await page.getByRole('combobox', { name: '手動清單市場' }).selectOption('US');
   await page.getByRole('textbox', { name: '手動清單股票' }).fill(symbol);
   await page.getByRole('button', { name: '儲存手動清單', exact: true }).click();
-  await expect(board(page).locator('.wb-caption')).toContainText(name);
+  await expect(page.locator('.site-data-footer .wb-caption')).toContainText(name);
 }
 
 test('my lists opens the default list and selects other groups directly above the stock rows', async ({ page }) => {
@@ -72,12 +72,14 @@ test('my lists opens the default list and selects other groups directly above th
   const positions = await board(page).evaluate(element => ({
     sources: element.querySelector('.wb-tabs')!.getBoundingClientRect().bottom,
     picker: element.querySelector('.wb-list-picker')!.getBoundingClientRect().top,
+    pickerBottom: element.querySelector('.wb-list-picker')!.getBoundingClientRect().bottom,
     toggle: element.querySelector('.wb-chart-toggle')!.getBoundingClientRect().top,
+    toggleBottom: element.querySelector('.wb-chart-toggle')!.getBoundingClientRect().bottom,
     rows: element.querySelector('.wb-rows')!.getBoundingClientRect().top,
   }));
   expect(positions.picker).toBeGreaterThanOrEqual(positions.sources);
-  expect(positions.toggle).toBeGreaterThan(positions.picker);
-  expect(positions.rows).toBeGreaterThan(positions.toggle);
+  expect(Math.abs(positions.toggle - positions.picker)).toBeLessThanOrEqual(1);
+  expect(positions.rows).toBeGreaterThan(Math.max(positions.pickerBottom, positions.toggleBottom));
   expect((await picker.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await page.locator('#main').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
 });

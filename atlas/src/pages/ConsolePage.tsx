@@ -28,7 +28,7 @@ import '../ui/research.css';
 import { accessState, requireCloudAccess } from '../auth/access';
 import { canPersist } from '../auth/storage';
 import { StorageAdminPanel } from '../ui/StorageAdminPanel';
-import { LegacyImportCard } from '../ui/LegacyImportCard';
+import { PageFooterNote } from '../ui/PageFooterNote';
 import { getDailyBars, getScreenerPeFigures } from '../app/dataSources';
 import { loadScreenerFixedMAs } from './screenerFixedMAs';
 import { HoldingsPanel } from '../holdings/HoldingsPanel';
@@ -283,23 +283,23 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         : '已儲存的選股群組'
     : '';
 
+  const viewSwitch = <div className="segmented console-tabs wb-view-switch" role="group" aria-label="自選檢視">
+    <button type="button" className={listsView === 'lists' ? 'active' : ''} aria-pressed={listsView === 'lists'} onClick={() => setListsView('lists')}>清單</button>
+    <button type="button" className={listsView === 'holdings' ? 'active' : ''} aria-pressed={listsView === 'holdings'} onClick={() => setListsView('holdings')}>持股</button>
+  </div>;
   return (
-    <div className="page console-page">
-      <div className="page-head">
+    <div className={`page console-page ${section === 'lists' ? 'watchlist-page' : ''}`}>
+      <div className={`page-head ${section === 'lists' ? 'watchlist-heading' : ''}`}>
         <div>
           <h2 className="page-title">{section === 'lists' ? '自選清單' : '我的'}</h2>
-          <p className="page-sub">設定選股條件、追蹤名單變化；保存方式由帳號授權決定。</p>
         </div>
       </div>
-      {section === 'lists' && <div className="segmented console-tabs" role="group" aria-label="自選檢視">
-        <button type="button" className={listsView === 'lists' ? 'active' : ''} aria-pressed={listsView === 'lists'} onClick={() => setListsView('lists')}>清單</button>
-        <button type="button" className={listsView === 'holdings' ? 'active' : ''} aria-pressed={listsView === 'holdings'} onClick={() => setListsView('holdings')}>持股</button>
-      </div>}
+      <PageFooterNote><p>設定選股條件、追蹤名單變化；保存方式由帳號授權決定。</p></PageFooterNote>
+      {section === 'lists' && listsView === 'holdings' && viewSwitch}
       {section === 'lists' && listsView === 'lists' && (
-        <WatchlistBoard list={selected} lists={document.lists} parameters={stockParameters.stocks} parameterError={stockParameters.error}
+        <WatchlistBoard viewSwitch={viewSwitch} list={selected} lists={document.lists} parameters={stockParameters.stocks} parameterError={stockParameters.error}
           onSelectList={id => navigate({ page: 'watchlist', list: id })} openChart={openChart} navigate={navigate} />
       )}
-      <LegacyImportCard />
       {section === 'settings' && <a className="console-card console-watchlist-link" href="?page=watchlist" onClick={event => {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         event.preventDefault(); navigate({ page: 'watchlist' });

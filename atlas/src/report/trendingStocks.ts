@@ -43,12 +43,12 @@ export async function fetchTrendingStocks(signal?: AbortSignal, fetcher: typeof 
   try {
     const response = await fetcher(new URL('trending-stocks.json', reportUrl()).href, { cache: 'no-cache', signal });
     if (response.status === 404) return { status: 'error', message: LINE_TRENDING_MISSING };
-    if (!response.ok) throw new Error('HTTP error');
+    if (!response.ok) return { status: 'error', message: `LINE 熱門清單來源回應 HTTP ${response.status}，請稍後重試。` };
     const body: unknown = await response.json().catch(() => null);
     const parsed = trendingStocksSchema.safeParse(body);
-    if (!parsed.success) return { status: 'error', message: LINE_TRENDING_MISSING };
+    if (!parsed.success) return { status: 'error', message: 'LINE 熱門清單資料格式無效，請稍後重試。' };
     return { status: 'ok', data: parsed.data };
   } catch {
-    return { status: 'error', message: '暫時無法取得 LINE 熱門美股，請稍後重試。' };
+    return { status: 'error', message: '無法連線至 LINE 熱門清單來源，請檢查網路後重試。' };
   }
 }
