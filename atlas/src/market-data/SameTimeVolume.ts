@@ -26,7 +26,7 @@ export function sameTimeVolume(
   });
   if (result.dataState === "simulated")
     return no("模擬資料無法計算真實同期量比");
-  if (/^\^|=|CRYPTO-|-[A-Z]+$/.test(symbol))
+  if (/^\^|=|^CRYPTO-|-USDT?$/.test(symbol))
     return no("此商品不支援股票交易時段同期量比");
   const profile = getMarketProfile(symbol),
     step = 300;

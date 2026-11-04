@@ -31,6 +31,9 @@ test("welcome is visible before the app bundle and the normal launch opens watch
   }
   await expect(page.locator(".site")).toHaveAttribute("data-page", "watchlist");
   await expect(page.locator("#atlas-welcome")).toHaveCount(0);
+  // End the deliberate bundle interception before a second full navigation (WebKit).
+  await page.waitForLoadState("load");
+  await page.unroute("**/assets/index-*.js");
   await page.goto("./?page=markets&market=us");
   await expect(page.locator(".site")).toHaveAttribute("data-page", "markets");
 });
@@ -38,6 +41,7 @@ test("welcome is visible before the app bundle and the normal launch opens watch
 test("failed app script keeps the welcome page and gives a reason and retry", async ({
   page,
 }) => {
+  await page.clock.install();
   await page.route("**/assets/index-*.js", (route) => route.abort("failed"));
   await page.goto("./", { waitUntil: "commit" });
   await expect(
@@ -46,6 +50,8 @@ test("failed app script keeps the welcome page and gives a reason and retry", as
   await expect(page.locator("#atlas-boot-status")).toContainText(
     "應用程式檔案載入失敗",
   );
+  await page.clock.fastForward(16000);
+  await expect(page.locator("#atlas-boot-status")).toContainText("應用程式檔案載入失敗");
   await expect(
     page.getByRole("button", { name: "重新載入", exact: true }),
   ).toBeVisible();

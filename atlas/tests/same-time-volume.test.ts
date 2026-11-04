@@ -32,6 +32,8 @@ describe("same-session elapsed-time volume", () => {
       "AAPL",
       t("2026-11-02T15:07:00Z"),
     );
+    expect(sameTimeVolume(result(bars, t("2026-11-02T15:07:00Z")), "BRK-B", t("2026-11-02T15:07:00Z"))).toHaveProperty("status", "ok");
+    expect(sameTimeVolume(result(bars, t("2026-11-02T15:07:00Z")), "BTC-USD", t("2026-11-02T15:07:00Z"))).toHaveProperty("status", "unavailable");
     expect(value).toMatchObject({
       status: "ok",
       ratio: 2,

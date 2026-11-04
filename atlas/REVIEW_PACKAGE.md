@@ -15,6 +15,7 @@ navigation, live quotes, PWA and stock-view cases in that wider run passed.
 Real-source smoke in an external temporary directory obtained AAPL's after-hours trade timestamp
 and an honestly unavailable premarket observation; no permanent records were written.
 Final semantic review also separated Nasdaq expectedPriceDate/pricedDate from listing dates; the five Python cases, 14 focused unit cases and 12 stock/IPO browser cases passed again.
+Final boundary fixes keep hyphenated share classes (BRK-B) eligible for same-time volume, and preserve a known startup failure after the 15-second waiting timer. Their unit/browser assertions are included without relaxing the gates.
 CI will verify the exact pushed head. No merge or deployment is authorized.
 
 ## Current follow-up: timeframe fixation, calibrated breadth and list evidence (2026-11-02)
