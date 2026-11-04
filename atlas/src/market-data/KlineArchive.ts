@@ -1,0 +1,161 @@
+/** Public, read-only archive. CSVs use the existing disposable market IndexedDB cache. */
+import { CachedMarketDataProvider, type CachedMarketDataOptions } from './CachedMarketDataProvider';
+import { usableBarResult } from './KlineIntegrity';
+import { calendarDate, getMarketProfile, marketDateTime } from './MarketProfile';
+import { normalizeSymbol, type Bar, type BarResult, type MarketRange, type Quote } from './MarketDataProvider';
+
+export const ARCHIVE_BASE = 'https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/';
+export const ARCHIVE_SOURCE = 'GitHub 永久封存';
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY = 86400;
+interface ArchiveEntry {
+  market: 'tw' | 'us'; path: string; firstDate: string; lastDate: string;
+  years?: Record<string, { sha256?: string }>;
+}
+interface Manifest {
+  version: 1 | 2;
+  markets: Record<string, { symbols: string[]; firstDate: string; lastDate: string }>;
+  bySymbol?: Record<string, ArchiveEntry>;
+}
+export interface ArchiveOptions {
+  baseUrl?: string; fetcher?: typeof fetch; now?: () => number;
+  cache?: false | CachedMarketDataOptions;
+  timeoutMs?: number;
+}
+
+export function parseArchiveCsv(text: string, symbol: string, year: number): BarResult {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.shift() !== 'Date,Open,High,Low,Close,Volume') throw new Error('封存 CSV 欄位不符');
+  const missingVolumeAt: number[] = [];
+  const bars: Bar[] = [];
+  let previous = '';
+  for (const line of lines) {
+    const values = line.split(',');
+    const date = values[0]!;
+    const bucket = Date.parse(date + 'T00:00:00Z') / 1000;
+    if (values.length !== 6 || !DATE.test(date) || !Number.isFinite(bucket)
+      || new Date(bucket * 1000).toISOString().slice(0, 10) !== date || !date.startsWith(`${year}-`) || date <= previous)
+      throw new Error('封存 CSV 日期或排序不符');
+    previous = date;
+    // Preserve the existing stock/Yahoo daily anchor convention; TPEx's official
+    // ^TWOII series is the one existing UTC-date series in the deployed index.
+    const profile = getMarketProfile(symbol);
+    const time = symbol === '^TWOII' ? bucket : marketDateTime(date, profile.sessionOpenMinutes, profile);
+    const [open, high, low, close] = values.slice(1, 5).map(value => value.trim() ? Number(value) : NaN);
+    const volume = values[5]!.trim() ? Number(values[5]) : 0;
+    if (!values[5]!.trim()) missingVolumeAt.push(time);
+    bars.push({ time, open: open!, high: high!, low: low!, close: close!, volume });
+  }
+  return usableBarResult({ bars, missingVolumeAt, source: ARCHIVE_SOURCE, session: 'regular', delayed: true,
+    adjusted: true, priceBasis: 'split-adjusted', dataState: 'delayed', market: getMarketProfile(symbol) }, symbol, '1D');
+}
+
+function entryFor(raw: unknown, symbol: string): ArchiveEntry | null {
+  const m = raw as Partial<Manifest> | null;
+  if (!m || (m.version !== 1 && m.version !== 2) || !m.markets || typeof m.markets !== 'object') throw new Error('封存 manifest 格式不符');
+  const market = getMarketProfile(symbol).market === 'TW' ? 'tw' : 'us';
+  const part = m.markets[market];
+  if (!part || !Array.isArray(part.symbols) || !part.symbols.includes(symbol)) return null;
+  const item = m.bySymbol?.[symbol];
+  const firstDate = item?.firstDate ?? part.firstDate, lastDate = item?.lastDate ?? part.lastDate;
+  const path = `${market}/${encodeURIComponent(symbol)}`;
+  if (!DATE.test(firstDate) || !DATE.test(lastDate) || firstDate > lastDate
+      || (item && (item.market !== market || item.path !== path))) throw new Error('封存 manifest 日期或路徑不符');
+  return { market, path, firstDate, lastDate, ...(item?.years ? { years: item.years } : {}) };
+}
+
+export class KlineArchive {
+  private manifest?: Promise<unknown>;
+  private manifestDay = '';
+  private readonly years = new Map<string, Promise<BarResult>>();
+  private readonly fetcher: typeof fetch;
+  private readonly now: () => number;
+  private readonly base: string;
+  constructor(private readonly options: ArchiveOptions = {}) {
+    this.fetcher = options.fetcher ?? ((url, init) => fetch(url, init));
+    this.now = options.now ?? Date.now;
+    this.base = options.baseUrl ?? ARCHIVE_BASE;
+  }
+  private async request(path: string): Promise<Response> {
+    const response = await this.fetcher(this.base + path, { signal: AbortSignal.timeout(this.options.timeoutMs ?? 8000) });
+    if (!response.ok) throw new Error(`永久封存讀取失敗（HTTP ${response.status}）`);
+    return response;
+  }
+  private loadManifest() {
+    const day = new Date(this.now()).toISOString().slice(0, 10);
+    if (this.manifestDay !== day) { this.manifest = undefined; this.manifestDay = day; }
+    if (!this.manifest) {
+      this.manifest = this.request('manifest.json').then(response => response.json());
+      void this.manifest.catch(() => { this.manifest = undefined; });
+    }
+    return this.manifest;
+  }
+  async getDaily(symbolInput: string, range?: MarketRange, signal?: AbortSignal): Promise<BarResult | null> {
+    const symbol = normalizeSymbol(symbolInput);
+    signal?.throwIfAborted();
+    const entry = entryFor(await this.loadManifest(), symbol);
+    signal?.throwIfAborted();
+    if (!entry) return null;
+    const first = Math.max(Number(entry.firstDate.slice(0, 4)), range?.from === undefined ? 0 : new Date(range.from * 1000).getUTCFullYear());
+    const last = Math.min(Number(entry.lastDate.slice(0, 4)), range?.to === undefined ? 9999 : new Date(range.to * 1000).getUTCFullYear());
+    const needed = Array.from({ length: Math.max(0, last - first + 1) }, (_, i) => first + i)
+      .filter(year => !entry.years || Object.hasOwn(entry.years, String(year)));
+    const results = await Promise.allSettled(needed.map(year => this.loadYear(symbol, year, entry)));
+    signal?.throwIfAborted();
+    const valid = results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
+    if (!valid.length) throw new Error('此代號的封存年度檔暫時無法讀取');
+    const bars = valid.flatMap(result => result.bars).filter(bar => (range?.from === undefined || bar.time >= range.from) && (range?.to === undefined || bar.time <= range.to));
+    const missing = valid.flatMap(result => result.missingVolumeAt ?? []).filter(time => bars.some(bar => bar.time === time));
+    return usableBarResult({ ...valid[0]!, bars, missingVolumeAt: missing, asOf: this.now() / 1000,
+      source: ARCHIVE_SOURCE + (results.some(result => result.status === 'rejected') ? ' · 部分年度暫時無法讀取' : '') }, symbol, '1D');
+  }
+  private loadYear(symbol: string, year: number, entry: ArchiveEntry): Promise<BarResult> {
+    const current = year >= new Date(this.now()).getUTCFullYear();
+    const sha = entry.years?.[String(year)]?.sha256;
+    const version = `${sha ?? 'legacy-v1'}${current ? ':' + new Date(this.now()).toISOString().slice(0, 10) : ''}`;
+    const key = `${symbol}:${year}:${version}`;
+    let pending = this.years.get(key);
+    if (!pending) {
+      const load = async (): Promise<BarResult> => {
+        const text = await (await this.request(`${entry.path}/${year}.csv`)).text();
+        if (sha) {
+          const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
+          if (hash !== sha) throw new Error('封存年度檔 SHA-256 不符');
+        }
+        return { ...parseArchiveCsv(text, symbol, year), asOf: this.now() / 1000 };
+      };
+      const provider = { id: 'kline-archive-year', cacheVersion: `market-open-v1:${year}:${version}`, supportedTimeframes: ['1D'] as const,
+        getBars: load, getQuote: async (): Promise<Quote> => { throw new Error('Archive year has no quote endpoint'); } };
+      if (this.options.cache === false) pending = load();
+      else {
+        const cached = new CachedMarketDataProvider(provider, {
+          ...this.options.cache, now: this.now, ttlMs: current ? DAY * 1000 : 3650 * DAY * 1000,
+        });
+        pending = cached.getBars(symbol, '1D', { from: Date.UTC(year, 0, 1) / 1000, to: Date.UTC(year + 1, 0, 1) / 1000 - 1 })
+          .finally(() => cached.close().catch(() => undefined));
+      }
+      this.years.set(key, pending);
+      void pending.catch(() => this.years.delete(key));
+      while (this.years.size > 400) this.years.delete(this.years.keys().next().value!);
+    }
+    return pending;
+  }
+}
+
+/** Compare the same session date, independent of each provider's daily timestamp convention.
+ * Existing archive rows win; only absent sessions are appended. A split uses Yahoo's whole segment.
+ */
+export function mergeArchiveDaily(archived: readonly Bar[], recent: readonly Bar[], symbol: string): { bars: Bar[]; splitMismatch: boolean } {
+  const market = getMarketProfile(symbol);
+  const old = new Map(archived.map(bar => [calendarDate(bar.time, market), bar]));
+  const splitMismatch = recent.some(bar => {
+    const baseline = old.get(calendarDate(bar.time, market));
+    return baseline && (['open', 'high', 'low', 'close'] as const).some(field => Math.abs(bar[field] / baseline[field] - 1) > 0.02);
+  });
+  if (splitMismatch) return { bars: [...recent], splitMismatch: true };
+  const merged = [...archived, ...recent.filter(bar => !old.has(calendarDate(bar.time, market)))].sort((a, b) => a.time - b.time);
+  return { bars: merged, splitMismatch: false };
+}
+
+let shared: KlineArchive | undefined;
+export function klineArchive(): KlineArchive { return shared ??= new KlineArchive(); }

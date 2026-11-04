@@ -522,6 +522,13 @@ export class CachedMarketDataProvider implements MarketDataProvider {
     await tx.done;
   }
 
+  /** Short-lived public archive year readers release their connection after a complete request. */
+  async close(): Promise<void> {
+    const db = this.dbPromise;
+    this.dbPromise = undefined;
+    (await db)?.close();
+  }
+
   private database(context: string): Promise<IDBPDatabase<MarketCacheSchema> | null> {
     this.assertContext(context);
     const name = persistentDatabaseName(this.dbName);
