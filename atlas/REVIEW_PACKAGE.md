@@ -1,3 +1,12 @@
+## PR-C：永久封存優先（2026-11-04）
+
+Primary self-review only; no independent sign-off. Branch starts at main `c3668287ae`.
+C1～C5 的程式、來源退路、快取與分割基準、可見訂閱、測試及 20 張桌機／手機截圖，見 [PR_C_ARCHIVE_FIRST.md](docs/PR_C_ARCHIVE_FIRST.md) 與 [ADR-026](docs/architecture/ADR-026-archive-first-history.md)。
+沒有修改登入／帳號、Supabase 函式／SQL、GCP 或永久行情／財報；archive 分支唯讀。
+新功能 50 個瀏覽器組合（五種桌機／手機配置），另有既有頁面、provider/cache、提醒與離線回歸。
+原非選股站點的離線失敗已在未改前端的基準重現：11 個 shell 資源缺懶載入圖表。補 public JS/CSS 預載並保持選股站點不快取策略；不放寬既有離線測試。
+實際最終檢查計數記於 PR；目前沒有部署、合併或執行正式補檔。
+
 ## Current follow-up: startup, compact watchlists and public market details (2026-11-04)
 
 Primary self-review only; no independent sign-off. Based on latest main `df29c9351`.

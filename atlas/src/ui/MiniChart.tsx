@@ -10,7 +10,9 @@ import {
   type LogicalRange,
   type UTCTimestamp,
 } from 'lightweight-charts';
-import { getDailyBars } from '../app/dataSources';
+import { getDailyBarResult, getLegacyDailyResult, getWatchlistDailyResult } from '../app/dataSources';
+import { liveQuotes, mergeDailyBars, sameBars, type LiveDaily } from '../market-data/LiveQuotes';
+import { mergeArchiveDaily } from '../market-data/KlineArchive';
 import { sitePreferences, upDownColors } from '../app/sitePreferences';
 import type { Bar } from '../market-data/MarketDataProvider';
 import { sma } from '../indicators/MovingAverage';
@@ -25,6 +27,7 @@ const NO_MAS: readonly number[] = [];
 export function useNearViewport<T extends Element>(margin = '200px') {
   const ref = useRef<T>(null);
   const [near, setNear] = useState(false);
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
     const element = ref.current;
     if (!element || near) return;
@@ -41,7 +44,14 @@ export function useNearViewport<T extends Element>(margin = '200px') {
     observer.observe(element);
     return () => observer.disconnect();
   }, [margin, near]);
-  return { ref, near };
+  useEffect(() => {
+    if (!ref.current) return;
+    if (typeof IntersectionObserver === 'undefined') { setVisible(true); return; }
+    const observer = new IntersectionObserver(entries => setVisible(entries.some(entry => entry.isIntersecting)));
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+  return { ref, near, visible };
 }
 
 export type MiniChartStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -70,28 +80,59 @@ export function MiniChart({
   wheelZoom?: boolean;
   initialMonths?: number;
 }) {
-  const { ref, near } = useNearViewport<HTMLDivElement>();
+  const { ref, near, visible } = useNearViewport<HTMLDivElement>();
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const viewRef = useRef<{ symbol: string; range: LogicalRange | null } | null>(null);
   const countRef = useRef<HTMLOutputElement>(null);
   const [bars, setBars] = useState<Bar[] | null>(null);
+  const barsRef = useRef<Bar[] | null>(null);
+  const archivedThrough = useRef<string | undefined>(undefined);
+  const recentRef = useRef<LiveDaily | null>(null);
+  const mounted = useRef(true), splitPending = useRef(false);
+  const context = useRef('');
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const [sourceNote, setSourceNote] = useState('');
   const [status, setStatus] = useState<MiniChartStatus>('idle');
   const colors = useSyncExternalStore(sitePreferences.subscribe, () => sitePreferences.get().colors);
   const statusRef = useRef(onStatus);
   statusRef.current = onStatus;
   const maKey = [...new Set(maPeriods.filter(period => Number.isInteger(period) && period > 0))].join(',');
+  context.current = `${symbol}:${maKey}:${interactive}:${initialMonths}`;
+  const replaceSplitHistory = () => {
+    archivedThrough.current = undefined;
+    setSourceNote('封存價格差異超過 2%，整段改用 Yahoo');
+    if (splitPending.current) return;
+    splitPending.current = true;
+    const requestedContext = context.current;
+    void getLegacyDailyResult(symbol).then(result => {
+      if (!mounted.current || context.current !== requestedContext) return;
+      const all = mergeDailyBars(result.bars, barsRef.current?.slice(-30) ?? []);
+      const next = Math.max(0, ...maPeriods) > 126 ? all : all.slice(-126);
+      barsRef.current = next; setBars(next); statusRef.current?.('ready', next);
+    }).catch(() => { if (mounted.current && context.current === requestedContext) setSourceNote('封存價格差異超過 2%，暫用較短的 Yahoo 範圍；較長歷史暫時無法取得'); });
+  };
   useEffect(() => {
     if (!near) return;
     let live = true;
+    recentRef.current = null; barsRef.current = null; archivedThrough.current = undefined;
+    splitPending.current = false; setSourceNote('');
     setBars(null);
     setStatus('loading');
     statusRef.current?.('loading', null);
-    getDailyBars(symbol)
+    // Long configured MAs need historical warm-up; the visible chart still starts at six months.
+    (Math.max(0, ...maPeriods) > 126 || (interactive && initialMonths !== 6) ? getDailyBarResult(symbol) : getWatchlistDailyResult(symbol))
       .then((result) => {
         if (!live) return;
-        setBars(result);
-        setStatus(result.length ? 'ready' : 'error');
-        statusRef.current?.(result.length ? 'ready' : 'error', result);
+        archivedThrough.current = result.archive?.lastDate;
+        const recent = recentRef.current;
+        const merged = result.archive && recent ? mergeArchiveDaily(result.bars, recent.bars, symbol, result.archive.lastDate) : null;
+        const next = merged?.bars ?? (recent ? mergeDailyBars(result.bars, recent.bars) : result.bars);
+        barsRef.current = next; setBars(next);
+        setSourceNote(result.source);
+        if (merged?.splitMismatch) replaceSplitHistory();
+        setStatus(next.length ? 'ready' : 'error');
+        statusRef.current?.(next.length ? 'ready' : 'error', next);
       })
       .catch(() => {
         if (!live) return;
@@ -101,7 +142,21 @@ export function MiniChart({
     return () => {
       live = false;
     };
-  }, [near, symbol]);
+  }, [near, symbol, maKey, interactive, initialMonths]);
+  useEffect(() => {
+    if (!visible) return;
+    return liveQuotes().subscribe(symbol, value => {
+      recentRef.current = value;
+      const current = barsRef.current;
+      if (!current?.length) return; // historical load owns initial/error state
+      const merged = archivedThrough.current ? mergeArchiveDaily(current, value.bars, symbol, archivedThrough.current) : null;
+      const next = merged?.bars ?? mergeDailyBars(current, value.bars);
+      if (sameBars(current, next)) return;
+      barsRef.current = next; setBars(next);
+      if (merged?.splitMismatch) replaceSplitHistory();
+      statusRef.current?.('ready', next);
+    }, { minIntervalMs: 300_000 });
+  }, [visible, symbol]);
   useEffect(() => {
     const host = hostRef.current;
     if (!host || !bars?.length) return;
@@ -175,9 +230,11 @@ export function MiniChart({
     };
     if (interactive) {
       scale.subscribeVisibleLogicalRangeChange(showRange);
-      scale.setVisibleLogicalRange({ from: miniChartStart(bars, initialMonths), to: bars.length - 1 });
+      const view = viewRef.current?.symbol === symbol ? viewRef.current.range : null;
+      scale.setVisibleLogicalRange(view && view.to < bars.length + 10 ? view : { from: miniChartStart(bars, initialMonths), to: bars.length - 1 });
     } else scale.fitContent();
     return () => {
+      viewRef.current = { symbol, range: scale.getVisibleLogicalRange() };
       cancelAnimationFrame(rangeFrame);
       scale.unsubscribeVisibleLogicalRangeChange(showRange);
       chartRef.current = null;
@@ -193,7 +250,7 @@ export function MiniChart({
     scale.setVisibleLogicalRange({ from, to: from + count - 1 });
   };
   return (
-    <div ref={ref} className={`mini-chart${interactive ? ' mini-chart-interactive' : ''}`} style={{ height }} data-status={status}>
+    <div ref={ref} className={`mini-chart${interactive ? ' mini-chart-interactive' : ''}`} style={{ height }} data-status={status} title={sourceNote}>
       {interactive && <div className="mini-chart-controls" role="group" aria-label={`${symbol} 圖表縮放`}>
         <span>日 K{showVolume ? ' · 成交量' : ''}</span>
         <button type="button" aria-label="縮小圖表" title="縮小（顯示更多 K 線）" disabled={status !== 'ready'} onClick={() => zoom(1.5)}>−</button>
