@@ -135,6 +135,9 @@ export class LiveQuoteFeed {
   private kickTimer: ReturnType<typeof setTimeout> | null = null;
   private running: Promise<void> | null = null;
   private onVisibility: (() => void) | null = null;
+  private readonly updateListeners = new Set<(atMs: number) => void>();
+  /** Milliseconds of the last batch that came back (0 before the first). */
+  lastUpdatedAt = 0;
 
   constructor(readonly proxyUrl: string, options: LiveQuoteFeedOptions = {}) {
     this.fetcher = options.fetcher ?? ((input, init) => fetch(input, init));
@@ -145,6 +148,12 @@ export class LiveQuoteFeed {
 
   get currentInterval(): number {
     return this.interval;
+  }
+
+  /** Called with the receive time of every batch that came back, for an "updated at" label. */
+  onUpdate(listener: (atMs: number) => void): () => void {
+    this.updateListeners.add(listener);
+    return () => this.updateListeners.delete(listener);
   }
 
   /** Starts live updates for a symbol; the returned function stops them. */
@@ -230,6 +239,8 @@ export class LiveQuoteFeed {
         const body = (await response.json()) as { results?: Record<string, unknown>; errors?: Record<string, string> };
         if (Object.values(body.errors ?? {}).includes('rate_limited')) failed = true;
         const retrievedAt = this.now() / 1000;
+        this.lastUpdatedAt = retrievedAt * 1000;
+        for (const listener of [...this.updateListeners]) listener(this.lastUpdatedAt);
         for (const symbol of batch) {
           const raw = body.results?.[symbol];
           const value = raw === undefined ? null : normalizeLive(raw, symbol, retrievedAt);
@@ -271,4 +282,9 @@ export function sameBars(a: readonly Bar[], b: readonly Bar[]): boolean {
     return bar.time === other.time && bar.open === other.open && bar.high === other.high &&
       bar.low === other.low && bar.close === other.close && bar.volume === other.volume;
   });
+}
+
+/** "12:35:09" in the viewer's clock, for the live "updated at" labels. */
+export function formatLiveTime(atMs: number): string {
+  return new Date(atMs).toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }

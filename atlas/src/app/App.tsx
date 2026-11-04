@@ -76,7 +76,7 @@ import { legacyVolumeEnabled } from '../storage/schema';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { EDGE_YAHOO_SOURCE } from '../market-data/EdgeYahooProvider';
 import { usableBarResult } from '../market-data/KlineIntegrity';
-import { inRegularSession, isLiveSymbol, LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, mergePeriodBars, sameBars } from '../market-data/LiveQuotes';
+import { formatLiveTime, inRegularSession, isLiveSymbol, LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, mergePeriodBars, sameBars } from '../market-data/LiveQuotes';
 import {
   getLoadedSymbolDirectory,
   loadSymbolCatalog,
@@ -548,6 +548,9 @@ export function App({
     return () => abort.abort();
   }, [state.ready, symbol, providerId, reloadToken]);
   // Live refresh of the open chart: a fresh price right away, then once a minute during the session.
+  // When the open chart last received live data (shown next to the header price).
+  const [liveAt, setLiveAt] = useState<{ key: string; at: number } | null>(null);
+  const liveKey = `${symbol}:${tf}:${providerId}`;
   const liveState = useRef({ result, tool, selected });
   liveState.current = { result, tool, selected };
   const liveChart = state.ready && providerId === 'market' && !!result && result.source.startsWith(EDGE_YAHOO_SOURCE) && isLiveSymbol(symbol);
@@ -582,6 +585,7 @@ export function App({
       const unsubscribe = liveQuotes().subscribe(symbol, (value) => {
         const current = liveState.current.result;
         if (!live || !current) return;
+        setLiveAt({ key: `${symbol}:${tf}:${providerId}`, at: value.retrievedAt * 1000 });
         if (value.quote) setQuote({ symbol, provider: providerId, quote: value.quote });
         const bars = tf === '1D' ? mergeDailyBars(current.bars, value.bars) : mergePeriodBars(current.bars, value.bars, tf, market);
         if (bars) apply({ ...current, bars, latestBarAt: bars.at(-1)!.time, asOf: value.retrievedAt, cacheStatus: 'fresh', ...(value.quote ? { quote: value.quote } : {}) });
@@ -599,6 +603,7 @@ export function App({
       pending = true;
       void provider.refreshBars(symbol, tf, abort.signal)
         .then((next) => {
+          if (live) setLiveAt({ key: `${symbol}:${tf}:${providerId}`, at: Date.now() });
           apply(next);
           if (live && next.quote) setQuote({ symbol, provider: providerId, quote: next.quote });
         })
@@ -1134,6 +1139,7 @@ export function App({
             {headerQuote ? ` (${formatPercent(headerQuote.changePercent)})` : ''}
           </span>
           <small>{asset?.unit ?? market.currency}</small>
+          {liveAt?.key === liveKey && <small className="ws-live-time" data-testid="live-time">更新於 {formatLiveTime(liveAt.at)}</small>}
         </div>
         {!isIndex && providerId !== 'demo' && (
           <div className="ws-stock-statistics">

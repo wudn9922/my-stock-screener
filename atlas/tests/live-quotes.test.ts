@@ -184,6 +184,19 @@ describe('LiveQuoteFeed', () => {
     expect(feed.currentInterval).toBe(LIVE_INTERVAL_MS);
   });
 
+  it('reports the receive time of each batch for the update-time labels', async () => {
+    const { feed, advance } = setup();
+    const times: number[] = [];
+    const stop = feed.onUpdate((at) => times.push(at));
+    feed.subscribe('AAPL', () => undefined);
+    await advance(300);
+    await advance(LIVE_INTERVAL_MS);
+    stop();
+    await advance(LIVE_INTERVAL_MS);
+    expect(times).toHaveLength(2);
+    expect(feed.lastUpdatedAt).toBeGreaterThan(times[1]!);
+  });
+
   it('a later subscriber gets the last value without a new request', async () => {
     const { feed, urls, advance } = setup();
     feed.subscribe('AAPL', () => undefined);

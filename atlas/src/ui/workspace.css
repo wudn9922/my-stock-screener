@@ -1667,6 +1667,11 @@
   .ws-quote small {
     display: none;
   }
+  .ws-quote small.ws-live-time {
+    display: block;
+    font-size: 10px;
+    line-height: 1.2;
+  }
   .ws-stock-statistics {
     grid-area: valuation;
   }
