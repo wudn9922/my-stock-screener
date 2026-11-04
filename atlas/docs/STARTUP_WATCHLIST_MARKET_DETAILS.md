@@ -21,7 +21,7 @@
 
 新增 `market-extras.yml`，UTC 01:41、12:41、13:41、21:41、22:41（週一至六）更新。`scripts/build_market_extras.py` 只讀公開日報與 LINE 熱門代號，每次最多 240 檔（熱門優先，再每日報告，最後常見美股），6 個 worker、150 秒收集預算、每請求 12 秒逾時。**不是全美股即時服務，也不讀私人自選／持股。**失敗沿用原成交時間並標過舊；上游無新成交保留上次觀察並標明原因，不捏造報價。
 
-工作流只在既有 `GENERATED_BRANCH_MODE=1` 啟用，經 `generated_branch.py` 的 `marketExtras` owner 寫入上述新快照及 IPO 小檔。沒有更動 K 線、價格歷史、財報、封存分支、Supabase 函式或 SQL。PR 不執行排程、不部署；合併與啟用由維護者決定。
+工作流只在既有 `GENERATED_BRANCH_MODE=1` 啟用，完成後透過既有 assembled Pages 的 workflow_run 更新公開快照（GITHUB_TOKEN 推送本身不會觸發 push 工作流）。經 `generated_branch.py` 的 `marketExtras` owner 寫入上述新快照及 IPO 小檔。沒有更動 K 線、價格歷史、財報、封存分支、Supabase 函式或 SQL。PR 不執行排程、不部署；合併與啟用由維護者決定。
 
 ## IPO 搜尋
 
