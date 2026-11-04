@@ -19,3 +19,27 @@
 .timeframe-study-lock button, .timeframe-ma-editor > summary { min-height: 44px; }
 .timeframe-ma-editor > summary { display: flex; align-items: center; cursor: pointer; font-size: 13px; }
 .timeframe-ma-editor .indicator-panel { padding: 8px 0; }
+.ws-ma-candidates .ws-ma-candidate-extra {
+  display: block;
+  color: var(--text-3);
+  font-size: 10px;
+  line-height: 1.2;
+}
+.ws-ma-candidates .ws-ma-candidate[aria-pressed="true"] .ws-ma-candidate-extra {
+  color: inherit;
+}
+.ws-ma-v2 {
+  margin: 8px 0;
+}
+.ws-ma-v2 > summary {
+  font-variant-numeric: tabular-nums;
+}
+.ws-ma-v2-suitability {
+  margin: 6px 0;
+  padding-left: 18px;
+  color: var(--text-2);
+}
+/* Range labels stay on their own short lines instead of breaking per character on phones. */
+.ws-ma-reco-table th[scope="row"] {
+  white-space: nowrap;
+}

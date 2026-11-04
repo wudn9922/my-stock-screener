@@ -74,6 +74,9 @@ import { SCREENER_HOSTING, STATIC_HOSTING } from './HostingMode';
 import { parseLaunchParams } from './LaunchParams';
 import { legacyVolumeEnabled } from '../storage/schema';
 import { getMarketProfile } from '../market-data/MarketProfile';
+import { EDGE_YAHOO_SOURCE } from '../market-data/EdgeYahooProvider';
+import { usableBarResult } from '../market-data/KlineIntegrity';
+import { formatLiveTime, inRegularSession, isLiveSymbol, LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, mergePeriodBars, sameBars } from '../market-data/LiveQuotes';
 import {
   getLoadedSymbolDirectory,
   loadSymbolCatalog,
@@ -223,6 +226,9 @@ export function App({
     [dataError, setDataError] = useState(''),
     [notice, setNotice] = useState(''),
     [result, setResult] = useState<BarResult | null>(null),
+    // The data a backtest runs on: set by loads and manual refreshes, not by the live minute refresh
+    // (which would otherwise clear a finished backtest every minute).
+    [loadedResult, setLoadedResult] = useState<BarResult | null>(null),
     [quote, setQuote] = useState<{ symbol: string; provider: string; quote: Quote } | null>(null),
     [pe, setPe] = useState<{ symbol: string; figures: PeFigures } | null>(null),
     [quotes, setQuotes] = useState<Record<string, Quote>>({}),
@@ -268,6 +274,7 @@ export function App({
       setTool('select');
       setSelected(null);
       setResult(refreshed);
+      setLoadedResult(refreshed);
       setDataError('');
       if (refreshed.quote) setQuote({ symbol, provider: providerId, quote: refreshed.quote });
       setNotice(`已更新 ${symbol} 的 ${tf} K 線；${refreshed.source}。`);
@@ -455,6 +462,7 @@ export function App({
     setSelected(null);
     setLoading(true);
     setResult(null);
+    setLoadedResult(null);
     setDataError('');
     setEventsStatus(
       STATIC_HOSTING && providerId === 'yahoo' ? '公司事件：需要後端' : '公司事件：載入中…',
@@ -494,6 +502,7 @@ export function App({
           legacyVolumeFor(symbol, settings.preferences, tf),
         );
         setResult(result);
+        setLoadedResult(result);
         setLoading(false);
         if (!provider.getCorporateEvents) {
           setEventsStatus('公司事件：此資料來源不提供');
@@ -538,6 +547,77 @@ export function App({
       .catch(() => undefined);
     return () => abort.abort();
   }, [state.ready, symbol, providerId, reloadToken]);
+  // Live refresh of the open chart: a fresh price right away, then once a minute during the session.
+  // When the open chart last received live data (shown next to the header price).
+  const [liveAt, setLiveAt] = useState<{ key: string; at: number } | null>(null);
+  const liveKey = `${symbol}:${tf}:${providerId}`;
+  const liveState = useRef({ result, tool, selected });
+  liveState.current = { result, tool, selected };
+  const liveChart = state.ready && providerId === 'market' && !!result && result.source.startsWith(EDGE_YAHOO_SOURCE) && isLiveSymbol(symbol);
+  useEffect(() => {
+    if (!liveChart) return;
+    let live = true;
+    const abort = new AbortController();
+    const apply = (next: BarResult) => {
+      const chart = engine.current,
+        current = liveState.current.result;
+      if (!live || !chart || !current) return;
+      try {
+        next = usableBarResult(next, symbol, tf);
+      } catch {
+        return;
+      }
+      if (sameBars(current.bars, next.bars)) return;
+      if (!chart.patchBars(next)) {
+        // A new bar needs a full redraw; never while the user is drawing or editing a drawing.
+        if (chart.interacting || liveState.current.tool !== 'select' || liveState.current.selected) return;
+        chart.flushView();
+        const settings = store.symbol(symbol);
+        chart.reloadLive(next, settings.drawings, settings.indicators, settings.preferences.views[tf],
+          legacyVolumeFor(symbol, settings.preferences, tf), worldAssetFor(symbol)?.calendar);
+        chart.sync(settings.drawings, settings.indicators, settings.preferences.magnet, 'select',
+          legacyVolumeFor(symbol, settings.preferences, tf));
+      }
+      setResult(next);
+    };
+    if (tf === '1D' || tf === '1W' || tf === '1M') {
+      const market = getMarketProfile(symbol);
+      const unsubscribe = liveQuotes().subscribe(symbol, (value) => {
+        const current = liveState.current.result;
+        if (!live || !current) return;
+        setLiveAt({ key: `${symbol}:${tf}:${providerId}`, at: value.retrievedAt * 1000 });
+        if (value.quote) setQuote({ symbol, provider: providerId, quote: value.quote });
+        const bars = tf === '1D' ? mergeDailyBars(current.bars, value.bars) : mergePeriodBars(current.bars, value.bars, tf, market);
+        if (bars) apply({ ...current, bars, latestBarAt: bars.at(-1)!.time, asOf: value.retrievedAt, cacheStatus: 'fresh', ...(value.quote ? { quote: value.quote } : {}) });
+      });
+      return () => {
+        live = false;
+        unsubscribe();
+      };
+    }
+    // Intraday: the open chart re-downloads its own interval once a minute in session.
+    const provider = providers[providerId];
+    let pending = false;
+    const timer = setInterval(() => {
+      if (pending || document.hidden || !provider.refreshBars || !inRegularSession(getMarketProfile(symbol), Date.now())) return;
+      pending = true;
+      void provider.refreshBars(symbol, tf, abort.signal)
+        .then((next) => {
+          if (live) setLiveAt({ key: `${symbol}:${tf}:${providerId}`, at: Date.now() });
+          apply(next);
+          if (live && next.quote) setQuote({ symbol, provider: providerId, quote: next.quote });
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          pending = false;
+        });
+    }, LIVE_INTERVAL_MS);
+    return () => {
+      live = false;
+      abort.abort();
+      clearInterval(timer);
+    };
+  }, [liveChart, symbol, tf, providerId]);
   const headerQuote =
     quote && quote.symbol === symbol && quote.provider === providerId
       ? quote.quote
@@ -980,7 +1060,7 @@ export function App({
           )}
         </>
       ) : panel === 'backtest' ? (
-        <BacktestPanel symbol={symbol} timeframe={tf} market={market} result={result} onResult={onStrategy} />
+        <BacktestPanel symbol={symbol} timeframe={tf} market={market} result={loadedResult} onResult={onStrategy} />
       ) : panel === 'alerts' ? (
         <AlertPanel store={store} symbol={symbol} timeframe={tf} drawings={activeDrawings} />
       ) : (
@@ -1059,6 +1139,7 @@ export function App({
             {headerQuote ? ` (${formatPercent(headerQuote.changePercent)})` : ''}
           </span>
           <small>{asset?.unit ?? market.currency}</small>
+          {liveAt?.key === liveKey && <small className="ws-live-time" data-testid="live-time">更新於 {formatLiveTime(liveAt.at)}</small>}
         </div>
         {!isIndex && providerId !== 'demo' && (
           <div className="ws-stock-statistics">

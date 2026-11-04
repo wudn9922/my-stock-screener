@@ -9,7 +9,8 @@
  * Per market the first source that passes a size sanity check wins:
  *   Taiwan: TWSE ISIN page (strMode=2 上市 / 4 上櫃, Big5) → TWSE/TPEx OpenAPI issuer list →
  *           previous directory (seeded from the last deployment) → tracked public/symbols/taiwan.json.
- *   US:     NasdaqTrader nasdaqlisted.txt + otherlisted.txt → previous directory.
+ *   US:     NasdaqTrader nasdaqlisted.txt → previous Nasdaq rows, and otherlisted.txt → previous
+ *           NYSE/other rows, each checked separately; if either half is missing the build fails.
  * The file is written atomically; if no market has any data the previous file is left untouched.
  */
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
@@ -29,7 +30,7 @@ import {
 
 const OUT = process.env.ATLAS_DIRECTORY_OUT || 'public/symbols/directory.json';
 /** Minimum plausible counts; a smaller result means a broken/partial source. Fixture runs use 1. */
-const MINIMUM = { TWSE: 700, TPEx: 500, US: 3000 } as const;
+const MINIMUM = { TWSE: 700, TPEx: 500, US: 3000, NASDAQ: 2000, OTHER: 1500 } as const;
 
 async function readJson(path: string): Promise<unknown> {
   try {
@@ -39,7 +40,7 @@ async function readJson(path: string): Promise<unknown> {
   }
 }
 
-type Market = 'TWSE' | 'TPEx' | 'US';
+type Market = 'TWSE' | 'TPEx' | 'US' | 'US Nasdaq' | 'US NYSE/other';
 interface Attempt {
   source: string;
   load: () => Promise<DirectoryItem[]>;
@@ -59,7 +60,7 @@ async function firstGood(market: Market, attempts: Attempt[], minimum: number, w
 }
 
 async function buildDirectory(fetcher: SourceFetcher, previous: unknown, catalog: unknown) {
-  const minimum = fetcher.offline ? { TWSE: 1, TPEx: 1, US: 1 } : MINIMUM;
+  const minimum = fetcher.offline ? { TWSE: 1, TPEx: 1, US: 1, NASDAQ: 1, OTHER: 1 } : MINIMUM;
   const warnings: string[] = [];
   const previousItems = directoryItemsFromDocument(previous);
   const fromPrevious = (filter: (item: DirectoryItem) => boolean) => async () => previousItems.filter(filter);
@@ -93,17 +94,26 @@ async function buildDirectory(fetcher: SourceFetcher, previous: unknown, catalog
     { source: 'previous directory', load: fromPrevious((item) => item[2] === 'TPEx') },
     { source: 'public/symbols/taiwan.json', load: async () => taiwanItemsFromCatalog(catalog, 'TPEx') },
   ], minimum.TPEx, warnings);
-  const us = await firstGood('US', [
-    {
-      source: 'https://www.nasdaqtrader.com/dynamic/SymDir/{nasdaqlisted,otherlisted}.txt',
-      load: async () => {
-        const nasdaq = await fetcher.text('https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt', { fixture: 'nasdaqlisted.txt' });
-        const other = await fetcher.text('https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt', { fixture: 'otherlisted.txt' });
-        return [...usItemsFromNasdaqListed(nasdaq ?? ''), ...usItemsFromOtherListed(other ?? '')];
-      },
-    },
-    { source: 'previous directory', load: fromPrevious((item) => item[2] !== 'TWSE' && item[2] !== 'TPEx') },
-  ], minimum.US, warnings);
+  // Each NasdaqTrader file is checked on its own: Nasdaq alone exceeds the US total, so a missing
+  // otherlisted.txt once published a directory without any NYSE / NYSE American / Arca listing.
+  const usFile = (name: 'nasdaqlisted' | 'otherlisted', parse: (text: string) => DirectoryItem[]): Attempt => ({
+    source: `https://www.nasdaqtrader.com/dynamic/SymDir/${name}.txt`,
+    load: async () => parse(await fetcher.text(`https://www.nasdaqtrader.com/dynamic/SymDir/${name}.txt`, { fixture: `${name}.txt` }) ?? ''),
+  });
+  const isUs = (item: DirectoryItem) => item[2] !== 'TWSE' && item[2] !== 'TPEx';
+  const nasdaq = await firstGood('US Nasdaq', [
+    usFile('nasdaqlisted', usItemsFromNasdaqListed),
+    { source: 'previous directory', load: fromPrevious((item) => item[2] === 'NASDAQ') },
+  ], minimum.NASDAQ, warnings);
+  const other = await firstGood('US NYSE/other', [
+    usFile('otherlisted', usItemsFromOtherListed),
+    { source: 'previous directory', load: fromPrevious((item) => isUs(item) && item[2] !== 'NASDAQ') },
+  ], minimum.OTHER, warnings);
+  const usItems = [...nasdaq.items, ...other.items];
+  // Never publish half of the US market: the step fails and the deployed directory stays.
+  if (!nasdaq.items.length || !other.items.length || usItems.length < minimum.US)
+    throw new Error(`US directory incomplete (Nasdaq ${nasdaq.items.length}, NYSE/other ${other.items.length}): ${warnings.join('; ')}`);
+  const us = { items: usItems, source: nasdaq.source === other.source ? nasdaq.source : `${nasdaq.source} + ${other.source}` };
   const document = buildDirectoryDocument(
     { TWSE: twse, TPEx: tpex, US: us },
     new Date(Number(process.env.ATLAS_NOW_MS) || Date.now()).toISOString(),

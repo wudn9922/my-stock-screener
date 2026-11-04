@@ -14,6 +14,20 @@ GET /functions/v1/market-chart?symbol=2330.TW&interval=1d&range=5y&events=1
 | `interval` / `range` | Whitelisted pairs (see `validate.ts`): `5m`/`15m`/`30m` → `1d`,`5d`,`1mo`; `60m` → `5d`,`1mo`,`3mo`; `1d` → `1mo`…`10y`; `1wk`/`1mo` → `1y`…`max`. |
 | `events` | `1` (default) adds `events=div,splits`; `0` omits them. |
 
+Batch live quotes (the site's once-a-minute refresh of the stocks on screen, `atlas/src/market-data/LiveQuotes.ts`):
+
+```
+GET /functions/v1/market-chart?quotes=AAPL,2330.TW,^GSPC
+→ { "asOf": 1793722781, "results": { "AAPL": <chart JSON> , … }, "errors": { "XYZ": "not_found" } }
+```
+
+- Up to 40 symbols (same symbol rules as above; duplicates removed). Each is one Yahoo request
+  `interval=1d&range=1mo` (no events), six at a time; the chart JSON keeps only `meta` (without
+  `validRanges`/`tradingPeriods`), `timestamp` and `indicators.quote`.
+- Each symbol is cached in the function instance for 20 s; the response has `Cache-Control: public, max-age=20`.
+- After one `rate_limited` answer the rest of the batch is not requested (reported as `rate_limited`);
+  the site then doubles its polling interval, up to five minutes.
+
 Behaviour:
 
 - Upstream: `https://query2.finance.yahoo.com/v8/finance/chart/<symbol>?interval=..&range=..&events=div%2Csplits&includePrePost=false`
