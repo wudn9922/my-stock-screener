@@ -207,6 +207,14 @@ describe('replacement, valuation and conversion', () => {
     expect(replaceAccount(replaced, tw, []).accounts.find((a) => a.account.id === tw.id)!.holdings).toEqual([]);
     expect(() => replaceAccount(base, tw, [holding({ quantity: '-1' })])).toThrow();
   });
+  it('accepts a Taiwan broker 複委託 account for US stocks in USD, but never mixes markets or currencies', () => {
+    const sub = { ...tw, id: '44444444-4444-4444-8444-444444444444', name: '國泰證券 複委託', kind: 'us-broker' as const, currency: 'USD' as const };
+    expect(validateHoldingAccount(sub)).toEqual(sub);
+    const position = holding({ accountId: sub.id, symbol: 'AAPL', market: 'US', costCurrency: 'USD', quantity: '10', averageCost: '150' });
+    expect(replaceAccount(emptyHoldings(), sub, [position]).accounts[0]!.holdings[0]!.symbol).toBe('AAPL');
+    expect(() => validateHoldingAccount({ ...sub, currency: 'TWD' })).toThrow();
+    expect(() => replaceAccount(emptyHoldings(), sub, [holding({ accountId: sub.id })])).toThrow();
+  });
   it('rejects oversized accounts, forged markets and arbitrary extra metadata', () => {
     expect(() => validateHoldingAccount({ ...tw, rawFile: 'sensitive' })).toThrow();
     expect(() => replaceAccount(emptyHoldings(), tw, [holding({ market: 'US' })])).toThrow();
