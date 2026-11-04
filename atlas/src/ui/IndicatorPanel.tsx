@@ -1,4 +1,5 @@
 import { HelpDisclosure } from './HelpDisclosure';
+import { TimeframeStudyLock } from './TimeframeStudyLock';
 import { worldAssetFor } from '../market-data/worldAssets';
 import { useId, useState, type FormEvent } from 'react';
 import { Eye, EyeOff, LockKeyhole, UnlockKeyhole, Settings2, Trash2, Plus } from 'lucide-react';
@@ -97,6 +98,7 @@ export function IndicatorPanel({
       <p className="muted small" data-testid="indicator-scope">
         {worldAssetFor(symbol)?.ticker ?? symbol} · {timeframe} 股票＋週期專屬
       </p>
+      <TimeframeStudyLock store={store} symbol={symbol} timeframe={timeframe} />
       <HelpDisclosure label="指標儲存說明">
         指標按目前個股與 K 線週期分開保留；啟用儲存時，新增與修改會自動儲存，不需要另存組合。儲存狀態顯示於圖表下方。
       </HelpDisclosure>

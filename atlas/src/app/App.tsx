@@ -1172,9 +1172,9 @@ export function App({
                     <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
                   </StockStatsMenu>}
                 <StockStatsMenu label="建議均線" testId="ma-recommendation-toggle" tabStyle>
-                  <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} savedStock={parameter} parameterError={parameters.error} onNotice={setNotice} />
+                  {open => <><MaRecommendation active={open} store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} savedStock={parameter} parameterError={parameters.error} onNotice={setNotice} />
                   <p className="stock-view-hint">套用後切回「K線」即可在圖上看到均線。</p>
-                  {!stockViews && <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>}
+                  {!stockViews && <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>}</>}
                 </StockStatsMenu>
                 <StockVolatility symbol={symbol} provider={providers[providerId]} reloadToken={reloadToken} tabStyle />
               </StockTabs>
@@ -1185,8 +1185,8 @@ export function App({
                 <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
               </StockStatsMenu>
               <StockStatsMenu label="建議均線" testId="ma-recommendation-toggle">
-                <MaRecommendation store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} savedStock={parameter} parameterError={parameters.error} onNotice={setNotice} />
-                <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>
+                {open => <><MaRecommendation active={open} store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} savedStock={parameter} parameterError={parameters.error} onNotice={setNotice} />
+                <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense></>}
               </StockStatsMenu></>}
             </div>}
           </div>

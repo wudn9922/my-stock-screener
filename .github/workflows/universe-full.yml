@@ -56,6 +56,20 @@ jobs:
         if: vars.GENERATED_BRANCH_MODE == '1'
         run: python scripts/generated_branch.py restore
 
+      # These derived calibration inputs are checked in beside their code as a read-only
+      # seed. Restore the durable generated copy when it exists; initialize it once
+      # after first deploy or if generated storage is reset.
+      - name: Seed missing breadth signal inputs
+        if: always() && !cancelled()
+        run: |
+          mkdir -p docs/report
+          if [ ! -f docs/report/breadth-us-calibration.json ]; then
+            cp scripts/breadth_signals/bootstrap/breadth-us-calibration.json docs/report/breadth-us-calibration.json
+          fi
+          if [ ! -f docs/report/breadth-us-history.csv ]; then
+            cp scripts/breadth_signals/bootstrap/breadth-us-history.csv docs/report/breadth-us-history.csv
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -133,6 +147,20 @@ jobs:
         timeout-minutes: 15
         run: python -u scripts/build_full_market_breadth.py --cache-dir .cache/universe-full
 
+      # Failure leaves breadth.json untouched and must not prevent that report's
+      # existing generated-path publication.
+      - name: Build breadth trading signals
+        if: always() && !cancelled()
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          pip install --quiet yfinance
+          python -u -m scripts.breadth_signals.daily \
+            --calibration docs/report/breadth-us-calibration.json \
+            --history docs/report/breadth-us-history.csv \
+            --breadth docs/report/breadth.json \
+            --out docs/report/breadth-signals.json
+
       - name: Build full-market entry success rates
         if: always() && !cancelled()
         run: python -u scripts/build_full_market_breakouts.py --cache-dir .cache/universe-full
@@ -149,6 +177,9 @@ jobs:
           git add docs/report/universe.json docs/report/breakouts.json
           if [ -f docs/report/breadth.json ]; then git add -f -- docs/report/breadth.json; fi
           if [ -f docs/report/breakouts-history.json ]; then git add -f -- docs/report/breakouts-history.json; fi
+          if [ -f docs/report/breadth-signals.json ]; then git add -f -- docs/report/breadth-signals.json; fi
+          if [ -f docs/report/breadth-us-calibration.json ]; then git add -f -- docs/report/breadth-us-calibration.json; fi
+          if [ -f docs/report/breadth-us-history.csv ]; then git add -f -- docs/report/breadth-us-history.csv; fi
           if [ -f docs/report/kline-corrections.json ]; then git add -- docs/report/kline-corrections.json; fi
           # The same immutable 20-calendar-day snapshots are committed before cutover too.
           if [ -d docs/report/breakouts-archive ]; then

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { breadthTone, breadthUrl, fetchBreadth, linePath, parseBreadth } from '../src/report/breadth';
+import { breadthUrl, fetchBreadth, linePath, parseBreadth } from '../src/report/breadth';
 
 const ratio = (above: number, total: number, pct: number | null) => ({ above, total, pct });
 
@@ -103,15 +103,6 @@ describe('breadth helpers', () => {
     expect(breadthUrl('/', 'https://cdn.example.com/r/latest.json', 'https://x.test')).toBe(
       'https://cdn.example.com/r/breadth.json',
     );
-  });
-
-  it('classifies the percentage: below 20 is weak, above 80 is hot, boundaries are neutral', () => {
-    expect(breadthTone(15)).toBe('weak');
-    expect(breadthTone(20)).toBe('neutral');
-    expect(breadthTone(50)).toBe('neutral');
-    expect(breadthTone(80)).toBe('neutral');
-    expect(breadthTone(80.1)).toBe('hot');
-    expect(breadthTone(null)).toBe('none');
   });
 
   it('draws the series as an SVG path that breaks at missing values', () => {

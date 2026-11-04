@@ -1,0 +1,98 @@
+name: Recalibrate US breadth signals
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 8 1 1,4,7,10 *'
+
+env:
+  GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: universe-full
+  cancel-in-progress: false
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Restore generated inputs
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        run: python scripts/generated_branch.py restore
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install --quiet numpy pandas yfinance
+
+      - name: Rebuild calibration in a temporary directory
+        run: |
+          mkdir -p .cache
+          python -u -m scripts.breadth_signals.calibrate \
+            --out-dir .cache/breadth-calibration-output \
+            --save-prices .cache/breadth-calibration-prices.pkl
+
+      - name: Check calibrated sample and trade coverage
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('.cache/breadth-calibration-output/breadth-us-calibration.json')
+          calibration = json.loads(path.read_text(encoding='utf-8'))
+          sample = calibration['sample']
+          errors = []
+          if sample.get('start', '9999') > '2004-12-31':
+              errors.append(f"sample starts too late: {sample.get('start')}")
+          for symbol in ('^GSPC', '^IXIC', '^DJI', '^RUT', '^SOX'):
+              stats = calibration.get('indices', {}).get(symbol)
+              if not stats or stats.get('trades', 0) < 50:
+                  errors.append(f"{symbol} has fewer than 50 completed trades")
+          if errors:
+              raise SystemExit('; '.join(errors))
+
+          sp = calibration['indices']['^GSPC']
+          if (sp.get('hitRate') is None or sp.get('baseRate') is None
+                  or not 0.60 <= sp['hitRate'] <= 0.70 or sp['hitRate'] <= sp['baseRate']):
+              print('::warning::S&P 500 calibration differs from the expected hit-rate range; review the data and rules before interpreting it.')
+          print(f"Validated sample {sample['start']}–{sample['end']}; S&P 500 {sp['trades']} trades, hit rate {sp['hitRate']}, base rate {sp['baseRate']}.")
+          PY
+
+      - name: Install calibrated files
+        run: |
+          install -D .cache/breadth-calibration-output/breadth-us-calibration.json docs/report/breadth-us-calibration.json
+          install -D .cache/breadth-calibration-output/breadth-us-history.csv docs/report/breadth-us-history.csv
+
+      - name: Publish owned outputs to generated
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        run: python scripts/generated_branch.py publish universe
+
+      - name: Commit and push calibrated files
+        if: vars.GENERATED_BRANCH_MODE != '1'
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f -- docs/report/breadth-us-calibration.json docs/report/breadth-us-history.csv
+          git commit -m "Recalibrate US breadth signals" || { echo "No changes to commit"; exit 0; }
+          for attempt in 1 2 3; do
+            git pull --rebase
+            if git push; then
+              exit 0
+            fi
+            echo "Push failed (attempt ${attempt}); retrying"
+            sleep $((attempt * 15))
+          done
+          exit 1

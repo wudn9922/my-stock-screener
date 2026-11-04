@@ -1,10 +1,85 @@
-## Current review: ma-selector ranking, 2-year score and selector v2 in the recommendation panel (2026-10-30)
+## Current follow-up: timeframe fixation, calibrated breadth and list evidence (2026-11-02)
+
+Primary self-review only; no independent sign-off. Based on main `133220a01`.
+On November 4, integrated main `04feb00d2` into this feature branch to resolve the three
+workflow/review/CSS conflicts. Both sets of styles and review entries remain. Current selector
+ranking, 2-year scores, selector v2, live price updates and update timestamps are preserved;
+their implementation remains identical to main outside the existing recommendation wrapper.
+The previous feature head `167ab294a` passed all four CI workflows, including the complete site,
+disposable PostgreSQL and offline integrations. The merged head is verified again separately.
+After integration, lint/typecheck and both builds passed; all 1,759 tests in 135 Vitest files
+passed with one worker. An initial concurrent-build run exceeded the unchanged 5-second SEC
+lineage test limit; rerunning without the competing builds passed, with no test or timeout edit.
+All 84 related desktop/mobile Chromium and iPhone WebKit cases passed, including selector v2 and
+live quote refresh/update timestamps. Live quote coverage is also included in the PR CI sweep.
+The diff against current main contains no auth/backend or permanent market-record changes.
+The two implementation subtasks followed the model allocation in the user's attachment;
+their implementation checks are not represented as independent review.
+
+Existing v4 symbol/timeframe ownership and storage authorization remain. The indicator panel
+and recommendation popover expose the current timeframe's existing MAs and drawing locks.
+Batch fixation goes through AppStore's guarded indicator and drawing APIs, preserves anchors,
+and excludes Volume, foreign timeframes and other symbols. Daily stock/monitor parameters remain
+separate, under an explicit daily disclosure on non-daily charts. The popover's editor mounts
+only while open; existing recommendation fetching and apply/cancel/fix behavior remain.
+
+The attachment's Python rules/core are unchanged; imports, workflow wiring, and input-quality
+checks are integrated separately. Quarterly/manual calibration and daily updates share the
+universe publication owner and concurrency group. A bounded, fail-soft signal step installs
+its own optional dependency, so errors cannot consume the whole job or block original breadth
+publication. Missing, short, empty or stale index histories and excessive overlap fail before
+writing. No price, financial or archive record is modified. Bootstrap stores only newly derived
+aggregate history and calibration, with provenance in scripts/breadth_signals/README.md.
+
+Real calibration requested all 5,346 website-listed US symbols, all with nonempty history.
+The 5,937-day breadth sample is 2003-03-28–2026-10-30; five indices have 57–67 completed trades.
+S&P 500 hit rate is 68.25% versus the same-rule arbitrary-day 47.61% baseline. Untouched generated
+breadth overlaps 120 sessions with maximum MA20/60 differences of 0.4 percentage points each.
+Actual sample dates and the higher Russell/SOX results relative to the attachment are disclosed
+without changing rules. The real daily payload also passes the frontend contract with all five
+indices. Physical trading performance and independently reproduced TW research are not claimed.
+
+Optional breadth parsing isolates malformed indices and rejects invalid top-level data. Stale
+signal dates do not label newer breadth. Numeric breadth, source/date, chart and TW segments
+survive missing/invalid signals. Visible P10/P90 bounds, five percentile zones, index plans,
+selectable historical markers and folded evidence use the existing SVG chart and theme variables.
+TW has no calibrated trading labels; overbought is not presented as a sell instruction.
+
+Watchlist explanations reuse the existing evaluator over each isolated condition and its complete
+source, preserving fixed-MA precedence, strict/inclusive boundaries, repeated growth gates and
+missing-data policy. Prior membership is not treated as historical indicator evidence. Explanations
+stay in UI memory; saved definitions, collector history, last-opening baseline and cloud payloads
+are unchanged. Source removal, manual removal and unavailable inputs have distinct explanations.
+
+Clean npm ci, lint, typecheck, normal/Pages builds and the disabled-sync collector command passed.
+All 1,743 unit tests in 134 files passed; the final changed-component subset passed 20 tests.
+Python: 24 attachment/fail-soft tests and 63 breadth/generated-publication regressions passed.
+Failure fixtures use complete calibration and assert the specific rejection reason; a successful
+daily run also appends the new site session, emits all five indices and leaves source breadth intact.
+Related desktop/mobile Chromium and iPhone WebKit site regressions passed all 114 cases in 8.1
+minutes. Screenshots were visually inspected for chart-local controls, current evidence
+and calibrated breadth; browser automation is not physical iPhone verification.
+The original chart gesture/timeframe suite additionally passed 23 cases, with its existing
+desktop-only touch skip, across desktop/mobile Chromium and iPhone WebKit. The Python CI matrix
+now explicitly installs pytest and runs the attachment tests in both records-only and generated
+modes; unittest discovery alone does not execute pytest-style function tests.
+The full CI site sweep passed 754 cases and exposed three profile variants of an old volatility
+test expecting daily recommendations immediately on a weekly chart. Its interaction now expands
+the explicit daily disclosure before retaining the original visibility/value assertions, matching
+the weekly recommendation test. No assertion was loosened or production code changed for that fix.
+The four-file follow-up (volatility, recommendation, stock views and layout) passed all 30 cases
+across desktop/mobile Chromium and iPhone WebKit; targeted lint also passed.
+
+Protected auth/account/backend files, outer navigation, permanent K-line/price/financial records,
+archive branch, SQL, notifications and deployments are untouched. No merge or deployment.
+
+## Previous review: ma-selector ranking, 2-year score and selector v2 in the recommendation panel (2026-10-30)
 
 ma-selector PR #9 added three display-only features to its web page: stock-level ranking against the 83 reference stocks, a 2-year reference score on short/medium candidates, and the experimental selector v2. The companion ma-selector branch `claude/atlas-v2-fields` writes them into the recommendation JSON (VERSION 2; production fields byte-for-byte unchanged, extras omitted without their reference files). Atlas parses each extra as optional — a malformed extra is dropped, VERSION 1 files still read — and shows: 「贏過 X%」 under each range, 「2年 NN」 on short/medium candidate buttons, and a collapsed 「實驗選線 v2（尚未驗證）」 section with toggleable candidates, suitability with ranking, and 「套用 v2 全部」 (adds only missing daily SMAs by id, as the current apply does). The current picks, fixed-parameter flow and toggles are unchanged.
 
 Local verification: typecheck, lint, production and Pages builds passed; Vitest 128 files / 1,697 tests passed (3 new, using fixtures generated by ma-selector's own `recommend()` on synthetic prices). Playwright desktop and phone Chromium for `ma-recommendation.spec.ts`: 8 passed (2 new: ranking, 2-year scores, v2 apply/toggle; v2 without a second line). The phone range-label column was set to `nowrap` after a screenshot showed per-character wrapping. WebKit runs in CI only. No physical-device or independent review sign-off is claimed.
 
-## Current follow-up: Chinese heatmap, asset lists and P/E (2026-10-31)
+## Previous follow-up: Chinese heatmap, asset lists and P/E (2026-10-31)
 
 Primary self-review only; no independent sign-off. Based on main `e60f63d8a`.
 

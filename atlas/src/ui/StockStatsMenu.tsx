@@ -5,7 +5,7 @@ import { ChevronDown } from 'lucide-react';
  * Header controls open their details in a floating panel
  * over the chart instead of adding rows that shrink it. Children stay mounted while closed so their data loads once.
  */
-export function StockStatsMenu({ label, children, trigger, triggerLabel, tabStyle = false, testId = 'stock-stats-toggle' }: { label: string; children: ReactNode; trigger?: ReactNode; triggerLabel?: string; tabStyle?: boolean; testId?: string }) {
+export function StockStatsMenu({ label, children, trigger, triggerLabel, tabStyle = false, testId = 'stock-stats-toggle' }: { label: string; children: ReactNode | ((open: boolean) => ReactNode); trigger?: ReactNode; triggerLabel?: string; tabStyle?: boolean; testId?: string }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -55,7 +55,7 @@ export function StockStatsMenu({ label, children, trigger, triggerLabel, tabStyl
         <ChevronDown size={14} aria-hidden="true" />
       </button>
       <div id={panelId} className="ws-stats-panel" style={position} role="region" aria-label={label} hidden={!open}>
-        {children}
+        {typeof children === 'function' ? children(open) : children}
       </div>
     </div>
   );

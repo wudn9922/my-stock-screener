@@ -13,6 +13,12 @@
   background: var(--accent-soft);
   color: var(--accent-text);
 }
+.timeframe-study-lock { display: grid; gap: 8px; padding: 8px 0; border-block: 1px solid var(--border); margin: 8px 0; min-width: 0; }
+.timeframe-study-lock p { margin: 0; font-size: 12px; overflow-wrap: anywhere; }
+.timeframe-study-lock small { display: block; color: var(--text-3); margin-top: 4px; }
+.timeframe-study-lock button, .timeframe-ma-editor > summary { min-height: 44px; }
+.timeframe-ma-editor > summary { display: flex; align-items: center; cursor: pointer; font-size: 13px; }
+.timeframe-ma-editor .indicator-panel { padding: 8px 0; }
 .ws-ma-candidates .ws-ma-candidate-extra {
   display: block;
   color: var(--text-3);

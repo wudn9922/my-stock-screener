@@ -1,6 +1,8 @@
 import { DisplaySettings } from '../ui/DisplaySettings';
 import { DataStatusPanel } from '../ui/DataStatusPanel';
 import { WatchlistBoard } from '../ui/WatchlistBoard';
+import { WatchlistChanges } from '../ui/WatchlistChanges';
+import { explainWatchlistChanges, type WatchlistChangeReasons } from '../watchlists/reasons';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
 import type { PageProps } from './pageProps';
@@ -46,7 +48,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
   const [settingsTab, setTab] = useState<'parameters' | 'admin' | 'display' | 'status'>('parameters');
   const [listsView, setListsView] = useState<'lists' | 'holdings'>('lists');
   const tab = section === 'lists' ? listsView : settingsTab === 'admin' && !access.isAdmin ? 'parameters' : settingsTab;
-  const [visit, setVisit] = useState<WatchlistVisit | null>(null);
+  const [visit, setVisit] = useState<(WatchlistVisit & { reasons?: WatchlistChangeReasons }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [visibleCount, setVisibleCount] = useState(100);
@@ -165,8 +167,9 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         members,
         dataDate.slice(0, 10),
       );
+      const reasons = explainWatchlistChanges(result, latest, items, { market: selected.market, growth, fixedMAs, pe });
       store.save(result.list);
-      setVisit(result);
+      setVisit({ ...result, reasons });
       try {
         // Also queue an observation behind a not-yet-finished first cloud create.
         await sync.sync(result.list.id);
@@ -533,19 +536,8 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                       <span>目前入選</span>
                     </div>
                   </div>
-                  <div className="watchlist-changes">
-                    <div>
-                      <h3>新入選</h3>
-                      <p>
-                        {activeVisit.entered.map((entry) => `${displayTicker(entry.symbol)} ${entry.name}`).join('、') ||
-                          (activeVisit.firstVisit ? '首次建立基準' : '無')}
-                      </p>
-                    </div>
-                    <div>
-                      <h3>出榜</h3>
-                      <p>{activeVisit.exited.map((entry) => `${displayTicker(entry.symbol)} ${entry.name}`).join('、') || '無'}</p>
-                    </div>
-                  </div>
+                  <WatchlistChanges key={`${activeVisit.list.id}:${activeVisit.previousDate}:${activeVisit.list.history.at(-1)?.date}`} visit={activeVisit} reasons={activeVisit.reasons}
+                    onOpen={entry => openChart({ symbol: entry.symbol, name: entry.name, maList: fixedParameters[entry.symbol] ?? selected.maList })} />
                   <ul className="saved-member-list">
                     {activeVisit.members.slice(0, visibleCount).map((entry) => (
                       <li key={entry.symbol}>
