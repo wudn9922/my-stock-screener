@@ -7,8 +7,9 @@ New display snapshots are bounded, read-only consumers of public sources; source
 Verified locally: clean npm ci; lint; typecheck; 137 Vitest files / 1,773 tests;
 normal + Pages builds; 5 public market-extras Python tests; 33 generated-branch tests;
 36 final browser cases across desktop Chromium, mobile Chromium and iPhone WebKit.
-The wider 237-case regression run had 234 passes and three compact-home findings; the
-accessibility label and WebKit padding fixes then passed all 36 final cases without weakening
+The wider 237-case regression run had 233 passes and four findings (including a fractional
+43.999996px touch-target measurement). The accessibility label, WebKit padding and 45px
+compact-control fixes are verified without weakening
 assertions (80% main viewport, 44px controls, <=52px rows). Existing auth, holdings, import,
 navigation, live quotes, PWA and stock-view cases in that wider run passed.
 Real-source smoke in an external temporary directory obtained AAPL's after-hours trade timestamp
