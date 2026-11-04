@@ -4,6 +4,9 @@ import type { Timeframe } from '../market-data/MarketDataProvider';
 import type { Drawing } from '../drawing/DrawingModel';
 import type { AlertDefinition } from '../storage/schema';
 import { AppStore } from '../app/AppStore';
+import { accessState } from '../auth/access';
+import { cloudSyncState } from '../cloud/startDrawingSync';
+import { discordDrawingAvailability, priceAlertDrawing, type PriceAlertAnchor } from '../alerts/priceAlertDrawing';
 
 type AlertKind = 'level' | 'ma' | 'drawing';
 type AlertDirection = 'above' | 'below' | 'cross';
@@ -24,13 +27,19 @@ export function AlertPanel({
   symbol,
   timeframe,
   drawings,
+  anchor,
 }: {
   store: AppStore;
   symbol: string;
   timeframe: Timeframe;
   drawings: Drawing[];
+  anchor?: PriceAlertAnchor;
 }) {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
+  const sync = useSyncExternalStore(cloudSyncState.subscribe, cloudSyncState.get);
+  const discordUnavailable = discordDrawingAvailability(access, sync, !!anchor);
+  const [discordNotice, setDiscordNotice] = useState('');
   const [kind, setKind] = useState<AlertKind>('level');
   const [direction, setDirection] = useState<AlertDirection>('cross');
   const [level, setLevel] = useState('');
@@ -86,14 +95,30 @@ export function AlertPanel({
     store.updateAlerts(store.getSnapshot().app.alerts.filter((alert) => alert.id !== id));
   };
 
+  const monitorPrice = (alert: AlertDefinition) => {
+    setError(''); setDiscordNotice('');
+    try {
+      const currentAccess = accessState.getSnapshot();
+      const unavailable = discordDrawingAvailability(currentAccess, cloudSyncState.get(), !!anchor);
+      if (unavailable) throw new Error(unavailable);
+      if (currentAccess.userId !== access.userId || store.getSnapshot().app.activeSymbol !== symbol || store.symbol(symbol).preferences.timeframe !== timeframe) throw new Error('股票、週期或保存授權已改變，請重新開啟提醒面板。');
+      const current = store.symbol(symbol).drawings;
+      const next = priceAlertDrawing(symbol, timeframe, alert.level!, anchor!, current, snapshot.app.drawingDefaults.horizontal);
+      if (next.created) store.commitDrawings(symbol, [...current, next.drawing], 'create price alert', timeframe);
+      setDiscordNotice(next.created ? '已建立水平線；同步完成後由伺服器監控突破／跌破。' : '此價格已有水平線，由既有雲端畫線同步與伺服器監控。');
+    } catch (caught) { setError(caught instanceof Error ? caught.message : '無法建立監控水平線，請稍後重試。'); }
+  };
+
   return (
     <section className="research-panel alert-panel" aria-label={`${symbol} 價格提醒`}>
       <div className="section-heading">
         <span>價格提醒</span>
         <span>{symbol} · {timeframe}</span>
       </div>
+      <p className="small muted">瀏覽器提醒：只在開著此圖表時檢查</p>
+      <p className="small muted">Discord 推播：由伺服器監控</p>
       <HelpDisclosure label="提醒執行範圍">
-        提醒只儲存在這台裝置。網頁開啟且在前景時，每分鐘以新收盤的 K 棒檢查一次目前股票與週期；不會在背景執行，也不會推播通知。
+        瀏覽器提醒維持現有保存方式，在網頁前景以已收盤 K 棒檢查。Discord 按鈕會建立一條可雲端同步的水平線，由既有伺服器監控突破與跌破，不限瀏覽器提醒的單向設定。停用或刪除瀏覽器提醒不會刪除水平線；要停止 Discord 監控，請在「畫線物件」刪除或隱藏該線。
       </HelpDisclosure>
       <form className="research-form" onSubmit={create}>
         <label>
@@ -152,6 +177,7 @@ export function AlertPanel({
         <button className="primary-button" type="submit" disabled={kind === 'drawing' && !alertDrawings.length} style={{ minHeight: 44 }}>建立提醒</button>
       </form>
       {error && <p className="research-error" role="alert">{error}</p>}
+      {discordNotice && <p className="small" role="status">{discordNotice}</p>}
       <div className="alert-list" aria-live="polite">
         <h3>{symbol} · {timeframe} 的提醒</h3>
         {!alerts.length ? <p className="small muted">此股票與週期尚無提醒。</p> : alerts.map((alert) => (
@@ -167,11 +193,13 @@ export function AlertPanel({
               <div><dt>最近檢查</dt><dd>{dateText(alert.lastEvaluated)}</dd></div>
             </dl>
             <div className="alert-actions">
+              {alert.kind === 'level' && <button type="button" disabled={!!discordUnavailable} title={discordUnavailable ?? '建立水平線並沿用現有雲端畫線同步'} onClick={() => monitorPrice(alert)} style={{ minHeight: 44 }}>推播到 Discord</button>}
               <button type="button" disabled={!!alert.invalidReason} aria-label={`${alert.enabled ? '停用' : '啟用'}提醒`} onClick={() => toggleAlert(alert)} style={{ minHeight: 44 }}>
                 {alert.enabled ? '停用' : '啟用'}
               </button>
               <button type="button" onClick={() => deleteAlert(alert.id)} style={{ minHeight: 44 }}>刪除</button>
             </div>
+            {alert.kind === 'level' && discordUnavailable && <p className="small muted">{discordUnavailable}</p>}
           </article>
         ))}
       </div>

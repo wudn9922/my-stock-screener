@@ -241,6 +241,7 @@ export function App({
     [drawingPickerOpen, setDrawingPickerOpen] = useState(false),
     [reloadToken, setReloadToken] = useState(0);
   const [drawingMenuPoint, setDrawingMenuPoint] = useState<Point | null>(null);
+  const loadedContext = useRef('');
   const [drawingMenuBounds, setDrawingMenuBounds] = useState<{ top: number; bottom: number } | null>(null);
   const [quickEditing, setQuickEditing] = useState(false);
   useEffect(() => setQuickEditing(false), [symbol, tf, selected]);
@@ -276,6 +277,7 @@ export function App({
       setTool('select');
       setSelected(null);
       setResult(refreshed);
+      loadedContext.current = `${symbol}:${tf}:${providerId}`;
       setLoadedResult(refreshed);
       setDataError('');
       if (refreshed.quote) setQuote({ symbol, provider: providerId, quote: refreshed.quote });
@@ -460,6 +462,7 @@ export function App({
     const abort = new AbortController();
     let live = true;
     chart.clear();
+    loadedContext.current = '';
     setTool('select');
     setSelected(null);
     setLoading(true);
@@ -504,6 +507,7 @@ export function App({
           legacyVolumeFor(symbol, settings.preferences, tf),
         );
         setResult(result);
+        loadedContext.current = `${symbol}:${tf}:${providerId}`;
         setLoadedResult(result);
         setLoading(false);
         if (!provider.getCorporateEvents) {
@@ -1070,7 +1074,7 @@ export function App({
       ) : panel === 'backtest' ? (
         <BacktestPanel symbol={symbol} timeframe={tf} market={market} result={loadedResult} onResult={onStrategy} />
       ) : panel === 'alerts' ? (
-        <AlertPanel store={store} symbol={symbol} timeframe={tf} drawings={activeDrawings} />
+        <AlertPanel store={store} symbol={symbol} timeframe={tf} drawings={activeDrawings} anchor={!loading && loadedContext.current === `${symbol}:${tf}:${providerId}` && result?.bars.length ? { time: result.bars.at(-1)!.time, logical: result.bars.length - 1, timeframe: tf } : undefined} />
       ) : (
         <>
           <label className="provider-field">
