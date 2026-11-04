@@ -1,3 +1,6 @@
+import { INITIAL_IPOS } from '../ipo/initial';
+import { loadIpos, matchIpos, type IpoCompany } from '../ipo/ipoWatch';
+import { IpoDetails } from './IpoDetails';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowUpRight, Clock, Search, X } from 'lucide-react';
 import { sitePreferences, type RecentSearch } from '../app/sitePreferences';
@@ -16,7 +19,8 @@ export interface SearchResult {
   name: string;
   /** Short badge, e.g. 上市 / 上櫃 / NASDAQ / 指數. */
   badge: string;
-  kind: 'stock' | 'index' | 'recent' | 'direct';
+  ipo?: IpoCompany;
+  kind: 'stock' | 'index' | 'recent' | 'direct' | 'ipo';
 }
 
 function exchangeBadge(exchange: string, market: 'TW' | 'US') {
@@ -63,6 +67,14 @@ export function SymbolSearch({
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus({ preventScroll: true });
   }, [autoFocus]);
+  const [ipos, setIpos] = useState<{ companies: IpoCompany[]; reason?: string }>({ companies: INITIAL_IPOS, reason: '已核對的申報紀錄；正在查詢 IPO 更新檔。' });
+  const [selectedIpo, setSelectedIpo] = useState<IpoCompany | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const abort = new AbortController();
+    void loadIpos(abort.signal).then(value => { if (!abort.signal.aborted) setIpos(value); });
+    return () => abort.abort();
+  }, [open]);
   const trimmed = query.trim();
   useEffect(() => {
     if (!trimmed) return;
@@ -93,7 +105,8 @@ export function SymbolSearch({
     };
   }, [trimmed]);
   const results = useMemo<SearchResult[]>(() => {
-    if (!trimmed) return recent.map((item) => ({ ...item, badge: '最近', kind: 'recent' as const }));
+    const ipoResults: SearchResult[] = matchIpos(ipos?.companies ?? [], trimmed).map(ipo => ({ symbol: ipo.symbol || ipo.id, name: ipo.name, badge: 'IPO 申報', kind: 'ipo', ipo }));
+    if (!trimmed) return [...recent.map((item) => ({ ...item, badge: '最近', kind: 'recent' as const })), ...ipoResults];
     const local = matchLocalSymbols(trimmed, localSymbols).map((item) => ({
       symbol: item.symbol,
       name: item.name,
@@ -101,7 +114,7 @@ export function SymbolSearch({
       kind: item.symbol.startsWith('^') ? ('index' as const) : ('stock' as const),
     }));
     const seen = new Set<string>();
-    const merged: SearchResult[] = [];
+    const merged: SearchResult[] = [...ipoResults];
     const remoteResults = remote.query === trimmed ? remote.results : [];
     // Indices from the report first, then the full stock directory.
     for (const item of [...local.filter((r) => r.kind === 'index'), ...remoteResults, ...local])
@@ -110,10 +123,10 @@ export function SymbolSearch({
         merged.push(item);
       }
     const upper = trimmed.toUpperCase();
-    if (!seen.has(upper) && isCanonicalSymbol(upper) && !/^\d+$/.test(upper))
+    if (!ipoResults.some(item => item.symbol.toUpperCase() === upper) && !seen.has(upper) && isCanonicalSymbol(upper) && !/^\d+$/.test(upper))
       merged.push({ symbol: upper, name: '直接開啟代號', badge: '代號', kind: 'direct' });
     return merged.slice(0, 20);
-  }, [trimmed, recent, localSymbols, remote]);
+  }, [trimmed, recent, localSymbols, remote, ipos]);
   const pending = !!trimmed && remote.query !== trimmed;
   const activeIndex = Math.min(active, Math.max(0, results.length - 1));
   useEffect(() => {
@@ -131,6 +144,7 @@ export function SymbolSearch({
   }, [mode, open]);
   const choose = (result: SearchResult | undefined) => {
     if (!result) return;
+    if (result.kind === 'ipo' && result.ipo) { setSelectedIpo(result.ipo); return; }
     if (result.kind !== 'direct') sitePreferences.addRecent({ symbol: result.symbol, name: result.name });
     setQuery('');
     setActive(0);
@@ -141,6 +155,10 @@ export function SymbolSearch({
     onSelect(result);
   };
   const keyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (selectedIpo) {
+      if (event.key === 'Escape') { event.preventDefault(); setSelectedIpo(null); }
+      return;
+    }
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       setOpen(true);
@@ -173,11 +191,11 @@ export function SymbolSearch({
           type="search"
           role="combobox"
           aria-label="搜尋股票"
-          aria-expanded={showList}
+          aria-expanded={showList && !selectedIpo}
           aria-controls={listId}
           aria-autocomplete="list"
-          aria-activedescendant={showList && results.length ? `${listId}-${activeIndex}` : undefined}
-          placeholder="搜尋股票：台積電、2330、NVDA"
+          aria-activedescendant={showList && !selectedIpo && results.length ? `${listId}-${activeIndex}` : undefined}
+          placeholder="股票／IPO：2330、NVDA、ANT"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="characters"
@@ -189,6 +207,7 @@ export function SymbolSearch({
             void dataSources().then((module) => module.preloadSymbolDirectory());
           }}
           onChange={(event) => {
+            setSelectedIpo(null);
             setQuery(event.target.value);
             setActive(0);
             setOpen(true);
@@ -204,9 +223,10 @@ export function SymbolSearch({
       </div>
       {showList && (
         <div className="search-results" role="presentation">
+          {selectedIpo ? <IpoDetails company={selectedIpo} onBack={() => { setSelectedIpo(null); inputRef.current?.focus(); }} /> : <>
           {!trimmed && (
             <div className="search-section-title">
-              <span>{recent.length ? '最近搜尋' : '輸入公司名稱或代號'}</span>
+              <span>{recent.length ? '最近搜尋' : '輸入公司名稱、代號或查看熱門 IPO'}</span>
               {!!recent.length && (
                 <button type="button" onClick={() => sitePreferences.clearRecent()}>
                   清除
@@ -217,7 +237,7 @@ export function SymbolSearch({
           <ul id={listId} role="listbox" aria-label="搜尋結果">
             {results.map((result, index) => (
               <li
-                key={`${result.kind}:${result.symbol}`}
+                key={`${result.kind}:${result.ipo?.id ?? result.symbol}`}
                 id={`${listId}-${index}`}
                 data-index={index}
                 role="option"
@@ -244,6 +264,8 @@ export function SymbolSearch({
             </p>
           )}
           {pending && !results.length && <p className="search-empty">搜尋中…</p>}
+          {results.some(item => item.kind === 'ipo') && <p className="search-empty">{ipos?.reason ?? 'IPO 為待上市申報資料，擬用代號不代表已掛牌。'}</p>}
+          </>}
         </div>
       )}
     </div>

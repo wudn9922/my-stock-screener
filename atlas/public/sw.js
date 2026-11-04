@@ -24,6 +24,7 @@ function isCacheableAsset(url) {
   if (!isInScope(url) || isApiPath(url.pathname)) return false;
   return (
     url.pathname.startsWith(assetsPath) ||
+    url.pathname === new URL('startup.js', scopeRoot).pathname ||
     url.pathname === manifestURL.pathname ||
     iconURLs.some((iconURL) => url.pathname === iconURL.pathname)
   );

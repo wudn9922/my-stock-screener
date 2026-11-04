@@ -154,8 +154,8 @@ describe('EdgeYahooProvider', () => {
       new EdgeYahooProvider(PROXY, { now: () => asOfMs, fetcher: (async () => json({ error: {} }, status)) as typeof fetch });
     const unavailable = failing(503).getBars('NVDA', '1D');
     await expect(unavailable).rejects.toBeInstanceOf(MarketDataUnavailableError);
-    await expect(unavailable).rejects.toThrow('暫時無法取得 NVDA 行情，請稍後再試');
-    await expect(failing(502).getQuote('2330.TW')).rejects.toThrow('暫時無法取得 2330.TW 行情，請稍後再試');
+    await expect(unavailable).rejects.toThrow('NVDA 行情服務暫時無法使用（HTTP 503）');
+    await expect(failing(502).getQuote('2330.TW')).rejects.toThrow('2330.TW 行情服務暫時無法使用（HTTP 502）');
     const notFound = failing(404).getBars('ZZZZ', '1D');
     await expect(notFound).rejects.toThrow('找不到 ZZZZ 的行情資料');
     await expect(notFound).rejects.not.toBeInstanceOf(MarketDataUnavailableError);
@@ -165,7 +165,7 @@ describe('EdgeYahooProvider', () => {
         throw new TypeError('Failed to fetch');
       }) as typeof fetch,
     });
-    await expect(offline.getBars('NVDA', '5m')).rejects.toThrow('暫時無法取得 NVDA 行情，請稍後再試');
+    await expect(offline.getBars('NVDA', '5m')).rejects.toThrow('NVDA 無法連線至行情來源');
     const timeout = new EdgeYahooProvider(PROXY, {
       now: () => asOfMs,
       timeoutMs: 5,

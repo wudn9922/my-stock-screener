@@ -15,7 +15,8 @@ const number = z.number().finite();
 const timestamp = number.int().positive();
 const bar = z.object({ time: timestamp, open: number.nonnegative(), high: number.nonnegative(), low: number.nonnegative(), close: number.nonnegative(), volume: number.nonnegative() })
   .refine(b => b.low <= Math.min(b.open, b.close) && b.high >= Math.max(b.open, b.close) && b.low <= b.high, 'Invalid OHLC');
-const quote = z.object({ symbol: z.string().regex(CANONICAL_SYMBOL_REGEX), price: number.positive(), change: number, changePercent: number, asOf: timestamp, source: z.string(), dataState: z.literal('delayed'), retrievedAt: number.positive(), cacheStatus: z.enum(['fresh', 'cached', 'stale']).optional(), market: marketProfileSchema.optional() });
+const extended = z.object({ pre: z.object({ price: number.positive(), asOf: timestamp }).optional(), post: z.object({ price: number.positive(), asOf: timestamp }).optional() }).optional();
+const quote = z.object({ extended, symbol: z.string().regex(CANONICAL_SYMBOL_REGEX), price: number.positive(), change: number, changePercent: number, asOf: timestamp, source: z.string(), dataState: z.literal('delayed'), retrievedAt: number.positive(), cacheStatus: z.enum(['fresh', 'cached', 'stale']).optional(), market: marketProfileSchema.optional() });
 const normalization = z.object({
   healedDailyClose: z.object({ method: z.literal('validated-regular-market-price'), time: timestamp, quoteAsOf: timestamp }).optional(),
   liveBarBounds: z.object({ method: z.literal('live-session-open-close'), time: timestamp, quoteAsOf: timestamp }).optional(),
@@ -25,7 +26,7 @@ const normalization = z.object({
     quoteAsOf: timestamp, native: bar.optional(),
   }).optional(),
 }).optional();
-const bars = z.object({ bars: z.array(bar).min(1).max(10000), source: z.string(), session: z.literal('regular'), delayed: z.literal(true), adjusted: z.literal(true), priceBasis: z.literal('split-adjusted'), asOf: number.positive(), latestBarAt: timestamp, dataState: z.literal('delayed'), cacheStatus: z.enum(['fresh', 'cached', 'stale']).optional(), quote: quote.optional(), market: marketProfileSchema.optional(), sessionCloseObservations: z.array(timestamp).optional(), normalization })
+const bars = z.object({ missingVolumeAt: z.array(timestamp).optional(), bars: z.array(bar).min(1).max(10000), source: z.string(), session: z.literal('regular'), delayed: z.literal(true), adjusted: z.literal(true), priceBasis: z.literal('split-adjusted'), asOf: number.positive(), latestBarAt: timestamp, dataState: z.literal('delayed'), cacheStatus: z.enum(['fresh', 'cached', 'stale']).optional(), quote: quote.optional(), market: marketProfileSchema.optional(), sessionCloseObservations: z.array(timestamp).optional(), normalization })
   .refine(r => r.bars.every((b, i) => (!i || b.time > r.bars[i - 1].time) && b.time <= r.asOf + 300) && r.latestBarAt === r.bars.at(-1)!.time, 'Invalid bar timeline');
 const event = z.object({ symbol: z.string(), type: z.enum(['split', 'dividend']), time: timestamp, value: number, source: z.string(), currency: z.string().optional(), numerator: number.positive().optional(), denominator: number.positive().optional() })
   .refine(e => e.type !== 'split' || !!e.numerator && !!e.denominator && Math.abs(e.value - e.numerator / e.denominator) < 1e-9, 'Invalid split ratio');

@@ -17,6 +17,7 @@
       "docs/report/breakouts-history.json",
       "docs/report/breakouts-archive/*.json"
     ],
+    "marketExtras": ["docs/report/ipo-watch.json", "docs/report/extended-quotes/*.json"],
     "research": ["docs/report/research/**"],
     "chips": ["docs/report/tw-chips.json"],
     "themes": ["docs/report/themes-tw.json"],

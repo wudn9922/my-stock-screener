@@ -119,3 +119,29 @@
   .wb-spark { width: 56px; }
   .wb-quote { width: 84px; }
 }
+/* Compact quote-first home. Controls stay >=44px; rows have no card gaps. */
+.watchlist-heading { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.watchlist-board { gap: 4px; }
+.wb-toolbar, .wb-list-toolbar { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.wb-toolbar .console-tabs { margin: 0; flex: none; padding: 1px; }
+.wb-view-switch button { padding: 0 9px; min-height: 44px; }
+.wb-tabs { gap: 2px; flex-wrap: nowrap; flex: 1; }
+.wb-tabs button { min-height: 44px; padding: 0 9px; font-size: 12px; white-space: nowrap; flex: 1; border-radius: 8px; }
+.wb-list-picker { flex: 1; min-width: 0; }
+.wb-list-picker select { min-height: 44px; padding: 6px 8px; }
+.wb-chart-toggle { min-height: 44px; margin-left: auto; padding: 6px 14px; }
+.wb-row { box-sizing: border-box; min-height: 50px; padding: 4px 2px; gap: 8px; }
+.wb-name b { font-size: 17px; line-height: 21px; }
+.wb-name small { font-size: 11px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-quote b { font-size: 17px; line-height: 21px; }
+.wb-change { line-height: 16px; }
+.wb-error { max-width: 160px; font-size: 10px; color: var(--text-2); overflow-wrap: anywhere; text-align: right; }
+.wb-quote:has(.wb-error) { width: 160px; }
+.page-footer-note { font-size: 12px; color: var(--text-3); overflow-wrap: anywhere; }
+@media (max-width: 420px) {
+  .watchlist-page { padding-top: 4px; }
+  .wb-toolbar { gap: 4px; }
+  .wb-view-switch button { padding: 0 7px; font-size: 12px; }
+  .wb-tabs button { padding: 0 6px; }
+  .wb-caption { flex-direction: column; }
+}

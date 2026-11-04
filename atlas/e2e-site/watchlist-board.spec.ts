@@ -67,11 +67,11 @@ test('a saved list shows its rows read-only; a row opens 個股 and a failed quo
   await page.getByRole('textbox', { name: '手動清單股票' }).fill('NVDA, AAPL');
   await page.getByRole('button', { name: '儲存手動清單', exact: true }).click();
   await expect(source(page, '我的清單')).toHaveAttribute('aria-pressed', 'true');
-  await expect(board(page)).toContainText('清單：看板測試');
+  await expect(page.locator('.site-data-footer')).toContainText('清單：看板測試');
   await expect(rows(page)).toHaveCount(2);
   // Rows load lazily near the viewport; saving the list leaves the page scrolled to the form on phones.
   await rows(page).nth(1).scrollIntoViewIfNeeded();
-  await expect(rows(page).nth(1).locator('.wb-change')).toHaveText('暫無行情');
+  await expect(rows(page).nth(1).locator('.wb-change')).toHaveText('載入失敗');
   await source(page, 'LINE 熱門').click();
   await expect(rows(page)).toHaveCount(1);
   await source(page, '我的清單').click();

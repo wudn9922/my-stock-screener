@@ -73,4 +73,4 @@ async function render() {
   createRoot(document.getElementById('root')!).render(<AccessBoundary />);
 }
 
-void render();
+void render().catch(() => document.dispatchEvent(new Event('atlas-startup-error')));

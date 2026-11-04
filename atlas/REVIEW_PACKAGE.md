@@ -1,3 +1,20 @@
+## Current follow-up: startup, compact watchlists and public market details (2026-11-04)
+
+Primary self-review only; no independent sign-off. Based on latest main `df29c9351`.
+The explicit ten-item request is documented in `docs/STARTUP_WATCHLIST_MARKET_DETAILS.md`.
+No protected auth/account/Edge Function source, SQL, existing permanent market records or archive branch is edited.
+New display snapshots are bounded, read-only consumers of public sources; source dates are never invented.
+Verified locally: clean npm ci; lint; typecheck; 137 Vitest files / 1,773 tests;
+normal + Pages builds; 5 public market-extras Python tests; 33 generated-branch tests;
+36 final browser cases across desktop Chromium, mobile Chromium and iPhone WebKit.
+The wider 237-case regression run had 234 passes and three compact-home findings; the
+accessibility label and WebKit padding fixes then passed all 36 final cases without weakening
+assertions (80% main viewport, 44px controls, <=52px rows). Existing auth, holdings, import,
+navigation, live quotes, PWA and stock-view cases in that wider run passed.
+Real-source smoke in an external temporary directory obtained AAPL's after-hours trade timestamp
+and an honestly unavailable premarket observation; no permanent records were written.
+CI will verify the exact pushed head. No merge or deployment is authorized.
+
 ## Current follow-up: timeframe fixation, calibrated breadth and list evidence (2026-11-02)
 
 Primary self-review only; no independent sign-off. Based on main `133220a01`.

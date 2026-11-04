@@ -1,3 +1,4 @@
+import { PageFooterNote } from '../ui/PageFooterNote';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { userStorage } from '../auth/storage';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
@@ -498,11 +499,11 @@ export default function ThemesPage({
       <div className="page-head">
         <div>
           <h2 className="page-title">題材輪動</h2>
-          <p className="page-sub">
+          <PageFooterNote><p className="page-sub">
             {state.status === 'ok'
               ? `${meta.name} ${state.data.themes.length} 個題材 · 資料日 ${formatDateTime(state.data.asOf, false)} · 基準 ${state.data.benchmark.label}`
               : `${meta.name}產業題材 · 看資金現在流向哪裡`}
-          </p>
+          </p></PageFooterNote>
         </div>
       </div>
       <div className="tabs market-tabs themes-market" role="tablist" aria-label="市場">

@@ -1,3 +1,4 @@
+import { ExtendedQuotes } from '../ui/ExtendedQuotes';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   Activity,
@@ -1158,6 +1159,9 @@ export function App({
               <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}</p>
               {onShowPeChart && <button type="button" className="ghost-button" onClick={onShowPeChart}>查看下方本益比圖表</button>}
             </StockStatsMenu>
+            {market.market === 'US' && !asset && <StockStatsMenu label="盤前盤後報價" testId="extended-quotes-toggle" trigger={<span>盤前／後</span>}>
+              {open => <ExtendedQuotes key={symbol} symbol={symbol} quote={headerQuote} active={open} />}
+            </StockStatsMenu>}
           </div>
         )}
         {!isIndex && providerId !== 'demo' && (
@@ -1169,7 +1173,7 @@ export function App({
                 onSelect={(tab) => (tab === 'financials' ? onOpenFinancials(symbol, tf) : onViewChange?.(tab))}
               >
                 {!stockViews && <StockStatsMenu label="價量" testId="volume-analysis-toggle" tabStyle>
-                    <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
+                    <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} provider={providers[providerId]} mode="volume" /></Suspense>
                   </StockStatsMenu>}
                 <StockStatsMenu label="建議均線" testId="ma-recommendation-toggle" tabStyle>
                   {open => <><MaRecommendation active={open} store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} savedStock={parameter} parameterError={parameters.error} onNotice={setNotice} />
@@ -1182,7 +1186,7 @@ export function App({
             {!onOpenFinancials && <div className="ws-analysis-tools">
               <StockVolatility symbol={symbol} provider={providers[providerId]} reloadToken={reloadToken} />
               {!stockViews && <><StockStatsMenu label="價量" testId="volume-analysis-toggle">
-                <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
+                <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} provider={providers[providerId]} mode="volume" /></Suspense>
               </StockStatsMenu>
               <StockStatsMenu label="建議均線" testId="ma-recommendation-toggle">
                 {open => <><MaRecommendation active={open} store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} savedStock={parameter} parameterError={parameters.error} onNotice={setNotice} />
@@ -1236,7 +1240,7 @@ export function App({
         <section className="stock-view" aria-label="價量" hidden={stockView !== 'volume'} inert={modal} aria-hidden={modal}>
           <div className="stock-view-card">
             <h2>價量分析</h2>
-            <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} mode="volume" /></Suspense>
+            <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} provider={providers[providerId]} mode="volume" /></Suspense>
           </div>
         </section>
       )}

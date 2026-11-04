@@ -16,6 +16,7 @@ import './siteNav.css';
 import { DataHealthPanel } from '../ui/DataHealthPanel';
 import { StorageNotice } from '../auth/StorageNotice';
 import { StorageModeNotice } from '../ui/StorageAdminPanel';
+import { LegacyImportCard } from '../ui/LegacyImportCard';
 import { RouteBoundary } from './RouteBoundary';
 import { DisplaySettings } from '../ui/DisplaySettings';
 import { INITIAL_MARKET_SECTIONS, MarketSectionNav, marketSectionOf, rememberMarketSection, type MarketSectionRoutes } from '../ui/MarketSectionNav';
@@ -35,7 +36,7 @@ const ConsolePage = lazy(() => import('../pages/ConsolePage'));
 const DEFAULT_PAGE: Page =
   import.meta.env?.VITE_DEFAULT_PAGE === 'chart' || (!SCREENER_HOSTING && import.meta.env?.VITE_DEFAULT_PAGE !== 'markets')
     ? 'chart'
-    : 'markets';
+    : import.meta.env?.VITE_DEFAULT_PAGE === 'markets' ? 'markets' : 'watchlist';
 
 const NAV: { page: Page; label: string; icon: typeof Star }[] = [
   { page: 'watchlist', label: '自選', icon: Star },
@@ -205,10 +206,10 @@ export function Site() {
       <header className="site-topbar">
         <a
           className="site-brand"
-          href="?page=markets&market=tw"
+          href="?page=watchlist"
           onClick={(event) => {
             event.preventDefault();
-            navigate({ page: 'markets', market: 'tw' });
+            navigate({ page: 'watchlist' });
           }}
           aria-label="Atlas 股市報告首頁"
         >
@@ -291,6 +292,8 @@ export function Site() {
           </div>
         )}
         <div className="site-data-footer">
+          <div id="site-page-notes" />
+          {(route.page === 'console' || route.page === 'watchlist') && <LegacyImportCard />}
           <StorageModeNotice />
           <DataHealthPanel report={reportState} />
         </div>
