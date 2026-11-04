@@ -3,7 +3,7 @@ import type { OpenChartOptions } from '../app/Site';
 import type { Route } from '../app/routes';
 import { getDailyBars } from '../app/dataSources';
 import type { Bar } from '../market-data/MarketDataProvider';
-import { liveQuotes, mergeDailyBars } from '../market-data/LiveQuotes';
+import { formatLiveTime, liveQuotes, mergeDailyBars } from '../market-data/LiveQuotes';
 import { fetchTrendingStocks, type TrendingStocksResult } from '../report/trendingStocks';
 import type { SavedWatchlist } from '../watchlists/model';
 import { displayTicker, formatDateTime, formatPercent, formatPrice, toneClass } from './format';
@@ -127,6 +127,13 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
   );
 }
 
+/** Receive time of the latest live batch, while this board is mounted. */
+function useLiveUpdatedAt(): number {
+  const [at, setAt] = useState(() => liveQuotes().lastUpdatedAt);
+  useEffect(() => liveQuotes().onUpdate(setAt), []);
+  return at;
+}
+
 function useTrending(wanted: boolean) {
   const [state, setState] = useState<TrendingStocksResult>();
   const [attempt, setAttempt] = useState(0);
@@ -158,6 +165,7 @@ export function WatchlistBoard({ list, lists, parameters, parameterError, onSele
   const [expanded, setExpanded] = useState(false);
   const [charts, setCharts] = useState(false);
   const { state: trending, retry } = useTrending(tab === 'trending');
+  const liveAt = useLiveUpdatedAt();
   useEffect(() => { setExpanded(false); setCharts(false); }, [tab, list?.id]);
   // The first saved list becomes the default source.
   useEffect(() => {
@@ -205,7 +213,7 @@ export function WatchlistBoard({ list, lists, parameters, parameterError, onSele
       </button>}
       <p className="wb-caption">
         <span>{tab === 'list' ? list ? `清單：${list.name}` : '我的清單' : 'LINE 熱門美股'}</span>
-        <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}盤中每分鐘更新（Yahoo 延遲報價）</span>
+        <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}盤中每分鐘更新（Yahoo 延遲報價）{liveAt ? <> · <time data-testid="board-live-time">更新於 {formatLiveTime(liveAt)}</time></> : null}</span>
       </p>
       {charts && parameterError && <p role="status">{parameterError}</p>}
       {empty ? <div className="wb-empty" role="status">{empty}</div> : charts ? <StockChartList key={`${tab}:${list?.id ?? ''}`} rows={rows}
