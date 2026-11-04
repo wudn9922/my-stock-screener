@@ -3,6 +3,7 @@
 Primary self-review only; Claude review remains with the maintainer. Based on main `b0ca518232`.
 A1: timestamp restored to the existing list toolbar; one unit and five browser cases pass.
 A2: shared regular-session status, with 19 related unit and 30 browser cases passing, plus typecheck. Extended prices never supply the regular trade timestamp.
+A3: direct extended quotes, in-flow source details, <=56px list rows. Public Nasdaq responses confirm a missing newly priced issuer; parser and synthetic actual-shape fixtures fixed. Seven Python and 17 related unit tests pass; 50 affected browser executions and 20 numeric-P/E layout cases pass across all five targets.
 See `docs/PR_A_UI_QUOTES_ALERTS.md` for exact scope, checks and screenshots.
 
 ## Current follow-up: startup, compact watchlists and public market details (2026-11-04)

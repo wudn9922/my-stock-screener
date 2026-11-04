@@ -1,4 +1,4 @@
-import { ExtendedQuotes } from '../ui/ExtendedQuotes';
+import { ExtendedQuoteLine, ExtendedQuotes } from '../ui/ExtendedQuotes';
 import { quoteStatus } from '../market-data/quoteStatus';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
@@ -631,6 +631,8 @@ export function App({
         ? result.quote
         : null;
   const headerPrice = headerQuote?.price ?? null;
+  const [extendedDetails, setExtendedDetails] = useState<{ symbol: string; open: boolean }>();
+  const extendedOpen = extendedDetails?.symbol === symbol && extendedDetails.open;
   useEffect(() => {
     if (!state.ready || providerId === 'demo') return;
     let live = true;
@@ -1138,7 +1140,7 @@ export function App({
           </span>
           {onOpenSearch ? <Search size={16} className="ws-symbol-icon" /> : <ChevronDown size={16} className="ws-symbol-icon" />}
         </button>
-        <div className={`ws-quote ${changeTone}`} aria-live="polite" data-testid="header-quote">
+        <div className="ws-price-block"><div className={`ws-quote ${changeTone}`} aria-live="polite" data-testid="header-quote">
           <b>{headerQuote ? formatPrice(headerQuote.price, asset?.precision) : '—'}</b>
           <span>
             {headerQuote ? `${headerQuote.change > 0 ? '+' : ''}${formatPrice(headerQuote.change)}` : ''}
@@ -1146,6 +1148,8 @@ export function App({
           </span>
           <small>{asset?.unit ?? market.currency}</small>
           {!asset && headerQuote && <small className="ws-live-time" data-testid="live-time">{quoteStatus(symbol, headerQuote, liveAt?.key === liveKey ? liveAt.at : result?.asOf ? result.asOf * 1000 : undefined)}</small>}
+        </div>
+        {market.market === 'US' && !isIndex && !asset && providerId !== 'demo' && <ExtendedQuoteLine symbol={symbol} quote={headerQuote} expanded={extendedOpen} onToggle={() => setExtendedDetails({ symbol, open: !extendedOpen })} />}
         </div>
         {!isIndex && providerId !== 'demo' && (
           <div className="ws-stock-statistics">
@@ -1164,9 +1168,6 @@ export function App({
               <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}</p>
               {onShowPeChart && <button type="button" className="ghost-button" onClick={onShowPeChart}>查看下方本益比圖表</button>}
             </StockStatsMenu>
-            {market.market === 'US' && !asset && <StockStatsMenu label="盤前盤後報價" testId="extended-quotes-toggle" trigger={<span>盤前／後</span>}>
-              {open => <ExtendedQuotes key={symbol} symbol={symbol} quote={headerQuote} active={open} />}
-            </StockStatsMenu>}
           </div>
         )}
         {!isIndex && providerId !== 'demo' && (
@@ -1232,15 +1233,19 @@ export function App({
             </IconButton>
           )}
           <StockStatsMenu label="行情資料說明" testId="source-info-toggle" trigger={<Info size={16} />}>
-            <div className="source-details">
+            {open => <div className="source-details">
               <div ref={sourceRef} className="data-source" />
               {STATIC_HOSTING && <p className="static-hosting-note">{staticHostingText}</p>}
               {providerId === 'demo' && <p className="demo-data-note">{demoDataText}</p>}
               <div className="events-source">{eventsStatus}</div>
-            </div>
+              {market.market === 'US' && !isIndex && !asset && providerId !== 'demo' && <ExtendedQuotes key={symbol} symbol={symbol} quote={headerQuote} active={open} />}
+            </div>}
           </StockStatsMenu>
         </div>
       </header>
+      {extendedOpen && market.market === 'US' && !isIndex && !asset && providerId !== 'demo' && <section id="extended-quote-details" className="ws-extended-details" role="region" aria-label="盤前盤後報價">
+        <ExtendedQuotes key={symbol} symbol={symbol} quote={headerQuote} active />
+      </section>}
       {stockViews && visitedViews.has('volume') && (
         <section className="stock-view" aria-label="價量" hidden={stockView !== 'volume'} inert={modal} aria-hidden={modal}>
           <div className="stock-view-card">

@@ -147,3 +147,9 @@
 }
 
 .wb-live-time { flex: none; margin-left: auto; color: var(--text-3); font-size: 10px; line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wb-extended { color: var(--text-2); font-size: 9px; line-height: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wb-row:has(.wb-extended) { height: 56px; min-height: 56px; }
+.wb-row:has(.wb-extended) .wb-quote { width: 174px; gap: 0; }
+.wb-row:has(.wb-extended) .wb-quote b { line-height: 19px; }
+.wb-row:has(.wb-extended) .wb-change { line-height: 14px; font-size: 11px; }
+.wb-row:has(.wb-extended) .wb-spark { width: 48px; }

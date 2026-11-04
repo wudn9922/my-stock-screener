@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { OpenChartOptions } from '../app/Site';
 import type { Route } from '../app/routes';
 import { getDailyBars, searchStocks } from '../app/dataSources';
-import type { Bar } from '../market-data/MarketDataProvider';
+import type { Bar, Quote } from '../market-data/MarketDataProvider';
+import { ExtendedQuoteLine } from './ExtendedQuotes';
+import { getMarketProfile } from '../market-data/MarketProfile';
 import { liveQuotes, mergeDailyBars } from '../market-data/LiveQuotes';
 import { quoteStatus } from '../market-data/quoteStatus';
 import { fetchTrendingStocks, type TrendingStocksResult } from '../report/trendingStocks';
@@ -80,6 +82,7 @@ function useNear<T extends Element>() {
 function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => void }) {
   const { ref, near, visible } = useNear<HTMLLIElement>();
   const [bars, setBars] = useState<readonly Bar[] | null>(null);
+  const [regularQuote, setRegularQuote] = useState<Quote>();
   const [resolvedName, setResolvedName] = useState<{ symbol: string; name: string }>();
   useEffect(() => {
     if (!near || row.name !== row.symbol) return;
@@ -106,7 +109,7 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
   useEffect(() => {
     if (!visible) return;
     return liveQuotes().subscribe(row.symbol, (value) =>
-      { setFailure(null); setBars((current) => (current ? mergeDailyBars(current, value.bars) : value.bars)); });
+      { setFailure(null); setRegularQuote(value.quote); setBars((current) => (current ? mergeDailyBars(current, value.bars) : value.bars)); });
   }, [visible, row.symbol]);
   const quote = Array.isArray(bars) ? rowQuote(bars) : null;
   const ticker = displayTicker(row.symbol);
@@ -136,6 +139,7 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
           <small className={`wb-change ${tone}`}>
             {failure && !bars ? '載入失敗' : quote?.changePct == null ? '…' : `${tone === 'up' ? '▲ ' : tone === 'down' ? '▼ ' : ''}${formatPercent(quote.changePct)}`}
           </small>
+          {getMarketProfile(row.symbol).market === 'US' && !row.symbol.startsWith('^') && <ExtendedQuoteLine symbol={row.symbol} quote={regularQuote} active={visible} compact />}
           {failure && <small className="wb-error" role="status">{failure}</small>}
         </span>
       </a>
