@@ -1,5 +1,7 @@
 # 全市場日 K 永久封存
 
+五個完整年度＋今年、ETF／指數的範圍、來源例外、唯讀試跑與維護者操作，見 [五年擴充說明](KLINE_ARCHIVE_EXPANSION.md)。正式補檔由維護者手動觸發，本 PR 未執行。
+
 日 K 的永久副本在獨立 orphan 分支 **`kline-archive`**。`main` 的 `data/*.csv`、`data/world/*.csv`、財報紀錄及選股規則不變。Actions 的 `.cache/universe-full` 仍是 320 根的運算快取；它可以被驅逐，永久封存不依賴其保存期限。
 
 ## 保存格式與邊界

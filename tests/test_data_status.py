@@ -4,9 +4,11 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+import io
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from build_data_status import SOURCES, Source, build, evaluate, expected_date, workflow_status
+from build_data_status import SOURCES, Source, build, evaluate, expected_date, workflow_status, github_json
 
 
 def now(text):
@@ -14,6 +16,15 @@ def now(text):
 
 
 class DataStatusTests(unittest.TestCase):
+    def test_large_archive_manifest_uses_authenticated_raw_media_without_a_base64_envelope(self):
+        manifest = {'version': 2, 'markets': {'tw': {'lastDate': '2026-11-04'}}, 'bySymbol': {'synthetic': 'x' * 1_100_000}}
+        with patch('build_data_status.urlopen', return_value=io.BytesIO(json.dumps(manifest).encode())) as request:
+            result = github_json('contents/manifest.json?ref=kline-archive', 'example/repo', 'synthetic-token', accept='application/vnd.github.raw+json')
+        self.assertEqual(result['markets']['tw']['lastDate'], '2026-11-04')
+        sent = request.call_args.args[0]
+        self.assertEqual(sent.get_header('Accept'), 'application/vnd.github.raw+json')
+        self.assertEqual(sent.get_header('Authorization'), 'Bearer synthetic-token')
+        self.assertNotIn('synthetic-token', sent.full_url)
     tw = Source("test", "測試", "TW", "x.json", "asOf")
     us = Source("test", "測試", "US", "x.json", "asOf", calendar="XNYS", publish_minutes=360)
 

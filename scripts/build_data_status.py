@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
@@ -174,10 +173,10 @@ def evaluate(source, document, now, *, archive_generated=None, error=None):
     return result
 
 
-def github_json(path, repository, token):
+def github_json(path, repository, token, accept="application/vnd.github+json"):
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
         raise ValueError("未設定有效的 GITHUB_REPOSITORY")
-    headers = {"Accept": "application/vnd.github+json", "User-Agent": "Atlas-data-status", "X-GitHub-Api-Version": "2022-11-28"}
+    headers = {"Accept": accept, "User-Agent": "Atlas-data-status", "X-GitHub-Api-Version": "2022-11-28"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     with urlopen(Request(f"https://api.github.com/repos/{repository}/{path}", headers=headers), timeout=15) as response:
@@ -238,8 +237,9 @@ def main():
             archive = json.loads(subprocess.check_output(["git", "show", f"{args.archive_ref}:manifest.json"], cwd=args.root))
             generated = subprocess.check_output(["git", "show", "-s", "--format=%cI", args.archive_ref], cwd=args.root).decode().strip()
         elif not args.offline:
-            body = github_json("contents/manifest.json?ref=kline-archive", repository, token)
-            archive = json.loads(base64.b64decode(body["content"]))
+            # Per-symbol/year hashes can exceed Contents API's 1 MB base64-envelope limit.
+            # Raw media remains authenticated at api.github.com and supports larger manifests.
+            archive = github_json("contents/manifest.json?ref=kline-archive", repository, token, accept="application/vnd.github.raw+json")
             commits = github_json("commits?sha=kline-archive&path=manifest.json&per_page=1", repository, token)
             generated = commits[0]["commit"]["committer"]["date"]
     except (OSError, ValueError, KeyError, IndexError, subprocess.CalledProcessError) as exc:
