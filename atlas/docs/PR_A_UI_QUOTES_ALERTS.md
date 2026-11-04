@@ -64,3 +64,9 @@
 - 最後保留來源列原有延遲／快取等 metadata 文字後，再通過 lint、typecheck、23 項相關單元測試與兩種建置。未新增 skip 或調高 timeout。
 - Workflow YAML、`git diff --check` 與檔案範圍檢查通過；受保護的登入／帳號原始碼、Supabase 函式／SQL、GCP 與永久行情／財報檔變更數為零。
 - 以上為本機自我驗證；GitHub CI 與維護者的 Claude 審查另行確認，未宣稱實機 iPhone 驗收。
+
+### 完整 CI 的標頭高度回歸補正
+
+第一輪完整 CI 為 836 通過、5 項原有 skip、2 項失敗；失敗為手機標頭 131.1875px 超過原有 124px 上限。保留字級與全部資訊，將行距明確設為主價格 20px、漲跌 14px、狀態 11px。原本 124px、圖表貼齊導覽列、畫布占比及元件不重疊的斷言完全保留。
+
+修正後相關桌機／390px／375px Chromium 與 WebKit 共 44 項通過，另有 1 項既有桌機 skip。375px CI 也加入原有 workspace-refinements 多尺寸回歸（含 320px、橫向與安全區）。後續完整 CI 及離線儲存／突破整合仍依原流程重跑。

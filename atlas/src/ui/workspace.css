@@ -1666,10 +1666,11 @@
   }
   .ws-quote b {
     font-size: 19px;
-    line-height: 1.2;
+    line-height: 20px;
   }
   .ws-quote span {
     font-size: 12px;
+    line-height: 14px;
   }
   .ws-quote small {
     display: none;
@@ -1677,7 +1678,7 @@
   .ws-quote small.ws-live-time {
     display: block;
     font-size: 10px;
-    line-height: 1.2;
+    line-height: 11px;
   }
   .ws-stock-statistics {
     grid-area: valuation;
