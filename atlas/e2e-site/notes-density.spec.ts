@@ -50,3 +50,18 @@ test('metric explanations occupy no extra row until opened and remain keyboard a
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   await institutional.screenshot({ path: info.outputPath('compact-explanations.png') });
 });
+
+
+test('the screener introduction stays at the page bottom without taking a header row', async ({ page }) => {
+  await mockSite(page);
+  await page.goto('./?page=screener');
+  const row = page.locator('.screener-row').first();
+  await expect(row).toBeVisible();
+  await expect(page.locator('.screener-page .page-head').getByText('選股說明', { exact: true })).toHaveCount(0);
+  const footer = page.locator('.site-data-footer');
+  await expect(footer.getByText('選股說明', { exact: true })).toBeVisible();
+  expect((await footer.boundingBox())!.y).toBeGreaterThan((await row.boundingBox())!.y);
+  await footer.getByText('選股說明', { exact: true }).click();
+  await expect(footer).toContainText('每日報告的群組與全市場條件篩選');
+  expect(await page.locator('#main').evaluate(element => element.scrollWidth - element.clientWidth)).toBe(0);
+});

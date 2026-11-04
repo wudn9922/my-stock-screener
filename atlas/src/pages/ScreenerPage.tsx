@@ -1,3 +1,4 @@
+import { PageFooterNote } from '../ui/PageFooterNote';
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
 import { ChevronRight, Globe2, Search, SlidersHorizontal, X } from 'lucide-react';
 import type { PageProps } from './pageProps';
@@ -741,7 +742,7 @@ export default function ScreenerPage({ report, reload, navigate, openChart, grou
         <div>
           <h2 className="page-title">選股</h2>
           {report.status === 'ok' && (
-            <HelpDisclosure label="選股說明">每日報告的群組與全市場條件篩選；點選股票可開啟圖表。</HelpDisclosure>
+            <PageFooterNote><HelpDisclosure label="選股說明">每日報告的群組與全市場條件篩選；點選股票可開啟圖表。</HelpDisclosure></PageFooterNote>
           )}
         </div>
       </div>
