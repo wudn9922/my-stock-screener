@@ -68,6 +68,8 @@ export interface BarNormalization {
   };
 }
 export interface BarResult {
+  /** Read-only permanent history provenance; live failures never discard these bars. */
+  archive?: { lastDate: string; status: 'archive' | 'live' | 'unavailable' | 'split' };
   /** Unknown volume is distinct from an observed zero for intraday comparisons. */
   missingVolumeAt?: number[];
   bars: Bar[];
@@ -102,6 +104,8 @@ export interface MarketDataProvider {
     signal?: AbortSignal,
   ): Promise<BarResult>;
   getQuote(symbol: string, signal?: AbortSignal): Promise<Quote>;
+  /** Optional background extension: keeps archive periods on screen while older data loads. */
+  getOlderBars?(symbol: string, timeframe: Timeframe, current: BarResult, signal?: AbortSignal): Promise<BarResult>;
   /** Explicit single-symbol refresh; bypass caches and report failure instead of returning stale data. */
   refreshBars?(symbol: string, timeframe: Timeframe, signal?: AbortSignal): Promise<BarResult>;
   getCorporateEvents?(

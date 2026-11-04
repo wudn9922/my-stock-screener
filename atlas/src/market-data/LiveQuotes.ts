@@ -22,6 +22,7 @@ export interface LiveDaily {
 }
 
 export type LiveListener = (value: LiveDaily) => void;
+export interface LiveSubscriptionOptions { onError?: () => void }
 
 export const LIVE_INTERVAL_MS = 60_000;
 export const LIVE_MAX_INTERVAL_MS = 300_000;
@@ -111,7 +112,7 @@ export function normalizeLive(raw: unknown, symbol: string, retrievedAt: number)
 }
 
 interface Entry {
-  listeners: Set<LiveListener>;
+  listeners: Map<LiveListener, LiveSubscriptionOptions>;
   fetchedAt: number;
   last?: LiveDaily;
 }
@@ -157,12 +158,12 @@ export class LiveQuoteFeed {
   }
 
   /** Starts live updates for a symbol; the returned function stops them. */
-  subscribe(symbolInput: string, listener: LiveListener): () => void {
+  subscribe(symbolInput: string, listener: LiveListener, options: LiveSubscriptionOptions = {}): () => void {
     if (!this.proxyUrl || !isLiveSymbol(symbolInput)) return () => undefined;
     const symbol = normalizeSymbol(symbolInput);
     let entry = this.entries.get(symbol);
-    if (!entry) this.entries.set(symbol, (entry = { listeners: new Set(), fetchedAt: 0 }));
-    entry.listeners.add(listener);
+    if (!entry) this.entries.set(symbol, (entry = { listeners: new Map(), fetchedAt: 0 }));
+    entry.listeners.set(listener, options);
     const last = entry.last;
     if (last) queueMicrotask(() => entry!.listeners.has(listener) && listener(last));
     this.start();
@@ -172,6 +173,22 @@ export class LiveQuoteFeed {
       if (!entry!.listeners.size) this.entries.delete(symbol);
       if (!this.entries.size) this.stop();
     };
+  }
+
+  /** Explicit retry uses the existing batched feed, without adding a polling loop. */
+  async refresh(symbol: string): Promise<LiveDaily> {
+    let latest: LiveDaily | undefined;
+    const stop = this.subscribe(symbol, value => { latest = value; });
+    const entry = this.entries.get(normalizeSymbol(symbol));
+    if (!entry) { stop(); throw new Error('即時報價代理尚未設定'); }
+    const previous = entry.last;
+    entry.fetchedAt = 0;
+    try {
+      if (this.running) await this.running;
+      await this.poll(false);
+      if (!latest || latest === previous) throw new Error('即時報價來源暫時無法取得');
+      return latest;
+    } finally { stop(); }
   }
 
   /** Fetches subscribers that have nothing recent (new symbols), whatever the session. */
@@ -245,14 +262,19 @@ export class LiveQuoteFeed {
           const raw = body.results?.[symbol];
           const value = raw === undefined ? null : normalizeLive(raw, symbol, retrievedAt);
           const entry = this.entries.get(symbol);
-          if (!value || !entry) continue;
+          if (!entry) continue;
+          if (!value) {
+            for (const options of entry.listeners.values()) options.onError?.();
+            continue;
+          }
           entry.last = value;
-          for (const listener of [...entry.listeners]) listener(value);
+          for (const listener of entry.listeners.keys()) listener(value);
         }
       } catch {
         // Retried on the next tick even outside the session (an unanswered first fetch counts as none).
         for (const symbol of batch) {
           const entry = this.entries.get(symbol);
+          for (const options of entry?.listeners.values() ?? []) options.onError?.();
           if (entry && !entry.last) entry.fetchedAt = 0;
         }
         failed = true;

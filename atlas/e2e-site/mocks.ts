@@ -177,6 +177,10 @@ export const screenerFixtures = {
 };
 /** Installs all site mocks on the page; returns the list of market symbols requested. */
 export async function mockSite(page: Page, options: MockOptions = {}) {
+  // Legacy source regression fixtures explicitly have no archive. Archive suites override this route.
+  await page.route('https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/**', route => route.fulfill({
+    json: { version: 2, markets: { tw: { symbols: [] }, us: { symbols: [] } } },
+  }));
   const requested: string[] = [];
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });

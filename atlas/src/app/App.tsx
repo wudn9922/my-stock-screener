@@ -76,6 +76,7 @@ import { parseLaunchParams } from './LaunchParams';
 import { legacyVolumeEnabled } from '../storage/schema';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { EDGE_YAHOO_SOURCE } from '../market-data/EdgeYahooProvider';
+import { archiveUnavailableSource, mergeArchivedLive } from '../market-data/ArchiveFirstProvider';
 import { usableBarResult } from '../market-data/KlineIntegrity';
 import { formatLiveTime, inRegularSession, isLiveSymbol, LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, mergePeriodBars, sameBars } from '../market-data/LiveQuotes';
 import {
@@ -468,7 +469,7 @@ export function App({
     setEventsStatus(
       STATIC_HOSTING && providerId === 'yahoo' ? '公司事件：需要後端' : '公司事件：載入中…',
     );
-    const provider = providers[providerId];
+    const provider: MarketDataProvider = providers[providerId];
     if (!supportsTimeframe(provider, tf)) {
       store.updateSymbol(symbol, (s) => ({
         ...s,
@@ -503,8 +504,23 @@ export function App({
           legacyVolumeFor(symbol, settings.preferences, tf),
         );
         setResult(result);
+        liveState.current.result = result;
         setLoadedResult(result);
         setLoading(false);
+        if (result.archive && (tf === '1W' || tf === '1M') && provider.getOlderBars) {
+          void provider.getOlderBars(symbol, tf, result, abort.signal).then(extended => {
+            if (!live || chart.interacting) return;
+            const active = liveState.current.result ?? result;
+            if (active.archive?.status === 'split' && extended.archive?.status !== 'split') return;
+            const bars = [...extended.bars.filter(bar => bar.time < active.bars[0]!.time), ...active.bars];
+            const next = extended.archive?.status === 'split' ? extended : { ...active, bars, source: active.source + extended.source.slice(result.source.length) };
+            const settings = store.symbol(symbol);
+            chart.reloadLive(next, settings.drawings, settings.indicators, settings.preferences.views[tf],
+              legacyVolumeFor(symbol, settings.preferences, tf), worldAssetFor(symbol)?.calendar);
+            liveState.current.result = next;
+            setResult(next); setLoadedResult(next);
+          }).catch(() => undefined);
+        }
         if (!provider.getCorporateEvents) {
           setEventsStatus('公司事件：此資料來源不提供');
           return;
@@ -554,7 +570,7 @@ export function App({
   const liveKey = `${symbol}:${tf}:${providerId}`;
   const liveState = useRef({ result, tool, selected });
   liveState.current = { result, tool, selected };
-  const liveChart = state.ready && providerId === 'market' && !!result && result.source.startsWith(EDGE_YAHOO_SOURCE) && isLiveSymbol(symbol);
+  const liveChart = state.ready && providerId === 'market' && !!result && (result.archive || result.source.startsWith(EDGE_YAHOO_SOURCE)) && isLiveSymbol(symbol);
   useEffect(() => {
     if (!liveChart) return;
     let live = true;
@@ -568,7 +584,7 @@ export function App({
       } catch {
         return;
       }
-      if (sameBars(current.bars, next.bars)) return;
+      if (sameBars(current.bars, next.bars)) { chart.refreshSource(next); liveState.current.result = next; setResult(next); return; }
       if (!chart.patchBars(next)) {
         // A new bar needs a full redraw; never while the user is drawing or editing a drawing.
         if (chart.interacting || liveState.current.tool !== 'select' || liveState.current.selected) return;
@@ -579,7 +595,7 @@ export function App({
         chart.sync(settings.drawings, settings.indicators, settings.preferences.magnet, 'select',
           legacyVolumeFor(symbol, settings.preferences, tf));
       }
-      setResult(next);
+      liveState.current.result = next; setResult(next);
     };
     if (tf === '1D' || tf === '1W' || tf === '1M') {
       const market = getMarketProfile(symbol);
@@ -588,9 +604,28 @@ export function App({
         if (!live || !current) return;
         setLiveAt({ key: `${symbol}:${tf}:${providerId}`, at: value.retrievedAt * 1000 });
         if (value.quote) setQuote({ symbol, provider: providerId, quote: value.quote });
+        if (current.archive) {
+          void mergeArchivedLive(current, value, tf).then(next => {
+            if (!live) return;
+            apply(next);
+            const provider: MarketDataProvider = providers[providerId];
+            if (next.archive?.status === 'split' && current.archive?.status !== 'split' && provider.getOlderBars)
+              void provider.getOlderBars(symbol, tf, next, abort.signal).then(full => { if (live) apply(full); }).catch(() => undefined);
+          }).catch(() => undefined);
+          return;
+        }
         const bars = tf === '1D' ? mergeDailyBars(current.bars, value.bars) : mergePeriodBars(current.bars, value.bars, tf, market);
         if (bars) apply({ ...current, bars, latestBarAt: bars.at(-1)!.time, asOf: value.retrievedAt, cacheStatus: 'fresh', ...(value.quote ? { quote: value.quote } : {}) });
-      });
+      }, { onError: () => {
+        const current = liveState.current.result;
+        if (live && current?.archive) {
+          const split = current.archive.status === 'split';
+          const next: BarResult = { ...current,
+            archive: { ...current.archive, status: split ? 'split' : 'unavailable' },
+            source: split ? `${current.source} · 即時報價暫時無法取得` : archiveUnavailableSource(current.archive.lastDate) };
+          engine.current?.refreshSource(next); liveState.current.result = next; setResult(next);
+        }
+      } });
       return () => {
         live = false;
         unsubscribe();
@@ -1228,7 +1263,7 @@ export function App({
           )}
           <StockStatsMenu label="行情資料說明" testId="source-info-toggle" trigger={<Info size={16} />}>
             <div className="source-details">
-              <div ref={sourceRef} className="data-source" />
+              <div ref={sourceRef} className="data-source" data-testid="source-label" />
               {STATIC_HOSTING && <p className="static-hosting-note">{staticHostingText}</p>}
               {providerId === 'demo' && <p className="demo-data-note">{demoDataText}</p>}
               <div className="events-source">{eventsStatus}</div>
@@ -1349,6 +1384,9 @@ export function App({
       </div>
       <div className="workspace" inert={modal} aria-hidden={modal}>
         <main className="main-workspace">
+          {result?.archive?.status === 'unavailable' && <p className="archive-availability" role="status" data-testid="archive-availability">
+            即時報價暫時無法取得，顯示至 {result.archive.lastDate} 收盤
+          </p>}
           <div className="chart-workspace">
             <div className="chart-stage">
               <div className="chart-overlay" role="group" aria-label={`${symbol} 圖例`}>
@@ -1420,6 +1458,10 @@ export function App({
                       <RefreshCw size={15} />
                       重試
                     </button>
+                    {!['1D', '1W', '1M'].includes(tf) && <button className="ghost-button" type="button"
+                      onClick={() => store.updateSymbol(symbol, s => ({ ...s, preferences: { ...s.preferences, timeframe: '1D' } }))}>
+                      改看日 K
+                    </button>}
                     {providerId !== 'demo' && (
                       <button className="ghost-button" type="button" onClick={() => store.updateApp({ provider: 'demo' })}>
                         改看離線模擬資料

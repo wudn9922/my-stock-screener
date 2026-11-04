@@ -2189,3 +2189,13 @@
   background: var(--surface);
   pointer-events: none;
 }
+.archive-availability {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 4px 10px;
+  color: var(--text-2);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  line-height: 1.4;
+}

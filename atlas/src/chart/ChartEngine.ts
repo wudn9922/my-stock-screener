@@ -370,6 +370,10 @@ export class ChartEngine {
     this.corporateMarkers = valid(kept[2]!);
     this.refreshMarkers();
   }
+  /** Metadata can change while the delayed OHLCV stays identical. */
+  refreshSource(result: BarResult) {
+    this.renderSource(result, result.market ?? getMarketProfile(this.symbol));
+  }
   private renderSource(result: BarResult, market: MarketProfile) {
     const state = result.dataState ?? (result.delayed ? 'delayed' : 'simulated');
     const stateText = state === 'simulated' ? '模擬' : state === 'live' ? '即時' : '延遲';

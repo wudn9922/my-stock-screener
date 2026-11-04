@@ -241,6 +241,22 @@ export class EdgeYahooProvider implements MarketDataProvider {
     if (!this.configured) throw new MarketDataUnavailableError(EDGE_PROXY_NOT_CONFIGURED);
   }
 
+  /** Native older periods only: the archive already supplies the daily rebuild. */
+  async getArchiveHistory(symbol: string, timeframe: '1W' | '1M', signal?: AbortSignal): Promise<BarResult> {
+    this.assertConfigured();
+    const { entry } = await this.fetchRaw(normalizeSymbol(symbol), timeframe, signal, false, timeframe === '1M');
+    return this.validated(symbol, () => normalizeYahooResponse(entry.raw, entry.retrievedAt, timeframe, symbol));
+  }
+
+  /** Background events use a small ten-year monthly payload, never a five-year daily download. */
+  async getArchiveEvents(symbol: string, signal?: AbortSignal): Promise<CorporateEventsResult> {
+    this.assertConfigured();
+    const { entry } = await this.fetchRaw(normalizeSymbol(symbol), '1M', signal, false, true);
+    const result = this.validated(symbol, () => normalizeYahooEvents(entry.raw, symbol, entry.retrievedAt));
+    if (result.status !== 'available') return result;
+    return { ...result, source: relabel(result.source), events: result.events.map(event => ({ ...event, source: relabel(event.source) })) };
+  }
+
   private async nativeBars(symbol: string, timeframe: Exclude<YahooTimeframe, '1W' | '1M'>, signal?: AbortSignal): Promise<BarResult> {
     const { entry } = await this.fetchRaw(symbol, timeframe, signal);
     return this.validated(symbol, () => normalizeYahooResponse(entry.raw, entry.retrievedAt, timeframe, symbol));
@@ -297,9 +313,10 @@ export class EdgeYahooProvider implements MarketDataProvider {
     timeframe: YahooTimeframe,
     signal?: AbortSignal,
     fresh = false,
+    includeEvents = false,
   ): Promise<{ entry: RawEntry; cached: boolean }> {
     signal?.throwIfAborted();
-    const key = `${symbol}|${timeframe}`;
+    const key = `${symbol}|${timeframe}${includeEvents ? '|events' : ''}`;
     const cached = this.recent.get(key);
     if (!fresh && cached && this.now() - cached.fetchedAtMs < this.ttl(timeframe)) return { entry: cached, cached: true };
     let flight = this.inFlight.get(key);
@@ -309,7 +326,7 @@ export class EdgeYahooProvider implements MarketDataProvider {
       const created: InFlight = {
         controller,
         waiters: 0,
-        promise: this.download(symbol, timeframe, controller.signal).then((entry) => {
+        promise: this.download(symbol, timeframe, controller.signal, includeEvents).then((entry) => {
           if ((this.revisions.get(symbol) ?? 0) !== revision) return entry;
           this.recent.delete(key);
           this.recent.set(key, entry);
@@ -363,7 +380,7 @@ export class EdgeYahooProvider implements MarketDataProvider {
     });
   }
 
-  private async download(symbol: string, timeframe: YahooTimeframe, signal: AbortSignal): Promise<RawEntry> {
+  private async download(symbol: string, timeframe: YahooTimeframe, signal: AbortSignal, includeEvents = false): Promise<RawEntry> {
     const controller = new AbortController();
     const forward = () => controller.abort(abortError(signal));
     signal.addEventListener('abort', forward, { once: true });
@@ -375,7 +392,9 @@ export class EdgeYahooProvider implements MarketDataProvider {
     try {
       let response: Response;
       try {
-        response = await this.fetcher(this.requestUrl(symbol, timeframe), {
+        const url = this.requestUrl(symbol, timeframe);
+        const eventUrl = includeEvents ? url.replace(/([?&])events=0(?=&|$)/, '$1events=1') : url;
+        response = await this.fetcher(eventUrl, {
           signal: controller.signal,
           headers: { Accept: 'application/json' },
         });

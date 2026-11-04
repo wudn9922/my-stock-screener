@@ -435,6 +435,11 @@ export class CachedMarketDataProvider implements MarketDataProvider {
     )) as CorporateEventsResult;
   }
 
+  async getOlderBars(symbol: string, timeframe: Timeframe, current: BarResult, signal?: AbortSignal): Promise<BarResult> {
+    if (!this.provider.getOlderBars) return current;
+    return usableBarResult(await this.provider.getOlderBars(symbol, timeframe, current, signal), symbol, timeframe);
+  }
+
   private async request(
     identity: CacheIdentity,
     load: () => Promise<CacheValue>,

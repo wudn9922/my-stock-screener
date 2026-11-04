@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 export function versionedServiceWorker(): Plugin {
   let outDir = 'dist';
   let base = '/';
+  let buildAssets: string[] = [];
   return {
     name: 'atlas-versioned-service-worker',
     apply: 'build',
@@ -13,11 +14,15 @@ export function versionedServiceWorker(): Plugin {
       outDir = config.build.outDir;
       base = config.base;
     },
+    generateBundle(_options, bundle) {
+      buildAssets = Object.keys(bundle).filter(name => name.startsWith('assets/')
+        && !name.split('/').includes('..') && /\.(?:js|css)$/.test(name)).sort();
+    },
     async closeBundle() {
       const indexPath = resolve(outDir, 'index.html');
       const index = (await readFile(indexPath, 'utf8')).replace(/\s*<meta name="atlas-build" content="[a-f0-9]+"\s*\/?>(?:\r?\n)?/g, '');
       const path = resolve(outDir, 'sw.js');
-      const source = await readFile(path, 'utf8');
+      const source = (await readFile(path, 'utf8')).replace('const BUILD_ASSETS = [];', `const BUILD_ASSETS = ${JSON.stringify(buildAssets)};`);
       const revision = createHash('sha256')
         .update(index + source + await readFile(resolve(outDir, 'startup.js'), 'utf8'))
         .digest('hex')
