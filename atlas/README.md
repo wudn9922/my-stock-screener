@@ -1,3 +1,5 @@
+清單更新時間顯示在清單工具列右側；名單日與來源說明仍在頁尾。[PR-A 操作與驗證](docs/PR_A_UI_QUOTES_ALERTS.md)。
+
 歡迎畫面取代啟動黑屏，預設進入自選；清單採代號大字的緊湊版面，說明移至頁尾。個股新增同期量比與盤前盤後入口，搜尋支援 ANT 等 IPO 申報資料。來源、有限覆蓋與操作見 [使用說明](docs/STARTUP_WATCHLIST_MARKET_DETAILS.md)。
 
 各週期可獨立自訂／固定均線與畫線；美股市場寬度加入附件規則的歷史上下限與指數訊號，自選清單新增可展開的進出榜條件證據。詳見 [操作、資料來源與限制](docs/TIMEFRAME_BREADTH_WATCHLIST_REASONS.md)。

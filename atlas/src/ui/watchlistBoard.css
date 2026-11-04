@@ -145,3 +145,5 @@
   .wb-tabs button { padding: 0 6px; }
   .wb-caption { flex-direction: column; }
 }
+
+.wb-live-time { flex: none; margin-left: auto; color: var(--text-3); font-size: 10px; line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; }

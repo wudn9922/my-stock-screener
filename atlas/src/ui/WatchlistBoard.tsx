@@ -229,10 +229,11 @@ export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterE
       {rows.length > 0 && <button type="button" className="ghost-button wb-chart-toggle" aria-label={charts ? '返回行情清單' : `連續看全部股票圖表（${rows.length} 檔）`} title={charts ? '返回行情清單' : `連續看全部股票圖表（${rows.length} 檔）`} aria-pressed={charts} onClick={() => setCharts(value => !value)}>
         {charts ? '清單' : '圖表'}
       </button>}
+      {liveAt > 0 && <time className="wb-live-time" data-testid="board-live-time" dateTime={new Date(liveAt).toISOString()}>更新於 {formatLiveTime(liveAt)}</time>}
       </div>
       <PageFooterNote><p className="wb-caption">
         <span>{tab === 'list' ? list ? `清單：${list.name}` : '我的清單' : 'LINE 熱門美股'}</span>
-        <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}盤中每分鐘更新（Yahoo 延遲報價）{liveAt ? <> · <time data-testid="board-live-time">更新於 {formatLiveTime(liveAt)}</time></> : null}</span>
+        <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}盤中每分鐘更新（Yahoo 延遲報價）</span>
       </p></PageFooterNote>
       {charts && parameterError && <p role="status">{parameterError}</p>}
       {empty ? <div className="wb-empty" role="status">{empty}</div> : charts ? <StockChartList key={`${tab}:${list?.id ?? ''}`} rows={rows}

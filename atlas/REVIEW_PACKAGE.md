@@ -1,3 +1,9 @@
+## PR-A：報價與圖表介面 (2026-11-04)
+
+Primary self-review only; Claude review remains with the maintainer. Based on main `b0ca518232`.
+A1: timestamp restored to the existing list toolbar; one unit and five browser cases pass.
+See `docs/PR_A_UI_QUOTES_ALERTS.md` for exact scope, checks and screenshots.
+
 ## Current follow-up: startup, compact watchlists and public market details (2026-11-04)
 
 Primary self-review only; no independent sign-off. Based on latest main `df29c9351`.
