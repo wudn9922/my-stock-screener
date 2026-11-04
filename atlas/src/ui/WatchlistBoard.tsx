@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { OpenChartOptions } from '../app/Site';
 import type { Route } from '../app/routes';
-import { getDailyBars, searchStocks } from '../app/dataSources';
+import { getLegacyDailyResult, getWatchlistDailyResult, searchStocks } from '../app/dataSources';
+import { mergeArchiveDaily } from '../market-data/KlineArchive';
 import type { Bar } from '../market-data/MarketDataProvider';
 import { formatLiveTime, liveQuotes, mergeDailyBars } from '../market-data/LiveQuotes';
 import { fetchTrendingStocks, type TrendingStocksResult } from '../report/trendingStocks';
@@ -21,7 +22,7 @@ interface BoardRow {
 }
 
 const FIRST_ROWS = 20;
-const SPARK_BARS = 30;
+const SPARK_BARS = 126;
 
 /**
  * Read-only rows of a saved list: the last recorded result (manual lists keep their own order).
@@ -79,6 +80,23 @@ function useNear<T extends Element>() {
 function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => void }) {
   const { ref, near, visible } = useNear<HTMLLIElement>();
   const [bars, setBars] = useState<readonly Bar[] | null>(null);
+  const barsRef = useRef<readonly Bar[] | null>(null);
+  const alive = useRef(true), replacementPending = useRef(false);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  const fromArchive = useRef(false);
+  const archivedThrough = useRef<string | undefined>(undefined);
+  const [historyNote, setHistoryNote] = useState('近 6 個月');
+  const replaceSplitHistory = () => {
+    fromArchive.current = false;
+    setHistoryNote('近 6 個月 · 封存價格差異超過 2%，整段改用 Yahoo');
+    if (replacementPending.current) return;
+    replacementPending.current = true;
+    void getLegacyDailyResult(row.symbol).then(result => {
+      if (!alive.current) return;
+      const next = mergeDailyBars(result.bars, barsRef.current ?? []).slice(-126);
+      barsRef.current = next; setBars(next);
+    }).catch(() => { if (alive.current) setHistoryNote('封存價格差異超過 2%，暫顯示較短的 Yahoo 範圍；較長歷史暫時無法取得'); });
+  };
   const [resolvedName, setResolvedName] = useState<{ symbol: string; name: string }>();
   useEffect(() => {
     if (!near || row.name !== row.symbol) return;
@@ -93,8 +111,18 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
   useEffect(() => {
     if (!near) return;
     let live = true;
-    getDailyBars(row.symbol).then(
-      (result) => { if (live) { setBars((current) => (current ? mergeDailyBars(result, current.slice(-30)) : result)); setFailure(result.length ? null : '來源沒有有效的日 K 資料'); } },
+    getWatchlistDailyResult(row.symbol).then(
+      (result) => { if (live) {
+        fromArchive.current = !!result.archive;
+        archivedThrough.current = result.archive?.lastDate;
+        const current = barsRef.current;
+        const merged = result.archive && current ? mergeArchiveDaily(result.bars, current.slice(-30), row.symbol) : null;
+        const next = merged?.bars ?? (current ? mergeDailyBars(result.bars, current.slice(-30)) : result.bars);
+        barsRef.current = next; setBars(next);
+        setHistoryNote(result.archive ? '近 6 個月 · GitHub 永久封存' : '近 6 個月 · Yahoo／原資料來源');
+        if (merged?.splitMismatch) replaceSplitHistory();
+        setFailure(result.bars.length ? null : '來源沒有有效的日 K 資料');
+      } },
       (error: unknown) => { if (live) setFailure(loadFailureReason(error)); },
     );
     return () => {
@@ -105,7 +133,13 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
   useEffect(() => {
     if (!visible) return;
     return liveQuotes().subscribe(row.symbol, (value) =>
-      { setFailure(null); setBars((current) => (current ? mergeDailyBars(current, value.bars) : value.bars)); });
+      { setFailure(null);
+        const current = barsRef.current;
+        const merged = current && fromArchive.current ? mergeArchiveDaily(current, value.bars, row.symbol, archivedThrough.current) : null;
+        const next = (merged?.bars ?? (current ? mergeDailyBars(current, value.bars) : value.bars)).slice(-126);
+        barsRef.current = next; setBars(next);
+        if (merged?.splitMismatch) replaceSplitHistory();
+      });
   }, [visible, row.symbol]);
   const quote = Array.isArray(bars) ? rowQuote(bars) : null;
   const ticker = displayTicker(row.symbol);
@@ -115,6 +149,8 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
     <li ref={ref}>
       <a
         className="wb-row"
+        title={historyNote}
+        data-history-window="6mo"
         href={`?page=chart&symbol=${encodeURIComponent(row.symbol)}`}
         aria-label={`${row.name === row.symbol ? ticker : `${row.name} ${ticker}`} 行情，開啟個股`}
         onClick={(event) => {

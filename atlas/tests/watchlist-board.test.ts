@@ -36,10 +36,11 @@ describe('watchlist board quote', () => {
     expect(quote.trend).toBe(-1);
   });
 
-  it('uses only the latest 30 bars for the path', () => {
-    const bars = Array.from({ length: 40 }, (_, i) => bar(i, 100 + i));
-    expect(rowQuote(bars).points.split(' ')).toHaveLength(30);
-    expect(rowQuote(bars).trend).toBe(29);
+  it('uses the latest 126 bars (six months) for the path and retains the daily change', () => {
+    const bars = Array.from({ length: 200 }, (_, i) => bar(i, 100 + i));
+    expect(rowQuote(bars).points.split(' ')).toHaveLength(126);
+    expect(rowQuote(bars).trend).toBe(125);
+    expect(rowQuote(bars).changePct).toBeCloseTo((299 / 298 - 1) * 100);
   });
 
   it('has no change or path without two usable closes', () => {

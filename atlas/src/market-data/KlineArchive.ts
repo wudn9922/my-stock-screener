@@ -105,9 +105,12 @@ export class KlineArchive {
     const valid = results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
     if (!valid.length) throw new Error('此代號的封存年度檔暫時無法讀取');
     const bars = valid.flatMap(result => result.bars).filter(bar => (range?.from === undefined || bar.time >= range.from) && (range?.to === undefined || bar.time <= range.to));
+    if (!bars.length) throw new Error('此區間沒有有效封存資料');
     const missing = valid.flatMap(result => result.missingVolumeAt ?? []).filter(time => bars.some(bar => bar.time === time));
+    const incomplete = results.some(result => result.status === 'rejected');
     return usableBarResult({ ...valid[0]!, bars, missingVolumeAt: missing, asOf: this.now() / 1000,
-      source: ARCHIVE_SOURCE + (results.some(result => result.status === 'rejected') ? ' · 部分年度暫時無法讀取' : '') }, symbol, '1D');
+      archive: { lastDate: new Date(bars.at(-1)!.time * 1000).toISOString().slice(0, 10), status: 'archive', incomplete },
+      source: ARCHIVE_SOURCE + (incomplete ? ' · 部分年度暫時無法讀取' : '') }, symbol, '1D');
   }
   private loadYear(symbol: string, year: number, entry: ArchiveEntry): Promise<BarResult> {
     const current = year >= new Date(this.now()).getUTCFullYear();
@@ -145,15 +148,21 @@ export class KlineArchive {
 /** Compare the same session date, independent of each provider's daily timestamp convention.
  * Existing archive rows win; only absent sessions are appended. A split uses Yahoo's whole segment.
  */
-export function mergeArchiveDaily(archived: readonly Bar[], recent: readonly Bar[], symbol: string): { bars: Bar[]; splitMismatch: boolean } {
+export function mergeArchiveDaily(archived: readonly Bar[], recent: readonly Bar[], symbol: string, archivedThrough?: string): { bars: Bar[]; splitMismatch: boolean } {
   const market = getMarketProfile(symbol);
   const old = new Map(archived.map(bar => [calendarDate(bar.time, market), bar]));
+  const cutoff = archivedThrough ?? (archived.at(-1) ? calendarDate(archived.at(-1)!.time, market) : '');
   const splitMismatch = recent.some(bar => {
-    const baseline = old.get(calendarDate(bar.time, market));
+    const day = calendarDate(bar.time, market);
+    const baseline = day <= cutoff ? old.get(day) : undefined;
     return baseline && (['open', 'high', 'low', 'close'] as const).some(field => Math.abs(bar[field] / baseline[field] - 1) > 0.02);
   });
   if (splitMismatch) return { bars: [...recent], splitMismatch: true };
-  const merged = [...archived, ...recent.filter(bar => !old.has(calendarDate(bar.time, market)))].sort((a, b) => a.time - b.time);
+  for (const bar of recent) {
+    const day = calendarDate(bar.time, market);
+    if (!old.has(day) || day > cutoff) old.set(day, bar);
+  }
+  const merged = [...old.values()].sort((a, b) => a.time - b.time);
   return { bars: merged, splitMismatch: false };
 }
 

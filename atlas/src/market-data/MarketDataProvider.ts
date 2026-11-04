@@ -69,7 +69,7 @@ export interface BarNormalization {
 }
 export interface BarResult {
   /** Read-only permanent history provenance; live failures never discard these bars. */
-  archive?: { lastDate: string; status: 'archive' | 'live' | 'unavailable' | 'split' };
+  archive?: { lastDate: string; status: 'archive' | 'live' | 'unavailable' | 'split'; incomplete?: boolean };
   /** Unknown volume is distinct from an observed zero for intraday comparisons. */
   missingVolumeAt?: number[];
   bars: Bar[];
