@@ -2,6 +2,7 @@
 
 Primary self-review only; Claude review remains with the maintainer. Based on main `b0ca518232`.
 A1: timestamp restored to the existing list toolbar; one unit and five browser cases pass.
+A2: shared regular-session status, with 19 related unit and 30 browser cases passing, plus typecheck. Extended prices never supply the regular trade timestamp.
 See `docs/PR_A_UI_QUOTES_ALERTS.md` for exact scope, checks and screenshots.
 
 ## Current follow-up: startup, compact watchlists and public market details (2026-11-04)

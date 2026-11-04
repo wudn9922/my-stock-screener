@@ -1,4 +1,5 @@
 import { ExtendedQuotes } from '../ui/ExtendedQuotes';
+import { quoteStatus } from '../market-data/quoteStatus';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   Activity,
@@ -77,7 +78,7 @@ import { legacyVolumeEnabled } from '../storage/schema';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { EDGE_YAHOO_SOURCE } from '../market-data/EdgeYahooProvider';
 import { usableBarResult } from '../market-data/KlineIntegrity';
-import { formatLiveTime, inRegularSession, isLiveSymbol, LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, mergePeriodBars, sameBars } from '../market-data/LiveQuotes';
+import { inRegularSession, isLiveSymbol, LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, mergePeriodBars, sameBars } from '../market-data/LiveQuotes';
 import {
   getLoadedSymbolDirectory,
   loadSymbolCatalog,
@@ -568,7 +569,11 @@ export function App({
       } catch {
         return;
       }
-      if (sameBars(current.bars, next.bars)) return;
+      if (sameBars(current.bars, next.bars)) {
+        chart.refreshSource(next);
+        setResult(next);
+        return;
+      }
       if (!chart.patchBars(next)) {
         // A new bar needs a full redraw; never while the user is drawing or editing a drawing.
         if (chart.interacting || liveState.current.tool !== 'select' || liveState.current.selected) return;
@@ -1140,7 +1145,7 @@ export function App({
             {headerQuote ? ` (${formatPercent(headerQuote.changePercent)})` : ''}
           </span>
           <small>{asset?.unit ?? market.currency}</small>
-          {liveAt?.key === liveKey && <small className="ws-live-time" data-testid="live-time">更新於 {formatLiveTime(liveAt.at)}</small>}
+          {!asset && headerQuote && <small className="ws-live-time" data-testid="live-time">{quoteStatus(symbol, headerQuote, liveAt?.key === liveKey ? liveAt.at : result?.asOf ? result.asOf * 1000 : undefined)}</small>}
         </div>
         {!isIndex && providerId !== 'demo' && (
           <div className="ws-stock-statistics">

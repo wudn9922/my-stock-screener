@@ -12,3 +12,10 @@
 畫面：[桌機](screenshots/pr-a/a1-desktop.png)、[iPhone 390px](screenshots/pr-a/a1-iphone390.png)、[iPhone 375px](screenshots/pr-a/a1-iphone375.png)。瀏覽器模擬不代表實機驗收。
 
 375px 測試另外執行 `npx playwright test --config e2e-site/playwright.compact.config.ts`，CI 平行執行，原有三種裝置的完整回歸不縮減。
+
+## A2 正常交易報價狀態
+
+標頭、K 線來源列、清單工具列共用格式：盤中「延遲報價 · 更新於 HH:MM:SS」，其餘時間「已收盤 · 最後成交 MM/DD HH:MM」（台灣時間）。成交時間來自正常交易 quote，盤前盤後不參與；未提供時間顯示 `—`。保留 Demo 模擬標示。最後成交時間不會因重新抓取而變成抓取時間；K 棒數值未改變也會更新來源列的接收時間。
+
+單元測試涵蓋台美時段、收盤後補抓寬限、週末、夏令時間及無效時間；19 項相關單元測試、30 項瀏覽器回歸（五種尺寸／引擎）與 typecheck 通過。休市日規則在獨立 PR-D 補入。
+畫面：[桌機](screenshots/pr-a/a2-desktop.png)、[iPhone](screenshots/pr-a/a2-iphone390.png)。

@@ -24,12 +24,14 @@ test('A1 receive time stays above the list without adding toolbar height and adv
   await page.goto('./?page=watchlist');
   const toolbar = page.locator('.wb-list-toolbar');
   await expect(page.locator('.wb-row').first()).toBeVisible();
-  const before = (await toolbar.boundingBox())!.height;
+  // clientHeight compares actual CSS pixels, without subtracting two fractional viewport positions.
+  const before = await toolbar.evaluate(element => element.clientHeight);
+  expect(before).toBe(45);
   release();
   const time = toolbar.getByTestId('board-live-time');
-  await expect(time).toHaveText(/^更新於 12:20:\d{2}$/);
+  await expect(time).toHaveText(/^延遲報價 · 更新於 12:20:\d{2}$/);
   const firstTime = await time.textContent();
-  expect((await toolbar.boundingBox())!.height).toBe(before);
+  expect(await toolbar.evaluate(element => element.clientHeight)).toBe(before);
   expect(await page.locator('.site-data-footer').getByTestId('board-live-time').count()).toBe(0);
   const layout = await page.locator('#main').evaluate(main => ({
     proportion: (main.getBoundingClientRect().bottom - document.querySelector('.wb-rows')!.getBoundingClientRect().top) / main.getBoundingClientRect().height,
@@ -38,7 +40,7 @@ test('A1 receive time stays above the list without adding toolbar height and adv
   expect(layout.proportion).toBeGreaterThanOrEqual(.8);
   expect(layout.overflow).toBe(0);
   await page.clock.fastForward(61000);
-  await expect(time).toHaveText(/^更新於 12:21:\d{2}$/);
+  await expect(time).toHaveText(/^延遲報價 · 更新於 12:21:\d{2}$/);
   expect(await time.textContent()).not.toBe(firstTime);
   expect(requests).toBeGreaterThanOrEqual(2);
   await page.screenshot({ path: info.outputPath('a1-live-clock.png') });
