@@ -51,11 +51,13 @@ def ipo_companies(payload, checked_at):
             symbol = str(row.get('proposedTickerSymbol') or '')
             if symbol and not SYMBOL.fullmatch(symbol):
                 continue
-            date = row.get('expectedPriceDate') if section == 'upcoming' else None
+            # Nasdaq expectedPriceDate is a pricing estimate, not a listing date.
+            expected_pricing = row.get('expectedPriceDate') if section == 'upcoming' else None
             key = 'nasdaq-' + str(row.get('dealID') or symbol or name)
             output[key] = {'id': key, 'name': name[:250], 'symbol': symbol,
                 'aliases': [], 'status': status, 'exchange': str(row.get('proposedExchange') or '')[:100],
-                'filedDate': row.get('filedDate'), 'listingDate': date, 'price': row.get('proposedSharePrice'),
+                'filedDate': row.get('filedDate'), 'listingDate': row.get('listingDate'),
+                'expectedPricingDate': expected_pricing, 'price': row.get('proposedSharePrice'),
                 'checkedAt': checked_at, 'sourceUrl': 'https://www.nasdaq.com/market-activity/ipos'}
     return list(output.values())
 
@@ -116,7 +118,7 @@ def collect(root=ROOT, getter=fetch, now=None, limit=240, budget=150):
             for key, company in companies.items():
                 if company['symbol'] and company['symbol'] == row.get('proposedTickerSymbol') and company['name'].casefold() in str(row.get('companyName', '')).casefold():
                     companies[key] = {**company, 'status': '已定價，掛牌狀態請查官方公告',
-                        'price': row.get('proposedSharePrice') or company['price'], 'checkedAt': checked,
+                        'price': row.get('proposedSharePrice') or company['price'], 'pricingDate': row.get('pricedDate'), 'checkedAt': checked,
                         'sourceUrl': 'https://www.nasdaq.com/market-activity/ipos'}
                     # pricedDate is pricing day, not listing day; never substitute one for the other.
         failure = None

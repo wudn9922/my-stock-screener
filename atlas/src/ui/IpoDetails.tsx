@@ -23,6 +23,8 @@ export function IpoDetails({
         <dd>{company.exchange || "待公布"}</dd>
         <dt>最近申報</dt>
         <dd>{company.filedDate ?? "未提供"}</dd>
+        {company.expectedPricingDate && <><dt>預計定價（非掛牌日）</dt><dd>{company.expectedPricingDate}</dd></>}
+        {company.pricingDate && <><dt>定價日（非掛牌日）</dt><dd>{company.pricingDate}</dd></>}
         <dt>預計掛牌</dt>
         <dd>{company.listingDate ?? "尚未公布"}</dd>
         <dt>發行價格／區間</dt>

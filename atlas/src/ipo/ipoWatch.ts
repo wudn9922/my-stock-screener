@@ -22,6 +22,8 @@ export const ipoSchema = z.object({
   exchange: z.string().max(100),
   filedDate: z.string().nullable(),
   listingDate: z.string().nullable(),
+  expectedPricingDate: z.string().nullable().optional(),
+  pricingDate: z.string().nullable().optional(),
   price: z.string().max(100).nullable(),
   checkedAt: z.string().datetime({ offset: true }),
   sourceUrl,

@@ -26,7 +26,8 @@ class MarketExtrasTests(unittest.TestCase):
         rows = ipo_companies({'data': {'upcoming': {'upcomingTable': {'rows': [{'companyName': 'Example', 'proposedTickerSymbol': 'EX', 'expectedPriceDate': '11/12/2026', 'proposedExchange': 'NASDAQ'}]}}, 'priced': {'rows': [{'companyName': 'Already listed'}]}}}, NOW.isoformat())
         self.assertEqual(len(rows), 1)
         self.assertIsNone(rows[0]['price'])
-        self.assertEqual(rows[0]['listingDate'], '11/12/2026')
+        self.assertIsNone(rows[0]['listingDate'])
+        self.assertEqual(rows[0]['expectedPricingDate'], '11/12/2026')
     def test_bounded_collection_writes_only_new_snapshots_and_preserves_failed_quote_time(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); report = root / 'docs/report'; report.mkdir(parents=True)
@@ -62,5 +63,6 @@ class MarketExtrasTests(unittest.TestCase):
             self.assertIn('已定價', company['status'])
             self.assertEqual(company['price'], '20.00')
             self.assertIsNone(company['listingDate'])
+            self.assertEqual(company['pricingDate'], '11/03/2026')
             self.assertEqual(company['aliases'], ['Brand'])
 if __name__ == '__main__': unittest.main()
