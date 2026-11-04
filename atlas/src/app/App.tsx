@@ -77,6 +77,8 @@ import { legacyVolumeEnabled } from '../storage/schema';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { EDGE_YAHOO_SOURCE } from '../market-data/EdgeYahooProvider';
 import { archiveUnavailableSource, mergeArchivedLive } from '../market-data/ArchiveFirstProvider';
+import { subscribeWatchlistQuotes } from '../market-data/watchlistQuotes';
+import { getWatchlistDailyResult } from './dataSources';
 import { usableBarResult } from '../market-data/KlineIntegrity';
 import { formatLiveTime, inRegularSession, isLiveSymbol, LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, mergePeriodBars, sameBars } from '../market-data/LiveQuotes';
 import {
@@ -243,6 +245,7 @@ export function App({
   const [drawingMenuPoint, setDrawingMenuPoint] = useState<Point | null>(null);
   const [drawingMenuBounds, setDrawingMenuBounds] = useState<{ top: number; bottom: number } | null>(null);
   const [quickEditing, setQuickEditing] = useState(false);
+  const [visibleWatchSymbols, setVisibleWatchSymbols] = useState<string[]>([]);
   useEffect(() => setQuickEditing(false), [symbol, tf, selected]);
   const [catalogEntries, setCatalogEntries] = useState<SymbolCatalogEntry[]>([]);
   const refreshController = useRef<AbortController | null>(null);
@@ -935,13 +938,17 @@ export function App({
     [],
   );
   const watchlistKey = state.app.watchlist.join(',');
+  const visibleWatchlistKey = visibleWatchSymbols.filter(ticker => state.app.watchlist.includes(ticker)).join(',');
   useEffect(() => {
     if (!state.ready) return;
     let live = true;
     const abort = new AbortController();
     setQuotes({});
+    const visible = visibleWatchlistKey.split(',').filter(Boolean);
+    if (providerId === 'market') return subscribeWatchlistQuotes(visible, liveQuotes(), getWatchlistDailyResult,
+      (ticker, quote) => setQuotes(previous => ({ ...previous, [ticker]: quote })));
     void (async () => {
-      for (const ticker of watchlistKey.split(',').filter(Boolean)) {
+      for (const ticker of visible) {
         if (!live) return;
         try {
           const quote = await providers[providerId].getQuote(ticker, abort.signal);
@@ -955,7 +962,7 @@ export function App({
       live = false;
       abort.abort();
     };
-  }, [state.ready, watchlistKey, providerId]);
+  }, [state.ready, watchlistKey, visibleWatchlistKey, providerId]);
   const evaluateCurrentAlerts = useCallback(
     (data: BarResult, initialize = false) => {
       const app = store.getSnapshot().app;
@@ -1130,6 +1137,7 @@ export function App({
       symbols={state.app.watchlist}
       active={symbol}
       quotes={quotes}
+      onVisibleSymbolsChange={setVisibleWatchSymbols}
       catalogEntries={catalogEntries}
       onSelect={selectSymbol}
       onChange={(watchlist) => store.updateApp({ watchlist })}

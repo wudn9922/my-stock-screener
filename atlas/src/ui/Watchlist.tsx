@@ -1,5 +1,5 @@
 import { ChevronUp, ChevronDown, X, Plus, Search, Settings2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Quote } from '../market-data/MarketDataProvider';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { resolveSymbolInput, type SymbolCatalogEntry } from '../market-data/SymbolCatalog';
@@ -24,6 +24,7 @@ export function Watchlist({
   onChange,
   quotes = {},
   catalogEntries = [],
+  onVisibleSymbolsChange,
 }: {
   quotes?: Record<string, Quote>;
   catalogEntries?: readonly SymbolCatalogEntry[];
@@ -31,11 +32,27 @@ export function Watchlist({
   active: string;
   onSelect: (symbol: string) => void;
   onChange: (symbols: string[]) => void;
+  onVisibleSymbolsChange?: (symbols: string[]) => void;
 }) {
   const [adding, setAdding] = useState(false),
     [input, setInput] = useState(''),
     [error, setError] = useState(''),
     [manage, setManage] = useState(false);
+  const rowsRef = useRef<HTMLDivElement>(null);
+  const symbolKey = symbols.join(',');
+  useEffect(() => {
+    const root = rowsRef.current;
+    if (!root || !onVisibleSymbolsChange) return;
+    const rows = [...root.querySelectorAll<HTMLElement>('[data-watch-symbol]')];
+    if (typeof IntersectionObserver === 'undefined') { onVisibleSymbolsChange(rows.map(row => row.dataset.watchSymbol!)); return; }
+    const shown = new Set<Element>();
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) { if (entry.isIntersecting) shown.add(entry.target); else shown.delete(entry.target); }
+      onVisibleSymbolsChange(rows.filter(row => shown.has(row)).map(row => row.dataset.watchSymbol!));
+    });
+    for (const row of rows) observer.observe(row);
+    return () => { observer.disconnect(); onVisibleSymbolsChange([]); };
+  }, [symbolKey, onVisibleSymbolsChange]);
   const reorder = (index: number, delta: number) => {
     const next = [...symbols],
       j = index + delta;
@@ -88,7 +105,7 @@ export function Watchlist({
           <Settings2 size={16} />
         </IconButton>
       </div>
-      <div className={`watchlist-rows ${manage ? 'managing' : ''}`}>
+      <div ref={rowsRef} className={`watchlist-rows ${manage ? 'managing' : ''}`}>
         {symbols.map((symbol, index) => {
           const quote = quotes[symbol];
           const profile = quote?.market ?? getMarketProfile(symbol);
@@ -106,7 +123,7 @@ export function Watchlist({
               : company;
 
           return (
-            <div key={symbol} className={`watch-row ${symbol === active ? 'selected' : ''}`}>
+            <div key={symbol} data-watch-symbol={symbol} className={`watch-row ${symbol === active ? 'selected' : ''}`}>
               <button
                 className="watch-symbol"
                 aria-label={`選擇 ${symbol}`}
