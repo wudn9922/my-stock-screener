@@ -37,10 +37,11 @@ const responseSchema = z.object({
             exchangeTimezoneName: z.string().optional(),
             regularMarketPrice: z.number().finite().positive().optional(),
             regularMarketTime: z.number().int().positive().optional(),
-            preMarketPrice: z.number().finite().positive().optional(),
-            preMarketTime: z.number().int().positive().optional(),
-            postMarketPrice: z.number().finite().positive().optional(),
-            postMarketTime: z.number().int().positive().optional(),
+            // Optional extended metadata must never invalidate regular-session bars.
+            preMarketPrice: z.number().finite().positive().optional().catch(undefined),
+            preMarketTime: z.number().int().positive().optional().catch(undefined),
+            postMarketPrice: z.number().finite().positive().optional().catch(undefined),
+            postMarketTime: z.number().int().positive().optional().catch(undefined),
           }).optional(),
           timestamp: z.array(z.number().int().positive()),
           indicators: z.object({

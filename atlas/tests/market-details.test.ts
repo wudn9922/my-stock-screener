@@ -112,3 +112,14 @@ describe("safe public failure reasons", () => {
     ).not.toContain("abc");
   });
 });
+
+
+it("does not reject valid regular bars for missing or malformed optional extended metadata", () => {
+  const row = raw().chart.result[0]!;
+  for (const invalid of [null, 0, -1, "not-provided"]) {
+    const payload = { chart: { result: [{ ...row, meta: { ...row.meta,
+      preMarketPrice: invalid, preMarketTime: invalid, postMarketPrice: invalid, postMarketTime: invalid,
+    } }] } };
+    expect(normalizeYahooResponse(payload, at, "1D", "AAPL").quote).toMatchObject({ price: 100, extended: {} });
+  }
+});

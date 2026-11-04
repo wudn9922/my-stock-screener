@@ -4,7 +4,7 @@ Primary self-review only; no independent sign-off. Based on latest main `df29c93
 The explicit ten-item request is documented in `docs/STARTUP_WATCHLIST_MARKET_DETAILS.md`.
 No protected auth/account/Edge Function source, SQL, existing permanent market records or archive branch is edited.
 New display snapshots are bounded, read-only consumers of public sources; source dates are never invented.
-Verified locally: clean npm ci; lint; typecheck; 137 Vitest files / 1,773 tests;
+Verified locally: clean npm ci; lint; typecheck; 137 Vitest files / 1,774 tests;
 normal + Pages builds; 5 public market-extras Python tests; 33 generated-branch tests;
 36 final browser cases across desktop Chromium, mobile Chromium and iPhone WebKit.
 The wider 237-case regression run had 233 passes and four findings (including a fractional
@@ -22,6 +22,7 @@ interaction. Tests now assert the new exact footer locations, storage-to-health 
 compact picker/chart alignment, distinct missing/invalid reasons and a settled NVDA chart.
 The affected 78-case suite passed 77 with its existing desktop-only skip. No assertion was
 removed or broadly relaxed; no new skip was introduced.
+Optional extended quote fields also tolerate null/zero/malformed metadata without rejecting otherwise valid regular bars; the complete 1,774-unit suite, lint and both builds passed after this compatibility fix.
 CI will verify the exact pushed head. No merge or deployment is authorized.
 
 ## Current follow-up: timeframe fixation, calibrated breadth and list evidence (2026-11-02)
