@@ -39,7 +39,7 @@ const CLOSE_GRACE_MINUTES = 15;
 
 const weekdayFormatters = new Map<string, Intl.DateTimeFormat>();
 /** True on a weekday between the market's open and shortly after its close (holidays are not known). */
-export function inRegularSession(profile: MarketProfile, nowMs: number): boolean {
+export function inRegularSession(profile: MarketProfile, nowMs: number, graceMinutes = CLOSE_GRACE_MINUTES): boolean {
   let format = weekdayFormatters.get(profile.timezone);
   if (!format) {
     format = new Intl.DateTimeFormat('en-US', { timeZone: profile.timezone, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -48,7 +48,7 @@ export function inRegularSession(profile: MarketProfile, nowMs: number): boolean
   const parts = Object.fromEntries(format.formatToParts(new Date(nowMs)).map((part) => [part.type, part.value]));
   if (parts.weekday === 'Sat' || parts.weekday === 'Sun') return false;
   const minute = Number(parts.hour) * 60 + Number(parts.minute);
-  return minute >= profile.sessionOpenMinutes && minute < profile.sessionCloseMinutes + CLOSE_GRACE_MINUTES;
+  return minute >= profile.sessionOpenMinutes && minute < profile.sessionCloseMinutes + graceMinutes;
 }
 
 /**
@@ -157,6 +157,11 @@ export class LiveQuoteFeed {
 
   get currentInterval(): number {
     return this.interval;
+  }
+
+  /** Read the current subscription's validated observation; does not fetch or start a timer. */
+  latest(symbol: string): LiveDaily | undefined {
+    return this.entries.get(symbol)?.last;
   }
 
   /** Called with the receive time of every batch that came back, for an "updated at" label. */
@@ -293,7 +298,6 @@ export class LiveQuoteFeed {
         if (Object.values(body.errors ?? {}).includes('rate_limited')) failed = true;
         const retrievedAt = this.now() / 1000;
         this.lastUpdatedAt = retrievedAt * 1000;
-        for (const listener of [...this.updateListeners]) listener(this.lastUpdatedAt);
         for (const symbol of batch) {
           const raw = body.results?.[symbol];
           const value = raw === undefined ? null : normalizeLive(raw, symbol, retrievedAt);
@@ -307,6 +311,7 @@ export class LiveQuoteFeed {
           entry.fetchedAt = Math.max(entry.fetchedAt, now);
           for (const listener of entry.listeners.keys()) listener(value);
         }
+        for (const listener of [...this.updateListeners]) listener(this.lastUpdatedAt);
       } catch {
         // Retried on the next tick even outside the session (an unanswered first fetch counts as none).
         for (const symbol of batch) {

@@ -175,6 +175,26 @@ test('undeployed cloud holdings fail clearly and never fall back to device persi
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage }))).not.toContain('holdings:v1');
 });
 
+test('a Taiwan broker 複委託 account holds US stocks in USD', async ({ page }) => {
+  await open(page);
+  await panel(page).getByRole('button', { name: '新增帳戶', exact: true }).click();
+  const brokers = panel(page).getByRole('combobox', { name: '券商／交易所' });
+  for (const label of ['國泰證券 複委託美股 · USD', '永豐金證券 複委託美股 · USD', '凱基證券 複委託美股 · USD', '口袋證券 複委託美股 · USD', '其他台灣券商 複委託美股 · USD'])
+    await expect(brokers.getByRole('option', { name: label, exact: true })).toHaveCount(1);
+  await panel(page).getByRole('button', { name: '取消', exact: true }).click();
+  await create(page, 'cathay-us');
+  await paste(page, 'Symbol,Quantity,Avg Cost\nAAPL,10,150\n2330,1,500');
+  // A US-stock account resolves US tickers only; a Taiwan code is flagged instead of guessed.
+  await expect(importer(page)).toContainText('代號找不到');
+  await importer(page).getByRole('checkbox', { name: '略過此列' }).nth(1).check();
+  await save(page);
+  const position = panel(page).getByRole('article', { name: 'AAPL 持股' });
+  await expect(position).toBeVisible();
+  await expect(position).not.toContainText('無報價');
+  await expect(panel(page)).toContainText('USD 市值');
+  await layout(page);
+});
+
 test('unsupported crypto stays unquoted rather than guessed and USDT is kept separate', async ({ page }) => {
   await open(page);
   await create(page, 'mexc');

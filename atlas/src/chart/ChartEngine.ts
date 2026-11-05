@@ -1,4 +1,5 @@
 import { worldAssetFor } from '../market-data/worldAssets';
+import { quoteStatus } from '../market-data/quoteStatus';
 import {
   createChart,
   createSeriesMarkers,
@@ -370,7 +371,7 @@ export class ChartEngine {
     this.corporateMarkers = valid(kept[2]!);
     this.refreshMarkers();
   }
-  /** Metadata can change while the delayed OHLCV stays identical. */
+  /** Refresh metadata even when the latest delayed OHLCV has not changed. */
   refreshSource(result: BarResult) {
     this.renderSource(result, result.market ?? getMarketProfile(this.symbol));
   }
@@ -382,7 +383,8 @@ export class ChartEngine {
     const time = (seconds: number) => new Date(seconds * 1000).toLocaleString('zh-TW', { hour12: false });
     const asset = worldAssetFor(this.symbol);
     const sessionText = asset ? asset.calendar === 'continuous-utc' ? '全天交易 UTC 日線' : '來源日 K（日曆標籤）' : result.session === 'regular' ? '一般交易時段' : '含盤前盤後';
-    this.sourceLabel.textContent = `${result.source} · ${asset?.unit ?? market.currency} · ${sessionText} · ${stateText} · ${cacheText} · ${basisText} · 取得 ${result.asOf ? time(result.asOf) : '—'} · 最後 K 棒 ${time(result.bars.at(-1)!.time)}`;
+    const status = asset ? stateText : quoteStatus(this.symbol, result.quote ?? { asOf: 0, dataState: state }, result.asOf ? result.asOf * 1000 : undefined);
+    this.sourceLabel.textContent = `${asset ? '' : `${status} · `}${result.source} · ${asset?.unit ?? market.currency} · ${sessionText} · ${stateText} · ${cacheText} · ${basisText} · 取得 ${result.asOf ? time(result.asOf) : '—'} · 最後 K 棒 ${time(result.bars.at(-1)!.time)}`;
     if (result.sessionCloseObservations?.length) this.sourceLabel.textContent += ` · ${result.sessionCloseObservations.length} 筆收盤競價觀測點（瞬時樣本）`;
     this.sourceLabel.title = this.sourceLabel.textContent;
   }

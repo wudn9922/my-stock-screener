@@ -34,6 +34,7 @@ test('the open chart takes the fresh price at once, keeping its loaded history',
 });
 
 test('watchlist rows on screen show the fresh price in one batched request', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-04T16:00:00Z') });
   await mockSite(page);
   await page.route('**/my-stock-screener/report/trending-stocks.json', (route) =>
     route.fulfill({ json: { version: 1, source: 'line', fetchedAt: '2026-10-27T01:00:00+08:00', sentAt: '2026-10-27T01:05:00+08:00', symbols: ['NVDA', 'AAPL'] } }));
@@ -43,7 +44,7 @@ test('watchlist rows on screen show the fresh price in one batched request', asy
   await expect(rows).toHaveCount(2);
   for (const row of await rows.all()) await expect(row.locator('.wb-quote b')).toHaveText(/1,?234\.50/);
   expect(batches.flat().sort()).toEqual(['AAPL', 'NVDA']);
-  await expect(page.getByTestId('board-live-time')).toHaveText(/^更新於 \d{2}:\d{2}:\d{2}$/);
+  await expect(page.getByTestId('board-live-time')).toHaveText(/^延遲報價 · 更新於 \d{2}:\d{2}:\d{2}$/);
 });
 
 test('during the session the chart price and its update time move again a minute later', async ({ page }) => {
@@ -69,11 +70,11 @@ test('during the session the chart price and its update time move again a minute
   });
   await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
   await expect(page.getByTestId('ohlc-header')).toContainText('1000.00');
-  await expect(page.getByTestId('live-time')).toHaveText(/^更新於 12:20:\d{2}$/);
+  await expect(page.getByTestId('live-time')).toHaveText(/^延遲報價 · 更新於 12:20:\d{2}$/);
   price = 1010;
   await page.clock.fastForward(61_000);
   await expect(page.getByTestId('ohlc-header')).toContainText('1010.00');
   await expect(page.getByTestId('header-quote')).toContainText('1,010.00');
-  await expect(page.getByTestId('live-time')).toHaveText(/^更新於 12:21:\d{2}$/);
+  await expect(page.getByTestId('live-time')).toHaveText(/^延遲報價 · 更新於 12:21:\d{2}$/);
   await page.screenshot({ path: test.info().outputPath('live-time-header.png') });
 });

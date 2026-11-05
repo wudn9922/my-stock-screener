@@ -203,12 +203,14 @@ for (const mode of ['device', 'cloud'] as const) {
     const before = await readBrowserData(page, DEVICE_USER_ID, mode);
     const calls = await installStoragePolicy(page, mode);
     await page.goto('./?page=chart&symbol=2330.TW');
+    await expect(page.getByTestId('ohlc-header')).toBeVisible();
+    await expect(page.getByTestId('legacy-import-card')).toHaveCount(0);
+    await page.getByRole('button', { name: '我的', exact: true }).click();
     const card = page.getByTestId('legacy-import-card');
     await expect(card).toBeVisible();
     await expect(card).toContainText(/畫線\s*2/);
     await expect(card).toContainText(/指標\s*2/);
     await expect(card).toContainText(/清單\s*\d+/);
-    await expect(page.getByTestId('ohlc-header')).toBeVisible();
     expect(calls.filter(call => call.action === 'atlas.save' && JSON.stringify(call).includes('legacy-drawing'))).toEqual([]);
     expect((await readBrowserData(page, DEVICE_USER_ID, mode)).account.symbols[0].drawings).toHaveLength(1);
     await page.screenshot({ path: testInfo.outputPath(`legacy-import-${mode}-prompt.png`) });
@@ -233,6 +235,7 @@ for (const mode of ['device', 'cloud'] as const) {
       await expect.poll(() => calls.filter(call => call.action === 'watchlists.save' && (call.definition as { id?: string }).id === LEGACY_LIST).length).toBeGreaterThan(0);
       expect(calls.filter(call => call.action === 'atlas.save').every(call => call.idToken === `token-${DEVICE_USER_ID}`)).toBe(true);
     } else expect(calls).toEqual([]);
+    await page.goto('./?page=chart&symbol=2330.TW');
     await page.reload();
     await expect(page.getByTestId('ohlc-header')).toBeVisible();
     await expect(page.getByTestId('legacy-import-card')).toHaveCount(0);
@@ -255,6 +258,9 @@ test('cloud import preserves server-only drawings before merging shared legacy r
   await seedBrowser(page, 'cloud', false);
   const calls = await installStoragePolicy(page, 'cloud', false, [drawing('shared-drawing', 2500), drawing('cloud-only', 2600)]);
   await page.goto('./?page=chart&symbol=2330.TW');
+  await expect(page.getByTestId('ohlc-header')).toBeVisible();
+  await expect(page.getByTestId('legacy-import-card')).toHaveCount(0);
+  await page.getByRole('button', { name: '我的', exact: true }).click();
   await expect(page.getByTestId('legacy-import-confirm')).toBeVisible();
   await page.getByTestId('legacy-import-confirm').click();
   await expect(page.getByTestId('legacy-import-card')).toContainText('已匯入');
