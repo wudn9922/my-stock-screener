@@ -75,6 +75,12 @@ class ExpansionTests(_ArchiveCase):
             result = daily.refresh(self.archive, self.cache, now=NOW, selected={'^TWOII': metadata('^TWOII')}, sleep=lambda _: None)
             self.assertEqual(result['appended'], 1)
 
+    def test_daily_command_line_gives_the_yahoo_reader_a_real_network(self):
+        argv = ['refresh_archive_instruments.py', '--archive-dir', str(self.archive), '--cache-dir', str(self.cache)]
+        with patch.object(sys, 'argv', argv), patch.object(daily, 'refresh', return_value={}) as run:
+            daily.main()
+        self.assertIsInstance(run.call_args.kwargs['net'], bu.Network)
+
     def test_scope_includes_otc_kind_etf_and_public_flagged_us_etfs_but_no_name_guesses(self):
         root = self.root / 'website'
         (root / 'config').mkdir(parents=True)
