@@ -75,6 +75,7 @@ export function parseArchiveIndex(raw: unknown, symbol: string): ArchiveEntry | 
 
 export class KlineArchive {
   private readonly indexes = new Map<string, Promise<ArchiveEntry | null>>();
+  private indexDay = '';
   private readonly years = new Map<string, Promise<BarResult>>();
   private readonly fetcher: typeof fetch;
   private readonly now: () => number;
@@ -91,6 +92,7 @@ export class KlineArchive {
   }
   private loadIndex(symbol: string): Promise<ArchiveEntry | null> {
     const day = new Date(this.now()).toISOString().slice(0, 10), key = `${day}:${symbol}`;
+    if (this.indexDay !== day) { this.indexes.clear(); this.indexDay = day; }
     let pending = this.indexes.get(key);
     if (!pending) {
       const market = getMarketProfile(symbol).market === 'TW' ? 'tw' : 'us';
@@ -108,12 +110,13 @@ export class KlineArchive {
           getBars: async (): Promise<BarResult> => { throw new Error('Index has no bars'); },
           getQuote: async (): Promise<Quote> => { throw new Error('Index has no quote'); } };
         const cached = new CachedMarketDataProvider(provider, { ...this.options.cache, now: this.now,
-          ttlMs: Date.parse(day + 'T00:00:00Z') + DAY * 1000 - this.now(), maxEntries: this.options.cache?.maxEntries ?? 2000 });
+          ttlMs: Date.parse(day + 'T00:00:00Z') + DAY * 1000 - this.now(), maxEntries: this.options.cache?.maxEntries ?? 10000 });
         pending = cached.getDocument(symbol, load, value => parseArchiveIndex(value, symbol))
           .finally(() => cached.close().catch(() => undefined));
       }
       this.indexes.set(key, pending);
-      while (this.indexes.size > 400) this.indexes.delete(this.indexes.keys().next().value!);
+      // Covers the complete public TW/US catalog, including visitors without IDB.
+      while (this.indexes.size > 10000) this.indexes.delete(this.indexes.keys().next().value!);
     }
     return pending;
   }

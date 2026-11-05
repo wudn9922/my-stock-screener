@@ -61,6 +61,27 @@ describe('archive reader C1', () => {
     expect(paths).toHaveLength(4);
     expect(paths).not.toContain('manifest.json');
   });
+  it('year-cache eviction cannot evict the index and trigger another same-day download', async () => {
+    const paths: string[] = [];
+    const fetcher = (async (url: RequestInfo | URL) => {
+      paths.push(String(url));
+      return String(url).includes('/index/') ? Response.json(index)
+        : new Response(csv(Number(String(url).match(/(\d{4})\.csv/)![1])));
+    }) as typeof fetch;
+    const options={fetcher,now,cache:{dbName:'index-eviction-'+crypto.randomUUID(),maxEntries:1}};
+    await new KlineArchive(options).getDaily('AAPL');
+    paths.length=0;
+    await new KlineArchive(options).getDaily('AAPL');
+    expect(paths.some(path=>path.endsWith('.csv'))).toBe(true); // real year eviction occurred
+    expect(paths.filter(path=>path.includes('/index/'))).toEqual([]);
+  });
+  it('a visitor scanning hundreds of symbols still reuses same-day 404 results', async () => {
+    const fetcher=vi.fn(async()=>new Response('',{status:404}));
+    const archive=new KlineArchive({fetcher,now,cache:false});
+    for(let i=0;i<500;i++) expect(await archive.getDaily(`TEST${i}`)).toBeNull();
+    expect(await archive.getDaily('TEST0')).toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(500);
+  });
   it('caches 404 once per UTC day and never reuses yesterday\'s positive index after removal', async () => {
     let clock = now(), absent = false;
     const paths: string[] = [];
