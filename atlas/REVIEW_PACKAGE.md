@@ -1,3 +1,25 @@
+## 市場多頭末期警示與波段計數（2026-11-05）
+
+Primary self-review only；沒有獨立模型或 Claude 簽核。分支從 main `e28a5bed4cb87468f7ae7c71bf7a0ca4a88d0d64` 建立；一個 PR，不合併、不部署、不觸發正式排程。
+
+新卡片、計算、來源與限制見 [MARKET_WARNINGS.md](docs/MARKET_WARNINGS.md)、[ADR-028](docs/architecture/ADR-028-market-warnings.md)。研究原文保存在 `scripts/market_warnings_evidence.json`，卡片直接讀輸出原文。
+
+審查重點：`swing_cohort.py` 只改首次／更高／合格收盤的計數，沒有更動 ATR 波段偵測、箱型或 EMA。`build_market_warnings.py` 排除未收盤 bar，指數兩個方向各有分母，756日門檻先 shift(1)。領頭羊為每個觀察日 t−1 的名單，窗口 t−(W+4)…t−5，最後五日平均。已知零量與未知量分開；缺少歷史不猜成正常。
+
+CSV 以 (market,asOf) 首次紀錄為準，保存在 main durable records。兩種發布模式都驗證前綴，拒絕改寫、截短、刪除；並行新增做非 force 聯集，同鍵保留先發布者。既有快照一律不動，舊格式明示舊口徑，混合版本不畫比較柱。
+
+本機實測：npm ci、lint、typecheck、一般與 Pages 建置通過；151檔／1,870個 Vitest。完整 Python 執行1,849項、0失敗，1個原有需另啟用的7,000檔封存效能基準未啟用；最後新增的觀察日名單案例另以18個警示專項完整通過。generated真實Git整合35項、breadth pytest24項通過。117個受影響桌機／390px Chromium／iPhone WebKit回歸、45個警示／突破、30個375px兩引擎，以及12＋2個最終版面重驗通過。未新增 skip、放寬斷言或增加測試 timeout。完整 CI 對最後 HEAD 重跑，結果以 PR checks 為準。
+
+未mock Pages 桌機與 iPhone WebKit 冒煙通過，直接比對真實 JSON 兩個比例、avg60、中位數與資料日，保留原財報、SEC、世界資料與月度圖表斷言。首次 PR 預覽只在新檔不存在時放入真實試算的126個交易日切片；它不是網站 runtime fallback，也不會取代既有發布資料。
+
+試算使用先前由 `kline-archive` commit `4c934296a` 唯讀種子重建的320根快取，並非本次最新 Actions cache。指數由 Yahoo 取得七年日線。輸入hash、來源、最新值與十月前後數值見 [proof](../docs/research-verification/market-warnings-proof.json)。CSV 前瞻紀錄沒有拿歷史回算補寫。
+
+限制：320根個股快取無法提供400個有效家數觀測，初次分位數為null；三年日期區間不表示三年都有股票值。研究p值未重新驗證，現行名單有存活者偏差。21日累計／有效股票聯集，與研究每千檔每日不是相同單位；沒有調參追求19%／40%。
+
+截圖為合成數值的版面測試，展示20日切換；初始60日有獨立斷言。見 [桌機](docs/screenshots/market-warnings/desktop.png)、[390px WebKit](docs/screenshots/market-warnings/iphone390.png)、[375px WebKit](docs/screenshots/market-warnings/iphone375.png)。這是 Playwright 模擬，不是實體 iPhone Safari 驗證。
+
+永久行情／財報、archive分支、登入／帳號、Supabase函式／SQL、GCP與原價格監控均未修改。未新增通知。
+
 ## PR-C：永久封存優先（2026-11-04）
 
 Primary self-review only; no independent sign-off. Branch starts at main `c3668287ae`; review revision merged main `5d2a99b720` without rebase or force-push.

@@ -124,3 +124,13 @@ Atlas 是內嵌在每日報告裡的研究工具（Vite/React，原始碼在 `at
 ### 永久 K 線目錄
 
 `kline-archive` 的小型 `manifest.json` 僅保留市場總覽；逐檔的日期、年度 rows／bytes／SHA-256 改存 `index/{tw|us|global}/{URL 編碼代號}.json`，沒有資料變化的索引不重寫。CSV、索引及歷史稽核由同一個驗證器核對。五年範圍、檔名／HTTP 編碼、唯讀試跑與 Git 歷史容量估計見 [KLINE_ARCHIVE_EXPANSION.md](docs/KLINE_ARCHIVE_EXPANSION.md)。正式補檔仍由維護者執行。
+
+### 市場風險警示資料
+
+| 資料 | 產生器／來源 | 保存與限制 |
+|---|---|---|
+| `docs/report/market-warnings.json` | `scripts/build_market_warnings.py`；完整市場 cache＋Yahoo 指數日線（SOX量用SOXX） | universe owner／generated；三年日期序列，歷史不足保留 null；失敗保留舊檔 |
+| `docs/report/market-warnings-log.csv` | 每市場、每資料日首次燈號與數值 | main durable record；只追加，禁止覆寫或截短；包含門檻 SHA-256 |
+| `docs/report/breakouts.json` 的波段新口徑 | 原 ATR 波段偵測＋首次／更高高點／合格收盤＋完整五日守住 | 每月同口徑重算；箱型、20EMA不變；舊快照標示舊口徑且不改寫 |
+
+多頭末期警示是風險提示，不能預測修正時點，不是買賣訊號；現行名單含存活者偏差。原320根快取尚不足400個突破家數有效值，首次執行的背離門檻會缺值，之後依已觀察序列累積。定義、門檻、追加保護與已知限制見 [MARKET_WARNINGS.md](atlas/docs/MARKET_WARNINGS.md)。
