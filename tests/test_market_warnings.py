@@ -162,6 +162,13 @@ class SafetyTest(unittest.TestCase):
         now = datetime(2026,11,27,18,1,tzinfo=timezone.utc) # 13:01 New York early close
         self.assertEqual(mw.completed_calendar('us', now, '2026-11-20')[-1], pd.Timestamp('2026-11-27'))
 
+    def test_cached_rows_older_than_the_exchange_calendar_are_clamped(self):
+        now = datetime(2026, 11, 5, 13, tzinfo=timezone.utc)
+        for market in ('tw', 'us'):
+            days = mw.completed_calendar(market, now, '2000-05-01')
+            self.assertGreaterEqual(days[0], pd.Timestamp('2001-01-01'))
+            self.assertLess(days[-1], pd.Timestamp('2026-11-06'))
+
     def test_log_append_is_idempotent_and_never_rewrites_first_observation(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)/'log.csv'
