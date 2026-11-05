@@ -79,6 +79,7 @@ import { getMarketProfile } from '../market-data/MarketProfile';
 import { EDGE_YAHOO_SOURCE } from '../market-data/EdgeYahooProvider';
 import { usableBarResult } from '../market-data/KlineIntegrity';
 import { inRegularSession, isLiveSymbol, LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, mergePeriodBars, sameBars } from '../market-data/LiveQuotes';
+import { liveDailySource } from '../market-data/YahooNormalizer';
 import { marketCalendar } from '../market-data/MarketCalendar';
 import {
   getLoadedSymbolDirectory,
@@ -560,7 +561,8 @@ export function App({
   const liveKey = `${symbol}:${tf}:${providerId}`;
   const liveState = useRef({ result, tool, selected });
   liveState.current = { result, tool, selected };
-  const liveChart = state.ready && providerId === 'market' && !!result && result.source.startsWith(EDGE_YAHOO_SOURCE) && isLiveSymbol(symbol);
+  const liveChart = state.ready && providerId === 'market' && !!result
+    && (result.source.startsWith(EDGE_YAHOO_SOURCE) || getMarketProfile(symbol).market === 'TW') && isLiveSymbol(symbol);
   useEffect(() => {
     if (!liveChart) return;
     let live = true;
@@ -599,7 +601,11 @@ export function App({
         setLiveAt({ key: `${symbol}:${tf}:${providerId}`, at: value.retrievedAt * 1000 });
         if (value.quote) setQuote({ symbol, provider: providerId, quote: value.quote });
         const bars = tf === '1D' ? mergeDailyBars(current.bars, value.bars) : mergePeriodBars(current.bars, value.bars, tf, market);
-        if (bars) apply({ ...current, bars, latestBarAt: bars.at(-1)!.time, asOf: value.retrievedAt, cacheStatus: 'fresh', ...(value.quote ? { quote: value.quote } : {}) });
+        if (bars) apply({ ...current, bars, latestBarAt: bars.at(-1)!.time, asOf: value.retrievedAt, cacheStatus: 'fresh', ...(value.quote ? {
+          quote: value.quote, source: liveDailySource(current.source, value.quote, value.source),
+          dataState: value.quote.dataState ?? current.dataState,
+          delayed: value.quote.dataState === undefined ? current.delayed : value.quote.dataState !== 'live',
+        } : {}) });
       });
       return () => {
         live = false;

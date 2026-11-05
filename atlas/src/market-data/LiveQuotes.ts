@@ -20,6 +20,8 @@ export interface LiveDaily {
   quote?: Quote;
   /** Unix seconds the batch was received. */
   retrievedAt: number;
+  /** Provenance of the recent daily rows (may differ from a retained Yahoo close). */
+  source?: string;
 }
 
 export type LiveListener = (value: LiveDaily) => void;
@@ -107,7 +109,8 @@ export function normalizeLive(raw: unknown, symbol: string, retrievedAt: number)
   try {
     const result: BarResult = normalizeYahooResponse(raw, retrievedAt, '1D', symbol);
     const quote = result.quote && { ...result.quote, market: result.market, source: (result.quote.source ?? YAHOO_SOURCE).replace(YAHOO_SOURCE, EDGE_YAHOO_SOURCE) };
-    return { symbol, bars: result.bars, ...(quote ? { quote } : {}), retrievedAt };
+    return { symbol, bars: result.bars, ...(quote ? { quote } : {}), retrievedAt,
+      source: result.source.replace(YAHOO_SOURCE, EDGE_YAHOO_SOURCE) };
   } catch {
     return null;
   }
