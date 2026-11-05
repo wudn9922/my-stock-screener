@@ -1,6 +1,6 @@
 # PR-C：封存優先，Yahoo 補最新
 
-本 PR 從 main `c3668287ae` 開分支，C1～C5 各一個 commit；沒有合併、部署、執行正式排程或寫入永久資料。PR-A 的介面修正與 PR-B 的補檔另行審查；讀取器直接讀 PR-B 的個股 index；尚未發布 index 的代號（HTTP 404）繼續用原資料來源，不下載全市場 manifest。
+原 C1～C5 的分項 commit 保留；本輪用 merge 整合 main `5d2a99b720`（包含已合併 #219），沒有 rebase／force-push。保留報價狀態、盤前盤後直接顯示、自選更新時間與價格警示。讀取器直接讀 PR-B 的個股 index；尚未發布 index 的代號（HTTP 404）繼續用原資料來源，不下載全市場 manifest。沒有合併 PR、部署、執行正式排程或寫入永久資料。
 
 ## 行為與限制
 
@@ -20,7 +20,7 @@
 
 封存請求固定指向 `raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/`；只接受對應 symbol／bucket／路徑及有效年度明細。個股 index 的年度 SHA 驗證、年度／日期排序、OHLC、quarantine 與未知成交量均有檢查。年檔存入原有 account-scoped 行情 IndexedDB；未授權持久化時沿用記憶體，不修改登入或儲存授權程式。台股張／美股股仍由原顯示函式處理。
 
-PR-B 另封存的全球指數保留 global/，本次 tw/us 讀取不把其他幣別誤標為美股；世界資產仍走既有路由。五年覆蓋由 [PR-B 操作說明](https://github.com/wudn9922/my-stock-screener/blob/4636c2514f5289c5af992e3855d7997e7ca2b528/docs/KLINE_ARCHIVE_EXPANSION.md) 的維護者補檔決定，本 PR 沒有執行正式補檔。
+PR-B 另封存的全球指數保留 global/，本次 tw/us 讀取不把其他幣別誤標為美股；世界資產仍走既有路由。五年覆蓋由 [PR-B 操作說明](https://github.com/wudn9922/my-stock-screener/blob/2e5c02ab1943f5e334efe74bf981a034f0b9df05/docs/KLINE_ARCHIVE_EXPANSION.md) 的維護者補檔決定，本 PR 沒有執行正式補檔。
 
 日 K 的日期轉換保留既有畫線時間：股票與 Yahoo 指數使用市場開盤時間（含美國夏令時間），唯一原有官方序列 ^TWOII 保留 UTC 日期時間。已核對部署的 series/index.json 只有 ^TWOII，且增加美股冬／夏令、上市／上櫃、官方指數的舊畫線定位測試。正規化版本有獨立快取 key。
 
@@ -38,13 +38,14 @@ PR-B 另封存的全球指數保留 global/，本次 tw/us 讀取不把其他幣
 
 ## 截圖
 
-全部是假的行情與帳號 fixture。每項有桌機、390px Chromium／WebKit、375px Chromium／WebKit，放在 [screenshots/pr-c](screenshots/pr-c)。
+全部是假的行情與帳號 fixture，共 25 張。每項有桌機、390px Chromium／WebKit、375px Chromium／WebKit，放在 [screenshots/pr-c](screenshots/pr-c)。
 
 | 案例 | 桌機 | iPhone 375px |
 | --- | --- | --- |
 | 斷線保留封存（C1/C2） | [圖](screenshots/pr-c/c2-desktop-chromium.png) | [圖](screenshots/pr-c/c2-iphone-webkit-375.png) |
 | 六個月自選（C3） | [圖](screenshots/pr-c/c3-desktop-chromium.png) | [圖](screenshots/pr-c/c3-iphone-webkit-375.png) |
 | 批次側邊清單（C4） | [圖](screenshots/pr-c/c4-desktop-chromium.png) | [圖](screenshots/pr-c/c4-iphone-webkit-375.png) |
+| #224 補齊日 K | [圖](screenshots/pr-c/c3-fill-desktop-chromium.png) | [圖](screenshots/pr-c/c3-fill-iphone-webkit-375.png) |
 | 五分鐘小圖（C5） | [圖](screenshots/pr-c/c5-desktop-chromium.png) | [圖](screenshots/pr-c/c5-iphone-webkit-375.png) |
 
 ## 審查修訂：個股索引與 #219 整合
@@ -56,3 +57,9 @@ index 與 404 都使用原有行情 IndexedDB／記憶體授權機制快取，�
 先由維護者讓 PR-B 的正常 archive publisher 產出新 index；本 PR 不會從瀏覽器產生或寫入封存資料。尚無 index 時功能沿用原來源。完整 CI 與新手機截圖於本輪修訂重跑。
 
 #224 的 meta.atlasIntradayFill 形狀已核對，測試使用 ^TWII 2026-11-04／11-05 原為全 null、補齊後有值的完整回應。日 K 與封存以交易所交易日期比對；同日 timestamp 從原日 K 換成首筆 5 分 K（或下一批不同時間戳）也只保留一根。已有封存日期的值保留，新的形成中日期持續更新。單元涵蓋封存截至 11/03 與 11/04；五種瀏覽器配置另驗證兩次批次更新、不抓五年與圖表保留。
+
+## 本輪驗證結果
+
+合併與索引修改後，lint、typecheck、一般／Pages 建置通過；最終完整 Vitest 149 檔／1,841 個測試全數通過。包含 index／404 跨實例同日重用與跨日重載、年度快取淘汰不逐出 index、訪客瀏覽 500 檔仍不重抓當日 index。
+
+桌機／390px 99 個、375px Chromium／WebKit 50 個瀏覽器案例全數通過，保留 #219、舊自選／市場／導覽與本次所有斷言；25 張截圖已更新。完整 CI 將驗證推送的相同程式，包括舊離線旅程、PostgreSQL 授權與 breakout 整合；最終結果記於 PR。

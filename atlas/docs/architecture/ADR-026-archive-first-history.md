@@ -2,7 +2,7 @@
 
 狀態：使用者授權的 PR-C。沿用單一 MarketDataProvider、既有 IndexedDB 行情快取與 LiveQuoteFeed，不新增行情伺服器、通知、排程或持久化個資模型。
 
-`KlineArchive` 先驗證公開 per-symbol index v1/v2 的代號、日期與編碼路徑，再平行讀需要的年度 CSV。v2 年檔驗 SHA-256；舊年長期快取，今年以日期／SHA 更新。快取 identity 含年份與內容 SHA，修正後不重用舊 blob；v1 沒有 SHA 時以原目錄為準，升級 v2 自動換 key。所有資料仍通過 usableBarResult／quarantine；未知成交量有獨立標記，原始單位維持股，顯示端照原有規則換台股張數。
+`KlineArchive` 直接驗證公開的個股 index v1（代號、bucket、日期、編碼路徑與年度明細），不下載 manifest，再平行讀需要的年度 CSV。index／404 存進既有 IndexedDB，按 UTC 日更新；沒有 index 就走原資料來源。每個年檔驗 SHA-256，舊年長期快取，今年以日期／SHA 更新。快取 identity 含年份與內容 SHA，修正後不重用舊 blob。所有資料仍通過 usableBarResult／quarantine；未知成交量有獨立標記，原始單位維持股，顯示端照原有規則換台股張數。
 
 `ArchiveFirstProvider` 在可取得封存時直接回傳日 K，週／月 K 依原 calendarPeriodStart 聚合。App 在背景接更早的 Yahoo 原生週／月資料；本益比歷史讀取也保留較早資料的補充。公司事件背景使用含 events 的十年月 K payload，不再為事件下載五年日 K。世界資產保留原有路由；無封存的代號走既有 Yahoo／官方序列。
 
