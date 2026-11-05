@@ -1,3 +1,13 @@
+## 台股 MIS 盤中來源（2026-11-05）
+
+Primary self-review only; no independent sign-off. From latest main `3282e2fa82` (includes #224, #223, #220).
+只修改 market-chart 的盤中台股來源與必要前端標示；美股、既有歷史、SQL、GCP、登入與永久資料不變。
+依使用者提供形狀建立離線假資料，不連線真實證交所；維護者自行部署。
+新增按市場代號驗證、40 檔分段、15 秒快取、1 秒節流、2 秒逾時、跨日清空、空價沿用及 MIS-only 今日棒；
+Yahoo 與 #224 補洞照舊，失敗完整退回。前端沿用 LiveQuoteFeed，保留 TPEx 歷史來源並顯示 MIS／Yahoo 實際來源。
+操作、欄位與部署順序見 [market-chart README](../supabase/functions/market-chart/README.md#台股盤中-mis維護者部署後生效)。
+完整結果與桌機、390px／375px Chromium／WebKit 截圖列於 PR；自動化不代表實機 iPhone 簽核。
+
 ## PR-D：交易日曆（2026-11-05）
 
 Primary self-review only; no independent sign-off. Branch starts at latest main `0cb7789772`.
