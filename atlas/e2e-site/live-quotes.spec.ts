@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mockSite, yahooChart } from './mocks';
 import { misOnlyChart, overlayMis, parseMisRow } from '../../supabase/functions/market-chart/twse-mis';
 import { MIS_NOW, MIS_TODAY, misRows, misYahoo } from '../tests/fixtures/twse-mis';
+import { archiveIndexFixture } from '../tests/fixtures/archive-index';
 
 const LIVE_PRICE = 1234.5;
 
@@ -98,6 +99,13 @@ for (const symbol of ['2330.TW', '6488.TWO', '^TWII', '^TWOII']) {
   test(`MIS ${symbol}: today's candle and source arrive through the existing minute feed`, async ({ page }, info) => {
     await page.clock.install({ time: new Date(MIS_NOW) });
     await mockSite(page);
+    if (symbol === '^TWII') {
+      const r = misYahoo(symbol).chart.result[0]!, q = r.indicators.quote[0]!;
+      const csv = 'Date,Open,High,Low,Close,Volume\n' + r.timestamp.map((t, i) => [new Date(t * 1000).toISOString().slice(0, 10),
+        q.open[i], q.high[i], q.low[i], q.close[i], q.volume[i]].join(',')).join('\n') + '\n';
+      await page.route('https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/**', route =>
+        route.fulfill(route.request().url().includes('/index/') ? { json: archiveIndexFixture(symbol, { 2026: csv }) } : { body: csv, contentType: 'text/csv' }));
+    }
     if (symbol === '^TWOII') {
       await page.route('**/report/series/index.json', route => route.fulfill({ json: { symbols: ['^TWOII'] } }));
       await page.route('**/report/series/%5ETWOII.json', route => route.fulfill({ json: {
@@ -127,6 +135,8 @@ for (const symbol of ['2330.TW', '6488.TWO', '^TWII', '^TWOII']) {
     await expect(page.getByTestId('live-time')).toContainText('即時報價');
     await page.getByTestId('source-info-toggle').click();
     await expect(page.locator('.data-source')).toContainText('證交所即時（非官方 API）');
+    if (symbol === '^TWII') await expect(page.locator('.data-source')).toContainText('GitHub 永久封存');
+    if (symbol === '^TWOII') await expect(page.locator('.data-source')).toContainText('TPEx 歷史');
     await expect(page.locator('.data-source')).toContainText(new Date(MIS_TODAY * 1000).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }));
     await page.getByTestId('source-info-toggle').click();
     price += symbol.startsWith('^') ? 0.1 : 1;

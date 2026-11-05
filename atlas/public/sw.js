@@ -11,6 +11,8 @@ const iconURLs = ['icon.svg', 'icon-192.png', 'icon-512.png'].map(
   (path) => new URL(path, scopeRoot),
 );
 const assetsPath = new URL('assets/', scopeRoot).pathname;
+// Replaced with public JS/CSS chunk names by the existing versioned-build plugin.
+const BUILD_ASSETS = [];
 
 function isInScope(url) {
   return url.origin === scopeRoot.origin && url.pathname.startsWith(scopePath);
@@ -61,7 +63,7 @@ self.addEventListener('install', (event) => {
       const response = await fetchAndCache(cache, scopeRoot);
       const html = await response.clone().text();
       const resources = new Map(
-        [manifestURL, ...iconURLs, ...extractBuildAssets(html)]
+        [manifestURL, ...iconURLs, ...extractBuildAssets(html), ...BUILD_ASSETS.map(path => new URL(path, scopeRoot))]
           .filter(isCacheableAsset)
           .map((url) => [url.href, url]),
       );

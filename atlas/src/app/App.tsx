@@ -77,9 +77,12 @@ import { parseLaunchParams } from './LaunchParams';
 import { legacyVolumeEnabled } from '../storage/schema';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { EDGE_YAHOO_SOURCE } from '../market-data/EdgeYahooProvider';
+import { archiveUnavailableSource, mergeArchivedLive } from '../market-data/ArchiveFirstProvider';
+import { subscribeWatchlistQuotes } from '../market-data/watchlistQuotes';
+import { getWatchlistDailyResult } from './dataSources';
 import { usableBarResult } from '../market-data/KlineIntegrity';
 import { inRegularSession, isLiveSymbol, LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, mergePeriodBars, sameBars } from '../market-data/LiveQuotes';
-import { liveDailySource } from '../market-data/YahooNormalizer';
+import { applyLiveQuoteMetadata } from '../market-data/YahooNormalizer';
 import { marketCalendar } from '../market-data/MarketCalendar';
 import {
   getLoadedSymbolDirectory,
@@ -246,6 +249,7 @@ export function App({
   const loadedContext = useRef('');
   const [drawingMenuBounds, setDrawingMenuBounds] = useState<{ top: number; bottom: number } | null>(null);
   const [quickEditing, setQuickEditing] = useState(false);
+  const [visibleWatchSymbols, setVisibleWatchSymbols] = useState<string[]>([]);
   useEffect(() => setQuickEditing(false), [symbol, tf, selected]);
   const [catalogEntries, setCatalogEntries] = useState<SymbolCatalogEntry[]>([]);
   const refreshController = useRef<AbortController | null>(null);
@@ -474,7 +478,7 @@ export function App({
     setEventsStatus(
       STATIC_HOSTING && providerId === 'yahoo' ? '公司事件：需要後端' : '公司事件：載入中…',
     );
-    const provider = providers[providerId];
+    const provider: MarketDataProvider = providers[providerId];
     if (!supportsTimeframe(provider, tf)) {
       store.updateSymbol(symbol, (s) => ({
         ...s,
@@ -509,9 +513,24 @@ export function App({
           legacyVolumeFor(symbol, settings.preferences, tf),
         );
         setResult(result);
+        liveState.current.result = result;
         loadedContext.current = `${symbol}:${tf}:${providerId}`;
         setLoadedResult(result);
         setLoading(false);
+        if (result.archive && (tf === '1W' || tf === '1M') && provider.getOlderBars) {
+          void provider.getOlderBars(symbol, tf, result, abort.signal).then(extended => {
+            if (!live || chart.interacting) return;
+            const active = liveState.current.result ?? result;
+            if (active.archive?.status === 'split' && extended.archive?.status !== 'split') return;
+            const bars = [...extended.bars.filter(bar => bar.time < active.bars[0]!.time), ...active.bars];
+            const next = extended.archive?.status === 'split' ? extended : { ...active, bars, source: active.source + extended.source.slice(result.source.length) };
+            const settings = store.symbol(symbol);
+            chart.reloadLive(next, settings.drawings, settings.indicators, settings.preferences.views[tf],
+              legacyVolumeFor(symbol, settings.preferences, tf), worldAssetFor(symbol)?.calendar);
+            liveState.current.result = next;
+            setResult(next); setLoadedResult(next);
+          }).catch(() => undefined);
+        }
         if (!provider.getCorporateEvents) {
           setEventsStatus('公司事件：此資料來源不提供');
           return;
@@ -562,7 +581,7 @@ export function App({
   const liveState = useRef({ result, tool, selected });
   liveState.current = { result, tool, selected };
   const liveChart = state.ready && providerId === 'market' && !!result
-    && (result.source.startsWith(EDGE_YAHOO_SOURCE) || getMarketProfile(symbol).market === 'TW') && isLiveSymbol(symbol);
+    && (result.archive || result.source.startsWith(EDGE_YAHOO_SOURCE) || getMarketProfile(symbol).market === 'TW') && isLiveSymbol(symbol);
   useEffect(() => {
     if (!liveChart) return;
     let live = true;
@@ -578,6 +597,7 @@ export function App({
       }
       if (sameBars(current.bars, next.bars)) {
         chart.refreshSource(next);
+        liveState.current.result = next;
         setResult(next);
         return;
       }
@@ -591,7 +611,7 @@ export function App({
         chart.sync(settings.drawings, settings.indicators, settings.preferences.magnet, 'select',
           legacyVolumeFor(symbol, settings.preferences, tf));
       }
-      setResult(next);
+      liveState.current.result = next; setResult(next);
     };
     if (tf === '1D' || tf === '1W' || tf === '1M') {
       const market = getMarketProfile(symbol);
@@ -600,13 +620,30 @@ export function App({
         if (!live || !current) return;
         setLiveAt({ key: `${symbol}:${tf}:${providerId}`, at: value.retrievedAt * 1000 });
         if (value.quote) setQuote({ symbol, provider: providerId, quote: value.quote });
+        if (current.archive) {
+          void mergeArchivedLive(current, value, tf).then(next => {
+            if (!live) return;
+            apply(next);
+            const provider: MarketDataProvider = providers[providerId];
+            if (next.archive?.status === 'split' && current.archive?.status !== 'split' && provider.getOlderBars)
+              void provider.getOlderBars(symbol, tf, next, abort.signal).then(full => { if (live) apply(full); }).catch(() => undefined);
+          }).catch(() => undefined);
+          return;
+        }
         const bars = tf === '1D' ? mergeDailyBars(current.bars, value.bars) : mergePeriodBars(current.bars, value.bars, tf, market);
-        if (bars) apply({ ...current, bars, latestBarAt: bars.at(-1)!.time, asOf: value.retrievedAt, cacheStatus: 'fresh', ...(value.quote ? {
-          quote: value.quote, source: liveDailySource(current.source, value.quote, value.source),
-          dataState: value.quote.dataState ?? current.dataState,
-          delayed: value.quote.dataState === undefined ? current.delayed : value.quote.dataState !== 'live',
-        } : {}) });
-      });
+        if (bars) apply(applyLiveQuoteMetadata({ ...current, bars, latestBarAt: bars.at(-1)!.time,
+          asOf: value.retrievedAt, cacheStatus: 'fresh' }, value.quote, value.source));
+      }, { onError: () => {
+        const current = liveState.current.result;
+        if (live && current?.archive) {
+          const split = current.archive.status === 'split';
+          const next: BarResult = { ...current,
+            archive: { ...current.archive, status: split ? 'split' : 'unavailable' },
+            source: split ? `${current.source} · 即時報價暫時無法取得` : archiveUnavailableSource(current.archive.lastDate) };
+          engine.current?.refreshSource(next); liveState.current.result = next; setResult(next);
+        }
+      } });
+
       return () => {
         live = false;
         unsubscribe();
@@ -923,13 +960,17 @@ export function App({
     [],
   );
   const watchlistKey = state.app.watchlist.join(',');
+  const visibleWatchlistKey = visibleWatchSymbols.filter(ticker => state.app.watchlist.includes(ticker)).join(',');
   useEffect(() => {
     if (!state.ready) return;
     let live = true;
     const abort = new AbortController();
     setQuotes({});
+    const visible = visibleWatchlistKey.split(',').filter(Boolean);
+    if (providerId === 'market') return subscribeWatchlistQuotes(visible, liveQuotes(), getWatchlistDailyResult,
+      (ticker, quote) => setQuotes(previous => ({ ...previous, [ticker]: quote })));
     void (async () => {
-      for (const ticker of watchlistKey.split(',').filter(Boolean)) {
+      for (const ticker of visible) {
         if (!live) return;
         try {
           const quote = await providers[providerId].getQuote(ticker, abort.signal);
@@ -943,7 +984,7 @@ export function App({
       live = false;
       abort.abort();
     };
-  }, [state.ready, watchlistKey, providerId]);
+  }, [state.ready, watchlistKey, visibleWatchlistKey, providerId]);
   const evaluateCurrentAlerts = useCallback(
     (data: BarResult, initialize = false) => {
       const app = store.getSnapshot().app;
@@ -1118,6 +1159,7 @@ export function App({
       symbols={state.app.watchlist}
       active={symbol}
       quotes={quotes}
+      onVisibleSymbolsChange={setVisibleWatchSymbols}
       catalogEntries={catalogEntries}
       onSelect={selectSymbol}
       onChange={(watchlist) => store.updateApp({ watchlist })}
@@ -1250,7 +1292,7 @@ export function App({
           )}
           <StockStatsMenu label="行情資料說明" testId="source-info-toggle" trigger={<Info size={16} />}>
             {open => <div className="source-details">
-              <div ref={sourceRef} className="data-source" />
+              <div ref={sourceRef} className="data-source" data-testid="source-label" />
               {STATIC_HOSTING && <p className="static-hosting-note">{staticHostingText}</p>}
               {providerId === 'demo' && <p className="demo-data-note">{demoDataText}</p>}
               <div className="events-source">{eventsStatus}</div>
@@ -1375,6 +1417,9 @@ export function App({
       </div>
       <div className="workspace" inert={modal} aria-hidden={modal}>
         <main className="main-workspace">
+          {result?.archive?.status === 'unavailable' && <p className="archive-availability" role="status" data-testid="archive-availability">
+            即時報價暫時無法取得，顯示至 {result.archive.lastDate} 收盤
+          </p>}
           <div className="chart-workspace">
             <div className="chart-stage">
               <div className="chart-overlay" role="group" aria-label={`${symbol} 圖例`}>
@@ -1446,6 +1491,10 @@ export function App({
                       <RefreshCw size={15} />
                       重試
                     </button>
+                    {!['1D', '1W', '1M'].includes(tf) && <button className="ghost-button" type="button"
+                      onClick={() => store.updateSymbol(symbol, s => ({ ...s, preferences: { ...s.preferences, timeframe: '1D' } }))}>
+                      改看日 K
+                    </button>}
                     {providerId !== 'demo' && (
                       <button className="ghost-button" type="button" onClick={() => store.updateApp({ provider: 'demo' })}>
                         改看離線模擬資料

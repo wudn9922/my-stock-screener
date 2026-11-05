@@ -1,12 +1,23 @@
 ## 台股 MIS 盤中來源（2026-11-05）
 
-Primary self-review only; no independent sign-off. From latest main `3282e2fa82` (includes #224, #223, #220).
+Primary self-review only; no independent sign-off. From latest main `3282e2fa82` (includes #224, #223, #220); merged `b10f5e7dbe` (#222) normally.
 只修改 market-chart 的盤中台股來源與必要前端標示；美股、既有歷史、SQL、GCP、登入與永久資料不變。
 依使用者提供形狀建立離線假資料，不連線真實證交所；維護者自行部署。
 新增按市場代號驗證、40 檔分段、15 秒快取、1 秒節流、2 秒逾時、跨日清空、空價沿用及 MIS-only 今日棒；
 Yahoo 與 #224 補洞照舊，失敗完整退回。前端沿用 LiveQuoteFeed，保留 TPEx 歷史來源並顯示 MIS／Yahoo 實際來源。
 操作、欄位與部署順序見 [market-chart README](../supabase/functions/market-chart/README.md#台股盤中-mis維護者部署後生效)。
 完整結果與桌機、390px／375px Chromium／WebKit 截圖列於 PR；自動化不代表實機 iPhone 簽核。
+
+## PR-C：永久封存優先（2026-11-04）
+
+Primary self-review only; no independent sign-off. Branch starts at main `c3668287ae`; review revision merged main `5d2a99b720` without rebase or force-push.
+C1～C5 的程式、來源退路、快取與分割基準、可見訂閱、測試及 25 張桌機／手機截圖，見 [PR_C_ARCHIVE_FIRST.md](docs/PR_C_ARCHIVE_FIRST.md) 與 [ADR-026](docs/architecture/ADR-026-archive-first-history.md)。
+沒有修改登入／帳號、Supabase 函式／SQL、GCP 或永久行情／財報；archive 分支唯讀。
+審查修訂通過 149 檔／1,845 單元、99＋50 瀏覽器、lint／typecheck／一般與 Pages 建置；完整 CI 另跑。
+真實 Pages 的文件離開後 fallback race 已補 lifetime／BFCache 測試，原 smoke 以最新資料桌機／WebKit errors0 通過；完整 CI 於修正後 head 重跑。
+個股 index／404 使用既有 IndexedDB 按日快取，不下載 manifest；#224 補齊日 K 依交易日比對。#219 全功能保留。
+原非選股站點的離線失敗已在未改前端的基準重現：11 個 shell 資源缺懶載入圖表。補 public JS/CSS 預載並保持選股站點不快取策略；不放寬既有離線測試。
+實際最終檢查計數記於 PR；目前沒有部署、合併 PR 或執行正式補檔。
 
 ## PR-D：交易日曆（2026-11-05）
 

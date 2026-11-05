@@ -102,6 +102,12 @@ export function liveDailySource(history: string, quote: Quote, recentSource?: st
     : `${base}${TODAY_SOURCE}${quote.source ?? 'Yahoo 延遲行情'}`;
 }
 
+export function applyLiveQuoteMetadata(result: BarResult, quote?: Quote, recentSource?: string): BarResult {
+  return quote ? { ...result, quote, source: liveDailySource(result.source, quote, recentSource),
+    dataState: quote.dataState ?? result.dataState,
+    delayed: quote.dataState === undefined ? result.delayed : quote.dataState !== 'live' } : result;
+}
+
 function nextCalendarPeriodStart(start: number, timeframe: '1W' | '1M', market: MarketProfile): number {
   if (market.market === 'TW') {
     return calendarPeriodStart(start + (timeframe === '1W' ? 8 : 32) * 86400, timeframe, market);

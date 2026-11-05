@@ -122,6 +122,16 @@ export function calendarDate(time: number, profile: MarketProfile): string {
     : sessionDate(time, profile);
 }
 
+/** A market-local date/time as Unix seconds, including New York daylight saving. */
+export function marketDateTime(date: string, minuteOfDay: number, profile: MarketProfile): number {
+  const noon = Date.parse(date + 'T12:00:00Z') / 1000;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(noon)
+      || new Date(noon * 1000).toISOString().slice(0, 10) !== date
+      || !Number.isInteger(minuteOfDay) || minuteOfDay < 0 || minuteOfDay >= 1440) throw new Error('Invalid market date/time');
+  const local = partsAt(noon, profile);
+  return noon + (minuteOfDay - Number(local.hour) * 60 - Number(local.minute)) * 60;
+}
+
 export interface SessionCloseBar {
   time: number;
   open: number;

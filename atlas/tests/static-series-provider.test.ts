@@ -157,7 +157,7 @@ describe('ScreenerMarketRouter', () => {
   });
 
   it('createScreenerMarketProvider returns the bare router without cache and a cached wrapper by default', () => {
-    const bare = createScreenerMarketProvider({ cache: false, proxyUrl: 'https://edge.example', reportBase: BASE });
+    const bare = createScreenerMarketProvider({ archive: false, cache: false, proxyUrl: 'https://edge.example', reportBase: BASE });
     expect(bare).toBeInstanceOf(ScreenerMarketRouter);
     const cached = createScreenerMarketProvider({ proxyUrl: 'https://edge.example', reportBase: BASE });
     expect(cached).not.toBeInstanceOf(ScreenerMarketRouter);

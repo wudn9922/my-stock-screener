@@ -13,8 +13,11 @@ import { StaticSeriesProvider, defaultReportBase } from './StaticSeriesProvider'
 import { usableBarResult } from './KlineIntegrity';
 import { WorldAssetProvider } from './WorldAssetProvider';
 import { worldAssetFor } from './worldAssets';
+import { ArchiveFirstProvider } from './ArchiveFirstProvider';
+import { KlineArchive, klineArchive, type ArchiveOptions } from './KlineArchive';
 
 export interface ScreenerMarketProviderOptions {
+  archive?: false | ArchiveOptions;
   /** Supabase `market-chart` function URL; default `import.meta.env.VITE_MARKET_PROXY_URL`. */
   proxyUrl?: string;
   /** Report root holding `series/`; default `${BASE_URL}../report/` (→ /my-stock-screener/report/). */
@@ -86,6 +89,8 @@ export function createScreenerMarketProvider(options: ScreenerMarketProviderOpti
     new StaticSeriesProvider(options.reportBase ?? defaultReportBase(), shared),
     new WorldAssetProvider(options.reportBase, options.fetcher),
   );
-  if (options.cache === false) return router;
-  return new CachedMarketDataProvider(router, options.cache === true || options.cache === undefined ? {} : options.cache);
+  const provider = options.archive === false ? router : new ArchiveFirstProvider(router,
+    options.archive || options.fetcher || options.now ? new KlineArchive({ ...shared, ...options.archive }) : klineArchive(), router.live);
+  if (options.cache === false) return provider;
+  return new CachedMarketDataProvider(provider, options.cache === true || options.cache === undefined ? {} : options.cache);
 }

@@ -23,7 +23,12 @@ export type PriceLoad =
 export async function loadWeeklyPrices(symbol: string, signal: AbortSignal): Promise<PriceLoad> {
   try {
     const { marketProvider } = await import('../../app/dataSources');
-    const result = await marketProvider().getBars(symbol, '1W', undefined, signal);
+    const provider = marketProvider();
+    let result = await provider.getBars(symbol, '1W', undefined, signal);
+    if (result.archive && provider.getOlderBars) {
+      try { result = await provider.getOlderBars(symbol, '1W', result, signal); }
+      catch (error) { signal.throwIfAborted(); void error; /* retain the available archive */ }
+    }
     const last = result.bars.at(-1);
     return {
       status: 'ok',

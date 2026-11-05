@@ -4,6 +4,9 @@ import { liveDailySource, normalizeYahooResponse, TWSE_MIS_SOURCE } from '../src
 import { normalizeLive } from '../src/market-data/LiveQuotes';
 import { quoteStatus } from '../src/market-data/quoteStatus';
 import { MIS_NOW, MIS_TODAY, misRows, misYahoo } from './fixtures/twse-mis';
+import { mergeArchivedLive } from '../src/market-data/ArchiveFirstProvider';
+import { ARCHIVE_SOURCE, type KlineArchive } from '../src/market-data/KlineArchive';
+import type { BarResult } from '../src/market-data/MarketDataProvider';
 
 afterEach(() => vi.useRealTimers());
 const response = () => Response.json({ msgArray: misRows() });
@@ -74,6 +77,21 @@ describe('TWSE MIS parsing and daily overlay', () => {
     expect(quoteStatus('^TWII', fallback.quote, MIS_NOW, MIS_NOW)).toContain('延遲報價');
     const us = misYahoo('AAPL'); Object.assign(us.chart.result[0]!.meta, { atlasLiveSource: 'twse-mis' });
     expect(normalizeLive(us, 'AAPL', MIS_NOW / 1000)?.quote?.dataState).toBe('delayed');
+  });
+  it('keeps archived historical rows intact while applying MIS provenance, including a later Yahoo fallback', async () => {
+    const history: BarResult = { ...normalizeYahooResponse(misYahoo('^TWII'), MIS_NOW / 1000, '1D', '^TWII'),
+      source: ARCHIVE_SOURCE, archive: { lastDate: '2026-11-04', status: 'archive' } };
+    const archive = { getDaily: vi.fn(async () => history) } as unknown as KlineArchive;
+    const row = parseMisRow(misRows()[0], '^TWII', MIS_NOW)!;
+    const current = normalizeLive(misOnlyChart(row), '^TWII', MIS_NOW / 1000)!;
+    const merged = await mergeArchivedLive(history, current, '1D', archive);
+    expect(merged.bars.slice(0, 2)).toEqual(history.bars);
+    expect(merged.bars.at(-1)).toMatchObject({ time: MIS_TODAY, close: 42306.23 });
+    expect(merged.source).toContain(ARCHIVE_SOURCE); expect(merged.source).toContain(TWSE_MIS_SOURCE);
+    expect(merged).toMatchObject({ dataState: 'live', delayed: false, archive: { status: 'live' } });
+    const fallback = await mergeArchivedLive(merged, normalizeLive(misYahoo('^TWII'), '^TWII', MIS_NOW / 1000)!, '1D', archive);
+    expect(fallback.source).not.toContain(TWSE_MIS_SOURCE);
+    expect(fallback).toMatchObject({ dataState: 'delayed', delayed: true });
   });
 });
 

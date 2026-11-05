@@ -214,6 +214,53 @@ describe('LiveQuoteFeed', () => {
     expect(urls).toHaveLength(1);
   });
 
+  it('C5 mini-chart subscriptions do not refresh before five minutes', async () => {
+    const { feed, urls, advance } = setup();
+    const stop=feed.subscribe('AAPL',()=>undefined,{minIntervalMs:300_000});
+    await advance(300);
+    for(let i=0;i<4;i++)await advance(60_000);
+    expect(urls).toHaveLength(1);
+    await advance(60_000);expect(urls).toHaveLength(2);stop();
+  });
+  it('C5 the shortest active subscriber wins and removal restores the longer interval',async()=>{
+    const {feed,urls,advance}=setup();
+    const slow=feed.subscribe('AAPL',()=>undefined,{minIntervalMs:300_000});
+    await advance(300);await advance(60_000);
+    const fast=feed.subscribe('AAPL',()=>undefined);
+    await advance(300);expect(urls).toHaveLength(2);
+    await advance(60_000);expect(urls).toHaveLength(3);fast();
+    for(let i=0;i<4;i++)await advance(60_000);
+    expect(urls).toHaveLength(3);
+    await advance(60_000);expect(urls).toHaveLength(4);slow();
+  });
+  it('C5 scrolling away and back reuses a five-minute quote without a new request',async()=>{
+    const {feed,urls,advance}=setup();const seen=vi.fn();
+    let stop=feed.subscribe('AAPL',seen,{minIntervalMs:300_000});await advance(300);stop();
+    await advance(100_000);stop=feed.subscribe('AAPL',seen,{minIntervalMs:300_000});await advance(300);
+    expect(urls).toHaveLength(1);expect(seen).toHaveBeenCalledTimes(2);stop();
+    await advance(201_000);stop=feed.subscribe('AAPL',seen,{minIntervalMs:300_000});await advance(300);
+    expect(urls).toHaveLength(2);stop();
+  });
+  it('C2 notifies the archive UI for invalid payloads and allows an explicit batched retry',async()=>{
+    const {feed,advance,setResponse}=setup();const failed=vi.fn();
+    setResponse(()=>Response.json({results:{}}));
+    const stop=feed.subscribe('AAPL',()=>undefined,{onError:failed});await advance(300);
+    expect(failed).toHaveBeenCalledTimes(1);
+    setResponse(symbols=>Response.json({results:Object.fromEntries(symbols.map(s=>[s,yahooPayload(s,days,[10,11,12])]))}));
+    const refreshed=await feed.refresh('AAPL');expect(refreshed.symbol).toBe('AAPL');stop();
+  });
+  it('a genuinely stalled quote request times out, notifies archive subscribers and releases the batch',async()=>{
+    const failed=vi.fn();
+    const fetcher=vi.fn((_input:RequestInfo|URL,init?:RequestInit)=>new Promise<Response>((_resolve,reject)=>{
+      init!.signal!.addEventListener('abort',()=>reject(init!.signal!.reason),{once:true});
+    })) as typeof fetch;
+    const feed=new LiveQuoteFeed('https://edge.test/market-chart',{fetcher,timeoutMs:100,visible:()=>true,inSession:()=>true});
+    const stop=feed.subscribe('AAPL',()=>undefined,{onError:failed});
+    await vi.advanceTimersByTimeAsync(351);
+    expect(failed).toHaveBeenCalledTimes(1);expect(feed.currentInterval).toBe(120_000);
+    stop();
+  });
+
   it('ignores rows that fail validation', async () => {
     const { feed, advance, setResponse } = setup();
     setResponse(() => Response.json({ results: { AAPL: yahooPayload('MSFT', days, [1, 2, 3]) }, errors: {} }));
