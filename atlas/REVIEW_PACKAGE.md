@@ -5,6 +5,7 @@ D1 只新增 XTAI／XNYS 的 generated 日曆、既有 LiveQuoteFeed 的交易�
 細節、來源限制與驗證見 [PR_D_MARKET_CALENDAR.md](docs/PR_D_MARKET_CALENDAR.md) 和 [ADR-027](docs/architecture/ADR-027-market-calendar.md)。
 原有 15 分鐘一般收盤寬限與日曆失敗的星期／時段退路保留，提前收盤精確停止。
 沒有改登入／帳號、Supabase 函式／SQL、GCP 或永久行情，沒有手動執行正式排程、通知、合併或部署。
+審查修訂已 merge main 5d2a99b720，獨立 market-calendar.yml 與 vars 開關已完成。143 檔／1,809 單元、建置、78＋36 瀏覽器與 8 Python 通過；完整 CI 另跑。
 本地完整檢查與五種桌機／手機配置的結果列於 PR；瀏覽器自動化不代表實機 iPhone 簽核。
 
 ## PR-A：報價與圖表介面 (2026-11-04)
