@@ -1426,8 +1426,8 @@ export function App({
                 <div className="chart-heading">
                   <b>{displayTicker(symbol)}</b>
                   <span>· {tf} · {marketLabel}</span>
-                  <span className={`demo-badge ${providerId}`}>
-                    {providerId === 'demo' ? '模擬' : providerId === 'yahoo' ? '後端' : '延遲'}
+                  <span className={`demo-badge ${providerId}`} data-testid="chart-data-state">
+                    {providerId === 'demo' ? '模擬' : result?.dataState === 'live' ? '即時' : providerId === 'yahoo' ? '後端' : '延遲'}
                   </span>
                 </div>
                 <div ref={headerRef} className="ohlc-header" data-testid="ohlc-header" />

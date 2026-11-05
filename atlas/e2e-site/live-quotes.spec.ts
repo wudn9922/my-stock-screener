@@ -103,8 +103,12 @@ for (const symbol of ['2330.TW', '6488.TWO', '^TWII', '^TWOII']) {
       const r = misYahoo(symbol).chart.result[0]!, q = r.indicators.quote[0]!;
       const csv = 'Date,Open,High,Low,Close,Volume\n' + r.timestamp.map((t, i) => [new Date(t * 1000).toISOString().slice(0, 10),
         q.open[i], q.high[i], q.low[i], q.close[i], q.volume[i]].join(',')).join('\n') + '\n';
-      await page.route('https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/**', route =>
-        route.fulfill(route.request().url().includes('/index/') ? { json: archiveIndexFixture(symbol, { 2026: csv }) } : { body: csv, contentType: 'text/csv' }));
+      await page.route('https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/**', route => {
+        const url = route.request().url();
+        if (url.endsWith('/index/tw/%255ETWII.json')) return route.fulfill({ json: archiveIndexFixture(symbol, { 2026: csv }) });
+        if (url.endsWith('/tw/%5ETWII/2026.csv')) return route.fulfill({ body: csv, contentType: 'text/csv' });
+        return route.fulfill({ status: 404 });
+      });
     }
     if (symbol === '^TWOII') {
       await page.route('**/report/series/index.json', route => route.fulfill({ json: { symbols: ['^TWOII'] } }));
@@ -133,6 +137,7 @@ for (const symbol of ['2330.TW', '6488.TWO', '^TWII', '^TWOII']) {
     await expect(page.getByTestId('header-quote')).toContainText(formatted(price));
     await expect(page.getByTestId('ohlc-header')).toContainText(price.toFixed(2));
     await expect(page.getByTestId('live-time')).toContainText('即時報價');
+    await expect(page.getByTestId('chart-data-state')).toHaveText('即時');
     await page.getByTestId('source-info-toggle').click();
     await expect(page.locator('.data-source')).toContainText('證交所即時（非官方 API）');
     if (symbol === '^TWII') await expect(page.locator('.data-source')).toContainText('GitHub 永久封存');
@@ -165,6 +170,7 @@ test('MIS failure restores Yahoo labeling through the same minute feed', async (
   fail = true;
   await page.clock.fastForward(61_000);
   await expect(page.getByTestId('live-time')).toContainText('延遲報價');
+  await expect(page.getByTestId('chart-data-state')).toHaveText('延遲');
   await page.getByTestId('source-info-toggle').click();
   await expect(page.locator('.data-source')).not.toContainText('證交所即時');
   await expect(page.locator('.data-source')).toContainText('Yahoo');
