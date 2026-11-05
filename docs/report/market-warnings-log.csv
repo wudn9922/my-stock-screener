@@ -1,0 +1,3 @@
+asOf,market,generatedAt,params_sha256,warning_complete,warning_level,vol60_weak,leader_lag,breadth_divergence,avg60,median756,leader_success,market_success,breakout_count_per_1000,count_p30
+2026-11-05,tw,2026-11-05T15:24:07+00:00,67f834829da9eece5d196bf19f3760bdf86905469b940816a4cae881cba61e20,False,0,False,,,0.5240741,0.5,,0.7290579,,
+2026-11-04,us,2026-11-05T15:24:07+00:00,67f834829da9eece5d196bf19f3760bdf86905469b940816a4cae881cba61e20,False,0,,False,,0.4461279,0.4309764,0.8521178,0.8062817,54.6068681,
