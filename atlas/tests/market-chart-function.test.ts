@@ -9,8 +9,12 @@ import {
   isChartPayload,
   parseAllowedOrigins,
   validateChartRequest,
+  fillDailyFromIntraday,
+  INTRADAY_FILL_REQUEST,
+  needsIntradayFill,
 } from '../../supabase/functions/market-chart/validate.ts';
 import { yahooIntervals } from '../src/market-data/YahooIntervals';
+import { normalizeYahooResponse } from '../src/market-data/YahooNormalizer';
 
 const params = (query: string) => new URLSearchParams(query);
 
@@ -86,5 +90,74 @@ describe('market-chart Edge Function request validation', () => {
     expect(isChartPayload({ chart: { result: [{}] } })).toBe(true);
     expect(isChartPayload({ chart: { result: null, error: { code: 'Not Found' } } })).toBe(false);
     expect(isChartPayload('nope')).toBe(false);
+  });
+});
+
+describe('market-chart rebuilds empty recent daily rows from 5-minute bars', () => {
+  // Shape observed for ^TWII on 2026-11-05 09:18 Taipei: 11/03 has a close, 11/04 and 11/05 are
+  // all null, while meta already carries the 11/04 close.
+  const D3 = 1793667600, D4 = 1793754000, D5 = 1793840400;
+  const daily = () => ({ chart: { result: [{
+    meta: { symbol: '^TWII', gmtoffset: 28800, regularMarketTime: 1793770395, regularMarketPrice: 42948.91 },
+    timestamp: [D3, D4, D5],
+    indicators: { quote: [{ open: [44481.59, null, null], high: [44614.64, null, null], low: [43191.58, null, null], close: [43307.54, null, null], volume: [4346200, null, null] }] },
+  }], error: null } });
+  const minute = (days: number[]) => {
+    const timestamp: number[] = [], open: number[] = [], high: number[] = [], low: number[] = [], close: number[] = [], volume: (number | null)[] = [];
+    for (const day of days) for (let i = 0; i < 3; i++) {
+      timestamp.push(day + i * 300); open.push(43000 + i); high.push(43100 + i); low.push(42900 - i); close.push(43050 + i); volume.push(i === 1 ? null : 100);
+    }
+    return { chart: { result: [{ meta: { symbol: '^TWII', gmtoffset: 28800 }, timestamp, indicators: { quote: [{ open, high, low, close, volume }] } }], error: null } };
+  };
+
+  it('fills only empty rows, ends the quote session at meta and leaves rows with prices alone', () => {
+    expect(needsIntradayFill(daily())).toBe(true);
+    const { payload, filled } = fillDailyFromIntraday(daily(), minute([D3, D4]));
+    expect(filled).toEqual(['2026-11-04']);
+    const q = (payload as ReturnType<typeof daily>).chart.result[0]!.indicators.quote[0]!;
+    expect(q.close.slice(0, 2)).toEqual([43307.54, 42948.91]);
+    expect(q.open[1]).toBe(43000);
+    expect(q.high[1]).toBe(43102);
+    expect(q.low[1]).toBe(42898);
+    expect(q.volume[1]).toBe(200);
+    expect(q.close[2]).toBeNull();
+    expect(daily().chart.result[0]!.indicators.quote[0]!.close[1]).toBeNull();
+  });
+
+  it('the site normalizer then shows the rebuilt 11/04 index bar and quote', () => {
+    const base = daily();
+    Object.assign(base.chart.result[0]!.meta, { currency: 'TWD', exchangeTimezoneName: 'Asia/Taipei' });
+    const { payload } = fillDailyFromIntraday(base, minute([D3, D4]));
+    const result = normalizeYahooResponse(payload, 1793771000, '1D', '^TWII');
+    expect(result.bars.at(-1)).toMatchObject({ time: D4, close: 42948.91 });
+    expect(result.quote).toMatchObject({ price: 42948.91 });
+  });
+
+  it('appends a session the daily series does not list yet', () => {
+    const base = daily();
+    base.chart.result[0]!.timestamp = [D3];
+    for (const values of Object.values(base.chart.result[0]!.indicators.quote[0]!)) values.splice(1);
+    const { payload, filled } = fillDailyFromIntraday(base, minute([D4, D5]));
+    expect(filled).toEqual(['2026-11-04', '2026-11-05']);
+    expect((payload as ReturnType<typeof daily>).chart.result[0]!.timestamp).toEqual([D3, D4, D5]);
+  });
+
+  it('does not request 5-minute bars when the latest session row already has prices', () => {
+    // US after the close: 11/04 has open/high/low but a null close; the client heals it from meta.
+    const us = { chart: { result: [{ meta: { symbol: 'GOOGL', gmtoffset: -18000, regularMarketTime: 1793826001, regularMarketPrice: 288.93 },
+      timestamp: [1793716200, 1793802600], indicators: { quote: [{ open: [280.23, 283.51], high: [281.61, 296.49], low: [277.2, 283.51], close: [280.03, null], volume: [34974500, 51316963] }] } }], error: null } };
+    expect(needsIntradayFill(us)).toBe(false);
+    // Before the Taiwan open the quote is still yesterday's: nothing to rebuild.
+    const early = daily();
+    early.chart.result[0]!.indicators.quote[0]!.close[1] = 42948.91;
+    early.chart.result[0]!.indicators.quote[0]!.open[1] = 43000;
+    expect(needsIntradayFill(early)).toBe(false);
+  });
+
+  it('keeps the payload unchanged when 5-minute bars have nothing usable', () => {
+    const { payload, filled } = fillDailyFromIntraday(daily(), { chart: { result: [{ timestamp: [], indicators: { quote: [{}] } }] } });
+    expect(filled).toEqual([]);
+    expect(payload).toEqual(daily());
+    expect(INTRADAY_FILL_REQUEST).toEqual({ interval: '5m', range: '5d' });
   });
 });
