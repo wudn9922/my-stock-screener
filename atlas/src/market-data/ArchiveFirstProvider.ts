@@ -7,6 +7,7 @@ import { liveQuotes, mergeDailyBars, mergePeriodBars, type LiveDaily } from './L
 import { usableBarResult } from './KlineIntegrity';
 import { worldAssetFor } from './worldAssets';
 import { marketDateTime } from './MarketProfile';
+import { applyLiveQuoteMetadata, TWSE_MIS_SOURCE } from './YahooNormalizer';
 
 // Shared archive lookups may outlive a component, but must not start another
 // provider request once this document has left. A restored BFCache page gets
@@ -143,17 +144,20 @@ export async function mergeArchivedLive(current: BarResult, value: LiveDaily, ti
     const bars = timeframe === '1W' || timeframe === '1M'
       ? mergePeriodBars(current.bars, value.bars, timeframe, getMarketProfile(value.symbol)) ?? current.bars
       : mergeDailyBars(current.bars, value.bars);
-    return { ...current, bars, asOf: value.retrievedAt, quote: value.quote, latestBarAt: bars.at(-1)!.time };
+    return applyLiveQuoteMetadata({ ...current, bars, asOf: value.retrievedAt, quote: value.quote,
+      latestBarAt: bars.at(-1)!.time }, value.quote, value.source);
   }
   const daily = await archive.getDaily(value.symbol);
   if (!daily) return current;
   const merged = mergeArchiveDaily(daily.bars, value.bars, value.symbol);
   const base: BarResult = { ...daily, bars: merged.bars, asOf: value.retrievedAt, quote: value.quote,
-    source: merged.splitMismatch ? 'Yahoo 延遲行情 · 與封存價格差異超過 2%，暫用 Yahoo 以免混用分割前後價格' : `${ARCHIVE_SOURCE} · 今日與缺少交易日由 Yahoo 延遲報價補上`,
+    source: merged.splitMismatch ? 'Yahoo 延遲行情 · 與封存價格差異超過 2%，暫用 Yahoo 以免混用分割前後價格'
+      : value.source?.includes(TWSE_MIS_SOURCE) ? `${ARCHIVE_SOURCE} · 缺少交易日由 Yahoo／MIS 補上`
+      : `${ARCHIVE_SOURCE} · 今日與缺少交易日由 Yahoo 延遲報價補上`,
     archive: { lastDate: current.archive!.lastDate, status: merged.splitMismatch ? 'split' : 'live' } };
   const period = archivePeriod(base, value.symbol, timeframe);
   // Keep optional pre-archive weekly/monthly history unless its adjustment basis changed.
   if (!merged.splitMismatch && (timeframe === '1W' || timeframe === '1M'))
     period.bars = [...current.bars.filter(bar => bar.time < period.bars[0]!.time), ...period.bars];
-  return period;
+  return applyLiveQuoteMetadata(period, value.quote, value.source);
 }

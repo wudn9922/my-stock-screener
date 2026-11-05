@@ -82,6 +82,7 @@ test('A3 an actually empty monthly IPO calendar is explained without losing cura
   await mockSite(page);
   await page.route('**/report/ipo-watch.json', route => route.fulfill({ json: { version: 1, generatedAt: now, reason: '本月行事曆暫無資料', companies: INITIAL_IPOS } }));
   await page.goto('./?page=watchlist');
+  await expect(page.getByRole('heading', { name: '自選清單', exact: true })).toBeVisible();
   if (await page.locator('.site-tabbar').isVisible()) await page.getByRole('button', { name: '搜尋股票', exact: true }).click();
   const input = page.getByRole('combobox', { name: '搜尋股票', exact: true });
   await input.fill('ANT');

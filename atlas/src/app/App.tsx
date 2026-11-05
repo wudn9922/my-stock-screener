@@ -82,6 +82,7 @@ import { subscribeWatchlistQuotes } from '../market-data/watchlistQuotes';
 import { getWatchlistDailyResult } from './dataSources';
 import { usableBarResult } from '../market-data/KlineIntegrity';
 import { inRegularSession, isLiveSymbol, LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, mergePeriodBars, sameBars } from '../market-data/LiveQuotes';
+import { applyLiveQuoteMetadata } from '../market-data/YahooNormalizer';
 import { marketCalendar } from '../market-data/MarketCalendar';
 import {
   getLoadedSymbolDirectory,
@@ -579,7 +580,8 @@ export function App({
   const liveKey = `${symbol}:${tf}:${providerId}`;
   const liveState = useRef({ result, tool, selected });
   liveState.current = { result, tool, selected };
-  const liveChart = state.ready && providerId === 'market' && !!result && (result.archive || result.source.startsWith(EDGE_YAHOO_SOURCE)) && isLiveSymbol(symbol);
+  const liveChart = state.ready && providerId === 'market' && !!result
+    && (result.archive || result.source.startsWith(EDGE_YAHOO_SOURCE) || getMarketProfile(symbol).market === 'TW') && isLiveSymbol(symbol);
   useEffect(() => {
     if (!liveChart) return;
     let live = true;
@@ -629,7 +631,8 @@ export function App({
           return;
         }
         const bars = tf === '1D' ? mergeDailyBars(current.bars, value.bars) : mergePeriodBars(current.bars, value.bars, tf, market);
-        if (bars) apply({ ...current, bars, latestBarAt: bars.at(-1)!.time, asOf: value.retrievedAt, cacheStatus: 'fresh', ...(value.quote ? { quote: value.quote } : {}) });
+        if (bars) apply(applyLiveQuoteMetadata({ ...current, bars, latestBarAt: bars.at(-1)!.time,
+          asOf: value.retrievedAt, cacheStatus: 'fresh' }, value.quote, value.source));
       }, { onError: () => {
         const current = liveState.current.result;
         if (live && current?.archive) {
@@ -640,6 +643,7 @@ export function App({
           engine.current?.refreshSource(next); liveState.current.result = next; setResult(next);
         }
       } });
+
       return () => {
         live = false;
         unsubscribe();
@@ -1422,8 +1426,8 @@ export function App({
                 <div className="chart-heading">
                   <b>{displayTicker(symbol)}</b>
                   <span>· {tf} · {marketLabel}</span>
-                  <span className={`demo-badge ${providerId}`}>
-                    {providerId === 'demo' ? '模擬' : providerId === 'yahoo' ? '後端' : '延遲'}
+                  <span className={`demo-badge ${providerId}`} data-testid="chart-data-state">
+                    {providerId === 'demo' ? '模擬' : result?.dataState === 'live' ? '即時' : providerId === 'yahoo' ? '後端' : '延遲'}
                   </span>
                 </div>
                 <div ref={headerRef} className="ohlc-header" data-testid="ohlc-header" />
