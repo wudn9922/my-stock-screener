@@ -1,0 +1,15 @@
+{
+  "scope": "Temporary copy of the existing 50-symbol trial; no remote publication",
+  "csvFiles": 21330,
+  "rows": 3575773,
+  "csvBytes": 177948763,
+  "csvSha256BeforeAfter": "all identical",
+  "manifestVersion": 3,
+  "manifestBytes": 57037,
+  "indexFiles": 7374,
+  "indexBytes": 4651782,
+  "totalBytes": 190841310,
+  "refreshVerifySeconds": 52.871,
+  "readOnlyVerifySeconds": 44.343,
+  "productionWrites": 0
+}

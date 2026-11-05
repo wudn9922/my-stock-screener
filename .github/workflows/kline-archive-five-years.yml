@@ -1,0 +1,103 @@
+name: Permanent K-line five-year expansion
+on:
+  workflow_dispatch:
+    inputs:
+      segment:
+        type: choice
+        options: [all, stocks, etfs, indices]
+        default: all
+        description: 'Resume one public instrument segment; completed symbols are skipped'
+      markets:
+        default: 'TW,US'
+        description: 'TW,US; US also includes the separately stored global indices'
+      batch_size:
+        default: '250'
+        description: 'Maximum attempted symbols (1..10000)'
+      budget:
+        default: '600'
+        description: 'Yahoo request budget in seconds (30..2400)'
+      symbols:
+        default: ''
+        description: 'Optional comma-separated subset of the public scope'
+permissions:
+  contents: read
+concurrency:
+  group: universe-full
+  cancel-in-progress: false
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      ready: ${{ steps.checkpoint.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/checkout@v4
+        with:
+          ref: kline-archive
+          path: .cache/kline-archive
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install --quiet pandas requests 'curl_cffi>=0.7,<1'
+      - name: Resume five complete years plus this year, without editing archive files
+        env:
+          SEGMENT: ${{ inputs.segment }}
+          MARKETS: ${{ inputs.markets }}
+          BATCH_SIZE: ${{ inputs.batch_size }}
+          BUDGET: ${{ inputs.budget }}
+          SYMBOLS: ${{ inputs.symbols }}
+          KLINE_CORRECTIONS_LOG: /tmp/expansion-input-quality.json
+        run: >-
+          python -u scripts/backfill_kline_archive.py
+          --archive-dir .cache/kline-archive --years 5 --calendar-years --include-instruments
+          --refresh-public-reports --segment "$SEGMENT" --markets "$MARKETS"
+          --max-symbols "$BATCH_SIZE" --budget "$BUDGET" --symbols "$SYMBOLS"
+      - name: Detect resumable checkpoint
+        id: checkpoint
+        if: always() && !cancelled()
+        run: |
+          if [ -f .cache/kline-backfill-payload/operations.json ]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.checkpoint.outputs.ready == 'true'
+        with:
+          name: kline-five-years-${{ github.run_id }}
+          path: .cache/kline-backfill-payload/
+          include-hidden-files: true
+          retention-days: 7
+  publish:
+    needs: fetch
+    if: always() && !cancelled() && needs.fetch.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    concurrency:
+      group: kline-archive-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/checkout@v4
+        with:
+          ref: kline-archive
+          path: .cache/kline-archive
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install --quiet pandas
+      - uses: actions/download-artifact@v4
+        with:
+          name: kline-five-years-${{ github.run_id }}
+          path: .cache/kline-backfill-payload
+      - name: Verify append-only history, then push only kline-archive
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python -u scripts/kline_archive_git.py publish --archive-dir .cache/kline-archive --payload-dir .cache/kline-backfill-payload

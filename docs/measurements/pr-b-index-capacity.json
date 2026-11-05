@@ -1,0 +1,14 @@
+{
+  "symbols": 7727,
+  "yearEntries": 46362,
+  "manifestBytes": 60616,
+  "indexFiles": 7727,
+  "indexBytes": 8830872,
+  "maxIndexBytes": 1308,
+  "indexDailyLooseObjectBytes": 3732876,
+  "csvMeasuredSymbols": 7374,
+  "csvDailyLooseObjectBytesMeasured": 21547571,
+  "csvDailyLooseObjectBytesProjected": 22579073,
+  "method": "Six years2021..2026; actual archive symbol union public scope; historical years250rows,current210; annual row byte sizes from existing archive, new symbols60bytes/row; loose objects zlib6 including Git blob header; dailyCSV all-active upper scenario; no assumed GC/delta/squash",
+  "dailyLooseObjectBytesProjected": 26333056
+}

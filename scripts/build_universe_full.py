@@ -778,7 +778,7 @@ class Run:
         rows, _, _ = src.parse_yahoo_chart(self.net.chart(symbol, range_), symbol)
         return pd.DataFrame([row[1:] for row in rows], index=pd.to_datetime([row[0] for row in rows]), columns=uc.PRICE_COLUMNS)
 
-    def fetch_chart(self, symbol, range_):
+    def fetch_chart(self, symbol, range_, *, completed_market=None):
         """→ DataFrame；429 依 RATE_LIMIT_WAITS 退避重試，仍失敗丟 RateLimited。"""
         for wait in (0,) + RATE_LIMIT_WAITS:
             if wait:
@@ -788,7 +788,7 @@ class Run:
                 self.sleep(wait)
 
             try:
-                market = market_of(symbol)
+                market = completed_market or market_of(symbol)
                 raw = self.fetch_raw_chart_once(symbol, range_)
                 checked = kline.accept_frame(raw, symbol, refetch=lambda:self.fetch_raw_chart_once(symbol, range_), now=self.now,
                     source_url='https://query1.finance.yahoo.com/v8/finance/chart/' + symbol)

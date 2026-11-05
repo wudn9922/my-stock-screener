@@ -283,6 +283,9 @@ class ArchiveTests(_ArchiveCase):
         with self.assertRaisesRegex(ValueError, "dates deleted"):
             ka.verify(self.archive, base)
         path.unlink()
+        # Even regenerating consistent derived metadata must not hide the
+        # missing permanent CSV from the baseline-history check.
+        (self.archive / 'index/us/AAPL.json').unlink()
         ka.update_manifest(self.archive)
         with self.assertRaisesRegex(ValueError, "file deleted"):
             ka.verify(self.archive, base)
@@ -807,6 +810,15 @@ class CollectorAdjustmentTests(_ArchiveCase):
 
 
 class ArchiveGitTests(_ArchiveCase):
+    def test_publisher_retains_global_symbols_and_per_symbol_indexes(self):
+        ka.put_symbol(self.writer, '^N225', [row('2021-01-04')])
+        ka.json_write(self.writer / ka.INSTRUMENTS_STATE, {'version': 1, 'symbols': {'^N225': {'kind': 'index', 'name': 'Nikkei'}}})
+        ka.update_manifest(self.writer)
+        self.assertTrue(kg.publish(self.writer, sleep=lambda _: None))
+        document = json.loads(git(self.remote, 'show', 'kline-archive:index/global/%5EN225.json'))
+        self.assertEqual(document['symbol'], '^N225')
+        self.assertEqual(document['years']['2021']['rows'], 1)
+
     def setUp(self):
         super().setUp()
         self.remote = self.root / "remote.git"

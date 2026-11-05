@@ -33,6 +33,8 @@ FIELDS = ["Date", "Open", "High", "Low", "Close", "Volume"]
 LOG = "docs/report/kline-corrections.json"
 CONFLICTS = "state/conflicts.json"
 PROGRESS = "state/backfill.json"
+from kline_instruments import bucket as instrument_bucket, url_path as instrument_url_path, INDEX_METADATA, INSTRUMENTS_STATE
+
 SYMBOL = re.compile(r"^[A-Z0-9^][A-Z0-9.^=_-]{0,39}$")
 README = """# Permanent full-market daily K-lines
 
@@ -80,7 +82,7 @@ def json_read(path, default):
 def market_of(symbol):
     if not SYMBOL.fullmatch(symbol) or symbol in (".", ".."):
         raise ValueError(f"Unsafe symbol: {symbol!r}")
-    return "tw" if symbol.endswith((".TW", ".TWO")) else "us"
+    return instrument_bucket(symbol)
 
 
 def normalize(row):
@@ -158,7 +160,7 @@ def _read_rows(stream, path, strict=False):
 def archive_files(root):
     root = Path(root)
     result = []
-    for market in ("tw", "us"):
+    for market in ("tw", "us", "global"):
         for path in sorted((root / market).rglob("*")):
             if path.is_symlink():
                 raise ValueError(f"Archive symlink forbidden: {path}")
@@ -565,31 +567,34 @@ def remove_closed_session(root, market, day):
     return {"market": market, "date": day, "removed": len(events)}
 
 
-def update_manifest(root, write=True):
-    root = Path(root)
-    stats = {}
-    for path in archive_files(root):
-        rows = read_rows(path, strict=True)
-        if any(row[0][:4] != path.stem for row in rows):
-            raise ValueError(f"CSV year mismatch: {path}")
-        stats[path.relative_to(root).as_posix()] = _row_stats(rows, path.stat().st_size)
-    other = sum(p.stat().st_size for p in root.rglob("*") if p.is_file()
-                and ".git" not in p.relative_to(root).parts and p.name != "manifest.json")
-    manifest = _manifest(stats, other)
-    if write:
-        json_write(root / "manifest.json", manifest)
-    return manifest
+INDEX_README = """## Per-symbol indexes (v1)
+
+manifest.json v3 contains small aggregate totals, not per-year bySymbol details.
+index/{tw|us|global}/{URL-encoded-symbol}.json contains one symbol's metadata and
+all annual rows/bytes/date bounds/SHA-256. Unchanged index files are not rewritten.
+CSV directory names remain canonical Yahoo symbols; index filenames are percent
+encoded on disk. Encode the filename again for HTTP (e.g. index/tw/%255ETWII.json).
+Verification compares every index with validated CSVs and rejects missing/extra files.
+"""
 
 
-def _row_stats(rows, size):
-    return {"firstDate": rows[0][0], "lastDate": rows[-1][0], "rows": len(rows), "csvBytes": size}
+def _json_bytes(value):
+    return (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n").encode()
 
 
-def _manifest(stats, other):
-    """Build the exact manifest from already validated rows, without another CSV pass."""
+def _metadata(stats, instruments=None):
     markets = {key: {"symbols": [], "firstDate": None, "lastDate": None, "rows": 0, "csvBytes": 0} for key in ("tw", "us")}
+    details = {}
     for name, stat in stats.items():
-        market, symbol, _ = name.split("/")
+        market, symbol, year_file = name.split("/")
+        if market not in markets:
+            markets[market] = {"symbols": [], "firstDate": None, "lastDate": None, "rows": 0, "csvBytes": 0}
+        item = details.setdefault(symbol, {"market": market, "path": instrument_url_path(symbol), "kind": "index" if symbol.startswith("^") else "stock", **{k: v for k, v in INDEX_METADATA.get(symbol, {}).items() if k not in ("symbol", "bucket")}, **(instruments or {}).get(symbol, {}), "firstDate": stat["firstDate"], "lastDate": stat["lastDate"], "rows": 0, "csvBytes": 0, "years": {}})
+        item["firstDate"] = min(item["firstDate"], stat["firstDate"])
+        item["lastDate"] = max(item["lastDate"], stat["lastDate"])
+        item["rows"] += stat["rows"]
+        item["csvBytes"] += stat["csvBytes"]
+        item["years"][year_file[:4]] = dict(stat)
         part = markets[market]
         part["symbols"].append(symbol)
         part["firstDate"] = min(part["firstDate"] or stat["firstDate"], stat["firstDate"])
@@ -599,11 +604,75 @@ def _manifest(stats, other):
     for part in markets.values():
         part["symbols"] = sorted(set(part["symbols"]))
         part["symbolCount"] = len(part["symbols"])
-    manifest = {"version": 1, "priceBasis": "Yahoo split-adjusted; not dividend-adjusted",
+    return markets, details
+
+
+def _index_documents(stats, instruments=None):
+    _, details = _metadata(stats, instruments)
+    return {f"index/{instrument_url_path(symbol)}.json": {"version": 1, "symbol": symbol, **item}
+            for symbol, item in details.items()}
+
+
+def _sync_indexes(root, documents, write=False, required=True):
+    actual = {p.relative_to(root).as_posix() for p in (root / "index").rglob("*") if p.is_file()}
+    if actual - documents.keys():
+        raise ValueError("Unexpected archive index file: " + sorted(actual - documents.keys())[0])
+    if write:
+        for name, document in documents.items():
+            json_write(root / name, document)  # atomic() preserves bytes and mtime for unchanged symbols
+    elif required or actual:
+        if actual != documents.keys():
+            raise ValueError("Archive index file missing")
+        for name, document in documents.items():
+            if json_read(root / name, None) != document:
+                raise ValueError("Archive index does not match CSV: " + name)
+
+
+def _index_readme(root):
+    readme = (root / "README.md").read_text()
+    if "## Per-symbol indexes (v1)" not in readme:
+        atomic(root / "README.md", readme + "\n" + INDEX_README)
+
+
+def update_manifest(root, write=True):
+    root = Path(root)
+    stats = {}
+    for path in archive_files(root):
+        rows = read_rows(path, strict=True)
+        if any(row[0][:4] != path.stem for row in rows):
+            raise ValueError(f"CSV year mismatch: {path}")
+        stats[path.relative_to(root).as_posix()] = _row_stats(rows, path.stat().st_size, digest(path.read_bytes()))
+    instruments = json_read(root / INSTRUMENTS_STATE, {}).get("symbols", {})
+    indexes = _index_documents(stats, instruments)
+    if write:
+        _sync_indexes(root, indexes, write=True)
+        _index_readme(root)
+    other = sum(p.stat().st_size for p in root.rglob("*") if p.is_file()
+                and ".git" not in p.relative_to(root).parts and p.name != "manifest.json"
+                and p.relative_to(root).parts[0] != "index") + sum(len(_json_bytes(v)) for v in indexes.values())
+    manifest = _manifest(stats, other, instruments, indexes=indexes)
+    if write:
+        json_write(root / "manifest.json", manifest)
+    return manifest
+
+
+def _row_stats(rows, size, sha256=None):
+    return {"firstDate": rows[0][0], "lastDate": rows[-1][0], "rows": len(rows), "csvBytes": size, "sha256": sha256}
+
+
+def _manifest(stats, other, instruments=None, version=3, indexes=None):
+    """Small current manifest; legacy v1/v2 computation is verification-only."""
+    markets, details = _metadata(stats, instruments)
+    manifest = {"version": version, "priceBasis": "Yahoo split-adjusted; not dividend-adjusted",
                 "markets": markets, "csvBytes": sum(p["csvBytes"] for p in markets.values()), "totalBytes": 0}
-    # Fixed point includes the manifest's own byte count, plus README/audit/progress.
+    if version == 2:
+        manifest["bySymbol"] = details
+    elif version == 3:
+        indexes = indexes if indexes is not None else _index_documents(stats, instruments)
+        manifest.update({"indexFiles": len(indexes), "indexBytes": sum(len(_json_bytes(v)) for v in indexes.values()),
+                         "indexTemplate": "index/{market}/{URL-encoded-symbol}.json"})
     for _ in range(10):
-        size = other + len((json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode())
+        size = other + len(_json_bytes(manifest))
         if manifest["totalBytes"] == size:
             break
         manifest["totalBytes"] = size
@@ -612,7 +681,7 @@ def _manifest(stats, other):
 
 def initialize(root):
     root = Path(root)
-    if any(root.glob("tw/*/*.csv")) or any(root.glob("us/*/*.csv")):
+    if any(root.glob("tw/*/*.csv")) or any(root.glob("us/*/*.csv")) or any(root.glob("global/*/*.csv")):
         raise ValueError("Initialization refuses an existing archive")
     atomic(root / "README.md", README)
     json_write(root / LOG, {"version": 1, "quarantined": [], "events": []})
@@ -718,6 +787,16 @@ def _apply_operations(archive, payload, now, audit):
     plan = json_read(payload / "operations.json", None)
     if not plan or plan.get("version") != 1 or plan.get("mode") not in ("daily", "backfill"):
         raise ValueError("Invalid archive transport")
+    instruments = plan.get('instruments', {})
+    if not isinstance(instruments, dict):
+        raise ValueError('Invalid instrument metadata')
+    for symbol, metadata in instruments.items():
+        market_of(symbol)
+        if (not isinstance(metadata, dict) or metadata.get('kind') not in ('etf', 'index')
+                or set(metadata) != {'kind', 'name', 'currency', 'timezone', 'source'}
+                or any(not isinstance(v, str) or len(v) > 250 or any(ord(c) < 32 for c in v) for v in metadata.values())
+                or (symbol.startswith('^') != (metadata['kind'] == 'index'))):
+            raise ValueError('Invalid instrument metadata')
     prepared = []
     now = now or datetime.now(timezone.utc)
     started = time.perf_counter()
@@ -788,6 +867,26 @@ def _apply_operations(archive, payload, now, audit):
             progress["symbols"][symbol] = entry
         progress.update({k: v for k, v in plan["progress"].items() if k != "symbols"})
         json_write(archive / PROGRESS, progress)
+    if instruments:
+        catalog = json_read(archive / INSTRUMENTS_STATE, {'version': 1, 'symbols': {}})
+        for symbol, metadata in instruments.items():
+            catalog['symbols'].setdefault(symbol, metadata)
+        json_write(archive / INSTRUMENTS_STATE, catalog)
+        marker = '## ETFs and website indices (archive scope v1)'
+        readme = (archive / 'README.md').read_text()
+        if marker not in readme:
+            atomic(archive / 'README.md', readme + '\n' + marker + '\n\n'
+                   'tw/ contains Taiwan stocks, catalog ETFs and ^TWII/^TWOII.\n'
+                   'us/ contains US stocks, selected public ETFs and US indices.\n'
+                   'global/ contains the other website indices, separate from US date statistics.\n'
+                   'Directories retain canonical Yahoo symbols (including ^); HTTP paths encode each\n'
+                   'segment, e.g. tw/%5ETWII/2021.csv. Never interpolate symbols in shell commands.\n'
+                   'Per-symbol index JSON gives exact dates, yearly SHA-256, encoded path, kind and venue.\n'
+                   'state/instruments.json retains every previously public ETF/index; leaving a list\n'
+                   'does not delete its history. Backfill inserts missing dates only; existing rows win.\n'
+                   '^TWOII uses the existing website TPEx cash-index OHLC source (Yahoo has no history);\n'
+                   'cash indices have no split/dividend adjustment. Missing source volume stays blank.\n'
+                   'See docs/KLINE_ARCHIVE.md on main for the scope rule and resumable workflow.\n')
     return totals
 
 
@@ -908,14 +1007,14 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
     """
     started = time.perf_counter()
     root = Path(root)
-    allowed = {"README.md", "manifest.json", LOG, CONFLICTS, PROGRESS}
+    allowed = {"README.md", "manifest.json", LOG, CONFLICTS, PROGRESS, INSTRUMENTS_STATE}
     for path in root.rglob("*"):
         relative = path.relative_to(root)
         if ".git" in relative.parts:
             continue
         if path.is_symlink():
             raise ValueError(f"Archive symlink forbidden: {relative}")
-        if path.is_file() and relative.as_posix() not in allowed and relative.parts[0] not in ("tw", "us"):
+        if path.is_file() and relative.as_posix() not in allowed and relative.parts[0] not in ("tw", "us", "global", "index"):
             raise ValueError(f"Unexpected archive file: {relative}")
     if not (root / "README.md").is_file() or not (root / LOG).is_file():
         raise ValueError("Archive not initialized")
@@ -935,11 +1034,11 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
             validate_adjustment_audit(record)
     old_tree, old_last, changed, file_audit, removals = {}, {}, {}, {}, {}
     if base:
-        for item in _git(root, "ls-tree", "-rz", base, "--", "tw", "us").split("\0"):
+        for item in _git(root, "ls-tree", "-rz", base, "--", "tw", "us", "global").split("\0"):
             if not item:
                 continue
             metadata, name = item.split("\t", 1)
-            if not re.fullmatch(r"(?:tw|us)/[^/]+/\d{4}\.csv", name) or metadata.split()[1] != "blob":
+            if not re.fullmatch(r"(?:tw|us|global)/[^/]+/\d{4}\.csv", name) or metadata.split()[1] != "blob":
                 raise ValueError(f"Invalid baseline archive path: {name}")
             old_tree[name] = metadata.split()[2]
         if any(name not in current for name in old_tree):
@@ -975,7 +1074,7 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
             rows = _read_rows(io.StringIO(body.decode()), name, strict=True)
             if any(r[0][:4] != path.stem for r in rows):
                 raise ValueError(f"Year/date mismatch: {path}")
-            stats[name] = _row_stats(rows, len(body))
+            stats[name] = _row_stats(rows, len(body), current[name]["sha256"])
             symbol = name.split("/")[1]
             if symbol != active_symbol:
                 active_symbol = symbol
@@ -1025,10 +1124,20 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
                     continue
                 raise ValueError(f"Unlogged historical modification: {symbol} {day}")
     stored = json_read(root / "manifest.json", None)
+    version = 3 if refresh_manifest else (stored or {}).get('version', 3)
+    if version not in (1, 2, 3):
+        raise ValueError('Unsupported archive manifest version')
+    instruments = json_read(root / INSTRUMENTS_STATE, {}).get('symbols', {})
+    indexes = _index_documents(stats, instruments)
+    # History checks above finish before any derived metadata is refreshed.
+    with timed("verify.symbol_indexes"):
+        _sync_indexes(root, indexes, write=refresh_manifest, required=version == 3)
+        if refresh_manifest:
+            _index_readme(root)
     sizes = {p.relative_to(root).as_posix(): p.stat().st_size for p in root.rglob("*")
              if p.is_file() and ".git" not in p.relative_to(root).parts}
     other = sum(size for name, size in sizes.items() if name != "manifest.json")
-    expected = _manifest(stats, other)
+    expected = _manifest(stats, other, instruments, version, indexes)
     if refresh_manifest:
         json_write(root / "manifest.json", expected)
         stored = json_read(root / "manifest.json", None)

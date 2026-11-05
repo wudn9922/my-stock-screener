@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "majorUsEtfs": ["SPY", "IVV", "VOO", "QQQ", "QQQM", "DIA", "IWM", "VTI", "VT", "VEA", "VWO", "EFA", "EEM", "SCHD", "VIG", "VYM", "VUG", "VTV", "AGG", "BND", "TLT", "IEF", "SHY", "SGOV", "BIL", "LQD", "HYG", "TIP", "GLD", "IAU", "SLV", "USO", "XLE", "XLF", "XLK", "XLV", "XLI", "XLP", "XLY", "XLU", "XLB", "XLRE", "XLC", "SMH", "SOXX", "ARKK", "ARKG", "ARKW", "ARKQ", "ARKF", "ICLN", "TAN", "CIBR", "HACK", "ITA", "XBI", "IBB", "KWEB", "MCHI", "FXI", "EWJ", "EWY", "EWT", "EWG", "FEZ", "VGK", "JEPI", "JEPQ", "IBIT", "FBTC", "ETHA", "BITO", "TQQQ", "SQQQ", "SOXL", "SOXS"],
+  "indices": [
+    {"symbol":"^TWII","name":"加權指數","bucket":"tw","currency":"TWD","timezone":"Asia/Taipei"},
+    {"symbol":"^TWOII","name":"櫃買指數","bucket":"tw","currency":"TWD","timezone":"Asia/Taipei"},
+    {"symbol":"^GSPC","name":"標普500","bucket":"us","currency":"USD","timezone":"America/New_York"},
+    {"symbol":"^IXIC","name":"納斯達克綜合","bucket":"us","currency":"USD","timezone":"America/New_York"},
+    {"symbol":"^DJI","name":"道瓊工業","bucket":"us","currency":"USD","timezone":"America/New_York"},
+    {"symbol":"^RUT","name":"羅素2000","bucket":"us","currency":"USD","timezone":"America/New_York"},
+    {"symbol":"^SOX","name":"費城半導體","bucket":"us","currency":"USD","timezone":"America/New_York"},
+    {"symbol":"^N225","name":"日經225","bucket":"global","currency":"JPY","timezone":"Asia/Tokyo"},
+    {"symbol":"^KS11","name":"韓國綜合","bucket":"global","currency":"KRW","timezone":"Asia/Seoul"},
+    {"symbol":"^STOXX50E","name":"歐洲50","bucket":"global","currency":"EUR","timezone":"Europe/Berlin"},
+    {"symbol":"^FCHI","name":"法國CAC40","bucket":"global","currency":"EUR","timezone":"Europe/Paris"},
+    {"symbol":"^GDAXI","name":"德國DAX","bucket":"global","currency":"EUR","timezone":"Europe/Berlin"},
+    {"symbol":"^FTSE","name":"英國富時100","bucket":"global","currency":"GBP","timezone":"Europe/London"},
+    {"symbol":"^GSPTSE","name":"加拿大TSX","bucket":"global","currency":"CAD","timezone":"America/Toronto"},
+    {"symbol":"^HSI","name":"香港恆生","bucket":"global","currency":"HKD","timezone":"Asia/Hong_Kong"},
+    {"symbol":"^BSESN","name":"印度SENSEX","bucket":"global","currency":"INR","timezone":"Asia/Kolkata"},
+    {"symbol":"^AXJO","name":"澳洲ASX200","bucket":"global","currency":"AUD","timezone":"Australia/Sydney"},
+    {"symbol":"^BVSP","name":"巴西Bovespa","bucket":"global","currency":"BRL","timezone":"America/Sao_Paulo"}
+  ]
+}
