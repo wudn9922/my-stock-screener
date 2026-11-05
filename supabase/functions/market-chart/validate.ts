@@ -176,9 +176,10 @@ export function slimChartPayload(value: unknown): unknown {
 /**
  * Yahoo sometimes leaves recent daily rows empty (all OHLCV null) although the session traded:
  * ^TWII on 2026-11-05 had null rows for 11/04 and 11/05 while meta.regularMarketPrice carried
- * the 11/04 close. When the latest quote time falls on a later exchange date than the last daily
- * row with any price, completely empty sessions are rebuilt from Yahoo's 5-minute bars. Rows with
- * any price are never changed (the client heals a missing latest close from meta).
+ * the 11/04 close; later the same morning 11/05 had prices but 11/04 stayed empty. When the latest
+ * quote is from a session the daily rows do not show yet, or one of the last five rows before the
+ * last priced row is completely empty, those empty sessions are rebuilt from Yahoo's 5-minute bars.
+ * Rows with any price are never changed (the client heals a missing latest close from meta).
  */
 export const INTRADAY_FILL_REQUEST = { interval: '5m', range: '5d' } as const;
 
@@ -200,6 +201,9 @@ export function exchangeDate(time: number, gmtoffset = 0): string {
   return new Date((time + gmtoffset) * 1000).toISOString().slice(0, 10);
 }
 
+/** Rows near the end that the 5-day intraday request can still rebuild. */
+const FILLABLE_TAIL = 5;
+
 export function needsIntradayFill(payload: unknown): boolean {
   const result = firstResult(payload);
   const times = result?.timestamp ?? [];
@@ -207,11 +211,18 @@ export function needsIntradayFill(payload: unknown): boolean {
   const metaTime = result?.meta?.regularMarketTime;
   if (!finite(metaTime) || !times.length || !q) return false;
   const offset = finite(result?.meta?.gmtoffset) ? result!.meta!.gmtoffset! : 0;
+  const metaDate = exchangeDate(metaTime, offset);
+  const priced = (i: number) => [q.open?.[i], q.high?.[i], q.low?.[i], q.close?.[i]].some(finite);
   // A row with any price is left to the client (it heals a missing latest close from meta).
   let last = -1;
-  for (let i = times.length - 1; i >= 0; i--) if (finite(q.close?.[i]) || finite(q.open?.[i])) { last = i; break; }
+  for (let i = times.length - 1; i >= 0; i--) if (priced(i)) { last = i; break; }
   if (last < 0) return false;
-  return exchangeDate(metaTime, offset) > exchangeDate(times[last]!, offset);
+  // The latest quote is from a session the daily rows do not show yet.
+  if (metaDate > exchangeDate(times[last]!, offset)) return true;
+  // Or a recent session the quote has already moved past is completely empty (a gap).
+  for (let i = Math.max(0, times.length - FILLABLE_TAIL); i < times.length; i++)
+    if (!priced(i) && exchangeDate(times[i]!, offset) <= metaDate && i < last) return true;
+  return false;
 }
 
 /** Returns the patched daily payload and the exchange dates that were rebuilt from 5-minute bars. */

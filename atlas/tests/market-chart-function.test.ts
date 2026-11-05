@@ -133,6 +133,24 @@ describe('market-chart rebuilds empty recent daily rows from 5-minute bars', () 
     expect(result.quote).toMatchObject({ price: 42948.91 });
   });
 
+  it('also fills a gap once the following session has prices (11/04 empty, 11/05 trading)', () => {
+    const gap = daily();
+    const q = gap.chart.result[0]!.indicators.quote[0]!;
+    q.open[2] = 43200; q.high[2] = 43300; q.low[2] = 43100; q.close[2] = 43250; q.volume[2] = 100;
+    gap.chart.result[0]!.meta.regularMarketTime = D5 + 1800;
+    gap.chart.result[0]!.meta.regularMarketPrice = 43250;
+    expect(needsIntradayFill(gap)).toBe(true);
+    const { payload, filled } = fillDailyFromIntraday(gap, minute([D4, D5]));
+    expect(filled).toEqual(['2026-11-04']);
+    const out = (payload as ReturnType<typeof daily>).chart.result[0]!.indicators.quote[0]!;
+    expect(out.close).toEqual([43307.54, 43052, 43250]);
+    // An empty row for a session the quote has not reached (before the open) is not a gap.
+    const early = daily();
+    early.chart.result[0]!.indicators.quote[0]!.open[1] = 43000;
+    early.chart.result[0]!.indicators.quote[0]!.close[1] = 42948.91;
+    expect(needsIntradayFill(early)).toBe(false);
+  });
+
   it('appends a session the daily series does not list yet', () => {
     const base = daily();
     base.chart.result[0]!.timestamp = [D3];
