@@ -1,0 +1,401 @@
+{
+  "source": "Read-only previously bootstrapped universe-full-format rolling cache (320 bars/symbol), seeded from kline-archive 4c934296a; not a fresh Actions cache download. Index CSVs fetched from Yahoo 2026-11-05.",
+  "base": "e28a5bed4cb87468f7ae7c71bf7a0ca4a88d0d64",
+  "generatedAt": "2026-11-05T11:11:48+00:00",
+  "reportSha256": "d8cf34289d7e583c8bd77fad46d066bdcfd225ee7aae3b4c1b23cd074a154d85",
+  "reportBytes": 1456057,
+  "previewSliceSessions": 126,
+  "params": {
+    "windows": [
+      5,
+      10,
+      20,
+      60
+    ],
+    "defaultWindow": 60,
+    "medianWindow": 756,
+    "medianMinValid": 500,
+    "volumeGap": 0.05,
+    "maxReturn": 0.4,
+    "countWindow": 21,
+    "stockJumpLimit": 0.3,
+    "minCoverage": 0.9,
+    "minEvaluated": 200,
+    "leaderReturnDays": 126,
+    "liquidityDays": 20,
+    "markets": {
+      "tw": {
+        "indices": [
+          "^TWII"
+        ],
+        "leaderShare": 0.2,
+        "minAmount": 20000000,
+        "minPrice": 10,
+        "successWindow": 42
+      },
+      "us": {
+        "indices": [
+          "^GSPC",
+          "^IXIC",
+          "^SOX"
+        ],
+        "leaderShare": 0.1,
+        "minAmount": 5000000,
+        "minPrice": 5,
+        "successWindow": 21
+      }
+    },
+    "indexVolumeProxies": {
+      "^SOX": "SOXX"
+    },
+    "minBreakouts": 15,
+    "smoothDays": 5,
+    "leaderGap": 0.08,
+    "trendDays": 60,
+    "trendSlopeDays": 20,
+    "highWindow": 252,
+    "nearHigh": 0.97,
+    "quantileWindow": 756,
+    "quantileMinValid": 400,
+    "countQuantile": 0.3,
+    "correctionDrop": 0.07,
+    "historyYears": 3,
+    "countDenominator": "近21日內至少有一根有效日線的股票聯集；次數不再除以21",
+    "leaderMembership": "每個觀察日t的領頭羊由t−1收盤資料決定；彙總該名單在窗口內的成熟突破，再取5日平均",
+    "firstPivot": "沒有上一個已確認高點可比較時排除，另列未知前高次數",
+    "diagnosticDenominators": "收盤沒站上：第一次且更高高點的嘗試；較低高點：第一次且有上一個高點可比較的嘗試；重試全部另列",
+    "closeBufferAtr": 0.1,
+    "atrPeriod": 14,
+    "observationDays": 5,
+    "barrier": 0.05,
+    "swingAtrPeriod": 20,
+    "swingReversalAtr": 2.0,
+    "swingCountingModel": "first-higher-close-v1"
+  },
+  "inputs": {
+    "^TWII": {
+      "sha256": "a1301b37b46f1010d1c54b525b42040fe3e6d4cfdecf1b66c9c6309712f6d54d",
+      "bytes": 166363
+    },
+    "^GSPC": {
+      "sha256": "ae10ae67c1b0812c96dbb962fbc9766d6d1910fe624eb0711ef2ddb87f551bb6",
+      "bytes": 184859
+    },
+    "^IXIC": {
+      "sha256": "faf7df7ecc41603338857229211355ede5554847feddf712b33958ed3677cc60",
+      "bytes": 179345
+    },
+    "^SOX": {
+      "sha256": "c671117d66f843e28d6d5529e6417c7ef6c813bb598884c9344b124d3a9b59bb",
+      "bytes": 172023
+    },
+    "SOXX": {
+      "sha256": "6234084225b549eb00c96c45d0bfd5a957d3cd4a92977d42550005b13496562a",
+      "bytes": 196676
+    },
+    "lists.json": {
+      "sha256": "819d7f0b2cb7851ecde72b6912aec9bebebce1c9ae091654d099f0a04ab33489",
+      "bytes": 1213310
+    },
+    "state.json": {
+      "sha256": "9074b88d7ee9019cf6f25f669e7a655a61eb04fdeef4b87e30ad315b1c5fe32e",
+      "bytes": 1323872
+    }
+  },
+  "markets": {
+    "tw": {
+      "asOf": "2026-10-22",
+      "listed": 1981,
+      "evaluated": 1944,
+      "latest": {
+        "date": "2026-10-22",
+        "market_success": 0.7486713,
+        "market_success_n": 231.0,
+        "leader_success": 0.70301,
+        "leader_success_n": 74.0,
+        "breakout_count_per_1000": 73.2693279,
+        "count_p30": null,
+        "uptrend": false,
+        "breadth_divergence": null,
+        "leader_lag": false,
+        "avg60": 0.5491071,
+        "median756": 0.5,
+        "vol60_weak": false,
+        "warning_level": 0,
+        "warning_complete": false
+      },
+      "examples": [
+        {
+          "date": "2026-09-30",
+          "leader_success": 0.6012731,
+          "market_success": 0.7171157,
+          "breakout_count_per_1000": 46.0060667,
+          "count_p30": null,
+          "avg60": 0.5357143,
+          "median756": 0.4946854
+        },
+        {
+          "date": "2026-10-06",
+          "leader_success": 0.6596586,
+          "market_success": 0.7440066,
+          "breakout_count_per_1000": 53.5894843,
+          "count_p30": null,
+          "avg60": 0.5460373,
+          "median756": 0.4954183
+        },
+        {
+          "date": "2026-10-13",
+          "leader_success": 0.6934626,
+          "market_success": 0.7610671,
+          "breakout_count_per_1000": 64.1738252,
+          "count_p30": null,
+          "avg60": 0.5513393,
+          "median756": 0.4970174
+        },
+        {
+          "date": "2026-10-22",
+          "leader_success": 0.70301,
+          "market_success": 0.7486713,
+          "breakout_count_per_1000": 73.2693279,
+          "count_p30": null,
+          "avg60": 0.5491071,
+          "median756": 0.5
+        }
+      ]
+    },
+    "us": {
+      "asOf": "2026-10-23",
+      "listed": 5348,
+      "evaluated": 5273,
+      "latest": {
+        "date": "2026-10-23",
+        "market_success": 0.7586899,
+        "market_success_n": 147.0,
+        "leader_success": 0.7647384,
+        "leader_success_n": 40.0,
+        "breakout_count_per_1000": 32.9649747,
+        "count_p30": null,
+        "uptrend": false,
+        "breadth_divergence": null,
+        "leader_lag": false,
+        "avg60": 0.4524887,
+        "median756": 0.4309764,
+        "vol60_weak": null,
+        "warning_level": 0,
+        "warning_complete": false
+      },
+      "examples": [
+        {
+          "date": "2026-09-30",
+          "leader_success": 0.5929567,
+          "market_success": 0.669428,
+          "breakout_count_per_1000": 32.1489002,
+          "count_p30": null,
+          "avg60": 0.4524887,
+          "median756": 0.4309764
+        },
+        {
+          "date": "2026-10-06",
+          "leader_success": 0.6892281,
+          "market_success": 0.6717918,
+          "breakout_count_per_1000": 27.0422535,
+          "count_p30": null,
+          "avg60": 0.4933036,
+          "median756": 0.4309764
+        },
+        {
+          "date": "2026-10-13",
+          "leader_success": 0.7787679,
+          "market_success": 0.713385,
+          "breakout_count_per_1000": 27.2045028,
+          "count_p30": null,
+          "avg60": 0.4393939,
+          "median756": 0.4309764
+        },
+        {
+          "date": "2026-10-22",
+          "leader_success": 0.7587128,
+          "market_success": 0.7454325,
+          "breakout_count_per_1000": 31.4783586,
+          "count_p30": null,
+          "avg60": 0.4393939,
+          "median756": 0.4309764
+        }
+      ]
+    }
+  },
+  "twOldNew21SessionCohort": [
+    {
+      "asOf": "2026-09-30",
+      "old": {
+        "n": 839,
+        "hold5": {
+          "wins": 197,
+          "failures": 384,
+          "evaluatedN": 581,
+          "winRate": 33.9
+        },
+        "counting": null
+      },
+      "new": {
+        "n": 91,
+        "hold5": {
+          "wins": 43,
+          "failures": 21,
+          "evaluatedN": 64,
+          "winRate": 67.2
+        },
+        "counting": {
+          "countingModel": "first-higher-close-v1",
+          "first_attempts": 182,
+          "retry_attempts": 312,
+          "retry_failures": 189,
+          "lower_high_share": 0.6539923954372624,
+          "unknown_previous_high": 1,
+          "close_fail_share": 0.5
+        }
+      }
+    },
+    {
+      "asOf": "2026-10-06",
+      "old": {
+        "n": 914,
+        "hold5": {
+          "wins": 229,
+          "failures": 373,
+          "evaluatedN": 602,
+          "winRate": 38.0
+        },
+        "counting": null
+      },
+      "new": {
+        "n": 104,
+        "hold5": {
+          "wins": 52,
+          "failures": 18,
+          "evaluatedN": 70,
+          "winRate": 74.3
+        },
+        "counting": {
+          "countingModel": "first-higher-close-v1",
+          "first_attempts": 209,
+          "retry_attempts": 317,
+          "retry_failures": 168,
+          "lower_high_share": 0.6493288590604027,
+          "unknown_previous_high": 1,
+          "close_fail_share": 0.5023923444976076
+        }
+      }
+    },
+    {
+      "asOf": "2026-10-13",
+      "old": {
+        "n": 1026,
+        "hold5": {
+          "wins": 293,
+          "failures": 422,
+          "evaluatedN": 715,
+          "winRate": 41.0
+        },
+        "counting": null
+      },
+      "new": {
+        "n": 127,
+        "hold5": {
+          "wins": 66,
+          "failures": 21,
+          "evaluatedN": 87,
+          "winRate": 75.9
+        },
+        "counting": {
+          "countingModel": "first-higher-close-v1",
+          "first_attempts": 248,
+          "retry_attempts": 350,
+          "retry_failures": 195,
+          "lower_high_share": 0.6325925925925926,
+          "unknown_previous_high": 1,
+          "close_fail_share": 0.4879032258064516
+        }
+      }
+    },
+    {
+      "asOf": "2026-10-22",
+      "old": {
+        "n": 1098,
+        "hold5": {
+          "wins": 335,
+          "failures": 565,
+          "evaluatedN": 900,
+          "winRate": 37.2
+        },
+        "counting": null
+      },
+      "new": {
+        "n": 144,
+        "hold5": {
+          "wins": 88,
+          "failures": 28,
+          "evaluatedN": 116,
+          "winRate": 75.9
+        },
+        "counting": {
+          "countingModel": "first-higher-close-v1",
+          "first_attempts": 289,
+          "retry_attempts": 395,
+          "retry_failures": 220,
+          "lower_high_share": 0.5883190883190883,
+          "unknown_previous_high": 1,
+          "close_fail_share": 0.5017301038062284
+        }
+      }
+    }
+  ],
+  "cacheOrigin": {
+    "archiveGitCommit": "4c934296ac3bb1003d0d4a7f106d21a099cddb87",
+    "archiveManifestSha256": "d7286e3ec29dac16ba0d3e13fd1f75a48dc4243a81e289365254054cb036fb34",
+    "sourceBasis": "Yahoo split-adjusted; not dividend-adjusted",
+    "sourceMarkets": {
+      "tw": {
+        "symbolCount": 1981,
+        "firstDate": "2024-10-24",
+        "lastDate": "2026-10-23",
+        "rows": 952449,
+        "csvBytes": 48488668
+      },
+      "us": {
+        "symbolCount": 5347,
+        "firstDate": "2024-10-24",
+        "lastDate": "2026-10-23",
+        "rows": 2528381,
+        "csvBytes": 124616870
+      }
+    },
+    "replayStartedAt": "2026-10-25T06:16:04.604027+00:00",
+    "rollingBarsPerSymbol": 320,
+    "seededSymbolCount": 7328,
+    "lists": {
+      "TWSE": {
+        "fetchedAt": "2026-10-25",
+        "source": "t187ap03_L",
+        "count": 1087
+      },
+      "TPEx": {
+        "fetchedAt": "2026-10-25",
+        "source": "mopsfin_t187ap03_O",
+        "count": 894
+      },
+      "US": {
+        "fetchedAt": "2026-10-25",
+        "source": "nasdaqtrader",
+        "count": 5348
+      }
+    },
+    "listsSha256": "819d7f0b2cb7851ecde72b6912aec9bebebce1c9ae091654d099f0a04ab33489",
+    "stateSha256": "9074b88d7ee9019cf6f25f669e7a655a61eb04fdeef4b87e30ad315b1c5fe32e",
+    "marketReferenceCutoffs": {
+      "tw": "2026-10-22",
+      "us": "2026-10-23"
+    }
+  },
+  "calculationSeconds": 185.24738517399237
+}

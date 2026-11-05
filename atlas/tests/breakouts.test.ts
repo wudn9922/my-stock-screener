@@ -19,6 +19,7 @@ const stats = (overrides: Partial<BreakoutStats> = {}): BreakoutStats => ({
   baseRate: 50,
   baseAvgReturn: 0.5,
   comparison: null,
+  swingCounting: null,
   ...overrides,
 });
 

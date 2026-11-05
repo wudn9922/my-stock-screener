@@ -185,8 +185,9 @@ class SwingEntryStatsTest(unittest.TestCase):
         frame = wave([108, 109, 109, 109, 109])
         frame.iloc[48, frame.columns.get_loc('High')] = 112
         stats = self.evaluate(frame)
-        self.assertEqual((stats['n'], stats['maturedN'], stats['wins']), (1, 1, 0))
-        self.assertEqual(stats['avgReturn'], round((109 / 110.5 - 1) * 100, 2))
+        self.assertEqual((stats['n'], stats['maturedN'], stats['wins']), (0, 0, 0))
+        self.assertIsNone(stats['avgReturn'])
+        self.assertEqual(stats['swingCounting']['unknown_previous_high'], 1)
 
     def test_gap_above_pivot_uses_open_and_keeps_one_entry_per_wave(self):
         frame = wave([108, 116, 112, 112, 112])
@@ -194,13 +195,15 @@ class SwingEntryStatsTest(unittest.TestCase):
         frame.iloc[48, frame.columns.get_loc('High')] = 118
         frame.iloc[48, frame.columns.get_loc('Low')] = 114
         stats = self.evaluate(frame)
-        self.assertEqual((stats['n'], stats['maturedN'], stats['wins']), (1, 1, 0))
-        self.assertEqual(stats['avgReturn'], round((112 / 115 - 1) * 100, 2))
+        self.assertEqual((stats['n'], stats['maturedN'], stats['wins']), (0, 0, 0))
+        self.assertIsNone(stats['avgReturn'])
+        self.assertEqual(stats['swingCounting']['unknown_previous_high'], 1)
 
     def test_separate_substantial_waves_can_enter_inside_ten_days(self):
         frame = wave([108, 111, 108, 109, 113, 112, 111, 110])
         stats = self.evaluate(frame)
-        self.assertEqual((stats['eligible'], stats['n'], stats['maturedN']), (1, 2, 2))
+        self.assertEqual((stats['eligible'], stats['n'], stats['maturedN']), (1, 1, 1))
+        self.assertEqual(stats['swingCounting']['unknown_previous_high'], 1)
 
     def test_asof_cutoff_does_not_use_future_confirmations_or_prices(self):
         frame = wave([108, 111, 108, 109, 113, 112, 111, 110])

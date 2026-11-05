@@ -25,6 +25,7 @@ from kline_journal import dump_journal, merge_logs, prune_main_journal
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / ".github/generated-paths.json"
 UNION_JOURNALS = {"docs/report/kline-corrections.json"}
+WARNINGS_LOG = "docs/report/market-warnings-log.csv"
 # Written by both the daily report (main.py) and the full-market job; each keeps
 # the other's markets, so a concurrent write merges per market instead of failing.
 UNIVERSE = "docs/report/universe.json"
@@ -226,7 +227,16 @@ class Storage:
 
     def publish_one(self, branch, base, patterns, message):
         delta, original = self.changed(base, patterns)
+        if WARNINGS_LOG in delta:
+            # Other producers also run a copied standalone helper. They do not
+            # need this new standard-library-only dependency unless publishing it.
+            import market_warnings_log as warnings_log
         for path, entry in delta.items():
+            if path == WARNINGS_LOG:
+                if entry is None:
+                    raise ValueError("Forward market warnings log is append-only")
+                baseline = git("cat-file", "blob", original[path][1]) if path in original else b""
+                warnings_log.require_append(baseline, git("cat-file", "blob", entry[1]))
             if branch == "main" and matches(path, ["data/*.csv", "data/world/*.csv", "docs/report/financials/**"]) and entry is None:
                 raise ValueError("Refusing to delete owner-retained K-line history: " + path)
             if matches(path, self.append_only) and (entry is None or path in original):
@@ -245,7 +255,7 @@ class Storage:
                 # Only the append-only journal (main) and the per-market universe
                 # (generated) merge. Deletion, mode changes and all other conflicts
                 # remain fail-closed.
-                mergeable = UNION_JOURNALS if branch == "main" else {UNIVERSE} if branch == "generated" else set()
+                mergeable = UNION_JOURNALS | {WARNINGS_LOG} if branch == "main" else {UNIVERSE} if branch == "generated" else set()
                 if any(
                     p not in mergeable or not current.get(p) or not delta[p]
                     or current[p][0] != "100644" or delta[p][0] != "100644"
@@ -253,6 +263,15 @@ class Storage:
                 ):
                     raise ValueError("Concurrent same-path change; rerun producer: " + repr(conflicts))
                 for path in conflicts:
+                    if path == WARNINGS_LOG:
+                        remote = git("cat-file", "blob", current[path][1])
+                        local = git("cat-file", "blob", delta[path][1])
+                        baseline = git("cat-file", "blob", original[path][1]) if path in original else b""
+                        warnings_log.require_append(baseline, remote)
+                        body = warnings_log.merge(remote, local)
+                        delta[path] = ("100644", git("hash-object", "-w", "--stdin", data=body).decode().strip())
+                        original[path] = current[path]
+                        continue
                     remote = json.loads(git("cat-file", "blob", current[path][1]))
                     local = json.loads(git("cat-file", "blob", delta[path][1]))
                     if path == UNIVERSE:

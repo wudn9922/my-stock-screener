@@ -14,6 +14,7 @@ import { countOf, finiteOrNull, optionalText, pctOf, text } from './breadth';
 export const BREAKOUT_MARKET_KEYS = ['tw', 'us'] as const;
 export type BreakoutMarketKey = (typeof BREAKOUT_MARKET_KEYS)[number];
 export const SUCCESS_MODEL = 'four-rules-v1';
+export const SWING_COUNTING_MODEL = 'first-higher-close-v1';
 export const OUTCOME_KEYS = ['hold5', 'nextHigh', 'firstHit', 'targetAndNext'] as const;
 export type OutcomeKey = (typeof OUTCOME_KEYS)[number];
 export const OUTCOME_RULES: { key: OutcomeKey; label: string; short: string; description: string }[] = [
@@ -38,6 +39,7 @@ export interface BreakoutWindowMeta {
   label: string;
 }
 export interface BreakoutParams {
+  swingCountingModel: typeof SWING_COUNTING_MODEL | null;
   windows: BreakoutWindowMeta[];
   matureDays: number;
   minSample: number;
@@ -60,6 +62,8 @@ export interface BreakoutParams {
   strategies: BreakoutStrategyMeta[];
 }
 export interface BreakoutStats {
+  swingCounting: { countingModel: typeof SWING_COUNTING_MODEL; first_attempts: number; retry_attempts: number; retry_failures: number;
+    lower_high_share: number | null; close_fail_share: number | null; unknown_previous_high: number } | null;
   /** Usable swing references in the window; box/EMA require whole-window warmup. */
   eligible: number;
   /** Swing retries failed closes until qualified; box/EMA take the first fresh event per window. */
@@ -145,6 +149,7 @@ export interface Breakouts {
 
 /** Safe fallbacks: missing method metadata must not relabel old results as ATR waves. */
 export const DEFAULT_BREAKOUT_PARAMS: BreakoutParams = {
+  swingCountingModel: null,
   windows: [
     { key: '1m', days: 21, label: '近1月' },
   ],
@@ -215,6 +220,10 @@ function parseComparison(value: unknown, signals: number): BreakoutComparison | 
 }
 
 const statsSchema = z.object({
+  swingCounting: z.object({ countingModel: z.literal(SWING_COUNTING_MODEL), first_attempts: z.number().int().nonnegative(),
+    retry_attempts: z.number().int().nonnegative(), retry_failures: z.number().int().nonnegative(),
+    lower_high_share: z.number().min(0).max(1).nullable(), close_fail_share: z.number().min(0).max(1).nullable(),
+    unknown_previous_high: z.number().int().nonnegative() }).nullable().optional().default(null),
   eligible: countOf,
   n: countOf,
   maturedN: countOf,
@@ -227,7 +236,14 @@ const statsSchema = z.object({
   baseRate: pctOf,
   baseAvgReturn: pctOf,
   comparison: z.unknown().optional(),
-}).transform((stats): BreakoutStats => ({ ...stats, comparison: parseComparison(stats.comparison, stats.n) }));
+}).transform((stats): BreakoutStats => {
+  let comparison = parseComparison(stats.comparison, stats.n);
+  const counting = stats.swingCounting;
+  if (counting && (counting.retry_failures > counting.retry_attempts || stats.n > counting.first_attempts ||
+    comparison?.commonFailedN !== 0 || (counting.close_fail_share !== null &&
+      Math.abs(stats.n - counting.first_attempts * (1 - counting.close_fail_share)) > 1e-5))) comparison = null;
+  return { ...stats, comparison };
+});
 
 const windowSchema = z
   .object({
@@ -361,6 +377,7 @@ function parseParams(value: unknown): BreakoutParams {
   const legacyPivots = (raw.swingMethod === undefined || raw.swingMethod === 'fractal-v1') &&
     positiveInt(raw.swingPivotLeft) !== null && positiveInt(raw.swingPivotRight) !== null;
   return {
+    swingCountingModel: raw.swingCountingModel === SWING_COUNTING_MODEL ? SWING_COUNTING_MODEL : null,
     windows: windows.length ? windows : defaults.windows,
     matureDays: positiveInt(raw.matureDays) ?? defaults.matureDays,
     minSample: positiveInt(raw.minSample) ?? defaults.minSample,

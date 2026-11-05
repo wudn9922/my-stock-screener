@@ -54,6 +54,7 @@ docs/report/**/*.tmp
 /docs/report/fundamentals/tw-finmind.json
 /docs/report/breakouts.json
 /docs/report/breakouts-history.json
+/docs/report/market-warnings.json
 /docs/report/breakouts-archive/*.json
 /docs/report/research/
 /docs/report/tw-chips.json

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { TimeBands, type TimeBand } from './TimeBands';
 import {
   BaselineSeries,
   ColorType,
@@ -50,6 +51,7 @@ export function TimeChart({
   onHover,
   className = 'rates-time-chart',
   zoom = false,
+  bands = [],
 }: {
   lines: readonly ChartLine[];
   format: (value: number) => string;
@@ -58,6 +60,7 @@ export function TimeChart({
   onHover?: (values: Record<string, number> | null, time: string | null) => void;
   className?: string;
   zoom?: boolean;
+  bands?: readonly TimeBand[];
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -150,5 +153,14 @@ export function TimeChart({
     }
     chart.timeScale().fitContent();
   }, [lines, zeroLine]);
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !bands.length) return;
+    const pane = chart.panes()[0];
+    if (!pane) return;
+    const overlay = new TimeBands(bands);
+    pane.attachPrimitive(overlay);
+    return () => { if (chartRef.current === chart) pane.detachPrimitive(overlay); };
+  }, [bands, zoom]);
   return <div ref={hostRef} className={className} role="img" aria-label={ariaLabel} />;
 }

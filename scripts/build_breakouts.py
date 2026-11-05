@@ -4,9 +4,10 @@
 
 全市場產品由 build_full_market_breakouts.py 呼叫本計算引擎，只發布波段前高、箱型、20EMA 三法。
 舊 N 日前高與放量變體保留作相容／研究用途，不再作為產品的「突破前高」。
-波段前高採 swing_breakouts.py 的 ATR 波段；盤中嚴格突破即記嘗試，收盤失敗保留關鍵點可重試。
-波段法理論進場價＝max(當日開盤, 已確認波段高點)，每個新波段都可貢獻樣本；其餘方法維持收盤進場。
-產品四種勝率使用 comparison 欄位：共通收盤門檻＋同一批後續完整5交易日資料，第三組採先觸發判定。
+波段前高偵測沿用 swing_breakouts.py，計數改為 first-higher-close-v1：每個高點首次、更高高點、合格收盤；
+重試、較低高點、收盤失敗另列，不進成功率。新波段 UI 固定用完整後續5日 hold5，箱型與20EMA四組口徑不變。
+波段法保留理論進場價＝max(當日開盤, 已確認波段高點) 的舊平面欄位；其餘方法維持收盤進場。
+comparison 的四組欄位仍保留，但新版波段的分母只含合格首次高點，不能與舊快照直接比較。
 原本持有至asOf的平面統計欄位僅保留供舊格式與研究相容，新畫面不使用這些欄位作四組勝率。
 
 本檔舊命令列模式只讀 data/ 內的日 K CSV（Date,Open,High,Low,Close,Volume），universe 與市場寬度（build_breadth.py）相同：
@@ -59,6 +60,7 @@ from build_breadth import (  # noqa: E402
 )
 from swing_breakouts import ATR_PERIOD, REVERSAL_ATR, SWING_KEY, SWING_METHOD, swing_high_signals, wilder_atr  # noqa: E402
 from breakout_outcomes import GATE_ATR_PERIOD, OBSERVATION_DAYS, evaluate_attempt, summarize_attempts, success_params  # noqa: E402
+from swing_cohort import COUNTING_MODEL, diagnostics, included, swing_attempts  # noqa: E402
 
 BREAKOUTS_JSON_VERSION = 2
 HIGH_LOOKBACKS = (20, 60, 120)
@@ -117,7 +119,7 @@ def _strategy_specs():
         "definition": f"收盤自低點上漲至少 {REVERSAL_ATR:g} 倍 ATR({ATR_PERIOD}) 才形成上升段；"
                       f"其最高影線在後續收盤回落至少 {REVERSAL_ATR:g} 倍該高點當時 ATR 後確認，下一根才可使用；"
                       "橫盤小反彈不取代前高。盤中最高價嚴格超過已確認波段高點即觸發，"
-                      "收盤未達關鍵點＋0.1ATR(14)則保留前高，後續可重試；合格收盤後同高點不重複，不要求完整123型態、放量或冷卻期",
+                      "每個高點只算第一次、只算更高的高點；收盤須達關鍵點＋0.1ATR(14)，再觀察完整5日守住關鍵點下方5%；重試、較低高點與收盤失敗另列，不進成功率分母",
     })
     return specs
 
@@ -286,6 +288,7 @@ def build_market(frames, universe_label, market_key, as_of=None, *, strategy_spe
                 "open": clean["Open"].to_numpy(),
                 "bars": clean,
                 "atr14": wilder_atr(clean, GATE_ATR_PERIOD),
+                "swing_attempts": swing_attempts(clean, calendar) if any(s["kind"] == "swing" for s in specs) else [],
                 "signals": {
                     key: (fresh.to_numpy(), level.to_numpy(), known.to_numpy())
                     for key, (fresh, level, known) in signals.items()
@@ -316,6 +319,7 @@ def build_market(frames, universe_label, market_key, as_of=None, *, strategy_spe
         for spec in specs:
             events = []
             attempts = []
+            swing_diagnostics = []
             eligible = 0
             for stock, mask in zip(stocks, masks):
                 fresh, level, known = stock["signals"][spec["key"]]
@@ -326,6 +330,10 @@ def build_market(frames, universe_label, market_key, as_of=None, *, strategy_spe
                     continue
                 eligible += 1
                 hits = np.flatnonzero(mask & fresh)
+                if swing:
+                    selected = [a for a in stock["swing_attempts"] if mask[a["index"]]]
+                    swing_diagnostics.extend(selected)
+                    hits = [a["index"] for a in selected if included(a)]
                 if not len(hits):
                     continue
                 last_close = stock["close"][-1]
@@ -347,6 +355,8 @@ def build_market(frames, universe_label, market_key, as_of=None, *, strategy_spe
             strategies[spec["key"]] = summarize(events, eligible, base_by_day)
             if spec['key'] in (SWING_KEY, 'box20', 'ema20'):
                 strategies[spec['key']]['comparison'] = summarize_attempts(attempts)
+            if spec["kind"] == "swing":
+                strategies[spec["key"]]["swingCounting"] = diagnostics(swing_diagnostics)
 
         matured_days = [day for day in window_days if last_position - position[day] >= MATURE_DAYS and day in base_by_day]
         windows[window_key] = {
@@ -400,6 +410,7 @@ def params_meta():
         "volumeMultiple": VOLUME_MULTIPLE,
         "boxLookback": BOX_LOOKBACK,
         "swingMethod": SWING_METHOD,
+        "swingCountingModel": COUNTING_MODEL,
         "swingAtrPeriod": ATR_PERIOD,
         "swingReversalAtr": REVERSAL_ATR,
         "minEvaluated": MIN_EVALUATED,

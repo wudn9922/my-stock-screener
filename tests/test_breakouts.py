@@ -554,7 +554,13 @@ class FrontendFixtureContractTest(unittest.TestCase):
         with open(path, encoding="utf-8") as file:
             fixture = json.load(file)
         import build_full_market_breakouts as full
-        self.assertEqual(fixture["params"], full.params_meta())
+        # Immutable legacy fixture remains readable with its own old counting rule.
+        expected = full.params_meta()
+        self.assertEqual(expected.pop("swingCountingModel"), "first-higher-close-v1")
+        self.assertNotIn("swingCountingModel", fixture["params"])
+        expected["strategies"] = [dict(s, definition=next(old["definition"] for old in fixture["params"]["strategies"] if old["key"] == s["key"]))
+                                  if s["key"] == "swingHigh" else s for s in expected["strategies"]]
+        self.assertEqual(fixture["params"], expected)
         market = bo.build_market({**filler(), "X": make_bars(flat_then([101.0, 102, 102, 102]))}, "測試", "tw")
         for key in ("tw", "us"):
             sample = fixture["markets"][key]
@@ -567,7 +573,7 @@ class FrontendFixtureContractTest(unittest.TestCase):
                 self.assertEqual(set(window["market"]), set(produced["market"]))
                 self.assertEqual(set(window["strategies"]), set(full.ACTIVE_STRATEGIES))
                 for strategy_key, stats_ in window["strategies"].items():
-                    self.assertEqual(set(stats_), set(produced["strategies"][strategy_key]))
+                    self.assertEqual(set(stats_) | ({"swingCounting"} if strategy_key == "swingHigh" else set()), set(produced["strategies"][strategy_key]))
 
 
 class MainTest(unittest.TestCase):
