@@ -40,16 +40,18 @@ def ipo_companies(payload, checked_at):
     if not isinstance(data, dict):
         raise ValueError('IPO source did not provide a calendar')
     output = {}
-    for section, status in [('filed', '已申報，掛牌日待確認'), ('upcoming', '預計上市（日期可能變動）')]:
+    for section, status in [('filed', '已申報，掛牌日待確認'), ('upcoming', '預計上市（日期可能變動）'), ('priced', '已定價，掛牌狀態請查官方公告')]:
         table = data.get(section) or {}
         if section == 'upcoming':
             table = table.get('upcomingTable', table)
         for row in table.get('rows') or []:
+            if not isinstance(row, dict):
+                continue
             name = row.get('companyName')
             if not isinstance(name, str) or not name.strip():
                 continue
             symbol = str(row.get('proposedTickerSymbol') or '')
-            if symbol and not SYMBOL.fullmatch(symbol):
+            if (section == 'priced' and not symbol) or (symbol and not SYMBOL.fullmatch(symbol)):
                 continue
             # Nasdaq expectedPriceDate is a pricing estimate, not a listing date.
             expected_pricing = row.get('expectedPriceDate') if section == 'upcoming' else None
@@ -57,7 +59,7 @@ def ipo_companies(payload, checked_at):
             output[key] = {'id': key, 'name': name[:250], 'symbol': symbol,
                 'aliases': [], 'status': status, 'exchange': str(row.get('proposedExchange') or '')[:100],
                 'filedDate': row.get('filedDate'), 'listingDate': row.get('listingDate'),
-                'expectedPricingDate': expected_pricing, 'price': row.get('proposedSharePrice'),
+                'expectedPricingDate': expected_pricing, 'pricingDate': row.get('pricedDate') if section == 'priced' else None, 'price': row.get('proposedSharePrice'),
                 'checkedAt': checked_at, 'sourceUrl': 'https://www.nasdaq.com/market-activity/ipos'}
     return list(output.values())
 
@@ -121,7 +123,7 @@ def collect(root=ROOT, getter=fetch, now=None, limit=240, budget=150):
                         'price': row.get('proposedSharePrice') or company['price'], 'pricingDate': row.get('pricedDate'), 'checkedAt': checked,
                         'sourceUrl': 'https://www.nasdaq.com/market-activity/ipos'}
                     # pricedDate is pricing day, not listing day; never substitute one for the other.
-        failure = None
+        failure = None if fresh else '本月行事曆暫無資料'
     except (requests.RequestException, ValueError, TypeError):
         failure = 'IPO 行事曆更新失敗，保留上次核對資料'
     write(dest / 'ipo-watch.json', {'version': 1, 'generatedAt': checked, 'reason': failure, 'companies': list(companies.values())[:1000]})

@@ -1,0 +1,8 @@
+{
+  "data": {
+    "filed": {"asOf": "Nov 4, 2026", "headers": {"proposedTickerSymbol": "Symbol", "companyName": "Company Name", "filedDate": "Date Filed"}, "rows": [{"dealID": "fixture-filed", "proposedTickerSymbol": "FAKEF", "companyName": "Fixture Filing Inc.", "filedDate": "11/03/2026", "dollarValueOfSharesOffered": "$10,000,000"}]},
+    "upcoming": {"upcomingTable": {"headers": {}, "rows": [{"dealID": "fixture-upcoming", "proposedTickerSymbol": "FAKEU", "companyName": "Fixture Upcoming Inc.", "proposedExchange": "NASDAQ Capital", "expectedPriceDate": "11/12/2026", "proposedSharePrice": "10.00-12.00"}]}, "lastUpdatedTime": "Nov 4, 2026"},
+    "priced": {"asOf": "Nov 4, 2026", "headers": {"pricedDate": "Date", "dealStatus": "Actions"}, "rows": [{"dealID": "fixture-priced", "proposedTickerSymbol": "FAKEP", "companyName": "Fixture Priced Inc.", "proposedExchange": "NASDAQ Capital", "proposedSharePrice": "10.00", "sharesOffered": "9,098,800", "pricedDate": "11/02/2026", "dollarValueOfSharesOffered": "$90,988,000", "dealStatus": "Priced"}]},
+    "withdrawn": {"rows": []}
+  }
+}

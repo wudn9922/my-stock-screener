@@ -1,5 +1,4 @@
 import { App, type ChartWorkspaceProps } from './App';
-import { LegacyImportCard } from '../ui/LegacyImportCard';
 import { useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { getChartStore } from './chartStore';
 import { ChartPeHistory } from '../ui/financials/ChartPeHistory';
@@ -30,7 +29,6 @@ export default function ChartPage(props: ChartWorkspaceProps) {
   const showPe = props.active !== false && state.app.provider !== 'demo' && !symbol.startsWith('^');
   return (
     <><div ref={viewport} className="chart-page-layout">
-      {props.active !== false && <LegacyImportCard />}
       <App {...props} onShowPeChart={showPe ? () => {
         pe.current?.focus({ preventScroll: true });
         pe.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });

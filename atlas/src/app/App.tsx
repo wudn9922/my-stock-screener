@@ -1,4 +1,5 @@
-import { ExtendedQuotes } from '../ui/ExtendedQuotes';
+import { ExtendedQuoteLine, ExtendedQuotes } from '../ui/ExtendedQuotes';
+import { quoteStatus } from '../market-data/quoteStatus';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   Activity,
@@ -77,7 +78,7 @@ import { legacyVolumeEnabled } from '../storage/schema';
 import { getMarketProfile } from '../market-data/MarketProfile';
 import { EDGE_YAHOO_SOURCE } from '../market-data/EdgeYahooProvider';
 import { usableBarResult } from '../market-data/KlineIntegrity';
-import { formatLiveTime, inRegularSession, isLiveSymbol, LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, mergePeriodBars, sameBars } from '../market-data/LiveQuotes';
+import { inRegularSession, isLiveSymbol, LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, mergePeriodBars, sameBars } from '../market-data/LiveQuotes';
 import {
   getLoadedSymbolDirectory,
   loadSymbolCatalog,
@@ -240,6 +241,7 @@ export function App({
     [drawingPickerOpen, setDrawingPickerOpen] = useState(false),
     [reloadToken, setReloadToken] = useState(0);
   const [drawingMenuPoint, setDrawingMenuPoint] = useState<Point | null>(null);
+  const loadedContext = useRef('');
   const [drawingMenuBounds, setDrawingMenuBounds] = useState<{ top: number; bottom: number } | null>(null);
   const [quickEditing, setQuickEditing] = useState(false);
   useEffect(() => setQuickEditing(false), [symbol, tf, selected]);
@@ -275,6 +277,7 @@ export function App({
       setTool('select');
       setSelected(null);
       setResult(refreshed);
+      loadedContext.current = `${symbol}:${tf}:${providerId}`;
       setLoadedResult(refreshed);
       setDataError('');
       if (refreshed.quote) setQuote({ symbol, provider: providerId, quote: refreshed.quote });
@@ -459,6 +462,7 @@ export function App({
     const abort = new AbortController();
     let live = true;
     chart.clear();
+    loadedContext.current = '';
     setTool('select');
     setSelected(null);
     setLoading(true);
@@ -503,6 +507,7 @@ export function App({
           legacyVolumeFor(symbol, settings.preferences, tf),
         );
         setResult(result);
+        loadedContext.current = `${symbol}:${tf}:${providerId}`;
         setLoadedResult(result);
         setLoading(false);
         if (!provider.getCorporateEvents) {
@@ -568,7 +573,11 @@ export function App({
       } catch {
         return;
       }
-      if (sameBars(current.bars, next.bars)) return;
+      if (sameBars(current.bars, next.bars)) {
+        chart.refreshSource(next);
+        setResult(next);
+        return;
+      }
       if (!chart.patchBars(next)) {
         // A new bar needs a full redraw; never while the user is drawing or editing a drawing.
         if (chart.interacting || liveState.current.tool !== 'select' || liveState.current.selected) return;
@@ -626,6 +635,8 @@ export function App({
         ? result.quote
         : null;
   const headerPrice = headerQuote?.price ?? null;
+  const [extendedDetails, setExtendedDetails] = useState<{ symbol: string; open: boolean }>();
+  const extendedOpen = extendedDetails?.symbol === symbol && extendedDetails.open;
   useEffect(() => {
     if (!state.ready || providerId === 'demo') return;
     let live = true;
@@ -1063,7 +1074,7 @@ export function App({
       ) : panel === 'backtest' ? (
         <BacktestPanel symbol={symbol} timeframe={tf} market={market} result={loadedResult} onResult={onStrategy} />
       ) : panel === 'alerts' ? (
-        <AlertPanel store={store} symbol={symbol} timeframe={tf} drawings={activeDrawings} />
+        <AlertPanel store={store} symbol={symbol} timeframe={tf} drawings={activeDrawings} anchor={!loading && loadedContext.current === `${symbol}:${tf}:${providerId}` && result?.bars.length ? { time: result.bars.at(-1)!.time, logical: result.bars.length - 1, timeframe: tf } : undefined} />
       ) : (
         <>
           <label className="provider-field">
@@ -1133,14 +1144,16 @@ export function App({
           </span>
           {onOpenSearch ? <Search size={16} className="ws-symbol-icon" /> : <ChevronDown size={16} className="ws-symbol-icon" />}
         </button>
-        <div className={`ws-quote ${changeTone}`} aria-live="polite" data-testid="header-quote">
+        <div className="ws-price-block"><div className={`ws-quote ${changeTone}`} aria-live="polite" data-testid="header-quote">
           <b>{headerQuote ? formatPrice(headerQuote.price, asset?.precision) : '—'}</b>
           <span>
             {headerQuote ? `${headerQuote.change > 0 ? '+' : ''}${formatPrice(headerQuote.change)}` : ''}
             {headerQuote ? ` (${formatPercent(headerQuote.changePercent)})` : ''}
           </span>
           <small>{asset?.unit ?? market.currency}</small>
-          {liveAt?.key === liveKey && <small className="ws-live-time" data-testid="live-time">更新於 {formatLiveTime(liveAt.at)}</small>}
+          {!asset && headerQuote && <small className="ws-live-time" data-testid="live-time">{quoteStatus(symbol, headerQuote, liveAt?.key === liveKey ? liveAt.at : result?.asOf ? result.asOf * 1000 : undefined)}</small>}
+        </div>
+        {market.market === 'US' && !isIndex && !asset && providerId !== 'demo' && <ExtendedQuoteLine symbol={symbol} quote={headerQuote} expanded={extendedOpen} onToggle={() => setExtendedDetails({ symbol, open: !extendedOpen })} />}
         </div>
         {!isIndex && providerId !== 'demo' && (
           <div className="ws-stock-statistics">
@@ -1159,9 +1172,6 @@ export function App({
               <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}</p>
               {onShowPeChart && <button type="button" className="ghost-button" onClick={onShowPeChart}>查看下方本益比圖表</button>}
             </StockStatsMenu>
-            {market.market === 'US' && !asset && <StockStatsMenu label="盤前盤後報價" testId="extended-quotes-toggle" trigger={<span>盤前／後</span>}>
-              {open => <ExtendedQuotes key={symbol} symbol={symbol} quote={headerQuote} active={open} />}
-            </StockStatsMenu>}
           </div>
         )}
         {!isIndex && providerId !== 'demo' && (
@@ -1227,15 +1237,19 @@ export function App({
             </IconButton>
           )}
           <StockStatsMenu label="行情資料說明" testId="source-info-toggle" trigger={<Info size={16} />}>
-            <div className="source-details">
+            {open => <div className="source-details">
               <div ref={sourceRef} className="data-source" />
               {STATIC_HOSTING && <p className="static-hosting-note">{staticHostingText}</p>}
               {providerId === 'demo' && <p className="demo-data-note">{demoDataText}</p>}
               <div className="events-source">{eventsStatus}</div>
-            </div>
+              {market.market === 'US' && !isIndex && !asset && providerId !== 'demo' && <ExtendedQuotes key={symbol} symbol={symbol} quote={headerQuote} active={open} />}
+            </div>}
           </StockStatsMenu>
         </div>
       </header>
+      {extendedOpen && market.market === 'US' && !isIndex && !asset && providerId !== 'demo' && <section id="extended-quote-details" className="ws-extended-details" role="region" aria-label="盤前盤後報價">
+        <ExtendedQuotes key={symbol} symbol={symbol} quote={headerQuote} active />
+      </section>}
       {stockViews && visitedViews.has('volume') && (
         <section className="stock-view" aria-label="價量" hidden={stockView !== 'volume'} inert={modal} aria-hidden={modal}>
           <div className="stock-view-card">
