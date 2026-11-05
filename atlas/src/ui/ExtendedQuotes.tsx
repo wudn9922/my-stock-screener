@@ -1,10 +1,44 @@
 import { useEffect, useState } from "react";
 import {
-  fetchExtendedQuotes,
+  loadExtendedSnapshot,
+  selectExtendedQuote,
+  type SelectedExtendedPrice,
   type ExtendedSnapshot,
 } from "../market-data/extendedQuotes";
 import type { Quote } from "../market-data/MarketDataProvider";
-import { formatPrice } from "./format";
+import { formatPercent, formatPrice } from "./format";
+function useSnapshot(symbol: string, active: boolean, attempt = 0) {
+  const [state, setState] = useState<{ symbol: string; data?: ExtendedSnapshot; error?: string }>();
+  useEffect(() => {
+    if (!active) return;
+    let current = true;
+    void loadExtendedSnapshot(symbol, attempt > 0).then(
+      data => { if (current) setState({ symbol, data }); },
+      error => { if (current) setState({ symbol, error: error instanceof Error && /尚未收錄|HTTP/.test(error.message) ? error.message : '延長時段快照連線失敗或格式無效' }); },
+    );
+    return () => { current = false; };
+  }, [symbol, active, attempt]);
+  return state?.symbol === symbol ? state : null;
+}
+
+export function extendedLineText(value: SelectedExtendedPrice, compact = false, now = Date.now()): string {
+  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const historical = date.format(value.asOf * 1000) !== date.format(now);
+  const time = new Intl.DateTimeFormat('zh-TW', { timeZone: 'America/New_York', ...(historical ? { month: '2-digit', day: '2-digit' } as const : {}), hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(value.asOf * 1000).replace(/[,\s]+/g, ' ');
+  return `${value.mode === 'pre' ? '盤前' : '盤後'} ${formatPrice(value.price)}${value.changePercent === undefined ? '' : ` ${formatPercent(value.changePercent)}`}${compact ? ` · ${time}紐約` : `（${time} 紐約）`}`;
+}
+
+/** Visible price, not a popup trigger. No valid trade means no placeholder or reserved height. */
+export function ExtendedQuoteLine({ symbol, quote, active = true, compact = false, expanded = false, onToggle }: {
+  symbol: string; quote: Quote | null | undefined; active?: boolean; compact?: boolean; expanded?: boolean; onToggle?: () => void;
+}) {
+  const state = useSnapshot(symbol, active);
+  const value = selectExtendedQuote(symbol, quote, state?.data);
+  if (!value) return null;
+  const text = extendedLineText(value, compact);
+  if (compact) return <span className="wb-extended" data-testid="board-extended-quote" title={`${text} · ${value.source}`}>{text}</span>;
+  return <button type="button" className="ws-extended-line" data-testid="extended-quotes-toggle" aria-label={`盤前盤後報價：${text}`} aria-expanded={expanded} aria-controls="extended-quote-details" onClick={onToggle}>{text}</button>;
+}
 export function ExtendedQuotes({
   symbol,
   quote,
@@ -14,33 +48,8 @@ export function ExtendedQuotes({
   quote: Quote | null;
   active: boolean;
 }) {
-  const [state, setState] = useState<{
-    symbol: string;
-    data?: ExtendedSnapshot;
-    error?: string;
-  }>();
   const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    const abort = new AbortController();
-    void fetchExtendedQuotes(symbol, abort.signal).then(
-      (data) => {
-        if (!abort.signal.aborted) setState({ symbol, data });
-      },
-      (error) => {
-        if (!abort.signal.aborted)
-          setState({
-            symbol,
-            error:
-              error instanceof Error && /尚未收錄|HTTP/.test(error.message)
-                ? error.message
-                : "延長時段快照連線失敗或格式無效",
-          });
-      },
-    );
-    return () => abort.abort();
-  }, [symbol, active, attempt]);
-  const current = state?.symbol === symbol ? state : null;
+  const current = useSnapshot(symbol, active, attempt);
   const time = (asOf: number) =>
     new Intl.DateTimeFormat("zh-TW", {
       timeZone: "America/New_York",

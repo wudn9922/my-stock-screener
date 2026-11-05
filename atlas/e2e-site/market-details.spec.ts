@@ -128,16 +128,16 @@ test("missing extended coverage and missing intraday history explain the cause",
   await expect(page.getByTestId("active-symbol")).toHaveText("NVDA");
   await expect(page.getByTestId("ohlc-header")).toContainText("O ");
   await expect(page.locator(".chart-loading")).toHaveCount(0);
-  await page.getByTestId("extended-quotes-toggle").click();
+  await page.getByTestId("source-info-toggle").click();
   await expect(
-    page.getByRole("region", { name: "盤前盤後報價" }),
+    page.getByRole("region", { name: "行情資料說明" }),
   ).toContainText("此股票尚未收錄延長時段快照");
   await expect(
     page
-      .getByRole("region", { name: "盤前盤後報價" })
+      .getByRole("region", { name: "行情資料說明" })
       .getByRole("link", { name: "查看官方盤前頁面" }),
   ).toHaveAttribute("href", /nasdaq.com.*nvda\/pre-market/);
-  await page.getByTestId("extended-quotes-toggle").click();
+  await page.getByTestId("source-info-toggle").click();
   await page.getByRole("button", { name: "價量", exact: true }).click();
   await expect(
     page.getByRole("region", { name: "前一交易日同時間量比" }),

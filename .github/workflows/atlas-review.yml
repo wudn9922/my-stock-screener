@@ -6,6 +6,7 @@ on:
       - 'atlas/**'
       - 'scripts/build_market_calendar.py'
       - 'tests/test_market_calendar.py'
+      - '.github/workflows/market-calendar.yml'
       - 'scripts/build_market_extras.py'
       - 'tests/test_market_extras.py'
       - 'config/ipo-watch.json'
@@ -235,7 +236,7 @@ jobs:
           retention-days: 7
       - name: Desktop, phone and WebKit regressions
         working-directory: atlas
-        run: npm run test:site -- market-calendar.spec.ts startup-watchlist.spec.ts market-details.spec.ts live-quotes.spec.ts timeframe-fixed-studies.spec.ts watchlist-reasons.spec.ts breadth-signals.spec.ts market-lists-pe.spec.ts market-coverage-charts.spec.ts market-bond-drawing.spec.ts layout-followups.spec.ts rates.spec.ts stock-parameter-consistency.spec.ts chart-watchlist-followups.spec.ts monitor-signals.spec.ts screener-health-layout.spec.ts watchlist-board.spec.ts mexc.spec.ts holdings.spec.ts data-status.spec.ts analysis-comparisons.spec.ts nav-inventory.spec.ts stock-views.spec.ts account-privacy.spec.ts legacy-import.spec.ts parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts data-integrity.spec.ts closed-market.spec.ts pwa-install.spec.ts pwa-login.spec.ts pwa-update.spec.ts line-handoff.spec.ts line-sdk-contract.spec.ts navigation-recovery.spec.ts market-chart-controls.spec.ts world-btc.spec.ts analysis-panel-layout.spec.ts notes-density.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts themes-map.spec.ts breakouts.spec.ts index-volume.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts trending-refresh.spec.ts workspace-refinements.spec.ts
+        run: npm run test:site -- market-calendar.spec.ts pr-a-live-clock.spec.ts pr-a-quote-status.spec.ts pr-a-extended-quotes.spec.ts pr-a-legacy-location.spec.ts pr-a-price-alert.spec.ts startup-watchlist.spec.ts market-details.spec.ts live-quotes.spec.ts timeframe-fixed-studies.spec.ts watchlist-reasons.spec.ts breadth-signals.spec.ts market-lists-pe.spec.ts market-coverage-charts.spec.ts market-bond-drawing.spec.ts layout-followups.spec.ts rates.spec.ts stock-parameter-consistency.spec.ts chart-watchlist-followups.spec.ts monitor-signals.spec.ts screener-health-layout.spec.ts watchlist-board.spec.ts mexc.spec.ts holdings.spec.ts data-status.spec.ts analysis-comparisons.spec.ts nav-inventory.spec.ts stock-views.spec.ts account-privacy.spec.ts legacy-import.spec.ts parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts data-integrity.spec.ts closed-market.spec.ts pwa-install.spec.ts pwa-login.spec.ts pwa-update.spec.ts line-handoff.spec.ts line-sdk-contract.spec.ts navigation-recovery.spec.ts market-chart-controls.spec.ts world-btc.spec.ts analysis-panel-layout.spec.ts notes-density.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts themes-map.spec.ts breakouts.spec.ts index-volume.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts trending-refresh.spec.ts workspace-refinements.spec.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -354,6 +355,33 @@ jobs:
           name: full-market-breakouts
           path: /tmp/full-market-breakouts/breakouts.json
           if-no-files-found: error
+          retention-days: 7
+
+  compact-ui-regressions:
+    # Add both 375px engines without reducing the original full desktop/390px matrix.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: atlas/package-lock.json
+      - name: Install dependencies
+        working-directory: atlas
+        run: npm ci
+      - name: Install compact browser engines
+        working-directory: atlas
+        run: npx playwright install --with-deps chromium webkit
+      - name: Verify affected UI at 375px on Chromium and WebKit
+        working-directory: atlas
+        run: npx playwright test --config e2e-site/playwright.compact.config.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atlas-compact-ui-evidence
+          path: atlas/test-results/site-compact
           retention-days: 7
 
   calendar-compact:

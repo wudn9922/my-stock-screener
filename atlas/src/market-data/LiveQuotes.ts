@@ -159,6 +159,11 @@ export class LiveQuoteFeed {
     return this.interval;
   }
 
+  /** Read the current subscription's validated observation; does not fetch or start a timer. */
+  latest(symbol: string): LiveDaily | undefined {
+    return this.entries.get(symbol)?.last;
+  }
+
   /** Called with the receive time of every batch that came back, for an "updated at" label. */
   onUpdate(listener: (atMs: number) => void): () => void {
     this.updateListeners.add(listener);
@@ -254,7 +259,6 @@ export class LiveQuoteFeed {
         if (Object.values(body.errors ?? {}).includes('rate_limited')) failed = true;
         const retrievedAt = this.now() / 1000;
         this.lastUpdatedAt = retrievedAt * 1000;
-        for (const listener of [...this.updateListeners]) listener(this.lastUpdatedAt);
         for (const symbol of batch) {
           const raw = body.results?.[symbol];
           const value = raw === undefined ? null : normalizeLive(raw, symbol, retrievedAt);
@@ -263,6 +267,7 @@ export class LiveQuoteFeed {
           entry.last = value;
           for (const listener of [...entry.listeners]) listener(value);
         }
+        for (const listener of [...this.updateListeners]) listener(this.lastUpdatedAt);
       } catch {
         // Retried on the next tick even outside the session (an unanswered first fetch counts as none).
         for (const symbol of batch) {

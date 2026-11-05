@@ -2,8 +2,11 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { OpenChartOptions } from '../app/Site';
 import type { Route } from '../app/routes';
 import { getDailyBars, searchStocks } from '../app/dataSources';
-import type { Bar } from '../market-data/MarketDataProvider';
-import { formatLiveTime, liveQuotes, mergeDailyBars } from '../market-data/LiveQuotes';
+import type { Bar, Quote } from '../market-data/MarketDataProvider';
+import { ExtendedQuoteLine } from './ExtendedQuotes';
+import { getMarketProfile } from '../market-data/MarketProfile';
+import { liveQuotes, mergeDailyBars } from '../market-data/LiveQuotes';
+import { quoteStatus } from '../market-data/quoteStatus';
 import { fetchTrendingStocks, type TrendingStocksResult } from '../report/trendingStocks';
 import type { SavedWatchlist } from '../watchlists/model';
 import { displayTicker, formatDateTime, formatPercent, formatPrice, toneClass } from './format';
@@ -79,6 +82,7 @@ function useNear<T extends Element>() {
 function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => void }) {
   const { ref, near, visible } = useNear<HTMLLIElement>();
   const [bars, setBars] = useState<readonly Bar[] | null>(null);
+  const [regularQuote, setRegularQuote] = useState<Quote>();
   const [resolvedName, setResolvedName] = useState<{ symbol: string; name: string }>();
   useEffect(() => {
     if (!near || row.name !== row.symbol) return;
@@ -105,7 +109,7 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
   useEffect(() => {
     if (!visible) return;
     return liveQuotes().subscribe(row.symbol, (value) =>
-      { setFailure(null); setBars((current) => (current ? mergeDailyBars(current, value.bars) : value.bars)); });
+      { setFailure(null); setRegularQuote(value.quote); setBars((current) => (current ? mergeDailyBars(current, value.bars) : value.bars)); });
   }, [visible, row.symbol]);
   const quote = Array.isArray(bars) ? rowQuote(bars) : null;
   const ticker = displayTicker(row.symbol);
@@ -135,6 +139,7 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
           <small className={`wb-change ${tone}`}>
             {failure && !bars ? '載入失敗' : quote?.changePct == null ? '…' : `${tone === 'up' ? '▲ ' : tone === 'down' ? '▼ ' : ''}${formatPercent(quote.changePct)}`}
           </small>
+          {getMarketProfile(row.symbol).market === 'US' && !row.symbol.startsWith('^') && <ExtendedQuoteLine symbol={row.symbol} quote={regularQuote} active={visible} compact />}
           {failure && <small className="wb-error" role="status">{failure}</small>}
         </span>
       </a>
@@ -194,6 +199,8 @@ export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterE
         ? trending.data.symbols.map((symbol) => ({ symbol, name: symbol }))
         : [];
   const shown = expanded ? rows : rows.slice(0, FIRST_ROWS);
+  const latestQuote = shown.map(row => liveQuotes().latest(row.symbol)?.quote).filter(value => !!value).sort((a, b) => b.asOf - a.asOf)[0];
+  const statusSymbol = tab === 'list' && list?.market === 'TW' ? '2330.TW' : 'AAPL';
   const listDate = list && tab === 'list' ? (list.lastViewed ?? list.history.at(-1))?.date : undefined;
   const open = (row: BoardRow) => openChart({ symbol: row.symbol, ...(row.name !== row.symbol ? { name: row.name } : {}) });
 
@@ -229,10 +236,11 @@ export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterE
       {rows.length > 0 && <button type="button" className="ghost-button wb-chart-toggle" aria-label={charts ? '返回行情清單' : `連續看全部股票圖表（${rows.length} 檔）`} title={charts ? '返回行情清單' : `連續看全部股票圖表（${rows.length} 檔）`} aria-pressed={charts} onClick={() => setCharts(value => !value)}>
         {charts ? '清單' : '圖表'}
       </button>}
+      {liveAt > 0 && <time className="wb-live-time" data-testid="board-live-time" dateTime={new Date(liveAt).toISOString()}>{quoteStatus(statusSymbol, latestQuote, liveAt)}</time>}
       </div>
       <PageFooterNote><p className="wb-caption">
         <span>{tab === 'list' ? list ? `清單：${list.name}` : '我的清單' : 'LINE 熱門美股'}</span>
-        <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}盤中每分鐘更新（Yahoo 延遲報價）{liveAt ? <> · <time data-testid="board-live-time">更新於 {formatLiveTime(liveAt)}</time></> : null}</span>
+        <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}盤中每分鐘更新（Yahoo 延遲報價）</span>
       </p></PageFooterNote>
       {charts && parameterError && <p role="status">{parameterError}</p>}
       {empty ? <div className="wb-empty" role="status">{empty}</div> : charts ? <StockChartList key={`${tab}:${list?.id ?? ''}`} rows={rows}

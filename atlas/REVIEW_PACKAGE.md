@@ -7,6 +7,18 @@ D1 只新增 XTAI／XNYS 的 generated 日曆、既有 LiveQuoteFeed 的交易�
 沒有改登入／帳號、Supabase 函式／SQL、GCP 或永久行情，沒有手動執行正式排程、通知、合併或部署。
 本地完整檢查與五種桌機／手機配置的結果列於 PR；瀏覽器自動化不代表實機 iPhone 簽核。
 
+## PR-A：報價與圖表介面 (2026-11-04)
+
+Primary self-review only; Claude review remains with the maintainer. Based on main `b0ca518232`.
+A1: timestamp restored to the existing list toolbar; one unit and five browser cases pass.
+A2: shared regular-session status, with 19 related unit and 30 browser cases passing, plus typecheck. Extended prices never supply the regular trade timestamp.
+A3: direct extended quotes, in-flow source details, <=56px list rows. Public Nasdaq responses confirm a missing newly priced issuer; parser and synthetic actual-shape fixtures fixed. Seven Python and 17 related unit tests pass; 50 affected browser executions and 20 numeric-P/E layout cases pass across all five targets.
+A4: empty legacy import UI disappears; importable records are offered only in the My footer. Five new unit cases plus 18 related units and 45 browser cases pass. Existing opt-in import, cloud-only data preservation and account isolation assertions remain.
+A5: price-alert shortcut commits a canonical horizontal drawing through existing history/cloud sync. Checks cloud grant and successful synchronization, loaded symbol/timeframe and duplicate lines. Five new unit cases (including atlas.save/undo integration) and 20 browser cases pass; all cloud endpoints and notifications are fake in tests. No protected server/auth/SQL/GCP or permanent-record file is edited.
+Full lint, typecheck, normal + Pages builds and 142 Vitest files / 1,797 tests pass. The broader affected site suite passes all 141 cases. The existing provider/cache/local-alert/drawing journey passes all 16 cases on desktop and mobile Chromium, iPad and iPhone WebKit. Final source-metadata retention also passes lint/typecheck, 23 focused units and both builds. Original assertions remain, except exact changes required by the requested new status text and removal of the empty legacy prompt; those now assert their new locations/absence explicitly. No skip or timeout was added.
+The first full CI site sweep found two phone header-height failures (131.1875px against the unchanged 124px cap), with 836 passes and five pre-existing skips. Explicit compact line heights preserve fonts/content and satisfy the existing cap. The focused five-target run passes 44 cases with one existing desktop skip; the unchanged full CI and downstream offline integrations rerun on the follow-up head.
+See `docs/PR_A_UI_QUOTES_ALERTS.md` for exact scope, checks and screenshots.
+
 ## Current follow-up: startup, compact watchlists and public market details (2026-11-04)
 
 Primary self-review only; no independent sign-off. Based on latest main `df29c9351`.
