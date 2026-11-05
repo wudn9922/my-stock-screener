@@ -50,18 +50,18 @@ export function inRegularSession(profile: MarketProfile, nowMs: number, graceMin
 }
 
 /**
- * Replaces rows with the same time and appends newer ones. Older history is never touched, and
- * rows older than the existing first bar are ignored.
+ * Replaces rows with the same time, inserts sessions missing from the existing series (for example
+ * a day the source left empty and later rebuilt) and appends newer ones. Rows older than the
+ * existing first bar are ignored, so older history is never extended or rewritten.
  */
 export function mergeDailyBars(existing: readonly Bar[], recent: readonly Bar[]): Bar[] {
   if (!existing.length) return [...recent];
   const first = existing[0]!.time;
-  const updates = new Map(recent.filter((bar) => bar.time >= first).map((bar) => [bar.time, bar]));
-  if (!updates.size) return [...existing];
-  const merged = existing.map((bar) => updates.get(bar.time) ?? bar);
-  const last = existing.at(-1)!.time;
-  for (const bar of recent) if (bar.time > last && updates.get(bar.time) === bar) merged.push(bar);
-  return merged;
+  const updates = recent.filter((bar) => bar.time >= first);
+  if (!updates.length) return [...existing];
+  const byTime = new Map(existing.map((bar) => [bar.time, bar]));
+  for (const bar of updates) byTime.set(bar.time, bar);
+  return [...byTime.values()].sort((a, b) => a.time - b.time);
 }
 
 /**

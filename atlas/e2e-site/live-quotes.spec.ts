@@ -78,3 +78,15 @@ test('during the session the chart price and its update time move again a minute
   await expect(page.getByTestId('live-time')).toHaveText(/^延遲報價 · 更新於 12:21:\d{2}$/);
   await page.screenshot({ path: test.info().outputPath('live-time-header.png') });
 });
+
+test('market index cards follow the live refresh without rebuilding their chart', async ({ page }) => {
+  await mockSite(page);
+  const batches = await liveQuotes(page);
+  await page.goto('./?page=markets&market=tw');
+  const card = page.locator('article.index-card').first();
+  await expect(card).toBeVisible();
+  await expect(card.locator('.index-card-quote b')).toHaveText(/1,?234\.50/);
+  await expect(card.getByTestId('index-live-time')).toHaveText(/^更新於 \d{2}:\d{2}:\d{2}$/);
+  await expect(card.locator('.mini-chart')).toHaveAttribute('data-status', 'ready');
+  expect(batches.flat().length).toBeGreaterThan(0);
+});

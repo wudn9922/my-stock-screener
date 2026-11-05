@@ -172,3 +172,122 @@ export function slimChartPayload(value: unknown): unknown {
   const quote = ((result.indicators as { quote?: unknown[] } | undefined)?.quote ?? []).slice(0, 1);
   return { chart: { result: [{ meta, timestamp: result.timestamp ?? [], indicators: { quote } }], error: null } };
 }
+
+/**
+ * Yahoo sometimes leaves recent daily rows empty (all OHLCV null) although the session traded:
+ * ^TWII on 2026-11-05 had null rows for 11/04 and 11/05 while meta.regularMarketPrice carried
+ * the 11/04 close; later the same morning 11/05 had prices but 11/04 stayed empty. When the latest
+ * quote is from a session the daily rows do not show yet, or one of the last five rows before the
+ * last priced row is completely empty, those empty sessions are rebuilt from Yahoo's 5-minute bars.
+ * Rows with any price are never changed (the client heals a missing latest close from meta).
+ */
+export const INTRADAY_FILL_REQUEST = { interval: '5m', range: '5d' } as const;
+
+type Series = (number | null)[];
+interface ChartResult {
+  meta?: { regularMarketTime?: number; gmtoffset?: number } & Record<string, unknown>;
+  timestamp?: number[];
+  indicators?: { quote?: { open?: Series; high?: Series; low?: Series; close?: Series; volume?: Series }[]; adjclose?: { adjclose?: Series }[] };
+}
+
+const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+function firstResult(payload: unknown): ChartResult | undefined {
+  return (payload as { chart?: { result?: ChartResult[] } })?.chart?.result?.[0];
+}
+
+/** Calendar date in the exchange's local time (Yahoo's gmtoffset, seconds). */
+export function exchangeDate(time: number, gmtoffset = 0): string {
+  return new Date((time + gmtoffset) * 1000).toISOString().slice(0, 10);
+}
+
+/** Rows near the end that the 5-day intraday request can still rebuild. */
+const FILLABLE_TAIL = 5;
+
+export function needsIntradayFill(payload: unknown): boolean {
+  const result = firstResult(payload);
+  const times = result?.timestamp ?? [];
+  const q = result?.indicators?.quote?.[0];
+  const metaTime = result?.meta?.regularMarketTime;
+  if (!finite(metaTime) || !times.length || !q) return false;
+  const offset = finite(result?.meta?.gmtoffset) ? result!.meta!.gmtoffset! : 0;
+  const metaDate = exchangeDate(metaTime, offset);
+  const priced = (i: number) => [q.open?.[i], q.high?.[i], q.low?.[i], q.close?.[i]].some(finite);
+  // A row with any price is left to the client (it heals a missing latest close from meta).
+  let last = -1;
+  for (let i = times.length - 1; i >= 0; i--) if (priced(i)) { last = i; break; }
+  if (last < 0) return false;
+  // The latest quote is from a session the daily rows do not show yet.
+  if (metaDate > exchangeDate(times[last]!, offset)) return true;
+  // Or a recent session the quote has already moved past is completely empty (a gap).
+  for (let i = Math.max(0, times.length - FILLABLE_TAIL); i < times.length; i++)
+    if (!priced(i) && exchangeDate(times[i]!, offset) <= metaDate && i < last) return true;
+  return false;
+}
+
+/** Returns the patched daily payload and the exchange dates that were rebuilt from 5-minute bars. */
+export function fillDailyFromIntraday(daily: unknown, intraday: unknown): { payload: unknown; filled: string[] } {
+  const result = firstResult(daily), minute = firstResult(intraday);
+  const quote = result?.indicators?.quote?.[0];
+  const bars = minute?.indicators?.quote?.[0];
+  if (!result?.timestamp || !quote || !minute?.timestamp || !bars) return { payload: daily, filled: [] };
+  const offset = finite(result.meta?.gmtoffset) ? result.meta!.gmtoffset! : 0;
+  const sessions = new Map<string, { time: number; open: number; high: number; low: number; close: number; volume: number | null }>();
+  minute.timestamp.forEach((time, i) => {
+    const o = bars.open?.[i], h = bars.high?.[i], l = bars.low?.[i], c = bars.close?.[i], v = bars.volume?.[i];
+    if (!finite(time) || !finite(o) || !finite(h) || !finite(l) || !finite(c) || o <= 0 || h <= 0 || l <= 0 || c <= 0) return;
+    const date = exchangeDate(time, offset);
+    const session = sessions.get(date);
+    if (!session) sessions.set(date, { time, open: o, high: h, low: l, close: c, volume: finite(v) ? v : null });
+    else {
+      session.high = Math.max(session.high, h);
+      session.low = Math.min(session.low, l);
+      session.close = c;
+      if (finite(v)) session.volume = (session.volume ?? 0) + v;
+    }
+  });
+  if (!sessions.size) return { payload: daily, filled: [] };
+  const copy = structuredClone(daily) as { chart: { result: ChartResult[] } };
+  const target = copy.chart.result[0]!;
+  const times = target.timestamp!;
+  const q = target.indicators!.quote![0]!;
+  const fields = ['open', 'high', 'low', 'close', 'volume'] as const;
+  for (const field of fields) q[field] ??= times.map(() => null);
+  const adj = target.indicators?.adjclose?.[0]?.adjclose;
+  const filled: string[] = [];
+  const put = (i: number, s: { open: number; high: number; low: number; close: number; volume: number | null }) => {
+    q.open![i] = s.open; q.high![i] = s.high; q.low![i] = s.low; q.close![i] = s.close; q.volume![i] = s.volume;
+    if (adj && !finite(adj[i])) adj[i] = s.close;
+  };
+  times.forEach((time, i) => {
+    // Only completely empty rows are rebuilt.
+    if ([q.open![i], q.high![i], q.low![i], q.close![i]].some(finite)) return;
+    const date = exchangeDate(time, offset), session = sessions.get(date);
+    if (session) { put(i, session); filled.push(date); }
+  });
+  const lastDate = times.length ? exchangeDate(times.at(-1)!, offset) : '';
+  for (const [date, session] of [...sessions].sort(([a], [b]) => a.localeCompare(b))) {
+    if (date <= lastDate) continue;
+    times.push(session.time);
+    for (const field of fields) q[field]!.push(null);
+    if (adj) adj.push(null);
+    put(times.length - 1, session);
+    filled.push(date);
+  }
+  if (!filled.length) return { payload: daily, filled };
+  // A rebuilt session that Yahoo's latest quote belongs to closes at that quote (the official
+  // close after the session, the live price during it).
+  const metaTime = target.meta?.regularMarketTime, metaPrice = target.meta?.regularMarketPrice;
+  if (finite(metaTime) && finite(metaPrice) && metaPrice > 0) {
+    const metaDate = exchangeDate(metaTime, offset);
+    const i = times.findIndex((time) => exchangeDate(time, offset) === metaDate);
+    if (i >= 0 && filled.includes(metaDate) && metaTime >= times[i]!) {
+      q.close![i] = metaPrice;
+      q.high![i] = Math.max(q.high![i]!, metaPrice);
+      q.low![i] = Math.min(q.low![i]!, metaPrice);
+      if (adj) adj[i] = metaPrice;
+    }
+  }
+  target.meta = { ...target.meta, atlasIntradayFill: filled };
+  return { payload: copy, filled };
+}
