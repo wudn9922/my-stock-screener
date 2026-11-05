@@ -179,7 +179,7 @@ export const screenerFixtures = {
 export async function mockSite(page: Page, options: MockOptions = {}) {
   // Legacy source regression fixtures explicitly have no archive. Archive suites override this route.
   await page.route('https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/**', route => route.fulfill({
-    json: { version: 2, markets: { tw: { symbols: [] }, us: { symbols: [] } } },
+    status: 404,
   }));
   const requested: string[] = [];
   const json = (route: Route, body: unknown, status = 200) =>

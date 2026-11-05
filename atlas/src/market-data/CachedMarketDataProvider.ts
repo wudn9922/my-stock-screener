@@ -27,8 +27,9 @@ export const DEFAULT_DEMO_TTL_MS = 24 * 60 * 60 * 1000;
 export const DEFAULT_YAHOO_TTL_MS = 60 * 1000;
 const DEFAULT_MAX_ENTRIES = 150;
 
-type CacheKind = 'bars' | 'quote' | 'events';
-type CacheValue = BarResult | Quote | CorporateEventsResult;
+type CacheKind = 'bars' | 'quote' | 'events' | 'document';
+interface PublicDocument { symbol: string; document: unknown }
+type CacheValue = BarResult | Quote | CorporateEventsResult | PublicDocument;
 
 interface NormalizedRange {
   from: number | null;
@@ -128,6 +129,10 @@ function validateValue(
   timeframe?: string,
 ): asserts value is CacheValue {
   if (!isObject(value)) throw new MarketCacheCorruptionError('Cached market data is not an object');
+  if (kind === 'document') {
+    if (value.symbol !== expectedSymbol || !Object.hasOwn(value, 'document')) throw new MarketCacheCorruptionError('Cached public document has invalid identity');
+    return;
+  }
   if (kind === 'bars') {
     if (
       !Array.isArray(value.bars) ||
@@ -367,6 +372,13 @@ export class CachedMarketDataProvider implements MarketDataProvider {
     return result as Quote;
   }
 
+  /** Small public archive indexes share the existing account-scoped database and grant rules. */
+  async getDocument<T>(symbol: string, load: () => Promise<unknown>, parse: (value: unknown) => T): Promise<T> {
+    const identity = makeIdentity(this.cacheIdentity, symbol, 'document', '1D', { from: null, to: null });
+    const result = await this.request(identity, async () => ({ symbol: identity.symbol, document: parse(await load()) }));
+    return parse((result as PublicDocument).document);
+  }
+
   async refreshBars(symbol: string, timeframe: Timeframe, signal?: AbortSignal): Promise<BarResult> {
     signal?.throwIfAborted();
     const context = this.ensureContext();
@@ -515,13 +527,13 @@ export class CachedMarketDataProvider implements MarketDataProvider {
     };
     if (!db) {
       this.memory.set(identity.key, entry);
-      const entries = [...this.memory.values()].sort((a, b) => b.createdAt - a.createdAt);
+      const entries = [...this.memory.values()].filter(e => (e.kind === 'document') === (identity.kind === 'document')).sort((a, b) => b.createdAt - a.createdAt);
       for (const expired of entries.slice(this.maxEntries)) this.memory.delete(expired.key);
       return;
     }
     const tx = db.transaction('entries', 'readwrite');
     await tx.store.put(entry);
-    const entries = await tx.store.getAll();
+    const entries = (await tx.store.getAll()).filter(e => (e.kind === 'document') === (identity.kind === 'document'));
     entries.sort((a, b) => b.createdAt - a.createdAt);
     for (const expired of entries.slice(this.maxEntries)) await tx.store.delete(expired.key);
     await tx.done;

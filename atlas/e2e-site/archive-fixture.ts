@@ -1,3 +1,4 @@
+import { archiveIndexFixture } from '../tests/fixtures/archive-index';
 import type { Page } from '@playwright/test';
 import { dailyBars, yahooChart } from './mocks';
 
@@ -7,9 +8,17 @@ export async function archives(page: Page, symbols: string[]) {
   const requests: string[]=[];
   await page.route(root+'**',route=>{
     const path=route.request().url().slice(root.length); requests.push(path);
-    if(path==='manifest.json') return route.fulfill({json:{version:1,markets:Object.fromEntries(['tw','us'].map(m=>[m,{
-      symbols:symbols.filter(s=>s.endsWith('.TW')===(m==='tw')),firstDate:'2026-01-01',lastDate:'2026-10-08',
-    }]))}});
+    if(path.startsWith('index/')) {
+      const symbol=decodeURIComponent(decodeURIComponent(path.split('/').at(-1)!.slice(0,-5)));
+      if(!symbols.includes(symbol))return route.fulfill({status:404});
+      const files:Record<number,string>={};
+      for(const row of dailyBars(symbol)) {
+        const year=new Date(row.time*1000).getUTCFullYear();
+        files[year]??='Date,Open,High,Low,Close,Volume\n';
+        files[year]+=[new Date(row.time*1000).toISOString().slice(0,10),row.open,row.high,row.low,row.close,row.volume].join(',')+'\n';
+      }
+      return route.fulfill({json:archiveIndexFixture(symbol,files)});
+    }
     const parts=path.split('/'),symbol=decodeURIComponent(parts[1]??''),year=Number(parts[2]?.slice(0,4));
     const rows=dailyBars(symbol).filter(bar=>new Date(bar.time*1000).getUTCFullYear()===year);
     return route.fulfill({contentType:'text/csv',body:'Date,Open,High,Low,Close,Volume\n'+rows.map(b=>[new Date(b.time*1000).toISOString().slice(0,10),b.open,b.high,b.low,b.close,b.volume].join(',')).join('\n')+'\n'});

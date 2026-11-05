@@ -1,3 +1,4 @@
+import { archiveIndexFixture } from './fixtures/archive-index';
 import { describe, expect, it, vi } from 'vitest';
 import { ArchiveFirstProvider, archiveQuote, mergeArchivedLive } from '../src/market-data/ArchiveFirstProvider';
 import { KlineArchive } from '../src/market-data/KlineArchive';
@@ -10,9 +11,8 @@ const make = () => {
   const calls: string[] = [];
   const fetcher = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input); calls.push(url);
-    return new Response(url.endsWith('manifest.json') ? JSON.stringify({ version: 1, markets: {
-      us: { symbols: ['AAPL'], firstDate: '2026-01-02', lastDate: '2026-01-05' },
-    } }) : body);
+    if(url.endsWith('/NEW.json'))return new Response('',{status:404});
+    return new Response(url.endsWith('.json') ? JSON.stringify(archiveIndexFixture('AAPL',{2026:body})) : body);
   }) as typeof fetch;
   const archive = new KlineArchive({ fetcher, cache: false });
   const fallback = { id: 'test', supportedTimeframes: ['1D','1W','1M','5m'],

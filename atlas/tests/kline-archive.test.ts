@@ -1,11 +1,12 @@
 import 'fake-indexeddb/auto';
+import { archiveIndexFixture } from './fixtures/archive-index';
 import { describe, expect, it, vi } from 'vitest';
 import { KlineArchive, mergeArchiveDaily, parseArchiveCsv } from '../src/market-data/KlineArchive';
 import { TimeMapper, regularSessionOpen } from '../src/chart/TimeMapper';
 import { getMarketProfile } from '../src/market-data/MarketProfile';
 
 const csv = (year = 2026, price = 100, volume = '1000') => `Date,Open,High,Low,Close,Volume\n${year}-01-02,${price},${price + 1},${price - 1},${price},${volume}\n`;
-const manifest = { version: 1, markets: { us: { symbols: ['AAPL'], firstDate: '2024-01-02', lastDate: '2026-01-02' } } };
+const index = archiveIndexFixture('AAPL', {2024:csv(2024),2025:csv(2025),2026:csv(2026)});
 const now = () => Date.UTC(2026, 10, 4);
 const range = { from: Date.UTC(2025, 6, 4) / 1000 };
 
@@ -28,7 +29,7 @@ describe('archive reader C1', () => {
     const paths: string[] = [];
     const fetcher = (async (url: RequestInfo | URL) => {
       paths.push(String(url));
-      return new Response(String(url).endsWith('manifest.json') ? JSON.stringify(manifest) : csv(Number(String(url).match(/(\d{4})\.csv/)![1])));
+      return new Response(String(url).endsWith('.json') ? JSON.stringify(index) : csv(Number(String(url).match(/(\d{4})\.csv/)![1])));
     }) as typeof fetch;
     const options = { fetcher, now: () => clock, cache: { dbName: 'archive-unit-' + crypto.randomUUID() } };
     await new KlineArchive(options).getDaily('AAPL');
@@ -36,41 +37,62 @@ describe('archive reader C1', () => {
     paths.length = 0;
     await new KlineArchive(options).getDaily('AAPL');
     expect(paths.filter(url=>url.endsWith('.csv'))).toHaveLength(0);
+    expect(paths).toHaveLength(0); // The index also survived in the existing IndexedDB.
     clock += 86400000;
     paths.length = 0;
     await new KlineArchive(options).getDaily('AAPL');
     expect(paths.filter(url=>url.endsWith('.csv'))).toHaveLength(1);
     expect(paths.at(-1)).toContain('2026.csv');
+    expect(paths.filter(url=>url.includes('/index/'))).toHaveLength(1);
   });
-  it('reads manifest once and only needed year files; de-duplicates simultaneous consumers', async () => {
+  it('reads each symbol index once and only needed year files; de-duplicates simultaneous consumers', async () => {
     const paths: string[] = [];
     const fetcher = vi.fn(async (url: RequestInfo | URL) => {
       const path = String(url).replace('https://archive.test/', ''); paths.push(path);
-      return new Response(path === 'manifest.json' ? JSON.stringify(manifest) : csv(Number(path.match(/(\d{4})\.csv/)![1])));
+      if(path==='index/us/NEW.json')return new Response('',{status:404});
+      return new Response(path.endsWith('.json') ? JSON.stringify(index) : csv(Number(path.match(/(\d{4})\.csv/)![1])));
     }) as typeof fetch;
     const archive = new KlineArchive({ fetcher, baseUrl: 'https://archive.test/', cache: false, now });
     const [first, second] = await Promise.all([archive.getDaily('AAPL', range), archive.getDaily('AAPL', range)]);
     expect(first?.bars).toEqual(second?.bars);
-    expect(paths.sort()).toEqual(['manifest.json', 'us/AAPL/2025.csv', 'us/AAPL/2026.csv']);
+    expect(paths.sort()).toEqual(['index/us/AAPL.json', 'us/AAPL/2025.csv', 'us/AAPL/2026.csv']);
     expect(await archive.getDaily('NEW')).toBeNull();
-    expect(paths).toHaveLength(3);
+    expect(await archive.getDaily('NEW')).toBeNull();
+    expect(paths).toHaveLength(4);
+    expect(paths).not.toContain('manifest.json');
   });
-  it('v2 uses exact membership, encoded path, year hashes and actual IPO date', async () => {
+  it('caches 404 once per UTC day and never reuses yesterday\'s positive index after removal', async () => {
+    let clock = now(), absent = false;
+    const paths: string[] = [];
+    const fetcher = (async (url: RequestInfo | URL) => {
+      paths.push(String(url));
+      if (String(url).includes('/index/')) return absent ? new Response('',{status:404}) : Response.json(index);
+      return new Response(csv(Number(String(url).match(/(\d{4})\.csv/)![1])));
+    }) as typeof fetch;
+    const options = { fetcher, now:()=>clock, cache:{dbName:'index-negative-'+crypto.randomUUID()} };
+    await new KlineArchive(options).getDaily('AAPL');
+    clock += 86400_000; absent = true; paths.length = 0;
+    expect(await new KlineArchive(options).getDaily('AAPL')).toBeNull();
+    expect(await new KlineArchive(options).getDaily('AAPL')).toBeNull();
+    expect(paths).toHaveLength(1);
+    expect(paths[0]).toContain('index/us/AAPL.json');
+  });
+  it('per-symbol indexes use exact membership, encoded filenames, hashes and actual IPO date', async () => {
     const body = csv(2026);
     const sha256 = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body)))].map(b => b.toString(16).padStart(2, '0')).join('');
-    const m = { version: 2, markets: { tw: { symbols: ['^TWII'], firstDate: '2021-01-01', lastDate: '2026-01-02' } }, bySymbol: {
-      '^TWII': { market: 'tw', path: 'tw/%5ETWII', firstDate: '2026-01-02', lastDate: '2026-01-02', years: { 2026: { sha256 } } },
-    } };
-    const fetcher = vi.fn(async (url: RequestInfo | URL) => new Response(String(url).endsWith('manifest.json') ? JSON.stringify(m) : body)) as typeof fetch;
+    const m = archiveIndexFixture('^TWII', {2026:body});
+    expect(m.years[2026].sha256).toBe(sha256);
+    const fetcher = vi.fn(async (url: RequestInfo | URL) => new Response(String(url).endsWith('.json') ? JSON.stringify(m) : body)) as typeof fetch;
     expect((await new KlineArchive({ fetcher, cache: false, now }).getDaily('^TWII'))?.bars).toHaveLength(1);
     expect(vi.mocked(fetcher).mock.calls.map(call => String(call[0]))).toContain('https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/tw/%5ETWII/2026.csv');
-    m.bySymbol['^TWII'].years[2026].sha256 = '0'.repeat(64);
+    expect(vi.mocked(fetcher).mock.calls.map(call => String(call[0]))).toContain('https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/index/tw/%255ETWII.json');
+    m.years[2026].sha256 = '0'.repeat(64);
     await expect(new KlineArchive({ fetcher, cache: false, now }).getDaily('^TWII')).rejects.toThrow('年度檔');
   });
   it('keeps partial available history when an older year is missing; retries failed files', async () => {
     let fail = true;
-    const fetcher = vi.fn(async (url: RequestInfo | URL) => new Response(String(url).endsWith('manifest.json') ? JSON.stringify(manifest)
-      : String(url).endsWith('2026.csv') || !fail ? csv(Number(String(url).match(/(\d{4})\.csv/)![1])) : '', { status: String(url).endsWith('manifest.json') || String(url).endsWith('2026.csv') || !fail ? 200 : 404 })) as typeof fetch;
+    const fetcher = vi.fn(async (url: RequestInfo | URL) => new Response(String(url).endsWith('.json') ? JSON.stringify(index)
+      : String(url).endsWith('2026.csv') || !fail ? csv(Number(String(url).match(/(\d{4})\.csv/)![1])) : '', { status: String(url).endsWith('.json') || String(url).endsWith('2026.csv') || !fail ? 200 : 404 })) as typeof fetch;
     const archive = new KlineArchive({ fetcher, cache: false, now });
     const first = await archive.getDaily('AAPL');
     expect(first?.bars).toHaveLength(1); expect(first?.source).toContain('部分年度');
@@ -95,7 +117,7 @@ describe('archive reader C1', () => {
     const next = { ...old[0]!, time: old[0]!.time + 86400 };
     expect(mergeArchiveDaily(old, [next], 'AAPL').bars).toHaveLength(2);
   });
-  it('manifest unavailable fails explicitly; aborting one consumer leaves shared requests usable', async () => {
+  it('symbol index unavailable fails explicitly; aborting one consumer leaves shared requests usable', async () => {
     const archive = new KlineArchive({ fetcher: async () => new Response('', { status: 503 }), cache: false });
     await expect(archive.getDaily('AAPL')).rejects.toThrow('HTTP 503');
     const controller = new AbortController(); controller.abort();

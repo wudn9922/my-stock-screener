@@ -1,3 +1,4 @@
+import { archiveIndexFixture } from '../tests/fixtures/archive-index';
 import { expect, test, type Page } from '@playwright/test';
 import { dailyBars, mockSite } from './mocks';
 
@@ -14,9 +15,8 @@ async function archived(page: Page, symbol = 'AAPL') {
   const requested: string[] = [];
   await page.route(archiveRoot + '**', route => {
     const path = route.request().url().slice(archiveRoot.length); requested.push(path);
-    const market = symbol.endsWith('.TW') ? 'tw' : 'us';
-    if (path === 'manifest.json') return route.fulfill({ json: { version:1, markets: { [market]: { symbols:[symbol],
-      firstDate:new Date(bars[0]!.time*1000).toISOString().slice(0,10),lastDate:'2026-10-08' } } } });
+    if (path.startsWith('index/')) return route.fulfill({json:archiveIndexFixture(symbol,
+      Object.fromEntries([...byYear].map(([year,rows])=>[year,'Date,Open,High,Low,Close,Volume\n'+rows.join('\n')+'\n'])))});
     const rows = byYear.get(Number(path.match(/(\d{4})\.csv/)?.[1]));
     return route.fulfill(rows ? { contentType:'text/csv',body:'Date,Open,High,Low,Close,Volume\n'+rows.join('\n')+'\n' } : {status:404});
   });
@@ -48,7 +48,8 @@ for (const failure of ['502','timeout','invalid'] as const) test(`C1/C2 archive 
   }
   expect(market.some(url=>new URL(url).searchParams.get('symbol')==='AAPL'
     && new URL(url).searchParams.get('interval')==='1d' && new URL(url).searchParams.get('range')==='5y')).toBe(false);
-  expect(archiveRequests.filter(path=>path==='manifest.json')).toHaveLength(3); // one per independent navigation
+  expect(archiveRequests).not.toContain('manifest.json');
+  expect(archiveRequests.filter(path=>path.startsWith('index/'))).toHaveLength(3); // one per independent navigation
 });
 
 test('C2 intraday failure explains the cause and offers daily archive recovery', async ({page}) => {

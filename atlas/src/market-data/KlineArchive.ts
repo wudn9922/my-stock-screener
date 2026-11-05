@@ -8,14 +8,9 @@ export const ARCHIVE_BASE = 'https://raw.githubusercontent.com/wudn9922/my-stock
 export const ARCHIVE_SOURCE = 'GitHub 永久封存';
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY = 86400;
-interface ArchiveEntry {
-  market: 'tw' | 'us'; path: string; firstDate: string; lastDate: string;
-  years?: Record<string, { sha256?: string }>;
-}
-interface Manifest {
-  version: 1 | 2;
-  markets: Record<string, { symbols: string[]; firstDate: string; lastDate: string }>;
-  bySymbol?: Record<string, ArchiveEntry>;
+export interface ArchiveEntry {
+  version: 1; symbol: string; market: 'tw' | 'us'; path: string; firstDate: string; lastDate: string;
+  years: Record<string, { sha256: string; firstDate: string; lastDate: string; rows: number; csvBytes: number }>;
 }
 export interface ArchiveOptions {
   baseUrl?: string; fetcher?: typeof fetch; now?: () => number;
@@ -50,23 +45,36 @@ export function parseArchiveCsv(text: string, symbol: string, year: number): Bar
     adjusted: true, priceBasis: 'split-adjusted', dataState: 'delayed', market: getMarketProfile(symbol) }, symbol, '1D');
 }
 
-function entryFor(raw: unknown, symbol: string): ArchiveEntry | null {
-  const m = raw as Partial<Manifest> | null;
-  if (!m || (m.version !== 1 && m.version !== 2) || !m.markets || typeof m.markets !== 'object') throw new Error('封存 manifest 格式不符');
+function validDate(value: unknown): value is string {
+  return typeof value === 'string' && DATE.test(value) && Number.isFinite(Date.parse(value))
+    && new Date(value).toISOString().slice(0, 10) === value;
+}
+export function parseArchiveIndex(raw: unknown, symbol: string): ArchiveEntry | null {
+  if (raw === null) return null;
+  const item = raw as Partial<ArchiveEntry> | null;
   const market = getMarketProfile(symbol).market === 'TW' ? 'tw' : 'us';
-  const part = m.markets[market];
-  if (!part || !Array.isArray(part.symbols) || !part.symbols.includes(symbol)) return null;
-  const item = m.bySymbol?.[symbol];
-  const firstDate = item?.firstDate ?? part.firstDate, lastDate = item?.lastDate ?? part.lastDate;
-  const path = `${market}/${encodeURIComponent(symbol)}`;
-  if (!DATE.test(firstDate) || !DATE.test(lastDate) || firstDate > lastDate
-      || (item && (item.market !== market || item.path !== path))) throw new Error('封存 manifest 日期或路徑不符');
-  return { market, path, firstDate, lastDate, ...(item?.years ? { years: item.years } : {}) };
+  if (!item || item.version !== 1 || item.symbol !== symbol || item.market !== market
+    || item.path !== `${market}/${encodeURIComponent(symbol)}` || !validDate(item.firstDate)
+    || !validDate(item.lastDate) || item.firstDate > item.lastDate || !item.years
+    || typeof item.years !== 'object' || Array.isArray(item.years) || !Object.keys(item.years).length)
+    throw new Error('封存個股 index 身分、日期或路徑不符');
+  const years = Object.entries(item.years);
+  for (const [year, detail] of years) {
+    if (!/^\d{4}$/.test(year) || year < item.firstDate.slice(0, 4) || year > item.lastDate.slice(0, 4)
+      || !detail || !/^[a-f0-9]{64}$/.test(detail.sha256) || !validDate(detail.firstDate) || !validDate(detail.lastDate)
+      || !detail.firstDate.startsWith(year + '-') || !detail.lastDate.startsWith(year + '-')
+      || detail.firstDate > detail.lastDate || detail.firstDate < item.firstDate || detail.lastDate > item.lastDate
+      || !Number.isSafeInteger(detail.rows) || detail.rows < 1 || !Number.isSafeInteger(detail.csvBytes) || detail.csvBytes < 1)
+      throw new Error('封存個股 index 年度明細不符');
+  }
+  if (years.map(([, detail]) => detail.firstDate).sort()[0] !== item.firstDate
+    || years.map(([, detail]) => detail.lastDate).sort().at(-1) !== item.lastDate)
+    throw new Error('封存個股 index 年度日期不符');
+  return item as ArchiveEntry;
 }
 
 export class KlineArchive {
-  private manifest?: Promise<unknown>;
-  private manifestDay = '';
+  private readonly indexes = new Map<string, Promise<ArchiveEntry | null>>();
   private readonly years = new Map<string, Promise<BarResult>>();
   private readonly fetcher: typeof fetch;
   private readonly now: () => number;
@@ -81,25 +89,44 @@ export class KlineArchive {
     if (!response.ok) throw new Error(`永久封存讀取失敗（HTTP ${response.status}）`);
     return response;
   }
-  private loadManifest() {
-    const day = new Date(this.now()).toISOString().slice(0, 10);
-    if (this.manifestDay !== day) { this.manifest = undefined; this.manifestDay = day; }
-    if (!this.manifest) {
-      this.manifest = this.request('manifest.json').then(response => response.json());
-      void this.manifest.catch(() => { this.manifest = undefined; });
+  private loadIndex(symbol: string): Promise<ArchiveEntry | null> {
+    const day = new Date(this.now()).toISOString().slice(0, 10), key = `${day}:${symbol}`;
+    let pending = this.indexes.get(key);
+    if (!pending) {
+      const market = getMarketProfile(symbol).market === 'TW' ? 'tw' : 'us';
+      const load = async () => {
+        // Index filenames are encoded on disk; encode '%' again for HTTP.
+        const path = `index/${market}/${encodeURIComponent(encodeURIComponent(symbol))}.json`;
+        const response = await this.fetcher(this.base + path, { signal: AbortSignal.timeout(this.options.timeoutMs ?? 8000) });
+        if (response.status === 404) return null;
+        if (!response.ok) throw new Error(`永久封存 index 讀取失敗（HTTP ${response.status}）`);
+        return parseArchiveIndex(await response.json(), symbol);
+      };
+      if (this.options.cache === false) pending = load();
+      else {
+        const provider = { id: 'kline-archive-index', cacheVersion: `${this.base}:v1:${day}`, supportedTimeframes: ['1D'] as const,
+          getBars: async (): Promise<BarResult> => { throw new Error('Index has no bars'); },
+          getQuote: async (): Promise<Quote> => { throw new Error('Index has no quote'); } };
+        const cached = new CachedMarketDataProvider(provider, { ...this.options.cache, now: this.now,
+          ttlMs: Date.parse(day + 'T00:00:00Z') + DAY * 1000 - this.now(), maxEntries: this.options.cache?.maxEntries ?? 2000 });
+        pending = cached.getDocument(symbol, load, value => parseArchiveIndex(value, symbol))
+          .finally(() => cached.close().catch(() => undefined));
+      }
+      this.indexes.set(key, pending);
+      while (this.indexes.size > 400) this.indexes.delete(this.indexes.keys().next().value!);
     }
-    return this.manifest;
+    return pending;
   }
   async getDaily(symbolInput: string, range?: MarketRange, signal?: AbortSignal): Promise<BarResult | null> {
     const symbol = normalizeSymbol(symbolInput);
     signal?.throwIfAborted();
-    const entry = entryFor(await this.loadManifest(), symbol);
+    const entry = await this.loadIndex(symbol);
     signal?.throwIfAborted();
     if (!entry) return null;
     const first = Math.max(Number(entry.firstDate.slice(0, 4)), range?.from === undefined ? 0 : new Date(range.from * 1000).getUTCFullYear());
     const last = Math.min(Number(entry.lastDate.slice(0, 4)), range?.to === undefined ? 9999 : new Date(range.to * 1000).getUTCFullYear());
     const needed = Array.from({ length: Math.max(0, last - first + 1) }, (_, i) => first + i)
-      .filter(year => !entry.years || Object.hasOwn(entry.years, String(year)));
+      .filter(year => Object.hasOwn(entry.years, String(year)));
     const results = await Promise.allSettled(needed.map(year => this.loadYear(symbol, year, entry)));
     signal?.throwIfAborted();
     const valid = results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
