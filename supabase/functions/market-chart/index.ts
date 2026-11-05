@@ -242,14 +242,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     : Promise.resolve(new Map());
   const outcome = await fetchDaily(request);
   const snapshot = (await taiwan).get(request.symbol);
-  const payload = snapshot
-    ? (outcome.ok
-      ? overlayMis(outcome.payload, snapshot)
-      : misOnlyChart(snapshot))
-    : null;
-  if (outcome.ok || payload) {
+  // A full-history chart request never answers with a lone MIS bar: a failed Yahoo history stays an
+  // error so Atlas keeps its cached/archived history. Only the ?quotes= feed (merged) uses misOnlyChart.
+  if (outcome.ok) {
+    const payload = snapshot ? overlayMis(outcome.payload, snapshot) : null;
     return new Response(
-      payload ? JSON.stringify(payload) : outcome.ok ? outcome.text : "",
+      payload ? JSON.stringify(payload) : outcome.text,
       {
         status: 200,
         headers: {

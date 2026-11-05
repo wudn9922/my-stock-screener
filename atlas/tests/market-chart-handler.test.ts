@@ -66,7 +66,7 @@ describe('market-chart endpoint MIS integration (all upstreams are fake)', () =>
     expect(results.AAPL).toEqual(validation.slimChartPayload(misYahoo('AAPL', true)));
     await h.request('quotes=^TWII,6488.TWO'); expect(h.misCalls()).toHaveLength(1);
   });
-  it.each(['^TWII', '6488.TWO', '^TWOII'])('overlays a daily chart request for %s with a short HTTP cache', async (symbol) => {
+  it.each(['^TWII', '6488.TWO'])('overlays a daily chart request for %s with a short HTTP cache', async (symbol) => {
     const h = harness(), response = await h.request(`symbol=${encodeURIComponent(symbol)}&interval=1d&range=5y`);
     expect(response.status).toBe(200); expect(response.headers.get('Cache-Control')).toBe('public, max-age=15');
     const raw = await response.json();
@@ -76,6 +76,10 @@ describe('market-chart endpoint MIS integration (all upstreams are fake)', () =>
   it.each(['network', 'timeout', 'http', 'json', 'shape', 'stale', 'api'])('keeps the full Yahoo payload after MIS %s', async (fail) => {
     const h = harness({ fail }), response = await h.request('symbol=%5ETWII&interval=1d&range=5y');
     expect(response.status).toBe(200); expect(await response.json()).toEqual(misYahoo('^TWII', true));
+  });
+  it('keeps a failed Yahoo history an error in chart mode instead of a lone MIS bar', async () => {
+    const h = harness(), response = await h.request('symbol=%5ETWOII&interval=1d&range=5y');
+    expect(response.status).toBe(404); expect((await response.json()).error).toBeDefined();
   });
   it('preserves #224 5m hole filling when MIS is unavailable', async () => {
     const h = harness({ fail: 'network', fill: true }), response = await h.request('symbol=%5ETWII&interval=1d&range=5y');
