@@ -76,8 +76,14 @@ class MarketCalendarTests(unittest.TestCase):
         self.assertIn("--is-session US --github-output", workflow)
         self.assertEqual(workflow.count("if: steps.session.outputs.is_session == 'true'"), 3)
         daily = (root / ".github/workflows/schedule.yml").read_text()
-        self.assertIn("publish calendar", daily)
-        self.assertIn("group: market-calendar-generated", daily)
+        self.assertNotIn("publish calendar", daily)
+        self.assertNotIn("  calendar:", daily)
+        workflow = (root / ".github/workflows/market-calendar.yml").read_text()
+        self.assertIn("publish calendar", workflow)
+        self.assertIn("group: market-calendar-generated", workflow)
+        self.assertIn("workflow_dispatch:", workflow)
+        pages = (root / ".github/workflows/generated-pages.yml").read_text()
+        self.assertIn("- Market trading calendar", pages)
 
 
 if __name__ == "__main__":

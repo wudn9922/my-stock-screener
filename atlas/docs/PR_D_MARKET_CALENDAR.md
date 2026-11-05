@@ -6,7 +6,7 @@
 
 `scripts/build_market_calendar.py` 只用 exchange-calendars **4.13.2** 的 XTAI／XNYS，產生 `docs/report/market-calendar.json`。涵蓋產生日前 30 天至後 366 天，含交易日的 UTC 開收盤秒數、交易所時區、平日休市日與提前收盤清單。日曆約 39 KB，前端不讀全市場行情來推算交易日。臨時休市／交易所修訂仍依上游日曆版本更新，不自行編造日期。
 
-每日 schedule.yml 新增獨立的小型 calendar job，沿用 generated_branch.py 的 restore／owner delta／非強制推送重試，只發布 calendar owner；既有 daily job、通知與永久紀錄流程不改。calendar job 的權限只有 contents: write，並有獨立 concurrency，沒有新通知。產出加入 gitignore，避免意外進 main。
+獨立 market-calendar.yml（每日 cron＋workflow_dispatch）的 calendar job，沿用 generated_branch.py 的 restore／owner delta／非強制推送重試，只發布 calendar owner；既有 daily job、通知與永久紀錄流程不改。日曆不再是 schedule.yml 的 job，失敗不會讓每日報告 watchdog 誤判。generated-pages.yml 的 workflow_run 已加入 Market trading calendar。calendar job 的權限只有 contents: write，並有獨立 concurrency，沒有新通知。產出加入 gitignore，避免意外進 main。
 
 market-extras.yml 在抓取 IPO／盤前盤後之前，用紐約當地日期檢查是否為交易日。休市時不 restore、不抓公開來源、不 publish，保留上一份顯示資料；UTC 已跨午夜的週五盤後仍屬紐約週五，可以更新。這個檢查直接讀本機 exchange-calendars，不依賴遠端 JSON 是否剛發布。
 
@@ -29,7 +29,7 @@ Vitest 測格式／時區／日期驗證、同日合併、跨日重載、失敗�
 
 正式發布由維護者合併後的正常排程執行。沒有 SQL、函式部署、金鑰設定或補檔步驟；首次 JSON 發布以前前端使用原規則。未執行正式 schedule 或 market-extras workflow。
 
-PR-A／C 尚未合併，因此本分支以 main 的 feed 為基底；依 A→B→C→D 整合時必須保留 A 的報價狀態與 C 的最短訂閱間隔／timeout，再加入本次日曆判斷，不能用本分支整份覆蓋那些功能。
+已用 merge 合併最新 main（含 #219），沒有 rebase 或 force-push；報價狀態、盤前盤後直接顯示、自選更新時間與價格警示均保留。PR-C 仍另行審查，之後整合時須保留其最短訂閱間隔／timeout。
 
 ## 本地結果
 
