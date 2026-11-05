@@ -120,7 +120,7 @@ function BreakoutBody({ data, params }: { data: BreakoutMarket; params: Breakout
   const [selectedRule, setRule] = useState<OutcomeKey>('hold5');
   const current = data.windows['1m'];
   if (!current) return <p className="muted-text">沒有可顯示的近月統計。</p>;
-  if (params.successModel !== SUCCESS_MODEL) return <p className="bo-update" role="status"><Timer size={18} aria-hidden="true" />四種勝率口徑更新中，等待新版全市場報表。舊報酬勝率不混入新口徑。</p>;
+  if (params.successModel !== SUCCESS_MODEL) return <p className="bo-update" role="status"><Timer size={18} aria-hidden="true" />舊口徑：四種勝率口徑更新中，等待新版全市場報表。舊報酬勝率不混入新口徑。</p>;
   const rule = OUTCOME_RULES.find(entry => entry.key === selectedRule)!;
   const complete = Object.values(current.strategies).some(stats => stats.comparison?.completeN);
   const points: BreakoutMonthlyPoint[] = data.monthly?.points ?? (data.asOf ? [{ targetDate: data.asOf, asOf: data.asOf,
@@ -195,7 +195,7 @@ export function BreakoutCard({ market }: { market: BreakoutMarketKey }) {
         {history && !snapshots.length ? <small>{history.status === 'ok' ? '尚無已保存的歷史結果。' : history.message}</small> : null}
       </div>
       {result === null ? <p className="muted-text" role="status">載入中…</p> : data?.scope === 'full' ? <BreakoutBody key={`${market}:${activeDate}`} data={data} params={params} /> :
-      data ? <p className="muted-text" role="status">全市場進場成功率尚未產生；舊的部分市場樣本不列入。</p> :
+      data ? <p className="muted-text" role="status">舊口徑：全市場進場成功率尚未產生；舊的部分市場樣本不列入。</p> :
         <p className="muted-text" role="status">{result.status === 'ok' ? `${MARKET_NAMES[market]}的突破勝率尚未產生。` : result.message}</p>}
     </div>
   </section>;

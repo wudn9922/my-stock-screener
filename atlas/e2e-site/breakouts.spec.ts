@@ -135,6 +135,7 @@ test('old reports wait for the new model instead of relabelling their rates', as
   await mockBreakouts(page, old);
   await page.goto('./?page=markets&market=tw');
   await expect(card(page).getByRole('status')).toContainText('等待新版全市場報表');
+  await expect(card(page).getByRole('status')).toContainText('舊口徑');
   await expect(card(page).locator('.bo-win')).toHaveCount(0);
 });
 
