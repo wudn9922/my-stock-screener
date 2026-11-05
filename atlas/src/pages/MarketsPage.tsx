@@ -15,6 +15,8 @@ import { MiniChart } from '../ui/MiniChart';
 import { indicatorColors } from '../indicators/IndicatorRegistry';
 import { formatDateTime, formatPercent, formatPrice, maDistance, maValue, toneClass } from '../ui/format';
 import { serializeRoute } from '../app/routes';
+import { useLiveQuote } from '../ui/useLiveQuote';
+import { formatLiveTime } from '../market-data/LiveQuotes';
 
 export const MARKET_META: Record<MarketKey, { name: string; flag: string }> = {
   tw: { name: '台灣', flag: '🇹🇼' },
@@ -24,7 +26,10 @@ export const MARKET_META: Record<MarketKey, { name: string; flag: string }> = {
   us: { name: '美國', flag: '🇺🇸' },
 };
 
-function IndexCard({ index, onOpen }: { index: IndexStatus; onOpen: () => void }) {
+function IndexCard({ index: reported, onOpen }: { index: IndexStatus; onOpen: () => void }) {
+  // The report gives the last close; during the session the card follows the live refresh.
+  const live = useLiveQuote(reported.symbol);
+  const index = live?.quote ? { ...reported, close: live.quote.price, changePct: live.quote.changePercent } : reported;
   const tone = toneClass(index.changePct);
   const open = (event: MouseEvent<HTMLAnchorElement>) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey) return;
@@ -43,11 +48,12 @@ function IndexCard({ index, onOpen }: { index: IndexStatus; onOpen: () => void }
         <div className={`index-card-quote ${tone}`}>
           <b>{formatPrice(index.close)}</b>
           <span>{formatPercent(index.changePct)}</span>
+          {live && <small className="index-card-live" data-testid="index-live-time">更新於 {formatLiveTime(live.retrievedAt * 1000)}</small>}
         </div>
       </div>
       <TrendBadge trend={index.trend} label={index.trendLabel} />
       </a>
-      <MiniChart symbol={index.symbol} height={244} maPeriods={index.maList} interactive showVolume />
+      <MiniChart symbol={index.symbol} height={244} maPeriods={index.maList} interactive showVolume live />
       <a className="index-card-foot index-card-link" href={href} onClick={open} aria-label={`${index.name}，開啟完整圖表`}>
         <span className="ma-legend">
           {index.maList.length ? (
