@@ -12,6 +12,24 @@ NOW = datetime(2026, 11, 4, 2, tzinfo=timezone.utc)
 def payload(mode='post'):
     return {'data': {'lastUpdateInfo': ['Data last updated Nov 3, 2026 08:00 PM ET.'], 'tradeDetailTable': {'rows': [{'time': '19:59:53' if mode == 'post' else '09:20:00', 'price': '$123.45'}]}}}
 class MarketExtrasTests(unittest.TestCase):
+    def test_actual_calendar_shape_includes_new_priced_issuers(self):
+        fixture = json.loads((Path(__file__).parent / 'fixtures/market-extras/nasdaq-calendar-shape.json').read_text())
+        companies = ipo_companies(fixture, NOW.isoformat())
+        self.assertEqual({c['symbol'] for c in companies}, {'FAKEF', 'FAKEU', 'FAKEP'})
+        priced = next(c for c in companies if c['symbol'] == 'FAKEP')
+        self.assertEqual(priced['pricingDate'], '11/02/2026')
+        self.assertIsNone(priced['listingDate'])
+        self.assertEqual(priced['price'], '10.00')
+        self.assertIn('已定價', priced['status'])
+        upcoming = next(c for c in companies if c['symbol'] == 'FAKEU')
+        self.assertEqual(upcoming['expectedPricingDate'], '11/12/2026')
+    def test_empty_current_month_calendar_has_explicit_reason(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            collect(root, lambda url: {'data': {'filed': {'rows': None}, 'upcoming': {'upcomingTable': {'rows': None}}, 'priced': {'rows': None}}} if '/ipo/' in url else {'data': None}, NOW, limit=1)
+            value = json.loads((root / 'docs/report/ipo-watch.json').read_text())
+            self.assertEqual(value['reason'], '本月行事曆暫無資料')
+            self.assertEqual(value['companies'], [])
     def test_actual_trade_time_not_collection_or_regular_close(self):
         value = extended_quote(payload(), 'AAPL', 'post', NOW)
         self.assertEqual(value['price'], 123.45)

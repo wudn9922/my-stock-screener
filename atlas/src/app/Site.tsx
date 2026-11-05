@@ -293,7 +293,7 @@ export function Site() {
         )}
         <div className="site-data-footer">
           <div id="site-page-notes" />
-          {(route.page === 'console' || route.page === 'watchlist') && <LegacyImportCard />}
+          {route.page === 'console' && <LegacyImportCard />}
           <StorageModeNotice />
           <DataHealthPanel report={reportState} />
         </div>

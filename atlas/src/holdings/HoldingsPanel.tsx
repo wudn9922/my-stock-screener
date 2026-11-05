@@ -21,13 +21,22 @@ import './holdings.css';
 import { MexcPanel } from './MexcPanel';
 import { mexcStore } from './mexc';
 
-const BROKERS: { id: Broker; name: string; kind: HoldingAccount['kind']; currency: HoldingAccount['currency'] }[] = [
-  { id: 'cathay', name: '國泰證券', kind: 'tw-broker', currency: 'TWD' },
-  { id: 'sinopac', name: '永豐金證券', kind: 'tw-broker', currency: 'TWD' },
-  { id: 'kgi', name: '凱基證券', kind: 'tw-broker', currency: 'TWD' },
-  { id: 'pocket', name: '口袋證券', kind: 'tw-broker', currency: 'TWD' },
-  { id: 'mexc', name: 'MEXC', kind: 'crypto-exchange', currency: 'USDT' },
-  { id: 'firstrade', name: 'Firstrade', kind: 'us-broker', currency: 'USD' },
+/**
+ * Account choices. Taiwan brokers also offer 複委託 (sub-brokerage) accounts that hold US stocks
+ * priced in USD; they are ordinary 'us-broker' accounts that keep the Taiwan broker's id.
+ */
+const BROKERS: { key: string; id: Broker; name: string; label: string; kind: HoldingAccount['kind']; currency: HoldingAccount['currency'] }[] = [
+  { key: 'cathay', id: 'cathay', name: '國泰證券', label: '國泰證券 台股', kind: 'tw-broker', currency: 'TWD' },
+  { key: 'cathay-us', id: 'cathay', name: '國泰證券 複委託', label: '國泰證券 複委託美股', kind: 'us-broker', currency: 'USD' },
+  { key: 'sinopac', id: 'sinopac', name: '永豐金證券', label: '永豐金證券 台股', kind: 'tw-broker', currency: 'TWD' },
+  { key: 'sinopac-us', id: 'sinopac', name: '永豐金證券 複委託', label: '永豐金證券 複委託美股', kind: 'us-broker', currency: 'USD' },
+  { key: 'kgi', id: 'kgi', name: '凱基證券', label: '凱基證券 台股', kind: 'tw-broker', currency: 'TWD' },
+  { key: 'kgi-us', id: 'kgi', name: '凱基證券 複委託', label: '凱基證券 複委託美股', kind: 'us-broker', currency: 'USD' },
+  { key: 'pocket', id: 'pocket', name: '口袋證券', label: '口袋證券 台股', kind: 'tw-broker', currency: 'TWD' },
+  { key: 'pocket-us', id: 'pocket', name: '口袋證券 複委託', label: '口袋證券 複委託美股', kind: 'us-broker', currency: 'USD' },
+  { key: 'other-us', id: 'other', name: '其他券商 複委託', label: '其他台灣券商 複委託美股', kind: 'us-broker', currency: 'USD' },
+  { key: 'firstrade', id: 'firstrade', name: 'Firstrade', label: 'Firstrade 美股', kind: 'us-broker', currency: 'USD' },
+  { key: 'mexc', id: 'mexc', name: 'MEXC', label: 'MEXC 加密貨幣', kind: 'crypto-exchange', currency: 'USDT' },
 ];
 function amount(value: string | null | undefined, digits = 2) {
   if (value == null) return '—';
@@ -55,7 +64,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   const [accountId, setAccountId] = useState(''),
     [draft, setDraft] = useState<HoldingAccount | null>(null),
     [creating, setCreating] = useState(false);
-  const [broker, setBroker] = useState<Broker>('cathay'),
+  const [brokerKey, setBrokerKey] = useState('cathay'),
     [name, setName] = useState(''),
     [editing, setEditing] = useState(false),
     [initial, setInitial] = useState<Holding[] | undefined>(),
@@ -233,11 +242,11 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           aria-label="新增持股帳戶"
           onSubmit={(event) => {
             event.preventDefault();
-            const chosen = BROKERS.find((entry) => entry.id === broker)!;
+            const chosen = BROKERS.find((entry) => entry.key === brokerKey)!;
             setDraft({
               id: crypto.randomUUID(),
               name: name.trim() || chosen.name,
-              broker,
+              broker: chosen.id,
               kind: chosen.kind,
               currency: chosen.currency,
             });
@@ -252,12 +261,12 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
               券商／交易所
               <select
                 aria-label="券商／交易所"
-                value={broker}
-                onChange={(event) => setBroker(event.target.value as Broker)}
+                value={brokerKey}
+                onChange={(event) => setBrokerKey(event.target.value)}
               >
                 {BROKERS.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.name} · {entry.currency}
+                  <option key={entry.key} value={entry.key}>
+                    {entry.label} · {entry.currency}
                   </option>
                 ))}
               </select>
@@ -270,7 +279,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 autoComplete="off"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder={BROKERS.find((entry) => entry.id === broker)?.name}
+                placeholder={BROKERS.find((entry) => entry.key === brokerKey)?.name}
               />
             </label>
           </div>
@@ -278,7 +287,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             <button type="submit" className="primary-button" disabled={!directory?.length || blocked}>
               繼續匯入
             </button>
-            {broker === 'mexc' && access.storageMode === 'cloud' && (
+            {brokerKey === 'mexc' && access.storageMode === 'cloud' && (
               <button
                 type="button"
                 className="primary-button"
@@ -303,10 +312,10 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
               取消
             </button>
           </div>
-          {broker === 'mexc' && access.storageMode !== 'cloud' && (
+          {brokerKey === 'mexc' && access.storageMode !== 'cloud' && (
             <p className="holdings-muted">自動讀取 MEXC 需要雲端儲存授權；目前仍可上傳或貼上持股。</p>
           )}
-          {broker === 'mexc' && access.storageMode === 'cloud' && !mexcSnapshot.state.configured && (
+          {brokerKey === 'mexc' && access.storageMode === 'cloud' && !mexcSnapshot.state.configured && (
             <p role="note">MEXC API 服務尚未啟用，維護者完成設定後即可連線；目前可先匯入持股。</p>
           )}
         </form>

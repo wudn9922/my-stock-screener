@@ -124,7 +124,8 @@ test("compact home reserves at least 80% of main viewport for quotes; tickers le
   await page.screenshot({ path: testInfo.outputPath("compact-watchlist.png") });
   const footer = page.locator(".site-data-footer");
   await expect(footer).toContainText("設定選股條件、追蹤名單變化");
-  await expect(footer).toContainText("這台裝置沒有可匯入的舊版資料");
+  await expect(page.getByText("這台裝置沒有可匯入的舊版資料。", { exact: true })).toHaveCount(0);
+  await expect(footer.getByTestId('legacy-import-card')).toHaveCount(0);
   expect((await footer.boundingBox())!.y).toBeGreaterThan(
     (await row.boundingBox())!.y,
   );
