@@ -4,7 +4,7 @@ import original from './playwright.config';
 export default defineConfig({
   ...original,
   testMatch: [
-    /archive-(?:first|board|sidebar|mini-charts)\.spec\.ts$/,
+    /archive-(?:first|board|sidebar|mini-charts|intraday-fill)\.spec\.ts$/,
     /(?:nav-inventory|workspace-refinements|chart-watchlist-followups|market-coverage-charts)\.spec\.ts$/,
   ],
   outputDir: '../test-results/archive-compact',
