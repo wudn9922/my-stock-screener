@@ -73,13 +73,13 @@ cached data; nothing else on the site depends on this function.
 ## 台股盤中 MIS（維護者部署後生效）
 
 只在台灣週一至週五 09:00–13:30，對 `.TW`、`.TWO`、`^TWII`、`^TWOII` 的 `interval=1d` 與 `?quotes=` 查詢 MIS。
-對照為 `tse_2330.tw`、`otc_6488.tw`、`tse_t00.tw`、`otc_o00.tw`。股票尾碼字母支援 ETF；查詢網址使用固定主機與經驗證的代號。
+對照為 `tse_2330.tw`、`otc_6488.tw`、`tse_t00.tw`、`otc_o00.tw`。股票尾碼字母支援 ETF，查詢保留代號大寫，例如 `tse_00632R.tw`；查詢網址使用固定主機與經驗證的代號。
 既有 Yahoo 歷史／美股／分 K／週月原始請求、#224 的 5 分 K 補洞不變。MIS 與原 Yahoo 工作並行，完成後才覆蓋今天，不儲存或改寫任何永久 K 線。
 
 - 同一批的台股只送一個 MIS 請求；adapter 每段最多 40 檔，超過分段。既有 `?quotes=` 上限仍為 40 檔。
 - 同一 isolate 的請求串行，開始時間至少相隔 1 秒；成功與失敗都快取 15 秒，重疊查詢會重用快取。
   等候佇列超過 2.5 秒便退回 Yahoo，避免多人開頁時因節流而阻塞。跨 isolate 不共用此快取，也沒有新增背景排程。
-- MIS 連線／讀取逾時為 2 秒；HTTP 失敗、JSON／欄位格式錯誤、代號／市場不符、非今日日期、非法／未來時間都不使用。
+- MIS 連線／讀取逾時為 2 秒；HTTP 失敗、MIS rtcode 非 0000、JSON／欄位格式錯誤、代號／市場不符、非今日日期、非法／未來時間都不使用。
   休市日若沿用上次交易日資料，會被同日檢查排除；前端仍沿用既有交易日曆與 LiveQuoteFeed。
 - `d+t` 以 Asia/Taipei 轉換 Unix 秒。今日 K 棒固定當日 01:00 UTC；同交易日的不同時間戳只留一列（含 #224 補入的首筆 5 分 K）。過去列不變。
 - `z` 空白／`-` 不轉成 0。只沿用本 isolate **同交易日**最近有效成交價，並保留那次實際成交時間；跨日清空。
@@ -121,7 +121,7 @@ npx playwright test --config e2e-site/playwright.compact.config.ts live-quotes.s
 
 ### 本地驗證紀錄（2026-11-05）
 
-- Deno 2.5.6 check、lint（3 個函式檔）、npm lint／typecheck，152 個 Vitest 檔／1,907 測試，普通與 Pages 建置全部通過。
+- Deno 2.5.6 check、lint（3 個函式檔）、npm lint／typecheck，152 個 Vitest 檔／1,909 測試，普通與 Pages 建置全部通過。
 - 合併最新 main #222 後，相關桌機／390px 回歸 111 個通過；修正原先寫死的圖內「延遲」標籤後，27 個報價案例再跑通過。
 - 375px Chromium／WebKit 40 個案例全部通過；既有 IPO 搜尋增加就緒斷言後，五種配置（3＋2）再次全數通過。所有原有斷言與門檻保留；
   IPO 測試補上等待頁面標題渲染的就緒斷言，避免手機版尚未渲染時誤判為桌機搜尋。

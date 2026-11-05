@@ -18,6 +18,7 @@ function harness(options: { now?: number; fail?: string; fill?: boolean } = {}) 
       if (fail === 'http') return new Response('offline', { status: 503 });
       if (fail === 'json') return new Response('{');
       if (fail === 'shape') return Response.json({ msgArray: {} });
+      if (fail === 'api') return Response.json({ rtcode: '5000', msgArray: misRows() });
       return Response.json({ msgArray: misRows().map(row => fail === 'stale' ? { ...row, d: '20261104' } : row) });
     }
     if (!validation.YAHOO_HOSTS.includes(url.hostname as typeof validation.YAHOO_HOSTS[number])) throw new Error('Unexpected network in offline fixture');
@@ -72,7 +73,7 @@ describe('market-chart endpoint MIS integration (all upstreams are fake)', () =>
     expect(raw.chart.result[0].timestamp.at(-1)).toBe(MIS_TODAY);
     expect(raw.chart.result[0].meta.atlasLiveSource).toBe('twse-mis'); expect(h.misCalls()).toHaveLength(1);
   });
-  it.each(['network', 'timeout', 'http', 'json', 'shape', 'stale'])('keeps the full Yahoo payload after MIS %s', async (fail) => {
+  it.each(['network', 'timeout', 'http', 'json', 'shape', 'stale', 'api'])('keeps the full Yahoo payload after MIS %s', async (fail) => {
     const h = harness({ fail }), response = await h.request('symbol=%5ETWII&interval=1d&range=5y');
     expect(response.status).toBe(200); expect(await response.json()).toEqual(misYahoo('^TWII', true));
   });

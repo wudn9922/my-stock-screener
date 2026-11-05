@@ -26,9 +26,7 @@ export function misChannel(symbol: string): string | null {
   if (symbol === "^TWII") return "tse_t00.tw";
   if (symbol === "^TWOII") return "otc_o00.tw";
   const match = /^(\d{4,6}[A-Z]?)\.(TW|TWO)$/.exec(symbol);
-  return match
-    ? `${match[2] === "TW" ? "tse" : "otc"}_${match[1]!.toLowerCase()}.tw`
-    : null;
+  return match ? `${match[2] === "TW" ? "tse" : "otc"}_${match[1]}.tw` : null;
 }
 
 export function taipeiDate(nowMs: number): string {
@@ -70,7 +68,7 @@ export function parseMisRow(
   if (!channel) return null;
   const [venue, code] = channel.slice(0, -3).split("_");
   if (
-    typeof row.c !== "string" || row.c.toLowerCase() !== code ||
+    typeof row.c !== "string" || row.c.toLowerCase() !== code!.toLowerCase() ||
     (row.ex !== undefined && row.ex !== venue)
   ) return null;
   if (
@@ -195,8 +193,14 @@ export class TwseMisClient {
             signal: AbortSignal.timeout(this.options.timeoutMs ?? TIMEOUT_MS),
           });
           if (response.ok) {
-            const payload = await response.json() as { msgArray?: unknown };
-            if (Array.isArray(payload?.msgArray)) {
+            const payload = await response.json() as {
+              msgArray?: unknown;
+              rtcode?: unknown;
+            };
+            if (
+              (payload?.rtcode === undefined || payload.rtcode === "0000") &&
+              Array.isArray(payload?.msgArray)
+            ) {
               for (const raw of payload.msgArray) {
                 // An unlabelled ambiguous venue cannot be attributed to either symbol.
                 const matches = chunk.map((symbol) =>
@@ -251,7 +255,9 @@ export class TwseMisClient {
     };
     const result = this.queue.then(run);
     this.queue = result.then(() => undefined, () => undefined);
-    return await Promise.race([result, waiting]).finally(() => clearTimeout(timer));
+    return await Promise.race([result, waiting]).finally(() =>
+      clearTimeout(timer)
+    );
   }
 }
 

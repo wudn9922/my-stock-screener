@@ -9,12 +9,12 @@ import { ARCHIVE_SOURCE, type KlineArchive } from '../src/market-data/KlineArchi
 import type { BarResult } from '../src/market-data/MarketDataProvider';
 
 afterEach(() => vi.useRealTimers());
-const response = () => Response.json({ msgArray: misRows() });
+const response = () => Response.json({ rtcode: '0000', msgArray: [...misRows(), { ...misRows()[1], c: '00632R', z: '1820' }] });
 
 describe('TWSE MIS parsing and daily overlay', () => {
   it('maps listed, OTC, indices and letter-suffix ETFs without accepting foreign symbols', () => {
     expect(['2330.TW', '6488.TWO', '^TWII', '^TWOII', '00632R.TW', 'AAPL', '^GSPC'].map(misChannel))
-      .toEqual(['tse_2330.tw', 'otc_6488.tw', 'tse_t00.tw', 'otc_o00.tw', 'tse_00632r.tw', null, null]);
+      .toEqual(['tse_2330.tw', 'otc_6488.tw', 'tse_t00.tw', 'otc_o00.tw', 'tse_00632R.tw', null, null]);
     expect(parseMisRow({ ...misRows()[1], c: '00632R' }, '00632R.TW', MIS_NOW)).not.toBeNull();
   });
   it.each(['^TWII', '^TWOII'])('overlays %s once at 01:00 UTC, preserving history and unknown index volume', (symbol) => {
@@ -100,10 +100,11 @@ describe('TWSE MIS per-instance batching, caching and fallback', () => {
     let now = MIS_NOW;
     const fetcher = vi.fn(async (_input: RequestInfo | URL) => response());
     const client = new TwseMisClient({ fetcher, now: () => now });
-    await Promise.all([client.get(['^TWII', '2330.TW', '^TWOII', '6488.TWO', 'AAPL']), client.get(['^TWII'])]);
+    const [batch] = await Promise.all([client.get(['^TWII', '2330.TW', '^TWOII', '6488.TWO', '00632R.TW', 'AAPL']), client.get(['^TWII'])]);
+    expect(batch.get('00632R.TW')?.price).toBe(1820);
     expect(fetcher).toHaveBeenCalledTimes(1);
     const url = new URL(String(fetcher.mock.calls[0]?.[0]));
-    expect(url.searchParams.get('ex_ch')).toBe('tse_t00.tw|tse_2330.tw|otc_o00.tw|otc_6488.tw');
+    expect(url.searchParams.get('ex_ch')).toBe('tse_t00.tw|tse_2330.tw|otc_o00.tw|otc_6488.tw|tse_00632R.tw');
     expect(url.searchParams.get('delay')).toBe('0');
     now += 15001;
     fetcher.mockImplementation(async () => Response.json({ msgArray: [{ ...misRows()[0], z: '-', t: '09:47:10' }] }));
@@ -125,12 +126,13 @@ describe('TWSE MIS per-instance batching, caching and fallback', () => {
     expect(times).toEqual([MIS_NOW, MIS_NOW + 1000, MIS_NOW + 2000]);
     for (const args of fetcher.mock.calls) expect(new URL(String(args[0])).searchParams.get('ex_ch')!.split('|').length).toBeLessThanOrEqual(40);
   });
-  it.each(['http', 'json', 'shape', 'stale', 'network'])('fails softly and negatively caches %s failures', async (failure) => {
+  it.each(['http', 'json', 'shape', 'stale', 'network', 'api'])('fails softly and negatively caches %s failures', async (failure) => {
     const fetcher = vi.fn(async () => {
       if (failure === 'network') throw new Error('offline');
       if (failure === 'http') return new Response('no', { status: 503 });
       if (failure === 'json') return new Response('{');
       if (failure === 'shape') return Response.json({ bad: [] });
+      if (failure === 'api') return Response.json({ rtcode: '5000', msgArray: misRows() });
       return Response.json({ msgArray: [{ ...misRows()[0], d: '20261104' }] });
     });
     const client = new TwseMisClient({ fetcher, now: () => MIS_NOW });
