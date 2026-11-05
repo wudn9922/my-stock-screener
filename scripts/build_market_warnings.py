@@ -41,7 +41,10 @@ def exchange(market, year):
 def completed_calendar(market, now, start):
     cal = exchange(market, now.year)
     end = now.astimezone(cal.tz).date()
-    days = cal.sessions_in_range(pd.Timestamp(start), pd.Timestamp(end))
+    # Cached rows older than the calendar's first session (e.g. 2000) are outside every
+    # warning window; clamp instead of letting exchange_calendars reject the whole run.
+    first = pd.Timestamp(cal.first_session).tz_localize(None) if pd.Timestamp(cal.first_session).tzinfo else pd.Timestamp(cal.first_session)
+    days = cal.sessions_in_range(max(pd.Timestamp(start), first), pd.Timestamp(end))
     return pd.DatetimeIndex([day.tz_localize(None) for day in days
                              if cal.session_close(day).to_pydatetime() <= now])
 
