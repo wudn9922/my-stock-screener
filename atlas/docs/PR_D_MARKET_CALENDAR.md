@@ -6,7 +6,7 @@
 
 `scripts/build_market_calendar.py` 只用 exchange-calendars **4.13.2** 的 XTAI／XNYS，產生 `docs/report/market-calendar.json`。涵蓋產生日前 30 天至後 366 天，含交易日的 UTC 開收盤秒數、交易所時區、平日休市日與提前收盤清單。日曆約 39 KB，前端不讀全市場行情來推算交易日。臨時休市／交易所修訂仍依上游日曆版本更新，不自行編造日期。
 
-獨立 market-calendar.yml（每日 cron＋workflow_dispatch）的 calendar job，沿用 generated_branch.py 的 restore／owner delta／非強制推送重試，只發布 calendar owner；既有 daily job、通知與永久紀錄流程不改。日曆不再是 schedule.yml 的 job，失敗不會讓每日報告 watchdog 誤判。generated-pages.yml 的 workflow_run 已加入 Market trading calendar。calendar job 的權限只有 contents: write，並有獨立 concurrency，沒有新通知。產出加入 gitignore，避免意外進 main。
+獨立 market-calendar.yml（每日 cron＋workflow_dispatch）的 calendar job，沿用 generated_branch.py 的 restore／owner delta／非強制推送重試，只發布 calendar owner；既有 daily job、通知與永久紀錄流程不改。日曆不再是 schedule.yml 的 job，失敗不會讓每日報告 watchdog 誤判。generated-pages.yml 的 workflow_run 已加入 Market trading calendar。calendar job 的權限只有 contents: write，並有獨立 concurrency，沒有新通知。產出加入 gitignore，避免意外進 main。GENERATED_BRANCH_MODE 沿用 vars.GENERATED_BRANCH_MODE，未開啟時 job 不執行；沒有寫死切換開關。
 
 market-extras.yml 在抓取 IPO／盤前盤後之前，用紐約當地日期檢查是否為交易日。休市時不 restore、不抓公開來源、不 publish，保留上一份顯示資料；UTC 已跨午夜的週五盤後仍屬紐約週五，可以更新。這個檢查直接讀本機 exchange-calendars，不依賴遠端 JSON 是否剛發布。
 

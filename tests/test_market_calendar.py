@@ -67,6 +67,13 @@ class MarketCalendarTests(unittest.TestCase):
                             "--now", "2026-11-26T22:00:00Z", "--is-session", "US", "--github-output", str(github_output)], check=True)
             self.assertEqual(github_output.read_text(), "is_session=false\n")
 
+    def test_calendar_respects_repository_generated_mode(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github/workflows/market-calendar.yml").read_text()
+        self.assertIn("GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}", workflow)
+        self.assertIn("if: vars.GENERATED_BRANCH_MODE == '1'", workflow)
+        self.assertNotIn("GENERATED_BRANCH_MODE: '1'", workflow)
+
     def test_only_generated_owner_and_workflow_gates(self):
         root = Path(__file__).resolve().parents[1]
         config = json.loads((root / ".github/generated-paths.json").read_text())
