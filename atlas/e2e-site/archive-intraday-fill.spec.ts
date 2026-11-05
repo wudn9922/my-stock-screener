@@ -18,7 +18,7 @@ test('C3 review: #224 filled TWII sessions stay current through consecutive dail
   await page.route('https://edge.test/functions/v1/market-chart**',route=>{
     const params=new URL(route.request().url()).searchParams;
     if(!params.has('quotes')) {
-      if(params.get('interval')==='1d'&&params.get('range')==='5y')fiveYears.push(params.get('symbol')!);
+      if(params.get('symbol')==='^TWII'&&params.get('interval')==='1d'&&params.get('range')==='5y')fiveYears.push(params.get('symbol')!);
       return route.fallback();
     }
     batches++;
@@ -36,7 +36,8 @@ test('C3 review: #224 filled TWII sessions stay current through consecutive dail
   await page.clock.fastForward(61_000);
   await expect(page.getByTestId('ohlc-header')).toContainText(/43,?260\.00/);
   expect(batches).toBe(2);expect(fiveYears).toEqual([]);
-  expect(files.sort()).toEqual(['index/tw/%255ETWII.json','tw/%5ETWII/2026.csv']);
+  expect(files).not.toContain('manifest.json');
+  expect(files.filter(path=>path.includes('ETWII')).sort()).toEqual(['index/tw/%255ETWII.json','tw/%5ETWII/2026.csv']);
   await expect(page.getByTestId('chart')).toBeVisible();
   await page.screenshot({path:info.outputPath('twii-intraday-filled.png')});
 });

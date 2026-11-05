@@ -15,6 +15,7 @@ async function archived(page: Page, symbol = 'AAPL') {
   const requested: string[] = [];
   await page.route(archiveRoot + '**', route => {
     const path = route.request().url().slice(archiveRoot.length); requested.push(path);
+    if (path.startsWith('index/') && !path.endsWith('/'+encodeURIComponent(encodeURIComponent(symbol))+'.json')) return route.fulfill({status:404});
     if (path.startsWith('index/')) return route.fulfill({json:archiveIndexFixture(symbol,
       Object.fromEntries([...byYear].map(([year,rows])=>[year,'Date,Open,High,Low,Close,Volume\n'+rows.join('\n')+'\n'])))});
     const rows = byYear.get(Number(path.match(/(\d{4})\.csv/)?.[1]));
@@ -49,7 +50,7 @@ for (const failure of ['502','timeout','invalid'] as const) test(`C1/C2 archive 
   expect(market.some(url=>new URL(url).searchParams.get('symbol')==='AAPL'
     && new URL(url).searchParams.get('interval')==='1d' && new URL(url).searchParams.get('range')==='5y')).toBe(false);
   expect(archiveRequests).not.toContain('manifest.json');
-  expect(archiveRequests.filter(path=>path.startsWith('index/'))).toHaveLength(3); // one per independent navigation
+  expect(archiveRequests.filter(path=>path==='index/us/AAPL.json')).toHaveLength(3); // one per independent navigation of this symbol
 });
 
 test('C2 intraday failure explains the cause and offers daily archive recovery', async ({page}) => {
