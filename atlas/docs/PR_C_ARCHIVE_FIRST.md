@@ -60,6 +60,12 @@ index 與 404 都使用原有行情 IndexedDB／記憶體授權機制快取，�
 
 ## 本輪驗證結果
 
-合併與索引修改後，lint、typecheck、一般／Pages 建置通過；最終完整 Vitest 149 檔／1,841 個測試全數通過。包含 index／404 跨實例同日重用與跨日重載、年度快取淘汰不逐出 index、訪客瀏覽 500 檔仍不重抓當日 index。
+合併與索引修改後，lint、typecheck、一般／Pages 建置通過；最終完整 Vitest 149 檔／1,845 個測試全數通過。包含 index／404 跨實例同日重用與跨日重載、年度快取淘汰不逐出 index、訪客瀏覽 500 檔仍不重抓當日 index。
 
 桌機／390px 99 個、375px Chromium／WebKit 50 個瀏覽器案例全數通過，保留 #219、舊自選／市場／導覽與本次所有斷言；25 張截圖已更新。完整 CI 將驗證推送的相同程式，包括舊離線旅程、PostgreSQL 授權與 breakout 整合；最終結果記於 PR。
+
+## CI 真實 Pages 導航修正
+
+首輪完整 CI 在 iPhone WebKit 捕捉到頁面已離開後，舊 archive lookup 才啟動 `series/index.json` fallback，產生 access-control pageerror。ArchiveFirstProvider 現在於頁面離開後停止後續 provider 工作；BFCache 還原使用新 lifetime，舊 pending lookup 不會復活。沒有過濾錯誤或修改 smoke 斷言。
+
+三個 late fallback 測試先重現失敗，再加入修正與 BFCache 恢復測試；完整 149 檔／1,845 單元、lint／typecheck 與精確 Pages 建置通過。原研究 smoke 在桌機與 WebKit 以兩份真實 generated snapshot（包含最新 487f3dfbf5）驗證通過，errors 為空且無橫向溢出。完整 CI 於本修正 head 重新跑全部下游檢查。

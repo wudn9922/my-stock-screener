@@ -8,6 +8,18 @@ import { usableBarResult } from './KlineIntegrity';
 import { worldAssetFor } from './worldAssets';
 import { marketDateTime } from './MarketProfile';
 
+// Shared archive lookups may outlive a component, but must not start another
+// provider request once this document has left. A restored BFCache page gets
+// a fresh lifetime; already pending work retains its aborted signal.
+const pageLifetime = typeof window === 'undefined' ? undefined : { current: new AbortController() };
+if (pageLifetime) {
+  const lifetime = pageLifetime;
+  window.addEventListener('pagehide', () => lifetime.current.abort());
+  window.addEventListener('pageshow', () => {
+    if (lifetime.current.signal.aborted) lifetime.current = new AbortController();
+  });
+}
+
 export function archiveQuote(symbol: string, result: BarResult): Quote {
   const last = result.bars.at(-1)!, previous = result.bars.at(-2);
   const profile = getMarketProfile(symbol);
@@ -37,23 +49,35 @@ export class ArchiveFirstProvider implements MarketDataProvider {
   readonly cacheVersion = 'archive-first-v2-market-open';
   readonly supportedTimeframes: readonly Timeframe[];
   readonly capabilities;
-  constructor(readonly fallback: MarketDataProvider, readonly archive = klineArchive(), readonly yahoo?: EdgeYahooProvider) {
+  constructor(readonly fallback: MarketDataProvider, readonly archive = klineArchive(), readonly yahoo?: EdgeYahooProvider,
+    private readonly lifetime: () => AbortSignal | undefined = () => pageLifetime?.current.signal) {
     this.id = fallback.id; this.supportedTimeframes = fallback.supportedTimeframes; this.capabilities = fallback.capabilities;
   }
+  private checkActive(signal?: AbortSignal, lifetime = this.lifetime()) {
+    signal?.throwIfAborted();
+    lifetime?.throwIfAborted();
+  }
   private async daily(symbol: string, range?: MarketRange, signal?: AbortSignal): Promise<BarResult | null> {
+    const lifetime = this.lifetime();
+    this.checkActive(signal, lifetime);
     if (worldAssetFor(symbol)) return null;
-    try { return await this.archive.getDaily(symbol, range, signal); }
-    catch (error) { signal?.throwIfAborted(); void error; return null; }
+    try {
+      const result = await this.archive.getDaily(symbol, range, signal);
+      this.checkActive(signal, lifetime);
+      return result;
+    } catch (error) { this.checkActive(signal, lifetime); void error; return null; }
   }
   async getBars(symbol: string, timeframe: Timeframe, range?: MarketRange, signal?: AbortSignal): Promise<BarResult> {
     if (timeframe === '1D' || timeframe === '1W' || timeframe === '1M') {
       const daily = await this.daily(symbol, undefined, signal);
       if (daily) return archivePeriod(daily, symbol, timeframe, range);
     }
+    this.checkActive(signal);
     return this.fallback.getBars(symbol, timeframe, range, signal);
   }
   async getQuote(symbol: string, signal?: AbortSignal): Promise<Quote> {
     const daily = await this.daily(symbol, undefined, signal);
+    this.checkActive(signal);
     return daily ? archiveQuote(symbol, daily) : this.fallback.getQuote(symbol, signal);
   }
   async refreshBars(symbol: string, timeframe: Timeframe, signal?: AbortSignal): Promise<BarResult> {
@@ -61,19 +85,23 @@ export class ArchiveFirstProvider implements MarketDataProvider {
     const current = await this.getBars(symbol, timeframe, undefined, signal);
     if (!current.archive) return this.fallback.refreshBars?.(symbol, timeframe, signal) ?? current;
     const value = await liveQuotes().refresh(symbol);
-    signal?.throwIfAborted();
+    this.checkActive(signal);
     const merged = await mergeArchivedLive(current, value, timeframe, this.archive);
     return merged.archive?.status === 'split' ? this.getOlderBars(symbol, timeframe, merged, signal) : merged;
   }
   async getCorporateEvents(symbol: string, range?: MarketRange, signal?: AbortSignal): Promise<CorporateEventsResult> {
-    if (await this.daily(symbol, undefined, signal))
+    const daily = await this.daily(symbol, undefined, signal);
+    this.checkActive(signal);
+    if (daily)
       return this.yahoo ? this.yahoo.getArchiveEvents(symbol, signal) : { status: 'unavailable', events: [], source: '公司事件來源暫時無法取得' };
     return this.fallback.getCorporateEvents?.(symbol, range, signal) ?? { status: 'unavailable', events: [], source: '此來源不提供公司事件' };
   }
   async getSymbolTimeframes(symbol: string, signal?: AbortSignal): Promise<readonly Timeframe[]> {
+    this.checkActive(signal);
     return this.fallback.getSymbolTimeframes?.(symbol, signal) ?? this.supportedTimeframes;
   }
   async getOlderBars(symbol: string, timeframe: Timeframe, current: BarResult, signal?: AbortSignal): Promise<BarResult> {
+    this.checkActive(signal);
     if (!current.archive || !this.yahoo) return current;
     if (current.archive.status === 'split') {
       try {

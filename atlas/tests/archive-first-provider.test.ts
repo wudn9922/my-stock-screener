@@ -23,6 +23,36 @@ const make = () => {
 };
 
 describe('archive-first chart C2', () => {
+  it('BFCache restoration allows new requests without reviving an old pending fallback', async () => {
+    const oldPage = new AbortController();
+    let lifetime = oldPage.signal, finish!: (value: null) => void;
+    const archive = {getDaily:vi.fn().mockReturnValueOnce(new Promise<null>(resolve=>{finish=resolve;})).mockResolvedValue(null)} as unknown as KlineArchive;
+    const fallback = {id:'test',supportedTimeframes:['1D'] as const,
+      getBars:vi.fn(async()=>({bars:[],source:'test',session:'regular' as const,delayed:true,adjusted:true})),
+      getQuote:vi.fn(async()=>{throw new Error('unused');})};
+    const provider=new ArchiveFirstProvider(fallback,archive,undefined,()=>lifetime);
+    const pending=provider.getBars('AAPL','1D');
+    oldPage.abort();lifetime=new AbortController().signal;finish(null);
+    await expect(pending).rejects.toMatchObject({name:'AbortError'});
+    expect(fallback.getBars).not.toHaveBeenCalled();
+    await provider.getBars('AAPL','1D');
+    expect(fallback.getBars).toHaveBeenCalledTimes(1);
+  });
+  it.each(['getBars','getQuote','getCorporateEvents'] as const)('does not start a late %s fallback after the owning document left', async method => {
+    const page = new AbortController();
+    let finish!: (value: null) => void;
+    const archive = {getDaily:vi.fn(()=>new Promise<null>(resolve=>{finish=resolve;}))} as unknown as KlineArchive;
+    const fallback = {id:'test',supportedTimeframes:['1D'] as const,
+      getBars:vi.fn(async()=>{throw new Error('late fetch');}),getQuote:vi.fn(async()=>{throw new Error('late fetch');}),
+      getCorporateEvents:vi.fn(async()=>{throw new Error('late fetch');})};
+    const provider = new ArchiveFirstProvider(fallback,archive,undefined,()=>page.signal);
+    const pending = method==='getBars' ? provider.getBars('AAPL','1D') : provider[method]('AAPL');
+    page.abort();finish(null);
+    await expect(pending).rejects.toMatchObject({name:'AbortError'});
+    expect(fallback.getBars).not.toHaveBeenCalled();
+    expect(fallback.getQuote).not.toHaveBeenCalled();
+    expect(fallback.getCorporateEvents).not.toHaveBeenCalled();
+  });
   it.each(['1D','1W','1M'] as const)('%s survives unavailable Yahoo without any five-year daily call', async timeframe => {
     const { archive, fallback } = make();
     const provider = new ArchiveFirstProvider(fallback, archive);
