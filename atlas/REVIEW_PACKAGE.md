@@ -1,3 +1,17 @@
+## 指數下載重試、唯讀封存備援與市場隔離（2026-11-05）
+
+Primary self-review only；沒有獨立模型或 Claude 簽核。分支 `codex/index-daily-resilience` 從 main `c3f5c76511` 建立，先以一般 merge 納入 #228，待其合併後再以一般 merge 合入最新 main `afe469f522`（包含 #228 的 `21d49127ee`）。沒有 rebase／force-push；只交付 PR，不合併、不部署、不觸發正式 workflow。
+
+共用 `scripts/index_daily.py` 先批次 Yahoo 下載，只對失敗成員逐檔最多重試2次（5／10秒）。明確 RateLimited／YFRateLimitError／429 使用既有30／60秒退避，持續限流後停止追加 Yahoo 請求。之後唯讀使用已 checkout archive 的 per-symbol index 與年度 CSV，驗 SHA-256、bytes、rows、日期與 canonical 格式。只用 XTAI／XNYS 已收盤 session，價格不作股利還原，不混接來源，不降低原本60／400根及 breadth 同日要求。來源寫入各指數 meta；SOX／SOXX 的價量來源獨立記錄。
+
+警示單市場指數失敗時，另一市場正常更新；相同 params 的失敗市場保留原數值、資料日及計算時間，另標 retained／checkedAt／reason。首次沒有舊內容則 unavailable，沒有替代數值。兩市場指數都失敗時，整份舊 JSON／CSV bytes 不動。retained／unavailable 不追加前瞻紀錄；既有 market-warnings-log.csv 已比對最新 main 完全一致。名單／覆蓋失敗的原有整份保留行為不變。嚴格 Zod 保留舊文件相容性，新增狀態／來源驗證，UI 明示未更新及原因。
+
+本機驗證：npm ci、lint、typecheck、一般 build、Pages build 全通過；Vitest 153檔／1,918項；Python 共用讀取器10項、market warnings25項（含#228）、breadth signals pytest27項、generated真實Git整合35項。桌機／390px Chromium／iPhone WebKit 33項，375px Chromium／WebKit 10項全部通過；最後畫面取景6＋4項亦通過。actionlint 1.7.7 通過。未新增 skip 或放寬斷言／timeout。最終 GitHub CI 結果以 PR checks 為準。
+
+全部來源故障測試離線，沒有向真實 Yahoo 發請求，也沒有重跑正式排程；封存 fixture 由實際 writer 的格式產生，並驗證讀取前後 bytes 相同。實際備援能力仍依已完成封存的日期／根數，資料太舊仍會失敗。封存四位小數與 Yahoo 浮點資料可能略有精度差異，不改研究公式或門檻。更正先前將試算320根誤寫為正式快取上限的說明，未截短快取或改計算。
+
+截圖為合成 fixture 的狀態／來源版面，不是真實行情；以1100px高視窗展示內容，手機寬度維持390／375。已目視檢查 [桌機](docs/screenshots/index-daily-resilience/desktop-retained.png)、[390px WebKit](docs/screenshots/index-daily-resilience/iphone390-retained.png)、[375px WebKit](docs/screenshots/index-daily-resilience/iphone375-retained.png)；同目錄另有 unavailable 截圖。這是 Playwright 模擬，不是實體 iPhone 驗證。沒有修改登入／Supabase／SQL／GCP／永久價格財報／archive 分支，沒有新增通知。
+
 ## 市場多頭末期警示與波段計數（2026-11-05）
 
 Primary self-review only；沒有獨立模型或 Claude 簽核。分支從 main `e28a5bed4cb87468f7ae7c71bf7a0ca4a88d0d64` 建立；一個 PR，不合併、不部署、不觸發正式排程。
