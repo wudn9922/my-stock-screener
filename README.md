@@ -120,3 +120,7 @@ Atlas 是內嵌在每日報告裡的研究工具（Vite/React，原始碼在 `at
 - Atlas 的畫圖、設定等資料存在瀏覽器的 IndexedDB，**只保存在當下這個瀏覽器**：
   LINE 內建瀏覽器、手機 Safari / Chrome、電腦之間不會同步，清除瀏覽器資料也會一併刪除。
   （報告頁原本的水平線段仍照舊同步到 Supabase，不受影響。）
+
+### 永久 K 線目錄
+
+`kline-archive` 的小型 `manifest.json` 僅保留市場總覽；逐檔的日期、年度 rows／bytes／SHA-256 改存 `index/{tw|us|global}/{URL 編碼代號}.json`，沒有資料變化的索引不重寫。CSV、索引及歷史稽核由同一個驗證器核對。五年範圍、檔名／HTTP 編碼、唯讀試跑與 Git 歷史容量估計見 [KLINE_ARCHIVE_EXPANSION.md](docs/KLINE_ARCHIVE_EXPANSION.md)。正式補檔仍由維護者執行。

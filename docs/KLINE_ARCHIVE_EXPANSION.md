@@ -34,7 +34,9 @@ XBI XLB XLC XLE XLF XLI XLK XLP XLRE XLU XLV XLY
 
 ## Manifest 與每日追加
 
-Manifest v2 保留既有市場統計，新增 `bySymbol`：實際範圍、kind、來源／幣別／時區、encoded path，以及每年檔的列數、bytes、日期與 SHA-256。總 bytes 含 manifest、README、進度與稽核，不含 Git objects。唯讀 verify 仍接受已部署 v1，不會自動改寫它；產生新資料時才升級 v2。大 manifest 由資料健康程式透過已授權 GitHub API 的 raw media type 讀取，避開 Contents API 1MB base64 限制。
+Manifest v3 保留小型市場總覽（代號清單、日期、筆數、bytes），不再放 `bySymbol`。每檔明細在 `index/{tw|us|global}/{URL 編碼代號}.json`，version 1，含 symbol、market、CSV 的 HTTP path、kind/name（來源有提供時）、實際日期與各年的 rows/csvBytes/sha256。索引總檔數／bytes 也記在 manifest；總 bytes 含 CSV、index、README、進度及稽核，不含 Git objects。唯讀 verify 仍接受部署中的 v1／舊 v2，不改寫檔案；有新資料的 publisher 才升級為小 manifest＋索引。
+
+CSV 目錄仍保留原代號；index 檔名在磁碟上是編碼字串，所以 `^TWII` 存為 `index/tw/%5ETWII.json`，HTTP 必須再編碼檔名為 `index/tw/%255ETWII.json`。驗證先完成所有 CSV／歷史稽核，再更新衍生 index；唯讀驗證拒絕缺漏、額外、錯誤日期／大小／SHA 的 index。無變化的 index 保留相同 bytes 與 mtime，每日只重寫有新資料的代號。
 
 `universe-full` 保留原普通股 cache、來源與輸出；額外標的使用 `.cache/universe-full/archive-instruments`。共用既有 Yahoo 批次 reader、限速與 OHLC/quarantine 驗證，僅完成交易日寫 cache；連續日可批次追加，缺多日則讀歷史補齊。^TWOII 使用上述官方來源。額外來源失敗仍可發布原股票 payload。合併仍經同一 append-only publisher、基準驗證及 SHA 稽核，不增加前端輪詢或通知。
 
@@ -73,3 +75,23 @@ Manifest v2 保留既有市場統計，新增 `bySymbol`：實際範圍、kind�
 擴充單元測試涵蓋公開 ETF 判斷、上櫃 ETF、五個完整年度起日、分批續傳、舊值不覆寫、全球指數防刪、manifest v1/v2 與年 SHA、每日缺多日補齊、未知成交量、來源故障保留、TPEx 實際欄位形狀與只讀來源／預算中斷、quarantine 沿用、額外來源失敗不阻擋股票，以及 workflow 不寫 main journal。
 
 實際測試數與瀏覽器結果記在 PR 說明。沒有介面變更，沿用指數／題材／導覽的桌機、390px、375px Chromium／iPhone WebKit 回歸；沒有宣稱實機 iPhone 或獨立審查通過。
+
+## 索引與 Git 歷史容量（審查修訂）
+
+以原本 50 檔試跑的唯讀暫存封存＋公開擴充清單聯集，投影 7,727 個代號、每檔 2021～2026 六年，共 46,362 筆年度明細；新上市實際可能更少。以既有 CSV 每列大小、一般完整年 250 列／今年 210 列估算，hash 為獨立測量用值，沒有寫入行情。結果見 [測量 JSON](measurements/pr-b-index-capacity.json)。
+
+| 項目 | 預估大小 |
+| --- | ---: |
+| manifest.json | 60,616 bytes（約 61 KB） |
+| 7,727 份 index 合計 | 8,830,872 bytes（約 8.83 MB） |
+| 單份最大 index | 1,308 bytes |
+| 全部代號當日都有新資料：新增 index Git loose blobs | 約 3.73 MB／日 |
+| 同情境，含原本的年度 CSV 與小 manifest 的新增 Git loose blobs | 約 26.3 MB／日 |
+
+每日 Git 數字使用 zlib level 6，含 blob header；CSV 部分從 7,374 個真實形狀當年檔，在記憶體追加一列後量測，再依代號數外推。這是未經正常 Git pack/delta 的全市場同日更新情境；休市／無資料的代號不改寫，Git 正常 delta 壓縮通常更小，但未假設伺服器何時 GC，也不依賴 squash、force-push 或刪歷史。
+
+約 459 MB CSV／480 MB 工作樹的原估計與永久 Git 歷史是不同數字：歷史仍會持續增加。分檔避免前端下載巨型目錄，也讓未更新代號的 metadata blob 完全重用，並不宣稱永久分支從此不成長。
+
+修訂後 7,000 檔 × 3 年／21,000 年檔的既有 runner-scale 測試再次通過：驗證 **61.643 秒**、apply 110.864 秒、daily publish **185.724 秒**；包含 224 萬筆來源差異的 compact conflict 測試。離線 archive 單元 82 個通過，原本 opt-in performance 另行執行通過。Git publisher 的入口 allowlist 同步接受 global、instrument metadata 與 index，且仍交由嚴格 verify 拒絕不符檔案。
+
+另在原 50 檔試跑封存的獨立暫存副本完成新版索引驗證：21,330 年檔／3,575,773 列，全部 CSV 的 SHA-256 前後完全相同。manifest 57,037 bytes，7,374 個 index 合計 4,651,782 bytes；升級驗證 52.871 秒，接著唯讀驗證 44.343 秒。沒有接觸遠端封存。測量摘要見 [實際形狀試跑](measurements/pr-b-index-real-shape.json)。

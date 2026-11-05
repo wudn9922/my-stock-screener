@@ -98,27 +98,82 @@ class ExpansionTests(_ArchiveCase):
         self.assertEqual(scope.bucket('^N225'), 'global')
         self.assertEqual(scope.url_path('^TWII'), 'tw/%5ETWII')
 
-    def test_manifest_v2_exact_year_hashes_and_old_v1_readonly_verification(self):
+    def test_small_manifest_and_symbol_indexes_with_legacy_readonly_verification(self):
         self.seed('AAPL', [row('2024-10-24'), row('2026-01-02')])
         ka.put_symbol(self.archive, '^TWII', [row('2021-01-04')], mode='backfill')
         ka.put_symbol(self.archive, '^N225', [row('2021-01-04')], mode='backfill')
         document = ka.update_manifest(self.archive)
-        self.assertEqual(document['version'], 2)
-        self.assertEqual(document['bySymbol']['^TWII']['path'], 'tw/%5ETWII')
-        self.assertEqual(document['bySymbol']['^N225']['currency'], 'JPY')
-        for symbol, item in document['bySymbol'].items():
+        self.assertEqual(document['version'], 3)
+        self.assertNotIn('bySymbol', document)
+        indexes = {p: ka.json_read(self.archive / p, None) for p in ka._index_documents({q.relative_to(self.archive).as_posix(): ka._row_stats(ka.read_rows(q), q.stat().st_size, ka.digest(q.read_bytes())) for q in ka.archive_files(self.archive)})}
+        self.assertEqual(indexes['index/tw/%5ETWII.json']['path'], 'tw/%5ETWII')
+        self.assertEqual(indexes['index/global/%5EN225.json']['currency'], 'JPY')
+        for item in indexes.values():
+            symbol = item['symbol']
             for year, detail in item['years'].items():
                 body = (self.archive / ka.market_of(symbol) / symbol / (year + '.csv')).read_bytes()
                 self.assertEqual(detail['sha256'], hashlib.sha256(body).hexdigest())
                 self.assertEqual(detail['csvBytes'], len(body))
         ka.verify(self.archive)
         # An existing deployed v1 archive remains valid and is never rewritten by verify.
-        stats = {p.relative_to(self.archive).as_posix(): ka._row_stats(ka.read_rows(p, strict=True), p.stat().st_size) for p in ka.archive_files(self.archive)}
+        stats = {p.relative_to(self.archive).as_posix(): ka._row_stats(ka.read_rows(p, strict=True), p.stat().st_size, ka.digest(p.read_bytes())) for p in ka.archive_files(self.archive)}
         total = sum(p.stat().st_size for p in self.archive.rglob('*') if p.is_file() and p.name != 'manifest.json')
-        ka.json_write(self.archive / 'manifest.json', ka._manifest(stats, total, version=1))
-        before = (self.archive / 'manifest.json').read_bytes()
+        for version in (1, 2):
+            ka.json_write(self.archive / 'manifest.json', ka._manifest(stats, total, version=version))
+            before = (self.archive / 'manifest.json').read_bytes()
+            ka.verify(self.archive)
+            self.assertEqual(before, (self.archive / 'manifest.json').read_bytes())
+
+    def test_indexes_only_rewrite_changed_symbols(self):
+        self.seed('AAPL')
+        self.seed('MSFT')
+        paths = list((self.archive / 'index').rglob('*.json'))
+        before = {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in paths}
+        ka.update_manifest(self.archive)
+        self.assertEqual(before, {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in paths})
+        ka.put_symbol(self.archive, 'AAPL', [row('2026-01-05')])
+        ka.update_manifest(self.archive)
+        changed = [p.name for p in paths if p.read_bytes() != before[p][0]]
+        self.assertEqual(changed, ['AAPL.json'])
+        self.assertEqual((self.archive / 'index/us/MSFT.json').stat().st_mtime_ns,
+                         before[self.archive / 'index/us/MSFT.json'][1])
         ka.verify(self.archive)
-        self.assertEqual(before, (self.archive / 'manifest.json').read_bytes())
+
+    def test_index_missing_extra_or_inexact_is_rejected(self):
+        self.seed('AAPL')
+        index = self.archive / 'index/us/AAPL.json'
+        original = index.read_bytes()
+        index.unlink()
+        with self.assertRaisesRegex(ValueError, 'index file missing'):
+            ka.verify(self.archive)
+        index.write_bytes(original)
+        value = ka.json_read(index, {})
+        for field, wrong in [('rows', 999), ('firstDate', '2000-01-01'), ('path', 'us/MSFT')]:
+            ka.json_write(index, {**value, field: wrong})
+            with self.assertRaisesRegex(ValueError, 'index does not match CSV'):
+                ka.verify(self.archive)
+        index.write_bytes(original)
+        value['years']['2026']['sha256'] = '0' * 64
+        ka.json_write(index, value)
+        with self.assertRaisesRegex(ValueError, 'index does not match CSV'):
+            ka.verify(self.archive)
+        index.write_bytes(original)
+        ka.json_write(self.archive / 'index/us/UNEXPECTED.json', {})
+        with self.assertRaisesRegex(ValueError, 'Unexpected archive index'):
+            ka.verify(self.archive, refresh_manifest=True)
+
+    def test_six_year_catalog_stays_small_and_has_no_monolithic_years(self):
+        stats = {f'us/A{symbol:04d}/{year}.csv': {'firstDate': f'{year}-01-04', 'lastDate': f'{year}-12-30',
+                 'rows': 250, 'csvBytes': 15000, 'sha256': ka.digest(f'{symbol}/{year}'.encode())}
+                 for symbol in range(7000) for year in range(2021, 2027)}
+        indexes = ka._index_documents(stats)
+        index_bytes = sum(len(ka._json_bytes(v)) for v in indexes.values())
+        manifest = ka._manifest(stats, 630000000 + index_bytes, indexes=indexes)
+        self.assertLess(len(ka._json_bytes(manifest)), 100000)
+        self.assertNotIn('bySymbol', manifest)
+        self.assertEqual(manifest['indexFiles'], 7000)
+        self.assertEqual(manifest['indexBytes'], index_bytes)
+        self.assertLess(max(len(ka._json_bytes(v)) for v in indexes.values()), 2500)
 
     def test_five_complete_years_batch_limit_resume_and_immutable_existing_rows(self):
         self.seed('AAPL', [row('2026-01-02', close=100)])
@@ -235,6 +290,7 @@ class ExpansionTests(_ArchiveCase):
         self.seed('^N225', [row('2021-01-04')])
         base = self.checkpoint()
         (self.archive / 'global/^N225/2021.csv').unlink()
+        (self.archive / 'index/global/%5EN225.json').unlink()
         ka.update_manifest(self.archive)
         with self.assertRaisesRegex(ValueError, 'deleted'): ka.verify(self.archive, base)
 
