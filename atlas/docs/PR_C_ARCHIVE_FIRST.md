@@ -1,6 +1,6 @@
 # PR-C：封存優先，Yahoo 補最新
 
-原 C1～C5 的分項 commit 保留；本輪用 merge 整合 main `5d2a99b720`（包含已合併 #219），沒有 rebase／force-push。保留報價狀態、盤前盤後直接顯示、自選更新時間與價格警示。讀取器直接讀 PR-B 的個股 index；尚未發布 index 的代號（HTTP 404）繼續用原資料來源，不下載全市場 manifest。沒有合併 PR、部署、執行正式排程或寫入永久資料。
+原 C1～C5 的分項 commit 保留；本輪用 merge 整合 main `b6ba9afd60`（包含已合併 #219、#224），沒有 rebase／force-push。保留報價狀態、盤前盤後直接顯示、自選更新時間與價格警示。讀取器直接讀 PR-B 的個股 index；尚未發布 index 的代號（HTTP 404）繼續用原資料來源，不下載全市場 manifest。沒有合併 PR、部署、執行正式排程或寫入永久資料。
 
 ## 行為與限制
 
@@ -50,7 +50,7 @@ PR-B 另封存的全球指數保留 global/，本次 tw/us 讀取不把其他幣
 
 ## 審查修訂：個股索引與 #219 整合
 
-已以 merge 合併 main 5d2a99b720，保留 #219 全部功能，沒有 rebase 或 force-push。讀取歷史以前僅請求 `index/{bucket}/{代號}.json`；不請求 manifest。PR-B 的 index 檔名是磁碟上的 URL 編碼字串，HTTP 要再編碼 `%`，例如 `^TWII` 為 `index/tw/%255ETWII.json`；CSV 則仍為 `tw/%5ETWII/2026.csv`。
+已以 merge 合併 main b6ba9afd60，保留 #219 全部功能，沒有 rebase 或 force-push。讀取歷史以前僅請求 `index/{bucket}/{代號}.json`；不請求 manifest。PR-B 的 index 檔名是磁碟上的 URL 編碼字串，HTTP 要再編碼 `%`，例如 `^TWII` 為 `index/tw/%255ETWII.json`；CSV 則仍為 `tw/%5ETWII/2026.csv`。
 
 index 與 404 都使用原有行情 IndexedDB／記憶體授權機制快取，每個 UTC 日最多更新一次；不另建帳戶儲存。不持久化授權時只保留記憶體。公開文件與原行情的淘汰額度分開，避免年度 K 線逐出當天已讀的 index。跨日會重新取得 index，舊的正向快取不會掩蓋次日的 404。身份、bucket、CSV path、年度日期範圍、SHA／rows／bytes 都驗證後才讀年度檔；index 不存在就回原 Yahoo 路由。
 
@@ -60,12 +60,18 @@ index 與 404 都使用原有行情 IndexedDB／記憶體授權機制快取，�
 
 ## 本輪驗證結果
 
-合併與索引修改後，lint、typecheck、一般／Pages 建置通過；最終完整 Vitest 149 檔／1,845 個測試全數通過。包含 index／404 跨實例同日重用與跨日重載、年度快取淘汰不逐出 index、訪客瀏覽 500 檔仍不重抓當日 index。
+合併與索引修改後，lint、typecheck、一般／Pages 建置通過；最終完整 Vitest 149 檔／1,852 個測試全數通過。包含 index／404 跨實例同日重用與跨日重載、年度快取淘汰不逐出 index、訪客瀏覽 500 檔仍不重抓當日 index。
 
-桌機／390px 99 個、375px Chromium／WebKit 50 個瀏覽器案例全數通過，保留 #219、舊自選／市場／導覽與本次所有斷言；25 張截圖已更新。完整 CI 將驗證推送的相同程式，包括舊離線旅程、PostgreSQL 授權與 breakout 整合；最終結果記於 PR。
+前一輪桌機／390px 99 個、375px Chromium／WebKit 50 個瀏覽器案例全數通過。再納入 #224 後，桌機／390px 重跑 87 個受影響案例，375px Chromium／WebKit 重跑 50 個；保留 #219、舊自選／市場／導覽與本次所有斷言，25 張截圖已更新。完整 CI 將驗證推送的相同程式，包括舊離線旅程、PostgreSQL 授權與 breakout 整合；最終結果記於 PR。
 
 ## CI 真實 Pages 導航修正
 
 首輪完整 CI 在 iPhone WebKit 捕捉到頁面已離開後，舊 archive lookup 才啟動 `series/index.json` fallback，產生 access-control pageerror。ArchiveFirstProvider 現在於頁面離開後停止後續 provider 工作；BFCache 還原使用新 lifetime，舊 pending lookup 不會復活。沒有過濾錯誤或修改 smoke 斷言。
 
-三個 late fallback 測試先重現失敗，再加入修正與 BFCache 恢復測試；完整 149 檔／1,845 單元、lint／typecheck 與精確 Pages 建置通過。原研究 smoke 在桌機與 WebKit 以兩份真實 generated snapshot（包含最新 487f3dfbf5）驗證通過，errors 為空且無橫向溢出。完整 CI 於本修正 head 重新跑全部下游檢查。
+三個 late fallback 測試先重現失敗，再加入修正與 BFCache 恢復測試；完整 149 檔／1,852 單元、lint／typecheck 與精確 Pages 建置通過。原研究 smoke 在桌機與 WebKit 以兩份真實 generated snapshot（包含最新 487f3dfbf5）驗證通過，errors 為空且無橫向溢出。完整 CI 於本修正 head 重新跑全部下游檢查。
+
+## 最新 main #224 合併
+
+再以正常 merge 納入 b6ba9afd60。MiniChart 保留 #224 的盤中原地重繪，不重建圖表或重置縮放；市場卡片使用每分鐘批次訂閱，連續看圖保留可見範圍訂閱與五分鐘間隔，沒有另開輪詢。新增 main 的缺漏日期插回與市場卡片更新案例一併通過；同交易日期補齊與封存測試繼續保留。
+
+最新合併後，未修改的 research-pages-smoke 也以精確 Pages 路徑與真實 generated snapshot 487f3dfbf5 通過桌機／iPhone WebKit，兩者 errors=[]、horizontalOverflow=0。
