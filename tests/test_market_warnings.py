@@ -13,6 +13,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import build_market_warnings as mw
 import market_warnings_log as log
+from index_daily import IndexDailyBars
 from swing_breakouts import SwingHigh, SwingHighTrace
 from swing_cohort import diagnostics, included, swing_attempts
 
@@ -235,6 +236,88 @@ class SafetyTest(unittest.TestCase):
         self.assertEqual((row['leader_success'],row['market_success']),(.2,.4))
         self.assertTrue(row['leader_lag'])
         self.assertEqual(row['breakout_count_per_1000'],10)
+
+
+class DownloadIsolationTest(unittest.TestCase):
+    def previous(self):
+        value = json.loads((Path(__file__).resolve().parents[1] / 'atlas/tests/fixtures/market-warnings.sample.json').read_text())
+        value['params'] = {**mw.PARAMS, 'swingCountingModel': mw.COUNTING_MODEL}
+        return value
+
+    def test_fetch_wrapper_keeps_seven_year_period_and_each_index_error(self):
+        result = IndexDailyBars()
+        result.errors['^IXIC'] = '^IXIC offline'
+        with patch.object(mw,'read_index_daily',return_value=result) as read:
+            self.assertIs(mw.fetch_indices(now=datetime(2026,11,5,tzinfo=timezone.utc)),result)
+        self.assertEqual(set(read.call_args.args[0]),{'^TWII','^GSPC','^IXIC','^SOX','SOXX'})
+        self.assertEqual(read.call_args.kwargs['period'],'7y')
+        self.assertEqual(read.call_args.kwargs['min_bars'],60)
+
+    def test_real_tw_calculation_completes_when_no_us_index_is_available(self):
+        bars = frame(range(100,280))
+        spec = {'frames':{'A':bars,'B':bars},'listed':2,'listingAsOf':'2022-09-01'}
+        with patch.dict(mw.PARAMS,{'minEvaluated':1}):
+            payload = mw.build_payload({'tw':spec},{'^TWII':bars},datetime(2022,10,1,tzinfo=timezone.utc))
+        self.assertEqual(payload['markets']['tw']['update']['status'],'updated')
+        self.assertEqual(payload['markets']['tw']['evaluated'],2)
+        self.assertEqual(payload['markets']['tw']['latest']['date'],payload['markets']['tw']['asOf'])
+        self.assertTrue(payload['markets']['tw']['indices']['^TWII']['series'])
+        self.assertEqual(payload['markets']['us']['update']['status'],'unavailable')
+
+    def test_only_us_download_failure_updates_tw_retains_us_and_never_relogs_us(self):
+        previous = self.previous()
+        indices = IndexDailyBars()
+        indices['^TWII'] = frame(range(100,280))
+        indices.errors['^IXIC'] = '^IXIC Yahoo 與封存都沒有完整資料'
+        now = datetime(2026,10,15,9,tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as folder:
+            out, forward = Path(folder)/'report.json', Path(folder)/'log.csv'
+            out.write_text(json.dumps(previous))
+            old_row = {field:'' for field in log.FIELDS}
+            old_row.update(asOf='2026-10-12',market='tw')
+            forward.write_bytes(log.encode([old_row],True))
+            original_bytes = forward.read_bytes()
+            original_us = copy.deepcopy(previous['markets']['us'])
+            with patch.object(mw, 'build_market', return_value=copy.deepcopy(previous['markets']['tw'])) as build:
+                self.assertEqual(mw.main(['--out',str(out),'--log',str(forward)],
+                    inputs_loader=lambda *_:{'tw':{}}, indices_loader=lambda:indices, now=now),0)
+                self.assertEqual(build.call_count,1)
+            payload = json.loads(out.read_text())
+            self.assertEqual(payload['markets']['tw']['update']['status'],'updated')
+            self.assertEqual(payload['markets']['us']['update']['status'],'retained')
+            self.assertIn('^IXIC',payload['markets']['us']['update']['reason'])
+            self.assertEqual(payload['markets']['us']['update']['generatedAt'],previous['generatedAt'])
+            retained = copy.deepcopy(payload['markets']['us'])
+            retained.pop('update')
+            self.assertEqual(retained,original_us)
+            self.assertTrue(forward.read_bytes().startswith(original_bytes))
+            self.assertEqual([r['market'] for r in log.read_rows(forward.read_bytes())],['tw','tw'])
+
+    def test_first_publication_without_old_us_keeps_tw_and_marks_us_unavailable(self):
+        prior = self.previous()
+        with patch.object(mw,'build_market',return_value=copy.deepcopy(prior['markets']['tw'])):
+            result = mw.build_payload({'tw':{}},{'^TWII':frame(range(100,280))},datetime(2026,10,15,tzinfo=timezone.utc))
+        self.assertEqual(result['markets']['us']['update']['status'],'unavailable')
+        self.assertEqual(set(result['markets']['us']),{'update'})
+
+    def test_both_markets_missing_preserves_entire_report_and_log(self):
+        with tempfile.TemporaryDirectory() as folder:
+            out, forward = Path(folder)/'report.json', Path(folder)/'log.csv'
+            out.write_text(json.dumps(self.previous()))
+            forward.write_bytes(b'unchanged log')
+            before = out.read_bytes()
+            self.assertEqual(mw.main(['--out',str(out),'--log',str(forward)],
+                inputs_loader=lambda *_:{},indices_loader=lambda:{},now=datetime(2026,10,15,tzinfo=timezone.utc)),1)
+            self.assertEqual(out.read_bytes(),before)
+            self.assertEqual(forward.read_bytes(),b'unchanged log')
+
+    def test_volume_proxy_failure_only_retains_its_market(self):
+        prior = self.previous()
+        indices = {s:frame(range(100,280)) for s in ['^TWII','^GSPC','^IXIC','^SOX']}
+        with patch.object(mw,'build_market',return_value=copy.deepcopy(prior['markets']['tw'])):
+            result = mw.build_payload({'tw':{}},indices,datetime(2026,10,15,tzinfo=timezone.utc),prior)
+        self.assertEqual(result['markets']['us']['update']['status'],'retained')
+        self.assertIn('SOXX',result['markets']['us']['update']['reason'])
 
 
 if __name__ == '__main__':
