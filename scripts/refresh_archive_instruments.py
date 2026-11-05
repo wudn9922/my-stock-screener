@@ -162,7 +162,8 @@ def main():
         failures = instruments.restore_public_reports(args.report_dir)
         print('Archive public reference files unavailable:', ','.join(failures) or 'none', flush=True)
     started = time.perf_counter()
-    result = refresh(args.archive_dir, args.cache_dir, args.budget, reports=args.report_dir)
+    # bu.Run never creates its own Network (bu.run() does); without one every Yahoo symbol fails.
+    result = refresh(args.archive_dir, args.cache_dir, args.budget, net=bu.Network(), reports=args.report_dir)
     print(json.dumps(result, ensure_ascii=False), flush=True)
     print(f'K-line timing: instruments.refresh: {time.perf_counter()-started:.3f}s', flush=True)
 
