@@ -6,7 +6,8 @@ Primary self-review only; no independent sign-off. From latest main `3282e2fa82`
 新增按市場代號驗證、40 檔分段、15 秒快取、1 秒節流、2 秒逾時、跨日清空、空價沿用及 MIS-only 今日棒；
 Yahoo 與 #224 補洞照舊，失敗完整退回。前端沿用 LiveQuoteFeed，保留 TPEx 歷史來源並顯示 MIS／Yahoo 實際來源。
 操作、欄位與部署順序見 [market-chart README](../supabase/functions/market-chart/README.md#台股盤中-mis維護者部署後生效)。
-完整結果與桌機、390px／375px Chromium／WebKit 截圖列於 PR；自動化不代表實機 iPhone 簽核。
+本地 lint／typecheck、152 檔／1,907 單元、Deno check／lint、一般與 Pages 建置通過；合併後 111 個受影響案例與標籤修正後 27 個報價案例通過。
+桌機、390px／375px Chromium／WebKit 共 10 張截圖位於 docs/screenshots/twse-mis；375px Chromium／WebKit 40 個與 IPO 就緒五種配置全部通過；完整 CI 最終結果列於 PR。IPO 測試只增加頁面就緒等待，沒有放寬斷言或逾時。自動化不代表實機 iPhone 簽核。
 
 ## PR-C：永久封存優先（2026-11-04）
 

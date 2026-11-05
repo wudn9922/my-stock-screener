@@ -115,5 +115,20 @@ npx playwright test --config e2e-site/playwright.compact.config.ts live-quotes.s
 `tests/twse-mis.test.ts` 涵蓋分批／節流／快取、跨日與空價、成交量、無量指數、失敗、非交易時段與來源還原。
 瀏覽器涵蓋上市、上櫃、加權、櫃買，今日 K／來源及下一分鐘更新，並保留美股與既有盤中回歸。
 
-發布由維護者依上方既有 Deploy 步驟執行：先部署 `market-chart`，再發布包含來源標示的前端。
+發布由維護者依上方既有 Deploy 步驟執行：先發布包含來源標示的前端（相容舊函式），再部署 `market-chart`。
 兩端向後相容；不需 SQL、資料遷移、新環境變數或 API key。此 PR 不部署、不觸發正式 workflow，也不合併。
+
+
+### 本地驗證紀錄（2026-11-05）
+
+- Deno 2.5.6 check、lint（3 個函式檔）、npm lint／typecheck，152 個 Vitest 檔／1,907 測試，普通與 Pages 建置全部通過。
+- 合併最新 main #222 後，相關桌機／390px 回歸 111 個通過；修正原先寫死的圖內「延遲」標籤後，27 個報價案例再跑通過。
+- 375px Chromium／WebKit 40 個案例全部通過；既有 IPO 搜尋增加就緒斷言後，五種配置（3＋2）再次全數通過。所有原有斷言與門檻保留；
+  IPO 測試補上等待頁面標題渲染的就緒斷言，避免手機版尚未渲染時誤判為桌機搜尋。
+- 共 10 張合成行情截圖，含桌機、390px Chromium／WebKit、375px Chromium／WebKit：
+  [加權指數桌機](../../../atlas/docs/screenshots/twse-mis/index-desktop-chromium.png)、
+  [加權指數 iPhone 375px](../../../atlas/docs/screenshots/twse-mis/index-iphone375-webkit.png)、
+  [個股桌機](../../../atlas/docs/screenshots/twse-mis/stock-desktop-chromium.png)、
+  [個股 iPhone 375px](../../../atlas/docs/screenshots/twse-mis/stock-iphone375-webkit.png)。
+
+未以實機 iPhone 或真實 MIS 連線測試，不宣稱部署或獨立審查通過。完整 GitHub CI 結果另列於 PR。

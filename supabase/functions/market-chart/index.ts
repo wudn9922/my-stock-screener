@@ -1,4 +1,4 @@
-// market-chart: a read-only Yahoo Finance chart proxy for Atlas (GitHub Pages cannot call Yahoo
+// market-chart: read-only Yahoo history with a Taiwan MIS overlay (GitHub Pages cannot call Yahoo
 // directly because of CORS). GET ?symbol=&interval=&range=&events=1 → Yahoo's raw chart JSON.
 // GET ?quotes=AAPL,2330.TW → { results: { SYMBOL: slim chart JSON }, errors: { SYMBOL: code } }
 // with the last month of daily rows per symbol (the site's once-a-minute live refresh).
