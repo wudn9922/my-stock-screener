@@ -1,3 +1,14 @@
+## PR-C：永久封存優先（2026-11-04）
+
+Primary self-review only; no independent sign-off. Branch starts at main `c3668287ae`; review revision merged main `5d2a99b720` without rebase or force-push.
+C1～C5 的程式、來源退路、快取與分割基準、可見訂閱、測試及 25 張桌機／手機截圖，見 [PR_C_ARCHIVE_FIRST.md](docs/PR_C_ARCHIVE_FIRST.md) 與 [ADR-026](docs/architecture/ADR-026-archive-first-history.md)。
+沒有修改登入／帳號、Supabase 函式／SQL、GCP 或永久行情／財報；archive 分支唯讀。
+審查修訂通過 149 檔／1,845 單元、99＋50 瀏覽器、lint／typecheck／一般與 Pages 建置；完整 CI 另跑。
+真實 Pages 的文件離開後 fallback race 已補 lifetime／BFCache 測試，原 smoke 以最新資料桌機／WebKit errors0 通過；完整 CI 於修正後 head 重跑。
+個股 index／404 使用既有 IndexedDB 按日快取，不下載 manifest；#224 補齊日 K 依交易日比對。#219 全功能保留。
+原非選股站點的離線失敗已在未改前端的基準重現：11 個 shell 資源缺懶載入圖表。補 public JS/CSS 預載並保持選股站點不快取策略；不放寬既有離線測試。
+實際最終檢查計數記於 PR；目前沒有部署、合併 PR 或執行正式補檔。
+
 ## PR-D：交易日曆（2026-11-05）
 
 Primary self-review only; no independent sign-off. Branch starts at latest main `0cb7789772`.

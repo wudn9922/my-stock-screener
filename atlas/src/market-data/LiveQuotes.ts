@@ -23,6 +23,11 @@ export interface LiveDaily {
 }
 
 export type LiveListener = (value: LiveDaily) => void;
+export interface LiveSubscriptionOptions {
+  onError?: () => void;
+  /** Minimum source refresh interval; the shortest active subscriber wins for this symbol. */
+  minIntervalMs?: number;
+}
 
 export const LIVE_INTERVAL_MS = 60_000;
 export const LIVE_MAX_INTERVAL_MS = 300_000;
@@ -114,13 +119,14 @@ export function normalizeLive(raw: unknown, symbol: string, retrievedAt: number)
 }
 
 interface Entry {
-  listeners: Set<LiveListener>;
+  listeners: Map<LiveListener, LiveSubscriptionOptions>;
   fetchedAt: number;
   last?: LiveDaily;
 }
 
 export interface LiveQuoteFeedOptions {
   fetcher?: typeof fetch;
+  timeoutMs?: number;
   now?: () => number;
   /** Defaults to document visibility. */
   visible?: () => boolean;
@@ -130,7 +136,9 @@ export interface LiveQuoteFeedOptions {
 
 export class LiveQuoteFeed {
   private readonly entries = new Map<string, Entry>();
+  private readonly warm = new Map<string, Pick<Entry, 'fetchedAt' | 'last'>>();
   private readonly fetcher: typeof fetch;
+  private readonly timeoutMs: number;
   private readonly now: () => number;
   private readonly visible: () => boolean;
   private readonly inSession: (symbol: string, nowMs: number) => boolean;
@@ -147,6 +155,7 @@ export class LiveQuoteFeed {
 
   constructor(readonly proxyUrl: string, options: LiveQuoteFeedOptions = {}) {
     this.fetcher = options.fetcher ?? ((input, init) => fetch(input, init));
+    this.timeoutMs = options.timeoutMs ?? 15_000;
     this.now = options.now ?? Date.now;
     this.visible = options.visible ?? (() => typeof document === 'undefined' || !document.hidden);
     this.calendar = options.calendar ?? marketCalendar;
@@ -171,21 +180,62 @@ export class LiveQuoteFeed {
   }
 
   /** Starts live updates for a symbol; the returned function stops them. */
-  subscribe(symbolInput: string, listener: LiveListener): () => void {
+  subscribe(symbolInput: string, listener: LiveListener, options: LiveSubscriptionOptions = {}): () => void {
     if (!this.proxyUrl || !isLiveSymbol(symbolInput)) return () => undefined;
     const symbol = normalizeSymbol(symbolInput);
     let entry = this.entries.get(symbol);
-    if (!entry) this.entries.set(symbol, (entry = { listeners: new Set(), fetchedAt: 0 }));
-    entry.listeners.add(listener);
+    const requested = Number.isFinite(options.minIntervalMs) ? Math.max(LIVE_INTERVAL_MS, options.minIntervalMs!) : LIVE_INTERVAL_MS;
+    if (!entry) {
+      const cached = this.warm.get(symbol);
+      const reuseFor = options.minIntervalMs === undefined ? FRESH_MS : requested;
+      this.entries.set(symbol, (entry = { listeners: new Map(), fetchedAt: cached && this.now()-cached.fetchedAt < reuseFor ? cached.fetchedAt : 0,
+        ...(cached?.last ? { last: cached.last } : {}) }));
+      this.warm.delete(symbol);
+    } else if (entry.last && requested < this.minimumInterval(entry) && this.now()-entry.fetchedAt >= FRESH_MS) {
+      entry.fetchedAt = 0;
+    }
+    entry.listeners.set(listener, options);
     const last = entry.last;
     if (last) queueMicrotask(() => entry!.listeners.has(listener) && listener(last));
     this.start();
     this.kick();
+    let subscribed = true;
     return () => {
+      if (!subscribed) return;
+      subscribed = false;
       entry!.listeners.delete(listener);
-      if (!entry!.listeners.size) this.entries.delete(symbol);
+      if (!entry!.listeners.size) {
+        this.entries.delete(symbol);
+        this.remember(symbol, { fetchedAt: entry!.fetchedAt, last: entry!.last });
+      }
       if (!this.entries.size) this.stop();
     };
+  }
+
+  private remember(symbol: string, value: Pick<Entry, 'fetchedAt' | 'last'>) {
+    this.warm.delete(symbol); this.warm.set(symbol, value);
+    while (this.warm.size > 400) this.warm.delete(this.warm.keys().next().value!);
+  }
+
+  private minimumInterval(entry: Entry): number {
+    return Math.min(...[...entry.listeners.values()].map(options => Number.isFinite(options.minIntervalMs)
+      ? Math.max(LIVE_INTERVAL_MS, options.minIntervalMs!) : LIVE_INTERVAL_MS));
+  }
+
+  /** Explicit retry uses the existing batched feed, without adding a polling loop. */
+  async refresh(symbol: string): Promise<LiveDaily> {
+    let latest: LiveDaily | undefined;
+    const stop = this.subscribe(symbol, value => { latest = value; });
+    const entry = this.entries.get(normalizeSymbol(symbol));
+    if (!entry) { stop(); throw new Error('即時報價代理尚未設定'); }
+    const previous = entry.last;
+    entry.fetchedAt = 0;
+    try {
+      if (this.running) await this.running;
+      await this.poll(false);
+      if (!latest || latest === previous) throw new Error('即時報價來源暫時無法取得');
+      return latest;
+    } finally { stop(); }
   }
 
   /** Fetches subscribers that have nothing recent (new symbols), whatever the session. */
@@ -243,7 +293,8 @@ export class LiveQuoteFeed {
       // Opening still reads the last close once. Known closed sessions never
       // retry periodically, including an unsuccessful first quote request.
       (!periodic || !this.loadCalendar || calendarSessionOpen(this.calendar, getMarketProfile(symbol), now) !== false) &&
-      (!entry.fetchedAt || (periodic && now - entry.fetchedAt >= this.interval - 5000 && this.inSession(symbol, now))))
+      (!entry.fetchedAt || (periodic && now - entry.fetchedAt >= (this.minimumInterval(entry) > LIVE_INTERVAL_MS
+        ? Math.max(this.minimumInterval(entry), this.interval - 5000) : this.interval - 5000) && this.inSession(symbol, now))))
       .map(([symbol]) => symbol);
     let failed = false;
     for (let i = 0; i < due.length; i += MAX_BATCH) {
@@ -252,8 +303,10 @@ export class LiveQuoteFeed {
         const entry = this.entries.get(symbol);
         if (entry) entry.fetchedAt = now;
       }
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(new DOMException('Quote batch timed out', 'TimeoutError')), this.timeoutMs);
       try {
-        const response = await this.fetcher(quotesUrl(this.proxyUrl, batch), { headers: { Accept: 'application/json' } });
+        const response = await this.fetcher(quotesUrl(this.proxyUrl, batch), { headers: { Accept: 'application/json' }, signal: controller.signal });
         if (!response.ok) throw new Error(`quotes ${response.status}`);
         const body = (await response.json()) as { results?: Record<string, unknown>; errors?: Record<string, string> };
         if (Object.values(body.errors ?? {}).includes('rate_limited')) failed = true;
@@ -263,19 +316,27 @@ export class LiveQuoteFeed {
           const raw = body.results?.[symbol];
           const value = raw === undefined ? null : normalizeLive(raw, symbol, retrievedAt);
           const entry = this.entries.get(symbol);
-          if (!value || !entry) continue;
+          if (!entry) { if (value) this.remember(symbol, { fetchedAt: now, last: value }); continue; }
+          if (!value) {
+            for (const options of entry.listeners.values()) options.onError?.();
+            continue;
+          }
           entry.last = value;
-          for (const listener of [...entry.listeners]) listener(value);
+          entry.fetchedAt = Math.max(entry.fetchedAt, now);
+          for (const listener of entry.listeners.keys()) listener(value);
         }
         for (const listener of [...this.updateListeners]) listener(this.lastUpdatedAt);
       } catch {
         // Retried on the next tick even outside the session (an unanswered first fetch counts as none).
         for (const symbol of batch) {
           const entry = this.entries.get(symbol);
+          for (const options of entry?.listeners.values() ?? []) options.onError?.();
           if (entry && !entry.last) entry.fetchedAt = 0;
         }
         failed = true;
         break;
+      } finally {
+        clearTimeout(timeout);
       }
     }
     if (!due.length) return;

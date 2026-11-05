@@ -11,8 +11,9 @@ import {
   type LogicalRange,
   type UTCTimestamp,
 } from 'lightweight-charts';
-import { liveQuotes, mergeDailyBars, sameBars } from '../market-data/LiveQuotes';
-import { getDailyBars } from '../app/dataSources';
+import { getDailyBarResult, getLegacyDailyResult, getWatchlistDailyResult } from '../app/dataSources';
+import { LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, sameBars, type LiveDaily } from '../market-data/LiveQuotes';
+import { mergeArchiveDaily } from '../market-data/KlineArchive';
 import { sitePreferences, upDownColors } from '../app/sitePreferences';
 import type { Bar } from '../market-data/MarketDataProvider';
 import { sma } from '../indicators/MovingAverage';
@@ -27,6 +28,7 @@ const NO_MAS: readonly number[] = [];
 export function useNearViewport<T extends Element>(margin = '200px') {
   const ref = useRef<T>(null);
   const [near, setNear] = useState(false);
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
     const element = ref.current;
     if (!element || near) return;
@@ -43,7 +45,14 @@ export function useNearViewport<T extends Element>(margin = '200px') {
     observer.observe(element);
     return () => observer.disconnect();
   }, [margin, near]);
-  return { ref, near };
+  useEffect(() => {
+    if (!ref.current) return;
+    if (typeof IntersectionObserver === 'undefined') { setVisible(true); return; }
+    const observer = new IntersectionObserver(entries => setVisible(entries.some(entry => entry.isIntersecting)));
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+  return { ref, near, visible };
 }
 
 export type MiniChartStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -75,11 +84,19 @@ export function MiniChart({
   /** Keep the latest daily bar moving with the site's once-a-minute live refresh (market cards). */
   live?: boolean;
 }) {
-  const { ref, near } = useNearViewport<HTMLDivElement>();
+  const { ref, near, visible } = useNearViewport<HTMLDivElement>();
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const viewRef = useRef<{ symbol: string; range: LogicalRange | null } | null>(null);
   const countRef = useRef<HTMLOutputElement>(null);
   const [bars, setBars] = useState<Bar[] | null>(null);
+  const barsRef = useRef<Bar[] | null>(null);
+  const archivedThrough = useRef<string | undefined>(undefined);
+  const recentRef = useRef<LiveDaily | null>(null);
+  const mounted = useRef(true), splitPending = useRef(false);
+  const context = useRef('');
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const [sourceNote, setSourceNote] = useState('');
   // Series drawn from `bars`; a live update repaints them in place so zoom and pan survive.
   const paintRef = useRef<((next: Bar[]) => void) | null>(null);
   const drawnRef = useRef<Bar[] | null>(null);
@@ -88,18 +105,41 @@ export function MiniChart({
   const statusRef = useRef(onStatus);
   statusRef.current = onStatus;
   const maKey = [...new Set(maPeriods.filter(period => Number.isInteger(period) && period > 0))].join(',');
+  context.current = `${symbol}:${maKey}:${interactive}:${initialMonths}`;
+  const replaceSplitHistory = () => {
+    archivedThrough.current = undefined;
+    setSourceNote('封存價格差異超過 2%，整段改用 Yahoo');
+    if (splitPending.current) return;
+    splitPending.current = true;
+    const requestedContext = context.current;
+    void getLegacyDailyResult(symbol).then(result => {
+      if (!mounted.current || context.current !== requestedContext) return;
+      const all = mergeDailyBars(result.bars, barsRef.current?.slice(-30) ?? []);
+      const next = Math.max(0, ...maPeriods) > 126 ? all : all.slice(-126);
+      barsRef.current = next; setBars(next); statusRef.current?.('ready', next);
+    }).catch(() => { if (mounted.current && context.current === requestedContext) setSourceNote('封存價格差異超過 2%，暫用較短的 Yahoo 範圍；較長歷史暫時無法取得'); });
+  };
   useEffect(() => {
     if (!near) return;
     let live = true;
+    recentRef.current = null; barsRef.current = null; archivedThrough.current = undefined;
+    splitPending.current = false; setSourceNote('');
     setBars(null);
     setStatus('loading');
     statusRef.current?.('loading', null);
-    getDailyBars(symbol)
+    // Long configured MAs need historical warm-up; the visible chart still starts at six months.
+    (Math.max(0, ...maPeriods) > 126 || (interactive && initialMonths !== 6) ? getDailyBarResult(symbol) : getWatchlistDailyResult(symbol))
       .then((result) => {
         if (!live) return;
-        setBars(result);
-        setStatus(result.length ? 'ready' : 'error');
-        statusRef.current?.(result.length ? 'ready' : 'error', result);
+        archivedThrough.current = result.archive?.lastDate;
+        const recent = recentRef.current;
+        const merged = result.archive && recent ? mergeArchiveDaily(result.bars, recent.bars, symbol, result.archive.lastDate) : null;
+        const next = merged?.bars ?? (recent ? mergeDailyBars(result.bars, recent.bars) : result.bars);
+        barsRef.current = next; setBars(next);
+        setSourceNote(result.source);
+        if (merged?.splitMismatch) replaceSplitHistory();
+        setStatus(next.length ? 'ready' : 'error');
+        statusRef.current?.(next.length ? 'ready' : 'error', next);
       })
       .catch(() => {
         if (!live) return;
@@ -109,7 +149,22 @@ export function MiniChart({
     return () => {
       live = false;
     };
-  }, [near, symbol]);
+  }, [near, symbol, maKey, interactive, initialMonths]);
+  useEffect(() => {
+    if (!visible) return;
+    return liveQuotes().subscribe(symbol, value => {
+      recentRef.current = value;
+      const current = barsRef.current;
+      if (!current?.length) return; // historical load owns initial/error state
+      const merged = archivedThrough.current ? mergeArchiveDaily(current, value.bars, symbol, archivedThrough.current) : null;
+      const next = merged?.bars ?? mergeDailyBars(current, value.bars);
+      if (sameBars(current, next)) return;
+      barsRef.current = next;
+      if (paintRef.current) paintRef.current(next); else setBars(next);
+      if (merged?.splitMismatch) replaceSplitHistory();
+      statusRef.current?.('ready', next);
+    }, { minIntervalMs: live ? LIVE_INTERVAL_MS : 300_000 });
+  }, [visible, symbol, live]);
   useEffect(() => {
     const host = hostRef.current;
     if (!host || !bars?.length) return;
@@ -174,7 +229,8 @@ export function MiniChart({
         color: `${bar.close >= bar.open ? up : down}99` })));
       drawnRef.current = source;
     };
-    paint(bars);
+    const source = barsRef.current ?? bars;
+    paint(source);
     paintRef.current = (next) => {
       const previous = drawnRef.current ?? bars;
       const range = chart.timeScale().getVisibleLogicalRange();
@@ -190,14 +246,16 @@ export function MiniChart({
         // Native pan/pinch updates the readout without React or persistence on
         // pointer movement. The range remains owned by Lightweight Charts.
         if (countRef.current && range)
-          countRef.current.value = String(Math.min(bars.length, Math.round(range.to - range.from + 1)));
+          countRef.current.value = String(Math.min(barsRef.current?.length ?? bars.length, Math.round(range.to - range.from + 1)));
       });
     };
     if (interactive) {
       scale.subscribeVisibleLogicalRangeChange(showRange);
-      scale.setVisibleLogicalRange({ from: miniChartStart(bars, initialMonths), to: bars.length - 1 });
+      const view = viewRef.current?.symbol === symbol ? viewRef.current.range : null;
+      scale.setVisibleLogicalRange(view && view.to < source.length + 10 ? view : { from: miniChartStart(source, initialMonths), to: source.length - 1 });
     } else scale.fitContent();
     return () => {
+      viewRef.current = { symbol, range: scale.getVisibleLogicalRange() };
       cancelAnimationFrame(rangeFrame);
       scale.unsubscribeVisibleLogicalRangeChange(showRange);
       chartRef.current = null;
@@ -206,32 +264,24 @@ export function MiniChart({
       chart.remove();
     };
   }, [bars, colors, maKey, interactive, showVolume, wheelZoom, initialMonths]);
-  // Market cards: today's bar follows the live refresh without rebuilding the chart.
-  useEffect(() => {
-    if (!live || !near || status !== 'ready') return;
-    return liveQuotes().subscribe(symbol, (value) => {
-      const current = drawnRef.current;
-      if (!current || !paintRef.current) return;
-      const next = mergeDailyBars(current, value.bars);
-      if (!sameBars(next, current)) paintRef.current(next);
-    });
-  }, [live, near, status, symbol]);
   const zoom = (factor: number) => {
     const scale = chartRef.current?.timeScale();
     const range = scale?.getVisibleLogicalRange();
-    if (!range || !scale || !bars?.length) return;
-    const count = Math.min(bars.length, Math.max(20, Math.round((range.to - range.from + 1) * factor)));
-    const from = Math.max(0, Math.min(bars.length - count, (range.from + range.to + 1 - count) / 2));
+    const current = barsRef.current;
+    if (!range || !scale || !current?.length) return;
+    const count = Math.min(current.length, Math.max(20, Math.round((range.to - range.from + 1) * factor)));
+    const from = Math.max(0, Math.min(current.length - count, (range.from + range.to + 1 - count) / 2));
     scale.setVisibleLogicalRange({ from, to: from + count - 1 });
   };
   return (
-    <div ref={ref} className={`mini-chart${interactive ? ' mini-chart-interactive' : ''}`} style={{ height }} data-status={status}>
+    <div ref={ref} className={`mini-chart${interactive ? ' mini-chart-interactive' : ''}`} style={{ height }} data-status={status} title={sourceNote}>
       {interactive && <div className="mini-chart-controls" role="group" aria-label={`${symbol} 圖表縮放`}>
         <span>日 K{showVolume ? ' · 成交量' : ''}</span>
         <button type="button" aria-label="縮小圖表" title="縮小（顯示更多 K 線）" disabled={status !== 'ready'} onClick={() => zoom(1.5)}>−</button>
         <button type="button" aria-label="放大圖表" title="放大（顯示較少 K 線）" disabled={status !== 'ready'} onClick={() => zoom(2 / 3)}>＋</button>
         <button type="button" disabled={status !== 'ready'} onClick={() => {
-          if (bars?.length) chartRef.current?.timeScale().setVisibleLogicalRange({ from: miniChartStart(bars, initialMonths), to: bars.length - 1 });
+          const current = barsRef.current;
+          if (current?.length) chartRef.current?.timeScale().setVisibleLogicalRange({ from: miniChartStart(current, initialMonths), to: current.length - 1 });
         }}>重設</button>
         <output ref={countRef} aria-label="顯示 K 線根數">—</output><span>根</span>
       </div>}

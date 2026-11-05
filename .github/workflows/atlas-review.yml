@@ -236,7 +236,7 @@ jobs:
           retention-days: 7
       - name: Desktop, phone and WebKit regressions
         working-directory: atlas
-        run: npm run test:site -- market-calendar.spec.ts pr-a-live-clock.spec.ts pr-a-quote-status.spec.ts pr-a-extended-quotes.spec.ts pr-a-legacy-location.spec.ts pr-a-price-alert.spec.ts startup-watchlist.spec.ts market-details.spec.ts live-quotes.spec.ts timeframe-fixed-studies.spec.ts watchlist-reasons.spec.ts breadth-signals.spec.ts market-lists-pe.spec.ts market-coverage-charts.spec.ts market-bond-drawing.spec.ts layout-followups.spec.ts rates.spec.ts stock-parameter-consistency.spec.ts chart-watchlist-followups.spec.ts monitor-signals.spec.ts screener-health-layout.spec.ts watchlist-board.spec.ts mexc.spec.ts holdings.spec.ts data-status.spec.ts analysis-comparisons.spec.ts nav-inventory.spec.ts stock-views.spec.ts account-privacy.spec.ts legacy-import.spec.ts parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts data-integrity.spec.ts closed-market.spec.ts pwa-install.spec.ts pwa-login.spec.ts pwa-update.spec.ts line-handoff.spec.ts line-sdk-contract.spec.ts navigation-recovery.spec.ts market-chart-controls.spec.ts world-btc.spec.ts analysis-panel-layout.spec.ts notes-density.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts themes-map.spec.ts breakouts.spec.ts index-volume.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts trending-refresh.spec.ts workspace-refinements.spec.ts
+        run: npm run test:site -- market-calendar.spec.ts archive-intraday-fill.spec.ts archive-first.spec.ts archive-board.spec.ts archive-sidebar.spec.ts archive-mini-charts.spec.ts pr-a-live-clock.spec.ts pr-a-quote-status.spec.ts pr-a-extended-quotes.spec.ts pr-a-legacy-location.spec.ts pr-a-price-alert.spec.ts startup-watchlist.spec.ts market-details.spec.ts live-quotes.spec.ts timeframe-fixed-studies.spec.ts watchlist-reasons.spec.ts breadth-signals.spec.ts market-lists-pe.spec.ts market-coverage-charts.spec.ts market-bond-drawing.spec.ts layout-followups.spec.ts rates.spec.ts stock-parameter-consistency.spec.ts chart-watchlist-followups.spec.ts monitor-signals.spec.ts screener-health-layout.spec.ts watchlist-board.spec.ts mexc.spec.ts holdings.spec.ts data-status.spec.ts analysis-comparisons.spec.ts nav-inventory.spec.ts stock-views.spec.ts account-privacy.spec.ts legacy-import.spec.ts parameter-console.spec.ts unified-console.spec.ts screener-filters.spec.ts data-integrity.spec.ts closed-market.spec.ts pwa-install.spec.ts pwa-login.spec.ts pwa-update.spec.ts line-handoff.spec.ts line-sdk-contract.spec.ts navigation-recovery.spec.ts market-chart-controls.spec.ts world-btc.spec.ts analysis-panel-layout.spec.ts notes-density.spec.ts financials.spec.ts pe-river.spec.ts themes.spec.ts themes-map.spec.ts breakouts.spec.ts index-volume.spec.ts stock-volatility.spec.ts research-modules.spec.ts drawable-research.spec.ts ma-recommendation.spec.ts trending-refresh.spec.ts workspace-refinements.spec.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -310,6 +310,42 @@ jobs:
         with:
           name: atlas-review-browser-evidence
           path: atlas/test-results/site
+          retention-days: 7
+  archive-compact-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: atlas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: atlas/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - name: Archive charts and unchanged navigation at 375px Chromium and iPhone WebKit
+        run: npx playwright test --config e2e-site/playwright.archive-compact.config.ts
+      - name: Build and retain the original offline drawing-lab journey
+        run: |
+          npm run build
+          node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 4173 --strictPort > /tmp/atlas-legacy-preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid"' EXIT
+          for attempt in 1 2 3 4 5; do
+            if curl -fsS http://127.0.0.1:4173/ -o /dev/null; then break; fi
+            sleep 1
+          done
+          npx playwright test e2e/offline.spec.ts e2e/v1-data-alerts.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atlas-archive-compact-evidence
+          path: |
+            atlas/test-results/archive-compact
+            atlas/test-results/browser
           retention-days: 7
   full-market-report:
     # Read the default branch's existing cache; no data downloads, credentials or cache writes.
