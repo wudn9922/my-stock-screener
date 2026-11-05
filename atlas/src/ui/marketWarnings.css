@@ -1,0 +1,21 @@
+.market-warning-card { min-width: 0; padding: 14px; overflow: hidden; scroll-margin-top: 80px; }
+.market-warning-card h2 { font-size: 17px; margin: 0 0 12px; }
+.market-warning-card h2 small { color: var(--text-muted, #939cab); font-size: 12px; }
+.mw-score { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.mw-score > b { font-size: 28px; }.mw-score small { font-size: 13px; }
+.mw-score time { margin-left: auto; font-size: 12px; color: var(--text-muted, #939cab); }
+.mw-purpose { font-size: 12px; line-height: 1.6; color: var(--text-muted, #939cab); }
+.mw-lights { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; font-size: 12px; }
+.mw-lights li { display: flex; gap: 8px; align-items: center; }.mw-lights b { margin-left: auto; font-size: 11px; }
+.mw-lights i { width: 9px; height: 9px; border-radius: 50%; background: #56a596; flex-shrink: 0; }
+.mw-lights [data-state='warning'] i { background: #e6aa43; }.mw-lights [data-state='na'] { color: var(--text-muted, #939cab); }.mw-lights [data-state='na'] i { background: #727b89; }
+.mw-chart-block { min-width: 0; border-top: 1px solid var(--border, #29303b); padding-top: 12px; margin-top: 14px; }
+.mw-chart-block h3 { font-size: 14px; margin: 8px 0; }.mw-tools { display: flex; gap: 12px; flex-wrap: wrap; }
+.mw-tools label { display: flex; align-items: center; gap: 7px; font-size: 12px; }.mw-tools select, .market-warning-card button { min-height: 44px; }
+.mw-plot { width: 100%; height: 215px; min-width: 0; }
+.mw-values { display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 10px 0; }
+.mw-values dt { font-size: 10px; color: var(--text-muted, #939cab); }.mw-values dd { font-size: 13px; margin: 4px 0; }
+.mw-legend { font-size: 11px; color: var(--text-muted, #939cab); line-height: 1.6; overflow-wrap: anywhere; }
+.mw-latest { font-size: 22px; margin: 8px 0; }.mw-latest small { font-size: 11px; margin-left: 8px; }
+.mw-evidence { white-space: pre-line; }.market-warning-card pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
+@media (max-width: 420px) { .market-warning-card { padding: 12px; }.mw-plot { height: 195px; } }

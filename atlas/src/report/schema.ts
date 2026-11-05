@@ -296,3 +296,77 @@ export function isEmptyReport(report: Report): boolean {
     !report.markets.length && !report.worldIndices.length && !report.groups.length && !report.sectors.length
   );
 }
+
+// Versioned warning documents fail as a whole; never coerce corrupt values to zero.
+const warningDate = z.iso.date();
+const fraction = z.number().finite().min(0).max(1).nullable();
+const countValue = z.number().finite().nonnegative().nullable();
+const warningFlag = z.boolean().nullable();
+const volumeWarningPoint = z.object({
+  date: warningDate,
+  up_vol_up_ratio_5: fraction, down_vol_down_ratio_5: fraction,
+  up_vol_up_ratio_10: fraction, down_vol_down_ratio_10: fraction,
+  up_vol_up_ratio_20: fraction, down_vol_down_ratio_20: fraction,
+  up_vol_up_ratio_60: fraction, down_vol_down_ratio_60: fraction,
+  avg60: fraction, median756: fraction, vol60_weak: warningFlag,
+});
+const marketWarningPoint = z.object({
+  date: warningDate, leader_success: fraction, market_success: fraction,
+  leader_success_n: countValue, market_success_n: countValue,
+  breakout_count_per_1000: countValue, count_p30: countValue,
+  uptrend: warningFlag, leader_lag: warningFlag, breadth_divergence: warningFlag,
+  avg60: fraction, median756: fraction, vol60_weak: warningFlag,
+  warning_level: z.number().int().min(0).max(3), warning_complete: z.boolean(),
+});
+const ordered = <T extends { date: string }>(rows: T[]) => rows.every((row, i) => i === 0 || row.date > rows[i - 1]!.date);
+const indexWarningSchema = z.object({
+  proxy: z.string().nullable(), validated: z.boolean(),
+  series: z.array(volumeWarningPoint).min(1).refine(ordered), latest: volumeWarningPoint,
+  corrections: z.array(z.object({ start: warningDate, end: warningDate, drawdown: z.number().finite().max(-0.07), confirmed: z.boolean() })
+    .refine(value => value.start <= value.end)),
+}).refine(value => JSON.stringify(value.latest) === JSON.stringify(value.series.at(-1)));
+const warningMarketSchema = z.object({
+  asOf: warningDate, universeCount: z.number().int().positive(), evaluated: z.number().int().nonnegative(),
+  listingAsOf: warningDate, series: z.array(marketWarningPoint).min(1).refine(ordered), latest: marketWarningPoint,
+  indices: z.record(z.string(), indexWarningSchema), limitations: z.array(z.string()),
+}).refine(value => value.latest.date === value.asOf && JSON.stringify(value.latest) === JSON.stringify(value.series.at(-1)) && value.evaluated <= value.universeCount);
+const marketParams = z.object({ indices: z.array(z.string()).min(1), leaderShare: z.number().positive().max(1),
+  minAmount: z.number().positive(), minPrice: z.number().positive(), successWindow: z.number().int().positive() });
+export const marketWarningsSchema = z.object({
+  version: z.literal(1), generatedAt: z.iso.datetime({ offset: true }),
+  params: z.object({
+    windows: z.tuple([z.literal(5), z.literal(10), z.literal(20), z.literal(60)]), defaultWindow: z.literal(60),
+    medianWindow: z.number().int().positive(), medianMinValid: z.number().int().positive(), volumeGap: z.number().positive(),
+    maxReturn: z.number().positive(), countWindow: z.number().int().positive(), leaderReturnDays: z.number().int().positive(),
+    stockJumpLimit: z.number().positive(), minCoverage: z.number().positive().max(1), minEvaluated: z.number().int().positive(),
+    liquidityDays: z.number().int().positive(), markets: z.object({ tw: marketParams, us: marketParams }),
+    indexVolumeProxies: z.record(z.string(), z.string()), minBreakouts: z.number().int().positive(), smoothDays: z.number().int().positive(),
+    leaderGap: z.number().positive(), trendDays: z.number().int().positive(), trendSlopeDays: z.number().int().positive(),
+    highWindow: z.number().int().positive(), nearHigh: z.number().positive().max(1), quantileWindow: z.number().int().positive(),
+    quantileMinValid: z.number().int().positive(), countQuantile: z.number().positive().max(1), correctionDrop: z.number().positive().max(1),
+    historyYears: z.number().int().positive(), closeBufferAtr: z.number().positive(), atrPeriod: z.number().int().positive(),
+    observationDays: z.number().int().positive(), barrier: z.number().positive(), swingAtrPeriod: z.number().int().positive(),
+    swingReversalAtr: z.number().positive(), swingCountingModel: z.literal('first-higher-close-v1'),
+    countDenominator: z.string(), leaderMembership: z.string(), firstPivot: z.string(),
+    diagnosticDenominators: z.string(),
+  }),
+  evidence: z.array(z.string()).min(6), markets: z.object({ tw: warningMarketSchema, us: warningMarketSchema }),
+}).superRefine((data, ctx) => {
+  for (const key of ['tw', 'us'] as const) {
+    const market = data.markets[key];
+    if (market.evaluated / market.universeCount < data.params.minCoverage || market.evaluated < data.params.minEvaluated)
+      ctx.addIssue({ code: 'custom', message: 'Insufficient full-market coverage' });
+    if (data.params.markets[key].indices.some(symbol => !market.indices[symbol])) ctx.addIssue({ code: 'custom', message: 'Missing index' });
+    for (const [symbol, index] of Object.entries(market.indices)) {
+      if (index.latest.date !== market.asOf || index.validated !== (key === 'tw' && symbol === '^TWII') ||
+        index.proxy !== (data.params.indexVolumeProxies[symbol] ?? null)) ctx.addIssue({ code: 'custom', message: 'Inconsistent index provenance' });
+    }
+    for (const row of market.series) {
+      const flags = key === 'tw' ? [row.vol60_weak, row.leader_lag, row.breadth_divergence] : [row.leader_lag, row.breadth_divergence];
+      if (row.warning_level !== flags.filter(value => value === true).length || row.warning_complete !== flags.every(value => value !== null) || (key === 'us' && row.vol60_weak !== null))
+        ctx.addIssue({ code: 'custom', message: 'Inconsistent warning count' });
+    }
+  }
+});
+export type MarketWarnings = z.infer<typeof marketWarningsSchema>;
+export type MarketWarningPoint = z.infer<typeof marketWarningPoint>;

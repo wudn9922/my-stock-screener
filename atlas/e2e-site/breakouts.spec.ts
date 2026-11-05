@@ -69,7 +69,7 @@ test('three entry cards compare four outcomes with fixed cohorts on desktop and 
   await expect(section.getByRole('heading', { name: /全市場進場成功率/ })).toContainText('台股');
   await expect(section.locator('.bo-asof')).toHaveText('資料日 2026/10/09');
   const order = await page.locator('.markets-side > section.card').evaluateAll(nodes => nodes.map(node => node.className));
-  expect(order.slice(0, 3)).toEqual(['card index-volume-card', 'card breakout-card', 'card breadth-card']);
+  expect(order.slice(0, 3)).toEqual(['card market-warning-card', 'card breakout-card', 'card breadth-card']);
   await expect(section.locator('.bo-row')).toHaveCount(3);
   await expect(picker(page).getByRole('button')).toHaveCount(4);
   await expect(row(page).locator('.bo-win')).toContainText('50.0%');
@@ -244,5 +244,31 @@ test('monthly recalculations have distinct bars, current values, and a five-mont
   await card(page).getByText('每月測試數值與涵蓋', { exact: true }).click();
   await expect(card(page).locator('.bo-history-table tbody tr')).toHaveCount(7);
   await expect(card(page).locator('.bo-history-table tbody tr').first()).toContainText('20.0%');
+  await noOverflow(page);
+});
+
+test('new swing cohorts show exclusions, use hold5 and do not compare an old monthly point', async ({ page }) => {
+  const payload = JSON.parse(body);
+  payload.params.swingCountingModel = 'first-higher-close-v1';
+  const market = payload.markets.tw;
+  const swing = market.windows['1m'].strategies.swingHigh;
+  swing.comparison.commonFailedN = 0;
+  swing.swingCounting = { countingModel: 'first-higher-close-v1', first_attempts: 400, retry_attempts: 80,
+    retry_failures: 65, lower_high_share: .49, close_fail_share: .25, unknown_previous_high: 2 };
+  const old = JSON.parse(body).markets.tw.windows['1m'].strategies;
+  market.monthly = { intervalMonths:1, referenceDate:market.asOf, points:[
+    { targetDate:'2026-09-09',asOf:'2026-09-09',status:'ok',evaluated:900,universeCount:1000,strategies:old },
+    { targetDate:market.asOf,asOf:market.asOf,status:'ok',evaluated:900,universeCount:1000,strategies:market.windows['1m'].strategies },
+  ] };
+  await mockBreakouts(page,payload); await page.goto('./?page=markets&market=tw');
+  await expect(row(page)).toContainText('每個高點只算第一次、只算更高的高點');
+  await expect(row(page)).toContainText('25.0%'); await expect(row(page)).toContainText('49.0%');
+  await expect(row(page)).toContainText('80（65）');
+  await picker(page).getByRole('button',{ name:/隔日再創高/ }).click();
+  await expect(row(page).locator('.bo-win')).toContainText('50.0%'); // New swing stays hold5.
+  await expect(row(page,'box20').locator('.bo-win')).toContainText('60.0%'); // Existing box outcome unchanged.
+  await expect(row(page).getByRole('img')).toHaveAttribute('aria-label', /2026-09-09 無完整結果/);
+  await card(page).getByText('每月測試數值與涵蓋',{exact:true}).click();
+  await expect(card(page).locator('.bo-history-table tbody tr').first()).toContainText('舊口徑／不比較');
   await noOverflow(page);
 });

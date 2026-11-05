@@ -3,14 +3,15 @@ import { ColorType, HistogramSeries, createChart, type IChartApi, type ISeriesAp
 import type { BreakoutMonthlyPoint, OutcomeKey } from '../report/breakouts';
 
 /** Percentages are recalculated as of each session; missing observations stay whitespace. */
-export function BreakoutHistoryPlot({ points, method, rule, months }: {
-  points: BreakoutMonthlyPoint[]; method: string; rule: OutcomeKey; months: number;
+export function BreakoutHistoryPlot({ points, method, rule, months, countingModel = null }: {
+  points: BreakoutMonthlyPoint[]; method: string; rule: OutcomeKey; months: number; countingModel?: string | null;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
   const series = useRef<ISeriesApi<'Histogram'> | null>(null);
+  const compatible = (point: BreakoutMonthlyPoint) => method !== 'swingHigh' || (point.strategies[method]?.swingCounting?.countingModel ?? null) === countingModel;
   const values = points.map(point => ({ date: point.asOf ?? point.targetDate,
-    rate: point.status === 'ok' ? point.strategies[method]?.comparison?.rules[rule]?.winRate ?? null : null }));
+    rate: point.status === 'ok' && compatible(point) ? point.strategies[method]?.comparison?.rules[rule]?.winRate ?? null : null }));
   useEffect(() => {
     if (!host.current) return;
     const instance = createChart(host.current, {
@@ -37,7 +38,7 @@ export function BreakoutHistoryPlot({ points, method, rule, months }: {
     // for an entire month. Keep a unique, ascending time per public series API.
     const data = new Map<string, number | null>();
     for (const point of points) data.set(point.asOf ?? point.targetDate,
-      point.status === 'ok' ? point.strategies[method]?.comparison?.rules[rule]?.winRate ?? null : null);
+      point.status === 'ok' && (method !== 'swingHigh' || (point.strategies[method]?.swingCounting?.countingModel ?? null) === countingModel) ? point.strategies[method]?.comparison?.rules[rule]?.winRate ?? null : null);
     const ordered = [...data].sort(([a], [b]) => a.localeCompare(b));
     bars.setData(ordered.map(([date, value]) => value === null ? { time: date as Time } : { time: date as Time, value }));
     if (months === 0) instance.timeScale().fitContent();
@@ -52,7 +53,7 @@ export function BreakoutHistoryPlot({ points, method, rule, months }: {
       start.setUTCDate(Math.min(anchorDay, lastDay));
       instance.timeScale().setVisibleRange({ from: start.toISOString().slice(0, 10), to: last });
     }
-  }, [points, method, rule, months]);
+  }, [points, method, rule, months, countingModel]);
   return <div className="bo-history-chart" role="img" aria-label={`每月成功率柱狀圖：${values.map(value => `${value.date} ${value.rate === null ? '無完整結果' : `${value.rate.toFixed(1)}%`}`).join('；')}`}
     data-visible-months={months || 'all'} data-point-count={points.length}>
     <div ref={host} aria-hidden="true" />

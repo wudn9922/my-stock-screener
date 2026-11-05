@@ -1,122 +1,85 @@
+import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
-import { dailyBars, mockSite } from './mocks';
+import { mockSite } from './mocks';
 
-const symbols = ['^TWII', '^TWOII', '^GSPC', '^DJI', '^IXIC', '^RUT', '^SOX'];
-const breakout = readFileSync(resolve(import.meta.dirname, '../tests/fixtures/breakouts/breakouts.sample.json'), 'utf8');
-const panel = (page: Page) => page.getByRole('region', { name: '指數價量分析', exact: true });
-function packet(symbol: string, zero = false) {
-  const tail = symbol === '^TWII' ? [300, 200, 100, 200, 400] : [300, 400, 200, 100, 50];
-  return {
-    symbol, name: symbol, source: 'Synthetic index-volume browser fixture', interval: '1D', asOf: Date.now() / 1000,
-    bars: dailyBars(symbol, 25).map((bar, index) => {
-      const close = 100 + index % 2 * 2;
-      return { ...bar, open: close, close, high: close + 1, low: close - 1, volume: zero ? 0 : index < 20 ? 100 : tail[index - 20]! };
-    }),
-  };
-}
-async function fixtures(page: Page) {
+const panel = (page: Page) => page.getByRole('region', { name: '多頭末期警示', exact: true });
+const sample = JSON.parse(readFileSync(resolve(import.meta.dirname, '../tests/fixtures/market-warnings.sample.json'), 'utf8'));
+async function fixtures(page: Page, raw: unknown = sample, status = 200) {
   await mockSite(page);
-  await page.route('**/my-stock-screener/report/breakouts.json', route => route.fulfill({ contentType: 'application/json', body: breakout }));
-  await page.route('**/my-stock-screener/report/breakouts-history.json', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ version: 1, intervalDays: 20, snapshots: [] }) }));
-  const requested: string[] = [];
-  await page.route('**/my-stock-screener/report/series/*.json', route => {
-    const symbol = decodeURIComponent(new URL(route.request().url()).pathname.split('/').at(-1)!.replace(/\.json$/, ''));
-    if (symbol === 'index') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ symbols }) });
-    requested.push(symbol);
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(packet(symbol)) });
-  });
-  return requested;
+  await page.route('**/report/market-warnings.json', route => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(raw) }));
 }
-
-test('index ratios appear directly above full-market success rates, share chart data and change with the selected window', async ({ page }, testInfo) => {
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(error.message));
-  const requests = await fixtures(page);
-  for (const market of ['tw', 'us']) {
-    await page.goto(`./?page=markets&market=${market}`);
-    const card = panel(page);
-    await expect(card.getByLabel('價量分析指數')).toHaveValue(market === 'tw' ? '^TWII' : '^GSPC');
-    await expect(card.locator('.research-stats dd')).toHaveText(market === 'tw'
-      ? ['1/10 = 10%', '2/10 = 20%', '1/10 = 10%', '1/10 = 10%']
-      : ['1/10 = 10%', '1/10 = 10%', '1/10 = 10%', '2/10 = 20%']);
-    await expect(card.locator('.index-volume-date')).toContainText('2026-10-08');
-    await expect(card).not.toContainText(/異常量|RVOL/);
-    await expect(card.locator('input[type="number"]')).toHaveCount(0);
-    expect(await page.locator('.markets-side > section.card').evaluateAll(nodes => nodes.slice(0, 3).map(node => node.className)))
-      .toEqual(['card index-volume-card', 'card breakout-card', 'card breadth-card']);
-    await card.getByLabel('價量觀測窗口').selectOption('5');
-    await expect(card.locator('.research-stats dd')).toHaveText(market === 'tw'
-      ? ['1/2 = 50%', '2/3 = 66.7%', '1/2 = 50%', '1/3 = 33.3%']
-      : ['1/2 = 50%', '1/3 = 33.3%', '1/2 = 50%', '2/3 = 66.7%']);
-    await card.getByLabel('價量觀測窗口').selectOption('10');
-    await expect(card.getByText(/有效觀測 10\/10 日/)).toBeVisible();
-    await card.getByLabel('價量觀測窗口').selectOption('20');
-    await card.scrollIntoViewIfNeeded();
-    expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
-    await card.screenshot({ path: testInfo.outputPath(`${market}-index-volume.png`) });
-    expect(requests.filter(symbol => symbol === (market === 'tw' ? '^TWII' : '^GSPC'))).toHaveLength(1);
-  }
-  expect(errors).toEqual([]);
-});
-
-test('changing indices clears prior ratios while loading and zero volume stays N/A', async ({ page }) => {
+test('three warning charts replace short-window volume ratios, default to 60 days and remain usable on phones', async ({ page }, info) => {
+  const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await fixtures(page);
-  let release!: () => void;
-  const held = new Promise<void>(resolve => { release = resolve; });
-  await page.route('**/my-stock-screener/report/series/%5ETWOII.json', async route => {
-    await held;
-    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(packet('^TWOII', true)) });
-  });
-  try {
-    await page.goto('./?page=markets&market=tw');
-    const card = panel(page);
-    await expect(card.locator('.research-stats dd').first()).toHaveText('1/10 = 10%');
-    await card.getByLabel('價量分析指數').selectOption('^TWOII');
-    await expect(card.getByRole('status')).toHaveText('載入指數價量資料…');
-    await expect(card.locator('.research-stats dd')).toHaveCount(0);
-    release();
-    await expect(card.locator('.research-stats dd')).toHaveText(['0/0 = N/A', '0/0 = N/A', '0/0 = N/A', '0/0 = N/A']);
-    await expect(card.getByRole('status')).toContainText('暫無可計算比例');
-    await card.getByLabel('價量分析指數').selectOption('^TWII');
-    await expect(card.locator('.research-stats dd').first()).toHaveText('1/10 = 10%');
-    await page.getByRole('tab', { name: '美國' }).click();
-    await expect(panel(page).getByLabel('價量分析指數')).toHaveValue('^GSPC');
-    await expect(panel(page).locator('.research-stats dd').nth(1)).toHaveText('1/10 = 10%');
-  } finally { release(); }
-});
-
-test('unavailable daily source leaves success rates usable and an explicit retry recovers', async ({ page }) => {
-  await fixtures(page);
-  let fail = true;
-  await page.route('**/my-stock-screener/report/series/%5ETWII.json', route => route.fulfill(fail
-    ? { status: 503, body: 'unavailable' }
-    : { contentType: 'application/json', body: JSON.stringify(packet('^TWII')) }));
   await page.goto('./?page=markets&market=tw');
   const card = panel(page);
-  await expect(card.getByRole('status')).toContainText('暫時無法取得');
-  await expect(card.locator('.research-stats dd')).toHaveCount(0);
-  await expect(page.locator('.breakout-card .bo-win').first()).toContainText('50.0%');
-  fail = false;
-  await card.getByRole('button', { name: '重試價量分析', exact: true }).click();
-  await expect(card.locator('.research-stats dd').first()).toHaveText('1/10 = 10%');
+  await expect(card.getByLabel('警示價量窗口')).toHaveValue('60');
+  await expect(card.getByLabel('警示指數')).toHaveValue('^TWII');
+  await expect(card.locator('.mw-plot')).toHaveCount(3);
+  await expect(card.locator('.mw-plot canvas')).toHaveCount(21);
+  await expect(card.locator('.mw-score')).toContainText('2 項亮燈');
+  await expect(card.locator('.mw-values dd').first()).toHaveText('40.0%');
+  await expect(card).toContainText('僅台股有歷史參考價值');
+  await expect(card).toContainText('事後標註');
+  expect(await page.locator('.markets-side > section.card').evaluateAll(nodes => nodes.slice(0,3).map(n => n.className)))
+    .toEqual(['card market-warning-card','card breakout-card','card breadth-card']);
+  await card.getByLabel('警示價量窗口').selectOption('5');
+  await expect(card.getByRole('heading', { name: /指數價量/ })).toContainText('每週取一次');
+  await expect(card.locator('.mw-values dd').first()).toHaveText('42.0%');
+  await card.getByLabel('警示價量窗口').selectOption('10');
+  await expect(card.getByRole('heading', { name: /指數價量/ })).toContainText('每週取一次');
+  await card.getByLabel('警示價量窗口').selectOption('20');
+  await expect(card.getByRole('heading', { name: /指數價量/ })).not.toContainText('每週取一次');
+  await card.getByText('計算說明', { exact: true }).click();
+  for (const text of ['存活者偏差','p≈0.07','2005–2026','5.6 降到 2.8']) await expect(card).toContainText(text);
+  await card.getByText('計算說明', { exact: true }).click();
+  for (const control of await card.locator('select').all()) expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+  for (const plot of await card.locator('.mw-plot').all()) {
+    const bounds = (await plot.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    expect(await plot.evaluate(node => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(0);
+  }
+  await page.setViewportSize({ width: page.viewportSize()!.width, height: 2100 });
+  await card.scrollIntoViewIfNeeded();
+  // Keep the real sticky market navigator above the card, instead of capturing
+  // it over the heading. Only adjust the test's native scroller, not page styles.
+  await card.evaluate(node => {
+    const nav = document.querySelector('.market-section-nav');
+    const offset = (nav?.getBoundingClientRect().bottom ?? 0) + 12 - node.getBoundingClientRect().top;
+    for (let parent = node.parentElement; parent && offset > 0; parent = parent.parentElement) {
+      if (parent.scrollHeight > parent.clientHeight && ['auto', 'scroll'].includes(getComputedStyle(parent).overflowY)) {
+        parent.scrollTop -= offset;
+        break;
+      }
+    }
+  });
+  await card.screenshot({ path: info.outputPath('market-warnings.png') });
+  expect(errors).toEqual([]);
 });
-
-test('SOX has no index volume: the card uses labelled SOXX volume with the index prices', async ({ page }) => {
-  await fixtures(page);
-  await page.route('**/my-stock-screener/report/series/%5ESOX.json', route =>
-    route.fulfill({ contentType: 'application/json', body: JSON.stringify(packet('^SOX', true)) }));
-  await page.goto('./?page=markets&market=us');
+test('US volume warning is grey and SOX uses labelled SOXX volume while other index values stay separate', async ({ page }) => {
+  await fixtures(page); await page.goto('./?page=markets&market=us');
   const card = panel(page);
-  await card.getByLabel('價量分析指數').selectOption('^SOX');
-  await expect(card.getByRole('note')).toHaveText(/此指數的資料來源沒有成交量；成交量改用 SOXX（iShares 半導體 ETF）同日成交量/);
-  await expect(card.locator('.research-stats dd')).toHaveCount(4);
-  for (const text of await card.locator('.research-stats dd').allTextContents()) expect(text).not.toBe('0/0 = N/A');
-  await expect(card.getByRole('status')).toHaveCount(0);
-  await expect(card).toContainText('成交量為 SOXX（iShares 半導體 ETF）');
-  // An index with its own volume never shows the proxy note.
-  await card.getByLabel('價量分析指數').selectOption('^GSPC');
-  await expect(card.locator('.research-stats dd').first()).toHaveText('1/10 = 10%');
-  await expect(card.getByRole('note')).toHaveCount(0);
+  await expect(card.locator('.mw-lights li').first()).toHaveAttribute('data-state','na');
+  await expect(card).toContainText('不適用（無歷史驗證）');
+  await card.getByLabel('警示指數').selectOption('^SOX');
+  await expect(card).toContainText('成交量代理 SOXX');
+  await expect(card.locator('.mw-values dd').first()).toHaveText('42.0%');
+  await card.getByLabel('警示指數').selectOption('^GSPC');
+  await expect(card.locator('.mw-values dd').first()).toHaveText('40.0%');
+  await expect(card).not.toContainText('成交量代理');
+});
+test('invalid or missing warnings never retain old numbers and explicit retry recovers', async ({ page }) => {
+  await fixtures(page, { ...sample, version: 999 }); await page.goto('./?page=markets&market=tw');
+  const card = panel(page);
+  await expect(card.getByRole('status')).toContainText('格式無效');
+  await expect(card.locator('.mw-values')).toHaveCount(0);
+  await page.route('**/report/market-warnings.json', route => route.fulfill({ status:503,body:'offline' }));
+  await card.getByRole('button', { name:'重試警示資料' }).click();
+  await expect(card.getByRole('status')).toContainText('HTTP 503');
+  await page.route('**/report/market-warnings.json', route => route.fulfill({ json:sample }));
+  await card.getByRole('button', { name:'重試警示資料' }).click();
+  await expect(card.locator('.mw-score')).toContainText('2 項亮燈');
 });
