@@ -25,10 +25,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install requests
+      - run: pip install requests 'exchange-calendars==4.13.2'
+      - name: Check US session date before public source requests
+        id: session
+        run: python scripts/build_market_calendar.py --is-session US --github-output "$GITHUB_OUTPUT"
       - name: Restore generated display snapshots
+        if: steps.session.outputs.is_session == 'true'
         run: python scripts/generated_branch.py restore
       - name: Refresh public IPO and extended quote snapshots
+        if: steps.session.outputs.is_session == 'true'
         run: python scripts/build_market_extras.py
       - name: Publish only new display snapshots
+        if: steps.session.outputs.is_session == 'true'
         run: python scripts/generated_branch.py publish marketExtras

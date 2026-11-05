@@ -113,6 +113,12 @@ jobs:
         run: python -u scripts/build_universe_full.py --markets "${{ inputs.markets || 'TW,US' }}" --archive-dir .cache/kline-archive
 
       # 即使上一步失敗或時間不夠，也保存已補到的日 K，下次接著補
+      - name: Refresh archive-only ETFs and indices through the existing Yahoo batch reader
+        id: archive_instruments
+        if: always() && !cancelled() && steps.archive_bootstrap.outcome == 'success'
+        continue-on-error: true
+        run: python -u scripts/refresh_archive_instruments.py --archive-dir .cache/kline-archive --refresh-public-reports --budget 300
+
       - name: Save daily-bar cache
         id: cache_save
         if: always()
@@ -126,12 +132,19 @@ jobs:
         if: always() && !cancelled() && steps.archive_checkout.outcome == 'success' && steps.cache_save.outcome == 'success'
         run: python scripts/kline_archive.py stage --archive-dir .cache/kline-archive --cache-dir .cache/universe-full --payload-dir .cache/kline-payload --previous-payload .cache/kline-baseline
 
+      # Keep the stock payload as the existing baseline. A supplemental failure cannot block it.
+      - name: Combine archive-only instruments with the accepted stock payload
+        id: archive_instrument_stage
+        if: always() && !cancelled() && steps.archive_stage.outcome == 'success'
+        continue-on-error: true
+        run: python -u scripts/refresh_archive_instruments.py --archive-dir .cache/kline-archive --stage-only --previous-payload .cache/kline-payload --payload-dir .cache/kline-combined-payload
+
       - name: Transfer archive append payload
         if: always() && steps.archive_stage.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: kline-daily-${{ github.run_id }}
-          path: .cache/kline-payload/
+          path: ${{ steps.archive_instrument_stage.outcome == 'success' && '.cache/kline-combined-payload/' || '.cache/kline-payload/' }}
           include-hidden-files: true
           retention-days: 7
 

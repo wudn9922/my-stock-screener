@@ -81,6 +81,9 @@ export class ArchiveFirstProvider implements MarketDataProvider {
     return daily ? archiveQuote(symbol, daily) : this.fallback.getQuote(symbol, signal);
   }
   async refreshBars(symbol: string, timeframe: Timeframe, signal?: AbortSignal): Promise<BarResult> {
+    // Intraday intervals have no archive: refresh them directly (one request, not a stale read first).
+    if (timeframe !== '1D' && timeframe !== '1W' && timeframe !== '1M')
+      return this.fallback.refreshBars?.(symbol, timeframe, signal) ?? this.fallback.getBars(symbol, timeframe, undefined, signal);
     // LiveQuoteFeed is the only current-day refresh source for an archived daily/period chart.
     const current = await this.getBars(symbol, timeframe, undefined, signal);
     if (!current.archive) return this.fallback.refreshBars?.(symbol, timeframe, signal) ?? current;

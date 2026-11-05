@@ -23,6 +23,15 @@ const make = () => {
 };
 
 describe('archive-first chart C2', () => {
+  it('an intraday refresh is one fallback refresh, never a stale read first', async () => {
+    const { archive, fallback } = make();
+    const fresh = { bars: [], source: 'fresh', session: 'regular' as const, delayed: true, adjusted: true } as unknown as BarResult;
+    const refreshing = { ...fallback, refreshBars: vi.fn(async () => fresh) };
+    const provider = new ArchiveFirstProvider(refreshing, archive);
+    await expect(provider.refreshBars('AAPL', '5m')).resolves.toBe(fresh);
+    expect(refreshing.refreshBars).toHaveBeenCalledTimes(1);
+    expect(fallback.getBars).not.toHaveBeenCalled();
+  });
   it('BFCache restoration allows new requests without reviving an old pending fallback', async () => {
     const oldPage = new AbortController();
     let lifetime = oldPage.signal, finish!: (value: null) => void;

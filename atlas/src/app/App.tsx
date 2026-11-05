@@ -82,6 +82,7 @@ import { subscribeWatchlistQuotes } from '../market-data/watchlistQuotes';
 import { getWatchlistDailyResult } from './dataSources';
 import { usableBarResult } from '../market-data/KlineIntegrity';
 import { inRegularSession, isLiveSymbol, LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, mergePeriodBars, sameBars } from '../market-data/LiveQuotes';
+import { marketCalendar } from '../market-data/MarketCalendar';
 import {
   getLoadedSymbolDirectory,
   loadSymbolCatalog,
@@ -646,15 +647,20 @@ export function App({
     }
     // Intraday: the open chart re-downloads its own interval once a minute in session.
     const provider = providers[providerId];
+    void marketCalendar.ensure(Date.now());
     let pending = false;
     const timer = setInterval(() => {
-      if (pending || document.hidden || !provider.refreshBars || !inRegularSession(getMarketProfile(symbol), Date.now())) return;
+      if (pending || document.hidden || !provider.refreshBars) return;
       pending = true;
-      void provider.refreshBars(symbol, tf, abort.signal)
-        .then((next) => {
-          if (live) setLiveAt({ key: `${symbol}:${tf}:${providerId}`, at: Date.now() });
-          apply(next);
-          if (live && next.quote) setQuote({ symbol, provider: providerId, quote: next.quote });
+      void marketCalendar.ensure(Date.now())
+        .then(async () => {
+          if (!live || document.hidden || !inRegularSession(getMarketProfile(symbol), Date.now())) return;
+          const next = await provider.refreshBars!(symbol, tf, abort.signal);
+          if (live) {
+            setLiveAt({ key: `${symbol}:${tf}:${providerId}`, at: Date.now() });
+            apply(next);
+            if (next.quote) setQuote({ symbol, provider: providerId, quote: next.quote });
+          }
         })
         .catch(() => undefined)
         .finally(() => {

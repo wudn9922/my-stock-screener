@@ -1,5 +1,7 @@
 # 全市場日 K 永久封存
 
+五個完整年度＋今年、ETF／指數的範圍、來源例外、唯讀試跑與維護者操作，見 [五年擴充說明](KLINE_ARCHIVE_EXPANSION.md)。正式補檔由維護者手動觸發，本 PR 未執行。
+
 日 K 的永久副本在獨立 orphan 分支 **`kline-archive`**。`main` 的 `data/*.csv`、`data/world/*.csv`、財報紀錄及選股規則不變。Actions 的 `.cache/universe-full` 仍是 320 根的運算快取；它可以被驅逐，永久封存不依賴其保存期限。
 
 ## 保存格式與邊界
@@ -8,6 +10,8 @@
 kline-archive (orphan; no main parent)
   README.md
   manifest.json
+  index/us/AAPL.json
+  index/tw/%5ETWII.json
   tw/2330.TW/2025.csv
   tw/2330.TW/2026.csv
   us/AAPL/2025.csv
@@ -21,7 +25,7 @@ kline-archive (orphan; no main parent)
 
 全市場來源解析將未知量保留為 `None`。快取沿用 `main` 的單一缺量設計：`clean()` 在 `frame.attrs[UNKNOWN_VOLUME_DATES]` 記錄未知日期，數值欄仍補 0 供既有計算使用；合併、來源一致性比較、CSV／封存序列化前依 attrs 還原缺值。因此未知量在快取及封存都寫空白，明確的 0 仍寫 0。已存在且沒有缺值 lineage 的舊快取，不能事後猜測其 0 是否曾由缺值轉成；封存不假造這項歷史資訊。既有永久 CSV 沒有改寫。
 
-封存不設 TTL、KEEP_BARS 或刪除清單。移出 universe、改名、下市或停牌的代號檔案全部保留；新代號建立新目錄，不移走舊代號。`manifest.json` 列出實際代號清單、各市場筆數、最早／最新日期、CSV bytes 與包含 README／狀態／稽核的總 bytes；總大小不包含 Git objects／pack。無資料變化不產生時間戳改寫或空提交。
+封存不設 TTL、KEEP_BARS 或刪除清單。移出 universe、改名、下市或停牌的代號檔案全部保留；新代號建立新目錄，不移走舊代號。`manifest.json` 列出實際代號清單、各市場筆數、最早／最新日期、CSV bytes 與包含 README／狀態／稽核的總 bytes；總大小不包含 Git objects／pack。manifest v3 不包含逐年 bySymbol，年度 SHA／大小與來源資訊改存每檔 index；詳見五年擴充說明。索引也由 verify 與 CSV 逐項比對，缺漏、額外、錯誤 SHA 均拒絕。無資料變化不產生時間戳改寫或空提交。
 
 此分支不是 `generated`，不在 `.github/generated-paths.json` 的 owners，不安裝 Pages relay、不放網站產物或執行程式。一般 generated 清理／squash 不會操作它。資料與分支歷史不可 squash、force-push 或刪除。
 

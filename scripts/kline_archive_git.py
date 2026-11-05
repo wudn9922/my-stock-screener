@@ -49,7 +49,7 @@ def assert_archive(path):
         if ".git" in rel.parts or not p.is_file():
             continue
         name = rel.as_posix()
-        if name not in ("README.md", "manifest.json", archive.LOG, archive.CONFLICTS, archive.PROGRESS) and not name.startswith(("tw/", "us/")):
+        if name not in ("README.md", "manifest.json", archive.LOG, archive.CONFLICTS, archive.PROGRESS, archive.INSTRUMENTS_STATE) and not name.startswith(("tw/", "us/", "global/", "index/")):
             raise ValueError("Unexpected file in permanent archive: " + name)
 
 
@@ -102,7 +102,7 @@ def publish(path, payload=None, summary=None, sleep=time.sleep, create_only=Fals
             raise RuntimeError("Archive rebase conflict; remote unchanged, retry the producer against the new tip")
         remote_base = git(path, "rev-parse", "FETCH_HEAD").stdout.strip()
         archive.verify(path, remote_base, summary, refresh_manifest=True)
-        git(path, "add", "--", "manifest.json")
+        git(path, "add", "-A", "--", "manifest.json", *(["index"] if (path / "index").exists() else []))
         if git(path, "diff", "--cached", "--quiet", check=False).returncode == 1:
             git(path, "commit", "-m", "Update archive size after concurrent append")
         sleep(attempt + 1)

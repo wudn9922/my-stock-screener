@@ -4,6 +4,10 @@ on:
     branches: [main]
     paths:
       - 'scripts/*kline_archive*.py'
+      - 'scripts/kline_instruments.py'
+      - 'scripts/archive_tpex_index.py'
+      - 'scripts/refresh_archive_instruments.py'
+      - 'config/kline-archive-instruments.json'
       - 'scripts/build_universe_full.py'
       - 'scripts/universe_cache.py'
       - 'scripts/universe_sources.py'
