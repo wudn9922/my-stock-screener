@@ -9,7 +9,10 @@ import {
   cacheControlFor,
   classifyUpstreamStatus,
   corsHeaders,
+  fillDailyFromIntraday,
+  INTRADAY_FILL_REQUEST,
   isAllowedOrigin,
+  needsIntradayFill,
   isChartPayload,
   parseAllowedOrigins,
   QUOTE_CACHE_SECONDS,
@@ -84,6 +87,18 @@ async function fetchChart(request: ChartRequest): Promise<ChartOutcome> {
   return { ok: false, failure };
 }
 
+/** Daily request whose empty recent sessions are rebuilt from 5-minute bars (see validate.ts). */
+async function fetchDaily(request: ChartRequest): Promise<ChartOutcome> {
+  const outcome = await fetchChart(request);
+  if (!outcome.ok || request.interval !== "1d" || !needsIntradayFill(outcome.payload)) return outcome;
+  const minute = await fetchChart({ symbol: request.symbol, ...INTRADAY_FILL_REQUEST, events: false });
+  if (!minute.ok) return outcome;
+  const { payload, filled } = fillDailyFromIntraday(outcome.payload, minute.payload);
+  if (!filled.length) return outcome;
+  console.log(`market-chart ${request.symbol} ${request.range}: filled ${filled.join(",")} from 5m bars`);
+  return { ok: true, text: JSON.stringify(payload), payload };
+}
+
 // Recent quote rows per symbol, shared by every viewer reaching this instance.
 const quoteCache = new Map<string, { at: number; payload: unknown }>();
 const QUOTE_CONCURRENCY = 6;
@@ -109,7 +124,7 @@ async function quoteBatch(origin: string | null, value: string): Promise<Respons
         errors[symbol] = "rate_limited";
         continue;
       }
-      const outcome = await fetchChart(quoteChartRequest(symbol));
+      const outcome = await fetchDaily(quoteChartRequest(symbol));
       if (!outcome.ok) {
         errors[symbol] = outcome.failure.code;
         if (outcome.failure.code === "rate_limited") rateLimited = true;
@@ -161,7 +176,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return errorResponse(origin, validation.status, validation.code, validation.message);
   }
   const request = validation.value;
-  const outcome = await fetchChart(request);
+  const outcome = await fetchDaily(request);
   if (outcome.ok) {
     return new Response(outcome.text, {
       status: 200,

@@ -79,6 +79,12 @@ describe('live bar merging', () => {
     expect(sameBars(existing, merged)).toBe(false);
   });
 
+  it('inserts a session the existing series is missing (a day the source left empty, later rebuilt)', () => {
+    const existing = [bar(OCT1, 10), bar(OCT1 + 2 * DAY, 12)];
+    const merged = mergeDailyBars(existing, [bar(OCT1 + DAY, 11), bar(OCT1 + 2 * DAY, 13)]);
+    expect(merged.map((b) => [b.time, b.close])).toEqual([[OCT1, 10], [OCT1 + DAY, 11], [OCT1 + 2 * DAY, 13]]);
+  });
+
   it('rebuilds the current week and month from the daily rows', () => {
     const market = getMarketProfile('AAPL');
     const days = tradingDays();
