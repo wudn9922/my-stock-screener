@@ -7,9 +7,11 @@ import {
   LineSeries,
   createChart,
   type IChartApi,
+  type ISeriesApi,
   type LogicalRange,
   type UTCTimestamp,
 } from 'lightweight-charts';
+import { liveQuotes, mergeDailyBars, sameBars } from '../market-data/LiveQuotes';
 import { getDailyBars } from '../app/dataSources';
 import { sitePreferences, upDownColors } from '../app/sitePreferences';
 import type { Bar } from '../market-data/MarketDataProvider';
@@ -59,6 +61,7 @@ export function MiniChart({
   showVolume = false,
   wheelZoom = true,
   initialMonths,
+  live = false,
 }: {
   symbol: string;
   height?: number;
@@ -69,12 +72,17 @@ export function MiniChart({
   /** Long review lists let the mouse wheel scroll the page; buttons/pinch still zoom. */
   wheelZoom?: boolean;
   initialMonths?: number;
+  /** Keep the latest daily bar moving with the site's once-a-minute live refresh (market cards). */
+  live?: boolean;
 }) {
   const { ref, near } = useNearViewport<HTMLDivElement>();
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const countRef = useRef<HTMLOutputElement>(null);
   const [bars, setBars] = useState<Bar[] | null>(null);
+  // Series drawn from `bars`; a live update repaints them in place so zoom and pan survive.
+  const paintRef = useRef<((next: Bar[]) => void) | null>(null);
+  const drawnRef = useRef<Bar[] | null>(null);
   const [status, setStatus] = useState<MiniChartStatus>('idle');
   const colors = useSyncExternalStore(sitePreferences.subscribe, () => sitePreferences.get().colors);
   const statusRef = useRef(onStatus);
@@ -124,7 +132,6 @@ export function MiniChart({
       localization: { locale: 'zh-TW' },
     });
     chartRef.current = chart;
-    const visible = interactive ? bars : bars.slice(-VISIBLE_BARS);
     const candles = chart.addSeries(CandlestickSeries, {
       upColor: up,
       downColor: down,
@@ -134,34 +141,47 @@ export function MiniChart({
       priceLineVisible: false,
       lastValueVisible: true,
     });
-    candles.setData(
-      visible.map((bar) => ({
-        time: bar.time as UTCTimestamp,
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-      })),
-    );
-    maKey.split(',').filter(Boolean).map(Number).forEach((period, index) => {
-      const average = chart.addSeries(LineSeries, {
+    const averages: { period: number; series: ISeriesApi<'Line'> }[] = maKey.split(',').filter(Boolean).map(Number)
+      .map((period, index) => ({ period, series: chart.addSeries(LineSeries, {
         color: indicatorColors[index % indicatorColors.length],
         lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
-      });
-      // Calculate with the full source history, including warmup before the
-      // initial viewport; a long configured MA must not start from 130 bars.
-      average.setData(sma(bars, period).filter(point => point.time >= visible[0]!.time)
-        .map(point => ({ ...point, time: point.time as UTCTimestamp })));
-    });
+      }) }));
+    let volume: ISeriesApi<'Histogram'> | null = null;
     if (showVolume) {
-      const volume = chart.addSeries(HistogramSeries, {
+      volume = chart.addSeries(HistogramSeries, {
         priceScaleId: 'volume', priceFormat: { type: 'volume' },
         priceLineVisible: false, lastValueVisible: false,
       });
       volume.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-      volume.setData(visible.map(bar => ({ time: bar.time as UTCTimestamp, value: bar.volume,
-        color: `${bar.close >= bar.open ? up : down}99` })));
     }
+    const paint = (source: Bar[]) => {
+      const visible = interactive ? source : source.slice(-VISIBLE_BARS);
+      candles.setData(
+        visible.map((bar) => ({
+          time: bar.time as UTCTimestamp,
+          open: bar.open,
+          high: bar.high,
+          low: bar.low,
+          close: bar.close,
+        })),
+      );
+      // Calculate with the full source history, including warmup before the
+      // initial viewport; a long configured MA must not start from 130 bars.
+      for (const { period, series } of averages)
+        series.setData(sma(source, period).filter(point => point.time >= visible[0]!.time)
+          .map(point => ({ ...point, time: point.time as UTCTimestamp })));
+      volume?.setData(visible.map(bar => ({ time: bar.time as UTCTimestamp, value: bar.volume,
+        color: `${bar.close >= bar.open ? up : down}99` })));
+      drawnRef.current = source;
+    };
+    paint(bars);
+    paintRef.current = (next) => {
+      const previous = drawnRef.current ?? bars;
+      const range = chart.timeScale().getVisibleLogicalRange();
+      const shift = (interactive ? next.length - previous.length : 0);
+      paint(next);
+      if (range) chart.timeScale().setVisibleLogicalRange({ from: range.from + shift, to: range.to + shift });
+    };
     const scale = chart.timeScale();
     let rangeFrame = 0;
     const showRange = (range: LogicalRange | null) => {
@@ -181,9 +201,21 @@ export function MiniChart({
       cancelAnimationFrame(rangeFrame);
       scale.unsubscribeVisibleLogicalRangeChange(showRange);
       chartRef.current = null;
+      paintRef.current = null;
+      drawnRef.current = null;
       chart.remove();
     };
   }, [bars, colors, maKey, interactive, showVolume, wheelZoom, initialMonths]);
+  // Market cards: today's bar follows the live refresh without rebuilding the chart.
+  useEffect(() => {
+    if (!live || !near || status !== 'ready') return;
+    return liveQuotes().subscribe(symbol, (value) => {
+      const current = drawnRef.current;
+      if (!current || !paintRef.current) return;
+      const next = mergeDailyBars(current, value.bars);
+      if (!sameBars(next, current)) paintRef.current(next);
+    });
+  }, [live, near, status, symbol]);
   const zoom = (factor: number) => {
     const scale = chartRef.current?.timeScale();
     const range = scale?.getVisibleLogicalRange();

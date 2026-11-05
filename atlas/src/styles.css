@@ -1049,6 +1049,11 @@ h3 {
   font-size: 13px;
   font-weight: 650;
 }
+.index-card-quote small.index-card-live {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-3);
+}
 .index-card-foot {
   display: flex;
   align-items: center;
