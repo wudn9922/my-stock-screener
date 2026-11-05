@@ -1,3 +1,14 @@
+## 台股 MIS 盤中來源（2026-11-05）
+
+Primary self-review only; no independent sign-off. From latest main `3282e2fa82` (includes #224, #223, #220); merged `b10f5e7dbe` (#222) normally.
+只修改 market-chart 的盤中台股來源與必要前端標示；美股、既有歷史、SQL、GCP、登入與永久資料不變。
+依使用者提供形狀建立離線假資料，不連線真實證交所；維護者自行部署。
+新增按市場代號驗證、40 檔分段、15 秒快取、1 秒節流、2 秒逾時、跨日清空、空價沿用及 MIS-only 今日棒；
+Yahoo 與 #224 補洞照舊，失敗完整退回。前端沿用 LiveQuoteFeed，保留 TPEx 歷史來源並顯示 MIS／Yahoo 實際來源。
+操作、欄位與部署順序見 [market-chart README](../supabase/functions/market-chart/README.md#台股盤中-mis維護者部署後生效)。
+本地 lint／typecheck、152 檔／1,909 單元、Deno check／lint、一般與 Pages 建置通過；合併後 111 個受影響案例與標籤修正後 27 個報價案例通過。
+桌機、390px／375px Chromium／WebKit 共 10 張截圖位於 docs/screenshots/twse-mis；375px Chromium／WebKit 40 個與 IPO 就緒五種配置全部通過；完整 CI 最終結果列於 PR。IPO 測試只增加頁面就緒等待，沒有放寬斷言或逾時。自動化不代表實機 iPhone 簽核。
+
 ## PR-C：永久封存優先（2026-11-04）
 
 Primary self-review only; no independent sign-off. Branch starts at main `c3668287ae`; review revision merged main `5d2a99b720` without rebase or force-push.
@@ -1194,7 +1205,7 @@ Accepted: recursive clock-insensitive writes; seven market archives with stable 
 
 Accepted: two source-timed schedules, market-selective volume, fresh Taiwan turnover artifact dependency, one non-force publish commit per run, collectors read-only without persisted credentials, checksum/path validation before overlay, main-only publication and research-code race guard. Missing SEC secret skips with no request and no snapshot change; fallback identity removed from the radar.
 
-Measured payload 158,722,480 → 103,409,630 bytes, 10,389 → 12 files. Full real-data clock-only replay made no byte/mtime changes. Growth replay measured 1,907,836 bytes delta-packed; budget 2–4 MB/day packed, or roughly 23 MB/day before server packing, with documented source/backfill uncertainty. Existing PR history retained, no force push. No production run, merge, external AI or independent-review claim. Evidence and reproducible commands: `docs/RESEARCH_OPERATIONS.md`.
+Measured payload 158,722,480 → 103,409,630 bytes, 10,389 → 12 files. Full real-data clock-only replay made no byte/mtime changes. Growth replay measured 1,909,836 bytes delta-packed; budget 2–4 MB/day packed, or roughly 23 MB/day before server packing, with documented source/backfill uncertainty. Existing PR history retained, no force push. No production run, merge, external AI or independent-review claim. Evidence and reproducible commands: `docs/RESEARCH_OPERATIONS.md`.
 
 ## 可畫線世界／題材圖表自我審查
 

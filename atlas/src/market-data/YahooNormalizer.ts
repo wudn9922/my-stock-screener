@@ -7,6 +7,7 @@ import {
   type CorporateEvent,
   type CorporateEventsResult,
   type Timeframe,
+  type Quote,
   getMarketProfile,
   calendarPeriodStart,
   isSessionCloseObservation,
@@ -37,6 +38,10 @@ const responseSchema = z.object({
             exchangeTimezoneName: z.string().optional(),
             regularMarketPrice: z.number().finite().positive().optional(),
             regularMarketTime: z.number().int().positive().optional(),
+            chartPreviousClose: z.number().finite().positive().optional().catch(undefined),
+            atlasLiveSource: z.literal('twse-mis').optional().catch(undefined),
+            atlasOhlcSource: z.literal('twse-mis').optional().catch(undefined),
+            atlasHistoryUnavailable: z.boolean().optional().catch(undefined),
             // Optional extended metadata must never invalidate regular-session bars.
             preMarketPrice: z.number().finite().positive().optional().catch(undefined),
             preMarketTime: z.number().int().positive().optional().catch(undefined),
@@ -84,6 +89,24 @@ const eventsResponseSchema = z.object({
   }),
 });
 export const YAHOO_SOURCE = 'Yahoo unofficial prototype · delayed / as-of data';
+export const TWSE_MIS_SOURCE = '證交所即時（非官方 API）';
+const TODAY_SOURCE = ' · 今日來源：';
+const PARTIAL_SOURCE = ' · 今日開高低／量：';
+
+/** Keep the historical provider visible when the shared feed replaces today's bar. */
+export function liveDailySource(history: string, quote: Quote, recentSource?: string): string {
+  const price = quote.source?.includes(TWSE_MIS_SOURCE), partial = recentSource?.includes(PARTIAL_SOURCE);
+  if (quote.market?.market !== 'TW' || (!price && !partial && !history.includes(TODAY_SOURCE) && !history.includes(PARTIAL_SOURCE))) return history;
+  const base = history.split(TODAY_SOURCE)[0]!.split(PARTIAL_SOURCE)[0];
+  return partial && !price ? `${base}${PARTIAL_SOURCE}${recentSource!.split(PARTIAL_SOURCE)[1]}`
+    : `${base}${TODAY_SOURCE}${quote.source ?? 'Yahoo 延遲行情'}`;
+}
+
+export function applyLiveQuoteMetadata(result: BarResult, quote?: Quote, recentSource?: string): BarResult {
+  return quote ? { ...result, quote, source: liveDailySource(result.source, quote, recentSource),
+    dataState: quote.dataState ?? result.dataState,
+    delayed: quote.dataState === undefined ? result.delayed : quote.dataState !== 'live' } : result;
+}
 
 function nextCalendarPeriodStart(start: number, timeframe: '1W' | '1M', market: MarketProfile): number {
   if (market.market === 'TW') {
@@ -253,11 +276,14 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
   const quoteTime = useMeta ? metaTime : latest.time;
   const quotePrice = useMeta ? metaPrice : latest.close;
   const sameDay = calendarDate(quoteTime, market) === calendarDate(latest.time, market);
-  const previous = sameDay ? bars.at(-2)?.close : latest.close;
+  const mis = market.market === 'TW' && timeframe === '1D' && meta?.atlasLiveSource === 'twse-mis'
+    && useMeta && sameDay && calendarDate(quoteTime, market) === calendarDate(asOf, market);
+  const dataState = mis ? 'live' as const : 'delayed' as const;
+  const previous = mis && meta?.chartPreviousClose ? meta.chartPreviousClose : sameDay ? bars.at(-2)?.close : latest.close;
   const quote = meta && timeframe === '1D' && previous && previous > 0 ? {
     symbol: canonicalSymbol ?? normalizeSymbol(meta.symbol), price: quotePrice, change: quotePrice - previous,
     changePercent: (quotePrice / previous - 1) * 100, asOf: quoteTime,
-    source: YAHOO_SOURCE, dataState: 'delayed' as const, retrievedAt: asOf, cacheStatus: 'fresh' as const,
+    source: mis ? TWSE_MIS_SOURCE : YAHOO_SOURCE, dataState, retrievedAt: asOf, cacheStatus: 'fresh' as const,
     market,
     ...(market.market === 'US' ? { extended: Object.fromEntries((['pre', 'post'] as const).flatMap(mode => {
       const price = mode === 'pre' ? meta.preMarketPrice : meta.postMarketPrice;
@@ -267,12 +293,15 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
   } : undefined;
   sessionCloseObservations.sort((a, b) => a - b);
   const hasSessionCloseObservations = sessionCloseObservations.length > 0;
+  const historySource = meta?.atlasHistoryUnavailable && market.market === 'TW' ? '歷史行情暫時無法取得' : YAHOO_SOURCE;
+  const source = mis ? `${historySource}${TODAY_SOURCE}${TWSE_MIS_SOURCE}`
+    : meta?.atlasOhlcSource === 'twse-mis' && market.market === 'TW' ? `${historySource}${PARTIAL_SOURCE}${TWSE_MIS_SOURCE}；成交價沿用 Yahoo` : historySource;
   return {
     bars,
     ...(missingVolumeAt.size ? { missingVolumeAt: [...missingVolumeAt] } : {}),
-    source: hasSessionCloseObservations ? `${YAHOO_SOURCE} · ${SESSION_CLOSE_SOURCE_QUALIFIER}` : YAHOO_SOURCE,
+    source: hasSessionCloseObservations ? `${source} · ${SESSION_CLOSE_SOURCE_QUALIFIER}` : source,
     session: 'regular',
-    delayed: true,
+    delayed: !mis,
     adjusted: verifiedBasis,
     priceBasis: verifiedBasis ? 'split-adjusted' : 'unknown',
     ...(quote ? { quote } : {}),
@@ -281,7 +310,7 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
       : {}),
     asOf,
     latestBarAt: bars.at(-1)!.time,
-    dataState: 'delayed',
+    dataState,
     cacheStatus: 'fresh',
     market,
     ...(hasSessionCloseObservations ? { sessionCloseObservations } : {}),
