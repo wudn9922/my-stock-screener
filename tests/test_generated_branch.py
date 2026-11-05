@@ -110,6 +110,41 @@ class GeneratedStorageTests(unittest.TestCase):
         self.assertNotIn("data/world/CMD-WTI.csv", self.store.entries(generated))
         self.assertEqual(self.body(generated, "docs/report/research/world-assets.json"), b'{"version":1}')
 
+    def test_warning_forward_log_concurrent_append_is_durable_and_union_is_lossless(self):
+        import market_warnings_log as log
+        blank = {field: "" for field in log.FIELDS}
+        a = {**blank, "asOf": "2026-11-04", "market": "tw"}
+        b = {**blank, "asOf": "2026-11-05", "market": "tw"}
+        remote = self.store.entries(self.base)
+        remote[log.PATH] = ("100644", gb.git("hash-object", "-w", "--stdin", data=log.encode([a], True)).decode().strip())
+        tip = self.store.commit(self.store.tree(remote), "Concurrent observation", self.base)
+        self.git("push", "origin", tip + ":refs/heads/main")
+        self.write(log.PATH, log.encode([a, b], True))
+        self.write("docs/report/market-warnings.json", b'{"version":1}')
+        self.store.publish("universe")
+        main = self.remote("main")
+        self.assertEqual(log.read_rows(self.body(main, log.PATH)), [a, b])
+        self.assertNotIn(log.PATH, self.store.entries(self.remote("generated")))
+        self.assertEqual(self.body(self.remote("generated"), "docs/report/market-warnings.json"), b'{"version":1}')
+        self.assertEqual(self.body(self.base, "data/AAPL.csv"), self.files["data/AAPL.csv"])
+        self.store.publish("universe")
+        self.assertEqual(log.read_rows(self.body(self.remote("main"), log.PATH)), [a, b])
+
+    def test_warning_log_rewrite_and_delete_are_rejected_before_publish(self):
+        import market_warnings_log as log
+        row = {field: "" for field in log.FIELDS}
+        row.update(asOf="2026-11-04", market="tw")
+        self.write(log.PATH, log.encode([row], True))
+        self.store.publish("universe")
+        baseline = self.remote("main")
+        self.write(log.PATH, log.encode([{**row, "warning_level": "3"}], True))
+        with self.assertRaisesRegex(ValueError, "append-only"):
+            self.store.publish_one("main", baseline, [log.PATH], "Forbidden rewrite")
+        Path(log.PATH).unlink()
+        with self.assertRaisesRegex(ValueError, "append-only"):
+            self.store.publish_one("main", baseline, [log.PATH], "Forbidden delete")
+        self.assertEqual(self.remote("main"), baseline)
+
     def test_publish_only_owned_changes_preserves_main_index_and_records(self):
         self.write("docs/report/latest.json", b"new latest")
         self.write("docs/report/trending-stocks.json", b'{"symbols":["NVDA","AAPL"]}')
@@ -221,6 +256,12 @@ class GeneratedStorageTests(unittest.TestCase):
         self.assertEqual(self.remote("generated"), self.seed)
 
     def test_legacy_universe_workflow_commits_archives_with_switch_off(self):
+        import market_warnings_log as log
+        self.write("scripts/market_warnings_log.py", (REPO / "scripts/market_warnings_log.py").read_bytes())
+        row = {field: "" for field in log.FIELDS}
+        row.update(asOf="2026-10-22", market="tw")
+        forward = log.encode([row], True)
+        self.write(log.PATH, forward)
         snapshot = "docs/report/breakouts-archive/2026-10-22.json"
         self.write(snapshot, b"immutable full-market snapshot")
         self.write("docs/report/breakouts.json", b"current full-market snapshot")
@@ -231,6 +272,7 @@ class GeneratedStorageTests(unittest.TestCase):
         with patch.dict(os.environ, {"GENERATED_BRANCH_MODE": ""}):
             subprocess.run(["bash", "-e", "-c", script], check=True, capture_output=True)
         self.assertEqual(self.body(self.remote("main"), snapshot), b"immutable full-market snapshot")
+        self.assertEqual(self.body(self.remote("main"), log.PATH), forward)
         self.assertEqual(self.remote("generated"), self.seed)
 
     def test_archive_snapshots_are_append_only_and_survive_daily_squash(self):

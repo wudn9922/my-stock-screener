@@ -178,6 +178,14 @@ jobs:
         if: always() && !cancelled()
         run: python -u scripts/build_full_market_breakouts.py --cache-dir .cache/universe-full
 
+      - name: Build market risk warnings
+        if: always() && !cancelled()
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          pip install --quiet 'exchange-calendars>=4.5,<5.0' yfinance
+          python -u scripts/build_market_warnings.py --cache-dir .cache/universe-full
+
       - name: Publish owned outputs to generated and durable records to main
         if: (always()) && vars.GENERATED_BRANCH_MODE == '1' && steps.generated_restore.outcome == 'success'
         run: python scripts/generated_branch.py publish universe
@@ -187,8 +195,11 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          python scripts/market_warnings_log.py --verify-against HEAD
           git add docs/report/universe.json docs/report/breakouts.json
           if [ -f docs/report/breadth.json ]; then git add -f -- docs/report/breadth.json; fi
+          if [ -f docs/report/market-warnings.json ]; then git add -f -- docs/report/market-warnings.json; fi
+          if [ -f docs/report/market-warnings-log.csv ]; then git add -f -- docs/report/market-warnings-log.csv; fi
           if [ -f docs/report/breakouts-history.json ]; then git add -f -- docs/report/breakouts-history.json; fi
           if [ -f docs/report/breadth-signals.json ]; then git add -f -- docs/report/breadth-signals.json; fi
           if [ -f docs/report/breadth-us-calibration.json ]; then git add -f -- docs/report/breadth-us-calibration.json; fi

@@ -60,6 +60,10 @@ on:
       - 'tests/test_breakouts.py'
       - 'scripts/build_breakouts.py'
       - 'scripts/build_full_market_breakouts.py'
+      - 'scripts/build_market_warnings.py'
+      - 'scripts/market_warnings*'
+      - 'scripts/swing_cohort.py'
+      - 'tests/test_market_warnings.py'
       - 'scripts/swing_breakouts.py'
       - 'scripts/breakout_outcomes.py'
       - 'scripts/preview_swing_breakouts.py'
@@ -213,6 +217,14 @@ jobs:
                       path.write_text(updated)
           PY
           npx playwright install --with-deps chromium webkit
+      - name: Stage read-only warning calculation for the first PR preview
+        run: |
+          # No production publisher has this new report before the first merge.
+          # This is a real 126-session slice from the read-only full-cache trial,
+          # not synthetic data or a runtime fallback. Never replace an existing file.
+          if [ ! -f docs/report/market-warnings.json ]; then
+            cp atlas/tests/fixtures/market-warnings.real.json docs/report/market-warnings.json
+          fi
       - name: Real Pages data on desktop and iPhone WebKit
         run: |
           mkdir -p /tmp/research-pages/my-stock-screener
@@ -305,6 +317,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_full_market_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_swing_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_breakout_outcomes.py' -v
+          python -m unittest discover -s tests -p 'test_market_warnings.py' -v
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
