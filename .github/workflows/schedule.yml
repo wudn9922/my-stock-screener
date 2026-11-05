@@ -27,6 +27,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  calendar:
+    # Independent, small derived output; no daily producer, archive or notifications.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GENERATED_BRANCH_MODE: '1'
+    concurrency:
+      group: market-calendar-generated
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install 'exchange-calendars==4.13.2'
+      - name: Restore generated publication baseline
+        run: python scripts/generated_branch.py restore
+      - name: Build future TW and US sessions without touching market records
+        run: python scripts/build_market_calendar.py
+      - name: Publish only the calendar owner
+        run: python scripts/generated_branch.py publish calendar
   build:
     runs-on: ubuntu-latest
     steps:

@@ -1,3 +1,12 @@
+## PR-D：交易日曆（2026-11-05）
+
+Primary self-review only; no independent sign-off. Branch starts at latest main `0cb7789772`.
+D1 只新增 XTAI／XNYS 的 generated 日曆、既有 LiveQuoteFeed 的交易時段判斷及公開盤前盤後收集的休市 gate。
+細節、來源限制與驗證見 [PR_D_MARKET_CALENDAR.md](docs/PR_D_MARKET_CALENDAR.md) 和 [ADR-027](docs/architecture/ADR-027-market-calendar.md)。
+原有 15 分鐘一般收盤寬限與日曆失敗的星期／時段退路保留，提前收盤精確停止。
+沒有改登入／帳號、Supabase 函式／SQL、GCP 或永久行情，沒有手動執行正式排程、通知、合併或部署。
+本地完整檢查與五種桌機／手機配置的結果列於 PR；瀏覽器自動化不代表實機 iPhone 簽核。
+
 ## Current follow-up: startup, compact watchlists and public market details (2026-11-04)
 
 Primary self-review only; no independent sign-off. Based on latest main `df29c9351`.

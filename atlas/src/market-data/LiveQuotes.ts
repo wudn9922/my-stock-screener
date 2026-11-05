@@ -4,6 +4,7 @@ import { calendarPeriodStart, getMarketProfile, type MarketProfile } from './Mar
 import { normalizeYahooResponse, YAHOO_SOURCE } from './YahooNormalizer';
 import { defaultMarketProxyUrl, EDGE_YAHOO_SOURCE } from './EdgeYahooProvider';
 import { worldAssetFor } from './worldAssets';
+import { calendarSessionOpen, marketCalendar, type MarketCalendarStore } from './MarketCalendar';
 
 /**
  * Live refresh of the stocks on screen: one batched `market-chart?quotes=` request returns the last
@@ -33,8 +34,10 @@ const FRESH_MS = 20_000;
 const CLOSE_GRACE_MINUTES = 15;
 
 const weekdayFormatters = new Map<string, Intl.DateTimeFormat>();
-/** True on a weekday between the market's open and shortly after its close (holidays are not known). */
-export function inRegularSession(profile: MarketProfile, nowMs: number): boolean {
+/** Published sessions include holidays/early closes; unavailable calendars retain the old rules. */
+export function inRegularSession(profile: MarketProfile, nowMs: number, graceMinutes = CLOSE_GRACE_MINUTES): boolean {
+  const known = calendarSessionOpen(marketCalendar, profile, nowMs, graceMinutes);
+  if (known !== undefined) return known;
   let format = weekdayFormatters.get(profile.timezone);
   if (!format) {
     format = new Intl.DateTimeFormat('en-US', { timeZone: profile.timezone, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -43,7 +46,7 @@ export function inRegularSession(profile: MarketProfile, nowMs: number): boolean
   const parts = Object.fromEntries(format.formatToParts(new Date(nowMs)).map((part) => [part.type, part.value]));
   if (parts.weekday === 'Sat' || parts.weekday === 'Sun') return false;
   const minute = Number(parts.hour) * 60 + Number(parts.minute);
-  return minute >= profile.sessionOpenMinutes && minute < profile.sessionCloseMinutes + CLOSE_GRACE_MINUTES;
+  return minute >= profile.sessionOpenMinutes && minute < profile.sessionCloseMinutes + graceMinutes;
 }
 
 /**
@@ -122,6 +125,7 @@ export interface LiveQuoteFeedOptions {
   /** Defaults to document visibility. */
   visible?: () => boolean;
   inSession?: (symbol: string, nowMs: number) => boolean;
+  calendar?: MarketCalendarStore;
 }
 
 export class LiveQuoteFeed {
@@ -130,6 +134,8 @@ export class LiveQuoteFeed {
   private readonly now: () => number;
   private readonly visible: () => boolean;
   private readonly inSession: (symbol: string, nowMs: number) => boolean;
+  private readonly calendar: MarketCalendarStore;
+  private readonly loadCalendar: boolean;
   private interval = LIVE_INTERVAL_MS;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private kickTimer: ReturnType<typeof setTimeout> | null = null;
@@ -143,7 +149,10 @@ export class LiveQuoteFeed {
     this.fetcher = options.fetcher ?? ((input, init) => fetch(input, init));
     this.now = options.now ?? Date.now;
     this.visible = options.visible ?? (() => typeof document === 'undefined' || !document.hidden);
-    this.inSession = options.inSession ?? ((symbol, nowMs) => inRegularSession(getMarketProfile(symbol), nowMs));
+    this.calendar = options.calendar ?? marketCalendar;
+    this.loadCalendar = !options.inSession;
+    this.inSession = options.inSession ?? ((symbol, nowMs) => calendarSessionOpen(this.calendar, getMarketProfile(symbol), nowMs)
+      ?? inRegularSession(getMarketProfile(symbol), nowMs));
   }
 
   get currentInterval(): number {
@@ -221,9 +230,14 @@ export class LiveQuoteFeed {
 
   private async run(periodic: boolean) {
     if (!this.visible()) return;
+    if (this.loadCalendar) await this.calendar.ensure(this.now());
+    if (!this.visible()) return;
     const now = this.now();
     const due = [...this.entries].filter(([symbol, entry]) =>
       now - entry.fetchedAt >= FRESH_MS &&
+      // Opening still reads the last close once. Known closed sessions never
+      // retry periodically, including an unsuccessful first quote request.
+      (!periodic || !this.loadCalendar || calendarSessionOpen(this.calendar, getMarketProfile(symbol), now) !== false) &&
       (!entry.fetchedAt || (periodic && now - entry.fetchedAt >= this.interval - 5000 && this.inSession(symbol, now))))
       .map(([symbol]) => symbol);
     let failed = false;
