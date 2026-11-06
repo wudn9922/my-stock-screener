@@ -46,7 +46,7 @@ def disposable_quality_log(cache):
 def seed_selected(archive_dir, cache_dir, selected, state, now):
     count = 0
     policy = sessions.read_policy(Path(cache_dir).parent / sessions.POLICY_FILE)
-    closed = {m:set(policy.get(m,{})) | set(sessions.reference_closed_dates(sessions.archive_primary(archive_dir,m,now))) for m in ('tw','us')}
+    closed = {m:set(policy.get(m,{})) for m in ('tw','us')}
     for symbol in selected:
         path = uc.bars_path(str(cache_dir), symbol)
         old = uc.read_bars(path)

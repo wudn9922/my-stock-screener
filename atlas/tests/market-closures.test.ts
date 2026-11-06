@@ -62,6 +62,18 @@ describe('market-wide closures are projections, never price edits',()=>{
     expect(merged.bars.map(day)).toEqual(['2026-10-22']);
     expect(mergeArchiveDaily(raw,raw,'2330.TW',undefined,new Set(daily!.closedSessions)).bars.map(day)).toEqual(['2026-10-22']);
   });
+  it('keeps November 4 stock bars when only the primary index has a gap',async()=>{
+    const csv='Date,Open,High,Low,Close,Volume\n2026-11-03,100,101,99,100,1000\n2026-11-04,101,102,100,101,1000\n2026-11-05,102,103,101,102,1000\n';
+    const gap={version:1,threshold:.95,markets:{tw:{closedSessions:[],indexGapsWithTrading:[{
+      date:'2026-11-04',reason:'primary-index-gap-with-trading',observedSymbols:100,positiveVolumeSymbols:100,
+    }]}}};
+    const fetcher=async(url:RequestInfo|URL)=>String(url).endsWith('market-closures.json')?Response.json(gap)
+      :String(url).includes('/index/')?Response.json(archiveIndexFixture('2330.TW',{2026:csv})):new Response(csv);
+    const daily=await new KlineArchive({fetcher,cache:false,now:()=>Date.UTC(2026,10,6)}).getDaily('2330.TW');
+    expect(daily!.bars.map(day)).toEqual(['2026-11-03','2026-11-04','2026-11-05']);
+    expect(daily!.closedSessions).not.toContain('2026-11-04');
+    expect(marketClosuresSchema.safeParse({...policy,markets:{tw:{closedSessions:[{...evidence,positiveVolumeSymbols:5}]}}}).success).toBe(false);
+  });
   it('daily, weekly and monthly aggregation all start after closure projection',()=>{
     const raw:BarResult={...parseArchiveCsv(body,'2330.TW',2026),closedSessions:['2026-10-23'],archive:{status:'archive',lastDate:'2026-10-27'}};
     expect(archivePeriod(raw,'2330.TW','1D').bars.map(day)).toEqual(['2026-10-22','2026-10-27']);

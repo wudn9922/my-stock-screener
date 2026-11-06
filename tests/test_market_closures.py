@@ -43,7 +43,7 @@ class ClosureRulesTest(unittest.TestCase):
     def test_95_percent_flat_zero_is_closed_even_if_price_changed_from_previous_close(self):
         frames={str(i):ghost(prices()) for i in range(100)}
         for i in range(95,100):
-            frames[str(i)].loc['2026-10-23','Volume']=1000
+            frames[str(i)].attrs[ms.UNKNOWN_VOLUME_DATES]=('2026-10-23',)
         evidence=ms.classify_closures(ms.cohort_statistics(frames))
         self.assertIn('flat-zero-cohort',evidence['2026-10-23']['reasons'])
         self.assertEqual(evidence['2026-10-23']['flatZeroShare'],.95)
@@ -65,16 +65,39 @@ class ClosureRulesTest(unittest.TestCase):
     def test_primary_absence_requires_readable_bounded_coverage_not_a_failed_download(self):
         bars=prices().drop(pd.to_datetime(['2026-10-23','2026-10-26']))
         primary=ms.primary_reference(bars,'^TWII','offline primary',NOW)
-        dates=ms.non_trading_dates({'A':prices(),'B':prices()},primary)
+        stock=ghost(prices()).drop(pd.Timestamp('2026-10-26'))
+        dates=ms.non_trading_dates({'A':stock,'B':stock},primary)
         self.assertIn('2026-10-23',dates)
         self.assertIn('2026-10-26',dates)
         self.assertNotIn('2026-10-28',dates)
         self.assertNotIn('2026-10-23',ms.non_trading_dates({'A':prices(),'B':prices()},None))
 
+    def test_index_gap_with_trading_vetoes_old_closure_even_at_five_percent_boundary(self):
+        stats=pd.DataFrame(dict(observed=[100,2000,100],flatZero=[95,1950,100],unknownVolume=[0,0,0],
+                                 positiveVolume=[5,50,0]),index=pd.to_datetime(['2026-11-03','2026-11-04','2026-10-23']))
+        primary=ms.primary_reference(pd.DataFrame(dict(Open=[1,1],High=[1,1],Low=[1,1],Close=[1,1]),
+                 index=pd.to_datetime(['2026-10-22','2026-11-05'])),'^TWII','fixture',NOW)
+        reviews={}
+        closed=ms.classify_closures(stats,primary,known={'2026-11-04':{}},reviews=reviews)
+        self.assertNotIn('2026-11-03',closed)
+        self.assertNotIn('2026-11-04',closed)
+        self.assertEqual(reviews['2026-11-04']['reason'],'primary-index-gap-with-trading')
+        self.assertIn('2026-10-23',closed)
+        self.assertIn('2026-10-26',closed)
+
     def test_sparse_snapshot_is_not_a_95_percent_valid_listing(self):
         listing={str(i):{} for i in range(100)}
         bars={str(i):dict(date='2026-10-23',open=102,high=102,low=102,close=102,volume=0) for i in range(5)}
         self.assertFalse(ms.classify_closures(ms.snapshot_statistics(bars,listing)))
+
+    def test_prior_trading_evidence_survives_a_later_snapshot_without_replacing_counts_with_zero(self):
+        prior={'2026-11-04':dict(date='2026-11-04',reason='primary-index-gap-with-trading',observedSymbols=100,positiveVolumeSymbols=100,positiveVolumeShare=1.)}
+        primary=ms.primary_reference(pd.DataFrame(dict(Open=[1,1],High=[1,1],Low=[1,1],Close=[1,1]),
+            index=pd.to_datetime(['2026-11-03','2026-11-05'])),'^TWII','fixture',NOW)
+        stats=pd.DataFrame(dict(observed=[100],flatZero=[0],unknownVolume=[0],positiveVolume=[100]),index=pd.to_datetime(['2026-11-05']))
+        reviews=copy.deepcopy(prior)
+        self.assertNotIn('2026-11-04',ms.classify_closures(stats,primary,known=['2026-11-04'],trading=prior,reviews=reviews))
+        self.assertEqual(reviews,prior)
 
     def test_projection_keeps_legacy_weekend_counts_and_close_only_loader_eligibility(self):
         frame=ghost(prices(),day='2026-10-25')
@@ -119,7 +142,6 @@ class ClosureRulesTest(unittest.TestCase):
         base=pd.DataFrame(dict(Open=close,High=close+1,Low=close-1,Close=close,Volume=1e7),index=days)
         normal={f'{1000+i}.TW':base.copy() for i in range(100)}
         fake={s:ghost(f,close=float(f.loc[:'2026-10-22'].Close.iloc[-1])) for s,f in normal.items()}
-        for symbol in list(fake)[95:]: fake[symbol].loc['2026-10-23','Volume']=1000
         spec=lambda frames:dict(frames=frames,listed=100,listingAsOf='2026-11-05')
         def attempts(bars,calendar):
             return [dict(first=True,higher=True,qualified=True,date=calendar[-25],outcome={'status':'complete','wins':{'hold5':True}})]
@@ -169,6 +191,8 @@ class ArchiveClosureTest(unittest.TestCase):
             root,cache,payload=Path(folder)/'archive',Path(folder)/'cache',Path(folder)/'payload'
             self.make_archive(root)
             before=(root/'tw/2330.TW/2026.csv').read_bytes()
+            scan.write_report(cache/ms.POLICY_FILE,scan.scan_archive(root,NOW))
+            scan.write_report(Path(folder)/ms.POLICY_FILE,scan.scan_archive(root,NOW))
             ka.bootstrap(root,cache,now=NOW)
             self.assertNotIn('2026-10-23',uc.read_bars(uc.bars_path(str(cache),'2330.TW')).index.strftime('%Y-%m-%d'))
             # Reproduce an old rolling cache with a changed legacy placeholder.
@@ -202,6 +226,43 @@ class ArchiveClosureTest(unittest.TestCase):
             self.assertIn('2026-10-23',dates)
             self.assertIn('published-closure',dates['2026-11-04']['reasons'])
             self.assertEqual(json.loads(out.read_text()),saved)
+
+    def test_traded_november_4_is_staged_when_primary_index_has_a_hole(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root,cache,payload=Path(folder)/'archive',Path(folder)/'cache',Path(folder)/'payload'
+            ka.initialize(root)
+            ka.put_symbol(root,'^TWII',[ka.normalize([d,100,101,99,100,0]) for d in ['2026-11-03','2026-11-05']])
+            ka.put_symbol(root,'9999.TW',[ka.normalize([d,100,101,99,100,1000]) for d in ['2026-11-03','2026-11-04','2026-11-05']])
+            ka.update_manifest(root)
+            frame=pd.DataFrame(dict(Open=100.,High=101.,Low=99.,Close=100.,Volume=1000.),
+                               index=pd.to_datetime(['2026-11-03','2026-11-04','2026-11-05']))
+            state=uc.load_state(str(cache))
+            for i in range(100):
+                symbol=f'{1000+i}.TW'
+                uc.write_bars(uc.bars_path(str(cache),symbol),frame)
+                uc.record_frame(state,symbol,frame,'2026-11-05',full=True,verified=True)
+            uc.save_state(str(cache),state)
+            plan=ka.stage_cache(cache,root,payload,now=NOW)
+            self.assertEqual(len(plan['symbols']),100)
+            self.assertTrue(all('2026-11-04' in {r[0] for r in ka.read_rows(payload/x['file'])} for x in plan['symbols']))
+            self.assertNotIn('2026-11-04',{x['date'] for x in plan['closedSessions']})
+            self.assertEqual(plan['indexGapsWithTrading'][0]['reason'],'primary-index-gap-with-trading')
+            report=scan.scan_archive(root,NOW)
+            self.assertNotIn('2026-11-04',{r['date'] for r in report['markets']['tw']['closedSessions']})
+            self.assertEqual(report['markets']['tw']['indexGapsWithTrading'][0]['reason'],'primary-index-gap-with-trading')
+            # A previously inferred gap cannot survive a full scan with trading.
+            empty=pd.DataFrame(columns=['observed','flatZero','unknownVolume','positiveVolume'])
+            primary=ms.archive_primary(root,'tw',NOW)
+            report['markets']['tw']['closedSessions']=list(ms.classify_closures(empty,primary).values())
+            report['markets']['tw']['indexGapsWithTrading']=[]
+            scan.write_report(cache/ms.POLICY_FILE,report)
+            scan.main(['--archive-dir',str(root),'--out',str(Path(folder)/'report.json'),'--cache-policy',str(cache/ms.POLICY_FILE)])
+            self.assertNotIn('2026-11-04',ms.read_policy(cache/ms.POLICY_FILE)['tw'])
+            job=bu.Run(SimpleNamespace(budget=300,cache_dir=str(cache),markets=['TW'],archive_dir=str(root)),
+                       now=NOW,sleep=lambda _:None,log=lambda _:None)
+            job.listing={'TW':{f'{1000+i}.TW':{} for i in range(100)}}
+            job.snapshots={'TW':{'date':'2026-11-04','bars':{symbol:dict(date='2026-11-04',open=100,high=101,low=99,close=100,volume=1000) for symbol in job.listing['TW']}}}
+            self.assertNotIn('2026-11-04',job.closed_dates('TW'))
 
     def test_a_real_adjustment_can_preserve_an_existing_closed_row_without_inserting_one(self):
         with tempfile.TemporaryDirectory() as folder:

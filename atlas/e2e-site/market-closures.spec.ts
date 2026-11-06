@@ -7,12 +7,14 @@ const root = 'https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline
 // remain. Only 10/23 is the independently audited market-wide legacy closure.
 const body = 'Date,Open,High,Low,Close,Volume\n2026-10-21,99,101,98,100,1000\n2026-10-22,100,100,100,100,0\n2026-10-23,100,100,100,100,0\n';
 
-for (const mode of ['audited-offline', 'published-evidence'] as const) {
+for (const mode of ['audited-offline', 'published-evidence', 'gap-with-trading'] as const) {
   test(`closed market: ${mode} filters daily/weekly/monthly without erasing individual halts`, async ({ page }, info) => {
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     await mockSite(page);
-    const policy = { version: 1, threshold: .95, markets: { tw: { closedSessions: [{
+    const traded = mode === 'gap-with-trading';
+    const csv = traded ? 'Date,Open,High,Low,Close,Volume\n2026-11-03,99,101,98,100,1000\n2026-11-04,100,102,99,101,1000\n' : body;
+    const policy = traded ? { version: 1, threshold: .95, markets: { tw: { closedSessions: [], indexGapsWithTrading: [{ date: '2026-11-04', reason: 'primary-index-gap-with-trading', observedSymbols: 100, positiveVolumeSymbols: 100 }] } } } : { version: 1, threshold: .95, markets: { tw: { closedSessions: [{
       // Synthetic future evidence also removes 10/22, proving the reader uses
       // the published policy rather than only its bundled 10/23 audit seed.
       date: '2026-10-22', reasons: ['flat-zero-cohort'], observedSymbols: 100,
@@ -23,16 +25,16 @@ for (const mode of ['audited-offline', 'published-evidence'] as const) {
       ? { status: 503, body: 'unavailable' } : { json: policy }));
     await page.route(root + '**', route => {
       const path = route.request().url().slice(root.length);
-      if (path === 'index/tw/2330.TW.json') return route.fulfill({ json: archiveIndexFixture('2330.TW', { 2026: body }) });
-      return route.fulfill(path === 'tw/2330.TW/2026.csv' ? { contentType: 'text/csv', body } : { status: 404 });
+      if (path === 'index/tw/2330.TW.json') return route.fulfill({ json: archiveIndexFixture('2330.TW', { 2026: csv }) });
+      return route.fulfill(path === 'tw/2330.TW/2026.csv' ? { contentType: 'text/csv', body: csv } : { status: 404 });
     });
     await page.route('**/functions/v1/market-chart?**', route => route.fulfill({ status: 502, body: 'unavailable' }));
-    const cutoff = mode === 'audited-offline' ? '2026-10-22' : '2026-10-21';
+    const cutoff = traded ? '2026-11-04' : mode === 'audited-offline' ? '2026-10-22' : '2026-10-21';
     for (const tf of ['1D', '1W', '1M']) {
       await page.goto(`./?page=chart&symbol=2330.TW&tf=${tf}`);
       await expect(page.getByTestId('chart')).toBeVisible();
       await expect(page.locator('.chart-loading.error')).toHaveCount(0);
-      await expect(page.getByTestId('ohlc-header')).toContainText('100.00');
+      await expect(page.getByTestId('ohlc-header')).toContainText(traded ? '101.00' : '100.00');
       await expect(page.getByTestId('source-label')).toContainText(`顯示至 ${cutoff} 收盤`);
       await expect(page.getByTestId('archive-availability')).toContainText(cutoff);
       expect(await page.locator('#main').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);

@@ -17,17 +17,17 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from market_sessions import CLOSURE_SHARE, archive_primary, classify_closures, read_policy
+from market_sessions import CLOSURE_SHARE, archive_primary, classify_closures, read_policy, read_trading_policy
 
 
-def scan_archive(root, now=None):
+def scan_archive(root, now=None, previous=None, trading=None):
     root = Path(root)
     now = now or datetime.now(timezone.utc)
     started = time.monotonic()
     stats, affected, samples = {}, {}, {}
     totals, errors, invalid_rows = Counter(), [], 0
     for market in ('tw', 'us'):
-        daily = defaultdict(lambda: [0, 0, 0])
+        daily = defaultdict(lambda: [0, 0, 0, 0])
         affected[market], samples[market] = Counter(), defaultdict(list)
         for document in sorted((root / 'index' / market).glob('*.json')):
             meta = json.loads(document.read_text())
@@ -68,30 +68,32 @@ def scan_archive(root, now=None):
                         daily[day][0] += 1
                         daily[day][1] += int(known and volume == 0 and len(set(price)) == 1)
                         daily[day][2] += int(not known)
+                        daily[day][3] += int(known and volume > 0)
                     if count != detail['rows']:
                         raise ValueError(f'Archive index row mismatch: {path}')
                     totals['rows'] += count
                     totals['yearFiles'] += 1
             if totals['symbols'] % 500 == 0:
                 print(f'Closure scan: {totals["symbols"]} symbols, {totals["rows"]} rows, {time.monotonic()-started:.1f}s', flush=True)
-        frame = pd.DataFrame.from_dict(daily, orient='index', columns=['observed','flatZero','unknownVolume'])
+        frame = pd.DataFrame.from_dict(daily, orient='index', columns=['observed','flatZero','unknownVolume','positiveVolume'])
         frame.index = pd.to_datetime(frame.index)
         stats[market] = frame.sort_index()
     markets = {}
     for market in ('tw','us'):
         primary = archive_primary(root, market, now)
-        records = classify_closures(stats[market], primary, min_symbols=50)
+        reviews = {}
+        records = classify_closures(stats[market], primary, (previous or {}).get(market,{}), min_symbols=50, reviews=reviews, trading=(trading or {}).get(market,{}))
         for day, row in records.items():
             row.update(affectedRows=affected[market][day], sampleSymbols=samples[market][day])
         markets[market] = dict(primary=None if primary is None else {k:v for k,v in primary.items() if k != 'dates'},
-                               closedSessions=list(records.values()))
+                               closedSessions=list(records.values()), indexGapsWithTrading=list(reviews.values()))
     try:
         commit = subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True,stderr=subprocess.DEVNULL).strip()
     except (OSError,subprocess.CalledProcessError):
         commit = None
     rows = [r for m in markets.values() for r in m['closedSessions']]
     return dict(version=1, generatedAt=now.isoformat(), threshold=CLOSURE_SHARE,
-                method='primary-index-or-flat-zero-v1', markets=markets,
+                method='trading-veto-primary-or-flat-zero-v2', markets=markets,
                 scan=dict(archiveCommit=commit, **dict(totals), invalidRows=invalid_rows, errors=errors,
                           suspectedDatesWithRows=sum(r['affectedRows'] > 0 for r in rows),
                           suspectedRows=sum(r['affectedRows'] for r in rows), seconds=round(time.monotonic()-started,3)))
@@ -116,19 +118,25 @@ def main(argv=None):
     root, destination=Path(args.archive_dir).resolve(),Path(args.out).resolve()
     if any(Path(p).resolve().is_relative_to(root) for p in [args.out,args.cache_policy,args.frontend_seed] if p):
         raise ValueError('Read-only scan cannot write any output inside the archive')
-    report=scan_archive(root)
+    previous = read_policy(args.cache_policy) if args.cache_policy else {}
+    prior_reviews = read_trading_policy(args.cache_policy) if args.cache_policy else {}
+    report=scan_archive(root,previous=previous,trading=prior_reviews)
     if args.cache_policy and report['scan']['invalidRows']:
         raise ValueError('Invalid archive rows; retaining the previous runtime closure policy')
     if args.cache_policy:
         # A just-observed emergency closure can be newer than the archive's
         # bounded index coverage. Do not erase its already-published evidence.
-        previous = read_policy(args.cache_policy)
         for market, part in report['markets'].items():
             records = {r['date']:r for r in part['closedSessions']}
+            traded = {r['date']:r for r in part['indexGapsWithTrading']}
+            # Current stock trading evidence corrects a previously inferred closure.
             for day, row in previous.get(market,{}).items():
-                if day not in records or not records[day]['observedSymbols']:
+                if day not in records:
+                    continue
+                if not records[day]['observedSymbols']:
                     records[day] = {**row,'reasons':list(dict.fromkeys([*row['reasons'],'published-closure']))}
             part['closedSessions'] = [records[day] for day in sorted(records)]
+            part['indexGapsWithTrading'] = list({**prior_reviews.get(market,{}),**traded}.values())
     write_report(destination,report)
     if args.cache_policy:
         write_report(args.cache_policy,report)

@@ -19,6 +19,8 @@ CLOSED_DATES = "atlas_market_closed_dates"
 PROJECTED = "atlas_market_sessions_projected"
 REMOVED_WEEKENDS = "atlas_removed_weekend_dates"
 CLOSURE_SHARE = 0.95
+TRADING_SHARE = 0.05
+TRADING_SYMBOLS = 50
 PRIMARY_INDICES = {"tw": "^TWII", "us": "^GSPC"}
 POLICY_FILE = "market-closures.json"
 
@@ -31,10 +33,10 @@ def cohort_statistics(frames):
     """
     frames = {s: f for s, f in frames.items() if f is not None and not f.empty}
     if not frames:
-        return pd.DataFrame(columns=['observed', 'flatZero', 'unknownVolume'])
+        return pd.DataFrame(columns=['observed', 'flatZero', 'unknownVolume', 'positiveVolume'])
     indexed = [(f, pd.DatetimeIndex(f.index).tz_localize(None).normalize()) for f in frames.values()]
     days = pd.DatetimeIndex(np.unique(np.concatenate([d.to_numpy(dtype='datetime64[ns]') for _, d in indexed])))
-    counts = np.zeros((len(days), 3), dtype=np.int64)
+    counts = np.zeros((len(days), 4), dtype=np.int64)
     for frame, dates in indexed:
         unique = ~dates.duplicated(keep='last')
         frame, dates = frame.loc[unique], dates[unique]
@@ -51,12 +53,12 @@ def cohort_statistics(frames):
             observed &= np.isfinite(price).all(axis=1) & (price > 0).all(axis=1)
             observed &= (price.High >= price.max(axis=1)) & (price.Low <= price.min(axis=1))
             flat = price.eq(price.Close, axis=0).all(axis=1)
-        values = np.column_stack([observed, observed & flat & (volume == 0) & ~missing, observed & missing])
+        values = np.column_stack([observed, observed & flat & (volume == 0) & ~missing, observed & missing, observed & ~missing & (volume > 0)])
         counts[days.get_indexer(dates)] += values.astype(np.int64)
-    return pd.DataFrame(counts, index=days, columns=['observed', 'flatZero', 'unknownVolume'])
+    return pd.DataFrame(counts, index=days, columns=['observed', 'flatZero', 'unknownVolume', 'positiveVolume'])
 
 
-def classify_closures(stats, primary=None, known=(), min_symbols=2):
+def classify_closures(stats, primary=None, known=(), min_symbols=2, *, trading=(), reviews=None):
     """One rule for scans, collection and calculations; evidence is JSON-safe.
 
     Index absence is evidence ONLY inside a successfully read, complete index's
@@ -67,15 +69,28 @@ def classify_closures(stats, primary=None, known=(), min_symbols=2):
         candidates = pd.bdate_range(primary['firstDate'], primary['lastDate'])
         stats = stats.reindex(stats.index.union(candidates)).sort_index().fillna(0)
     records = {}
+    traded = set(trading)
+    for day, row in stats.iterrows():
+        count, positive = int(row.observed), int(row.get('positiveVolume', 0))
+        if positive >= TRADING_SYMBOLS or count and positive / count >= TRADING_SHARE:
+            traded.add(pd.Timestamp(day).strftime('%Y-%m-%d'))
     reference = stats.observed.rolling(20, min_periods=1).quantile(.25) if len(stats) else pd.Series(dtype=float)
     for day, row in stats.iterrows():
         date = pd.Timestamp(day).strftime('%Y-%m-%d')
         count, flat = int(row.observed), int(row.flatZero)
         eligible = max(count, int(row.get('eligible', count)))
+        positive = int(row.get('positiveVolume', 0))
+        index_missing = bool(primary and primary['firstDate'] <= date <= primary['lastDate'] and date not in primary['dates'])
+        if date in traded:
+            if index_missing and reviews is not None and count and (positive >= TRADING_SYMBOLS or positive / count >= TRADING_SHARE):
+                reviews[date] = dict(date=date, reason='primary-index-gap-with-trading',
+                                    observedSymbols=count, positiveVolumeSymbols=positive,
+                                    positiveVolumeShare=positive/count if count else None)
+            continue
         reasons = []
         if pd.Timestamp(day).dayofweek >= 5:
             reasons.append('weekend')
-        if primary and primary['firstDate'] <= date <= primary['lastDate'] and date not in primary['dates']:
+        if index_missing:
             reasons.append('primary-index-missing')
         if count >= min_symbols and count >= reference.loc[day] * .5 and flat >= eligible * CLOSURE_SHARE:
             reasons.append('flat-zero-cohort')
@@ -84,11 +99,12 @@ def classify_closures(stats, primary=None, known=(), min_symbols=2):
         if reasons:
             records[date] = dict(date=date, reasons=reasons, observedSymbols=count,
                                  flatZeroSymbols=flat, eligibleSymbols=eligible, unknownVolumeSymbols=int(row.unknownVolume),
+                                 positiveVolumeSymbols=positive, positiveVolumeShare=positive/count if count else None,
                                  flatZeroShare=flat/eligible if eligible else None,
                                  coverageReference=float(reference.loc[day]))
-    for date in known:
+    for date in set(known) - traded:
         records.setdefault(date, dict(date=date, reasons=['published-closure'], observedSymbols=0,
-                                      flatZeroSymbols=0, eligibleSymbols=0, unknownVolumeSymbols=0, flatZeroShare=None, coverageReference=0.))
+                                      flatZeroSymbols=0, eligibleSymbols=0, unknownVolumeSymbols=0, positiveVolumeSymbols=0, positiveVolumeShare=None, flatZeroShare=None, coverageReference=0.))
     return records
 
 
@@ -139,23 +155,25 @@ def read_policy(path):
         value = json.loads(Path(path).read_text())
         if value.get('version') != 1 or value.get('threshold') != CLOSURE_SHARE:
             return {}
-        return {market: {r['date']: r for r in value['markets'].get(market,{}).get('closedSessions',[])}
+        return {market: {r['date']: r for r in value['markets'].get(market,{}).get('closedSessions',[])
+                         if r['date'] not in {g['date'] for g in value['markets'].get(market,{}).get('indexGapsWithTrading',[])}}
                 for market in ('tw', 'us')}
     except (OSError, ValueError, TypeError, KeyError, AttributeError):
         return {}
 
 
-def reference_closed_dates(primary):
-    if not primary:
-        return frozenset()
-    return frozenset(d.strftime('%Y-%m-%d') for d in pd.bdate_range(primary['firstDate'],primary['lastDate'])
-                     if d.strftime('%Y-%m-%d') not in primary['dates'])
+def read_trading_policy(path):
+    try:
+        value = json.loads(Path(path).read_text())
+        return {m:{r['date']:r for r in value.get('markets',{}).get(m,{}).get('indexGapsWithTrading',[])} for m in ('tw','us')}
+    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        return {}
 
 
 def snapshot_statistics(bars, listed):
     frame = pd.DataFrame.from_dict({s:b for s,b in bars.items() if s in listed},orient='index')
     if frame.empty:
-        return pd.DataFrame(columns=['observed','flatZero','unknownVolume','eligible'])
+        return pd.DataFrame(columns=['observed','flatZero','unknownVolume','positiveVolume','eligible'])
     price = frame.reindex(columns=['open','high','low','close']).apply(pd.to_numeric,errors='coerce')
     volume = pd.to_numeric(frame.get('volume',pd.Series(index=frame.index,dtype=float)),errors='coerce')
     valid = np.isfinite(price).all(axis=1) & (price > 0).all(axis=1)
@@ -163,7 +181,7 @@ def snapshot_statistics(bars, listed):
     unknown = ~np.isfinite(volume) | (volume < 0)
     flat = price.eq(price.close,axis=0).all(axis=1)
     result = pd.DataFrame({'observed':valid.astype(int),'flatZero':(valid & flat & (volume == 0) & ~unknown).astype(int),
-                           'unknownVolume':(valid & unknown).astype(int)})
+                           'unknownVolume':(valid & unknown).astype(int), 'positiveVolume':(valid & ~unknown & (volume > 0)).astype(int)})
     result.index = pd.to_datetime(frame['date'],errors='coerce').to_numpy()
     result = result.loc[result.index.notna()].groupby(level=0).sum().sort_index()
     result['eligible'] = len(listed)
