@@ -6,41 +6,176 @@ Raw caches and permanent archives are not modified.
 """
 from __future__ import annotations
 
+import hashlib
+import io
+import json
+from pathlib import Path
+
+import numpy as np
 import pandas as pd
 
 UNKNOWN_VOLUME_DATES = "atlas_unknown_volume_dates"
+CLOSED_DATES = "atlas_market_closed_dates"
+PROJECTED = "atlas_market_sessions_projected"
+REMOVED_WEEKENDS = "atlas_removed_weekend_dates"
+CLOSURE_SHARE = 0.95
+PRIMARY_INDICES = {"tw": "^TWII", "us": "^GSPC"}
+POLICY_FILE = "market-closures.json"
 
 
-def non_trading_dates(frames):
-    """Known weekends and broad, known-zero dates; missing volume is not zero.
+def cohort_statistics(frames):
+    """Count valid OHLC observations, not ETFs/indices added to a stock universe.
 
-    At least two independent histories and half the recent observed coverage must
-    be present before inferring a weekday closure. A positive-volume observation
-    or unknown source volume prevents that inference.
+    Close-only legacy inputs remain readable, but cannot prove O=H=L=C. Unknown
+    volume is retained in the denominator and never counted as known zero.
     """
     frames = {s: f for s, f in frames.items() if f is not None and not f.empty}
     if not frames:
-        return frozenset()
-    present, positive, unknown = {}, {}, {}
-    for symbol, frame in frames.items():
+        return pd.DataFrame(columns=['observed', 'flatZero', 'unknownVolume'])
+    indexed = [(f, pd.DatetimeIndex(f.index).tz_localize(None).normalize()) for f in frames.values()]
+    days = pd.DatetimeIndex(np.unique(np.concatenate([d.to_numpy(dtype='datetime64[ns]') for _, d in indexed])))
+    counts = np.zeros((len(days), 3), dtype=np.int64)
+    for frame, dates in indexed:
+        unique = ~dates.duplicated(keep='last')
+        frame, dates = frame.loc[unique], dates[unique]
         close = pd.to_numeric(frame["Close"], errors="coerce")
         volume = pd.to_numeric(frame["Volume"], errors="coerce")
-        days = pd.DatetimeIndex(frame.index).tz_localize(None).normalize()
-        missing = volume.isna() | (volume < 0)
+        missing = ~np.isfinite(volume) | (volume < 0)
         lineage = {str(day)[:10] for day in frame.attrs.get(UNKNOWN_VOLUME_DATES, ())}
         if lineage:
-            missing |= days.strftime("%Y-%m-%d").isin(lineage)
-        observed = close.notna() & (close > 0)
-        present[symbol] = pd.Series(observed.to_numpy(), index=days).groupby(level=0).any()
-        positive[symbol] = pd.Series((observed & (volume > 0)).to_numpy(), index=days).groupby(level=0).any()
-        unknown[symbol] = pd.Series((observed & missing).to_numpy(), index=days).groupby(level=0).any()
-    counts = pd.DataFrame(present).sum(axis=1).sort_index()
-    active = pd.DataFrame(positive).sum(axis=1).reindex(counts.index, fill_value=0)
-    missing = pd.DataFrame(unknown).sum(axis=1).reindex(counts.index, fill_value=0)
-    reference = counts.rolling(20, min_periods=1).quantile(0.25)
-    closed = (counts >= 2) & (counts >= reference * 0.5) & (active == 0) & (missing == 0)
-    closed |= counts.index.dayofweek >= 5
-    return frozenset(counts.index[closed].strftime("%Y-%m-%d"))
+            missing |= dates.strftime("%Y-%m-%d").isin(lineage)
+        observed = np.isfinite(close) & (close > 0)
+        flat = pd.Series(False, index=frame.index)
+        if {'Open', 'High', 'Low', 'Close'}.issubset(frame.columns):
+            price = frame[['Open', 'High', 'Low', 'Close']].apply(pd.to_numeric, errors='coerce')
+            observed &= np.isfinite(price).all(axis=1) & (price > 0).all(axis=1)
+            observed &= (price.High >= price.max(axis=1)) & (price.Low <= price.min(axis=1))
+            flat = price.eq(price.Close, axis=0).all(axis=1)
+        values = np.column_stack([observed, observed & flat & (volume == 0) & ~missing, observed & missing])
+        counts[days.get_indexer(dates)] += values.astype(np.int64)
+    return pd.DataFrame(counts, index=days, columns=['observed', 'flatZero', 'unknownVolume'])
+
+
+def classify_closures(stats, primary=None, known=(), min_symbols=2):
+    """One rule for scans, collection and calculations; evidence is JSON-safe.
+
+    Index absence is evidence ONLY inside a successfully read, complete index's
+    coverage. A failed download or a date after its last bar is unknown, not a
+    holiday. The cohort guard retains the existing half-recent-coverage safeguard.
+    """
+    if primary:
+        candidates = pd.bdate_range(primary['firstDate'], primary['lastDate'])
+        stats = stats.reindex(stats.index.union(candidates)).sort_index().fillna(0)
+    records = {}
+    reference = stats.observed.rolling(20, min_periods=1).quantile(.25) if len(stats) else pd.Series(dtype=float)
+    for day, row in stats.iterrows():
+        date = pd.Timestamp(day).strftime('%Y-%m-%d')
+        count, flat = int(row.observed), int(row.flatZero)
+        eligible = max(count, int(row.get('eligible', count)))
+        reasons = []
+        if pd.Timestamp(day).dayofweek >= 5:
+            reasons.append('weekend')
+        if primary and primary['firstDate'] <= date <= primary['lastDate'] and date not in primary['dates']:
+            reasons.append('primary-index-missing')
+        if count >= min_symbols and count >= reference.loc[day] * .5 and flat >= eligible * CLOSURE_SHARE:
+            reasons.append('flat-zero-cohort')
+        if date in known:
+            reasons.append('published-closure')
+        if reasons:
+            records[date] = dict(date=date, reasons=reasons, observedSymbols=count,
+                                 flatZeroSymbols=flat, eligibleSymbols=eligible, unknownVolumeSymbols=int(row.unknownVolume),
+                                 flatZeroShare=flat/eligible if eligible else None,
+                                 coverageReference=float(reference.loc[day]))
+    for date in known:
+        records.setdefault(date, dict(date=date, reasons=['published-closure'], observedSymbols=0,
+                                      flatZeroSymbols=0, eligibleSymbols=0, unknownVolumeSymbols=0, flatZeroShare=None, coverageReference=0.))
+    return records
+
+
+def primary_reference(frame, symbol, source, now=None):
+    if frame is None or frame.empty or not {'Open','High','Low','Close'}.issubset(frame.columns):
+        return None
+    values = frame[['Open','High','Low','Close']].apply(pd.to_numeric, errors='coerce')
+    good = np.isfinite(values).all(axis=1) & (values > 0).all(axis=1)
+    good &= (values.High >= values.max(axis=1)) & (values.Low <= values.min(axis=1))
+    days = pd.DatetimeIndex(frame.index[good]).tz_localize(None).normalize()
+    if now is not None:
+        import universe_cache as uc
+        market = 'TW' if symbol == '^TWII' else 'US'
+        days = days[[uc.session_done(d.strftime('%Y-%m-%d'), market, now) for d in days]]
+    if days.empty:
+        return None
+    dates = frozenset(days.strftime('%Y-%m-%d'))
+    return dict(symbol=symbol, source=source, firstDate=min(dates), lastDate=max(dates), dates=dates)
+
+
+def archive_primary(root, market, now=None):
+    """Read and hash-check the tiny primary index and all its referenced years."""
+    symbol = PRIMARY_INDICES[market.lower()]
+    try:
+        root = Path(root)
+        doc = json.loads((root / 'index' / market.lower() / (symbol.replace('^','%5E') + '.json')).read_text())
+        if doc['symbol'] != symbol or doc['version'] != 1 or doc['market'] != market.lower():
+            return None
+        parts = []
+        for year, detail in sorted(doc['years'].items()):
+            if len(year) != 4 or not year.isdigit():
+                return None
+            body = (root / market.lower() / symbol / (year + '.csv')).read_bytes()
+            if hashlib.sha256(body).hexdigest() != detail['sha256'] or len(body) != detail['csvBytes']:
+                return None
+            part = pd.read_csv(io.BytesIO(body), parse_dates=['Date']).set_index('Date')
+            if (len(part) != detail['rows'] or part.index[0].strftime('%Y-%m-%d') != detail['firstDate']
+                    or part.index[-1].strftime('%Y-%m-%d') != detail['lastDate']):
+                return None
+            parts.append(part)
+        return primary_reference(pd.concat(parts), symbol, 'kline-archive', now) if parts else None
+    except (OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
+        return None
+
+
+def read_policy(path):
+    try:
+        value = json.loads(Path(path).read_text())
+        if value.get('version') != 1 or value.get('threshold') != CLOSURE_SHARE:
+            return {}
+        return {market: {r['date']: r for r in value['markets'].get(market,{}).get('closedSessions',[])}
+                for market in ('tw', 'us')}
+    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        return {}
+
+
+def reference_closed_dates(primary):
+    if not primary:
+        return frozenset()
+    return frozenset(d.strftime('%Y-%m-%d') for d in pd.bdate_range(primary['firstDate'],primary['lastDate'])
+                     if d.strftime('%Y-%m-%d') not in primary['dates'])
+
+
+def snapshot_statistics(bars, listed):
+    frame = pd.DataFrame.from_dict({s:b for s,b in bars.items() if s in listed},orient='index')
+    if frame.empty:
+        return pd.DataFrame(columns=['observed','flatZero','unknownVolume','eligible'])
+    price = frame.reindex(columns=['open','high','low','close']).apply(pd.to_numeric,errors='coerce')
+    volume = pd.to_numeric(frame.get('volume',pd.Series(index=frame.index,dtype=float)),errors='coerce')
+    valid = np.isfinite(price).all(axis=1) & (price > 0).all(axis=1)
+    valid &= (price.high >= price.max(axis=1)) & (price.low <= price.min(axis=1))
+    unknown = ~np.isfinite(volume) | (volume < 0)
+    flat = price.eq(price.close,axis=0).all(axis=1)
+    result = pd.DataFrame({'observed':valid.astype(int),'flatZero':(valid & flat & (volume == 0) & ~unknown).astype(int),
+                           'unknownVolume':(valid & unknown).astype(int)})
+    result.index = pd.to_datetime(frame['date'],errors='coerce').to_numpy()
+    result = result.loc[result.index.notna()].groupby(level=0).sum().sort_index()
+    result['eligible'] = len(listed)
+    return result
+
+
+def non_trading_dates(frames, primary=None, known=()):
+    inherited = set(known)
+    for frame in frames.values():
+        if frame is not None:
+            inherited.update(frame.attrs.get(CLOSED_DATES, ()))
+    return frozenset(classify_closures(cohort_statistics(frames), primary, inherited))
 
 
 def analysis_prices(frame, excluded_dates):
@@ -53,8 +188,23 @@ def analysis_prices(frame, excluded_dates):
     return result
 
 
-def market_prices(frames):
+def market_prices(frames, primary=None, known=()):
     """Return projected market histories and the dates needed for custom-stock views."""
-    excluded = non_trading_dates(frames)
-    projected = {s: analysis_prices(f, excluded) for s, f in frames.items()}
+    if frames and primary is None and not known and all(f is not None and f.attrs.get(PROJECTED) for f in frames.values()):
+        return frames, frozenset(d for f in frames.values() for d in f.attrs.get(CLOSED_DATES, ()))
+    excluded = non_trading_dates(frames, primary, known)
+    projected = {}
+    for symbol, frame in frames.items():
+        view = analysis_prices(frame, excluded)
+        if view is None or view.empty:
+            continue
+        if view is frame:
+            view = frame.copy(deep=False)
+        # Mark the cohort, so a later sector/monthly view cannot infer a whole
+        # market closure from its own few halted members. Never mutate raw attrs.
+        view.attrs[CLOSED_DATES] = tuple(sorted(excluded))
+        view.attrs[PROJECTED] = True
+        view.attrs[REMOVED_WEEKENDS] = tuple(sorted(set(frame.attrs.get(REMOVED_WEEKENDS,())) |
+            set(frame.index[frame.index.dayofweek >= 5].strftime('%Y-%m-%d'))))
+        projected[symbol] = view
     return {s: f for s, f in projected.items() if f is not None and not f.empty}, excluded

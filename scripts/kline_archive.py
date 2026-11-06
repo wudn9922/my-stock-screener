@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 import kline_integrity as ki
 import universe_cache as uc
+import market_sessions as sessions
 
 BRANCH = "kline-archive"
 FIELDS = ["Date", "Open", "High", "Low", "Close", "Volume"]
@@ -208,7 +209,7 @@ def first_date(root, symbol):
 # do not know) shows up as a flat, zero-volume bar at the previous close for nearly every stock.
 CLOSED_SESSION_REASON = "kline-archive/closed-session"
 CLOSED_SESSION_MIN_SYMBOLS = 50
-CLOSED_SESSION_SHARE = 0.95
+CLOSED_SESSION_SHARE = sessions.CLOSURE_SHARE
 
 
 def is_placeholder(row, previous_close):
@@ -218,8 +219,20 @@ def is_placeholder(row, previous_close):
 
 def closed_sessions(observations):
     """observations: {(market, date): [is_placeholder, ...]} -> market-wide closed (market, date) keys."""
-    return {key for key, flags in observations.items()
-            if len(flags) >= CLOSED_SESSION_MIN_SYMBOLS and sum(flags) >= CLOSED_SESSION_SHARE * len(flags)}
+    return set(closed_session_evidence(observations))
+
+
+def closed_session_evidence(observations):
+    """Keep the shared classifier's actual reasons (including weekends)."""
+    import pandas as pd
+    result = {}
+    for market in ('tw','us','global'):
+        data = {pd.Timestamp(day):dict(observed=len(flags),flatZero=sum(flags),unknownVolume=0)
+                for (key,day),flags in observations.items() if key == market}
+        if data:
+            frame = pd.DataFrame.from_dict(data,orient='index').sort_index()
+            result.update({(market,day):row for day,row in sessions.classify_closures(frame,min_symbols=CLOSED_SESSION_MIN_SYMBOLS).items()})
+    return result
 
 
 def values(row):
@@ -694,6 +707,10 @@ def stage_cache(cache, archive, output, now=None, previous=None):
     cache, output = Path(cache), Path(output)
     plan = {"version": 1, "mode": "daily", "symbols": [], "skipped": []}
     staged, observations = [], {}
+    policy = sessions.read_policy(cache / sessions.POLICY_FILE)
+    references = {market:sessions.archive_primary(archive,market,now) for market in ('tw','us')}
+    instrument_kinds = json_read(Path(archive)/INSTRUMENTS_STATE,{}).get('symbols',{})
+    instrument_kinds = {**instrument_kinds,**json_read(cache/'scope.json',{}).get('symbols',{})}
     for symbol, entry in sorted(uc.load_state(str(cache))["symbols"].items()):
         try:
             market_of(symbol)
@@ -726,24 +743,42 @@ def stage_cache(cache, archive, output, now=None, previous=None):
             existing = symbol_rows(archive, symbol, {r[0][:4] for r in rows})
             known = {r[0]: r for r in existing}
             market = market_of(symbol)
-            for before, bar in zip(rows, rows[1:]):
-                if known.get(bar[0]) != bar:
-                    observations.setdefault((market, bar[0]), []).append(is_placeholder(bar, before[4]))
+            for bar in rows:
+                # Count the entire stock cohort, including already archived rows;
+                # a changed-only denominator cannot identify legacy closures.
+                if not symbol.startswith('^') and instrument_kinds.get(symbol,{}).get('kind') != 'etf':
+                    observations.setdefault((market, bar[0]), []).append(bar[1] == bar[2] == bar[3] == bar[4] and bar[5] == '0')
             # Changed overlaps are retained so the publisher can report conflicts.
             rows = rows if receipt else [r for r in rows if known.get(r[0]) != r]
             if rows:
-                staged.append((symbol, rows, receipt))
+                staged.append((symbol, rows, receipt, known if receipt else {}))
         except (ValueError, InvalidOperation, KeyError, OSError) as exc:
             plan["skipped"].append({"symbol": symbol, "reason": str(exc)})
     # A market-wide closed session is never archived; isolated flat bars (a real day
     # without trades) still are. Corrections carry their own proven full history.
-    closed = closed_sessions(observations)
-    plan["closedSessions"] = [{"market": market, "date": day, "symbols": len(observations[(market, day)])}
+    cohort_evidence = closed_session_evidence(observations)
+    cohort_closed = set(cohort_evidence)
+    closed = set(cohort_closed)
+    reference_closed = {m:sessions.reference_closed_dates(r) for m,r in references.items()}
+    for market in ('tw','us'):
+        closed.update((market,day) for day in set(policy.get(market,{})) | set(reference_closed[market]))
+    plan["closedSessions"] = [{"market": market, "date": day, "symbols": len(observations.get((market, day),[]))}
                               for market, day in sorted(closed)]
-    for symbol, rows, receipt in staged:
+    plan['closedSessionEvidence'] = [{**row,'reasons':list(dict.fromkeys([
+        *cohort_evidence.get((row['market'],row['date']),{}).get('reasons',[]),
+        *(['primary-index-missing'] if row['date'] in reference_closed.get(row['market'],()) else []),
+        *policy.get(row['market'],{}).get(row['date'],{}).get('reasons',[]),
+    ]))} for row in plan['closedSessions']]
+    for symbol, rows, receipt, old in staged:
         market = market_of(symbol)
-        if not receipt:
-            rows = [r for r in rows if (market, r[0]) not in closed]
+        if receipt:
+            by_date = {r[0]:r for r in rows}
+            by_date.update({day:bar for day,bar in old.items() if (market,day) in closed})
+            rows = [by_date[day] for day in sorted(by_date)]
+        # An adjustment transport retains an existing closed-date row verbatim;
+        # it may neither insert a new one nor remove/repair permanent history.
+        rows = [old[r[0]] if (market,r[0]) in closed and r[0] in old else r
+                for r in rows if (market,r[0]) not in closed or receipt and r[0] in old]
         if not rows:
             continue
         relative = f"{market}/{symbol}.csv"
@@ -922,13 +957,16 @@ def bootstrap(archive, cache, now=None):
     state = uc.load_state(str(cache))
     verify(archive)
     symbols = sorted({p.parent.name for p in archive_files(archive)})
+    policy = sessions.read_policy(Path(cache)/sessions.POLICY_FILE)
+    closed = {m:set(policy.get(m,{})) | set(sessions.reference_closed_dates(sessions.archive_primary(archive,m,now))) for m in ('tw','us')}
     seeded = 0
     for symbol in symbols:
         target = Path(uc.bars_path(str(cache), symbol))
         if target.exists() and uc.is_complete(state["symbols"].get(symbol)):
             continue
         rows = latest_rows(archive, symbol, uc.KEEP_BARS)
-        rows = [r for r in rows if uc.session_done(r[0], "TW" if market_of(symbol) == "tw" else "US", now)]
+        rows = [r for r in rows if uc.session_done(r[0], "TW" if market_of(symbol) == "tw" else "US", now)
+                and r[0] not in closed.get(market_of(symbol),set())]
         if not rows:
             continue
         frame = pd.DataFrame([[float(v) if v else float("nan") for v in row[1:]] for row in rows],

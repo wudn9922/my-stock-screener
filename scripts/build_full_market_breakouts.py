@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_breakouts as bo  # noqa: E402
 import universe_cache as uc  # noqa: E402
 from build_breadth import load_daily_bars, write_json_atomic  # noqa: E402
+from market_sessions import archive_primary, market_prices, read_policy, POLICY_FILE  # noqa: E402
 
 MIN_LIST = {"TWSE": 800, "TPEx": 500, "US": 3000}
 MIN_COVERAGE = 0.9
@@ -78,9 +79,13 @@ def load_inputs(cache_dir, today):
             bars = load_daily_bars(uc.bars_path(cache_dir, symbol), bo.PRICE_COLUMNS)
             if bars is not None:
                 frames[symbol] = bars
+        policy = read_policy(Path(cache_dir)/POLICY_FILE).get(key,{})
+        primary = archive_primary(Path(cache_dir).parent/'kline-archive',key)
+        frames, closed = market_prices(frames,primary,policy)
         inputs[key] = {
             "frames": frames, "universe": LABELS[key], "listed": len(listing),
             "listingAsOf": min(dates), "listingSource": "、".join(sources),
+            "closedSessions": sorted(closed),
         }
     return inputs
 

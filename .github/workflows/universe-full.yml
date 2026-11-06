@@ -95,6 +95,12 @@ jobs:
           path: .cache/kline-archive
           fetch-depth: 1
 
+      - name: Build market closure evidence from read-only archive
+        if: steps.archive_checkout.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 5
+        run: python -u scripts/scan_market_closures.py --archive-dir .cache/kline-archive --out docs/report/market-closures.json --cache-policy .cache/universe-full/market-closures.json
+
       - name: Seed missing rolling bars from permanent archive
         id: archive_bootstrap
         if: steps.archive_checkout.outcome == 'success'
@@ -111,6 +117,19 @@ jobs:
           UNIVERSE_CACHE_DIR: .cache/universe-full
           UNIVERSE_BUDGET_SECONDS: ${{ inputs.budget || '2400' }}
         run: python -u scripts/build_universe_full.py --markets "${{ inputs.markets || 'TW,US' }}" --archive-dir .cache/kline-archive
+
+      - name: Publish derived closure evidence including the daily cohort
+        if: always() && !cancelled()
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.scan_market_closures import write_report
+          source = Path('.cache/universe-full/market-closures.json')
+          if source.exists():
+              write_report('docs/report/market-closures.json', json.loads(source.read_text()))
+          PY
 
       # 即使上一步失敗或時間不夠，也保存已補到的日 K，下次接著補
       - name: Refresh archive-only ETFs and indices through the existing Yahoo batch reader
@@ -199,6 +218,7 @@ jobs:
           git add docs/report/universe.json docs/report/breakouts.json
           if [ -f docs/report/breadth.json ]; then git add -f -- docs/report/breadth.json; fi
           if [ -f docs/report/market-warnings.json ]; then git add -f -- docs/report/market-warnings.json; fi
+          if [ -f docs/report/market-closures.json ]; then git add -f -- docs/report/market-closures.json; fi
           if [ -f docs/report/market-warnings-log.csv ]; then git add -f -- docs/report/market-warnings-log.csv; fi
           if [ -f docs/report/breakouts-history.json ]; then git add -f -- docs/report/breakouts-history.json; fi
           if [ -f docs/report/breadth-signals.json ]; then git add -f -- docs/report/breadth-signals.json; fi

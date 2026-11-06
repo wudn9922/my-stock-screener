@@ -20,7 +20,7 @@ import build_full_market_breakouts as full
 from build_breadth import write_json_atomic
 from market_warnings_log import append_observations
 from swing_cohort import COUNTING_MODEL, included, swing_attempts
-from market_sessions import UNKNOWN_VOLUME_DATES, market_prices
+from market_sessions import UNKNOWN_VOLUME_DATES, market_prices, primary_reference
 from breakout_outcomes import BARRIER_PCT, CLOSE_BUFFER_ATR, GATE_ATR_PERIOD, OBSERVATION_DAYS
 from swing_breakouts import ATR_PERIOD, REVERSAL_ATR
 
@@ -212,7 +212,8 @@ def build_market(spec, indices, market, now, params=PARAMS, previous=None):
     # Anchor to the cache's common completed data date, not the execution date.
     clipped = {s: f.loc[f.index.isin(calendar)] for s, f in frames.items()}
     clipped = {s: f for s, f in clipped.items() if not f.empty}
-    clipped, closed = market_prices(clipped)
+    reference = primary_reference(indices[cfg['indices'][0]],cfg['indices'][0],'warning-index-daily',now)
+    clipped, closed = market_prices(clipped,reference,spec.get('closedSessions',()))
     calendar = calendar[~calendar.strftime("%Y-%m-%d").isin(closed)]
     if not clipped:
         raise ValueError(f"{market} 沒有已收盤有效日線")

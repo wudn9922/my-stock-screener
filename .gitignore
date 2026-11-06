@@ -55,6 +55,7 @@ docs/report/**/*.tmp
 /docs/report/breakouts.json
 /docs/report/breakouts-history.json
 /docs/report/market-warnings.json
+/docs/report/market-closures.json
 /docs/report/breakouts-archive/*.json
 /docs/report/research/
 /docs/report/tw-chips.json
