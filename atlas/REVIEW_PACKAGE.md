@@ -1,3 +1,9 @@
+## PR #229 WebKit 切頁取消修正（2026-11-06）
+
+Primary self-review only；沒有獨立簽核。市場頁 `MiniChart` 的封存請求在 `beforeunload` 後被 WebKit 取消，原本只在 `pagehide` 中止的生命週期仍允許備援呼叫 `StaticSeriesProvider.listSymbols()`，因而在離站文件中觸發 access-control 頁面錯誤。現在於 `beforeunload` 即中止，保留既有 `pagehide` 與 BFCache `pageshow` 恢復。沒有修改 smoke、errors 斷言、timeout、skip 或 preview server。
+
+根因、HTTP 404／取消／中斷連線檢查、前後各 20 次逐次結果與重現方式見 [調查與驗證](docs/PR229_WEBKIT_NAVIGATION.md) 及 [機器可讀結果](docs/pr229-webkit-verification.json)。只推回原 PR，不合併。
+
 ## 指數下載重試、唯讀封存備援與市場隔離（2026-11-05）
 
 Primary self-review only；沒有獨立模型或 Claude 簽核。分支 `codex/index-daily-resilience` 從 main `c3f5c76511` 建立，先以一般 merge 納入 #228，待其合併後再以一般 merge 合入最新 main `afe469f522`（包含 #228 的 `21d49127ee`）。沒有 rebase／force-push；只交付 PR，不合併、不部署、不觸發正式 workflow。

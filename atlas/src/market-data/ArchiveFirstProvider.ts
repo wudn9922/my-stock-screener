@@ -10,11 +10,14 @@ import { marketDateTime } from './MarketProfile';
 import { applyLiveQuoteMetadata, TWSE_MIS_SOURCE } from './YahooNormalizer';
 
 // Shared archive lookups may outlive a component, but must not start another
-// provider request once this document has left. A restored BFCache page gets
+// provider request once this document starts leaving. WebKit cancels outstanding
+// loads between beforeunload and pagehide; their rejection must not start a
+// fallback fetch in the departing document. A restored BFCache page gets
 // a fresh lifetime; already pending work retains its aborted signal.
 const pageLifetime = typeof window === 'undefined' ? undefined : { current: new AbortController() };
 if (pageLifetime) {
   const lifetime = pageLifetime;
+  window.addEventListener('beforeunload', () => lifetime.current.abort());
   window.addEventListener('pagehide', () => lifetime.current.abort());
   window.addEventListener('pageshow', () => {
     if (lifetime.current.signal.aborted) lifetime.current = new AbortController();
