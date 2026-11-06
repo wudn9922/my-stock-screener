@@ -3,6 +3,7 @@ import { mexcStore } from './mexc';
 import { type HoldingAccount, type HoldingAccountState } from './model';
 import { parseNumber } from './import';
 import { formatDateTime } from '../ui/format';
+import { mexcKeyAgeNotice } from './mexcStatus';
 
 interface Props {
   account: HoldingAccount;
@@ -13,7 +14,8 @@ interface Props {
 }
 export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel }: Props) {
   const store = mexcStore(),
-    { state, loading, busy, error } = useSyncExternalStore(store.subscribe, store.getSnapshot);
+    { state, loading, busy, error: loadError, accountErrors } = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const error = accountErrors[account.id] ?? loadError;
   const connection = state.connections.find((entry) => entry.accountId === account.id);
   const [keyForm, setKeyForm] = useState(false),
     [apiKey, setApiKey] = useState(''),
@@ -131,6 +133,11 @@ export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel 
           <p className="holdings-muted">
             上次同步 {formatDateTime(connection.syncedAt)}。停留此頁且可見時，每五分鐘讀取一次現貨餘額與報價。
           </p>
+          {mexcKeyAgeNotice(connection.connectedAt, tick) && (
+            <p role="note" data-testid="mexc-key-age-warning" className="holdings-muted">
+              {mexcKeyAgeNotice(connection.connectedAt, tick)}
+            </p>
+          )}
           <div className="holdings-toolbar">
             <button
               type="button"

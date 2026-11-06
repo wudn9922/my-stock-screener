@@ -42,6 +42,10 @@ test('a missing old deployment bundle offers reload into the new deployment and 
   await fixtures(page);
   let fail = true;
   let newDeployment = false;
+  let newWorldPageRequested = false;
+  page.on('request', request => {
+    if (/\/WorldPage-[\w-]+\.js\?deployment=new$/.test(request.url())) newWorldPageRequested = true;
+  });
   // Model an open old tab across a deployment: reload serves the new graph's
   // fresh lazy URL. WebKit retains failed module URLs even across reloads, so
   // merely making the exact old URL available again does not model a release.
@@ -50,7 +54,9 @@ test('a missing old deployment bundle offers reload into the new deployment and 
     let body = await response.text();
     if (!fail) {
       body = body.replace(/WorldPage-[\w-]+\.js/g, match => `${match}?deployment=new`);
-      newDeployment = body.includes('?deployment=new');
+      // Vite also emits dependency chunks named index-*.js. A later dependency
+      // response must not erase evidence that the fresh entry was already served.
+      newDeployment ||= body.includes('?deployment=new');
     }
     await route.fulfill({ response, body });
   });
@@ -68,6 +74,7 @@ test('a missing old deployment bundle offers reload into the new deployment and 
   fail = false;
   await fallback.getByRole('button', { name: '重新載入', exact: true }).click();
   await expect.poll(() => newDeployment).toBe(true);
+  await expect.poll(() => newWorldPageRequested).toBe(true);
   await expect(page.locator('.research-world-tabs')).toBeVisible();
   await expect(fallback).toHaveCount(0);
 });

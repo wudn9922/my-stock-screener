@@ -71,6 +71,34 @@ async function privateStorage(page: Page) {
   expect(storage).not.toContain('holdings:v1');
 }
 
+test('80-day key reminder and expired-key error preserve confirmed holdings and last successful sync', async ({ page }, info) => {
+  const f = await setup(page);
+  await enterKeys(page);
+  await confirmCosts(page);
+  const saved = structuredClone(f.documents.get(MEXC_USER));
+  const previous = structuredClone([...f.connections.values()][0]!);
+  await expect(mexc(page).getByTestId('mexc-key-age-warning')).toHaveCount(0);
+  f.advance(80 * 86400000);
+  await page.clock.setFixedTime(f.now());
+  await page.clock.runFor(1100);
+  await expect(mexc(page).getByTestId('mexc-key-age-warning')).toHaveText('MEXC 未綁 IP 的 Key 約 90 天到期，請準備更換');
+  await mexc(page).getByTestId('mexc-key-age-warning').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath('mexc-key-age.png') });
+  f.setFailure('bad-key');
+  await mexc(page).getByRole('button', { name: /^同步餘額/ }).click();
+  await expect(mexc(page).getByRole('alert')).toContainText('MEXC API Key 已失效，請到 MEXC 重新建立唯讀 Key 後重新填入');
+  await expect(panel(page).getByRole('article')).toHaveCount(3);
+  expect(f.documents.get(MEXC_USER)).toEqual(saved);
+  expect([...f.connections.values()][0]!.syncedAt).toBe(previous.syncedAt);
+  await expect(mexc(page)).toContainText('上次同步');
+  await mexc(page).getByRole('alert').scrollIntoViewIfNeeded();
+  expect(await page.locator('#main').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+  expect(await page.locator('body').innerText()).not.toContain(TEST_KEY);
+  expect(await page.locator('body').innerText()).not.toContain(TEST_SECRET);
+  await privateStorage(page);
+  await page.screenshot({ path: info.outputPath('mexc-key-expired.png') });
+});
+
 test('website connects a read-only MEXC key once, reviews costs and shows actual MEXC P&L at 390px', async ({
   page,
 }) => {

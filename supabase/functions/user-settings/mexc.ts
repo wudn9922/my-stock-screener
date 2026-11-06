@@ -14,12 +14,95 @@ export class MexcError extends Error {
     readonly code: ErrorCode,
     readonly status = 400,
     readonly retryAfter = 0,
+    readonly reason: string = code,
   ) {
     super(MEXC_ERRORS[code]);
   }
 }
+type DiagnosticStep = 'apiKeyInfo' | 'account' | 'ticker' | 'parse-balances' | 'parse-quotes' | 'assert-key';
+const safeKeys = new Set([
+  'code',
+  'msg',
+  'data',
+  'note',
+  'apikey',
+  'accessKey',
+  'status',
+  'permissions',
+  'ipWhiteList',
+  'createTime',
+  'remainingValidity',
+  'accountType',
+  'balances',
+  'canTrade',
+  'canWithdraw',
+  'canDeposit',
+  'updateTime',
+  'makerCommission',
+  'takerCommission',
+  'buyerCommission',
+  'sellerCommission',
+  'symbol',
+  'price',
+  'timestamp',
+]);
+const safeMessages = new Set([
+  'Api key info invalid',
+  'invalid access key',
+  'API-key format invalid',
+  'Signature for this request is not valid',
+  'Signature verification failed',
+  'API KEY information does not exist',
+  'No authority',
+  'No permission to access the endpoint',
+  'IP non white list',
+  'Too Many Requests',
+  'Internal error',
+  'service not available, please try again',
+  'success',
+]);
+/** Only fixed metadata crosses the logging boundary. Unknown names/messages can
+ * contain echoed credentials or asset names, so they are redacted, never sliced. */
+function diagnostic(step: DiagnosticStep, status: number | null, value: unknown, reason: string) {
+  const row =
+    value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const keys = [
+    ...new Set(
+      Object.keys(row)
+        .slice(0, 80)
+        .map((key) => (safeKeys.has(key) ? key : '[other]')),
+    ),
+  ].sort();
+  const includeError = (status !== null && status >= 400 && status < 500) || 'code' in row;
+  const code = typeof row.code === 'number' && Number.isSafeInteger(row.code) ? row.code : undefined;
+  console.warn(
+    JSON.stringify({
+      step,
+      status,
+      topLevelKeys: keys,
+      reason,
+      ...(includeError && code !== undefined ? { code } : {}),
+      ...(includeError && 'msg' in row
+        ? {
+            msg: typeof row.msg === 'string' && safeMessages.has(row.msg) ? row.msg : '[redacted]',
+          }
+        : {}),
+    }),
+  );
+}
+function sourceFailure(reason: string): never {
+  throw new MexcError('source', 502, 0, reason);
+}
+function parseFailure(step: DiagnosticStep, value: unknown, status: number | null, error: unknown): never {
+  const failure = error instanceof MexcError ? error : new MexcError('source', 502, 0, 'response-object');
+  diagnostic(step, status, value, failure.reason);
+  throw failure;
+}
 interface Database {
-  rpc(name: string, params: Record<string, unknown>): PromiseLike<{ data: unknown; error: { code?: string } | null }>;
+  rpc(
+    name: string,
+    params: Record<string, unknown>,
+  ): PromiseLike<{ data: unknown; error: { code?: string } | null }>;
 }
 interface Credentials {
   apiKey: string;
@@ -35,16 +118,15 @@ const assetPattern = /^[A-Z0-9]{1,20}$/;
 const origin = 'https://api.mexc.com';
 const scale = 10n ** 18n;
 export function mexcDecimal(input: unknown): string {
-  if (typeof input !== 'string' || !/^\d{1,15}(?:\.\d{1,40})?$/.test(input)) throw new MexcError('source', 502);
+  if (typeof input !== 'string' || !/^\d{1,15}(?:\.\d{1,40})?$/.test(input)) sourceFailure('decimal-format');
   const [integer, fraction] = input.split('.');
-  const value = (integer!.replace(/^0+(?=\d)/, '') + (fraction ? '.' + fraction.replace(/0+$/, '') : '')).replace(
-    /\.$/,
-    '',
-  );
+  const value = (
+    integer!.replace(/^0+(?=\d)/, '') + (fraction ? '.' + fraction.replace(/0+$/, '') : '')
+  ).replace(/\.$/, '');
   try {
     return holdingDecimal(value, true);
   } catch {
-    throw new MexcError('source', 502);
+    sourceFailure('decimal-range');
   }
 }
 function units(text: string): bigint {
@@ -54,10 +136,21 @@ function units(text: string): bigint {
 function fromUnits(value: bigint): string {
   return `${value / scale}.${String(value % scale).padStart(18, '0')}`.replace(/\.?0+$/, '');
 }
-export function parseMexcBalances(value: unknown): MexcBalance[] {
+export function parseMexcBalances(
+  value: unknown,
+  status: number | null = null,
+  diagnosticValue: unknown = value,
+): MexcBalance[] {
+  try {
+    return balancesFrom(value);
+  } catch (error) {
+    return parseFailure('parse-balances', diagnosticValue, status, error);
+  }
+}
+function balancesFrom(value: unknown): MexcBalance[] {
   const row = holdingsObject(value);
   if (row.accountType !== 'SPOT' || !Array.isArray(row.balances) || row.balances.length > 10000)
-    throw new MexcError('source', 502);
+    sourceFailure('account-shape');
   const result: MexcBalance[] = [],
     seen = new Set<string>();
   for (const raw of row.balances) {
@@ -72,14 +165,32 @@ export function parseMexcBalances(value: unknown): MexcBalance[] {
     }
     if (quantity === '0') continue;
     if (typeof item.asset !== 'string' || !assetPattern.test(item.asset) || seen.has(item.asset))
-      throw new MexcError('source', 502);
+      sourceFailure('asset-invalid-or-duplicate');
     seen.add(item.asset);
-    result.push({ asset: item.asset, symbol: `${item.asset}/USDT`, free, locked, quantity });
+    result.push({
+      asset: item.asset,
+      symbol: `${item.asset}/USDT`,
+      free,
+      locked,
+      quantity,
+    });
   }
   if (result.length > 1000) throw new MexcError('limit');
   return result.sort((a, b) => a.asset.localeCompare(b.asset));
 }
-export function assertReadOnlyKey(value: unknown, apiKey: string) {
+export function assertReadOnlyKey(
+  value: unknown,
+  apiKey: string,
+  status: number | null = null,
+  diagnosticValue: unknown = value,
+) {
+  try {
+    return readOnlyKey(value, apiKey);
+  } catch (error) {
+    return parseFailure('assert-key', diagnosticValue, status, error);
+  }
+}
+function readOnlyKey(value: unknown, apiKey: string) {
   const row = holdingsObject(value);
   const reads = new Set([
     'SPOT_ACCOUNT_READ',
@@ -102,9 +213,9 @@ export function assertReadOnlyKey(value: unknown, apiKey: string) {
     !Number.isInteger(row.remainingValidity) ||
     (Number(row.remainingValidity) <= 0 && row.remainingValidity !== -999)
   )
-    throw new MexcError('credentials');
+    throw new MexcError('credentials', 400, 0, 'key-invalid-or-expired');
   if (!permissions.includes('SPOT_ACCOUNT_READ') || permissions.some((p) => !reads.has(p)))
-    throw new MexcError('permission');
+    throw new MexcError('permission', 400, 0, 'read-only-permissions');
 }
 function credentials(value: Record<string, unknown>): Credentials {
   if (
@@ -139,7 +250,12 @@ export async function encryptMexcCredentials(
 ): Promise<Envelope> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv, additionalData: aad(owner, accountId), tagLength: 128 },
+    {
+      name: 'AES-GCM',
+      iv,
+      additionalData: aad(owner, accountId),
+      tagLength: 128,
+    },
     key,
     encoder.encode(JSON.stringify(data)),
   );
@@ -158,7 +274,12 @@ export async function decryptMexcCredentials(
     const iv = unbase64(row.iv);
     if (iv.length !== 12) throw new Error();
     const plain = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv, additionalData: aad(owner, accountId), tagLength: 128 },
+      {
+        name: 'AES-GCM',
+        iv,
+        additionalData: aad(owner, accountId),
+        tagLength: 128,
+      },
       key,
       unbase64(row.data),
     );
@@ -168,23 +289,38 @@ export async function decryptMexcCredentials(
   }
 }
 export async function mexcSignature(secret: string, query: string) {
-  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
-    'sign',
-  ]);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
   return [...new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(query)))]
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
 }
-async function database(db: Database, owner: string, operation: string, payload: Record<string, unknown> = {}) {
+async function database(
+  db: Database,
+  owner: string,
+  operation: string,
+  payload: Record<string, unknown> = {},
+) {
   let result;
   try {
-    result = await db.rpc('atlas_mexc_action', { operation, owner_id: owner, payload });
+    result = await db.rpc('atlas_mexc_action', {
+      operation,
+      owner_id: owner,
+      payload,
+    });
   } catch {
     throw new MexcError('service', 503);
   }
   if (result.error)
     throw new MexcError(
-      ['PGRST202', 'PGRST205', '42883', '42P01', '3F000'].includes(result.error.code ?? '') ? 'setup' : 'service',
+      ['PGRST202', 'PGRST205', '42883', '42P01', '3F000'].includes(result.error.code ?? '')
+        ? 'setup'
+        : 'service',
       503,
     );
   const row = holdingsObject(result.data);
@@ -196,13 +332,13 @@ async function database(db: Database, owner: string, operation: string, payload:
   return row;
 }
 /** Fixed-origin, GET-only MEXC client. Neither upstream errors nor signed URLs escape this module. */
-async function readMexc(
+export async function readMexc(
   path: '/api/v3/apiKeyInfo' | '/api/v3/account' | '/api/v3/ticker/price',
   fetcher: typeof fetch,
   signal: AbortSignal,
   now: number,
   auth?: Credentials,
-): Promise<unknown> {
+): Promise<{ value: unknown; status: number; diagnosticValue: unknown }> {
   const query = new URLSearchParams();
   if (auth) {
     if (path === '/api/v3/apiKeyInfo') query.set('accessKey', auth.apiKey);
@@ -210,7 +346,22 @@ async function readMexc(
     query.set('timestamp', String(now));
     query.set('signature', await mexcSignature(auth.apiSecret, query.toString()));
   }
-  let response;
+  const step: DiagnosticStep = path.endsWith('apiKeyInfo')
+    ? 'apiKeyInfo'
+    : path.endsWith('account')
+      ? 'account'
+      : 'ticker';
+  const fail = (
+    reason: string,
+    status: number | null,
+    value?: unknown,
+    code: ErrorCode = 'source',
+    retryAfter = 0,
+  ): never => {
+    diagnostic(step, status, value, reason);
+    throw new MexcError(code, code === 'limit' ? 429 : 502, retryAfter, reason);
+  };
+  let response: Response;
   try {
     response = await fetcher(`${origin}${path}${query.size ? '?' + query : ''}`, {
       method: 'GET',
@@ -221,18 +372,19 @@ async function readMexc(
       referrerPolicy: 'no-referrer',
     });
   } catch {
-    throw new MexcError('source', 502);
+    return fail('network-or-timeout', null);
   }
-  if ([418, 429].includes(response.status))
-    throw new MexcError('limit', 429, Math.min(3600, Math.max(30, Number(response.headers.get('Retry-After')) || 30)));
-  if (!response.ok) throw new MexcError(auth && response.status < 500 ? 'credentials' : 'source', 502);
-  // Bound both declared and streamed response size; do not consume arbitrary error bodies.
+  const rate = [418, 429].includes(response.status);
+  const retryAfter = rate
+    ? Math.min(3600, Math.max(30, Number(response.headers.get('Retry-After')) || 30))
+    : 0;
   if (Number(response.headers.get('Content-Length')) > 2 * 1024 * 1024 || !response.body)
-    throw new MexcError('source', 502);
-  const reader = response.body.getReader(),
-    chunks: Uint8Array[] = [];
-  let size = 0;
+    return fail('response-size-or-empty', response.status, undefined, rate ? 'limit' : 'source', retryAfter);
+  let parsed: unknown;
   try {
+    const reader = response.body.getReader(),
+      chunks: Uint8Array[] = [];
+    let size = 0;
     while (true) {
       const part = await reader.read();
       if (part.done) break;
@@ -243,28 +395,69 @@ async function readMexc(
       }
       chunks.push(part.value);
     }
-    const data = new Uint8Array(size);
+    const bytes = new Uint8Array(size);
     let offset = 0;
     for (const chunk of chunks) {
-      data.set(chunk, offset);
+      bytes.set(chunk, offset);
       offset += chunk.length;
     }
-    const parsed: unknown = JSON.parse(new TextDecoder().decode(data));
-    if (parsed && typeof parsed === 'object' && 'code' in parsed) throw new Error();
-    return parsed;
+    parsed = JSON.parse(new TextDecoder().decode(bytes));
   } catch {
-    throw new MexcError('source', 502);
+    return fail(
+      rate ? 'upstream-rate-limit' : 'invalid-json-or-stream',
+      response.status,
+      undefined,
+      rate ? 'limit' : 'source',
+      retryAfter,
+    );
+  }
+  const row =
+    parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  if (rate) return fail('upstream-rate-limit', response.status, parsed, 'limit', retryAfter);
+  if (!response.ok || ('code' in row && row.code !== 0)) {
+    const code = typeof row.code === 'number' ? row.code : undefined;
+    const invalid =
+      !!auth &&
+      (response.status === 401 ||
+        [401, 602, 10072, 700001, 700002, 730706, -2014, -2015, -1022].includes(code ?? 0));
+    return fail(
+      'code' in row ? 'upstream-code' : 'upstream-http',
+      response.status,
+      parsed,
+      invalid ? 'credentials' : 'source',
+    );
+  }
+  // The endpoint docs show bare objects. Also accept an explicit numeric-zero
+  // success envelope; the same strict endpoint parsers still validate its data.
+  return {
+    value: 'code' in row && row.code === 0 && 'data' in row ? row.data : parsed,
+    status: response.status,
+    diagnosticValue: parsed,
+  };
+}
+
+export function quotesFrom(
+  value: unknown,
+  balances: MexcBalance[],
+  now: number,
+  status: number | null = null,
+  diagnosticValue: unknown = value,
+): Record<string, MexcQuote> {
+  try {
+    return parseQuotes(value, balances, now);
+  } catch (error) {
+    return parseFailure('parse-quotes', diagnosticValue, status, error);
   }
 }
-function quotesFrom(value: unknown, balances: MexcBalance[], now: number): Record<string, MexcQuote> {
-  if (!Array.isArray(value) || value.length > 20000) throw new MexcError('source', 502);
+function parseQuotes(value: unknown, balances: MexcBalance[], now: number): Record<string, MexcQuote> {
+  if (!Array.isArray(value) || value.length > 20000) sourceFailure('ticker-shape');
   const quotes: Record<string, MexcQuote> = {},
     wanted = new Set(balances.map((b) => b.asset + 'USDT'));
   for (const raw of value) {
     const item = holdingsObject(raw);
     if (typeof item.symbol !== 'string' || !wanted.has(item.symbol)) continue;
     const symbol = item.symbol.slice(0, -4) + '/USDT';
-    if (symbol in quotes) throw new MexcError('source', 502);
+    if (symbol in quotes) sourceFailure('duplicate-quote');
     const price = mexcDecimal(item.price);
     if (price !== '0')
       quotes[symbol] = {
@@ -302,10 +495,14 @@ export async function handleMexc(
       configured: !!master && /^[A-Za-z0-9+/]{43}=$/.test(master),
     });
   }
-  const accountId = operation === 'connect' ? validateHoldingAccount(body.account).id : holdingsId(body.accountId);
+  const accountId =
+    operation === 'connect' ? validateHoldingAccount(body.account).id : holdingsId(body.accountId);
   if (operation === 'disconnect') {
     const row = await database(db, owner, 'disconnect', { accountId });
-    return { ...publicState(row), document: validateHoldingsDocument(row.document) };
+    return {
+      ...publicState(row),
+      document: validateHoldingsDocument(row.document),
+    };
   }
   if (operation === 'apply') {
     const costs = holdingsObject(body.costs);
@@ -320,7 +517,10 @@ export async function handleMexc(
       expectedRevision,
       costs,
     });
-    return { ...publicState(row), document: validateHoldingsDocument(row.document) };
+    return {
+      ...publicState(row),
+      document: validateHoldingsDocument(row.document),
+    };
   }
   if (operation !== 'connect' && operation !== 'sync') throw new MexcError('invalid');
   const key = await encryptionKey(master);
@@ -347,14 +547,18 @@ export async function handleMexc(
   const controller = new AbortController(),
     timeout = setTimeout(() => controller.abort(), 9000);
   try {
-    assertReadOnlyKey(await readMexc('/api/v3/apiKeyInfo', fetcher, controller.signal, now(), auth), auth.apiKey);
-    const balances = parseMexcBalances(await readMexc('/api/v3/account', fetcher, controller.signal, now(), auth));
-    const quotes = quotesFrom(
-      await readMexc('/api/v3/ticker/price', fetcher, controller.signal, now()),
-      balances,
-      now(),
+    const info = await readMexc('/api/v3/apiKeyInfo', fetcher, controller.signal, now(), auth);
+    assertReadOnlyKey(info.value, auth.apiKey, info.status, info.diagnosticValue);
+    const accountResponse = await readMexc('/api/v3/account', fetcher, controller.signal, now(), auth);
+    const balances = parseMexcBalances(
+      accountResponse.value,
+      accountResponse.status,
+      accountResponse.diagnosticValue,
     );
-    const envelope = operation === 'connect' ? await encryptMexcCredentials(auth, key, owner, accountId) : undefined;
+    const ticker = await readMexc('/api/v3/ticker/price', fetcher, controller.signal, now());
+    const quotes = quotesFrom(ticker.value, balances, now(), ticker.status, ticker.diagnosticValue);
+    const envelope =
+      operation === 'connect' ? await encryptMexcCredentials(auth, key, owner, accountId) : undefined;
     try {
       await authorize();
     } catch {
@@ -370,22 +574,33 @@ export async function handleMexc(
       balances,
       quotes,
     });
-    return { ...publicState(row), document: validateHoldingsDocument(row.document) };
+    return {
+      ...publicState(row),
+      document: validateHoldingsDocument(row.document),
+    };
   } catch (error) {
     // No raw network errors, signed URLs, credentials, or balances enter logs.
     if (error instanceof MexcError && error.retryAfter) {
       try {
-        await database(db, owner, 'backoff', { requestId, seconds: error.retryAfter });
+        await database(db, owner, 'backoff', {
+          requestId,
+          seconds: error.retryAfter,
+        });
       } catch {
         /* Fail closed; do not retry upstream. */
       }
     }
     if (error instanceof MexcError) throw error;
+    diagnostic('account', null, undefined, 'unexpected-internal-response');
     throw new MexcError('source', 502);
   } finally {
     clearTimeout(timeout);
   }
 }
 function publicState(row: Record<string, unknown>) {
-  return validateMexcState({ connections: row.connections, retryAt: row.retryAt, configured: true });
+  return validateMexcState({
+    connections: row.connections,
+    retryAt: row.retryAt,
+    configured: true,
+  });
 }
