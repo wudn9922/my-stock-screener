@@ -92,7 +92,7 @@ export const MEXC_ERRORS = {
   setup: 'MEXC 同步尚未啟用，請由維護者完成設定。',
   permission: '請使用只含讀取權限的 MEXC API 金鑰，不可包含交易、提幣或其他寫入權限。',
   authorization: '雲端儲存授權已變更，請重新開啟 Atlas 確認。',
-  credentials: 'MEXC 金鑰無法驗證，請確認金鑰、期限與 IP 白名單。',
+  credentials: 'MEXC API Key 已失效，請到 MEXC 重新建立唯讀 Key 後重新填入',
   source: 'MEXC 暫時無法讀取，已保留原本持股，請稍後重試。',
   limit: 'MEXC 同步次數或持股數量已達限制，請稍後再試。',
   conflict: '持股或 MEXC 連線已更新，請重新載入後再操作。',

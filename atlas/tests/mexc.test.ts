@@ -52,7 +52,7 @@ describe('MEXC cryptography and response validation', () => {
     expect(a).not.toEqual(b);
     expect(JSON.stringify(a)).not.toMatch(/test-mexc/);
     expect(await decryptMexcCredentials(a, key, MEXC_USER, MEXC_ACCOUNT.id)).toEqual(data);
-    await expect(decryptMexcCredentials(a, key, OTHER_USER, MEXC_ACCOUNT.id)).rejects.toThrow('無法驗證');
+    await expect(decryptMexcCredentials(a, key, OTHER_USER, MEXC_ACCOUNT.id)).rejects.toThrow('MEXC API Key 已失效');
     await expect(decryptMexcCredentials(a, key, MEXC_USER, '22222222-2222-4222-8222-222222222222')).rejects.toThrow();
     const tampered = { ...a, data: (a.data[0] === 'A' ? 'B' : 'A') + a.data.slice(1) };
     await expect(decryptMexcCredentials(tampered, key, MEXC_USER, MEXC_ACCOUNT.id)).rejects.toThrow();
