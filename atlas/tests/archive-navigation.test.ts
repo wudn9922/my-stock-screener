@@ -64,7 +64,8 @@ describe('archive document cancellation', () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementationOnce(async (_url, init) => {
       networkSignal = init!.signal!;
       return new Promise(resolve => { finish = resolve; });
-    }).mockResolvedValue(new Response(csv));
+    }).mockImplementation(async url => String(url).endsWith('market-closures.json')
+      ? new Response('', { status: 404 }) : new Response(csv));
     const archive = new KlineArchive({ page: new EventTarget(), fetcher, cache: false });
     const chart = new AbortController();
     const cancelled = expect(archive.getDaily('AAPL', undefined, chart.signal)).rejects.toMatchObject({ name: 'AbortError' });
@@ -74,7 +75,8 @@ describe('archive document cancellation', () => {
     finish(Response.json(index));
     await cancelled;
     expect((await active)?.bars).toHaveLength(1);
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher.mock.calls.filter(([url]) => !String(url).endsWith('market-closures.json'))).toHaveLength(2);
   });
 
   it.each(['404', '503', 'network', 'timeout'])('still falls back on genuine %s unavailability', async failure => {

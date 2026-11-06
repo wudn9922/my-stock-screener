@@ -8,6 +8,8 @@
 
 實測：原相關Python套件273項通過；最後追加的成交證據保留案例以14項休市專項重驗。完整Vitest154檔／1,931項通過，lint／typecheck／一般與Pages建置通過。受影響桌機／390px Chromium／iPhone WebKit 51項、375px兩引擎16項，合計67項瀏覽器通過。未新增skip、增加timeout或放寬原數值斷言；原SEC測試在首輪高負載超時，減少並行後以原設定完整重跑通過。
 
+合入最新main `e2ea0322c5` 後再次驗證：122項Python（休市、警示、交易時段、指數讀取器、封存）與155檔／1,942項Vitest全部通過；lint、typecheck、一般／Pages建置通過；11/04日週月保留案例在桌機、390px Chromium／WebKit、375px Chromium／WebKit共5項通過。新main的archive取消測試為每個實際請求建立獨立Response，補入休市policy請求，保留單一消費者取消不影響其他消費者的原斷言。
+
 新增案例涵蓋11/04指數缺列但100檔股票成交時不休市、stage正常帶出11/04、scanner更正舊policy、前端日週月不排除11/04；10/23全部零量、10/26完全無股票觀測仍判休市。5%與50檔門檻均測，舊成交證據的數值在次日保留。
 
 [桌機11/04](docs/screenshots/market-closures/index-gap-desktop.png)、[390px Chromium](docs/screenshots/market-closures/index-gap-chromium390.png)、[390px WebKit](docs/screenshots/market-closures/index-gap-iphone390.png)、[375px Chromium](docs/screenshots/market-closures/index-gap-chromium375.png)、[375px WebKit](docs/screenshots/market-closures/index-gap-iphone375.png) 是合成行情版面／截止日證明，不是實體iPhone或正式行情驗收。未改登入、Supabase、GCP、永久資料、突破舊快照或前瞻log；不合併、不部署、不執行正式workflow。
