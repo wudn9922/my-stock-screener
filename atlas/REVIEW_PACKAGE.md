@@ -1,3 +1,13 @@
+## WebKit 研究頁面導頁回退（2026-11-06）
+
+Primary self-review only；沒有獨立簽核。從 main `afe469f5229fd66b3515cfa473053dd81480a229` 建立 `codex/webkit-research-smoke`，只推 PR、不合併或部署。
+
+根因為 WebKit 在 `pagehide` 前取消 archive，TypeError 被轉成缺檔回退，導致停止中的文件啟動新 manifest fetch。獨立 Node HTTP + 真實 provider 可重現，排除 Python 預覽回應／Range；完整時序與前後各20次逐次證據見 [RESEARCH_PAGES_WEBKIT.md](docs/RESEARCH_PAGES_WEBKIT.md)。
+
+審查重點：共用下載的 owner 是文件，單一圖表不能取消其他訂閱；listener 覆蓋本文且在 finally 移除；取消不可被年度 allSettled 的部分成功掩蓋；只有取消的 index 拒絕會清除以供重試。beforeunload 不阻止導頁、不新增提示，取消離頁後可重讀，BFCache 舊測試保留。真正的404／503／網路／逾時仍回退。
+
+原 smoke 只加輸出路徑選項，所有旅程、pageerror 收集與斷言完全保留；沒有改既有 unit/e2e spec、伺服器、workflow、Supabase 或正式資料。新真實 HTTP 回歸透過既有 test:research-pages 指令接入 CI。確切檢查計數列於 PR 與 proof；不是實體 iPhone Safari 簽核。
+
 ## 市場多頭末期警示與波段計數（2026-11-05）
 
 Primary self-review only；沒有獨立模型或 Claude 簽核。分支從 main `e28a5bed4cb87468f7ae7c71bf7a0ca4a88d0d64` 建立；一個 PR，不合併、不部署、不觸發正式排程。
