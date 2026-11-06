@@ -351,7 +351,8 @@ class CaptureFlowTest(unittest.TestCase):
         # 驗證頁沒有被截圖，只截了 Barron's 一張，且是 JPEG
         self.assertEqual(len(page.screenshots), 1)
         self.assertEqual(page.screenshots[0]["type"], "jpeg")
-        publish.assert_called_once()
+        # 截圖本身不發佈；去重複與發佈由 capture_prepare_and_publish 負責
+        publish.assert_not_called()
 
     def test_wsj_goes_through_wayback(self):
         page = SequencedPage(first_is_blocked=False)
@@ -362,7 +363,12 @@ class CaptureFlowTest(unittest.TestCase):
         self.assertTrue(
             page.goto_urls[0].startswith("https://web.archive.org/web/")
         )
-        self.assertEqual(page.goto_urls[1], "https://www.barrons.com")
+        # 2026-11-05 起 Barron's 直接連線回 401，比照 WSJ 改截 Wayback
+        self.assertTrue(
+            page.goto_urls[1].startswith("https://web.archive.org/web/")
+        )
+        self.assertTrue(page.goto_urls[1].endswith("if_/https://www.barrons.com"))
+        self.assertTrue(all(c.get("snapshot") for c in captured))
 
     def test_unscrollable_page_is_rejected(self):
         page = FakePage([FakeFrame("Top stories")], scroll_y=0)
@@ -417,7 +423,8 @@ if __name__ == "__main__":
 
 
 class PublishScreenshotsTest(unittest.TestCase):
-    ITEMS = [{"name": "WSJ", "path": "docs/wsj.jpg", "url": None}]
+    ITEMS = [{"name": "WSJ", "path": "docs/wsj.jpg", "url": None,
+              "publish_path": "docs/news/wsj-20261106-0123456789ab.jpg"}]
 
     def publish(self, env, returncode=0):
         calls = []
@@ -444,9 +451,11 @@ class PublishScreenshotsTest(unittest.TestCase):
         self.assertEqual(calls[0][1:], [
             "scripts/generated_branch.py", "publish", "screenshots",
         ])
-        self.assertTrue(items[0]["url"].startswith(
-            "https://raw.githubusercontent.com/o/r/generated/docs/wsj.jpg?v="
-        ))
+        # 專屬檔名、不帶 ?v=：舊 LINE 訊息重新讀取時仍是當天那張
+        self.assertEqual(
+            items[0]["url"],
+            "https://raw.githubusercontent.com/o/r/generated/docs/news/wsj-20261106-0123456789ab.jpg",
+        )
 
     def test_generated_mode_failure_omits_image_url(self):
         items, _ = self.publish(
@@ -463,4 +472,119 @@ class PublishScreenshotsTest(unittest.TestCase):
         })
 
         self.assertTrue(any(c[:2] == ["git", "push"] for c in calls))
-        self.assertIn("/o/r/main/docs/wsj.jpg", items[0]["url"])
+        self.assertIn("/o/r/main/docs/news/wsj-20261106-0123456789ab.jpg", items[0]["url"])
+        self.assertIn(["git", "add", "-A", "-f", "--", "docs/news"], calls)
+
+
+class NewsDedupTest(unittest.TestCase):
+    """每天送出的圖另存不覆寫的檔名；相同或失敗的來源只寫「今日無新聞」。"""
+
+    NOW = datetime(2026, 11, 6, 9, 30, tzinfo=timezone.utc)
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = self.tmp.name
+        self.news = os.path.join(self.root, "news")
+
+    def shot(self, name, content):
+        path = os.path.join(self.root, f"{name}.jpg")
+        with open(path, "wb") as f:
+            f.write(content)
+        return path
+
+    def prepare(self, captured, failures, state, now=None):
+        return dify_report.prepare_news_items(captured, failures, now or self.NOW, state, news_dir=self.news)
+
+    def test_new_image_gets_an_immutable_dated_fingerprint_name(self):
+        state = {"version": 1, "sources": {}}
+        item = {"name": "Barron's", "path": self.shot("barrons", b"day1"), "url": None, "snapshot": "x"}
+        send, no_news = self.prepare([item], [], state)
+        self.assertEqual(no_news, [])
+        self.assertEqual(len(send), 1)
+        digest = dify_report.file_sha256(item["path"])
+        expected = f"{self.news}/barrons-20261106-{digest[:12]}.jpg"
+        self.assertEqual(send[0]["publish_path"], expected)
+        with open(expected, "rb") as f:
+            self.assertEqual(f.read(), b"day1")
+        self.assertEqual(state["sources"]["Barron's"]["sha256"], digest)
+        self.assertEqual(state["sources"]["Barron's"]["failStreak"], 0)
+
+    def test_identical_image_is_not_sent_again(self):
+        state = {"version": 1, "sources": {}}
+        first = {"name": "WSJ", "path": self.shot("wsj", b"same"), "url": None}
+        self.prepare([first], [], state)
+        send, no_news = self.prepare([dict(first)], [], state, self.NOW + timedelta(days=1))
+        self.assertEqual(send, [])
+        self.assertEqual(no_news, [{"name": "WSJ", "reason": "same", "streak": 0}])
+        self.assertEqual(dify_report.no_news_lines(no_news), "📰 WSJ：今日無新聞")
+
+    def test_changed_image_is_sent_with_a_new_name_and_old_file_kept(self):
+        state = {"version": 1, "sources": {}}
+        path = self.shot("wsj", b"day1")
+        first, _ = self.prepare([{"name": "WSJ", "path": path, "url": None}], [], state)
+        self.shot("wsj", b"day2")
+        second, _ = self.prepare([{"name": "WSJ", "path": path, "url": None}], [], state, self.NOW + timedelta(days=1))
+        self.assertNotEqual(first[0]["publish_path"], second[0]["publish_path"])
+        self.assertTrue(os.path.exists(first[0]["publish_path"]))
+        self.assertIn("-20261107-", second[0]["publish_path"])
+
+    def test_failures_count_consecutive_days_and_notice_only_on_day_one_and_seven(self):
+        state = {"version": 1, "sources": {}}
+        lines = []
+        for day in range(1, 9):
+            _, no_news = self.prepare([], [{"name": "Barron's", "reason": "401"}], state,
+                                      self.NOW + timedelta(days=day))
+            lines.append(dify_report.no_news_lines(no_news))
+        self.assertIn("網站擋下截圖", lines[0])
+        self.assertNotIn("連續", lines[0])
+        self.assertTrue(all(line == "📰 Barron's：今日無新聞" for line in lines[1:6] + lines[7:]))
+        self.assertIn("已連續 7 天", lines[6])
+        # 恢復成功後連續失敗歸零
+        item = {"name": "Barron's", "path": self.shot("barrons", b"back"), "url": None}
+        self.prepare([item], [], state)
+        self.assertEqual(state["sources"]["Barron's"]["failStreak"], 0)
+
+    def test_prune_keeps_recent_and_unrelated_files(self):
+        os.makedirs(self.news)
+        names = ["wsj-20261006-aaaaaaaaaaaa.jpg", "wsj-20261007-bbbbbbbbbbbb.jpg",
+                 "wsj-20261106-cccccccccccc.jpg", "keep-me.jpg"]
+        for name in names:
+            open(os.path.join(self.news, name), "wb").close()
+        removed = dify_report.prune_news_files(self.NOW, self.news, keep_days=30)
+        self.assertEqual(removed, [f"{self.news}/wsj-20261006-aaaaaaaaaaaa.jpg"])
+        self.assertEqual(sorted(os.listdir(self.news)), sorted(names[1:]))
+
+    def test_state_roundtrip_and_corrupt_state_starts_fresh(self):
+        path = os.path.join(self.root, "state.json")
+        dify_report.save_news_state({"version": 1, "sources": {"WSJ": {"sha256": "x"}}}, path)
+        self.assertEqual(dify_report.load_news_state(path)["sources"]["WSJ"]["sha256"], "x")
+        with open(path, "w") as f:
+            f.write("{broken")
+        self.assertEqual(dify_report.load_news_state(path), {"version": 1, "sources": {}})
+
+    def test_full_flow_publishes_state_even_without_new_images(self):
+        old_cwd = os.getcwd()
+        os.chdir(self.root)
+        self.addCleanup(os.chdir, old_cwd)
+        os.makedirs("docs")
+        with open("docs/wsj.jpg", "wb") as f:
+            f.write(b"wsj")
+        captured = [{"name": "WSJ", "path": "docs/wsj.jpg", "url": None}]
+        failures = [{"name": "Barron's", "reason": "HTTP 401"}]
+        with mock.patch.object(dify_report, "capture_and_upload_screenshots",
+                               return_value=(captured, failures)), \
+             mock.patch.object(dify_report, "publish_screenshots") as publish:
+            send, no_news = dify_report.capture_prepare_and_publish(self.NOW)
+            self.assertEqual([i["name"] for i in send], ["WSJ"])
+            self.assertTrue(os.path.exists(send[0]["publish_path"]))
+            self.assertEqual([n["name"] for n in no_news], ["Barron's"])
+            publish.assert_called_once_with(send)
+            # 隔天同一張 WSJ：不送圖，但仍發佈狀態檔
+            send2, no_news2 = dify_report.capture_prepare_and_publish(self.NOW + timedelta(days=1))
+        self.assertEqual(send2, [])
+        self.assertEqual([(n["name"], n["reason"]) for n in no_news2], [("WSJ", "same"), ("Barron's", "failed")])
+        self.assertEqual(publish.call_count, 2)
+        state = dify_report.load_news_state()
+        self.assertEqual(state["sources"]["Barron's"]["failStreak"], 2)
