@@ -1,0 +1,1088 @@
+{
+  "baselineSource": "2e8799ba4dc9fa01c4d1e617ab79a551b0c6d21c",
+  "project": "iphone375-webkit",
+  "viewport": {
+    "width": 375,
+    "height": 667
+  },
+  "environment": {
+    "os": "Debian 13",
+    "node": "24.19.0",
+    "playwright": "1.63.0",
+    "webkit": "26.6 build 2359"
+  },
+  "commandOptions": {
+    "repeatEach": 20,
+    "workers": 1,
+    "retries": 0,
+    "trace": "on",
+    "testTimeoutMs": 60000,
+    "expectTimeoutMs": 10000
+  },
+  "normalRuns": {
+    "before": [
+      {
+        "run": 1,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 7774,
+        "startTime": "2026-11-06T07:26:17.802Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "09233a68694ebb12714c970238104fa9a3a2ead179bebbb7d7f5080c02fd0806"
+      },
+      {
+        "run": 2,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 7777,
+        "startTime": "2026-11-06T07:26:26.813Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "d61cb78cc5bc982dd7e6a8b7542d990e857666b7434b20a83b254e78691bd75a"
+      },
+      {
+        "run": 3,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8344,
+        "startTime": "2026-11-06T07:26:35.806Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "aaf430c2a7426195c0238f478248285d3aee1f0112a8c37cda39795c87f4ddaf"
+      },
+      {
+        "run": 4,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8505,
+        "startTime": "2026-11-06T07:26:45.318Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "04b545d718337e9fbbb5e1df6099b8d82e45d27e2d493ad50bd6e61928bfdeb5"
+      },
+      {
+        "run": 5,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 9154,
+        "startTime": "2026-11-06T07:26:55.055Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "4b9e90599b17669c95b3a513de5f0f727bfb0d1d2988fa3a1b91aa98f9debcf4"
+      },
+      {
+        "run": 6,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8374,
+        "startTime": "2026-11-06T07:27:05.540Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "1e76f7e138976afaf1cc54a23b021d144adbe0f2c396605f01e5b81136538a7a"
+      },
+      {
+        "run": 7,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8884,
+        "startTime": "2026-11-06T07:27:15.153Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "7fa437e50757315b15bae528298d12af9710157747641d1383ed84b9598ef5a2"
+      },
+      {
+        "run": 8,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 7961,
+        "startTime": "2026-11-06T07:27:25.249Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "870a137f19f1b53ac2e68fd95ced99538763461d90879d9a4c7dc48e76b2ff5e"
+      },
+      {
+        "run": 9,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8092,
+        "startTime": "2026-11-06T07:27:34.330Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "40a916ca3db620c014d95e0baf3ca45a08ba04274cb2be38fe9b580a12e49088"
+      },
+      {
+        "run": 10,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8593,
+        "startTime": "2026-11-06T07:27:43.570Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "6327763d77c987fc0f24cdf1c4d94e419c5755ed8ab14d77952cb1a142d1a94b"
+      },
+      {
+        "run": 11,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8374,
+        "startTime": "2026-11-06T07:27:53.294Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "4fdc998915ef193804f8221692fbb2cc3bf66d93fbed65f863fe03d2762f6c48"
+      },
+      {
+        "run": 12,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8187,
+        "startTime": "2026-11-06T07:28:02.997Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "5863e155617554602469233a9eea0e213bdc0e10113506e51e4edcfa2ea195f4"
+      },
+      {
+        "run": 13,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8054,
+        "startTime": "2026-11-06T07:28:12.414Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "19792fdaf85db8bcf8418c56925248b03400e61eee4efa6d470aeee5b596d02e"
+      },
+      {
+        "run": 14,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8243,
+        "startTime": "2026-11-06T07:28:21.709Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "2c0bcd3c2a36ef4e4c051b052d7ad8731e5d308eb4d0feaed9efa06868827cc1"
+      },
+      {
+        "run": 15,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8629,
+        "startTime": "2026-11-06T07:28:31.128Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "08622aa537936bc6606e94b8c5ba49830e9e3bfb13e50d1c384eeb6feb107617"
+      },
+      {
+        "run": 16,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8560,
+        "startTime": "2026-11-06T07:28:41.043Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "6fc382760c94abd8eebfdee5a94730bd985b2c13b4a6c64b1efb3b0854728e36"
+      },
+      {
+        "run": 17,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8233,
+        "startTime": "2026-11-06T07:28:50.868Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "4dc73481fdf33db65630620f065ee3e38bbe30cc2c284d281a48727dc9c46027"
+      },
+      {
+        "run": 18,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8216,
+        "startTime": "2026-11-06T07:29:00.352Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "e29f0c3951b13b74b4d2dc5f302ab63f02dda55d3dd045472aa0b159054c3567"
+      },
+      {
+        "run": 19,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8156,
+        "startTime": "2026-11-06T07:29:09.809Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "92d596d40e267981924db60f4a182585a10fbe8fc82aa6444aa8bdb3ebcf1d73"
+      },
+      {
+        "run": 20,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 7878,
+        "startTime": "2026-11-06T07:29:19.147Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "dc383ffa865940d58bd5f1159e29fd56812980cd167a65aea3d0c0cedc650371"
+      }
+    ],
+    "after": [
+      {
+        "run": 1,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8623,
+        "startTime": "2026-11-06T07:41:19.075Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "0b628a27728d55b6d697848c75c412830544cdf967df86a11f90b7b9ef8f8bf2"
+      },
+      {
+        "run": 2,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 7743,
+        "startTime": "2026-11-06T07:41:28.957Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "87a4f457fb83f707152065fab2b8d5bb95660c6cd2474ad8f9024b4e4051dbd5"
+      },
+      {
+        "run": 3,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 7939,
+        "startTime": "2026-11-06T07:41:37.833Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "4167a05371f2281c7c88274d340f3489b5c0b6ab84dc96f0a361bdcd3741bc46"
+      },
+      {
+        "run": 4,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8349,
+        "startTime": "2026-11-06T07:41:46.886Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "557fd545a84180395b02b4ee32a158cc56d08d3fb1c5540937ebf17f6d0c4546"
+      },
+      {
+        "run": 5,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8051,
+        "startTime": "2026-11-06T07:41:56.369Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "32b39dcf20338332df85ebf91d4272fdca000aecaf50637081dccdc0acecbcf8"
+      },
+      {
+        "run": 6,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8320,
+        "startTime": "2026-11-06T07:42:05.524Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "39daccd921ad6073797081c91896567d197bebc9118639109cecd9cf97db8885"
+      },
+      {
+        "run": 7,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8131,
+        "startTime": "2026-11-06T07:42:14.990Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "12d1ae5730c15433326b249339ec2c0c99c9980a7113ba817ce65fdf4037b618"
+      },
+      {
+        "run": 8,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8551,
+        "startTime": "2026-11-06T07:42:24.267Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "a3042b63f042b3ec23eb5a5858573924e190cdfed632c8d4c6f2a76ea020f0da"
+      },
+      {
+        "run": 9,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8344,
+        "startTime": "2026-11-06T07:42:33.991Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "2a4848d3e67298f1285723d9929f82a10a32d23ec109d0ec0efa68a16225481c"
+      },
+      {
+        "run": 10,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 7768,
+        "startTime": "2026-11-06T07:42:43.537Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "dc273676e977d80e9fd6d9e41ac28c50648d3e2f67dddebef1d976dbe6849bc8"
+      },
+      {
+        "run": 11,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8305,
+        "startTime": "2026-11-06T07:42:52.463Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "eeb2539da45c462098fda3d420bfc9be1a7713fb41df7a9ab64e6827970479d5"
+      },
+      {
+        "run": 12,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8181,
+        "startTime": "2026-11-06T07:43:01.931Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "acb3e0988656ef3ae27857e215277c922c7e190bde4a383b1b29dd53ffef50e7"
+      },
+      {
+        "run": 13,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8336,
+        "startTime": "2026-11-06T07:43:11.352Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "3a887112be45afa164d38367a2db30a126e40a8cedba2e5b4f3008703df38f2d"
+      },
+      {
+        "run": 14,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8006,
+        "startTime": "2026-11-06T07:43:20.820Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "ad3eeb6a5f32792db3a8eb1616dda2cd4ad831c5ad87032cad528d4a96df92b5"
+      },
+      {
+        "run": 15,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8177,
+        "startTime": "2026-11-06T07:43:29.971Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "f2f5f39f5f88f73059c459c7cd8497b214b0dc921c07a6f249b37d55c5d951c3"
+      },
+      {
+        "run": 16,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 7793,
+        "startTime": "2026-11-06T07:43:39.339Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "4425fcef05e7796f5552b539982700c869e3fb77d09a84c34678e37fddc9674e"
+      },
+      {
+        "run": 17,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8044,
+        "startTime": "2026-11-06T07:43:48.246Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "7109510431b76d80680c22abdf517eda20937e21a8045f176d06e4badc03d4f4"
+      },
+      {
+        "run": 18,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 7989,
+        "startTime": "2026-11-06T07:43:57.431Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "e5fdbb64cb7fc64fcbff936558a9e69c638cecf3c3c6ed770b9bcff6744e9cee"
+      },
+      {
+        "run": 19,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8221,
+        "startTime": "2026-11-06T07:44:06.520Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "3e00ea94091ec3eca885907f8984fbf1bd6478866a611d641383735a4be6fb6e"
+      },
+      {
+        "run": 20,
+        "title": "cloud explicitly merges old settings, preserves account conflicts, and can rerun without duplicates",
+        "project": "iphone375-webkit",
+        "status": "passed",
+        "durationMs": 8037,
+        "startTime": "2026-11-06T07:44:15.872Z",
+        "retry": 0,
+        "errors": [],
+        "traceSha256": "ae2b15650f548ed4969f6330f52552ac50a540ad82011ce2cf4b1de56e8560b4"
+      }
+    ]
+  },
+  "normalTotals": {
+    "before": {
+      "passed": 20,
+      "failed": 0,
+      "flaky": 0,
+      "skipped": 0,
+      "durationMs": 202462.367,
+      "rawReportSha256": "82ec28cb6ccf9c22479f62997733749f655095129805bbd923ff90a5e07239cd"
+    },
+    "after": {
+      "passed": 20,
+      "failed": 0,
+      "flaky": 0,
+      "skipped": 0,
+      "durationMs": 195246.217,
+      "rawReportSha256": "3e69d23255ba0118619449bf1d4fe9f3f996093496707580bba1bae17e69e725"
+    }
+  },
+  "controlledReproduction": {
+    "before": {
+      "status": "failed",
+      "durationMs": 14234,
+      "retry": 0,
+      "errors": [
+        {
+          "location": {
+            "file": "/workspace/my-stock-screener/atlas/test-results/legacy-import-race-source-1793951127408/legacy-import-race.spec.ts",
+            "column": 24,
+            "line": 218
+          },
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('legacy-import-card')\nExpected pattern: \u001b[32m/匯入完成|已匯入/\u001b[39m\nReceived string:  \u001b[31m\"這台裝置有舊版資料（畫線 2、指標 2、清單 3、設定 3），要匯入到你的帳號嗎？匯入暫時不要只新增帳號缺少的項目；衝突保留帳號版本。舊版資料維持原樣，可從控制台重新顯示匯入提示。\"\u001b[39m\nTimeout: 10000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('legacy-import-card') with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('legacy-import-card')\u001b[22m\n\u001b[2m    24 × locator resolved to <aside aria-busy=\"false\" aria-label=\"舊版資料匯入\" class=\"legacy-import-card\" data-testid=\"legacy-import-card\">…</aside>\u001b[22m\n\u001b[2m       - unexpected value \"這台裝置有舊版資料（畫線 2、指標 2、清單 3、設定 3），要匯入到你的帳號嗎？匯入暫時不要只新增帳號缺少的項目；衝突保留帳號版本。舊版資料維持原樣，可從控制台重新顯示匯入提示。\"\u001b[22m\n\n\n  216 |     await page.screenshot({ path: testInfo.outputPath(`legacy-import-${mode}-prompt.png`) });\n  217 |     await page.getByTestId('legacy-import-confirm').click();\n> 218 |     await expect(card).toContainText(/匯入完成|已匯入/);\n      |                        ^\n  219 |     await expect(card).toContainText(/衝突[^。]*[1-9]|[1-9][^。]*衝突/);\n  220 |     const after = await readBrowserData(page, DEVICE_USER_ID, mode);\n  221 |     expect(after.legacy).toEqual(before.legacy);\n    at /workspace/my-stock-screener/atlas/test-results/legacy-import-race-source-1793951127408/legacy-import-race.spec.ts:218:24"
+        }
+      ],
+      "firstPress": [
+        {
+          "event": "input",
+          "type": "pointerdown",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-confirm",
+          "text": "匯入",
+          "consoleReady": false,
+          "cardBusy": "false"
+        },
+        {
+          "event": "input",
+          "type": "pointerup",
+          "trusted": true,
+          "target": "LABEL",
+          "testid": null,
+          "text": "分組台股權值台股熱門美股權值低本益比超級績效美股熱門無分組（固定參數）",
+          "consoleReady": true,
+          "cardBusy": "false"
+        },
+        {
+          "event": "input",
+          "type": "click",
+          "trusted": true,
+          "target": "MAIN",
+          "testid": null,
+          "text": "已登入 · 此帳號已獲雲端儲存授權。登出 Atlas我的自選清單 →均線參數顯示與App資料狀態均線參數與個人分組參數使用說明各自設定股票、分組及均線。只有允許",
+          "consoleReady": true,
+          "cardBusy": "false"
+        }
+      ],
+      "events": [
+        {
+          "event": "request",
+          "action": "access.get"
+        },
+        {
+          "event": "request",
+          "action": "atlas.list"
+        },
+        {
+          "event": "request",
+          "action": "stocks.list"
+        },
+        {
+          "event": "input",
+          "type": "pointerdown",
+          "trusted": true,
+          "target": "svg",
+          "testid": null,
+          "text": "",
+          "consoleReady": false
+        },
+        {
+          "event": "input",
+          "type": "pointerup",
+          "trusted": true,
+          "target": "svg",
+          "testid": null,
+          "text": "",
+          "consoleReady": false
+        },
+        {
+          "event": "input",
+          "type": "click",
+          "trusted": true,
+          "target": "svg",
+          "testid": null,
+          "text": "",
+          "consoleReady": false
+        },
+        {
+          "event": "input",
+          "type": "pointerdown",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-confirm",
+          "text": "匯入",
+          "consoleReady": false,
+          "cardBusy": "false"
+        },
+        {
+          "event": "request",
+          "action": "groups.list"
+        },
+        {
+          "event": "request",
+          "action": "stocks.list"
+        },
+        {
+          "event": "request",
+          "action": "stocks.list"
+        },
+        {
+          "event": "request",
+          "action": "watchlists.save"
+        },
+        {
+          "event": "input",
+          "type": "pointerup",
+          "trusted": true,
+          "target": "LABEL",
+          "testid": null,
+          "text": "分組台股權值台股熱門美股權值低本益比超級績效美股熱門無分組（固定參數）",
+          "consoleReady": true,
+          "cardBusy": "false"
+        },
+        {
+          "event": "input",
+          "type": "click",
+          "trusted": true,
+          "target": "MAIN",
+          "testid": null,
+          "text": "已登入 · 此帳號已獲雲端儲存授權。登出 Atlas我的自選清單 →均線參數顯示與App資料狀態均線參數與個人分組參數使用說明各自設定股票、分組及均線。只有允許",
+          "consoleReady": true,
+          "cardBusy": "false"
+        }
+      ],
+      "rawReportSha256": "1de8f38b5efce1f3c3b039fb2b1c146510f8a1a5d86cbe062cde7258032eb3f2",
+      "traceSha256": "d064a8da58afc3b73d59b52e4234c3925e83dc32e914fa7edd78912d3422b5c1"
+    },
+    "after": {
+      "status": "passed",
+      "durationMs": 12867,
+      "retry": 0,
+      "errors": [],
+      "firstPress": [
+        {
+          "event": "input",
+          "type": "pointerdown",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-confirm",
+          "text": "匯入",
+          "consoleReady": true,
+          "cardBusy": "false"
+        },
+        {
+          "event": "input",
+          "type": "pointerup",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-confirm",
+          "text": "匯入",
+          "consoleReady": true,
+          "cardBusy": "false"
+        },
+        {
+          "event": "input",
+          "type": "click",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-confirm",
+          "text": "匯入",
+          "consoleReady": true,
+          "cardBusy": "false"
+        }
+      ],
+      "events": [
+        {
+          "event": "request",
+          "action": "access.get"
+        },
+        {
+          "event": "request",
+          "action": "atlas.list"
+        },
+        {
+          "event": "request",
+          "action": "stocks.list"
+        },
+        {
+          "event": "input",
+          "type": "pointerdown",
+          "trusted": true,
+          "target": "svg",
+          "testid": null,
+          "text": "",
+          "consoleReady": false
+        },
+        {
+          "event": "input",
+          "type": "pointerup",
+          "trusted": true,
+          "target": "svg",
+          "testid": null,
+          "text": "",
+          "consoleReady": false
+        },
+        {
+          "event": "input",
+          "type": "click",
+          "trusted": true,
+          "target": "svg",
+          "testid": null,
+          "text": "",
+          "consoleReady": false
+        },
+        {
+          "event": "request",
+          "action": "groups.list"
+        },
+        {
+          "event": "request",
+          "action": "stocks.list"
+        },
+        {
+          "event": "request",
+          "action": "stocks.list"
+        },
+        {
+          "event": "request",
+          "action": "watchlists.save"
+        },
+        {
+          "event": "input",
+          "type": "pointerdown",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-confirm",
+          "text": "匯入",
+          "consoleReady": true,
+          "cardBusy": "false"
+        },
+        {
+          "event": "input",
+          "type": "pointerup",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-confirm",
+          "text": "匯入",
+          "consoleReady": true,
+          "cardBusy": "false"
+        },
+        {
+          "event": "input",
+          "type": "click",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-confirm",
+          "text": "匯入",
+          "consoleReady": true,
+          "cardBusy": "false"
+        },
+        {
+          "event": "request",
+          "action": "access.get"
+        },
+        {
+          "event": "request",
+          "action": "watchlists.list"
+        },
+        {
+          "event": "request",
+          "action": "watchlists.save"
+        },
+        {
+          "event": "request",
+          "action": "atlas.save"
+        },
+        {
+          "event": "request",
+          "action": "access.get"
+        },
+        {
+          "event": "request",
+          "action": "access.get"
+        },
+        {
+          "event": "request",
+          "action": "atlas.list"
+        },
+        {
+          "event": "request",
+          "action": "stocks.list"
+        },
+        {
+          "event": "input",
+          "type": "pointerdown",
+          "trusted": true,
+          "target": "svg",
+          "testid": null,
+          "text": "",
+          "consoleReady": false
+        },
+        {
+          "event": "input",
+          "type": "pointerup",
+          "trusted": true,
+          "target": "svg",
+          "testid": null,
+          "text": "",
+          "consoleReady": false
+        },
+        {
+          "event": "input",
+          "type": "click",
+          "trusted": true,
+          "target": "svg",
+          "testid": null,
+          "text": "",
+          "consoleReady": false
+        },
+        {
+          "event": "input",
+          "type": "pointerdown",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-reopen",
+          "text": "重新檢查舊版資料",
+          "consoleReady": false
+        },
+        {
+          "event": "input",
+          "type": "pointerup",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-reopen",
+          "text": "重新檢查舊版資料",
+          "consoleReady": false
+        },
+        {
+          "event": "input",
+          "type": "click",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-reopen",
+          "text": "重新檢查舊版資料",
+          "consoleReady": false
+        },
+        {
+          "event": "request",
+          "action": "groups.list"
+        },
+        {
+          "event": "request",
+          "action": "stocks.list"
+        },
+        {
+          "event": "request",
+          "action": "stocks.list"
+        },
+        {
+          "event": "input",
+          "type": "pointerdown",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-confirm",
+          "text": "匯入",
+          "consoleReady": true,
+          "cardBusy": "false"
+        },
+        {
+          "event": "input",
+          "type": "pointerup",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-confirm",
+          "text": "匯入",
+          "consoleReady": true,
+          "cardBusy": "false"
+        },
+        {
+          "event": "input",
+          "type": "click",
+          "trusted": true,
+          "target": "BUTTON",
+          "testid": "legacy-import-confirm",
+          "text": "匯入",
+          "consoleReady": true,
+          "cardBusy": "false"
+        },
+        {
+          "event": "request",
+          "action": "access.get"
+        },
+        {
+          "event": "request",
+          "action": "watchlists.list"
+        }
+      ],
+      "rawReportSha256": "a126afc7bbb5ab86033797b4a5a9607a07b9dfff34dabdbd90072e61f524ba72",
+      "traceSha256": "1a182415409869f4c646f327ba076b44fac8c4da85f441fe04a2c0a2d75cd0fd"
+    }
+  },
+  "ci": {
+    "run": 42168222865,
+    "attempt": 2,
+    "job": 127741896613,
+    "artifactId": 13481483973,
+    "artifactSha256": "4ba2ca775226d4d87b632fbdfa7c40140dd156af30f5066fce601c731302beb8",
+    "artifactSha256MatchesJobLog": true,
+    "api": [
+      {
+        "time": 141742.511,
+        "action": "access.get",
+        "httpStatus": 200,
+        "failure": null
+      },
+      {
+        "time": 142488.562,
+        "action": "atlas.list",
+        "httpStatus": 200,
+        "failure": null
+      },
+      {
+        "time": 142489.01,
+        "action": "stocks.list",
+        "httpStatus": 200,
+        "failure": null
+      },
+      {
+        "time": 143483.798,
+        "action": "groups.list",
+        "httpStatus": 200,
+        "failure": null
+      },
+      {
+        "time": 143486.386,
+        "action": "stocks.list",
+        "httpStatus": 200,
+        "failure": null
+      },
+      {
+        "time": 143486.632,
+        "action": "stocks.list",
+        "httpStatus": 200,
+        "failure": null
+      },
+      {
+        "time": 143486.805,
+        "action": "watchlists.save",
+        "httpStatus": 200,
+        "failure": null
+      }
+    ],
+    "clickLogs": [
+      {
+        "type": "before",
+        "callId": "call@1732",
+        "startTime": 143329.989,
+        "class": "Frame",
+        "method": "click",
+        "params": {
+          "selector": "internal:testid=[data-testid=\"legacy-import-confirm\"s]",
+          "strict": true
+        },
+        "stepId": "pw:api@66"
+      },
+      {
+        "type": "log",
+        "callId": "call@1732",
+        "time": 143337.476,
+        "message": "waiting for getByTestId('legacy-import-confirm')"
+      },
+      {
+        "type": "log",
+        "callId": "call@1732",
+        "time": 143345.108,
+        "message": "  locator resolved to <button type=\"button\" class=\"primary-button\" data-testid=\"legacy-import-confirm\">匯入</button>"
+      },
+      {
+        "type": "log",
+        "callId": "call@1732",
+        "time": 143345.878,
+        "message": "attempting click action"
+      },
+      {
+        "type": "log",
+        "callId": "call@1732",
+        "time": 143345.917,
+        "message": "  waiting for element to be visible, enabled and stable"
+      },
+      {
+        "type": "log",
+        "callId": "call@1732",
+        "time": 143372.853,
+        "message": "  element is visible, enabled and stable"
+      },
+      {
+        "type": "log",
+        "callId": "call@1732",
+        "time": 143372.86,
+        "message": "  scrolling into view if needed"
+      },
+      {
+        "type": "log",
+        "callId": "call@1732",
+        "time": 143373.453,
+        "message": "  done scrolling"
+      },
+      {
+        "type": "input",
+        "callId": "call@1732",
+        "point": {
+          "x": 57,
+          "y": 488.59
+        },
+        "box": {
+          "x": 29,
+          "y": 466.59375,
+          "width": 56,
+          "height": 44
+        }
+      },
+      {
+        "type": "log",
+        "callId": "call@1732",
+        "time": 143382.701,
+        "message": "  performing click action"
+      },
+      {
+        "type": "log",
+        "callId": "call@1732",
+        "time": 143483.488,
+        "message": "  click action done"
+      },
+      {
+        "type": "log",
+        "callId": "call@1732",
+        "time": 143483.497,
+        "message": "  waiting for scheduled navigations to finish"
+      },
+      {
+        "type": "log",
+        "callId": "call@1732",
+        "time": 143484.256,
+        "message": "  navigations have finished"
+      },
+      {
+        "type": "after",
+        "callId": "call@1732",
+        "endTime": 143484.345
+      }
+    ]
+  },
+  "checks": {
+    "site regressions": {
+      "passed": 63,
+      "failed": 0,
+      "skipped": 0,
+      "logSha256": "86f1f7865604f8b79cefbaf8f590abb8ea8854b9dd6c00dc13ba1521e8e927b3"
+    },
+    "compact legacy import": {
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "logSha256": "4d951bf0da42966ded3be1c2d6f750f761a02de90c49ea67465724c94903767b"
+    },
+    "npm ci": {
+      "status": "passed",
+      "logSha256": "ea1a12bec4c285af2eb4658f287c36ddc9eda19469ed0a15248c5104a4f49d88"
+    },
+    "npm test: 154 files, 1935 tests": {
+      "status": "passed",
+      "logSha256": "0463f70baa1192fa5293b3671b01b79d0d4932dbb0ce8ba0f7fd78b7037a5ca3"
+    },
+    "npm run lint": {
+      "status": "passed",
+      "logSha256": "9cc2767f24ce9e069f13108e832e1429ae3b1d5c924380d714ce5a0a98ec13e5"
+    },
+    "npm run build": {
+      "status": "passed",
+      "logSha256": "c8bb00bf5c9bd75be65f6ca0eacfc87b5de52387ae80dd47d00ac4f0a2f5828c"
+    },
+    "npm run build:pages": {
+      "status": "passed",
+      "logSha256": "039aa8c02bd8a17727b1f55cc0513e823e03f88741884ca2515c139dfa38b119"
+    }
+  },
+  "preservation": {
+    "originalSpecSha256": "5069460bb42a7d59645e7593e3f97999ffa49c2c250cfbdf7ef719bd9b18da50",
+    "fixedSpecSha256": "a79597ac782650c4ac3a9eb4d3d0bc64dec105162b276d778a53e7b86070f7b5",
+    "allOriginalStepsAndAssertionsByteIdenticalAfterRemovingNewGuards": true,
+    "testConfigSha256": "dd620e44850ff89efdadd1b5ea86303ff49dc9590fddf9476cf7a6c0f625d88f",
+    "compactConfigSha256": "9553e9292c1914379f8962d1297eb873d8ff49f2f292111128ba1360761e1185",
+    "raceScriptSha256": "1bd16ade790c5aa381152a3c15c06e3d6481c0ec71de306dd085f50bb4b85e21"
+  },
+  "interpretation": "Normal baseline 20/20 and fixed 20/20 passed. The local baseline did not naturally hit the flake; this is not a measured failure-rate improvement. Causal evidence is the original CI trace plus the controlled native press crossing the lazy-route commit (baseline failed, fix passed).",
+  "excludedStartupFailure": {
+    "casesExecuted": 0,
+    "reason": "npm ci was mistakenly started while the first fixed-cohort runner was importing dependencies; module import failed before test collection. A fresh complete 20-run cohort started after npm ci completed.",
+    "logSha256": "83386b96b537c6cb316bf1bb3ff411d0616a1e727c0eb85498c565c064623a61"
+  },
+  "finalBase": "e2ea0322c584b66ce12be417535bcfa86b150bb0",
+  "inScopeProductionSourcesUnchangedBetweenBrowserCohortBaseAndFinalBase": true
+}
