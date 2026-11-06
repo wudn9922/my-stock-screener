@@ -1,3 +1,31 @@
+## 全市場休市日與假 K 線投影（2026-11-06）
+
+Primary self-review only；沒有獨立模型或 Claude 簽核。分支 `codex/market-closed-session-guard` 起於最新 main `afe469f522`，完成前以正常 fast-forward 納入 main 的資料更新至 `14952fa576`；沒有 rebase／遠端 force-push。只推 PR，不合併、不部署、不執行正式 workflow。
+
+實作、覆蓋限制與唯讀重現命令見 [MARKET_CLOSURES.md](../docs/MARKET_CLOSURES.md)、[ADR-029](docs/architecture/ADR-029-market-closed-session-projection.md)。以主要指數在有效首末範圍內缺日，或至少95%有效普通股零量平盤判定；整份指數失敗、範圍外日期、未知量、少數個股停牌不作休市證據。保留近期覆蓋與最小樣本保護。
+
+唯讀掃描 archive `61fdbdbda0df7f68f9f998ccaa1d65aaaae27fb5`：7,689代號、35,391年檔、7,843,344列，無無效OHLC；唯一含疑似列的日期為台股2026-10-23，共2,214列。普通股1,981／1,981零量平盤，且^TWII缺當天完成bar。美股0列。完整 [JSON報告](../docs/research-verification/market-closure-scan-20261106.json) 已入PR，實測掃描163.866秒。archive checkout前後git status乾淨；沒有寫入、刪除或推送archive。
+
+| 本機檢查 | 實際結果 |
+| --- | --- |
+| 12個相關Python unittest套件（新休市日、原market_sessions／market_warnings、archive／conflicts／expansion、universe_full、breadth／full_market_breadth、breakouts／full_market_breakouts、generated） | 306項通過；包含11項新休市回歸與35項generated真實暫存Git整合 |
+| `pytest tests/test_breadth_signals.py -q` | 24項通過 |
+| `npm ci`、`npm run lint`、`npm run typecheck` | 通過，無新增依賴 |
+| `npm test` | 154檔／1,921項通過 |
+| `npm run build`、Pages建置 | 通過；Pages輸出至dist-pages，沒有替換正式docs/atlas |
+| `actionlint`（universe-full、atlas-review） | 通過 |
+| 日週月封存、Yahoo失敗、#224盤中補洞、休市快照、新休市政策 | 桌機／390px Chromium／iPhone WebKit共27項通過 |
+| 新休市政策＋封存＋盤中補洞的375px兩引擎 | 14項通過 |
+| 原自選47檔／缺檔退路／新股、側邊、連續小圖、資料日期 | 三種原專案共21項通過 |
+
+62項瀏覽器測試全通過；沒有新增skip、增加timeout或放寬既有數值斷言。兩個舊archive單元測試嚴格加上唯一的新metadata GET；原raw CSV內容仍先驗SHA。原閉市單元改為明確給市場證據，保留原數值斷言並新增個股零量不可自行刪除的檢查。Python回歸也確認10/23假列不再讓10/27後領頭羊成功率與突破家數變null、原週末排除數不變、部分欄位的Close讀取規則與完整OHLC驗證不變。
+
+[桌機](docs/screenshots/market-closures/desktop.png)、[390px Chromium](docs/screenshots/market-closures/chromium390.png)、[390px WebKit](docs/screenshots/market-closures/iphone390.png)、[375px Chromium](docs/screenshots/market-closures/chromium375.png)、[375px WebKit](docs/screenshots/market-closures/iphone375.png) 為合成行情的版面／讀取驗證，顯示有效封存截止10/22，當天個別零量停牌仍保留。不是實體iPhone驗證，也不是新的真實行情證據。
+
+review重點：`market_sessions.py`共用判定與投影lineage，避免sector／monthly子集合重新誤判；scanner輸出禁止位於archive內；所有daily cache／bootstrap／ETF補充與stage共用日期；真正拆股transport保留既有休市列原值；警示先縮交易日再算窗口，舊前瞻CSV不回寫。前端先驗raw年檔，再過濾並聚合，live不能把假列加回；cache換版恢復被舊單股判定刪掉的真停牌列。
+
+已知限制：主要指數在有效範圍內的來源孤立缺列依指定OR規則也會被排除，報告公開理由供核對；範圍外且樣本不足保持未知。永久CSV仍有原始假列，僅網站／計算投影排除。未執行正式universe-full，之後正式資料輸出由原排程驗證。登入、Supabase函式／SQL、GCP、永久價格／財報、breakouts既有快照與前瞻log皆無本PR差異。
+
 ## 市場多頭末期警示與波段計數（2026-11-05）
 
 Primary self-review only；沒有獨立模型或 Claude 簽核。分支從 main `e28a5bed4cb87468f7ae7c71bf7a0ca4a88d0d64` 建立；一個 PR，不合併、不部署、不觸發正式排程。

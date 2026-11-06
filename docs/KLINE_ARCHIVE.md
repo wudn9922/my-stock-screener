@@ -113,9 +113,10 @@ publish 必須確認修正資料涵蓋原有較早交易日。只修正該股票
 
 ## 全市場臨時休市（颱風假等）
 
-交易所日曆只知道預定假日，不知道臨時休市（例如 2026-10-23 颱風休市）。那天整個市場每檔都會是「開高低收相同、成交量 0、等於前一日收盤」的空白 K 棒。
+交易所日曆可能來不及收錄臨時休市。來源也可能在休市日回傳「開高低收相同、成交量 0」的占位 K 棒，價格不一定等於前一日收盤。單一股票這種形狀也可能是停牌，必須看完整市場與主要指數證據。
 
-- **每日流程**：`stage` 若發現某市場某日至少 50 檔、且 95% 以上都是這種空白 K 棒，就判定為全市場休市，不寫入封存（`operations.json` 的 `closedSessions` 會列出）。個別股票在交易日沒有成交的平盤 K 棒仍照常保存。
+- **每日流程**：共用 `market_sessions.py` 判定：主要指數成功讀取、驗證且已收盤的首末日期之間缺日，或有效普通股樣本至少 95% 零量平盤。`stage`／掃描保留至少 50 檔的樣本限制，未知量不算零；指數下載失敗或超出涵蓋日期不推定休市。cache／bootstrap／ETF 與指數補充也排除這些日期。`operations.json` 的 `closedSessions` 原欄位不變，另加 `closedSessionEvidence` 說明理由。
+- **既有永久列**：這次任務只讀 archive，沒有執行清除工具。網站與研究先過濾再聚合；永久列仍留在原檔。真正拆股 transport 必須原樣保留已封存的休市列，不得以此次過濾刪除永久日期；新的休市列不追加。唯讀報告、掃描命令及 2,214 筆結果見 [MARKET_CLOSURES.md](MARKET_CLOSURES.md)。
 - **已寫入的清除**：`python scripts/kline_archive.py remove-closed-session --archive-dir <封存> --market tw --date YYYY-MM-DD`。只有當天該市場每一檔都是空白 K 棒時才會執行，否則整批拒絕、不改任何檔案。每個檔案記一筆 `status: removed`、`reason: kline-archive/closed-session` 的稽核（新舊 SHA-256）。
 - **驗證**：`verify` 仍拒絕任何刪除日期，唯一例外是有對應稽核、且被刪的那列確實是空白 K 棒。
 
