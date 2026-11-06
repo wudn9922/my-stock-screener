@@ -13,8 +13,10 @@ const COLORS = ['#4699ef', '#35bba0', '#dfb550', '#a798e8'];
 function stateBands(rows: { date: string }[], active: (i: number) => boolean, color: string): TimeBand[] {
   return rows.flatMap((row, i) => active(i) ? [{ from: row.date, to: row.date, color }] : []);
 }
-function WarningBody({ data, market }: { data: MarketWarnings; market: 'tw' | 'us' }) {
-  const params = data.params, report = data.markets[market], cfg = params.markets[market];
+type AvailableMarket = Extract<MarketWarnings['markets']['tw'], { asOf: string }>;
+const sourceLabel = (source: 'yahoo' | 'kline-archive' | undefined) => source === 'kline-archive' ? 'GitHub 永久封存（Yahoo 分割調整、未股利還原）' : 'Yahoo 已收盤日線';
+function WarningBody({ data, market, report }: { data: MarketWarnings; market: 'tw' | 'us'; report: AvailableMarket }) {
+  const params = data.params, cfg = params.markets[market];
   const [selected, setSelected] = useState(cfg.indices[0]!);
   const [window, setWindow] = useState<5 | 10 | 20 | 60>(params.defaultWindow);
   const index = report.indices[selected]!, latest = report.latest;
@@ -44,6 +46,7 @@ function WarningBody({ data, market }: { data: MarketWarnings; market: 'tw' | 'u
   ];
   const unknown = lights.filter(light => !light.na && light.value === null).length;
   return <>
+    {report.update?.status === 'retained' && <p className="mw-update-note" role="status">本市場未更新，保留 {report.asOf} 的已發布資料。原因：{report.update.reason}</p>}
     <div className="mw-score"><b>{latest.warning_level} <small>項亮燈</small></b><span>{unknown ? `${unknown} 項資料不足` : latest.warning_level ? '風險升高' : '目前未亮燈'}</span><time>{report.asOf}</time></div>
     <p className="mw-purpose">不是買賣訊號；回測顯示無法預測修正時點，但亮燈後下一次修正較深的比例較高</p>
     <ul className="mw-lights">{lights.map(light => <li key={light.label} data-state={light.na || light.value === null ? 'na' : light.value ? 'warning' : 'off'}>
@@ -53,7 +56,7 @@ function WarningBody({ data, market }: { data: MarketWarnings; market: 'tw' | 'u
       <div className="mw-tools"><label>指數<select aria-label="警示指數" value={selected} onChange={event => setSelected(event.target.value)}>{cfg.indices.map(symbol => <option key={symbol}>{symbol}</option>)}</select></label>
         <label>窗口<select aria-label="警示價量窗口" value={window} onChange={event => setWindow(Number(event.target.value) as typeof window)}>{params.windows.map(value => <option key={value} value={value}>{value} 日</option>)}</select></label></div>
       <h3>指數價量 · {window} 日{window <= 10 ? '（每週取一次）' : ''}</h3>
-      <p className="source-note">{index.validated ? '僅台股有歷史參考價值' : '此指數無歷史驗證'}{index.proxy ? ` · 成交量代理 ${index.proxy}` : ''}</p>
+      <p className="source-note">{index.validated ? '僅台股有歷史參考價值' : '此指數無歷史驗證'}{index.proxy ? ` · 成交量代理 ${index.proxy}` : ''} · {sourceLabel(index.meta?.price.source)}{index.proxy && index.meta?.volume ? ` · 量來源：${sourceLabel(index.meta.volume.source)}` : ''}</p>
       <dl className="mw-values"><div><dt>上漲日量增</dt><dd>{ratio(index.latest[`up_vol_up_ratio_${window}`])}</dd></div><div><dt>下跌日量縮</dt><dd>{ratio(index.latest[`down_vol_down_ratio_${window}`])}</dd></div><div><dt>avg60／過去中位數</dt><dd>{ratio(index.latest.avg60)}／{ratio(index.latest.median756)}</dd></div></dl>
       <TimeChart lines={volumeLines} format={percent} zoom className="mw-plot" ariaLabel={`${selected} 指數價量比例圖`}
         bands={[...grey(selected), ...stateBands(index.series, i => index.series[i]!.vol60_weak === true, '#e4585828')]} />
@@ -77,12 +80,12 @@ function WarningBody({ data, market }: { data: MarketWarnings; market: 'tw' | 'u
       <p>{params.leaderReturnDays} 日報酬、前 {params.liquidityDays} 日平均成交值；{params.leaderMembership}。{params.countDenominator}。{params.firstPivot}。</p>
       <p>領頭羊：平均成交值（收盤價 × 股數代理）至少 {cfg.minAmount.toLocaleString('zh-TW')} {market === 'tw' ? 'TWD' : 'USD'}、前日股價至少 {cfg.minPrice}，取報酬前 {percent(cfg.leaderShare)}。已知零量計為零，未知量保持缺值。</p>
       <p>所有中位數與分位數只用當日以前資料；只採已收盤日線，不跨無效日比較。上漲走勢：收盤高於 {params.trendDays} 日均線且均線高於 {params.trendSlopeDays} 日前。近 {params.highWindow} 日高點 × {params.nearHigh} 以上才檢查家數背離。</p>
-      <p>指數來源為 Yahoo 已收盤日線，價格為分割調整、未作股利還原；個股使用 universe-full 的完整名單與日線快取。以下研究結論為使用者提供的原文，本次未重新驗證完整 21 年研究。</p>
+      <p>指數優先採 Yahoo 已收盤日線，下載不足時以 GitHub 永久封存備援；兩者均為分割調整、未作股利還原，實際來源見各指數標示。個股使用 universe-full 的完整名單與日線快取。以下研究結論為使用者提供的原文，本次未重新驗證完整 21 年研究。</p>
       <p>{params.diagnosticDenominators}</p>
       {report.limitations.map(text => <p key={text}>{text}</p>)}
       {data.evidence.map(text => <p className="mw-evidence" key={text}>{text}</p>)}
       <details><summary>完整門檻設定</summary><pre>{JSON.stringify(params, null, 2)}</pre></details>
-      <p>資料日 {report.asOf} · 計算時間 {data.generatedAt} · 有效 {report.evaluated}／{report.universeCount} 檔 · 名單日 {report.listingAsOf}</p>
+      <p>資料日 {report.asOf} · 計算時間 {report.update?.generatedAt ?? data.generatedAt} · 有效 {report.evaluated}／{report.universeCount} 檔 · 名單日 {report.listingAsOf}</p>
     </ResearchNote>
   </>;
 }
@@ -95,8 +98,12 @@ export function MarketWarningCard({ market }: { market: 'tw' | 'us' }) {
     return () => controller.abort();
   }, [retry]);
   const result = loaded?.retry === retry ? loaded.result : undefined;
+  const report = result?.data?.markets[market];
   return <section className="card market-warning-card" aria-label="多頭末期警示"><h2>多頭末期警示 <small>{market === 'tw' ? '台股' : '美股'}</small></h2>
-    {result?.data ? <WarningBody data={result.data} market={market} /> : <div role="status"><p>{result?.error ?? '載入警示資料…'}</p>
+    {result?.data && report ? 'asOf' in report ? <WarningBody key={market} data={result.data} market={market} report={report} /> : <div role="status">
+      <p className="mw-update-note">本市場未更新：{report.update.reason}。尚無可保留的已發布資料。</p>
+      <button type="button" onClick={() => setRetry(value => value + 1)}>重試警示資料</button>
+    </div> : <div role="status"><p>{result?.error ?? '載入警示資料…'}</p>
       {result?.error && <button type="button" onClick={() => setRetry(value => value + 1)}>重試警示資料</button>}</div>}
   </section>;
 }

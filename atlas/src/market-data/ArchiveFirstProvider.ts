@@ -75,7 +75,13 @@ export class ArchiveFirstProvider implements MarketDataProvider {
       const result = await this.archive.getDaily(symbol, range, signal);
       this.checkActive(signal, lifetime);
       return result;
-    } catch (error) { this.checkActive(signal, lifetime); void error; return null; }
+    } catch (error) {
+      this.checkActive(signal, lifetime);
+      // Explicit document/request cancellation is not evidence of an absent
+      // archive. In particular, beforeunload precedes WebKit's pagehide.
+      if (error instanceof Error && error.name === 'AbortError') throw error;
+      return null;
+    }
   }
   async getBars(symbol: string, timeframe: Timeframe, range?: MarketRange, signal?: AbortSignal): Promise<BarResult> {
     if (timeframe === '1D' || timeframe === '1W' || timeframe === '1M') {

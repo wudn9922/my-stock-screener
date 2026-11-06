@@ -9,12 +9,24 @@
 ## 計算與發布
 
 ```bash
-python scripts/build_market_warnings.py --cache-dir .cache/universe-full
+python scripts/build_market_warnings.py --cache-dir .cache/universe-full --archive-dir .cache/kline-archive
 ```
 
-這是正式排程的產生器說明；本 PR 不手動觸發正式 workflow。維護者合併後由原 universe-full 排程，在完整市場突破統計之後執行。步驟與其額外依賴安裝均 continue-on-error，覆蓋／名單／指數失敗保留舊 JSON，不擋其他輸出。
+這是正式排程的產生器說明；本 PR 不手動觸發正式 workflow。維護者合併後由原 universe-full 排程，在完整市場突破統計之後執行。步驟與其額外依賴安裝均 continue-on-error，覆蓋／名單或兩市場指數都失敗時保留整份舊 JSON，不擋其他輸出。只有單市場指數失敗時，另一市場仍可更新，失敗市場依下述狀態明示，不冒充新計算。
 
-個股只讀原完整名單與日 K cache；指數由既有 Yahoo 日線來源取得七年資料供三年圖表與 warmup。SOX 使用 SOXX 同日期量。XTAI／XNYS 排除尚未收盤日，市場共同零量占位日沿用既有排除規則。股票與指數 OHLC、快取、永久行情、財報與 kline-archive 都不寫入。
+個股只讀原完整名單與日 K cache；指數優先由既有 Yahoo 日線來源取得七年資料供三年圖表與 warmup。SOX 使用 SOXX 同日期量。XTAI／XNYS 排除尚未收盤日，市場共同零量占位日沿用既有排除規則。股票與指數 OHLC、快取、永久行情、財報與 kline-archive 都不寫入。
+
+### 指數下載、封存備援與市場隔離
+
+`scripts/index_daily.py` 同時供本產生器與 breadth signals 使用。一批下載後，只對空檔、有效 OHLC 根數不足或（寬度訊號）資料日不符的代號重試，最多兩次，間隔5／10秒。明確的 `RateLimited`／`YFRateLimitError`／HTTP429 沿用既有30／60秒退避；持續限流後不再對其他失敗代號追加 Yahoo 請求，改讀其封存。已成功的批次成員不重抓。
+
+備援只讀 workflow 已 checkout 的 `.cache/kline-archive`，依 `index/{tw|us}/{百分比編碼代號}.json` 的年度明細驗證 CSV 的 SHA-256、bytes、rows、日期範圍及 canonical 格式，不下載整份 manifest、不寫入封存。兩個來源皆排除未收盤／休市日，使用 split-adjusted OHLC、不作股利還原、不拼接兩種來源。Yahoo 的無效 session 保留給原計算規則排除，不跨過它比較量。
+
+警示仍要求每檔至少60根有效 OHLC；寬度訊號仍要求400根且最後有效日期必須等於 breadth 的 asOf。封存也必須通過相同要求，過舊或太短時不降門檻。每個指數 `meta.price`／`meta.volume` 記錄 Yahoo 或 kline-archive、最後有效日期、有效根數、嘗試次數、價格基準與備援原因。SOX 價格與 SOXX 量的來源分別記錄；卡片及 Actions log 都明示封存使用情況。
+
+每市場新增 `update`：`updated`（本次計算）、`retained`（保留相同 params 的上次已發布內容及原計算時間，另附本次檢查時間與原因）、`unavailable`（首次執行且沒有可保留的舊內容，只有原因，不補任何數值）。JSON 仍要求 tw／us 兩個市場鍵，Zod 嚴格驗證這三種狀態；舊版沒有 update 的文件仍相容。保留市場的卡片最上方標示「本市場未更新」，沒有資料時不顯示燈號或圖表。只有本次成功更新的市場可追加前瞻 CSV，原有 bytes、日期與首次紀錄規則不變。
+
+備援可用範圍取決於已完成的封存補檔；若七年歷史不足，原有756日暖機門檻仍可能為 null。封存價格只有四位小數，與 Yahoo 原始浮點數可能有微小精度差異。本次不更改研究公式／門檻，也不把來源失敗視為正常。
 
 - `market_warnings_params.json` 定義獨立警示窗口、分位、流動性與風險門檻；A2 的 ATR／收盤確認／五日守住常數直接取自既有共享核心，避免說明和實際計算不同。
 - `market-warnings.json` 是 universe owner 的 generated 衍生輸出，兩市場各有 asOf，圖表保留三年日期，無法計算的早期日保留 null。
@@ -30,7 +42,7 @@ python scripts/build_market_warnings.py --cache-dir .cache/universe-full
 ## 已知限制與待審口徑
 
 1. 研究原文由使用者提供；本次試算不是重新驗證 2005–2026 的 p 值。當前名單有存活者偏差。
-2. 原 cache 最多320根，首次產生不足400個有效突破家數，第三燈會是資料不足。後續保存已算過的日期序列累積門檻；不把短歷史當三年分布。三年日期區間不代表三年每個值皆可用。
+2. 先前 PR 試算使用每檔320根的快取，不足400個有效突破家數，第三燈為資料不足；正式快取可能保留更長歷史，依實際有效值判斷，不強制截成320根。後續保存已算過的日期序列累積門檻；不把短歷史當三年分布。三年日期區間不代表三年每個值皆可用。
 3. 21日次數的分母依任務文字採同期有效股票聯集，未除以21；與研究「每千檔每日5.6／2.8」不是相同單位。領頭羊依任務 t 的記法，採每個觀察日 t−1 的名單篩選該窗口的成熟突破；不是每個突破日各自的名單。這兩個解讀在 PR 明列供審查，未暗中調參以貼近研究數字。
 4. 停牌、來源缺漏、未知前高與冷啟動會減少樣本；五日平滑需五個各自至少15次的有效日值。價格異常會重新開始波段，126日端點報酬不跨已知大幅跳價。
 5. 灰底含未確認末段，會隨後續價格變動。圖表的歷史回算可更新，前瞻 CSV 首次紀錄永不重算。

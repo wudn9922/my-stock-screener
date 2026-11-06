@@ -1,5 +1,9 @@
 """python -m pytest tests -q"""
 import json
+from pathlib import Path
+import sys
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import numpy as np
 import pandas as pd
@@ -196,6 +200,53 @@ def test_daily_accepts_complete_aligned_indices_and_appends_the_site_session(tmp
     assert {index["symbol"] for index in payload["lowSignal"]["indices"]} == set(R.INDICES)
     assert len(daily.load_history(history_path)) == 6
     assert breadth_path.read_bytes() == source_bytes
+
+
+@pytest.mark.parametrize('mode', ['retry', 'archive', 'missing'])
+def test_daily_real_reader_retry_archive_and_fail_closed_are_offline(tmp_path, monkeypatch, mode):
+    from scripts import index_daily as reader, kline_archive as archive
+    days = pd.bdate_range(end='2026-11-04', periods=6)
+    hist = pd.DataFrame({'pct20':50., 'pct60':60.},index=days[:-1])
+    hist.index.name = 'date'
+    history_path, out_path = tmp_path/'history.csv', tmp_path/'signals.json'
+    calibration_path, breadth_path = tmp_path/'cal.json', tmp_path/'breadth.json'
+    hist.to_csv(history_path)
+    calibration_path.write_text(json.dumps(calibration()))
+    breadth_path.write_text(json.dumps(site_json([str(d.date()) for d in days],[50.]*6,[60.]*6)))
+    out_path.write_bytes(b'previous report')
+    before = history_path.read_bytes(), out_path.read_bytes()
+    sessions = reader._calendar('us',2024,2027).sessions_in_range('2024-01-02','2026-11-04')[-440:]
+    bars = bars_from(np.full(440,100.),sessions)
+    batch = pd.concat({t:bars if t != '^IXIC' else bars*np.nan for t in R.INDICES},axis=1)
+    downloads = Mock(side_effect=[batch,bars] if mode == 'retry' else [batch,pd.DataFrame(),pd.DataFrame()])
+    monkeypatch.setitem(sys.modules,'yfinance',SimpleNamespace(download=downloads))
+    monkeypatch.setattr(reader.time,'sleep',Mock())
+    root = tmp_path/'archive'
+    if mode == 'archive':
+        stats = {}
+        for year, part in bars.assign(Volume=10000.).groupby(bars.index.year):
+            path = root/'us/^IXIC'/f'{year}.csv'
+            path.parent.mkdir(parents=True,exist_ok=True)
+            rows = archive.frame_rows(part)
+            body = archive.csv_text(rows).encode()
+            path.write_bytes(body)
+            stats[path.relative_to(root).as_posix()] = archive._row_stats(rows,len(body),archive.digest(body))
+        for name,doc in archive._index_documents(stats).items():
+            path = root/name
+            path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_text(json.dumps(doc))
+    result = daily.main(['--calibration',str(calibration_path),'--history',str(history_path),
+                         '--breadth',str(breadth_path),'--out',str(out_path),'--archive-dir',str(root)])
+    if mode == 'missing':
+        assert result == 1
+        assert (history_path.read_bytes(),out_path.read_bytes()) == before
+    else:
+        assert result == 0
+        indices = json.loads(out_path.read_text())['markets']['us']['lowSignal']['indices']
+        meta = next(i['meta'] for i in indices if i['symbol'] == '^IXIC')
+        assert meta['source'] == ('kline-archive' if mode == 'archive' else 'yahoo')
+        assert meta['lastDate'] == '2026-11-04'
+        assert len(daily.load_history(history_path)) == 6
 
 
 def scenario(last_pct, drop):

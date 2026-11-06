@@ -2,7 +2,7 @@
 
 只做primary self-review，未聲稱獨立簽核。依使用者修正原prompt的OR規格：有效普通股正量占比≥5%或至少50檔時一律保留當天資料；指數缺列只記 `primary-index-gap-with-trading`。沒有任何股票觀測時仍可依主要指數缺列判休市，95%零量平盤門檻不變；成交證據優先處理5%／95%恰好相交的邊界。
 
-以一般merge納入最新main `2e8799ba4d`（#231），沒有rebase／遠端force-push。移除bootstrap／ETF補充中繞過股票證據的單獨指數缺日判定；它們只採完整掃描的市場policy。stage與每日快照重新檢查成交，撤銷舊誤判；較新的人工查核證據不因下次快照無該日股票而被零數值覆蓋。前端嚴格驗證正量數，保留11/04，完整行情cache換版。
+以一般merge納入main `2e8799ba4d`（#231），交付前再合入最新main `e2ea0322c5`（#229／#232／#233），保留來源備援與取消生命週期，文件衝突保留雙方內容，沒有rebase／遠端force-push。移除bootstrap／ETF補充中繞過股票證據的單獨指數缺日判定；它們只採完整掃描的市場policy。stage與每日快照重新檢查成交，撤銷舊誤判；較新的人工查核證據不因下次快照無該日股票而被零數值覆蓋。前端嚴格驗證正量數，保留11/04，完整行情cache換版。
 
 最新唯讀掃描archive `339f57e742d904976eefbf73b7fad506fff6d9c7`：7,689代號、41,507年檔、9,772,433列、0無效OHLC，59.225秒。普通股／ETF仍只有TW2026-10-23的2,214筆；但新回補另有^TWOII 2021-04-06一筆，當天普通股0、^TWII缺列，依指定的無觀測規則列出人工核對。因此最新完整報告是2個日期／2,215列，未把它隱藏成只有10/23。[JSON報告](../docs/research-verification/market-closure-scan-20261106.json)、[方法與限制](../docs/MARKET_CLOSURES.md)、[ADR-029](docs/architecture/ADR-029-market-closed-session-projection.md)。archive前後git status乾淨，無任何publish／修復／刪除。
 
@@ -11,6 +11,30 @@
 新增案例涵蓋11/04指數缺列但100檔股票成交時不休市、stage正常帶出11/04、scanner更正舊policy、前端日週月不排除11/04；10/23全部零量、10/26完全無股票觀測仍判休市。5%與50檔門檻均測，舊成交證據的數值在次日保留。
 
 [桌機11/04](docs/screenshots/market-closures/index-gap-desktop.png)、[390px Chromium](docs/screenshots/market-closures/index-gap-chromium390.png)、[390px WebKit](docs/screenshots/market-closures/index-gap-iphone390.png)、[375px Chromium](docs/screenshots/market-closures/index-gap-chromium375.png)、[375px WebKit](docs/screenshots/market-closures/index-gap-iphone375.png) 是合成行情版面／截止日證明，不是實體iPhone或正式行情驗收。未改登入、Supabase、GCP、永久資料、突破舊快照或前瞻log；不合併、不部署、不執行正式workflow。
+
+## 指數下載重試、唯讀封存備援與市場隔離（2026-11-05）
+
+Primary self-review only；沒有獨立模型或 Claude 簽核。分支 `codex/index-daily-resilience` 從 main `c3f5c76511` 建立，先以一般 merge 納入 #228，待其合併後再以一般 merge 合入最新 main `afe469f522`（包含 #228 的 `21d49127ee`）。沒有 rebase／force-push；只交付 PR，不合併、不部署、不觸發正式 workflow。
+
+共用 `scripts/index_daily.py` 先批次 Yahoo 下載，只對失敗成員逐檔最多重試2次（5／10秒）。明確 RateLimited／YFRateLimitError／429 使用既有30／60秒退避，持續限流後停止追加 Yahoo 請求。之後唯讀使用已 checkout archive 的 per-symbol index 與年度 CSV，驗 SHA-256、bytes、rows、日期與 canonical 格式。只用 XTAI／XNYS 已收盤 session，價格不作股利還原，不混接來源，不降低原本60／400根及 breadth 同日要求。來源寫入各指數 meta；SOX／SOXX 的價量來源獨立記錄。
+
+警示單市場指數失敗時，另一市場正常更新；相同 params 的失敗市場保留原數值、資料日及計算時間，另標 retained／checkedAt／reason。首次沒有舊內容則 unavailable，沒有替代數值。兩市場指數都失敗時，整份舊 JSON／CSV bytes 不動。retained／unavailable 不追加前瞻紀錄；既有 market-warnings-log.csv 已比對最新 main 完全一致。名單／覆蓋失敗的原有整份保留行為不變。嚴格 Zod 保留舊文件相容性，新增狀態／來源驗證，UI 明示未更新及原因。
+
+本機驗證：npm ci、lint、typecheck、一般 build、Pages build 全通過；Vitest 153檔／1,918項；Python 共用讀取器10項、market warnings25項（含#228）、breadth signals pytest27項、generated真實Git整合35項。桌機／390px Chromium／iPhone WebKit 33項，375px Chromium／WebKit 10項全部通過；最後畫面取景6＋4項亦通過。actionlint 1.7.7 通過。未新增 skip 或放寬斷言／timeout。最終 GitHub CI 結果以 PR checks 為準。
+
+全部來源故障測試離線，沒有向真實 Yahoo 發請求，也沒有重跑正式排程；封存 fixture 由實際 writer 的格式產生，並驗證讀取前後 bytes 相同。實際備援能力仍依已完成封存的日期／根數，資料太舊仍會失敗。封存四位小數與 Yahoo 浮點資料可能略有精度差異，不改研究公式或門檻。更正先前將試算320根誤寫為正式快取上限的說明，未截短快取或改計算。
+
+截圖為合成 fixture 的狀態／來源版面，不是真實行情；以1100px高視窗展示內容，手機寬度維持390／375。已目視檢查 [桌機](docs/screenshots/index-daily-resilience/desktop-retained.png)、[390px WebKit](docs/screenshots/index-daily-resilience/iphone390-retained.png)、[375px WebKit](docs/screenshots/index-daily-resilience/iphone375-retained.png)；同目錄另有 unavailable 截圖。這是 Playwright 模擬，不是實體 iPhone 驗證。沒有修改登入／Supabase／SQL／GCP／永久價格財報／archive 分支，沒有新增通知。
+
+## WebKit 研究頁面導頁回退（2026-11-06）
+
+Primary self-review only；沒有獨立簽核。從 main `afe469f5229fd66b3515cfa473053dd81480a229` 建立 `codex/webkit-research-smoke`，只推 PR、不合併或部署。
+
+根因為 WebKit 在 `pagehide` 前取消 archive，TypeError 被轉成缺檔回退，導致停止中的文件啟動新 manifest fetch。獨立 Node HTTP + 真實 provider 可重現，排除 Python 預覽回應／Range；完整時序與前後各20次逐次證據見 [RESEARCH_PAGES_WEBKIT.md](docs/RESEARCH_PAGES_WEBKIT.md)。
+
+審查重點：共用下載的 owner 是文件，單一圖表不能取消其他訂閱；listener 覆蓋本文且在 finally 移除；取消不可被年度 allSettled 的部分成功掩蓋；只有取消的 index 拒絕會清除以供重試。beforeunload 不阻止導頁、不新增提示，取消離頁後可重讀，BFCache 舊測試保留。真正的404／503／網路／逾時仍回退。
+
+原 smoke 只加輸出路徑選項，所有旅程、pageerror 收集與斷言完全保留；沒有改既有 unit/e2e spec、伺服器、workflow、Supabase 或正式資料。新真實 HTTP 回歸透過既有 test:research-pages 指令接入 CI。確切檢查計數列於 PR 與 proof；不是實體 iPhone Safari 簽核。
 
 ## 市場多頭末期警示與波段計數（2026-11-05）
 

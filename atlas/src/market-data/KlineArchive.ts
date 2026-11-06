@@ -17,6 +17,8 @@ export interface ArchiveOptions {
   baseUrl?: string; fetcher?: typeof fetch; now?: () => number;
   cache?: false | CachedMarketDataOptions;
   timeoutMs?: number;
+  /** Request owner; shared downloads belong to the document, not an individual chart. */
+  page?: Pick<Window, 'addEventListener' | 'removeEventListener'>;
 }
 
 export function parseArchiveCsv(text: string, symbol: string, year: number): BarResult {
@@ -86,10 +88,29 @@ export class KlineArchive {
     this.now = options.now ?? Date.now;
     this.base = options.baseUrl ?? ARCHIVE_BASE;
   }
-  private async request(path: string): Promise<Response> {
-    const response = await this.fetcher(this.base + path, { signal: AbortSignal.timeout(this.options.timeoutMs ?? 8000) });
-    if (!response.ok) throw new Error(`永久封存讀取失敗（HTTP ${response.status}）`);
-    return response;
+  private async request<T>(path: string, read: (response: Response) => Promise<T>): Promise<T> {
+    const owner = this.options.page ?? (typeof window === 'undefined' ? undefined : window);
+    const navigation = new AbortController();
+    const leave = () => navigation.abort();
+    // WebKit cancels network loads *before* pagehide, rejecting them as TypeError.
+    // Abort explicitly first so ArchiveFirstProvider can distinguish leaving from
+    // an unavailable archive. Keep listeners through body consumption as well.
+    owner?.addEventListener('beforeunload', leave, { once: true });
+    owner?.addEventListener('pagehide', leave, { once: true });
+    const signal = AbortSignal.any([navigation.signal, AbortSignal.timeout(this.options.timeoutMs ?? 8000)]);
+    try {
+      const response = await this.fetcher(this.base + path, { signal });
+      const value = await read(response);
+      signal.throwIfAborted();
+      return value;
+    } catch (error) {
+      // Some engines report a transport TypeError even after explicit abort.
+      signal.throwIfAborted();
+      throw error;
+    } finally {
+      owner?.removeEventListener('beforeunload', leave);
+      owner?.removeEventListener('pagehide', leave);
+    }
   }
   private loadIndex(symbol: string): Promise<ArchiveEntry | null> {
     const day = new Date(this.now()).toISOString().slice(0, 10), key = `${day}:${symbol}`;
@@ -100,10 +121,11 @@ export class KlineArchive {
       const load = async () => {
         // Index filenames are encoded on disk; encode '%' again for HTTP.
         const path = `index/${market}/${encodeURIComponent(encodeURIComponent(symbol))}.json`;
-        const response = await this.fetcher(this.base + path, { signal: AbortSignal.timeout(this.options.timeoutMs ?? 8000) });
-        if (response.status === 404) return null;
-        if (!response.ok) throw new Error(`永久封存 index 讀取失敗（HTTP ${response.status}）`);
-        return parseArchiveIndex(await response.json(), symbol);
+        return this.request(path, async response => {
+          if (response.status === 404) return null;
+          if (!response.ok) throw new Error(`永久封存 index 讀取失敗（HTTP ${response.status}）`);
+          return parseArchiveIndex(await response.json(), symbol);
+        });
       };
       if (this.options.cache === false) pending = load();
       else {
@@ -116,6 +138,11 @@ export class KlineArchive {
           .finally(() => cached.close().catch(() => undefined));
       }
       this.indexes.set(key, pending);
+      // A cancelled navigation can leave this document in use. Its next read
+      // must retry, rather than reusing the rejected shared index promise.
+      void pending.catch(error => {
+        if (error?.name === 'AbortError' && this.indexes.get(key) === pending) this.indexes.delete(key);
+      });
       // Covers the complete public TW/US catalog, including visitors without IDB.
       while (this.indexes.size > 10000) this.indexes.delete(this.indexes.keys().next().value!);
     }
@@ -134,6 +161,8 @@ export class KlineArchive {
       .filter(year => Object.hasOwn(entry.years, String(year)));
     const results = await Promise.allSettled(needed.map(year => this.loadYear(symbol, year, entry)));
     signal?.throwIfAborted();
+    const aborted = results.find(result => result.status === 'rejected' && result.reason?.name === 'AbortError');
+    if (aborted?.status === 'rejected') throw aborted.reason;
     const valid = results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
     if (!valid.length) throw new Error('此代號的封存年度檔暫時無法讀取');
     const policy = await policyRequest;
@@ -157,7 +186,10 @@ export class KlineArchive {
     let pending = this.years.get(key);
     if (!pending) {
       const load = async (): Promise<BarResult> => {
-        const text = await (await this.request(`${entry.path}/${year}.csv`)).text();
+        const text = await this.request(`${entry.path}/${year}.csv`, async response => {
+          if (!response.ok) throw new Error(`永久封存讀取失敗（HTTP ${response.status}）`);
+          return response.text();
+        });
         if (sha) {
           const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
           if (hash !== sha) throw new Error('封存年度檔 SHA-256 不符');
