@@ -12,6 +12,8 @@ Primary self-review only；沒有獨立模型簽核。從最新main `2e8799ba4d`
 
 [失效：桌機](docs/screenshots/mexc-diagnostics/mexc-key-expired-desktop.png)、[375px Chromium](docs/screenshots/mexc-diagnostics/mexc-key-expired-chromium375.png)、[375px WebKit](docs/screenshots/mexc-diagnostics/mexc-key-expired-iphone375.png)；[期限提醒：桌機](docs/screenshots/mexc-diagnostics/mexc-key-age-desktop.png)、[375px WebKit](docs/screenshots/mexc-diagnostics/mexc-key-age-iphone375.png)。同資料夾另附390px兩引擎與其他375px截圖。全部為假帳戶／假持股／假Key，不是實體iPhone或正式連線認證。
 
+合入最新main後再驗：完整Vitest156檔／1,965項、typecheck、一般與Pages建置通過；基本連線與80天／失效案例在桌機、390px與375px兩引擎另10項重驗通過。
+
 本修訂不需新SQL或更換主金鑰。維護者先更新user-settings，再發布Atlas並刷新舊頁；本次皆未執行。正式根因需由維護者部署後依安全診斷核對，不請使用者提供金鑰或原始帳戶回應。
 
 ## 指數下載重試、唯讀封存備援與市場隔離（2026-11-05）
