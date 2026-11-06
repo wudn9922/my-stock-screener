@@ -86,6 +86,8 @@ class ClosureRulesTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'A.csv'
             path.write_text('Date,Open,High,Low,Close,Volume\n2026-10-22,,,,100,1000\n')
+            self.assertIsNone(breadth.load_daily_bars(path)) # existing OHLC validation still rejects this
+            path.write_text('Date,Open,Close,Volume\n2026-10-22,,100,1000\n')
             loaded=breadth.load_daily_bars(path)
             self.assertEqual(len(loaded),1)
             self.assertTrue(pd.isna(loaded.Open.iloc[0]))
