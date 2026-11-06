@@ -57,6 +57,31 @@ const empty = (value: unknown) =>
   value == null ||
   (typeof value === "string" && ["", "-"].includes(value.trim()));
 
+/** Nested latest trade; rejected unless it is a valid same-day regular-session match. */
+function tradePrice(
+  raw: unknown,
+  date: string,
+  nowMs: number,
+  high: number,
+  low: number,
+): { price: number; time: number } | null {
+  if (!raw || typeof raw !== "object") return null;
+  const trade = raw as Record<string, unknown>;
+  const price = positive(trade.z);
+  if (
+    price === null || price > high || price < low ||
+    typeof trade.t !== "string" || !/^\d{2}:\d{2}:\d{2}$/.test(trade.t) ||
+    trade.t < "09:00:00" || trade.t > "13:30:00"
+  ) return null;
+  const time = Date.parse(`${date}T${trade.t}+08:00`) / 1000;
+  if (
+    !Number.isFinite(time) || time * 1000 > nowMs + 300_000 ||
+    new Date((time + TAIPEI_OFFSET) * 1000).toISOString().slice(0, 19) !==
+      `${date}T${trade.t}`
+  ) return null;
+  return { price, time };
+}
+
 /** Parses only the requested venue/code; malformed, future and previous-session rows are ignored. */
 export function parseMisRow(
   raw: unknown,
@@ -86,14 +111,22 @@ export function parseMisRow(
   ) return null;
   const open = positive(row.o),
     high = positive(row.h),
-    low = positive(row.l),
-    price = positive(row.z);
+    low = positive(row.l);
+  let price = positive(row.z), priceTime: number | null = price === null ? null : time;
   if (
     open === null || high === null || low === null || high < open ||
     low > open || high < low ||
     (price === null && !empty(row.z)) ||
     (price !== null && (price > high || price < low))
   ) return null;
+  // Since 2026-11 MIS usually leaves the top-level z at "-" for stocks and ETFs and
+  // reports the latest match in a nested trade object, e.g.
+  // {"z":"-","trade":{"t":"10:38:35","v":1,"z":"2170.0000"}}. Use it only when it is a
+  // same-day regular-session trade inside today's high/low; otherwise keep no price.
+  if (price === null) {
+    const last = tradePrice(row.trade, date, nowMs, high, low);
+    if (last) [price, priceTime] = [last.price, last.time];
+  }
   const lots = number(row.v), isIndex = symbol.startsWith("^");
   if (lots === null && !empty(row.v)) return null;
   // Index v is not individual-stock lots. Preserve Yahoo's volume instead of inventing units.
@@ -104,7 +137,7 @@ export function parseMisRow(
     date,
     time,
     price,
-    priceTime: price === null ? null : time,
+    priceTime,
     open,
     high,
     low,
@@ -131,7 +164,7 @@ export class TwseMisClient {
   >();
   private readonly prices = new Map<
     string,
-    { date: string; price: number; time: number }
+    { date: string; price: number; time: number; priceTime: number }
   >();
   private day = "";
   private queue: Promise<void> = Promise.resolve();
@@ -216,13 +249,14 @@ export class TwseMisClient {
                     date: row.date,
                     price: row.price,
                     time: row.time,
+                    priceTime: row.priceTime ?? row.time,
                   });
                 } else if (
                   previous?.date === row.date && previous.time <= row.time &&
                   previous.price <= row.high && previous.price >= row.low
                 ) {
                   row.price = previous.price;
-                  row.priceTime = previous.time;
+                  row.priceTime = previous.priceTime;
                 }
                 if (
                   !found.has(row.symbol) ||

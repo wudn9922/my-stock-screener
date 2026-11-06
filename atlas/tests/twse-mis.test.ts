@@ -54,6 +54,37 @@ describe('TWSE MIS parsing and daily overlay', () => {
     expect(out.chart.result[0]!.meta).not.toHaveProperty('atlasLiveSource');
     expect(normalizeYahooResponse(out, MIS_NOW / 1000, '1D', '2330.TW').quote?.dataState).toBe('delayed');
   });
+  it('reads the nested latest trade when the top-level z is "-" (observed 2026-11-06 shape)', () => {
+    // MIS_NOW is 09:47 Taipei; the nested trade is two minutes earlier, inside today's high/low.
+    const raw = { ...misRows()[1], trade: { t: '09:45:10', v: 1, z: '1835.0000', ft: 20 } };
+    const row = parseMisRow(raw, '2330.TW', MIS_NOW)!;
+    expect(row.price).toBe(1835);
+    expect(row.priceTime).toBe(Date.parse('2026-11-05T09:45:10+08:00') / 1000);
+    expect(row.volume).toBe(1_234_000);
+    const today = misYahoo('2330.TW', true);
+    const out = overlayMis(today, row) as typeof today;
+    expect(out.chart.result[0]!.indicators.quote[0]!.close.at(-1)).toBe(1835);
+    expect(out.chart.result[0]!.meta).toMatchObject({ atlasLiveSource: 'twse-mis', regularMarketPrice: 1835 });
+    expect(normalizeYahooResponse(out, MIS_NOW / 1000, '1D', '2330.TW').quote?.dataState).toBe('live');
+  });
+  it.each([
+    ['outside the high/low', { t: '09:45:10', z: '1900' }],
+    ['before the session', { t: '08:59:59', z: '1820' }],
+    ['after the session', { t: '13:30:01', z: '1820' }],
+    ['in the future', { t: '09:53:00', z: '1820' }],
+    ['malformed time', { t: '9:45', z: '1820' }],
+    ['malformed price', { t: '09:45:10', z: '-' }],
+    ['not an object', 'x'],
+  ])('ignores a nested trade %s and keeps no price', (_, trade) => {
+    const row = parseMisRow({ ...misRows()[1], trade }, '2330.TW', MIS_NOW)!;
+    expect(row).not.toBeNull(); expect(row.price).toBeNull(); expect(row.priceTime).toBeNull();
+  });
+  it('keeps the top-level z when it is valid, even with a nested trade', () => {
+    const row = parseMisRow({ ...misRows()[3], trade: { t: '09:40:00', z: '2870' } }, '6488.TWO', MIS_NOW)!;
+    expect(row.price).toBe(2900); expect(row.priceTime).toBe(row.time);
+    const index = parseMisRow(misRows()[0], '^TWII', MIS_NOW)!;
+    expect(index.price).toBe(42306.23);
+  });
   it('supports MIS-only OTC quotes with the actual previous close, without fake historic rows', () => {
     const row = parseMisRow(misRows()[2], '^TWOII', MIS_NOW)!;
     const normalized = normalizeLive(misOnlyChart(row), '^TWOII', MIS_NOW / 1000)!;
