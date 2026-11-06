@@ -2,6 +2,10 @@
 
 `rules.py`、`core.py`、`calibrate.py` 與 `daily.py` 來自使用者提供的 `us-breadth-signals` 附件；規則版本為 `rulesVersion: 1`。規則與交易模擬照附件保留。整合只調整了套件匯入與每日流程的資料檢查：下載失敗、指數資料缺漏／過短／過期或寬度重疊差異超標時，回傳失敗且不寫入歷史或訊號檔。附件未包含 `RESEARCH.md`。
 
+每日指數下載與市場風險警示共用 `scripts/index_daily.py`：先批次下載 Yahoo 兩年日線，只對空檔／有效根數不足／資料日不符者逐檔最多重試兩次（5／10秒）；明確限流沿用30／60秒退避，持續限流停止追加 Yahoo 請求。之後唯讀使用 `--archive-dir .cache/kline-archive` 的 per-symbol index 及經 SHA-256 驗證的年度 CSV。兩者均只用 XNYS 已收盤 session，split-adjusted、不作股利還原。每檔來源記在 `markets.us.lowSignal.indices[].meta`，備援代號也印入 log。
+
+最低400根有效日 K、與網站寬度 asOf 同日、重疊檢查與計算規則都不變。封存不足／日期落後或兩種來源都失敗時，history CSV 與 signals JSON 仍保持原檔；不降低門檻，不自行補造新收盤。此備援不修改校準下載流程或 bootstrap。
+
 在 repo 根目錄重新校準：
 
 ```bash

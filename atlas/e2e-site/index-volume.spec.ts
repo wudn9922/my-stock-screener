@@ -9,6 +9,21 @@ async function fixtures(page: Page, raw: unknown = sample, status = 200) {
   await mockSite(page);
   await page.route('**/report/market-warnings.json', route => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(raw) }));
 }
+async function captureState(page: Page, path: string) {
+  await page.setViewportSize({ width: page.viewportSize()!.width, height: 1100 });
+  await panel(page).evaluate(node => node.scrollIntoView({ block: 'start' }));
+  await panel(page).evaluate(node => {
+    const nav = document.querySelector('.market-section-nav');
+    const offset = (nav?.getBoundingClientRect().bottom ?? 0) + 12 - node.getBoundingClientRect().top;
+    for (let parent = node.parentElement; parent && offset > 0; parent = parent.parentElement) {
+      if (parent.scrollHeight > parent.clientHeight && ['auto', 'scroll'].includes(getComputedStyle(parent).overflowY)) {
+        parent.scrollTop -= offset;
+        break;
+      }
+    }
+  });
+  await page.screenshot({ path, fullPage: false });
+}
 test('three warning charts replace short-window volume ratios, default to 60 days and remain usable on phones', async ({ page }, info) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await fixtures(page);
@@ -82,4 +97,42 @@ test('invalid or missing warnings never retain old numbers and explicit retry re
   await page.route('**/report/market-warnings.json', route => route.fulfill({ json:sample }));
   await card.getByRole('button', { name:'重試警示資料' }).click();
   await expect(card.locator('.mw-score')).toContainText('2 項亮燈');
+});
+test('a retained US market labels the old calculation and archive source while TW stays current', async ({ page }, info) => {
+  const raw = structuredClone(sample);
+  const oldGenerated = raw.generatedAt;
+  raw.generatedAt = '2026-10-15T09:00:00+00:00';
+  raw.markets.tw.update = { status: 'updated', checkedAt: raw.generatedAt, generatedAt: raw.generatedAt, reason: null };
+  raw.markets.us.update = { status: 'retained', checkedAt: raw.generatedAt, generatedAt: oldGenerated, reason: '^IXIC Yahoo 與封存均未取得完整日線' };
+  const source = { source: 'kline-archive', lastDate: raw.markets.us.asOf, validBars: 500, attempts: 3,
+    priceBasis: 'split-adjusted', dividendAdjusted: false, fallbackReason: 'Yahoo 回空' };
+  raw.markets.us.indices['^IXIC'].meta = { price: source, volume: source };
+  await fixtures(page, raw); await page.goto('./?page=markets&market=us');
+  const card = panel(page);
+  await expect(card.getByRole('status')).toContainText('本市場未更新');
+  await expect(card.getByRole('status')).toContainText('^IXIC');
+  await card.getByLabel('警示指數').selectOption('^IXIC');
+  await expect(card.locator('.mw-chart-block > p.source-note')).toContainText('GitHub 永久封存');
+  await expect(card.locator('.mw-score time')).toHaveText(raw.markets.us.asOf);
+  await card.getByText('計算說明', { exact: true }).click();
+  await expect(card).toContainText(`計算時間 ${oldGenerated}`);
+  await card.getByText('計算說明', { exact: true }).click();
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+  await captureState(page, info.outputPath('market-warning-retained.png'));
+  await page.goto('./?page=markets&market=tw');
+  await expect(panel(page).locator('.mw-plot')).toHaveCount(3);
+  await expect(panel(page).locator('.mw-update-note')).toHaveCount(0);
+});
+test('a first-run US failure has no invented lights or charts and does not hide the TW report', async ({ page }, info) => {
+  const raw = { ...sample, markets: { ...sample.markets, us: {
+    update: { status: 'unavailable', checkedAt: sample.generatedAt, generatedAt: null, reason: '^IXIC Yahoo 與封存均無資料' },
+  } } };
+  await fixtures(page, raw); await page.goto('./?page=markets&market=us');
+  const card = panel(page);
+  await expect(card.getByRole('status')).toContainText('尚無可保留的已發布資料');
+  await expect(card.locator('.mw-plot, .mw-values, .mw-lights')).toHaveCount(0);
+  await expect(card.getByRole('button', { name: '重試警示資料' })).toBeVisible();
+  await captureState(page, info.outputPath('market-warning-unavailable.png'));
+  await page.goto('./?page=markets&market=tw');
+  await expect(panel(page).locator('.mw-plot')).toHaveCount(3);
 });

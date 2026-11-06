@@ -119,15 +119,15 @@ def merge_history(hist: pd.DataFrame, site: pd.DataFrame) -> tuple[pd.DataFrame,
     return merged.sort_index(), check
 
 
-def fetch_bars(tickers) -> dict[str, pd.DataFrame]:
-    import yfinance as yf
+def fetch_bars(tickers, *, as_of=None, archive_dir=None) -> dict[str, pd.DataFrame]:
+    from scripts.index_daily import read_index_daily, IndexDailyError
     from .calibrate import clean_bars
-    d = yf.download(list(tickers), period="2y", progress=False, auto_adjust=False, group_by="column")
-    out = {}
+    options = {} if archive_dir is None else {"archive_dir": archive_dir}
+    out = read_index_daily(tickers, period="2y", min_bars=MIN_INDEX_BARS, as_of=as_of, **options)
+    if out.errors:
+        raise IndexDailyError("；".join(out.errors.values()))
     for t in tickers:
-        df = pd.DataFrame({k: d[k][t] for k in ("Open", "High", "Low", "Close")}).dropna(subset=["Close"])
-        df.index = pd.to_datetime(df.index).tz_localize(None)
-        out[t] = clean_bars(df)
+        out[t] = clean_bars(out[t].dropna(subset=["Close"]))
     return out
 
 
@@ -221,6 +221,8 @@ def build(cal: dict, hist: pd.DataFrame, bars: dict, check: dict, generated_at: 
             continue
         s = index_state(hist, bars[t], th["ma20"]["p10"], meta, cal["indices"][t])
         s["symbol"] = t
+        if t in getattr(bars, "sources", {}):
+            s["meta"] = bars.sources[t]
         indices.append(s)
     ob = cal.get("overbought", {})
     tail = hist.iloc[-CHART_DAYS:]
@@ -263,6 +265,7 @@ def main(argv=None, bars_loader=fetch_bars):
     ap.add_argument("--breadth", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--bars-file")
+    ap.add_argument("--archive-dir", default=".cache/kline-archive")
     ap.add_argument("--max-overlap-diff", type=float, default=3.0,
                     help="長歷史與網站重疊日期的寬度差超過這個值（百分點）就失敗，提示需要重新校準")
     a = ap.parse_args(argv)
@@ -276,7 +279,12 @@ def main(argv=None, bars_loader=fetch_bars):
         missing_calibration = [ticker for ticker in R.INDICES if ticker not in (cal.get("indices") or {})]
         if missing_calibration:
             raise ValueError("校準檔缺少指數統計：" + ", ".join(missing_calibration))
-        bars = pd.read_pickle(a.bars_file) if a.bars_file else bars_loader(list(R.INDICES))
+        if a.bars_file:
+            bars = pd.read_pickle(a.bars_file)
+        elif bars_loader is fetch_bars:
+            bars = fetch_bars(list(R.INDICES), as_of=hist.index[-1], archive_dir=a.archive_dir)
+        else:
+            bars = bars_loader(list(R.INDICES))
         validate_index_bars(bars, hist.index[-1])
         payload = build(cal, hist, bars, check, datetime.now(timezone.utc).replace(microsecond=0).isoformat())
         write_csv_atomic(a.history, hist)

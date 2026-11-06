@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 from datetime import datetime, timezone
 from functools import lru_cache
 import json
@@ -23,6 +24,7 @@ from swing_cohort import COUNTING_MODEL, included, swing_attempts
 from market_sessions import UNKNOWN_VOLUME_DATES, market_prices
 from breakout_outcomes import BARRIER_PCT, CLOSE_BUFFER_ATR, GATE_ATR_PERIOD, OBSERVATION_DAYS
 from swing_breakouts import ATR_PERIOD, REVERSAL_ATR
+from index_daily import read_index_daily, IndexDailyError, DEFAULT_ARCHIVE
 
 ROOT = Path(__file__).resolve().parents[1]
 PARAMS = json.loads(Path(__file__).with_name("market_warnings_params.json").read_text())
@@ -252,7 +254,7 @@ def build_market(spec, indices, market, now, params=PARAMS, previous=None):
     p30 = past_quantile(count, params)
     primary = indices[cfg["indices"][0]].reindex(calendar).Close
     if pd.isna(primary.iloc[-1]) or primary.iloc[-1] <= 0:
-        raise ValueError(f"{market} 指數缺少 {as_of.date()} 完成日線")
+        raise IndexDailyError(f"{market} 指數缺少 {as_of.date()} 完成日線")
     # As with the existing chart SMA, use actual completed index closes; don't
     # fabricate a close for an omitted source date (e.g. an emergency closure).
     observed_close = primary.dropna()
@@ -283,6 +285,9 @@ def build_market(spec, indices, market, now, params=PARAMS, previous=None):
                              "series": records(values, history_start),
                              "latest": records(values.tail(1), history_start)[-1],
                              "corrections": correction_segments(bars.Close, params["correctionDrop"])}
+        sources = getattr(indices, "sources", {})
+        if symbol in sources:
+            index_out[symbol]["meta"] = {"price": sources[symbol], "volume": sources.get(proxy or symbol)}
     primary_latest = index_out[cfg["indices"][0]]["series"]
     primary_by_day = {r["date"]: r for r in primary_latest}
     series = records(out, history_start)
@@ -293,7 +298,7 @@ def build_market(spec, indices, market, now, params=PARAMS, previous=None):
     return {"asOf": str(as_of.date()), "universeCount": spec["listed"], "evaluated": evaluated,
             "listingAsOf": spec["listingAsOf"], "series": series, "latest": series[-1], "indices": index_out,
             "limitations": ["名單是目前上市股票，含存活者偏差；歷史也使用這份現有名單，並非當時上市成分。",
-                             "個股滾動快取最多320根；已產生的突破家數沿用日期累積，三年分位數至少400個值，歷史不足保留缺值，不推定正常。",
+                             "個股歷史依快取實際覆蓋；已產生的突破家數沿用日期累積，三年分位數至少400個值，歷史不足保留缺值，不推定正常。",
                              "缺乏上一個已確認高點的第一次高點不納入；日線無法推斷成交先後與可執行價格。"]}
 
 
@@ -301,31 +306,48 @@ def build_payload(inputs, indices, now, previous=None):
     previous = previous or {}
     if previous.get("params") != {**PARAMS, "swingCountingModel": COUNTING_MODEL}:
         previous = {}
+    markets, updated = {}, 0
+    for key, cfg in PARAMS["markets"].items():
+        prior = previous.get("markets", {}).get(key)
+        try:
+            needed = cfg["indices"] + [PARAMS["indexVolumeProxies"][s] for s in cfg["indices"] if s in PARAMS["indexVolumeProxies"]]
+            missing = [getattr(indices, "errors", {}).get(s, f"{s} 指數日線未取得") for s in needed if s not in indices]
+            if missing:
+                raise IndexDailyError("；".join(missing))
+            old_market = prior if prior and "asOf" in prior else None
+            markets[key] = build_market(inputs[key], indices, key, now, previous=old_market)
+            markets[key]["update"] = {"status": "updated", "checkedAt": now.isoformat(),
+                                       "generatedAt": now.isoformat(), "reason": None}
+            updated += 1
+        except IndexDailyError as exc:
+            reason = str(exc)
+            if prior and "asOf" in prior:
+                markets[key] = copy.deepcopy(prior)
+                generated = (prior.get("update") or {}).get("generatedAt") or previous["generatedAt"]
+                markets[key]["update"] = {"status": "retained", "checkedAt": now.isoformat(),
+                                           "generatedAt": generated, "reason": reason}
+            else:
+                markets[key] = {"update": {"status": "unavailable", "checkedAt": now.isoformat(),
+                                            "generatedAt": None, "reason": reason}}
+            print(f"Market warnings {key.upper()} 未更新：{reason}；" +
+                  (f"保留 {prior['asOf']} 已發布資料" if prior and "asOf" in prior else "尚無可保留的已發布資料"), flush=True)
+    if not updated:
+        raise IndexDailyError("兩個市場的指數日線都未取得，保留整份舊檔")
     return {"version": 1, "generatedAt": now.isoformat(),
-            "params": {**PARAMS, "swingCountingModel": COUNTING_MODEL}, "evidence": EVIDENCE,
-            "markets": {key: build_market(spec, indices, key, now, previous=previous.get("markets", {}).get(key)) for key, spec in inputs.items()}}
+            "params": {**PARAMS, "swingCountingModel": COUNTING_MODEL}, "evidence": EVIDENCE, "markets": markets}
 
 
-def fetch_indices():
+def fetch_indices(*, now=None, archive_dir=DEFAULT_ARCHIVE):
     # Same Yahoo daily OHLC source as main.download_index_history / IndexStatus;
     # never import main's account/report side effects or adjust by dividends.
-    import yfinance as yf
     symbols = [s for cfg in PARAMS["markets"].values() for s in cfg["indices"]] + list(PARAMS["indexVolumeProxies"].values())
-    raw = yf.download(symbols, period="7y", auto_adjust=False, progress=False, group_by="ticker")
-    result = {}
-    for symbol in symbols:
-        frame = raw[symbol].copy()
-        frame.index = pd.DatetimeIndex(frame.index).tz_localize(None).normalize()
-        # Preserve null rows as invalid sessions rather than bridging across them.
-        if frame.Close.notna().sum() < 60:
-            raise ValueError(f"{symbol} Yahoo 指數日線不足")
-        result[symbol] = frame
-    return result
+    return read_index_daily(symbols, period="7y", min_bars=60, now=now, archive_dir=archive_dir)
 
 
 def main(argv=None, inputs_loader=full.load_inputs, indices_loader=fetch_indices, now=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cache-dir", default=full.DEFAULT_CACHE)
+    parser.add_argument("--archive-dir", default=str(DEFAULT_ARCHIVE))
     parser.add_argument("--out", default=str(ROOT / "docs/report/market-warnings.json"))
     parser.add_argument("--log", default=str(ROOT / "docs/report/market-warnings-log.csv"))
     args = parser.parse_args(argv)
@@ -339,7 +361,8 @@ def main(argv=None, inputs_loader=full.load_inputs, indices_loader=fetch_indices
             previous = json.loads(Path(args.out).read_text())
         except (OSError, ValueError):
             previous = {}
-        payload = build_payload(inputs, indices_loader(), now, previous)
+        indices = fetch_indices(now=now, archive_dir=args.archive_dir) if indices_loader is fetch_indices else indices_loader()
+        payload = build_payload(inputs, indices, now, previous)
         # Validate the entire payload before appending any forward observations.
         json.dumps(payload, allow_nan=False)
         append_observations(args.log, payload)
