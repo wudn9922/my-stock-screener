@@ -1,6 +1,6 @@
 ## MEXC 同步診斷、回應與期限提醒（2026-11-06）
 
-Primary self-review only；沒有獨立模型簽核。從最新main `2e8799ba4d` 建立 `codex/mexc-sync-diagnostics`，與PR #230無相依。只推PR，不部署、不執行SQL、不查正式資料庫、不呼叫真實MEXC帳戶。既有授權、AES-GCM／HMAC、private表／RPC、持股成本與同步頻率不變。
+Primary self-review only；沒有獨立模型簽核。從最新main `2e8799ba4d` 建立 `codex/mexc-sync-diagnostics`，與PR #230無相依；交付前一般merge納入最新main `e2ea0322c5`，保留#229／#232／#233，僅REVIEW_PACKAGE前置段落衝突，兩邊內容皆保留。只推PR，不部署、不執行SQL、不查正式資料庫、不呼叫真實MEXC帳戶。既有授權、AES-GCM／HMAC、private表／RPC、持股成本與同步頻率不變。
 
 [操作、官方依據與維護者部署順序](../docs/ATLAS_MEXC_SYNC.md#2026-11-06-同步診斷與金鑰期限修訂)、[ADR-020](docs/architecture/ADR-020-mexc-read-only-holdings.md)。三個官方端點目前範例為裸物件／ticker陣列；apikey／accessKey兩別名保留。code:0 envelope是兼容修正，尚未觀察到正式帳戶回應，不能宣稱它就是根因。官方有寫入權限的範例仍須拒絕；free＋locked、不重複available、18位精度與上限仍嚴格。
 
@@ -13,6 +13,30 @@ Primary self-review only；沒有獨立模型簽核。從最新main `2e8799ba4d`
 [失效：桌機](docs/screenshots/mexc-diagnostics/mexc-key-expired-desktop.png)、[375px Chromium](docs/screenshots/mexc-diagnostics/mexc-key-expired-chromium375.png)、[375px WebKit](docs/screenshots/mexc-diagnostics/mexc-key-expired-iphone375.png)；[期限提醒：桌機](docs/screenshots/mexc-diagnostics/mexc-key-age-desktop.png)、[375px WebKit](docs/screenshots/mexc-diagnostics/mexc-key-age-iphone375.png)。同資料夾另附390px兩引擎與其他375px截圖。全部為假帳戶／假持股／假Key，不是實體iPhone或正式連線認證。
 
 本修訂不需新SQL或更換主金鑰。維護者先更新user-settings，再發布Atlas並刷新舊頁；本次皆未執行。正式根因需由維護者部署後依安全診斷核對，不請使用者提供金鑰或原始帳戶回應。
+
+## 指數下載重試、唯讀封存備援與市場隔離（2026-11-05）
+
+Primary self-review only；沒有獨立模型或 Claude 簽核。分支 `codex/index-daily-resilience` 從 main `c3f5c76511` 建立，先以一般 merge 納入 #228，待其合併後再以一般 merge 合入最新 main `afe469f522`（包含 #228 的 `21d49127ee`）。沒有 rebase／force-push；只交付 PR，不合併、不部署、不觸發正式 workflow。
+
+共用 `scripts/index_daily.py` 先批次 Yahoo 下載，只對失敗成員逐檔最多重試2次（5／10秒）。明確 RateLimited／YFRateLimitError／429 使用既有30／60秒退避，持續限流後停止追加 Yahoo 請求。之後唯讀使用已 checkout archive 的 per-symbol index 與年度 CSV，驗 SHA-256、bytes、rows、日期與 canonical 格式。只用 XTAI／XNYS 已收盤 session，價格不作股利還原，不混接來源，不降低原本60／400根及 breadth 同日要求。來源寫入各指數 meta；SOX／SOXX 的價量來源獨立記錄。
+
+警示單市場指數失敗時，另一市場正常更新；相同 params 的失敗市場保留原數值、資料日及計算時間，另標 retained／checkedAt／reason。首次沒有舊內容則 unavailable，沒有替代數值。兩市場指數都失敗時，整份舊 JSON／CSV bytes 不動。retained／unavailable 不追加前瞻紀錄；既有 market-warnings-log.csv 已比對最新 main 完全一致。名單／覆蓋失敗的原有整份保留行為不變。嚴格 Zod 保留舊文件相容性，新增狀態／來源驗證，UI 明示未更新及原因。
+
+本機驗證：npm ci、lint、typecheck、一般 build、Pages build 全通過；Vitest 153檔／1,918項；Python 共用讀取器10項、market warnings25項（含#228）、breadth signals pytest27項、generated真實Git整合35項。桌機／390px Chromium／iPhone WebKit 33項，375px Chromium／WebKit 10項全部通過；最後畫面取景6＋4項亦通過。actionlint 1.7.7 通過。未新增 skip 或放寬斷言／timeout。最終 GitHub CI 結果以 PR checks 為準。
+
+全部來源故障測試離線，沒有向真實 Yahoo 發請求，也沒有重跑正式排程；封存 fixture 由實際 writer 的格式產生，並驗證讀取前後 bytes 相同。實際備援能力仍依已完成封存的日期／根數，資料太舊仍會失敗。封存四位小數與 Yahoo 浮點資料可能略有精度差異，不改研究公式或門檻。更正先前將試算320根誤寫為正式快取上限的說明，未截短快取或改計算。
+
+截圖為合成 fixture 的狀態／來源版面，不是真實行情；以1100px高視窗展示內容，手機寬度維持390／375。已目視檢查 [桌機](docs/screenshots/index-daily-resilience/desktop-retained.png)、[390px WebKit](docs/screenshots/index-daily-resilience/iphone390-retained.png)、[375px WebKit](docs/screenshots/index-daily-resilience/iphone375-retained.png)；同目錄另有 unavailable 截圖。這是 Playwright 模擬，不是實體 iPhone 驗證。沒有修改登入／Supabase／SQL／GCP／永久價格財報／archive 分支，沒有新增通知。
+
+## WebKit 研究頁面導頁回退（2026-11-06）
+
+Primary self-review only；沒有獨立簽核。從 main `afe469f5229fd66b3515cfa473053dd81480a229` 建立 `codex/webkit-research-smoke`，只推 PR、不合併或部署。
+
+根因為 WebKit 在 `pagehide` 前取消 archive，TypeError 被轉成缺檔回退，導致停止中的文件啟動新 manifest fetch。獨立 Node HTTP + 真實 provider 可重現，排除 Python 預覽回應／Range；完整時序與前後各20次逐次證據見 [RESEARCH_PAGES_WEBKIT.md](docs/RESEARCH_PAGES_WEBKIT.md)。
+
+審查重點：共用下載的 owner 是文件，單一圖表不能取消其他訂閱；listener 覆蓋本文且在 finally 移除；取消不可被年度 allSettled 的部分成功掩蓋；只有取消的 index 拒絕會清除以供重試。beforeunload 不阻止導頁、不新增提示，取消離頁後可重讀，BFCache 舊測試保留。真正的404／503／網路／逾時仍回退。
+
+原 smoke 只加輸出路徑選項，所有旅程、pageerror 收集與斷言完全保留；沒有改既有 unit/e2e spec、伺服器、workflow、Supabase 或正式資料。新真實 HTTP 回歸透過既有 test:research-pages 指令接入 CI。確切檢查計數列於 PR 與 proof；不是實體 iPhone Safari 簽核。
 
 ## 市場多頭末期警示與波段計數（2026-11-05）
 

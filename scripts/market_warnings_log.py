@@ -65,6 +65,10 @@ def append_observations(path, payload):
     known = {(r["asOf"], r["market"]) for r in read_rows(old)}
     additions = []
     for market, data in payload["markets"].items():
+        # Retained/unavailable markets were NOT observed again by this producer.
+        # Never backdate an old value into the immutable forward experiment.
+        if data.get("update", {}).get("status") in ("retained", "unavailable"):
+            continue
         latest = data["latest"]
         if (data["asOf"], market) in known:
             continue

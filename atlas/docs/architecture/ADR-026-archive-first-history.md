@@ -13,3 +13,9 @@ LiveQuoteFeed 是今天與缺少日期的唯一新增訂閱來源。同日以市
 額外舊離線回歸在未改前端的基準與本 PR 都發現相同問題：正常繪圖實驗室的 worker 只快取 HTML 的直接資源，遺漏懶載入的 ChartPage。建置插件現在把公開 JS/CSS chunk 清單寫進非選股站點的 shell 預載，恢復原 Demo 離線旅程。選股站點的 SCREENER_MEMORY_ONLY／worker 退役策略不變；不快取帳戶 API、報告、登入交接頁或個資。
 
 此變更只讀 archive/main/generated；沒有對永久行情／財報或遠端封存寫入。PR-B 正式補檔由維護者執行，實際覆蓋依 per-symbol index，不假定已完成五年補檔。[驗證與截圖](../PR_C_ARCHIVE_FIRST.md)。
+
+## 導頁取消與回退（2026-11-06）
+
+WebKit 會在 `pagehide` 之前停止舊文件的載入，原生取消卻可能拒絕為 `TypeError: Load failed`。封存的共用 HTTP 請求因此在 `beforeunload`／`pagehide` 明確取消，保護到 response 本文讀完，結束後移除 listener；仍不接受單一圖表的 signal 作為共用下載 owner。取消向上傳遞，不能當成缺檔、部分年度成功或啟動另一個來源的理由。缺檔／網路／HTTP／逾時的既有回退保留。
+
+取消離頁後，取消的 index Promise 可重試；每筆下載有自己的 controller，不永久停用文件，既有 BFCache 重啟機制保留。原 smoke 與所有錯誤斷言不變；[根因、真實 HTTP 重現與前後各 20 次證據](../RESEARCH_PAGES_WEBKIT.md)。

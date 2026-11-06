@@ -19,3 +19,4 @@
 .mw-latest { font-size: 22px; margin: 8px 0; }.mw-latest small { font-size: 11px; margin-left: 8px; }
 .mw-evidence { white-space: pre-line; }.market-warning-card pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
 @media (max-width: 420px) { .market-warning-card { padding: 12px; }.mw-plot { height: 195px; } }
+.market-warning-card .mw-update-note { border-inline-start: 3px solid var(--warning, #dfb550); padding: 8px 12px; overflow-wrap: anywhere; }

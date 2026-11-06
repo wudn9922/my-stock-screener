@@ -319,8 +319,21 @@ const marketWarningPoint = z.object({
   warning_level: z.number().int().min(0).max(3), warning_complete: z.boolean(),
 });
 const ordered = <T extends { date: string }>(rows: T[]) => rows.every((row, i) => i === 0 || row.date > rows[i - 1]!.date);
+const warningIndexSource = z.object({
+  source: z.enum(['yahoo', 'kline-archive']), lastDate: warningDate,
+  validBars: z.number().int().positive(), attempts: z.number().int().min(1).max(3),
+  priceBasis: z.literal('split-adjusted'), dividendAdjusted: z.literal(false),
+  fallbackReason: z.string().min(1).nullable(),
+}).refine(value => value.source === 'kline-archive' ? value.fallbackReason !== null : value.fallbackReason === null);
+const warningUpdate = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('updated'), checkedAt: z.iso.datetime({ offset: true }),
+    generatedAt: z.iso.datetime({ offset: true }), reason: z.null() }),
+  z.object({ status: z.literal('retained'), checkedAt: z.iso.datetime({ offset: true }),
+    generatedAt: z.iso.datetime({ offset: true }), reason: z.string().min(1) }),
+]);
 const indexWarningSchema = z.object({
   proxy: z.string().nullable(), validated: z.boolean(),
+  meta: z.object({ price: warningIndexSource, volume: warningIndexSource.nullable() }).optional(),
   series: z.array(volumeWarningPoint).min(1).refine(ordered), latest: volumeWarningPoint,
   corrections: z.array(z.object({ start: warningDate, end: warningDate, drawdown: z.number().finite().max(-0.07), confirmed: z.boolean() })
     .refine(value => value.start <= value.end)),
@@ -329,7 +342,13 @@ const warningMarketSchema = z.object({
   asOf: warningDate, universeCount: z.number().int().positive(), evaluated: z.number().int().nonnegative(),
   listingAsOf: warningDate, series: z.array(marketWarningPoint).min(1).refine(ordered), latest: marketWarningPoint,
   indices: z.record(z.string(), indexWarningSchema), limitations: z.array(z.string()),
+  update: warningUpdate.optional(),
 }).refine(value => value.latest.date === value.asOf && JSON.stringify(value.latest) === JSON.stringify(value.series.at(-1)) && value.evaluated <= value.universeCount);
+const warningUnavailableSchema = z.strictObject({
+  update: z.object({ status: z.literal('unavailable'), checkedAt: z.iso.datetime({ offset: true }),
+    generatedAt: z.null(), reason: z.string().min(1) }),
+});
+const warningMarketResult = z.union([warningMarketSchema, warningUnavailableSchema]);
 const marketParams = z.object({ indices: z.array(z.string()).min(1), leaderShare: z.number().positive().max(1),
   minAmount: z.number().positive(), minPrice: z.number().positive(), successWindow: z.number().int().positive() });
 export const marketWarningsSchema = z.object({
@@ -350,10 +369,17 @@ export const marketWarningsSchema = z.object({
     countDenominator: z.string(), leaderMembership: z.string(), firstPivot: z.string(),
     diagnosticDenominators: z.string(),
   }),
-  evidence: z.array(z.string()).min(6), markets: z.object({ tw: warningMarketSchema, us: warningMarketSchema }),
+  evidence: z.array(z.string()).min(6), markets: z.object({ tw: warningMarketResult, us: warningMarketResult }),
 }).superRefine((data, ctx) => {
   for (const key of ['tw', 'us'] as const) {
     const market = data.markets[key];
+    if (market.update) {
+      if (market.update.checkedAt !== data.generatedAt ||
+        (market.update.status === 'updated' && market.update.generatedAt !== data.generatedAt) ||
+        (market.update.generatedAt !== null && Date.parse(market.update.generatedAt) > Date.parse(market.update.checkedAt)))
+        ctx.addIssue({ code: 'custom', message: 'Inconsistent market update provenance' });
+    }
+    if (!('asOf' in market)) continue;
     if (market.evaluated / market.universeCount < data.params.minCoverage || market.evaluated < data.params.minEvaluated)
       ctx.addIssue({ code: 'custom', message: 'Insufficient full-market coverage' });
     if (data.params.markets[key].indices.some(symbol => !market.indices[symbol])) ctx.addIssue({ code: 'custom', message: 'Missing index' });

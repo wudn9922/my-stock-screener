@@ -3,7 +3,9 @@
 import { chromium, webkit, devices } from "playwright";
 import { writeFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-const out = resolve(import.meta.dirname, "../test-results/research-pages-live");
+const out = process.env.RESEARCH_PAGES_OUT
+  ? resolve(process.env.RESEARCH_PAGES_OUT)
+  : resolve(import.meta.dirname, "../test-results/research-pages-live");
 await mkdir(out, { recursive: true });
 const base =
   process.env.RESEARCH_PAGES_BASE ||
