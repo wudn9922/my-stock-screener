@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "threshold": 0.95,
+  "archiveCommit": "61fdbdbda0df7f68f9f998ccaa1d65aaaae27fb5",
+  "markets": {
+    "tw": {
+      "closedSessions": [
+        {
+          "date": "2026-10-23",
+          "reasons": [
+            "primary-index-missing",
+            "flat-zero-cohort"
+          ],
+          "observedSymbols": 1981,
+          "flatZeroSymbols": 1981,
+          "eligibleSymbols": 1981,
+          "unknownVolumeSymbols": 0,
+          "flatZeroShare": 1.0,
+          "coverageReference": 1987.0,
+          "affectedRows": 2214,
+          "sampleSymbols": [
+            "00400A.TW",
+            "00401A.TW",
+            "00402A.TW",
+            "00403A.TW",
+            "00404A.TW"
+          ]
+        }
+      ]
+    },
+    "us": {
+      "closedSessions": []
+    }
+  }
+}

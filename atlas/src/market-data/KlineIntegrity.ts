@@ -21,28 +21,20 @@ export function validKline(bar: Bar): boolean {
     && bar.low <= Math.min(bar.open, bar.close) && Math.max(bar.open, bar.close) <= bar.high;
 }
 
-/**
- * A source's stand-in for a session that never traded (market closure, typhoon day, holiday): no volume and
- * one price equal to the previous close for open, high, low and close. A real session always differs in
- * volume or price, so only these flat copies are dropped (daily bars; never the first bar).
- */
-export function isClosedSessionPlaceholder(bar: Bar, previous: Bar | undefined): boolean {
-  return !!previous && bar.volume === 0 && bar.open === bar.close && bar.high === bar.close && bar.low === bar.close
-    && bar.close === previous.close;
-}
-
-export function usableBars(bars: readonly Bar[], symbol: string, timeframe: Timeframe = '1D'): Bar[] {
+/** A single flat zero-volume stock can be halted. Only market-wide evidence
+ * identifies a closed day; never infer a holiday from the previous stock close. */
+export function usableBars(bars: readonly Bar[], symbol: string, timeframe: Timeframe = '1D', closedDates: ReadonlySet<string> = new Set()): Bar[] {
   const usable: Bar[] = [];
   for (const bar of bars) {
     if (!validKline(bar) || isQuarantinedBar(symbol, bar.time, timeframe)) continue;
-    if (timeframe === '1D' && isClosedSessionPlaceholder(bar, usable.at(-1))) continue;
+    if (timeframe === '1D' && closedDates.has(calendarDate(bar.time,getMarketProfile(symbol)))) continue;
     usable.push(bar);
   }
   return usable;
 }
 
 export function usableBarResult(result: BarResult, symbol: string, timeframe: Timeframe): BarResult {
-  const bars = usableBars(result.bars, symbol, timeframe);
+  const bars = usableBars(result.bars, symbol, timeframe, new Set(result.closedSessions ?? []));
   if (!bars.length) throw new Error('沒有未隔離且有效的 K 線資料');
   return { ...result, bars, latestBarAt: bars.at(-1)!.time,
     ...(result.sessionCloseObservations ? { sessionCloseObservations: result.sessionCloseObservations.filter(time => bars.some(bar => bar.time === time)) } : {}) };

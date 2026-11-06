@@ -12,12 +12,14 @@ const bar = (day: string) => ({ time: t(day), open: 87, high: 105, low: 85, clos
 describe('closed-session placeholders in charts', () => {
   const day = (date: string, close: number, volume: number, flat = false) =>
     ({ time: t(date), open: flat ? close : close - 5, high: flat ? close : close + 5, low: flat ? close : close - 10, close, volume });
-  it('drops a flat zero-volume copy of the previous close, as on the 10/23 Taiwan closure', () => {
+  it('drops flat zero-volume rows only with shared market-closure evidence, as on the 10/23 Taiwan closure', () => {
+    const closed = new Set(['2026-10-23','2026-10-26']);
     const bars = [day('2026-10-22', 2385, 22930116), day('2026-10-23', 2385, 0, true), day('2026-10-27', 2400, 35766965)];
-    expect(usableBars(bars, '2330.TW').map(b => b.time)).toEqual([t('2026-10-22'), t('2026-10-27')]);
-    // Consecutive closure days are all dropped (each compares with the last kept session).
+    expect(usableBars(bars, '2330.TW', '1D', closed).map(b => b.time)).toEqual([t('2026-10-22'), t('2026-10-27')]);
+    expect(usableBars(bars, '2330.TW')).toHaveLength(3); // an isolated stock is insufficient evidence
+    // Consecutive confirmed market closures are all dropped.
     const twoDays = [bars[0]!, day('2026-10-23', 2385, 0, true), day('2026-10-26', 2385, 0, true), bars[2]!];
-    expect(usableBars(twoDays, '2330.TW')).toHaveLength(2);
+    expect(usableBars(twoDays, '2330.TW', '1D', closed)).toHaveLength(2);
   });
   it('keeps every real session: traded volume, a moved price, a first bar, and weekly or monthly bars', () => {
     expect(usableBars([day('2026-10-22', 100, 10), day('2026-10-23', 100, 5, true)], '2330.TW')).toHaveLength(2);
