@@ -40,4 +40,4 @@ python scripts/build_market_warnings.py --cache-dir .cache/universe-full
 
 ## 休市日投影（2026-11-06）
 
-警示在建立交易日窗口前，沿用共用市場休市證據排除日期：完整主要指數涵蓋範圍內缺日，或至少 95% 有效普通股零量且 O=H=L=C。指數下載失敗與未知量不當作休市。正常交易日的少數停牌不被移除。領頭羊／成功率／突破家數的公式、門檻及既有前瞻 CSV 不變；不修改永久行情。理由與唯讀掃描見 [MARKET_CLOSURES](../../docs/MARKET_CLOSURES.md)、[ADR-029](architecture/ADR-029-market-closed-session-projection.md)。
+警示在建立交易日窗口前，沿用共用市場休市證據排除日期：有效普通股正量≥5%或至少50檔時一律保留、缺指數只列人工查核；沒有成交證據時，完整主要指數涵蓋範圍內缺日，或至少 95% 有效普通股零量且 O=H=L=C。指數下載失敗與未知量不當作休市。正常交易日的少數停牌不被移除。領頭羊／成功率／突破家數的公式、門檻及既有前瞻 CSV 不變；不修改永久行情。理由與唯讀掃描見 [MARKET_CLOSURES](../../docs/MARKET_CLOSURES.md)、[ADR-029](architecture/ADR-029-market-closed-session-projection.md)。

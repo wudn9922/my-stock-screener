@@ -1,17 +1,1379 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-06T02:03:50.089447+00:00",
+  "generatedAt": "2026-11-06T07:33:29.513583+00:00",
   "threshold": 0.95,
-  "method": "primary-index-or-flat-zero-v1",
+  "method": "trading-veto-primary-or-flat-zero-v2",
   "markets": {
     "tw": {
       "primary": {
         "symbol": "^TWII",
         "source": "kline-archive",
-        "firstDate": "2025-07-14",
+        "firstDate": "2021-01-04",
         "lastDate": "2026-11-05"
       },
       "closedSessions": [
+        {
+          "date": "2021-02-08",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1758.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-09",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1758.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-10",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1757.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-11",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1755.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-12",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1314.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-15",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-16",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-03-01",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-04-02",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1761.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-04-05",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1760.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-04-06",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1759.75,
+          "affectedRows": 1,
+          "sampleSymbols": [
+            "^TWOII"
+          ]
+        },
+        {
+          "date": "2021-04-30",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1764.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-06-14",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1767.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-09-20",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1773.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-09-21",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1773.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-10-11",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1776.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-12-31",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1790.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-01-27",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1794.5,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-01-28",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1794.5,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-01-31",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1794.5,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-02-01",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1793.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-02-02",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1344.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-02-03",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-02-04",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-02-28",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1348.5,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-04-04",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1806.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-04-05",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1806.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-05-02",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1806.5,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-06-03",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1809.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-09-09",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1820.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-10-10",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1823.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-02",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1831.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-18",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1834.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-19",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1833.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-20",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1833.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-23",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1374.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-24",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-25",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-26",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-27",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-02-27",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1839.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-02-28",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1839.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-04-03",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1842.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-04-04",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1842.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-04-05",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1841.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-05-01",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1847.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-06-22",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1854.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-06-23",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1853.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-08-03",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1859.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-09-29",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1860.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-10-09",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1860.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-10-10",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1859.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-01-01",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1871.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-06",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1891.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-07",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1890.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-08",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1890.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-09",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1889.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-12",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1416.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-13",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-14",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-28",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-04-04",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1900.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-04-05",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1900.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-05-01",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1899.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-06-10",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1904.5,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-07-24",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1913.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-07-25",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1912.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-09-17",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1914.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-10-02",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1918.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-10-03",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1917.25,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-10-10",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1914.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-10-31",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1922.5,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-01",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1937.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-23",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1940.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-24",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1940.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-27",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1939.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-28",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1454.25,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-29",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1454.25,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-30",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-31",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-02-28",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1953.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-04-03",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1956.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-04-04",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1956.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-05-01",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1960.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-05-30",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1963.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
         {
           "date": "2025-09-29",
           "reasons": [
@@ -21,6 +1383,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1970.0,
           "affectedRows": 0,
@@ -35,6 +1399,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1970.0,
           "affectedRows": 0,
@@ -49,6 +1415,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1971.0,
           "affectedRows": 0,
@@ -63,6 +1431,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1971.0,
           "affectedRows": 0,
@@ -77,6 +1447,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1978.0,
           "affectedRows": 0,
@@ -91,6 +1463,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1978.0,
           "affectedRows": 0,
@@ -105,6 +1479,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1979.0,
           "affectedRows": 0,
@@ -119,6 +1495,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1979.0,
           "affectedRows": 0,
@@ -133,6 +1511,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1979.0,
           "affectedRows": 0,
@@ -147,6 +1527,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1979.0,
           "affectedRows": 0,
@@ -161,6 +1543,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1484.25,
           "affectedRows": 0,
@@ -175,6 +1559,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 0.0,
           "affectedRows": 0,
@@ -189,6 +1575,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 0.0,
           "affectedRows": 0,
@@ -203,6 +1591,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 0.0,
           "affectedRows": 0,
@@ -217,6 +1607,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1980.0,
           "affectedRows": 0,
@@ -231,6 +1623,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1980.0,
           "affectedRows": 0,
@@ -245,6 +1639,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1981.0,
           "affectedRows": 0,
@@ -259,6 +1655,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1982.0,
           "affectedRows": 0,
@@ -273,6 +1671,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1982.0,
           "affectedRows": 0,
@@ -287,6 +1687,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1986.0,
           "affectedRows": 0,
@@ -301,6 +1703,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1986.0,
           "affectedRows": 0,
@@ -315,6 +1719,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1987.0,
           "affectedRows": 0,
@@ -330,6 +1736,8 @@
           "flatZeroSymbols": 1981,
           "eligibleSymbols": 1981,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": 0.0,
           "flatZeroShare": 1.0,
           "coverageReference": 1987.0,
           "affectedRows": 2214,
@@ -350,21 +1758,744 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 1987.0,
           "affectedRows": 0,
           "sampleSymbols": []
         }
-      ]
+      ],
+      "indexGapsWithTrading": []
     },
     "us": {
       "primary": {
         "symbol": "^GSPC",
         "source": "kline-archive",
-        "firstDate": "2025-07-30",
+        "firstDate": "2021-01-04",
         "lastDate": "2026-11-04"
       },
       "closedSessions": [
+        {
+          "date": "2021-01-18",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 3764.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-15",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 3804.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-04-02",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 3865.5,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-05-31",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 3955.25,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-07-05",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 3989.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-09-06",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4096.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-11-25",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4187.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-12-24",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4218.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-01-17",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4242.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-02-21",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4263.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-04-15",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4295.5,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-05-30",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4322.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-06-20",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4328.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-07-04",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4330.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-09-05",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4352.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-11-24",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4380.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-12-26",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4389.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-02",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4390.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-16",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4393.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-02-20",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4407.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-04-07",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4423.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-05-29",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4452.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-06-19",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4454.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-07-04",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4457.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-09-04",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4493.5,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-11-23",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4534.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-12-25",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4544.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-01-01",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4544.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-01-15",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4548.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-19",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4568.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-03-29",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4587.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-05-27",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4627.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-06-19",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4636.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-07-04",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4645.5,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-09-02",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4678.75,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-11-28",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4770.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-12-25",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4786.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-01",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4791.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-09",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4795.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-20",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4800.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-02-17",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4822.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-04-18",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4875.5,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-05-26",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4905.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-06-19",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4919.0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-07-04",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4932.5,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
         {
           "date": "2025-09-01",
           "reasons": [
@@ -374,6 +2505,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 5001.75,
           "affectedRows": 0,
@@ -388,6 +2521,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 5086.25,
           "affectedRows": 0,
@@ -402,6 +2537,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 5105.0,
           "affectedRows": 0,
@@ -416,6 +2553,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 5107.75,
           "affectedRows": 0,
@@ -430,6 +2569,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 5114.0,
           "affectedRows": 0,
@@ -444,6 +2585,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 5125.5,
           "affectedRows": 0,
@@ -458,6 +2601,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 5173.0,
           "affectedRows": 0,
@@ -472,6 +2617,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 5214.0,
           "affectedRows": 0,
@@ -486,6 +2633,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 5245.75,
           "affectedRows": 0,
@@ -500,6 +2649,8 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 5260.75,
           "affectedRows": 0,
@@ -514,23 +2665,26 @@
           "flatZeroSymbols": 0,
           "eligibleSymbols": 0,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
           "flatZeroShare": null,
           "coverageReference": 5324.75,
           "affectedRows": 0,
           "sampleSymbols": []
         }
-      ]
+      ],
+      "indexGapsWithTrading": []
     }
   },
   "scan": {
-    "archiveCommit": "61fdbdbda0df7f68f9f998ccaa1d65aaaae27fb5",
+    "archiveCommit": "339f57e742d904976eefbf73b7fad506fff6d9c7",
     "symbols": 7689,
-    "rows": 7843344,
-    "yearFiles": 35391,
+    "rows": 9772433,
+    "yearFiles": 41507,
     "invalidRows": 0,
     "errors": [],
-    "suspectedDatesWithRows": 1,
-    "suspectedRows": 2214,
-    "seconds": 163.866
+    "suspectedDatesWithRows": 2,
+    "suspectedRows": 2215,
+    "seconds": 59.225
   }
 }

@@ -1,10 +1,28 @@
 {
   "version": 1,
   "threshold": 0.95,
-  "archiveCommit": "61fdbdbda0df7f68f9f998ccaa1d65aaaae27fb5",
+  "archiveCommit": "339f57e742d904976eefbf73b7fad506fff6d9c7",
   "markets": {
     "tw": {
       "closedSessions": [
+        {
+          "date": "2021-04-06",
+          "reasons": [
+            "primary-index-missing"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1759.75,
+          "affectedRows": 1,
+          "sampleSymbols": [
+            "^TWOII"
+          ]
+        },
         {
           "date": "2026-10-23",
           "reasons": [
@@ -15,6 +33,8 @@
           "flatZeroSymbols": 1981,
           "eligibleSymbols": 1981,
           "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": 0.0,
           "flatZeroShare": 1.0,
           "coverageReference": 1987.0,
           "affectedRows": 2214,

@@ -1,30 +1,16 @@
-## 全市場休市日與假 K 線投影（2026-11-06）
+## PR #230 修訂：股票成交證據優先（2026-11-06）
 
-Primary self-review only；沒有獨立模型或 Claude 簽核。分支 `codex/market-closed-session-guard` 起於最新 main `afe469f522`，完成前以正常 fast-forward 納入 main 的資料更新至 `14952fa576`；沒有 rebase／遠端 force-push。只推 PR，不合併、不部署、不執行正式 workflow。
+只做primary self-review，未聲稱獨立簽核。依使用者修正原prompt的OR規格：有效普通股正量占比≥5%或至少50檔時一律保留當天資料；指數缺列只記 `primary-index-gap-with-trading`。沒有任何股票觀測時仍可依主要指數缺列判休市，95%零量平盤門檻不變；成交證據優先處理5%／95%恰好相交的邊界。
 
-實作、覆蓋限制與唯讀重現命令見 [MARKET_CLOSURES.md](../docs/MARKET_CLOSURES.md)、[ADR-029](docs/architecture/ADR-029-market-closed-session-projection.md)。以主要指數在有效首末範圍內缺日，或至少95%有效普通股零量平盤判定；整份指數失敗、範圍外日期、未知量、少數個股停牌不作休市證據。保留近期覆蓋與最小樣本保護。
+以一般merge納入最新main `2e8799ba4d`（#231），沒有rebase／遠端force-push。移除bootstrap／ETF補充中繞過股票證據的單獨指數缺日判定；它們只採完整掃描的市場policy。stage與每日快照重新檢查成交，撤銷舊誤判；較新的人工查核證據不因下次快照無該日股票而被零數值覆蓋。前端嚴格驗證正量數，保留11/04，完整行情cache換版。
 
-唯讀掃描 archive `61fdbdbda0df7f68f9f998ccaa1d65aaaae27fb5`：7,689代號、35,391年檔、7,843,344列，無無效OHLC；唯一含疑似列的日期為台股2026-10-23，共2,214列。普通股1,981／1,981零量平盤，且^TWII缺當天完成bar。美股0列。完整 [JSON報告](../docs/research-verification/market-closure-scan-20261106.json) 已入PR，實測掃描163.866秒。archive checkout前後git status乾淨；沒有寫入、刪除或推送archive。
+最新唯讀掃描archive `339f57e742d904976eefbf73b7fad506fff6d9c7`：7,689代號、41,507年檔、9,772,433列、0無效OHLC，59.225秒。普通股／ETF仍只有TW2026-10-23的2,214筆；但新回補另有^TWOII 2021-04-06一筆，當天普通股0、^TWII缺列，依指定的無觀測規則列出人工核對。因此最新完整報告是2個日期／2,215列，未把它隱藏成只有10/23。[JSON報告](../docs/research-verification/market-closure-scan-20261106.json)、[方法與限制](../docs/MARKET_CLOSURES.md)、[ADR-029](docs/architecture/ADR-029-market-closed-session-projection.md)。archive前後git status乾淨，無任何publish／修復／刪除。
 
-| 本機檢查 | 實際結果 |
-| --- | --- |
-| 12個相關Python unittest套件（新休市日、原market_sessions／market_warnings、archive／conflicts／expansion、universe_full、breadth／full_market_breadth、breakouts／full_market_breakouts、generated） | 306項通過；包含11項新休市回歸與35項generated真實暫存Git整合 |
-| `pytest tests/test_breadth_signals.py -q` | 24項通過 |
-| `npm ci`、`npm run lint`、`npm run typecheck` | 通過，無新增依賴 |
-| `npm test` | 154檔／1,921項通過 |
-| `npm run build`、Pages建置 | 通過；Pages輸出至dist-pages，沒有替換正式docs/atlas |
-| `actionlint`（universe-full、atlas-review） | 通過 |
-| 日週月封存、Yahoo失敗、#224盤中補洞、休市快照、新休市政策 | 桌機／390px Chromium／iPhone WebKit共27項通過 |
-| 新休市政策＋封存＋盤中補洞的375px兩引擎 | 14項通過 |
-| 原自選47檔／缺檔退路／新股、側邊、連續小圖、資料日期 | 三種原專案共21項通過 |
+實測：原相關Python套件273項通過；最後追加的成交證據保留案例以14項休市專項重驗。完整Vitest154檔／1,931項通過，lint／typecheck／一般與Pages建置通過。受影響桌機／390px Chromium／iPhone WebKit 51項、375px兩引擎16項，合計67項瀏覽器通過。未新增skip、增加timeout或放寬原數值斷言；原SEC測試在首輪高負載超時，減少並行後以原設定完整重跑通過。
 
-62項瀏覽器測試全通過；沒有新增skip、增加timeout或放寬既有數值斷言。兩個舊archive單元測試嚴格加上唯一的新metadata GET；原raw CSV內容仍先驗SHA。原閉市單元改為明確給市場證據，保留原數值斷言並新增個股零量不可自行刪除的檢查。Python回歸也確認10/23假列不再讓10/27後領頭羊成功率與突破家數變null、原週末排除數不變、部分欄位的Close讀取規則與完整OHLC驗證不變。
+新增案例涵蓋11/04指數缺列但100檔股票成交時不休市、stage正常帶出11/04、scanner更正舊policy、前端日週月不排除11/04；10/23全部零量、10/26完全無股票觀測仍判休市。5%與50檔門檻均測，舊成交證據的數值在次日保留。
 
-[桌機](docs/screenshots/market-closures/desktop.png)、[390px Chromium](docs/screenshots/market-closures/chromium390.png)、[390px WebKit](docs/screenshots/market-closures/iphone390.png)、[375px Chromium](docs/screenshots/market-closures/chromium375.png)、[375px WebKit](docs/screenshots/market-closures/iphone375.png) 為合成行情的版面／讀取驗證，顯示有效封存截止10/22，當天個別零量停牌仍保留。不是實體iPhone驗證，也不是新的真實行情證據。
-
-review重點：`market_sessions.py`共用判定與投影lineage，避免sector／monthly子集合重新誤判；scanner輸出禁止位於archive內；所有daily cache／bootstrap／ETF補充與stage共用日期；真正拆股transport保留既有休市列原值；警示先縮交易日再算窗口，舊前瞻CSV不回寫。前端先驗raw年檔，再過濾並聚合，live不能把假列加回；cache換版恢復被舊單股判定刪掉的真停牌列。
-
-已知限制：主要指數在有效範圍內的來源孤立缺列依指定OR規則也會被排除，報告公開理由供核對；範圍外且樣本不足保持未知。永久CSV仍有原始假列，僅網站／計算投影排除。未執行正式universe-full，之後正式資料輸出由原排程驗證。登入、Supabase函式／SQL、GCP、永久價格／財報、breakouts既有快照與前瞻log皆無本PR差異。
+[桌機11/04](docs/screenshots/market-closures/index-gap-desktop.png)、[390px Chromium](docs/screenshots/market-closures/index-gap-chromium390.png)、[390px WebKit](docs/screenshots/market-closures/index-gap-iphone390.png)、[375px Chromium](docs/screenshots/market-closures/index-gap-chromium375.png)、[375px WebKit](docs/screenshots/market-closures/index-gap-iphone375.png) 是合成行情版面／截止日證明，不是實體iPhone或正式行情驗收。未改登入、Supabase、GCP、永久資料、突破舊快照或前瞻log；不合併、不部署、不執行正式workflow。
 
 ## 市場多頭末期警示與波段計數（2026-11-05）
 
