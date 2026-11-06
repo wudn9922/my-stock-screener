@@ -14,6 +14,8 @@ Primary self-review only；沒有獨立模型簽核。從最新main `2e8799ba4d`
 
 合入最新main後再驗：完整Vitest156檔／1,965項、typecheck、一般與Pages建置通過；基本連線與80天／失效案例在桌機、390px與375px兩引擎另10項重驗通過。
 
+GitHub首輪完整瀏覽器930通過，但導頁復原舊案例的成功旗標被另一個index相依檔覆寫。對照#230實際artifact trace，只修共用測試的觀測與頁面就緒條件，新增新版WorldPage請求斷言，並先等懶載入控制台完成再操作頁尾；沒有修改登入、帳號或產品程式。[證據與方法](docs/CI_FOLLOWUP_230_235.md)。原兩檔27項桌機／390px Chromium／WebKit與14項375px兩引擎全部通過，lint／typecheck再次通過；未增加timeout／skip，完整CI對最後head重跑。
+
 本修訂不需新SQL或更換主金鑰。維護者先更新user-settings，再發布Atlas並刷新舊頁；本次皆未執行。正式根因需由維護者部署後依安全診斷核對，不請使用者提供金鑰或原始帳戶回應。
 
 ## 指數下載重試、唯讀封存備援與市場隔離（2026-11-05）
