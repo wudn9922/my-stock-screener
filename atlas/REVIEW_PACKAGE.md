@@ -1,3 +1,23 @@
+## MEXC 同步診斷、回應與期限提醒（2026-11-06）
+
+Primary self-review only；沒有獨立模型簽核。從最新main `2e8799ba4d` 建立 `codex/mexc-sync-diagnostics`，與PR #230無相依；交付前一般merge納入最新main `e2ea0322c5`，保留#229／#232／#233，僅REVIEW_PACKAGE前置段落衝突，兩邊內容皆保留。只推PR，不部署、不執行SQL、不查正式資料庫、不呼叫真實MEXC帳戶。既有授權、AES-GCM／HMAC、private表／RPC、持股成本與同步頻率不變。
+
+[操作、官方依據與維護者部署順序](../docs/ATLAS_MEXC_SYNC.md#2026-11-06-同步診斷與金鑰期限修訂)、[ADR-020](docs/architecture/ADR-020-mexc-read-only-holdings.md)。三個官方端點目前範例為裸物件／ticker陣列；apikey／accessKey兩別名保留。code:0 envelope是兼容修正，尚未觀察到正式帳戶回應，不能宣稱它就是根因。官方有寫入權限的範例仍須拒絕；free＋locked、不重複available、18位精度與上限仍嚴格。
+
+失敗診斷只有step／status／topLevelKeys／固定reason，4xx或含code時才可有數字code／安全msg。未知鍵名與非白名單msg遮蔽；連parser失敗也使用實際HTTP外層鍵名。不得記錄URL／query／簽章、原始例外、Key／Secret、資產／數量／餘額或owner。單元測試逐一掃描全部warning及allowed-key集合，含上游惡意回顯與未知內部回應。成功不產生日誌。
+
+失效訊息依帳戶留在RAM，重讀狀態也保留；不清空上次持股、成功時間或密文。成功更換／同步／斷線才清除該帳戶錯誤，其他帳戶不受影響。connectedAt滿80日提醒未綁IP約90日期限，是提示而非精確到期日。
+
+實測：npm ci、lint、typecheck、Deno check／lint、一般與Pages建置通過；完整Vitest155檔／1,954項通過。桌機／390px Chromium／iPhone WebKit的mexc＋holdings共57項通過；375px兩引擎的mexc共18項通過，總75項，無新增skip、放寬斷言或增加timeout。前端只新增本次提醒／帳戶錯誤狀態，沒有修改登入或設定API傳輸。
+
+[失效：桌機](docs/screenshots/mexc-diagnostics/mexc-key-expired-desktop.png)、[375px Chromium](docs/screenshots/mexc-diagnostics/mexc-key-expired-chromium375.png)、[375px WebKit](docs/screenshots/mexc-diagnostics/mexc-key-expired-iphone375.png)；[期限提醒：桌機](docs/screenshots/mexc-diagnostics/mexc-key-age-desktop.png)、[375px WebKit](docs/screenshots/mexc-diagnostics/mexc-key-age-iphone375.png)。同資料夾另附390px兩引擎與其他375px截圖。全部為假帳戶／假持股／假Key，不是實體iPhone或正式連線認證。
+
+合入最新main後再驗：完整Vitest156檔／1,965項、typecheck、一般與Pages建置通過；基本連線與80天／失效案例在桌機、390px與375px兩引擎另10項重驗通過。
+
+GitHub首輪完整瀏覽器930通過，但導頁復原舊案例的成功旗標被另一個index相依檔覆寫。對照#230實際artifact trace，只修共用測試的觀測與頁面就緒條件，新增新版WorldPage請求斷言，並先等懶載入控制台完成再操作頁尾；沒有修改登入、帳號或產品程式。[證據與方法](docs/CI_FOLLOWUP_230_235.md)。原兩檔27項桌機／390px Chromium／WebKit與14項375px兩引擎全部通過，lint／typecheck再次通過；未增加timeout／skip，完整CI對最後head重跑。
+
+本修訂不需新SQL或更換主金鑰。維護者先更新user-settings，再發布Atlas並刷新舊頁；本次皆未執行。正式根因需由維護者部署後依安全診斷核對，不請使用者提供金鑰或原始帳戶回應。
+
 ## 指數下載重試、唯讀封存備援與市場隔離（2026-11-05）
 
 Primary self-review only；沒有獨立模型或 Claude 簽核。分支 `codex/index-daily-resilience` 從 main `c3f5c76511` 建立，先以一般 merge 納入 #228，待其合併後再以一般 merge 合入最新 main `afe469f522`（包含 #228 的 `21d49127ee`）。沒有 rebase／force-push；只交付 PR，不合併、不部署、不觸發正式 workflow。

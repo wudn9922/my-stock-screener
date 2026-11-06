@@ -212,6 +212,10 @@ for (const mode of ['device', 'cloud'] as const) {
     await expect(page.getByTestId('ohlc-header')).toBeVisible();
     await expect(page.getByTestId('legacy-import-card')).toHaveCount(0);
     await page.getByRole('button', { name: '我的', exact: true }).click();
+    // The footer sits outside Suspense. Wait for the lazy page and its initial
+    // layout before scrolling to/tapping the import action on mobile WebKit.
+    await expect(page.getByRole('heading', { name: '均線參數與個人分組', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '重新載入參數', exact: true })).toBeEnabled();
     const card = page.getByTestId('legacy-import-card');
     await expect(card).toBeVisible();
     await expect(card).toContainText(/畫線\s*2/);
@@ -247,6 +251,8 @@ for (const mode of ['device', 'cloud'] as const) {
     await expect(page.getByTestId('ohlc-header')).toBeVisible();
     await expect(page.getByTestId('legacy-import-card')).toHaveCount(0);
     await page.getByRole('button', { name: '我的', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '均線參數與個人分組', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '重新載入參數', exact: true })).toBeEnabled();
     await page.getByTestId('legacy-import-reopen').click();
     await expect(page.getByTestId('legacy-import-card')).toBeVisible();
     await expectConsoleReady(page);

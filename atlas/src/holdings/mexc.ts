@@ -1,16 +1,36 @@
 import { accessState } from '../auth/access';
 import { getStorageContextKey } from '../auth/storage';
 import { holdingsContextApi } from './contextApi';
-import { MEXC_ERRORS, validateMexcState, type MexcState } from '../../../supabase/functions/user-settings/mexcContract';
+import {
+  MEXC_ERRORS,
+  validateMexcState,
+  type MexcState,
+} from '../../../supabase/functions/user-settings/mexcContract';
 import { holdingsStore } from './store';
 export type { MexcConnection, MexcState } from '../../../supabase/functions/user-settings/mexcContract';
 
-const blank = { connections: [], retryAt: null, configured: false } as MexcState;
-const inactive = { state: blank, loading: false, busy: false, error: '' };
+const blank = {
+  connections: [],
+  retryAt: null,
+  configured: false,
+} as MexcState;
+const inactive = {
+  state: blank,
+  loading: false,
+  busy: false,
+  error: '',
+  accountErrors: {} as Record<string, string>,
+};
 export class MexcStore {
   private readonly context = getStorageContextKey();
   private readonly mode = accessState.getSnapshot().storageMode;
-  private snapshot = { state: blank, loading: false, busy: false, error: '' };
+  private snapshot = {
+    state: blank,
+    loading: false,
+    busy: false,
+    error: '',
+    accountErrors: {} as Record<string, string>,
+  };
   private listeners = new Set<() => void>();
   getSnapshot = () => (this.context === getStorageContextKey() ? this.snapshot : inactive);
   subscribe = (listener: () => void) => {
@@ -46,31 +66,58 @@ export class MexcStore {
   async call(action: 'connect' | 'sync' | 'apply' | 'disconnect', payload: Record<string, unknown>) {
     this.active();
     if (this.snapshot.busy || this.snapshot.loading) throw new Error('請等候目前操作完成。');
+    const account = payload.account as { id?: unknown } | undefined;
+    const accountId =
+      typeof payload.accountId === 'string'
+        ? payload.accountId
+        : typeof account?.id === 'string'
+          ? account.id
+          : undefined;
     this.set({
       busy: true,
       error: '',
       ...(action === 'connect' || action === 'sync'
-        ? { state: { ...this.snapshot.state, retryAt: new Date(Date.now() + 30000).toISOString() } }
+        ? {
+            state: {
+              ...this.snapshot.state,
+              retryAt: new Date(Date.now() + 30000).toISOString(),
+            },
+          }
         : {}),
     });
     try {
-      const raw = await holdingsContextApi<Record<string, unknown>>(this.context, `holdings.mexc.${action}`, payload);
+      const raw = await holdingsContextApi<Record<string, unknown>>(
+        this.context,
+        `holdings.mexc.${action}`,
+        payload,
+      );
       this.active();
       const state = validateMexcState(raw);
       holdingsStore().acceptCloudDocument(raw.document);
-      this.set({ state });
+      const accountErrors = { ...this.snapshot.accountErrors };
+      if (accountId) delete accountErrors[accountId];
+      this.set({ state, accountErrors });
       return state;
     } catch (error) {
       const message =
         error instanceof Error && (Object.values(MEXC_ERRORS) as string[]).includes(error.message)
           ? error.message
           : MEXC_ERRORS.service;
-      this.set({ error: message });
+      const errorUpdate = accountId
+        ? {
+            error: '',
+            accountErrors: {
+              ...this.snapshot.accountErrors,
+              [accountId]: message,
+            },
+          }
+        : { error: message };
+      this.set(errorUpdate);
       if (message === MEXC_ERRORS.limit && this.context === getStorageContextKey()) {
         try {
           const state = validateMexcState(await holdingsContextApi(this.context, 'holdings.mexc.status'));
           this.active();
-          this.set({ state, error: message });
+          this.set({ state, ...errorUpdate });
         } catch {
           /* Keep the local cooldown and fixed error when metadata is unavailable. */
         }
