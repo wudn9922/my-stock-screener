@@ -1,5 +1,30 @@
 # Atlas MEXC 只讀同步（PR B）
 
+## 2026-11-06 同步診斷與金鑰期限修訂
+
+此修訂沒有修改 SQL、加密格式、主金鑰、授權、限流或同步頻率。只在上游讀取／解析失敗時新增一行結構化 `console.warn`，接受明確的數字零成功 envelope，並在個別帳戶保留失效狀態及80天提醒。沒有使用真實金鑰、呼叫真實MEXC帳戶、查正式資料庫或部署。
+
+官方文件核對日期為2026-11-06：
+
+- [Query APIKey Info — Response Parameters／Response](https://www.mexc.com/api-docs/spot-v3/spot-account-trade/query-api-key-info)：目前範例是直接物件，欄位表寫 `apikey`，範例使用 `accessKey`；維持兩個別名。`permissions` 是逗號分隔字串；`remainingValidity` 是整數，-999永久、0過期、正值有效。官方完整範例包含寫入權限，測試仍拒絕，不能當成唯讀金鑰通過。
+- [Account Information — Response](https://www.mexc.com/api-docs/spot-v3/spot-account-trade/account-information)：直接回傳 `accountType: SPOT` 與 balances，free／locked為十進位字串；`available` 不再加一次，帳戶canTrade／canWithdraw不代表API Key具備寫入權限。
+- [Symbol Price Ticker — Response](https://www.mexc.com/api-docs/spot-v3/market-data-endpoints/symbol-price-ticker)：未傳symbol時回陣列，price為字串。
+- [Error Code](https://www.mexc.com/api-docs/spot-v3/error-code)：10072、700001、730706等失效Key與602／700002簽章失敗會回固定失效提示；不把所有4xx都解釋成Key過期。418／429仍沿用原Retry-After。
+
+文件中的三個端點目前沒有展示 `code: 0, data: ...` envelope，因此不能斷言它就是正式環境此次502的原因。舊程式只要看到code就拒絕的缺口已修正：數字0可解包data，之後仍走同一嚴格解析器；非零或不正確型別不當成功。正式根因需由維護者部署後，依下列安全診斷確認，不能靠假資料測試宣稱已認證正式連線。
+
+診斷只含 `step`（apiKeyInfo／account／ticker／parse-balances／parse-quotes／assert-key）、`status`、`topLevelKeys`、固定 `reason`；只有4xx或含code時可加數字code及msg。頂層未知鍵名可能本身是資產／識別碼，所以改為 `[other]`；只有已知不含使用者資料的MEXC訊息可原樣記錄，其他msg一律 `[redacted]`。不記錄headers、URL／query／簽章、原始exception、Key／Secret、餘額、資產名稱、數量或owner。未知內部回應也只記固定原因碼。診斷範例：
+
+```json
+{"step":"apiKeyInfo","status":400,"topLevelKeys":["code","msg"],"reason":"upstream-code","code":10072,"msg":"Api key info invalid"}
+```
+
+Key驗證失敗時，該帳戶顯示「MEXC API Key 已失效，請到 MEXC 重新建立唯讀 Key 後重新填入」。原確認持股、均價、最後成功同步時間與密文都保留，只有成功同步／更換Key／中斷連線才清除該帳戶的錯誤；在同次瀏覽重新讀狀態不抹掉失效提示，也不把錯誤顯示在其他帳戶。
+
+`connectedAt`滿80個完整日顯示「MEXC 未綁 IP 的 Key 約90天到期，請準備更換」。依據官方[Introduction的API Key FAQ](https://www.mexc.com/api-docs/spot-v3/introduction)，未綁IP的Key有90天期限。提醒以Atlas連線日計算，是維護提示，並非MEXC實際建立日或精確到期日；較早建立、後來才連線的Key可能更早失效。不新增通知或背景排程。
+
+維護者部署順序（本次不執行）：既有MEXC SQL與加密secret保持原狀，**不需重跑SQL或更換主金鑰**；先更新 `user-settings`（mexc.ts／mexcContract.ts），再依原流程發布Atlas並刷新頁面。舊前端在過渡期間可能把新失效文案當作通用錯誤，但不會清空持股。診斷應只查看上述欄位，不要把Key／Secret或原始帳戶回應貼到issue／log。
+
 PR A #199 已合併後，從 main `61eb973919c8f1fd045213c726d9eed293a9f346` 開始此分支。
 此功能讓使用者**在網站輸入自己的 MEXC API Key 與 Secret Key**，伺服器讀取現貨餘額及公開 USDT 行情；不下單、不取消訂單、不交易、不轉帳、不提幣，也不發任何通知。
 
