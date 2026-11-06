@@ -12,6 +12,14 @@ Primary self-review only；沒有獨立模型或 Claude 簽核。分支 `codex/i
 
 截圖為合成 fixture 的狀態／來源版面，不是真實行情；以1100px高視窗展示內容，手機寬度維持390／375。已目視檢查 [桌機](docs/screenshots/index-daily-resilience/desktop-retained.png)、[390px WebKit](docs/screenshots/index-daily-resilience/iphone390-retained.png)、[375px WebKit](docs/screenshots/index-daily-resilience/iphone375-retained.png)；同目錄另有 unavailable 截圖。這是 Playwright 模擬，不是實體 iPhone 驗證。沒有修改登入／Supabase／SQL／GCP／永久價格財報／archive 分支，沒有新增通知。
 
+## WebKit 舊版匯入頁面就緒（2026-11-06）
+
+Primary self-review only；沒有獨立簽核。`legacy-import.spec.ts` 的卡片在 ConsolePage 的 Suspense 外先出現；原 CI 在整頁尚未掛載時點擊，版面替換使輸入未落在匯入按鈕。只有新增既有 region「原有均線參數控制台」可見的前置斷言，五處入口共用；原全部步驟／click／斷言逐字保留，10秒 expect／60秒 case timeout 不變。
+
+原始 CI trace／截圖、受控 native pointerdown→LABEL pointerup→MAIN click 的重現，以及修正後同一交錯的成功，見 [LEGACY_IMPORT_WEBKIT.md](docs/LEGACY_IMPORT_WEBKIT.md)。正常前後各20次皆通過，沒有宣稱本機量到失敗率改善；診斷原版1失敗／修正版1通過，兩組證據分開記錄。可重跑腳本只用 fixture 與本機 ConsolePage 回應，不改正常測試輸入。
+
+本機63個帳號隔離／匯入／控制台、14個375px匯入回歸通過。同步main後完整154檔／1,935單元、lint、一般與Pages建置通過。沒有改正式程式、帳號授權、Supabase／SQL、workflow或正式資料。#232已由遠端合併，此附加工作另推PR，不合併或部署。
+
 ## WebKit 研究頁面導頁回退（2026-11-06）
 
 Primary self-review only；沒有獨立簽核。從 main `afe469f5229fd66b3515cfa473053dd81480a229` 建立 `codex/webkit-research-smoke`，只推 PR、不合併或部署。
