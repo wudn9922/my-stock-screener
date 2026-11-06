@@ -53,6 +53,12 @@ const legacyDocument = {
   lists: [list(SHARED_LIST, '舊版同名 ID'), list(LEGACY_LIST, '舊版研究清單')],
 };
 
+async function expectConsoleReady(page: Page) {
+  // The footer card is outside the route's Suspense boundary. Its enabled button
+  // can appear before ConsolePage mounts and moves it during a WebKit click.
+  await expect(page.getByRole('region', { name: '原有均線參數控制台' })).toBeVisible();
+}
+
 async function seedBrowser(page: Page, mode: TestStorageMode, populatedAccount: boolean) {
   await page.route('**/__legacy_seed__', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>seed</title>' }));
   await page.goto('./__legacy_seed__');
@@ -217,6 +223,7 @@ for (const mode of ['device', 'cloud'] as const) {
     await expect(card).toContainText(/清單\s*\d+/);
     expect(calls.filter(call => call.action === 'atlas.save' && JSON.stringify(call).includes('legacy-drawing'))).toEqual([]);
     expect((await readBrowserData(page, DEVICE_USER_ID, mode)).account.symbols[0].drawings).toHaveLength(1);
+    await expectConsoleReady(page);
     await page.screenshot({ path: testInfo.outputPath(`legacy-import-${mode}-prompt.png`) });
     await page.getByTestId('legacy-import-confirm').click();
     await expect(card).toContainText(/匯入完成|已匯入/);
@@ -248,6 +255,7 @@ for (const mode of ['device', 'cloud'] as const) {
     await expect(page.getByRole('button', { name: '重新載入參數', exact: true })).toBeEnabled();
     await page.getByTestId('legacy-import-reopen').click();
     await expect(page.getByTestId('legacy-import-card')).toBeVisible();
+    await expectConsoleReady(page);
     await page.getByTestId('legacy-import-confirm').click();
     await expect(page.getByTestId('legacy-import-card')).toContainText(/匯入完成|已匯入/);
     const rerun = await readBrowserData(page, DEVICE_USER_ID, mode);
@@ -268,6 +276,7 @@ test('cloud import preserves server-only drawings before merging shared legacy r
   await expect(page.getByTestId('legacy-import-card')).toHaveCount(0);
   await page.getByRole('button', { name: '我的', exact: true }).click();
   await expect(page.getByTestId('legacy-import-confirm')).toBeVisible();
+  await expectConsoleReady(page);
   await page.getByTestId('legacy-import-confirm').click();
   await expect(page.getByTestId('legacy-import-card')).toContainText('已匯入');
   const after = await readBrowserData(page, DEVICE_USER_ID, 'cloud');
@@ -290,6 +299,7 @@ test('dismissal is per browser account, can be reopened, and leaves legacy avail
   await expect(page.getByTestId('legacy-import-reopen')).toBeVisible();
   await expect(page.getByTestId('legacy-import-card')).toHaveCount(0);
   await page.getByTestId('legacy-import-reopen').click();
+  await expectConsoleReady(page);
   await page.getByTestId('legacy-import-confirm').click();
   await expect(page.getByTestId('legacy-import-card')).toContainText(/匯入完成|已匯入/);
   const first = await readBrowserData(page);
@@ -301,6 +311,7 @@ test('dismissal is per browser account, can be reopened, and leaves legacy avail
   }, SECOND_USER_ID);
   await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toContainText(SECOND_USER_ID);
   await expect(page.getByTestId('legacy-import-card')).toBeVisible();
+  await expectConsoleReady(page);
   await page.getByTestId('legacy-import-confirm').click();
   await expect(page.getByTestId('legacy-import-card')).toContainText(/匯入完成|已匯入/);
   const second = await readBrowserData(page, SECOND_USER_ID);

@@ -34,6 +34,7 @@ docs/report/**/*.tmp
 /docs/index.html
 /docs/wsj.jpg
 /docs/barrons.jpg
+/docs/news/
 /docs/atlas/
 /docs/report/latest.json
 /docs/report/trending-stocks.json

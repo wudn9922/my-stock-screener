@@ -3,7 +3,7 @@
   "owners": {
     "calendar": ["docs/report/market-calendar.json"],
     "status": ["docs/report/data-status.json", "docs/report/industry-rotation.json", "docs/report/screener-history/*.json"],
-    "screenshots": ["docs/wsj.png", "docs/barrons.png", "docs/wsj.jpg", "docs/barrons.jpg"],
+    "screenshots": ["docs/wsj.png", "docs/barrons.png", "docs/wsj.jpg", "docs/barrons.jpg", "docs/news/*.jpg", "docs/news/state.json"],
     "daily": ["docs/index.html", "docs/wsj.png", "docs/barrons.png", "docs/wsj.jpg", "docs/barrons.jpg", "docs/report/latest.json", "docs/report/trending-stocks.json", "docs/report/universe.json", "docs/report/series/**", "docs/report/themes.json", "docs/report/rates.json", "docs/report/rates-history.json", "docs/report/jp-rates.json", "docs/report/yield-band-params.json"],
     "atlas": ["docs/atlas/**", "docs/index.html"],
     "financials": ["docs/report/growth.json"],

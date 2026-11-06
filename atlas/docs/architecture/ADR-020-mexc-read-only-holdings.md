@@ -2,6 +2,19 @@
 
 Status: proposed, PR B after #199 merged, 2026-10-28.
 
+2026-11-06 follow-up keeps encryption, authorization and SQL unchanged. Upstream
+failures log one metadata-only diagnostic with fixed reason codes; unknown field
+names and non-allowlisted messages are redacted. Explicit numeric-zero success
+envelopes are unwrapped, while all endpoint schemas and read-only permission
+checks remain strict. Current official examples are bare objects, so the actual
+production failure still needs the maintainer's post-deployment diagnostic.
+
+Invalid-key errors belong to one account in the current RAM-only view and retain
+the successful snapshot/time, including across status reload. Successful sync,
+key replacement or disconnect clears that account's error. After 80 days since
+connectedAt, the panel shows the unbound-key 90-day reminder; it is not an exact
+exchange expiry date. No notification channel or polling interval is added.
+
 Add website API credential entry for cloud-authorized MEXC accounts. The browser
 sends the pair once on explicit submission, clears fields, never persists keys and
 shows only the server-returned last four characters. Bind the originating storage

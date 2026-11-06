@@ -36,6 +36,16 @@ WAYBACK_AVAILABLE_API = "https://archive.org/wayback/available"
 # JPEG 比 PNG 小很多，LINE 圖片大小有限制（約 1MB）
 JPEG_QUALITY = 85
 
+# LINE 的 Flex 圖片每次打開訊息都會重新讀取網址。若網址指向會被覆寫的
+# docs/wsj.jpg，舊訊息永遠顯示最新的圖（2026-11-04～06 都顯示同一張）。
+# 因此每張送出的圖都另存成「日期＋內容指紋」的檔名，永不覆寫，只保留 30 天。
+NEWS_DIR = "docs/news"
+NEWS_STATE_PATH = "docs/news/state.json"
+NEWS_RETENTION_DAYS = int(os.environ.get("NEWS_RETENTION_DAYS", "30"))
+# 同一來源連續失敗時，只在第 1 天和第 7 天說明原因，其餘只寫「今日無新聞」
+NEWS_FAILURE_NOTICE_DAYS = (1, 7)
+NEWS_FILE_PATTERN = re.compile(r"^(?P<key>[a-z0-9]+)-(?P<date>\d{8})-(?P<digest>[0-9a-f]{12})\.jpg$")
+
 # 防機器人驗證頁的特徵文字與 iframe 網址
 BLOCKED_PAGE_MARKERS = (
     "Verification Required",
@@ -261,6 +271,102 @@ def get_wayback_snapshot(site, page_url, max_age_hours=None):
     )
 
 
+def news_key(name):
+    """'WSJ' → 'wsj'，"Barron's" → 'barrons'。"""
+    return re.sub(r"[^a-z0-9]", "", name.lower())
+
+
+def file_sha256(path):
+    import hashlib
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def load_news_state(path=NEWS_STATE_PATH):
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"version": 1, "sources": {}}
+    if not isinstance(data, dict) or not isinstance(data.get("sources"), dict):
+        return {"version": 1, "sources": {}}
+    return {"version": 1, "sources": data["sources"]}
+
+
+def save_news_state(state, path=NEWS_STATE_PATH):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text(
+        json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def prune_news_files(now, news_dir=NEWS_DIR, keep_days=NEWS_RETENTION_DAYS):
+    """刪除超過保留天數的每日截圖；檔名不符格式的檔案不動。"""
+    cutoff = (now - timedelta(days=keep_days)).strftime("%Y%m%d")
+    removed = []
+    folder = Path(news_dir)
+    if not folder.is_dir():
+        return removed
+    for file in sorted(folder.glob("*.jpg")):
+        match = NEWS_FILE_PATTERN.match(file.name)
+        if match and match.group("date") < cutoff:
+            file.unlink()
+            removed.append(file.as_posix())
+    return removed
+
+
+def prepare_news_items(captured_items, failures, now, state, news_dir=NEWS_DIR):
+    """
+    決定今天哪些截圖要送出，並把要送出的圖另存成不會被覆寫的檔名。
+
+    - 與上次送出的圖完全相同（SHA-256）→ 不送、不給 Dify，改列「今日無新聞」。
+    - 截圖失敗 → 累計連續失敗天數，列「今日無新聞」。
+    回傳 (send_items, no_news)；no_news = [{"name", "reason", "streak"}]。
+    state 會就地更新，呼叫端在發佈前寫回。
+    """
+    sources = state.setdefault("sources", {})
+    send_items, no_news = [], []
+    day = now.strftime("%Y%m%d")
+
+    for item in captured_items:
+        entry = sources.setdefault(item["name"], {})
+        digest = file_sha256(item["path"])
+        if entry.get("sha256") == digest:
+            print(f"{item['name']} 截圖與上次送出的相同，今日不重複發送。")
+            no_news.append({"name": item["name"], "reason": "same", "streak": 0})
+            entry["failStreak"] = 0
+            continue
+        Path(news_dir).mkdir(parents=True, exist_ok=True)
+        publish_path = f"{news_dir}/{news_key(item['name'])}-{day}-{digest[:12]}.jpg"
+        Path(publish_path).write_bytes(Path(item["path"]).read_bytes())
+        send_items.append({**item, "publish_path": publish_path, "sha256": digest})
+        entry.update(sha256=digest, sentAt=now.isoformat(), file=publish_path, failStreak=0)
+        if item.get("snapshot"):
+            entry["snapshot"] = item["snapshot"]
+
+    for failure in failures:
+        entry = sources.setdefault(failure["name"], {})
+        entry["failStreak"] = int(entry.get("failStreak") or 0) + 1
+        entry["lastFailure"] = now.isoformat()
+        no_news.append({"name": failure["name"], "reason": "failed", "streak": entry["failStreak"]})
+
+    return send_items, no_news
+
+
+def no_news_lines(no_news):
+    """每個沒有新圖的來源一行；連續失敗只在第 1、7 天補充原因。"""
+    lines = []
+    for item in no_news:
+        line = f"📰 {item['name']}：今日無新聞"
+        if item["reason"] == "failed" and item["streak"] in NEWS_FAILURE_NOTICE_DAYS:
+            line += (
+                "（網站擋下截圖"
+                + (f"，已連續 {item['streak']} 天" if item["streak"] > 1 else "")
+                + "；之後只顯示今日無新聞）"
+            )
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def publish_screenshots(captured_items):
     """
     將截圖推送到 GitHub，提供 LINE 可公開讀取的圖片網址。
@@ -297,7 +403,10 @@ def publish_screenshots(captured_items):
             "rm", "-q", "--ignore-unmatch",
             "docs/wsj.png", "docs/barrons.png",
         )
-        git("add", *[item["path"] for item in captured_items])
+        if captured_items:
+            git("add", "-f", *[item.get("publish_path", item["path"]) for item in captured_items])
+        # 每日截圖、刪除的過期檔與去重狀態檔一起提交（docs/news 平時被 .gitignore 排除）
+        git("add", "-A", "-f", "--", NEWS_DIR)
 
         if git("diff", "--cached", "--quiet") != 0:
             git("commit", "-q", "-m", "Update financial news screenshots")
@@ -322,14 +431,12 @@ def publish_screenshots(captured_items):
         print("截圖未能同步，LINE 不附圖片。")
         return
 
-    # 避免 LINE 取得 GitHub Raw 舊快取
-    cache_version = int(time.time())
-
+    # 每張圖都是「日期＋內容指紋」的專屬檔名，永不覆寫：
+    # 舊的 LINE 訊息重新讀取網址時，仍拿到當天那張圖。
     for item in captured_items:
         item["url"] = (
             f"https://raw.githubusercontent.com/"
-            f"{repo}/{branch}/{item['path']}"
-            f"?v={cache_version}"
+            f"{repo}/{branch}/{item.get('publish_path', item['path'])}"
         )
 
 
@@ -337,8 +444,9 @@ def capture_and_upload_screenshots():
     """
     截取 WSJ 與 Barron's 首頁（向下捲動後），存成 JPEG。
 
-    WSJ 截 Wayback 存檔（避開防機器人驗證）；Barron's 直接連線。
+    兩者都截 Wayback 最近存檔（避開防機器人驗證）；沒有期限內存檔時才直接連線。
     任何一個被擋或失敗都不會被送出，而是記錄在 failures。
+    發佈與去重複由 capture_prepare_and_publish() 處理。
 
     回傳 (captured_items, failures)：
     captured_items = [{"name": "WSJ", "path": "docs/wsj.jpg", "url": "https://..."}]
@@ -361,6 +469,8 @@ def capture_and_upload_screenshots():
             "url": "https://www.barrons.com",
             "path": "docs/barrons.jpg",
             "scroll_y": BARRONS_SCROLL_Y,
+            # 2026-11-05 起直接連線一律回 401 防機器人驗證頁，比照 WSJ 改截 Wayback
+            "wayback_site": "barrons.com",
         },
     ]
 
@@ -402,10 +512,11 @@ def capture_and_upload_screenshots():
             for target in targets:
                 try:
                     page_url = target["url"]
+                    snapshot_time = None
 
                     if target.get("wayback_site"):
                         try:
-                            page_url, _ = get_wayback_snapshot(
+                            page_url, snapshot_time = get_wayback_snapshot(
                                 target["wayback_site"],
                                 target["url"],
                             )
@@ -470,6 +581,7 @@ def capture_and_upload_screenshots():
                         "name": target["name"],
                         "path": target["path"],
                         "url": None,
+                        **({"snapshot": snapshot_time.isoformat()} if snapshot_time else {}),
                     })
 
                     print(f"{target['name']} 截圖完成。")
@@ -489,10 +601,32 @@ def capture_and_upload_screenshots():
             if target["name"] not in done:
                 record_failure(target["name"], f"瀏覽器啟動失敗：{e}")
 
-    if captured_items:
-        publish_screenshots(captured_items)
-
     return captured_items, failures
+
+
+def capture_prepare_and_publish(now=None):
+    """
+    截圖 → 去重複並另存不會被覆寫的檔名 → 刪除過期檔 → 與狀態檔一起發佈。
+
+    回傳 (send_items, no_news)：send_items 才會交給 Dify 與 LINE。
+    發佈失敗時 send_items 沒有 url，LINE 不附圖（不送舊圖）。
+    """
+    now = now or datetime.now(timezone.utc)
+    captured_items, failures = capture_and_upload_screenshots()
+    for failure in failures:
+        print(
+            f"::warning title={failure['name']} 截圖失敗::"
+            f"{failure['reason']}"
+        )
+    state = load_news_state()
+    send_items, no_news = prepare_news_items(captured_items, failures, now, state)
+    removed = prune_news_files(now)
+    if removed:
+        print(f"刪除超過 {NEWS_RETENTION_DAYS} 天的新聞截圖：{len(removed)} 張")
+    save_news_state(state)
+    # 即使今天沒有新圖，也要發佈狀態檔與刪除，讓明天的去重複與連續失敗天數正確
+    publish_screenshots(send_items)
+    return send_items, no_news
 
 
 def get_yahoo_chart_metadata(symbol, session):
@@ -1596,16 +1730,8 @@ def send_line_report(message, image_urls):
 
 if __name__ == "__main__":
     try:
-        # 1. 向下捲動後截取 WSJ 與 Barron's
-        captured_news, capture_failures = (
-            capture_and_upload_screenshots()
-        )
-
-        for failure in capture_failures:
-            print(
-                f"::warning title={failure['name']} 截圖失敗::"
-                f"{failure['reason']}"
-            )
+        # 1. 截取 WSJ 與 Barron's；與上次相同或失敗的來源改列「今日無新聞」
+        captured_news, no_news = capture_prepare_and_publish()
 
         # 2. 取得熱門商品，並只保留美國交易所掛牌股票
         stocks_live = fetch_yahoo_realtime_trending(
@@ -1654,23 +1780,18 @@ if __name__ == "__main__":
                 "略過 Dify 圖片分析。"
             )
 
-            # 即使截圖失敗，若有取得熱門美股仍可發送文字
+            # 沒有新截圖時，若有取得熱門美股仍可發送文字
             if stocks_live:
                 report_text = (
-                    "⚠️ 今日新聞截圖取得失敗。"
-                    "\n\n"
                     "📈 今日熱門美股\n"
                     f"{stocks_live}"
                 )
 
-        # 部分來源截圖失敗（例如 WSJ 被擋）時，在報告開頭簡短提醒
-        if captured_news and capture_failures:
-            failed_names = "、".join(
-                failure["name"] for failure in capture_failures
-            )
-
+        # 沒有新圖的來源（與上次相同或截圖失敗）只列一行「今日無新聞」，
+        # 不再每天重複同樣的失敗警告
+        if no_news:
             report_text = (
-                f"⚠️ {failed_names} 今日截圖失敗\n\n{report_text}"
+                f"{no_news_lines(no_news)}\n\n{report_text}"
             ).strip()
 
         # 5. 將兩行利率資訊插入熱門股下方
