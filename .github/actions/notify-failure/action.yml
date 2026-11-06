@@ -1,0 +1,56 @@
+name: Notify system failure
+description: Discord first, LINE fallback; notification delivery never fails its caller
+inputs:
+  title:
+    description: Static system notice title
+    required: true
+  summary:
+    description: Safe job or step summary; no user data or command output
+    default: ''
+  needs-json:
+    description: Job results; only notification summaries are read
+    default: '{}'
+  run-url:
+    description: GitHub Actions run link
+    required: true
+  workflow:
+    description: Originating workflow name
+    required: true
+  event:
+    description: Originating trigger type
+    required: true
+  discord-webhook:
+    description: Pass only secrets.DISCORD_WEBHOOK_URL1
+    default: ''
+  line-access-token:
+    description: Existing LINE failure fallback token
+    default: ''
+  line-user-id:
+    description: Existing LINE failure fallback recipient
+    default: ''
+  github-token:
+    description: Optional actions-read token for failed job and step metadata
+    default: ''
+outputs:
+  delivered:
+    description: Whether either channel accepted the notification
+    value: ${{ steps.send.outputs.delivered }}
+runs:
+  using: composite
+  steps:
+    - name: Send failure notice without exposing credentials
+      id: send
+      continue-on-error: true
+      shell: bash
+      env:
+        NOTICE_TITLE: ${{ inputs.title }}
+        NOTICE_SUMMARY: ${{ inputs.summary }}
+        NOTICE_NEEDS: ${{ inputs.needs-json }}
+        NOTICE_RUN_URL: ${{ inputs.run-url }}
+        NOTICE_WORKFLOW: ${{ inputs.workflow }}
+        NOTICE_EVENT: ${{ inputs.event }}
+        NOTICE_DISCORD_WEBHOOK: ${{ inputs.discord-webhook }}
+        NOTICE_LINE_TOKEN: ${{ inputs.line-access-token }}
+        NOTICE_LINE_USER: ${{ inputs.line-user-id }}
+        NOTICE_GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: python "$GITHUB_ACTION_PATH/notify.py"

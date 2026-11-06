@@ -30,6 +30,9 @@ concurrency:
 jobs:
   build-and-deploy:
     # workflow_run 只有在每日報告成功時才繼續
+    outputs:
+      notify_partial: ${{ steps.collect_notification_outcomes.outputs.has_partial }}
+      notify_summary: ${{ steps.collect_notification_outcomes.outputs.summary }}
     if: >-
       github.event_name != 'workflow_run'
       || github.event.workflow_run.conclusion == 'success'
@@ -154,7 +157,8 @@ jobs:
 
       # Opt-in only: apply supabase/manual/atlas_watchlists.sql and deploy user-settings first.
       # Daily observations preserve the last-opening baseline and never send notifications here.
-      - name: Restore full-market daily bars for saved watchlists (read-only)
+      - id: notice_soft_07
+        name: Restore full-market daily bars for saved watchlists (read-only)
         if: vars.ATLAS_WATCHLIST_SYNC_ENABLED == '1'
         continue-on-error: true
         uses: actions/cache/restore@v4
@@ -163,7 +167,8 @@ jobs:
           key: atlas-watchlists-universe-read-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: universe-full-v1-
 
-      - name: Refresh saved watchlist observations
+      - id: notice_soft_08
+        name: Refresh saved watchlist observations
         if: vars.ATLAS_WATCHLIST_SYNC_ENABLED == '1'
         continue-on-error: true
         working-directory: atlas
@@ -269,25 +274,34 @@ jobs:
             echo "::warning::美股財報日（Yahoo）更新失敗，沿用上次部署的 valuation/us-events.json"
           fi
 
-      # 不依賴 Claude 的故障通知：本 job 失敗或逾時（取消）時推播 LINE
-      - name: Notify LINE on failure
-        if: failure() || cancelled()
+      - name: Collect partial failure outcomes without changing this job result
+        id: collect_notification_outcomes
+        if: always() && !cancelled()
+        continue-on-error: true
         env:
-          LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
-          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
-          TITLE: "Atlas 網站更新"
-          RESULT: ${{ job.status }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          NOTIFY_STEP_RESULTS: ${{ toJSON(steps) }}
+          NOTIFY_STEP_NAMES: '{"directory": "Build full-market symbol directory (TWSE / TPEx / US)", "valuation_us": "Build US valuation data (Yahoo Finance)", "valuation_growth": "Build US growth data (Yahoo Finance)", "valuation_tw_annual": "Build Taiwan annual EPS (Yahoo Finance)", "valuation": "Build Taiwan valuation data (TWSE / TPEx)", "events_us": "Build US earnings dates (Yahoo Finance)", "notice_soft_07": "Restore full-market daily bars for saved watchlists (read-only)", "notice_soft_08": "Refresh saved watchlist observations"}'
         run: |
-          if [ -z "${LINE_ACCESS_TOKEN}" ] || [ -z "${LINE_USER_ID}" ]; then
-            echo "::warning::未設定 LINE_ACCESS_TOKEN / LINE_USER_ID，無法推播故障通知"
-            exit 0
-          fi
-          text=$(printf '⚠️ %s %s\n台灣時間 %s\n%s' "${TITLE}" \
-            "$([ "${RESULT}" = cancelled ] && echo '逾時或被取消' || echo '執行失敗')" \
-            "$(TZ=Asia/Taipei date '+%m/%d %H:%M')" "${RUN_URL}")
-          jq -n --arg to "${LINE_USER_ID}" --arg text "${text}" \
-            '{to: $to, messages: [{type: "text", text: $text}]}' |
-            curl -sS --fail-with-body --max-time 30 -X POST https://api.line.me/v2/bot/message/push \
-              -H "Authorization: Bearer ${LINE_ACCESS_TOKEN}" -H 'Content-Type: application/json' -d @- ||
-            echo "::warning::LINE 故障通知推播失敗"
+          python - <<'PY'
+          import json, os
+          steps = json.loads(os.environ['NOTIFY_STEP_RESULTS'])
+          names = json.loads(os.environ['NOTIFY_STEP_NAMES'])
+          failed = [label for key, label in names.items() if steps.get(key, {}).get('outcome') == 'failure']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('has_partial=' + str(bool(failed)).lower() + '\n')
+              stream.write('summary=' + json.dumps(failed, ensure_ascii=False) + '\n')
+          PY
+  notify-system-failure:
+    needs: ["build-and-deploy"]
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled() || needs['build-and-deploy'].outputs.notify_partial == 'true') }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/notify-failure.yml
+    with:
+      title: "${{ github.workflow }} · ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && '執行失敗／取消' || '部分失敗' }}"
+      needs-json: ${{ toJSON(needs) }}
+    secrets:
+      DISCORD_WEBHOOK_URL1: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+      LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}

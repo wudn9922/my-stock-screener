@@ -1,0 +1,80 @@
+name: System failure notification fallback
+# A separate trusted run can still send after a producer runner was hard-cancelled.
+on:
+  workflow_run:
+    workflows:
+      - "Atlas Research Terminal"
+      - "Recalibrate US breadth signals"
+      - "Deploy Cloud Run (breakout alert)"
+      - "Daily Report Watchdog"
+      - "Data status"
+      - "Financial Statement History"
+      - "Official Fundamentals (TW / US)"
+      - "Deploy assembled Pages"
+      - "Squash generated snapshot"
+      - "🔄 GitHub Actions 永久續命腳本"
+      - "Permanent K-line Backfill"
+      - "Permanent K-line five-year expansion"
+      - "MA Recommendations"
+      - "Market trading calendar"
+      - "IPO and extended quotes"
+      - "Q4 EPS from 8-K (manual)"
+      - "Refresh US Rates"
+      - "Research public data"
+      - "Daily Stock Screener"
+      - "Deploy Supabase Edge Functions"
+      - "Taiwan Theme Rotation"
+      - "Trim Git History (disabled)"
+      - "Taiwan Chips"
+      - "Full-Market Universe"
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  fallback:
+    if: >-
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.event != 'pull_request' &&
+      github.event.workflow_run.event != 'pull_request_target' &&
+      contains(fromJSON('["failure","cancelled","timed_out"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        continue-on-error: true
+        id: source
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Check the original run-only delivery receipt
+        id: receipt
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+                ...context.repo, run_id: context.payload.workflow_run.id, per_page: 100,
+              });
+              core.setOutput('delivered', String(artifacts.some(item =>
+                !item.expired && item.name === `system-failure-notice-${context.payload.workflow_run.id}`)));
+            } catch {
+              core.warning('無法檢查原執行通知回執；嘗試故障備援。');
+              core.setOutput('delivered', 'false');
+            }
+      - name: Send only if no earlier delivery was recorded
+        if: always() && steps.source.outcome == 'success' && steps.receipt.outputs.delivered != 'true'
+        continue-on-error: true
+        uses: ./.github/actions/notify-failure
+        with:
+          title: ${{ github.event.workflow_run.name }} · 執行失敗／取消
+          summary: 原執行未留下已送達回執，依失敗 job／step metadata 補送。
+          run-url: ${{ github.event.workflow_run.html_url }}
+          workflow: ${{ github.event.workflow_run.name }}
+          event: ${{ github.event.workflow_run.event }}
+          discord-webhook: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+          line-access-token: ${{ secrets.LINE_ACCESS_TOKEN }}
+          line-user-id: ${{ secrets.LINE_USER_ID }}
+          github-token: ${{ github.token }}

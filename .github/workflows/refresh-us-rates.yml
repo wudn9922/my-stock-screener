@@ -28,6 +28,9 @@ concurrency:
 
 jobs:
   refresh:
+    outputs:
+      notify_partial: ${{ steps.collect_notification_outcomes.outputs.has_partial }}
+      notify_summary: ${{ steps.collect_notification_outcomes.outputs.summary }}
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
@@ -66,7 +69,8 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python -u scripts/build_rates.py
 
-      - name: Rebuild Japan spreads and monthly reasonable bands
+      - id: notice_soft_01
+        name: Rebuild Japan spreads and monthly reasonable bands
         continue-on-error: true
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
@@ -144,3 +148,34 @@ jobs:
             sleep $((attempt * 10))
           done
           exit 1
+      - name: Collect partial failure outcomes without changing this job result
+        id: collect_notification_outcomes
+        if: always() && !cancelled()
+        continue-on-error: true
+        env:
+          NOTIFY_STEP_RESULTS: ${{ toJSON(steps) }}
+          NOTIFY_STEP_NAMES: '{"notice_soft_01": "Rebuild Japan spreads and monthly reasonable bands"}'
+        run: |
+          python - <<'PY'
+          import json, os
+          steps = json.loads(os.environ['NOTIFY_STEP_RESULTS'])
+          names = json.loads(os.environ['NOTIFY_STEP_NAMES'])
+          failed = [label for key, label in names.items() if steps.get(key, {}).get('outcome') == 'failure']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('has_partial=' + str(bool(failed)).lower() + '\n')
+              stream.write('summary=' + json.dumps(failed, ensure_ascii=False) + '\n')
+          PY
+  notify-system-failure:
+    needs: ["refresh"]
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled() || needs['refresh'].outputs.notify_partial == 'true') }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/notify-failure.yml
+    with:
+      title: "${{ github.workflow }} · ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && '執行失敗／取消' || '部分失敗' }}"
+      needs-json: ${{ toJSON(needs) }}
+    secrets:
+      DISCORD_WEBHOOK_URL1: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+      LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
