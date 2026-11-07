@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / '.github/actions/notify-failure'))
 import notify
 from run_policy import decide
+sys.path.insert(0, str(ROOT / 'scripts'))
+from replay_cancelled_notifications import replay
 
 RUN = dict(id=12345, workflow_id=1, head_branch='main', event='workflow_run',
            conclusion='cancelled', created_at='2026-11-06T01:00:00Z')
@@ -137,6 +139,15 @@ class CancellationDecisionTest(unittest.TestCase):
         decisions = [decide(item['run'], item['jobs'], item['newer']) for item in snapshot['runs']]
         self.assertEqual(sum(row['notify'] for row in decisions), 0)
         self.assertTrue(all(row['reason'] == 'superseded' for row in decisions))
+
+    def test_historical_replay_does_not_use_future_runs_to_hide_cross_event_cancellations(self):
+        snapshot = json.loads((ROOT / 'tests/fixtures/notifications/cancelled-week-20261106.json').read_text())
+        result = replay(snapshot)
+        self.assertEqual(result['summary']['notifications'], 0)
+        self.assertEqual(result['summary']['atCancellation'], {'suppressed': 18, 'notifications': 3})
+        notices = [row for row in result['records'] if row['atCancellation']['notify']]
+        self.assertEqual({row['runId'] for row in notices}, {42201900727, 41893600132, 40992959979})
+        self.assertTrue(all(row['crossEventReplacement']['event'] != row['event'] for row in notices))
 
 
 if __name__ == '__main__':

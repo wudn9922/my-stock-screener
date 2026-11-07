@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '.github/actions/notify-failure'))
-from run_policy import decide
+from run_policy import decide, timestamp
 
 
 def replay(snapshot):
@@ -14,14 +14,20 @@ def replay(snapshot):
     for item in snapshot['runs']:
         result = decide(item['run'], item['jobs'], item['newer'])
         run = item['run']
+        visible = [candidate for candidate in item['newer'] if timestamp(candidate['created_at']) <= timestamp(run['updated_at'])]
+        at_cancellation = decide(run, item['jobs'], visible)
         records.append(dict(runId=run['id'], workflow=run['name'], event=run['event'],
                             branch=run['head_branch'], createdAt=run['created_at'], url=run['html_url'],
                             jobConclusions=[job['conclusion'] for job in item['jobs']],
-                            **result, newerRuns=item['newer']))
+                            **result, newerRuns=item['newer'], cancellationCompletedAt=run['updated_at'],
+                            atCancellation=at_cancellation, crossEventReplacement=item.get('crossEventReplacement')))
     notifications = sum(row['notify'] for row in records)
     return dict(version=1, generatedAt=datetime.now(timezone.utc).isoformat(), window=snapshot['window'],
                 source=snapshot['source'], queries=snapshot['queries'],
-                summary=dict(runs=len(records), suppressed=len(records)-notifications, notifications=notifications),
+                summary=dict(runs=len(records), suppressed=len(records)-notifications, notifications=notifications,
+                             atCancellation=dict(suppressed=sum(not row['atCancellation']['notify'] for row in records),
+                                                 notifications=sum(row['atCancellation']['notify'] for row in records))),
+                replayScope='Current metadata versus metadata visible by cancellation completion; no future witnesses in the second result.',
                 records=records)
 
 
