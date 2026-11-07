@@ -6,7 +6,7 @@
 
 正式工作新增一個獨立的 `notify-system-failure` job，等待所有原有 jobs，以 `failure() || cancelled()` 或已收集的部分失敗結果決定是否通知。原有報告、資料計算、發布條件與價格推播不變；每日 Screener／Dify 的正常 LINE 報告仍走原本步驟。
 
-2026-11-06 修訂：取消不是直接發送的充分條件。in-run helper 與 workflow_run fallback 都先用同一個 `run_policy.py` 查核。failure、失敗 job、run／job／step timed_out 一律通知；cancelled 且無失敗／逾時，只有找不到同 workflow_id／branch／event、created_at 更晚的 run 才通知。被取代只記 log；排隊中根本沒有 job 的 run 也適用。API／格式／分頁查核失敗採保守通知，沒有因 metadata 故障略過真正故障。
+2026-11-07 修訂：取消不是直接發送的充分條件。in-run helper 與 workflow_run fallback 都先用同一個 `run_policy.py` 查核。failure、失敗 job、run／job／step timed_out 一律通知；cancelled 且無失敗／逾時，只有找不到同 workflow_id／head_branch、created_at 嚴格更晚（不限 event）的 run 才通知。被取代只記 log；排隊中根本沒有 job 的 run 也適用。API／格式／分頁查核失敗採保守通知，沒有因 metadata 故障略過真正故障。
 
 為與PR #230的新唯讀掃描相容，部分失敗收集器也預先認得可選的 `archive_closure_scan` ID；該步驟尚未存在時無作用，兩個PR合入後可列出實際掃描失敗。離線測試執行真實收集器，分別模擬breadth與該掃描的outcome=failure／conclusion=success。
 
@@ -130,28 +130,24 @@ actionlint
 
 未變更任何前端檔案，這個 PR 無畫面變更或瀏覽器互動。GitHub CI 仍以 PR 最終 head 的 checks 為準，不把尚未完成的結果預記為通過。
 
-## 21 次取消的唯讀回放
+## 21 次取消的唯讀回放（2026-11-07 跨 event 修訂）
 
-資料取自 GitHub Actions metadata 的 GET，查詢日期 `2026-10-30..2026-11-06`，排除 PR 事件後共有 **21 次**，全部為 Deploy assembled Pages。每筆核對 jobs（其中一筆排隊取消，沒有 jobs），並完整分頁找最早的同 workflow／branch／event 後續 run。用**現在已存在的全部metadata**回放為21筆略過、0通知；按原run的updated_at重建**取消完成時可見資料**則為18筆略過、3筆通知。這兩者不能混稱為當時零誤報。
+採用原 #236 保存的 GitHub Actions GET metadata 與 `2026-10-30..2026-11-06` 日期窗口，共 21 次取消，全部為 Deploy assembled Pages。回放將原始 `newer` 與已保存的 `crossEventReplacement` 候選合併，再以原 run 的 `updated_at` 過濾：只採用取消完成時已建立的 run，不使用之後才出現的證據。
 
-3筆不同event的取代候選都在原run取消完成前已建立，但同event後續run是在取消之後才出現：
+同 workflow_id、head_branch、created_at 嚴格較晚即可取代，無 event 限制。結果為 **21 次抑制、0 則通知**；failure／timed_out 與 API 不確定時保守通知一次的行為不變。三筆原本因 event 限制而誤報的取消，都有當時已存在的替代 run：
 
-| 原run | 原event | 取消完成前的較新run | 新event |
+| 原 run | 原 event | 取消完成前的較新 run | 新 event |
 | --- | --- | --- | --- |
 | 42201900727 | workflow_run | 42201965206 | push |
 | 41893600132 | push | 41894556051 | workflow_run |
 | 40992959979 | push | 40993029010 | workflow_run |
 
-本修訂維持使用者明示的同event約束，沒有擅自跨event抑制通知。因此在取消當時的回放仍會通知這3筆；要讓它們當時也不通知，需要另行允許Pages的push／workflow_run共用event類別。此限制已列PR並提出澄清，沒有用後來才建立的run假裝當時已有證據。
+這次只有離線回放，沒有發送任何測試通知。21 筆是指定的日期窗口，不宣稱等於精確的往前 168 小時。
 
-為避免日期窗口混淆：以 11/06 18:30:46 UTC 往前精確168小時計為17筆；本報告保留題述21筆所對應的10/30起始日期窗口。「現在metadata」兩種窗口均為0通知，不代表取消當時也為0。來源fixture、updated_at、最早successor、跨event候選與可點擊run URL都納入版本控制。
-
-[回放報告](research-verification/cancelled-notices-20261106.json)、[原始精簡 metadata](../tests/fixtures/notifications/cancelled-week-20261106.json)。可離線重現：
+[本次回放](research-verification/cancelled-notices-cross-event-20261107.json)、[原始精簡 metadata](../tests/fixtures/notifications/cancelled-week-20261106.json)、[舊版同 event 回放](research-verification/cancelled-notices-20261106.json)。可離線重現：
 
 ```sh
 python scripts/replay_cancelled_notifications.py \
   --input tests/fixtures/notifications/cancelled-week-20261106.json \
   --out /tmp/cancelled-notices-replay.json
 ```
-
-新增單元測試涵蓋被取代／無後續／不同分支事件與 workflow／相同建立時間、failure、三種逾時、API 失敗只送一次、in-run／fallback 相同規則、job／run 第二頁，以及21筆metadata回放和不使用未來run的時點回放。所有發送transport都是假的；合計38項通知／健康／取代規則測試與全部workflow的actionlint已通過。

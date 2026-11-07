@@ -1,0 +1,21 @@
+{
+  "mode": "read-only-preview",
+  "apply": false,
+  "date": "2026-10-23",
+  "market": "TW",
+  "archiveCommit": "62bd86a6e7fcde3572c56aa607eed5018a0cfe68",
+  "expected": 2214,
+  "actual": 2214,
+  "differenceFraction": 0.0,
+  "guardPassed": true,
+  "nonmatchingRowsPreserved": 0,
+  "note": "Read-only inventory only. No removal, metadata update, workflow dispatch or remote write occurred. Not a replacement for the pending repair/restore implementation.",
+  "selectionInventorySha256": "dffbd8360365612adbbb4c51ea8817b67c05d07b85a99d366f97242cc13d2091",
+  "sampleSymbols": [
+    "00400A.TW",
+    "00401A.TW",
+    "00402A.TW",
+    "00403A.TW",
+    "00404A.TW"
+  ]
+}

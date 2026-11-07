@@ -13,16 +13,15 @@ def timestamp(value):
 
 
 def newer_run(run, candidates):
-    """A later creation, same workflow id, branch and event; status is irrelevant."""
+    """A later creation, same workflow id and branch; event/status are irrelevant."""
     if (type(run.get('id')) is not int or type(run.get('workflow_id')) is not int
-            or not isinstance(run.get('head_branch'), str) or not isinstance(run.get('event'), str)):
+            or not isinstance(run.get('head_branch'), str)):
         raise ValueError('Incomplete originating run metadata')
     created = timestamp(run['created_at'])
     matches = [candidate for candidate in candidates
                if type(candidate.get('id')) is int and candidate['id'] != run['id']
                and candidate.get('workflow_id') == run['workflow_id']
                and candidate.get('head_branch') == run['head_branch']
-               and candidate.get('event') == run['event']
                and timestamp(candidate['created_at']) > created]
     return min(matches, key=lambda row: (timestamp(row['created_at']), row['id'])) if matches else None
 
@@ -100,7 +99,7 @@ def cancellation_decision(run_url, token, opener, hint='', needs=None):
         initial = decide(run, jobs, hint=hint, results=results)
         if initial['reason'] in ('failed-job', 'failed-run', 'timed-out'):
             return initial
-        query = urllib.parse.urlencode({'branch': run['head_branch'], 'event': run['event'],
+        query = urllib.parse.urlencode({'branch': run['head_branch'],
                                         'created': '>' + run['created_at']})
         for page in api.pages(f'workflows/{int(run["workflow_id"])}/runs?{query}', 'workflow_runs'):
             decision = decide(run, jobs, page, hint=hint, results=results)

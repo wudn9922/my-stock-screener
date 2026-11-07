@@ -87,10 +87,20 @@ class CancellationDecisionTest(unittest.TestCase):
         self.assertTrue(delivered)
         self.assertEqual(len(posts), 1)
 
-    def test_different_workflow_branch_event_or_equal_creation_never_suppresses(self):
-        for update in (dict(workflow_id=2), dict(head_branch='other'), dict(event='push'),
-                       dict(created_at=RUN['created_at'])):
+    def test_different_workflow_branch_or_equal_creation_never_suppresses(self):
+        for update in (dict(workflow_id=2), dict(head_branch='other'),
+                       dict(created_at=RUN['created_at']), dict(created_at='2026-11-06T00:59:59Z')):
             self.assertTrue(decide(RUN, [], [dict(NEXT, **update)])['notify'])
+
+    def test_cross_event_successor_suppresses_without_event_query_filter(self):
+        for event in ('push', 'workflow_run'):
+            _, posts, _, opener = self.execute(run=dict(RUN, event=event),
+                                              newer=[dict(NEXT, event='workflow_run' if event == 'push' else 'push')])
+            self.assertEqual(posts, [])
+            query = next(url for method, url in opener.calls if '/workflows/' in url)
+            self.assertNotIn('event=', query)
+            self.assertIn('branch=main', query)
+            self.assertIn('created=%3E', query)
 
     def test_overall_failure_or_any_failed_job_still_notifies_with_a_successor(self):
         for kwargs in (dict(run=dict(RUN, conclusion='failure')), dict(jobs=[dict(conclusion='failure')])):
@@ -144,10 +154,25 @@ class CancellationDecisionTest(unittest.TestCase):
         snapshot = json.loads((ROOT / 'tests/fixtures/notifications/cancelled-week-20261106.json').read_text())
         result = replay(snapshot)
         self.assertEqual(result['summary']['notifications'], 0)
-        self.assertEqual(result['summary']['atCancellation'], {'suppressed': 18, 'notifications': 3})
+        self.assertEqual(result['summary']['atCancellation'], {'suppressed': 21, 'notifications': 0})
         notices = [row for row in result['records'] if row['atCancellation']['notify']]
-        self.assertEqual({row['runId'] for row in notices}, {42201900727, 41893600132, 40992959979})
-        self.assertTrue(all(row['crossEventReplacement']['event'] != row['event'] for row in notices))
+        self.assertEqual(notices, [])
+        for row in result['records']:
+            witnesses = [candidate for candidate in row['newerRuns']
+                         if candidate['id'] == row['atCancellation']['supersededBy']]
+            self.assertEqual(len(witnesses), 1)
+            self.assertLessEqual(witnesses[0]['created_at'], row['cancellationCompletedAt'])
+
+    def test_future_only_candidate_cannot_suppress_at_cancellation(self):
+        snapshot = json.loads((ROOT / 'tests/fixtures/notifications/cancelled-week-20261106.json').read_text())
+        item = copy.deepcopy(snapshot['runs'][0])
+        item['newer'] = [dict(item['run'], id=item['run']['id'] + 1,
+                             event='push', created_at='2099-01-01T00:00:00Z')]
+        item.pop('crossEventReplacement', None)
+        snapshot['runs'] = [item]
+        result = replay(snapshot)
+        self.assertEqual(result['summary']['notifications'], 0)
+        self.assertEqual(result['summary']['atCancellation']['notifications'], 1)
 
 
 if __name__ == '__main__':
