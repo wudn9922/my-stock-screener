@@ -7,6 +7,9 @@ on:
       - 'scripts/check_data_freshness.py'
       - 'tests/test_failure_notifications.py'
       - 'tests/test_data_freshness.py'
+      - 'tests/test_cancelled_notification_policy.py'
+      - 'tests/fixtures/notifications/**'
+      - 'scripts/replay_cancelled_notifications.py'
 permissions:
   contents: read
 jobs:
@@ -22,3 +25,4 @@ jobs:
         run: |
           python -m unittest discover -s tests -p test_failure_notifications.py -v
           python -m unittest discover -s tests -p test_data_freshness.py -v
+          python -m unittest discover -s tests -p test_cancelled_notification_policy.py -v

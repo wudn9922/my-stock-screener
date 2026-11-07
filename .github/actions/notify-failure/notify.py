@@ -12,6 +12,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from zoneinfo import ZoneInfo
+from run_policy import cancellation_decision
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -113,6 +114,14 @@ def notify(env, opener=None, now=None):
         needs = json.loads(env.get('NOTICE_NEEDS', '{}'))
     except (TypeError, ValueError):
         needs = {}
+    if env.get('NOTICE_CHECK_SUPERSEDED') == 'true':
+        decision = cancellation_decision(run_url, github_token, opener,
+                                         env.get('NOTICE_RUN_CONCLUSION', ''), needs if isinstance(needs, dict) else {})
+        if not decision['notify']:
+            print(f'System notice skipped: cancelled run superseded by run {decision["supersededBy"]}.')
+            return False
+        if decision['reason'] == 'metadata-unavailable':
+            print('::warning::無法確認取消是否被取代，保守通知一次。')
     rows = [env.get('NOTICE_SUMMARY', ''), *summaries(needs), *job_summary(run_url, github_token, opener)]
     detail = clean('\n'.join(dict.fromkeys(str(r) for r in rows if r)), hidden, 1000) or '執行失敗／取消；請查看執行紀錄。'
     taipei = now.astimezone(ZoneInfo('Asia/Taipei')).strftime('%Y-%m-%d %H:%M:%S 台北')

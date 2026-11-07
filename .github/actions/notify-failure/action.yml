@@ -31,6 +31,12 @@ inputs:
   github-token:
     description: Optional actions-read token for failed job and step metadata
     default: ''
+  check-superseded:
+    description: Suppress only cancelled runs superseded by a later matching run
+    default: 'false'
+  run-conclusion:
+    description: Originating conclusion or in-run cancellation hint
+    default: ''
 outputs:
   delivered:
     description: Whether either channel accepted the notification
@@ -53,4 +59,6 @@ runs:
         NOTICE_LINE_TOKEN: ${{ inputs.line-access-token }}
         NOTICE_LINE_USER: ${{ inputs.line-user-id }}
         NOTICE_GITHUB_TOKEN: ${{ inputs.github-token }}
+        NOTICE_CHECK_SUPERSEDED: ${{ inputs.check-superseded }}
+        NOTICE_RUN_CONCLUSION: ${{ inputs.run-conclusion }}
       run: python "$GITHUB_ACTION_PATH/notify.py"

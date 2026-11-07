@@ -1,0 +1,588 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-06T18:37:12.863455+00:00",
+  "window": {
+    "from": "2026-10-30T00:00:00Z",
+    "to": "2026-11-06T18:30:46Z",
+    "definition": "2026-10-30..2026-11-06 inclusive dates; latest 168 hours contains 17"
+  },
+  "source": "GitHub Actions GET metadata only; no logs, artifacts, credentials or notifications",
+  "queries": [
+    "actions/runs?status=cancelled&created=2026-10-30..2026-11-06&per_page=100",
+    "actions/runs?event=workflow_run&branch=main&created=2026-10-30..2026-11-06&per_page=100&page=1",
+    "actions/runs?event=push&branch=main&created=2026-10-30..2026-11-06&per_page=100&page=1",
+    "actions/runs/{id}/jobs"
+  ],
+  "summary": {
+    "runs": 21,
+    "suppressed": 21,
+    "notifications": 0
+  },
+  "records": [
+    {
+      "runId": 42251141796,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-06T16:18:29Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/42251141796",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 42251195034,
+      "newerRuns": [
+        {
+          "id": 42251195034,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-06T16:18:49Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/42251195034"
+        }
+      ]
+    },
+    {
+      "runId": 42201900727,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-06T10:20:23Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/42201900727",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 42202606198,
+      "newerRuns": [
+        {
+          "id": 42202606198,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-06T10:25:50Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/42202606198"
+        }
+      ]
+    },
+    {
+      "runId": 42195918675,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-06T09:33:12Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/42195918675",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 42197107137,
+      "newerRuns": [
+        {
+          "id": 42197107137,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-06T09:42:57Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/42197107137"
+        }
+      ]
+    },
+    {
+      "runId": 42195866036,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-06T09:32:49Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/42195866036",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 42195918675,
+      "newerRuns": [
+        {
+          "id": 42195918675,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-06T09:33:12Z",
+          "conclusion": "cancelled",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/42195918675"
+        }
+      ]
+    },
+    {
+      "runId": 42076643867,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-05T17:38:45Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/42076643867",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 42076675257,
+      "newerRuns": [
+        {
+          "id": 42076675257,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-05T17:38:57Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/42076675257"
+        }
+      ]
+    },
+    {
+      "runId": 42068747257,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-05T16:51:25Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/42068747257",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 42068839032,
+      "newerRuns": [
+        {
+          "id": 42068839032,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-05T16:51:57Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/42068839032"
+        }
+      ]
+    },
+    {
+      "runId": 41980427207,
+      "workflow": "Deploy assembled Pages",
+      "event": "push",
+      "branch": "main",
+      "createdAt": "2026-11-05T06:26:30Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41980427207",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41980483904,
+      "newerRuns": [
+        {
+          "id": 41980483904,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "push",
+          "created_at": "2026-11-05T06:27:01Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41980483904"
+        }
+      ]
+    },
+    {
+      "runId": 41893600132,
+      "workflow": "Deploy assembled Pages",
+      "event": "push",
+      "branch": "main",
+      "createdAt": "2026-11-04T19:05:48Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41893600132",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41947612736,
+      "newerRuns": [
+        {
+          "id": 41947612736,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "push",
+          "created_at": "2026-11-05T01:18:29Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41947612736"
+        }
+      ]
+    },
+    {
+      "runId": 41869063107,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-04T16:36:49Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41869063107",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41869126840,
+      "newerRuns": [
+        {
+          "id": 41869126840,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-04T16:37:10Z",
+          "conclusion": "failure",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41869126840"
+        }
+      ]
+    },
+    {
+      "runId": 41808733231,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-04T09:35:08Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41808733231",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41868788196,
+      "newerRuns": [
+        {
+          "id": 41868788196,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-04T16:35:19Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41868788196"
+        }
+      ]
+    },
+    {
+      "runId": 41675499321,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-03T16:33:58Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41675499321",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41868788196,
+      "newerRuns": [
+        {
+          "id": 41868788196,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-04T16:35:19Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41868788196"
+        }
+      ]
+    },
+    {
+      "runId": 41612004774,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-03T09:33:38Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41612004774",
+      "jobConclusions": [],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41868788196,
+      "newerRuns": [
+        {
+          "id": 41868788196,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-04T16:35:19Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41868788196"
+        }
+      ]
+    },
+    {
+      "runId": 41611816886,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-03T09:32:14Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41611816886",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41868788196,
+      "newerRuns": [
+        {
+          "id": 41868788196,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-04T16:35:19Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41868788196"
+        }
+      ]
+    },
+    {
+      "runId": 41523280943,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-02T20:53:11Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41523280943",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41868788196,
+      "newerRuns": [
+        {
+          "id": 41868788196,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-04T16:35:19Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41868788196"
+        }
+      ]
+    },
+    {
+      "runId": 41504441162,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-02T18:51:08Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41504441162",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41868788196,
+      "newerRuns": [
+        {
+          "id": 41868788196,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-04T16:35:19Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41868788196"
+        }
+      ]
+    },
+    {
+      "runId": 41421896346,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-02T09:35:18Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41421896346",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41868788196,
+      "newerRuns": [
+        {
+          "id": 41868788196,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-04T16:35:19Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41868788196"
+        }
+      ]
+    },
+    {
+      "runId": 41321409179,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-11-01T15:28:36Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41321409179",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41868788196,
+      "newerRuns": [
+        {
+          "id": 41868788196,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-04T16:35:19Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41868788196"
+        }
+      ]
+    },
+    {
+      "runId": 41079950618,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-10-30T15:21:27Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41079950618",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41868788196,
+      "newerRuns": [
+        {
+          "id": 41868788196,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-04T16:35:19Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41868788196"
+        }
+      ]
+    },
+    {
+      "runId": 41034511063,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-10-30T09:35:13Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41034511063",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41868788196,
+      "newerRuns": [
+        {
+          "id": 41868788196,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-04T16:35:19Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41868788196"
+        }
+      ]
+    },
+    {
+      "runId": 41034339060,
+      "workflow": "Deploy assembled Pages",
+      "event": "workflow_run",
+      "branch": "main",
+      "createdAt": "2026-10-30T09:33:48Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41034339060",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41868788196,
+      "newerRuns": [
+        {
+          "id": 41868788196,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "workflow_run",
+          "created_at": "2026-11-04T16:35:19Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41868788196"
+        }
+      ]
+    },
+    {
+      "runId": 40992959979,
+      "workflow": "Deploy assembled Pages",
+      "event": "push",
+      "branch": "main",
+      "createdAt": "2026-10-30T02:39:30Z",
+      "url": "https://github.com/wudn9922/my-stock-screener/actions/runs/40992959979",
+      "jobConclusions": [
+        "cancelled"
+      ],
+      "notify": false,
+      "reason": "superseded",
+      "supersededBy": 41011043203,
+      "newerRuns": [
+        {
+          "id": 41011043203,
+          "workflow_id": 392896911,
+          "name": "Deploy assembled Pages",
+          "head_branch": "main",
+          "event": "push",
+          "created_at": "2026-10-30T05:54:46Z",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/wudn9922/my-stock-screener/actions/runs/41011043203"
+        }
+      ]
+    }
+  ]
+}

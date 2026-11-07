@@ -78,3 +78,5 @@ jobs:
           line-access-token: ${{ secrets.LINE_ACCESS_TOKEN }}
           line-user-id: ${{ secrets.LINE_USER_ID }}
           github-token: ${{ github.token }}
+          check-superseded: 'true'
+          run-conclusion: ${{ github.event.workflow_run.conclusion }}

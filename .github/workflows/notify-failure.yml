@@ -35,6 +35,11 @@ jobs:
           ref: main
           path: .notify-source
           persist-credentials: false
+      - name: Capture cancellation in the supported status-function context
+        id: cancellation
+        if: cancelled()
+        continue-on-error: true
+        run: echo 'conclusion=cancelled' >> "$GITHUB_OUTPUT"
       - name: Notify Discord with LINE fallback
         id: notice
         if: always() && steps.source.outcome == 'success'
@@ -51,6 +56,8 @@ jobs:
           line-access-token: ${{ secrets.LINE_ACCESS_TOKEN }}
           line-user-id: ${{ secrets.LINE_USER_ID }}
           github-token: ${{ github.token }}
+          check-superseded: 'true'
+          run-conclusion: ${{ steps.cancellation.outputs.conclusion }}
       - name: Record delivery marker without message or credential contents
         if: always() && steps.notice.outputs.delivered == 'true'
         continue-on-error: true

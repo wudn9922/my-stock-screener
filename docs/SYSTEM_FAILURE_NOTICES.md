@@ -6,6 +6,8 @@
 
 正式工作新增一個獨立的 `notify-system-failure` job，等待所有原有 jobs，以 `failure() || cancelled()` 或已收集的部分失敗結果決定是否通知。原有報告、資料計算、發布條件與價格推播不變；每日 Screener／Dify 的正常 LINE 報告仍走原本步驟。
 
+2026-11-06 修訂：取消不是直接發送的充分條件。in-run helper 與 workflow_run fallback 都先用同一個 `run_policy.py` 查核。failure、失敗 job、run／job／step timed_out 一律通知；cancelled 且無失敗／逾時，只有找不到同 workflow_id／branch／event、created_at 更晚的 run 才通知。被取代只記 log；排隊中根本沒有 job 的 run 也適用。API／格式／分頁查核失敗採保守通知，沒有因 metadata 故障略過真正故障。
+
 共用 [.github/actions/notify-failure](../.github/actions/notify-failure/README.md) 先使用 **`DISCORD_WEBHOOK_URL1`**，未設定或失敗才使用既有 `LINE_ACCESS_TOKEN`／`LINE_USER_ID` 故障備援。沒有使用、讀取或修改既有價格警示 `DISCORD_WEBHOOK_URL`。Webhook 和 token 只從 secrets 經 action input／環境變數傳入；不在命令列、log、cache 或 artifact 輸出。
 
 Embed 只含 workflow、觸發事件、失敗 job／step、run URL、台北時間，資料監測另含公開來源的日期／狀態。停用 mentions，不下載 job logs，不轉送原始例外／API 回應。Actions token 只需 `actions: read` 與讀取程式碼的 `contents: read`；呼叫端只明確傳三個通知 secret，不使用 `secrets: inherit`。
@@ -53,6 +55,8 @@ PR review 工作 **atlas-review、research-review、generated-verify、kline-arc
 
 手動取消整個 run 可能中止清理 job，因此 `failure-notice-fallback.yml` 另以 `workflow_run: completed` 監看上表正式工作。原執行為失敗／取消／逾時，且沒有送達回執時才補送；它只 checkout **main**，只讀原 run 的 job／step metadata 和 artifact 名稱，不執行原分支或 artifact 程式。不監看 PR 事件、外部 fork 或通知 helper，避免迴圈。
 
+補送也會執行「較新執行取代」判定，沒有繞過。查詢使用 `actions: read`：先讀原 run 和所有 jobs，再讀該 workflow 的 runs（branch、event、created 篩選），同時在程式內重新核對欄位；比較的是建立時間，不以較大 run ID 猜測順序。job 和候選 run 都支援分頁，超過查核上限或回應不完整時不抑制通知。
+
 回執與去重是 best effort：若送達後 runner 在寫回執前中止、artifact API 不可用或回執過期，取消備援可能重複一次。若通知服務和 runner 都不可用，系統無法保證送達；這不會改動生產者結論。
 
 ## 每日資料日期檢查
@@ -97,6 +101,7 @@ Actions cache 被清除／驅逐會失去去重記錄；下一次會重新提醒
 ```sh
 python -m unittest discover -s tests -p test_failure_notifications.py -v
 python -m unittest discover -s tests -p test_data_freshness.py -v
+python -m unittest discover -s tests -p test_cancelled_notification_policy.py -v
 actionlint
 ```
 
@@ -122,3 +127,19 @@ actionlint
 | 原生產者 steps 與 main 的 YAML 結構比對 | 除指定的故障通知替換、soft-step ID、收集器與 watchdog 外無更動；正常報告與計算／發布步驟相同 |
 
 未變更任何前端檔案，這個 PR 無畫面變更或瀏覽器互動。GitHub CI 仍以 PR 最終 head 的 checks 為準，不把尚未完成的結果預記為通過。
+
+## 21 次取消的唯讀回放
+
+資料取自 GitHub Actions metadata 的 GET，查詢日期 `2026-10-30..2026-11-06`，排除 PR 事件後共有 **21 次**，全部為 Deploy assembled Pages。每筆都核對 jobs（其中一筆排隊取消，沒有 jobs）以及一筆同 workflow／branch／event、建立較晚的實際後續 run。共用決策的離線回放為 **21 筆略過、0 則通知**，沒有為驗證發真實訊息。
+
+為避免日期窗口混淆：以 11/06 18:30:46 UTC 往前精確168小時計為17筆；本報告保留題述21筆所對應的10/30起始日期窗口，兩者均為0通知。來源 fixture、每筆 successor／結論與可點擊 run URL 都納入版本控制。
+
+[回放報告](research-verification/cancelled-notices-20261106.json)、[原始精簡 metadata](../tests/fixtures/notifications/cancelled-week-20261106.json)。可離線重現：
+
+```sh
+python scripts/replay_cancelled_notifications.py \
+  --input tests/fixtures/notifications/cancelled-week-20261106.json \
+  --out /tmp/cancelled-notices-replay.json
+```
+
+新增單元測試涵蓋被取代／無後續／不同分支事件與 workflow／相同建立時間、failure、三種逾時、API 失敗只送一次、in-run／fallback 相同規則、job／run 第二頁，以及21筆真實形狀回放。所有發送 transport 都是假的；合計37項通知／健康／取代規則測試與全部 workflow 的 actionlint 已通過。

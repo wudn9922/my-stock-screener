@@ -13,6 +13,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 ACTION = ROOT / '.github/actions/notify-failure'
+sys.path.insert(0, str(ACTION))
 spec = importlib.util.spec_from_file_location('failure_notify', ACTION / 'notify.py')
 notify = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(notify)
@@ -21,6 +22,7 @@ TOKEN, RECIPIENT = 'PRIVATE-LINE-TOKEN', 'PRIVATE-LINE-RECIPIENT'
 RUN = 'https://github.com/wudn9922/my-stock-screener/actions/runs/12345'
 CHILD = r'''
 import json,os,runpy,sys
+from pathlib import Path
 from unittest.mock import patch
 from urllib.error import URLError
 calls=[];texts=[]
@@ -40,6 +42,7 @@ class Fake:
         if case=='both-fail' or kind=='discord' and case=='discord-fail':
             raise URLError('PRIVATE-LINE-TOKEN '+url)
         return Response()
+sys.path.insert(0,str(Path(sys.argv[1]).parent))
 with patch('urllib.request.build_opener',return_value=Fake()):
     try: runpy.run_path(sys.argv[1],run_name='__main__')
     except SystemExit as result: code=result.code
