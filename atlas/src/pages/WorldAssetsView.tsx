@@ -1,4 +1,5 @@
 import { HelpDisclosure } from '../ui/HelpDisclosure';
+import { chartList } from '../app/listContext';
 import { useEffect, useState } from "react";
 import {
   worldAssetsSchema,
@@ -161,7 +162,8 @@ export default function WorldAssetsView({
           : "匯率日K為延遲參考報價；非銀行牌告或 Fed 統計匯率，報價方向逐組標示。"}
       </HelpDisclosure>
       {!gallery ? <section className="card asset-list" aria-label={view === 'fx' ? '匯率清單' : '原物料清單'}>
-        {keys[view].map(id => <AssetRow key={id} id={id} asset={data.series[id]} openChart={openChart} />)}
+        {keys[view].map(id => <AssetRow key={id} id={id} asset={data.series[id]} openChart={options => openChart({ ...options,
+          list: chartList(view === 'fx' ? '匯率' : '原物料', keys[view].map(key => WORLD_ASSETS.find(item => item.id === key)!)) })} />)}
       </section> : <div>
         {keys[view].map((id) =>
           id === "btcusdt" ? <BitcoinChart key={id} asset={data.series[id]} openChart={openChart} /> : data.series[id] ? (
