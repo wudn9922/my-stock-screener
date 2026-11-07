@@ -1,4 +1,65 @@
-# 全市場休市日：判定、掃描與資料保留
+# 全市場休市與交易日資料缺漏
+
+## 最新修訂：交易日曆與官方資料優先（2026-11-07）
+
+本節取代下方歷史判定。永久封存只讀；不補造、不刪除、不覆寫任何K線，不觸發正式排程或通知。
+
+共用 `scripts/market_sessions.py` 先查XTAI／XNYS：
+
+1. 保留原正量≥5%或至少50檔的成交證據優先規則。指數缺列保留原 `primary-index-gap-with-trading`，另列 `missing-session-data`。
+2. 日曆不是交易日，可記為 `exchange-calendar-closed`；台股10/26無股票觀測，結果不變。
+3. 日曆是交易日，只有「主要指數缺列＋有效普通股≥95%已知零量平盤」才能判臨時休市；已驗證官方當日資料會阻止此推論。原樣本數、近期覆蓋與未知量規則不變。10/23具備兩項證據。
+4. 其餘交易日缺資料，記為 `missing-session-data`，保留現存列。2021-04-06只有官方^TWOII、沒有^TWII與普通股，不能再判休市。日曆不可用時不產生新的工作日休市推論。
+
+主要／官方指數先驗per-symbol index、SHA-256、bytes、rows與日期。官方來源限具明確TPEx provenance的^TWOII，Yahoo不冒認官方。新metadata增加 `calendar`／`calendarSession` 與 `missingSessions`；舊的日曆交易日index-only休市標記會撤銷。投影lineage保留少量完整臨時休市證據，讓下游已移除假列後仍保留正確10/23判定。
+
+前端嚴格驗證日曆及臨時休市的兩項證據，無證據的舊policy回退至新版已驗證種子；`missingSessions`優先撤銷舊休市標記。2021-04-06已從種子移出。IndexedDB raw年檔不變，完整行情投影cache升到v5，恢復舊投影隱藏的資料；沒有新增輪詢。
+
+## 本次兩份唯讀報告
+
+重跑時間 `2026-11-07T03:29:16.986973+00:00`，固定commit `62bd86a6e7fcde3572c56aa607eed5018a0cfe68`：7,689代號、41,507年檔、9,780,006列、0無效OHLC，103.851秒。只有TW2026-10-23含2,214筆疑似休市占位列；2021-04-06已從休市清單移出。archive掃描前後git status乾淨。
+
+| 市場／日期 | 可觀察股票 | 有列 | 股票缺列檔數 | 佐證／分類 |
+| --- | ---: | ---: | ---: | --- |
+| TW 2021-04-06 | 1,767 | 0 | 1,767 | TPEx ^TWOII當日OHLC |
+| TW 2022-02-04 | 1,805 | 0 | 1,805 | 待核對臨時休市／日曆差異 |
+| TW 2023-01-18 | 1,846 | 0 | 1,846 | 待核對臨時休市／日曆差異 |
+| TW 2024-10-31 | 1,938 | 0 | 1,938 | 待核對臨時休市／日曆差異 |
+| TW 2025-08-01 | 1,969 | 3 | 1,966 | TPEx ^TWOII當日OHLC |
+| TW 2026-07-10 | 1,982 | 0 | 1,982 | 待核對臨時休市／日曆差異 |
+| US 2026-11-06 | 5,373 | 0 | 5,373 | 最新收盤日尚未封存（尾端），非既有範圍內缺口 |
+
+每個代號每年一個CSV，表中的missingSymbols也是該日受影響的普通股年檔數；主要指數是否缺列另外列於JSON。跨日相同年檔可能重複計數，彙總不是互異檔案總數。台股6個歷史疑點合計11,304筆股票缺列；美股既有覆蓋範圍內0日，最新11/6另列1個尾端待封存日。
+
+[休市掃描](research-verification/market-closure-scan-20261106.json)、[資料缺漏掃描](research-verification/market-data-gaps-20261106.json)。保留原審查檔名，generatedAt為實際重跑時間；來源commit固定在報告中，不宣稱之後live分支相同。
+
+缺漏掃描檢查2021起已收盤的XTAI／XNYS session：主要指數無列，或>50%的可觀察普通股無有效列，就列出日期、檔數、比例及官方OHLC佐證。分母為封存 firstDate≤該日的普通股；firstDate是資料覆蓋界線，不是已驗證IPO日。未推定下市日，結束更新的股票仍可能算在缺列內，現行目錄也有存活者偏差。
+
+`coveragePosition`區分既有主要指數範圍內缺口，與最新收盤日尚未進入封存的尾端；後者可能只是排程尚未完成。已確認休市不列為待補資料。**這是缺漏疑點清單**：無官方交易佐證的全空日期可能涉及臨時休市或日曆誤差，保持待查，不自動刪日期或補檔。2021-04-06與2025-08-01有TPEx當日OHLC；其餘歷史疑點沒有同等佐證。
+
+一次讀CSV產生兩份報告：
+
+```sh
+python -u scripts/scan_market_closures.py \
+  --archive-dir /path/to/read-only-kline-archive \
+  --out /tmp/market-closure-scan.json \
+  --missing-out /tmp/market-data-gaps.json
+```
+
+獨立缺漏掃描入口：
+
+```sh
+python scripts/scan_market_data_gaps.py \
+  --archive-dir /path/to/read-only-kline-archive \
+  --out /tmp/market-data-gaps.json
+```
+
+兩個入口都拒絕輸出到archive內。原 `--cache-policy` 與 `--frontend-seed` 選項保留，只寫衍生metadata。每日寫入、bootstrap、ETF／指數補充、stage與研究共用判定；永久日期與價格、原追加／衝突／拆股稽核、成功口徑、研究門檻、前瞻CSV不變。只有primary self-review；測試與圖片見 [REVIEW_PACKAGE](../atlas/REVIEW_PACKAGE.md)。
+
+<details>
+<summary>前一版修訂紀錄（已由上方新規則取代，舊掃描結果供追溯）</summary>
+
+## 舊版：全市場休市日判定、掃描與資料保留
 
 本次修正只產生衍生日期證據、阻擋新的休市日輸入，並在讀取時隱藏舊假列。**沒有修改、刪除或推送 kline-archive 分支內容，也沒有執行正式排程。**
 
@@ -43,3 +104,5 @@ python -u scripts/scan_market_closures.py \
 主要指數缺列本身不再足以關閉有正常成交的市場。正量≥5%／50檔的成交證據優先，即使舊metadata曾記為休市也撤銷阻擋；指數缺列另列人工查核。完全沒有股票觀測時仍可依已驗證指數範圍內缺日判定休市。範圍外且未達樣本覆蓋的日期維持未知，不能假裝已證明休市。這個 PR 沒有修復永久 archive，下載原始 CSV 仍會看到原本的 10/23 列；網站與計算只讀時排除。已有 `market-warnings-log.csv` 的前瞻觀察不回寫、不截斷。
 
 測試結果與桌機／390px／375px 圖片見 [REVIEW_PACKAGE](../atlas/REVIEW_PACKAGE.md)。自動化 WebKit 是模擬環境，沒有實體 iPhone 驗證或獨立審核簽章。
+
+</details>

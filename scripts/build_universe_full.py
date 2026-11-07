@@ -399,7 +399,9 @@ class Run:
             stats = sessions.snapshot_statistics((self.snapshots.get(market) or {}).get('bars',{}),self.listing.get(market) or {})
             prior_reviews = sessions.read_trading_policy(os.path.join(self.cache_dir,sessions.POLICY_FILE)).get(key,{})
             reviews = dict(prior_reviews)
-            evidence = sessions.classify_closures(stats,primary,known,trading=prior_reviews,reviews=reviews)
+            missing = {}
+            evidence = sessions.classify_closures(stats,primary,known,trading=prior_reviews,reviews=reviews,
+                market=key,missing=missing,official=sessions.archive_official_days(getattr(self.args,'archive_dir',None) or '',key,self.now))
             for day in set(evidence) & set(known):
                 if not evidence[day]['observedSymbols']:
                     evidence[day] = known[day]
@@ -408,12 +410,13 @@ class Run:
                 if item['observedSymbols']:
                     self.log(f'市場休市 {market} {day}: {item["reasons"]}, 零量平盤 {item["flatZeroSymbols"]}/{item["eligibleSymbols"]}')
             policy = uc.read_json(os.path.join(self.cache_dir,sessions.POLICY_FILE),{}) or {}
-            policy.update(version=1,generatedAt=self.now.isoformat(),threshold=sessions.CLOSURE_SHARE,method='trading-veto-primary-or-flat-zero-v2')
+            policy.update(version=1,generatedAt=self.now.isoformat(),threshold=sessions.CLOSURE_SHARE,method='calendar-session-guard-v3')
             part = policy.setdefault('markets',{}).setdefault(key,{})
             if primary:
                 part['primary'] = {k:v for k,v in primary.items() if k != 'dates'}
             part['closedSessions'] = list(evidence.values())
             part['indexGapsWithTrading'] = list(reviews.values())
+            part['missingSessions'] = list(missing.values())
             uc.write_json(os.path.join(self.cache_dir,sessions.POLICY_FILE),policy)
         return frozenset(self.closures[key])
 

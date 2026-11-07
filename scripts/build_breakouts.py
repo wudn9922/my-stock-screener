@@ -260,7 +260,7 @@ def build_market(frames, universe_label, market_key, as_of=None, *, strategy_spe
     # 高低價＝漲跌停價、收盤沿用前一日的假K線，會墊高前高並讓箱型失真）
     weekend_dates = [bars.index[bars.index.day_of_week >= 5].union(pd.DatetimeIndex(bars.attrs.get(REMOVED_WEEKENDS,())))
                      for bars in frames.values()]
-    frames, _ = market_prices(frames)
+    frames, _ = market_prices(frames,market=market_key)
     frames = {symbol: bars[bars.index.day_of_week < 5] for symbol, bars in frames.items()}
     frames = {symbol: bars for symbol, bars in frames.items() if not bars.empty}
     if not frames:

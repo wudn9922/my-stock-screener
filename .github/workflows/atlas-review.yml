@@ -34,6 +34,7 @@ on:
       - 'report_metrics.py'
       - 'scripts/market_sessions.py'
       - 'scripts/scan_market_closures.py'
+      - 'scripts/scan_market_data_gaps.py'
       - 'tests/test_market_closures.py'
       - 'scripts/restore_closed_market_snapshot.py'
       - 'scripts/build_breadth.py'

@@ -222,7 +222,7 @@ def closed_sessions(observations):
     return set(closed_session_evidence(observations))
 
 
-def closed_session_evidence(observations, positive=None, references=None, policy=None, reviews=None, trading=None):
+def closed_session_evidence(observations, positive=None, references=None, policy=None, reviews=None, trading=None, officials=None):
     """Use stock trading evidence to veto an index gap, including stale policy."""
     import pandas as pd
     result = {}
@@ -234,7 +234,8 @@ def closed_session_evidence(observations, positive=None, references=None, policy
         frame.index = pd.DatetimeIndex(frame.index)
         local_reviews = {}
         classified = sessions.classify_closures(frame,(references or {}).get(market),(policy or {}).get(market,{}),
-            min_symbols=CLOSED_SESSION_MIN_SYMBOLS,trading=(trading or {}).get(market,{}),reviews=local_reviews)
+            min_symbols=CLOSED_SESSION_MIN_SYMBOLS,trading=(trading or {}).get(market,{}),reviews=local_reviews,
+            market=market,official=(officials or {}).get(market))
         result.update({(market,day):row for day,row in classified.items()})
         if reviews is not None:
             reviews.extend(dict(market=market,**row) for row in local_reviews.values())
@@ -766,7 +767,8 @@ def stage_cache(cache, archive, output, now=None, previous=None):
     # without trades) still are. Corrections carry their own proven full history.
     reviews = []
     evidence = closed_session_evidence(observations,positive,references,policy,reviews,
-                                       sessions.read_trading_policy(cache / sessions.POLICY_FILE))
+        sessions.read_trading_policy(cache / sessions.POLICY_FILE),
+        {m:sessions.archive_official_days(archive,m,now) for m in ('tw','us')})
     closed = set(evidence)
     plan["closedSessions"] = [{"market": market, "date": day, "symbols": len(observations.get((market, day),[]))}
                               for market, day in sorted(closed)]

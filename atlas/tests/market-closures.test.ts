@@ -9,7 +9,7 @@ import type { BarResult } from '../src/market-data/MarketDataProvider';
 
 const body='Date,Open,High,Low,Close,Volume\n2026-10-22,100,100,100,100,0\n2026-10-23,100,100,100,100,0\n2026-10-27,101,102,100,101,1000\n';
 const day=(bar:{time:number})=>calendarDate(bar.time,getMarketProfile('2330.TW'));
-const evidence={date:'2026-10-27',reasons:['flat-zero-cohort'],observedSymbols:100,eligibleSymbols:100,
+const evidence={date:'2026-10-27',reasons:['flat-zero-cohort','primary-index-missing'],calendar:'XTAI',calendarSession:true,observedSymbols:100,eligibleSymbols:100,
   flatZeroSymbols:95,unknownVolumeSymbols:0,flatZeroShare:.95,coverageReference:100};
 const policy={version:1,threshold:.95,markets:{tw:{closedSessions:[evidence]},us:{closedSessions:[]}}};
 
@@ -26,6 +26,10 @@ describe('market-wide closures are projections, never price edits',()=>{
     for(const changed of [{...evidence,date:'2026-02-30'},{...evidence,reasons:[]},{...evidence,flatZeroShare:2}])
       expect(marketClosuresSchema.safeParse({...policy,markets:{tw:{closedSessions:[changed]}}}).success).toBe(false);
     expect(marketClosuresSchema.safeParse({...policy,threshold:.5}).success).toBe(false);
+    const { calendar, calendarSession, ...legacy } = evidence;
+    void calendar; void calendarSession;
+    expect(marketClosuresSchema.safeParse({...policy,markets:{tw:{closedSessions:[legacy]}}}).success).toBe(false);
+    expect(marketClosuresSchema.safeParse({...policy,markets:{tw:{closedSessions:[{...evidence,reasons:['primary-index-missing'],flatZeroSymbols:0,flatZeroShare:0}]}}}).success).toBe(false);
   });
   it('keeps previously validated dynamic evidence when the next UTC day fetch fails',async()=>{
     const fetcher=vi.fn(async()=>Response.json(policy));
@@ -73,6 +77,23 @@ describe('market-wide closures are projections, never price edits',()=>{
     expect(daily!.bars.map(day)).toEqual(['2026-11-03','2026-11-04','2026-11-05']);
     expect(daily!.closedSessions).not.toContain('2026-11-04');
     expect(marketClosuresSchema.safeParse({...policy,markets:{tw:{closedSessions:[{...evidence,positiveVolumeSymbols:5}]}}}).success).toBe(false);
+  });
+  it('retains the official April 6 index bar, including when the optional report fails',async()=>{
+    const csv='Date,Open,High,Low,Close,Volume\n2021-04-01,207,208,206,207,\n2021-04-06,207.79,209.81,207.79,209.70,\n';
+    for (const reportAvailable of [true,false]) {
+      const missing={version:1,threshold:.95,markets:{tw:{closedSessions:[],missingSessions:[{
+        date:'2021-04-06',reason:'missing-session-data',calendar:'XTAI',calendarSession:true,
+        primaryIndexMissing:true,observedSymbols:0,officialSources:[{symbol:'^TWOII',source:'TPEx official cash-index OHLC'}],
+      }]}}};
+      const fetcher=async(url:RequestInfo|URL)=>String(url).endsWith('market-closures.json')
+        ?reportAvailable?Response.json(missing):new Response('',{status:503})
+        :String(url).includes('/index/')?Response.json(archiveIndexFixture('^TWOII',{2021:csv})):new Response(csv);
+      const result=await new KlineArchive({fetcher,cache:false,now:()=>Date.UTC(2026,10,6)}).getDaily('^TWOII');
+      expect(result!.bars.map(bar=>calendarDate(bar.time,getMarketProfile('^TWOII')))).toEqual(['2021-04-01','2021-04-06']);
+      expect(result!.bars.at(-1)!.close).toBe(209.7);
+      expect(result!.closedSessions).not.toContain('2021-04-06');
+      for(const tf of ['1D','1W','1M'] as const) expect(archivePeriod(result!,'^TWOII',tf).bars.at(-1)!.close).toBe(209.7);
+    }
   });
   it('daily, weekly and monthly aggregation all start after closure projection',()=>{
     const raw:BarResult={...parseArchiveCsv(body,'2330.TW',2026),closedSessions:['2026-10-23'],archive:{status:'archive',lastDate:'2026-10-27'}};

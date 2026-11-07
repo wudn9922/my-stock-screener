@@ -1,4 +1,16 @@
-## PR #230 修訂：股票成交證據優先（2026-11-06）
+## PR #230 再修訂：交易日資料缺漏保護（2026-11-07）
+
+本節取代下方前次的2021-04-06休市判定。只做primary self-review，沒有獨立簽核。一般merge最新main，保留已合併#235與原導頁／匯入測試修正；不rebase／force-push。
+
+XTAI／XNYS先判日曆日。交易日須「主要指數缺列＋≥95%有效普通股零量平盤」才判臨時休市，且官方當日資料可否決；正量≥5%／50檔與原覆蓋門檻不變。2021-04-06官方^TWOII保留，改列missing-session-data；10/23、10/26結果不變。舊index-only政策撤銷，前端嚴格驗日曆／雙證據，完整行情投影cache升v5；raw年檔不動。
+
+唯讀掃描固定archive `62bd86a6e7fcde3572c56aa607eed5018a0cfe68`，7,689代號、41,507年檔、9,780,006列、0無效OHLC，103.851秒；只有10/23含2,214筆疑似休市占位列。新[缺漏報告](../docs/research-verification/market-data-gaps-20261106.json)列6個TW歷史疑點，其中4/6與2025-08-01有TPEx佐證；另外4日待核對臨時休市／日曆差異。US既有範圍內0日，跨日後最新11/6尚未封存另列尾端。各日普通股缺列檔數與限制見[方法及摘要](../docs/MARKET_CLOSURES.md)、[ADR-029](docs/architecture/ADR-029-market-closed-session-projection.md)。掃描前後archive乾淨，無修復／推送／刪除。
+
+本機相關Python套件336項通過（最後休市專項20項重驗），breadth pytest27項通過；完整Vitest157檔／1,973項、lint、typecheck、一般與Pages建置通過。受影響桌機／390px Chromium／WebKit 63項、375px兩引擎18項，共81項瀏覽器通過。沒有新增skip、放寬斷言或增加timeout。日曆套件移到universe-full掃描前安裝，archive review也安裝相同既有版本範圍；新的掃描ID可由#236收集部分失敗。全部workflow actionlint通過。
+
+[4/6桌機](docs/screenshots/market-closures/calendar-gap-desktop.png)、[390px Chromium](docs/screenshots/market-closures/calendar-gap-chromium390.png)、[390px WebKit](docs/screenshots/market-closures/calendar-gap-iphone390.png)、[375px Chromium](docs/screenshots/market-closures/calendar-gap-chromium375.png)、[375px WebKit](docs/screenshots/market-closures/calendar-gap-iphone375.png)為離線fixture，不是實體iPhone或正式即時行情驗收。只更新原PR，不合併、不部署、不觸發正式workflow、不通知；永久行情／財報、突破快照與前瞻CSV未改。
+
+## PR #230 前次修訂紀錄：股票成交證據優先（2026-11-06）
 
 只做primary self-review，未聲稱獨立簽核。依使用者修正原prompt的OR規格：有效普通股正量占比≥5%或至少50檔時一律保留當天資料；指數缺列只記 `primary-index-gap-with-trading`。沒有任何股票觀測時仍可依主要指數缺列判休市，95%零量平盤門檻不變；成交證據優先處理5%／95%恰好相交的邊界。
 

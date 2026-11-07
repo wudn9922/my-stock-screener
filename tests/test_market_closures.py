@@ -21,6 +21,7 @@ import build_universe_full as bu
 import build_market_warnings as mw
 import kline_archive as ka
 import scan_market_closures as scan
+import scan_market_data_gaps as gaps
 import refresh_archive_instruments as instruments
 import build_breadth as breadth
 import build_breakouts as breakouts
@@ -40,6 +41,49 @@ def ghost(frame, day='2026-10-23', close=102.):
 
 
 class ClosureRulesTest(unittest.TestCase):
+    def test_calendar_dependency_is_installed_before_the_scan_and_archive_contracts(self):
+        workflow=(ROOT/'.github/workflows/universe-full.yml').read_text()
+        before=workflow.split('- name: Build market closure evidence from read-only archive',1)[0]
+        self.assertIn("'exchange-calendars>=4.5,<5.0'",before)
+        review=(ROOT/'.github/workflows/kline-archive-review.yml').read_text()
+        before=review.split('- name: Offline append, correction, retention, resume and Git retry contracts',1)[0]
+        self.assertIn("'exchange-calendars>=4.5,<5.0'",before)
+
+    def test_calendar_session_with_only_official_tpex_bar_is_missing_data_not_closed(self):
+        self.assertIn('2021-04-06',ms.exchange_sessions('tw','2021-04-01','2021-04-07'))
+        primary=ms.primary_reference(pd.DataFrame(dict(Open=1.,High=1.,Low=1.,Close=1.),
+            index=pd.to_datetime(['2021-04-01','2021-04-07'])),'^TWII','fixture')
+        official={'2021-04-06':[dict(symbol='^TWOII',source='TPEx official cash-index OHLC')]}
+        empty=pd.DataFrame(columns=['observed','flatZero','unknownVolume','positiveVolume'])
+        missing={}
+        closed=ms.classify_closures(empty,primary,known=['2021-04-06'],market='tw',official=official,missing=missing)
+        self.assertNotIn('2021-04-06',closed)
+        self.assertEqual(missing['2021-04-06']['reason'],'missing-session-data')
+        self.assertEqual(missing['2021-04-06']['officialSources'],official['2021-04-06'])
+        self.assertTrue(missing['2021-04-06']['calendarSession'])
+        # Even one ordinary-stock observation on a calendar session is a gap,
+        # never holiday evidence; the existing flat-zero emergency rule is separate.
+        stats=pd.DataFrame(dict(observed=[1],flatZero=[0],unknownVolume=[1],positiveVolume=[0]),
+                           index=pd.to_datetime(['2021-04-06']))
+        self.assertNotIn('2021-04-06',ms.classify_closures(stats,primary,market='tw'))
+
+    def test_available_index_or_official_bar_vetoes_zero_stock_placeholders_on_a_session(self):
+        stats=pd.DataFrame(dict(observed=[100],flatZero=[100],unknownVolume=[0],positiveVolume=[0]),
+                           index=pd.to_datetime(['2021-04-06']))
+        full=ms.primary_reference(pd.DataFrame(dict(Open=1.,High=1.,Low=1.,Close=1.),
+            index=pd.to_datetime(['2021-04-01','2021-04-06','2021-04-07'])),'^TWII','fixture')
+        gap={**full,'dates':full['dates']-{'2021-04-06'}}
+        self.assertNotIn('2021-04-06',ms.classify_closures(stats,full,market='tw'))
+        self.assertNotIn('2021-04-06',ms.classify_closures(stats,gap,market='tw',
+                         official={'2021-04-06':[dict(symbol='^TWOII',source='TPEx official cash-index OHLC')]}))
+        self.assertIn('2021-04-06',ms.classify_closures(stats,gap,market='tw')) # emergency exception needs both proofs
+
+    def test_calendar_failure_does_not_create_a_new_weekday_closure(self):
+        stats=pd.DataFrame(dict(observed=[100],flatZero=[100],unknownVolume=[0],positiveVolume=[0]),
+                           index=pd.to_datetime(['2021-04-06']))
+        with patch.object(ms,'exchange_sessions',side_effect=RuntimeError('calendar unavailable')):
+            self.assertNotIn('2021-04-06',ms.classify_closures(stats,market='tw'))
+
     def test_95_percent_flat_zero_is_closed_even_if_price_changed_from_previous_close(self):
         frames={str(i):ghost(prices()) for i in range(100)}
         for i in range(95,100):
@@ -142,7 +186,9 @@ class ClosureRulesTest(unittest.TestCase):
         base=pd.DataFrame(dict(Open=close,High=close+1,Low=close-1,Close=close,Volume=1e7),index=days)
         normal={f'{1000+i}.TW':base.copy() for i in range(100)}
         fake={s:ghost(f,close=float(f.loc[:'2026-10-22'].Close.iloc[-1])) for s,f in normal.items()}
-        spec=lambda frames:dict(frames=frames,listed=100,listingAsOf='2026-11-05')
+        proof={'2026-10-23':dict(date='2026-10-23',reasons=['primary-index-missing','flat-zero-cohort'],
+               observedSymbols=100,eligibleSymbols=100,flatZeroSymbols=100,positiveVolumeSymbols=0)}
+        spec=lambda frames:dict(frames=frames,listed=100,listingAsOf='2026-11-05',closedSessions=proof)
         def attempts(bars,calendar):
             return [dict(first=True,higher=True,qualified=True,date=calendar[-25],outcome={'status':'complete','wins':{'hold5':True}})]
         with patch.object(mw,'swing_attempts',side_effect=attempts):
@@ -157,9 +203,56 @@ class ClosureRulesTest(unittest.TestCase):
 
 
 class ArchiveClosureTest(unittest.TestCase):
+    def make_gap_archive(self, root, official=True):
+        ka.initialize(root)
+        for symbol in ['^TWII',*[f'{1000+i}.TW' for i in range(50)]]:
+            ka.put_symbol(root,symbol,[ka.normalize([day,100,101,99,100,1000]) for day in ['2021-04-01','2021-04-07']])
+        if official:
+            ka.put_symbol(root,'^TWOII',[ka.normalize(['2021-04-06',207.79,209.81,207.79,209.70,None])])
+            ka.json_write(root/ka.INSTRUMENTS_STATE,dict(version=1,symbols={
+                '^TWOII':dict(kind='index',source='TPEx official cash-index OHLC; synthetic test fixture')}))
+        ka.update_manifest(root)
+
+    def test_read_only_gap_scan_reports_missing_index_and_stocks_and_retains_official_row(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'archive';self.make_gap_archive(root)
+            before={p:hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file()}
+            report=scan.scan_archive(root,datetime(2021,4,8,tzinfo=timezone.utc))
+            tw=report['markets']['tw']
+            self.assertNotIn('2021-04-06',{row['date'] for row in tw['closedSessions']})
+            missing=next(row for row in tw['missingSessions'] if row['date']=='2021-04-06')
+            self.assertEqual(missing['reason'],'missing-session-data')
+            row=next(row for row in scan.gap_report(report)['markets']['tw']['sessions'] if row['date']=='2021-04-06')
+            self.assertEqual((row['observedSymbols'],row['eligibleSymbols'],row['missingSymbols']),(0,50,50))
+            self.assertEqual(row['missingShare'],1.)
+            self.assertEqual(row['reasons'],['primary-index-missing','majority-stock-rows-missing'])
+            self.assertEqual(row['officialSources'][0]['ohlc'],dict(open=207.79,high=209.81,low=207.79,close=209.70))
+            self.assertEqual(before,{p:hashlib.sha256(p.read_bytes()).hexdigest() for p in before})
+            with self.assertRaisesRegex(ValueError,'Read-only'):
+                gaps.main(['--archive-dir',str(root),'--out',str(root/'bad.json')])
+
+    def test_stage_retains_april_6_and_revokes_a_legacy_index_only_closure(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root,cache,payload=Path(folder)/'archive',Path(folder)/'cache',Path(folder)/'payload'
+            self.make_gap_archive(root,official=False)
+            false_row=dict(date='2021-04-06',reasons=['primary-index-missing'],observedSymbols=0,eligibleSymbols=0,
+                           flatZeroSymbols=0,positiveVolumeSymbols=0)
+            scan.write_report(cache/ms.POLICY_FILE,dict(version=1,threshold=.95,markets={'tw':{'closedSessions':[false_row]}}))
+            self.assertNotIn('2021-04-06',ms.read_policy(cache/ms.POLICY_FILE)['tw'])
+            frame=pd.DataFrame([[207.79,209.81,207.79,209.70,float('nan')]],columns=uc.PRICE_COLUMNS,
+                               index=pd.to_datetime(['2021-04-06']))
+            uc.write_bars(uc.bars_path(str(cache),'^TWOII'),frame)
+            state=uc.load_state(str(cache));uc.record_frame(state,'^TWOII',frame,'2026-11-05',full=True,verified=True);uc.save_state(str(cache),state)
+            before={p:p.read_bytes() for p in root.rglob('*') if p.is_file()}
+            plan=ka.stage_cache(cache,root,payload,now=NOW)
+            self.assertNotIn('2021-04-06',{row['date'] for row in plan['closedSessions']})
+            item=next(item for item in plan['symbols'] if item['symbol']=='^TWOII')
+            self.assertEqual(ka.read_rows(payload/item['file'])[0][0],'2021-04-06')
+            self.assertEqual(before,{p:p.read_bytes() for p in before})
+
     def make_archive(self,root):
         ka.initialize(root)
-        for symbol in ['2330.TW','6488.TWO']:
+        for symbol in ['2330.TW','6488.TWO',*[f'{1000+i}.TW' for i in range(48)]]:
             ka.put_symbol(root,symbol,[ka.normalize(['2026-10-22',100,101,99,100,1000]),
                                        ka.normalize(['2026-10-23',100,100,100,100,0]),
                                        ka.normalize(['2026-10-27',101,102,100,101,1000])])
@@ -175,7 +268,7 @@ class ArchiveClosureTest(unittest.TestCase):
             report=scan.scan_archive(root,NOW)
             rows=[r for r in report['markets']['tw']['closedSessions'] if r['affectedRows']]
             self.assertEqual(len(rows),1)
-            self.assertEqual((rows[0]['date'],rows[0]['affectedRows']),('2026-10-23',2))
+            self.assertEqual((rows[0]['date'],rows[0]['affectedRows']),('2026-10-23',50))
             self.assertIn('primary-index-missing',rows[0]['reasons'])
             self.assertEqual(before,{p:hashlib.sha256(p.read_bytes()).hexdigest() for p in before})
             with self.assertRaisesRegex(ValueError,'Read-only'):
@@ -268,6 +361,7 @@ class ArchiveClosureTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root,cache,payload=Path(folder)/'archive',Path(folder)/'cache',Path(folder)/'payload'
             self.make_archive(root)
+            scan.write_report(cache/ms.POLICY_FILE,scan.scan_archive(root,NOW))
             old=ka.symbol_rows(root,'2330.TW')[1]
             fresh=pd.DataFrame([[50,50.5,49.5,50,1000],[50.5,51,50,50.5,1000]],
                                 columns=uc.PRICE_COLUMNS,index=pd.to_datetime(['2026-10-22','2026-10-27']))

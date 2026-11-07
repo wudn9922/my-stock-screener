@@ -215,7 +215,7 @@ def build_market(spec, indices, market, now, params=PARAMS, previous=None):
     clipped = {s: f.loc[f.index.isin(calendar)] for s, f in frames.items()}
     clipped = {s: f for s, f in clipped.items() if not f.empty}
     reference = primary_reference(indices[cfg['indices'][0]],cfg['indices'][0],'warning-index-daily',now)
-    clipped, closed = market_prices(clipped,reference,spec.get('closedSessions',()))
+    clipped, closed = market_prices(clipped,reference,spec.get('closedSessions',()),market=market,official=spec.get('officialSessions'))
     calendar = calendar[~calendar.strftime("%Y-%m-%d").isin(closed)]
     if not clipped:
         raise ValueError(f"{market} 沒有已收盤有效日線")

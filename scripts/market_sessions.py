@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +17,7 @@ import pandas as pd
 
 UNKNOWN_VOLUME_DATES = "atlas_unknown_volume_dates"
 CLOSED_DATES = "atlas_market_closed_dates"
+CLOSURE_EVIDENCE = "atlas_emergency_closure_evidence"
 PROJECTED = "atlas_market_sessions_projected"
 REMOVED_WEEKENDS = "atlas_removed_weekend_dates"
 CLOSURE_SHARE = 0.95
@@ -23,6 +25,27 @@ TRADING_SHARE = 0.05
 TRADING_SYMBOLS = 50
 PRIMARY_INDICES = {"tw": "^TWII", "us": "^GSPC"}
 POLICY_FILE = "market-closures.json"
+CALENDARS = {'tw': 'XTAI', 'us': 'XNYS'}
+
+
+@lru_cache(maxsize=32)
+def exchange_sessions(market, start, end):
+    """Official exchange calendar labels, with a small margin for library bounds."""
+    import exchange_calendars as xcals
+    calendar = xcals.get_calendar(CALENDARS[market], start=pd.Timestamp(start)-pd.Timedelta(days=7),
+                                 end=pd.Timestamp(end)+pd.Timedelta(days=7))
+    return frozenset(calendar.sessions.strftime('%Y-%m-%d'))
+
+
+def _emergency_proof(row, min_symbols=2):
+    if not isinstance(row, dict):
+        return False
+    count, eligible = row.get('observedSymbols', 0), row.get('eligibleSymbols', 0)
+    return (count >= min_symbols and eligible >= count and row.get('flatZeroSymbols', 0) >= eligible * CLOSURE_SHARE
+            and 'primary-index-missing' in row.get('reasons', ())
+            and 'flat-zero-cohort' in row.get('reasons', ())
+            and row.get('positiveVolumeSymbols', 0) < TRADING_SYMBOLS
+            and row.get('positiveVolumeSymbols', 0) < count * TRADING_SHARE)
 
 
 def cohort_statistics(frames):
@@ -58,16 +81,28 @@ def cohort_statistics(frames):
     return pd.DataFrame(counts, index=days, columns=['observed', 'flatZero', 'unknownVolume', 'positiveVolume'])
 
 
-def classify_closures(stats, primary=None, known=(), min_symbols=2, *, trading=(), reviews=None):
+def classify_closures(stats, primary=None, known=(), min_symbols=2, *, trading=(), reviews=None,
+                      market=None, official=None, missing=None):
     """One rule for scans, collection and calculations; evidence is JSON-safe.
 
-    Index absence is evidence ONLY inside a successfully read, complete index's
-    coverage. A failed download or a date after its last bar is unknown, not a
-    holiday. The cohort guard retains the existing half-recent-coverage safeguard.
+    A calendar session cannot be closed just because prices are absent. Only a
+    missing index AND the existing >=95% flat-zero cohort can override a session
+    (emergency closure). Calendar gaps are observable missing data, never holidays.
     """
     if primary:
         candidates = pd.bdate_range(primary['firstDate'], primary['lastDate'])
         stats = stats.reindex(stats.index.union(candidates)).sort_index().fillna(0)
+    extra = set(known) | set(official or {})
+    if extra:
+        stats = stats.reindex(stats.index.union(pd.to_datetime(sorted(extra)))).sort_index().fillna(0)
+    market = (market or ('tw' if (primary or {}).get('symbol') == '^TWII' else 'us' if primary else '')).lower()
+    calendar = None
+    if market in CALENDARS and len(stats):
+        try:
+            calendar = exchange_sessions(market, stats.index.min().strftime('%Y-%m-%d'), stats.index.max().strftime('%Y-%m-%d'))
+        except Exception:
+            # Calendar uncertainty must never turn an index hole into a closure.
+            calendar = None
     records = {}
     traded = set(trading)
     for day, row in stats.iterrows():
@@ -81,30 +116,50 @@ def classify_closures(stats, primary=None, known=(), min_symbols=2, *, trading=(
         eligible = max(count, int(row.get('eligible', count)))
         positive = int(row.get('positiveVolume', 0))
         index_missing = bool(primary and primary['firstDate'] <= date <= primary['lastDate'] and date not in primary['dates'])
+        index_absent = not primary or date not in primary['dates']
+        is_session = date in calendar if calendar is not None else None
+        flat_cohort = count >= min_symbols and count >= reference.loc[day] * .5 and flat >= eligible * CLOSURE_SHARE
+        old_proof = _emergency_proof(known.get(date), min_symbols) if isinstance(known, dict) else False
+        emergency = index_absent and (flat_cohort or old_proof) and not (official or {}).get(date)
         if date in traded:
             if index_missing and reviews is not None and count and (positive >= TRADING_SYMBOLS or positive / count >= TRADING_SHARE):
                 reviews[date] = dict(date=date, reason='primary-index-gap-with-trading',
                                     observedSymbols=count, positiveVolumeSymbols=positive,
                                     positiveVolumeShare=positive/count if count else None)
+            if is_session is True and index_missing and missing is not None:
+                missing[date] = dict(date=date, reason='missing-session-data', calendar=CALENDARS[market],
+                                     calendarSession=True, primaryIndexMissing=True,
+                                     observedSymbols=count, officialSources=list((official or {}).get(date, ())))
+            continue
+        if is_session is True and not emergency:
+            if missing is not None and (index_absent or date in known):
+                missing[date] = dict(date=date, reason='missing-session-data', calendar=CALENDARS[market],
+                                     calendarSession=True, primaryIndexMissing=index_absent,
+                                     observedSymbols=count, officialSources=list((official or {}).get(date, ())))
             continue
         reasons = []
         if pd.Timestamp(day).dayofweek >= 5:
             reasons.append('weekend')
-        if index_missing:
+        if is_session is False:
+            reasons.append('exchange-calendar-closed')
+        if index_missing or emergency:
             reasons.append('primary-index-missing')
-        if count >= min_symbols and count >= reference.loc[day] * .5 and flat >= eligible * CLOSURE_SHARE:
+        if flat_cohort:
             reasons.append('flat-zero-cohort')
-        if date in known:
+        if date in known and (is_session is False or emergency or market not in CALENDARS):
             reasons.append('published-closure')
+        if market in CALENDARS and is_session is None:
+            reasons = [reason for reason in reasons if reason == 'weekend']
         if reasons:
             records[date] = dict(date=date, reasons=reasons, observedSymbols=count,
                                  flatZeroSymbols=flat, eligibleSymbols=eligible, unknownVolumeSymbols=int(row.unknownVolume),
                                  positiveVolumeSymbols=positive, positiveVolumeShare=positive/count if count else None,
                                  flatZeroShare=flat/eligible if eligible else None,
-                                 coverageReference=float(reference.loc[day]))
-    for date in set(known) - traded:
-        records.setdefault(date, dict(date=date, reasons=['published-closure'], observedSymbols=0,
-                                      flatZeroSymbols=0, eligibleSymbols=0, unknownVolumeSymbols=0, positiveVolumeSymbols=0, positiveVolumeShare=None, flatZeroShare=None, coverageReference=0.))
+                                 coverageReference=float(reference.loc[day]), calendar=CALENDARS.get(market),
+                                 calendarSession=is_session)
+            if emergency and old_proof and not count:
+                records[date] = {**known[date], 'reasons':list(dict.fromkeys([*known[date]['reasons'],'published-closure'])),
+                                 'calendar': CALENDARS[market], 'calendarSession': is_session}
     return records
 
 
@@ -117,7 +172,7 @@ def primary_reference(frame, symbol, source, now=None):
     days = pd.DatetimeIndex(frame.index[good]).tz_localize(None).normalize()
     if now is not None:
         import universe_cache as uc
-        market = 'TW' if symbol == '^TWII' else 'US'
+        market = 'TW' if symbol in ('^TWII', '^TWOII') else 'US'
         days = days[[uc.session_done(d.strftime('%Y-%m-%d'), market, now) for d in days]]
     if days.empty:
         return None
@@ -127,7 +182,11 @@ def primary_reference(frame, symbol, source, now=None):
 
 def archive_primary(root, market, now=None):
     """Read and hash-check the tiny primary index and all its referenced years."""
-    symbol = PRIMARY_INDICES[market.lower()]
+    return archive_reference(root, market, PRIMARY_INDICES[market.lower()], now)
+
+
+def archive_reference(root, market, symbol, now=None):
+    """Hash-verified archive index reference; no network and no archive mutations."""
     try:
         root = Path(root)
         doc = json.loads((root / 'index' / market.lower() / (symbol.replace('^','%5E') + '.json')).read_text())
@@ -150,15 +209,35 @@ def archive_primary(root, market, now=None):
         return None
 
 
+def archive_official_days(root, market, now=None):
+    """TPEx provenance is explicit in this index; Yahoo indices are not official evidence."""
+    if market.lower() != 'tw':
+        return {}
+    try:
+        source = json.loads((Path(root)/'index/tw/%5ETWOII.json').read_text()).get('source', '')
+        if not source.startswith('TPEx official cash-index OHLC'):
+            return {}
+        reference = archive_reference(root, 'tw', '^TWOII', now)
+        return {day: [dict(symbol='^TWOII', source=source)] for day in reference['dates']} if reference else {}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
 def read_policy(path):
     try:
         value = json.loads(Path(path).read_text())
         if value.get('version') != 1 or value.get('threshold') != CLOSURE_SHARE:
             return {}
-        return {market: {r['date']: r for r in value['markets'].get(market,{}).get('closedSessions',[])
-                         if r['date'] not in {g['date'] for g in value['markets'].get(market,{}).get('indexGapsWithTrading',[])}}
-                for market in ('tw', 'us')}
-    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        result = {}
+        for market in ('tw', 'us'):
+            part = value['markets'].get(market, {})
+            veto = {g['date'] for g in [*part.get('indexGapsWithTrading', []), *part.get('missingSessions', [])]}
+            rows = part.get('closedSessions', [])
+            days = exchange_sessions(market, min(r['date'] for r in rows), max(r['date'] for r in rows)) if rows else ()
+            result[market] = {r['date']: r for r in rows if r['date'] not in veto
+                              and (r['date'] not in days or _emergency_proof(r))}
+        return result
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, ImportError, RuntimeError):
         return {}
 
 
@@ -188,12 +267,24 @@ def snapshot_statistics(bars, listed):
     return result
 
 
-def non_trading_dates(frames, primary=None, known=()):
+def non_trading_dates(frames, primary=None, known=(), *, market=None, official=None, evidence=None):
     inherited = set(known)
+    proofs = dict(known) if isinstance(known, dict) else {}
     for frame in frames.values():
         if frame is not None:
             inherited.update(frame.attrs.get(CLOSED_DATES, ()))
-    return frozenset(classify_closures(cohort_statistics(frames), primary, inherited))
+            proofs.update(frame.attrs.get(CLOSURE_EVIDENCE, {}))
+    if market is None:
+        if (primary or {}).get('symbol') in PRIMARY_INDICES.values():
+            market = next(m for m,symbol in PRIMARY_INDICES.items() if symbol == primary['symbol'])
+        elif frames:
+            market = 'tw' if any(s.endswith(('.TW', '.TWO')) or s in ('^TWII', '^TWOII') for s in frames) else 'us'
+    # Preserve the published evidence, not just its date, for emergency closures.
+    records = classify_closures(cohort_statistics(frames), primary,
+        {day:proofs.get(day, {}) for day in inherited | set(proofs)}, market=market,official=official)
+    if evidence is not None:
+        evidence.update(records)
+    return frozenset(records)
 
 
 def analysis_prices(frame, excluded_dates):
@@ -206,11 +297,12 @@ def analysis_prices(frame, excluded_dates):
     return result
 
 
-def market_prices(frames, primary=None, known=()):
+def market_prices(frames, primary=None, known=(), *, market=None, official=None):
     """Return projected market histories and the dates needed for custom-stock views."""
     if frames and primary is None and not known and all(f is not None and f.attrs.get(PROJECTED) for f in frames.values()):
         return frames, frozenset(d for f in frames.values() for d in f.attrs.get(CLOSED_DATES, ()))
-    excluded = non_trading_dates(frames, primary, known)
+    evidence = {}
+    excluded = non_trading_dates(frames, primary, known, market=market,official=official,evidence=evidence)
     projected = {}
     for symbol, frame in frames.items():
         view = analysis_prices(frame, excluded)
@@ -221,6 +313,9 @@ def market_prices(frames, primary=None, known=()):
         # Mark the cohort, so a later sector/monthly view cannot infer a whole
         # market closure from its own few halted members. Never mutate raw attrs.
         view.attrs[CLOSED_DATES] = tuple(sorted(excluded))
+        # Ordinary calendar holidays can be rechecked. Keep only the exceptional
+        # emergency proof, so downstream projections do not need the removed rows.
+        view.attrs[CLOSURE_EVIDENCE] = {day:row for day,row in evidence.items() if row.get('calendarSession') is True}
         view.attrs[PROJECTED] = True
         view.attrs[REMOVED_WEEKENDS] = tuple(sorted(set(frame.attrs.get(REMOVED_WEEKENDS,())) |
             set(frame.index[frame.index.dayofweek >= 5].strftime('%Y-%m-%d'))))

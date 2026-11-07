@@ -17,7 +17,7 @@ for (const mode of ['audited-offline', 'published-evidence', 'gap-with-trading']
     const policy = traded ? { version: 1, threshold: .95, markets: { tw: { closedSessions: [], indexGapsWithTrading: [{ date: '2026-11-04', reason: 'primary-index-gap-with-trading', observedSymbols: 100, positiveVolumeSymbols: 100 }] } } } : { version: 1, threshold: .95, markets: { tw: { closedSessions: [{
       // Synthetic future evidence also removes 10/22, proving the reader uses
       // the published policy rather than only its bundled 10/23 audit seed.
-      date: '2026-10-22', reasons: ['flat-zero-cohort'], observedSymbols: 100,
+      date: '2026-10-22', reasons: ['flat-zero-cohort', 'primary-index-missing'], calendar: 'XTAI', calendarSession: true, observedSymbols: 100,
       flatZeroSymbols: 95, eligibleSymbols: 100, unknownVolumeSymbols: 0,
       flatZeroShare: .95, coverageReference: 100,
     }] } } };
@@ -43,3 +43,24 @@ for (const mode of ['audited-offline', 'published-evidence', 'gap-with-trading']
     expect(errors).toEqual([]);
   });
 }
+
+test('calendar session gap retains official April 6 in daily, weekly and monthly charts', async ({ page }, info) => {
+  await mockSite(page);
+  const csv = 'Date,Open,High,Low,Close,Volume\n2021-04-01,207,208,206,207,\n2021-04-06,207.79,209.81,207.79,209.70,\n';
+  await page.route('**/report/market-closures.json', route => route.fulfill({ status: 503 }));
+  await page.route(root + '**', route => {
+    const path = decodeURIComponent(route.request().url().slice(root.length));
+    if (path === 'index/tw/%5ETWOII.json') return route.fulfill({ json: archiveIndexFixture('^TWOII', { 2021: csv }) });
+    return route.fulfill(path === 'tw/^TWOII/2021.csv' ? { contentType: 'text/csv', body: csv } : { status: 404 });
+  });
+  await page.route('**/functions/v1/market-chart?**', route => route.fulfill({ status: 502, body: 'unavailable' }));
+  for (const tf of ['1D', '1W', '1M']) {
+    await page.goto(`./?page=chart&symbol=%5ETWOII&tf=${tf}`);
+    await expect(page.getByTestId('chart')).toBeVisible();
+    await expect(page.locator('.chart-loading.error')).toHaveCount(0);
+    await expect(page.getByTestId('ohlc-header')).toContainText('209.70');
+    await expect(page.getByTestId('archive-availability')).toContainText('2021-04-06');
+    expect(await page.locator('#main').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+    if (tf === '1D') await page.screenshot({ path: info.outputPath('calendar-missing-session.png') });
+  }
+});
