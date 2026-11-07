@@ -16,3 +16,7 @@ retry semantics. Public extended-quote collection checks the same calendar libra
 date before fetching. No permanent archive/price records, authentication, Edge Functions or GCP
 monitoring are modified. Exchange emergency changes require updating the upstream calendar and
 republishing; the browser never guesses future exchange holidays.
+
+ADR-029 adds a separate read-only, evidence-based projection for already observed
+market closures, including emergency closures absent from XTAI/XNYS. It does not
+change the scheduled session boundaries or add another polling loop.

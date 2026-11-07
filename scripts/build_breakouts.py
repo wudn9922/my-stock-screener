@@ -61,6 +61,7 @@ from build_breadth import (  # noqa: E402
 from swing_breakouts import ATR_PERIOD, REVERSAL_ATR, SWING_KEY, SWING_METHOD, swing_high_signals, wilder_atr  # noqa: E402
 from breakout_outcomes import GATE_ATR_PERIOD, OBSERVATION_DAYS, evaluate_attempt, summarize_attempts, success_params  # noqa: E402
 from swing_cohort import COUNTING_MODEL, diagnostics, included, swing_attempts  # noqa: E402
+from market_sessions import market_prices, REMOVED_WEEKENDS  # noqa: E402
 
 BREAKOUTS_JSON_VERSION = 2
 HIGH_LOOKBACKS = (20, 60, 120)
@@ -257,7 +258,9 @@ def build_market(frames, universe_label, market_key, as_of=None, *, strategy_spe
     universe_count = len(frames)
     # 兩個市場週六日都不交易：週末K線一律視為無效日（2026-09-20 週日曾有 591 檔台股出現
     # 高低價＝漲跌停價、收盤沿用前一日的假K線，會墊高前高並讓箱型失真）
-    weekend_dates = [bars.index[bars.index.day_of_week >= 5] for bars in frames.values()]
+    weekend_dates = [bars.index[bars.index.day_of_week >= 5].union(pd.DatetimeIndex(bars.attrs.get(REMOVED_WEEKENDS,())))
+                     for bars in frames.values()]
+    frames, _ = market_prices(frames,market=market_key)
     frames = {symbol: bars[bars.index.day_of_week < 5] for symbol, bars in frames.items()}
     frames = {symbol: bars for symbol, bars in frames.items() if not bars.empty}
     if not frames:

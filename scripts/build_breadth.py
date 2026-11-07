@@ -70,6 +70,10 @@ def load_daily_bars(csv_path, price_columns=("Close",)):
         return None
     if not {"Date", "Volume", *price_columns}.issubset(raw.columns):
         return None
+    # Keep available OHLC for closure detection even when the calculation itself
+    # needs only Close. Never reconstruct high/low from an isolated Close.
+    required_prices = price_columns
+    price_columns = tuple(dict.fromkeys([*price_columns,*[c for c in ('Open','High','Low','Close') if c in raw]]))
 
     volume = pd.to_numeric(raw["Volume"], errors="coerce")
     bars = pd.DataFrame(
@@ -80,7 +84,7 @@ def load_daily_bars(csv_path, price_columns=("Close",)):
             "_volume_unknown": volume.isna() | (volume < 0),
         }
     )
-    bars = bars.dropna(subset=["Date", *price_columns])
+    bars = bars.dropna(subset=["Date", *required_prices])
     bars = bars.drop_duplicates("Date", keep="last").sort_values("Date").set_index("Date")
     bars.attrs[UNKNOWN_VOLUME_DATES] = tuple(day.isoformat() for day in bars.index[bars.pop("_volume_unknown")])
     return bars if len(bars) else None

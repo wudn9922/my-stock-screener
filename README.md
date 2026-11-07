@@ -134,6 +134,8 @@ Atlas 是內嵌在每日報告裡的研究工具（Vite/React，原始碼在 `at
 | 資料 | 產生器／來源 | 保存與限制 |
 |---|---|---|
 | `docs/report/market-warnings.json` | `scripts/build_market_warnings.py`；完整市場 cache＋Yahoo 指數日線／唯讀封存備援（SOX量用SOXX，source meta） | universe owner／generated；三年日期序列，歷史不足保留 null；單市場指數失敗明示保留／無資料，兩市場失敗保留整份舊檔 |
+| `docs/report/market-closures.json` | XTAI／XNYS＋全市場快照；正量 ≥5%／50檔優先保留，交易日須指數缺列且 ≥95% 零量平盤才判臨時休市 | universe owner／generated；只排除已證實休市，資料缺漏列為 missing-session-data；[判定與限制](docs/MARKET_CLOSURES.md) |
+| `docs/research-verification/market-data-gaps-20261106.json` | `scripts/scan_market_data_gaps.py` 唯讀封存；2021起交易日缺主要指數或 >50%普通股缺列 | 審查用報告，分列既有範圍內缺口與最新收盤待封存，附檔數／官方佐證；不自動補檔或修改archive |
 | `docs/report/market-warnings-log.csv` | 每市場、每資料日首次燈號與數值 | main durable record；只追加，禁止覆寫或截短；包含門檻 SHA-256 |
 | `docs/report/breakouts.json` 的波段新口徑 | 原 ATR 波段偵測＋首次／更高高點／合格收盤＋完整五日守住 | 每月同口徑重算；箱型、20EMA不變；舊快照標示舊口徑且不改寫 |
 

@@ -18,6 +18,7 @@ import kline_instruments as instruments
 import kline_integrity as integrity
 import universe_cache as uc
 import archive_tpex_index
+import market_sessions as sessions
 
 
 @contextmanager
@@ -44,6 +45,8 @@ def disposable_quality_log(cache):
 
 def seed_selected(archive_dir, cache_dir, selected, state, now):
     count = 0
+    policy = sessions.read_policy(Path(cache_dir).parent / sessions.POLICY_FILE)
+    closed = {m:set(policy.get(m,{})) for m in ('tw','us')}
     for symbol in selected:
         path = uc.bars_path(str(cache_dir), symbol)
         old = uc.read_bars(path)
@@ -53,7 +56,7 @@ def seed_selected(archive_dir, cache_dir, selected, state, now):
         rows = [r for r in rows if uc.session_done(r[0], 'TW' if archive.market_of(symbol) == 'tw' else 'US', now)]
         if not rows: continue
         frame = uc.frame_from_rows(rows)
-        frame = uc.write_bars(path, frame, now=now)
+        frame = uc.write_bars(path, frame, now=now, exclude_dates=closed.get(archive.market_of(symbol),()))
         uc.record_frame(state, symbol, frame, now.date().isoformat(), full=True, verified=True)
         count += 1
     return count
@@ -67,6 +70,10 @@ def refresh(archive_dir, cache_dir, budget=300, now=None, net=None, selected=Non
     cache_dir = Path(cache_dir)
     with disposable_quality_log(cache_dir):
         args = bu.parse_args(['--cache-dir', str(cache_dir), '--budget', str(budget)])
+        args.archive_dir = str(archive_dir)
+        policy = uc.read_json(str(cache_dir.parent / sessions.POLICY_FILE),None)
+        if policy:
+            uc.write_json(str(cache_dir / sessions.POLICY_FILE),policy)
         job = bu.Run(args, net=net, now=now, clock=clock, sleep=sleep)
         if selected is None:
             prior = archive.json_read(Path(archive_dir) / instruments.INSTRUMENTS_STATE, {}).get('symbols', {})
@@ -119,7 +126,7 @@ def refresh(archive_dir, cache_dir, budget=300, now=None, net=None, selected=Non
                     frame = uc.merge_incremental(old, fresh) if not old.empty else fresh
                 if frame.empty:
                     raise ValueError('no data from source: no valid completed sessions')
-                frame = uc.write_bars(path, frame, now=now)
+                frame = uc.write_bars(path, frame, now=now, exclude_dates=job.closed_dates(market))
                 uc.record_frame(state, symbol, frame, now.date().isoformat(), full=not uc.is_complete(entry), verified=True)
                 counts['appended'] += 1
             except Exception as exc:

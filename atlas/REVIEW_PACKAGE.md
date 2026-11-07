@@ -1,3 +1,41 @@
+## PR #230 合入 #236 後的部分失敗通知整合（2026-11-07）
+
+一般 merge 最新 main `63f4236aa`，merge commit `788be46ff` 保留兩個 parent；REVIEW_PACKAGE 的文件衝突保留雙方紀錄，沒有 rebase 或 force-push。只做 primary self-review，沒有獨立簽核。
+
+發布衍生休市證據步驟新增 `id: archive_closure_publish`，並將原步驟名稱加入 `collect_notification_outcomes` 的 `NOTIFY_STEP_NAMES`。原 `continue-on-error`、執行條件與 job 結果不變。回歸測試補強所有 producer 的 soft-failure ID 必須納入映射，並實際驗證發布步驟 outcome=failure／conclusion=success 時能輸出正確部分失敗摘要。
+
+先重現原 `test_all_producers_notify_without_altering_review_workflows` 失敗，再驗證指定三檔 45 項全部通過（failure notifications 13、cancelled policy 12、market closures 20）；全部 workflows 的 actionlint 1.7.12 通過。完整 Vitest 159 檔／2,025 項、lint、build、diff check 通過。未放寬斷言或新增 skip／timeout。只推回原 PR，不合併 PR、不部署、不 dispatch 正式 workflow。
+
+## PR #230 再修訂：交易日資料缺漏保護（2026-11-07）
+
+本節取代下方前次的2021-04-06休市判定。只做primary self-review，沒有獨立簽核。一般merge最新main，保留已合併#235與原導頁／匯入測試修正；不rebase／force-push。
+
+XTAI／XNYS先判日曆日。交易日須「主要指數缺列＋≥95%有效普通股零量平盤」才判臨時休市，且官方當日資料可否決；正量≥5%／50檔與原覆蓋門檻不變。2021-04-06官方^TWOII保留，改列missing-session-data；10/23、10/26結果不變。舊index-only政策撤銷，前端嚴格驗日曆／雙證據，完整行情投影cache升v5；raw年檔不動。
+
+唯讀掃描固定archive `62bd86a6e7fcde3572c56aa607eed5018a0cfe68`，7,689代號、41,507年檔、9,780,006列、0無效OHLC，103.851秒；只有10/23含2,214筆疑似休市占位列。新[缺漏報告](../docs/research-verification/market-data-gaps-20261106.json)列6個TW歷史疑點，其中4/6與2025-08-01有TPEx佐證；另外4日待核對臨時休市／日曆差異。US既有範圍內0日，跨日後最新11/6尚未封存另列尾端。各日普通股缺列檔數與限制見[方法及摘要](../docs/MARKET_CLOSURES.md)、[ADR-029](docs/architecture/ADR-029-market-closed-session-projection.md)。掃描前後archive乾淨，無修復／推送／刪除。
+
+本機相關Python套件336項通過（最後休市專項20項重驗），breadth pytest27項通過；完整Vitest157檔／1,973項、lint、typecheck、一般與Pages建置通過。受影響桌機／390px Chromium／WebKit 63項、375px兩引擎18項，共81項瀏覽器通過。沒有新增skip、放寬斷言或增加timeout。日曆套件移到universe-full掃描前安裝，archive review也安裝相同既有版本範圍；新的掃描ID可由#236收集部分失敗。全部workflow actionlint通過。
+
+[4/6桌機](docs/screenshots/market-closures/calendar-gap-desktop.png)、[390px Chromium](docs/screenshots/market-closures/calendar-gap-chromium390.png)、[390px WebKit](docs/screenshots/market-closures/calendar-gap-iphone390.png)、[375px Chromium](docs/screenshots/market-closures/calendar-gap-chromium375.png)、[375px WebKit](docs/screenshots/market-closures/calendar-gap-iphone375.png)為離線fixture，不是實體iPhone或正式即時行情驗收。只更新原PR，不合併、不部署、不觸發正式workflow、不通知；永久行情／財報、突破快照與前瞻CSV未改。
+
+## PR #230 前次修訂紀錄：股票成交證據優先（2026-11-06）
+
+只做primary self-review，未聲稱獨立簽核。依使用者修正原prompt的OR規格：有效普通股正量占比≥5%或至少50檔時一律保留當天資料；指數缺列只記 `primary-index-gap-with-trading`。沒有任何股票觀測時仍可依主要指數缺列判休市，95%零量平盤門檻不變；成交證據優先處理5%／95%恰好相交的邊界。
+
+以一般merge納入main `2e8799ba4d`（#231），交付前再合入最新main `e2ea0322c5`（#229／#232／#233），保留來源備援與取消生命週期，文件衝突保留雙方內容，沒有rebase／遠端force-push。移除bootstrap／ETF補充中繞過股票證據的單獨指數缺日判定；它們只採完整掃描的市場policy。stage與每日快照重新檢查成交，撤銷舊誤判；較新的人工查核證據不因下次快照無該日股票而被零數值覆蓋。前端嚴格驗證正量數，保留11/04，完整行情cache換版。
+
+最新唯讀掃描archive `339f57e742d904976eefbf73b7fad506fff6d9c7`：7,689代號、41,507年檔、9,772,433列、0無效OHLC，59.225秒。普通股／ETF仍只有TW2026-10-23的2,214筆；但新回補另有^TWOII 2021-04-06一筆，當天普通股0、^TWII缺列，依指定的無觀測規則列出人工核對。因此最新完整報告是2個日期／2,215列，未把它隱藏成只有10/23。[JSON報告](../docs/research-verification/market-closure-scan-20261106.json)、[方法與限制](../docs/MARKET_CLOSURES.md)、[ADR-029](docs/architecture/ADR-029-market-closed-session-projection.md)。archive前後git status乾淨，無任何publish／修復／刪除。
+
+實測：原相關Python套件273項通過；最後追加的成交證據保留案例以14項休市專項重驗。完整Vitest154檔／1,931項通過，lint／typecheck／一般與Pages建置通過。受影響桌機／390px Chromium／iPhone WebKit 51項、375px兩引擎16項，合計67項瀏覽器通過。未新增skip、增加timeout或放寬原數值斷言；原SEC測試在首輪高負載超時，減少並行後以原設定完整重跑通過。
+
+合入最新main `e2ea0322c5` 後再次驗證：122項Python（休市、警示、交易時段、指數讀取器、封存）與155檔／1,942項Vitest全部通過；lint、typecheck、一般／Pages建置通過；11/04日週月保留案例在桌機、390px Chromium／WebKit、375px Chromium／WebKit共5項通過。新main的archive取消測試為每個實際請求建立獨立Response，補入休市policy請求，保留單一消費者取消不影響其他消費者的原斷言。
+
+GitHub首輪完整瀏覽器935通過但2項舊案例失敗；實際下載artifact trace確認導頁成功旗標被另一個index相依檔覆寫，另有頁尾先於懶載入控制台出現的點擊競態。只修測試觀測與頁面就緒條件，新增新版WorldPage請求斷言，所有原斷言／timeout保留；沒有改登入、帳號或產品程式。[完整trace說明](docs/CI_FOLLOWUP_230_235.md)。修訂後兩檔27項桌機／390px Chromium／WebKit，以及14項375px兩引擎全部通過；lint／typecheck再次通過，完整CI對最後head重跑。
+
+新增案例涵蓋11/04指數缺列但100檔股票成交時不休市、stage正常帶出11/04、scanner更正舊policy、前端日週月不排除11/04；10/23全部零量、10/26完全無股票觀測仍判休市。5%與50檔門檻均測，舊成交證據的數值在次日保留。
+
+[桌機11/04](docs/screenshots/market-closures/index-gap-desktop.png)、[390px Chromium](docs/screenshots/market-closures/index-gap-chromium390.png)、[390px WebKit](docs/screenshots/market-closures/index-gap-iphone390.png)、[375px Chromium](docs/screenshots/market-closures/index-gap-chromium375.png)、[375px WebKit](docs/screenshots/market-closures/index-gap-iphone375.png) 是合成行情版面／截止日證明，不是實體iPhone或正式行情驗收。未改登入、Supabase、GCP、永久資料、突破舊快照或前瞻log；不合併、不部署、不執行正式workflow。
+
 ## MEXC 唯讀合約部位（2026-11-07）
 
 Primary self-review only，沒有獨立簽核。從 main `41f87eaae` 建立，只推 PR、不合併或部署。依任務「官方文件為準」採現行 Futures V1 固定網域 `api.mexc.com`、`detail/country` 與 ticker.fairPrice；與預期的舊網域／detail 路徑差異、官方連結及欄位映射見 [合約 API 與資料隔離說明](../docs/ATLAS_MEXC_FUTURES.md)。網域固定，不接受任意 URL。

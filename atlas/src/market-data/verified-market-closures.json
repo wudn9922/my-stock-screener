@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "threshold": 0.95,
+  "archiveCommit": "62bd86a6e7fcde3572c56aa607eed5018a0cfe68",
+  "markets": {
+    "tw": {
+      "closedSessions": [
+        {
+          "date": "2026-10-23",
+          "reasons": [
+            "primary-index-missing",
+            "flat-zero-cohort"
+          ],
+          "observedSymbols": 1981,
+          "flatZeroSymbols": 1981,
+          "eligibleSymbols": 1981,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": 0.0,
+          "flatZeroShare": 1.0,
+          "coverageReference": 1987.0,
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "affectedRows": 2214,
+          "sampleSymbols": [
+            "00400A.TW",
+            "00401A.TW",
+            "00402A.TW",
+            "00403A.TW",
+            "00404A.TW"
+          ]
+        }
+      ],
+      "missingSessions": [
+        {
+          "date": "2021-04-06",
+          "reason": "missing-session-data",
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "primaryIndexMissing": true,
+          "observedSymbols": 0,
+          "officialSources": [
+            {
+              "symbol": "^TWOII",
+              "source": "TPEx official cash-index OHLC; read-only existing CSV; unavailable volume stays unknown",
+              "ohlc": {
+                "open": 207.79,
+                "high": 209.81,
+                "low": 207.79,
+                "close": 209.7
+              }
+            }
+          ]
+        },
+        {
+          "date": "2022-02-04",
+          "reason": "missing-session-data",
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "primaryIndexMissing": true,
+          "observedSymbols": 0,
+          "officialSources": []
+        },
+        {
+          "date": "2023-01-18",
+          "reason": "missing-session-data",
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "primaryIndexMissing": true,
+          "observedSymbols": 0,
+          "officialSources": []
+        },
+        {
+          "date": "2024-10-31",
+          "reason": "missing-session-data",
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "primaryIndexMissing": true,
+          "observedSymbols": 0,
+          "officialSources": []
+        },
+        {
+          "date": "2026-07-10",
+          "reason": "missing-session-data",
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "primaryIndexMissing": true,
+          "observedSymbols": 0,
+          "officialSources": []
+        }
+      ]
+    },
+    "us": {
+      "closedSessions": [],
+      "missingSessions": []
+    }
+  }
+}

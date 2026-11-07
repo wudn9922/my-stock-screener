@@ -41,6 +41,7 @@ import report_metrics  # noqa: E402
 import universe_cache as uc  # noqa: E402
 import universe_sources as src  # noqa: E402
 import kline_integrity as kline  # noqa: E402
+import market_sessions as sessions  # noqa: E402
 
 TWSE_COMPANIES_URL = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
 TPEX_COMPANIES_URL = "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"
@@ -384,10 +385,40 @@ class Run:
         self.yahoo_ready = False
         self.chart_stopped = None
         self.agreement = []
+        self.closures = {}
 
     # ---- helpers
     def time_left(self):
         return self.deadline - self.clock()
+
+    def closed_dates(self, market):
+        key = market.lower()
+        if key not in self.closures:
+            known = sessions.read_policy(os.path.join(self.cache_dir,sessions.POLICY_FILE)).get(key,{})
+            primary = sessions.archive_primary(getattr(self.args,'archive_dir',None) or '',key,self.now)
+            stats = sessions.snapshot_statistics((self.snapshots.get(market) or {}).get('bars',{}),self.listing.get(market) or {})
+            prior_reviews = sessions.read_trading_policy(os.path.join(self.cache_dir,sessions.POLICY_FILE)).get(key,{})
+            reviews = dict(prior_reviews)
+            missing = {}
+            evidence = sessions.classify_closures(stats,primary,known,trading=prior_reviews,reviews=reviews,
+                market=key,missing=missing,official=sessions.archive_official_days(getattr(self.args,'archive_dir',None) or '',key,self.now))
+            for day in set(evidence) & set(known):
+                if not evidence[day]['observedSymbols']:
+                    evidence[day] = known[day]
+            self.closures[key] = evidence
+            for day, item in evidence.items():
+                if item['observedSymbols']:
+                    self.log(f'市場休市 {market} {day}: {item["reasons"]}, 零量平盤 {item["flatZeroSymbols"]}/{item["eligibleSymbols"]}')
+            policy = uc.read_json(os.path.join(self.cache_dir,sessions.POLICY_FILE),{}) or {}
+            policy.update(version=1,generatedAt=self.now.isoformat(),threshold=sessions.CLOSURE_SHARE,method='calendar-session-guard-v3')
+            part = policy.setdefault('markets',{}).setdefault(key,{})
+            if primary:
+                part['primary'] = {k:v for k,v in primary.items() if k != 'dates'}
+            part['closedSessions'] = list(evidence.values())
+            part['indexGapsWithTrading'] = list(reviews.values())
+            part['missingSessions'] = list(missing.values())
+            uc.write_json(os.path.join(self.cache_dir,sessions.POLICY_FILE),policy)
+        return frozenset(self.closures[key])
 
     def fetch_json(self, url, params=None, headers=None, label=None):
         return with_retries(lambda: self.net.get_json(url, params, headers, timeout=60), label or url, self.log,
@@ -587,7 +618,7 @@ class Run:
                     fresh = uc.drop_unfinished(uc.frame_from_rows(rows), market, self.now)
 
                     if len(fresh) >= report_metrics.BENCH_MIN_BARS:
-                        frame = uc.write_bars(path, fresh, keep=600)
+                        frame = uc.write_bars(path, fresh, keep=600, exclude_dates=self.closed_dates(market))
                 except Exception as exc:  # noqa: BLE001
                     self.warnings.append(f"基準 {symbol} 下載失敗：{type(exc).__name__}: {exc}")
 
@@ -675,6 +706,9 @@ class Run:
         for market in self.markets:
             snapshot = self.snapshots.get(market) or {}
             calendar = self.calendars.get(market) or uc.TradingCalendar()
+            closed = self.closed_dates(market)
+            if snapshot.get('date') in closed:
+                snapshot = {**snapshot,'bars':{},'date':None}
 
             if snapshot.get("date"):
                 calendar.add(snapshot["date"])
@@ -733,7 +767,8 @@ class Run:
                         path = uc.bars_path(self.cache_dir, symbol)
                         frame = uc.append_row(uc.read_bars(path), detail)
                         uc.record_frame(self.state, symbol, uc.write_bars(
-                            path, frame, refetch=lambda: self.fetch_raw_chart_once(symbol, RECENT_RANGE), now=self.now), self.today)
+                            path, frame, refetch=lambda: self.fetch_raw_chart_once(symbol, RECENT_RANGE), now=self.now,
+                            exclude_dates=closed), self.today)
                         self.stats[f"{market}.appended"] += 1
                     elif action == "adjusted":
                         self.log(f"🔁 {symbol}：{detail} → 整檔重抓")
@@ -792,7 +827,7 @@ class Run:
                 raw = self.fetch_raw_chart_once(symbol, range_)
                 checked = kline.accept_frame(raw, symbol, refetch=lambda:self.fetch_raw_chart_once(symbol, range_), now=self.now,
                     source_url='https://query1.finance.yahoo.com/v8/finance/chart/' + symbol)
-                return uc.drop_unfinished(checked, market, self.now)
+                return sessions.analysis_prices(uc.drop_unfinished(checked, market, self.now),self.closed_dates(market))
             except RateLimited:
                 continue
 
@@ -953,7 +988,8 @@ class Run:
                     continue
             merged = uc.merge_full(old, frame) if kind == "full" else uc.merge_incremental(old, frame)
             merged = self.apply_pending(symbol, merged)
-            written = uc.write_bars(path, merged, refetch=lambda: self.fetch_raw_chart_once(symbol, RECENT_RANGE), now=self.now)
+            written = uc.write_bars(path, merged, refetch=lambda: self.fetch_raw_chart_once(symbol, RECENT_RANGE), now=self.now,
+                                    exclude_dates=self.closed_dates(market_of(symbol)))
             uc.record_frame(self.state, symbol, written, self.today, full=kind == "full", verified=True)
             if archive_adjustment:
                 archive.stage_adjustment(self.cache_dir, symbol, frame, archive_adjustment, self.now)
@@ -1221,8 +1257,9 @@ def run(args, net=None, now=None, clock=time.monotonic, sleep=time.sleep, log=pr
 
         job.load_lists()
         job.connect_yahoo()
-        job.load_benchmarks()
         job.load_quote_snapshots()
+        # Form the full cohort before any benchmark/stock cache write.
+        job.load_benchmarks()
         queue = job.plan()
 
         if job.yahoo_ready:

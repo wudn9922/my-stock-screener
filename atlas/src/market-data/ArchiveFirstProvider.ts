@@ -6,8 +6,9 @@ import { EdgeYahooProvider } from './EdgeYahooProvider';
 import { liveQuotes, mergeDailyBars, mergePeriodBars, type LiveDaily } from './LiveQuotes';
 import { usableBarResult } from './KlineIntegrity';
 import { worldAssetFor } from './worldAssets';
-import { marketDateTime } from './MarketProfile';
+import { calendarDate, marketDateTime } from './MarketProfile';
 import { applyLiveQuoteMetadata, TWSE_MIS_SOURCE } from './YahooNormalizer';
+import { closedMarketDates, withoutClosedDates } from './MarketClosures';
 
 // Shared archive lookups may outlive a component, but must not start another
 // provider request once this document has left. A restored BFCache page gets
@@ -36,18 +37,26 @@ export function archiveUnavailableSource(lastDate: string): string {
 }
 
 export function archivePeriod(daily: BarResult, symbol: string, timeframe: Timeframe, range?: MarketRange): BarResult {
-  const bars = timeframe === '1W' || timeframe === '1M' ? aggregateBars(daily.bars, timeframe, getMarketProfile(symbol)) : daily.bars;
-  const lastDate = daily.archive?.lastDate ?? new Date(daily.bars.at(-1)!.time * 1000).toISOString().slice(0, 10);
-  const missing = [...new Set((daily.missingVolumeAt ?? []).map(time => timeframe === '1W' || timeframe === '1M'
+  const closed = new Set([...(daily.closedSessions ?? []),...closedMarketDates(symbol)]);
+  const projected = withoutClosedDates(daily.bars,symbol,closed);
+  if (!projected.length) throw new Error('沒有已開市且有效的封存 K 線資料');
+  const bars = timeframe === '1W' || timeframe === '1M' ? aggregateBars(projected, timeframe, getMarketProfile(symbol)) : projected;
+  const profile = getMarketProfile(symbol);
+  const lastArchived = projected.filter(bar => !daily.archive || calendarDate(bar.time,profile) <= daily.archive.lastDate).at(-1) ?? projected.at(-1)!;
+  const lastDate = daily.archive && !closed.has(daily.archive.lastDate) ? daily.archive.lastDate : calendarDate(lastArchived.time,profile);
+  const validTimes = new Set(projected.map(bar => bar.time));
+  const missing = [...new Set((daily.missingVolumeAt ?? []).filter(time => validTimes.has(time)).map(time => timeframe === '1W' || timeframe === '1M'
     ? calendarPeriodStart(time, timeframe, getMarketProfile(symbol)) : time))];
   return usableBarResult({ ...daily, bars: filterBarsByRange(bars, range), missingVolumeAt: missing,
-    quote: daily.quote ?? archiveQuote(symbol, daily), archive: daily.archive ?? { lastDate, status: 'archive' } }, symbol, timeframe);
+    closedSessions: [...closed],
+    quote: daily.quote && !closed.has(calendarDate(daily.quote.asOf,profile)) ? daily.quote : archiveQuote(symbol,{...daily,bars:projected}),
+    archive: { ...(daily.archive ?? { status:'archive' as const }), lastDate } }, symbol, timeframe);
 }
 
 /** All archived history is available before either live quotes or optional Yahoo supplements finish. */
 export class ArchiveFirstProvider implements MarketDataProvider {
   readonly id: string;
-  readonly cacheVersion = 'archive-first-v2-market-open';
+  readonly cacheVersion = 'archive-first-v5-calendar-session-guard';
   readonly supportedTimeframes: readonly Timeframe[];
   readonly capabilities;
   constructor(readonly fallback: MarketDataProvider, readonly archive = klineArchive(), readonly yahoo?: EdgeYahooProvider,
@@ -116,7 +125,7 @@ export class ArchiveFirstProvider implements MarketDataProvider {
     if (current.archive.status === 'split') {
       try {
         const daily = await this.yahoo.getBars(symbol, '1D', undefined, signal);
-        return archivePeriod({ ...daily, archive: current.archive,
+        return archivePeriod({ ...daily, archive: current.archive, closedSessions: current.closedSessions,
           source: 'Yahoo 延遲行情 · 與封存價格差異超過 2%，整段採用 Yahoo 分割調整資料' }, symbol, timeframe);
       } catch (error) {
         signal?.throwIfAborted(); void error;
@@ -146,6 +155,9 @@ export class ArchiveFirstProvider implements MarketDataProvider {
 
 export async function mergeArchivedLive(current: BarResult, value: LiveDaily, timeframe: Timeframe,
   archive: KlineArchive = klineArchive()): Promise<BarResult> {
+  const closed = new Set([...(current.closedSessions ?? []),...closedMarketDates(value.symbol)]);
+  value = { ...value, bars: withoutClosedDates(value.bars,value.symbol,closed),
+    quote: value.quote && closed.has(calendarDate(value.quote.asOf,getMarketProfile(value.symbol))) ? undefined : value.quote };
   if (current.archive?.status === 'split') {
     const bars = timeframe === '1W' || timeframe === '1M'
       ? mergePeriodBars(current.bars, value.bars, timeframe, getMarketProfile(value.symbol)) ?? current.bars
@@ -155,7 +167,7 @@ export async function mergeArchivedLive(current: BarResult, value: LiveDaily, ti
   }
   const daily = await archive.getDaily(value.symbol);
   if (!daily) return current;
-  const merged = mergeArchiveDaily(daily.bars, value.bars, value.symbol);
+  const merged = mergeArchiveDaily(daily.bars, value.bars, value.symbol,undefined,new Set([...(daily.closedSessions ?? []),...closed]));
   const base: BarResult = { ...daily, bars: merged.bars, asOf: value.retrievedAt, quote: value.quote,
     source: merged.splitMismatch ? 'Yahoo 延遲行情 · 與封存價格差異超過 2%，暫用 Yahoo 以免混用分割前後價格'
       : value.source?.includes(TWSE_MIS_SOURCE) ? `${ARCHIVE_SOURCE} · 缺少交易日由 Yahoo／MIS 補上`

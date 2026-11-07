@@ -49,3 +49,7 @@ python scripts/build_market_warnings.py --cache-dir .cache/universe-full --archi
 6. 本機試算使用先前由唯讀封存 commit `4c934296ac3bb1003d0d4a7f106d21a099cddb87` 種子重建、每檔保留320根的 universe-full 格式快取；名單日2026-10-25。不是本次重新下載的最新 Actions cache，資料日至台股2026-10-22、美股2026-10-23。PR 預覽明列原日期，不冒充當天即時資料或正式站已更新。
 
 研究原文與完整設計見 [ADR-028](architecture/ADR-028-market-warnings.md)。測試與實際數值見 PR 和 review package；Playwright WebKit 為模擬，沒有實體 iPhone 簽核。
+
+## 休市日投影（2026-11-06）
+
+警示在建立交易日窗口前，沿用共用市場休市證據排除日期：有效普通股正量≥5%或至少50檔時一律保留、缺指數只列人工查核；沒有成交證據時，完整主要指數涵蓋範圍內缺日，或至少 95% 有效普通股零量且 O=H=L=C。指數下載失敗與未知量不當作休市。正常交易日的少數停牌不被移除。領頭羊／成功率／突破家數的公式、門檻及既有前瞻 CSV 不變；不修改永久行情。理由與唯讀掃描見 [MARKET_CLOSURES](../../docs/MARKET_CLOSURES.md)、[ADR-029](architecture/ADR-029-market-closed-session-projection.md)。

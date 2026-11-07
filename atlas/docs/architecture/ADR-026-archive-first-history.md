@@ -14,6 +14,8 @@ LiveQuoteFeed 是今天與缺少日期的唯一新增訂閱來源。同日以市
 
 此變更只讀 archive/main/generated；沒有對永久行情／財報或遠端封存寫入。PR-B 正式補檔由維護者執行，實際覆蓋依 per-symbol index，不假定已完成五年補檔。[驗證與截圖](../PR_C_ARCHIVE_FIRST.md)。
 
+[ADR-029](ADR-029-market-closed-session-projection.md) 補上市場休市證據投影：raw 年檔驗證後才過濾，日 K／週月聚合／live 合併一致排除；正常交易日的個別零量停牌保留，永久原檔不變。
+
 ## 導頁取消與回退（2026-11-06）
 
 WebKit 會在 `pagehide` 之前停止舊文件的載入，原生取消卻可能拒絕為 `TypeError: Load failed`。封存的共用 HTTP 請求因此在 `beforeunload`／`pagehide` 明確取消，保護到 response 本文讀完，結束後移除 listener；仍不接受單一圖表的 signal 作為共用下載 owner。取消向上傳遞，不能當成缺檔、部分年度成功或啟動另一個來源的理由。缺檔／網路／HTTP／逾時的既有回退保留。
