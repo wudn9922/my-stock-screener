@@ -87,6 +87,28 @@ export function validateMexcState(value: unknown): MexcState {
     throw new Error('MEXC 回應格式不正確。');
   return { connections, retryAt: row.retryAt === null ? null : timestamp(row.retryAt), configured: row.configured };
 }
+export const SKIPPED_ASSET_NAME_LIMIT = 20;
+export const SKIPPED_ASSET_NAME_LENGTH = 40;
+export const SKIPPED_ASSET_CONTROL = /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/gu;
+/**
+ * Connect/sync-only list of unsupported raw MEXC asset names shown to the same user. RAM only:
+ * never stored, logged or included in status. Missing (older function) means none.
+ */
+export function validateSkippedAssetNames(value: unknown, count: number): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > SKIPPED_ASSET_NAME_LIMIT || value.length > count)
+    throw new Error('MEXC 回應格式不正確。');
+  return value.map((name) => {
+    if (
+      typeof name !== 'string' ||
+      !name.trim() ||
+      Array.from(name).length > SKIPPED_ASSET_NAME_LENGTH ||
+      new RegExp(SKIPPED_ASSET_CONTROL.source, 'u').test(name)
+    )
+      throw new Error('MEXC 回應格式不正確。');
+    return name;
+  });
+}
 export const MEXC_ERRORS = {
   invalid: 'MEXC 資料格式不正確，請檢查輸入。',
   setup: 'MEXC 同步尚未啟用，請由維護者完成設定。',

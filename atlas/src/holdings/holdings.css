@@ -158,6 +158,39 @@
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
+.holdings-visibility {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.holdings-hidden {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.holdings-hidden ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.holdings-hidden li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  overflow-wrap: anywhere;
+}
+.holdings-hidden-symbol {
+  font-weight: 700;
+}
+.holdings-hidden li button {
+  margin-left: auto;
+}
 @media (max-width: 480px) {
   .holdings-fields {
     grid-template-columns: minmax(0, 1fr);

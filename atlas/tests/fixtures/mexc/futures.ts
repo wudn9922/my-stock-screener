@@ -49,3 +49,29 @@ export function futuresResponses(): Record<string, unknown> {
     ],
   };
 }
+/** Contract rows for `count` distinct held symbols, each with an exact contract size and fair price. */
+export function manyFuturesResponses(count: number): Record<string, unknown> {
+  const base = futuresResponses();
+  const position = (base[positionsPath] as Record<string, unknown>[])[0]!;
+  const symbols = Array.from({ length: count }, (_, i) => `HELD${i}_USDT`);
+  return {
+    ...base,
+    [positionsPath]: symbols.map((symbol) => ({ ...position, symbol })),
+    [detailPath]: symbols.map((symbol) => ({ symbol, contractSize: '0.0001' })),
+    [tickerPath]: symbols.map((symbol) => ({ symbol, fairPrice: '59000' })),
+  };
+}
+/**
+ * Public list endpoint double: a `symbol=` query returns that one contract as a wrapped object;
+ * the unfiltered list pads its rows so the whole body is at least `bytes` long, like the real
+ * all-contracts list that outgrew the 2 MiB response cap.
+ */
+export function publicList(rows: Record<string, unknown>[], bytes: number) {
+  return (input: RequestInfo | URL) => {
+    const symbol = new URL(String(input)).searchParams.get('symbol');
+    if (symbol !== null)
+      return Response.json({ success: true, code: 0, data: rows.find((row) => row.symbol === symbol) ?? null });
+    const filler = 'x'.repeat(Math.ceil(bytes / Math.max(rows.length, 1)));
+    return Response.json({ success: true, code: 0, data: rows.map((row) => ({ ...row, displayName: filler })) });
+  };
+}

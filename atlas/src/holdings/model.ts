@@ -12,6 +12,11 @@ export const emptyHoldings = (): HoldingsDocument => ({ version: 1, accounts: []
 export function decimalText(value: Decimal.Value): string {
   return new Money(value).toFixed(18).replace(/\.?0+$/, '') || '0';
 }
+export function formatAmount(value: string | null | undefined, digits = 2) {
+  if (value == null) return '—';
+  const [integer, fraction] = new Money(value).toFixed(digits).split('.');
+  return integer!.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (fraction === undefined ? '' : `.${fraction}`);
+}
 export function replaceAccount(
   document: HoldingsDocument,
   account: HoldingAccount,

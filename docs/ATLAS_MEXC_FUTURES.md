@@ -10,16 +10,29 @@
 - [Change Log](https://www.mexc.com/api-docs/futures/update-log)：2026-01-19 把 Futures REST 網域改為 `https://api.mexc.com`。依任務「有出入以官方文件為準」採此固定網域；不接受外部 URL 或網域參數。這與任務預期的舊 `contract.mexc.com` 有差異。
 - [Get All Account Assets](https://www.mexc.com/api-docs/futures/account-and-trading-endpoints/get-all-account-assets)：私有 `GET /api/v1/private/account/assets`，只取唯一的 USDT 列。
 - [Get Open Positions](https://www.mexc.com/api-docs/futures/account-and-trading-endpoints/get-open-positions)：私有 `GET /api/v1/private/position/open_positions`；文件列 View Order Details 權限。`unRealizedPnl` 為 2026-06-18 更新的欄位，不使用歷史 `realised` 或 `profitRatio` 代替未實現盈虧。
-- [Get Contract Info](https://www.mexc.com/api-docs/futures/market-endpoints/get-contract-info)：現行為公開 `GET /api/v1/contract/detail/country`，與任務預期的舊 `/detail` 有差異，讀取 `contractSize`。
-- [Get Ticker](https://www.mexc.com/api-docs/futures/market-endpoints/get-ticker-contract-market-data)：公開 `GET /api/v1/contract/ticker`，以 `fairPrice` 作標記價格，不使用成交價 lastPrice。一次讀全部所需價格，避免每個部位各發 fair_price 請求。
+- [Get Contract Info](https://www.mexc.com/api-docs/futures/market-endpoints/get-contract-info)：現行為公開 `GET /api/v1/contract/detail/country`，與任務預期的舊 `/detail` 有差異，讀取 `contractSize`。選填參數 `symbol`（字串，合約名稱，如 `BTC_USDT`）；省略時回全部合約。
+- [Get Ticker](https://www.mexc.com/api-docs/futures/market-endpoints/get-ticker-contract-market-data)：公開 `GET /api/v1/contract/ticker`，以 `fairPrice` 作標記價格，不使用成交價 lastPrice。選填參數 `symbol`（字串，合約名稱）；省略時回全部合約。另有 `GET /api/v1/contract/fair_price/{symbol}`（官方列 20 次／2 秒），不採用，避免多一種回應格式。
 - [Error Code](https://www.mexc.com/api-docs/futures/error-code)：私有端點 HTTP 403 或代碼 511／701／703 顯示 no-permission；其他來源錯誤顯示 unavailable。
 
 未使用真實 Key 或私人帳戶。公開 GET 相容性檢查成功，當時 detail/country 為 1,382,872 bytes／727 筆，ticker 為 624,740 bytes／1,198 筆，均小於既有每個回應 2 MiB 上限。這只能確認公開端點相容性，不代表已驗證正式帳戶權限。
 
+## 2026-11-07 修正：只讀持有合約（正式環境一律 unavailable）
+
+正式記錄顯示私有 assets、open_positions 均成功，接著 `{"step":"futures-detail","status":200,"reason":"response-size-or-empty"}`：不帶參數的 `detail/country` 已超過每回應 2 MiB 上限（`ticker` 全清單同樣有風險），整個合約區塊因此降級 unavailable，即使使用者確有持倉。
+
+修正後只查實際持有的合約：
+
+1. 取 open_positions 中有效且未平倉的代號去重。代號已通過 `^[A-Z0-9]{1,20}_USDT$`，才放入固定 origin、固定路徑的唯一 query：`/api/v1/contract/detail/country?symbol=XXX_USDT` 與 `/api/v1/contract/ticker?symbol=XXX_USDT`。
+2. 不超過 **20** 個代號時逐代號讀取，兩端點合計最多 40 個請求，**同時最多 4 個**。每個回應沿用 2 MiB 上限。單一合約回應可為包裝物件或陣列；都必須正好含該代號，否則 unavailable。任一請求失敗即停止排程並中止其餘進行中的請求，只記一筆診斷。
+3. 超過 20 個代號時，逐代號請求在共用 9 秒期限內不可行（最多 400 個請求，也會撞到公開端點頻率限制），改回各讀一次全清單；**只有這兩個公開全清單**上限放寬為 **8 MiB**（2026-11 前實測 1.4 MB／0.6 MB，保留約 6 倍成長空間），私有端點與逐代號讀取仍為 2 MiB。超過 8 MiB 仍降級 unavailable，不截斷。
+4. 其他不變：固定 `https://api.mexc.com`、GET、`redirect: error`、no-store、no-referrer、宣告與串流雙重大小檢查、共用 9 秒 AbortController、嚴格解析與精度。診斷仍只記 step／status／固定 reason／允許的 code 與 msg，不記代號、金額、query 或 Key。
+
+**官方文件核對的限制**：本次工作環境的網路政策封鎖 `www.mexc.com`、`api.mexc.com` 與 MEXC 文件鏡像，無法直接開啟官方頁面或打公開端點。端點與 `symbol` 參數是由搜尋引擎索引的上述兩個官方頁面內容確認（2026-11-07），並與先前已核對的路徑一致。部署前建議維護者以瀏覽器打開兩頁並以 `curl 'https://api.mexc.com/api/v1/contract/ticker?symbol=BTC_USDT'` 確認 `data` 形狀；程式已同時接受物件或陣列。
+
 ## 執行順序與隔離
 
 1. 沿用現貨 apiKeyInfo 的唯讀白名單驗證，沒有 CONTRACT_ACCOUNT_READ 時直接回 `{status: "no-permission"}`，不呼叫合約私有或公開端點。
-2. 現貨的 key info、account balances 與 ticker 都成功並驗證後，才開始可選的合約讀取。合約使用固定四個 GET 路徑、`redirect: error`、no-store、no-referrer、宣告與串流雙重 2 MiB 限制。
+2. 現貨的 key info、account balances 與 ticker 都成功並驗證後，才開始可選的合約讀取。合約使用固定四個 GET 路徑（公開路徑只帶已驗證的 `symbol`）、`redirect: error`、no-store、no-referrer、宣告與串流雙重 2 MiB 限制（僅 20 個以上代號時的兩個公開全清單為 8 MiB）。
 3. 全部上游讀取共用原有 9 秒 AbortController；不另加第二段 9 秒。即使某個 transport 不配合取消，也會在截止時結束等待並回合約 unavailable。沒有重試或放寬逾時。
 4. 合約讀取與解析失敗只產生合約 status；接著仍執行原本的最終授權與 revision／finish 流程。合約查詢留在這些最終檢查之前，避免讀取期間被中斷連線或改掉成本時回傳過時快照。授權／資料庫衝突仍沿用原本錯誤，不能被合約降級處理吞掉。
 5. finish RPC 只收到原本的現貨餘額、現貨報價及必要密文資訊。futures 不進 RPC、資料庫、holdings document 或 MEXC status 回應。

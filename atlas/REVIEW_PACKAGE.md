@@ -1,3 +1,13 @@
+## MEXC 合約逐代號讀取、跳過資產名稱與隱藏持股（2026-11-07）
+
+只做 primary self-review，沒有獨立簽核；不合併、不部署。合併後須重新部署 Edge Function `user-settings`。
+
+1. 合約：正式記錄 `futures-detail` `response-size-or-empty` 來自不帶參數的 `contract/detail/country` 全清單超過 2 MiB。改為只讀持有代號的 `?symbol=`（detail 與 ticker），同時最多 4 個；超過 20 個代號才回到兩個公開全清單並只對它們放寬為 8 MiB。固定 origin、GET、redirect error、9 秒共用期限、嚴格解析與不含代號的診斷不變；首個失敗即中止其餘請求並只記一筆。新增回歸測試：全清單超過 2 MiB 時舊實作為 unavailable、新實作為 ok 且不呼叫全清單。官方頁面因工作環境網路封鎖未能直接開啟，以搜尋索引的官方頁面確認參數，見 `docs/ATLAS_MEXC_FUTURES.md`。
+2. 跳過資產名稱：connect／sync 回應新增 `skippedAssetNames`（原始名稱、最多 20、去重、去除控制／格式字元、40 字元），前端驗證後只放記憶體並顯示於原提示；伺服器 `asset-skipped` 記錄不變，不進 RPC、DB、status。原測試「回應不含名稱」依新需求改為「只在該回應、不在記錄／RPC／DB／status／URL／瀏覽器儲存」。
+3. 隱藏持股：卡片「隱藏」、帳戶「隱藏設定」（小額門檻、USDT）、收合「已隱藏 N 檔」。總計、市場小計、帳戶小計與匯率提示只用可見列；持股文件不變。偏好經 `userStorage` 存 `holdings-visibility-v1`（cloud 也存在本機帳號空間，只含帳戶 id＋代號＋規則），限制見 `docs/ATLAS_HOLDINGS.md`。
+
+實測：`npm ci`、完整 Vitest 161 檔／2,079 項、lint、`tsc --noEmit`、build 通過；Playwright `mexc.spec.ts`、`holdings.spec.ts`、新 `holdings-hide.spec.ts` 於 desktop-chromium 與 mobile-chromium 共 50 項通過（`--trace off`），375px 無水平捲動，截圖 `docs/screenshots/holdings-hide/mexc-hidden-375.png`。本機只有 Chromium，iPhone WebKit 交由 CI；皆為模擬，不是實體裝置驗證。
+
 ## PR #240 修訂：根目錄匯入與保守三日比較（2026-11-07）
 
 只更新原PR，沒有合併PR、dispatch、部署或寫正式archive。一般merge main `6e279a94bf`（#241），merge commit `aaeb4e0318`；REVIEW_PACKAGE前置段落衝突保留雙方紀錄，沒有rebase／force-push。只有primary self-review，沒有獨立簽核。
