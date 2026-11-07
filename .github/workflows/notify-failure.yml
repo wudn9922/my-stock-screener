@@ -1,0 +1,78 @@
+name: System failure notification helper
+on:
+  workflow_call:
+    inputs:
+      title:
+        type: string
+        required: true
+      summary:
+        type: string
+        default: ''
+      needs-json:
+        type: string
+        default: '{}'
+    secrets:
+      DISCORD_WEBHOOK_URL1:
+        required: false
+      LINE_ACCESS_TOKEN:
+        required: false
+      LINE_USER_ID:
+        required: false
+permissions:
+  contents: read
+  actions: read
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 5
+    steps:
+      - name: Read trusted notification source without changing producer checkouts
+        id: source
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: .notify-source
+          persist-credentials: false
+      - name: Capture cancellation in the supported status-function context
+        id: cancellation
+        if: cancelled()
+        continue-on-error: true
+        run: echo 'conclusion=cancelled' >> "$GITHUB_OUTPUT"
+      - name: Notify Discord with LINE fallback
+        id: notice
+        if: always() && steps.source.outcome == 'success'
+        continue-on-error: true
+        uses: ./.notify-source/.github/actions/notify-failure
+        with:
+          title: ${{ inputs.title }}
+          summary: ${{ inputs.summary }}
+          needs-json: ${{ inputs.needs-json }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          workflow: ${{ github.workflow }}
+          event: ${{ github.event_name }}
+          discord-webhook: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+          line-access-token: ${{ secrets.LINE_ACCESS_TOKEN }}
+          line-user-id: ${{ secrets.LINE_USER_ID }}
+          github-token: ${{ github.token }}
+          check-superseded: 'true'
+          run-conclusion: ${{ steps.cancellation.outputs.conclusion }}
+      - name: Record delivery marker without message or credential contents
+        if: always() && steps.notice.outputs.delivered == 'true'
+        continue-on-error: true
+        env:
+          NOTICE_RUN_ID: ${{ github.run_id }}
+        run: printf '%s\n' "$NOTICE_RUN_ID" > notification-delivered.txt
+      - name: Save a public run-only delivery receipt for the cancelled-run fallback
+        if: always() && steps.notice.outputs.delivered == 'true'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: system-failure-notice-${{ github.run_id }}
+          path: notification-delivered.txt
+          retention-days: 1
+      - name: Keep delivery errors separate from the producer result
+        if: always() && (steps.source.outcome != 'success' || steps.notice.outcome != 'success')
+        continue-on-error: true
+        run: echo '::warning::通知程序未完成；不改變原排程結論。'

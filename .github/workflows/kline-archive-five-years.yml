@@ -101,3 +101,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python -u scripts/kline_archive_git.py publish --archive-dir .cache/kline-archive --payload-dir .cache/kline-backfill-payload
+  notify-system-failure:
+    needs: ["fetch", "publish"]
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled()) }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/notify-failure.yml
+    with:
+      title: "${{ github.workflow }} · ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && '執行失敗／取消' || '部分失敗' }}"
+      needs-json: ${{ toJSON(needs) }}
+    secrets:
+      DISCORD_WEBHOOK_URL1: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+      LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}

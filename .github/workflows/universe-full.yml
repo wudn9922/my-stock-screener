@@ -39,6 +39,8 @@ jobs:
   build:
     outputs:
       archive_payload: ${{ steps.archive_stage.outcome == 'success' }}
+      notify_partial: ${{ steps.collect_notification_outcomes.outputs.has_partial }}
+      notify_summary: ${{ steps.collect_notification_outcomes.outputs.summary }}
     # workflow_run 只有在每日報告成功時才繼續
     if: >-
       github.event_name != 'workflow_run'
@@ -162,7 +164,8 @@ jobs:
 
       # Failure leaves breadth.json untouched and must not prevent that report's
       # existing generated-path publication.
-      - name: Build breadth trading signals
+      - id: notice_soft_05
+        name: Build breadth trading signals
         if: always() && !cancelled()
         continue-on-error: true
         timeout-minutes: 8
@@ -179,7 +182,8 @@ jobs:
         if: always() && !cancelled()
         run: python -u scripts/build_full_market_breakouts.py --cache-dir .cache/universe-full
 
-      - name: Build market risk warnings
+      - id: notice_soft_06
+        name: Build market risk warnings
         if: always() && !cancelled()
         continue-on-error: true
         timeout-minutes: 8
@@ -222,6 +226,23 @@ jobs:
           done
           exit 1
 
+      - name: Collect partial failure outcomes without changing this job result
+        id: collect_notification_outcomes
+        if: always() && !cancelled()
+        continue-on-error: true
+        env:
+          NOTIFY_STEP_RESULTS: ${{ toJSON(steps) }}
+          NOTIFY_STEP_NAMES: '{"archive_closure_scan": "Build market closure evidence from read-only archive", "archive_checkout": "Shallow checkout permanent K-line archive", "archive_bootstrap": "Seed missing rolling bars from permanent archive", "archive_instruments": "Refresh archive-only ETFs and indices through the existing Yahoo batch reader", "archive_instrument_stage": "Combine archive-only instruments with the accepted stock payload", "notice_soft_05": "Build breadth trading signals", "notice_soft_06": "Build market risk warnings"}'
+        run: |
+          python - <<'PY'
+          import json, os
+          steps = json.loads(os.environ['NOTIFY_STEP_RESULTS'])
+          names = json.loads(os.environ['NOTIFY_STEP_NAMES'])
+          failed = [label for key, label in names.items() if steps.get(key, {}).get('outcome') == 'failure']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('has_partial=' + str(bool(failed)).lower() + '\n')
+              stream.write('summary=' + json.dumps(failed, ensure_ascii=False) + '\n')
+          PY
   archive:
     needs: build
     if: always() && !cancelled() && needs.build.outputs.archive_payload == 'true'
@@ -255,3 +276,17 @@ jobs:
         run: python -u scripts/kline_archive_git.py publish --archive-dir .cache/kline-archive --payload-dir .cache/kline-payload
       - name: Merge archive correction events into the existing main journal
         run: python scripts/kline_archive_git.py journal --archive-dir .cache/kline-archive
+  notify-system-failure:
+    needs: ["build", "archive"]
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled() || needs['build'].outputs.notify_partial == 'true') }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/notify-failure.yml
+    with:
+      title: "${{ github.workflow }} · ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && '執行失敗／取消' || '部分失敗' }}"
+      needs-json: ${{ toJSON(needs) }}
+    secrets:
+      DISCORD_WEBHOOK_URL1: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+      LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}

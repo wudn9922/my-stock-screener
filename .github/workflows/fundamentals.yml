@@ -46,6 +46,9 @@ concurrency:
 
 jobs:
   build:
+    outputs:
+      notify_partial: ${{ steps.collect_notification_outcomes.outputs.has_partial }}
+      notify_summary: ${{ steps.collect_notification_outcomes.outputs.summary }}
     runs-on: ubuntu-latest
     # 90 分鐘：台股官方 900 秒 + SEC + FinMind 歷史 1200 秒 + FinMind 財報 1500 秒 + 重建與提交
     timeout-minutes: 90
@@ -68,7 +71,8 @@ jobs:
       - name: Install dependencies
         run: pip install --quiet requests 'curl_cffi>=0.7,<1'
 
-      - name: Taiwan official statements (MOPS / OpenAPI)
+      - id: notice_soft_01
+        name: Taiwan official statements (MOPS / OpenAPI)
         if: contains(inputs.markets || 'TW,US', 'TW')
         continue-on-error: true
         env:
@@ -81,13 +85,15 @@ jobs:
             python -u atlas/scripts/build_fundamentals_tw.py
           fi
 
-      - name: US SEC XBRL frames
+      - id: notice_soft_02
+        name: US SEC XBRL frames
         if: contains(inputs.markets || 'TW,US', 'US')
         continue-on-error: true
         run: python -u atlas/scripts/build_fundamentals_sec.py --foreign-max-age-days 7
 
       # FinMind 逐檔續跑（已抓的歷史不重抓；被限額時停在原處，下次接著）。失敗不擋其他步驟。
-      - name: Taiwan history (FinMind, resumable)
+      - id: notice_soft_03
+        name: Taiwan history (FinMind, resumable)
         if: contains(inputs.markets || 'TW,US', 'TW')
         continue-on-error: true
         env:
@@ -96,7 +102,8 @@ jobs:
 
       # 台股財報檔（docs/report/financials/<代號>.TW(O).json）：FinMind 損益表、資產負債表、現金流量表逐檔續跑，
       # 寫進與 Yahoo 同一個檔（Yahoo 每日更新只補空值與較新季，不覆蓋 FinMind 值）。失敗不擋其他步驟。
-      - name: Taiwan statements (FinMind, resumable)
+      - id: notice_soft_04
+        name: Taiwan statements (FinMind, resumable)
         if: contains(inputs.markets || 'TW,US', 'TW')
         continue-on-error: true
         env:
@@ -133,3 +140,34 @@ jobs:
             sleep $((attempt * 15))
           done
           exit 1
+      - name: Collect partial failure outcomes without changing this job result
+        id: collect_notification_outcomes
+        if: always() && !cancelled()
+        continue-on-error: true
+        env:
+          NOTIFY_STEP_RESULTS: ${{ toJSON(steps) }}
+          NOTIFY_STEP_NAMES: '{"notice_soft_01": "Taiwan official statements (MOPS / OpenAPI)", "notice_soft_02": "US SEC XBRL frames", "notice_soft_03": "Taiwan history (FinMind, resumable)", "notice_soft_04": "Taiwan statements (FinMind, resumable)"}'
+        run: |
+          python - <<'PY'
+          import json, os
+          steps = json.loads(os.environ['NOTIFY_STEP_RESULTS'])
+          names = json.loads(os.environ['NOTIFY_STEP_NAMES'])
+          failed = [label for key, label in names.items() if steps.get(key, {}).get('outcome') == 'failure']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('has_partial=' + str(bool(failed)).lower() + '\n')
+              stream.write('summary=' + json.dumps(failed, ensure_ascii=False) + '\n')
+          PY
+  notify-system-failure:
+    needs: ["build"]
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled() || needs['build'].outputs.notify_partial == 'true') }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/notify-failure.yml
+    with:
+      title: "${{ github.workflow }} · ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && '執行失敗／取消' || '部分失敗' }}"
+      needs-json: ${{ toJSON(needs) }}
+    secrets:
+      DISCORD_WEBHOOK_URL1: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+      LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}

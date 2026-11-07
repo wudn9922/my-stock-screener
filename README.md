@@ -49,6 +49,10 @@ gcloud scheduler jobs create http daily-stock-screener \
 
 見 `.env.example`。
 
+## 系統故障與資料未更新通知
+
+正式 workflow 的失敗、取消與部分步驟失敗統一使用 `DISCORD_WEBHOOK_URL1`；Discord 不可用才退回原 LINE 故障通知。每日報告的正常 LINE 推播與價格警示通道維持原流程。每日另依已發布交易日曆檢查封存、警示、寬度、突破與全市場資料日期，提供同日去重與恢復通知。工作清單、權限、啟用順序與限制見 [操作說明](docs/SYSTEM_FAILURE_NOTICES.md)。
+
 ## 成交股數篩選
 
 每日行情更新不設成交股數門檻，低成交量與零成交量股票仍會更新 CSV。
