@@ -56,3 +56,63 @@ describe('account-specific MEXC invalid-key state', () => {
     expect(store.getSnapshot().error).toBe('');
   });
 });
+
+describe('transient account-specific skipped asset notice', () => {
+  it('handles connect, metadata reload, apply and sync without persisting the skipped count', async () => {
+    const document = { version: 1, accounts: [] };
+    h.api.mockResolvedValue({ ...state, document, skippedAssets: 2 });
+    const store = new MexcStore();
+    await store.call('connect', { account: { id: accountId } });
+    expect(store.getSnapshot().accountSkippedAssets).toEqual({
+      [accountId]: 2,
+    });
+    expect(store.getSnapshot().state).not.toHaveProperty('skippedAssets');
+    expect(h.accept).toHaveBeenCalledExactlyOnceWith(document);
+    expect(h.api.mock.calls[0]![2]).not.toHaveProperty('skippedAssets');
+    h.api.mockResolvedValue({ ...state, document });
+    await store.load();
+    await store.call('apply', { accountId });
+    expect(store.getSnapshot().accountSkippedAssets[accountId]).toBe(2);
+    const otherId = '33333333-3333-4333-8333-333333333333';
+    h.api.mockResolvedValue({ ...state, document, skippedAssets: 1 });
+    await store.call('sync', { accountId: otherId });
+    expect(store.getSnapshot().accountSkippedAssets).toEqual({
+      [accountId]: 2,
+      [otherId]: 1,
+    });
+    h.api.mockResolvedValue({ ...state, document, skippedAssets: 0 });
+    await store.call('sync', { accountId });
+    expect(store.getSnapshot().accountSkippedAssets).toEqual({
+      [accountId]: 0,
+      [otherId]: 1,
+    });
+    await store.call('disconnect', { accountId: otherId });
+    expect(store.getSnapshot().accountSkippedAssets[otherId]).toBeUndefined();
+    expect(new MexcStore().getSnapshot().accountSkippedAssets).toEqual({});
+  });
+
+  it('accepts older responses without the optional count', async () => {
+    h.api.mockResolvedValue({
+      ...state,
+      document: { version: 1, accounts: [] },
+    });
+    const store = new MexcStore();
+    await store.call('sync', { accountId });
+    expect(store.getSnapshot().accountSkippedAssets[accountId]).toBe(0);
+  });
+
+  it.each([-1, 1.5, '2', null, 10001])(
+    'rejects an invalid skipped count %j before accepting the cloud document',
+    async (skippedAssets) => {
+      h.api.mockResolvedValue({
+        ...state,
+        document: { version: 1, accounts: [] },
+        skippedAssets,
+      });
+      const store = new MexcStore();
+      await expect(store.call('sync', { accountId })).rejects.toThrow(MEXC_ERRORS.service);
+      expect(h.accept).not.toHaveBeenCalled();
+      expect(store.getSnapshot().accountSkippedAssets).toEqual({});
+    },
+  );
+});
