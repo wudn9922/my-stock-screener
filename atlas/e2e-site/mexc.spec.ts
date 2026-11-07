@@ -71,6 +71,53 @@ async function privateStorage(page: Page) {
   expect(storage).not.toContain('holdings:v1');
 }
 
+test('unsupported names show a count on connect and automatic sync while other balances continue normally', async ({
+  page,
+}) => {
+  const f = await setup(page);
+  f.setBalances([
+    { asset: 'bTc', free: '0.1', locked: '0.02' },
+    { asset: 'ETH', free: '2', locked: '0' },
+    { asset: 'USDT', free: '100', locked: '0' },
+    { asset: 'PRIVATE-ASSET', free: '7', locked: '0' },
+    { asset: 'VERYLONGPRIVATECOIN123456789', free: '8', locked: '0' },
+  ]);
+  await enterKeys(page);
+  await expect(mexc(page)).toContainText('有 2 個 MEXC 資產名稱格式不支援，未匯入；其他持股已同步。');
+  await expect(mexc(page).getByRole('alert')).toHaveCount(0);
+  await expect(mexc(page)).not.toContainText('PRIVATE-ASSET');
+  await expect(mexc(page)).not.toContainText('VERYLONGPRIVATECOIN123456789');
+  await confirmCosts(page);
+  await expect(mexc(page)).toContainText('有 2 個 MEXC 資產名稱格式不支援');
+  f.setBalances([
+    { asset: 'btc', free: '0.1', locked: '0.02' },
+    { asset: 'PRIVATE-ASSET', free: '7', locked: '0' },
+  ]);
+  await tick(page, f, 301000);
+  await expect(mexc(page)).toContainText('有 1 個 MEXC 資產名稱格式不支援，未匯入；其他持股已同步。');
+  await expect(panel(page).getByRole('article')).toHaveCount(1);
+  f.setBalances([{ asset: 'BTC', free: '0.1', locked: '0.02' }]);
+  await tick(page, f);
+  await mexc(page)
+    .getByRole('button', { name: /^同步餘額/ })
+    .click();
+  await expect(mexc(page)).not.toContainText('MEXC 資產名稱格式不支援');
+  await expect(panel(page).getByRole('article')).toHaveCount(1);
+  await privateStorage(page);
+});
+
+test('an all-skipped snapshot connects successfully and displays the warning with an empty portfolio', async ({
+  page,
+}) => {
+  const f = await setup(page);
+  f.setBalances([{ asset: 'PRIVATE-ASSET', free: '7', locked: '0' }]);
+  await enterKeys(page);
+  await expect(mexc(page)).toContainText('已連線');
+  await expect(mexc(page)).toContainText('有 1 個 MEXC 資產名稱格式不支援，未匯入；其他持股已同步。');
+  await expect(mexc(page).getByRole('alert')).toHaveCount(0);
+  await expect(panel(page).getByRole('article')).toHaveCount(0);
+});
+
 test('80-day key reminder and expired-key error preserve confirmed holdings and last successful sync', async ({ page }, info) => {
   const f = await setup(page);
   await enterKeys(page);

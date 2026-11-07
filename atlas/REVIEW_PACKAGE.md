@@ -1,3 +1,11 @@
+## MEXC 特殊資產名稱跳過與計數（2026-11-07）
+
+Primary self-review only，沒有獨立簽核。分支從 main `799fa85d2` 建立，只推 PR、不合併或部署。MEXC 非零餘額名稱先轉大寫，再套用原本的 ASCII 英數 1–20 字元規則；不合法或正規化後重複的項目跳過並計數，重複保留第一筆、不加總，零餘額不計。全部跳過仍回成功空清單。金額格式、來源大小、持股上限、唯讀權限、加密與授權檢查不變。
+
+`connect`／`sync` 成功只額外回 `skippedAssets` 數字，沒有送入 RPC 或資料庫。前端於個別帳戶的 RAM 顯示指定提示，涵蓋手動與自動同步，正常後續同步或中斷連線清除。`validateMexcState`、SQL 及全站持股代號規則保持原樣。安全摘要每次解析一行，固定 `reason: asset-skipped`，`reasons` 分開統計 `asset-invalid`／`asset-duplicate`，僅附固定分類；測試確認無資產名稱、餘額或 Key。行為與範例見 [MEXC 說明](../docs/ATLAS_MEXC_SYNC.md)。
+
+驗證：乾淨 npm ci，Vitest 156 檔／1,977 項，MEXC 專項 75 項，桌面 Chromium／手機 Chromium／iPhone WebKit 共33項，lint 及 production build 通過。沒有呼叫真實 MEXC 帳戶或正式資料庫，沒有修改 SQL 或進行部署。WebKit 為 Playwright 模擬。
+
 ## MEXC 同步診斷、回應與期限提醒（2026-11-06）
 
 Primary self-review only；沒有獨立模型簽核。從最新main `2e8799ba4d` 建立 `codex/mexc-sync-diagnostics`，與PR #230無相依；交付前一般merge納入最新main `e2ea0322c5`，保留#229／#232／#233，僅REVIEW_PACKAGE前置段落衝突，兩邊內容皆保留。只推PR，不部署、不執行SQL、不查正式資料庫、不呼叫真實MEXC帳戶。既有授權、AES-GCM／HMAC、private表／RPC、持股成本與同步頻率不變。
