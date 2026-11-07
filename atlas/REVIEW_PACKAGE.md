@@ -1,4 +1,18 @@
-## PR #240 官方封存修補、完整還原及休市佐證（2026-11-07）
+## PR #240 修訂：根目錄匯入與保守三日比較（2026-11-07）
+
+只更新原PR，沒有合併PR、dispatch、部署或寫正式archive。一般merge main `6e279a94bf`（#241），merge commit `aaeb4e0318`；REVIEW_PACKAGE前置段落衝突保留雙方紀錄，沒有rebase／force-push。只有primary self-review，沒有獨立簽核。
+
+先重現根目錄`import report_metrics`的ModuleNotFoundError，再修正market_sessions的package／script匯入。repair_kline_archive依`__package__`選相對或直接匯入，維持模組實例一致。5項獨立程序回歸移除PYTHONPATH，涵蓋report_metrics、scripts.market_sessions、scripts目錄匯入、修補工具package匯入及兩種CLI --help，避免整批測試的sys.path改動掩蓋每日報告問題。
+
+仍只從最近前後各兩個官方交易日取證；三日須不同日期、前後各至少一日，所有archive/official比值都在1±0.5%內才准factor=1。factor≠1維持完整四日／前後各兩日與原穩定度、中位數、反向調量；不足或不穩定仍跳過。合成archive測試核對三日稽核、官方價量原值及既有列不變。
+
+完整Python **1,991通過、182子測試通過**；原有選跑7,000檔效能案例另行啟用也通過，合計1,992個案例已驗證，未新增skip。apply161.241秒、verify94.237秒，原300秒限制不變。CI同方式單獨執行test_report_metrics.py的41項也通過；匯入／補檔／報告專項71項及19子測試通過。前端完整單元、lint、build與actionlint實際結果見[修訂驗證總表](../docs/research-verification/official-repair-revision-verification-20261107.json)，不沿用初版計數冒稱本次結果。
+
+固定archive `62bd86a6e7fcde3572c56aa607eed5018a0cfe68`，新舊規則皆以apply=False／offline=True共用32份來源，各跑前後全量verifier；41,573年檔、9,796,080列的內容、tree及來源快取均不變。2021-04-06新增1,727→1,743、跳過495→479；2025-08-01新增1,783→1,823、跳過247→207。原3,510筆候選逐列不變，新增56筆皆三日原值，調基仍661／216檔。初版與此次重取來源僅2021-04-06的1,019筆TWSE來源URL改用已核准官方等價路徑，價量／factor／比較值與跳過名單相同；本次新舊比較使用同一快取。
+
+[完整前後對照與新增56筆佐證](../docs/research-verification/official-backfill-three-comparisons-20261107.json)、[操作與限制](../docs/ARCHIVE_OFFICIAL_REPAIR.md)。初版3,510列寫入／刪除／還原演練及25項瀏覽器紀錄仍保留為歷史，本次沒有將新計畫寫入任何正式封存。
+
+## PR #240 初版紀錄：官方封存修補、完整還原及休市佐證（2026-11-07）
 
 一般 merge 已合併 #230 的 main `0f42fef0b`，merge commit `cdd648d7f`；沒有另納入 #230 分支、rebase 或 force-push。只有 primary self-review，沒有獨立簽核。只推程式與證據 PR，沒有正式 archive 寫入、dispatch、合併或部署。
 

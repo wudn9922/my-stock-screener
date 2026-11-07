@@ -1,6 +1,6 @@
 # 官方封存補檔、占位列刪除與完整還原
 
-本 PR 一般 merge main `0f42fef0b`（已合併 #230），merge commit `cdd648d7f`；沒有另納入 #230 分支、rebase 或 force-push。工具預設 dry-run，正式寫入由維護者審查後自行執行。本次只對唯讀封存與無 remote 的本機副本驗證，沒有推送 kline-archive 或 dispatch workflow。
+本 PR 原先一般 merge main `0f42fef0b`（已合併 #230），本次再一般 merge `6e279a94bf`（#241），保留雙方審查紀錄；沒有另納入 #230 分支、rebase 或 force-push。工具預設 dry-run，正式寫入由維護者審查後自行執行。本次修訂只對唯讀封存重跑比較，沒有推送 kline-archive 或 dispatch workflow。
 
 ## 官方來源與欄位
 
@@ -21,21 +21,29 @@
 目標 TW 2021-04-06、2025-08-01。以封存已有 TW 代號為範圍；官方有、封存無歷史的代號只計入排除數，不推測 IPO 或建立缺乏比較證據的歷史。
 
 1. 從官方 ^TWII 月資料取得真正交易日，取目標日前後各最近兩日；只在本月不足時讀相鄰月。
-2. 每檔四日都必須同時有官方與封存收盤；少一日即跳過，不能以更遠日期代替。
-3. 比值定義為 `archive.close / official.close`。四個比值都在 `1±0.005` 內，factor=1，保留官方原始價量。
-4. 否則須 `max(ratios)/min(ratios)-1 <= 0.005`；採四值中位數（中間兩值平均）為 factor。OHLC 乘 factor、量除 factor，再用既有四位價格／整數量格式寫入。
-5. 不穩定或不足一律跳過。報告逐檔保留 factor、四日比較、擬新增列與跳過理由；年度 backfilled 稽核也保存 `officialBasis.factor`／witnesses 和實際官方 sourceUrl。
+2. 每檔比較日必須同時有官方與封存收盤，限定在上述四日內，不能以更遠日期代替。至少須有三個不同日期，且補檔日前後各至少一日；不足三日、單側或重複比較日都跳過。
+3. 比值定義為 `archive.close / official.close`。所有有效比值都在 `1±0.005` 內（含邊界），factor=1，保留官方原始價量；此情況允許三個比較日。
+4. 需要調整基準時仍須完整四日、前後各兩日，且 `max(ratios)/min(ratios)-1 <= 0.005`；採四值中位數（中間兩值平均）為 factor。OHLC 乘 factor、量除 factor，再用既有四位價格／整數量格式寫入。三日資料即使比值穩定，也不能授權 factor≠1。
+5. 不穩定或不足一律跳過。報告逐檔保留 factor、實際三日或四日比較、擬新增列與跳過理由；年度 backfilled 稽核也保存 `officialBasis.factor`／witnesses 和實際官方 sourceUrl。
 
 只把缺日期送入既有 `put_symbol(..., mode='backfill')`。既有列不送修正、不覆寫、不刪除；寫前再次確認目標不存在。年檔、per-symbol index 的 SHA／bytes／rows 和 manifest 沿用 `kline_archive`。大量稽核共用原 schema 批次沖寫，不逐檔重讀整份 journal。
 
-[完整 dry-run](research-verification/official-backfill-dry-run-20261107.json) 固定快照 `62bd86a6e7fcde3572c56aa607eed5018a0cfe68`，前後均用既有 verifier 驗證 41,573 年檔、9,796,080 列（含 global），封存 git status 乾淨：
+[原四日規則的完整 dry-run](research-verification/official-backfill-dry-run-20261107.json) 保留不變。本次[新舊規則唯讀比較](research-verification/official-backfill-three-comparisons-20261107.json) 固定同一快照 `62bd86a6e7fcde3572c56aa607eed5018a0cfe68`，兩次執行都以 `apply=False`／`offline=True` 共用32份已下載官方回應，前後均用既有 verifier 驗證41,573年檔、9,796,080列（含global），封存與來源快取保持不變。
 
-| 日期 | 新增列／涉及年檔 | factor≠1 | 原有列保留 | 跳過 |
-| --- | ---: | ---: | ---: | ---: |
-| 2021-04-06 | 1,727 | 661 | 1 | 495 |
-| 2025-08-01 | 1,783 | 216 | 193 | 247 |
+| 日期 | 新增：修訂前 | 新增：修訂後 | 多放行原值 | 跳過：修訂前 | 跳過：修訂後 | factor≠1（不變） | 原有列保留 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2021-04-06 | 1,727 | 1,743 | 16 | 495 | 479 | 661 | 1 |
+| 2025-08-01 | 1,783 | 1,823 | 40 | 247 | 207 | 216 | 193 |
+
+原先可補的每一列（含factor、比較值與來源）在新舊規則重跑中完全一致；多放行的56檔全部是三個有效比較日、前後各至少一日且factor=1。比較報告保留全部新增放行代號、擬新增列與三日佐證。不足比較資料仍跳過18／24檔，沒有以三日證據授權調基，也沒有改動其他跳過原因。
+
+相較初版報告，重新下載時2021-04-06的TWSE改由表列固定官方等價路徑回傳JSON；1,019筆既有候選的sourceUrl因此不同，價量、factor、比較值與跳過名單均相同。新舊規則比較本身使用完全相同的快取及來源標記，不混用兩次下載結果。完整CLI輸出保留在工作區，比較報告記錄其SHA-256。
 
 此表涵蓋股票、ETF 與指數，和 #230 普通股觀測數的口徑不同。跳過原因與每個代號均在 JSON 中；包括當日沒有官方觀測、無成交／缺價、比較資料不足、基準不穩定。firstDate 是封存覆蓋界線，不等於已驗證 IPO 日期。
+
+### 根目錄及腳本匯入回歸
+
+`market_sessions`支援`import scripts.market_sessions`與腳本目錄的直接匯入。`repair_kline_archive`依`__package__`選擇相對或直接匯入，保留同一執行模式的模組實例，避免測試替身與批次狀態分裂。新回歸以獨立Python程序、移除外部`PYTHONPATH`測試根目錄`import report_metrics`／`import scripts.market_sessions`、腳本目錄匯入、修補工具package匯入，以及兩種CLI的`--help`。不能因完整測試先將scripts加入sys.path而掩蓋每日報告的匯入錯誤。
 
 ```sh
 python scripts/repair_kline_archive.py --archive-dir /path/to/kline-archive \
@@ -92,10 +100,10 @@ Python 分類、資料缺漏掃描與前端同用 reviewed seed；舊 missing-se
 
 ## 完整副本演練與瀏覽器驗證
 
-[本機全量演練摘要](research-verification/official-repair-rehearsal-summary-20261107.json)：使用同一完整封存的獨立 clone，移除 Git remote，先新增 3,510 列，再刪除 2,214 列、完整還原；每階段前後均跑原 verifier。還原前也核對備份內每個檔案與獨立 Git 原件 blob，不只相信備份自己記錄的 SHA。
+[初版四日規則的本機全量演練摘要](research-verification/official-repair-rehearsal-summary-20261107.json)：使用同一完整封存的獨立 clone，移除 Git remote，先新增 3,510 列，再刪除 2,214 列、完整還原；每階段前後均跑原 verifier。還原前也核對備份內每個檔案與獨立 Git 原件 blob，不只相信備份自己記錄的 SHA。本次三日規則修訂只做唯讀dry-run，沒有以新計畫重做該次寫入演練。
 
 刪前與還原後的全部內容 tree 均為 `f1a5b15680b895346066bf0d4f2e2577da574b9d`，不是只比對 OHLC 數值。4,430 個恢復檔案含年檔、index、manifest、journal。備份 16,715,910 bytes、SHA-256 `4a335c6e5ec152ea5eec14ad6cb43831a42a64e30876f262b483cad25a65b464`。原始演練備份與原始報告另打包保留在工作區，不冒充正式操作的恢復 artifact，也不放進 main 的正式資料。
 
 25 項圖表瀏覽器回歸通過：桌機／390px Chromium／iPhone WebKit 15 項，375px Chromium／WebKit 10 項；包含日週月、個股停牌、缺漏交易日保留、實體刪列後日期／價格及手機無溢出。這是 Playwright 模擬，不是實體 iPhone。
 
-最終[驗證總表](research-verification/official-archive-repair-verification-20261107.json)：完整 Python 1,982 passed、168 subtests passed；既有需額外啟用的壓力案例已另跑通過，未新增 skip。修補專項21項通過；完整 Vitest159檔／2,029項、lint、build、全部workflow的actionlint 1.7.12通過；21次取消當時口徑回放0通知。壓力測試224萬筆衝突，apply161.493秒、verify92.126秒，原300秒門檻未變。
+初版[驗證總表](research-verification/official-archive-repair-verification-20261107.json)保留原次測試與寫入演練結果，屬修訂前紀錄；本次匯入與三日規則的實際結果、程式SHA-256及新舊dry-run對照見[修訂驗證總表](research-verification/official-repair-revision-verification-20261107.json)。不把初版1,982項Python／2,029項Vitest或3,510列演練冒稱為本次重跑結果。
