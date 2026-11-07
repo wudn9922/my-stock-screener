@@ -115,18 +115,41 @@ class OfficialParsingTest(unittest.TestCase):
 
 
 class BasisTest(unittest.TestCase):
-    def witnesses(self, ratios):
+    def witnesses(self, ratios, days=NEIGHBORS):
         return [dict(date=d,archiveClose=str(Decimal(str(r))*100),officialClose='100')
-                for d,r in zip(NEIGHBORS,ratios)]
+                for d,r in zip(days,ratios)]
 
     def test_raw_within_half_percent_and_stable_nonunit_factor(self):
-        self.assertEqual(repair.price_factor(self.witnesses(['.995','1','1.005','1'])),(Decimal(1),None))
-        factor,reason=repair.price_factor(self.witnesses(['.25','.25','.2501','.2499']))
+        self.assertEqual(repair.price_factor(self.witnesses(['.995','1','1.005','1']), DAY),(Decimal(1),None))
+        factor,reason=repair.price_factor(self.witnesses(['.25','.25','.2501','.2499']), DAY)
         self.assertEqual(factor,Decimal('.25'));self.assertIsNone(reason)
 
     def test_unstable_or_incomplete_is_skipped(self):
-        self.assertEqual(repair.price_factor(self.witnesses([1,1,.25,.25]))[1],'unstable-price-basis')
-        self.assertEqual(repair.price_factor(self.witnesses([1,1,1]))[1],'insufficient-comparison-data')
+        self.assertEqual(repair.price_factor(self.witnesses([1,1,.25,.25]), DAY)[1],'unstable-price-basis')
+        self.assertEqual(repair.price_factor(self.witnesses([1,1]), DAY)[1],'insufficient-comparison-data')
+
+    def test_three_raw_witnesses_require_both_sides_and_keep_half_percent_boundary(self):
+        for missing in range(4):
+            days = NEIGHBORS[:missing] + NEIGHBORS[missing+1:]
+            with self.subTest(missing=NEIGHBORS[missing]):
+                self.assertEqual(repair.price_factor(self.witnesses(['.995', '1', '1.005'], days), DAY),
+                                 (Decimal(1), None))
+
+    def test_three_witnesses_cannot_authorize_any_nonunit_adjustment(self):
+        for ratios in [['.25', '.25', '.25'], ['1.006', '1.006', '1.006'], ['1', '1', '1.005001'],
+                       ['1', '1', '.994999']]:
+            with self.subTest(ratios=ratios):
+                self.assertEqual(repair.price_factor(self.witnesses(ratios), DAY),
+                                 (None, 'insufficient-comparison-data'))
+
+    def test_one_sided_duplicate_or_target_date_witnesses_are_not_comparisons(self):
+        for days in [['2021-03-30', *NEIGHBORS[:2]],
+                     [*NEIGHBORS[2:], '2021-04-09'],
+                     [NEIGHBORS[0], NEIGHBORS[0], NEIGHBORS[2]],
+                     [NEIGHBORS[0], DAY, NEIGHBORS[2]]]:
+            with self.subTest(days=days):
+                self.assertEqual(repair.price_factor(self.witnesses([1, 1, 1], days), DAY),
+                                 (None, 'insufficient-comparison-data'))
 
 
 class RepairCase(_ArchiveCase):
@@ -173,6 +196,31 @@ class RepairCase(_ArchiveCase):
         report,operations=repair.plan_backfill(self.archive,Source(),[DAY])
         self.assertEqual(len(operations),1)
         self.assertEqual(report['days'][0]['skipped'][0]['reason'],'insufficient-comparison-data')
+
+    def test_three_raw_comparisons_plan_and_audit_preserve_official_values(self):
+        self.seed('2330.TW', [row(day, 100, 1000) for day in NEIGHBORS[1:]])
+        self.checkpoint()
+        before = self.inventory()
+        class Source:
+            records = {f'twse-{DAY}': {'url': official.urls(DAY)['twse']}}
+            def neighbors(self, day):
+                return NEIGHBORS
+            def observations(self, day):
+                return {'2330.TW': (day, *map(Decimal, ['100', '101', '99', '100', '1234567']))}, {}
+        report, operations = repair.plan_backfill(self.archive, Source(), [DAY])
+        self.assertEqual(before, self.inventory())
+        self.assertEqual(report['days'][0]['addedSymbols'], 1)
+        self.assertEqual(report['days'][0]['adjustedSymbols'], 0)
+        self.assertEqual(operations[0]['factor'], '1')
+        self.assertEqual(operations[0]['row'], list(ka.normalize([DAY, 100, 101, 99, 100, 1234567])))
+        self.assertEqual([r['date'] for r in operations[0]['witnesses']], NEIGHBORS[1:])
+        original = ka.symbol_rows(self.archive, '2330.TW')
+        repair.apply_backfill(self.archive, operations)
+        ka.verify(self.archive, base='HEAD')
+        after = ka.symbol_rows(self.archive, '2330.TW')
+        self.assertEqual([r for r in after if r[0] != DAY], original)
+        event = json.loads((self.archive/ka.LOG).read_text())['events'][-1]
+        self.assertEqual(event['officialBasis'], {'factor': '1', 'witnesses': operations[0]['witnesses']})
 
     def test_count_guard_and_nonmatching_rows_are_preserved(self):
         self.placeholder_fixture();before=self.inventory()

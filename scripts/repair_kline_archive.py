@@ -73,9 +73,13 @@ def write_json(path, doc, exclusive=False):
             os.close(directory)
 
 
-def price_factor(witnesses):
-    """Four exact official sessions, archive/official (the direction used to write)."""
-    if len(witnesses) != 4 or len({r['date'] for r in witnesses}) != 4:
+def price_factor(witnesses, day):
+    """Three bilateral witnesses may prove raw prices; adjustments still need four."""
+    if len(witnesses) not in (3, 4) or len({r['date'] for r in witnesses}) != len(witnesses):
+        return None, 'insufficient-comparison-data'
+    before = sum(r['date'] < day for r in witnesses)
+    after = sum(r['date'] > day for r in witnesses)
+    if not before or not after or before + after != len(witnesses):
         return None, 'insufficient-comparison-data'
     with localcontext() as context:
         context.prec = 50
@@ -84,6 +88,8 @@ def price_factor(witnesses):
             return None, 'invalid-comparison-data'
         if all(abs(r-1) <= Decimal('.005') for r in ratios):
             return Decimal(1), None
+        if len(witnesses) != 4 or before != 2 or after != 2:
+            return None, 'insufficient-comparison-data'
         if max(ratios)/min(ratios)-1 > Decimal('.005'):
             return None, 'unstable-price-basis'
         ordered = sorted(ratios)
@@ -112,7 +118,7 @@ def plan_backfill(root, client, targets=REPAIR_DAYS):
                 continue
             witnesses = [dict(date=d, archiveClose=current[d][4], officialClose=str(comparisons[d][symbol][4]))
                          for d in neighbors if d in current and symbol in comparisons[d]]
-            factor, reason = price_factor(witnesses)
+            factor, reason = price_factor(witnesses, day)
             if reason:
                 skipped.append(dict(symbol=symbol, reason=reason, witnesses=witnesses))
                 continue
