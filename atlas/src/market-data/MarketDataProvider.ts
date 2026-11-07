@@ -68,6 +68,8 @@ export interface BarNormalization {
   };
 }
 export interface BarResult {
+  /** Derived market-wide closures excluded from this projection; raw CSV stays immutable. */
+  closedSessions?: string[];
   /** Read-only permanent history provenance; live failures never discard these bars. */
   archive?: { lastDate: string; status: 'archive' | 'live' | 'unavailable' | 'split'; incomplete?: boolean };
   /** Unknown volume is distinct from an observed zero for intraday comparisons. */

@@ -42,7 +42,8 @@ describe('archive reader C1', () => {
     paths.length = 0;
     await new KlineArchive(options).getDaily('AAPL');
     expect(paths.filter(url=>url.endsWith('.csv'))).toHaveLength(1);
-    expect(paths.at(-1)).toContain('2026.csv');
+    expect(paths.filter(url=>url.endsWith('.csv')).at(-1)).toContain('2026.csv');
+    expect(paths.filter(url=>url.endsWith('market-closures.json'))).toHaveLength(1);
     expect(paths.filter(url=>url.includes('/index/'))).toHaveLength(1);
   });
   it('reads each symbol index once and only needed year files; de-duplicates simultaneous consumers', async () => {
@@ -55,10 +56,10 @@ describe('archive reader C1', () => {
     const archive = new KlineArchive({ fetcher, baseUrl: 'https://archive.test/', cache: false, now });
     const [first, second] = await Promise.all([archive.getDaily('AAPL', range), archive.getDaily('AAPL', range)]);
     expect(first?.bars).toEqual(second?.bars);
-    expect(paths.sort()).toEqual(['index/us/AAPL.json', 'us/AAPL/2025.csv', 'us/AAPL/2026.csv']);
+    expect(paths.sort()).toEqual(['/report/market-closures.json','index/us/AAPL.json', 'us/AAPL/2025.csv', 'us/AAPL/2026.csv']);
     expect(await archive.getDaily('NEW')).toBeNull();
     expect(await archive.getDaily('NEW')).toBeNull();
-    expect(paths).toHaveLength(4);
+    expect(paths).toHaveLength(5);
     expect(paths).not.toContain('manifest.json');
   });
   it('year-cache eviction cannot evict the index and trigger another same-day download', async () => {

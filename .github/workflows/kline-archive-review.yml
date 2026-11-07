@@ -30,7 +30,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - run: pip install --quiet pandas requests pyyaml
+      - run: pip install --quiet pandas requests pyyaml 'exchange-calendars>=4.5,<5.0'
       - name: Offline append, correction, retention, resume and Git retry contracts
         env:
           KLINE_CORRECTIONS_LOG: /tmp/archive-test-corrections.json

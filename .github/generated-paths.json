@@ -17,6 +17,7 @@
       "docs/report/breakouts.json",
       "docs/report/breakouts-history.json",
       "docs/report/market-warnings.json",
+      "docs/report/market-closures.json",
       "docs/report/breakouts-archive/*.json"
     ],
     "marketExtras": ["docs/report/ipo-watch.json", "docs/report/extended-quotes/*.json"],

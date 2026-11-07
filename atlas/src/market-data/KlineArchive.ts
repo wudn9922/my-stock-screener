@@ -3,6 +3,7 @@ import { CachedMarketDataProvider, type CachedMarketDataOptions } from './Cached
 import { usableBarResult } from './KlineIntegrity';
 import { calendarDate, getMarketProfile, marketDateTime } from './MarketProfile';
 import { normalizeSymbol, type Bar, type BarResult, type MarketRange, type Quote } from './MarketDataProvider';
+import { closedMarketDates, loadMarketClosures, withoutClosedDates } from './MarketClosures';
 
 export const ARCHIVE_BASE = 'https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/';
 export const ARCHIVE_SOURCE = 'GitHub 永久封存';
@@ -153,6 +154,7 @@ export class KlineArchive {
     const entry = await this.loadIndex(symbol);
     signal?.throwIfAborted();
     if (!entry) return null;
+    const policyRequest = loadMarketClosures(this.fetcher,this.now());
     const first = Math.max(Number(entry.firstDate.slice(0, 4)), range?.from === undefined ? 0 : new Date(range.from * 1000).getUTCFullYear());
     const last = Math.min(Number(entry.lastDate.slice(0, 4)), range?.to === undefined ? 9999 : new Date(range.to * 1000).getUTCFullYear());
     const needed = Array.from({ length: Math.max(0, last - first + 1) }, (_, i) => first + i)
@@ -163,13 +165,18 @@ export class KlineArchive {
     if (aborted?.status === 'rejected') throw aborted.reason;
     const valid = results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
     if (!valid.length) throw new Error('此代號的封存年度檔暫時無法讀取');
-    const bars = valid.flatMap(result => result.bars).filter(bar => (range?.from === undefined || bar.time >= range.from) && (range?.to === undefined || bar.time <= range.to));
+    const policy = await policyRequest;
+    signal?.throwIfAborted();
+    const closed = closedMarketDates(symbol, policy);
+    const all = valid.flatMap(result => result.bars);
+    const projected = withoutClosedDates(all,symbol,closed);
+    const bars = projected.filter(bar => (range?.from === undefined || bar.time >= range.from) && (range?.to === undefined || bar.time <= range.to));
     if (!bars.length) throw new Error('此區間沒有有效封存資料');
     const missing = valid.flatMap(result => result.missingVolumeAt ?? []).filter(time => bars.some(bar => bar.time === time));
     const incomplete = results.some(result => result.status === 'rejected');
-    return usableBarResult({ ...valid[0]!, bars, missingVolumeAt: missing, asOf: this.now() / 1000,
+    return usableBarResult({ ...valid[0]!, bars, missingVolumeAt: missing, asOf: this.now() / 1000, closedSessions: [...closed],
       archive: { lastDate: new Date(bars.at(-1)!.time * 1000).toISOString().slice(0, 10), status: 'archive', incomplete },
-      source: ARCHIVE_SOURCE + (incomplete ? ' · 部分年度暫時無法讀取' : '') }, symbol, '1D');
+      source: ARCHIVE_SOURCE + (incomplete ? ' · 部分年度暫時無法讀取' : '') + (projected.length < all.length ? ' · 已排除全市場休市日' : '') }, symbol, '1D');
   }
   private loadYear(symbol: string, year: number, entry: ArchiveEntry): Promise<BarResult> {
     const current = year >= new Date(this.now()).getUTCFullYear();
@@ -189,7 +196,7 @@ export class KlineArchive {
         }
         return { ...parseArchiveCsv(text, symbol, year), asOf: this.now() / 1000 };
       };
-      const provider = { id: 'kline-archive-year', cacheVersion: `market-open-v1:${year}:${version}`, supportedTimeframes: ['1D'] as const,
+      const provider = { id: 'kline-archive-year', cacheVersion: `market-closure-source-v2:${year}:${version}`, supportedTimeframes: ['1D'] as const,
         getBars: load, getQuote: async (): Promise<Quote> => { throw new Error('Archive year has no quote endpoint'); } };
       if (this.options.cache === false) pending = load();
       else {
@@ -210,7 +217,10 @@ export class KlineArchive {
 /** Compare the same session date, independent of each provider's daily timestamp convention.
  * Existing archive rows win; only absent sessions are appended. A split uses Yahoo's whole segment.
  */
-export function mergeArchiveDaily(archived: readonly Bar[], recent: readonly Bar[], symbol: string, archivedThrough?: string): { bars: Bar[]; splitMismatch: boolean } {
+export function mergeArchiveDaily(archived: readonly Bar[], recent: readonly Bar[], symbol: string, archivedThrough?: string,
+  closed: ReadonlySet<string> = closedMarketDates(symbol)): { bars: Bar[]; splitMismatch: boolean } {
+  archived = withoutClosedDates(archived,symbol,closed);
+  recent = withoutClosedDates(recent,symbol,closed);
   const market = getMarketProfile(symbol);
   const old = new Map(archived.map(bar => [calendarDate(bar.time, market), bar]));
   const cutoff = archivedThrough ?? (archived.at(-1) ? calendarDate(archived.at(-1)!.time, market) : '');

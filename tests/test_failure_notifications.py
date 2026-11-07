@@ -173,6 +173,9 @@ class WorkflowCoverageTest(unittest.TestCase):
                 if partial:
                     self.assertTrue(all(s.get('id') for s in partial), path.name)
                     self.assertIn('notify_partial', producer['outputs'], path.name)
+                    collector = next(s for s in producer['steps'] if s.get('id') == 'collect_notification_outcomes')
+                    names = json.loads(collector['env']['NOTIFY_STEP_NAMES'])
+                    self.assertTrue({s['id'] for s in partial} <= names.keys(), path.name)
         self.assertGreaterEqual(count, 24)
 
     def test_normal_daily_line_report_steps_are_preserved(self):
@@ -221,7 +224,8 @@ class WorkflowCoverageTest(unittest.TestCase):
         step = next(s for s in job['steps'] if s.get('id') == 'collect_notification_outcomes')
         names = json.loads(step['env']['NOTIFY_STEP_NAMES'])
         self.assertEqual(names['archive_closure_scan'], 'Build market closure evidence from read-only archive')
-        for label in ('Build breadth trading signals', 'Build market closure evidence from read-only archive'):
+        for label in ('Build breadth trading signals', 'Build market closure evidence from read-only archive',
+                      'Publish derived closure evidence including the daily cohort'):
             target = next(key for key, value in names.items() if value == label)
             results = {key: {'outcome': 'success', 'conclusion': 'success'} for key in names}
             results[target] = {'outcome': 'failure', 'conclusion': 'success', 'outputs': {'private': TOKEN}}

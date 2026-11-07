@@ -150,11 +150,14 @@ def _price(value):
     return text if "." in text else text + ".0"
 
 
-def write_bars(path, frame, keep=KEEP_BARS, refetch=None, now=None):
+def write_bars(path, frame, keep=KEEP_BARS, refetch=None, now=None, exclude_dates=()):
     """CSV 原子寫入：價格 4 位、已知成交量整數、未知成交量空欄；回傳相容的計算 frame。"""
     symbol = os.path.basename(path).removesuffix(".csv")
     frame = accept_frame(_volume_source_frame(frame), symbol, refetch=refetch, now=now,
                          source_url="https://query1.finance.yahoo.com/v8/finance/chart/" + symbol)
+    if exclude_dates:
+        from market_sessions import analysis_prices
+        frame = analysis_prices(frame,exclude_dates)
     frame = clean(frame).tail(keep)
     lines = ["Date,Open,High,Low,Close,Volume"]
     unknown = set(frame.attrs.get(UNKNOWN_VOLUME_DATES, ()))
