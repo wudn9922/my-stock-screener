@@ -19,6 +19,8 @@ import {
   enoughPeriods,
   formatRange,
   peRangeOf,
+  peRiverRangeOf,
+  PE_RIVER_PRESETS,
   gateCountText,
   gateSentence,
   isCustomVolume,
@@ -447,6 +449,8 @@ export function FilterSheet(props: FilterSheetProps) {
   const [volumeText, setVolumeText] = useState(value.vol === null ? '' : String(marketVolumeValue(value.vol, market)));
   const [peLower, setPeLower] = useState(String(value.pe?.min ?? ''));
   const [peUpper, setPeUpper] = useState(String(value.pe?.max ?? ''));
+  const [perLower, setPerLower] = useState(String(value.per?.min ?? ''));
+  const [perUpper, setPerUpper] = useState(String(value.per?.max ?? ''));
   const [terms, setTerms] = useState<GateTermsMap>(() => termsOf(value));
   const [category, setCategory] = useState<'all' | 'technical' | 'fundamental'>('all');
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -459,6 +463,8 @@ export function FilterSheet(props: FilterSheetProps) {
     setVolumeText(value.vol === null ? '' : String(marketVolumeValue(value.vol, market)));
     setPeLower(String(value.pe?.min ?? ''));
     setPeUpper(String(value.pe?.max ?? ''));
+    setPerLower(String(value.per?.min ?? ''));
+    setPerUpper(String(value.per?.max ?? ''));
     setTerms(termsOf(value));
   }, [open]);
   useDialogFocus(open, DIALOG_ID);
@@ -509,6 +515,17 @@ export function FilterSheet(props: FilterSheetProps) {
     setPeLower(lower); setPeUpper(upper);
     const range = peRangeOf(lower, upper);
     if (range !== undefined) update({ pe: range });
+  };
+  const perInvalid = peRiverRangeOf(perLower, perUpper) === undefined;
+  const setPerRange = (range: FilterRange | null) => {
+    setPerLower(String(range?.min ?? ''));
+    setPerUpper(String(range?.max ?? ''));
+    update({ per: range });
+  };
+  const editPerRange = (lower: string, upper: string) => {
+    setPerLower(lower); setPerUpper(upper);
+    const range = peRiverRangeOf(lower, upper);
+    if (range !== undefined) update({ per: range });
   };
   const setShareVolume = (vol: number | null) => {
     setVolumeText(vol === null ? '' : String(marketVolumeValue(vol, market)));
@@ -660,7 +677,7 @@ export function FilterSheet(props: FilterSheetProps) {
   const revenueChips = draftChips.filter((chip) => chip.key === 'rev' || chip.key === 'revY');
   const revenueCount = revenueChips.length;
   const revenueSummary = revenueChips.map((chip) => chip.label).join('；');
-  const fundamentalCount = draftChips.filter((chip) => ['pe', 'eps', 'epsY', 'rev', 'revY', 'epss', 'accel', 'accelY'].includes(chip.key)).length;
+  const fundamentalCount = draftChips.filter((chip) => ['pe', 'per', 'eps', 'epsY', 'rev', 'revY', 'epss', 'accel', 'accelY'].includes(chip.key)).length;
 
   return createPortal(
     <div className="fs-backdrop" ref={backdropRef} onClick={onClose}>
@@ -709,6 +726,7 @@ export function FilterSheet(props: FilterSheetProps) {
             setDraft(next);
             if (chip.id === 'vol') setVolumeText('');
             if (chip.id === 'pe') { setPeLower(''); setPeUpper(''); }
+            if (chip.id === 'per') { setPerLower(''); setPerUpper(''); }
             setTerms(termsOf(next));
           }}>{chip.label}{chip.unavailable && '（暫不套用）'}<X size={12} /></button>)}</div>
         </div>}
@@ -877,6 +895,26 @@ export function FilterSheet(props: FilterSheetProps) {
             {peInvalid && <p id="fs-pe-error" className="fs-unavailable" role="alert">請輸入非負數（最多兩位小數），下限不可大於上限。</p>}
             <p className="fs-hint">上下限皆包含；留白表示不限。虧損或缺少本益比資料的股票不會入選。</p>
           </Section>
+          <Section title="本益比河流分位" unavailable={availability.per} hint="目前本益比在這檔股票自己歷史本益比中的百分位（0＝歷史最便宜，100＝最貴），與個股頁「本益比河流圖」的 P10／P30／P50／P70／P90 同一套算法。篩選資料以永久封存週線（2021 年起）每日計算；個股頁另併入較早的週線，分位可能略有差異。">
+            <div className="fs-chips" role="group" aria-label="本益比河流分位">
+              {[null, ...PE_RIVER_PRESETS].map(preset => {
+                const range = preset?.range ?? null;
+                const active = range === null ? !draft.per : draft.per?.min === range.min && draft.per?.max === range.max;
+                return <button key={preset?.label ?? 'none'} type="button" className={`fs-chip ${active ? 'active' : ''}`} aria-pressed={active}
+                  onClick={() => setPerRange(range === null || active ? null : range)}>{preset?.label ?? '不限'}</button>;
+              })}
+            </div>
+            <div className="fs-number-row">
+              <label className="fs-number"><span>至少 P</span><input type="text" inputMode="decimal" enterKeyHint="done" placeholder="0"
+                aria-label="河流分位下限" aria-invalid={perInvalid} aria-describedby={perInvalid ? 'fs-per-error' : undefined}
+                value={perLower} onChange={event => editPerRange(event.target.value, perUpper)} /></label>
+              <label className="fs-number"><span>至多 P</span><input type="text" inputMode="decimal" enterKeyHint="done" placeholder="100"
+                aria-label="河流分位上限" aria-invalid={perInvalid} aria-describedby={perInvalid ? 'fs-per-error' : undefined}
+                value={perUpper} onChange={event => editPerRange(perLower, event.target.value)} /></label>
+            </div>
+            {perInvalid && <p id="fs-per-error" className="fs-unavailable" role="alert">請輸入 0～100（最多一位小數），下限不可大於上限。</p>}
+            <p className="fs-hint">上下限皆包含；留白表示不限。歷史太短畫不出河流、虧損或目前沒有可用 EPS 的股票不會入選。</p>
+          </Section>
           <Section title="基本面（EPS／營收成長）" unavailable={fundamentalsBlocked}>
             <Hint title="多重條件說明">同一指標可新增多個條件，全部同時滿足才入選。例如：近 5 年 EPS 年增皆 ≥ 10%，且最近 1 年 ≥ 20%。</Hint>
             <details className="fs-details fs-method"><summary>年增率與資料來源說明</summary>
@@ -1016,7 +1054,7 @@ export function FilterSheet(props: FilterSheetProps) {
           <button type="button" className="ghost-button" onClick={() => { setDraft({ ...EMPTY_FILTERS, tr: [] }); setTerms(termsOf(EMPTY_FILTERS)); setVolumeText(''); setPeLower(''); setPeUpper(''); }}>
             重設
           </button>
-          <button type="button" className="primary-button fs-apply" disabled={volumeInvalid || peInvalid || (!!draft.pe && !!availability.pe)} onClick={() => props.onApply(draft)}>
+          <button type="button" className="primary-button fs-apply" disabled={volumeInvalid || peInvalid || perInvalid || (!!draft.pe && !!availability.pe) || (!!draft.per && !!availability.per)} onClick={() => props.onApply(draft)}>
             {(wantsGrowth && (growth === undefined || growthLoading)) || (draft.pe && availability.pe) ? '套用' : `套用（${count.toLocaleString('en-US')} 檔）`}
           </button>
         </footer>

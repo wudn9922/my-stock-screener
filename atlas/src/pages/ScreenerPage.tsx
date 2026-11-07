@@ -56,6 +56,7 @@ import {
   type UniverseMarketKey,
 } from '../report/universe';
 import { loadMarketGrowth, type GrowthFile } from '../fundamentals/GrowthProvider';
+import { loadPeRiverFile, type PeRiverFile } from '../fundamentals/peRiverRank';
 import { FilterSheet } from '../ui/FilterSheet';
 import {
   displayTicker,
@@ -352,6 +353,18 @@ function useScreenerPe(wanted: boolean, market: 'TW' | 'US', items: readonly Gro
   return loaded?.market === market && loaded.items === items ? loaded.data : undefined;
 }
 
+/** The market's P/E river percentiles (one small file); undefined while loading, null when unavailable. */
+function useScreenerPeRiver(wanted: boolean, market: 'TW' | 'US') {
+  const [loaded, setLoaded] = useState<{ market: 'TW' | 'US'; data: PeRiverFile | null }>();
+  useEffect(() => {
+    if (!wanted) return;
+    let live = true;
+    void loadPeRiverFile(market).then(data => { if (live) setLoaded({ market, data }); });
+    return () => { live = false; };
+  }, [wanted, market]);
+  return loaded?.market === market ? loaded.data : undefined;
+}
+
 function ScreenerView({
   report,
   group: requested,
@@ -426,7 +439,8 @@ function ScreenerView({
   const { growth, loading: growthLoading } = useGrowth(wantGrowth, market);
   const peFigures = useScreenerPe(!!filters.pe || sheetOpen, market, groupItems);
   const observationDate = sourceMarketData?.asOf;
-  const context = useMemo<FilterContext>(() => ({ market, growth, growthLoading, pe: peFigures, asOf: observationDate, fixedMAs, maReferenceReason }), [market, growth, growthLoading, peFigures, observationDate, fixedMAs, maReferenceReason]);
+  const peRiver = useScreenerPeRiver(!!filters.per || sheetOpen, market);
+  const context = useMemo<FilterContext>(() => ({ market, growth, growthLoading, pe: peFigures, peRiver, asOf: observationDate, fixedMAs, maReferenceReason }), [market, growth, growthLoading, peFigures, peRiver, observationDate, fixedMAs, maReferenceReason]);
   const availability = useMemo(() => filterAvailability(groupItems, context), [groupItems, context]);
   const chips = useMemo(() => activeChips(filters, availability, market, hasFixedMAs), [filters, availability, market, hasFixedMAs]);
   const filtered = useMemo(() => applyFilters(viewItems, filters, context), [viewItems, filters, context]);
@@ -553,7 +567,7 @@ function ScreenerView({
             ))}
           </select>
         </label>
-        <span className="result-count">{filters.pe && peFigures === undefined ? '本益比載入中…' : filters.pe && peFigures === null ? '本益比資料無法取得' : resultCountText(items, viewItems.length, activeView, hasUnmatched)}</span>
+        <span className="result-count">{filters.pe && peFigures === undefined ? '本益比載入中…' : filters.pe && peFigures === null ? '本益比資料無法取得' : filters.per && peRiver === undefined ? '河流分位載入中…' : filters.per && peRiver === null ? '河流分位資料無法取得' : resultCountText(items, viewItems.length, activeView, hasUnmatched)}</span>
       </div>
       <div className="save-watchlist">
         <button type="button" className="ghost-button" disabled={groupPending} onClick={() => { setSavingList((previous) => !previous); setListName(group.name); }}>存成自選清單</button>
@@ -667,6 +681,10 @@ function ScreenerView({
         <PageState kind="loading" title="載入本益比資料…" />
       ) : filters.pe && peFigures === null ? (
         <PageState kind="error" title="本益比資料尚未產生或暫時無法取得" message="請稍後重試，或移除本益比條件；不會顯示未經篩選的結果。" />
+      ) : filters.per && peRiver === undefined ? (
+        <PageState kind="loading" title="載入本益比河流資料…" />
+      ) : filters.per && peRiver === null ? (
+        <PageState kind="error" title="本益比河流資料尚未產生或暫時無法取得" message="請稍後重試，或移除河流分位條件；不會顯示未經篩選的結果。" />
       ) : charts && items.length > 0 ? (
         <div className="screener-charts">
           {chartParameters.error && <p role="status">{chartParameters.error}</p>}
