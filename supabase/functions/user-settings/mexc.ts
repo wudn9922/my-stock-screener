@@ -140,19 +140,24 @@ export function parseMexcBalances(
   value: unknown,
   status: number | null = null,
   diagnosticValue: unknown = value,
-): MexcBalance[] {
+): { balances: MexcBalance[]; skippedAssets: number } {
   try {
     return balancesFrom(value);
   } catch (error) {
     return parseFailure('parse-balances', diagnosticValue, status, error);
   }
 }
-function balancesFrom(value: unknown): MexcBalance[] {
+function balancesFrom(value: unknown): {
+  balances: MexcBalance[];
+  skippedAssets: number;
+} {
   const row = holdingsObject(value);
   if (row.accountType !== 'SPOT' || !Array.isArray(row.balances) || row.balances.length > 10000)
     sourceFailure('account-shape');
   const result: MexcBalance[] = [],
     seen = new Set<string>();
+  const reasons = { 'asset-invalid': 0, 'asset-duplicate': 0 };
+  const classes = new Set<string>();
   for (const raw of row.balances) {
     const item = holdingsObject(raw);
     const free = mexcDecimal(item.free),
@@ -164,19 +169,46 @@ function balancesFrom(value: unknown): MexcBalance[] {
       throw new MexcError('limit', 400);
     }
     if (quantity === '0') continue;
-    if (typeof item.asset !== 'string' || !assetPattern.test(item.asset) || seen.has(item.asset))
-      sourceFailure('asset-invalid-or-duplicate');
-    seen.add(item.asset);
+    const asset = typeof item.asset === 'string' ? item.asset.toUpperCase() : '';
+    const invalid = !assetPattern.test(asset);
+    if (invalid || seen.has(asset)) {
+      reasons[invalid ? 'asset-invalid' : 'asset-duplicate']++;
+      if (typeof item.asset !== 'string') classes.add('non-string');
+      else {
+        if (/[a-z]/.test(item.asset)) classes.add('lowercase');
+        if (/[^A-Z0-9]/.test(asset)) classes.add('symbol');
+        if (asset.length > 20) classes.add('too-long');
+        if (!asset.length) classes.add('empty');
+      }
+      if (!invalid) classes.add('duplicate');
+      continue;
+    }
+    seen.add(asset);
     result.push({
-      asset: item.asset,
-      symbol: `${item.asset}/USDT`,
+      asset,
+      symbol: `${asset}/USDT`,
       free,
       locked,
       quantity,
     });
   }
   if (result.length > 1000) throw new MexcError('limit');
-  return result.sort((a, b) => a.asset.localeCompare(b.asset));
+  const skippedAssets = reasons['asset-invalid'] + reasons['asset-duplicate'];
+  if (skippedAssets) {
+    console.warn(
+      JSON.stringify({
+        step: 'parse-balances',
+        reason: 'asset-skipped',
+        count: skippedAssets,
+        reasons,
+        classes: [...classes].sort(),
+      }),
+    );
+  }
+  return {
+    balances: result.sort((a, b) => a.asset.localeCompare(b.asset)),
+    skippedAssets,
+  };
 }
 export function assertReadOnlyKey(
   value: unknown,
@@ -550,7 +582,7 @@ export async function handleMexc(
     const info = await readMexc('/api/v3/apiKeyInfo', fetcher, controller.signal, now(), auth);
     assertReadOnlyKey(info.value, auth.apiKey, info.status, info.diagnosticValue);
     const accountResponse = await readMexc('/api/v3/account', fetcher, controller.signal, now(), auth);
-    const balances = parseMexcBalances(
+    const { balances, skippedAssets } = parseMexcBalances(
       accountResponse.value,
       accountResponse.status,
       accountResponse.diagnosticValue,
@@ -577,6 +609,7 @@ export async function handleMexc(
     return {
       ...publicState(row),
       document: validateHoldingsDocument(row.document),
+      skippedAssets,
     };
   } catch (error) {
     // No raw network errors, signed URLs, credentials, or balances enter logs.

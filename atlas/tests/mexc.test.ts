@@ -65,7 +65,7 @@ describe('MEXC cryptography and response validation', () => {
           { asset: 'BTC', free: '0.100000000000000001', locked: '0.200000000000000002', available: '999' },
           { asset: 'ZERO-NOT-SUPPORTED', free: '0.0000', locked: '0' },
         ],
-      }),
+      }).balances,
     ).toEqual([
       {
         asset: 'BTC',
@@ -84,13 +84,6 @@ describe('MEXC cryptography and response validation', () => {
     { accountType: 'CONTRACT', balances: [] },
     { accountType: 'SPOT', balances: [{ asset: 'BTC', free: '-1', locked: '0' }] },
     { accountType: 'SPOT', balances: [{ asset: 'BTC', free: '0.1234567890123456789', locked: '0' }] },
-    {
-      accountType: 'SPOT',
-      balances: [
-        { asset: 'BTC', free: '1', locked: '0' },
-        { asset: 'BTC', free: '1', locked: '0' },
-      ],
-    },
   ])('rejects malformed balances without creating empty holdings: %j', (input) =>
     expect(() => parseMexcBalances(input)).toThrow(),
   );
