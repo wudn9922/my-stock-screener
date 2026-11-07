@@ -17,8 +17,12 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-import kline_archive as archive
-from official_tw_quotes import OfficialClient, REPAIR_DAYS
+if __package__:
+    from . import kline_archive as archive
+    from .official_tw_quotes import OfficialClient, REPAIR_DAYS
+else:  # python scripts/repair_kline_archive.py
+    import kline_archive as archive
+    from official_tw_quotes import OfficialClient, REPAIR_DAYS
 
 BACKUP_NAME = 'removed-placeholders-20261023.json'
 

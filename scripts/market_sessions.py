@@ -14,7 +14,10 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from official_tw_quotes import valid_closure_proof
+try:
+    from scripts.official_tw_quotes import valid_closure_proof
+except ImportError:  # Direct execution with only scripts/ on sys.path.
+    from official_tw_quotes import valid_closure_proof
 
 UNKNOWN_VOLUME_DATES = "atlas_unknown_volume_dates"
 CLOSED_DATES = "atlas_market_closed_dates"
