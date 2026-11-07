@@ -1,0 +1,1 @@
+import{r as e,j as s}from"./index-6njAxDbb.js";import{r as a}from"./index-CH87S-1G.js";function c({children:o}){const[t,r]=e.useState(null);return e.useEffect(()=>r(document.getElementById("site-page-notes")),[]),t?a.createPortal(s.jsx("div",{className:"page-footer-note",children:o}),t):null}export{c as P};
