@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 
 if __package__:
@@ -271,6 +272,137 @@ def restore_backup(root, path, apply=False):
     return dict(restoredRows=len(rows), restoredFiles=len(images), byteExact=True)
 
 
+SAMPLE_LIMIT = 10
+SAMPLE_PRIORITY = ('2330.TW', '^TWII')
+
+
+def _count(value):
+    return '-' if value is None else f'{value:,}' if isinstance(value, int) else str(value)
+
+
+def _factor(value):
+    """Display only: eight significant digits; the report keeps the exact factor."""
+    return format(Decimal(value).normalize(), '.8g')
+
+
+def _validation_rows(report):
+    before, after = report.get('validationBefore') or {}, report.get('validationAfter') or {}
+    rows = []
+    for key in ('files', 'rows'):
+        b, a = before.get(key), after.get(key)
+        delta = f'{a - b:+,}' if isinstance(a, int) and isinstance(b, int) else '-'
+        rows.append([key, _count(b), _count(a), delta])
+    return rows
+
+
+def _sample_additions(additions, limit=SAMPLE_LIMIT):
+    """Deterministic: 2330.TW and ^TWII first, then adjusted rows (up to half), then the rest."""
+    chosen = [a for name in SAMPLE_PRIORITY for a in additions if a['symbol'] == name][:limit]
+    adjusted = [a for a in additions if a not in chosen and Decimal(a['factor']) != 1]
+    chosen += adjusted[:max(0, (limit - len(chosen)) // 2)]
+    chosen += [a for a in additions if a not in chosen][:limit - len(chosen)]
+    return chosen
+
+
+def summary_sections(report):
+    """Pure: turn a repair report into [(title, headers, rows)] for logs and the step summary."""
+    mode = report.get('mode')
+    sections = [('Official archive repair', ['field', 'value'], [
+        ['mode', str(mode)], ['apply', str(bool(report.get('apply'))).lower()],
+        ['status', str(report.get('status'))], ['archive commit', str(report.get('archiveCommit'))],
+        *([['error', str(report['error'])]] if report.get('error') else [])])]
+    sections.append(('Validation', ['metric', 'before', 'after', 'delta'], _validation_rows(report)))
+    if mode == 'backfill':
+        days = report.get('days') or []
+        reasons = sorted({r for d in days for r in (d.get('skippedByReason') or {})})
+        columns = []
+        for d in days:
+            additions = d.get('additions')
+            added = len(additions) if additions is not None else d.get('addedSymbols', 0)
+            adjusted = (sum(Decimal(a['factor']) != 1 for a in additions) if additions is not None
+                        else d.get('adjustedSymbols', 0))
+            by_reason = d.get('skippedByReason') or {}
+            columns.append([added, added - adjusted, adjusted, sum(by_reason.values()),
+                            *(by_reason.get(r, 0) for r in reasons), d.get('existingSymbols') or 0])
+        labels = ['rows to add', 'of which factor = 1', 'of which factor != 1', 'rows skipped',
+                  *(f'skipped: {r}' for r in reasons), 'existing rows kept']
+        totals = [sum(c[i] for c in columns) for i in range(len(labels))] if columns else []
+        sections.append(('Backfill per date', ['', *(d['date'] for d in days), *(['total'] if days else [])],
+                         [[label, *(_count(c[i]) for c in columns), *([_count(totals[i])] if totals else [])]
+                          for i, label in enumerate(labels)] if days else []))
+        audit = report.get('officialDayAudit')
+        if audit:
+            sections.append(('Official day audit', ['closed days', 'opened days'],
+                             [[', '.join(c['date'] for c in audit.get('closed', [])) or '-',
+                               ', '.join(audit.get('opened', [])) or '-']]))
+        for d in days:
+            samples = _sample_additions(d.get('additions') or [])
+            if samples:
+                sections.append((f"Sample additions {d['date']} ({len(samples)} of {len(d['additions'])})",
+                    ['symbol', 'open', 'high', 'low', 'close', 'volume', 'factor'],
+                    [[a['symbol'], *a['row'][1:5], a['row'][5] or '-', _factor(a['factor'])] for a in samples]))
+    elif mode == 'remove-placeholders':
+        rows = report.get('rows') or []
+        groups = Counter((report.get('market', '-'),
+                          'tpex' if r['symbol'].endswith('.TWO') else 'twse', r['ohlcv'][0]) for r in rows)
+        expected, actual = report.get('expected'), report.get('actual', len(rows))
+        sections.append(('Placeholder rows matched for removal', ['market', 'exchange', 'date', 'rows'],
+                         [[*k, _count(v)] for k, v in sorted(groups.items())]
+                         or [[report.get('market', '-'), '-', report.get('date', '-'), _count(actual)]]))
+        diff = f'{(actual - expected) * 100 / expected:+.2f}%' if expected else '-'
+        backup = report.get('backupPath')
+        sections.append(('Removal totals', ['field', 'value'], [
+            ['matched rows', _count(actual)], ['expected rows', _count(expected)], ['difference', diff],
+            ['count guard passed', str(report.get('guardPassed')).lower()],
+            ['rows preserved (not placeholders)', _count(len(report.get('preserved') or []))],
+            ['year files touched', _count(len({r['path'] for r in rows})) if rows else '-'],
+            *([['archive files changed (incl. indexes, journal, manifest)', _count(report['changedFiles'])]]
+              if 'changedFiles' in report else []),
+            ['backup written', f'yes: {backup}' if backup else 'no'],
+            *([['backup sha256', str(report.get('backupSha256'))]] if backup else [])]))
+    elif mode == 'restore':
+        sections.append(('Restore', ['field', 'value'], [
+            ['rows restored', _count(report.get('restoredRows'))],
+            ['files touched', _count(report.get('restoredFiles'))],
+            ['byte exact', str(report.get('byteExact')).lower() if 'byteExact' in report else '-']]))
+    return sections
+
+
+def render_text(sections):
+    out = []
+    for title, headers, rows in sections:
+        widths = [max(len(str(c)) for c in col) for col in zip(headers, *rows)]
+        out += ['', f'== {title} ==', '  '.join(h.ljust(w) for h, w in zip(headers, widths)).rstrip(),
+                '  '.join('-' * w for w in widths)]
+        out += ['  '.join(str(c).ljust(w) for c, w in zip(r, widths)).rstrip() for r in rows]
+    return '\n'.join(out[1:]) + '\n'
+
+
+def render_markdown(sections):
+    def cell(value):
+        return str(value).replace('|', '\\|').replace('\n', ' ')
+    out = []
+    for title, headers, rows in sections:
+        out += [f'### {title}', '', '| ' + ' | '.join(map(cell, headers)) + ' |',
+                '|' + '|'.join('---' for _ in headers) + '|',
+                *('| ' + ' | '.join(map(cell, r)) + ' |' for r in rows), '']
+    return '\n'.join(out) + '\n'
+
+
+def emit_summary(report, stream=None, environ=None):
+    """Reporting only: never changes the repair outcome, even if the summary itself fails."""
+    stream, environ = stream or sys.stdout, os.environ if environ is None else environ
+    try:
+        sections = summary_sections(report)
+        stream.write(render_text(sections))
+        stream.flush()
+        if environ.get('GITHUB_STEP_SUMMARY'):
+            with open(environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+                summary.write(render_markdown(sections))
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f'warning: repair summary unavailable: {exc}', file=sys.stderr)
+
+
 def run(root, mode, report_path, source_cache, backup_path=None, apply=False, offline=False):
     root = Path(root).resolve()
     report_path, source_cache = outside(root, report_path), outside(root, source_cache)
@@ -315,9 +447,11 @@ def run(root, mode, report_path, source_cache, backup_path=None, apply=False, of
         report['status'] = 'stopped'
         report['error'] = str(exc)
         write_json(report_path, report)
+        emit_summary(report)
         raise
     write_json(report_path, report)
     print(json.dumps({k: report[k] for k in ('mode', 'apply', 'status', 'archiveCommit')}))
+    emit_summary(report)
     return report
 
 
