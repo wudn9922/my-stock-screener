@@ -19,6 +19,7 @@ import { loadScreenerFixedMAs } from "../src/pages/screenerFixedMAs";
 import type { ParameterStock } from "../src/cloud/settingsApi";
 import { ValuationProvider } from "../src/fundamentals/ValuationProvider";
 import { getScreenerPeFigures } from "../src/fundamentals/peFigures";
+import { loadPeRiverFile } from "../src/fundamentals/peRiverRank";
 
 const DEFAULT_ADMIN_LINE_ID = "Ua0037dbd5037b64fc76804c60520ad76";
 const LINE_ID = /^U[0-9a-f]{32}$/;
@@ -95,6 +96,22 @@ export async function readCollectorFixedMaBars(symbol: string, root: string) {
     csv = await readFile(resolve(cacheDir, "bars", `${symbol}.csv`), "utf8");
   }
   return fixedMaBarsFromCsv(csv);
+}
+
+/** A generated valuation file: this run's build output first, else the last deployment. */
+export function collectorValuationFetch(root: string): typeof fetch {
+  return async input => {
+    const file = String(input).split("/").pop()!;
+    try {
+      return new Response(await readFile(resolve(root, "atlas/public/valuation", file), "utf8"));
+    } catch {
+      try {
+        return new Response(await readFile(resolve(root, "docs/atlas/valuation", file), "utf8"));
+      } catch {
+        return new Response(null, { status: 404 });
+      }
+    }
+  };
 }
 
 /** Existing generated valuation inputs, using the same priority as the growth supplement. */
@@ -263,6 +280,7 @@ export async function refreshSavedWatchlists() {
           list.market === "US" ? mergeGrowth(yahooGrowth, growth) : growth,
           fixedMAs,
           parseFilters(list.filters).pe ? await getScreenerPeFigures(items, list.market, valuations) : undefined,
+          parseFilters(list.filters).per ? await loadPeRiverFile(list.market, "/valuation/", collectorValuationFetch(root)) : undefined,
         );
         let previousSession: string | null = null;
         try {

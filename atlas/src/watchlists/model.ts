@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { GroupItem } from '../report/schema';
 import type { GrowthFile } from '../fundamentals/GrowthProvider';
 import type { ScreenerPeFigures } from '../app/dataSources';
+import type { PeRiverFile } from '../fundamentals/peRiverRank';
 import { activeChips, applyFilters, filterAvailability, FILTER_PARAM_MAX, parseFilters, serializeFilters, type FixedScreenerMas } from '../pages/screenerFilters';
 
 const symbol = z.string().regex(/^[A-Z0-9^][A-Z0-9.^=-]{0,31}$/);
@@ -60,6 +61,7 @@ export function evaluateWatchlist(
   growth: GrowthFile | null | undefined,
   fixedMAs?: FixedScreenerMas,
   pe?: ScreenerPeFigures | null,
+  peRiver?: PeRiverFile | null,
 ): WatchlistMember[] {
   if (items.some((item) => item.status === 'failed')) throw new Error('部分股票行情載入失敗，暫不判定新入選或出榜；保留上次基準。');
   const filters = parseFilters(list.filters);
@@ -67,7 +69,7 @@ export function evaluateWatchlist(
   const missingFixedSymbols = filters.ema20 ? items.filter(item => fixedMAs?.[item.symbol]?.distance === null).map(item => item.symbol) : [];
   if (missingFixedSymbols.length)
     throw new Error(`固定均線行情暫時無法取得（${missingFixedSymbols.join('、')}），保留上次清單，暫不判定出榜。`);
-  const availability = filterAvailability(items, { market: list.market, growth, growthLoading: false, fixedMAs, pe });
+  const availability = filterAvailability(items, { market: list.market, growth, growthLoading: false, fixedMAs, pe, peRiver });
   const blocked = activeChips(filters, availability, list.market, !!fixedMAs && Object.keys(fixedMAs).length > 0).find((chip) => chip.unavailable);
   if (blocked) throw new Error(`${blocked.label}：${blocked.unavailable}。保留上次清單，待資料恢復後再比較。`);
   const source = items.filter((item) => item.status !== 'failed');
@@ -80,6 +82,7 @@ export function evaluateWatchlist(
     growth,
     fixedMAs,
     pe,
+    peRiver,
   }).map(({ symbol, name }) => ({ symbol, name }));
 }
 

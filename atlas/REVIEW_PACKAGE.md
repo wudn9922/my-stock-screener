@@ -1,3 +1,13 @@
+## 選股：本益比河流分位篩選（2026-11-07）
+
+只做 primary self-review，沒有獨立簽核。新增篩選條件 `per:min:max`：目前本益比在該股自己歷史本益比中的百分位（0–100，含上下限），預設選項對應河流圖 P10／P30／P70／P90。演算法沿用個股頁 `buildPeRiver`（同一 EPS TTM／年度備援、發布延遲、PE>200 與虧損排除、百分位定義），不另寫一套。
+
+全市場分位由 `scripts/build-pe-river.ts` 在 Atlas 每日建置時預先計算：讀 `docs/report/financials/*.json` 與永久封存（`archivePeriod` 週線，與瀏覽器同一休市日排除），輸出 `valuation/pe-river-{tw,us}.json`。封存只有 2021 年起，個股頁另併 Yahoo 較早週線，因此兩者分位可能略有差異，篩選說明與檔案 `basis` 都明示。封存 checkout 或計算失敗時保留上次部署的檔案，兩個步驟都有 id 並列入部分失敗通知。
+
+沒有河流（歷史不足、外國發行人、幣別不符）或沒有目前本益比（虧損、EPS 趨近零、無近期 EPS）的股票一律不入選；檔案載入中或無法取得時顯示明確狀態，不顯示未篩選結果，套用鍵在範圍無效或資料不可用時停用。已存自選清單（瀏覽器與每日 collector）同樣讀取此檔，缺檔時沿用既有「保留上次清單」行為。
+
+實測：完整 Vitest 161 檔全部通過（新增 9 項單元測試）、lint、typecheck、build 通過；桌機／手機 Chromium 30 項瀏覽器回歸（含新 3 項）通過，本機未安裝 WebKit，交由 CI。以真實財報與封存抽樣（2330.TW、2317.TW、1101.TW、AAPL、NVDA）驗證腳本輸出；全市場執行時間待 CI 實測。
+
 ## PR #230 合入 #236 後的部分失敗通知整合（2026-11-07）
 
 一般 merge 最新 main `63f4236aa`，merge commit `788be46ff` 保留兩個 parent；REVIEW_PACKAGE 的文件衝突保留雙方紀錄，沒有 rebase 或 force-push。只做 primary self-review，沒有獨立簽核。
