@@ -106,3 +106,9 @@ python -u scripts/scan_market_closures.py \
 測試結果與桌機／390px／375px 圖片見 [REVIEW_PACKAGE](../atlas/REVIEW_PACKAGE.md)。自動化 WebKit 是模擬環境，沒有實體 iPhone 驗證或獨立審核簽章。
 
 </details>
+
+## 2026-11-07 官方核對與刪列後的證據保留
+
+[官方雙交易所佐證](research-verification/official-market-days-20261107.json) 已確認 2022-02-04、2023-01-18、2024-10-31、2026-07-10 均無當日行情。verified-market-closures 新增四日的 `official-no-quotes` 與兩個精確日期端點／狀態／SHA。Python／前端嚴格驗證，不能用錯誤、HTML、不同日期或裸 marker 關市；成交證據優先及未知量保護仍保留。新的[缺漏報告](research-verification/official-repair-market-gaps-20261107.json) 中 TW 只剩 2021-04-06、2025-08-01。
+
+10/23 的原臨時休市證據持續保留，包括實體假列已移除、觀測為零的情況；有新未知量的觀測不藉種子當成零量。前端投影 cache 換 v6，日週月都先投影再聚合。指定修補與逐位元組恢復使用獨立、預設 dry-run 的[維護工具](ARCHIVE_OFFICIAL_REPAIR.md)；本 PR 不直接改正式封存。

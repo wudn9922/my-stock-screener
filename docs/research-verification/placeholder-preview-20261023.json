@@ -9,7 +9,7 @@
   "differenceFraction": 0.0,
   "guardPassed": true,
   "nonmatchingRowsPreserved": 0,
-  "note": "Read-only inventory only. No removal, metadata update, workflow dispatch or remote write occurred. Not a replacement for the pending repair/restore implementation.",
+  "note": "Historical initial read-only inventory, superseded by the completed repair tool and its full removal dry-run. No production removal occurred.",
   "selectionInventorySha256": "dffbd8360365612adbbb4c51ea8817b67c05d07b85a99d366f97242cc13d2091",
   "sampleSymbols": [
     "00400A.TW",
@@ -17,5 +17,7 @@
     "00402A.TW",
     "00403A.TW",
     "00404A.TW"
-  ]
+  ],
+  "historical": true,
+  "supersededBy": "official-placeholder-removal-dry-run-20261107.json"
 }

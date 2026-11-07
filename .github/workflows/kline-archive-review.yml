@@ -6,6 +6,7 @@ on:
       - 'scripts/*kline_archive*.py'
       - 'scripts/kline_instruments.py'
       - 'scripts/archive_tpex_index.py'
+      - 'scripts/official_tw_quotes.py'
       - 'scripts/refresh_archive_instruments.py'
       - 'config/kline-archive-instruments.json'
       - 'scripts/build_universe_full.py'
@@ -50,7 +51,7 @@ jobs:
         with:
           ref: kline-archive
           path: .cache/kline-archive
-          fetch-depth: 2
+          fetch-depth: 3
       - name: Validate every live archive CSV and the latest commit transition
         if: steps.remote.outputs.exists == 'true'
         run: |

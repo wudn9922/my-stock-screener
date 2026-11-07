@@ -1,0 +1,536 @@
+{
+  "version": 1,
+  "mode": "backfill",
+  "apply": true,
+  "archiveCommit": "62bd86a6e7fcde3572c56aa607eed5018a0cfe68",
+  "generatedAt": "2026-11-07T13:04:52.361858+00:00",
+  "status": "applied-locally",
+  "validationBefore": {
+    "files": 41573,
+    "rows": 9796080,
+    "totalBytes": 520080778,
+    "csvBytes": 489025679
+  },
+  "noTradePolicy": "skip all zero-volume or missing-OHLC observations",
+  "indexVolumePolicy": "unknown: MI_5MINS_HIST publishes OHLC only",
+  "days": [
+    {
+      "date": "2021-04-06",
+      "addedSymbols": 1727,
+      "adjustedSymbols": 661,
+      "existingSymbols": 1,
+      "excludedOfficialSymbolsNotInArchive": 3881,
+      "comparisonSessions": [
+        "2021-03-31",
+        "2021-04-01",
+        "2021-04-07",
+        "2021-04-08"
+      ],
+      "skippedByReason": {
+        "no-official-observation": 441,
+        "insufficient-comparison-data": 34,
+        "official-no-trade-or-missing-ohlc": 9,
+        "unstable-price-basis": 11
+      }
+    },
+    {
+      "date": "2025-08-01",
+      "addedSymbols": 1783,
+      "adjustedSymbols": 216,
+      "existingSymbols": 193,
+      "excludedOfficialSymbolsNotInArchive": 5071,
+      "comparisonSessions": [
+        "2025-07-30",
+        "2025-07-31",
+        "2025-08-04",
+        "2025-08-05"
+      ],
+      "skippedByReason": {
+        "no-official-observation": 147,
+        "insufficient-comparison-data": 64,
+        "unstable-price-basis": 14,
+        "official-no-trade-or-missing-ohlc": 22
+      }
+    }
+  ],
+  "officialDayAudit": {
+    "checkedAt": "2026-11-07T13:08:04.398490+00:00",
+    "closed": [
+      {
+        "date": "2022-02-04",
+        "reasons": [
+          "official-no-quotes"
+        ],
+        "officialEvidence": [
+          {
+            "exchange": "twse",
+            "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20220204&type=ALLBUT0999",
+            "httpAttempts": [],
+            "bytes": 71,
+            "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+            "stat": "很抱歉，沒有符合條件的資料!",
+            "responseDate": null,
+            "quoteRows": 0
+          },
+          {
+            "exchange": "tpex",
+            "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=111%2F02%2F04&id=&response=json",
+            "httpAttempts": [],
+            "bytes": 1630,
+            "sha256": "3043d74dc00e516a8326fe120f5ff489a8f19cb9dd5890f2b57320623dc323b0",
+            "stat": "ok",
+            "responseDate": "20220204",
+            "quoteRows": 0
+          }
+        ]
+      },
+      {
+        "date": "2023-01-18",
+        "reasons": [
+          "official-no-quotes"
+        ],
+        "officialEvidence": [
+          {
+            "exchange": "twse",
+            "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20230118&type=ALLBUT0999",
+            "httpAttempts": [],
+            "bytes": 71,
+            "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+            "stat": "很抱歉，沒有符合條件的資料!",
+            "responseDate": null,
+            "quoteRows": 0
+          },
+          {
+            "exchange": "tpex",
+            "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=112%2F01%2F18&id=&response=json",
+            "httpAttempts": [],
+            "bytes": 1630,
+            "sha256": "1e733b3ac94c2cf5180ed4c50b2cc5a8d75db4c887f590034b7f3bddd3350bc9",
+            "stat": "ok",
+            "responseDate": "20230118",
+            "quoteRows": 0
+          }
+        ]
+      },
+      {
+        "date": "2024-10-31",
+        "reasons": [
+          "official-no-quotes"
+        ],
+        "officialEvidence": [
+          {
+            "exchange": "twse",
+            "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20241031&type=ALLBUT0999",
+            "httpAttempts": [],
+            "bytes": 71,
+            "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+            "stat": "很抱歉，沒有符合條件的資料!",
+            "responseDate": null,
+            "quoteRows": 0
+          },
+          {
+            "exchange": "tpex",
+            "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=113%2F10%2F31&id=&response=json",
+            "httpAttempts": [],
+            "bytes": 1630,
+            "sha256": "ea53127c7c0cc77cbbf443ac716f5cc1185264ad2f21974e519b2fbc1fdf8d33",
+            "stat": "ok",
+            "responseDate": "20241031",
+            "quoteRows": 0
+          }
+        ]
+      },
+      {
+        "date": "2026-07-10",
+        "reasons": [
+          "official-no-quotes"
+        ],
+        "officialEvidence": [
+          {
+            "exchange": "twse",
+            "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20260710&type=ALLBUT0999",
+            "httpAttempts": [],
+            "bytes": 71,
+            "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+            "stat": "很抱歉，沒有符合條件的資料!",
+            "responseDate": null,
+            "quoteRows": 0
+          },
+          {
+            "exchange": "tpex",
+            "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=115%2F07%2F10&id=&response=json",
+            "httpAttempts": [],
+            "bytes": 1630,
+            "sha256": "dbe663baef40aedfd8a73857f8b71e8ef7b86cd46138d8637dfbe87345e87b5b",
+            "stat": "ok",
+            "responseDate": "20260710",
+            "quoteRows": 0
+          }
+        ]
+      }
+    ],
+    "opened": []
+  },
+  "officialSources": [
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20220204&type=ALLBUT0999",
+      "httpAttempts": [],
+      "bytes": 71,
+      "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+      "stat": "很抱歉，沒有符合條件的資料!",
+      "responseDate": null
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=111%2F02%2F04&id=&response=json",
+      "httpAttempts": [],
+      "bytes": 1630,
+      "sha256": "3043d74dc00e516a8326fe120f5ff489a8f19cb9dd5890f2b57320623dc323b0",
+      "stat": "ok",
+      "responseDate": "20220204"
+    },
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20230118&type=ALLBUT0999",
+      "httpAttempts": [],
+      "bytes": 71,
+      "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+      "stat": "很抱歉，沒有符合條件的資料!",
+      "responseDate": null
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=112%2F01%2F18&id=&response=json",
+      "httpAttempts": [],
+      "bytes": 1630,
+      "sha256": "1e733b3ac94c2cf5180ed4c50b2cc5a8d75db4c887f590034b7f3bddd3350bc9",
+      "stat": "ok",
+      "responseDate": "20230118"
+    },
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20241031&type=ALLBUT0999",
+      "httpAttempts": [],
+      "bytes": 71,
+      "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+      "stat": "很抱歉，沒有符合條件的資料!",
+      "responseDate": null
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=113%2F10%2F31&id=&response=json",
+      "httpAttempts": [],
+      "bytes": 1630,
+      "sha256": "ea53127c7c0cc77cbbf443ac716f5cc1185264ad2f21974e519b2fbc1fdf8d33",
+      "stat": "ok",
+      "responseDate": "20241031"
+    },
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20260710&type=ALLBUT0999",
+      "httpAttempts": [],
+      "bytes": 71,
+      "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+      "stat": "很抱歉，沒有符合條件的資料!",
+      "responseDate": null
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=115%2F07%2F10&id=&response=json",
+      "httpAttempts": [],
+      "bytes": 1630,
+      "sha256": "dbe663baef40aedfd8a73857f8b71e8ef7b86cd46138d8637dfbe87345e87b5b",
+      "stat": "ok",
+      "responseDate": "20260710"
+    },
+    {
+      "exchange": "twii",
+      "url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20210401&response=json",
+      "httpAttempts": [],
+      "bytes": 1371,
+      "sha256": "f51ef6b4a2509742cbec6c034ed939c8254ce0d3e602d3c1526a1ab32bb07f53",
+      "stat": "OK",
+      "responseDate": "20210401"
+    },
+    {
+      "exchange": "twii",
+      "url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20210301&response=json",
+      "httpAttempts": [],
+      "bytes": 1557,
+      "sha256": "efbd3f164e633704da89b0eb5d3a39f448b665c7e4999d74d00cc2b9059eba5e",
+      "stat": "OK",
+      "responseDate": "20210301"
+    },
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20210406&type=ALLBUT0999",
+      "httpAttempts": [],
+      "bytes": 194892,
+      "sha256": "f4ec7155f5bad446b256c0022e179e2bbd2681faf77b2bb049096d5e46b42f2d",
+      "stat": "OK",
+      "responseDate": "20210406"
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=110%2F04%2F06&id=&response=json",
+      "httpAttempts": [],
+      "bytes": 1046959,
+      "sha256": "4b870604e82b18007e5509686690623c859588644a198fc5f58e90716be13c27",
+      "stat": "ok",
+      "responseDate": "20210406"
+    },
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20210331&type=ALLBUT0999",
+      "httpAttempts": [],
+      "bytes": 194623,
+      "sha256": "5a4e2cdafa15fbc82dfa1a8cc7767ca3e565c558fc872bbcc34ce081a79d2e5b",
+      "stat": "OK",
+      "responseDate": "20210331"
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=110%2F03%2F31&id=&response=json",
+      "httpAttempts": [],
+      "bytes": 1057655,
+      "sha256": "0ade8e9826a57e24625b5c12bd2a4ab62379a49a4ab29ac7adde0b039c5c8fe4",
+      "stat": "ok",
+      "responseDate": "20210331"
+    },
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20210401&type=ALLBUT0999",
+      "httpAttempts": [],
+      "bytes": 194070,
+      "sha256": "dcb1fd6c92ca5afd5cd96f72ef191ca3b6ff994f87938cec44027c226ca6f17f",
+      "stat": "OK",
+      "responseDate": "20210401"
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=110%2F04%2F01&id=&response=json",
+      "httpAttempts": [],
+      "bytes": 1047062,
+      "sha256": "f284ffc200b245935fefcabeb5b764e4ec5759ba7ed89de4c2f39dd6be72b415",
+      "stat": "ok",
+      "responseDate": "20210401"
+    },
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20210407&type=ALLBUT0999",
+      "httpAttempts": [],
+      "bytes": 194398,
+      "sha256": "8478dfec89b32c09fced34c17add6bfb389194f60ca18d10fab13ed0db3c124e",
+      "stat": "OK",
+      "responseDate": "20210407"
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=110%2F04%2F07&id=&response=json",
+      "httpAttempts": [],
+      "bytes": 1060412,
+      "sha256": "a97d9b8b528d7147db85f5cb5246d19a2c8bf2a914a2400bc8a73e1ea722aebb",
+      "stat": "ok",
+      "responseDate": "20210407"
+    },
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20210408&type=ALLBUT0999",
+      "httpAttempts": [
+        {
+          "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20210408&type=ALLBUT0999",
+          "httpStatus": 200
+        }
+      ],
+      "bytes": 194576,
+      "sha256": "c1ea4931fc68f36b72097ee64fc36c9fef8d4b23ee0f69fece8ad65b78058bc5",
+      "stat": "OK",
+      "responseDate": "20210408"
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=110%2F04%2F08&id=&response=json",
+      "httpAttempts": [
+        {
+          "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=110%2F04%2F08&id=&response=json",
+          "httpStatus": 200
+        }
+      ],
+      "bytes": 1073703,
+      "sha256": "47b8b84d030a1df7c2dcd05ee82770797e4af43d425dc421081527c0b085460b",
+      "stat": "ok",
+      "responseDate": "20210408"
+    },
+    {
+      "exchange": "twii",
+      "url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20250801&response=json",
+      "httpAttempts": [
+        {
+          "url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20250801&response=json",
+          "httpStatus": 200
+        }
+      ],
+      "bytes": 1495,
+      "sha256": "0bbeb87eafc4e2736292b97535403a4d78d0b72af483545621ff6a7cb82bdf12",
+      "stat": "OK",
+      "responseDate": "20250801"
+    },
+    {
+      "exchange": "twii",
+      "url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20250701&response=json",
+      "httpAttempts": [
+        {
+          "url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20250701&response=json",
+          "httpStatus": 200
+        }
+      ],
+      "bytes": 1619,
+      "sha256": "e55b5fbed1e38d3a08f62a355667fdaf667473519d2e15ccfea97254590732d1",
+      "stat": "OK",
+      "responseDate": "20250701"
+    },
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20250801&type=ALLBUT0999",
+      "httpAttempts": [],
+      "bytes": 232851,
+      "sha256": "d566b0b806ccbbdb07fbf098311d6921cc12da72100d55f0f787287630ed0647",
+      "stat": "OK",
+      "responseDate": "20250801"
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=114%2F08%2F01&id=&response=json",
+      "httpAttempts": [],
+      "bytes": 1709215,
+      "sha256": "4299a701e753282ec50a53c1bc387cbe2ef710a853dc029a322bfd8ba4454c3d",
+      "stat": "ok",
+      "responseDate": "20250801"
+    },
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=20250730&type=ALLBUT0999&response=json",
+      "httpAttempts": [
+        {
+          "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20250730&type=ALLBUT0999",
+          "httpStatus": 307
+        },
+        {
+          "url": "https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=20250730&type=ALLBUT0999&response=json",
+          "httpStatus": 200
+        }
+      ],
+      "bytes": 231235,
+      "sha256": "455a338d739c0d1ca5164269e6de41760bd6854c84851e6ee8a583c474476ecb",
+      "stat": "OK",
+      "responseDate": "20250730"
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=114%2F07%2F30&id=&response=json",
+      "httpAttempts": [
+        {
+          "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=114%2F07%2F30&id=&response=json",
+          "httpStatus": 200
+        }
+      ],
+      "bytes": 1700063,
+      "sha256": "ce76bbf884ab0ab390a0cb3cfcdfb78675e6e362901f20ee8aa3d8bfd543d454",
+      "stat": "ok",
+      "responseDate": "20250730"
+    },
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20250731&type=ALLBUT0999",
+      "httpAttempts": [
+        {
+          "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20250731&type=ALLBUT0999",
+          "httpStatus": 200
+        }
+      ],
+      "bytes": 233580,
+      "sha256": "2bd013b356a5e1dd7918185806466947524e6fe15f7eda71712a1a31f6a26286",
+      "stat": "OK",
+      "responseDate": "20250731"
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=114%2F07%2F31&id=&response=json",
+      "httpAttempts": [
+        {
+          "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=114%2F07%2F31&id=&response=json",
+          "httpStatus": 200
+        }
+      ],
+      "bytes": 1711163,
+      "sha256": "8ea690f332347a5be10b6c61004d178e4f91ebb1921a0ae4a52a6f95cb4a37a9",
+      "stat": "ok",
+      "responseDate": "20250731"
+    },
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20250804&type=ALLBUT0999",
+      "httpAttempts": [
+        {
+          "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20250804&type=ALLBUT0999",
+          "httpStatus": 200
+        }
+      ],
+      "bytes": 232991,
+      "sha256": "6e5599055e9f142fbf6c5a09287f86486f7962a9b047ee79d8b4872abf358936",
+      "stat": "OK",
+      "responseDate": "20250804"
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=114%2F08%2F04&id=&response=json",
+      "httpAttempts": [
+        {
+          "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=114%2F08%2F04&id=&response=json",
+          "httpStatus": 200
+        }
+      ],
+      "bytes": 1709157,
+      "sha256": "a698cbae0e5444b8557f64c790d87071d0c157d5b7e3308860b832a37b048299",
+      "stat": "ok",
+      "responseDate": "20250804"
+    },
+    {
+      "exchange": "twse",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20250805&type=ALLBUT0999",
+      "httpAttempts": [
+        {
+          "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20250805&type=ALLBUT0999",
+          "httpStatus": 200
+        }
+      ],
+      "bytes": 232552,
+      "sha256": "5c282d398c29be1b0c33763536b425a5da0c4fb2f9190401a3403652a1e5725b",
+      "stat": "OK",
+      "responseDate": "20250805"
+    },
+    {
+      "exchange": "tpex",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=114%2F08%2F05&id=&response=json",
+      "httpAttempts": [
+        {
+          "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=114%2F08%2F05&id=&response=json",
+          "httpStatus": 200
+        }
+      ],
+      "bytes": 1706347,
+      "sha256": "8005044a7377a03db5314d24ce31af82557e32607054da50e5232d1a86a15563",
+      "stat": "ok",
+      "responseDate": "20250805"
+    }
+  ],
+  "validationAfter": {
+    "files": 41573,
+    "rows": 9799590,
+    "totalBytes": 523518677,
+    "csvBytes": 489203750
+  },
+  "detailsReport": "official-backfill-dry-run-20261107.json",
+  "rehearsalOnly": true
+}

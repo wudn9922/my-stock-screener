@@ -101,12 +101,18 @@
     }
   ],
   "prerequisite": {
-    "pr": 230,
-    "url": "https://github.com/wudn9922/my-stock-screener/pull/230",
-    "observedState": "OPEN",
-    "mergedAt": null,
-    "mainAtStart": "22ffc817f",
-    "status": "Archive implementation/integration awaits baseline decision; no archive data written."
+    "initialObservation": {
+      "pr": 230,
+      "url": "https://github.com/wudn9922/my-stock-screener/pull/230",
+      "observedState": "OPEN",
+      "mergedAt": null,
+      "mainAtStart": "22ffc817f",
+      "status": "Archive implementation/integration awaits baseline decision; no archive data written."
+    },
+    "resolved": true,
+    "mergedMain": "0f42fef0b",
+    "integrationCommit": "cdd648d7f",
+    "method": "ordinary merge of latest main after #230 merged; no separate incorporation of #230"
   },
   "verifiedEndpoints": [
     {

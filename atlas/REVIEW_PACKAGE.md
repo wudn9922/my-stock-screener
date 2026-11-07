@@ -1,3 +1,15 @@
+## PR #240 官方封存修補、完整還原及休市佐證（2026-11-07）
+
+一般 merge 已合併 #230 的 main `0f42fef0b`，merge commit `cdd648d7f`；沒有另納入 #230 分支、rebase 或 force-push。只有 primary self-review，沒有獨立簽核。只推程式與證據 PR，沒有正式 archive 寫入、dispatch、合併或部署。
+
+官方 MI_INDEX／TPEx dailyQuotes／MI_5MINS_HIST 依日期與欄位解析，四個最近官方交易日的 archive/official 比值檢查後才補缺列；不覆寫既有列。零量／缺價統一跳過，指數無量保留未知。CSV／index／manifest／backfilled audit 沿既有 writer，factor 與比較入稽核。TW 10/23 指定零量平盤用固定2214±1%保護；先 staged驗證、完整備份/fsync，再搬入。恢復先驗Git原件blob及整tree；原歷史驗證只增加全部內容精確回到指定刪除Git parent的窄例外，美股／其他日期不能借新reason刪除。
+
+四個官方空行情日加入嚴格雙來源seed並從缺漏名單移除；交易證據否決、未知量保護保留。10/23刪列後仍有已查核證據，前端投影cache v6、raw cache不改。日週月聚合與實體刪列前後資料序列相同。新增workflow預設dry-run/read權限；備份artifact成功後，apply=true才可用獨立write job精確tip驗證再非force推送。#236跨event取代修正與新producer故障／取消備援均覆蓋。
+
+實測：完整Python1,982 passed＋168 subtests；修補專項21項、獨立壓力案例1項通過（apply161.493秒、verify92.126秒，原300秒限制）。完整Vitest159檔／2,029項、lint、build、actionlint通過；一輪並行重負載的SEC舊案例5秒timeout，等重負載結束後以單worker完整通過，未改timeout／斷言或新增skip。桌機／390px Chromium／iPhone WebKit15項及375px兩引擎10項，共25項瀏覽器通過；為模擬裝置。21次取消按當時存在run回放0通知。
+
+固定完整快照41,573年檔／9,796,080列，唯讀dry-run前後verifier通過。無remote完整副本新增3,510列、刪2,214列、還原2,214列；4,430個檔案與刪前內容tree逐位元組一致，Git tree均為 `f1a5b15680b895346066bf0d4f2e2577da574b9d`。原快照保持乾淨。[操作與端點](../docs/ARCHIVE_OFFICIAL_REPAIR.md)、[驗證總表](../docs/research-verification/official-archive-repair-verification-20261107.json)、[全量演練](../docs/research-verification/official-repair-rehearsal-summary-20261107.json)。原始演練恢復檔另打包留在工作區，不能當作正式dispatch的恢復artifact。
+
 ## PR #230 合入 #236 後的部分失敗通知整合（2026-11-07）
 
 一般 merge 最新 main `63f4236aa`，merge commit `788be46ff` 保留兩個 parent；REVIEW_PACKAGE 的文件衝突保留雙方紀錄，沒有 rebase 或 force-push。只做 primary self-review，沒有獨立簽核。

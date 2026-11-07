@@ -206,7 +206,7 @@ def main(argv=None):
         write_report(args.cache_policy,report)
     if args.frontend_seed:
         seed=dict(version=1,threshold=CLOSURE_SHARE,archiveCommit=report['scan']['archiveCommit'],
-                  markets={m:dict(closedSessions=[r for r in v['closedSessions'] if r['affectedRows']],
+                  markets={m:dict(closedSessions=[r for r in v['closedSessions'] if r['affectedRows'] or r.get('officialEvidence') or r['date'] == '2026-10-23'],
                                   missingSessions=v['missingSessions']) for m,v in report['markets'].items()})
         write_report(args.frontend_seed,seed)
     if args.missing_out:

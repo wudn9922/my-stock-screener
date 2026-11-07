@@ -14,6 +14,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from official_tw_quotes import valid_closure_proof
 
 UNKNOWN_VOLUME_DATES = "atlas_unknown_volume_dates"
 CLOSED_DATES = "atlas_market_closed_dates"
@@ -47,6 +48,19 @@ def _emergency_proof(row, min_symbols=2):
             and row.get('positiveVolumeSymbols', 0) < TRADING_SYMBOLS
             and row.get('positiveVolumeSymbols', 0) < count * TRADING_SHARE)
 
+
+
+def verified_closures(market):
+    """Reviewed official empty quotes and the retained #230 emergency proof."""
+    try:
+        path = Path(__file__).resolve().parents[1] / 'atlas/src/market-data/verified-market-closures.json'
+        seed = json.loads(path.read_text())
+        if seed.get('version') != 1 or seed.get('threshold') != CLOSURE_SHARE:
+            return {}
+        return {row['date']: row for row in seed['markets'].get(market, {}).get('closedSessions', [])
+                if market == 'tw' and valid_closure_proof(row) or _emergency_proof(row)}
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
 
 def cohort_statistics(frames):
     """Count valid OHLC observations, not ETFs/indices added to a stock universe.
@@ -92,6 +106,16 @@ def classify_closures(stats, primary=None, known=(), min_symbols=2, *, trading=(
     if primary:
         candidates = pd.bdate_range(primary['firstDate'], primary['lastDate'])
         stats = stats.reindex(stats.index.union(candidates)).sort_index().fillna(0)
+    market = (market or ('tw' if (primary or {}).get('symbol') == '^TWII' else 'us' if primary else '')).lower()
+    bounds = [d.strftime('%Y-%m-%d') for d in stats.index] + list(known)
+    seed = verified_closures(market)
+    if bounds:
+        seed = {day: row for day, row in seed.items() if min(bounds) <= day <= max(bounds)
+                and (valid_closure_proof(row) or pd.Timestamp(day) not in stats.index
+                     or stats.loc[pd.Timestamp(day)].get('unknownVolume', 0) == 0)}
+    else:
+        seed = {}
+    known = {**(dict(known) if isinstance(known, dict) else {d: {} for d in known}), **seed}
     extra = set(known) | set(official or {})
     if extra:
         stats = stats.reindex(stats.index.union(pd.to_datetime(sorted(extra)))).sort_index().fillna(0)
@@ -120,6 +144,7 @@ def classify_closures(stats, primary=None, known=(), min_symbols=2, *, trading=(
         is_session = date in calendar if calendar is not None else None
         flat_cohort = count >= min_symbols and count >= reference.loc[day] * .5 and flat >= eligible * CLOSURE_SHARE
         old_proof = _emergency_proof(known.get(date), min_symbols) if isinstance(known, dict) else False
+        official_closed = market == 'tw' and valid_closure_proof(known.get(date, {})) and not (official or {}).get(date)
         emergency = index_absent and (flat_cohort or old_proof) and not (official or {}).get(date)
         if date in traded:
             if index_missing and reviews is not None and count and (positive >= TRADING_SYMBOLS or positive / count >= TRADING_SHARE):
@@ -131,11 +156,14 @@ def classify_closures(stats, primary=None, known=(), min_symbols=2, *, trading=(
                                      calendarSession=True, primaryIndexMissing=True,
                                      observedSymbols=count, officialSources=list((official or {}).get(date, ())))
             continue
-        if is_session is True and not emergency:
+        if is_session is True and not emergency and not official_closed:
             if missing is not None and (index_absent or date in known):
                 missing[date] = dict(date=date, reason='missing-session-data', calendar=CALENDARS[market],
                                      calendarSession=True, primaryIndexMissing=index_absent,
                                      observedSymbols=count, officialSources=list((official or {}).get(date, ())))
+            continue
+        if official_closed:
+            records[date] = dict(known[date])
             continue
         reasons = []
         if pd.Timestamp(day).dayofweek >= 5:
@@ -231,11 +259,12 @@ def read_policy(path):
         result = {}
         for market in ('tw', 'us'):
             part = value['markets'].get(market, {})
-            veto = {g['date'] for g in [*part.get('indexGapsWithTrading', []), *part.get('missingSessions', [])]}
+            traded = {g['date'] for g in part.get('indexGapsWithTrading', [])}
+            veto = {g['date'] for g in part.get('missingSessions', [])}
             rows = part.get('closedSessions', [])
             days = exchange_sessions(market, min(r['date'] for r in rows), max(r['date'] for r in rows)) if rows else ()
-            result[market] = {r['date']: r for r in rows if r['date'] not in veto
-                              and (r['date'] not in days or _emergency_proof(r))}
+            result[market] = {r['date']: r for r in rows if r['date'] not in traded and (r['date'] not in veto or market == 'tw' and valid_closure_proof(r))
+                              and (r['date'] not in days or _emergency_proof(r) or market == 'tw' and valid_closure_proof(r))}
         return result
     except (OSError, ValueError, TypeError, KeyError, AttributeError, ImportError, RuntimeError):
         return {}
@@ -299,7 +328,7 @@ def analysis_prices(frame, excluded_dates):
 
 def market_prices(frames, primary=None, known=(), *, market=None, official=None):
     """Return projected market histories and the dates needed for custom-stock views."""
-    if frames and primary is None and not known and all(f is not None and f.attrs.get(PROJECTED) for f in frames.values()):
+    if frames and primary is None and not known and all(f is not None and f.attrs.get(PROJECTED) == 'official-closures-v1' for f in frames.values()):
         return frames, frozenset(d for f in frames.values() for d in f.attrs.get(CLOSED_DATES, ()))
     evidence = {}
     excluded = non_trading_dates(frames, primary, known, market=market,official=official,evidence=evidence)
@@ -316,7 +345,7 @@ def market_prices(frames, primary=None, known=(), *, market=None, official=None)
         # Ordinary calendar holidays can be rechecked. Keep only the exceptional
         # emergency proof, so downstream projections do not need the removed rows.
         view.attrs[CLOSURE_EVIDENCE] = {day:row for day,row in evidence.items() if row.get('calendarSession') is True}
-        view.attrs[PROJECTED] = True
+        view.attrs[PROJECTED] = 'official-closures-v1'
         view.attrs[REMOVED_WEEKENDS] = tuple(sorted(set(frame.attrs.get(REMOVED_WEEKENDS,())) |
             set(frame.index[frame.index.dayofweek >= 5].strftime('%Y-%m-%d'))))
         projected[symbol] = view

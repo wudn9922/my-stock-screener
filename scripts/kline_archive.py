@@ -2,7 +2,8 @@
 
 Only this module writes archive CSVs. Daily imports append; backfill inserts missing
 dates with an audit event; a cache-proven adjustment may replace matching dates.
-All existing dates and unlisted symbols survive every operation.
+Ordinary imports retain all existing dates and unlisted symbols. The explicit TW
+2026-10-23 repair and its exact Git-parent restoration are narrowly audited exceptions.
 """
 import argparse
 import csv
@@ -448,14 +449,25 @@ class _AdjustmentBatch:
         add_events(self.root, self.events)
 
 
-def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at=None, _audit=None, _conflicts=None):
-    """Plan first; all writes retain the union of existing dates. No deletion API exists."""
+@contextmanager
+def backfill_batch(root):
+    """Keep the existing per-year audit schema, flushing its journal once per repair."""
+    conflicts, events = _ConflictBatch(root), []
+    try:
+        yield conflicts, events
+    finally:
+        add_events(root, events)
+        conflicts.commit()
+
+
+def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at=None, _audit=None, _conflicts=None, source_url=None, provenance=None, _events=None):
+    """Plan first; this import path always retains the union of existing dates."""
     # Standalone imports also batch all disagreements, rather than doing JSON IO
     # for every row. Transport imports share one batch across the whole payload.
     if _conflicts is None:
         batch = _ConflictBatch(root)
         try:
-            return put_symbol(root, symbol, incoming, mode, correction, fetched_at, _audit, batch)
+            return put_symbol(root, symbol, incoming, mode, correction, fetched_at, _audit, batch, source_url, provenance, _events)
         finally:
             batch.commit()
     if mode not in ("daily", "backfill"):
@@ -531,13 +543,18 @@ def put_symbol(root, symbol, incoming, mode="daily", correction=None, fetched_at
             record = dict(symbol=symbol, date=min(past_insertions[year]), status="backfilled",
                           old={"sha256": digest(path.read_bytes())} if path.exists() else None,
                           new={"path": path.relative_to(root).as_posix(), "sha256": digest(planned[path].encode()), "rowsAdded": len(past_insertions[year])},
-                          sourceUrl="https://query1.finance.yahoo.com/v8/finance/chart/" + symbol,
+                          sourceUrl=source_url or "https://query1.finance.yahoo.com/v8/finance/chart/" + symbol,
                           fetchedAt=fetched_at, reason="kline-archive/backfill-year")
+            if provenance is not None:
+                record['officialBasis'] = provenance
             record.update(id=digest(json.dumps(record, sort_keys=True).encode()), loggedAt=ki.utcnow())
             events.append(record)
         if _audit is not None:
             _audit.record(path, symbol, adjustment_event)
-    add_events(root, events)
+    if _events is None:
+        add_events(root, events)
+    else:
+        _events.extend(events)
     for path, content in planned.items():
         atomic(path, content)
     return counts
@@ -585,6 +602,149 @@ def remove_closed_session(root, market, day):
         atomic(path, content)
     update_manifest(root)
     return {"market": market, "date": day, "removed": len(events)}
+
+
+VERIFIED_PLACEHOLDER_DAY = '2026-10-23'
+VERIFIED_PLACEHOLDER_REASON = 'kline-archive/verified-placeholder-20261023'
+
+
+def placeholder_plan(root, expected=2214):
+    """Select only TW 10/23 zero-volume flat bars. No previous-close assumption."""
+    root, selected, preserved = Path(root), [], []
+    for path in sorted((root / 'tw').glob('*/2026.csv')):
+        rows = read_rows(path, strict=True)
+        target = next((r for r in rows if r[0] == VERIFIED_PLACEHOLDER_DAY), None)
+        if target is None:
+            continue
+        if target[5] != '0' or len(set(target[1:5])) != 1:
+            preserved.append(path.parent.name)
+            continue
+        if len(rows) == 1:
+            raise ValueError('Placeholder removal would empty an annual file')
+        selected.append(dict(symbol=path.parent.name, ohlcv=list(target),
+                             path=path.relative_to(root).as_posix(), beforeSha256=digest(path.read_bytes())))
+    return dict(date=VERIFIED_PLACEHOLDER_DAY, market='TW', expected=expected, actual=len(selected),
+                guardPassed=abs(len(selected)-expected) * 100 <= expected,
+                preserved=preserved, rows=selected)
+
+
+def remove_verified_placeholders(root, plan, rebuild_manifest=True):
+    """Repair-only writer, used on an isolated staging checkout before backup/promotion."""
+    if not plan['guardPassed'] or not plan['rows']:
+        raise ValueError('Placeholder count differs from the #230 scan by more than 1%')
+    root, planned, events = Path(root), {}, []
+    for item in plan['rows']:
+        relative = f"tw/{item['symbol']}/2026.csv"
+        if market_of(item['symbol']) != 'tw' or item['path'] != relative:
+            raise ValueError('Invalid placeholder path')
+        path = root / relative
+        if digest(path.read_bytes()) != item['beforeSha256']:
+            raise ValueError('Archive changed after placeholder selection')
+        rows = read_rows(path, strict=True)
+        target = normalize(item['ohlcv'])
+        if (target[0] != VERIFIED_PLACEHOLDER_DAY or target[5] != '0' or len(set(target[1:5])) != 1
+                or target not in rows):
+            raise ValueError('Invalid placeholder selection')
+        kept = [r for r in rows if r[0] != VERIFIED_PLACEHOLDER_DAY]
+        if not kept:
+            raise ValueError('Placeholder removal would empty an annual file')
+        content = csv_text(kept)
+        planned[path] = content
+        record = dict(symbol=item['symbol'], date=VERIFIED_PLACEHOLDER_DAY, status='removed',
+            old={'sha256': item['beforeSha256']},
+            new=dict(path=relative, sha256=digest(content.encode()), rowsRemoved=1),
+            reason=VERIFIED_PLACEHOLDER_REASON, backupFile='removed-placeholders-20261023.json')
+        record.update(id=digest(json.dumps(record, sort_keys=True).encode()), loggedAt=ki.utcnow())
+        events.append(record)
+    add_events(root, events)
+    for path, content in planned.items():
+        atomic(path, content)
+    if rebuild_manifest:
+        update_manifest(root)
+
+
+def replace_repair_images(root, images, expected):
+    """Promote/restore exact UTF-8 file images after checking every precondition first."""
+    root = Path(root).resolve()
+    for name, body in images.items():
+        path = root / name
+        if (path.resolve() != path or not path.is_relative_to(root) or not path.is_file()
+                or not (name in (LOG, 'manifest.json') or re.fullmatch(r'tw/[^/]+/2026\.csv', name)
+                        or re.fullmatch(r'index/tw/[^/]+\.json', name))):
+            raise ValueError('Unsafe repair image path')
+        if digest(path.read_bytes()) not in expected[name]:
+            raise ValueError('Archive changed since backup/preparation: ' + name)
+        body.decode('utf-8')
+    for name, body in images.items():
+        path = root / name
+        # Binary atomic writes preserve original newline/Unicode/formatting bytes.
+        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+            temp = Path(stream.name)
+            try:
+                stream.write(body)
+                stream.flush()
+                os.fsync(stream.fileno())
+            except BaseException:
+                temp.unlink(missing_ok=True)
+                raise
+        temp.replace(path)
+
+
+def _verified_placeholder_restoration(root, base):
+    """Only an exact complete undo of the immediately preceding scoped removal.
+
+    Its immutable Git parent independently witnesses every restored byte. Ordinary
+    history rewrites still fail; metadata-only changes cannot authorize an undo.
+    """
+    try:
+        parent = _git(root, 'rev-parse', base + '^').strip()
+        before = json.loads(_git(root, 'show', f'{parent}:{LOG}'))
+        after = json.loads(_git(root, 'show', f'{base}:{LOG}'))
+        prior = {e['id']: e for e in before['events']}
+        retained = {e['id']: e for e in after['events']}
+        if any(retained.get(key) != value for key, value in prior.items()):
+            return False
+        added = [e for e in after['events'] if e['id'] not in prior]
+        if not added or any(e.get('reason') != VERIFIED_PLACEHOLDER_REASON or e.get('status') != 'removed'
+                            or e.get('date') != VERIFIED_PLACEHOLDER_DAY for e in added):
+            return False
+        trees = []
+        for revision in (parent, base):
+            tree = {}
+            for item in _git(root, 'ls-tree', '-rz', revision).split('\0'):
+                if item:
+                    metadata, name = item.split('\t', 1)
+                    if metadata.split()[1] != 'blob':
+                        return False
+                    tree[name] = metadata.split()[2]
+            trees.append(tree)
+        original, removed_tree = trees
+        entries, allowed = {}, {LOG, 'manifest.json'}
+        for record in added:
+            name = record['new']['path']
+            if name != f"tw/{record['symbol']}/2026.csv" or market_of(record['symbol']) != 'tw':
+                return False
+            entries['before:' + name], entries['after:' + name] = original[name], removed_tree[name]
+            allowed.update((name, 'index/' + instrument_url_path(record['symbol']) + '.json'))
+        with _baseline_blobs(root, entries) as read:
+            for record in added:
+                name = record['new']['path']
+                rows, old_hash = read('before:' + name)
+                _, new_hash = read('after:' + name)
+                removed = [r for r in rows if r[0] == VERIFIED_PLACEHOLDER_DAY]
+                if (len(removed) != 1 or removed[0][5] != '0' or len(set(removed[0][1:5])) != 1
+                        or digest(csv_text([r for r in rows if r[0] != VERIFIED_PLACEHOLDER_DAY]).encode()) != new_hash
+                        or old_hash != record['old']['sha256'] or new_hash != record['new']['sha256']):
+                    return False
+        if not set(_git(root, 'diff', '--name-only', parent, base).splitlines()) <= allowed:
+            return False
+        files = {p.relative_to(root).as_posix(): p for p in Path(root).rglob('*')
+                 if p.is_file() and '.git' not in p.relative_to(root).parts}
+        object_format = _git(root, 'rev-parse', '--show-object-format')
+        return (files.keys() == original.keys()
+                and all(_blob_hash(path.read_bytes(), object_format) == original[name] for name, path in files.items()))
+    except (ValueError, KeyError, OSError, subprocess.CalledProcessError):
+        return False
 
 
 INDEX_README = """## Per-symbol indexes (v1)
@@ -1090,6 +1250,8 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
         old_ids = {e["id"]: e for e in old_log["events"]}
         new_ids = {e["id"]: e for e in log["events"]}
         if any(new_ids.get(key) != value for key, value in old_ids.items()):
+            if _verified_placeholder_restoration(root, base):
+                return verify(root, summary=summary, refresh_manifest=refresh_manifest)
             raise ValueError("Correction history was removed or rewritten")
         audit = [e for e in log["events"] if e["id"] not in old_ids]
         for name in old_tree:
@@ -1102,7 +1264,9 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
             if ((e["status"] == "backfilled" and e.get("reason") == "kline-archive/backfill-year")
                     or (e["status"] == "corrected" and str(e.get("reason", "")).startswith("kline-archive/adjustment-year:"))):
                 file_audit.setdefault(e["new"]["path"], []).append(e)
-            elif e["status"] == "removed" and e.get("reason") == CLOSED_SESSION_REASON:
+            elif e["status"] == "removed" and (e.get("reason") == CLOSED_SESSION_REASON
+                    or e.get("reason") == VERIFIED_PLACEHOLDER_REASON and e.get('date') == VERIFIED_PLACEHOLDER_DAY
+                    and re.fullmatch(r'tw/[^/]+/2026\.csv', e['new']['path'])):
                 removals.setdefault(e["new"]["path"], []).append(e)
     needed = {name: old_tree[name] for names in changed.values() for name in names if name in old_tree}
     needed.update({old_last[symbol]: old_tree[old_last[symbol]] for symbol in changed if symbol in old_last})
@@ -1139,8 +1303,12 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
             for day in missing:
                 index = ordered.index(day)
                 previous = old[ordered[index - 1]][4] if index else None
-                if day not in removed or not (old[day][1] == old[day][2] == old[day][3] == old[day][4] == (previous or old[day][4])
-                                              and old[day][5] == "0"):
+                specifically_verified = (day == VERIFIED_PLACEHOLDER_DAY and name.startswith('tw/')
+                    and any(e.get('reason') == VERIFIED_PLACEHOLDER_REASON and e['date'] == day
+                            and e['old']['sha256'] == old_hash and e['new']['sha256'] == current[name]['sha256']
+                            for e in removals.get(name, [])))
+                flat = old[day][1] == old[day][2] == old[day][3] == old[day][4] and old[day][5] == '0'
+                if day not in removed or not flat or not (specifically_verified or old[day][4] == (previous or old[day][4])):
                     raise ValueError(f"Archive dates deleted: {symbol}")
             # Journal union ordering can differ for events with the same
             # clock timestamp. Follow exact hash edges, never log order.

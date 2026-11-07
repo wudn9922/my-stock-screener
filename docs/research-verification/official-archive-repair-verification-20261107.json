@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-07T13:59:23.043837+00:00",
+  "scope": "Final implementation; official source dry-runs and full local replica only. No production archive write, merge, deployment or workflow dispatch.",
+  "integration": {
+    "main": "0f42fef0b",
+    "mergeCommit": "cdd648d7f",
+    "method": "ordinary merge after #230 merged; no separate incorporation/rebase/force-push"
+  },
+  "python": {
+    "command": "KLINE_CORRECTIONS_LOG=... venv/bin/python -m pytest -q tests",
+    "passed": 1982,
+    "existingConditionalSkipped": 1,
+    "subtestsPassed": 168,
+    "seconds": 273.51,
+    "finalRepairSpecificTests": 21,
+    "conditionalPerformanceSeparateRun": {
+      "status": "passed",
+      "tests": 1,
+      "symbols": 7000,
+      "files": 21000,
+      "rows": 3661000,
+      "verificationSeconds": 92.126,
+      "applySeconds": 161.493,
+      "conflicts": 2240000,
+      "conflictBytes": 6874398,
+      "dailyPublishSeconds": 268.746,
+      "baselineBatchProcesses": 1
+    }
+  },
+  "atlas": {
+    "command": "npm test -- --maxWorkers=1; npm run lint; npm run build",
+    "files": 159,
+    "tests": 2029,
+    "lint": "passed",
+    "build": "passed",
+    "unchangedSecTestTimeoutMs": 5000,
+    "resourceNote": "One concurrent-load rerun timed out in an existing SEC fixture. Final full run used one worker after other CPU-heavy work ended; no assertions/timeouts/skips changed."
+  },
+  "browsers": {
+    "desktopMobileIPhoneWebKit": 15,
+    "chromium375AndWebKit375": 10,
+    "status": "passed",
+    "note": "Real installed Playwright engines with extracted runtime libraries; host package lookup bypassed, no browser test skips. Emulated devices, not physical iPhones."
+  },
+  "actionlint": {
+    "version": "1.7.12",
+    "scope": "all repository workflows",
+    "status": "passed"
+  },
+  "cancellation": {
+    "runs": 21,
+    "cutoff": "run.updated_at cancellation completion; no future candidates",
+    "notifications": 0
+  },
+  "dryRuns": {
+    "archiveCommit": "62bd86a6e7fcde3572c56aa607eed5018a0cfe68",
+    "snapshotValidation": {
+      "files": 41573,
+      "rows": 9796080,
+      "totalBytes": 520080778,
+      "csvBytes": 489025679
+    },
+    "sourceUnchanged": true,
+    "days": [
+      {
+        "date": "2021-04-06",
+        "addedSymbols": 1727,
+        "adjustedSymbols": 661,
+        "existingSymbols": 1,
+        "skippedByReason": {
+          "no-official-observation": 441,
+          "insufficient-comparison-data": 34,
+          "official-no-trade-or-missing-ohlc": 9,
+          "unstable-price-basis": 11
+        }
+      },
+      {
+        "date": "2025-08-01",
+        "addedSymbols": 1783,
+        "adjustedSymbols": 216,
+        "existingSymbols": 193,
+        "skippedByReason": {
+          "no-official-observation": 147,
+          "insufficient-comparison-data": 64,
+          "unstable-price-basis": 14,
+          "official-no-trade-or-missing-ohlc": 22
+        }
+      }
+    ],
+    "placeholderRows": 2214,
+    "expected": 2214,
+    "differenceFraction": 0,
+    "fourOfficialClosureDates": [
+      "2022-02-04",
+      "2023-01-18",
+      "2024-10-31",
+      "2026-07-10"
+    ],
+    "remainingTwGaps": [
+      "2021-04-06",
+      "2025-08-01"
+    ]
+  },
+  "fullLocalRehearsal": {
+    "scope": "local full replica; no remotes, no workflow dispatch, no production write",
+    "sourceCommit": "62bd86a6e7fcde3572c56aa607eed5018a0cfe68",
+    "sourceTree": "660ee9fb8749deea94eeab7d97b06db842c3ccae",
+    "steps": [
+      {
+        "mode": "backfill",
+        "report": "official-repair-rehearsal-backfill-20261107.json",
+        "validationBefore": {
+          "files": 41573,
+          "rows": 9796080,
+          "totalBytes": 520080778,
+          "csvBytes": 489025679
+        },
+        "validationAfter": {
+          "files": 41573,
+          "rows": 9799590,
+          "totalBytes": 523518677,
+          "csvBytes": 489203750
+        }
+      },
+      {
+        "mode": "remove-placeholders",
+        "report": "official-repair-rehearsal-remove-placeholders-20261107.json",
+        "validationBefore": {
+          "files": 41573,
+          "rows": 9799590,
+          "totalBytes": 523518677,
+          "csvBytes": 489203750
+        },
+        "validationAfter": {
+          "files": 41573,
+          "rows": 9797376,
+          "totalBytes": 524517858,
+          "csvBytes": 489102440
+        }
+      },
+      {
+        "mode": "restore",
+        "report": "official-repair-rehearsal-restore-20261107.json",
+        "validationBefore": {
+          "files": 41573,
+          "rows": 9797376,
+          "totalBytes": 524517858,
+          "csvBytes": 489102440
+        },
+        "validationAfter": {
+          "files": 41573,
+          "rows": 9799590,
+          "totalBytes": 523518677,
+          "csvBytes": 489203750
+        }
+      }
+    ],
+    "addedRows": 3510,
+    "removalRows": 2214,
+    "backupSha256": "4a335c6e5ec152ea5eec14ad6cb43831a42a64e30876f262b483cad25a65b464",
+    "backupBytes": 16715910,
+    "beforeRemovalTree": "f1a5b15680b895346066bf0d4f2e2577da574b9d",
+    "afterRemovalTree": "16efdce9a8589e2a4798facb3e2d5aa3dbe620a4",
+    "restoredTree": "f1a5b15680b895346066bf0d4f2e2577da574b9d",
+    "byteExactFullTree": true,
+    "sourceStillClean": true,
+    "replicaHasNoRemotes": true,
+    "finalBackupValidator": {
+      "restoredRows": 2214,
+      "restoredFiles": 4430,
+      "byteExact": true
+    },
+    "immutableGitWitnessVerified": true
+  },
+  "evidenceBundle": {
+    "path": "/workspace/official-archive-repair-rehearsal-evidence.tar.gz",
+    "bytes": 12137793,
+    "sha256": "dc9f3db4b253d3b1cee8ace8cfb81f1f86d879c57482a33fa49c9d86a7518857",
+    "scope": "Rehearsal recovery data only; not a production recovery artifact"
+  },
+  "implementationSha256": {
+    "scripts/official_tw_quotes.py": "9c258cc8f51d2af140c1065cebbbb454530dcd1ae5e74fe3358d74ccfdfb47c0",
+    "scripts/repair_kline_archive.py": "6f3e8348dcb3cbe0bbdc73fa94675a339f6d965845849509bbd85af3bd932498",
+    "scripts/kline_archive.py": "f82a718a356e561a0a9063fbdf8a10586d0b020ae858bdbe4503c78da4bc5caf",
+    "scripts/market_sessions.py": "0dd5362e92083e843c3c1891d87ba3d5d08326e09c0fd217a1b06c381a56d972",
+    "scripts/scan_market_closures.py": "d48e9ad8b446d1ba785256c58fc46e6346890782a2b46e362db3b361f4a0ca6d",
+    ".github/actions/notify-failure/run_policy.py": "8bd7d8036ab8b9c7179056bdedb43e0ae4824b127e0395216ff43e7838b1adaf",
+    ".github/workflows/kline-archive-official-repair.yml": "24be5b69cc210ba8e6cf9720985afd5f82e9b701da61baf3e0ca895d3b4ec3a2",
+    ".github/workflows/kline-archive-review.yml": "eda8d572196a66345abeb84bb8ad2497e55da9e03c1c0e8cb2425b8f63a9c44d",
+    ".github/workflows/failure-notice-fallback.yml": "1ffe856410e5622fddb3f4f4806e9cd1075f1c0904228fbddcdeffaf9681b6ee",
+    "atlas/src/market-data/MarketClosures.ts": "54de74422f29eec0e0bc44ca827b0f712f539a91bb33ea6df9206ce317c3fe30",
+    "atlas/src/market-data/ArchiveFirstProvider.ts": "50bafe31ca525b6056d5b1150d359be164c4a45961540f726b8df4d7d717fa50",
+    "atlas/src/market-data/verified-market-closures.json": "a3ab36a4fb8547fae9fa1a85a12ef208aebb98a7384d10669222a4c539c6843b"
+  },
+  "review": "Primary self-review only; no independent sign-off."
+}
