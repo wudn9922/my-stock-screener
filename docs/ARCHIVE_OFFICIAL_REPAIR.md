@@ -27,3 +27,9 @@
 - 正式資料 apply。維護者審查後自行執行；本次不直接操作正式資料。
 
 基準因子應明確定義為 archive.close / official.close，四個鄰近日都須有官方與封存資料；資料不足或比值不穩定跳過。OHLC 乘因子、成交量除因子。停牌、缺價 `--`、無成交統一跳過，報告原因；不猜價格或填造平盤。
+
+## 已完成部分的本機驗證
+
+[驗證報告](research-verification/archive-repair-prerequisite-checks-20261107.json)：Python 全套 pytest 1,941 passed、168 subtests passed；其中既有需額外啟用的壓力測試已另以 `KLINE_ARCHIVE_PERFORMANCE=1` 跑過，1 passed。7,000 檔、21,000 年檔、224 萬筆衝突，apply 149.940 秒、verify 76.129 秒，均低於原 300 秒門檻。該測試只向臨時目錄內的 bare Git remote 寫入。
+
+取消策略 14 tests passed；Vitest 158 files／2,017 tests passed；lint、build、diff check 通過。固定正式封存快照的唯讀驗證（含 HEAD^ 轉換）通過：41,573 年檔、9,796,080 列，含 global 市場；驗證前後快照 git status 乾淨。尚未進行修補，這不是修補後驗證。
