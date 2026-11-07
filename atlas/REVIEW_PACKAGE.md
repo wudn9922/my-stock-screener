@@ -1,3 +1,17 @@
+## 清單上一檔／下一檔與主要頁面保留狀態（2026-11-07）
+
+只做 primary self-review，沒有獨立簽核。分支 `claude/list-nav-page-state` 從最新 main 建立，只推 PR、不合併或部署。
+
+**清單脈絡**：選股結果（含連續圖表）、名單變化、自選行情與圖表、清單追蹤結果／新入選／出榜、突破訊號組別、題材與產業成分股、世界指數、原物料／匯率、債券 ETF、持股開啟個股時，傳入「目前顯示順序（篩選、排序後全部，不只虛擬化可見列）＋清單名稱」。脈絡只存在本次頁面記憶體（`src/app/listContext.ts`），history state 只放不透明鍵；URL 仍是 `page=chart&symbol=…`，重新整理或分享連結沒有脈絡、不推測。圖表（K線／價量／研究）與財務頁顯示「‹ 上一檔｜第 N／M 檔 · 名稱｜下一檔 ›」，保留目前週期與分頁，首尾停用；桌機 `[`／`]`（輸入框、textarea、contenteditable 內不作用）；手機只在清單列水平滑動，不碰圖表畫布。切換以 replace 更新紀錄，瀏覽器返回直接回清單。搜尋開啟沒有清單列。
+
+**主要頁面保留**：自選、我的、市場三分頁、選股首次造訪後保持掛載（`src/app/KeptPage.tsx`）。隱藏頁渲染在脫離 document 的容器，因此沒有重複 id／標籤／測試選擇器，也不暴露給輔助技術；殼層不再重新渲染隱藏頁，依賴其他 store 的請求以 `useWhileActive` 凍結到返回時。即時報價訂閱、MEXC 計時與自動同步、突破訊號 focus 重新整理、對話框焦點陷阱與 Escape、頁尾說明 portal 都依 `usePageActive()` 停止；返回時依原有新鮮度規則（報價 20 秒重用、MEXC 5 分鐘）處理。內層捲動（選股清單等）與 `<main>` 捲動按頁記錄、同一檢視才還原；同頁換市場／群組／檢視仍回頂端。底部導覽重新開啟各頁最後路由（與原 `lastMarketSection` 合併為 `src/app/routeMemory.ts`；題材詳情仍不重開）。在目前頁再點一次：路由非預設時回到預設（清條件、預設群組或清單總覽，重新掛載該頁、回頂端、replace URL）；已是預設只回頂端。不刪任何自選清單、策略或雲端設定。
+
+**測試修改**：`screener-filters.spec.ts` 原「temporary filters reset across groups, markets and fresh visits…」改名並改為新規則：群組／市場切換仍清條件、新造訪與重新整理以 URL 為準、經導覽離開再回來保留、再點選股重設；舊偏好仍不還原。新增 `e2e-site/list-navigation.spec.ts` 5 項（順序與首尾停用、週期／價量分頁保留、鍵盤或滑動、財務頁與搜尋、篩選＋捲動經返回與導覽保留後重設、自選清單保留後回總覽、隱藏期間以 Playwright clock 快轉逾 4 分鐘並觸發 focus／visibility，無資料請求與輪詢），單元測試 `tests/list-navigation.test.ts` 7 項。
+
+**實測**：npm ci；完整 Vitest 161 檔／2,044 項、lint、typecheck、production build 通過。整套 e2e-site 於桌機＋手機 Chromium 754 項：745 通過、4 skipped、5 失敗；失敗為 `site.spec.ts` 兩項（預設首頁為自選而非大盤，兩專案共 4 項）與手機 `workspace-refinements` 標頭高度 124.30 > 124，三者在未修改的 main 原始碼上以相同方式失敗，與本次無關、未修改。rebase 到最新 main 後重跑相關 172 項（新增 spec、選股全部、控制台、自選、圖表、導覽、休市）全部通過。
+
+**限制**：清單脈絡是開啟當下的快照，之後清單內容變動不回寫；切到不在清單內的股票時隱藏清單列。隱藏頁若遇帳號切換等全站事件，只在返回時重新讀取。iPhone WebKit 本機未安裝，交由 CI；Playwright 為模擬裝置，非實機。[手機清單列](docs/screenshots/list-nav/chart-list-bar-375-mobile-chromium.png)。
+
 ## PR #240 修訂：根目錄匯入與保守三日比較（2026-11-07）
 
 只更新原PR，沒有合併PR、dispatch、部署或寫正式archive。一般merge main `6e279a94bf`（#241），merge commit `aaeb4e0318`；REVIEW_PACKAGE前置段落衝突保留雙方紀錄，沒有rebase／force-push。只有primary self-review，沒有獨立簽核。
