@@ -1,4 +1,5 @@
 import { LineChart } from 'lucide-react';
+import { chartList } from '../../app/listContext';
 import type { RatesEtf } from '../../report/rates';
 import type { PageProps } from '../../pages/pageProps';
 import { RATES_COLORS } from './TimeChart';
@@ -68,7 +69,7 @@ export function EtfCompareCard({ etfs, openChart }: { etfs: readonly RatesEtf[] 
                         type="button"
                         className="icon-button"
                         aria-label={`開啟 ${etf.symbol} 圖表`}
-                        onClick={() => openChart({ symbol: etf.symbol, name: etf.name, tf: '1D' })}
+                        onClick={() => openChart({ symbol: etf.symbol, name: etf.name, tf: '1D', list: chartList('債券 ETF 比較', etfs) })}
                       >
                         <LineChart size={16} />
                       </button>

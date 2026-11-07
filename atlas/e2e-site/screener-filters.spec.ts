@@ -5,7 +5,7 @@ import { buildReport, mockSite, screenerFixtures } from './mocks';
 // Set SCREENSHOT_DIR to keep a picture of the sheet (used for manual visual checks, not by CI).
 const shotDir = process.env.SCREENSHOT_DIR;
 
-test('temporary filters reset across groups, markets and fresh visits without restoring legacy preferences', async ({ page }) => {
+test('temporary filters reset across groups and markets, start from the URL on fresh visits, survive a nav round trip and reset on a repeated nav tap', async ({ page }) => {
   await mockDeviceAccount(page);
   const key = accountPreference('atlas-screener-filters-v1');
   const legacy = JSON.stringify({ TW: 'vol:999999999', US: 'vol:888888888' });
@@ -29,10 +29,34 @@ test('temporary filters reset across groups, markets and fresh visits without re
   await sheet.getByRole('textbox', { name: '自訂20日平均成交量下限（股）' }).fill('100000');
   await sheet.getByRole('button', { name: /^套用/ }).click();
   await expect(chips).toBeVisible();
+  // Leaving for another page and coming back through the bottom bar keeps the market, filters and URL.
   const nav = page.getByRole('navigation', { name: '主要頁面' }).filter({ visible: true });
   await nav.getByRole('button', { name: '市場', exact: true }).click();
+  await expect(page.locator('.site')).toHaveAttribute('data-page', 'markets');
+  await expect(chips).toHaveCount(0);
   await nav.getByRole('button', { name: '選股', exact: true }).click();
   await expect(page.locator('.screener-row').first()).toBeVisible();
+  await expect(chips).toBeVisible();
+  await expect(chips.getByRole('button', { name: /移除條件/ })).toHaveCount(1);
+  expect(new URL(page.url()).searchParams.get('group')).toBe('universe-us');
+  expect(new URL(page.url()).searchParams.get('f')).toBe('vol:100000');
+  // Tapping 選股 again while filtered returns to the page default: no filters, the default group, a clean URL.
+  await nav.getByRole('button', { name: '選股', exact: true }).click();
+  await expect(chips).toHaveCount(0);
+  await expect(page.locator('.screener-row').first()).toBeVisible();
+  expect(new URL(page.url()).searchParams.get('f')).toBeNull();
+  expect(new URL(page.url()).searchParams.get('group')).toBeNull();
+  // A fresh visit never restores the legacy per-market preference; a reload starts from its URL.
+  await page.goto('./?page=screener&group=universe-tw');
+  await expect(page.locator('.screener-row').first()).toBeVisible();
+  await expect(chips).toHaveCount(0);
+  await page.goto('./?page=screener&group=universe-tw&f=vol:1000000');
+  await expect(chips).toBeVisible();
+  await page.reload();
+  await expect(chips).toBeVisible();
+  expect(new URL(page.url()).searchParams.get('f')).toBe('vol:1000000');
+  // Within the screener, switching group still resets the temporary conditions.
+  await page.getByRole('button', { name: '美股全市場篩選', exact: true }).click();
   await expect(chips).toHaveCount(0);
   expect(new URL(page.url()).searchParams.get('f')).toBeNull();
   expect(await page.evaluate(key => localStorage.getItem(key), key)).toBe(legacy);

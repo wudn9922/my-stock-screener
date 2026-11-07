@@ -1,18 +1,21 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { usePageActive } from '../app/pageActivity';
+
+type ConsoleDialogProps = { title: string; busy?: boolean; onClose: () => void; children: ReactNode };
+
+/** A dialog of a kept page that is not on screen closes; it opens again when the page returns. */
+export function ConsoleDialog(props: ConsoleDialogProps) {
+  return usePageActive() ? <OpenConsoleDialog {...props} /> : null;
+}
 
 /** Native modal supplies focus trapping, background isolation and focus restoration. */
-export function ConsoleDialog({
+function OpenConsoleDialog({
   title,
   busy = false,
   onClose,
   children,
-}: {
-  title: string;
-  busy?: boolean;
-  onClose: () => void;
-  children: ReactNode;
-}) {
+}: ConsoleDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   useEffect(() => {

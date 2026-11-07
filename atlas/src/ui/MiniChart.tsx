@@ -20,6 +20,7 @@ import { sma } from '../indicators/MovingAverage';
 import { indicatorColors } from '../indicators/IndicatorRegistry';
 import './mini-chart-controls.css';
 import { miniChartStart } from './miniChartRange';
+import { usePageActive } from '../app/pageActivity';
 
 const VISIBLE_BARS = 130;
 const NO_MAS: readonly number[] = [];
@@ -85,6 +86,8 @@ export function MiniChart({
   live?: boolean;
 }) {
   const { ref, near, visible } = useNearViewport<HTMLDivElement>();
+  // A hidden kept page takes no part in the live refresh.
+  const pageActive = usePageActive();
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const viewRef = useRef<{ symbol: string; range: LogicalRange | null } | null>(null);
@@ -151,7 +154,7 @@ export function MiniChart({
     };
   }, [near, symbol, maKey, interactive, initialMonths]);
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !pageActive) return;
     return liveQuotes().subscribe(symbol, value => {
       recentRef.current = value;
       const current = barsRef.current;
@@ -164,7 +167,7 @@ export function MiniChart({
       if (merged?.splitMismatch) replaceSplitHistory();
       statusRef.current?.('ready', next);
     }, { minIntervalMs: live ? LIVE_INTERVAL_MS : 300_000 });
-  }, [visible, symbol, live]);
+  }, [visible, pageActive, symbol, live]);
   useEffect(() => {
     const host = hostRef.current;
     if (!host || !bars?.length) return;

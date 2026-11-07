@@ -5,6 +5,7 @@ import { parseNumber } from './import';
 import { formatDateTime } from '../ui/format';
 import { mexcKeyAgeNotice } from './mexcStatus';
 import { MexcFuturesPanel } from './MexcFuturesPanel';
+import { usePageActive } from '../app/pageActivity';
 
 interface Props {
   account: HoldingAccount;
@@ -30,10 +31,14 @@ export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel 
   const [tick, setTick] = useState(Date.now());
   const lastAttempt = useRef(0);
   const draftCosts = useRef(false);
+  // A hidden kept page runs no timers and no automatic sync; returning applies the same 5-minute rule.
+  const pageActive = usePageActive();
   useEffect(() => {
+    if (!pageActive) return;
+    setTick(Date.now());
     const timer = setInterval(() => setTick(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [pageActive]);
   const cooldown = Math.max(0, Math.ceil(((state.retryAt ? Date.parse(state.retryAt) : 0) - tick) / 1000));
   const blocked = disabled || busy || loading;
   const staleRevision = !!connection && connection.holdingRevision !== confirmed?.revision;
@@ -61,7 +66,7 @@ export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel 
     }
   };
   useEffect(() => {
-    if (!connection || disabled || keyForm || connection.needsReview) return;
+    if (!connection || disabled || keyForm || connection.needsReview || !pageActive) return;
     const sync = () => {
       if (
         document.visibilityState !== 'visible' ||
@@ -96,6 +101,7 @@ export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel 
     staleRevision,
     state.retryAt,
     store,
+    pageActive,
   ]);
   const validCosts =
     connection?.balances.every((balance) => {

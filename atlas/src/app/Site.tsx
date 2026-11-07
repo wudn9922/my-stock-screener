@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ChartCandlestick, LayoutDashboard, ListFilter, Search, Settings, Star, UserRound, X } from 'lucide-react';
 import { useRoute } from './useRoute';
 import type { Page, Route } from './routes';
@@ -19,8 +19,15 @@ import { StorageModeNotice } from '../ui/StorageAdminPanel';
 import { LegacyImportCard } from '../ui/LegacyImportCard';
 import { RouteBoundary } from './RouteBoundary';
 import { DisplaySettings } from '../ui/DisplaySettings';
-import { INITIAL_MARKET_SECTIONS, MarketSectionNav, marketSectionOf, rememberMarketSection, type MarketSectionRoutes } from '../ui/MarketSectionNav';
+import { MarketSectionNav, marketSectionOf } from '../ui/MarketSectionNav';
 import { WORLD_ASSETS, worldAssetFor } from '../market-data/worldAssets';
+import { KeptPage, scrollKeptPageToTop } from './KeptPage';
+import {
+  forgetDestination, INITIAL_ROUTE_MEMORY, isKeptPage, KEPT_PAGES, keptPagesOf, navDefault, navDestination, navPageOf,
+  rememberRoute, routeIsDefault, scrollIdentity, scrollSection, type KeptPage as KeptPageName, type NavPage,
+} from './routeMemory';
+import { chartListFor, listPosition, listState, rememberChartList, type ChartListContext, type ChartListItem } from './listContext';
+import { ListNavBar } from '../ui/ListNavBar';
 
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
@@ -38,7 +45,7 @@ const DEFAULT_PAGE: Page =
     ? 'chart'
     : import.meta.env?.VITE_DEFAULT_PAGE === 'markets' ? 'markets' : 'watchlist';
 
-const NAV: { page: Page; label: string; icon: typeof Star }[] = [
+const NAV: { page: NavPage; label: string; icon: typeof Star }[] = [
   { page: 'watchlist', label: '自選', icon: Star },
   { page: 'markets', label: '市場', icon: LayoutDashboard },
   { page: 'screener', label: '選股', icon: ListFilter },
@@ -57,8 +64,6 @@ const PAGE_TITLES: Record<Page, string> = {
 };
 const RATES_TITLE = '美債與利率';
 
-/** Existing detail pages light their parent primary section. */
-const navPageOf = (page: Page): Page => page === 'financials' ? 'chart' : page === 'world' || page === 'themes' ? 'markets' : page;
 const pageTitleOf = (route: Route) => route.page === 'world'
   ? route.view === 'jp-bonds' ? '日本國債利差' : route.view === 'commodities' ? '原物料' : route.view === 'fx' ? '匯率' : route.view === 'indices' ? PAGE_TITLES.world : RATES_TITLE
   : PAGE_TITLES[route.page];
@@ -75,6 +80,11 @@ export interface OpenChartOptions {
   tf?: Timeframe;
   /** Report metadata only; chart indicators are always chosen by the user. */
   maList?: readonly number[];
+  /**
+   * The full ordered list the stock was opened from (as displayed), so the chart offers previous/next. Kept in memory
+   * for this navigation only; search opens and reloads have none.
+   */
+  list?: ChartListContext;
 }
 
 function reportSymbols(report: Report | null): LocalSymbol[] {
@@ -89,15 +99,22 @@ function reportSymbols(report: Report | null): LocalSymbol[] {
 
 export function Site() {
   const mobile = useSyncExternalStore(subscribeMobile, () => mobileQuery.matches);
-  const { route, id: navId, source: navSource, navigate, syncRoute } = useRoute(DEFAULT_PAGE);
-  // 市場 remembers each section as it was left, and the bottom 「市場」 reopens the last section visited.
-  const marketMemory = useRef<MarketSectionRoutes>(INITIAL_MARKET_SECTIONS);
-  const lastMarketSection = useRef<Route>(INITIAL_MARKET_SECTIONS.markets);
+  const { route, id: navId, source: navSource, state: historyState, navigate, syncRoute } = useRoute(DEFAULT_PAGE);
+  // Each main page remembers the route it was left at (screener group/filters, watchlist, 市場 section); the bottom
+  // bar reopens it. 市場 also remembers every section as it was left.
+  const routeMemory = useRef(INITIAL_ROUTE_MEMORY);
+  routeMemory.current = rememberRoute(routeMemory.current, route);
   const marketSection = marketSectionOf(route);
-  if (marketSection) {
-    marketMemory.current = rememberMarketSection(marketMemory.current, route);
-    lastMarketSection.current = marketSection === 'themes' ? marketMemory.current.themes : route;
+  // Main pages stay mounted (detached from the document) after their first visit; a reset remounts one.
+  const visited = useRef(new Set<KeptPageName>());
+  const visits = useRef(new Map<KeptPageName, number>());
+  const lastPage = useRef<Page | null>(null);
+  if (isKeptPage(route.page)) {
+    visited.current.add(route.page);
+    if (lastPage.current !== route.page) visits.current.set(route.page, (visits.current.get(route.page) ?? 0) + 1);
   }
+  lastPage.current = route.page;
+  const [generations, setGenerations] = useState<Partial<Record<KeptPageName, number>>>({});
 
   // Builds without a published report (upstream Atlas) only fetch it when a report page opens.
   const { state: reportState, reload } = useReport(SCREENER_HOSTING || route.page !== 'chart');
@@ -122,21 +139,29 @@ export function Site() {
     pendingView.current = null;
     // Only a new navigation id issues a request; the route is read at that moment.
   }, [navId]);
-  // Each page starts at the top (the shell scrolls inside <main>).
+  // The shell scrolls inside <main>. Returning to a kept page puts back its scroll (same view only); any other page,
+  // and another market/group/view/symbol within a page, starts at the top.
+  const pageScrolls = useRef(new Map<Page, { identity: string; top: number }>());
+  const scrolled = useRef<{ page: Page; section: string; identity: string } | null>(null);
   useEffect(() => {
-    document.getElementById('main')?.scrollTo?.({ top: 0 });
-  }, [
-    route.page,
-    route.page === 'markets'
-      ? route.market
-      : route.page === 'screener'
-        ? route.group
-        : route.page === 'world'
-          ? route.view
-          : route.page === 'themes'
-            ? route.market
-            : route.page === 'chart' ? route.symbol : '',
-  ]);
+    const main = document.getElementById('main');
+    if (!main) return;
+    const record = () => {
+      const current = scrolled.current;
+      if (current) pageScrolls.current.set(current.page, { identity: current.identity, top: main.scrollTop });
+    };
+    main.addEventListener('scroll', record, { passive: true });
+    return () => main.removeEventListener('scroll', record);
+  }, []);
+  const section = scrollSection(route);
+  const identity = scrollIdentity(route);
+  useLayoutEffect(() => {
+    const previous = scrolled.current;
+    scrolled.current = { page: route.page, section, identity };
+    if (previous && previous.page === route.page && previous.section === section) return;
+    const saved = previous && previous.page !== route.page && isKeptPage(route.page) ? pageScrolls.current.get(route.page) : undefined;
+    document.getElementById('main')?.scrollTo?.({ top: saved?.identity === identity ? saved.top : 0 });
+  }, [route.page, section, identity]);
   useEffect(() => {
     const titles =
       route.page === 'chart' && route.symbol
@@ -162,8 +187,20 @@ export function Site() {
   const openChart = useCallback(
     (options: OpenChartOptions) => {
       setSearchOpen(false);
-      navigate({ page: 'chart', symbol: options.symbol, ...(options.tf ? { tf: options.tf } : {}) });
+      navigate({ page: 'chart', symbol: options.symbol, ...(options.tf ? { tf: options.tf } : {}) },
+        { state: options.list ? rememberChartList(options.list) : null });
     },
+    [navigate],
+  );
+  // The list a chart was opened from follows its chart/financials entries (history state, this page load only).
+  const onStockPage = route.page === 'chart' || route.page === 'financials';
+  const chartList = onStockPage ? chartListFor(historyState) : null;
+  const stockSymbol = onStockPage ? route.symbol : undefined;
+  const position = useMemo(() => listPosition(chartList, stockSymbol), [chartList, stockSymbol]);
+  /** Chart/financials navigations keep the list reference; any other destination drops it. */
+  const navigateStock = useCallback(
+    (next: Route, options: { replace?: boolean } = {}) =>
+      navigate(next, { ...options, state: next.page === 'chart' || next.page === 'financials' ? listState(window.history.state) : null }),
     [navigate],
   );
   const onSearchSelect = useCallback(
@@ -184,22 +221,86 @@ export function Site() {
   );
   const openFinancials = useCallback(
     (symbol: string, tf?: Timeframe) =>
-      navigate({ page: 'financials', symbol, ...(tf ? { tf } : {}), ...(periodMemory.current ? { p: periodMemory.current } : {}) }),
-    [navigate],
+      navigateStock({ page: 'financials', symbol, ...(tf ? { tf } : {}), ...(periodMemory.current ? { p: periodMemory.current } : {}) }),
+    [navigateStock],
   );
-  const go = (page: Page) => {
+  // Previous/next in the list: same timeframe, same K線／價量／研究 view (or the financials page); the entry is
+  // replaced so Back still returns to the list.
+  const stepList = useCallback((item: ChartListItem) => {
+    const state = listState(window.history.state);
+    if (route.page === 'financials')
+      navigate({ page: 'financials', symbol: item.symbol, ...(route.tf ? { tf: route.tf } : {}), ...(route.p ? { p: route.p } : {}) }, { replace: true, state });
+    else {
+      pendingView.current = stockView;
+      navigate({ page: 'chart', symbol: item.symbol, ...(route.page === 'chart' && route.tf ? { tf: route.tf } : {}) }, { replace: true, state });
+    }
+  }, [navigate, route, stockView]);
+  // `[` / `]` step through the list, except while typing.
+  useEffect(() => {
+    if (!position) return;
+    const key = (event: KeyboardEvent) => {
+      if ((event.key !== '[' && event.key !== ']') || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return;
+      const item = event.key === '[' ? position.previous : position.next;
+      if (!item) return;
+      event.preventDefault();
+      stepList(item);
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [position, stepList]);
+  const listNav = position && chartList ? <ListNavBar name={chartList.name} position={position} onStep={stepList} /> : null;
+
+  /**
+   * Tapping the current destination again: a page with a non-default route (filters, a group, an open list, another
+   * 市場 section) returns to its default and forgets its temporary view; otherwise it only scrolls to the top.
+   * Saved data (watchlists, strategies, cloud settings) is never touched.
+   */
+  const resetDestination = (nav: NavPage) => {
+    const main = document.getElementById('main');
+    if (nav === 'chart' || !isKeptPage(route.page) || routeIsDefault(route)) {
+      if (isKeptPage(route.page)) scrollKeptPageToTop(route.page);
+      main?.scrollTo?.({ top: 0 });
+      return;
+    }
+    // The default page remounts fresh; the destination's other pages (other 市場 sections) unmount until revisited.
+    const target = navDefault(nav);
+    const fresh = target.page as KeptPageName;
+    routeMemory.current = forgetDestination(routeMemory.current, nav);
+    for (const page of keptPagesOf(nav)) {
+      pageScrolls.current.delete(page);
+      if (page !== fresh) visited.current.delete(page);
+    }
+    setGenerations((previous) => ({ ...previous, [fresh]: (previous[fresh] ?? 0) + 1 }));
+    main?.scrollTo?.({ top: 0 });
+    navigate(target, { replace: true });
+  };
+  const go = (nav: NavPage) => {
     setSearchOpen(false);
-    // Already in that destination (市場 covers its sections).
-    if (page === route.page || (page === 'markets' && marketSection)) return;
+    if (navPageOf(route.page) === nav && (nav !== 'chart' || route.page === 'chart')) {
+      resetDestination(nav);
+      return;
+    }
     // Back from financials to the chart of the same symbol, with the timeframe it was opened with.
-    if (page === 'chart')
-      navigate(route.page === 'financials' && route.symbol ? { page: 'chart', symbol: route.symbol, ...(route.tf ? { tf: route.tf } : {}) } : { page: 'chart' });
-    else if (page === 'markets') navigate(lastMarketSection.current);
-    else navigate({ page } as Route);
+    if (nav === 'chart')
+      navigateStock(route.page === 'financials' && route.symbol ? { page: 'chart', symbol: route.symbol, ...(route.tf ? { tf: route.tf } : {}) } : { page: 'chart' });
+    else navigate(navDestination(routeMemory.current, nav));
   };
   const reportDate = report?.reportDate ?? null;
   const pageProps = { report: reportState, reload, navigate, openChart };
   const pageFallback = <PageState kind="loading" title="載入中…" />;
+  const keptContent = (shown: Route): ReactNode => {
+    switch (shown.page) {
+      case 'markets': return <MarketsPage {...pageProps} market={shown.market} />;
+      case 'world': return <WorldPage {...pageProps} view={shown.view} />;
+      case 'themes': return <ThemesPage {...pageProps} theme={shown.theme} market={shown.market} view={shown.v} />;
+      case 'screener': return <ScreenerPage {...pageProps} group={shown.group} f={shown.f} />;
+      case 'watchlist': return <ConsolePage {...pageProps} section="lists" list={shown.list} />;
+      case 'console': return <ConsolePage {...pageProps} section="settings" />;
+      default: return null;
+    }
+  };
 
   return (
     <div className={`site ${route.page === 'chart' ? 'on-chart' : ''}`} data-page={route.page}>
@@ -259,25 +360,32 @@ export function Site() {
         {/* Full account controls on 我的; elsewhere only an in-progress login or handoff shows. */}
         <div className="site-account-flow">{SCREENER_HOSTING && <StorageNotice variant={route.page === 'console' ? 'full' : 'alerts'} />}</div>
         {(route.page === 'markets' || route.page === 'world' || route.page === 'themes') &&
-          <MarketSectionNav active={marketSection!} routes={marketMemory.current} navigate={navigate} />}
-        <RouteBoundary key={route.page}>
-          <Suspense fallback={pageFallback}>
-            {route.page === 'markets' && <MarketsPage {...pageProps} market={route.market} />}
-            {route.page === 'world' && <WorldPage {...pageProps} view={route.view} />}
-            {route.page === 'themes' && <ThemesPage {...pageProps} theme={route.theme} market={route.market} view={route.v} />}
-            {route.page === 'screener' && <ScreenerPage {...pageProps} group={route.group} f={route.f} />}
-            {(route.page === 'console' || route.page === 'watchlist') && <ConsolePage {...pageProps} section={route.page === 'watchlist' ? 'lists' : 'settings'} list={route.page === 'watchlist' ? route.list : undefined} />}
-            {route.page === 'financials' && (
-              <FinancialsPage {...pageProps} symbol={route.symbol} p={route.p} tf={route.tf}
+          <MarketSectionNav active={marketSection!} routes={routeMemory.current.sections} navigate={navigate} />}
+        {KEPT_PAGES.filter((page) => visited.current.has(page)).map((page) => {
+          const shown = routeMemory.current.pages[page];
+          return shown && (
+            <KeptPage key={`${page}:${generations[page] ?? 0}`} page={page} active={route.page === page}>
+              <RouteBoundary resetKey={visits.current.get(page)}>
+                <Suspense fallback={pageFallback}>{keptContent(shown)}</Suspense>
+              </RouteBoundary>
+            </KeptPage>
+          );
+        })}
+        {route.page === 'financials' && (
+          <RouteBoundary key={route.page}>
+            {listNav && <div className="financials-list-nav">{listNav}</div>}
+            <Suspense fallback={pageFallback}>
+              <FinancialsPage {...pageProps} navigate={navigateStock} symbol={route.symbol} p={route.p} tf={route.tf}
                 onStockView={(view) => { pendingView.current = view; setStockView(view); }} />
-            )}
-          </Suspense>
-        </RouteBoundary>
+            </Suspense>
+          </RouteBoundary>
+        )}
         {chartVisited.current && (
           <div className="chart-page-host" hidden={route.page !== 'chart'}>
             <RouteBoundary>
               <Suspense fallback={route.page === 'chart' ? <PageState kind="loading" title="載入圖表工作台…" /> : null}>
               <ChartPage
+                listNav={route.page === 'chart' ? listNav : null}
                 active={route.page === 'chart'}
                 request={chartRequest}
                 onStateChange={onChartState}

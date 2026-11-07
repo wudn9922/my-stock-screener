@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { chartList } from '../app/listContext';
 import {
   fetchHistoryIndex,
   fetchScreenerSnapshot,
@@ -237,7 +238,7 @@ function Comparison({
                     <li className="analysis-comparison-row" key={row.symbol}>
                       <button
                         type="button"
-                        onClick={() => openChart({ symbol: row.symbol })}
+                        onClick={() => openChart({ symbol: row.symbol, list: chartList(`名單變化 · ${CHANGE_LABELS[kind]}`, result.rows.filter((entry) => entry.kind === kind)) })}
                       >
                         {row.symbol} {row.name}
                       </button>

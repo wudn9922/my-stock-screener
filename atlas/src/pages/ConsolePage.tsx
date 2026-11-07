@@ -36,6 +36,8 @@ import { getStorageContextKey } from '../auth/storage';
 import { useStockParameters } from '../cloud/useStockParameters';
 import { stockParameterMap } from '../cloud/stockParameters';
 import { loadPeRiverFile } from '../fundamentals/peRiverRank';
+import { useWhileActive } from '../app/pageActivity';
+import { chartList } from '../app/listContext';
 
 type CloudList = { id: string; definition: unknown; updated_at: string };
 
@@ -80,6 +82,9 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         selected.monitorBreakouts,
       ])
     : '';
+  // A hidden kept page does not sync or re-open lists; a change made meanwhile is handled once on return.
+  const syncKey = useWhileActive(settingsKey);
+  const syncCloud = useWhileActive(cloudAllowed);
   useEffect(() => {
     if (!selected) return;
     if (!cloudAllowed) {
@@ -109,11 +114,12 @@ export default function ConsolePage({ report, navigate, openChart, list: request
     return () => {
       active = false;
     };
-  }, [settingsKey, sync, cloudAllowed]);
+  }, [syncKey, sync, syncCloud]);
   useEffect(() => {
     setRenaming(selected?.name ?? '');
   }, [selected?.id, selected?.name]);
   const reportKey = report.status === 'ok' ? (report.report.generatedAt ?? report.report.reportDate) : report.status;
+  const openKey = useWhileActive(`${selected?.id ?? ''}|${reportKey}|${attempt}|${tab}`);
   useEffect(() => {
     if (!selected || tab !== 'lists') return;
     let active = true;
@@ -192,7 +198,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
       active = false;
     };
     // An opening is selected-id / explicit refresh / new report, never a storage-notification loop.
-  }, [selected?.id, reportKey, attempt, tab]);
+  }, [openKey]);
 
   const action = (fn: () => void) => {
     try {
@@ -506,6 +512,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                               openChart({
                                 symbol: entry.symbol,
                                 name: entry.name,
+                                list: chartList(selected.name, selected.history.at(-1)?.members.slice(0, 100) ?? []),
                               })
                             }
                           >
@@ -539,7 +546,8 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                     </div>
                   </div>
                   <WatchlistChanges key={`${activeVisit.list.id}:${activeVisit.previousDate}:${activeVisit.list.history.at(-1)?.date}`} visit={activeVisit} reasons={activeVisit.reasons}
-                    onOpen={entry => openChart({ symbol: entry.symbol, name: entry.name, maList: fixedParameters[entry.symbol] ?? selected.maList })} />
+                    onOpen={(entry, kind) => openChart({ symbol: entry.symbol, name: entry.name, maList: fixedParameters[entry.symbol] ?? selected.maList,
+                      list: chartList(`${selected.name} · ${kind === 'entered' ? '新入選' : '出榜'}`, activeVisit[kind]) })} />
                   <ul className="saved-member-list">
                     {activeVisit.members.slice(0, visibleCount).map((entry) => (
                       <li key={entry.symbol}>
@@ -552,6 +560,9 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                               name: entry.name,
                               tf: '1D',
                               maList: fixedParameters[entry.symbol] ?? selected.maList,
+                              list: chartList(selected.name, activeVisit.members.map((member) => ({
+                                symbol: member.symbol, name: member.name, maList: fixedParameters[member.symbol] ?? selected.maList,
+                              }))),
                             })
                           }
                         >

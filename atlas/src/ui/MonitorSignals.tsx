@@ -6,6 +6,8 @@ import { MiniChart } from './MiniChart';
 import type { OpenChartOptions } from '../app/Site';
 import { displayTicker, formatDateTime, formatPrice, formatRatio } from './format';
 import './monitorSignals.css';
+import { usePageActive } from '../app/pageActivity';
+import { chartList } from '../app/listContext';
 
 const sessionLabel = (sessions: MonitorSessions) => (['TW', 'US'] as const)
   .filter(market => sessions[market]).map(market => ` · ${market === 'TW' ? '台股' : '美股'} ${formatDateTime(sessions[market]!, false)}`).join('');
@@ -61,7 +63,8 @@ function GroupDetail({ group, onBack, openChart }: { group: MonitorGroup; onBack
       {([['all', '全部'], ['breakout_up', '突破'], ['breakout_down', '跌破']] as const).map(([value, label]) =>
         <button key={value} type="button" aria-pressed={direction === value} className={direction === value ? 'active' : ''} onClick={() => { setDirection(value); setLimit(20); }}>{label}</button>)}
     </div>
-    <div className="monitor-stock-list">{stocks.slice(0, limit).map(stock => <SignalStock key={stock.ticker} stock={stock} openChart={openChart} />)}</div>
+    <div className="monitor-stock-list">{stocks.slice(0, limit).map(stock => <SignalStock key={stock.ticker} stock={stock}
+      openChart={options => openChart({ ...options, list: chartList(group.name, stocks) })} />)}</div>
     {stocks.length > limit && <button ref={more} type="button" className="text-button" onClick={() => setLimit(value => value + 20)}>繼續載入圖表（{limit}／{stocks.length}）</button>}
     {!stocks.length && <p role="status">這個組別目前沒有此方向的已發送訊號。</p>}
   </section>;
@@ -78,13 +81,16 @@ function CloudSignals({ openChart }: { openChart: (options: OpenChartOptions) =>
     void fetchMonitorSignals(abort.signal).then(value => { if (!abort.signal.aborted) setResult(value); });
     return () => abort.abort();
   }, [attempt]);
+  // Refresh on returning to Atlas, at most once a minute while visible; a hidden kept page does not listen.
+  const pageActive = usePageActive();
+  const opened = useRef(Date.now());
   useEffect(() => {
-    // Refresh on returning to Atlas, at most once a minute while visible.
-    let last = Date.now();
-    const refresh = () => { if (document.visibilityState === 'visible' && Date.now() - last >= 60_000) { last = Date.now(); setAttempt(value => value + 1); } };
+    if (!pageActive) return;
+    let last = opened.current;
+    const refresh = () => { if (document.visibilityState === 'visible' && Date.now() - last >= 60_000) { last = opened.current = Date.now(); setAttempt(value => value + 1); } };
     document.addEventListener('visibilitychange', refresh); window.addEventListener('focus', refresh);
     return () => { document.removeEventListener('visibilitychange', refresh); window.removeEventListener('focus', refresh); };
-  }, []);
+  }, [pageActive]);
   const group = result?.status === 'ok' ? result.groups.find(group => group.key === selected) : undefined;
   return <section className="monitor-signals" aria-label="Discord 突破跌破監控">
     <div className="monitor-summary"><h3 ref={heading} tabIndex={-1}>突破／跌破</h3><button type="button" className="text-button" onClick={() => setAttempt(value => value + 1)}>重新整理</button></div>

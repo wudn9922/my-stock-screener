@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { chartList } from '../app/listContext';
 import type { PageProps } from '../pages/pageProps';
 import { accessState } from '../auth/access';
 import { ImportHoldings } from './ImportHoldings';
@@ -545,7 +546,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                     disabled={holding.market === 'CRYPTO' && holding.symbol !== 'BTC/USDT'}
                     onClick={() => {
                       if (holding.market === 'CRYPTO') navigate({ page: 'world', view: 'commodities' });
-                      else openChart({ symbol: holding.symbol });
+                      else openChart({ symbol: holding.symbol, list: chartList(`${selected.account.name} 持股`, rows.filter((row) => row.holding.market !== 'CRYPTO').map((row) => ({ symbol: row.holding.symbol }))) });
                     }}
                   >
                     {holding.symbol} {entry?.name ?? ''}

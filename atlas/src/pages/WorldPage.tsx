@@ -1,4 +1,5 @@
 import { PageFooterNote } from '../ui/PageFooterNote';
+import { chartList } from '../app/listContext';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
@@ -213,6 +214,7 @@ function WorldView({ report, openChart }: { report: Report } & Pick<PageProps, '
     });
     return sortRows(base, sort.key, sort.direction);
   }, [indices, loads, sort]);
+  const indexList = useMemo(() => chartList('世界指數', rows.map((row) => ({ symbol: row.index.symbol, name: row.name, maList: row.index.maList }))), [rows]);
   const windowReturns = useMemo(() => {
     const out: Record<string, number | null> = {};
     const ready = indices.filter((index) => loads[index.symbol]?.status === 'ready');
@@ -340,11 +342,11 @@ function WorldView({ report, openChart }: { report: Report } & Pick<PageProps, '
                 <tr
                   key={row.index.symbol}
                   tabIndex={0}
-                  onClick={() => openChart({ symbol: row.index.symbol, name: row.name, tf: '1D', maList: row.index.maList })}
+                  onClick={() => openChart({ symbol: row.index.symbol, name: row.name, tf: '1D', maList: row.index.maList, list: indexList })}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
-                      openChart({ symbol: row.index.symbol, name: row.name, tf: '1D', maList: row.index.maList });
+                      openChart({ symbol: row.index.symbol, name: row.name, tf: '1D', maList: row.index.maList, list: indexList });
                     }
                   }}
                   aria-label={`${row.name}，開啟圖表`}
