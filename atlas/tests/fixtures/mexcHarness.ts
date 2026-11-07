@@ -45,6 +45,7 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
     { asset: 'ETH', free: '2', locked: '0' },
     { asset: 'USDT', free: '100', locked: '0' },
   ];
+  let futuresResponses: Record<string, unknown> | undefined;
   const ownerDocument = (owner: string) =>
     structuredClone(documents.get(owner) ?? { version: 1 as const, accounts: [] });
   const slot = (owner: string, id: string) => `${owner}:${id}`;
@@ -269,6 +270,11 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
     upstream.push({ url, init });
     const path = new URL(url).pathname;
     await beforeUpstream?.(path);
+    if (path.startsWith('/api/v1/')) {
+      if (!futuresResponses || !(path in futuresResponses)) throw new Error('Unexpected futures path');
+      const body = futuresResponses[path];
+      return typeof body === 'function' ? body(input, init) : Response.json({ success: true, code: 0, data: body });
+    }
     if (failure === 'network') throw new Error(`PRIVATE ${TEST_SECRET} ${url}`);
     if (failure === 'rate')
       return new Response('private rate details', { status: 429, headers: { 'Retry-After': '120' } });
@@ -278,7 +284,8 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
       return Response.json({
         accessKey: new Headers(init?.headers).get('X-MEXC-APIKEY'),
         status: failure === 'bad-key' ? 'FROZEN' : 'VALID',
-        permissions: failure === 'write-key' ? 'SPOT_ACCOUNT_READ,SPOT_DEAL_WRITE' : 'SPOT_ACCOUNT_READ',
+        permissions: failure === 'write-key' ? 'SPOT_ACCOUNT_READ,SPOT_DEAL_WRITE' :
+          futuresResponses ? 'SPOT_ACCOUNT_READ,CONTRACT_ACCOUNT_READ,CONTRACT_DEAL_READ' : 'SPOT_ACCOUNT_READ',
         remainingValidity: 60,
         note: 'PRIVATE-DROP-THIS',
         apiSecret: 'upstream-echo-must-drop',
@@ -378,6 +385,7 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
     setBalances: (value: typeof sourceBalances) => {
       sourceBalances = value;
     },
+    setFutures: (value?: Record<string, unknown>) => { futuresResponses = value; },
     setFailure: (value: typeof failure) => {
       failure = value;
     },
