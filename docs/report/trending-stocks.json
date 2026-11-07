@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "source": "Yahoo Finance US trending · LINE 財經報告",
+  "fetchedAt": "2026-11-06T09:30:15.570437+00:00",
+  "sentAt": "2026-11-06T09:30:26.602400+00:00",
+  "symbols": [
+    "NVDA",
+    "IREN",
+    "NET",
+    "ABNB",
+    "DKNG"
+  ]
+}
