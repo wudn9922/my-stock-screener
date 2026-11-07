@@ -8,6 +8,8 @@
 
 2026-11-06 修訂：取消不是直接發送的充分條件。in-run helper 與 workflow_run fallback 都先用同一個 `run_policy.py` 查核。failure、失敗 job、run／job／step timed_out 一律通知；cancelled 且無失敗／逾時，只有找不到同 workflow_id／branch／event、created_at 更晚的 run 才通知。被取代只記 log；排隊中根本沒有 job 的 run 也適用。API／格式／分頁查核失敗採保守通知，沒有因 metadata 故障略過真正故障。
 
+為與PR #230的新唯讀掃描相容，部分失敗收集器也預先認得可選的 `archive_closure_scan` ID；該步驟尚未存在時無作用，兩個PR合入後可列出實際掃描失敗。離線測試執行真實收集器，分別模擬breadth與該掃描的outcome=failure／conclusion=success。
+
 共用 [.github/actions/notify-failure](../.github/actions/notify-failure/README.md) 先使用 **`DISCORD_WEBHOOK_URL1`**，未設定或失敗才使用既有 `LINE_ACCESS_TOKEN`／`LINE_USER_ID` 故障備援。沒有使用、讀取或修改既有價格警示 `DISCORD_WEBHOOK_URL`。Webhook 和 token 只從 secrets 經 action input／環境變數傳入；不在命令列、log、cache 或 artifact 輸出。
 
 Embed 只含 workflow、觸發事件、失敗 job／step、run URL、台北時間，資料監測另含公開來源的日期／狀態。停用 mentions，不下載 job logs，不轉送原始例外／API 回應。Actions token 只需 `actions: read` 與讀取程式碼的 `contents: read`；呼叫端只明確傳三個通知 secret，不使用 `secrets: inherit`。

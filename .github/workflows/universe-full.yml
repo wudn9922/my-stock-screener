@@ -232,7 +232,7 @@ jobs:
         continue-on-error: true
         env:
           NOTIFY_STEP_RESULTS: ${{ toJSON(steps) }}
-          NOTIFY_STEP_NAMES: '{"archive_checkout": "Shallow checkout permanent K-line archive", "archive_bootstrap": "Seed missing rolling bars from permanent archive", "archive_instruments": "Refresh archive-only ETFs and indices through the existing Yahoo batch reader", "archive_instrument_stage": "Combine archive-only instruments with the accepted stock payload", "notice_soft_05": "Build breadth trading signals", "notice_soft_06": "Build market risk warnings"}'
+          NOTIFY_STEP_NAMES: '{"archive_closure_scan": "Build market closure evidence from read-only archive", "archive_checkout": "Shallow checkout permanent K-line archive", "archive_bootstrap": "Seed missing rolling bars from permanent archive", "archive_instruments": "Refresh archive-only ETFs and indices through the existing Yahoo batch reader", "archive_instrument_stage": "Combine archive-only instruments with the accepted stock payload", "notice_soft_05": "Build breadth trading signals", "notice_soft_06": "Build market risk warnings"}'
         run: |
           python - <<'PY'
           import json, os

@@ -220,19 +220,21 @@ class WorkflowCoverageTest(unittest.TestCase):
         job = doc['jobs']['build']
         step = next(s for s in job['steps'] if s.get('id') == 'collect_notification_outcomes')
         names = json.loads(step['env']['NOTIFY_STEP_NAMES'])
-        target = next(key for key, value in names.items() if value == 'Build breadth trading signals')
-        results = {key: {'outcome': 'success', 'conclusion': 'success'} for key in names}
-        results[target] = {'outcome': 'failure', 'conclusion': 'success', 'outputs': {'private': TOKEN}}
-        with tempfile.TemporaryDirectory() as folder:
-            output = Path(folder) / 'output'
-            process = subprocess.run(['bash', '-euo', 'pipefail', '-c', step['run']], text=True, capture_output=True,
-                env={**os.environ, 'NOTIFY_STEP_RESULTS': json.dumps(results), 'NOTIFY_STEP_NAMES': json.dumps(names),
-                     'GITHUB_OUTPUT': str(output)}, timeout=10)
-            self.assertEqual(process.returncode, 0, process.stderr)
-            values = dict(line.split('=', 1) for line in output.read_text().splitlines())
-            self.assertEqual(values['has_partial'], 'true')
-            self.assertEqual(json.loads(values['summary']), ['Build breadth trading signals'])
-            self.assertNotIn(TOKEN, process.stdout + process.stderr + output.read_text())
+        self.assertEqual(names['archive_closure_scan'], 'Build market closure evidence from read-only archive')
+        for label in ('Build breadth trading signals', 'Build market closure evidence from read-only archive'):
+            target = next(key for key, value in names.items() if value == label)
+            results = {key: {'outcome': 'success', 'conclusion': 'success'} for key in names}
+            results[target] = {'outcome': 'failure', 'conclusion': 'success', 'outputs': {'private': TOKEN}}
+            with tempfile.TemporaryDirectory() as folder:
+                output = Path(folder) / 'output'
+                process = subprocess.run(['bash', '-euo', 'pipefail', '-c', step['run']], text=True, capture_output=True,
+                    env={**os.environ, 'NOTIFY_STEP_RESULTS': json.dumps(results), 'NOTIFY_STEP_NAMES': json.dumps(names),
+                         'GITHUB_OUTPUT': str(output)}, timeout=10)
+                self.assertEqual(process.returncode, 0, process.stderr)
+                values = dict(line.split('=', 1) for line in output.read_text().splitlines())
+                self.assertEqual(values['has_partial'], 'true')
+                self.assertEqual(json.loads(values['summary']), [label])
+                self.assertNotIn(TOKEN, process.stdout + process.stderr + output.read_text())
 
 
 if __name__ == '__main__':
