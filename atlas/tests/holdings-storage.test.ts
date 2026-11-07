@@ -168,6 +168,42 @@ describe('holdings use the existing verified storage context', () => {
     await expect(device.replace(account, [])).rejects.toThrow();
     expect(userStorage.getItem('holdings:v1')).toBe('broken-private-data');
   });
+  it.each(['none', 'device', 'cloud'] as const)(
+    'stores hide preferences by the %s storage rules without touching the holdings document',
+    async (mode) => {
+      const { accessState } = await import('../src/auth/access');
+      if (mode !== 'none') h.userId = `U${'1'.repeat(32)}`;
+      h.mode = mode;
+      await accessState.initialize();
+      const { holdingsVisibility, hide, holdingKey } = await import('../src/holdings/visibility');
+      const key = holdingKey(account.id, holding.symbol);
+      holdingsVisibility().update((current) => hide(current, key));
+      expect(holdingsVisibility().getSnapshot().hidden).toEqual([key]);
+      expect(h.calls.every((action) => action === 'access.get')).toBe(true);
+      if (mode === 'none') expect(disk.size).toBe(0);
+      else {
+        expect([...disk.keys()]).toEqual([expect.stringContaining(`:${h.userId}:${mode}:holdings-visibility-v1`)]);
+        const stored = [...disk.values()].join('');
+        expect(stored).not.toMatch(/holdings:v1|1500|800|PRIVATE/);
+        vi.resetModules();
+        const reloaded = await import('../src/holdings/visibility');
+        const access = await import('../src/auth/access');
+        await access.accessState.initialize();
+        expect(reloaded.holdingsVisibility().getSnapshot().hidden).toEqual([key]);
+      }
+    },
+  );
+  it('falls back to showing everything on unreadable preferences and keeps them until a change', async () => {
+    const { accessState } = await import('../src/auth/access');
+    h.userId = `U${'1'.repeat(32)}`;
+    h.mode = 'device';
+    await accessState.initialize();
+    const { userStorage } = await import('../src/auth/storage');
+    userStorage.setItem('holdings-visibility-v1', '{broken');
+    const { holdingsVisibility } = await import('../src/holdings/visibility');
+    expect(holdingsVisibility().getSnapshot()).toEqual({ version: 1, hidden: [], shown: [], accounts: {} });
+    expect(userStorage.getItem('holdings-visibility-v1')).toBe('{broken');
+  });
   it('ignores an in-flight cloud read after its account context changes without an unhandled error', async () => {
     const { accessState } = await import('../src/auth/access');
     h.userId = `U${'1'.repeat(32)}`;

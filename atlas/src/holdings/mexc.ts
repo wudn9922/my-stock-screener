@@ -4,6 +4,7 @@ import { holdingsContextApi } from './contextApi';
 import {
   MEXC_ERRORS,
   validateMexcState,
+  validateSkippedAssetNames,
   type MexcState,
 } from '../../../supabase/functions/user-settings/mexcContract';
 import { holdingsStore } from './store';
@@ -22,6 +23,7 @@ const inactive = {
   error: '',
   accountErrors: {} as Record<string, string>,
   accountSkippedAssets: {} as Record<string, number>,
+  accountSkippedAssetNames: {} as Record<string, string[]>,
   accountFutures: {} as Record<string, MexcFutures>,
 };
 export class MexcStore {
@@ -34,6 +36,7 @@ export class MexcStore {
     error: '',
     accountErrors: {} as Record<string, string>,
     accountSkippedAssets: {} as Record<string, number>,
+    accountSkippedAssetNames: {} as Record<string, string[]>,
     accountFutures: {} as Record<string, MexcFutures>,
   };
   private listeners = new Set<() => void>();
@@ -102,9 +105,13 @@ export class MexcStore {
       const skippedAssets = syncing && raw.skippedAssets !== undefined ? raw.skippedAssets : 0;
       if (!Number.isSafeInteger(skippedAssets) || Number(skippedAssets) < 0 || Number(skippedAssets) > 10000)
         throw new Error(MEXC_ERRORS.service);
+      const skippedAssetNames = syncing
+        ? validateSkippedAssetNames(raw.skippedAssetNames, Number(skippedAssets))
+        : [];
       holdingsStore().acceptCloudDocument(raw.document);
       const accountErrors = { ...this.snapshot.accountErrors };
       const accountSkippedAssets = { ...this.snapshot.accountSkippedAssets };
+      const accountSkippedAssetNames = { ...this.snapshot.accountSkippedAssetNames };
       const accountFutures = { ...this.snapshot.accountFutures };
       if (accountId && syncing) {
         try { accountFutures[accountId] = validateMexcFutures(raw.futures); }
@@ -112,9 +119,11 @@ export class MexcStore {
       }
       if (accountId) delete accountErrors[accountId];
       if (accountId && syncing) accountSkippedAssets[accountId] = Number(skippedAssets);
+      if (accountId && syncing) accountSkippedAssetNames[accountId] = skippedAssetNames;
       if (accountId && action === 'disconnect') delete accountSkippedAssets[accountId];
+      if (accountId && action === 'disconnect') delete accountSkippedAssetNames[accountId];
       if (accountId && action === 'disconnect') delete accountFutures[accountId];
-      this.set({ state, accountErrors, accountSkippedAssets, accountFutures });
+      this.set({ state, accountErrors, accountSkippedAssets, accountSkippedAssetNames, accountFutures });
       return state;
     } catch (error) {
       const message =

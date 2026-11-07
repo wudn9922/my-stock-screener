@@ -6,7 +6,15 @@ import {
   validateHoldingAccount,
   validateHoldingsDocument,
 } from './holdings.ts';
-import { MEXC_ERRORS, validateMexcState, type MexcBalance, type MexcQuote } from './mexcContract.ts';
+import {
+  MEXC_ERRORS,
+  SKIPPED_ASSET_CONTROL,
+  SKIPPED_ASSET_NAME_LENGTH,
+  SKIPPED_ASSET_NAME_LIMIT,
+  validateMexcState,
+  type MexcBalance,
+  type MexcQuote,
+} from './mexcContract.ts';
 import { readMexcFutures, type FuturesStep } from './mexcFutures.ts';
 
 type ErrorCode = keyof typeof MEXC_ERRORS;
@@ -148,16 +156,23 @@ export function parseMexcBalances(
   value: unknown,
   status: number | null = null,
   diagnosticValue: unknown = value,
-): { balances: MexcBalance[]; skippedAssets: number } {
+): { balances: MexcBalance[]; skippedAssets: number; skippedAssetNames: string[] } {
   try {
     return balancesFrom(value);
   } catch (error) {
     return parseFailure('parse-balances', diagnosticValue, status, error);
   }
 }
+/** At most 20 raw names, control/format characters removed, 40 code points each. Response-only, never logged. */
+export function skippedAssetName(raw: string): string {
+  return Array.from(raw.replace(SKIPPED_ASSET_CONTROL, ''))
+    .slice(0, SKIPPED_ASSET_NAME_LENGTH)
+    .join('');
+}
 function balancesFrom(value: unknown): {
   balances: MexcBalance[];
   skippedAssets: number;
+  skippedAssetNames: string[];
 } {
   const row = holdingsObject(value);
   if (row.accountType !== 'SPOT' || !Array.isArray(row.balances) || row.balances.length > 10000)
@@ -166,6 +181,7 @@ function balancesFrom(value: unknown): {
     seen = new Set<string>();
   const reasons = { 'asset-invalid': 0, 'asset-duplicate': 0 };
   const classes = new Set<string>();
+  const skippedNames = new Set<string>();
   for (const raw of row.balances) {
     const item = holdingsObject(raw);
     const free = mexcDecimal(item.free),
@@ -181,6 +197,10 @@ function balancesFrom(value: unknown): {
     const invalid = !assetPattern.test(asset);
     if (invalid || seen.has(asset)) {
       reasons[invalid ? 'asset-invalid' : 'asset-duplicate']++;
+      if (typeof item.asset === 'string' && skippedNames.size < SKIPPED_ASSET_NAME_LIMIT) {
+        const name = skippedAssetName(item.asset);
+        if (name.trim()) skippedNames.add(name);
+      }
       if (typeof item.asset !== 'string') classes.add('non-string');
       else {
         if (/[a-z]/.test(item.asset)) classes.add('lowercase');
@@ -216,6 +236,8 @@ function balancesFrom(value: unknown): {
   return {
     balances: result.sort((a, b) => a.asset.localeCompare(b.asset)),
     skippedAssets,
+    // Names go only to this user's connect/sync response; the log line above stays count/class only.
+    skippedAssetNames: [...skippedNames],
   };
 }
 export function assertReadOnlyKey(
@@ -590,7 +612,7 @@ export async function handleMexc(
     const info = await readMexc('/api/v3/apiKeyInfo', fetcher, controller.signal, now(), auth);
     assertReadOnlyKey(info.value, auth.apiKey, info.status, info.diagnosticValue);
     const accountResponse = await readMexc('/api/v3/account', fetcher, controller.signal, now(), auth);
-    const { balances, skippedAssets } = parseMexcBalances(
+    const { balances, skippedAssets, skippedAssetNames } = parseMexcBalances(
       accountResponse.value,
       accountResponse.status,
       accountResponse.diagnosticValue,
@@ -623,6 +645,7 @@ export async function handleMexc(
       ...publicState(row),
       document: validateHoldingsDocument(row.document),
       skippedAssets,
+      skippedAssetNames,
       futures,
     };
   } catch (error) {

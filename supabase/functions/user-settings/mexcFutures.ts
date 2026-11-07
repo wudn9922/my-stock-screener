@@ -19,6 +19,12 @@ type Path =
   | '/api/v1/private/position/open_positions'
   | '/api/v1/contract/detail/country'
   | '/api/v1/contract/ticker';
+/** Every futures response is capped; only the two public full-list fallbacks get more room. */
+export const FUTURES_RESPONSE_CAP = 2 * 1024 * 1024;
+export const FUTURES_FULL_LIST_CAP = 8 * 1024 * 1024;
+/** Above this many distinct held symbols, per-symbol reads would not fit the shared deadline. */
+export const FUTURES_PER_SYMBOL_LIMIT = 20;
+export const FUTURES_CONCURRENCY = 4;
 const SCALE = 10n ** 18n;
 
 export async function futuresAuth(
@@ -98,6 +104,25 @@ function abortable<T>(task: Promise<T>, signal: AbortSignal): Promise<T> {
     task.then(resolve, reject).finally(() => signal.removeEventListener('abort', aborted));
   });
 }
+/** Run tasks with bounded concurrency; stop scheduling after the first failure. */
+async function mapLimited<T, R>(items: readonly T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0,
+    failed = false;
+  const worker = async () => {
+    while (!failed && next < items.length) {
+      const index = next++;
+      try {
+        results[index] = await task(items[index]!);
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
 class ReadFailure extends Error {
   constructor(readonly permission: boolean) {
     super('Futures unavailable');
@@ -114,28 +139,39 @@ export async function readMexcFutures(
   diagnostic: Diagnostic,
 ): Promise<MexcFutures> {
   if (!permitted) return { status: 'no-permission' };
-  const read = async (path: Path, step: FuturesStep) => {
+  const read = async (
+    path: Path,
+    step: FuturesStep,
+    {
+      query,
+      cap = FUTURES_RESPONSE_CAP,
+      readSignal = signal,
+      report = diagnostic,
+    }: { query?: Record<string, string>; cap?: number; readSignal?: AbortSignal; report?: Diagnostic } = {},
+  ) => {
     let status: number | null = null,
       metadata: unknown,
       reason = 'network-or-timeout';
     const privateRead = path.startsWith('/api/v1/private/');
     try {
-      signal.throwIfAborted();
+      readSignal.throwIfAborted();
       const authHeaders = privateRead ? (await futuresAuth(auth, now())).headers : {};
+      // Fixed origin and path; the only query value is a symbol that already matched FUTURES_SYMBOL.
+      const search = query ? '?' + new URLSearchParams(query).toString() : '';
       const response = await abortable(
-        fetcher(MEXC_FUTURES_ORIGIN + path, {
+        fetcher(MEXC_FUTURES_ORIGIN + path + search, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json', ...authHeaders },
-          signal,
+          signal: readSignal,
           redirect: 'error',
           cache: 'no-store',
           referrerPolicy: 'no-referrer',
         }),
-        signal,
+        readSignal,
       );
       status = response.status;
       reason = 'response-size-or-empty';
-      if (Number(response.headers.get('Content-Length')) > 2 * 1024 * 1024 || !response.body) {
+      if (Number(response.headers.get('Content-Length')) > cap || !response.body) {
         void response.body?.cancel().catch(() => undefined);
         throw new Error();
       }
@@ -145,10 +181,10 @@ export async function readMexcFutures(
       reason = 'invalid-json-or-stream';
       try {
         while (true) {
-          const part = await abortable(reader.read(), signal);
+          const part = await abortable(reader.read(), readSignal);
           if (part.done) break;
           size += part.value.byteLength;
-          if (size > 2 * 1024 * 1024) {
+          if (size > cap) {
             reason = 'response-size-or-empty';
             throw new Error();
           }
@@ -177,11 +213,11 @@ export async function readMexcFutures(
       if (!response.ok || envelope.success !== true || envelope.code !== 0) throw new ReadFailure(permission);
       return { data: holdingsObject(futuresJson(text)).data, status };
     } catch (error) {
-      diagnostic(
+      report(
         step,
         status,
         metadata,
-        signal.aborted ? 'network-or-timeout' : status !== null && status >= 400 ? 'upstream-http' : reason,
+        readSignal.aborted ? 'network-or-timeout' : status !== null && status >= 400 ? 'upstream-http' : reason,
       );
       throw error instanceof ReadFailure ? error : new ReadFailure(privateRead && status === 403);
     }
@@ -190,11 +226,12 @@ export async function readMexcFutures(
     step: FuturesStep,
     response: { data: unknown; status: number },
     task: (data: unknown) => T,
+    report: Diagnostic = diagnostic,
   ): T => {
     try {
       return task(response.data);
     } catch {
-      diagnostic(step, response.status, undefined, 'invalid-response');
+      report(step, response.status, undefined, 'invalid-response');
       throw new ReadFailure(false);
     }
   };
@@ -231,24 +268,71 @@ export async function readMexcFutures(
         });
     });
     if (!pending.length) return { status: 'ok', account, positions: [], skippedPositions };
-    const detailsResponse = await read('/api/v1/contract/detail/country', 'futures-detail');
-    const tickersResponse = await read('/api/v1/contract/ticker', 'futures-detail');
-    const wanted = new Set(pending.map((p) => p.symbol));
-    const lookup = (data: unknown, field: string) => {
+    const wanted = [...new Set(pending.map((p) => p.symbol))];
+    // A per-symbol lookup may come back as one wrapped object or as an array; both are accepted.
+    const lookup = (data: unknown, field: string, symbols: ReadonlySet<string>) => {
       const rows = Array.isArray(data) ? data : [data];
       if (rows.length > 20000) throw new Error();
       const result = new Map<string, string>();
       for (const raw of rows) {
         const row = holdingsObject(raw);
-        if (typeof row.symbol !== 'string' || !wanted.has(row.symbol)) continue;
+        if (typeof row.symbol !== 'string' || !symbols.has(row.symbol)) continue;
         if (result.has(row.symbol)) throw new Error();
         result.set(row.symbol, sourceDecimal(row[field], false, true));
       }
-      if (result.size !== wanted.size) throw new Error();
+      if (result.size !== symbols.size) throw new Error();
       return result;
     };
-    const sizes = parse('futures-detail', detailsResponse, (data) => lookup(data, 'contractSize'));
-    const prices = parse('futures-detail', tickersResponse, (data) => lookup(data, 'fairPrice'));
+    const sizes = new Map<string, string>(),
+      prices = new Map<string, string>();
+    const sources = [
+      { path: '/api/v1/contract/detail/country', field: 'contractSize', into: sizes },
+      { path: '/api/v1/contract/ticker', field: 'fairPrice', into: prices },
+    ] as const;
+    if (wanted.length <= FUTURES_PER_SYMBOL_LIMIT) {
+      // Only the held contracts: the unfiltered lists outgrew the 2 MiB response cap.
+      const child = new AbortController(),
+        stop = () => child.abort();
+      signal.addEventListener('abort', stop, { once: true });
+      if (signal.aborted) stop();
+      let reported = false;
+      const once: Diagnostic = (...event) => {
+        if (reported) return;
+        reported = true;
+        diagnostic(...event);
+      };
+      try {
+        await mapLimited(
+          wanted.flatMap((symbol) => sources.map((source) => ({ symbol, ...source }))),
+          FUTURES_CONCURRENCY,
+          async ({ symbol, path, field, into }) => {
+            try {
+              const response = await read(path, 'futures-detail', {
+                query: { symbol },
+                readSignal: child.signal,
+                report: once,
+              });
+              const value = parse('futures-detail', response, (data) => lookup(data, field, new Set([symbol])), once);
+              into.set(symbol, value.get(symbol)!);
+            } catch (error) {
+              // read/parse already reported it; abort the other in-flight lookups (their logs are suppressed).
+              stop();
+              throw error;
+            }
+          },
+        );
+      } finally {
+        signal.removeEventListener('abort', stop);
+      }
+    } else {
+      // Too many symbols for per-symbol reads inside the shared deadline: read each public list once.
+      const symbols = new Set(wanted);
+      for (const { path, field, into } of sources) {
+        const response = await read(path, 'futures-detail', { cap: FUTURES_FULL_LIST_CAP });
+        for (const [symbol, value] of parse('futures-detail', response, (data) => lookup(data, field, symbols)))
+          into.set(symbol, value);
+      }
+    }
     return parse('futures-positions', positionsResponse, () =>
       validateMexcFutures({
         status: 'ok',

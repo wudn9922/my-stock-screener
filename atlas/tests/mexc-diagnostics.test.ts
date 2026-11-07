@@ -89,6 +89,7 @@ describe('MEXC unsupported asset names', () => {
       ],
     });
     expect(parsed.skippedAssets).toBe(0);
+    expect(parsed.skippedAssetNames).toEqual([]);
     expect(parsed.balances).toMatchObject([
       { asset: 'STETH', symbol: 'STETH/USDT', quantity: '3' },
       { asset: 'USDE', symbol: 'USDE/USDT', quantity: '2.5' },
@@ -120,6 +121,8 @@ describe('MEXC unsupported asset names', () => {
       })),
     });
     expect(parsed.skippedAssets).toBe(3);
+    // Raw names (not normalized) are returned for the user's own notice only.
+    expect(parsed.skippedAssetNames).toEqual(['USDE', 'PRIVATE-ASSET', 'VERYLONGPRIVATECOIN123456789']);
     expect(parsed.balances).toHaveLength(1);
     expect(parsed.balances[0]).toMatchObject({
       asset: 'USDE',
@@ -146,6 +149,7 @@ describe('MEXC unsupported asset names', () => {
       ],
     });
     expect(parsed.skippedAssets).toBe(1);
+    expect(parsed.skippedAssetNames).toEqual(['usde']);
     expect(parsed.balances).toMatchObject([{ asset: 'USDE', quantity: '2' }]);
     expect(event()).toMatchObject({
       reasons: { 'asset-invalid': 0, 'asset-duplicate': 1 },
@@ -184,6 +188,7 @@ describe('MEXC unsupported asset names', () => {
       );
       expect(response.status).toBe(200);
       expect(response.body.data.skippedAssets).toBe(2);
+      expect(response.body.data.skippedAssetNames).toEqual(['PRIVATE-ASSET', 'VERYLONGPRIVATECOIN123456789']);
       expect(response.body.data.connections[0].balances).toEqual([]);
       expect(response.body.data.document.accounts[0].holdings).toEqual([]);
       expect(
@@ -191,9 +196,12 @@ describe('MEXC unsupported asset names', () => {
           .filter((call) => call.parameters.operation === 'finish')
           .every((call) => !Object.hasOwn(call.parameters.payload as object, 'skippedAssets')),
       ).toBe(true);
-      expect((await request({ action: 'holdings.mexc.status' })).body.data).not.toHaveProperty(
-        'skippedAssets',
-      );
+      expect(JSON.stringify(f.calls)).not.toContain('PRIVATE-ASSET');
+      expect(JSON.stringify(response.body.data.document)).not.toContain('PRIVATE-ASSET');
+      const status = (await request({ action: 'holdings.mexc.status' })).body.data;
+      expect(status).not.toHaveProperty('skippedAssets');
+      expect(status).not.toHaveProperty('skippedAssetNames');
+      expect(JSON.stringify(status)).not.toContain('PRIVATE-ASSET');
       expect(event()).toMatchObject({
         count: 2,
         reasons: { 'asset-invalid': 2, 'asset-duplicate': 0 },
@@ -201,7 +209,7 @@ describe('MEXC unsupported asset names', () => {
     },
   );
 
-  it('returns other holdings and their quotes on connect and sync, exposing only a skipped count', async () => {
+  it('returns other holdings and their quotes on connect and sync, with skipped names only in that response', async () => {
     const f = createMexcFixture(),
       request = f.handler();
     f.setBalances([
@@ -219,9 +227,13 @@ describe('MEXC unsupported asset names', () => {
     });
     expect(linked.status).toBe(200);
     expect(linked.body.data.skippedAssets).toBe(2);
+    expect(linked.body.data.skippedAssetNames).toEqual(['BTC', 'PRIVATE-ASSET']);
     expect(linked.body.data.connections[0].balances).toMatchObject([{ asset: 'BTC', quantity: '1' }]);
     expect(linked.body.data.connections[0].quotes['BTC/USDT'].price).toBe('65000');
-    expect(JSON.stringify(linked.body)).not.toContain('PRIVATE-ASSET');
+    const rest = { ...linked.body.data };
+    delete rest.skippedAssetNames;
+    expect(JSON.stringify(rest)).not.toContain('PRIVATE-ASSET');
+    expect(JSON.stringify(f.calls)).not.toContain('PRIVATE-ASSET');
     f.advance();
     f.setBalances([{ asset: 'ETH', free: '1', locked: '0' }]);
     const synced = await request({
@@ -230,7 +242,32 @@ describe('MEXC unsupported asset names', () => {
     });
     expect(synced.status).toBe(200);
     expect(synced.body.data.skippedAssets).toBe(0);
+    expect(synced.body.data.skippedAssetNames).toEqual([]);
     expect(synced.body.data.connections[0].balances).toMatchObject([{ asset: 'ETH' }]);
+  });
+});
+
+describe('MEXC skipped asset names for the user', () => {
+  it('strips control/format characters, truncates to 40 code points, dedupes and caps at 20', () => {
+    const balances = [
+      { asset: 'XXX-Y\u0000\u0007\n\u202E\u200B\u2028', free: '1', locked: '0' },
+      { asset: 'XXX-Y', free: '2', locked: '0' },
+      { asset: 'L'.repeat(39) + '幣幣', free: '1', locked: '0' },
+      { asset: '\u0001\u0002', free: '1', locked: '0' },
+      { asset: 7, free: '1', locked: '0' },
+      ...Array.from({ length: 30 }, (_, i) => ({ asset: `BAD-${i}`, free: '1', locked: '0' })),
+    ];
+    const parsed = parseMexcBalances({ accountType: 'SPOT', balances });
+    expect(parsed.skippedAssets).toBe(35);
+    expect(parsed.skippedAssetNames).toHaveLength(20);
+    expect(parsed.skippedAssetNames.slice(0, 3)).toEqual(['XXX-Y', 'L'.repeat(39) + '幣', 'BAD-0']);
+    for (const name of parsed.skippedAssetNames) {
+      expect(Array.from(name).length).toBeLessThanOrEqual(40);
+      expect(name).not.toMatch(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u);
+    }
+    // The diagnostic line stays count/class only.
+    expect(warnings).toHaveLength(1);
+    for (const name of ['XXX-Y', 'BAD-0', 'LLLL']) expect(warnings[0]).not.toContain(name);
   });
 });
 

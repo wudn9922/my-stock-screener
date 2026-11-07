@@ -3,7 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { futuresAuth, futuresJson, sourceDecimal } from '../../supabase/functions/user-settings/mexcFutures';
 import { validateMexcFutures } from '../../supabase/functions/user-settings/mexcFuturesContract';
 import { createMexcFixture, MEXC_ACCOUNT, TEST_KEY, TEST_SECRET } from './fixtures/mexcHarness';
-import { assetsPath, positionsPath, detailPath, tickerPath, futuresResponses } from './fixtures/mexc/futures';
+import {
+  assetsPath,
+  positionsPath,
+  detailPath,
+  tickerPath,
+  futuresResponses,
+  manyFuturesResponses,
+  publicList,
+} from './fixtures/mexc/futures';
 
 const connect = {
   action: 'holdings.mexc.connect',
@@ -124,7 +132,18 @@ describe('read-only Futures V1', () => {
     expect(JSON.stringify(finish)).not.toContain('BTC_USDT');
     expect((await f.handler()({ action: 'holdings.mexc.status' })).body.data).not.toHaveProperty('futures');
     const calls = f.upstream.filter((c) => new URL(c.url).pathname.startsWith('/api/v1/'));
-    expect(calls).toHaveLength(4);
+    expect(calls).toHaveLength(6);
+    // Two held symbols: only per-symbol public reads, never the unfiltered all-contracts lists.
+    const publicCalls = calls.filter((c) => !new URL(c.url).pathname.includes('/private/'));
+    expect(publicCalls.map((c) => new URL(c.url).pathname + new URL(c.url).search).sort()).toEqual([
+      `${detailPath}?symbol=BTC_USDT`,
+      `${detailPath}?symbol=ETH_USDT`,
+      `${tickerPath}?symbol=BTC_USDT`,
+      `${tickerPath}?symbol=ETH_USDT`,
+    ]);
+    expect(publicCalls.every((c) => new URL(c.url).searchParams.has('symbol'))).toBe(true);
+    for (const c of calls.filter((c) => new URL(c.url).pathname.includes('/private/')))
+      expect(new URL(c.url).search).toBe('');
     expect(f.upstream.slice(0, 3).map((c) => new URL(c.url).pathname)).toEqual([
       '/api/v3/apiKeyInfo',
       '/api/v3/account',
@@ -318,5 +337,125 @@ describe('read-only Futures V1', () => {
       expect(response.body.data.futures.status).toBe(count === 200 ? 'ok' : 'unavailable');
       if (count === 200) expect(response.body.data.futures.positions).toHaveLength(200);
     }
+  });
+  it('regression: an all-contracts list over 2 MiB no longer makes the whole block unavailable', async () => {
+    const f = fixture(),
+      data = futuresResponses();
+    const big = 2 * 1024 * 1024 + 4096;
+    data[detailPath] = publicList(data[detailPath] as Record<string, unknown>[], big);
+    data[tickerPath] = publicList(data[tickerPath] as Record<string, unknown>[], big);
+    f.setFutures(data);
+    const response = await f.handler()(connect);
+    expect(response.status).toBe(200);
+    expect(response.body.data.futures.status).toBe('ok');
+    expect(response.body.data.futures.positions.map((p: { size: string }) => p.size)).toEqual(['0.0005', '0.025']);
+    // The oversized unfiltered list (the production failure) is never requested.
+    const unfiltered = f.upstream.filter(
+      (c) => [detailPath, tickerPath].includes(new URL(c.url).pathname) && !new URL(c.url).searchParams.has('symbol'),
+    );
+    expect(unfiltered).toHaveLength(0);
+    expect(warnings).toEqual([]);
+  });
+  it('accepts a per-symbol answer wrapped as a one-row array as well as a single object', async () => {
+    const f = fixture();
+    f.setFuturesSymbolShape('array');
+    const response = await f.handler()(connect);
+    expect(response.status).toBe(200);
+    expect(response.body.data.futures.status).toBe('ok');
+    expect(response.body.data.futures.positions.map((p: { markPrice: string }) => p.markPrice)).toEqual([
+      '59000',
+      '3450',
+    ]);
+  });
+  it('refuses a per-symbol answer for a different contract', async () => {
+    const f = fixture(),
+      data = futuresResponses();
+    data[tickerPath] = () => Response.json({ success: true, code: 0, data: { symbol: 'OTHER_USDT', fairPrice: '1' } });
+    f.setFutures(data);
+    const response = await f.handler()(connect);
+    expect(response.status).toBe(200);
+    expect(response.body.data.futures.status).toBe('unavailable');
+    expect(warnings).toHaveLength(1);
+    expect(JSON.parse(warnings[0]!)).toMatchObject({ step: 'futures-detail', reason: 'invalid-response' });
+  });
+  it('caps per-symbol concurrency for 20 distinct symbols and still avoids the full lists', async () => {
+    const f = fixture(),
+      data = manyFuturesResponses(20);
+    let active = 0,
+      peak = 0;
+    for (const path of [detailPath, tickerPath]) {
+      const respond = publicList(data[path] as Record<string, unknown>[], 0);
+      data[path] = async (input: RequestInfo | URL) => {
+        active++;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        active--;
+        return respond(input);
+      };
+    }
+    f.setFutures(data);
+    const response = await f.handler()(connect);
+    expect(response.status).toBe(200);
+    expect(response.body.data.futures.status).toBe('ok');
+    expect(response.body.data.futures.positions).toHaveLength(20);
+    const publicCalls = f.upstream.filter((c) => [detailPath, tickerPath].includes(new URL(c.url).pathname));
+    expect(publicCalls).toHaveLength(40);
+    expect(publicCalls.every((c) => new URL(c.url).searchParams.has('symbol'))).toBe(true);
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(4);
+  });
+  it('stops the remaining per-symbol lookups after the first failure and logs it once', async () => {
+    const f = fixture(),
+      data = manyFuturesResponses(12);
+    data[tickerPath] = () => Response.json({ success: false, code: 500 }, { status: 500 });
+    f.setFutures(data);
+    const response = await f.handler()(connect);
+    expect(response.status).toBe(200);
+    expect(response.body.data.futures.status).toBe('unavailable');
+    expect(f.upstream.filter((c) => [detailPath, tickerPath].includes(new URL(c.url).pathname)).length).toBeLessThan(24);
+    expect(warnings).toHaveLength(1);
+    expect(JSON.parse(warnings[0]!)).toMatchObject({ step: 'futures-detail', reason: 'upstream-http' });
+  });
+  it('falls back to the two full lists with an 8 MiB cap above 20 distinct symbols', async () => {
+    const f = fixture(),
+      data = manyFuturesResponses(21);
+    const big = 6 * 1024 * 1024;
+    data[detailPath] = publicList(data[detailPath] as Record<string, unknown>[], big);
+    data[tickerPath] = publicList(data[tickerPath] as Record<string, unknown>[], big);
+    f.setFutures(data);
+    const response = await f.handler()(connect);
+    expect(response.status).toBe(200);
+    expect(response.body.data.futures.status).toBe('ok');
+    expect(response.body.data.futures.positions).toHaveLength(21);
+    const publicCalls = f.upstream.filter((c) => [detailPath, tickerPath].includes(new URL(c.url).pathname));
+    expect(publicCalls.map((c) => new URL(c.url).pathname + new URL(c.url).search)).toEqual([detailPath, tickerPath]);
+    expect(warnings).toEqual([]);
+  });
+  it.each(['content-length', 'stream'] as const)(
+    'still refuses a full-list fallback over 8 MiB (%s)',
+    async (kind) => {
+      const f = fixture(),
+        data = manyFuturesResponses(21);
+      data[detailPath] =
+        kind === 'content-length'
+          ? () => new Response('{}', { headers: { 'Content-Length': String(8 * 1024 * 1024 + 1) } })
+          : publicList(data[detailPath] as Record<string, unknown>[], 8 * 1024 * 1024 + 1);
+      f.setFutures(data);
+      const response = await f.handler()(connect);
+      expect(response.status).toBe(200);
+      expect(response.body.data.futures.status).toBe('unavailable');
+      expect(warnings).toHaveLength(1);
+      expect(JSON.parse(warnings[0]!)).toMatchObject({ step: 'futures-detail', reason: 'response-size-or-empty' });
+    },
+  );
+  it('keeps the 2 MiB cap on per-symbol and private reads', async () => {
+    const f = fixture(),
+      data = futuresResponses();
+    data[tickerPath] = () => new Response(' '.repeat(2 * 1024 * 1024 + 1));
+    f.setFutures(data);
+    const response = await f.handler()(connect);
+    expect(response.status).toBe(200);
+    expect(response.body.data.futures.status).toBe('unavailable');
+    expect(JSON.parse(warnings[0]!)).toMatchObject({ step: 'futures-detail', reason: 'response-size-or-empty' });
   });
 });

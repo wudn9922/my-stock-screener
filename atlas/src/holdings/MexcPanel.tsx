@@ -16,9 +16,19 @@ interface Props {
 }
 export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel }: Props) {
   const store = mexcStore(),
-    { state, loading, busy, error: loadError, accountErrors, accountSkippedAssets, accountFutures } = useSyncExternalStore(store.subscribe, store.getSnapshot);
+    {
+      state,
+      loading,
+      busy,
+      error: loadError,
+      accountErrors,
+      accountSkippedAssets,
+      accountSkippedAssetNames,
+      accountFutures,
+    } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const error = accountErrors[account.id] ?? loadError;
   const skippedAssets = accountSkippedAssets[account.id] ?? 0;
+  const skippedNames = accountSkippedAssetNames[account.id] ?? [];
   const connection = state.connections.find((entry) => entry.accountId === account.id);
   const [keyForm, setKeyForm] = useState(false),
     [apiKey, setApiKey] = useState(''),
@@ -130,7 +140,16 @@ export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel 
       )}
       {message && <p role="status">{message}</p>}
       {skippedAssets > 0 && (
-        <p role="status">有 {skippedAssets} 個 MEXC 資產名稱格式不支援，未匯入；其他持股已同步。</p>
+        <p role="status" data-testid="mexc-skipped-assets">
+          有 {skippedAssets} 個 MEXC 資產名稱格式不支援，未匯入
+          {skippedNames.length > 0 && (
+            <>
+              ：<span className="mexc-skipped-names">{skippedNames.join('、')}</span>
+              {skippedNames.length < skippedAssets ? `（列出其中 ${skippedNames.length} 個名稱）` : ''}
+            </>
+          )}
+          ；其他持股已同步。
+        </p>
       )}
       {loading && <p role="status">載入 MEXC 連線中…</p>}
       {!state.configured && !loading && (
