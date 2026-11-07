@@ -840,7 +840,8 @@ h3 {
   background: var(--surface);
 }
 .page > .page-state,
-.site-main > .page-state {
+.site-main > .page-state,
+.kept-page > .page-state {
   margin: 20px auto;
   max-width: 560px;
 }

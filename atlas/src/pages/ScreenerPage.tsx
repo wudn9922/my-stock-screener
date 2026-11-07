@@ -6,6 +6,8 @@ import { ReportGate } from './ReportGate';
 import { itemStatusOf, type GroupItem, type Report, type ReportGroup } from '../report/schema';
 import { getPeFigures, getScreenerPeFigures, type PeFigures, type ScreenerPeFigures } from '../app/dataSources';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
+import { usePageActive } from '../app/pageActivity';
+import { chartList } from '../app/listContext';
 import { ScreenerChanges } from '../ui/ScreenerChanges';
 import {
   fetchTrendingStocks, LINE_TRENDING_GROUP_KEY, trendingStocksGroup, trendingStocksStale, type TrendingStocksResult,
@@ -505,6 +507,14 @@ function ScreenerView({
     setDraftNeedsGrowth(false);
   }, []);
   const onNeedGrowth = useCallback(() => setDraftNeedsGrowth(true), []);
+  // Leaving the page (nav, Back) closes the sheet; the applied filters stay.
+  const pageActive = usePageActive();
+  useEffect(() => {
+    if (!pageActive) closeSheet();
+  }, [pageActive, closeSheet]);
+  // Previous/next on the chart walks the whole result as displayed (filtered and sorted), not only rendered rows.
+  const groupName = group?.name ?? '';
+  const chartListContext = useMemo(() => chartList(groupName, items), [groupName, items]);
   if (!group)
     return (
       <div className="page-state empty" role="status">
@@ -689,7 +699,7 @@ function ScreenerView({
         <div className="screener-charts">
           {chartParameters.error && <p role="status">{chartParameters.error}</p>}
           <StockChartList key={group.key} rows={items} parameters={chartParameters.stocks} groupPeriods={group.maList}
-            openChart={options => openChart({ ...options, tf: '1D', maList: items.find(item => item.symbol === options.symbol)?.maList })} />
+            openChart={options => openChart({ ...options, tf: '1D', maList: items.find(item => item.symbol === options.symbol)?.maList, list: chartListContext })} />
         </div>
       ) : (
         <div className="screener-list card" ref={listRef} onScroll={onScroll} role="list" aria-label={`${group.name}股票清單`}>
@@ -706,7 +716,7 @@ function ScreenerView({
                     filters={filters}
                     fixedMAs={fixedMAs}
                     top={(start + offset) * ROW_HEIGHT}
-                    onOpen={() => openChart({ symbol: item.symbol, name: item.name, tf: '1D', maList: item.maList })}
+                    onOpen={() => openChart({ symbol: item.symbol, name: item.name, tf: '1D', maList: item.maList, list: chartListContext })}
                   />
                 </div>
               ))}

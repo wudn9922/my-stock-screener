@@ -17,6 +17,8 @@ import { PageFooterNote } from './PageFooterNote';
 import { loadFailureReason } from '../market-data/loadFailureReason';
 import { StockChartList } from './StockChartList';
 import type { ParameterStock } from '../cloud/settingsApi';
+import { usePageActive } from '../app/pageActivity';
+import { chartList } from '../app/listContext';
 
 type BoardTab = 'list' | 'trending' | 'signals';
 interface BoardRow {
@@ -134,8 +136,11 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
     };
   }, [near, row.symbol]);
   // While on screen: a fresh price right away, then once a minute during the session.
+  // A hidden kept page takes no part in the live refresh.
+  const pageActive = usePageActive();
+  const live = visible && pageActive;
   useEffect(() => {
-    if (!visible) return;
+    if (!live) return;
     return liveQuotes().subscribe(row.symbol, (value) =>
       { setFailure(null); setRegularQuote(value.quote);
         const current = barsRef.current;
@@ -144,7 +149,7 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
         barsRef.current = next; setBars(next);
         if (merged?.splitMismatch) replaceSplitHistory();
       });
-  }, [visible, row.symbol]);
+  }, [live, row.symbol]);
   const quote = Array.isArray(bars) ? rowQuote(bars) : null;
   const ticker = displayTicker(row.symbol);
   const fullName = row.name !== row.symbol ? row.name : resolvedName?.symbol === row.symbol ? resolvedName.name : null;
@@ -175,7 +180,7 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
           <small className={`wb-change ${tone}`}>
             {failure && !bars ? '載入失敗' : quote?.changePct == null ? '…' : `${tone === 'up' ? '▲ ' : tone === 'down' ? '▼ ' : ''}${formatPercent(quote.changePct)}`}
           </small>
-          {getMarketProfile(row.symbol).market === 'US' && !row.symbol.startsWith('^') && <ExtendedQuoteLine symbol={row.symbol} quote={regularQuote} active={visible} compact />}
+          {getMarketProfile(row.symbol).market === 'US' && !row.symbol.startsWith('^') && <ExtendedQuoteLine symbol={row.symbol} quote={regularQuote} active={live} compact />}
           {failure && <small className="wb-error" role="status">{failure}</small>}
         </span>
       </a>
@@ -238,7 +243,11 @@ export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterE
   const latestQuote = shown.map(row => liveQuotes().latest(row.symbol)?.quote).filter(value => !!value).sort((a, b) => b.asOf - a.asOf)[0];
   const statusSymbol = tab === 'list' && list?.market === 'TW' ? '2330.TW' : 'AAPL';
   const listDate = list && tab === 'list' ? (list.lastViewed ?? list.history.at(-1))?.date : undefined;
-  const open = (row: BoardRow) => openChart({ symbol: row.symbol, ...(row.name !== row.symbol ? { name: row.name } : {}) });
+  // The chart's previous/next walks every row of this source (not only the first 20 shown).
+  const sourceName = tab === 'list' ? list?.name ?? '我的清單' : 'LINE 熱門美股';
+  const listContext = chartList(sourceName, rows);
+  const openFromList = (options: OpenChartOptions) => openChart({ ...options, list: listContext });
+  const open = (row: BoardRow) => openFromList({ symbol: row.symbol, ...(row.name !== row.symbol ? { name: row.name } : {}) });
 
   let empty: ReactNode = null;
   if (!rows.length)
@@ -280,7 +289,7 @@ export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterE
       </p></PageFooterNote>
       {charts && parameterError && <p role="status">{parameterError}</p>}
       {empty ? <div className="wb-empty" role="status">{empty}</div> : charts ? <StockChartList key={`${tab}:${list?.id ?? ''}`} rows={rows}
-        parameters={parameters} groupPeriods={tab === 'list' ? list?.maList : undefined} openChart={openChart} /> : (
+        parameters={parameters} groupPeriods={tab === 'list' ? list?.maList : undefined} openChart={openFromList} /> : (
         <ul className="wb-rows" aria-label="自選行情列表">
           {shown.map((row) => <QuoteRow key={row.symbol} row={row} onOpen={open} />)}
         </ul>

@@ -6,11 +6,14 @@ import { settingsApi, type ParameterStock } from '../cloud/settingsApi';
 import type { GroupItem } from '../report/schema';
 import type { FixedScreenerMas } from './screenerFilters';
 import { loadScreenerFixedMAs } from './screenerFixedMAs';
+import { useWhileActive } from '../app/pageActivity';
 
 /** Loads only configured stocks, and only while MA filtering or inspection needs their references. */
 export function useScreenerFixedMAs(wanted: boolean, items: readonly GroupItem[], loadBars = getDailyBars, requireComplete = false) {
   const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
   const context = getStorageContextKey();
+  // A hidden kept page does not reload on an account change; it does once it is on screen again.
+  const account = useWhileActive(`${context}|${access.userId ?? ''}|${access.storageMode}`);
   const [state, setState] = useState<{ context: string; items: readonly GroupItem[]; mas: FixedScreenerMas; reason: string | null } | null>(null);
   useEffect(() => {
     if (!wanted || items.length === 0) return;
@@ -22,7 +25,7 @@ export function useScreenerFixedMAs(wanted: boolean, items: readonly GroupItem[]
       .then(mas => { if (active) setState({ context, items, mas, reason: requireComplete && Object.values(mas).some(reference => reference.distance === null) ? '固定均線缺少與快照同價格口徑的歷史資料，暫無法完整比較。' : null }); })
       .catch(() => { if (active) setState({ context, items, mas: {}, reason: '固定均線參數無法載入，請重新整理頁面重試。' }); });
     return () => { active = false; controller.abort(); };
-  }, [wanted, items, context, access.userId, access.storageMode, loadBars, requireComplete]);
+  }, [wanted, items, account, loadBars, requireComplete]);
   const current = state?.context === context && state.items === items ? state : null;
   return { fixedMAs: current?.mas, maReferenceReason: wanted && items.length > 0 ? (current ? current.reason : '固定均線參數載入中…') : null };
 }

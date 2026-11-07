@@ -1,4 +1,6 @@
 import { HelpDisclosure } from '../ui/HelpDisclosure';
+import { usePageActive } from '../app/pageActivity';
+import { chartList } from '../app/listContext';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useDialogFocus } from '../ui/useDialogFocus';
@@ -37,14 +39,17 @@ export function IndustryPanel({
   const [shown, setShown] = useState(PAGE);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
-  useDialogFocus(true, 'industry-detail');
+  // A hidden kept page neither traps focus nor reacts to Escape; both resume when it is on screen again.
+  const pageActive = usePageActive();
+  useDialogFocus(pageActive, 'industry-detail');
   useEffect(() => {
+    if (!pageActive) return;
     const key = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeRef.current();
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, []);
+  }, [pageActive]);
   const summary = useMemo(() => summarize(cell.stocks, period, model.basis), [cell, period, model.basis]);
   const hasCap = cell.stocks.some((stock) => stock.marketCap !== null);
   const rows = useMemo(() => {
@@ -148,7 +153,7 @@ export function IndustryPanel({
                       type="button"
                       className="ind-row"
                       aria-label={`${stock.symbol} ${stock.name}，${PERIOD_LABELS[period]}報酬 ${formatPercent(value, 1)}，開啟圖表`}
-                      onClick={() => openChart({ symbol: stock.symbol, name: stock.name, maList: [20, 50] })}
+                      onClick={() => openChart({ symbol: stock.symbol, name: stock.name, maList: [20, 50], list: chartList(displayName, rows) })}
                     >
                       <span className="constituent-id">
                         <b>{displayTicker(stock.symbol)}</b>

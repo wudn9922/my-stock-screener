@@ -1,10 +1,13 @@
 import { App, type ChartWorkspaceProps } from './App';
-import { useLayoutEffect, useRef, useSyncExternalStore } from 'react';
+import { useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { getChartStore } from './chartStore';
 import { ChartPeHistory } from '../ui/financials/ChartPeHistory';
 
 /** Lazy route entry for the chart workspace (engine, drawings, panels and their styles). */
-export default function ChartPage(props: ChartWorkspaceProps) {
+export default function ChartPage({ listNav, ...props }: ChartWorkspaceProps & {
+  /** Previous/next bar of the list the chart was opened from; it takes its height out of the chart viewport. */
+  listNav?: ReactNode;
+}) {
   const store = getChartStore();
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const symbol = state.app.activeSymbol;
@@ -29,6 +32,7 @@ export default function ChartPage(props: ChartWorkspaceProps) {
   const showPe = props.active !== false && state.app.provider !== 'demo' && !symbol.startsWith('^');
   return (
     <><div ref={viewport} className="chart-page-layout">
+      {listNav}
       <App {...props} onShowPeChart={showPe ? () => {
         pe.current?.focus({ preventScroll: true });
         pe.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });

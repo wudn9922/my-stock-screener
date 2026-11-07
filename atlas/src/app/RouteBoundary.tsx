@@ -3,8 +3,13 @@ import { reportError } from '../errors/UserErrors';
 import { PageState } from '../ui/PageState';
 
 /** Keep navigation available if a page render or an old lazy chunk fails. */
-export class RouteBoundary extends Component<{ children: ReactNode }, { failed: boolean; reason: string }> {
+export class RouteBoundary extends Component<{ children: ReactNode; resetKey?: unknown }, { failed: boolean; reason: string }> {
   state = { failed: false, reason: '' };
+
+  /** A kept page that failed renders afresh when it is opened again (as an unmounted page would). */
+  componentDidUpdate(previous: { resetKey?: unknown }) {
+    if (this.state.failed && previous.resetKey !== this.props.resetKey) this.setState({ failed: false, reason: '' });
+  }
 
   static getDerivedStateFromError(error: unknown) {
     const chunk = error instanceof Error && /import|module|chunk|fetch/i.test(error.message);

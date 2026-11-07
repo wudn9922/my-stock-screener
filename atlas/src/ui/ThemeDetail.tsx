@@ -1,4 +1,6 @@
 import { HelpDisclosure } from './HelpDisclosure';
+import { usePageActive } from '../app/pageActivity';
+import { chartList } from '../app/listContext';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { ChartCandlestick, ChevronDown, X } from 'lucide-react';
 import { MiniChart } from './MiniChart';
@@ -212,14 +214,17 @@ export function ThemeDetail({
   const dragStart = useRef<number | null>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
-  useDialogFocus(true, 'theme-detail');
+  // A hidden kept page neither traps focus nor reacts to Escape; both resume when it is on screen again.
+  const pageActive = usePageActive();
+  useDialogFocus(pageActive, 'theme-detail');
   useEffect(() => {
+    if (!pageActive) return;
     const key = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeRef.current();
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, []);
+  }, [pageActive]);
   const items = useMemo(
     () =>
       [...theme.constituents].sort((a, b) => {
@@ -335,7 +340,7 @@ export function ThemeDetail({
                   period={period}
                   expanded={expanded === item.symbol}
                   onToggle={() => setExpanded(expanded === item.symbol ? null : item.symbol)}
-                  openChart={openChart}
+                  openChart={(options) => openChart({ ...options, list: chartList(theme.name, items) })}
                 />
               ))}
             </ul>
