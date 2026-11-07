@@ -35,6 +35,20 @@ afterEach(() => {
   for (const value of forbidden) expect(text).not.toContain(value);
   for (const line of warnings) {
     const event = JSON.parse(line);
+    if (event.reason === 'asset-skipped') {
+      expect(Object.keys(event).sort()).toEqual(['classes', 'count', 'reason', 'reasons', 'step']);
+      expect(event.step).toBe('parse-balances');
+      expect(Number.isSafeInteger(event.count) && event.count > 0).toBe(true);
+      expect(Object.keys(event.reasons).sort()).toEqual(['asset-duplicate', 'asset-invalid']);
+      expect(event.reasons['asset-invalid'] + event.reasons['asset-duplicate']).toBe(event.count);
+      expect(
+        event.classes.every((c: string) =>
+          ['lowercase', 'symbol', 'too-long', 'empty', 'non-string', 'duplicate'].includes(c),
+        ),
+      ).toBe(true);
+      continue;
+    }
+
     expect(
       Object.keys(event).every((key) =>
         ['step', 'status', 'topLevelKeys', 'code', 'msg', 'reason'].includes(key),
@@ -63,6 +77,162 @@ const event = () => {
   expect(warnings).toHaveLength(1);
   return JSON.parse(warnings[0]!);
 };
+
+describe('MEXC unsupported asset names', () => {
+  it('normalizes mixed-case names and matches uppercase USDT tickers without warnings', () => {
+    const parsed = parseMexcBalances({
+      accountType: 'SPOT',
+      balances: [
+        { asset: 'USDe', free: '2', locked: '0.5' },
+        { asset: 'stETH', free: '3', locked: '0' },
+        { asset: 'ZERO-UNSUPPORTED', free: '0', locked: '0' },
+      ],
+    });
+    expect(parsed.skippedAssets).toBe(0);
+    expect(parsed.balances).toMatchObject([
+      { asset: 'STETH', symbol: 'STETH/USDT', quantity: '3' },
+      { asset: 'USDE', symbol: 'USDE/USDT', quantity: '2.5' },
+    ]);
+    expect(
+      quotesFrom(
+        [
+          { symbol: 'USDEUSDT', price: '1.01' },
+          { symbol: 'STETHUSDT', price: '3500' },
+        ],
+        parsed.balances,
+        now,
+      ),
+    ).toMatchObject({
+      'USDE/USDT': { price: '1.01' },
+      'STETH/USDT': { price: '3500' },
+    });
+    expect(warnings).toEqual([]);
+  });
+
+  it('skips unsupported and normalized duplicate names, counts rows once and logs only safe classes', () => {
+    const names = ['USDe', 'USDE', 'PRIVATE-ASSET', 'VERYLONGPRIVATECOIN123456789'];
+    const parsed = parseMexcBalances({
+      accountType: 'SPOT',
+      balances: names.map((asset) => ({
+        asset,
+        free: '987654321.123456789',
+        locked: '0',
+      })),
+    });
+    expect(parsed.skippedAssets).toBe(3);
+    expect(parsed.balances).toHaveLength(1);
+    expect(parsed.balances[0]).toMatchObject({
+      asset: 'USDE',
+      quantity: '987654321.123456789',
+    });
+    expect(event()).toEqual({
+      step: 'parse-balances',
+      reason: 'asset-skipped',
+      count: 3,
+      reasons: { 'asset-invalid': 2, 'asset-duplicate': 1 },
+      classes: ['duplicate', 'symbol', 'too-long'],
+    });
+    for (const name of names) expect(warnings.join('\n')).not.toContain(name);
+  });
+
+  it('retains the first accepted balance instead of adding a normalized duplicate, ignoring zero rows', () => {
+    const parsed = parseMexcBalances({
+      accountType: 'SPOT',
+      balances: [
+        { asset: 'USDE', free: '0', locked: '0' },
+        { asset: 'USDe', free: '2', locked: '0' },
+        { asset: 'usde', free: '99', locked: '0' },
+        { asset: 'USDE', free: '0', locked: '0' },
+      ],
+    });
+    expect(parsed.skippedAssets).toBe(1);
+    expect(parsed.balances).toMatchObject([{ asset: 'USDE', quantity: '2' }]);
+    expect(event()).toMatchObject({
+      reasons: { 'asset-invalid': 0, 'asset-duplicate': 1 },
+      classes: ['duplicate', 'lowercase'],
+    });
+  });
+
+  it.each(['connect', 'sync'] as const)(
+    'successfully returns an empty snapshot when %s skips every name',
+    async (operation) => {
+      const f = createMexcFixture(),
+        request = f.handler();
+      const connect = {
+        action: 'holdings.mexc.connect',
+        account: MEXC_ACCOUNT,
+        apiKey: TEST_KEY,
+        apiSecret: TEST_SECRET,
+        readOnlyConfirmed: true,
+        expectedRevision: null,
+      };
+      if (operation === 'sync') {
+        expect((await request(connect)).status).toBe(200);
+        f.advance();
+      }
+      f.setBalances([
+        { asset: 'PRIVATE-ASSET', free: '1', locked: '0' },
+        { asset: 'VERYLONGPRIVATECOIN123456789', free: '2', locked: '0' },
+      ]);
+      const response = await request(
+        operation === 'connect'
+          ? connect
+          : {
+              action: 'holdings.mexc.sync',
+              accountId: MEXC_ACCOUNT.id,
+            },
+      );
+      expect(response.status).toBe(200);
+      expect(response.body.data.skippedAssets).toBe(2);
+      expect(response.body.data.connections[0].balances).toEqual([]);
+      expect(response.body.data.document.accounts[0].holdings).toEqual([]);
+      expect(
+        f.calls
+          .filter((call) => call.parameters.operation === 'finish')
+          .every((call) => !Object.hasOwn(call.parameters.payload as object, 'skippedAssets')),
+      ).toBe(true);
+      expect((await request({ action: 'holdings.mexc.status' })).body.data).not.toHaveProperty(
+        'skippedAssets',
+      );
+      expect(event()).toMatchObject({
+        count: 2,
+        reasons: { 'asset-invalid': 2, 'asset-duplicate': 0 },
+      });
+    },
+  );
+
+  it('returns other holdings and their quotes on connect and sync, exposing only a skipped count', async () => {
+    const f = createMexcFixture(),
+      request = f.handler();
+    f.setBalances([
+      { asset: 'bTc', free: '1', locked: '0' },
+      { asset: 'BTC', free: '9', locked: '0' },
+      { asset: 'PRIVATE-ASSET', free: '1', locked: '0' },
+    ]);
+    const linked = await request({
+      action: 'holdings.mexc.connect',
+      account: MEXC_ACCOUNT,
+      apiKey: TEST_KEY,
+      apiSecret: TEST_SECRET,
+      readOnlyConfirmed: true,
+      expectedRevision: null,
+    });
+    expect(linked.status).toBe(200);
+    expect(linked.body.data.skippedAssets).toBe(2);
+    expect(linked.body.data.connections[0].balances).toMatchObject([{ asset: 'BTC', quantity: '1' }]);
+    expect(linked.body.data.connections[0].quotes['BTC/USDT'].price).toBe('65000');
+    expect(JSON.stringify(linked.body)).not.toContain('PRIVATE-ASSET');
+    f.advance();
+    f.setBalances([{ asset: 'ETH', free: '1', locked: '0' }]);
+    const synced = await request({
+      action: 'holdings.mexc.sync',
+      accountId: MEXC_ACCOUNT.id,
+    });
+    expect(synced.status).toBe(200);
+    expect(synced.body.data.skippedAssets).toBe(0);
+    expect(synced.body.data.connections[0].balances).toMatchObject([{ asset: 'ETH' }]);
+  });
+});
 
 describe('MEXC source diagnostics disclose only approved metadata', () => {
   it.each(['/api/v3/apiKeyInfo', '/api/v3/account', '/api/v3/ticker/price'] as const)(
@@ -223,7 +393,7 @@ describe('official Spot V3 examples and explicit success envelopes', () => {
       expect(() => assertReadOnlyKey(checked.value, TEST_KEY, checked.status)).not.toThrow();
       const response = await read(fetchResponse(wrap(account)), '/api/v3/account');
       expect(
-        parseMexcBalances(response.value, response.status).find((b) => b.asset === 'NBNTEST')!.quantity,
+        parseMexcBalances(response.value, response.status).balances.find((b) => b.asset === 'NBNTEST')!.quantity,
       ).toBe('1111111');
       const prices = await read(fetchResponse(wrap(ticker)), '/api/v3/ticker/price');
       expect(

@@ -20,6 +20,7 @@ const inactive = {
   busy: false,
   error: '',
   accountErrors: {} as Record<string, string>,
+  accountSkippedAssets: {} as Record<string, number>,
 };
 export class MexcStore {
   private readonly context = getStorageContextKey();
@@ -30,6 +31,7 @@ export class MexcStore {
     busy: false,
     error: '',
     accountErrors: {} as Record<string, string>,
+    accountSkippedAssets: {} as Record<string, number>,
   };
   private listeners = new Set<() => void>();
   getSnapshot = () => (this.context === getStorageContextKey() ? this.snapshot : inactive);
@@ -93,10 +95,17 @@ export class MexcStore {
       );
       this.active();
       const state = validateMexcState(raw);
+      const syncing = action === 'connect' || action === 'sync';
+      const skippedAssets = syncing && raw.skippedAssets !== undefined ? raw.skippedAssets : 0;
+      if (!Number.isSafeInteger(skippedAssets) || Number(skippedAssets) < 0 || Number(skippedAssets) > 10000)
+        throw new Error(MEXC_ERRORS.service);
       holdingsStore().acceptCloudDocument(raw.document);
       const accountErrors = { ...this.snapshot.accountErrors };
+      const accountSkippedAssets = { ...this.snapshot.accountSkippedAssets };
       if (accountId) delete accountErrors[accountId];
-      this.set({ state, accountErrors });
+      if (accountId && syncing) accountSkippedAssets[accountId] = Number(skippedAssets);
+      if (accountId && action === 'disconnect') delete accountSkippedAssets[accountId];
+      this.set({ state, accountErrors, accountSkippedAssets });
       return state;
     } catch (error) {
       const message =
