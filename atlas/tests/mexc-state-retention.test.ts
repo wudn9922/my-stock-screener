@@ -117,6 +117,58 @@ describe('transient account-specific skipped asset notice', () => {
   );
 });
 
+describe('transient skipped asset names', () => {
+  it('keeps validated names per account in RAM, retains them on apply/load and clears them on disconnect', async () => {
+    const document = { version: 1, accounts: [] };
+    h.api.mockResolvedValue({ ...state, document, skippedAssets: 2, skippedAssetNames: ['XXX-Y', 'usde'] });
+    const store = new MexcStore();
+    await store.call('connect', { account: { id: accountId } });
+    expect(store.getSnapshot().accountSkippedAssetNames).toEqual({ [accountId]: ['XXX-Y', 'usde'] });
+    expect(store.getSnapshot().state).not.toHaveProperty('skippedAssetNames');
+    h.api.mockResolvedValue({ ...state, document });
+    await store.load();
+    await store.call('apply', { accountId });
+    expect(store.getSnapshot().accountSkippedAssetNames[accountId]).toEqual(['XXX-Y', 'usde']);
+    for (const call of h.api.mock.calls) if (call[2]) expect(call[2]).not.toHaveProperty('skippedAssetNames');
+    h.api.mockResolvedValue({ ...state, document, skippedAssets: 0 });
+    await store.call('sync', { accountId });
+    expect(store.getSnapshot().accountSkippedAssetNames[accountId]).toEqual([]);
+    await store.call('disconnect', { accountId });
+    expect(store.getSnapshot().accountSkippedAssetNames[accountId]).toBeUndefined();
+    expect(new MexcStore().getSnapshot().accountSkippedAssetNames).toEqual({});
+  });
+  it('accepts an older response with a count but no names', async () => {
+    h.api.mockResolvedValue({ ...state, document: { version: 1, accounts: [] }, skippedAssets: 3 });
+    const store = new MexcStore();
+    await store.call('sync', { accountId });
+    expect(store.getSnapshot().accountSkippedAssets[accountId]).toBe(3);
+    expect(store.getSnapshot().accountSkippedAssetNames[accountId]).toEqual([]);
+  });
+  it.each([
+    ['not an array', 'XXX-Y', 1],
+    ['more names than skipped', ['A-1', 'B-2'], 1],
+    ['over 20 names', Array.from({ length: 21 }, (_, i) => `N-${i}`), 30],
+    ['over 40 characters', ['x'.repeat(41)], 1],
+    ['a control character', ['BAD\u0007'], 1],
+    ['a bidi override', ['BAD\u202E'], 1],
+    ['a blank name', ['  '], 1],
+    ['a non-string', [7], 1],
+  ])('rejects names with %s before accepting the cloud document', async (_label, skippedAssetNames, skippedAssets) => {
+    h.api.mockResolvedValue({ ...state, document: { version: 1, accounts: [] }, skippedAssets, skippedAssetNames });
+    const store = new MexcStore();
+    await expect(store.call('sync', { accountId })).rejects.toThrow(MEXC_ERRORS.service);
+    expect(h.accept).not.toHaveBeenCalled();
+    expect(store.getSnapshot().accountSkippedAssetNames).toEqual({});
+  });
+  it('accepts exactly 20 names of 40 characters', async () => {
+    const names = Array.from({ length: 20 }, (_, i) => `${i}`.padEnd(40, '-'));
+    h.api.mockResolvedValue({ ...state, document: { version: 1, accounts: [] }, skippedAssets: 25, skippedAssetNames: names });
+    const store = new MexcStore();
+    await store.call('sync', { accountId });
+    expect(store.getSnapshot().accountSkippedAssetNames[accountId]).toEqual(names);
+  });
+});
+
 describe('RAM-only futures data', () => {
   it('isolates accounts, updates on sync, retains on apply/load, clears on disconnect and never passes futures into holdings', async () => {
     const document = { version: 1, accounts: [] };

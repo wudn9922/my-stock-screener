@@ -7,6 +7,7 @@ import { loadHoldingQuotes, loadHoldingsDirectory } from './quotes';
 import {
   Money,
   decimalText,
+  formatAmount,
   summarizeHoldings,
   valueHolding,
   type Broker,
@@ -20,6 +21,16 @@ import { formatDateTime, toneClass } from '../ui/format';
 import './holdings.css';
 import { MexcPanel } from './MexcPanel';
 import { mexcStore } from './mexc';
+import { HiddenHoldings, VisibilitySettings } from './HoldingsVisibility';
+import {
+  forgetAccount,
+  hiddenReason,
+  hide,
+  holdingKey,
+  holdingsVisibility,
+  unhide,
+  type HiddenReason,
+} from './visibility';
 
 /**
  * Account choices. Taiwan brokers also offer 複委託 (sub-brokerage) accounts that hold US stocks
@@ -38,11 +49,7 @@ const BROKERS: { key: string; id: Broker; name: string; label: string; kind: Hol
   { key: 'firstrade', id: 'firstrade', name: 'Firstrade', label: 'Firstrade 美股', kind: 'us-broker', currency: 'USD' },
   { key: 'mexc', id: 'mexc', name: 'MEXC', label: 'MEXC 加密貨幣', kind: 'crypto-exchange', currency: 'USDT' },
 ];
-function amount(value: string | null | undefined, digits = 2) {
-  if (value == null) return '—';
-  const [integer, fraction] = new Money(value).toFixed(digits).split('.');
-  return integer!.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (fraction === undefined ? '' : `.${fraction}`);
-}
+const amount = formatAmount;
 function Signed({ value, percent = false }: { value: string | null; percent?: boolean }) {
   return (
     <span className={toneClass(value === null ? null : Number(value))}>
@@ -58,6 +65,8 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const mexc = mexcStore();
   const mexcSnapshot = useSyncExternalStore(mexc.subscribe, mexc.getSnapshot);
+  const visibility = holdingsVisibility();
+  const visibilityPreferences = useSyncExternalStore(visibility.subscribe, visibility.getSnapshot);
   const [directory, setDirectory] = useState<ImportSymbol[] | null>(null),
     [directoryError, setDirectoryError] = useState(false),
     [directoryAttempt, setDirectoryAttempt] = useState(0);
@@ -154,8 +163,16 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
         : connection.quotes[holding.symbol]
       : quotes[holding.symbol];
   };
-  const all = document.accounts.flatMap((entry) =>
-    entry.holdings.map((holding) => ({ holding, result: valueHolding(holding, holdingQuote(holding), costs) })),
+  const evaluated = document.accounts.flatMap((entry) =>
+    entry.holdings.map((holding) => {
+      const result = valueHolding(holding, holdingQuote(holding), costs);
+      return { holding, result, hidden: hiddenReason(holding, entry.account, result.value, visibilityPreferences) };
+    }),
+  );
+  // Hidden holdings are a view preference: every total, subtotal and note below uses `all` (visible only).
+  const all = evaluated.filter((row) => row.hidden === null);
+  const hiddenRows = evaluated.filter(
+    (row): row is (typeof evaluated)[number] & { hidden: HiddenReason } => row.hidden !== null,
   );
   const evaluatedSummary = summarizeHoldings(all, rates);
   const summary = { ...evaluatedSummary, partial: evaluatedSummary.partial || pendingAccounts.size > 0 };
@@ -172,6 +189,9 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           ? -1
           : new Money(bv).cmp(av);
     });
+  const selectedHidden = hiddenRows
+    .filter((row) => row.holding.accountId === selected?.account.id)
+    .sort((a, b) => a.holding.symbol.localeCompare(b.holding.symbol));
   const blocked = snapshot.loading || !!snapshot.error || busy || mexcSnapshot.busy;
   const importAccount = draft ?? selected?.account;
   const subtotal = (items: typeof all) => (
@@ -352,6 +372,11 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 </strong>
               </div>
             </div>
+            {hiddenRows.length > 0 && (
+              <p className="holdings-muted" data-testid="holdings-hidden-total-note">
+                已隱藏 {hiddenRows.length} 檔持股，未計入總計與小計。
+              </p>
+            )}
             {summary.partial && (
               <p role="note">
                 {pendingAccounts.size > 0
@@ -467,9 +492,11 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
               onClick={() => {
                 if (!selected || !confirm('刪除此帳戶與全部持股？此操作無法復原。')) return;
                 setBusy(true);
+                const removed = selected.account.id;
                 void store
-                  .removeAccount(selected.account.id)
+                  .removeAccount(removed)
                   .then(() => {
+                    visibility.update((current) => forgetAccount(current, removed));
                     setEditing(false);
                     setDraft(null);
                   })
@@ -532,6 +559,18 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             {selected.account.name} · {selected.account.currency}
           </h3>
           {subtotal(all.filter((row) => row.holding.accountId === selected.account.id))}
+          <VisibilitySettings
+            key={selected.account.id}
+            account={selected.account}
+            rules={visibilityPreferences.accounts[selected.account.id]}
+            storageMode={access.storageMode}
+            onChange={(rules) =>
+              visibility.update((current) => ({
+                ...current,
+                accounts: { ...current.accounts, [selected.account.id]: rules },
+              }))
+            }
+          />
           {quotesBusy && <p role="status">讀取報價中…</p>}
           <div className="holdings-cards">
             {rows.map(({ holding, result }) => {
@@ -619,6 +658,18 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                         : '目前來源無可用報價'}{' '}
                     · 持股更新 {formatDateTime(holding.updatedAt)}
                   </p>
+                  <div className="holdings-toolbar">
+                    <button
+                      type="button"
+                      className="text-button"
+                      title="不顯示，也不計入總計"
+                      onClick={() =>
+                        visibility.update((current) => hide(current, holdingKey(holding.accountId, holding.symbol)))
+                      }
+                    >
+                      隱藏
+                    </button>
+                  </div>
                 </article>
               );
             })}
@@ -627,9 +678,22 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             <p>
               {pendingAccounts.has(selected.account.id)
                 ? '請先確認 MEXC 餘額與平均成本，再計算持股損益。'
-                : '此帳戶目前沒有持股，可匯入庫存表格。'}
+                : selectedHidden.length
+                  ? '此帳戶的持股都已隱藏，可在下方「已隱藏」取消隱藏。'
+                  : '此帳戶目前沒有持股，可匯入庫存表格。'}
             </p>
           )}
+          <HiddenHoldings
+            key={selected.account.id}
+            account={selected.account}
+            rows={selectedHidden}
+            rules={visibilityPreferences.accounts[selected.account.id]}
+            onUnhide={(holding, ruleStillHides) =>
+              visibility.update((current) =>
+                unhide(current, holdingKey(holding.accountId, holding.symbol), ruleStillHides),
+              )
+            }
+          />
         </section>
       )}
       {!document.accounts.length && !editing && !creating && !connecting && !snapshot.loading && (

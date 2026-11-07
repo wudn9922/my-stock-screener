@@ -132,7 +132,7 @@ test('futures permission, failure and empty-position notices preserve a successf
   await expect(panel(page).getByRole('article')).toHaveCount(3);
 });
 
-test('unsupported names show a count on connect and automatic sync while other balances continue normally', async ({
+test('unsupported names are shown to the user on connect and automatic sync while other balances continue normally', async ({
   page,
 }) => {
   const f = await setup(page);
@@ -144,10 +144,15 @@ test('unsupported names show a count on connect and automatic sync while other b
     { asset: 'VERYLONGPRIVATECOIN123456789', free: '8', locked: '0' },
   ]);
   await enterKeys(page);
-  await expect(mexc(page)).toContainText('有 2 個 MEXC 資產名稱格式不支援，未匯入；其他持股已同步。');
+  await expect(mexc(page).getByTestId('mexc-skipped-assets')).toHaveText(
+    '有 2 個 MEXC 資產名稱格式不支援，未匯入：PRIVATE-ASSET、VERYLONGPRIVATECOIN123456789；其他持股已同步。',
+  );
   await expect(mexc(page).getByRole('alert')).toHaveCount(0);
-  await expect(mexc(page)).not.toContainText('PRIVATE-ASSET');
-  await expect(mexc(page)).not.toContainText('VERYLONGPRIVATECOIN123456789');
+  // The names reach only this user's notice: never a URL or browser storage.
+  expect(f.urls.join('\n')).not.toMatch(/PRIVATE-ASSET|VERYLONGPRIVATECOIN/);
+  expect(
+    await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } })),
+  ).not.toMatch(/PRIVATE-ASSET|VERYLONGPRIVATECOIN/);
   await confirmCosts(page);
   await expect(mexc(page)).toContainText('有 2 個 MEXC 資產名稱格式不支援');
   f.setBalances([
@@ -155,7 +160,9 @@ test('unsupported names show a count on connect and automatic sync while other b
     { asset: 'PRIVATE-ASSET', free: '7', locked: '0' },
   ]);
   await tick(page, f, 301000);
-  await expect(mexc(page)).toContainText('有 1 個 MEXC 資產名稱格式不支援，未匯入；其他持股已同步。');
+  await expect(mexc(page).getByTestId('mexc-skipped-assets')).toHaveText(
+    '有 1 個 MEXC 資產名稱格式不支援，未匯入：PRIVATE-ASSET；其他持股已同步。',
+  );
   await expect(panel(page).getByRole('article')).toHaveCount(1);
   f.setBalances([{ asset: 'BTC', free: '0.1', locked: '0.02' }]);
   await tick(page, f);
@@ -174,7 +181,7 @@ test('an all-skipped snapshot connects successfully and displays the warning wit
   f.setBalances([{ asset: 'PRIVATE-ASSET', free: '7', locked: '0' }]);
   await enterKeys(page);
   await expect(mexc(page)).toContainText('已連線');
-  await expect(mexc(page)).toContainText('有 1 個 MEXC 資產名稱格式不支援，未匯入；其他持股已同步。');
+  await expect(mexc(page)).toContainText('有 1 個 MEXC 資產名稱格式不支援，未匯入：PRIVATE-ASSET；其他持股已同步。');
   await expect(mexc(page).getByRole('alert')).toHaveCount(0);
   await expect(panel(page).getByRole('article')).toHaveCount(0);
 });

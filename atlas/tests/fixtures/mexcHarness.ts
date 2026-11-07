@@ -46,6 +46,7 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
     { asset: 'USDT', free: '100', locked: '0' },
   ];
   let futuresResponses: Record<string, unknown> | undefined;
+  let futuresSymbolShape: 'object' | 'array' = 'object';
   const ownerDocument = (owner: string) =>
     structuredClone(documents.get(owner) ?? { version: 1 as const, accounts: [] });
   const slot = (owner: string, id: string) => `${owner}:${id}`;
@@ -273,7 +274,18 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
     if (path.startsWith('/api/v1/')) {
       if (!futuresResponses || !(path in futuresResponses)) throw new Error('Unexpected futures path');
       const body = futuresResponses[path];
-      return typeof body === 'function' ? body(input, init) : Response.json({ success: true, code: 0, data: body });
+      if (typeof body === 'function') return body(input, init);
+      const symbol = new URL(url).searchParams.get('symbol');
+      if (symbol !== null && Array.isArray(body)) {
+        // Documented per-symbol query: one wrapped object by default, or a one-row array.
+        const rows = body.filter((row) => (row as Row | null)?.symbol === symbol);
+        return Response.json({
+          success: true,
+          code: 0,
+          data: futuresSymbolShape === 'array' ? rows : (rows[0] ?? null),
+        });
+      }
+      return Response.json({ success: true, code: 0, data: body });
     }
     if (failure === 'network') throw new Error(`PRIVATE ${TEST_SECRET} ${url}`);
     if (failure === 'rate')
@@ -386,6 +398,9 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
       sourceBalances = value;
     },
     setFutures: (value?: Record<string, unknown>) => { futuresResponses = value; },
+    setFuturesSymbolShape: (value: typeof futuresSymbolShape) => {
+      futuresSymbolShape = value;
+    },
     setFailure: (value: typeof failure) => {
       failure = value;
     },
