@@ -116,3 +116,35 @@ describe('transient account-specific skipped asset notice', () => {
     },
   );
 });
+
+describe('RAM-only futures data', () => {
+  it('isolates accounts, updates on sync, retains on apply/load, clears on disconnect and never passes futures into holdings', async () => {
+    const document = { version: 1, accounts: [] };
+    h.api.mockResolvedValue({ ...state, document, futures: { status: 'no-permission' } });
+    const store = new MexcStore();
+    await store.call('connect', { account: { id: accountId } });
+    expect(store.getSnapshot().accountFutures[accountId]).toEqual({ status: 'no-permission' });
+    const other = '33333333-3333-4333-8333-333333333333';
+    h.api.mockResolvedValue({ ...state, document, futures: { status: 'unavailable' } });
+    await store.call('sync', { accountId: other });
+    expect(store.getSnapshot().accountFutures[accountId]).toEqual({ status: 'no-permission' });
+    expect(store.getSnapshot().accountFutures[other]).toEqual({ status: 'unavailable' });
+    await store.load(); await store.call('apply', { accountId });
+    expect(store.getSnapshot().accountFutures[accountId]).toEqual({ status: 'no-permission' });
+    expect(store.getSnapshot().state).not.toHaveProperty('futures');
+    for (const [doc] of h.accept.mock.calls) expect(doc).toBe(document);
+    for (const call of h.api.mock.calls) if (call[2]) expect(call[2]).not.toHaveProperty('futures');
+    await store.call('disconnect', { accountId: other });
+    expect(store.getSnapshot().accountFutures[other]).toBeUndefined();
+    expect(new MexcStore().getSnapshot().accountFutures).toEqual({});
+  });
+  it('a malformed futures payload becomes unavailable without failing spot or displaying unchecked fields', async () => {
+    const document = { version: 1, accounts: [] };
+    h.api.mockResolvedValue({ ...state, document, futures: { status: 'ok', account: {}, positions: [], skippedPositions: 0 } });
+    const store = new MexcStore();
+    await store.call('sync', { accountId });
+    expect(store.getSnapshot().accountFutures[accountId]).toEqual({ status: 'unavailable' });
+    expect(h.accept).toHaveBeenCalledExactlyOnceWith(document);
+    expect(store.getSnapshot().accountErrors).toEqual({});
+  });
+});

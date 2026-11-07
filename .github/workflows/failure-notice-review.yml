@@ -1,0 +1,28 @@
+name: System notification verification
+on:
+  pull_request:
+    paths:
+      - '.github/actions/notify-failure/**'
+      - '.github/workflows/**'
+      - 'scripts/check_data_freshness.py'
+      - 'tests/test_failure_notifications.py'
+      - 'tests/test_data_freshness.py'
+      - 'tests/test_cancelled_notification_policy.py'
+      - 'tests/fixtures/notifications/**'
+      - 'scripts/replay_cancelled_notifications.py'
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyyaml
+      - name: Fake delivery and session-date regressions only
+        run: |
+          python -m unittest discover -s tests -p test_failure_notifications.py -v
+          python -m unittest discover -s tests -p test_data_freshness.py -v
+          python -m unittest discover -s tests -p test_cancelled_notification_policy.py -v

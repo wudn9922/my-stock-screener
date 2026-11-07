@@ -7,6 +7,7 @@ import {
   validateHoldingsDocument,
 } from './holdings.ts';
 import { MEXC_ERRORS, validateMexcState, type MexcBalance, type MexcQuote } from './mexcContract.ts';
+import { readMexcFutures, type FuturesStep } from './mexcFutures.ts';
 
 type ErrorCode = keyof typeof MEXC_ERRORS;
 export class MexcError extends Error {
@@ -19,7 +20,7 @@ export class MexcError extends Error {
     super(MEXC_ERRORS[code]);
   }
 }
-type DiagnosticStep = 'apiKeyInfo' | 'account' | 'ticker' | 'parse-balances' | 'parse-quotes' | 'assert-key';
+type DiagnosticStep = 'apiKeyInfo' | 'account' | 'ticker' | 'parse-balances' | 'parse-quotes' | 'assert-key' | FuturesStep;
 const safeKeys = new Set([
   'code',
   'msg',
@@ -66,6 +67,13 @@ const safeMessages = new Set([
 function diagnostic(step: DiagnosticStep, status: number | null, value: unknown, reason: string) {
   const row =
     value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  if (step.startsWith('futures-')) {
+    console.warn(JSON.stringify({ step, status, reason,
+      ...(typeof row.code === 'number' && Number.isSafeInteger(row.code) ? { code: row.code } : {}),
+      ...(typeof row.msg === 'string' && safeMessages.has(row.msg) ? { msg: row.msg } : {}),
+    }));
+    return;
+  }
   const keys = [
     ...new Set(
       Object.keys(row)
@@ -589,6 +597,11 @@ export async function handleMexc(
     );
     const ticker = await readMexc('/api/v3/ticker/price', fetcher, controller.signal, now());
     const quotes = quotesFrom(ticker.value, balances, now(), ticker.status, ticker.diagnosticValue);
+    // Optional reads only start after every spot source has been validated.
+    // Keep the final authorization/revision check after all upstream I/O.
+    const permitted = String(holdingsObject(info.value).permissions).split(',').map(p => p.trim())
+      .includes('CONTRACT_ACCOUNT_READ');
+    const futures = await readMexcFutures(auth, permitted, fetcher, controller.signal, now, diagnostic);
     const envelope =
       operation === 'connect' ? await encryptMexcCredentials(auth, key, owner, accountId) : undefined;
     try {
@@ -610,6 +623,7 @@ export async function handleMexc(
       ...publicState(row),
       document: validateHoldingsDocument(row.document),
       skippedAssets,
+      futures,
     };
   } catch (error) {
     // No raw network errors, signed URLs, credentials, or balances enter logs.
