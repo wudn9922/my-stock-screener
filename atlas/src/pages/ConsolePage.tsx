@@ -35,6 +35,7 @@ import { HoldingsPanel } from '../holdings/HoldingsPanel';
 import { getStorageContextKey } from '../auth/storage';
 import { useStockParameters } from '../cloud/useStockParameters';
 import { stockParameterMap } from '../cloud/stockParameters';
+import { loadPeRiverFile } from '../fundamentals/peRiverRank';
 
 type CloudList = { id: string; definition: unknown; updated_at: string };
 
@@ -148,7 +149,8 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         ? await loadScreenerFixedMAs(items, await settingsApi<ParameterStock[]>('stocks.list'), getDailyBars)
         : undefined;
       const pe = parseFilters(selected.filters).pe ? await getScreenerPeFigures(items, selected.market) : undefined;
-      const members = evaluateWatchlist(selected, items, growth, fixedMAs, pe);
+      const peRiver = parseFilters(selected.filters).per ? await loadPeRiverFile(selected.market) : undefined;
+      const members = evaluateWatchlist(selected, items, growth, fixedMAs, pe, peRiver);
       if (!active) return;
       const latest = store.getSnapshot().document.lists.find((entry) => entry.id === selected.id);
       if (!latest || latest.filters !== selected.filters || latest.group !== selected.group) return;
