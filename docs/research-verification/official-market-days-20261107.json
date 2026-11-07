@@ -1,0 +1,237 @@
+{
+  "version": 1,
+  "checkedAt": "2026-11-07T09:56:43.492209+00:00",
+  "method": "Direct HTTPS GET to both official dated daily quote endpoints. TWSE explicitly reports no matching data; TPEx echoes the requested date with zero daily quote rows. HTTP/network/JSON failures are never treated as closure evidence.",
+  "dates": [
+    {
+      "date": "2022-02-04",
+      "result": "closed",
+      "evidence": [
+        {
+          "exchange": "twse",
+          "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20220204&type=ALLBUT0999",
+          "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+          "bytes": 71,
+          "stat": "很抱歉，沒有符合條件的資料!",
+          "responseDate": null,
+          "quoteRows": 0
+        },
+        {
+          "exchange": "tpex",
+          "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=111%2F02%2F04&id=&response=json",
+          "sha256": "3043d74dc00e516a8326fe120f5ff489a8f19cb9dd5890f2b57320623dc323b0",
+          "bytes": 1630,
+          "stat": "ok",
+          "responseDate": "20220204",
+          "quoteRows": 0
+        }
+      ]
+    },
+    {
+      "date": "2023-01-18",
+      "result": "closed",
+      "evidence": [
+        {
+          "exchange": "twse",
+          "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20230118&type=ALLBUT0999",
+          "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+          "bytes": 71,
+          "stat": "很抱歉，沒有符合條件的資料!",
+          "responseDate": null,
+          "quoteRows": 0
+        },
+        {
+          "exchange": "tpex",
+          "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=112%2F01%2F18&id=&response=json",
+          "sha256": "1e733b3ac94c2cf5180ed4c50b2cc5a8d75db4c887f590034b7f3bddd3350bc9",
+          "bytes": 1630,
+          "stat": "ok",
+          "responseDate": "20230118",
+          "quoteRows": 0
+        }
+      ]
+    },
+    {
+      "date": "2024-10-31",
+      "result": "closed",
+      "evidence": [
+        {
+          "exchange": "twse",
+          "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20241031&type=ALLBUT0999",
+          "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+          "bytes": 71,
+          "stat": "很抱歉，沒有符合條件的資料!",
+          "responseDate": null,
+          "quoteRows": 0
+        },
+        {
+          "exchange": "tpex",
+          "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=113%2F10%2F31&id=&response=json",
+          "sha256": "ea53127c7c0cc77cbbf443ac716f5cc1185264ad2f21974e519b2fbc1fdf8d33",
+          "bytes": 1630,
+          "stat": "ok",
+          "responseDate": "20241031",
+          "quoteRows": 0
+        }
+      ]
+    },
+    {
+      "date": "2026-07-10",
+      "result": "closed",
+      "evidence": [
+        {
+          "exchange": "twse",
+          "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20260710&type=ALLBUT0999",
+          "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+          "bytes": 71,
+          "stat": "很抱歉，沒有符合條件的資料!",
+          "responseDate": null,
+          "quoteRows": 0
+        },
+        {
+          "exchange": "tpex",
+          "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=115%2F07%2F10&id=&response=json",
+          "sha256": "dbe663baef40aedfd8a73857f8b71e8ef7b86cd46138d8637dfbe87345e87b5b",
+          "bytes": 1630,
+          "stat": "ok",
+          "responseDate": "20260710",
+          "quoteRows": 0
+        }
+      ]
+    }
+  ],
+  "prerequisite": {
+    "initialObservation": {
+      "pr": 230,
+      "url": "https://github.com/wudn9922/my-stock-screener/pull/230",
+      "observedState": "OPEN",
+      "mergedAt": null,
+      "mainAtStart": "22ffc817f",
+      "status": "Archive implementation/integration awaits baseline decision; no archive data written."
+    },
+    "resolved": true,
+    "mergedMain": "0f42fef0b",
+    "integrationCommit": "cdd648d7f",
+    "method": "ordinary merge of latest main after #230 merged; no separate incorporation of #230"
+  },
+  "verifiedEndpoints": [
+    {
+      "purpose": "TWSE daily OHLCV",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20210406&type=ALLBUT0999",
+      "fields": [
+        "證券代號",
+        "成交股數",
+        "開盤價",
+        "最高價",
+        "最低價",
+        "收盤價"
+      ],
+      "date": "20210406"
+    },
+    {
+      "purpose": "TPEx daily OHLCV",
+      "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=110%2F04%2F06&id=&response=json",
+      "fields": [
+        "代號",
+        "成交股數",
+        "開盤",
+        "最高",
+        "最低",
+        "收盤"
+      ],
+      "date": "20210406",
+      "tableDate": "110/04/06"
+    },
+    {
+      "purpose": "TWSE ^TWII monthly historical OHLC",
+      "url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?response=json&date=20210406",
+      "fields": [
+        "日期",
+        "開盤指數",
+        "最高指數",
+        "最低指數",
+        "收盤指數"
+      ],
+      "example": [
+        "110/04/06",
+        "16,711.79",
+        "16,804.45",
+        "16,711.79",
+        "16,739.87"
+      ],
+      "volume": "Not supplied by this endpoint; must preserve unknown volume rather than manufacture zero."
+    }
+  ],
+  "missingDayQuotes": [
+    {
+      "date": "2021-04-06",
+      "sources": [
+        {
+          "exchange": "twse",
+          "stat": "OK",
+          "responseDate": "20210406",
+          "bytes": 194892,
+          "sha256": "f4ec7155f5bad446b256c0022e179e2bbd2681faf77b2bb049096d5e46b42f2d",
+          "tables": [
+            {
+              "title": "110年04月06日 每日收盤行情(全部(不含權證、牛熊證、可展延牛熊證))",
+              "rows": 1128
+            }
+          ]
+        },
+        {
+          "exchange": "tpex",
+          "stat": "ok",
+          "responseDate": "20210406",
+          "bytes": 1046959,
+          "sha256": "4b870604e82b18007e5509686690623c859588644a198fc5f58e90716be13c27",
+          "tables": [
+            {
+              "title": "上櫃股票行情",
+              "rows": 6844
+            },
+            {
+              "title": "管理股票",
+              "rows": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "date": "2025-08-01",
+      "sources": [
+        {
+          "exchange": "twse",
+          "stat": "OK",
+          "responseDate": "20250801",
+          "bytes": 232851,
+          "sha256": "d566b0b806ccbbdb07fbf098311d6921cc12da72100d55f0f787287630ed0647",
+          "tables": [
+            {
+              "title": "114年08月01日 每日收盤行情(全部(不含權證、牛熊證、可展延牛熊證))",
+              "rows": 1302
+            }
+          ]
+        },
+        {
+          "exchange": "tpex",
+          "stat": "ok",
+          "responseDate": "20250801",
+          "bytes": 1709215,
+          "sha256": "4299a701e753282ec50a53c1bc387cbe2ef710a853dc029a322bfd8ba4454c3d",
+          "tables": [
+            {
+              "title": "上櫃股票行情",
+              "rows": 11403
+            },
+            {
+              "title": "管理股票",
+              "rows": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

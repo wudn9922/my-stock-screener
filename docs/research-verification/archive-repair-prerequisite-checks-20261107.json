@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "verifiedAt": "2026-11-07T10:11:41.848601+00:00",
+  "scope": "Historical prerequisite checks before #230 merged; superseded by official-archive-repair-verification-20261107.json.",
+  "python": {
+    "command": "KLINE_CORRECTIONS_LOG=... venv/bin/python -m pytest -q tests",
+    "passed": 1941,
+    "subtestsPassed": 168,
+    "existingConditionalBenchmarkSkipped": 1,
+    "conditionalBenchmarkSeparateRun": {
+      "command": "KLINE_ARCHIVE_PERFORMANCE=1 venv/bin/python -m unittest discover -s tests -p test_kline_archive_performance.py -v",
+      "status": "passed",
+      "tests": 1,
+      "elapsedSeconds": 399.089,
+      "results": {
+        "symbols": 7000,
+        "files": 21000,
+        "rows": 3661000,
+        "verificationSeconds": 76.129,
+        "applySeconds": 149.94,
+        "conflicts": 2240000,
+        "conflictBytes": 6874398,
+        "dailyPublishSeconds": 241.03,
+        "baselineBatchProcesses": 1
+      },
+      "scope": "Synthetic temporary archive and local bare Git remote only; no production write."
+    }
+  },
+  "cancellation": {
+    "command": "python -m unittest discover -s tests -p test_cancelled_notification_policy.py",
+    "passed": 14,
+    "atCancellation": {
+      "runs": 21,
+      "suppressed": 21,
+      "notifications": 0
+    }
+  },
+  "atlas": {
+    "vitest": {
+      "files": 158,
+      "tests": 2017,
+      "status": "passed"
+    },
+    "lint": "passed",
+    "build": "passed"
+  },
+  "archive": {
+    "command": "venv/bin/python scripts/kline_archive.py verify --archive-dir .cache/kline-archive --base HEAD^",
+    "commit": "62bd86a6e7fcde3572c56aa607eed5018a0cfe68",
+    "base": "9a5029e32d3425466296927b494a2e6852b43439",
+    "status": "passed",
+    "results": {
+      "files": 41573,
+      "rows": 9796080,
+      "totalBytes": 520080778,
+      "csvBytes": 489025679
+    },
+    "includesGlobal": true,
+    "gitStatusAfter": "",
+    "writes": false
+  },
+  "review": "Primary self-review only; no independent sign-off.",
+  "historical": true,
+  "supersededBy": "official-archive-repair-verification-20261107.json",
+  "initialScope": "Completed cross-event cancellation fix and read-only prerequisite research. Repair/add/remove/restore workflow not implemented pending PR #230 baseline decision."
+}

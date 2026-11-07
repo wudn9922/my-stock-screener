@@ -6,6 +6,150 @@
     "tw": {
       "closedSessions": [
         {
+          "date": "2022-02-04",
+          "reasons": [
+            "official-no-quotes"
+          ],
+          "officialEvidence": [
+            {
+              "exchange": "twse",
+              "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20220204&type=ALLBUT0999",
+              "bytes": 71,
+              "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+              "stat": "很抱歉，沒有符合條件的資料!",
+              "responseDate": null,
+              "quoteRows": 0
+            },
+            {
+              "exchange": "tpex",
+              "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=111%2F02%2F04&id=&response=json",
+              "bytes": 1630,
+              "sha256": "3043d74dc00e516a8326fe120f5ff489a8f19cb9dd5890f2b57320623dc323b0",
+              "stat": "ok",
+              "responseDate": "20220204",
+              "quoteRows": 0
+            }
+          ],
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "flatZeroShare": null,
+          "coverageReference": 0,
+          "affectedRows": 0
+        },
+        {
+          "date": "2023-01-18",
+          "reasons": [
+            "official-no-quotes"
+          ],
+          "officialEvidence": [
+            {
+              "exchange": "twse",
+              "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20230118&type=ALLBUT0999",
+              "bytes": 71,
+              "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+              "stat": "很抱歉，沒有符合條件的資料!",
+              "responseDate": null,
+              "quoteRows": 0
+            },
+            {
+              "exchange": "tpex",
+              "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=112%2F01%2F18&id=&response=json",
+              "bytes": 1630,
+              "sha256": "1e733b3ac94c2cf5180ed4c50b2cc5a8d75db4c887f590034b7f3bddd3350bc9",
+              "stat": "ok",
+              "responseDate": "20230118",
+              "quoteRows": 0
+            }
+          ],
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "flatZeroShare": null,
+          "coverageReference": 0,
+          "affectedRows": 0
+        },
+        {
+          "date": "2024-10-31",
+          "reasons": [
+            "official-no-quotes"
+          ],
+          "officialEvidence": [
+            {
+              "exchange": "twse",
+              "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20241031&type=ALLBUT0999",
+              "bytes": 71,
+              "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+              "stat": "很抱歉，沒有符合條件的資料!",
+              "responseDate": null,
+              "quoteRows": 0
+            },
+            {
+              "exchange": "tpex",
+              "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=113%2F10%2F31&id=&response=json",
+              "bytes": 1630,
+              "sha256": "ea53127c7c0cc77cbbf443ac716f5cc1185264ad2f21974e519b2fbc1fdf8d33",
+              "stat": "ok",
+              "responseDate": "20241031",
+              "quoteRows": 0
+            }
+          ],
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "flatZeroShare": null,
+          "coverageReference": 0,
+          "affectedRows": 0
+        },
+        {
+          "date": "2026-07-10",
+          "reasons": [
+            "official-no-quotes"
+          ],
+          "officialEvidence": [
+            {
+              "exchange": "twse",
+              "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20260710&type=ALLBUT0999",
+              "bytes": 71,
+              "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+              "stat": "很抱歉，沒有符合條件的資料!",
+              "responseDate": null,
+              "quoteRows": 0
+            },
+            {
+              "exchange": "tpex",
+              "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=115%2F07%2F10&id=&response=json",
+              "bytes": 1630,
+              "sha256": "dbe663baef40aedfd8a73857f8b71e8ef7b86cd46138d8637dfbe87345e87b5b",
+              "stat": "ok",
+              "responseDate": "20260710",
+              "quoteRows": 0
+            }
+          ],
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "flatZeroShare": null,
+          "coverageReference": 0,
+          "affectedRows": 0
+        },
+        {
           "date": "2026-10-23",
           "reasons": [
             "primary-index-missing",
@@ -51,42 +195,6 @@
               }
             }
           ]
-        },
-        {
-          "date": "2022-02-04",
-          "reason": "missing-session-data",
-          "calendar": "XTAI",
-          "calendarSession": true,
-          "primaryIndexMissing": true,
-          "observedSymbols": 0,
-          "officialSources": []
-        },
-        {
-          "date": "2023-01-18",
-          "reason": "missing-session-data",
-          "calendar": "XTAI",
-          "calendarSession": true,
-          "primaryIndexMissing": true,
-          "observedSymbols": 0,
-          "officialSources": []
-        },
-        {
-          "date": "2024-10-31",
-          "reason": "missing-session-data",
-          "calendar": "XTAI",
-          "calendarSession": true,
-          "primaryIndexMissing": true,
-          "observedSymbols": 0,
-          "officialSources": []
-        },
-        {
-          "date": "2026-07-10",
-          "reason": "missing-session-data",
-          "calendar": "XTAI",
-          "calendarSession": true,
-          "primaryIndexMissing": true,
-          "observedSymbols": 0,
-          "officialSources": []
         }
       ]
     },

@@ -64,3 +64,27 @@ test('calendar session gap retains official April 6 in daily, weekly and monthly
     if (tf === '1D') await page.screenshot({ path: info.outputPath('calendar-missing-session.png') });
   }
 });
+
+test('physically removed placeholder keeps chart dates and prices aligned', async ({ page }) => {
+  await mockSite(page);
+  const csv = 'Date,Open,High,Low,Close,Volume\n2026-10-22,100,100,100,100,0\n2026-10-27,101,102,100,101,1000\n';
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.route('**/report/market-closures.json', route => route.fulfill({ status: 503 }));
+  await page.route(root + '**', route => {
+    const path = route.request().url().slice(root.length);
+    if (path === 'index/tw/2330.TW.json') return route.fulfill({ json: archiveIndexFixture('2330.TW', { 2026: csv }) });
+    return route.fulfill(path === 'tw/2330.TW/2026.csv' ? { contentType: 'text/csv', body: csv } : { status: 404 });
+  });
+  await page.route('**/functions/v1/market-chart?**', route => route.fulfill({ status: 502 }));
+  for (const tf of ['1D', '1W', '1M']) {
+    await page.goto(`./?page=chart&symbol=2330.TW&tf=${tf}`);
+    await expect(page.getByTestId('chart')).toBeVisible();
+    await expect(page.locator('.chart-loading.error')).toHaveCount(0);
+    await expect(page.getByTestId('ohlc-header')).toContainText('101.00');
+    await expect(page.getByTestId('source-label')).toContainText('顯示至 2026-10-27 收盤');
+    await expect(page.getByTestId('archive-availability')).toContainText('2026-10-27');
+    expect(await page.locator('#main').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+  }
+  expect(errors).toEqual([]);
+});

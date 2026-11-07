@@ -1,3 +1,29 @@
+## PR #240 修訂：根目錄匯入與保守三日比較（2026-11-07）
+
+只更新原PR，沒有合併PR、dispatch、部署或寫正式archive。一般merge main `6e279a94bf`（#241），merge commit `aaeb4e0318`；REVIEW_PACKAGE前置段落衝突保留雙方紀錄，沒有rebase／force-push。只有primary self-review，沒有獨立簽核。
+
+先重現根目錄`import report_metrics`的ModuleNotFoundError，再修正market_sessions的package／script匯入。repair_kline_archive依`__package__`選相對或直接匯入，維持模組實例一致。5項獨立程序回歸移除PYTHONPATH，涵蓋report_metrics、scripts.market_sessions、scripts目錄匯入、修補工具package匯入及兩種CLI --help，避免整批測試的sys.path改動掩蓋每日報告問題。
+
+仍只從最近前後各兩個官方交易日取證；三日須不同日期、前後各至少一日，所有archive/official比值都在1±0.5%內才准factor=1。factor≠1維持完整四日／前後各兩日與原穩定度、中位數、反向調量；不足或不穩定仍跳過。合成archive測試核對三日稽核、官方價量原值及既有列不變。
+
+完整Python **1,991通過、182子測試通過**；原有選跑7,000檔效能案例另行啟用也通過，合計1,992個案例已驗證，未新增skip。apply161.241秒、verify94.237秒，原300秒限制不變。CI同方式單獨執行test_report_metrics.py的41項也通過；匯入／補檔／報告專項71項及19子測試通過。前端完整單元、lint、build與actionlint實際結果見[修訂驗證總表](../docs/research-verification/official-repair-revision-verification-20261107.json)，不沿用初版計數冒稱本次結果。
+
+固定archive `62bd86a6e7fcde3572c56aa607eed5018a0cfe68`，新舊規則皆以apply=False／offline=True共用32份來源，各跑前後全量verifier；41,573年檔、9,796,080列的內容、tree及來源快取均不變。2021-04-06新增1,727→1,743、跳過495→479；2025-08-01新增1,783→1,823、跳過247→207。原3,510筆候選逐列不變，新增56筆皆三日原值，調基仍661／216檔。初版與此次重取來源僅2021-04-06的1,019筆TWSE來源URL改用已核准官方等價路徑，價量／factor／比較值與跳過名單相同；本次新舊比較使用同一快取。
+
+[完整前後對照與新增56筆佐證](../docs/research-verification/official-backfill-three-comparisons-20261107.json)、[操作與限制](../docs/ARCHIVE_OFFICIAL_REPAIR.md)。初版3,510列寫入／刪除／還原演練及25項瀏覽器紀錄仍保留為歷史，本次沒有將新計畫寫入任何正式封存。
+
+## PR #240 初版紀錄：官方封存修補、完整還原及休市佐證（2026-11-07）
+
+一般 merge 已合併 #230 的 main `0f42fef0b`，merge commit `cdd648d7f`；沒有另納入 #230 分支、rebase 或 force-push。只有 primary self-review，沒有獨立簽核。只推程式與證據 PR，沒有正式 archive 寫入、dispatch、合併或部署。
+
+官方 MI_INDEX／TPEx dailyQuotes／MI_5MINS_HIST 依日期與欄位解析，四個最近官方交易日的 archive/official 比值檢查後才補缺列；不覆寫既有列。零量／缺價統一跳過，指數無量保留未知。CSV／index／manifest／backfilled audit 沿既有 writer，factor 與比較入稽核。TW 10/23 指定零量平盤用固定2214±1%保護；先 staged驗證、完整備份/fsync，再搬入。恢復先驗Git原件blob及整tree；原歷史驗證只增加全部內容精確回到指定刪除Git parent的窄例外，美股／其他日期不能借新reason刪除。
+
+四個官方空行情日加入嚴格雙來源seed並從缺漏名單移除；交易證據否決、未知量保護保留。10/23刪列後仍有已查核證據，前端投影cache v6、raw cache不改。日週月聚合與實體刪列前後資料序列相同。新增workflow預設dry-run/read權限；備份artifact成功後，apply=true才可用獨立write job精確tip驗證再非force推送。#236跨event取代修正與新producer故障／取消備援均覆蓋。
+
+實測：完整Python1,982 passed＋168 subtests；修補專項21項、獨立壓力案例1項通過（apply161.493秒、verify92.126秒，原300秒限制）。完整Vitest159檔／2,029項、lint、build、actionlint通過；一輪並行重負載的SEC舊案例5秒timeout，等重負載結束後以單worker完整通過，未改timeout／斷言或新增skip。桌機／390px Chromium／iPhone WebKit15項及375px兩引擎10項，共25項瀏覽器通過；為模擬裝置。21次取消按當時存在run回放0通知。
+
+固定完整快照41,573年檔／9,796,080列，唯讀dry-run前後verifier通過。無remote完整副本新增3,510列、刪2,214列、還原2,214列；4,430個檔案與刪前內容tree逐位元組一致，Git tree均為 `f1a5b15680b895346066bf0d4f2e2577da574b9d`。原快照保持乾淨。[操作與端點](../docs/ARCHIVE_OFFICIAL_REPAIR.md)、[驗證總表](../docs/research-verification/official-archive-repair-verification-20261107.json)、[全量演練](../docs/research-verification/official-repair-rehearsal-summary-20261107.json)。原始演練恢復檔另打包留在工作區，不能當作正式dispatch的恢復artifact。
+
 ## 選股：本益比河流分位篩選（2026-11-07）
 
 只做 primary self-review，沒有獨立簽核。新增篩選條件 `per:min:max`：目前本益比在該股自己歷史本益比中的百分位（0–100，含上下限），預設選項對應河流圖 P10／P30／P70／P90。演算法沿用個股頁 `buildPeRiver`（同一 EPS TTM／年度備援、發布延遲、PE>200 與虧損排除、百分位定義），不另寫一套。

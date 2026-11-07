@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "mode": "remove-placeholders",
+  "apply": true,
+  "archiveCommit": "a35d70caba17396d97f84936290f50bc019eb3ed",
+  "generatedAt": "2026-11-07T13:13:55.563925+00:00",
+  "status": "applied-locally",
+  "validationBefore": {
+    "files": 41573,
+    "rows": 9799590,
+    "totalBytes": 523518677,
+    "csvBytes": 489203750
+  },
+  "date": "2026-10-23",
+  "market": "TW",
+  "expected": 2214,
+  "actual": 2214,
+  "guardPassed": true,
+  "preserved": [],
+  "backupPath": "/workspace/my-stock-screener/docs/research-verification/removed-placeholders-20261023.json",
+  "backupSha256": "4a335c6e5ec152ea5eec14ad6cb43831a42a64e30876f262b483cad25a65b464",
+  "changedFiles": 4430,
+  "validationAfter": {
+    "files": 41573,
+    "rows": 9797376,
+    "totalBytes": 524517858,
+    "csvBytes": 489102440
+  },
+  "detailsReport": "official-placeholder-removal-dry-run-20261107.json",
+  "rehearsalOnly": true
+}

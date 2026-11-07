@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "mode": "restore",
+  "apply": true,
+  "archiveCommit": "61e6563cdcf99687acb69982c168a49f3c534bae",
+  "generatedAt": "2026-11-07T13:26:22.724657+00:00",
+  "status": "applied-locally",
+  "validationBefore": {
+    "files": 41573,
+    "rows": 9797376,
+    "totalBytes": 524517858,
+    "csvBytes": 489102440
+  },
+  "restoredRows": 2214,
+  "restoredFiles": 4430,
+  "byteExact": true,
+  "validationAfter": {
+    "files": 41573,
+    "rows": 9799590,
+    "totalBytes": 523518677,
+    "csvBytes": 489203750
+  },
+  "rehearsalOnly": true
+}

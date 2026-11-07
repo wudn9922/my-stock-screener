@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-07T13:02:02.603249+00:00",
+  "archiveCommit": "62bd86a6e7fcde3572c56aa607eed5018a0cfe68",
+  "summary": {
+    "tw": {
+      "dates": 2,
+      "missingStockRows": 3733,
+      "interiorDates": 2,
+      "tailDates": 0
+    },
+    "us": {
+      "dates": 1,
+      "missingStockRows": 5373,
+      "interiorDates": 0,
+      "tailDates": 1
+    }
+  },
+  "markets": {
+    "tw": {
+      "status": "ok",
+      "startDate": "2021-01-01",
+      "through": "2026-11-06",
+      "calendar": "XTAI",
+      "missingStockThreshold": 0.5,
+      "comparison": "strictly-greater",
+      "eligibility": "ordinary-stock archive firstDate <= session; no assumed pre-firstDate history",
+      "primaryFirstDate": "2021-01-04",
+      "primaryLastDate": "2026-11-06",
+      "reason": null,
+      "sessions": [
+        {
+          "date": "2021-04-06",
+          "reason": "missing-session-data",
+          "reasons": [
+            "primary-index-missing",
+            "majority-stock-rows-missing"
+          ],
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "primaryIndexMissing": true,
+          "eligibleSymbols": 1767,
+          "observedSymbols": 0,
+          "missingSymbols": 1767,
+          "missingShare": 1.0,
+          "coveragePosition": "within-primary-coverage",
+          "officialSources": [
+            {
+              "symbol": "^TWOII",
+              "source": "TPEx official cash-index OHLC; read-only existing CSV; unavailable volume stays unknown",
+              "ohlc": {
+                "open": 207.79,
+                "high": 209.81,
+                "low": 207.79,
+                "close": 209.7
+              }
+            }
+          ]
+        },
+        {
+          "date": "2025-08-01",
+          "reason": "missing-session-data",
+          "reasons": [
+            "majority-stock-rows-missing"
+          ],
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "primaryIndexMissing": false,
+          "eligibleSymbols": 1969,
+          "observedSymbols": 3,
+          "missingSymbols": 1966,
+          "missingShare": 0.9984763839512443,
+          "coveragePosition": "within-primary-coverage",
+          "officialSources": [
+            {
+              "symbol": "^TWOII",
+              "source": "TPEx official cash-index OHLC; read-only existing CSV; unavailable volume stays unknown",
+              "ohlc": {
+                "open": 231.39,
+                "high": 234.03,
+                "low": 228.4,
+                "close": 234.03
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "us": {
+      "status": "ok",
+      "startDate": "2021-01-01",
+      "through": "2026-11-06",
+      "calendar": "XNYS",
+      "missingStockThreshold": 0.5,
+      "comparison": "strictly-greater",
+      "eligibility": "ordinary-stock archive firstDate <= session; no assumed pre-firstDate history",
+      "primaryFirstDate": "2021-01-04",
+      "primaryLastDate": "2026-11-05",
+      "reason": null,
+      "sessions": [
+        {
+          "date": "2026-11-06",
+          "reason": "missing-session-data",
+          "reasons": [
+            "primary-index-missing",
+            "majority-stock-rows-missing"
+          ],
+          "calendar": "XNYS",
+          "calendarSession": true,
+          "primaryIndexMissing": true,
+          "eligibleSymbols": 5373,
+          "observedSymbols": 0,
+          "missingSymbols": 5373,
+          "missingShare": 1.0,
+          "coveragePosition": "after-primary-coverage",
+          "officialSources": []
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "Current archive constituents have survivorship bias.",
+    "A first archived date is not a verified IPO date; missing leading history is not inferred.",
+    "Stocks whose history ends remain eligible; missing rows may include suspensions or delistings.",
+    "Confirmed closures are excluded; all price files remain unchanged."
+  ]
+}

@@ -193,3 +193,7 @@ python scripts/kline_archive.py verify --archive-dir /tmp/kline-check --base HEA
 2026-10-26 修正後的可重現合成測試使用 7,000 檔、21,000 個 packed 年度 CSV；逐檔追加一天後共 3,661,000 列、205,500,841 bytes。本機驗證為 48.755 秒，包含 apply、驗證、stage、commit 與本機 bare-origin push 的每日發布為 72.397 秒；基準 7,000 個 blob 僅啟動一次 Git batch。此為合成價格，不是正式行情；GitHub runner 另受 CI 的 300 秒驗證門檻約束。唯讀檢查正式 `4c934296a` 封存的 21,133 檔、3,480,830 列為 36.722 秒；沒有改動正式 main、generated 或 archive ref，也沒有宣稱已補齊正式資料。
 
 大小隨實際股票與歷史變動：例如 7,000 檔 × 252 日 × 每列約 70 bytes，新增 CSV 原始內容約 124 MB／年（約 0.5 MB／交易日）；Git 的 tree/blob/pack 與真實修正另計，不能把 CSV byte 增長冒充 repository 實際儲存量。每次驗證 job 都回報當時真正的檔案總大小。
+
+## 官方缺漏補檔與指定占位列還原（2026-11-07）
+
+[操作、官方欄位、factor、備份及完整驗證](ARCHIVE_OFFICIAL_REPAIR.md)。`scripts/repair_kline_archive.py` 與 `Official TW archive repair` 都預設 dry-run。只針對已查明的兩個缺漏日與 TW 2026-10-23；備份先於任何刪除搬入，正式 publish 前先保存 artifact。還原只允許完整內容精確回到該次刪除的 Git parent，不回捲後續更新。這是使用者明確批准的指定資料修補；普通 daily/backfill、一般刪除與價格調整的原規則不變。程式碼 PR 本身不操作正式 archive 或 dispatch。

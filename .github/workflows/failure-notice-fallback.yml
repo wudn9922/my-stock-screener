@@ -13,6 +13,7 @@ on:
       - "Deploy assembled Pages"
       - "Squash generated snapshot"
       - "🔄 GitHub Actions 永久續命腳本"
+      - "Official TW archive repair"
       - "Permanent K-line Backfill"
       - "Permanent K-line five-year expansion"
       - "MA Recommendations"

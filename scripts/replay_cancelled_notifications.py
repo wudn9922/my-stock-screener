@@ -12,14 +12,17 @@ from run_policy import decide, timestamp
 def replay(snapshot):
     records = []
     for item in snapshot['runs']:
-        result = decide(item['run'], item['jobs'], item['newer'])
+        candidates = [*item['newer']]
+        if item.get('crossEventReplacement'):
+            candidates.append(item['crossEventReplacement'])
+        result = decide(item['run'], item['jobs'], candidates)
         run = item['run']
-        visible = [candidate for candidate in item['newer'] if timestamp(candidate['created_at']) <= timestamp(run['updated_at'])]
+        visible = [candidate for candidate in candidates if timestamp(candidate['created_at']) <= timestamp(run['updated_at'])]
         at_cancellation = decide(run, item['jobs'], visible)
         records.append(dict(runId=run['id'], workflow=run['name'], event=run['event'],
                             branch=run['head_branch'], createdAt=run['created_at'], url=run['html_url'],
                             jobConclusions=[job['conclusion'] for job in item['jobs']],
-                            **result, newerRuns=item['newer'], cancellationCompletedAt=run['updated_at'],
+                            **result, newerRuns=candidates, cancellationCompletedAt=run['updated_at'],
                             atCancellation=at_cancellation, crossEventReplacement=item.get('crossEventReplacement')))
     notifications = sum(row['notify'] for row in records)
     return dict(version=1, generatedAt=datetime.now(timezone.utc).isoformat(), window=snapshot['window'],

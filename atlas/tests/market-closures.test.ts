@@ -103,3 +103,46 @@ describe('market-wide closures are projections, never price edits',()=>{
     expect(raw.bars).toHaveLength(3);
   });
 });
+
+describe('official closure evidence and physical removal', () => {
+  const days = ['2022-02-04', '2023-01-18', '2024-10-31', '2026-07-10'];
+  it('ignores stale missing-session markers for verified official closures', async () => {
+    const stale = { version: 1, threshold: .95, markets: { tw: { closedSessions: [], missingSessions: days.map(date => ({
+      date, reason: 'missing-session-data', calendar: 'XTAI', calendarSession: true,
+      primaryIndexMissing: true, observedSymbols: 0, officialSources: [],
+    })) } } };
+    const policy = await loadMarketClosures(async () => Response.json(stale), Date.UTC(2026, 10, 7));
+    for (const date of days) expect(closedMarketDates('2330.TW', policy).has(date)).toBe(true);
+    expect(closedMarketDates('2330.TW', policy).has('2026-10-23')).toBe(true);
+    expect(closedMarketDates('2330.TW', policy).has('2021-04-06')).toBe(false);
+    expect(closedMarketDates('AAPL', policy).has('2024-10-31')).toBe(false);
+  });
+  it('requires both official dated empty responses and hashes', async () => {
+    const seed = await loadMarketClosures(async () => new Response('', { status: 503 }), Date.UTC(2026, 10, 7));
+    const proof = seed.markets.tw!.closedSessions.find(row => row.date === '2024-10-31')!;
+    expect(proof.officialEvidence).toHaveLength(2);
+    const validate = (row: unknown) => marketClosuresSchema.safeParse({ version: 1, threshold: .95, markets: { tw: { closedSessions: [row] } } }).success;
+    expect(validate(proof)).toBe(true);
+    expect(marketClosuresSchema.safeParse({ version: 1, threshold: .95, markets: { us: { closedSessions: [proof] } } }).success).toBe(false);
+    expect(validate({ ...proof, officialEvidence: undefined })).toBe(false);
+    expect(validate({ ...proof, date: '2024-10-30' })).toBe(false);
+    for (const update of [{ url: 'https://example.com/' }, { quoteRows: 1 }, { sha256: 'invalid' }, { stat: 'unknown' }, { responseDate: '20241030' }])
+      expect(validate({ ...proof, officialEvidence: [{ ...proof.officialEvidence![0], ...update }, proof.officialEvidence![1]] })).toBe(false);
+  });
+  it('retains the positive trading evidence veto', async () => {
+    const policy = await loadMarketClosures(async () => Response.json({ version: 1, threshold: .95, markets: { tw: {
+      closedSessions: [], indexGapsWithTrading: [{ date: '2024-10-31', reason: 'primary-index-gap-with-trading', observedSymbols: 100, positiveVolumeSymbols: 100 }],
+    } } }), Date.UTC(2026, 10, 7));
+    expect(closedMarketDates('2330.TW', policy).has('2024-10-31')).toBe(false);
+  });
+  it('keeps identical daily/weekly/monthly bars before and after physical removal', () => {
+    const before = parseArchiveCsv(body, '2330.TW', 2026);
+    const after = parseArchiveCsv(body.replace('2026-10-23,100,100,100,100,0\n', ''), '2330.TW', 2026);
+    for (const tf of ['1D', '1W', '1M'] as const) {
+      const a = archivePeriod(before, '2330.TW', tf), b = archivePeriod(after, '2330.TW', tf);
+      expect(a.bars).toEqual(b.bars);
+      expect(a.bars.every((bar, index, values) => index === 0 || bar.time > values[index - 1]!.time)).toBe(true);
+      expect(a.bars.at(-1)!.close).toBe(101);
+    }
+  });
+});

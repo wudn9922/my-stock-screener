@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-07T15:26:29.735077+00:00",
+  "scope": "PR #240 import and conservative three-comparison follow-up; same PR only, no merge/dispatch/production archive write.",
+  "integration": {
+    "main": "6e279a94bf",
+    "mergeCommit": "aaeb4e0318",
+    "method": "ordinary merge, retaining both review sections; no rebase/force-push"
+  },
+  "implementationCommits": {
+    "imports": "7307887ade",
+    "rawThreeComparisons": "4bb09770e3"
+  },
+  "python": {
+    "command": "python -m pytest -q tests (isolated correction journal)",
+    "passed": 1991,
+    "subtestsPassed": 182,
+    "seconds": 307.3,
+    "existingConditionalSkippedInDefaultRun": 1,
+    "conditionalPerformanceSeparateRun": {
+      "status": "passed",
+      "tests": 1,
+      "symbols": 7000,
+      "files": 21000,
+      "rows": 3661000,
+      "verificationSeconds": 94.237,
+      "applySeconds": 161.241,
+      "conflicts": 2240000,
+      "conflictBytes": 6874391,
+      "dailyPublishSeconds": 277.963,
+      "baselineBatchProcesses": 1
+    },
+    "reportMetricsStandaloneUnittest": {
+      "passed": 41,
+      "seconds": 12.271
+    },
+    "targeted": {
+      "passed": 71,
+      "subtestsPassed": 19,
+      "freshProcessImportTests": 5,
+      "repairSpecificTests": 25
+    },
+    "newSkips": 0
+  },
+  "atlas": {
+    "npmCi": "passed; offline, exact lockfile",
+    "files": 160,
+    "tests": 2037,
+    "lint": "passed",
+    "build": "passed",
+    "scope": "No frontend product change in this follow-up; full unit/lint/build rerun after the ordinary main merge."
+  },
+  "actionlint": {
+    "version": "1.7.7",
+    "scope": "all repository workflows",
+    "status": "passed"
+  },
+  "dryRunComparison": {
+    "path": "docs/research-verification/official-backfill-three-comparisons-20261107.json",
+    "sha256": "4d4aaf8597b29927f2f00279e8132fe27d825e3e81326a56403d9730a60a1ad1",
+    "archiveUnchanged": true,
+    "sourceCacheUnchanged": true,
+    "validationBefore": {
+      "files": 41573,
+      "rows": 9796080,
+      "totalBytes": 520080778,
+      "csvBytes": 489025679
+    },
+    "validationAfter": {
+      "files": 41573,
+      "rows": 9796080,
+      "totalBytes": 520080778,
+      "csvBytes": 489025679
+    },
+    "days": [
+      {
+        "date": "2021-04-06",
+        "before": {
+          "addedSymbols": 1727,
+          "adjustedSymbols": 661,
+          "existingSymbols": 1,
+          "skippedByReason": {
+            "no-official-observation": 441,
+            "insufficient-comparison-data": 34,
+            "official-no-trade-or-missing-ohlc": 9,
+            "unstable-price-basis": 11
+          }
+        },
+        "after": {
+          "addedSymbols": 1743,
+          "adjustedSymbols": 661,
+          "existingSymbols": 1,
+          "skippedByReason": {
+            "no-official-observation": 441,
+            "official-no-trade-or-missing-ohlc": 9,
+            "insufficient-comparison-data": 18,
+            "unstable-price-basis": 11
+          }
+        },
+        "beforeSkipped": 495,
+        "afterSkipped": 479,
+        "additionalUnadjustedSymbols": 16,
+        "previousAdditionsUnchanged": true
+      },
+      {
+        "date": "2025-08-01",
+        "before": {
+          "addedSymbols": 1783,
+          "adjustedSymbols": 216,
+          "existingSymbols": 193,
+          "skippedByReason": {
+            "no-official-observation": 147,
+            "insufficient-comparison-data": 64,
+            "unstable-price-basis": 14,
+            "official-no-trade-or-missing-ohlc": 22
+          }
+        },
+        "after": {
+          "addedSymbols": 1823,
+          "adjustedSymbols": 216,
+          "existingSymbols": 193,
+          "skippedByReason": {
+            "no-official-observation": 147,
+            "insufficient-comparison-data": 24,
+            "unstable-price-basis": 14,
+            "official-no-trade-or-missing-ohlc": 22
+          }
+        },
+        "beforeSkipped": 247,
+        "afterSkipped": 207,
+        "additionalUnadjustedSymbols": 40,
+        "previousAdditionsUnchanged": true
+      }
+    ]
+  },
+  "historicalEvidence": {
+    "path": "docs/research-verification/official-archive-repair-verification-20261107.json",
+    "scope": "Prior PR head verification, including 3510-row local rehearsal and 25 browser cases; not represented as a rerun of this revision."
+  },
+  "implementationSha256": {
+    "scripts/market_sessions.py": "c783c1799a98604c8c7fe59b9a886f134968757e4b870d80d48480cd35a51a32",
+    "scripts/repair_kline_archive.py": "da90016009579fc24aa1d9dd73a88690b8b64b91ec3022087fdfed90e30cacac",
+    "scripts/official_tw_quotes.py": "9c258cc8f51d2af140c1065cebbbb454530dcd1ae5e74fe3358d74ccfdfb47c0",
+    "tests/test_root_script_imports.py": "5d49d3966062119d85f7e87c312686cc430b9d5a00917e0b5ed356eb2059e22c",
+    "tests/test_kline_archive_official_repair.py": "46e670118cc5abf9f19ed14873d952d617713a5fd11a553ddce537c47c923cbf"
+  },
+  "logSha256": {
+    "full-python": "c2f287d69c5c74530b0ba1823613361ed2f25a9d01c35da2667dc11329cfb4a5",
+    "report-metrics-unittest": "d7a0756c2745ec7dff22759410a9b27afc57e861b3397234ee90884d1a319008",
+    "targeted-tests": "d2f7e7e9ab42e9f2684b980ff0e9ac185d4722f2586d04c24a43c4749c9be247",
+    "performance": "f506de861042984dc7fd34291cefa1216a8d8cf50cfa831e7a1e885456f67916",
+    "vitest": "2da4e3e26e6283e3bec9472eca1e41d74a80052223f23d56a0d81ec340bc265c",
+    "lint": "9cc2767f24ce9e069f13108e832e1429ae3b1d5c924380d714ce5a0a98ec13e5",
+    "build": "72996f70df28802517e377823ab5b8a52bb31d7def5bb188476b5c45071fd609",
+    "dry-comparison": "aeeb4ab69ad71ec036b75c23df6f9aa85b3d44a84de81ecf4c6c67ab41bb9d09"
+  },
+  "review": "Primary self-review only; no independent sign-off. No assertions, timeouts or performance limits loosened."
+}

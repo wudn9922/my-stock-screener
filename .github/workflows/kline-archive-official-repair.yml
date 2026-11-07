@@ -1,0 +1,153 @@
+name: Official TW archive repair
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [backfill, remove-placeholders, restore]
+        default: backfill
+        description: 'Official missing days, scoped 2026-10-23 removal, or exact restoration'
+      apply:
+        type: boolean
+        default: false
+        description: 'Write only after reviewing a dry-run; false produces reports only'
+      backup_run_id:
+        type: string
+        default: ''
+        description: 'For restore: run ID whose archive-repair artifact contains the removal backup'
+permissions:
+  contents: read
+  actions: read
+# The same lock as every existing archive publisher. Never race a prepared backup.
+concurrency:
+  group: kline-archive-publish
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      changed: ${{ steps.prepare.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: kline-archive
+          path: .cache/kline-archive
+          fetch-depth: 3
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install --quiet pandas requests 'exchange-calendars>=4.5,<5.0'
+      - name: Require an explicit recovery artifact for restoration
+        if: inputs.mode == 'restore'
+        env:
+          BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+        run: '[[ "$BACKUP_RUN_ID" =~ ^[0-9]+$ ]]'
+      - uses: actions/download-artifact@v4
+        if: inputs.mode == 'restore'
+        with:
+          name: archive-repair-${{ inputs.backup_run_id }}
+          run-id: ${{ inputs.backup_run_id }}
+          github-token: ${{ github.token }}
+          path: .cache/restore-input
+      - name: Verify, plan and optionally apply to the local isolated checkout
+        id: prepare
+        env:
+          REPAIR_MODE: ${{ inputs.mode }}
+          REPAIR_APPLY: ${{ inputs.apply }}
+        run: |
+          report_dir=docs/research-verification
+          backup="$report_dir/removed-placeholders-20261023.json"
+          if [ "$REPAIR_MODE" = restore ]; then
+            mkdir -p "$report_dir"
+            cp .cache/restore-input/removed-placeholders-20261023.json "$backup"
+          fi
+          args=(--archive-dir .cache/kline-archive --mode "$REPAIR_MODE"
+            --report "$report_dir/official-archive-repair.json" --backup "$backup")
+          if [ "$REPAIR_APPLY" = true ]; then args+=(--apply); fi
+          python -u scripts/repair_kline_archive.py "${args[@]}"
+          mkdir -p .cache/repair-output
+          if [ "$REPAIR_APPLY" = true ]; then
+            git -C .cache/kline-archive rev-parse HEAD > .cache/repair-output/base-commit
+            git -C .cache/kline-archive diff --binary > .cache/repair-output/repair.patch
+            if [ -s .cache/repair-output/repair.patch ]; then echo 'changed=true' >> "$GITHUB_OUTPUT"; fi
+          fi
+      - name: Collect reports and the create-before-write removal backup
+        if: always() && !cancelled()
+        run: |
+          mkdir -p .cache/repair-output
+          for name in official-archive-repair.json removed-placeholders-20261023.json; do
+            if [ -f "docs/research-verification/$name" ]; then
+              cp "docs/research-verification/$name" .cache/repair-output/
+            fi
+          done
+      - name: Preserve recovery evidence before any remote publication
+        uses: actions/upload-artifact@v4
+        if: always() && !cancelled()
+        with:
+          name: archive-repair-${{ github.run_id }}
+          path: .cache/repair-output/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 90
+  publish:
+    needs: prepare
+    if: inputs.apply && needs.prepare.result == 'success' && needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: kline-archive
+          path: .cache/kline-archive
+          fetch-depth: 3
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install --quiet pandas
+      - uses: actions/download-artifact@v4
+        with:
+          name: archive-repair-${{ github.run_id }}
+          path: .cache/repair-output
+      - name: Require the exact prepared tip and validate the existing archive format
+        run: |
+          archive_dir=.cache/kline-archive
+          base=$(cat .cache/repair-output/base-commit)
+          test "$base" = "$(git -C "$archive_dir" rev-parse HEAD)"
+          patch_path="$GITHUB_WORKSPACE/.cache/repair-output/repair.patch"
+          git -C "$archive_dir" apply --check "$patch_path"
+          git -C "$archive_dir" apply "$patch_path"
+          python scripts/kline_archive.py verify --archive-dir "$archive_dir" --base "$base"
+      - name: Publish once without force, rebase, or retry against a changed tip
+        env:
+          REPAIR_MODE: ${{ inputs.mode }}
+        run: |
+          archive_dir=.cache/kline-archive
+          python - <<'PY'
+          from scripts.kline_archive_git import assert_archive
+          assert_archive('.cache/kline-archive')
+          PY
+          git -C "$archive_dir" config user.name 'github-actions[bot]'
+          git -C "$archive_dir" config user.email 'github-actions[bot]@users.noreply.github.com'
+          git -C "$archive_dir" add -A
+          git -C "$archive_dir" commit -m "Official TW archive repair: $REPAIR_MODE"
+          git -C "$archive_dir" push origin HEAD:refs/heads/kline-archive
+  notify-system-failure:
+    needs: [prepare, publish]
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled()) }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/notify-failure.yml
+    with:
+      title: '${{ github.workflow }} · 執行失敗／取消'
+      needs-json: ${{ toJSON(needs) }}
+    secrets:
+      DISCORD_WEBHOOK_URL1: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+      LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}

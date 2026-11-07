@@ -1,0 +1,71 @@
+{
+  "scope": "local full replica; no remotes, no workflow dispatch, no production write",
+  "sourceCommit": "62bd86a6e7fcde3572c56aa607eed5018a0cfe68",
+  "sourceTree": "660ee9fb8749deea94eeab7d97b06db842c3ccae",
+  "steps": [
+    {
+      "mode": "backfill",
+      "report": "official-repair-rehearsal-backfill-20261107.json",
+      "validationBefore": {
+        "files": 41573,
+        "rows": 9796080,
+        "totalBytes": 520080778,
+        "csvBytes": 489025679
+      },
+      "validationAfter": {
+        "files": 41573,
+        "rows": 9799590,
+        "totalBytes": 523518677,
+        "csvBytes": 489203750
+      }
+    },
+    {
+      "mode": "remove-placeholders",
+      "report": "official-repair-rehearsal-remove-placeholders-20261107.json",
+      "validationBefore": {
+        "files": 41573,
+        "rows": 9799590,
+        "totalBytes": 523518677,
+        "csvBytes": 489203750
+      },
+      "validationAfter": {
+        "files": 41573,
+        "rows": 9797376,
+        "totalBytes": 524517858,
+        "csvBytes": 489102440
+      }
+    },
+    {
+      "mode": "restore",
+      "report": "official-repair-rehearsal-restore-20261107.json",
+      "validationBefore": {
+        "files": 41573,
+        "rows": 9797376,
+        "totalBytes": 524517858,
+        "csvBytes": 489102440
+      },
+      "validationAfter": {
+        "files": 41573,
+        "rows": 9799590,
+        "totalBytes": 523518677,
+        "csvBytes": 489203750
+      }
+    }
+  ],
+  "addedRows": 3510,
+  "removalRows": 2214,
+  "backupSha256": "4a335c6e5ec152ea5eec14ad6cb43831a42a64e30876f262b483cad25a65b464",
+  "backupBytes": 16715910,
+  "beforeRemovalTree": "f1a5b15680b895346066bf0d4f2e2577da574b9d",
+  "afterRemovalTree": "16efdce9a8589e2a4798facb3e2d5aa3dbe620a4",
+  "restoredTree": "f1a5b15680b895346066bf0d4f2e2577da574b9d",
+  "byteExactFullTree": true,
+  "sourceStillClean": true,
+  "replicaHasNoRemotes": true,
+  "finalBackupValidator": {
+    "restoredRows": 2214,
+    "restoredFiles": 4430,
+    "byteExact": true
+  },
+  "immutableGitWitnessVerified": true
+}

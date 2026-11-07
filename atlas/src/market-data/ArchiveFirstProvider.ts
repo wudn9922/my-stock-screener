@@ -56,7 +56,7 @@ export function archivePeriod(daily: BarResult, symbol: string, timeframe: Timef
 /** All archived history is available before either live quotes or optional Yahoo supplements finish. */
 export class ArchiveFirstProvider implements MarketDataProvider {
   readonly id: string;
-  readonly cacheVersion = 'archive-first-v5-calendar-session-guard';
+  readonly cacheVersion = 'archive-first-v6-official-closures';
   readonly supportedTimeframes: readonly Timeframe[];
   readonly capabilities;
   constructor(readonly fallback: MarketDataProvider, readonly archive = klineArchive(), readonly yahoo?: EdgeYahooProvider,

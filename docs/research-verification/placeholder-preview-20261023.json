@@ -1,0 +1,23 @@
+{
+  "mode": "read-only-preview",
+  "apply": false,
+  "date": "2026-10-23",
+  "market": "TW",
+  "archiveCommit": "62bd86a6e7fcde3572c56aa607eed5018a0cfe68",
+  "expected": 2214,
+  "actual": 2214,
+  "differenceFraction": 0.0,
+  "guardPassed": true,
+  "nonmatchingRowsPreserved": 0,
+  "note": "Historical initial read-only inventory, superseded by the completed repair tool and its full removal dry-run. No production removal occurred.",
+  "selectionInventorySha256": "dffbd8360365612adbbb4c51ea8817b67c05d07b85a99d366f97242cc13d2091",
+  "sampleSymbols": [
+    "00400A.TW",
+    "00401A.TW",
+    "00402A.TW",
+    "00403A.TW",
+    "00404A.TW"
+  ],
+  "historical": true,
+  "supersededBy": "official-placeholder-removal-dry-run-20261107.json"
+}
