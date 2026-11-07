@@ -1,3 +1,15 @@
+## MEXC 唯讀合約部位（2026-11-07）
+
+Primary self-review only，沒有獨立簽核。從 main `41f87eaae` 建立，只推 PR、不合併或部署。依任務「官方文件為準」採現行 Futures V1 固定網域 `api.mexc.com`、`detail/country` 與 ticker.fairPrice；與預期的舊網域／detail 路徑差異、官方連結及欄位映射見 [合約 API 與資料隔離說明](../docs/ATLAS_MEXC_FUTURES.md)。網域固定，不接受任意 URL。
+
+現貨來源成功驗證後，才在原有 9 秒 controller 內讀取合約；最終授權與 revision／finish 檢查仍在全部上游 I/O 之後。合約來源錯誤一律成為該區塊 no-permission／unavailable，現貨照常完成。缺 CONTRACT_ACCOUNT_READ 時不發合約請求。僅固定 GET、2 MiB、redirect error；金融數字以原 JSON token 保留精度，張數換幣數使用精確 BigInt，負數只允許未實現盈虧。獨立回應驗證器與帳戶 RAM 狀態不進 RPC、SQL、holdings document、持股總值或資產配置。
+
+診斷只記允許的 step／HTTP status／固定 reason／有效 code／白名單訊息。測試涵蓋實際 handler 的簽名與 headers、權限／HTTP／success:false／無回應 transport 的9秒期限、精度、部位限制、欄位與診斷隱私，以及手動／自動同步、狀態文字、總計不變與手機無溢出。首輪新增測試修正了可見文字對 textContent 的比較差異，及匯率晚到造成的基準就緒問題；沒有放寬金額或溢出斷言、沒有增加 timeout 或 skip。
+
+驗證通過：npm ci；完整 Vitest 158 檔／2,017 項，合約與 RAM 專項49項，完整 MEXC 三引擎39項，375px Chromium／WebKit新增合約4項，lint、production build。
+
+沒有使用真實 Key、私人 MEXC 帳戶或正式資料庫；只對官方公開端點做相容性與大小檢查。Playwright 為模擬 iPhone。畫面：[桌面](docs/screenshots/mexc-futures/desktop.png)、[375px WebKit](docs/screenshots/mexc-futures/iphone375.png)。
+
 ## MEXC 特殊資產名稱跳過與計數（2026-11-07）
 
 Primary self-review only，沒有獨立簽核。分支從 main `799fa85d2` 建立，只推 PR、不合併或部署。MEXC 非零餘額名稱先轉大寫，再套用原本的 ASCII 英數 1–20 字元規則；不合法或正規化後重複的項目跳過並計數，重複保留第一筆、不加總，零餘額不計。全部跳過仍回成功空清單。金額格式、來源大小、持股上限、唯讀權限、加密與授權檢查不變。

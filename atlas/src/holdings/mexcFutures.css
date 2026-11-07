@@ -1,0 +1,59 @@
+.mexc-futures {
+  border-top: 1px solid var(--border);
+  margin-top: 20px;
+  padding-top: 16px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.mexc-futures header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+}
+.mexc-futures h4,
+.mexc-futures h5 {
+  margin: 0;
+}
+.mexc-futures small,
+.mexc-futures dt {
+  color: var(--text-3);
+}
+.mexc-futures-positions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 12px;
+}
+.mexc-futures article {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  min-width: 0;
+}
+.mexc-futures h5 {
+  font-size: 15px;
+}
+.mexc-futures-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.mexc-futures-values div {
+  min-width: 0;
+}
+.mexc-futures-values dt {
+  font-size: 12px;
+}
+.mexc-futures-values dd {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.mexc-futures-long,
+.mexc-futures-profit {
+  color: #2fbd83;
+}
+.mexc-futures-short,
+.mexc-futures-loss {
+  color: #f46a75;
+}

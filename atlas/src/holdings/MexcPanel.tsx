@@ -4,6 +4,7 @@ import { type HoldingAccount, type HoldingAccountState } from './model';
 import { parseNumber } from './import';
 import { formatDateTime } from '../ui/format';
 import { mexcKeyAgeNotice } from './mexcStatus';
+import { MexcFuturesPanel } from './MexcFuturesPanel';
 
 interface Props {
   account: HoldingAccount;
@@ -14,7 +15,7 @@ interface Props {
 }
 export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel }: Props) {
   const store = mexcStore(),
-    { state, loading, busy, error: loadError, accountErrors, accountSkippedAssets } = useSyncExternalStore(store.subscribe, store.getSnapshot);
+    { state, loading, busy, error: loadError, accountErrors, accountSkippedAssets, accountFutures } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const error = accountErrors[account.id] ?? loadError;
   const skippedAssets = accountSkippedAssets[account.id] ?? 0;
   const connection = state.connections.find((entry) => entry.accountId === account.id);
@@ -409,6 +410,7 @@ export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel 
           )}
         </>
       )}
+      {connection && <MexcFuturesPanel futures={accountFutures[account.id]} />}
       <details>
         <summary>同步範圍與成本說明</summary>
         <p>

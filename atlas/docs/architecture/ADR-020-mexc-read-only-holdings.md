@@ -15,6 +15,13 @@ key replacement or disconnect clears that account's error. After 80 days since
 connectedAt, the panel shows the unbound-key 90-day reminder; it is not an exact
 exchange expiry date. No notification channel or polling interval is added.
 
+2026-11-07 authorized extension adds a separate read-only Futures V1 response and
+account-scoped RAM view. It uses the current official REST domain api.mexc.com,
+header signing, detail/country and ticker fairPrice. Futures failures downgrade
+only that view; all upstream I/O precedes the existing final authorization and
+revision checks. Futures never enters SQL, the spot document, valuation or
+allocation. See [the API mapping and isolation](../../../docs/ATLAS_MEXC_FUTURES.md).
+
 Add website API credential entry for cloud-authorized MEXC accounts. The browser
 sends the pair once on explicit submission, clears fields, never persists keys and
 shows only the server-returned last four characters. Bind the originating storage

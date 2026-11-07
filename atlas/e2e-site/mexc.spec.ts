@@ -3,6 +3,7 @@ import { mockSite } from './mocks';
 import { installLineAccount } from './account-fixture';
 import { researchFixtureBody } from './research-fixtures';
 import { createMexcFixture, MEXC_USER, TEST_KEY, TEST_SECRET } from '../tests/fixtures/mexcHarness';
+import { futuresResponses, assetsPath, positionsPath } from '../tests/fixtures/mexc/futures';
 const panel = (page: Page) => page.getByRole('region', { name: '持股', exact: true });
 const mexc = (page: Page) => panel(page).getByRole('region', { name: 'MEXC 自動同步' });
 async function setup(page: Page, mode: 'cloud' | 'device' | 'none' = 'cloud') {
@@ -70,6 +71,66 @@ async function privateStorage(page: Page) {
   expect(storage).not.toContain(TEST_SECRET);
   expect(storage).not.toContain('holdings:v1');
 }
+
+test('futures long/short positions are read-only, fit a phone and leave spot totals unchanged across manual and automatic sync', async ({ page }, info) => {
+  const f = await setup(page);
+  await enterKeys(page); await confirmCosts(page);
+  const totals = panel(page).getByRole('region', { name: '持股總計', exact: true });
+  await expect(totals).toContainText(/1 USD＝[\d.]+ TWD/);
+  const previous = (await totals.textContent())!;
+  f.setFutures(futuresResponses());
+  await tick(page, f);
+  await mexc(page).getByRole('button', { name: /^同步餘額/ }).click();
+  const region = mexc(page).getByRole('region', { name: '合約部位', exact: true });
+  await expect(region).toContainText('僅供查看，未計入持股總值');
+  await expect(region).toContainText('1,000.12 USDT');
+  const long = region.getByRole('article', { name: 'BTC_USDT 多單 合約部位' });
+  const short = region.getByRole('article', { name: 'ETH_USDT 空單 合約部位' });
+  await expect(long).toContainText('0.0005 BTC');
+  await expect(long).toContainText('10× · 逐倉');
+  await expect(long).toContainText('-0.5 USDT · -1.67%');
+  await expect(long).toContainText('54,000 USDT');
+  await expect(short).toContainText('5× · 全倉');
+  await expect(short).toContainText('+1.25 USDT · +6.25%');
+  await expect(long.locator('.mexc-futures-long')).toHaveCSS('color', 'rgb(47, 189, 131)');
+  await expect(short.locator('.mexc-futures-short')).toHaveCSS('color', 'rgb(244, 106, 117)');
+  await expect(totals).toHaveText(previous);
+  expect(f.documents.get(MEXC_USER)!.accounts[0]!.holdings).toHaveLength(3);
+  expect(JSON.stringify(f.documents.get(MEXC_USER))).not.toContain('BTC_USDT');
+  await region.locator('header').scrollIntoViewIfNeeded();
+  await page.clock.runFor(100);
+  await page.screenshot({ path: info.outputPath('mexc-futures.png') });
+  const changed = futuresResponses();
+  (changed[assetsPath] as Record<string, unknown>[])[0]!.equity = '999999999999999.123456789012345678';
+  (changed[positionsPath] as Record<string, unknown>[])[0]!.unRealizedPnl = '-999999999999999.123456789012345678';
+  f.setFutures(changed); await tick(page, f, 301000);
+  await expect(region).toContainText('999,999,999,999,999.123456789012345678 USDT');
+  await expect(totals).toHaveText(previous);
+  await region.scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+  expect(await region.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+  await page.clock.runFor(100);
+  await page.screenshot({ path: info.outputPath('mexc-futures-long-numbers.png') });
+  await privateStorage(page);
+});
+
+test('futures permission, failure and empty-position notices preserve a successful spot portfolio', async ({ page }) => {
+  const f = await setup(page); await enterKeys(page); await confirmCosts(page);
+  const region = mexc(page).getByRole('region', { name: '合約部位', exact: true });
+  await expect(region).toContainText('這把 API Key 沒有合約讀取權限。請到 MEXC 編輯 Key，勾選『合約－讀取』（不要勾交易）後重新同步。');
+  const unavailable = futuresResponses();
+  unavailable[assetsPath] = () => Response.json({ success: false, code: 500 });
+  f.setFutures(unavailable); await tick(page, f);
+  await mexc(page).getByRole('button', { name: /^同步餘額/ }).click();
+  await expect(region).toContainText('合約資料暫時無法讀取，現貨已同步。');
+  await expect(mexc(page).getByRole('alert')).toHaveCount(0);
+  const empty = futuresResponses(); empty[positionsPath] = [];
+  f.setFutures(empty); await tick(page, f);
+  await mexc(page).getByRole('button', { name: /^同步餘額/ }).click();
+  await expect(region).toContainText('目前沒有合約持倉。');
+  await expect(region.getByRole('article')).toHaveCount(0);
+  await expect(panel(page).getByRole('article')).toHaveCount(3);
+});
 
 test('unsupported names show a count on connect and automatic sync while other balances continue normally', async ({
   page,

@@ -7,6 +7,7 @@ import {
   type MexcState,
 } from '../../../supabase/functions/user-settings/mexcContract';
 import { holdingsStore } from './store';
+import { validateMexcFutures, type MexcFutures } from '../../../supabase/functions/user-settings/mexcFuturesContract';
 export type { MexcConnection, MexcState } from '../../../supabase/functions/user-settings/mexcContract';
 
 const blank = {
@@ -21,6 +22,7 @@ const inactive = {
   error: '',
   accountErrors: {} as Record<string, string>,
   accountSkippedAssets: {} as Record<string, number>,
+  accountFutures: {} as Record<string, MexcFutures>,
 };
 export class MexcStore {
   private readonly context = getStorageContextKey();
@@ -32,6 +34,7 @@ export class MexcStore {
     error: '',
     accountErrors: {} as Record<string, string>,
     accountSkippedAssets: {} as Record<string, number>,
+    accountFutures: {} as Record<string, MexcFutures>,
   };
   private listeners = new Set<() => void>();
   getSnapshot = () => (this.context === getStorageContextKey() ? this.snapshot : inactive);
@@ -102,10 +105,16 @@ export class MexcStore {
       holdingsStore().acceptCloudDocument(raw.document);
       const accountErrors = { ...this.snapshot.accountErrors };
       const accountSkippedAssets = { ...this.snapshot.accountSkippedAssets };
+      const accountFutures = { ...this.snapshot.accountFutures };
+      if (accountId && syncing) {
+        try { accountFutures[accountId] = validateMexcFutures(raw.futures); }
+        catch { accountFutures[accountId] = { status: 'unavailable' }; }
+      }
       if (accountId) delete accountErrors[accountId];
       if (accountId && syncing) accountSkippedAssets[accountId] = Number(skippedAssets);
       if (accountId && action === 'disconnect') delete accountSkippedAssets[accountId];
-      this.set({ state, accountErrors, accountSkippedAssets });
+      if (accountId && action === 'disconnect') delete accountFutures[accountId];
+      this.set({ state, accountErrors, accountSkippedAssets, accountFutures });
       return state;
     } catch (error) {
       const message =
