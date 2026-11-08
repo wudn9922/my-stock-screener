@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-11-08T08:30:54.171553+00:00",
+  "base": "bb9bb3a112d9321df594151335a4471c37e9cdbd",
+  "branch": "codex/mexc-futures-refresh-precision",
+  "validation": {
+    "npmCi": "passed (offline cached dependencies)",
+    "typecheck": "passed",
+    "lint": "passed",
+    "denoCheck": "passed with user-settings/deno.json and system CA",
+    "denoLint": "2 files passed",
+    "vitest": {
+      "files": 163,
+      "tests": 2145,
+      "failed": 0
+    },
+    "mexcFocused": {
+      "files": 5,
+      "tests": 160,
+      "failed": 0
+    },
+    "build": "passed",
+    "buildPages": "passed",
+    "playwright": {
+      "desktopAnd390": 48,
+      "compact375": 32,
+      "finalCaptureRerun": 5,
+      "failed": 0
+    },
+    "sql": "9 SQL statements and PL/pgSQL parsed by pglast; not executed"
+  },
+  "sha256": {
+    "supabase/functions/user-settings/mexcFutures.ts": "b436c39f7aa3fdefac0821f1ba7672267d26db2aebfecb48331a366e96c4095b",
+    "supabase/functions/user-settings/mexc.ts": "34f0453c1b75e91b4cec40f048341818229c3e4269e19a375930a4dc860ca934",
+    "supabase/manual/atlas_mexc_futures_read.sql": "0895427b14e55004a941d115af98c08320d15f2fbec405bd610897a1f99b0226",
+    "atlas/src/holdings/mexc.ts": "31b1e901a07dd2bf5ddeb46e0c801d588ee73093f61bacd99bd78d86fc74e487",
+    "atlas/src/holdings/MexcPanel.tsx": "d7e620a7892b9e27c3be539037c101f40f39ef99717736b45be8846d756f5607",
+    "atlas/src/holdings/MexcFuturesPanel.tsx": "32e4d36520323a921f1f2991c821a7dea30cc35453fe325e4b93de7b39b3c98e",
+    "atlas/tests/mexc-futures.test.ts": "d0543b259acfd60adf803b577dc26d678166450d2e034e7d7a9d9e9c2648fab5",
+    "atlas/tests/mexc-futures-read.test.ts": "fad7afd3435d94a8593526d998b38a3f4811e2fc9a7b1c9d60c763b0e78bcc67",
+    "atlas/tests/mexc-state-retention.test.ts": "d39119a0ef5c40fb3c121866506f8c327d1fa02aca03e392566e250ea7a1bfcc",
+    "atlas/tests/mexc-futures-contract.test.tsx": "affa54851477d06283d0957de829259436e010b0e7cdb05dac0ebec9534b6465",
+    "atlas/e2e-site/mexc.spec.ts": "7f32c24aa269496cac93d64d6eb5d7396d189c2fd1b3d0abc4bfaebe4d9368d7"
+  },
+  "limitations": [
+    "Fake upstream and relational storage harness only; no production MEXC or Supabase access.",
+    "SQL statically parsed, not applied to any database.",
+    "Browser device emulation is not physical iPhone certification."
+  ],
+  "deploymentOrder": [
+    "Maintainer applies supabase/manual/atlas_mexc_futures_read.sql after existing holdings/MEXC SQL.",
+    "Maintainer redeploys user-settings with existing HOLDINGS_ENCRYPTION_KEY.",
+    "Maintainer publishes Atlas."
+  ],
+  "notPerformed": [
+    "merge",
+    "deployment",
+    "SQL execution",
+    "workflow dispatch",
+    "notification",
+    "production account reads"
+  ]
+}

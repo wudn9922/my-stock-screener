@@ -7,7 +7,11 @@ import * as lineHandoff from '../../../supabase/functions/_shared/lineLoginHando
 import * as deviceSession from '../../../supabase/functions/_shared/deviceSession';
 import * as holdings from '../../../supabase/functions/user-settings/holdings';
 import * as mexc from '../../../supabase/functions/user-settings/mexc';
-import type { MexcConnection, MexcBalance, MexcQuote } from '../../../supabase/functions/user-settings/mexcContract';
+import type {
+  MexcConnection,
+  MexcBalance,
+  MexcQuote,
+} from '../../../supabase/functions/user-settings/mexcContract';
 import { replaceAccount } from '../../src/holdings/model';
 
 export const MEXC_USER = 'U11111111111111111111111111111111';
@@ -24,7 +28,13 @@ export const MEXC_ACCOUNT: holdings.HoldingAccount = {
 };
 type Row = Record<string, unknown>;
 type PrivateConnection = MexcConnection & { credential: unknown };
-type Reservation = { requestId: string | null; accountId: string; purpose: string; expires: number; next: number };
+type Reservation = {
+  requestId: string | null;
+  accountId: string;
+  purpose: string;
+  expires: number;
+  next: number;
+};
 
 /** Transactional relational substitute. No SQL executed; no real MEXC network calls. */
 export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
@@ -32,14 +42,22 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
   const documents = new Map<string, holdings.HoldingsDocument>();
   const connections = new Map<string, PrivateConnection>();
   const reservations = new Map<string, Reservation>();
+  const futuresLimits = new Map<string, { next: number; requestId: string; expires: number }>();
   const grants = new Map<string, policy.StorageMode>([[MEXC_USER, mode]]);
   const calls: { name: string; parameters: Row }[] = [],
     reads: string[] = [],
     errorLogs: unknown[][] = [];
   const upstream: { url: string; init?: RequestInit }[] = [];
   let failure:
-    'none' | 'write-key' | 'bad-key' | 'malformed' | 'missing-rpc' | 'db-detail' | 'network' | 'rate' | 'redirect' =
-    'none';
+    | 'none'
+    | 'write-key'
+    | 'bad-key'
+    | 'malformed'
+    | 'missing-rpc'
+    | 'db-detail'
+    | 'network'
+    | 'rate'
+    | 'redirect' = 'none';
   let sourceBalances = [
     { asset: 'BTC', free: '0.1', locked: '0.02' },
     { asset: 'ETH', free: '2', locked: '0' },
@@ -82,7 +100,10 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
     async rpc(
       name: string,
       parameters: Row,
-    ): Promise<{ data: unknown; error: { code?: string; message?: string } | null }> {
+    ): Promise<{
+      data: unknown;
+      error: { code?: string; message?: string } | null;
+    }> {
       calls.push({ name, parameters: structuredClone(parameters) });
       const owner = String(parameters.owner_id),
         operation = String(parameters.operation),
@@ -90,14 +111,21 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
       const result = (data: unknown) => ({ data, error: null });
       if (failure === 'missing-rpc') return { data: null, error: { code: 'PGRST202' } };
       if (failure === 'db-detail')
-        return { data: null, error: { code: 'XX000', message: `${TEST_SECRET} ${TEST_KEY} PRIVATE-BALANCE` } };
+        return {
+          data: null,
+          error: {
+            code: 'XX000',
+            message: `${TEST_SECRET} ${TEST_KEY} PRIVATE-BALANCE`,
+          },
+        };
       const document = ownerDocument(owner);
       if (name === 'atlas_holdings_action') {
         if (operation === 'list') return result({ status: 'ok', document });
         if (operation === 'replaceAccount') {
           const account = holdings.validateHoldingAccount(payload.account);
           const previous = document.accounts.find((a) => a.account.id === account.id);
-          if ((previous?.revision ?? null) !== parameters.expected_revision) return result({ status: 'conflict' });
+          if ((previous?.revision ?? null) !== parameters.expected_revision)
+            return result({ status: 'conflict' });
           const next = replaceAccount(document, account, payload.holdings as holdings.Holding[]);
           documents.set(owner, next);
           return result({ status: 'ok', document: next });
@@ -110,6 +138,44 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
         }
         throw new Error('Unexpected holdings operation');
       }
+      if (name === 'atlas_mexc_futures_read') {
+        const accountId = String(payload.accountId),
+          key = slot(owner, accountId);
+        const connection = connections.get(key);
+        const account = document.accounts.find((a) => a.account.id === accountId);
+        if (!account || !connection) return result({ status: 'missing' });
+        if (account.account.broker !== 'mexc') return result({ status: 'invalid' });
+        const quota = futuresLimits.get(key);
+        if (operation === 'claim') {
+          if (quota && quota.next > currentTime)
+            return result({
+              status: 'rate_limited',
+              retryAfter: Math.ceil((quota.next - currentTime) / 1000),
+            });
+          futuresLimits.set(key, {
+            next: currentTime + 30000,
+            expires: currentTime + 30000,
+            requestId: String(payload.requestId),
+          });
+          return result({
+            status: 'ok',
+            credential: structuredClone(connection.credential),
+          });
+        }
+        if (!quota || quota.requestId !== payload.requestId || quota.expires <= currentTime)
+          return result({ status: 'conflict' });
+        if (operation === 'backoff')
+          quota.next = Math.max(
+            quota.next,
+            currentTime + Math.min(3600, Math.max(30, Number(payload.seconds))) * 1000,
+          );
+        else if (
+          operation !== 'verify' ||
+          JSON.stringify(connection.credential) !== JSON.stringify(payload.credential)
+        )
+          return result({ status: 'conflict' });
+        return result({ status: 'ok' });
+      }
       if (name !== 'atlas_mexc_action') throw new Error('Unexpected RPC');
       const accountId = String(payload.accountId),
         key = slot(owner, accountId);
@@ -119,7 +185,10 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
       if (operation === 'backoff') {
         const reservation = reservations.get(owner);
         if (reservation && reservation.requestId === payload.requestId)
-          reservation.next = Math.max(reservation.next, currentTime + Math.min(3600, Number(payload.seconds)) * 1000);
+          reservation.next = Math.max(
+            reservation.next,
+            currentTime + Math.min(3600, Number(payload.seconds)) * 1000,
+          );
         return result({ status: 'ok' });
       }
       if (operation === 'claim') {
@@ -130,7 +199,10 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
         if (account && account.account.broker !== 'mexc') return result({ status: 'invalid' });
         const previous = reservations.get(owner);
         if (previous && previous.next > currentTime)
-          return result({ status: 'rate_limited', retryAfter: Math.ceil((previous.next - currentTime) / 1000) });
+          return result({
+            status: 'rate_limited',
+            retryAfter: Math.ceil((previous.next - currentTime) / 1000),
+          });
         reservations.set(owner, {
           requestId: String(payload.requestId),
           accountId,
@@ -147,6 +219,7 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
       if (operation === 'disconnect') {
         if (!account) return result({ status: 'missing' });
         connections.delete(key);
+        futuresLimits.delete(key);
         const reservation = reservations.get(owner);
         if (reservation?.accountId === accountId) reservation.requestId = null;
         return result(publicResult(owner));
@@ -201,7 +274,10 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
         }));
         if (normalized.some((h) => h.averageCost === undefined)) return result({ status: 'invalid' });
         if (
-          document.accounts.reduce((sum, a) => sum + (a.account.id === accountId ? 0 : a.holdings.length), 0) +
+          document.accounts.reduce(
+            (sum, a) => sum + (a.account.id === accountId ? 0 : a.holdings.length),
+            0,
+          ) +
             normalized.length >
           2000
         )
@@ -214,7 +290,8 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
           accountId,
           credential: payload.purpose === 'connect' ? payload.credential : connection!.credential,
           keyLast4: payload.purpose === 'connect' ? String(payload.keyLast4) : connection!.keyLast4,
-          connectedAt: payload.purpose === 'connect' ? new Date(currentTime).toISOString() : connection!.connectedAt,
+          connectedAt:
+            payload.purpose === 'connect' ? new Date(currentTime).toISOString() : connection!.connectedAt,
           syncedAt: new Date(currentTime).toISOString(),
           snapshotId: String(payload.requestId),
           holdingRevision: nextRevision,
@@ -289,15 +366,25 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
     }
     if (failure === 'network') throw new Error(`PRIVATE ${TEST_SECRET} ${url}`);
     if (failure === 'rate')
-      return new Response('private rate details', { status: 429, headers: { 'Retry-After': '120' } });
+      return new Response('private rate details', {
+        status: 429,
+        headers: { 'Retry-After': '120' },
+      });
     if (failure === 'redirect')
-      return new Response('private redirect', { status: 302, headers: { Location: 'https://untrusted.invalid/' } });
+      return new Response('private redirect', {
+        status: 302,
+        headers: { Location: 'https://untrusted.invalid/' },
+      });
     if (path === '/api/v3/apiKeyInfo')
       return Response.json({
         accessKey: new Headers(init?.headers).get('X-MEXC-APIKEY'),
         status: failure === 'bad-key' ? 'FROZEN' : 'VALID',
-        permissions: failure === 'write-key' ? 'SPOT_ACCOUNT_READ,SPOT_DEAL_WRITE' :
-          futuresResponses ? 'SPOT_ACCOUNT_READ,CONTRACT_ACCOUNT_READ,CONTRACT_DEAL_READ' : 'SPOT_ACCOUNT_READ',
+        permissions:
+          failure === 'write-key'
+            ? 'SPOT_ACCOUNT_READ,SPOT_DEAL_WRITE'
+            : futuresResponses
+              ? 'SPOT_ACCOUNT_READ,CONTRACT_ACCOUNT_READ,CONTRACT_DEAL_READ'
+              : 'SPOT_ACCOUNT_READ',
         remainingValidity: 60,
         note: 'PRIVATE-DROP-THIS',
         apiSecret: 'upstream-echo-must-drop',
@@ -359,7 +446,9 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
       },
       createClient: () => db,
       fetch: async () =>
-        Response.json(verified ? { sub: user } : { error: 'invalid_token' }, { status: verified ? 200 : 401 }),
+        Response.json(verified ? { sub: user } : { error: 'invalid_token' }, {
+          status: verified ? 200 : 401,
+        }),
       Request,
       Response,
       URLSearchParams,
@@ -375,7 +464,11 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
           body: JSON.stringify({ idToken: 'fake-test-token', ...body }),
         }),
       );
-      return { status: response.status, headers: response.headers, body: await response.json() };
+      return {
+        status: response.status,
+        headers: response.headers,
+        body: await response.json(),
+      };
     };
   }
   return {
@@ -397,7 +490,9 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
     setBalances: (value: typeof sourceBalances) => {
       sourceBalances = value;
     },
-    setFutures: (value?: Record<string, unknown>) => { futuresResponses = value; },
+    setFutures: (value?: Record<string, unknown>) => {
+      futuresResponses = value;
+    },
     setFuturesSymbolShape: (value: typeof futuresSymbolShape) => {
       futuresSymbolShape = value;
     },

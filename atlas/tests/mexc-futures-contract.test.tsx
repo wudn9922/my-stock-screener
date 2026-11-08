@@ -61,7 +61,7 @@ describe('separate futures response and display', () => {
   });
   it.each([
     [{ status: 'no-permission' as const }, '這把 API Key 沒有合約讀取權限'],
-    [{ status: 'unavailable' as const }, '合約資料暫時無法讀取，現貨已同步'],
+    [{ status: 'unavailable' as const }, '合約資料暫時無法讀取。'],
     [{ ...sample(), positions: [] }, '目前沒有合約持倉'],
     [{ ...sample(), positions: [], skippedPositions: 2 }, '目前沒有可顯示的合約持倉'],
   ])('renders the appropriate state without a position card', (futures, expected) => {
@@ -75,4 +75,18 @@ describe('separate futures response and display', () => {
     expect(html).toContain('BTC_USDT');
     expect(html).not.toContain('目前沒有合約持倉');
   });
+});
+
+it('shows loading and last successful data time beside a failure while rounding displayed PnL to eight places', () => {
+  const data = sample();
+  data.positions[0]!.unrealized = '-0.123456789012345679';
+  const html = renderToStaticMarkup(
+    <MexcFuturesPanel futures={data} loading failed updatedAt="2026-11-08T00:00:00Z" />,
+  );
+  expect(html).toContain('合約部位讀取中…');
+  expect(html).toContain('合約資料暫時無法讀取，保留上次成功資料。');
+  expect(html).toContain('合約資料時間');
+  expect(html).toContain('-0.12345679');
+  expect(html).not.toContain('-0.123456789012345679');
+  expect(html).toContain('BTC_USDT');
 });

@@ -123,8 +123,25 @@ export function publicList(rows: Record<string, unknown>[], bytes: number) {
   return (input: RequestInfo | URL) => {
     const symbol = new URL(String(input)).searchParams.get('symbol');
     if (symbol !== null)
-      return Response.json({ success: true, code: 0, data: rows.find((row) => row.symbol === symbol) ?? null });
+      return Response.json({
+        success: true,
+        code: 0,
+        data: rows.find((row) => row.symbol === symbol) ?? null,
+      });
     const filler = 'x'.repeat(Math.ceil(bytes / Math.max(rows.length, 1)));
-    return Response.json({ success: true, code: 0, data: rows.map((row) => ({ ...row, displayName: filler })) });
+    return Response.json({
+      success: true,
+      code: 0,
+      data: rows.map((row) => ({ ...row, displayName: filler })),
+    });
   };
+}
+
+/** Excess precision and a malformed optional PnL; all financial tokens stay strings. */
+export function preciseFuturesResponses(): Record<string, unknown> {
+  const source = futuresResponses();
+  const rows = source[positionsPath] as Record<string, unknown>[];
+  rows[0]!.unRealizedPnl = '-0.123456789012345678500000000001';
+  rows[1]!.unRealizedPnl = 'not-a-decimal';
+  return source;
 }

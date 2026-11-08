@@ -25,6 +25,9 @@ export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel 
       accountSkippedAssets,
       accountSkippedAssetNames,
       accountFutures,
+      futuresLoading,
+      futuresErrors,
+      futuresUpdatedAt,
     } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const error = accountErrors[account.id] ?? loadError;
   const skippedAssets = accountSkippedAssets[account.id] ?? 0;
@@ -113,6 +116,21 @@ export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel 
     store,
     pageActive,
   ]);
+  useEffect(() => {
+    if (!connection || disabled || !pageActive) return;
+    const refresh = () => {
+      if (document.visibilityState === 'visible') void store.loadFutures(account.id);
+    };
+    refresh();
+    const timer = setInterval(refresh, 60000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [!!connection, account.id, disabled, pageActive, store, futuresUpdatedAt[account.id]]);
   const validCosts =
     connection?.balances.every((balance) => {
       try {
@@ -153,7 +171,9 @@ export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel 
       )}
       {loading && <p role="status">載入 MEXC 連線中…</p>}
       {!state.configured && !loading && (
-        <p role="note">同步服務尚未就緒。需要維護者先設定伺服器加密金鑰與資料表；請不要在其他地方貼上 API Secret。</p>
+        <p role="note">
+          同步服務尚未就緒。需要維護者先設定伺服器加密金鑰與資料表；請不要在其他地方貼上 API Secret。
+        </p>
       )}
       {connection && (
         <>
@@ -161,7 +181,8 @@ export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel 
             已連線 · API Key 末四碼 <strong>{connection.keyLast4}</strong>
           </p>
           <p className="holdings-muted">
-            上次同步 {formatDateTime(connection.syncedAt)}。停留此頁且可見時，每五分鐘讀取一次現貨餘額與報價。
+            上次同步 {formatDateTime(connection.syncedAt)}
+            。停留此頁且可見時，每五分鐘讀取一次現貨餘額與報價。
           </p>
           {mexcKeyAgeNotice(connection.connectedAt, tick) && (
             <p role="note" data-testid="mexc-key-age-warning" className="holdings-muted">
@@ -386,13 +407,18 @@ export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel 
                           value={costs[balance.asset] ?? ''}
                           onChange={(event) => {
                             draftCosts.current = true;
-                            setCosts((values) => ({ ...values, [balance.asset]: event.target.value }));
+                            setCosts((values) => ({
+                              ...values,
+                              [balance.asset]: event.target.value,
+                            }));
                             setAck(false);
                           }}
                         />
                       </label>
                       {balance.asset === 'USDT' && (
-                        <p className="holdings-muted">USDT 為計價幣，若按 USDT 記帳可填 1；這不代表 USDT＝USD。</p>
+                        <p className="holdings-muted">
+                          USDT 為計價幣，若按 USDT 記帳可填 1；這不代表 USDT＝USD。
+                        </p>
                       )}
                     </fieldset>
                   );
@@ -421,7 +447,8 @@ export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel 
                       Object.fromEntries(
                         connection.balances.map((balance) => [
                           balance.asset,
-                          confirmed?.holdings.find((holding) => holding.symbol === balance.symbol)?.averageCost ?? '',
+                          confirmed?.holdings.find((holding) => holding.symbol === balance.symbol)
+                            ?.averageCost ?? '',
                         ]),
                       ),
                     );
@@ -435,7 +462,14 @@ export function MexcPanel({ account, confirmed, disabled, onConnected, onCancel 
           )}
         </>
       )}
-      {connection && <MexcFuturesPanel futures={accountFutures[account.id]} />}
+      {connection && (
+        <MexcFuturesPanel
+          futures={accountFutures[account.id]}
+          loading={futuresLoading[account.id]}
+          failed={futuresErrors[account.id]}
+          updatedAt={futuresUpdatedAt[account.id]}
+        />
+      )}
       <details>
         <summary>同步範圍與成本說明</summary>
         <p>

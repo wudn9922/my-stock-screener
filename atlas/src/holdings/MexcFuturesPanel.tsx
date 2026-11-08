@@ -1,12 +1,16 @@
 import type { MexcFutures } from '../../../supabase/functions/user-settings/mexcFuturesContract';
 import { Money } from './model';
+import { formatDateTime } from '../ui/format';
 import './mexcFutures.css';
 
 const text = (value: string) => {
   const [whole, fraction] = value.split('.');
   return whole!.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (fraction ? '.' + fraction : '');
 };
-const signed = (value: string) => (value.startsWith('-') ? '' : '+') + text(value);
+const signed = (value: string) => {
+  const rounded = new Money(value).toDecimalPlaces(8, Money.ROUND_HALF_UP).toFixed();
+  return (rounded.startsWith('-') ? '' : '+') + text(rounded);
+};
 const tone = (value: string) => (value.startsWith('-') ? 'mexc-futures-loss' : 'mexc-futures-profit');
 
 export function futuresReturn(unrealized: string, margin: string): string {
@@ -15,21 +19,43 @@ export function futuresReturn(unrealized: string, margin: string): string {
   return (percent.isNegative() ? '' : '+') + percent.toFixed(2) + '%';
 }
 
-export function MexcFuturesPanel({ futures }: { futures?: MexcFutures }) {
+export function MexcFuturesPanel({
+  futures,
+  loading,
+  failed,
+  updatedAt,
+}: {
+  futures?: MexcFutures;
+  loading?: boolean;
+  failed?: boolean;
+  updatedAt?: string;
+}) {
   return (
     <section className="mexc-futures" aria-label="合約部位">
       <header>
         <h4>合約部位</h4>
         <small>僅供查看，未計入持股總值</small>
       </header>
+      {loading && <p role="status">合約部位讀取中…</p>}
+      {updatedAt && (
+        <p className="holdings-muted" data-testid="mexc-futures-time">
+          合約資料時間 {formatDateTime(updatedAt)}
+        </p>
+      )}
+      {failed && futures?.status !== 'unavailable' && (
+        <p role="status">
+          合約資料暫時無法讀取
+          {futures?.status === 'ok' ? '，保留上次成功資料。' : '。'}
+        </p>
+      )}
       {!futures ? (
-        <p role="status">同步 MEXC 後顯示合約資料。</p>
+        !loading && !failed && <p role="status">等待讀取合約資料。</p>
       ) : futures.status === 'no-permission' ? (
         <p role="status">
           這把 API Key 沒有合約讀取權限。請到 MEXC 編輯 Key，勾選『合約－讀取』（不要勾交易）後重新同步。
         </p>
       ) : futures.status === 'unavailable' ? (
-        <p role="status">合約資料暫時無法讀取，現貨已同步。</p>
+        <p role="status">合約資料暫時無法讀取。</p>
       ) : (
         <>
           <dl className="mexc-futures-values" aria-label="合約帳戶摘要">
@@ -54,7 +80,9 @@ export function MexcFuturesPanel({ futures }: { futures?: MexcFutures }) {
             <p role="note">有 {futures.skippedPositions} 筆合約資料格式不支援，未顯示。</p>
           )}
           {!futures.positions.length ? (
-            <p role="status">{futures.skippedPositions ? '目前沒有可顯示的合約持倉。' : '目前沒有合約持倉。'}</p>
+            <p role="status">
+              {futures.skippedPositions ? '目前沒有可顯示的合約持倉。' : '目前沒有合約持倉。'}
+            </p>
           ) : (
             <div className="mexc-futures-positions">
               {futures.positions.map((p, index) => (

@@ -49,3 +49,18 @@ Manual SQL and a server secret must precede function and frontend release. No SQ
 execution, production deployment or real MEXC calls during this task. Static SQL
 parsing and fake-backed handler/browser tests do not certify database RLS or native
 iPhone behavior. See [the runbook](../../../docs/ATLAS_MEXC_SYNC.md).
+
+
+2026-11-08 extension: `holdings.mexc.futures` reads encrypted credentials through
+an independent service-role RPC and per-owner/account 30-second quota. A small
+manual SQL addition stores only rate-limit/request metadata; financial futures
+remain RAM-only. Reauthorization and a final token/ciphertext check reject reads
+that raced a disconnect, key change or grant revocation. No spot document,
+snapshot, timestamp, revision or spot reservation is changed. The visible active
+holdings page loads once and refreshes each minute, while hidden pages stop new
+reads. Failed reads retain the last successful values with their retrieval time;
+manual sync results supersede older reads. Source decimals round with BigInt to
+18 places (half away from zero), optional invalid PnL falls back to mark-price
+calculation, and UI PnL displays at most eight places. Maintainer applies the new
+manual SQL before redeploying user-settings, then publishes Atlas. No deployment
+or SQL execution is part of this task.

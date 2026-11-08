@@ -1,3 +1,17 @@
+## MEXC 合約高精度與自動唯讀載入（2026-11-08）
+
+從 main `bb9bb3a112`（#245已合併）開 `codex/mexc-futures-refresh-precision`。只有primary self-review，沒有獨立簽核；只交付PR，不合併、不部署、不執行SQL、不觸發正式workflow、不發通知、不讀真實帳戶。
+
+來源小數超過18位以BigInt捨入（半值遠離零），科學記號與正負PnL有回歸測試，槓桿仍嚴格為整數。無效的選填unRealizedPnl改用原fairPrice公式，計算成功不列入skippedPositions；診斷仍只有固定field及安全欄位名，沒有私人數值。畫面PnL最多8位。
+
+新增holdings.mexc.futures，只讀合約，沿用雲端授權、AAD解密、唯讀權限檢查、最終撤權與換Key／中斷連線檢查。新手動SQL提供跨Edge實例的每帳戶30秒獨立限流及密文讀取／驗證RPC；只保存額度metadata，不寫現貨文件、syncedAt、snapshotId或holdingRevision，不占現貨同步額度。頁面可見時首次讀取、每60秒刷新；隱藏／離頁不發新請求，手動同步取代較舊請求結果。失敗保留上次成功值與資料時間，切換身分不帶入新帳號，全部只在RAM。
+
+實測：npm ci、tsc、lint、Deno check／lint、production及Pages build通過；完整Vitest163檔／2,145項、MEXC專項5檔／160項全過。MEXC全檔Playwright桌機／390px Chromium／iPhone WebKit48項、375px兩引擎32項全過；最後補拍能看到時間與保留提示的畫面，重跑該案例5項全過。第一輪發現測試選舊導覽名稱、舊訊息及把合約GET算入現貨同步次數，已修正檢查並完整重跑；沒有skip、提高timeout或放寬現貨修訂／持股總計斷言。
+
+SQL以pglast驗證9個statement與PL/pgSQL語法，並以fake relational handler測授權、獨立限流、跨owner、撤權、換Key與斷線競態；未執行SQL，因此不宣稱已驗證正式RLS或資料庫部署。維護者須先套用新增SQL，再重新部署user-settings，最後發布Atlas；無新環境變數、不更換主金鑰。
+
+[完整說明與操作順序](../docs/ATLAS_MEXC_FUTURES.md#高精度來源與獨立合約讀取2026-11-08)、[測試與SHA證據](../docs/research-verification/mexc-futures-refresh-20261108.json)。[桌機](docs/screenshots/mexc-futures-refresh/desktop-auto-load.png)、[390px WebKit](docs/screenshots/mexc-futures-refresh/iphone390-auto-load.png)、[375px WebKit失敗保留](docs/screenshots/mexc-futures-refresh/iphone375-retained.png)，同資料夾另附兩種手機引擎；全為假資料與模擬裝置，非實機iPhone驗證。
+
 ## MEXC 合約缺漏欄位、精度與逐筆隔離（2026-11-08）
 
 從最新main `b65eea0b46` 開 `codex/mexc-futures-position-resilience`。只有primary self-review，沒有獨立簽核；只開PR，不合併、不部署、不執行SQL、不讀取真實MEXC帳戶。
