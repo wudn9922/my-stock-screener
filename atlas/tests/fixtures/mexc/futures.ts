@@ -49,6 +49,59 @@ export function futuresResponses(): Record<string, unknown> {
     ],
   };
 }
+/** Documented position fields with PnL omitted and liquidation sentinels; all values are synthetic. */
+export function documentedFuturesResponses(): Record<string, unknown> {
+  const data = futuresResponses();
+  data[positionsPath] = [
+    {
+      positionId: 1394650,
+      symbol: 'BTC_USDT',
+      positionType: 1,
+      openType: 1,
+      state: 1,
+      holdVol: '5',
+      frozenVol: 0,
+      closeVol: 0,
+      holdAvgPrice: '60000',
+      openAvgPrice: '60000',
+      closeAvgPrice: 0,
+      liquidatePrice: 0,
+      oim: '30',
+      im: '30',
+      holdFee: 0,
+      realised: '-0.0073',
+      leverage: 10,
+      adlLevel: 1,
+      createTime: 1609991676000,
+      updateTime: 1609991676000,
+      autoAddIm: false,
+    },
+    {
+      positionId: 1394651,
+      symbol: 'ETH_USDT',
+      positionType: 2,
+      openType: 2,
+      state: 1,
+      holdVol: '2.5',
+      frozenVol: 0,
+      closeVol: 0,
+      holdAvgPrice: '3500',
+      openAvgPrice: '3500',
+      closeAvgPrice: 0,
+      liquidatePrice: -1,
+      oim: '20',
+      im: '20',
+      holdFee: 0,
+      realised: 0,
+      leverage: 5,
+      adlLevel: null,
+      createTime: 1609991676000,
+      updateTime: 1609991676000,
+      autoAddIm: false,
+    },
+  ];
+  return data;
+}
 /** Contract rows for `count` distinct held symbols, each with an exact contract size and fair price. */
 export function manyFuturesResponses(count: number): Record<string, unknown> {
   const base = futuresResponses();

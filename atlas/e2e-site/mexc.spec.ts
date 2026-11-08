@@ -3,7 +3,7 @@ import { mockSite } from './mocks';
 import { installLineAccount } from './account-fixture';
 import { researchFixtureBody } from './research-fixtures';
 import { createMexcFixture, MEXC_USER, TEST_KEY, TEST_SECRET } from '../tests/fixtures/mexcHarness';
-import { futuresResponses, assetsPath, positionsPath } from '../tests/fixtures/mexc/futures';
+import { futuresResponses, documentedFuturesResponses, assetsPath, positionsPath, tickerPath } from '../tests/fixtures/mexc/futures';
 const panel = (page: Page) => page.getByRole('region', { name: '持股', exact: true });
 const mexc = (page: Page) => panel(page).getByRole('region', { name: 'MEXC 自動同步' });
 async function setup(page: Page, mode: 'cloud' | 'device' | 'none' = 'cloud') {
@@ -111,6 +111,51 @@ test('futures long/short positions are read-only, fit a phone and leave spot tot
   expect(await region.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
   await page.clock.runFor(100);
   await page.screenshot({ path: info.outputPath('mexc-futures-long-numbers.png') });
+  await privateStorage(page);
+});
+
+test('documented futures without PnL retain valid rows, display unknown liquidation and recover on automatic sync', async ({ page }, info) => {
+  const f = await setup(page);
+  await enterKeys(page); await confirmCosts(page);
+  const totals = panel(page).getByRole('region', { name: '持股總計', exact: true });
+  await expect(totals).toContainText(/1 USD＝[\d.]+ TWD/);
+  const previous = (await totals.textContent())!;
+  const source = documentedFuturesResponses();
+  const positions = source[positionsPath] as Record<string, unknown>[];
+  positions.push({ ...positions[0], positionType: 9 });
+  f.setFutures(source); await tick(page, f);
+  await mexc(page).getByRole('button', { name: /^同步餘額/ }).click();
+  const region = mexc(page).getByRole('region', { name: '合約部位', exact: true });
+  const long = region.getByRole('article', { name: 'BTC_USDT 多單 合約部位' });
+  const short = region.getByRole('article', { name: 'ETH_USDT 空單 合約部位' });
+  await expect(region.getByRole('article')).toHaveCount(2);
+  await expect(region.getByRole('note')).toContainText('有 1 筆合約資料格式不支援，未顯示。');
+  await expect(long).toContainText('-0.5 USDT · -1.67%');
+  await expect(short).toContainText('+1.25 USDT · +6.25%');
+  for (const row of [long, short])
+    await expect(row.getByText('強平價', { exact: true }).locator('..')).toContainText('—');
+  await expect(totals).toHaveText(previous);
+  expect(JSON.stringify(f.documents.get(MEXC_USER))).not.toContain('BTC_USDT');
+  await region.scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: info.outputPath('mexc-derived-pnl.png'), fullPage: true });
+
+  const next = documentedFuturesResponses();
+  (next[tickerPath] as Record<string, unknown>[])[0]!.fairPrice = '61000';
+  (next[tickerPath] as Record<string, unknown>[])[1]!.fairPrice = '3550';
+  f.setFutures(next); await tick(page, f, 301000);
+  await expect(long).toContainText('+0.5 USDT · +1.67%');
+  await expect(short).toContainText('-1.25 USDT · -6.25%');
+  await expect(region.getByRole('note')).toHaveCount(0);
+  await expect(totals).toHaveText(previous);
+
+  for (const p of next[positionsPath] as Record<string, unknown>[]) p.state = 9;
+  f.setFutures(next); await tick(page, f);
+  await mexc(page).getByRole('button', { name: /^同步餘額/ }).click();
+  await expect(region.getByRole('article')).toHaveCount(0);
+  await expect(region).toContainText('有 2 筆合約資料格式不支援，未顯示。');
+  await expect(region.getByRole('status')).toHaveText('目前沒有可顯示的合約持倉。');
+  await expect(totals).toHaveText(previous);
   await privateStorage(page);
 });
 

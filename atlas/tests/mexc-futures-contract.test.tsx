@@ -63,9 +63,16 @@ describe('separate futures response and display', () => {
     [{ status: 'no-permission' as const }, '這把 API Key 沒有合約讀取權限'],
     [{ status: 'unavailable' as const }, '合約資料暫時無法讀取，現貨已同步'],
     [{ ...sample(), positions: [] }, '目前沒有合約持倉'],
+    [{ ...sample(), positions: [], skippedPositions: 2 }, '目前沒有可顯示的合約持倉'],
   ])('renders the appropriate state without a position card', (futures, expected) => {
     const html = renderToStaticMarkup(<MexcFuturesPanel futures={futures} />);
     expect(html).toContain(expected);
     expect(html).not.toContain('<article');
+  });
+  it('describes malformed rows as skipped data while retaining a valid position card', () => {
+    const html = renderToStaticMarkup(<MexcFuturesPanel futures={{ ...sample(), skippedPositions: 1 }} />);
+    expect(html).toContain('有 1 筆合約資料格式不支援，未顯示。');
+    expect(html).toContain('BTC_USDT');
+    expect(html).not.toContain('目前沒有合約持倉');
   });
 });

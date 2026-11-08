@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-08T03:23:44.661311+00:00",
+  "scope": "MEXC futures position parsing repair on a branch from latest main; PR only, no deployment, SQL, real-account requests or notifications.",
+  "baseMain": "b65eea0b46d6959391fe2bb5f2ec7cf234c70b4c",
+  "tests": {
+    "typecheck": "passed: npm run typecheck",
+    "vitest": {
+      "files": 162,
+      "passed": 2112,
+      "command": "npm test -- --maxWorkers=1"
+    },
+    "futuresSpecific": {
+      "files": 2,
+      "passed": 73
+    },
+    "lint": "passed: npm run lint",
+    "build": "passed: npm run build",
+    "denoCheck": "passed: mexcFutures.ts and mexc.ts",
+    "denoLint": "passed: both modules",
+    "browser": {
+      "desktopChromiumAnd390ChromiumAndWebKit": 42,
+      "chromiumAndWebKit375": 28,
+      "total": 70,
+      "newSkips": 0,
+      "emulatedNotPhysical": true
+    }
+  },
+  "coverage": [
+    "documented field fixture with unRealizedPnl omitted; long and short PnL",
+    "reported zero and 18-place PnL preserved; full-scale entry price precedence",
+    "exact BigInt arithmetic; eight-place computed PnL; eighteen-place quantity; signed half-up and recurring ratios",
+    "missing/zero/negative liquidation prices map to null",
+    "per-row malformed states, directions, margin modes, numeric fields and underflow skipped; strict container and 200-position cap preserved",
+    "diagnostics allowlisted field names only, maximum forty key names, no amounts, asset names or credentials",
+    "existing spot, skippedAssetNames, per-symbol twenty-symbol limit, concurrency four, 2 MiB private/per-symbol caps and 8 MiB full-list fallback tests",
+    "manual sync, automatic refresh, skip recovery, all-invalid notice and whole spot totals unchanged at five viewport/browser configurations"
+  ],
+  "testFollowup": "New 375px case initially captured the totals before the asynchronous FX annotation loaded. Added the same FX-readiness assertion as the existing futures test, retaining all whole-text equality assertions and original timeouts; reran the complete 42+28 MEXC browser cases successfully.",
+  "documentation": [
+    {
+      "url": "https://www.mexc.com/api-docs/futures/account-and-trading-endpoints/get-open-positions",
+      "retrieved": "2026-11-08",
+      "htmlSha256": "ccb9d7833bc5ebacf7f140330fd581c22611444d670737f2de86ab1e892804eb",
+      "note": "Current docs list unRealizedPnl; repair supports its observed omission. liquidatePrice is described for isolated mode."
+    },
+    {
+      "url": "https://www.mexc.com/api-docs/futures/market-endpoints/get-ticker-contract-market-data",
+      "retrieved": "2026-11-08",
+      "htmlSha256": "d968c4704ca8ba235c2c380f4f7b6e0ad0a44a38f44c0793cc0676ff9060ba24",
+      "note": "fairPrice used as the mark price, not lastPrice."
+    }
+  ],
+  "implementationSha256": {
+    "supabase/functions/user-settings/mexcFutures.ts": "688ec3ef077e4c54b965fee834c5b46a90a9b96802375f2f70d01aca514bb759",
+    "supabase/functions/user-settings/mexc.ts": "7b9230c9a3599bc93b1b73b7926fbeb115b4fd5b753733a9f239d87739b0c201",
+    "atlas/src/holdings/MexcFuturesPanel.tsx": "28721bf0b0cba7d918351b0734513bc2903c8291ac91b1043f9fce9e5bf4af66",
+    "atlas/tests/fixtures/mexc/futures.ts": "3a25e113b79bdb3a71cf200c62dba5f4e59f0a1f45ad49357fc96c0364244d35",
+    "atlas/tests/mexc-futures.test.ts": "2c235684de4278c68f9cd347ef1b3d9d35205acd96ef3234af6a32357f8a576a",
+    "atlas/tests/mexc-futures-contract.test.tsx": "12ba812f95252a1819f8fb71d1e5231cc8ed4c90a3ccb79940b57e6fb44cfaf7",
+    "atlas/e2e-site/mexc.spec.ts": "5812b155449856a3fbef5e188fced90c5b1ab3b984ab5ddbf342ccda7d4a1b89"
+  },
+  "screenshots": {
+    "chromium375.png": "e4fe109267d4559d82543d8dc0265ba4af4d3b751d31add990f8428205987279",
+    "chromium390.png": "20ffc7362d8775750063e224d5c23924b359f775652ad4182cd93661ee217650",
+    "desktop.png": "03b3eac7a4daa62769587642893e95f1a0f195365a777752fa42bd42385a3286",
+    "iphone375.png": "01ad1ad80a89aa600b965764b105ead8790f11ad46775af3f12b6aca3b468f31",
+    "iphone390.png": "245e187015fd55bd1dcb6726c668877c58f07fd62d02e73927cbbb7462ca60d9"
+  },
+  "review": "Primary self-review only; no independent sign-off. Screenshots use synthetic data; desktop and 375px WebKit visually inspected."
+}

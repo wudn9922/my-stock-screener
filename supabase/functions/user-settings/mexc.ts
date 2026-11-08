@@ -15,7 +15,7 @@ import {
   type MexcBalance,
   type MexcQuote,
 } from './mexcContract.ts';
-import { readMexcFutures, type FuturesStep } from './mexcFutures.ts';
+import { readMexcFutures, futuresDiagnosticMetadata, type FuturesStep } from './mexcFutures.ts';
 
 type ErrorCode = keyof typeof MEXC_ERRORS;
 export class MexcError extends Error {
@@ -77,6 +77,7 @@ function diagnostic(step: DiagnosticStep, status: number | null, value: unknown,
     value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   if (step.startsWith('futures-')) {
     console.warn(JSON.stringify({ step, status, reason,
+      ...futuresDiagnosticMetadata(value),
       ...(typeof row.code === 'number' && Number.isSafeInteger(row.code) ? { code: row.code } : {}),
       ...(typeof row.msg === 'string' && safeMessages.has(row.msg) ? { msg: row.msg } : {}),
     }));

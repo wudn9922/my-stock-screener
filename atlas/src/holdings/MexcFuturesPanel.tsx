@@ -51,10 +51,10 @@ export function MexcFuturesPanel({ futures }: { futures?: MexcFutures }) {
             </div>
           </dl>
           {futures.skippedPositions > 0 && (
-            <p role="note">有 {futures.skippedPositions} 筆合約代號格式不支援，未顯示。</p>
+            <p role="note">有 {futures.skippedPositions} 筆合約資料格式不支援，未顯示。</p>
           )}
           {!futures.positions.length ? (
-            <p role="status">目前沒有合約持倉。</p>
+            <p role="status">{futures.skippedPositions ? '目前沒有可顯示的合約持倉。' : '目前沒有合約持倉。'}</p>
           ) : (
             <div className="mexc-futures-positions">
               {futures.positions.map((p, index) => (

@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { futuresAuth, futuresJson, sourceDecimal } from '../../supabase/functions/user-settings/mexcFutures';
+import { futuresAuth, futuresJson, roundedFuturesRatio, sourceDecimal } from '../../supabase/functions/user-settings/mexcFutures';
 import { validateMexcFutures } from '../../supabase/functions/user-settings/mexcFuturesContract';
 import { createMexcFixture, MEXC_ACCOUNT, TEST_KEY, TEST_SECRET } from './fixtures/mexcHarness';
 import {
@@ -9,6 +9,7 @@ import {
   detailPath,
   tickerPath,
   futuresResponses,
+  documentedFuturesResponses,
   manyFuturesResponses,
   publicList,
 } from './fixtures/mexc/futures';
@@ -35,14 +36,21 @@ afterEach(() => {
     'ETH_USDT',
     'PRIVATE_USDT',
     '123456789.987654321',
+    'PRIVATE_BAD_FIELD',
+    '1394650',
   ])
     expect(text).not.toContain(privateValue);
   for (const line of warnings) {
     const event = JSON.parse(line);
     if (event.step.startsWith('futures-')) {
       expect(
-        Object.keys(event).every((key) => ['step', 'status', 'reason', 'code', 'msg'].includes(key)),
+        Object.keys(event).every((key) => ['step', 'status', 'reason', 'code', 'msg', 'field', 'positionKeys'].includes(key)),
       ).toBe(true);
+      if (event.positionKeys) {
+        expect(Array.isArray(event.positionKeys)).toBe(true);
+        expect(event.positionKeys.length).toBeLessThanOrEqual(40);
+        expect(event.positionKeys.every((key: unknown) => typeof key === 'string')).toBe(true);
+      }
       if (event.msg) expect(['Internal error', 'No permission to access the endpoint']).toContain(event.msg);
     }
   }
@@ -56,6 +64,121 @@ const fixture = () => {
 };
 
 describe('read-only Futures V1', () => {
+  it('supports documented positions without unRealizedPnl and with nonpositive liquidation prices', async () => {
+    const f = createMexcFixture();
+    f.setFutures(documentedFuturesResponses());
+    const response = await f.handler()(connect);
+    expect(response.status).toBe(200);
+    expect(response.body.data.futures).toMatchObject({
+      status: 'ok',
+      skippedPositions: 0,
+      positions: [
+        { side: 'long', size: '0.0005', unrealized: '-0.5', liquidationPrice: null },
+        { side: 'short', size: '0.025', unrealized: '1.25', liquidationPrice: null },
+      ],
+    });
+    expect(warnings).toEqual([]);
+  });
+  it.each(['state', 'positionType', 'openType', 'unRealizedPnl', 'holdAvgPriceFullyScale', 'liquidatePrice'])(
+    'skips only the position with invalid %s and reports safe field metadata', async (field) => {
+    const f = fixture(), data = futuresResponses();
+    (data[positionsPath] as Record<string, unknown>[])[0]![field] = 'PRIVATE_BAD_FIELD';
+    f.setFutures(data);
+    const response = await f.handler()(connect);
+    expect(response.body.data.futures).toMatchObject({
+      status: 'ok', skippedPositions: 1, positions: [{ symbol: 'ETH_USDT' }],
+    });
+    expect(response.body.data.futures.positions).toHaveLength(1);
+    expect(warnings).toHaveLength(1);
+    expect(JSON.parse(warnings[0]!)).toMatchObject({
+      step: 'futures-positions', status: 200, reason: 'invalid-response', field,
+      positionKeys: expect.arrayContaining(['state', 'symbol', 'holdVol']),
+    });
+  });
+  it.each([undefined, null, '', 0, '0', '-0', '-1', '-1e30'])(
+    'normalizes missing or nonpositive liquidation price %j without losing a position', async (value) => {
+      const f = fixture(), data = documentedFuturesResponses();
+      for (const row of data[positionsPath] as Record<string, unknown>[]) row.liquidatePrice = value;
+      f.setFutures(data);
+      const result = await f.handler()(connect);
+      expect(result.body.data.futures).toMatchObject({
+        status: 'ok', skippedPositions: 0,
+        positions: [{ liquidationPrice: null }, { liquidationPrice: null }],
+      });
+      expect(warnings).toEqual([]);
+    },
+  );
+  it('preserves supplied unrealized PnL, including zero and 18-decimal values', async () => {
+    const f = fixture(), data = documentedFuturesResponses();
+    const rows = data[positionsPath] as Record<string, unknown>[];
+    rows[0]!.unRealizedPnl = '0';
+    rows[1]!.unRealizedPnl = '-0.123456789012345678';
+    f.setFutures(data);
+    const result = await f.handler()(connect);
+    expect(result.body.data.futures.positions.map((p: { unrealized: string }) => p.unrealized))
+      .toEqual(['0', '-0.123456789012345678']);
+  });
+  it('uses the full-scale entry price and exact decimal differences without a Number round trip', async () => {
+    const f = fixture(), data = documentedFuturesResponses();
+    Object.assign((data[positionsPath] as Record<string, unknown>[])[0]!, {
+      holdVol: '1', holdAvgPriceFullyScale: '900719925474099.123456789012345678',
+    });
+    (data[detailPath] as Record<string, unknown>[])[0]!.contractSize = '1';
+    (data[tickerPath] as Record<string, unknown>[])[0]!.fairPrice = '900719925474099.123456808888888888';
+    f.setFutures(data);
+    const result = await f.handler()(connect);
+    expect(result.body.data.futures.positions[0]).toMatchObject({
+      entryPrice: '900719925474099.123456789012345678', size: '1', unrealized: '0.00000002',
+    });
+    expect(result.body.data.futures.skippedPositions).toBe(0);
+  });
+  it('rounds fractional contract products and PnL instead of rejecting excess decimal places', async () => {
+    const f = fixture(), data = documentedFuturesResponses();
+    Object.assign((data[positionsPath] as Record<string, unknown>[])[0]!, {
+      holdVol: '0.123456789012345678', holdAvgPrice: '1',
+    });
+    (data[detailPath] as Record<string, unknown>[])[0]!.contractSize = '0.123456789012345678';
+    (data[tickerPath] as Record<string, unknown>[])[0]!.fairPrice = '2.111111111';
+    f.setFutures(data);
+    const result = await f.handler()(connect);
+    expect(result.body.data.futures.positions[0]).toMatchObject({
+      size: '0.015241578753238837', unrealized: '0.01693509',
+    });
+    expect(result.body.data.futures.skippedPositions).toBe(0);
+  });
+  it.each([['1.000000005', '0.00000001'], ['0.999999995', '-0.00000001']])(
+    'rounds a computed mark price %s to PnL %s', async (mark, pnl) => {
+      const f = fixture(), data = documentedFuturesResponses();
+      Object.assign((data[positionsPath] as Record<string, unknown>[])[0]!, { holdVol: '1', holdAvgPrice: '1' });
+      (data[detailPath] as Record<string, unknown>[])[0]!.contractSize = '1';
+      (data[tickerPath] as Record<string, unknown>[])[0]!.fairPrice = mark;
+      f.setFutures(data);
+      const result = await f.handler()(connect);
+      expect(result.body.data.futures.positions[0].unrealized).toBe(pnl);
+    },
+  );
+  it('rounds recurring ratios with signed half-up arithmetic', () => {
+    expect(roundedFuturesRatio(1n, 3n, 8)).toBe('0.33333333');
+    expect(roundedFuturesRatio(2n, 3n, 8)).toBe('0.66666667');
+    expect(roundedFuturesRatio(-2n, 3n, 8)).toBe('-0.66666667');
+    expect(roundedFuturesRatio(-1n, 200000000n, 8)).toBe('-0.00000001');
+    expect(roundedFuturesRatio(-1n, 1000000000n, 8)).toBe('0');
+  });
+  it('never logs position values or arbitrary keys, and caps the key list at 40 names', async () => {
+    const f = fixture(), data = documentedFuturesResponses();
+    const row = (data[positionsPath] as Record<string, unknown>[])[0]!;
+    Object.assign(row, { state: 'PRIVATE_BAD_FIELD', [TEST_SECRET]: TEST_KEY,
+      BTC_USDT: '123456789.987654321', '123456789.987654321': TEST_SECRET });
+    for (let i = 0; i < 50; i++) row[`PRIVATE_BAD_FIELD_${i}`] = TEST_KEY;
+    f.setFutures(data);
+    const result = await f.handler()(connect);
+    expect(result.body.data.futures).toMatchObject({ status: 'ok', skippedPositions: 1 });
+    const event = JSON.parse(warnings[0]!);
+    expect(event).toMatchObject({ field: 'state', positionKeys: expect.arrayContaining(['positionId', '[other]']) });
+    expect(Object.keys(event).sort()).toEqual(['field', 'positionKeys', 'reason', 'status', 'step']);
+    expect(Object.values(row).filter(v => typeof v === 'string' && v.length > 4)
+      .every(v => !warnings.join('\n').includes(v as string))).toBe(true);
+  });
   it('signs the exact sorted GET parameter string, excluding nulls, with fixed-time headers', async () => {
     const timestamp = 1794000000000;
     const result = await futuresAuth({ apiKey: TEST_KEY, apiSecret: TEST_SECRET }, timestamp, {
@@ -296,25 +419,40 @@ describe('read-only Futures V1', () => {
       expect(result.body.data.futures.status).toBe('unavailable');
     },
   );
-  it.each(['invalid-state', 'inexact-size', 'missing-mark'] as const)(
-    'refuses malformed financial data: %s',
-    async (failure) => {
+  it('skips a position whose positive size is too small to represent, preserving its neighbour', async () => {
       const f = fixture(),
         data = futuresResponses();
-      if (failure === 'invalid-state') (data[positionsPath] as Record<string, unknown>[])[0]!.state = ['1'];
-      if (failure === 'inexact-size') {
-        (data[positionsPath] as Record<string, unknown>[])[0]!.holdVol = '0.1';
-        (data[detailPath] as Record<string, unknown>[])[0]!.contractSize = '0.000000000000000001';
-      }
-      if (failure === 'missing-mark') data[tickerPath] = [];
+      (data[positionsPath] as Record<string, unknown>[])[0]!.holdVol = '0.1';
+      (data[detailPath] as Record<string, unknown>[])[0]!.contractSize = '0.000000000000000001';
       f.setFutures(data);
       const result = await f.handler()(connect);
       expect(result.status).toBe(200);
-      expect(result.body.data.futures.status).toBe('unavailable');
+      expect(result.body.data.futures).toMatchObject({ status: 'ok', skippedPositions: 1,
+        positions: [{ symbol: 'ETH_USDT' }] });
+      expect(result.body.data.futures.positions).toHaveLength(1);
+      expect(JSON.parse(warnings[0]!)).toMatchObject({ field: 'contractSize' });
+  });
+  it('retains unavailable for a public mark-price response missing all requested contracts', async () => {
+    const f = fixture(), data = futuresResponses();
+    data[tickerPath] = [];
+    f.setFutures(data);
+    expect((await f.handler()(connect)).body.data.futures.status).toBe('unavailable');
+  });
+  it.each([null, {}, 'PRIVATE_BAD_FIELD'])(
+    'rejects a malformed positions container %j without logging its contents', async (positions) => {
+      const f = fixture(), data = futuresResponses();
+      data[positionsPath] = positions;
+      f.setFutures(data);
+      const result = await f.handler()(connect);
+      expect(result.status).toBe(200);
+      expect(result.body.data.futures).toEqual({ status: 'unavailable' });
+      expect(JSON.parse(warnings[0]!)).toEqual({
+        step: 'futures-positions', status: 200, reason: 'invalid-response', field: 'data',
+      });
     },
   );
   it.each(['im', 'holdVol', 'holdAvgPrice', 'leverage'] as const)(
-    'rejects a negative %s rather than displaying invalid financial data',
+    'skips only the position with negative %s rather than displaying invalid financial data',
     async (field) => {
       const f = fixture(),
         data = futuresResponses();
@@ -322,7 +460,10 @@ describe('read-only Futures V1', () => {
       f.setFutures(data);
       const response = await f.handler()(connect);
       expect(response.status).toBe(200);
-      expect(response.body.data.futures.status).toBe('unavailable');
+      expect(response.body.data.futures).toMatchObject({ status: 'ok', skippedPositions: 1,
+        positions: [{ symbol: 'ETH_USDT' }] });
+      expect(response.body.data.futures.positions).toHaveLength(1);
+      expect(JSON.parse(warnings[0]!)).toMatchObject({ field });
     },
   );
   it('accepts 200 positions and refuses 201 instead of silently truncating', async () => {
