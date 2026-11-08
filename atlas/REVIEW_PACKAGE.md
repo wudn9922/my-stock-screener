@@ -1,3 +1,15 @@
+## 持股精簡、刷新保留與分區總計（2026-11-08）
+
+從最新main `36ba6a42a8` 開 `codex/holdings-compact-retained-values`。只有primary self-review，沒有獨立簽核；不合併、不部署、不操作正式帳戶。API、Supabase程式／SQL、帳號授權與資料格式不變。
+
+可重現的BB缺價路徑：合法ticker批次暫缺單一代號時，原前端整份替換connection.quotes；revision短暫不同又會遮蔽原報價。現在以同帳戶RAM合併，刷新中／單次缺價保留原價、盈虧及原報價時間，新值才替換。新Key與斷線不帶入舊報價。一般公開報價和FX也保留。沒有取得正式事件的私人回應，不宣稱已證實BB現場每個時間點的根因。
+
+股票／現貨一列一檔，全部成本、今日損益、來源、隱藏操作可展開；合約精簡四欄，更多保留張數、保證金與完整單位。資料先於操作，連線設定預設收合。美股區包含美股券商／加密現貨／合約equity，台股獨立TWD；equity只加一次，權益本金=equity-account.unrealized，不使用名目本金或重加逐筆PnL。USDT只有在原兩組TWD匯率都可用時換算，否則分列，日期註明。失敗合約保留在持倉區，但總計明示排除。缺價仍列已知成本，盈虧百分比未知。
+
+驗證：npm ci、tsc、lint、build通過，完整Vitest164檔／2,156項通過。持股／MEXC／隱藏設定完整Playwright桌機與390px兩引擎93項、375px兩引擎62項全過。BB測試涵蓋進行中、合法成功卻缺報價、後續恢復；合約測試涵蓋刷新保留、失敗排除總計。新總計規則已取代原「合約不入總值」測試，仍精確驗證現貨小計、文件與時間不變。首輪舊提示文字斷言已修正後重跑全檔，沒有skip或提高timeout。
+
+截圖皆為假資料與模擬裝置，位於 [screenshots/holdings-compact](docs/screenshots/holdings-compact/)。擷取時重設真正的捲動容器，檢查首筆不是負座標，並要求第五筆仍在手機可見範圍內；補拍時真實首屏斷言先抓到第五筆超出約13px，縮小卡片內距後同一斷言於五種環境10項全過，沒有放寬測試；共15張截圖。非實機iPhone驗證。部分上游價格本來就不是即時，沒有增加輪詢或報價來源。WorldAssetsView不是BB持股取價路徑，未改其行情行為。此次僅需前端發布，無新SQL或後端部署步驟。
+
 ## MEXC 合約高精度與自動唯讀載入（2026-11-08）
 
 從 main `bb9bb3a112`（#245已合併）開 `codex/mexc-futures-refresh-precision`。只有primary self-review，沒有獨立簽核；只交付PR，不合併、不部署、不執行SQL、不觸發正式workflow、不發通知、不讀真實帳戶。

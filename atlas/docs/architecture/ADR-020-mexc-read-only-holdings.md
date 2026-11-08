@@ -64,3 +64,13 @@ manual sync results supersede older reads. Source decimals round with BigInt to
 calculation, and UI PnL displays at most eight places. Maintainer applies the new
 manual SQL before redeploying user-settings, then publishes Atlas. No deployment
 or SQL execution is part of this task.
+
+
+2026-11-08 compact holdings supersedes the earlier exclusion of futures from totals:
+US/crypto totals include each connected account's equity once and account unrealized
+PnL, with equity minus unrealized as the snapshot capital basis. TW stays in TWD;
+USDT converts via the existing dated USDT/TWD and USD/TWD pair or remains separately
+labelled. Failed retained futures stay visible but are excluded from totals with an
+explicit warning. Futures remain RAM-only; backend API and storage are unchanged.
+Spot quotes merge per account in RAM to retain missing/older symbols and timestamps.
+Data precedes operations, and all original details remain accessible in disclosures.

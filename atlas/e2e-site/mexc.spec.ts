@@ -7,6 +7,7 @@ import {
   futuresResponses,
   documentedFuturesResponses,
   preciseFuturesResponses,
+  manyFuturesResponses,
   assetsPath,
   positionsPath,
   tickerPath,
@@ -67,7 +68,7 @@ async function confirmCosts(page: Page) {
   await mexc(page).getByRole('textbox', { name: 'USDT 平均成本', exact: true }).fill('1');
   await mexc(page).getByRole('checkbox', { name: '已補上新增餘額的成本，並核對所有平均成本' }).check();
   await mexc(page).getByRole('button', { name: '確認成本並套用同步餘額' }).click();
-  await expect(panel(page).getByRole('article')).toHaveCount(3);
+  await expect(panel(page).locator('.holdings-position')).toHaveCount(3);
 }
 async function tick(page: Page, fixture: ReturnType<typeof createMexcFixture>, ms = 31000) {
   fixture.advance(ms);
@@ -103,7 +104,7 @@ test('connected futures load on reopen, refresh each minute and retain data/time
     .getByRole('group', { name: '自選檢視' })
     .getByRole('button', { name: '持股', exact: true })
     .click();
-  const region = mexc(page).getByRole('region', {
+  const region = panel(page).getByRole('region', {
     name: '合約部位',
     exact: true,
   });
@@ -175,7 +176,7 @@ test('automatic futures reads pause while hidden or on another page and resume w
     window.dispatchEvent(new Event('focus'));
   });
   await expect.poll(reads).toBe(1);
-  await expect(mexc(page).getByRole('region', { name: '合約部位', exact: true })).toContainText(
+  await expect(panel(page).getByRole('region', { name: '合約部位', exact: true })).toContainText(
     '1,000.12 USDT',
   );
   await page
@@ -191,7 +192,7 @@ test('automatic futures reads pause while hidden or on another page and resume w
   await expect.poll(reads).toBe(2);
 });
 
-test('futures long/short positions are read-only, fit a phone and leave spot totals unchanged across manual and automatic sync', async ({
+test('futures count equity once in USDT totals, fit a phone and preserve spot subtotals across sync', async ({
   page,
 }, info) => {
   const f = await setup(page);
@@ -199,26 +200,30 @@ test('futures long/short positions are read-only, fit a phone and leave spot tot
   await confirmCosts(page);
   const totals = panel(page).getByRole('region', { name: '持股總計', exact: true });
   await expect(totals).toContainText(/1 USD＝[\d.]+ TWD/);
-  const previous = (await totals.textContent())!;
+  const spotTotals = totals.getByTestId('holdings-spot-subtotals');
+  const previous = (await spotTotals.textContent())!;
   f.setFutures(futuresResponses());
   await tick(page, f);
   await mexc(page)
     .getByRole('button', { name: /^同步餘額/ })
     .click();
-  const region = mexc(page).getByRole('region', { name: '合約部位', exact: true });
-  await expect(region).toContainText('僅供查看，未計入持股總值');
+  const region = panel(page).getByRole('region', { name: '合約部位', exact: true });
+  await expect(region).toContainText('合約權益計入美股總計');
   await expect(region).toContainText('1,000.12 USDT');
+  await expect(totals.locator('[aria-label="USDT 分列總計"]')).toContainText('15,900.12 USDT');
   const long = region.getByRole('article', { name: 'BTC_USDT 多單 合約部位' });
   const short = region.getByRole('article', { name: 'ETH_USDT 空單 合約部位' });
   await expect(long).toContainText('0.0005 BTC');
   await expect(long).toContainText('10× · 逐倉');
-  await expect(long).toContainText('-0.5 USDT · -1.67%');
+  await expect(long).toContainText('-0.5 USDT');
+  await expect(long).toContainText('-1.67%');
   await expect(long).toContainText('54,000 USDT');
   await expect(short).toContainText('5× · 全倉');
-  await expect(short).toContainText('+1.25 USDT · +6.25%');
+  await expect(short).toContainText('+1.25 USDT');
+  await expect(short).toContainText('+6.25%');
   await expect(long.locator('.mexc-futures-long')).toHaveCSS('color', 'rgb(47, 189, 131)');
   await expect(short.locator('.mexc-futures-short')).toHaveCSS('color', 'rgb(244, 106, 117)');
-  await expect(totals).toHaveText(previous);
+  await expect(spotTotals).toHaveText(previous);
   expect(f.documents.get(MEXC_USER)!.accounts[0]!.holdings).toHaveLength(3);
   expect(JSON.stringify(f.documents.get(MEXC_USER))).not.toContain('BTC_USDT');
   await region.locator('header').scrollIntoViewIfNeeded();
@@ -231,7 +236,7 @@ test('futures long/short positions are read-only, fit a phone and leave spot tot
   f.setFutures(changed);
   await tick(page, f, 301000);
   await expect(region).toContainText('999,999,999,999,999.123456789012345678 USDT');
-  await expect(totals).toHaveText(previous);
+  await expect(spotTotals).toHaveText(previous);
   await region.scrollIntoViewIfNeeded();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   expect(await region.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
@@ -248,7 +253,8 @@ test('documented futures without PnL retain valid rows, display unknown liquidat
   await confirmCosts(page);
   const totals = panel(page).getByRole('region', { name: '持股總計', exact: true });
   await expect(totals).toContainText(/1 USD＝[\d.]+ TWD/);
-  const previous = (await totals.textContent())!;
+  const spotTotals = totals.getByTestId('holdings-spot-subtotals');
+  const previous = (await spotTotals.textContent())!;
   const source = documentedFuturesResponses();
   const positions = source[positionsPath] as Record<string, unknown>[];
   positions.push({ ...positions[0], positionType: 9 });
@@ -257,16 +263,20 @@ test('documented futures without PnL retain valid rows, display unknown liquidat
   await mexc(page)
     .getByRole('button', { name: /^同步餘額/ })
     .click();
-  const region = mexc(page).getByRole('region', { name: '合約部位', exact: true });
+  const region = panel(page).getByRole('region', { name: '合約部位', exact: true });
   const long = region.getByRole('article', { name: 'BTC_USDT 多單 合約部位' });
   const short = region.getByRole('article', { name: 'ETH_USDT 空單 合約部位' });
   await expect(region.getByRole('article')).toHaveCount(2);
   await expect(region.getByRole('note')).toContainText('有 1 筆合約資料格式不支援，未顯示。');
-  await expect(long).toContainText('-0.5 USDT · -1.67%');
-  await expect(short).toContainText('+1.25 USDT · +6.25%');
+  await expect(long).toContainText('-0.5 USDT');
+  await expect(long).toContainText('-1.67%');
+  await expect(short).toContainText('+1.25 USDT');
+  await expect(short).toContainText('+6.25%');
   for (const row of [long, short])
-    await expect(row.getByText('強平價', { exact: true }).locator('..')).toContainText('—');
-  await expect(totals).toHaveText(previous);
+    await expect(
+      row.locator('.mexc-position-grid').getByText('強平價', { exact: true }).locator('..'),
+    ).toContainText('—');
+  await expect(spotTotals).toHaveText(previous);
   expect(JSON.stringify(f.documents.get(MEXC_USER))).not.toContain('BTC_USDT');
   await region.scrollIntoViewIfNeeded();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
@@ -277,10 +287,12 @@ test('documented futures without PnL retain valid rows, display unknown liquidat
   (next[tickerPath] as Record<string, unknown>[])[1]!.fairPrice = '3550';
   f.setFutures(next);
   await tick(page, f, 301000);
-  await expect(long).toContainText('+0.5 USDT · +1.67%');
-  await expect(short).toContainText('-1.25 USDT · -6.25%');
+  await expect(long).toContainText('+0.5 USDT');
+  await expect(long).toContainText('+1.67%');
+  await expect(short).toContainText('-1.25 USDT');
+  await expect(short).toContainText('-6.25%');
   await expect(region.getByRole('note')).toHaveCount(0);
-  await expect(totals).toHaveText(previous);
+  await expect(spotTotals).toHaveText(previous);
 
   for (const p of next[positionsPath] as Record<string, unknown>[]) p.state = 9;
   f.setFutures(next);
@@ -291,7 +303,7 @@ test('documented futures without PnL retain valid rows, display unknown liquidat
   await expect(region.getByRole('article')).toHaveCount(0);
   await expect(region).toContainText('有 2 筆合約資料格式不支援，未顯示。');
   await expect(region.getByRole('status')).toHaveText('目前沒有可顯示的合約持倉。');
-  await expect(totals).toHaveText(previous);
+  await expect(spotTotals).toHaveText(previous);
   await privateStorage(page);
 });
 
@@ -301,7 +313,7 @@ test('futures permission, failure and empty-position notices preserve a successf
   const f = await setup(page);
   await enterKeys(page);
   await confirmCosts(page);
-  const region = mexc(page).getByRole('region', { name: '合約部位', exact: true });
+  const region = panel(page).getByRole('region', { name: '合約部位', exact: true });
   await expect(region).toContainText(
     '這把 API Key 沒有合約讀取權限。請到 MEXC 編輯 Key，勾選『合約－讀取』（不要勾交易）後重新同步。',
   );
@@ -323,7 +335,7 @@ test('futures permission, failure and empty-position notices preserve a successf
     .click();
   await expect(region).toContainText('目前沒有合約持倉。');
   await expect(region.getByRole('article')).toHaveCount(0);
-  await expect(panel(page).getByRole('article')).toHaveCount(3);
+  await expect(panel(page).locator('.holdings-position')).toHaveCount(3);
 });
 
 test('unsupported names are shown to the user on connect and automatic sync while other balances continue normally', async ({
@@ -460,7 +472,7 @@ test('increases require cost review, decreases preserve costs, and disconnect de
     .getByRole('button', { name: /^同步餘額/ })
     .click();
   await expect(mexc(page).getByRole('textbox', { name: 'BTC 平均成本', exact: true })).toHaveValue('50000');
-  await expect(panel(page).getByRole('article', { name: 'BTC/USDT 持股' })).toContainText('等候確認同步成本');
+  await expect(panel(page).getByRole('article', { name: 'BTC/USDT 持股' })).toContainText('上次確認持股');
   await mexc(page).getByRole('textbox', { name: 'BTC 平均成本', exact: true }).fill('55000');
   await mexc(page).getByRole('checkbox', { name: '已補上新增餘額的成本，並核對所有平均成本' }).check();
   await mexc(page).getByRole('button', { name: '確認成本並套用同步餘額' }).click();
@@ -474,6 +486,10 @@ test('increases require cost review, decreases preserve costs, and disconnect de
   await expect(panel(page).getByRole('article')).toContainText('0.06');
   await expect(panel(page).getByRole('article')).toContainText('55,000.0000');
   page.once('dialog', (dialog) => dialog.accept());
+  await mexc(page)
+    .locator('summary')
+    .filter({ hasText: /^MEXC 連線設定$/ })
+    .click();
   await mexc(page).getByRole('button', { name: '中斷連線', exact: true }).click();
   await expect(mexc(page)).toContainText('已中斷連線並刪除伺服器金鑰');
   expect(f.connections.size).toBe(0);
@@ -597,4 +613,98 @@ test('automatic synchronization keeps the selected account when server order cha
   );
   await expect(panel(page).getByRole('region', { name: '持股總計' })).not.toContainText('總計尚未完整');
   expect(f.connections.size).toBe(0);
+});
+
+test('BB PnL stays visible throughout refresh and a successful batch missing its quote, then recovers', async ({
+  page,
+}) => {
+  const f = await setup(page);
+  f.setBalances([{ asset: 'BB', free: '5', locked: '0' }]);
+  f.setTickers([{ symbol: 'BBUSDT', price: '3' }]);
+  await enterKeys(page);
+  await mexc(page).getByRole('textbox', { name: 'BB 平均成本', exact: true }).fill('2');
+  await mexc(page).getByRole('checkbox', { name: '已補上新增餘額的成本，並核對所有平均成本' }).check();
+  await mexc(page).getByRole('button', { name: '確認成本並套用同步餘額' }).click();
+  const row = panel(page).getByRole('article', { name: 'BB/USDT 持股', exact: true });
+  const pnl = row.locator('.holding-number').last();
+  await expect(pnl).toContainText('+5.00');
+  await expect(pnl).toContainText('+50.00%');
+  let resume!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    resume = resolve;
+  });
+  f.onUpstream(async (path) => {
+    if (path === '/api/v3/ticker/price') await gate;
+  });
+  f.setTickers([]);
+  await tick(page, f, 301000);
+  await expect.poll(() => f.bodies.filter((b) => b.action === 'holdings.mexc.sync').length).toBe(1);
+  await expect(pnl).toContainText('+5.00');
+  resume();
+  f.onUpstream();
+  await expect(row).toContainText('沿用上次報價');
+  await expect(row).toContainText('2026/10/28 18:00');
+  await expect(pnl).toContainText('+5.00');
+  expect(f.errorLogs).toEqual([]);
+  f.setTickers([{ symbol: 'BBUSDT', price: '4' }]);
+  await tick(page, f, 301000);
+  await expect(pnl).toContainText('+10.00');
+  await expect(pnl).toContainText('+100.00%');
+  await expect(row.getByRole('status')).toHaveCount(0);
+});
+
+test('six compact futures fit the phone, total equity once, and keep connection operations below positions', async ({
+  page,
+}, info) => {
+  const f = await setup(page);
+  f.setFutures(manyFuturesResponses(6));
+  await enterKeys(page);
+  await confirmCosts(page);
+  const region = panel(page).getByRole('region', { name: '合約部位', exact: true });
+  await expect(region.getByRole('article')).toHaveCount(6);
+  const settings = mexc(page).locator('.mexc-settings');
+  await expect(settings).not.toHaveAttribute('open');
+  const totals = panel(page).getByRole('region', { name: '持股總計', exact: true });
+  await expect(totals.locator('[aria-label="USDT 分列總計"]')).toContainText('15,900.12 USDT');
+  await expect(totals.locator('[aria-label="USDT 分列總計"]')).toContainText('13,112.46 USDT');
+  await expect(totals.locator('[aria-label="USDT 分列總計"]')).toContainText('2,787.66 USDT');
+  await expect(totals).not.toContainText('不含合約（暫時無法讀取）');
+  await panel(page).evaluate(el => { for (let parent: HTMLElement | null = el as HTMLElement; parent; parent = parent.parentElement) parent.scrollTop = 0; window.scrollTo(0, 0); });
+  await page.clock.runFor(100);
+  const boxes = await region.getByRole('article').evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const r = node.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, height: r.height };
+    }),
+  );
+  expect(boxes.every((b) => b.height <= 100)).toBe(true);
+  expect(boxes[0]!.top).toBeGreaterThanOrEqual(0);
+  if (info.project.name.includes('mobile') || info.project.name.includes('iphone')) {
+    expect(boxes[4]!.bottom).toBeLessThanOrEqual(await page.evaluate(() => innerHeight - 64));
+  }
+  expect((await mexc(page).boundingBox())!.y).toBeGreaterThan((await region.boundingBox())!.y);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: info.outputPath('holdings-compact-futures.png') });
+  await totals.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath('holdings-separated-totals.png') });
+  const before = (await region.getByRole('article').first().textContent())!;
+  let resume!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    resume = resolve;
+  });
+  f.onUpstream(async (path) => {
+    if (path === positionsPath) await gate;
+  });
+  await tick(page, f, 61000);
+  await expect(region).toContainText('合約部位讀取中…');
+  await expect(region.getByRole('article').first()).toHaveText(before);
+  resume();
+  f.onUpstream();
+  await expect(region.getByText('合約部位讀取中…', { exact: true })).toHaveCount(0);
+  f.setFutures({ ...manyFuturesResponses(6), [assetsPath]: null });
+  await tick(page, f, 61000);
+  await expect(totals).toContainText('不含合約（暫時無法讀取）');
+  await expect(totals.locator('[aria-label="USDT 分列總計"]')).toContainText('14,900.00 USDT');
+  await expect(region.getByRole('article').first()).toHaveText(before);
+  await privateStorage(page);
 });

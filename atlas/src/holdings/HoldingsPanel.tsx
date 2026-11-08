@@ -18,9 +18,14 @@ import {
   type HoldingQuote,
 } from './model';
 import type { ImportSymbol } from './import';
-import { formatDateTime, toneClass } from '../ui/format';
+import { toneClass } from '../ui/format';
 import './holdings.css';
 import { MexcPanel } from './MexcPanel';
+import { MexcFuturesPanel } from './MexcFuturesPanel';
+import { HoldingPosition } from './HoldingPosition';
+import { HoldingsTotals } from './HoldingsTotals';
+import { retainQuotes, retainRates } from './quoteRetention';
+import { useFuturesRefresh } from './useFuturesRefresh';
 import { mexcStore } from './mexc';
 import { HiddenHoldings, VisibilitySettings } from './HoldingsVisibility';
 import {
@@ -37,18 +42,95 @@ import {
  * Account choices. Taiwan brokers also offer 複委託 (sub-brokerage) accounts that hold US stocks
  * priced in USD; they are ordinary 'us-broker' accounts that keep the Taiwan broker's id.
  */
-const BROKERS: { key: string; id: Broker; name: string; label: string; kind: HoldingAccount['kind']; currency: HoldingAccount['currency'] }[] = [
-  { key: 'cathay', id: 'cathay', name: '國泰證券', label: '國泰證券 台股', kind: 'tw-broker', currency: 'TWD' },
-  { key: 'cathay-us', id: 'cathay', name: '國泰證券 複委託', label: '國泰證券 複委託美股', kind: 'us-broker', currency: 'USD' },
-  { key: 'sinopac', id: 'sinopac', name: '永豐金證券', label: '永豐金證券 台股', kind: 'tw-broker', currency: 'TWD' },
-  { key: 'sinopac-us', id: 'sinopac', name: '永豐金證券 複委託', label: '永豐金證券 複委託美股', kind: 'us-broker', currency: 'USD' },
+const BROKERS: {
+  key: string;
+  id: Broker;
+  name: string;
+  label: string;
+  kind: HoldingAccount['kind'];
+  currency: HoldingAccount['currency'];
+}[] = [
+  {
+    key: 'cathay',
+    id: 'cathay',
+    name: '國泰證券',
+    label: '國泰證券 台股',
+    kind: 'tw-broker',
+    currency: 'TWD',
+  },
+  {
+    key: 'cathay-us',
+    id: 'cathay',
+    name: '國泰證券 複委託',
+    label: '國泰證券 複委託美股',
+    kind: 'us-broker',
+    currency: 'USD',
+  },
+  {
+    key: 'sinopac',
+    id: 'sinopac',
+    name: '永豐金證券',
+    label: '永豐金證券 台股',
+    kind: 'tw-broker',
+    currency: 'TWD',
+  },
+  {
+    key: 'sinopac-us',
+    id: 'sinopac',
+    name: '永豐金證券 複委託',
+    label: '永豐金證券 複委託美股',
+    kind: 'us-broker',
+    currency: 'USD',
+  },
   { key: 'kgi', id: 'kgi', name: '凱基證券', label: '凱基證券 台股', kind: 'tw-broker', currency: 'TWD' },
-  { key: 'kgi-us', id: 'kgi', name: '凱基證券 複委託', label: '凱基證券 複委託美股', kind: 'us-broker', currency: 'USD' },
-  { key: 'pocket', id: 'pocket', name: '口袋證券', label: '口袋證券 台股', kind: 'tw-broker', currency: 'TWD' },
-  { key: 'pocket-us', id: 'pocket', name: '口袋證券 複委託', label: '口袋證券 複委託美股', kind: 'us-broker', currency: 'USD' },
-  { key: 'other-us', id: 'other', name: '其他券商 複委託', label: '其他台灣券商 複委託美股', kind: 'us-broker', currency: 'USD' },
-  { key: 'firstrade', id: 'firstrade', name: 'Firstrade', label: 'Firstrade 美股', kind: 'us-broker', currency: 'USD' },
-  { key: 'mexc', id: 'mexc', name: 'MEXC', label: 'MEXC 加密貨幣', kind: 'crypto-exchange', currency: 'USDT' },
+  {
+    key: 'kgi-us',
+    id: 'kgi',
+    name: '凱基證券 複委託',
+    label: '凱基證券 複委託美股',
+    kind: 'us-broker',
+    currency: 'USD',
+  },
+  {
+    key: 'pocket',
+    id: 'pocket',
+    name: '口袋證券',
+    label: '口袋證券 台股',
+    kind: 'tw-broker',
+    currency: 'TWD',
+  },
+  {
+    key: 'pocket-us',
+    id: 'pocket',
+    name: '口袋證券 複委託',
+    label: '口袋證券 複委託美股',
+    kind: 'us-broker',
+    currency: 'USD',
+  },
+  {
+    key: 'other-us',
+    id: 'other',
+    name: '其他券商 複委託',
+    label: '其他台灣券商 複委託美股',
+    kind: 'us-broker',
+    currency: 'USD',
+  },
+  {
+    key: 'firstrade',
+    id: 'firstrade',
+    name: 'Firstrade',
+    label: 'Firstrade 美股',
+    kind: 'us-broker',
+    currency: 'USD',
+  },
+  {
+    key: 'mexc',
+    id: 'mexc',
+    name: 'MEXC',
+    label: 'MEXC 加密貨幣',
+    kind: 'crypto-exchange',
+    currency: 'USDT',
+  },
 ];
 const amount = formatAmount;
 function Signed({ value, percent = false }: { value: string | null; percent?: boolean }) {
@@ -66,6 +148,15 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const mexc = mexcStore();
   const mexcSnapshot = useSyncExternalStore(mexc.subscribe, mexc.getSnapshot);
+  useFuturesRefresh(
+    mexc,
+    mexcSnapshot.state.connections
+      .map((c) => c.accountId)
+      .sort()
+      .join(','),
+    snapshot.loading || mexcSnapshot.loading || !!snapshot.error,
+    Object.values(mexcSnapshot.futuresUpdatedAt).join(','),
+  );
   const visibility = holdingsVisibility();
   const visibilityPreferences = useSyncExternalStore(visibility.subscribe, visibility.getSnapshot);
   const [directory, setDirectory] = useState<ImportSymbol[] | null>(null),
@@ -82,7 +173,10 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   const [message, setMessage] = useState(''),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
-  const [quotes, setQuotes] = useState<Record<string, HoldingQuote>>({}),
+  const [{ quotes, retained: retainedQuotes }, setQuoteBook] = useState<{
+      quotes: Record<string, HoldingQuote>;
+      retained: string[];
+    }>({ quotes: {}, retained: [] }),
     [rates, setRates] = useState<FxRate[]>([]),
     [quotesBusy, setQuotesBusy] = useState(false);
   const [net, setNet] = useState(false),
@@ -121,7 +215,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   useEffect(() => {
     const controller = new AbortController();
     if (!symbols) {
-      setQuotes({});
+      setQuoteBook({ quotes: {}, retained: [] });
       setRates([]);
       setQuotesBusy(false);
       return;
@@ -130,8 +224,8 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
     void loadHoldingQuotes(symbols.split(','), controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) {
-          setQuotes(result.quotes);
-          setRates(result.rates);
+          setQuoteBook((previous) => retainQuotes(previous.quotes, result.quotes));
+          setRates((previous) => retainRates(previous, result.rates));
         }
       })
       .catch(() => {
@@ -158,16 +252,16 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   );
   const holdingQuote = (holding: Holding) => {
     const connection = mexcSnapshot.state.connections.find((entry) => entry.accountId === holding.accountId);
-    return connection
-      ? pendingAccounts.has(holding.accountId)
-        ? undefined
-        : connection.quotes[holding.symbol]
-      : quotes[holding.symbol];
+    return connection ? connection.quotes[holding.symbol] : quotes[holding.symbol];
   };
   const evaluated = document.accounts.flatMap((entry) =>
     entry.holdings.map((holding) => {
       const result = valueHolding(holding, holdingQuote(holding), costs);
-      return { holding, result, hidden: hiddenReason(holding, entry.account, result.value, visibilityPreferences) };
+      return {
+        holding,
+        result,
+        hidden: hiddenReason(holding, entry.account, result.value, visibilityPreferences),
+      };
     }),
   );
   // Hidden holdings are a view preference: every total, subtotal and note below uses `all` (visible only).
@@ -175,8 +269,6 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   const hiddenRows = evaluated.filter(
     (row): row is (typeof evaluated)[number] & { hidden: HiddenReason } => row.hidden !== null,
   );
-  const evaluatedSummary = summarizeHoldings(all, rates);
-  const summary = { ...evaluatedSummary, partial: evaluatedSummary.partial || pendingAccounts.size > 0 };
   const rows = all
     .filter((row) => row.holding.accountId === selected?.account.id)
     .sort((a, b) => {
@@ -221,13 +313,151 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   );
   return (
     <section className="holdings-panel" aria-label="持股">
-      <p role="note" className="holdings-storage">
-        {access.storageMode === 'cloud'
-          ? '持股儲存於你的雲端帳號，不在此裝置留下持股副本。'
-          : access.storageMode === 'device'
-            ? '持股只保存在此裝置的帳號空間，不會上傳。'
-            : '訪客持股只存在記憶體，重新開啟就會消失。'}
-      </p>
+      {document.accounts.length > 0 && (
+        <>
+          <div className="holdings-fields holdings-selectors">
+            <label>
+              持股帳戶
+              <select
+                aria-label="持股帳戶"
+                value={selected?.account.id ?? ''}
+                disabled={editing || creating || connecting || mexcSnapshot.busy}
+                onChange={(event) => {
+                  setAccountId(event.target.value);
+                  setDraft(null);
+                }}
+              >
+                {document.accounts.map((entry) => (
+                  <option key={entry.account.id} value={entry.account.id}>
+                    {entry.account.name} · {entry.account.currency}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              排序
+              <select
+                aria-label="持股排序"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as typeof sort)}
+              >
+                <option value="value">市值</option>
+                <option value="profit">損益金額</option>
+                <option value="percent">損益 %</option>
+              </select>
+            </label>
+          </div>
+        </>
+      )}
+      {selected && (
+        <section className="holdings-account" aria-label="帳戶損益">
+          <h3 className="holdings-sr-only">
+            {selected.account.name} · {selected.account.currency}
+          </h3>
+          {selected.account.broker === 'mexc' &&
+            mexcSnapshot.state.connections.some((c) => c.accountId === selected.account.id) && (
+              <MexcFuturesPanel
+                futures={mexcSnapshot.accountFutures[selected.account.id]}
+                loading={mexcSnapshot.futuresLoading[selected.account.id]}
+                failed={mexcSnapshot.futuresErrors[selected.account.id]}
+                updatedAt={mexcSnapshot.futuresUpdatedAt[selected.account.id]}
+              />
+            )}
+          {quotesBusy && (
+            <p role="status" className="holdings-muted">
+              讀取報價中，保留上次數值…
+            </p>
+          )}
+          <div className="holdings-cards">
+            {rows.map(({ holding, result }) => (
+              <HoldingPosition
+                key={holding.id}
+                holding={holding}
+                result={result}
+                quote={holdingQuote(holding)}
+                name={directory?.find((entry) => entry.symbol === holding.symbol)?.name}
+                pending={pendingAccounts.has(holding.accountId)}
+                net={net && validDiscount}
+                retained={(mexcSnapshot.accountRetainedQuotes[holding.accountId] ?? retainedQuotes).includes(
+                  holding.symbol,
+                )}
+                onOpen={() =>
+                  holding.market === 'CRYPTO'
+                    ? navigate({ page: 'world', view: 'commodities' })
+                    : openChart({
+                        symbol: holding.symbol,
+                        list: chartList(
+                          `${selected.account.name} 持股`,
+                          rows
+                            .filter((row) => row.holding.market !== 'CRYPTO')
+                            .map((row) => ({ symbol: row.holding.symbol })),
+                        ),
+                      })
+                }
+                onHide={() =>
+                  visibility.update((current) => hide(current, holdingKey(holding.accountId, holding.symbol)))
+                }
+              />
+            ))}
+          </div>
+          {!rows.length && (
+            <p>
+              {pendingAccounts.has(selected.account.id)
+                ? '請先確認 MEXC 餘額與平均成本，再計算持股損益。'
+                : selectedHidden.length
+                  ? '此帳戶的持股都已隱藏，可在下方「已隱藏」取消隱藏。'
+                  : '此帳戶目前沒有持股，可匯入庫存表格。'}
+            </p>
+          )}
+        </section>
+      )}
+      {document.accounts.length > 0 && (
+        <HoldingsTotals
+          rows={all.filter((row) => !pendingAccounts.has(row.holding.accountId))}
+          rates={rates}
+          futures={mexcSnapshot.state.connections.map((c) => ({
+            id: c.accountId,
+            data: mexcSnapshot.accountFutures[c.accountId],
+            failed: mexcSnapshot.futuresErrors[c.accountId],
+            at: mexcSnapshot.futuresUpdatedAt[c.accountId],
+          }))}
+          pending={pendingAccounts.size > 0}
+          hidden={hiddenRows.length}
+        >
+          <details data-testid="holdings-spot-subtotals">
+            <summary>市場小計</summary>
+            {(['TW', 'US', 'CRYPTO'] as const)
+              .filter((market) => all.some((row) => row.holding.market === market))
+              .map((market) => (
+                <div key={market}>
+                  <h4>{{ TW: '台股', US: '美股', CRYPTO: '加密貨幣' }[market]}</h4>
+                  {subtotal(all.filter((row) => row.holding.market === market))}
+                </div>
+              ))}
+          </details>
+          <details>
+            <summary>台股賣出成本試算</summary>
+            <label className="holdings-check">
+              <input type="checkbox" checked={net} onChange={(event) => setNet(event.target.checked)} />
+              扣除預估賣出成本
+            </label>
+            <label>
+              手續費折扣（1＝原價，0.28＝二八折）
+              <input
+                aria-label="手續費折扣"
+                inputMode="decimal"
+                value={discount}
+                onChange={(event) => setDiscount(event.target.value)}
+              />
+            </label>
+            {!validDiscount && <p role="alert">折扣請填 0～1，修正前暫停淨額試算。</p>}
+            <p className="holdings-muted">
+              手續費 0.1425% × 折扣；證交稅：股票 0.3%、ETF
+              0.1%。未計最低手續費、日沖或特殊商品減免，實際以券商為準。
+            </p>
+          </details>
+        </HoldingsTotals>
+      )}
       {snapshot.error && <p role="alert">{snapshot.error}</p>}
       {error && <p role="alert">{error}</p>}
       {message && <p role="status">{message}</p>}
@@ -359,108 +589,6 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
       {!directory && !directoryError && <p role="status">載入股票目錄中…</p>}
       {document.accounts.length > 0 && (
         <>
-          <section className="console-card" aria-label="持股總計">
-            <h3>持股總計</h3>
-            <div className="holdings-metrics">
-              <div>
-                <span>台幣{summary.partial ? '可換算部分' : '總市值'}</span>
-                <strong>{amount(summary.twd)} TWD</strong>
-              </div>
-              <div>
-                <span>未實現損益{net ? '（預估淨額）' : ''}</span>
-                <strong>
-                  <Signed value={summary.profitTwd} /> TWD
-                </strong>
-              </div>
-            </div>
-            {hiddenRows.length > 0 && (
-              <p className="holdings-muted" data-testid="holdings-hidden-total-note">
-                已隱藏 {hiddenRows.length} 檔持股，未計入總計與小計。
-              </p>
-            )}
-            {summary.partial && (
-              <p role="note">
-                {pendingAccounts.size > 0
-                  ? '總計尚未完整：部分 MEXC 餘額與成本尚未確認，暫不納入總計。'
-                  : '總計尚未完整：缺少報價或換算匯率的持股未納入。'}
-              </p>
-            )}
-            {all.some((row) => row.holding.costCurrency === 'USD') &&
-              !rates.some((rate) => rate.currency === 'USD') &&
-              !quotesBusy && <p className="holdings-muted">目前無 USD/TWD 匯率，USD 部位另列，尚未納入台幣總計。</p>}
-            {rates.map((rate) => (
-              <p className="holdings-muted" key={rate.currency}>
-                1 {rate.currency}＝{amount(rate.twd, 4)} TWD · 匯率日期 {formatDateTime(rate.asOf, false)}
-              </p>
-            ))}
-            {all.some((row) => row.holding.costCurrency === 'USDT') &&
-              !rates.some((rate) => rate.currency === 'USDT') && (
-                <p className="holdings-muted">目前無 USDT/TWD 匯率，USDT 部位另列，未假設 USDT 與 USD 等值。</p>
-              )}
-            <details>
-              <summary>市場小計</summary>
-              {(['TW', 'US', 'CRYPTO'] as const)
-                .filter((market) => all.some((row) => row.holding.market === market))
-                .map((market) => (
-                  <div key={market}>
-                    <h4>{{ TW: '台股', US: '美股', CRYPTO: '加密貨幣' }[market]}</h4>
-                    {subtotal(all.filter((row) => row.holding.market === market))}
-                  </div>
-                ))}
-            </details>
-            <details>
-              <summary>台股賣出成本試算</summary>
-              <label className="holdings-check">
-                <input type="checkbox" checked={net} onChange={(event) => setNet(event.target.checked)} />
-                扣除預估賣出成本
-              </label>
-              <label>
-                手續費折扣（1＝原價，0.28＝二八折）
-                <input
-                  aria-label="手續費折扣"
-                  inputMode="decimal"
-                  value={discount}
-                  onChange={(event) => setDiscount(event.target.value)}
-                />
-              </label>
-              {!validDiscount && <p role="alert">折扣請填 0～1，修正前暫停淨額試算。</p>}
-              <p className="holdings-muted">
-                手續費 0.1425% × 折扣；證交稅：股票 0.3%、ETF 0.1%。未計最低手續費、日沖或特殊商品減免，實際以券商為準。
-              </p>
-            </details>
-          </section>
-          <div className="holdings-fields">
-            <label>
-              持股帳戶
-              <select
-                aria-label="持股帳戶"
-                value={selected?.account.id ?? ''}
-                disabled={editing || creating || connecting || mexcSnapshot.busy}
-                onChange={(event) => {
-                  setAccountId(event.target.value);
-                  setDraft(null);
-                }}
-              >
-                {document.accounts.map((entry) => (
-                  <option key={entry.account.id} value={entry.account.id}>
-                    {entry.account.name} · {entry.account.currency}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              排序
-              <select
-                aria-label="持股排序"
-                value={sort}
-                onChange={(event) => setSort(event.target.value as typeof sort)}
-              >
-                <option value="value">市值</option>
-                <option value="profit">損益金額</option>
-                <option value="percent">損益 %</option>
-              </select>
-            </label>
-          </div>
           <div className="holdings-toolbar">
             <button
               type="button"
@@ -555,11 +683,11 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
         />
       )}
       {selected && (
-        <section className="console-card" aria-label="帳戶損益">
-          <h3>
-            {selected.account.name} · {selected.account.currency}
-          </h3>
-          {subtotal(all.filter((row) => row.holding.accountId === selected.account.id))}
+        <section className="console-card" aria-label="帳戶設定">
+          <details>
+            <summary>帳戶小計</summary>
+            {subtotal(all.filter((row) => row.holding.accountId === selected.account.id))}
+          </details>
           <VisibilitySettings
             key={selected.account.id}
             account={selected.account}
@@ -572,118 +700,6 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
               }))
             }
           />
-          {quotesBusy && <p role="status">讀取報價中…</p>}
-          <div className="holdings-cards">
-            {rows.map(({ holding, result }) => {
-              const quote = holdingQuote(holding),
-                entry = directory?.find((entry) => entry.symbol === holding.symbol);
-              return (
-                <article className="holdings-position" key={holding.id} aria-label={`${holding.symbol} 持股`}>
-                  <button
-                    type="button"
-                    className="text-button holdings-symbol"
-                    disabled={holding.market === 'CRYPTO' && holding.symbol !== 'BTC/USDT'}
-                    onClick={() => {
-                      if (holding.market === 'CRYPTO') navigate({ page: 'world', view: 'commodities' });
-                      else openChart({ symbol: holding.symbol, list: chartList(`${selected.account.name} 持股`, rows.filter((row) => row.holding.market !== 'CRYPTO').map((row) => ({ symbol: row.holding.symbol }))) });
-                    }}
-                  >
-                    {holding.symbol} {entry?.name ?? ''}
-                  </button>
-                  <dl>
-                    <div>
-                      <dt>現價</dt>
-                      <dd>
-                        {quote
-                          ? amount(quote.price, holding.market === 'CRYPTO' ? 4 : 2)
-                          : pendingAccounts.has(holding.accountId)
-                            ? '等候確認同步成本'
-                            : '無報價'}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>
-                        {holding.market === 'TW'
-                          ? '持有張數'
-                          : holding.market === 'US'
-                            ? '股數'
-                            : pendingAccounts.has(holding.accountId)
-                              ? '上次確認幣數'
-                              : '幣數'}
-                      </dt>
-                      <dd>
-                        {holding.market === 'TW'
-                          ? decimalText(new Money(holding.quantity).div(1000)) + ' 張'
-                          : holding.quantity + (holding.market === 'US' ? ' 股' : '')}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>平均成本／{holding.market === 'CRYPTO' ? '幣' : '股'}</dt>
-                      <dd>{amount(holding.averageCost, 4)}</dd>
-                    </div>
-                    <div>
-                      <dt>市值</dt>
-                      <dd>{amount(result.value)}</dd>
-                    </div>
-                    <div>
-                      <dt>未實現損益{net && validDiscount && holding.market === 'TW' ? '（淨額）' : ''}</dt>
-                      <dd>
-                        <Signed value={result.profit} />
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>損益 %</dt>
-                      <dd>
-                        <Signed value={result.percent} percent />
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>今日損益</dt>
-                      <dd>
-                        <Signed value={result.today} />
-                      </dd>
-                    </div>
-                    {net && holding.market === 'TW' && (
-                      <div>
-                        <dt>預估賣出成本</dt>
-                        <dd>{amount(result.fee)}</dd>
-                      </div>
-                    )}
-                  </dl>
-                  <p className="holdings-muted">
-                    {holding.costCurrency} ·{' '}
-                    {quote
-                      ? `${quote.asOf} · ${quote.source}（非即時）`
-                      : pendingAccounts.has(holding.accountId)
-                        ? '同步餘額與成本尚未確認'
-                        : '目前來源無可用報價'}{' '}
-                    · 持股更新 {formatDateTime(holding.updatedAt)}
-                  </p>
-                  <div className="holdings-toolbar">
-                    <button
-                      type="button"
-                      className="text-button"
-                      title="不顯示，也不計入總計"
-                      onClick={() =>
-                        visibility.update((current) => hide(current, holdingKey(holding.accountId, holding.symbol)))
-                      }
-                    >
-                      隱藏
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-          {!rows.length && (
-            <p>
-              {pendingAccounts.has(selected.account.id)
-                ? '請先確認 MEXC 餘額與平均成本，再計算持股損益。'
-                : selectedHidden.length
-                  ? '此帳戶的持股都已隱藏，可在下方「已隱藏」取消隱藏。'
-                  : '此帳戶目前沒有持股，可匯入庫存表格。'}
-            </p>
-          )}
           <HiddenHoldings
             key={selected.account.id}
             account={selected.account}
@@ -700,6 +716,13 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
       {!document.accounts.length && !editing && !creating && !connecting && !snapshot.loading && (
         <p>尚未匯入持股。先新增帳戶，再上傳檔案或貼上庫存表格。</p>
       )}
+      <p role="note" className="holdings-storage">
+        {access.storageMode === 'cloud'
+          ? '持股儲存於你的雲端帳號，不在此裝置留下持股副本。'
+          : access.storageMode === 'device'
+            ? '持股只保存在此裝置的帳號空間，不會上傳。'
+            : '訪客持股只存在記憶體，重新開啟就會消失。'}
+      </p>
     </section>
   );
 }

@@ -342,6 +342,7 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
       return query;
     },
   };
+  let sourceTickers = [{ symbol: 'BTCUSDT', price: '65000' }, { symbol: 'ETHUSDT', price: '3500' }];
   let beforeUpstream: ((path: string) => void | Promise<void>) | undefined;
   const mexcFetch: typeof fetch = async (input, init) => {
     const url = String(input);
@@ -402,11 +403,7 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
               permissions: ['SPOT'],
             },
       );
-    if (path === '/api/v3/ticker/price')
-      return Response.json([
-        { symbol: 'BTCUSDT', price: '65000' },
-        { symbol: 'ETHUSDT', price: '3500' },
-      ]);
+    if (path === '/api/v3/ticker/price') return Response.json(sourceTickers);
     throw new Error('Unexpected upstream path');
   };
   function handler(user = MEXC_USER, verified = true) {
@@ -487,6 +484,7 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
     advance: (ms = 31000) => {
       currentTime += ms;
     },
+    setTickers: (value: typeof sourceTickers) => { sourceTickers = value; },
     setBalances: (value: typeof sourceBalances) => {
       sourceBalances = value;
     },

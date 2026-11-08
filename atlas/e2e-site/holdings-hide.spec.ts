@@ -1,4 +1,3 @@
-import { mkdirSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 import { installLineAccount, mockDeviceAccount } from './account-fixture';
@@ -9,8 +8,8 @@ const panel = (page: Page) => page.getByRole('region', { name: '持股', exact: 
 const mexc = (page: Page) => panel(page).getByRole('region', { name: 'MEXC 自動同步' });
 const account = (page: Page) => panel(page).getByRole('region', { name: '帳戶損益', exact: true });
 const totals = (page: Page) => panel(page).getByRole('region', { name: '持股總計', exact: true });
-const hidden = (page: Page) => account(page).getByRole('region', { name: '已隱藏持股', exact: true });
-const SCREENSHOTS = new URL('../docs/screenshots/holdings-hide/', import.meta.url).pathname;
+const accountSettings = (page: Page) => panel(page).getByRole('region', { name: '帳戶設定', exact: true });
+const hidden = (page: Page) => accountSettings(page).getByRole('region', { name: '已隱藏持股', exact: true });
 
 async function research(page: Page) {
   await mockSite(page, { fundamentals: true });
@@ -29,7 +28,7 @@ async function noHorizontalScroll(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
 }
 async function settings(page: Page) {
-  const details = account(page).locator('details.holdings-visibility');
+  const details = accountSettings(page).locator('details.holdings-visibility');
   if (!(await details.evaluate((el) => (el as HTMLDetailsElement).open)))
     await details.locator('summary').click();
   return details;
@@ -74,7 +73,7 @@ test('MEXC: USDT and dust rules plus a manual hide exclude holdings from every t
   page,
 }, info) => {
   const f = await connectMexc(page);
-  const subtotal = account(page).locator('.holdings-subtotal').first();
+  const subtotal = accountSettings(page).locator('.holdings-subtotal').first();
   await expect(subtotal).toContainText('USDT 市值 7,907.00');
   await expect(hidden(page)).toHaveCount(0);
 
@@ -91,6 +90,7 @@ test('MEXC: USDT and dust rules plus a manual hide exclude holdings from every t
   await expect(account(page).getByRole('article', { name: 'SHIB/USDT 持股' })).toHaveCount(1);
   await expect(subtotal).toContainText('USDT 市值 7,800.00');
 
+  await account(page).getByRole('article', { name: 'BTC/USDT 持股' }).locator('summary').click();
   await account(page).getByRole('article', { name: 'BTC/USDT 持股' }).getByRole('button', { name: '隱藏', exact: true }).click();
   await expect(account(page).getByRole('article')).toHaveCount(1);
   await expect(hidden(page).locator('summary')).toHaveText('已隱藏 3 檔');
@@ -138,8 +138,7 @@ test('MEXC: USDT and dust rules plus a manual hide exclude holdings from every t
     expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await page.clock.runFor(100);
   if (info.project.name === 'mobile-chromium') {
-    mkdirSync(SCREENSHOTS, { recursive: true });
-    await hidden(page).screenshot({ path: SCREENSHOTS + 'mexc-hidden-375.png' });
+    await hidden(page).screenshot({ path: info.outputPath('mexc-hidden-375.png') });
   }
 
   // One click unhides even a rule-hidden holding; totals follow.
@@ -170,7 +169,7 @@ test('device account: a manual hide is kept after re-import and reload, and leav
   };
   await paste('代號\t股數\t平均成本\n2330\t1000\t500\n6488\t2000\t100');
   await expect(account(page).getByRole('article')).toHaveCount(2);
-  const before = (await totals(page).locator('.holdings-metrics').textContent())!;
+  const before = (await totals(page).getByRole('region', { name: '台股總計', exact: true }).textContent())!;
   const stored = async () =>
     page.evaluate(() =>
       Object.entries(localStorage)
@@ -180,9 +179,10 @@ test('device account: a manual hide is kept after re-import and reload, and leav
     );
   expect(await stored()).toEqual(['2330.TW', '6488.TWO']);
 
+  await account(page).getByRole('article', { name: '2330.TW 持股' }).locator('summary').click();
   await account(page).getByRole('article', { name: '2330.TW 持股' }).getByRole('button', { name: '隱藏', exact: true }).click();
   await expect(account(page).getByRole('article')).toHaveCount(1);
-  await expect(totals(page).locator('.holdings-metrics')).not.toHaveText(before);
+  await expect(totals(page).getByRole('region', { name: '台股總計', exact: true })).not.toHaveText(before);
   await expect(hidden(page).locator('summary')).toHaveText('已隱藏 1 檔');
   expect(await stored()).toEqual(['2330.TW', '6488.TWO']);
 
