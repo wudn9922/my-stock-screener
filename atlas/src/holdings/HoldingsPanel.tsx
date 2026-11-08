@@ -135,7 +135,7 @@ const BROKERS: {
 const amount = formatAmount;
 function Signed({ value, percent = false }: { value: string | null; percent?: boolean }) {
   return (
-    <span className={toneClass(value === null ? null : Number(value))}>
+    <span title={value ?? undefined} className={toneClass(value === null ? null : Number(value))}>
       {value !== null && new Money(value).gt(0) ? '+' : ''}
       {amount(value)}
       {percent && value !== null ? '%' : ''}
@@ -291,7 +291,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
     <>
       {[...summarizeHoldings(items, rates).currencies].map(([currency, value]) => (
         <div key={currency} className="holdings-subtotal">
-          <span>
+          <span title={decimalText(value.value)}>
             {currency} 市值 {amount(decimalText(value.value))}
           </span>
           <span>

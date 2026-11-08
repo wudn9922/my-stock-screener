@@ -139,7 +139,7 @@ export function HiddenHoldings({
           {rows.map(({ holding, result, hidden }) => (
             <li key={holding.id} aria-label={`${holding.symbol} 已隱藏`}>
               <span className="holdings-hidden-symbol">{holding.symbol}</span>
-              <span className="holdings-muted">
+              <span className="holdings-muted" title={result.value ?? undefined}>
                 {reasonText(hidden, rules, account.currency)} · 市值 {formatAmount(result.value)}{' '}
                 {holding.costCurrency}
               </span>

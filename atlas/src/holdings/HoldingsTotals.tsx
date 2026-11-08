@@ -22,21 +22,21 @@ export function HoldingsTotals({
     <dl className="portfolio-total-values">
       <div>
         <dt>{value.missing ? '市值／權益（有報價部分）' : '總市值／權益'}</dt>
-        <dd>
+        <dd title={value.value}>
           {formatAmount(value.value)} {currency}
         </dd>
       </div>
       <div>
         <dt>總成本／權益本金</dt>
-        <dd>
+        <dd title={value.cost}>
           {formatAmount(value.cost)} {currency}
         </dd>
       </div>
       <div>
         <dt>{value.missing ? '未實現盈虧（有報價部分）' : '未實現盈虧'}</dt>
-        <dd className={value.profit.startsWith('-') ? 'mexc-futures-loss' : 'mexc-futures-profit'}>
+        <dd title={value.profit} className={value.profit.startsWith('-') ? 'mexc-futures-loss' : 'mexc-futures-profit'}>
           {formatAmount(value.profit)} {currency}{' '}
-          <small>（{value.percent === null ? '—' : formatAmount(value.percent) + '%'}）</small>
+          <small title={value.percent ?? undefined}>（{value.percent === null ? '—' : formatAmount(value.percent) + '%'}）</small>
         </dd>
       </div>
     </dl>

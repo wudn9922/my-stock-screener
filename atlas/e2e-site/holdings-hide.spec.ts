@@ -90,7 +90,7 @@ test('MEXC: USDT and dust rules plus a manual hide exclude holdings from every t
   await expect(account(page).getByRole('article', { name: 'SHIB/USDT 持股' })).toHaveCount(1);
   await expect(subtotal).toContainText('USDT 市值 7,800.00');
 
-  await account(page).getByRole('article', { name: 'BTC/USDT 持股' }).locator('summary').click();
+  await account(page).getByRole('article', { name: 'BTC/USDT 持股' }).locator('summary.holding-compact-row').click();
   await account(page).getByRole('article', { name: 'BTC/USDT 持股' }).getByRole('button', { name: '隱藏', exact: true }).click();
   await expect(account(page).getByRole('article')).toHaveCount(1);
   await expect(hidden(page).locator('summary')).toHaveText('已隱藏 3 檔');
@@ -179,7 +179,7 @@ test('device account: a manual hide is kept after re-import and reload, and leav
     );
   expect(await stored()).toEqual(['2330.TW', '6488.TWO']);
 
-  await account(page).getByRole('article', { name: '2330.TW 持股' }).locator('summary').click();
+  await account(page).getByRole('article', { name: '2330.TW 持股' }).locator('summary.holding-compact-row').click();
   await account(page).getByRole('article', { name: '2330.TW 持股' }).getByRole('button', { name: '隱藏', exact: true }).click();
   await expect(account(page).getByRole('article')).toHaveCount(1);
   await expect(totals(page).getByRole('region', { name: '台股總計', exact: true })).not.toHaveText(before);

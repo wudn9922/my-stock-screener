@@ -1,5 +1,6 @@
 import type { MexcFutures } from '../../../supabase/functions/user-settings/mexcFuturesContract';
-import { Money } from './model';
+import { Money, formatAmount } from './model';
+import { formatHoldingPrice, formatHoldingPnl } from './displayFormat';
 import { formatDateTime } from '../ui/format';
 import './mexcFutures.css';
 
@@ -7,10 +8,7 @@ const text = (value: string) => {
   const [whole, fraction] = value.split('.');
   return whole!.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (fraction ? '.' + fraction : '');
 };
-const signed = (value: string) => {
-  const rounded = new Money(value).toDecimalPlaces(8, Money.ROUND_HALF_UP).toFixed();
-  return (rounded.startsWith('-') ? '' : '+') + text(rounded);
-};
+const signed = formatHoldingPnl;
 const tone = (value: string) => (value.startsWith('-') ? 'mexc-futures-loss' : 'mexc-futures-profit');
 
 export function futuresReturn(unrealized: string, margin: string): string {
@@ -81,7 +79,7 @@ export function MexcFuturesPanel({
                       </small>
                     </h5>
                     <div className={tone(p.unrealized)} aria-label="未實現盈虧／報酬率">
-                      <strong>
+                      <strong title={p.unrealized}>
                         {signed(p.unrealized)} <small>USDT</small>
                       </strong>
                       <small>{futuresReturn(p.unrealized, p.margin)}</small>
@@ -94,19 +92,20 @@ export function MexcFuturesPanel({
                     </div>
                     <div>
                       <dt>開倉均價</dt>
-                      <dd>{text(p.entryPrice)}</dd>
+                      <dd title={p.entryPrice}>{formatHoldingPrice(p.entryPrice)}</dd>
                     </div>
                     <div>
                       <dt>標記價</dt>
-                      <dd>{text(p.markPrice)}</dd>
+                      <dd title={p.markPrice}>{formatHoldingPrice(p.markPrice)}</dd>
                     </div>
                     <div>
                       <dt>強平價</dt>
-                      <dd>{p.liquidationPrice === null ? '—' : text(p.liquidationPrice)}</dd>
+                      <dd title={p.liquidationPrice ?? undefined}>{p.liquidationPrice === null ? '—' : formatHoldingPrice(p.liquidationPrice)}</dd>
                     </div>
                   </dl>
                   <details className="mexc-position-more">
                     <summary>更多</summary>
+                    <p className="holdings-muted">原始精度：未實現盈虧 {p.unrealized} USDT · 保證金 {p.margin} USDT；下列價格保留完整精度。</p>
                     <dl className="mexc-futures-values">
                       <div>
                         <dt>張數</dt>
@@ -126,7 +125,7 @@ export function MexcFuturesPanel({
                       </div>
                       <div>
                         <dt>保證金</dt>
-                        <dd>{text(p.margin)} USDT</dd>
+                        <dd title={p.margin}>{formatAmount(p.margin)} USDT</dd>
                       </div>
                       <div>
                         <dt>開倉均價</dt>
@@ -148,22 +147,23 @@ export function MexcFuturesPanel({
           )}
           <details>
             <summary>合約帳戶摘要</summary>
+            <details><summary>完整精度</summary><p className="holdings-muted">權益 {futures.account.equity} · 可用 {futures.account.available} · 保證金 {futures.account.positionMargin} · 未實現盈虧 {futures.account.unrealized}</p></details>
             <dl className="mexc-futures-values" aria-label="合約帳戶摘要">
               <div>
                 <dt>合約帳戶權益</dt>
-                <dd>{text(futures.account.equity)} USDT</dd>
+                <dd title={futures.account.equity}>{formatAmount(futures.account.equity)} USDT</dd>
               </div>
               <div>
                 <dt>可用</dt>
-                <dd>{text(futures.account.available)} USDT</dd>
+                <dd title={futures.account.available}>{formatAmount(futures.account.available)} USDT</dd>
               </div>
               <div>
                 <dt>已用保證金</dt>
-                <dd>{text(futures.account.positionMargin)} USDT</dd>
+                <dd title={futures.account.positionMargin}>{formatAmount(futures.account.positionMargin)} USDT</dd>
               </div>
               <div>
                 <dt>未實現盈虧合計</dt>
-                <dd className={tone(futures.account.unrealized)}>
+                <dd title={futures.account.unrealized} className={tone(futures.account.unrealized)}>
                   {signed(futures.account.unrealized)} USDT
                 </dd>
               </div>

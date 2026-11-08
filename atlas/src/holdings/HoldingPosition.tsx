@@ -6,10 +6,11 @@ import {
   type HoldingQuote,
   type HoldingValue,
 } from './model';
+import { formatHoldingPrice } from './displayFormat';
 import { formatDateTime, toneClass } from '../ui/format';
 function Signed({ value, percent = false }: { value: string | null; percent?: boolean }) {
   return (
-    <span className={toneClass(value === null ? null : Number(value))}>
+    <span title={value ?? undefined} className={toneClass(value === null ? null : Number(value))}>
       {value !== null && new Money(value).gt(0) ? '+' : ''}
       {formatAmount(value)}
       {percent && value !== null ? '%' : ''}
@@ -66,7 +67,7 @@ export function HoldingPosition({
           </span>
           <span className="holding-number">
             <small>市值</small>
-            <span>{formatAmount(result.value)}</span>
+            <span title={result.value ?? undefined}>{formatAmount(result.value)}</span>
           </span>
           <span className="holding-number">
             <small>未實現盈虧</small>
@@ -81,9 +82,9 @@ export function HoldingPosition({
         <dl>
           <div>
             <dt>現價</dt>
-            <dd>
+            <dd title={quote?.price}>
               {quote
-                ? formatAmount(quote.price, holding.market === 'CRYPTO' ? 4 : 2)
+                ? formatHoldingPrice(quote.price)
                 : pending
                   ? '等候確認同步成本'
                   : '無報價'}
@@ -103,11 +104,11 @@ export function HoldingPosition({
           </div>
           <div>
             <dt>平均成本／{holding.market === 'CRYPTO' ? '幣' : '股'}</dt>
-            <dd>{formatAmount(holding.averageCost, 4)}</dd>
+            <dd title={holding.averageCost}>{formatHoldingPrice(holding.averageCost)}</dd>
           </div>
           <div>
             <dt>市值</dt>
-            <dd>{formatAmount(result.value)}</dd>
+            <dd title={result.value ?? undefined}>{formatAmount(result.value)}</dd>
           </div>
           <div>
             <dt>未實現損益{net && holding.market === 'TW' ? '（淨額）' : ''}</dt>
@@ -130,10 +131,11 @@ export function HoldingPosition({
           {net && holding.market === 'TW' && (
             <div>
               <dt>預估賣出成本</dt>
-              <dd>{formatAmount(result.fee)}</dd>
+              <dd title={result.fee ?? undefined}>{formatAmount(result.fee)}</dd>
             </div>
           )}
         </dl>
+        <details><summary>完整精度</summary><p className="holdings-muted">現價 {quote?.price ?? '—'} · 平均成本 {holding.averageCost} · 市值 {result.value ?? '—'} · 未實現盈虧 {result.profit ?? '—'} · 報酬率 {result.percent ?? '—'}% · 今日損益 {result.today ?? '—'} · 預估賣出成本 {result.fee ?? '—'}</p></details>
         <p className="holdings-muted">
           {holding.costCurrency} ·{' '}
           {quote ? `${quote.asOf} · ${quote.source}（非即時）` : '目前來源無可用報價'} · 持股更新{' '}
